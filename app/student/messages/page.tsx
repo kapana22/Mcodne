@@ -62,7 +62,7 @@ export default async function StudentMessagesPage() {
                 return (
                   <ConversationRow
                     key={b.id}
-                    href={`/student/bookings/${b.id}#chat`}
+                    href={`/student/messages/${b.id}`}
                     name={b.tutor.user.fullName}
                     avatarUrl={b.tutor.user.avatarUrl}
                     topic={b.topic}

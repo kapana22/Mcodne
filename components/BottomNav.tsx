@@ -56,7 +56,11 @@ export function BottomNav({ role }: { role: Role | null }) {
   const [unread, setUnread] = useState(0)
 
   const tabs = role ? TABS_BY_ROLE[role] : []
-  const show = tabs.length > 0
+  // Focused conversation screens (/student/messages/[id]) own the full
+  // viewport including the bottom edge (composer) — the tab bar would sit on
+  // top of the send box, so it steps aside there.
+  const isFocusedChat = /^\/student\/messages\/[^/]+$/.test(path)
+  const show = tabs.length > 0 && !isFocusedChat
 
   // Signal to globals.css that the bar is present so pages can reserve
   // extra bottom padding (only on the mobile breakpoints where the bar is
