@@ -15,11 +15,20 @@ export async function GET() {
       totalEarned: 0,
       pendingPayout: 0,
       completedCount: 0,
+      thisMonth: { earned: 0, count: 0 },
       transactions: [],
     })
   }
 
-  const [completed, pending, lifetime] = await Promise.all([
+  // Month boundary in Tbilisi wall-clock (fixed UTC+4, no DST) — same manual
+  // offset math as availability/bulk so "this month" doesn't shift in a UTC
+  // container.
+  const TB_OFFSET_MS = 4 * 3600 * 1000
+  const nowTb = new Date(Date.now() + TB_OFFSET_MS)
+  const monthStart = new Date(Date.UTC(nowTb.getUTCFullYear(), nowTb.getUTCMonth(), 1) - TB_OFFSET_MS)
+  const monthEnd = new Date(Date.UTC(nowTb.getUTCFullYear(), nowTb.getUTCMonth() + 1, 1) - TB_OFFSET_MS)
+
+  const [completed, pending, lifetime, month] = await Promise.all([
     // Recent list for the transactions table (display only).
     prisma.booking.findMany({
       where: { tutorId: profile.id, status: 'COMPLETED' },
@@ -38,11 +47,20 @@ export async function GET() {
       _count: true,
       where: { tutorId: profile.id, status: 'COMPLETED' },
     }),
+    prisma.booking.aggregate({
+      _sum: { price: true },
+      _count: true,
+      where: { tutorId: profile.id, status: 'COMPLETED', startAt: { gte: monthStart, lt: monthEnd } },
+    }),
   ])
 
   const totalEarned = Math.round(((lifetime as any)._sum?.price ?? 0) * TUTOR_SHARE)
   const pendingPayout = Math.round(((pending as any)._sum?.price ?? 0) * TUTOR_SHARE)
   const completedCount = (lifetime as any)._count ?? 0
+  const thisMonth = {
+    earned: Math.round(((month as any)._sum?.price ?? 0) * TUTOR_SHARE),
+    count: (month as any)._count ?? 0,
+  }
 
   const transactions = completed.map(b => ({
     id: b.id,
@@ -60,6 +78,7 @@ export async function GET() {
     totalEarned,
     pendingPayout,
     completedCount,
+    thisMonth,
     transactions,
   })
 }
