@@ -861,8 +861,8 @@ const Step3 = ({ form, set, media, setMedia }: StepProps) => (
   </>
 )
 
-/* ───── STEP 4 — Services + Pricing + Identity (KYC) ───── */
-const Step4 = ({ form, set, media, setMedia }: StepProps) => {
+/* ───── STEP 4 — Services + Pricing (1/2) · Payout + Identity/KYC (2/2) ───── */
+const Step4 = ({ form, set, media, setMedia, part = 1 }: StepProps) => {
   const updateService = (i: number, patch: Partial<FormState['services'][number]>) => {
     const next = form.services.map((s, idx) => idx === i ? { ...s, ...patch } : s)
     set({ services: next })
@@ -870,9 +870,67 @@ const Step4 = ({ form, set, media, setMedia }: StepProps) => {
   const removeService = (i: number) => set({ services: form.services.filter((_, idx) => idx !== i) })
   const addService = () => set({ services: [...form.services, { name: '', dur: 60, price: 60, free: false, desc: '' }] })
 
+  if (part === 2) return (
+    <>
+      <StepHeader n={4} total={5} eyebrow="ვინაობა · 2/2" title="ანგარიში და ვინაობის დადასტურება." sub="ბოლო ველები წარდგენამდე: payout-ანგარიში GEL-ში და ვინაობის დოკუმენტები. ეს ინფორმაცია კლიენტებზე არასდროს ჩანს." />
+
+      <FormSection title="Payout — ანგარიში" sub="GEL-ში, საქართველოს ბანკიდან.">
+        <div className="grid sm:grid-cols-[120px_1fr] gap-3">
+          <Field l="ბანკი">
+            <div className="relative">
+              <select value={form.bank} onChange={e => set({ bank: e.target.value })} className="w-full h-11 pl-3.5 pr-9 rounded-field border border-ink-200 bg-white text-ink-900 text-[13px] appearance-none hover:border-ink-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-[border-color,box-shadow] duration-fast">
+                <option>TBC</option>
+                <option>BOG</option>
+                <option>Liberty</option>
+              </select>
+              <Icon.chevR className="w-3.5 h-3.5 text-ink-500 rotate-90 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </Field>
+          <Field l="IBAN" sub="22 სიმბოლო · GE-ით იწყება"><Input value={form.iban} onChange={(e: any) => set({ iban: e.target.value })} placeholder="GE00 XX00 0000 0000 0000 0000" /></Field>
+        </div>
+      </FormSection>
+
+      {/* KYC deferred here (from Step 1) — the applicant reaches identity documents
+          only after investing in the profile, just before submitting. */}
+      <FormSection title="ვინაობის დადასტურება" sub="საქართველოს კანონის მიხედვით, ექსპერტი ვერ შემოვა ანონიმურად. ეს ინფორმაცია არ ჩანს მომხმარებლებზე — მხოლოდ შენი ვინაობის გადამოწმებისთვის.">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field l="პირადი ნომერი" sub="დაშიფრულია · არ ვუზიარებთ მესამე მხარეს"><Input value={form.personalId} onChange={(e: any) => set({ personalId: e.target.value })} placeholder="01234567890" /></Field>
+          <Field l="დაბადების თარიღი" required><Input type="date" value={form.dob} onChange={(e: any) => set({ dob: e.target.value })} /></Field>
+        </div>
+      </FormSection>
+
+      <FormSection title="დოკუმენტი" sub="პირადობის მოწმობა ან საქართველოს პასპორტი — მხოლოდ წინა გვერდის ფოტო. რეცენზია 24 საათში.">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <DocUploadTile
+            label="პირადობის წინა გვერდი"
+            hint="JPG / PNG · მაქს. 8 MB"
+            kind="idDoc"
+            icon={<Icon.upload className="w-7 h-7 mx-auto text-ink-400" />}
+            value={media?.idDocUrl}
+            onChange={url => setMedia?.({ idDocUrl: url })}
+          />
+          <DocUploadTile
+            label="სელფი დოკუმენტთან"
+            hint="გადაიღე დოკუმენტი სახესთან ერთად"
+            kind="selfie"
+            icon={<Icon.user className="w-7 h-7 mx-auto text-ink-400" />}
+            value={media?.selfieUrl}
+            onChange={url => setMedia?.({ selfieUrl: url })}
+          />
+        </div>
+        <div className="mt-3"><MediaWarning /></div>
+      </FormSection>
+
+      <div className="flex items-start gap-2.5 p-4 rounded-card bg-brand-50/40 border border-brand-200">
+        <Icon.shield className="w-4 h-4 text-brand-700 mt-0.5 shrink-0" />
+        <p className="text-[12px] text-ink-700 leading-[1.55]">პერსონალური მონაცემები ინახება საქართველოს კანონის შესაბამისად. ვერ ვუზიარებთ მესამე მხარეს ვერც ერთ შემთხვევაში. შენს პროფილზე ნახავენ მხოლოდ სახელი, გვარი და საჯაროდ მონიშნული ინფორმაცია.</p>
+      </div>
+    </>
+  )
+
   return (
   <>
-    <StepHeader n={4} total={5} eyebrow="სერვისები" title="რას სთავაზობ — და რა ფასად?" sub="დაიწყე 2-3 ტიპით. ფასს შენ ადგენ — რაც დადებ, ის ერიცხება კლიენტს. ბიზნეს-სტრატეგიის საშუალო კონსულტაცია — ₾60–₾120. ნუ შეუმცირებ — ფაუნდერი 'საუკეთესოს' ეძებს, არა 'იაფს'." />
+    <StepHeader n={4} total={5} eyebrow="სერვისები · 1/2" title="რას სთავაზობ — და რა ფასად?" sub="დაიწყე 2-3 ტიპით. ფასს შენ ადგენ — რაც დადებ, ის ერიცხება კლიენტს. ბიზნეს-სტრატეგიის საშუალო კონსულტაცია — ₾60–₾120. ნუ შეუმცირებ — ფაუნდერი 'საუკეთესოს' ეძებს, არა 'იაფს'." />
 
     <FormSection title="კონსულტაცია-ტიპები" sub="თითო ტიპს უნდა ჰქონდეს მკაფიო სახელი, ფასი და ხანგრძლივობა.">
       <div className="space-y-3">
@@ -932,57 +990,7 @@ const Step4 = ({ form, set, media, setMedia }: StepProps) => {
       </div>
     </FormSection>
 
-    <FormSection title="Payout — ანგარიში" sub="GEL-ში, საქართველოს ბანკიდან.">
-      <div className="grid sm:grid-cols-[120px_1fr] gap-3">
-        <Field l="ბანკი">
-          <div className="relative">
-            <select value={form.bank} onChange={e => set({ bank: e.target.value })} className="w-full h-11 pl-3.5 pr-9 rounded-field border border-ink-200 bg-white text-ink-900 text-[13px] appearance-none hover:border-ink-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-[border-color,box-shadow] duration-fast">
-              <option>TBC</option>
-              <option>BOG</option>
-              <option>Liberty</option>
-            </select>
-            <Icon.chevR className="w-3.5 h-3.5 text-ink-500 rotate-90 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-        </Field>
-        <Field l="IBAN" sub="22 სიმბოლო · GE-ით იწყება"><Input value={form.iban} onChange={(e: any) => set({ iban: e.target.value })} placeholder="GE00 XX00 0000 0000 0000 0000" /></Field>
-      </div>
-    </FormSection>
-
-    {/* KYC deferred here (from Step 1) — the applicant reaches identity documents
-        only after investing in the profile, just before submitting. */}
-    <FormSection title="ვინაობის დადასტურება" sub="საქართველოს კანონის მიხედვით, ექსპერტი ვერ შემოვა ანონიმურად. ეს ინფორმაცია არ ჩანს მომხმარებლებზე — მხოლოდ შენი ვინაობის გადამოწმებისთვის.">
-      <div className="grid sm:grid-cols-2 gap-3">
-        <Field l="პირადი ნომერი" sub="დაშიფრულია · არ ვუზიარებთ მესამე მხარეს"><Input value={form.personalId} onChange={(e: any) => set({ personalId: e.target.value })} placeholder="01234567890" /></Field>
-        <Field l="დაბადების თარიღი" required><Input type="date" value={form.dob} onChange={(e: any) => set({ dob: e.target.value })} /></Field>
-      </div>
-    </FormSection>
-
-    <FormSection title="დოკუმენტი" sub="პირადობის მოწმობა ან საქართველოს პასპორტი — მხოლოდ წინა გვერდის ფოტო. რეცენზია 24 საათში.">
-      <div className="grid sm:grid-cols-2 gap-3">
-        <DocUploadTile
-          label="პირადობის წინა გვერდი"
-          hint="JPG / PNG · მაქს. 8 MB"
-          kind="idDoc"
-          icon={<Icon.upload className="w-7 h-7 mx-auto text-ink-400" />}
-          value={media?.idDocUrl}
-          onChange={url => setMedia?.({ idDocUrl: url })}
-        />
-        <DocUploadTile
-          label="სელფი დოკუმენტთან"
-          hint="გადაიღე დოკუმენტი სახესთან ერთად"
-          kind="selfie"
-          icon={<Icon.user className="w-7 h-7 mx-auto text-ink-400" />}
-          value={media?.selfieUrl}
-          onChange={url => setMedia?.({ selfieUrl: url })}
-        />
-      </div>
-      <div className="mt-3"><MediaWarning /></div>
-    </FormSection>
-
-    <div className="flex items-start gap-2.5 p-4 rounded-card bg-brand-50/40 border border-brand-200">
-      <Icon.shield className="w-4 h-4 text-brand-700 mt-0.5 shrink-0" />
-      <p className="text-[12px] text-ink-700 leading-[1.55]">პერსონალური მონაცემები ინახება საქართველოს კანონის შესაბამისად. ვერ ვუზიარებთ მესამე მხარეს ვერც ერთ შემთხვევაში. შენს პროფილზე ნახავენ მხოლოდ სახელი, გვარი და საჯაროდ მონიშნული ინფორმაცია.</p>
-    </div>
+    <p className="mb-4 text-[12px] text-ink-500">payout-ანგარიში და ვინაობის დადასტურება — შემდეგ ეკრანზე.</p>
   </>
   )
 }
@@ -1136,18 +1144,29 @@ const isValidGeorgianPhone = (raw: string) => {
   return false
 }
 
-/* ───── Footer with next/back ───── */
-const FormFooter = ({ step, setStep, completed, setCompleted, onSubmit, submitting, validateStep, onError }: { step: StepId; setStep: (s: StepId) => void; completed: Set<StepId>; setCompleted: (c: Set<StepId>) => void; onSubmit: () => void; submitting: boolean; validateStep: (s: StepId) => string | null; onError: (msg: string | null) => void }) => {
+/* ───── Footer with next/back (part-aware: multi-part steps advance within
+   the step before moving on; back re-enters the previous step's LAST part) ───── */
+const FormFooter = ({ step, setStep, part, setPart, completed, setCompleted, onSubmit, submitting, validateStep, onError }: { step: StepId; setStep: (s: StepId) => void; part: StepPart; setPart: (p: StepPart) => void; completed: Set<StepId>; setCompleted: (c: Set<StepId>) => void; onSubmit: () => void; submitting: boolean; validateStep: (s: StepId, p: StepPart) => string | null; onError: (msg: string | null) => void }) => {
   const next = () => {
     if (step === 5) { onSubmit(); return }
-    const err = validateStep(step)
+    const err = validateStep(step, part)
     if (err) { onError(err); return }
     onError(null)
+    if (part < partsOf(step)) { setPart((part + 1) as StepPart); return }
     const c = new Set(completed); c.add(step)
     setCompleted(c)
     setStep((step + 1) as StepId)
+    setPart(1)
   }
-  const back = () => { if (step > 1) setStep((step - 1) as StepId) }
+  const back = () => {
+    if (part > 1) { setPart((part - 1) as StepPart); return }
+    if (step > 1) {
+      const prev = (step - 1) as StepId
+      setStep(prev)
+      setPart(partsOf(prev) as StepPart)
+    }
+  }
+  const isFinalPart = part >= partsOf(step)
   return (
     // Sticky below lg: on a long step (expertise, services+KYC) the advance
     // button would otherwise sit far off-screen — the #1 "am I stuck?" moment
@@ -1166,7 +1185,7 @@ const FormFooter = ({ step, setStep, completed, setCompleted, onSubmit, submitti
           {/* "შენახვა + გასვლა" removed — server-side draft persistence isn't
               implemented yet. Users can safely leave; the form is one flow. */}
           <button type="button" onClick={next} disabled={submitting} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 active:bg-brand-700 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[13px] shadow-xs hover:shadow-sm inline-flex items-center gap-2 transition-[background-color,box-shadow,transform] duration-fast motion-safe:active:scale-[0.97]">
-            {submitting ? 'იგზავნება…' : step === 5 ? 'წარდგენა მოდერაციისთვის' : step === 4 ? 'შემდეგი — წარდგენა' : 'შემდეგი'}
+            {submitting ? 'იგზავნება…' : step === 5 ? 'წარდგენა მოდერაციისთვის' : step === 4 && isFinalPart ? 'შემდეგი — წარდგენა' : 'შემდეგი'}
             <Icon.arrow className="w-4 h-4" />
           </button>
         </div>
@@ -1383,6 +1402,10 @@ export default function TutorApply() {
   const [submitted, setSubmitted] = useState(false)
   const [stage, setStage] = useState<Stage>('reviewing')
   const [step, setStep] = useState<StepId>(1)
+  const [part, setPart] = useState<StepPart>(1)
+  // Jumping via the progress nav always lands on a step's first screen; the
+  // footer's back/next manage `part` themselves.
+  const jumpToStep = (s: StepId) => { setStep(s); setPart(1) }
   const [completed, setCompleted] = useState<Set<StepId>>(new Set())
   const [countdown] = useState({ h: 3, m: 28 })
   const [submitting, setSubmitting] = useState(false)
@@ -1454,6 +1477,11 @@ export default function TutorApply() {
   useEffect(() => {
     if (step === 5) clearApplyDraft()
   }, [step])
+  // Each screen change starts at the top — without this, advancing from a long
+  // screen leaves the user mid-scroll on the next one, which reads as broken.
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+  }, [step, part])
 
   const validate = (): string | null => {
     const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`.trim()
@@ -1473,7 +1501,7 @@ export default function TutorApply() {
 
   // Per-step gate — runs before advancing from a step, so users can't reach the
   // end with empty required fields. Only gates fields that exist on each step.
-  const validateStep = (s: StepId): string | null => {
+  const validateStep = (s: StepId, p: StepPart = 1): string | null => {
     if (s === 1) {
       if (`${form.firstName.trim()} ${form.lastName.trim()}`.trim().length < 2) return 'შეავსე სახელი და გვარი.'
       if (!isValidEmail(form.email)) return 'შეიყვანე სწორი ელფოსტა.'
@@ -1481,9 +1509,15 @@ export default function TutorApply() {
       return null
     }
     if (s === 2) {
-      if (form.cats.length < 1) return 'აირჩიე მინიმუმ ერთი კატეგორია.'
-      if (form.headline.trim().length < 2) return 'შეავსე პროფესია (headline).'
-      if (form.motivation.trim().length < 150) return 'შესახებ ტექსტი მინ. 150 სიმბოლო უნდა იყოს.'
+      if (p === 1) {
+        if (form.cats.length < 1) return 'აირჩიე მინიმუმ ერთი კატეგორია.'
+        if (form.headline.trim().length < 2) return 'შეავსე პროფესია (headline).'
+        if (form.motivation.trim().length < 150) return 'შესახებ ტექსტი მინ. 150 სიმბოლო უნდა იყოს.'
+        return null
+      }
+      // Part 2 — details. Years get gated here (not only at final submit).
+      const years = Number(form.yearsExp)
+      if (form.yearsExp.trim() !== '' && (!Number.isInteger(years) || years < 0 || years > 80)) return 'გამოცდილების წლები არასწორია.'
       return null
     }
     if (s === 3) {
@@ -1492,11 +1526,14 @@ export default function TutorApply() {
       return null
     }
     if (s === 4) {
-      const paidService = form.services.find(sv => !sv.free && sv.price > 0)
-      const rate = paidService?.price ?? 0
-      if (rate < 10) return 'დაუმატე მინიმუმ ერთი ფასიანი სერვისი (ფასი ≥ ₾10).'
-      if (rate > 5000) return 'ფასი მაქს. ₾5000.'
-      // KYC lives on this step now — gate it here, just before final submit.
+      if (p === 1) {
+        const paidService = form.services.find(sv => !sv.free && sv.price > 0)
+        const rate = paidService?.price ?? 0
+        if (rate < 10) return 'დაუმატე მინიმუმ ერთი ფასიანი სერვისი (ფასი ≥ ₾10).'
+        if (rate > 5000) return 'ფასი მაქს. ₾5000.'
+        return null
+      }
+      // Part 2 — KYC lives on this screen, just before final submit.
       if (!form.dob.trim()) return 'მიუთითე დაბადების თარიღი.'
       const dob = new Date(form.dob)
       if (Number.isNaN(dob.getTime()) || dob.getTime() > Date.now()) return 'დაბადების თარიღი არასწორია.'
@@ -1609,7 +1646,7 @@ export default function TutorApply() {
               const isActive = step === s.id
               return (
                 <React.Fragment key={s.id}>
-                  <button type="button" onClick={() => setStep(s.id)} className="group flex items-center gap-2 min-h-[44px]">
+                  <button type="button" onClick={() => jumpToStep(s.id)} className="group flex items-center gap-2 min-h-[44px]">
                     <span className={`w-9 h-9 sm:w-7 sm:h-7 shrink-0 rounded-full inline-flex items-center justify-center font-display text-[13px] sm:text-[11px] font-bold tabular-nums transition-all duration-fast ${
                       isDone ? 'bg-brand-500 text-white shadow-xs' :
                       isActive ? 'bg-brand-500 text-white ring-4 ring-brand-500/15 shadow-sm' :
@@ -1628,7 +1665,7 @@ export default function TutorApply() {
       </div>
 
       <div className="flex-1 max-w-[1240px] mx-auto w-full flex">
-        <ProgressNav step={step} setStep={setStep} completed={completed} />
+        <ProgressNav step={step} setStep={jumpToStep} completed={completed} />
 
         <main className="flex-1 min-w-0 px-6 lg:px-8 py-8 lg:py-10">
           <div className="max-w-[720px]">
@@ -1677,9 +1714,9 @@ export default function TutorApply() {
               </div>
             )}
             {step === 1 && <Step1 form={form} set={set} />}
-            {step === 2 && <Step2 form={form} set={set} />}
+            {step === 2 && <Step2 form={form} set={set} part={part} />}
             {step === 3 && <Step3 form={form} set={set} media={media} setMedia={setMediaPatch} />}
-            {step === 4 && <Step4 form={form} set={set} media={media} setMedia={setMediaPatch} />}
+            {step === 4 && <Step4 form={form} set={set} media={media} setMedia={setMediaPatch} part={part} />}
             {step === 5 && <Step5 email={form.email} />}
 
             {submitError && (
@@ -1688,7 +1725,7 @@ export default function TutorApply() {
               </div>
             )}
 
-            <FormFooter step={step} setStep={setStep} completed={completed} setCompleted={setCompleted} onSubmit={submitApplication} submitting={submitting} validateStep={validateStep} onError={setSubmitError} />
+            <FormFooter step={step} setStep={setStep} part={part} setPart={setPart} completed={completed} setCompleted={setCompleted} onSubmit={submitApplication} submitting={submitting} validateStep={validateStep} onError={setSubmitError} />
           </div>
         </main>
 
