@@ -106,7 +106,39 @@ export default function TutorProfilePage() {
     | { kind: 'video'; id?: string }
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  // ── Tabs. Panels stay MOUNTED (hidden, not unmounted) so in-progress form
+  // state survives switches and every #section-* anchor stays in the DOM for
+  // ProfileCompleteness deep links.
+  const [activeTab, setActiveTab] = useState(0)
   const { toast } = useToast()
+
+  // ProfileCompleteness checklist links dispatch `mcodne:reveal-section`
+  // (and hard links may arrive as /tutor/profile#section-…). Activate the
+  // owning tab, then scroll once the panel is visible (double rAF: state
+  // flush → layout).
+  useEffect(() => {
+    const SECTION_TO_TAB: Record<string, number> = {
+      'section-avatar': 0, 'section-public-profile': 0, 'section-video': 0,
+      'section-availability': 1, 'section-consultations': 1,
+      'section-certificates': 2, 'section-education': 2, 'section-experience': 2,
+      'section-visibility': 3, 'section-response-time': 3,
+    }
+    const revealTab = (id: string) => {
+      const tab = SECTION_TO_TAB[id]
+      if (tab === undefined) return
+      setActiveTab(tab)
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }))
+    }
+    const onReveal = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail
+      if (id) revealTab(id)
+    }
+    window.addEventListener('mcodne:reveal-section', onReveal)
+    if (window.location.hash.startsWith('#section-')) revealTab(window.location.hash.slice(1))
+    return () => window.removeEventListener('mcodne:reveal-section', onReveal)
+  }, [])
   const [certForm, setCertForm] = useState({ title: '', issuer: '', year: new Date().getFullYear(), fileUrl: '', fileName: '' })
   const [certUploading, setCertUploading] = useState(false)
   const [certUploadErr, setCertUploadErr] = useState<string | null>(null)
@@ -548,52 +580,51 @@ export default function TutorProfilePage() {
             <span className="ml-3 text-[13px]">იტვირთება…</span>
           </div>
         ) : (
-          <div className="lg:grid lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-8 lg:items-start">
-            {/* Left sticky rail — profile completeness + section navigation.
-                On mobile it stacks above the content (nav hidden, completeness
-                stays at the top exactly as before). */}
-            <aside className="mb-6 lg:mb-0 lg:sticky lg:top-[84px] lg:max-h-[calc(100vh-6.5rem)] lg:overflow-y-auto space-y-4">
-              {/* Profile completeness — always visible on the profile page so
-                  tutors see immediate feedback as they fill in fields. */}
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8 lg:items-start">
+            {/* Main column: tab bar + one visible panel at a time. The old
+                page-local section rail is redundant next to the workspace
+                sidebar; tabs cut the ~5000px wall to one group. */}
+            <div className="min-w-0">
+              {/* Mobile: completeness compact above the tabs */}
               {profile && (
-                <ProfileCompleteness
-                  profile={profile}
-                  certificates={certificates.length}
-                  education={education.length}
-                  experience={experience.length}
-                  avatarUrl={me?.avatarUrl ?? null}
-                  variant="card"
-                  alwaysShow
-                />
+                <div className="lg:hidden mb-5">
+                  <ProfileCompleteness
+                    profile={profile}
+                    certificates={certificates.length}
+                    education={education.length}
+                    experience={experience.length}
+                    avatarUrl={me?.avatarUrl ?? null}
+                    variant="compact"
+                    alwaysShow
+                  />
+                </div>
               )}
 
-              <nav aria-label="პროფილის სექციები" className="hidden lg:block p-4 rounded-card border border-ink-200 bg-white">
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-ink-400 mb-2 px-2">სექციები</div>
-                <ul className="space-y-0.5">
-                  {[
-                    { href: '#group-public',      label: 'საჯარო პროფილი' },
-                    { href: '#group-services',    label: 'სერვისები და ფასი' },
-                    { href: '#group-credentials', label: 'კვალიფიკაცია' },
-                    { href: '#group-account',     label: 'ანგარიში' },
-                  ].map(l => (
-                    <li key={l.href}>
-                      <a
-                        href={l.href}
-                        className="block px-2 py-1.5 rounded-btn font-display text-[13px] font-semibold text-ink-700 hover:text-brand-700 hover:bg-ink-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-                      >
-                        {l.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            </aside>
+              <div className="flex border-b border-ink-200 mb-6 overflow-x-auto scrollbar-hide" role="tablist" aria-label="პროფილის სექციები">
+                {['საჯარო პროფილი', 'სერვისები და ფასი', 'კვალიფიკაცია', 'ანგარიში'].map((label, i) => {
+                  const on = activeTab === i
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      role="tab"
+                      aria-selected={on}
+                      onClick={() => setActiveTab(i)}
+                      className={`relative inline-flex items-center pb-3 px-1 mr-5 font-display text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                        on ? 'text-ink-900' : 'text-ink-500 hover:text-ink-800'
+                      }`}
+                    >
+                      {label}
+                      {on && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-brand-500 rounded-full" />}
+                    </button>
+                  )
+                })}
+              </div>
 
-            {/* Main content column — 4 titled section groups */}
-            <div className="min-w-0 space-y-10">
+              <div className="space-y-10">
 
             {/* ——— Group 1: საჯარო პროფილი ——— */}
-            <CollapsibleGroup id="group-public" title="საჯარო პროფილი" defaultOpen>
+            <TabPanel active={activeTab === 0}>
 
             {/* Avatar block — hover overlay pattern, keyboard-focusable button.
                 Reuses the existing `uploadAvatar` handler and hidden file input. */}
@@ -795,11 +826,11 @@ export default function TutorProfilePage() {
               </section>
             )}
 
-            </CollapsibleGroup>
+            </TabPanel>
 
             {/* ——— Group 2: სერვისები და ფასი ——— */}
             {profile && (
-            <CollapsibleGroup id="group-services" title="სერვისები და ფასი">
+            <TabPanel active={activeTab === 1}>
 
             {/* Service type + Available now (Type A) */}
             {profile && (
@@ -888,12 +919,12 @@ export default function TutorProfilePage() {
               </section>
             )}
 
-            </CollapsibleGroup>
+            </TabPanel>
             )}
 
             {/* ——— Group 3: კვალიფიკაცია ——— */}
             {profile && (
-            <CollapsibleGroup id="group-credentials" title="კვალიფიკაცია">
+            <TabPanel active={activeTab === 2}>
 
             {/* Certificates */}
             {profile && (
@@ -924,6 +955,7 @@ export default function TutorProfilePage() {
                   )}
                 </div>
 
+                <AddDisclosure label="სერტიფიკატის დამატება" forceOpen={certificates.length === 0}>
                 <form onSubmit={addCertificate} className="pt-3 border-t border-ink-100 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Field label="სახელი">
@@ -972,6 +1004,7 @@ export default function TutorProfilePage() {
                     </Btn>
                   </div>
                 </form>
+                </AddDisclosure>
               </section>
             )}
 
@@ -997,6 +1030,7 @@ export default function TutorProfilePage() {
                   )}
                 </div>
 
+                <AddDisclosure label="განათლების დამატება" forceOpen={education.length === 0}>
                 <form onSubmit={addEducation} className="pt-3 border-t border-ink-100 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Field label="სასწავლებელი">
@@ -1037,6 +1071,7 @@ export default function TutorProfilePage() {
                     </Btn>
                   </div>
                 </form>
+                </AddDisclosure>
               </section>
             )}
 
@@ -1063,6 +1098,7 @@ export default function TutorProfilePage() {
                   )}
                 </div>
 
+                <AddDisclosure label="გამოცდილების დამატება" forceOpen={experience.length === 0}>
                 <form onSubmit={addExperience} className="pt-3 border-t border-ink-100 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Field label="კომპანია">
@@ -1103,14 +1139,15 @@ export default function TutorProfilePage() {
                     </Btn>
                   </div>
                 </form>
+                </AddDisclosure>
               </section>
             )}
 
-            </CollapsibleGroup>
+            </TabPanel>
             )}
 
             {/* ——— Group 4: ანგარიში ——— */}
-            <CollapsibleGroup id="group-account" title="ანგარიში">
+            <TabPanel active={activeTab === 3}>
 
             {/* Public visibility — pause self-listing without touching bookings */}
             {profile && (
@@ -1240,9 +1277,25 @@ export default function TutorProfilePage() {
                 </Btn>
               </div>
             </form>
-            </CollapsibleGroup>
+            </TabPanel>
 
+              </div>
             </div>
+
+            {/* Desktop: completeness lives in a sticky right rail */}
+            <aside className="hidden lg:block lg:sticky lg:top-[84px]">
+              {profile && (
+                <ProfileCompleteness
+                  profile={profile}
+                  certificates={certificates.length}
+                  education={education.length}
+                  experience={experience.length}
+                  avatarUrl={me?.avatarUrl ?? null}
+                  variant="card"
+                  alwaysShow
+                />
+              )}
+            </aside>
           </div>
         )}
 
@@ -1263,48 +1316,34 @@ export default function TutorProfilePage() {
 
 // Group heading — titles each of the 4 section groups (საჯარო პროფილი /
 // სერვისები და ფასი / კვალიფიკაცია / ანგარიში) that the left-rail nav links to.
-function GroupLabel({ children }: { children: React.ReactNode }) {
+/* One tab's content. `hidden` (not unmount) keeps form state alive and every
+   #section-* anchor findable for ProfileCompleteness deep links. */
+function TabPanel({ active, children }: { active: boolean; children: React.ReactNode }) {
   return (
-    <h2 className="pt-1 font-display text-[12px] font-bold uppercase tracking-[0.22em] text-ink-400 select-none">
+    <div role="tabpanel" hidden={!active} className={active ? 'space-y-6' : undefined}>
       {children}
-    </h2>
+    </div>
   )
 }
 
-// Collapsible wrapper for a section group. Desktop: always expanded (the
-// left-rail nav does the wayfinding). Mobile: an accordion — only the first
-// group starts open, so the editor reads as 4 scannable headers instead of a
-// ~5000px wall. ProfileCompleteness deep-links still work: scrollToAnchor
-// broadcasts `mcodne:reveal-section` before scrolling and any group that
-// contains the target id opens itself. Only rendered post-load (client data
-// gate above), so the window-width initial state can't cause a hydration
-// mismatch.
-function CollapsibleGroup({ id, title, defaultOpen, children }: { id: string; title: string; defaultOpen?: boolean; children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [open, setOpen] = useState<boolean>(() =>
-    typeof window === 'undefined' ? true : window.innerWidth >= 1024 || !!defaultOpen,
-  )
-  useEffect(() => {
-    const onReveal = (e: Event) => {
-      const target = (e as CustomEvent<string>).detail
-      if (target && ref.current?.querySelector(`#${CSS.escape(target)}`)) setOpen(true)
-    }
-    window.addEventListener('mcodne:reveal-section', onReveal)
-    return () => window.removeEventListener('mcodne:reveal-section', onReveal)
-  }, [])
+/* Progressive disclosure for the credential add-forms: collapsed behind a
+   "+ დამატება" row once the list has entries; auto-open while empty so the
+   first item has zero extra clicks. Form stays mounted (state survives). */
+function AddDisclosure({ label, forceOpen, children }: { label: string; forceOpen: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const show = forceOpen || open
   return (
-    <div id={id} ref={ref} className="scroll-mt-24 space-y-6">
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        aria-expanded={open}
-        className="lg:hidden w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
-      >
-        <GroupLabel>{title}</GroupLabel>
-        <Icon.chevD className={`w-4 h-4 text-ink-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      <div className="hidden lg:block"><GroupLabel>{title}</GroupLabel></div>
-      <div className={`space-y-6 ${open ? '' : 'hidden lg:block'}`}>{children}</div>
+    <div>
+      {!show && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="w-full min-h-[44px] pt-3 border-t border-ink-100 inline-flex items-center justify-center gap-2 font-display text-[13px] font-semibold text-brand-700 hover:text-brand-800 transition-colors"
+        >
+          <Icon.plus className="w-4 h-4" /> {label}
+        </button>
+      )}
+      <div hidden={!show}>{children}</div>
     </div>
   )
 }
