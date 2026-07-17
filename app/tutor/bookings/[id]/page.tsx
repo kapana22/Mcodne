@@ -175,7 +175,11 @@ export default function TutorBookingDetailPage() {
         const res = await fetch(`/api/messages?bookingId=${bookingId}`)
         if (!res.ok || cancelled) return
         const j = await res.json().catch(() => null)
-        if (!cancelled && j?.ok && Array.isArray(j.messages)) setMsgs(j.messages)
+        // Keep any in-flight optimistic bubbles (tmp-*) — a poll landing
+        // between append and the POST response must not wipe them.
+        if (!cancelled && j?.ok && Array.isArray(j.messages)) {
+          setMsgs(prev => [...j.messages, ...prev.filter(m => m.id.startsWith('tmp-'))])
+        }
       } catch {}
     }
     tick()

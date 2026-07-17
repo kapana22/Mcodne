@@ -139,7 +139,28 @@ export default function TutorEarningsPage() {
                   <div className="text-[13px] text-ink-500 mt-1">დაასრულე პირველი სესია, რომ აქ ტრანზაქცია გამოჩნდეს.</div>
                 </div>
               ) : (
-                <div className="overflow-x-auto -mx-px">
+                <>
+                {/* Mobile: card rows instead of a 720px sideways-scrolling
+                    table — date/client/net at a glance, no horizontal pan. */}
+                <div className="lg:hidden divide-y divide-ink-100">
+                  {data.transactions.map(tx => {
+                    const s = payoutLabel(tx.payoutStatus)
+                    return (
+                      <div key={tx.id} className="px-5 py-3.5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="font-display text-[13.5px] font-bold text-ink-900 truncate">{tx.student?.fullName ?? '—'}</div>
+                          <div className="font-display text-[15px] font-bold text-ink-900 tabular-nums shrink-0">{fmtGel(tx.net)}</div>
+                        </div>
+                        <div className="mt-0.5 flex items-center justify-between gap-3 text-[12px] text-ink-500">
+                          <span className="truncate">{tx.topic}</span>
+                          <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border font-display text-[10px] font-bold uppercase tracking-[0.12em] shrink-0 ${s.cls}`}>{s.l}</span>
+                        </div>
+                        <div className="mt-1 text-[11.5px] text-ink-400 tabular-nums">{fmtDate(tx.startAt)} · {tx.durationMin} წთ · ბრუტო {fmtGel(tx.gross)}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="overflow-x-auto -mx-px hidden lg:block">
                   <table className="w-full text-[13px] min-w-[720px]">
                     <thead className="bg-ink-50 text-ink-500 font-display font-semibold uppercase text-[10.5px] tracking-[0.14em]">
                       <tr>
@@ -172,6 +193,7 @@ export default function TutorEarningsPage() {
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </div>
           </>

@@ -587,8 +587,7 @@ export default function TutorProfilePage() {
             <div className="min-w-0 space-y-10">
 
             {/* ——— Group 1: საჯარო პროფილი ——— */}
-            <div id="group-public" className="scroll-mt-24 space-y-6">
-            <GroupLabel>საჯარო პროფილი</GroupLabel>
+            <CollapsibleGroup id="group-public" title="საჯარო პროფილი" defaultOpen>
 
             {/* Avatar block — hover overlay pattern, keyboard-focusable button.
                 Reuses the existing `uploadAvatar` handler and hidden file input. */}
@@ -790,12 +789,11 @@ export default function TutorProfilePage() {
               </section>
             )}
 
-            </div>
+            </CollapsibleGroup>
 
             {/* ——— Group 2: სერვისები და ფასი ——— */}
             {profile && (
-            <div id="group-services" className="scroll-mt-24 space-y-6">
-            <GroupLabel>სერვისები და ფასი</GroupLabel>
+            <CollapsibleGroup id="group-services" title="სერვისები და ფასი">
 
             {/* Service type + Available now (Type A) */}
             {profile && (
@@ -884,13 +882,12 @@ export default function TutorProfilePage() {
               </section>
             )}
 
-            </div>
+            </CollapsibleGroup>
             )}
 
             {/* ——— Group 3: კვალიფიკაცია ——— */}
             {profile && (
-            <div id="group-credentials" className="scroll-mt-24 space-y-6">
-            <GroupLabel>კვალიფიკაცია</GroupLabel>
+            <CollapsibleGroup id="group-credentials" title="კვალიფიკაცია">
 
             {/* Certificates */}
             {profile && (
@@ -1103,12 +1100,11 @@ export default function TutorProfilePage() {
               </section>
             )}
 
-            </div>
+            </CollapsibleGroup>
             )}
 
             {/* ——— Group 4: ანგარიში ——— */}
-            <div id="group-account" className="scroll-mt-24 space-y-6">
-            <GroupLabel>ანგარიში</GroupLabel>
+            <CollapsibleGroup id="group-account" title="ანგარიში">
 
             {/* Public visibility — pause self-listing without touching bookings */}
             {profile && (
@@ -1238,7 +1234,7 @@ export default function TutorProfilePage() {
                 </Btn>
               </div>
             </form>
-            </div>
+            </CollapsibleGroup>
 
             </div>
           </div>
@@ -1269,6 +1265,44 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
     <h2 className="pt-1 font-display text-[12px] font-bold uppercase tracking-[0.22em] text-ink-400 select-none">
       {children}
     </h2>
+  )
+}
+
+// Collapsible wrapper for a section group. Desktop: always expanded (the
+// left-rail nav does the wayfinding). Mobile: an accordion — only the first
+// group starts open, so the editor reads as 4 scannable headers instead of a
+// ~5000px wall. ProfileCompleteness deep-links still work: scrollToAnchor
+// broadcasts `mcodne:reveal-section` before scrolling and any group that
+// contains the target id opens itself. Only rendered post-load (client data
+// gate above), so the window-width initial state can't cause a hydration
+// mismatch.
+function CollapsibleGroup({ id, title, defaultOpen, children }: { id: string; title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState<boolean>(() =>
+    typeof window === 'undefined' ? true : window.innerWidth >= 1024 || !!defaultOpen,
+  )
+  useEffect(() => {
+    const onReveal = (e: Event) => {
+      const target = (e as CustomEvent<string>).detail
+      if (target && ref.current?.querySelector(`#${CSS.escape(target)}`)) setOpen(true)
+    }
+    window.addEventListener('mcodne:reveal-section', onReveal)
+    return () => window.removeEventListener('mcodne:reveal-section', onReveal)
+  }, [])
+  return (
+    <div id={id} ref={ref} className="scroll-mt-24 space-y-6">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        className="lg:hidden w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
+      >
+        <GroupLabel>{title}</GroupLabel>
+        <Icon.chevD className={`w-4 h-4 text-ink-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <div className="hidden lg:block"><GroupLabel>{title}</GroupLabel></div>
+      <div className={`space-y-6 ${open ? '' : 'hidden lg:block'}`}>{children}</div>
+    </div>
   )
 }
 

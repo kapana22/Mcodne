@@ -70,8 +70,14 @@ const scrollToAnchor = (anchor: string) => {
   const id = anchor.slice(1)
   const el = document.getElementById(id)
   if (!el) return
+  // Ask any collapsed container (mobile accordion groups on /tutor/profile)
+  // to reveal this section first — scrollIntoView is a no-op on a
+  // display:none target. Scroll on the next frame so layout has settled.
+  window.dispatchEvent(new CustomEvent('mcodne:reveal-section', { detail: id }))
   const prefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  el.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth', block: 'start' })
+  requestAnimationFrame(() => {
+    el.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth', block: 'start' })
+  })
 }
 
 export function ProfileCompleteness({

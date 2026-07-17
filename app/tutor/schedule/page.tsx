@@ -283,14 +283,14 @@ export default function TutorSchedulePage() {
             <h1 className="font-display text-[26px] font-bold tracking-tight text-ink-900">გრაფიკი</h1>
             <p className="text-[13px] text-ink-500 mt-1">კვირეული ხელმისაწვდომობა და ჯავშნები</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setWeekStart(addDays(weekStart, -7))}
-                    className="h-9 w-9 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="წინა კვირა"
+                    className="h-11 w-11 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center">
               <Icon.chevR className="w-4 h-4 rotate-180" />
             </button>
-            <div className="font-display text-[13px] font-semibold text-ink-800 tabular-nums px-2">{fmtRangeLabel(weekStart)}</div>
-            <button type="button" onClick={() => setWeekStart(addDays(weekStart, 7))}
-                    className="h-9 w-9 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center">
+            <div className="font-display text-[13px] font-semibold text-ink-800 tabular-nums px-2 whitespace-nowrap">{fmtRangeLabel(weekStart)}</div>
+            <button type="button" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="შემდეგი კვირა"
+                    className="h-11 w-11 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center">
               <Icon.chevR className="w-4 h-4" />
             </button>
             <Btn variant="primary" size="sm" onClick={() => openModalFor(0, 9)}>
@@ -367,7 +367,12 @@ export default function TutorSchedulePage() {
             </div>
           </div>
         ) : (
+          // Below lg the 7-day grid scrolls horizontally at a readable column
+          // width instead of compressing to ~40px columns. Header + body share
+          // one scroll container so they stay aligned.
           <div className="rounded-card border border-ink-200 bg-white overflow-hidden">
+          <div className="overflow-x-auto">
+          <div className="min-w-[720px]">
             <div className="grid grid-cols-[64px_repeat(7,1fr)] border-b border-ink-200 bg-ink-50">
               <div />
               {DAY_LABELS.map((d, i) => {
@@ -439,6 +444,8 @@ export default function TutorSchedulePage() {
                 </div>
               ))}
             </div>
+          </div>
+          </div>
           </div>
         )}
       </main>

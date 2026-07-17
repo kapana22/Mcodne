@@ -64,6 +64,26 @@ export function TutorAppBar({ user }: { user?: { name: string; avatar?: string |
           <UserMenu user={user} role="TUTOR" />
         </div>
       </div>
+      {/* Mobile nav rail — BottomNav only carries 4 tabs, which left
+          Schedule / Earnings / Browse unreachable on a phone. Horizontal
+          scroll, same chip language as the search rail. */}
+      <nav className="lg:hidden border-t border-ink-100 px-4 sm:px-6 flex items-center gap-1.5 h-12 overflow-x-auto scrollbar-hide" aria-label="სამუშაო სივრცის ნავიგაცია">
+        {NAV.map(item => {
+          const active = path === item.href
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? 'page' : undefined}
+              className={`shrink-0 h-9 px-3 rounded-pill font-display text-[12px] font-semibold inline-flex items-center whitespace-nowrap transition-colors duration-fast ${
+                active ? 'bg-brand-50 text-brand-800 border border-brand-200' : 'text-ink-600 hover:text-ink-900 border border-transparent'
+              }`}
+            >
+              {item.label}
+            </Link>
+          )
+        })}
+      </nav>
     </header>
   )
 }

@@ -413,7 +413,11 @@ const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | n
         const res = await fetch(`/api/messages?bookingId=${booking.id}`)
         if (!res.ok || cancelled) return
         const j = await res.json().catch(() => null)
-        if (!cancelled && j?.ok && Array.isArray(j.messages)) setMsgs(j.messages)
+        // Keep any in-flight optimistic bubbles (tmp-*) — a poll landing
+        // between append and the POST response must not wipe them.
+        if (!cancelled && j?.ok && Array.isArray(j.messages)) {
+          setMsgs(prev => [...j.messages, ...prev.filter(m => m.id.startsWith('tmp-'))])
+        }
       } catch {}
     }
     tick()
@@ -459,17 +463,36 @@ const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | n
         body: text.trim() || (attachment ? `📎 ${attachment.name}` : ''),
       }
       if (attachment) { body.fileUrl = attachment.url; body.fileName = attachment.name }
+      // TRUE optimistic append — the bubble shows the instant you hit send
+      // (the POST itself takes seconds on the remote-DB dev setup). The temp
+      // row is replaced by the server row on success, rolled back on failure
+      // with the draft restored so nothing the user typed is lost.
+      const tempId = `tmp-${Date.now()}`
+      const sentText = text
+      const sentAttachment = attachment
+      setMsgs(prev => [...prev, {
+        id: tempId,
+        body: body.body,
+        fromId: meId ?? booking.student.id,
+        createdAt: new Date().toISOString(),
+        from: booking.student,
+        fileUrl: sentAttachment?.url ?? null,
+        fileName: sentAttachment?.name ?? null,
+      }])
+      setText(''); setAttachment(null)
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
       const j = await res.json().catch(() => null)
-      if (!res.ok || !j?.ok) { setErr('შეცდომა გაგზავნაში'); return }
-      // Optimistic append — the API returns the created row with `from`
-      // populated, so the message shows instantly (no 2-5s booking reload).
-      setMsgs(prev => [...prev, j.message])
-      setText(''); setAttachment(null)
+      if (!res.ok || !j?.ok) {
+        setMsgs(prev => prev.filter(m => m.id !== tempId))
+        setText(sentText); setAttachment(sentAttachment)
+        setErr('შეცდომა გაგზავნაში')
+        return
+      }
+      setMsgs(prev => prev.map(m => (m.id === tempId ? j.message : m)))
     } catch { setErr('ქსელის შეცდომა') }
     finally { setSending(false) }
   }

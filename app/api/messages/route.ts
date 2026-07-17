@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
@@ -53,6 +53,9 @@ export async function GET(req: Request) {
         where: { bookingId, toId: user.id, readAt: null },
         data: { readAt: new Date() },
       }),
+      // Viewer is looking at the thread — clear their MESSAGE_NEW notifs for
+      // this booking so the bell badge agrees with the chat's read state.
+      markRelatedRead(user.id, `/bookings/${bookingId}`, 'MESSAGE_NEW'),
     ])
     return NextResponse.json({ ok: true, messages })
   }
@@ -145,21 +148,25 @@ export async function POST(req: Request) {
     include: { from: { select: { id: true, fullName: true, avatarUrl: true } } },
   })
 
-  // Notify the recipient — booking-scoped chat surfaces are per-role, so
-  // link to the party's own booking-detail page (chat anchor).
+  // Notification + notif-cleanup run AFTER the response — they cost 3 more
+  // remote round-trips and the sender shouldn't wait on them to see their own
+  // bubble appear.
   const isFromStudent = user.id === b.studentId
   const preview = msg.body.length > 80 ? msg.body.slice(0, 77) + '…' : msg.body
-  await notify(toId, {
-    type: 'MESSAGE_NEW',
-    title: `ახალი შეტყობინება — ${msg.from.fullName}`,
-    body: preview,
-    href: isFromStudent ? `/tutor/bookings/${b.id}#chat` : `/student/bookings/${b.id}#chat`,
+  after(async () => {
+    // Notify the recipient — booking-scoped chat surfaces are per-role, so
+    // link to the party's own booking-detail page (chat anchor).
+    await notify(toId, {
+      type: 'MESSAGE_NEW',
+      title: `ახალი შეტყობინება — ${msg.from.fullName}`,
+      body: preview,
+      href: isFromStudent ? `/tutor/bookings/${b.id}#chat` : `/student/bookings/${b.id}#chat`,
+    })
+    // Sender is actively in the thread — clear any outstanding MESSAGE_NEW
+    // notifs on their side for this booking. The path stem matches both the
+    // student and tutor chat hrefs.
+    await markRelatedRead(user.id, `/bookings/${b.id}`, 'MESSAGE_NEW')
   })
-
-  // Sender is actively in the thread — clear any outstanding MESSAGE_NEW
-  // notifs on their side for this booking. The path stem matches both the
-  // student and tutor chat hrefs.
-  await markRelatedRead(user.id, `/bookings/${b.id}`, 'MESSAGE_NEW')
 
   return NextResponse.json({ ok: true, message: msg })
 }
