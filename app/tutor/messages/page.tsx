@@ -1,7 +1,5 @@
 import { requireRole } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { TutorAppBar } from '@/components/TutorAppBar'
-import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 import { EmptyState } from '@/components/EmptyState'
 import { ConversationRow } from '@/components/ConversationRow'
@@ -36,10 +34,7 @@ export default async function TutorMessagesPage() {
   const now = new Date()
 
   return (
-    <div className="min-h-screen bg-ink-50 flex flex-col">
-      <TutorAppBar user={{ name: user.fullName, avatar: user.avatarUrl ?? undefined }} />
-
-      <main className="flex-1 max-w-[820px] w-full mx-auto px-6 sm:px-8 py-8 lg:py-10">
+    <div className="max-w-[820px] mx-auto">
         <div className="mb-8">
           <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">შეტყობინებები</div>
           <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight">ჩატები კლიენტებთან</h1>
@@ -82,9 +77,6 @@ export default async function TutorMessagesPage() {
             </p>
           </>
         )}
-      </main>
-
-      <Footer />
     </div>
   )
 }

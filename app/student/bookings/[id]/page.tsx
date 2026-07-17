@@ -1699,7 +1699,13 @@ export default function BookingDetail() {
       <ConfirmModal
         open={cancelConfirmOpen}
         title="ჯავშნის გაუქმება?"
-        body="თანხა დაბრუნდება escrow-ის შემდეგ"
+        body={
+          PAYMENTS_LIVE
+            ? (hoursToStart >= CANCEL_CUTOFF_HOURS
+                ? `სესიის დაწყებამდე ${CANCEL_CUTOFF_HOURS} საათზე მეტია დარჩენილი — თანხა escrow-დან სრულად დაგიბრუნდება.`
+                : `სესიის დაწყებამდე ${CANCEL_CUTOFF_HOURS} საათზე ნაკლებია დარჩენილი — სრული დაბრუნება გარანტირებული აღარ არის.`)
+            : 'გაუქმება უფასოა — ჯერ არაფერი გადაგიხდია. დრო გათავისუფლდება და ექსპერტს ეცნობება.'
+        }
         tone="danger"
         confirmLabel="გაუქმება"
         cancelLabel="უკან"

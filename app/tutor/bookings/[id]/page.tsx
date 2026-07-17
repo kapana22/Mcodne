@@ -2,8 +2,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { TutorAppBar } from '@/components/TutorAppBar'
-import { Footer } from '@/components/Footer'
 import { Avatar } from '@/components/Avatar'
 import { StatusPill } from '@/components/StatusPill'
 import { Icon } from '@/components/Icon'
@@ -428,9 +426,7 @@ export default function TutorBookingDetailPage() {
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-ink-50 flex flex-col">
-        <TutorAppBar user={me ? { name: me.fullName, avatar: me.avatarUrl ?? undefined } : undefined} />
-        <main className="flex-1 px-6 py-8 max-w-[720px] w-full mx-auto">
+      <div className="max-w-[720px] mx-auto">
           <div className="p-12 rounded-card border border-ink-200 bg-white text-center">
             <div className="mx-auto w-12 h-12 rounded-full bg-ink-100 text-ink-500 flex items-center justify-center mb-3">
               <Icon.warn className="w-6 h-6" />
@@ -439,23 +435,17 @@ export default function TutorBookingDetailPage() {
             <div className="text-[13px] text-ink-500 mt-1">შესაძლოა წაიშალა, ან არ არის თქვენი.</div>
             <div className="mt-5"><Btn href="/tutor/bookings" variant="secondary" size="sm">ჯავშნების სია</Btn></div>
           </div>
-        </main>
-        <Footer />
       </div>
     )
   }
 
   if (!booking) {
     return (
-      <div className="min-h-screen bg-ink-50 flex flex-col">
-        <TutorAppBar user={me ? { name: me.fullName, avatar: me.avatarUrl ?? undefined } : undefined} />
-        <main className="flex-1 px-6 py-8 max-w-[900px] w-full mx-auto">
+      <div className="max-w-[900px] mx-auto">
           <div className="p-12 rounded-card border border-ink-200 bg-white flex items-center justify-center text-ink-400">
             <span className="inline-block w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
             <span className="ml-3 text-[13px]">იტვირთება…</span>
           </div>
-        </main>
-        <Footer />
       </div>
     )
   }
@@ -470,10 +460,7 @@ export default function TutorBookingDetailPage() {
   const showRemainingPill = booking.status !== 'CANCELED' && booking.status !== 'NO_SHOW'
 
   return (
-    <div className="min-h-screen bg-ink-50 flex flex-col">
-      <TutorAppBar user={me ? { name: me.fullName, avatar: me.avatarUrl ?? undefined } : undefined} />
-
-      <main className="flex-1 px-6 py-8 max-w-[900px] w-full mx-auto">
+    <div className="max-w-[900px] mx-auto">
         <div className="mb-5 flex items-center gap-3 text-[13px] text-ink-500">
           <Link href="/tutor/bookings" className="hover:text-ink-800 inline-flex items-center gap-1"><Icon.arrow className="w-3.5 h-3.5 rotate-180" /> ჯავშნების სია</Link>
           <span className="text-ink-300">·</span>
@@ -656,7 +643,9 @@ export default function TutorBookingDetailPage() {
         <section id="chat" className="mt-6 rounded-card border border-ink-200 bg-white shadow-xs overflow-hidden scroll-mt-24">
           <div className="px-5 sm:px-6 py-4 border-b border-ink-100 flex items-center justify-between">
             <div className="font-display text-[15px] font-bold tracking-tight text-ink-900">მიმოწერა კლიენტთან</div>
-            <div className="text-[11.5px] text-ink-500 font-mono tabular-nums">{msgs.length}</div>
+            {msgs.length > 0 && (
+              <div className="text-[11.5px] text-ink-400 tabular-nums">{msgs.length} შეტყობინება</div>
+            )}
           </div>
           <div className="max-h-[420px] min-h-[220px] overflow-y-auto p-4 sm:p-6 bg-ink-50/40">
             {msgs.length === 0 ? (
@@ -718,7 +707,8 @@ export default function TutorBookingDetailPage() {
                               download={m.fileName ?? undefined}
                               className={`inline-flex items-center gap-2 text-[12.5px] ${isMine ? 'text-white hover:text-white' : 'text-brand-700 hover:text-brand-800'} font-display font-semibold underline underline-offset-2 decoration-dotted`}
                             >
-                              📎 {m.fileName ?? 'ფაილი'}
+                              <Icon.paperclip className="w-3.5 h-3.5" />
+                              {m.fileName ?? 'ფაილი'}
                             </a>
                           )}
                         </div>
@@ -744,10 +734,11 @@ export default function TutorBookingDetailPage() {
             />
             {attachment && (
               <div className="flex items-center gap-2 rounded-btn border border-ink-200 bg-ink-50/40 px-3 py-2 text-[12.5px]">
-                <span className="flex-1 truncate font-display font-semibold text-ink-800">📎 {attachment.name}</span>
+                <Icon.paperclip className="w-3.5 h-3.5 text-ink-500 shrink-0" />
+                <span className="flex-1 truncate font-display font-semibold text-ink-800">{attachment.name}</span>
                 <span className="font-mono text-[10.5px] text-ink-500 tabular-nums shrink-0">{(attachment.size / 1024).toFixed(0)} KB</span>
                 <button type="button" onClick={() => setAttachment(null)} aria-label="ფაილის მოხსნა" className="w-6 h-6 rounded-btn hover:bg-ink-100 text-ink-500 hover:text-danger-600 inline-flex items-center justify-center">
-                  ×
+                  <Icon.x className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
@@ -760,24 +751,34 @@ export default function TutorBookingDetailPage() {
                 title="ფაილის მიბმა (PDF/JPG/PNG · max 8 MB)"
                 className="h-11 w-11 rounded-btn border border-ink-200 bg-white hover:border-ink-300 disabled:opacity-50 text-ink-600 hover:text-ink-900 inline-flex items-center justify-center transition-colors shrink-0"
               >
-                {uploading ? <span className="inline-block w-4 h-4 border-2 border-ink-500 border-t-transparent rounded-full animate-spin" /> : '📎'}
+                {uploading ? <span className="inline-block w-4 h-4 border-2 border-ink-500 border-t-transparent rounded-full animate-spin" /> : <Icon.paperclip className="w-4 h-4" />}
               </button>
               <textarea
                 value={msgText}
-                onChange={(e) => setMsgText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e as any) } }}
+                onChange={(e) => {
+                  setMsgText(e.target.value)
+                  // Autosize: grow with content up to ~5 lines, then scroll inside.
+                  const el = e.currentTarget
+                  el.style.height = 'auto'
+                  el.style.height = `${Math.min(el.scrollHeight, 132)}px`
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e as any); (e.currentTarget as HTMLTextAreaElement).style.height = 'auto' } }}
                 placeholder={attachment ? 'დაწერე შეტყობინება ან უბრალოდ გააგზავნე ფაილი…' : 'დაწერე შეტყობინება…'}
-                rows={2}
-                maxLength={4000}
-                className="flex-1 resize-none rounded-btn border border-ink-200 px-3 py-2 text-[13.5px] focus:outline-none focus:ring-2 focus:ring-brand-400"
+                rows={1}
+                maxLength={MSG_MAX_LEN}
+                className="flex-1 min-h-[44px] max-h-[132px] resize-none rounded-btn border border-ink-200 px-3 py-2.5 text-[13.5px] focus:outline-none focus:ring-2 focus:ring-brand-400"
               />
               <Btn type="submit" variant="primary" size="md" disabled={sending || uploading || (!msgText.trim() && !attachment)}>
-                {sending ? '…' : <><Icon.arrow className="w-4 h-4" /> გაგზავნა</>}
+                {sending ? '…' : <><Icon.send className="w-4 h-4" /><span className="hidden sm:inline">გაგზავნა</span></>}
               </Btn>
             </div>
+            {msgText.length > MSG_MAX_LEN - 200 && (
+              <div className={`text-right font-mono text-[10.5px] tabular-nums ${msgText.length >= MSG_MAX_LEN ? 'text-danger-600' : 'text-ink-400'}`}>
+                {msgText.length} / {MSG_MAX_LEN}
+              </div>
+            )}
           </form>
         </section>
-      </main>
 
       {/* Reschedule proposal modal — tutor picks a new date/time; server
           validates lead time and availability slot before writing the JSONB
@@ -856,8 +857,6 @@ export default function TutorBookingDetailPage() {
           </div>
         </div>
       )}
-
-      <Footer />
     </div>
   )
 }
