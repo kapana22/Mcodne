@@ -115,6 +115,25 @@ module.exports = {
         'inset-hairline': 'inset 0 1px 0 rgba(255, 255, 255, 0.5)',
       },
 
+      // ── Gradients — the ONLY four allowed. Never compose ad-hoc from-/to-
+      //    utilities in page code; reach for these named tokens so the
+      //    palette stays disciplined (premium restraint, same rule as colors).
+      //    All stops are existing palette values — no new hues.
+      backgroundImage: {
+        // Section/hero wash — white canvas melting into brand-50. Barely
+        // visible by design; use on hero and section backgrounds only.
+        'gradient-wash': 'linear-gradient(180deg, #FFFFFF 0%, #EAF7F3 100%)',
+        // Deep surface — ink-900 with a dark brand-green undertone. For
+        // dark hero blocks and the next-session card; richer than flat black.
+        'gradient-dark': 'linear-gradient(160deg, #0F0E0A 0%, #04241E 100%)',
+        // Primary CTA — brand-500 → brand-600, vertical. Pair with
+        // shadow-brand-glow. Primary actions only; secondary buttons stay flat.
+        'gradient-cta': 'linear-gradient(180deg, #159A82 0%, #0F8069 100%)',
+        // Signature text accent — brand-600 → info-500 (the one green→blue
+        // moment). Use with bg-clip-text in AT MOST one place per page.
+        'gradient-signature': 'linear-gradient(90deg, #0F8069 0%, #2563EB 100%)',
+      },
+
       fontSize: {
         'display-lg': ['2.75rem', { lineHeight: '1.08', letterSpacing: '-0.022em', fontWeight: '700' }],
         'display':    ['2rem',    { lineHeight: '1.12', letterSpacing: '-0.02em',  fontWeight: '700' }],
