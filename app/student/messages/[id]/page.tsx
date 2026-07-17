@@ -59,7 +59,9 @@ export default function StudentConversationPage() {
         ])
         if (cancelled) return
         setMe(meRes?.user ?? null)
-        const bk: BookingLite | null = bRes?.booking ?? null
+        // GET /api/bookings/[id] returns the booking object spread at the top
+        // level (not wrapped in { booking }).
+        const bk: BookingLite | null = bRes?.id ? (bRes as BookingLite) : null
         if (!bk) { setLoadErr('საუბარი ვერ მოიძებნა') ; return }
         setBooking(bk)
         setMsgs(bk.messages ?? [])
