@@ -68,7 +68,11 @@ export function Footer() {
         </div>
         <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-4 pt-6 border-t border-ink-100 text-[12px] text-ink-500">
           <div className="tabular-nums">© {new Date().getFullYear()} მცოდნე. ყველა უფლება დაცულია.</div>
-          <TrustStrip />
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+            <TrustStrip />
+            <span className="hidden sm:inline text-ink-300">·</span>
+            <span>თბილისი, საქართველო</span>
+          </div>
         </div>
       </div>
     </footer>

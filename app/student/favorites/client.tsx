@@ -79,8 +79,18 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
                 <span className="font-semibold tabular-nums">{t.rating.toFixed(1)}</span>
                 <span className="text-ink-400 tabular-nums">({t.reviews})</span>
               </div>
-              <div className="text-[13px] font-semibold text-ink-900 tabular-nums">₾{t.price}</div>
+              {/* Flat expert-set price for the whole session — bare "₾X" had no
+                  unit context (duration isn't in the favorites payload). */}
+              <div className="text-[13px] font-semibold text-ink-900 tabular-nums">₾{t.price}<span className="text-[11px] font-medium text-ink-500"> / სესია</span></div>
             </div>
+            {/* Booking path — ?rebook=1 auto-opens the booking modal on the
+                profile (this is a signed-in area, so no auth detour). */}
+            <Link
+              href={`/tutors/${t.tutorId}?rebook=1`}
+              className="mt-3 w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+            >
+              დაჯავშნა
+            </Link>
           </div>
         </div>
       ))}

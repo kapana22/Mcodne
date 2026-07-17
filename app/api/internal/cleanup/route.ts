@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { notify } from '@/lib/notify'
+import { fmtKaDateTime } from '@/lib/kaDate'
 
 // Cleanup job for expired auth artifacts + stale bookings.
 //
@@ -60,13 +62,37 @@ export async function POST(req: Request) {
   // ── Booking auto-transitions ──────────────────────────────────────────
   // PREPARING > 24h → CANCELED (+ free slot)
   const preparingCutoff = new Date(now.getTime() - PREPARING_TTL_HOURS * 3600_000)
-  const stalePrep = await prisma.booking.findMany({
+  const stalePrepAll = await prisma.booking.findMany({
     where: {
       status: 'PREPARING',
       createdAt: { lt: preparingCutoff },
     },
-    select: { id: true, tutorId: true, startAt: true, durationMin: true },
+    select: {
+      id: true,
+      tutorId: true,
+      startAt: true,
+      durationMin: true,
+      topic: true,
+      studentId: true,
+      tutor: { select: { userId: true } },
+    },
   })
+
+  // A pending reschedule proposal force-sets status back to PREPARING on a
+  // booking whose createdAt may be days old — keying the TTL on createdAt
+  // would silently auto-cancel it mid-negotiation. Exclude every booking with
+  // a pending rescheduleRequest (raw JSONB column — not in the Prisma model).
+  let pendingRescheduleIds = new Set<string>()
+  if (stalePrepAll.length > 0) {
+    const placeholders = stalePrepAll.map((_, i) => `$${i + 1}`).join(', ')
+    const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
+      `SELECT id FROM "Booking" WHERE "rescheduleRequest" IS NOT NULL AND id IN (${placeholders})`,
+      ...stalePrepAll.map(b => b.id),
+    )
+    pendingRescheduleIds = new Set(rows.map(r => r.id))
+  }
+  const stalePrep = stalePrepAll.filter(b => !pendingRescheduleIds.has(b.id))
+
   let preparingCanceled = 0
   for (const b of stalePrep) {
     const end = new Date(b.startAt.getTime() + b.durationMin * 60_000)
@@ -89,6 +115,22 @@ export async function POST(req: Request) {
       }
     })
     preparingCanceled++
+
+    // Tell both parties — the student's request expired unanswered, and the
+    // tutor's queue just lost an item. notify() swallows its own failures.
+    const sessionRef = `${b.topic} · ${fmtKaDateTime(b.startAt, { year: true })}`
+    await notify(b.studentId, {
+      type: 'BOOKING_CANCELED',
+      title: 'ჯავშანი გაუქმდა',
+      body: `${sessionRef} — შენი მოთხოვნა უპასუხოდ დარჩა და ავტომატურად გაუქმდა`,
+      href: `/student/bookings/${b.id}`,
+    })
+    await notify(b.tutor.userId, {
+      type: 'BOOKING_CANCELED',
+      title: 'ჯავშანი გაუქმდა',
+      body: `${sessionRef} — მოთხოვნა 24 საათში უპასუხოდ დარჩა და ავტომატურად გაუქმდა`,
+      href: `/tutor/bookings/${b.id}`,
+    })
   }
 
   // CONFIRMED / LIVE past (startAt + duration + 48h) with nobody having
@@ -108,7 +150,14 @@ export async function POST(req: Request) {
       status: { in: ['CONFIRMED', 'LIVE'] },
       startAt: { lt: candidateCutoff },
     },
-    select: { id: true, startAt: true, durationMin: true },
+    select: {
+      id: true,
+      startAt: true,
+      durationMin: true,
+      topic: true,
+      studentId: true,
+      tutor: { select: { userId: true } },
+    },
   })
   const overdue = staleActive.filter(b => {
     const sessionEnd = b.startAt.getTime() + b.durationMin * 60_000
@@ -126,6 +175,24 @@ export async function POST(req: Request) {
       data: { status: 'COMPLETED', payoutStatus: 'RELEASED', autoCompleted: true },
     })
     autoCompleted = res.count
+
+    // Both parties learn the session was closed automatically — otherwise the
+    // status flips silently and neither side knows why.
+    for (const b of overdue) {
+      const sessionRef = `${b.topic} · ${fmtKaDateTime(b.startAt, { year: true })}`
+      await notify(b.studentId, {
+        type: 'BOOKING_COMPLETED',
+        title: 'სესია დასრულებულად ჩაითვალა',
+        body: `${sessionRef} — ავტომატურად მოინიშნა დასრულებულად`,
+        href: `/student/bookings/${b.id}`,
+      })
+      await notify(b.tutor.userId, {
+        type: 'BOOKING_COMPLETED',
+        title: 'სესია დასრულებულად ჩაითვალა',
+        body: `${sessionRef} — ავტომატურად მოინიშნა დასრულებულად`,
+        href: `/tutor/bookings/${b.id}`,
+      })
+    }
   }
 
   return NextResponse.json({

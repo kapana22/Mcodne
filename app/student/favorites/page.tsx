@@ -1,9 +1,10 @@
-import Link from 'next/link'
 import { requireUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Icon } from '@/components/Icon'
 import { EmptyState } from '@/components/EmptyState'
 import { FavoritesClient } from './client'
+import { StudentAppBar } from '@/components/StudentAppBar'
+import { WorkspaceFooter } from '@/components/WorkspaceFooter'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,22 +36,10 @@ export default async function StudentFavoritesPage() {
   }))
 
   return (
-    <div className="font-sans bg-ink-50/40 min-h-screen">
-      <header className="sticky top-0 z-40 bg-ink-50/90 backdrop-blur-md border-b border-ink-100">
-        <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/student" className="inline-flex items-center" aria-label="მცოდნე">
-            <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain select-none" draggable={false} />
-          </Link>
-          <nav className="flex items-center gap-4 lg:gap-3 overflow-x-auto scrollbar-hide whitespace-nowrap min-w-0 ml-4">
-            <Link href="/student" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">დაშბორდი</Link>
-            <Link href="/student/bookings" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">ჩემი ჯავშნები</Link>
-            <Link href="/student/messages" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">შეტყობინებები</Link>
-            <Link href="/student/profile" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">პროფილი</Link>
-          </nav>
-        </div>
-      </header>
+    <div className="font-sans bg-ink-50/40 min-h-screen flex flex-col">
+      <StudentAppBar user={{ name: user.fullName, avatar: user.avatarUrl }} />
 
-      <main className="max-w-[1120px] mx-auto px-6 py-10">
+      <main className="w-full max-w-[1120px] mx-auto px-6 sm:px-8 py-8 lg:py-10 flex-1">
         <div className="mb-8">
           <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2 motion-safe:animate-rise-in">შენახული</div>
           <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>
@@ -69,6 +58,8 @@ export default async function StudentFavoritesPage() {
           <FavoritesClient items={items} />
         )}
       </main>
+
+      <WorkspaceFooter />
     </div>
   )
 }

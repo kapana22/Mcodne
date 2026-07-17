@@ -405,7 +405,16 @@ type StepProps = {
   set: (patch: Partial<FormState>) => void
   media?: MediaState
   setMedia?: (patch: Partial<MediaState>) => void
+  // Long steps (2, 4) render in two shorter screens — `part` picks which half.
+  part?: StepPart
 }
+
+/* Steps 2 and 4 are split into two sub-screens each: one long scroll of six
+ * form sections was the single most fatiguing surface of the mobile wizard.
+ * The part lives alongside `step`; the footer advances part-first. */
+type StepPart = 1 | 2
+const STEP_PARTS: Partial<Record<StepId, number>> = { 2: 2, 4: 2 }
+const partsOf = (s: StepId) => STEP_PARTS[s] ?? 1
 
 /* ───── STEP 1 — Contact (light) ─────
  * Deliberately light: name + contact only. The heavy KYC (personal ID, DOB,
@@ -641,15 +650,48 @@ const ProfessionFields = ({ form, set }: StepProps) => {
   )
 }
 
-/* ───── STEP 2 — Expertise ───── */
-const Step2 = ({ form, set }: StepProps) => {
+/* ───── STEP 2 — Expertise (2 parts: focus → details) ───── */
+const Step2 = ({ form, set, part = 1 }: StepProps) => {
   const ALL_CATS = ['ბიზნეს-სტრატეგია', 'Fundraising', 'მარკეტინგი', 'პროდუქტი / UX', 'სამართალი', 'საგადასახადო', 'კარიერა', 'Data / AI', 'მენტალური ჯანმრთელობა', 'ენები', 'ფინანსები']
   const cats = form.cats
   const toggle = (c: string) => set({ cats: cats.includes(c) ? cats.filter(x => x !== c) : [...cats, c] })
 
+  if (part === 2) return (
+    <>
+      <StepHeader n={2} total={5} eyebrow="ექსპერტიზა · 2/2" title="დეტალები — ენები, ლოკაცია, გამოცდილება." sub="ეს ველები პროფილს ავსებს და მოდერაციას აჩქარებს. LinkedIn და ვებსაიტი არასავალდებულოა — მაგრამ ნდობას მკვეთრად ზრდის." />
+
+      <FormSection title="ენები + ლოკაცია">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field l="ენები" sub="დაამატე ენა და დონე (A1–C2 ან მშობლიური)">
+            <LanguageEditor value={form.languages} onChange={list => set({ languages: list })} />
+          </Field>
+          <Field l="ქალაქი (საჯარო)" sub="მისამართი არ ჩანს — მხოლოდ ქალაქი">
+            <Input value={form.city} onChange={(e: any) => set({ city: e.target.value })} placeholder="თბილისი" />
+          </Field>
+        </div>
+      </FormSection>
+
+      <FormSection title="გამოცდილების წლები + ფორმალური საფუძველი">
+        <div className="grid sm:grid-cols-3 gap-3">
+          <Field l="გამოცდილების წლები">
+            <Input type="number" min={0} max={80} value={form.yearsExp} onChange={(e: any) => set({ yearsExp: e.target.value })} placeholder="მაგ. 12" />
+          </Field>
+          <Field l="LinkedIn (არასავალდებულო)">
+            <Input placeholder="linkedin.com/in/…" value={form.linkedin} onChange={(e: any) => set({ linkedin: e.target.value })} />
+          </Field>
+          <Field l="ვებსაიტი / პორტფოლიო (არასავალდებულო)">
+            <Input placeholder="https://…" value={form.website} onChange={(e: any) => set({ website: e.target.value })} />
+          </Field>
+        </div>
+      </FormSection>
+
+      <ProfessionFields form={form} set={set} />
+    </>
+  )
+
   return (
     <>
-      <StepHeader n={2} total={5} eyebrow="ექსპერტიზა" title="რა იცი და სად შეგიძლია ფაუნდერი დაგეხმარო?" sub="ეს არის ის, რასაც მომხმარებლები ნახავენ შენს პროფილზე. იყავი კონკრეტული — abstract-ი არ ყიდის. ერთი ფოკუსი > ხუთი 'სხვადასხვა'." />
+      <StepHeader n={2} total={5} eyebrow="ექსპერტიზა · 1/2" title="რა იცი და სად შეგიძლია ფაუნდერი დაგეხმარო?" sub="ეს არის ის, რასაც მომხმარებლები ნახავენ შენს პროფილზე. იყავი კონკრეტული — abstract-ი არ ყიდის. ერთი ფოკუსი > ხუთი 'სხვადასხვა'." />
 
       <FormSection title="კატეგორიები" sub="აირჩიე 1–3 ძირითადი მიმართულება. ერთი მთავარი + ერთი მეორადი ჯობია სამ ბუნდოვანზე.">
         <div className="flex flex-wrap gap-1.5">
@@ -699,32 +741,7 @@ const Step2 = ({ form, set }: StepProps) => {
         </div>
       </FormSection>
 
-      <FormSection title="ენები + ლოკაცია">
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field l="ენები" sub="დაამატე ენა და დონე (A1–C2 ან მშობლიური)">
-            <LanguageEditor value={form.languages} onChange={list => set({ languages: list })} />
-          </Field>
-          <Field l="ქალაქი (საჯარო)" sub="მისამართი არ ჩანს — მხოლოდ ქალაქი">
-            <Input value={form.city} onChange={(e: any) => set({ city: e.target.value })} placeholder="თბილისი" />
-          </Field>
-        </div>
-      </FormSection>
-
-      <FormSection title="გამოცდილების წლები + ფორმალური საფუძველი">
-        <div className="grid sm:grid-cols-3 gap-3">
-          <Field l="გამოცდილების წლები">
-            <Input type="number" min={0} max={80} value={form.yearsExp} onChange={(e: any) => set({ yearsExp: e.target.value })} placeholder="მაგ. 12" />
-          </Field>
-          <Field l="LinkedIn (არასავალდებულო)">
-            <Input placeholder="linkedin.com/in/…" value={form.linkedin} onChange={(e: any) => set({ linkedin: e.target.value })} />
-          </Field>
-          <Field l="ვებსაიტი / პორტფოლიო (არასავალდებულო)">
-            <Input placeholder="https://…" value={form.website} onChange={(e: any) => set({ website: e.target.value })} />
-          </Field>
-        </div>
-      </FormSection>
-
-      <ProfessionFields form={form} set={set} />
+      <p className="mb-4 text-[12px] text-ink-500">ენები, ლოკაცია და გამოცდილების დეტალები — შემდეგ ეკრანზე.</p>
     </>
   )
 }

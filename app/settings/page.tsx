@@ -6,6 +6,7 @@ import { Logo } from '@/components/Logo'
 import { Icon } from '@/components/Icon'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { signOut as doSignOut } from '@/lib/signout'
+import { homeForRole } from '@/lib/roleHome'
 
 // Local mirror of lib/notify.ts PrefKey. Keeping this in-file so the Settings
 // page doesn't import from a server helper. All keys default to true when
@@ -355,7 +356,7 @@ export default function SettingsPage() {
 
   if (!me) return null
 
-  const backHref = me.role === 'ADMIN' ? '/admin' : me.role === 'TUTOR' ? '/tutor' : '/student'
+  const backHref = homeForRole(me.role)
 
   return (
     <div className="min-h-screen bg-ink-50/50">

@@ -4,8 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { notify } from '@/lib/notify'
 import { audit } from '@/lib/audit'
-
-const CANCEL_CUTOFF_HOURS = 12
+import { CANCEL_CUTOFF_HOURS } from '@/lib/flags'
+import { fmtKaDateTime } from '@/lib/kaDate'
 
 // Cancel body is optional — legacy clients POST empty. When present we accept a
 // short reason chip label + optional freeform text (the "სხვა" case).
@@ -30,7 +30,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     include: { tutor: { select: { userId: true } } },
   })
   if (!booking) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
-  if (booking.status === 'COMPLETED' || booking.status === 'CANCELED') {
+  // Terminal statuses — includes NO_SHOW so a no-show booking can't be
+  // "re-canceled", which would overwrite cancelledBy and flip payoutStatus.
+  if (booking.status === 'COMPLETED' || booking.status === 'CANCELED' || booking.status === 'NO_SHOW') {
     return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 400 })
   }
 
@@ -82,17 +84,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   // Notify: student/tutor cancel → notify the OTHER party.
   // Admin cancel → notify BOTH parties so neither is left in the dark.
+  // Body always names WHICH session (topic + date/time) so the notified party
+  // doesn't have to open the app to figure out what was canceled.
+  const sessionRef = `${booking.topic} · ${fmtKaDateTime(booking.startAt, { year: true })}`
+  const cancelBody = reason ? `${sessionRef} — ${reason}` : sessionRef
   if (cancelledBy === 'ADMIN') {
     await notify(booking.studentId, {
       type: 'BOOKING_CANCELED',
       title: 'ჯავშანი გაუქმდა · ადმინმა',
-      body: reason ? `${booking.topic} — ${reason}` : booking.topic,
+      body: cancelBody,
       href: `/student/bookings/${booking.id}`,
     })
     await notify(booking.tutor.userId, {
       type: 'BOOKING_CANCELED',
       title: 'ჯავშანი გაუქმდა · ადმინმა',
-      body: reason ? `${booking.topic} — ${reason}` : booking.topic,
+      body: cancelBody,
       href: `/tutor/bookings/${booking.id}`,
     })
   } else {
@@ -100,7 +106,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     await notify(otherPartyId, {
       type: 'BOOKING_CANCELED',
       title: 'ჯავშანი გაუქმდა',
-      body: booking.topic,
+      body: cancelBody,
       href: cancelledBy === 'STUDENT'
         ? `/tutor/bookings/${booking.id}`
         : `/student/bookings/${booking.id}`,

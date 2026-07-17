@@ -1,11 +1,14 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { requireUser } from '@/lib/auth'
+import { PAYMENTS_LIVE } from '@/lib/flags'
 import { prisma } from '@/lib/prisma'
 import { Icon } from '@/components/Icon'
 import { fmtKaDateTime } from '@/lib/kaDate'
 import { StatusPill } from '@/components/StatusPill'
 import { EmptyState } from '@/components/EmptyState'
+import { StudentAppBar } from '@/components/StudentAppBar'
+import { WorkspaceFooter } from '@/components/WorkspaceFooter'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,27 +36,15 @@ export default async function StudentBookingsPage({
   const list = tab === 'past' ? past : tab === 'canceled' ? canceled : upcoming
 
   return (
-    <div className="font-sans bg-ink-50/40 min-h-screen">
-      <header className="sticky top-0 z-40 bg-ink-50/90 backdrop-blur-md border-b border-ink-100">
-        <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/student" className="inline-flex items-center" aria-label="მცოდნე">
-            <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain select-none" draggable={false} />
-          </Link>
-          <nav className="flex items-center gap-4 lg:gap-3 overflow-x-auto scrollbar-hide whitespace-nowrap min-w-0 ml-4">
-            <Link href="/student" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">დაშბორდი</Link>
-            <Link href="/student/messages" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">შეტყობინებები</Link>
-            <Link href="/student/favorites" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">შენახული</Link>
-            <Link href="/student/profile" className="text-[13px] font-display font-semibold text-brand-700 hover:text-brand-800">პროფილი</Link>
-          </nav>
-        </div>
-      </header>
+    <div className="font-sans bg-ink-50/40 min-h-screen flex flex-col">
+      <StudentAppBar user={{ name: user.fullName, avatar: user.avatarUrl }} />
 
-      <main className="max-w-[1120px] mx-auto px-6 py-10">
+      <main className="w-full max-w-[1120px] mx-auto px-6 sm:px-8 py-8 lg:py-10 flex-1">
         <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
           <div>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">ჯავშნები</div>
             <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight">ჩემი სესიები</h1>
-            <p className="text-[13.5px] text-ink-600 mt-1.5">ყველა შენი ჯავშანი ერთ ადგილას · escrow დაცული</p>
+            <p className="text-[13.5px] text-ink-600 mt-1.5">{PAYMENTS_LIVE ? 'ყველა შენი ჯავშანი ერთ ადგილას · escrow დაცული' : 'ყველა შენი ჯავშანი ერთ ადგილას'}</p>
           </div>
           <Link href="/tutors" className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 transition-colors">
             <Icon.plus className="w-3.5 h-3.5" /> ახალი ჯავშანი
@@ -114,6 +105,8 @@ export default async function StudentBookingsPage({
           </div>
         )}
       </main>
+
+      <WorkspaceFooter />
     </div>
   )
 }

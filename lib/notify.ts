@@ -7,6 +7,7 @@ import { prisma } from './prisma'
 export type NotifType =
   | 'BOOKING_CREATED'
   | 'BOOKING_CANCELED'
+  | 'BOOKING_COMPLETED'
   | 'RESCHEDULE_REQUEST'
   | 'MESSAGE_NEW'
   | 'REVIEW_NEW'
@@ -27,7 +28,7 @@ export type PrefKey =
 // Group all booking lifecycle types under BOOKING_CREATED — one toggle for
 // "ჯავშნის ცვლილება" covers both new-request and canceled notifications.
 function prefKeyForType(t: string): PrefKey | null {
-  if (t === 'BOOKING_CREATED' || t === 'BOOKING_CANCELED' || t === 'RESCHEDULE_REQUEST') return 'BOOKING_CREATED'
+  if (t === 'BOOKING_CREATED' || t === 'BOOKING_CANCELED' || t === 'BOOKING_COMPLETED' || t === 'RESCHEDULE_REQUEST') return 'BOOKING_CREATED'
   if (t === 'MESSAGE_NEW') return 'MESSAGE_NEW'
   if (t === 'REVIEW_NEW') return 'REVIEW_NEW'
   if (t === 'APPLICATION_STATUS') return 'APPLICATION_STATUS'

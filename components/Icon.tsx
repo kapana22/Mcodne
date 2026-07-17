@@ -60,4 +60,6 @@ export const Icon = {
   eyeOff: (p: IconProps) => (<svg {...S(p)}><path d="m3 3 18 18M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 7 10 7a17 17 0 0 1-3.1 4M6.4 7.6A17 17 0 0 0 2 12s3.5 7 10 7c1.3 0 2.5-.2 3.6-.7M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>),
   external: (p: IconProps) => (<svg {...S(p)}><path d="M14 4h6v6M20 4l-9 9M18 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" /></svg>),
   camera: (p: IconProps) => (<svg {...S(p)}><path d="M3 8a2 2 0 0 1 2-2h2.5l1.5-2h6l1.5 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" /><circle cx="12" cy="13" r="3.5" /></svg>),
+  paperclip: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="m20.5 11.5-8.2 8.2a5.3 5.3 0 0 1-7.5-7.5l8.5-8.5a3.5 3.5 0 0 1 5 5l-8.5 8.5a1.8 1.8 0 0 1-2.5-2.5l7.9-7.9" /></svg>),
+  send: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M21 3 10 14M21 3l-7 18-3-8-8-3 18-7Z" /></svg>),
 }

@@ -9,9 +9,11 @@ import { markRelatedRead } from '@/lib/notifClear'
 // Counter-party accepts or rejects a pending reschedule proposal.
 //
 // Only the party who did NOT propose may respond. On accept we move
-// `startAt` to the proposed time, restore CONFIRMED, and clear the JSONB
-// blob. On reject we clear the blob and leave the original time intact,
-// bouncing status back to CONFIRMED (proposal auto-set it to PREPARING).
+// `startAt` to the proposed time, set CONFIRMED, and clear the JSONB blob.
+// On reject we clear the blob, leave the original time intact, and restore
+// the status the booking had BEFORE the proposal force-set PREPARING
+// (blob.prevStatus) — a never-accepted PREPARING booking must NOT be
+// silently promoted to CONFIRMED by a rejected reschedule.
 
 const Body = z.object({
   accept: z.boolean(),
@@ -22,6 +24,8 @@ type ReschedulePayload = {
   newStartAt: string
   reason: string | null
   proposedAt: string
+  // Absent on legacy blobs written before prevStatus was recorded.
+  prevStatus?: 'PREPARING' | 'CONFIRMED'
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -69,7 +73,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return NextResponse.json({ ok: false, error: 'INVALID_STATE' }, { status: 400 })
     }
     const newEnd = new Date(newStart.getTime() + booking.durationMin * 60_000)
-    const isScheduled = booking.serviceType !== 'CONSULTATION'
     const oldHeldSlotId = booking.heldSlotId
 
     // Move atomically: re-verify the new window is free, release the old slot,
@@ -91,27 +94,27 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         const overlaps = others.some(o => o.startAt.getTime() + o.durationMin * 60_000 > newStart.getTime())
         if (overlaps) throw new SlotConflict()
 
-        let newSlotId: string | null = null
-        if (isScheduled) {
-          // Find + claim a covering slot for the new window (may differ from
-          // the one validated at propose time if it got booked meanwhile).
-          const slot = await tx.availabilitySlot.findFirst({
-            where: {
-              tutorId: booking.tutorId,
-              startAt: { lte: newStart },
-              endAt: { gte: newEnd },
-              booked: false,
-            },
-            select: { id: true },
-          })
-          if (!slot) throw new SlotConflict()
-          const claim = await tx.availabilitySlot.updateMany({
-            where: { id: slot.id, booked: false },
-            data: { booked: true },
-          })
-          if (claim.count !== 1) throw new SlotConflict()
-          newSlotId = slot.id
-        }
+        // Find + claim a covering slot for the new window (may differ from
+        // the one validated at propose time if it got booked meanwhile).
+        // EVERY booking claims a slot at creation regardless of serviceType,
+        // so every reschedule must claim one too — otherwise the move would
+        // free the old slot and claim nothing, desyncing the grid.
+        const slot = await tx.availabilitySlot.findFirst({
+          where: {
+            tutorId: booking.tutorId,
+            startAt: { lte: newStart },
+            endAt: { gte: newEnd },
+            booked: false,
+          },
+          select: { id: true },
+        })
+        if (!slot) throw new SlotConflict()
+        const claim = await tx.availabilitySlot.updateMany({
+          where: { id: slot.id, booked: false },
+          data: { booked: true },
+        })
+        if (claim.count !== 1) throw new SlotConflict()
+        const newSlotId = slot.id
 
         // Release the slot the booking used to hold.
         if (oldHeldSlotId) {
@@ -153,10 +156,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ ok: true, accepted: true, newStartAt: newStart.toISOString() })
   }
 
-  // Reject: keep original startAt, clear the proposal, restore CONFIRMED so
-  // the booking exits its "PREPARING while proposal was open" limbo.
+  // Reject: keep original startAt, clear the proposal, and restore the status
+  // the booking had before the proposal forced PREPARING. Legacy blobs
+  // (written before prevStatus existed) fall back to CONFIRMED — the old
+  // behavior. Never promote a never-accepted booking past its prior state.
+  const restoredStatus: 'PREPARING' | 'CONFIRMED' =
+    pending.prevStatus === 'PREPARING' || pending.prevStatus === 'CONFIRMED'
+      ? pending.prevStatus
+      : 'CONFIRMED'
   await prisma.$executeRawUnsafe(
-    `UPDATE "Booking" SET "status" = 'CONFIRMED', "rescheduleRequest" = NULL, "updatedAt" = NOW() WHERE id = $1`,
+    `UPDATE "Booking" SET "status" = $1::"BookingStatus", "rescheduleRequest" = NULL, "updatedAt" = NOW() WHERE id = $2`,
+    restoredStatus,
     booking.id,
   )
   const otherPartyUserId = pending.proposedBy === 'STUDENT'

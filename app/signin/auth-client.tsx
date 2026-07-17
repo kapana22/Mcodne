@@ -1128,6 +1128,10 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
   const [resendIn, setResendIn] = useState(0)
   const [errMsg, setErrMsg] = useState<string | null>(null)
   const [resetToken, setResetToken] = useState<string | null>(null)
+  // Where the done-step CTA goes. /api/auth/reset/confirm signs the user in on
+  // THIS device (it only revokes other sessions), so on success we continue
+  // straight into their workspace; null falls back to the signin view.
+  const [doneDest, setDoneDest] = useState<string | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1194,6 +1198,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
         setErrMsg(data?.error === 'BAD_TOKEN' ? 'ბმული ვადაგადასულია ან უკვე გამოყენებული.' : 'პაროლის შენახვა ვერ მოხერხდა.')
         return
       }
+      setDoneDest(safeInternalPath(data?.home) ?? (data?.role ? homeForRole(data.role) : null))
       setStep('done')
     } catch {
       setErrMsg('ქსელის შეცდომა. სცადე თავიდან.')
@@ -1378,10 +1383,10 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
             </div>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-success-700 mb-2">პაროლი შეიცვალა</div>
             <h1 className="font-display text-[28px] lg:text-[34px] font-bold text-ink-900 tracking-tight leading-[1.1]">
-              მზადაა. შესვლისთვის<br />ახალი პაროლი გამოიყენე.
+              {doneDest ? <>მზადაა. ამ მოწყობილობაზე<br />უკვე შესული ხარ.</> : <>მზადაა. შესვლისთვის<br />ახალი პაროლი გამოიყენე.</>}
             </h1>
             <p className="mt-3 text-[14px] text-ink-600 leading-[1.55] max-w-[440px]">
-              უსაფრთხოებისთვის გავთიშეთ ყველა სხვა მოწყობილობა — საჭიროა ხელახლა შესვლა iPad-ზე, ან სხვა ბრაუზერში.
+              უსაფრთხოებისთვის გავთიშეთ ყველა სხვა მოწყობილობა — სხვა ბრაუზერში ან iPad-ზე ახალი პაროლით შესვლა დაგჭირდება.
             </p>
             <div className="mt-7 rounded-card bg-brand-50/40 border border-brand-200 p-4 grid grid-cols-[auto_1fr] gap-3">
               <Icon.shield className="w-4 h-4 text-brand-700 mt-0.5" />
@@ -1390,8 +1395,15 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
                 <p className="text-[11.5px] text-ink-700 leading-[1.5]">SMS კოდი ან ავტენტიფიკატორი დაამატე — ერთჯერად პაროლი + 2-ე ფაქტორი ვერ გადააქცევს ვერავინ.</p>
               </div>
             </div>
-            <button onClick={() => setView('signin')} type="button" className="mt-7 w-full h-12 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
-              შესვლა ახალი პაროლით <Icon.arrow className="w-4 h-4" />
+            <button
+              type="button"
+              // Session already live on this device → continue into the
+              // workspace; only fall back to the signin form if the confirm
+              // response somehow lacked a destination.
+              onClick={() => { if (doneDest) window.location.href = doneDest; else setView('signin') }}
+              className="mt-7 w-full h-12 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors"
+            >
+              {doneDest ? 'გაგრძელება' : 'შესვლა ახალი პაროლით'} <Icon.arrow className="w-4 h-4" />
             </button>
           </div>
         )}

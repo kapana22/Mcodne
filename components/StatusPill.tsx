@@ -1,7 +1,7 @@
 type Tone = 'preparing' | 'confirmed' | 'live' | 'completed' | 'canceled' | 'noshow'
 
 const TONES: Record<Tone, { cls: string; dot?: string; label: string; pulse?: boolean }> = {
-  preparing: { cls: 'bg-warning-50 text-warning-700 border-warning-200', dot: 'bg-warning-500', label: 'მზადდება' },
+  preparing: { cls: 'bg-warning-50 text-warning-700 border-warning-200', dot: 'bg-warning-500', label: 'ელოდება დადასტურებას' },
   confirmed: { cls: 'bg-brand-50 text-brand-800 border-brand-200', dot: 'bg-brand-500', label: 'დადასტურდა' },
   live:      { cls: 'bg-danger-50 text-danger-700 border-danger-200', dot: 'bg-danger-500', label: 'ცოცხალია', pulse: true },
   completed: { cls: 'bg-success-50 text-success-700 border-success-200', dot: 'bg-success-500', label: 'დასრულდა' },

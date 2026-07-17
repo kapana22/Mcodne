@@ -130,7 +130,8 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, stats }:
         <h1 className="font-display text-[26px] sm:text-[34px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
           {stats ? `${stats.verifiedCount}+ შემოწმებული ექსპერტი შენი მიზნისთვის` : 'იპოვე შენი ექსპერტი'}
         </h1>
-        <p className="text-[13.5px] text-ink-500 mt-2">ხელით გადამოწმებული პროფესიონალები · გამჭვირვალე ფასი · escrow-დაცული</p>
+        {/* Honest by flag: only claim escrow once the payment gateway is live. */}
+        <p className="text-[13.5px] text-ink-500 mt-2">ხელით გადამოწმებული პროფესიონალები · გამჭვირვალე ფასი · {PAYMENTS_LIVE ? 'escrow-დაცული' : 'დაჯავშნა უფასოა'}</p>
 
         {/* Preply-style filter bar — labeled dropdown boxes on desktop.
             Below lg the four dropdowns would stack into ~1.5 screens of
@@ -700,7 +701,7 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
               </button>
             ) : (
               <button type="button" disabled title="ექსპერტს ჯერ არ აქვს გამოცხადებული სლოტები" className="w-full h-11 rounded-btn bg-ink-100 text-ink-400 font-display font-semibold text-[12px] tracking-wide inline-flex items-center justify-center gap-1.5 cursor-not-allowed">
-                <Icon.clock className="w-3.5 h-3.5" /> მალე
+                <Icon.clock className="w-3.5 h-3.5" /> ხელმისაწვდომობა მალე
               </button>
             )}
             <Link href={`/tutors/${t.id}`} className="w-full h-11 rounded-btn border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors">
@@ -754,8 +755,10 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
       {/* Bottom price strip — mobile only (desktop has the right-rail CTA) */}
       <div className="sm:hidden flex items-center justify-between gap-3 px-4 py-3.5 border-t border-ink-100 bg-ink-50/40">
         <div className="min-w-0 flex items-baseline gap-2 flex-wrap">
+          {/* Flat expert-set price for the whole session — "/ N წთ" read like a
+              per-minute rate; mirror the desktop rail's session phrasing. */}
           <span className="font-display text-[20px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">
-            ₾{priceForDuration(t.price, dur)}<span className="text-[11.5px] font-medium text-ink-500 ml-0.5">/ {dur} წთ</span>
+            ₾{priceForDuration(t.price, dur)}<span className="text-[11.5px] font-medium text-ink-500 ml-1">· {dur}-წუთიანი სესია</span>
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -771,7 +774,7 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
             <Icon.arrow className="w-4 h-4" />
           </Link>
           {bookable ? (
-            <button type="button" onClick={() => onBook(t)} className="h-10 px-3.5 sm:px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast shadow-xs hover:shadow-sm">
+            <button type="button" onClick={() => onBook(t)} className="h-11 px-3.5 sm:px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast shadow-xs hover:shadow-sm">
               {needsSignIn ? 'შესვლა & ჯავშანი' : 'დაიჯავშნე'} <Icon.arrow className="w-3.5 h-3.5" />
             </button>
           ) : (
@@ -780,7 +783,7 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
               disabled
               title="ექსპერტს ჯერ არ აქვს გამოცხადებული სლოტები"
               aria-label="ხელმისაწვდომობა მალე — ჯერ არ არის გამოცხადებული სლოტები"
-              className="h-10 px-3.5 sm:px-4 rounded-btn bg-ink-100 text-ink-400 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 cursor-not-allowed"
+              className="h-11 px-3.5 sm:px-4 rounded-btn bg-ink-100 text-ink-400 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 cursor-not-allowed"
             >
               <Icon.clock className="w-3.5 h-3.5" /> ხელმისაწვდომობა მალე
             </button>
@@ -973,6 +976,9 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
   const [resendingVerify, setResendingVerify] = useState(false)
   const [resendMsg, setResendMsg] = useState<string | null>(null)
   const [bookingRef, setBookingRef] = useState<string | null>(null)
+  // Full booking id from POST /api/bookings — powers the "ჯავშნის ნახვა" deep
+  // link on the success step (bookingRef is only the display short-code).
+  const [bookingId, setBookingId] = useState<string | null>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -1119,6 +1125,7 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
         return
       }
       setBookingRef(data.id?.slice(0, 8).toUpperCase() ?? null)
+      setBookingId(data.id ?? null)
       setStep(4)
     } catch {
       setBookingError('ქსელის შეცდომა. სცადე თავიდან.')
@@ -1501,8 +1508,10 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
                   </div>
                   <div className="mt-7 flex items-center gap-2">
                     <button type="button" onClick={onClose} className="h-11 px-5 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[13px] transition-colors">დახურვა</button>
-                    <a href="/student/bookings" className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] inline-flex items-center gap-2 transition-colors">
-                      ჩემს ჯავშნებზე გადასვლა <Icon.arrow className="w-4 h-4" />
+                    {/* Deep-link straight to the created booking when we have
+                        its id; fall back to the list only if the id is missing. */}
+                    <a href={bookingId ? `/student/bookings/${bookingId}` : '/student/bookings'} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] inline-flex items-center gap-2 transition-colors">
+                      {bookingId ? 'ჯავშნის ნახვა' : 'ჩემს ჯავშნებზე გადასვლა'} <Icon.arrow className="w-4 h-4" />
                     </a>
                   </div>
                 </div>
@@ -1712,14 +1721,21 @@ const Footer = () => (
         <div>
           <Logo />
           <p className="text-[13px] text-ink-600 mt-5 max-w-[280px] leading-relaxed">პირადი ვიდეო-კონსულტაცია ქართველ პროფესიონალებთან. ქართულ ბაზარზე, ქართულ ფასებზე.</p>
+          {/* Honest by flag: no bank names until the payment gateway is live. */}
           <div className="mt-5 inline-flex items-center gap-2 text-[12px] text-ink-500">
             <Icon.shield className="w-4 h-4 text-ink-400" />
-            <span>escrow:</span>
-            <span className="font-display font-semibold text-ink-700 tracking-wide">TBC</span>
-            <span className="text-ink-300">·</span>
-            <span className="font-display font-semibold text-ink-700 tracking-wide">BOG</span>
-            <span className="text-ink-300">·</span>
-            <span className="font-display font-semibold text-ink-700 tracking-wide">SOLO</span>
+            {PAYMENTS_LIVE ? (
+              <>
+                <span>escrow:</span>
+                <span className="font-display font-semibold text-ink-700 tracking-wide">TBC</span>
+                <span className="text-ink-300">·</span>
+                <span className="font-display font-semibold text-ink-700 tracking-wide">BOG</span>
+                <span className="text-ink-300">·</span>
+                <span className="font-display font-semibold text-ink-700 tracking-wide">SOLO</span>
+              </>
+            ) : (
+              <span>უსაფრთხო გადახდები · <span className="font-display font-semibold text-ink-700">მალე</span></span>
+            )}
           </div>
         </div>
         {[
@@ -1996,11 +2012,11 @@ function Tutors() {
   const [quickBook, setQuickBook] = useState<Tutor | null>(null)
   const openBook = (t: Tutor) => {
     if (!signedIn) {
-      setNeedsAuth(true)
-      setAuthDismissed(false)
-      if (typeof window !== 'undefined') {
-        try { window.scrollTo({ top: 0, behavior: 'smooth' }) } catch {}
-      }
+      // Anonymous book-tap: previously this discarded the click, scrolled to
+      // top and showed a banner far from the card. Instead carry the intent to
+      // the profile — ?rebook=1 opens the auth prompt there and auto-opens the
+      // booking modal after sign-in.
+      router.push(`/tutors/${t.id}?rebook=1`)
       return
     }
     setQuickBook(t)

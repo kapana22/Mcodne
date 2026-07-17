@@ -22,5 +22,23 @@ export async function signOut(dest: string = '/'): Promise<void> {
   } catch {
     /* swallow — the endpoint expires the cookie on its response; navigate anyway */
   }
-  if (typeof window !== 'undefined') window.location.replace(dest)
+  if (typeof window !== 'undefined') {
+    // Drop localStorage entries that aren't keyed by user id — browsing
+    // history and half-filled form drafts would otherwise surface to the NEXT
+    // person signing in on a shared device. Device-level prefs (cookie
+    // consent) and user-scoped keys (`…:${userId}`) deliberately survive.
+    try {
+      for (const k of [
+        'mcodne:recent-tutors',   // recently-viewed experts strip
+        'mcodne:apply-draft',     // expert-application form draft
+        'mcodne:signup-draft',    // signup form draft (name + email)
+        'mtsodne:onboarding',     // onboarding wizard answers
+      ]) {
+        window.localStorage.removeItem(k)
+      }
+    } catch {
+      /* storage may be unavailable (private mode) — cookie teardown already happened */
+    }
+    window.location.replace(dest)
+  }
 }

@@ -8,6 +8,9 @@ import { copyToClipboard } from '@/lib/clipboard'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
 import { fmtKaDate, fmtKaDateTime, fmtKaTime } from '@/lib/kaDate'
 import { safeHttpUrl } from '@/lib/safeUrl'
+import { sanitizeMsgBody, MSG_MAX_LEN, sendErrorText } from '@/lib/msgText'
+import { PAYMENTS_LIVE, CANCEL_CUTOFF_HOURS } from '@/lib/flags'
+import { isBookingLive } from '@/lib/bookingLive'
 
 /* ───── Minimal icon set ───── */
 const Icon = {
@@ -26,6 +29,8 @@ const Icon = {
   refresh:  (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 12a9 9 0 0 1 15.5-6L21 4M21 4v6h-6M21 12a9 9 0 0 1-15.5 6L3 20M3 20v-6h6" /></svg>,
   flag:     (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M4 21V4M4 4h13l-2 5 2 5H4" /></svg>,
   download: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 4v12m0 0 5-5m-5 5-5-5M4 20h16" /></svg>,
+  paperclip:(p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m20.5 11.5-8.2 8.2a5.3 5.3 0 0 1-7.5-7.5l8.5-8.5a3.5 3.5 0 0 1 5 5l-8.5 8.5a1.8 1.8 0 0 1-2.5-2.5l7.9-7.9" /></svg>,
+  send:     (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 3 10 14M21 3l-7 18-3-8-8-3 18-7Z" /></svg>,
 }
 
 /* ───── Types ───── */
@@ -78,10 +83,10 @@ const fmtTime = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(
 const STATUS_MAP: Record<ApiStatus, { l: string; cls: string; dot?: string }> = {
   PREPARING: { l: 'ჯავშანი ელოდება ექსპერტის დადასტურებას', cls: 'bg-warning-50 text-warning-700 border-warning-200', dot: 'bg-warning-500' },
   CONFIRMED: { l: 'ექსპერტმა დაადასტურა — ვიდეო-ოთახი გამზადებულია', cls: 'bg-brand-50 text-brand-800 border-brand-200', dot: 'bg-brand-500' },
-  LIVE:      { l: 'სესია მიმდინარეობს ცოცხალ ეთერში', cls: 'bg-danger-50 text-danger-700 border-danger-200', dot: 'bg-danger-500' },
+  LIVE:      { l: 'სესია მიმდინარეობს', cls: 'bg-danger-50 text-danger-700 border-danger-200', dot: 'bg-danger-500' },
   COMPLETED: { l: 'სესია დასრულდა', cls: 'bg-success-50 text-success-700 border-success-200', dot: 'bg-success-500' },
   CANCELED:  { l: 'ჯავშანი გაუქმდა', cls: 'bg-ink-100 text-ink-700 border-ink-200' },
-  NO_SHOW:   { l: 'აღინიშნა no-show', cls: 'bg-iris-50 text-iris-700 border-iris-200' },
+  NO_SHOW:   { l: 'სესია არ შედგა', cls: 'bg-iris-50 text-iris-700 border-iris-200' },
 }
 
 const tabOf = (s: ApiStatus) =>
@@ -184,7 +189,10 @@ const useUserTz = (): string => {
 
 /* ───── Hero ───── */
 const Hero = ({ booking, onEnterRoom, onReview, onCopyRef }: { booking: Booking; onEnterRoom: () => void; onReview: () => void; onCopyRef: () => void }) => {
-  const status = booking.status
+  // LIVE is never written to the DB — derive the in-progress state from the
+  // clock. Hero re-renders every second via useCountdown, so this stays fresh.
+  const live = isBookingLive(booking)
+  const status: ApiStatus = live ? 'LIVE' : booking.status
   const m = STATUS_MAP[status]
   const start = new Date(booking.startAt)
   const end = new Date(start.getTime() + booking.durationMin * 60_000)
@@ -279,7 +287,7 @@ const Hero = ({ booking, onEnterRoom, onReview, onCopyRef }: { booking: Booking;
               <div className="p-3 rounded-card border border-ink-200 bg-ink-50/50">
                 <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 inline-flex items-center gap-1.5"><Icon.wallet className="w-3 h-3" /> ფასი</div>
                 <div className="mt-1 font-display text-[14.5px] font-bold text-ink-900 tabular-nums">₾{booking.price}</div>
-                <div className="text-[11.5px] text-ink-500 tabular-nums">escrow-ში</div>
+                <div className="text-[11.5px] text-ink-500 tabular-nums">{PAYMENTS_LIVE ? 'escrow-ში' : 'გადახდები მალე'}</div>
               </div>
             </div>
 
@@ -323,7 +331,7 @@ const Hero = ({ booking, onEnterRoom, onReview, onCopyRef }: { booking: Booking;
                   <Icon.video className="w-4 h-4" /> ვიდეო-ოთახში
                 </button>
                 <div className="mt-2 text-[10.5px] text-white/55">
-                  {status === 'PREPARING' ? 'ჯერ არ დაადასტურა ექსპერტმა' : 'გაიხსნება 5 წუთით ადრე'}
+                  {status === 'PREPARING' ? 'ჯერ არ დაადასტურა ექსპერტმა' : status === 'LIVE' ? 'სესია ახლა მიმდინარეობს — შემოუერთდი' : 'გაიხსნება 5 წუთით ადრე'}
                 </div>
               </div>
             )}
@@ -356,13 +364,13 @@ const Hero = ({ booking, onEnterRoom, onReview, onCopyRef }: { booking: Booking;
             {(status === 'CANCELED' || status === 'NO_SHOW') && (
               <div className="p-4 rounded-card bg-iris-50 border border-iris-200">
                 <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-iris-700 mb-2">
-                  {status === 'NO_SHOW' ? 'აღინიშნა no-show' : 'ჯავშანი გაუქმდა'}
+                  {status === 'NO_SHOW' ? 'სესია არ შედგა' : 'ჯავშანი გაუქმდა'}
                 </div>
                 <p className="text-[12.5px] text-ink-700 leading-[1.5]">
                   {status === 'NO_SHOW'
                     ? 'ექსპერტმა აღნიშნა, რომ არ გამოცხადდი.'
                     : `${booking.cancelledBy === 'TUTOR' ? 'ექსპერტმა' : booking.cancelledBy === 'ADMIN' ? 'ადმინმა' : 'შენ'} გააუქმა ჯავშანი.`}
-                  {' '}Escrow თანხა დაბრუნებულია.
+                  {' '}{PAYMENTS_LIVE ? 'Escrow თანხა დაბრუნებულია.' : 'გადასახდელი არაფერია — დაჯავშნა უფასოა.'}
                 </p>
                 <Link href="/tutors" className="mt-3 w-full h-10 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-900 font-display font-semibold text-[12.5px] inline-flex items-center justify-center transition-colors">
                   ხელახლა დაჯავშნა
@@ -489,11 +497,11 @@ const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | n
       if (!res.ok || !j?.ok) {
         setMsgs(prev => prev.filter(m => m.id !== tempId))
         setText(sentText); setAttachment(sentAttachment)
-        setErr('შეცდომა გაგზავნაში')
+        setErr(sendErrorText(j?.error, j?.retryInSec))
         return
       }
       setMsgs(prev => prev.map(m => (m.id === tempId ? j.message : m)))
-    } catch { setErr('ქსელის შეცდომა') }
+    } catch { setErr('ქსელის შეცდომა — შეამოწმე კავშირი და სცადე თავიდან.') }
     finally { setSending(false) }
   }
 
@@ -509,10 +517,16 @@ const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | n
         </span>
       </div>
 
-      <div ref={scrollRef} className="px-6 py-5 max-h-[420px] overflow-y-auto space-y-3">
+      <div ref={scrollRef} className="px-4 sm:px-6 py-5 max-h-[420px] overflow-y-auto">
         {msgs.length === 0 ? (
-          <div className="text-center py-6 text-[13px] text-ink-500">
-            ჯერ არ არის შეტყობინებები — მიწერე პირველი კითხვა.
+          <div className="text-center py-8">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-50 text-brand-700 mb-3">
+              <Icon.chat className="w-5 h-5" />
+            </span>
+            <div className="font-display text-[13.5px] font-semibold text-ink-800">დაიწყე საუბარი {tutorName}-სთან</div>
+            <p className="text-[12.5px] text-ink-500 mt-1 max-w-[340px] mx-auto">
+              აღუწერე შენი საკითხი ან დასვი კითხვა კონსულტაციამდე — რაც უფრო კონკრეტულია, მით უკეთ მოემზადება ექსპერტი.
+            </p>
           </div>
         ) : (
           msgs.map((m, i) => {
@@ -520,8 +534,17 @@ const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | n
             // Day separator when the calendar date changes — individual bubbles
             // then only need the time, not a full date-time stamp each.
             const d = new Date(m.createdAt)
-            const prev = i > 0 ? new Date(msgs[i - 1].createdAt) : null
-            const newDay = !prev || prev.toDateString() !== d.toDateString()
+            const prev = i > 0 ? msgs[i - 1] : null
+            const next = i < msgs.length - 1 ? msgs[i + 1] : null
+            const newDay = !prev || new Date(prev.createdAt).toDateString() !== d.toDateString()
+            // Runs of messages from the same sender within 5 minutes collapse
+            // into one visual group: avatar on the first, timestamp on the last.
+            const GROUP_MS = 5 * 60_000
+            const groupedWithPrev = !newDay && !!prev && prev.fromId === m.fromId &&
+              d.getTime() - new Date(prev.createdAt).getTime() < GROUP_MS
+            const groupedWithNext = !!next && next.fromId === m.fromId &&
+              new Date(next.createdAt).getTime() - d.getTime() < GROUP_MS &&
+              new Date(next.createdAt).toDateString() === d.toDateString()
             // Defense-in-depth: even though the API now rejects unsafe schemes,
             // never render an attachment href that isn't a safe scheme (guards
             // against legacy rows written before the server-side check).
@@ -529,21 +552,25 @@ const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | n
             return (
               <React.Fragment key={m.id}>
               {newDay && (
-                <div className="flex items-center gap-3 py-1" aria-hidden>
+                <div className={`flex items-center gap-3 py-1 ${i > 0 ? 'mt-4' : ''}`} aria-hidden>
                   <span className="flex-1 h-px bg-ink-100" />
                   <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-400">{fmtKaDate(d)}</span>
                   <span className="flex-1 h-px bg-ink-100" />
                 </div>
               )}
-              <div className={`flex gap-2.5 ${mine ? 'flex-row-reverse' : ''}`}>
-                <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-semibold text-sm shrink-0 overflow-hidden">
-                  {m.from.avatarUrl
-                    ? <img src={m.from.avatarUrl} alt="" className="w-full h-full object-cover" />
-                    : m.from.fullName.slice(0, 1)}
-                </div>
-                <div className={`max-w-[78%] ${mine ? 'flex flex-col items-end' : ''}`}>
-                  <div className={`px-3.5 py-2.5 rounded-card text-[13.5px] leading-[1.55] whitespace-pre-wrap ${mine ? 'bg-brand-500 text-white rounded-tr-sm' : 'bg-ink-50 border border-ink-200 rounded-tl-sm text-ink-900'}`}>
-                    {m.body}
+              <div className={`flex gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${groupedWithPrev ? 'mt-1' : 'mt-3'}`}>
+                {groupedWithPrev ? (
+                  <span className="w-8 shrink-0" aria-hidden />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-semibold text-sm shrink-0 overflow-hidden">
+                    {m.from.avatarUrl
+                      ? <img src={m.from.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      : m.from.fullName.slice(0, 1)}
+                  </div>
+                )}
+                <div className={`max-w-[85%] sm:max-w-[78%] ${mine ? 'flex flex-col items-end' : ''}`}>
+                  <div className={`px-3.5 py-2.5 rounded-card text-[13.5px] leading-[1.55] whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${mine ? 'bg-brand-500 text-white rounded-tr-sm' : 'bg-ink-50 border border-ink-200 rounded-tl-sm text-ink-900'}`}>
+                    {sanitizeMsgBody(m.body)}
                     {safeFile && (
                       <div className={`mt-2 pt-2 border-t ${mine ? 'border-white/25' : 'border-ink-200'}`}>
                         {safeFile.startsWith('data:image/') ? (
@@ -566,9 +593,11 @@ const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | n
                       </div>
                     )}
                   </div>
-                  <div className="mt-1 font-mono text-[10px] tabular-nums text-ink-400">
-                    {fmtKaTime(d)}
-                  </div>
+                  {!groupedWithNext && (
+                    <div className="mt-1 font-mono text-[10px] tabular-nums text-ink-400">
+                      {fmtKaTime(d)}
+                    </div>
+                  )}
                 </div>
               </div>
               </React.Fragment>
@@ -587,7 +616,7 @@ const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | n
         />
         {attachment && (
           <div className="flex items-center gap-2 rounded-btn border border-ink-200 bg-white px-3 py-2 text-[12.5px]">
-            <Icon.download className="w-3.5 h-3.5 text-ink-500 rotate-180" />
+            <Icon.paperclip className="w-3.5 h-3.5 text-ink-500 shrink-0" />
             <span className="flex-1 truncate font-display font-semibold text-ink-800">{attachment.name}</span>
             <span className="font-mono text-[10.5px] text-ink-500 tabular-nums shrink-0">{(attachment.size / 1024).toFixed(0)} KB</span>
             <button type="button" onClick={() => setAttachment(null)} aria-label="ფაილის მოხსნა" className="w-6 h-6 rounded-btn hover:bg-ink-100 text-ink-500 hover:text-danger-600 inline-flex items-center justify-center">
@@ -595,7 +624,7 @@ const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | n
             </button>
           </div>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex items-end gap-2">
           <button
             type="button"
             onClick={pickFile}
@@ -607,21 +636,33 @@ const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | n
             {uploading ? (
               <span className="inline-block w-4 h-4 border-2 border-ink-500 border-t-transparent rounded-full animate-spin" />
             ) : (
-              <Icon.download className="w-4 h-4 rotate-180" />
+              <Icon.paperclip className="w-4 h-4" />
             )}
           </button>
           <textarea
             value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e as any) } }}
+            maxLength={MSG_MAX_LEN}
+            onChange={e => {
+              setText(e.target.value)
+              // Autosize: grow with content up to ~5 lines, then scroll inside.
+              const el = e.currentTarget
+              el.style.height = 'auto'
+              el.style.height = `${Math.min(el.scrollHeight, 132)}px`
+            }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e as any); (e.currentTarget as HTMLTextAreaElement).style.height = 'auto' } }}
             rows={1}
             placeholder={attachment ? 'დაწერე შეტყობინება ან უბრალოდ გააგზავნე ფაილი…' : 'მიუწერე შეტყობინება…'}
-            className="flex-1 h-11 px-3 py-2.5 rounded-btn border border-ink-200 bg-white text-[13.5px] resize-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
+            className="flex-1 min-h-[44px] max-h-[132px] px-3 py-2.5 rounded-btn border border-ink-200 bg-white text-[13.5px] resize-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
           />
-          <button type="submit" disabled={sending || uploading || (!text.trim() && !attachment)} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors">
-            {sending ? '…' : 'გაგზავნა'}
+          <button type="submit" aria-label="გაგზავნა" disabled={sending || uploading || (!text.trim() && !attachment)} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors shrink-0">
+            {sending ? '…' : (<><Icon.send className="w-4 h-4" /><span className="hidden sm:inline">გაგზავნა</span></>)}
           </button>
         </div>
+        {text.length > MSG_MAX_LEN - 200 && (
+          <div className={`text-right font-mono text-[10.5px] tabular-nums ${text.length >= MSG_MAX_LEN ? 'text-danger-600' : 'text-ink-400'}`}>
+            {text.length} / {MSG_MAX_LEN}
+          </div>
+        )}
       </form>
       {err && <div className="px-6 pb-3 text-[12px] text-danger-600">{err}</div>}
     </div>
@@ -681,7 +722,7 @@ const RescheduleModal = ({ open, onClose, onSent, booking }: { open: boolean; on
       <div role="dialog" className="relative w-full sm:max-w-[520px] bg-white sm:rounded-card shadow-float overflow-hidden motion-safe:animate-scale-in">
         <div className="px-6 py-4 border-b border-ink-100 flex items-start justify-between gap-4">
           <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">გადადება — უფასოდ 24სთ-მდე</div>
+            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">გადადება — უფასოდ {CANCEL_CUTOFF_HOURS}სთ-მდე</div>
             <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight">აირჩიე ახალი დრო</h2>
             <div className="text-[12px] text-ink-500 mt-1">ამჟამინდელი: <span className="font-display font-semibold text-ink-900">{fmtDate(new Date(booking.startAt))} · {fmtTime(new Date(booking.startAt))} · {booking.tutor.user.fullName}</span></div>
           </div>
@@ -740,7 +781,7 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
 
   if (!open) return null
   const REASONS: { id: DisputeReason; l: string; sub: string }[] = [
-    { id: 'no-show',        l: 'ექსპერტი არ მოვიდა',        sub: '100% დაბრუნება' },
+    { id: 'no-show',        l: 'ექსპერტი არ მოვიდა',        sub: PAYMENTS_LIVE ? '100% დაბრუნება' : 'პრიორიტეტული განხილვა' },
     { id: 'quality',        l: 'დაბალი ხარისხი',           sub: 'ცოდნა/მომზადება' },
     { id: 'wrong-topic',    l: 'არასწორი თემა',            sub: 'სხვა რაზე ვისაუბრეთ' },
     { id: 'unprofessional', l: 'არაპროფესიული ქცევა',      sub: 'უპატივცემლობა · დაგვიანება' },
@@ -1176,7 +1217,7 @@ const BookingBody = ({
   const canReschedule = (status === 'PREPARING' || status === 'CONFIRMED') && !booking.rescheduleRequest
 
   return (
-    <section className="max-w-[1240px] mx-auto px-6 lg:px-8 mt-6 grid lg:grid-cols-[1fr_360px] gap-6 pb-12">
+    <section className="max-w-[1240px] mx-auto px-6 lg:px-8 mt-6 grid lg:grid-cols-[1fr_360px] gap-6 pb-28 lg:pb-12">
       {/* On mobile the action rail comes FIRST — cancel/reschedule/receipt
           are why people open this page; burying them under the whole chat
           thread made them near-undiscoverable at 390px. Desktop keeps
@@ -1296,9 +1337,11 @@ const BookingBody = ({
           </div>
           <div className="mt-3 text-[11.5px] text-ink-600 flex items-center gap-1.5">
             <Icon.shield className="w-3 h-3 text-brand-700" />
-            {status === 'CANCELED' || status === 'NO_SHOW' ? 'თანხა დაბრუნებულია' :
-             status === 'COMPLETED' ? 'გათავისუფლდა ექსპერტზე' :
-             'escrow-ში დაცული'}
+            {PAYMENTS_LIVE
+              ? (status === 'CANCELED' || status === 'NO_SHOW' ? 'თანხა დაბრუნებულია' :
+                 status === 'COMPLETED' ? 'გათავისუფლდა ექსპერტზე' :
+                 'escrow-ში დაცული')
+              : 'დაჯავშნა უფასოა — გადახდები მალე'}
           </div>
         </div>
 
@@ -1307,8 +1350,17 @@ const BookingBody = ({
           <div className="flex items-start gap-2.5">
             <Icon.shield className="w-4 h-4 text-brand-700 mt-0.5 shrink-0" />
             <div>
-              <div className="font-display text-[12.5px] font-bold text-ink-900 tracking-tight mb-1">100% ფულის უკან-დაბრუნების გარანტია</div>
-              <p className="text-[11.5px] text-ink-700 leading-[1.5]">თუ ექსპერტი არ მოვა ან სესია ვერ შესრულდება — escrow მთლიანად დაგიბრუნდება.</p>
+              {PAYMENTS_LIVE ? (
+                <>
+                  <div className="font-display text-[12.5px] font-bold text-ink-900 tracking-tight mb-1">100% ფულის უკან-დაბრუნების გარანტია</div>
+                  <p className="text-[11.5px] text-ink-700 leading-[1.5]">თუ ექსპერტი არ მოვა ან სესია ვერ შესრულდება — escrow მთლიანად დაგიბრუნდება.</p>
+                </>
+              ) : (
+                <>
+                  <div className="font-display text-[12.5px] font-bold text-ink-900 tracking-tight mb-1">დაჯავშნა უფასოა</div>
+                  <p className="text-[11.5px] text-ink-700 leading-[1.5]">ამ ეტაპზე არაფერს იხდი — გადახდები და escrow დაცვა მალე ჩაირთვება. თუ ექსპერტი არ მოვა, დაგეხმარებით ახალი დროის შერჩევაში.</p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1317,7 +1369,11 @@ const BookingBody = ({
   )
 }
 
-/* ───── Real status timeline ───── */
+/* ───── Real status timeline ─────
+   Timestamps are shown ONLY for events whose time we actually know:
+   createdAt for creation, startAt/end for the session slot. Events the DB
+   doesn't stamp (confirmation, cancellation) render without a time — a fake
+   "now"/created timestamp is worse than none. */
 const StatusTimeline = ({ booking }: { booking: Booking }) => {
   const items = useMemo(() => {
     const created = new Date(booking.createdAt)
@@ -1326,26 +1382,28 @@ const StatusTimeline = ({ booking }: { booking: Booking }) => {
     const now = new Date()
     const s = booking.status
 
-    const list: { at: Date; l: string; sub?: string; done: boolean }[] = []
-    list.push({ at: created, l: 'ჯავშანი შეიქმნა', done: true, sub: `₾${booking.price} escrow-ში` })
+    const list: { at: Date | null; l: string; sub?: string; done: boolean }[] = []
+    list.push({ at: created, l: 'ჯავშანი შეიქმნა', done: true, sub: PAYMENTS_LIVE ? `₾${booking.price} escrow-ში` : 'დაჯავშნა უფასოა — გადახდები მალე' })
 
     if (s === 'PREPARING') {
-      list.push({ at: now, l: 'ველოდებით ექსპერტის დადასტურებას', done: false })
-    } else {
-      list.push({ at: created, l: 'ექსპერტმა დაადასტურა', done: true })
+      list.push({ at: null, l: 'ველოდებით ექსპერტის დადასტურებას', done: false })
+    } else if (s !== 'CANCELED') {
+      list.push({ at: null, l: 'ექსპერტმა დაადასტურა', done: true })
     }
 
-    list.push({ at: start, l: 'სესია იწყება', done: now.getTime() >= start.getTime() && s !== 'CANCELED' && s !== 'PREPARING' })
-    list.push({ at: end, l: 'სესია სრულდება', done: now.getTime() >= end.getTime() && (s === 'COMPLETED' || s === 'NO_SHOW') })
+    if (s !== 'CANCELED' && s !== 'NO_SHOW') {
+      list.push({ at: start, l: 'სესია იწყება', done: now.getTime() >= start.getTime() && s !== 'PREPARING' })
+      list.push({ at: end, l: 'სესია სრულდება', done: now.getTime() >= end.getTime() && s === 'COMPLETED' })
+    }
 
     if (s === 'CANCELED') {
-      list.push({ at: now, l: `${booking.cancelledBy === 'TUTOR' ? 'ექსპერტმა' : booking.cancelledBy === 'ADMIN' ? 'ადმინმა' : 'შენ'} გააუქმა`, done: true, sub: 'escrow დაბრუნდა' })
+      list.push({ at: null, l: `${booking.cancelledBy === 'TUTOR' ? 'ექსპერტმა' : booking.cancelledBy === 'ADMIN' ? 'ადმინმა' : 'შენ'} გააუქმა`, done: true, sub: PAYMENTS_LIVE ? 'escrow დაბრუნდა' : undefined })
     }
     if (s === 'NO_SHOW') {
-      list.push({ at: end, l: 'აღინიშნა no-show', done: true, sub: 'escrow დაბრუნდა' })
+      list.push({ at: end, l: 'სესია არ შედგა', done: true, sub: PAYMENTS_LIVE ? 'escrow დაბრუნდა' : undefined })
     }
     if (s === 'COMPLETED') {
-      list.push({ at: end, l: 'დასრულდა · escrow ექსპერტზე გათავისუფლდა', done: true })
+      list.push({ at: end, l: PAYMENTS_LIVE ? 'დასრულდა · escrow ექსპერტზე გათავისუფლდა' : 'დასრულდა', done: true })
     }
     return list
   }, [booking])
@@ -1361,13 +1419,85 @@ const StatusTimeline = ({ booking }: { booking: Booking }) => {
             {s.done && <Icon.check className="w-2 h-2" />}
           </span>
           <div className="min-w-0 flex-1">
-            <span className="font-mono text-[10.5px] tabular-nums text-ink-500">{fmtDate(s.at)} {fmtTime(s.at)}</span>
-            <div className={`mt-0.5 font-display text-[13px] font-semibold ${s.done ? 'text-ink-900' : 'text-ink-500'}`}>{s.l}</div>
+            {s.at && <span className="font-mono text-[10.5px] tabular-nums text-ink-500">{fmtDate(s.at)} {fmtTime(s.at)}</span>}
+            <div className={`${s.at ? 'mt-0.5 ' : ''}font-display text-[13px] font-semibold ${s.done ? 'text-ink-900' : 'text-ink-500'}`}>{s.l}</div>
             {s.sub && <div className="text-[11.5px] text-ink-500 mt-0.5">{s.sub}</div>}
           </div>
         </li>
       ))}
     </ol>
+  )
+}
+
+/* ───── Mobile sticky action bar ─────
+   Phones had no persistent CTA — the primary action lived far up in the Hero
+   rail. Fixed to the viewport bottom (lg:hidden) and flags the body with
+   data-mobile-cta so the cookie banner lifts above it (globals.css), same
+   convention as the tutor-profile booking bar. Terminal statuses render
+   nothing — the inline review card / rebook actions cover those. */
+const MobileActionBar = ({ booking, onReschedule, onCancel }: { booking: Booking; onReschedule: () => void; onCancel: () => void }) => {
+  const status = booking.status
+  const start = new Date(booking.startAt)
+  // 1s tick — keeps the countdown hint and the live/joinable switch fresh.
+  const cd = useCountdown(status === 'PREPARING' || status === 'CONFIRMED' ? start : null)
+  const live = isBookingLive(booking)
+  const joinable = live || (status === 'CONFIRMED' && cd !== null && cd.diff <= 5 * 60_000)
+  const show = status === 'PREPARING' || status === 'CONFIRMED'
+
+  useEffect(() => {
+    if (!show) return
+    document.body.setAttribute('data-mobile-cta', '1')
+    return () => document.body.removeAttribute('data-mobile-cta')
+  }, [show])
+
+  if (!show) return null
+
+  const hint = cd
+    ? cd.d > 0 ? `${cd.d} დღე ${cd.h} სთ` : cd.h > 0 ? `${cd.h} სთ ${cd.m} წთ` : `${Math.max(1, cd.m)} წთ`
+    : ''
+
+  return (
+    <div
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-[65] bg-white/95 backdrop-blur-md border-t border-ink-200 shadow-[0_-4px_20px_rgba(46,42,33,0.06)]"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div className="px-4 py-3 flex items-center gap-2.5">
+        {status === 'PREPARING' ? (
+          <>
+            <div className="min-w-0 flex-1">
+              <div className="font-display text-[13px] font-bold text-ink-900 leading-tight truncate">ელოდება დადასტურებას</div>
+              <div className="mt-0.5 text-[11px] text-ink-500 tabular-nums truncate">{fmtDate(start)} · {fmtTime(start)}</div>
+            </div>
+            <button type="button" onClick={onReschedule} className="shrink-0 h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
+              გადადება
+            </button>
+            <button type="button" onClick={onCancel} className="shrink-0 h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-danger-50 hover:border-danger-200 text-ink-600 hover:text-danger-700 font-display font-semibold text-[12.5px] transition-colors">
+              გაუქმება
+            </button>
+          </>
+        ) : joinable ? (
+          <>
+            <div className="min-w-0 flex-1">
+              <div className="font-display text-[13px] font-bold text-brand-800 leading-tight truncate">{live ? 'სესია მიმდინარეობს' : 'იწყება ახლა'}</div>
+              <div className="mt-0.5 text-[11px] text-ink-500 truncate">{booking.topic}</div>
+            </div>
+            <Link href={`/session/${booking.id}`} className="shrink-0 h-12 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] inline-flex items-center gap-2 transition-colors">
+              <Icon.video className="w-4 h-4" /> ვიდეო-ოთახში
+            </Link>
+          </>
+        ) : (
+          <>
+            <div className="min-w-0 flex-1">
+              <div className="font-display text-[13px] font-bold text-ink-900 leading-tight truncate">დაწყებამდე დარჩა <span className="tabular-nums">{hint}</span></div>
+              <div className="mt-0.5 text-[11px] text-ink-500 truncate">გაიხსნება 5 წუთით ადრე</div>
+            </div>
+            <button type="button" disabled className="shrink-0 h-12 px-5 rounded-btn bg-ink-200 text-ink-500 font-display font-semibold text-[13.5px] inline-flex items-center gap-2 cursor-not-allowed">
+              <Icon.video className="w-4 h-4" /> ვიდეო-ოთახში
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -1493,6 +1623,11 @@ export default function BookingDetail() {
     )
   }
 
+  // Hours until the session starts — drives the honest cancellation-policy
+  // sentence in the confirm dialog (CANCEL_CUTOFF_HOURS is the canonical
+  // free-cancellation window shared with the server).
+  const hoursToStart = (new Date(booking.startAt).getTime() - Date.now()) / 3_600_000
+
   return (
     <div className="font-sans bg-ink-50/50 text-ink-900 antialiased min-h-screen">
       <TopBar />
@@ -1524,6 +1659,12 @@ export default function BookingDetail() {
         onCancel={cancelBooking}
         onDispute={() => setDisputeOpen(true)}
         onReview={() => setReviewOpen(true)}
+      />
+
+      <MobileActionBar
+        booking={booking}
+        onReschedule={() => setRescheduleOpen(true)}
+        onCancel={cancelBooking}
       />
 
       <ReviewModal

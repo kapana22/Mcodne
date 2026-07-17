@@ -155,7 +155,14 @@ export async function POST(req: Request) {
   // longer both pass: the loser hits a conditional-claim miss or a Postgres
   // serialization failure and is rejected with SLOT_TAKEN.
   class SlotTaken extends Error {}
-  let booking: { id: string }
+  let booking: {
+    id: string
+    ref: string
+    startAt: Date
+    durationMin: number
+    price: number
+    status: string
+  }
   try {
     booking = await prisma.$transaction(async tx => {
       // Re-check overlap INSIDE the tx (covers instant with no slot).
@@ -198,7 +205,7 @@ export async function POST(req: Request) {
           // Exact slot claimed, so cancel/reschedule free the right one.
           heldSlotId: coveringSlotId,
         },
-        select: { id: true },
+        select: { id: true, ref: true, startAt: true, durationMin: true, price: true, status: true },
       })
     }, { isolationLevel: 'Serializable' })
   } catch (e: any) {
@@ -224,5 +231,16 @@ export async function POST(req: Request) {
     })
   })
 
-  return NextResponse.json({ ok: true, id: booking.id })
+  // Echo the AUTHORITATIVE facts (server may have overridden client-sent
+  // price/duration via the consultation row) so the confirmation screen
+  // renders what was actually booked, not what the client asked for.
+  return NextResponse.json({
+    ok: true,
+    id: booking.id,
+    ref: booking.ref,
+    startAt: booking.startAt,
+    durationMin: booking.durationMin,
+    price: booking.price,
+    status: booking.status,
+  })
 }

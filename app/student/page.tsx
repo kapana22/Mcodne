@@ -5,8 +5,9 @@ import { NotifBell } from '@/components/NotifBell'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { CountUp } from '@/components/CountUp'
 import { EmptyState } from '@/components/EmptyState'
-import { FEATURE_PAYMENTS_V2 } from '@/lib/flags'
+import { FEATURE_PAYMENTS_V2, PAYMENTS_LIVE, CANCEL_CUTOFF_HOURS } from '@/lib/flags'
 import { TBILISI_TZ, bucketBookings, deriveSummary } from '@/lib/bookings'
+import { isBookingLive } from '@/lib/bookingLive'
 import { fmtKaDate, fmtKaTime, fmtKaDateTime, KA_WEEKDAYS_SHORT } from '@/lib/kaDate'
 import { StatusPill } from '@/components/StatusPill'
 import { signOut } from '@/lib/signout'
@@ -371,13 +372,27 @@ const Welcome = ({ me, bookings }: { me: MeData | null; bookings: any[] }) => {
 /* ───── Next session hero ───── */
 const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loading: boolean; onOpenDetail: (id?: string) => void; onOpenExpert: () => void }) => {
   const [countdown, setCountdown] = useState<{ d: number; h: number; m: number } | null>(null)
-  // Same predicate/ordering as the header and the sessions list — one source.
-  const next = useMemo(() => bucketBookings(bookings).upcoming[0] ?? null, [bookings])
+  // Liveness is DERIVED from the clock (lib/bookingLive) — the DB never
+  // contains status 'LIVE', so a raw status check is dead code. `joinable`
+  // additionally opens 5 minutes before start, matching /session/[id]'s gate.
+  const [live, setLive] = useState(false)
+  const [joinable, setJoinable] = useState(false)
+  // Same predicate/ordering as the header and the sessions list — one source —
+  // EXCEPT a currently-running session: bucketBookings' upcoming rule drops
+  // bookings once startAt passes, which would hide an in-progress session's
+  // join button, so a live booking wins the hero slot.
+  const next = useMemo(() => {
+    const liveNow = bookings.find(b => isBookingLive(b))
+    return liveNow ?? bucketBookings(bookings).upcoming[0] ?? null
+  }, [bookings])
 
   useEffect(() => {
     if (!next) return
     const tick = () => {
       const diff = new Date(next.startAt).getTime() - Date.now()
+      const isLive = isBookingLive(next)
+      setLive(isLive)
+      setJoinable(isLive || (next.status === 'CONFIRMED' && diff > 0 && diff <= 5 * 60_000))
       if (diff <= 0) { setCountdown({ d: 0, h: 0, m: 0 }); return }
       const d = Math.floor(diff / 86400000)
       const h = Math.floor((diff % 86400000) / 3600000)
@@ -416,8 +431,14 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
   const tutorName = next.tutor?.user?.fullName ?? 'ექსპერტი'
   const tutorAvatar = next.tutor?.user?.avatarUrl
   const specialty = next.tutor?.specialty ?? next.tutor?.category?.name ?? ''
-  // Same wording as the shared StatusPill so the hero never contradicts the list below.
-  const statusLabel = next.status === 'CONFIRMED' ? 'დადასტურდა' : next.status === 'LIVE' ? 'ცოცხალია' : 'მზადდება'
+  // Same wording as the shared StatusPill so the hero never contradicts the
+  // list below. "ცოცხალია" only when the CLOCK says the session is running
+  // (derived via isBookingLive) — never from the dead raw 'LIVE' status.
+  const statusLabel = live
+    ? 'ცოცხალია'
+    : next.status === 'CONFIRMED' || next.status === 'LIVE'
+      ? 'დადასტურდა'
+      : 'ელოდება დადასტურებას'
 
   return (
     <article className="relative overflow-hidden rounded-card bg-gradient-dark text-white">
@@ -430,9 +451,17 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
               {fmtKaDateTime(startDate, { weekday: true })} · {next.durationMin} წთ
             </span>
             <span className="text-white/25">·</span>
+            {/* escrow is only claimed once payments are actually live — until
+                then the honest line is the flat price alone. */}
             <span className="inline-flex items-center gap-1.5 text-brand-300">
-              <Icon.shield className="w-3 h-3" />
-              escrow ₾{next.price}
+              {PAYMENTS_LIVE ? (
+                <>
+                  <Icon.shield className="w-3 h-3" />
+                  escrow ₾{next.price}
+                </>
+              ) : (
+                <>₾{next.price}</>
+              )}
             </span>
             <span className="text-white/25">·</span>
             <span className="inline-flex items-center gap-1.5 text-white/75">{statusLabel}</span>
@@ -460,10 +489,10 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
           </div>
 
           <div className="mt-7 flex flex-wrap items-center gap-2.5">
-            {next.status === 'LIVE' && (
+            {joinable && (
               <button type="button" onClick={() => { window.location.href = `/session/${next.id}` }} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-400 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 transition-colors">
                 <Icon.video className="w-4 h-4" />
-                ოთახში შესვლა
+                ვიდეო-ოთახში
                 <Icon.arrow className="w-3.5 h-3.5" />
               </button>
             )}
@@ -473,7 +502,15 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
           </div>
         </div>
 
-        {countdown && (
+        {live ? (
+          <div className="relative bg-white/[0.06] border-t lg:border-t-0 lg:border-l border-white/10 p-6 sm:p-8 flex flex-col justify-center">
+            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/50 mb-3">ახლა</div>
+            <div className="inline-flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-brand-400 motion-safe:animate-pulse-soft" />
+              <span className="font-display text-[26px] font-bold leading-none tracking-[-0.02em] text-white">მიმდინარეობს</span>
+            </div>
+          </div>
+        ) : countdown && (
           <div className="relative bg-white/[0.06] border-t lg:border-t-0 lg:border-l border-white/10 p-6 sm:p-8 flex flex-col justify-center">
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/50 mb-3">დაიწყება</div>
             <div className="flex items-baseline gap-2">
@@ -993,6 +1030,9 @@ type Session = {
   tutorId?: string
   expert: { name: string; avatarUrl: string | null; cat: string; headline: string }
   topic: string
+  /** Raw ISO start instant — the display strings below are pre-formatted, so
+      the cancel-policy math (time-to-start vs CANCEL_CUTOFF_HOURS) needs this. */
+  startAt: string
   date: string
   day: string
   time: string
@@ -1016,6 +1056,10 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
   // In-app confirm sheet instead of window.confirm — the native dialog is
   // jarring on mobile and inconsistent with the rest of the product.
   const [askCancel, setAskCancel] = useState(false)
+  // Cancellation policy shown BEFORE confirming, derived from the canonical
+  // CANCEL_CUTOFF_HOURS window and this row's actual time-to-start (the modal
+  // only mounts on click, so Date.now() here never runs during hydration).
+  const freeCancel = new Date(s.startAt).getTime() - Date.now() >= CANCEL_CUTOFF_HOURS * 3_600_000
   return (
   <>
   <article onClick={() => onOpen(s)} className="cursor-pointer grid grid-cols-[auto_1fr_auto] sm:grid-cols-[64px_auto_1fr_auto] gap-4 sm:gap-5 items-center py-4 px-5 hover:bg-ink-50/50 transition-colors">
@@ -1059,9 +1103,17 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
           <Icon.clock className="w-3 h-3" />
           {s.time} · {s.duration} წთ
         </span>
+        {/* escrow is only asserted once payments are live — free era shows the
+            flat price with no held-funds claim. */}
         <span className="hidden sm:inline-flex items-center gap-1 text-ink-600">
-          <Icon.shield className="w-3 h-3 text-success-600" />
-          ₾{s.price} escrow
+          {PAYMENTS_LIVE ? (
+            <>
+              <Icon.shield className="w-3 h-3 text-success-600" />
+              ₾{s.price} escrow
+            </>
+          ) : (
+            <>₾{s.price}</>
+          )}
         </span>
       </div>
     </div>
@@ -1132,7 +1184,16 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
   <ConfirmModal
     open={askCancel}
     title="სესიის გაუქმება"
-    body={<>უქმდება <span className="font-display font-semibold">{s.topic}</span> — {s.date}, {s.time}. თანხა escrow-დან სრულად დაგიბრუნდება.</>}
+    body={<>
+      უქმდება <span className="font-display font-semibold">{s.topic}</span> — {s.date}, {s.time}.{' '}
+      {PAYMENTS_LIVE ? (
+        freeCancel
+          ? <>დაწყებამდე {CANCEL_CUTOFF_HOURS} საათზე მეტია დარჩენილი — თანხა სრულად დაგიბრუნდება.</>
+          : <>დაწყებამდე {CANCEL_CUTOFF_HOURS} საათზე ნაკლებია დარჩენილი — თანხის სრული დაბრუნება გარანტირებული აღარ არის.</>
+      ) : (
+        <>გაუქმება უფასოა — დრო ისევ ექსპერტს დაუბრუნდება.</>
+      )}
+    </>}
     confirmLabel="გაუქმება"
     cancelLabel="დარჩეს"
     tone="danger"
@@ -1163,6 +1224,7 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
       // user into the fake-fixture fallback below.
       expert: { name: b.tutor?.user?.fullName ?? 'ექსპერტი', avatarUrl: b.tutor?.user?.avatarUrl ?? null, cat: b.tutor?.specialty ?? '', headline: b.tutor?.headline ?? '' },
       topic: b.topic,
+      startAt: b.startAt,
       date: fmtKaDate(dt, { month: 'long' }),
       day: KA_WEEKDAYS_SHORT[dt.getDay()],
       time: fmtKaTime(dt),
@@ -1186,7 +1248,9 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
         setFlash(data?.error === 'BAD_STATE' ? 'ეს სესია უკვე დასრულებული ან გაუქმებულია.' : 'გაუქმება ვერ მოხერხდა.')
         return
       }
-      setFlash(data?.fullRefund ? 'სესია გაუქმდა · სრული დაბრუნება.' : 'სესია გაუქმდა.')
+      // Refund wording only once payments are live — free-era bookings never
+      // held money, so "სრული დაბრუნება" would assert a refund that never was.
+      setFlash(PAYMENTS_LIVE && data?.fullRefund ? 'სესია გაუქმდა · სრული დაბრუნება.' : 'სესია გაუქმდა.')
       await reload()
     } catch {
       setFlash('ქსელის შეცდომა.')
@@ -1221,7 +1285,7 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
           <div>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">ჩემი აქტივობა</div>
             <h2 className="font-display text-[20px] sm:text-[22px] font-bold text-ink-900 tracking-tight">ჩემი სესიები</h2>
-            <p className="text-[12px] text-ink-500 mt-0.5">ყველა შენი ჯავშანი ერთ ადგილას · escrow დაცული</p>
+            <p className="text-[12px] text-ink-500 mt-0.5">{PAYMENTS_LIVE ? 'ყველა შენი ჯავშანი ერთ ადგილას · escrow დაცული' : 'ყველა შენი ჯავშანი ერთ ადგილას · დაჯავშნა უფასოა'}</p>
           </div>
           <Link href="/student/bookings" className="font-display text-[12px] font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
             მთლიანი ისტორია

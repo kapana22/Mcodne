@@ -10,6 +10,8 @@ import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
 import { safeHttpUrl } from '@/lib/safeUrl'
+import { fmtKaDate } from '@/lib/kaDate'
+import { sanitizeMsgBody, MSG_MAX_LEN, sendErrorText } from '@/lib/msgText'
 
 type BookingStatus = 'PREPARING' | 'CONFIRMED' | 'LIVE' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW'
 
@@ -404,7 +406,7 @@ export default function TutorBookingDetailPage() {
       if (!res.ok || !j.ok) {
         setMsgs(prev => prev.filter(m => m.id !== tempId))
         setMsgText(sentText); setAttachment(sentAttachment)
-        showFlash('err', 'შეტყობინება ვერ გაიგზავნა')
+        showFlash('err', sendErrorText(j?.error, j?.retryInSec))
         return
       }
       setMsgs(prev => prev.map(m => (m.id === tempId ? {
@@ -656,20 +658,51 @@ export default function TutorBookingDetailPage() {
             <div className="font-display text-[15px] font-bold tracking-tight text-ink-900">მიმოწერა კლიენტთან</div>
             <div className="text-[11.5px] text-ink-500 font-mono tabular-nums">{msgs.length}</div>
           </div>
-          <div className="max-h-[420px] min-h-[220px] overflow-y-auto p-5 sm:p-6 space-y-3 bg-ink-50/40">
+          <div className="max-h-[420px] min-h-[220px] overflow-y-auto p-4 sm:p-6 bg-ink-50/40">
             {msgs.length === 0 ? (
-              <div className="text-center text-[13px] text-ink-400 py-8">მიმოწერა ჯერ არ არის. დაწერე პირველი შეტყობინება.</div>
+              <div className="text-center py-8">
+                <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-50 text-brand-700 mb-3">
+                  <Icon.chat className="w-5 h-5" />
+                </span>
+                <div className="font-display text-[13.5px] font-semibold text-ink-800">მიმოწერა ჯერ არ არის</div>
+                <p className="text-[12.5px] text-ink-500 mt-1 max-w-[340px] mx-auto">
+                  მიესალმე კლიენტს ან დააზუსტე კონსულტაციის დეტალები — სწრაფი პასუხი ნდობას ზრდის.
+                </p>
+              </div>
             ) : (
-              msgs.map(m => {
+              msgs.map((m, i) => {
                 const isMine = me?.id && m.fromId === me.id
+                const d = new Date(m.createdAt)
+                const prev = i > 0 ? msgs[i - 1] : null
+                const next = i < msgs.length - 1 ? msgs[i + 1] : null
+                // Day separator when the calendar date flips; bubbles then only
+                // carry the time. Runs from the same sender within 5 minutes
+                // collapse into one group: avatar first, timestamp last.
+                const newDay = !prev || new Date(prev.createdAt).toDateString() !== d.toDateString()
+                const GROUP_MS = 5 * 60_000
+                const groupedWithPrev = !newDay && !!prev && prev.fromId === m.fromId &&
+                  d.getTime() - new Date(prev.createdAt).getTime() < GROUP_MS
+                const groupedWithNext = !!next && next.fromId === m.fromId &&
+                  new Date(next.createdAt).getTime() - d.getTime() < GROUP_MS &&
+                  new Date(next.createdAt).toDateString() === d.toDateString()
                 // Never render an attachment href with an unsafe scheme (guards
                 // legacy rows predating the server-side scheme check).
                 const safeFile = safeHttpUrl(m.fileUrl)
                 return (
-                  <div key={m.id} className={`flex gap-2 ${isMine ? 'justify-end' : 'justify-start'}`}>
-                    {!isMine && <Avatar src={m.from.avatarUrl ?? undefined} name={m.from.fullName} size={28} />}
-                    <div className={`max-w-[75%] rounded-card px-3 py-2 text-[13.5px] ${isMine ? 'bg-brand-500 text-white' : 'bg-white border border-ink-200 text-ink-800'}`}>
-                      <div className="whitespace-pre-wrap break-words">{m.body}</div>
+                  <div key={m.id}>
+                    {newDay && (
+                      <div className={`flex items-center gap-3 py-1 ${i > 0 ? 'mt-4' : ''}`} aria-hidden>
+                        <span className="flex-1 h-px bg-ink-200/70" />
+                        <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-400">{fmtKaDate(d)}</span>
+                        <span className="flex-1 h-px bg-ink-200/70" />
+                      </div>
+                    )}
+                    <div className={`flex gap-2 ${isMine ? 'justify-end' : 'justify-start'} ${groupedWithPrev ? 'mt-1' : 'mt-3'}`}>
+                    {!isMine && (groupedWithPrev
+                      ? <span className="w-7 shrink-0" aria-hidden />
+                      : <Avatar src={m.from.avatarUrl ?? undefined} name={m.from.fullName} size={28} />)}
+                    <div className={`max-w-[85%] sm:max-w-[75%] rounded-card px-3 py-2 text-[13.5px] ${isMine ? 'bg-brand-500 text-white' : 'bg-white border border-ink-200 text-ink-800'}`}>
+                      <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{sanitizeMsgBody(m.body)}</div>
                       {safeFile && (
                         <div className={`mt-2 pt-2 border-t ${isMine ? 'border-white/25' : 'border-ink-200'}`}>
                           {safeFile.startsWith('data:image/') ? (
@@ -690,7 +723,10 @@ export default function TutorBookingDetailPage() {
                           )}
                         </div>
                       )}
-                      <div className={`text-[10.5px] mt-1 font-mono tabular-nums ${isMine ? 'text-white/70' : 'text-ink-400'}`}>{fmtTime(m.createdAt, tz)}</div>
+                      {!groupedWithNext && (
+                        <div className={`text-[10.5px] mt-1 font-mono tabular-nums ${isMine ? 'text-white/70' : 'text-ink-400'}`}>{fmtTime(m.createdAt, tz)}</div>
+                      )}
+                    </div>
                     </div>
                   </div>
                 )

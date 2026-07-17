@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PAYMENTS_LIVE, COMMISSION_PCT, TUTOR_PAYOUT_PCT } from '@/lib/flags'
 import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
+import { Footer } from '@/components/Footer'
 
 /* ───── Icons (shared) ───── */
 const Icon = {
@@ -196,62 +197,10 @@ const TopNav = () => {
 }
 
 /* ───── Shared footer ───── */
-const Footer = () => (
-  <footer className="bg-white border-t border-ink-200">
-    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-16">
-      <div className="grid md:grid-cols-[1.6fr_1fr_1fr_1fr] gap-10 mb-12">
-        <div>
-          <Logo />
-          <p className="text-[13px] text-ink-600 mt-5 max-w-[280px] leading-relaxed">პირადი ვიდეო-კონსულტაცია ქართველ პროფესიონალებთან. ქართულ ბაზარზე, ქართულ ფასებზე.</p>
-          <div className="mt-5 inline-flex items-center gap-2 text-[12px] text-ink-500">
-            <Icon.shield className="w-4 h-4 text-ink-400" />
-            {PAYMENTS_LIVE ? (
-              <span className="font-display font-semibold text-ink-700 tracking-wide">escrow-ით დაცული გადახდები</span>
-            ) : (
-              <span>უსაფრთხო გადახდები · <span className="font-display font-semibold text-ink-700 tracking-wide">მალე</span></span>
-            )}
-          </div>
-        </div>
-        <div>
-          <div className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-4">პროდუქტი</div>
-          <ul className="space-y-2.5">
-            <li><Link href="/tutors" className="text-[13px] text-ink-700 hover:text-ink-900">ექსპერტები</Link></li>
-            <li><Link href="/tutors" className="text-[13px] text-ink-700 hover:text-ink-900">კატეგორიები</Link></li>
-            <li><Link href="/#how" className="text-[13px] text-ink-700 hover:text-ink-900">როგორ მუშაობს</Link></li>
-            <li><Link href="/apply" className="text-[13px] text-ink-700 hover:text-ink-900">გახდი ექსპერტი</Link></li>
-          </ul>
-        </div>
-        <div>
-          <div className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-4">კომპანია</div>
-          <ul className="space-y-2.5">
-            <li><Link href="/about" className="text-[13px] text-ink-700 hover:text-ink-900 min-h-[32px] inline-flex items-center">ჩვენ შესახებ</Link></li>
-            <li><Link href="/blog" className="text-[13px] text-ink-700 hover:text-ink-900 min-h-[32px] inline-flex items-center">ბლოგი</Link></li>
-            <li><Link href="/contact" className="text-[13px] text-ink-700 hover:text-ink-900 min-h-[32px] inline-flex items-center">დაგვიკავშირდი</Link></li>
-          </ul>
-        </div>
-        <div>
-          <div className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-4">დახმარება</div>
-          <ul className="space-y-2.5">
-            <li><Link href="/help" className="text-[13px] text-ink-700 hover:text-ink-900 min-h-[32px] inline-flex items-center">დახმარების ცენტრი</Link></li>
-            <li><Link href="/help" className="text-[13px] text-ink-700 hover:text-ink-900 min-h-[32px] inline-flex items-center">FAQ</Link></li>
-            <li><Link href="/terms" className="text-[13px] text-ink-700 hover:text-ink-900 min-h-[32px] inline-flex items-center">წესები</Link></li>
-            <li><Link href="/privacy" className="text-[13px] text-ink-700 hover:text-ink-900 min-h-[32px] inline-flex items-center">კონფიდენციალურობა</Link></li>
-          </ul>
-        </div>
-      </div>
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between pt-8 border-t border-ink-200 gap-4">
-        <div className="text-[12px] text-ink-500">© 2026 მცოდნე. ყველა უფლება დაცულია.</div>
-        <div className="flex items-center gap-3 text-[12px] text-ink-500">
-          {/* Language toggle disabled until real i18n lands — mutating `<html lang>`
-              alone does nothing visible, so it read as a broken button. */}
-          <span className="text-ink-400">ქართული</span>
-          <span className="text-ink-300">·</span>
-          <span>თბილისი, საქართველო</span>
-        </div>
-      </div>
-    </div>
-  </footer>
-)
+/* Local Footer removed — the home page now renders the shared
+   components/Footer.tsx like every other public page, so the columns, honesty
+   notes and bottom strip can never drift between surfaces again. (The old
+   local copy also pointed „კატეგორიები" at /tutors instead of /categories.) */
 
 /* ═══════════════════════════════════════════════════════════════════ */
 /* HOME VIEW                                                            */
@@ -502,10 +451,14 @@ const HomeHero = () => {
                 {/* Price + CTA */}
                 <div className="p-5 sm:p-6 pt-4 flex items-center justify-between gap-3">
                   <div>
+                    {/* Flat expert-set price for the whole session — "/ N წთ"
+                        read like a per-minute rate. */}
                     <span className="font-display text-[24px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">₾{featured.price}</span>
-                    <span className="text-[12px] font-medium text-ink-500 ml-1">/ {featured.durationMin} წთ</span>
+                    <span className="text-[12px] font-medium text-ink-500 ml-1">· {featured.durationMin}-წუთიანი სესია</span>
                   </div>
-                  <Link href={featured.id ? `/tutors/${featured.id}` : '/tutors'} className="shrink-0 h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] motion-safe:active:scale-[0.97] transition-all duration-fast">
+                  {/* ?rebook=1 opens the booking modal on arrival, so the CTA
+                      label is honest — it books, not just views. */}
+                  <Link href={featured.id ? `/tutors/${featured.id}?rebook=1` : '/tutors'} className="shrink-0 h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] motion-safe:active:scale-[0.97] transition-all duration-fast">
                     დაჯავშნა <Icon.arrow className="w-4 h-4" />
                   </Link>
                 </div>
@@ -513,7 +466,7 @@ const HomeHero = () => {
                 {/* Trust footer */}
                 <div className="border-t border-ink-100 px-5 sm:px-6 py-3 flex items-center gap-4 text-[11px] text-ink-600">
                   <span className="inline-flex items-center gap-1.5">
-                    <Icon.shield className="w-3.5 h-3.5 text-brand-600" /> Escrow-დაცული
+                    <Icon.shield className="w-3.5 h-3.5 text-brand-600" /> {PAYMENTS_LIVE ? 'Escrow-დაცული' : 'უსაფრთხო გადახდები · მალე'}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Icon.check className="w-3.5 h-3.5 text-brand-600" /> ID + გადამოწმებული
@@ -710,15 +663,19 @@ const ExpertCard = ({ e }: { e: Expert }) => (
     {/* Bottom price strip */}
     <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 border-t border-ink-100 bg-ink-50/40">
       <div className="min-w-0 flex items-baseline gap-2">
+        {/* Flat expert-set price for the whole session — "/ N წთ" read like a
+            per-minute rate. */}
         <span className="font-display text-[20px] sm:text-[22px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">
-          ₾{e.price}<span className="text-[11.5px] font-medium text-ink-500 ml-0.5">/ {e.durationMin} წთ</span>
+          ₾{e.price}<span className="text-[11.5px] font-medium text-ink-500 ml-1">· {e.durationMin}-წუთიანი სესია</span>
         </span>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <Link href={e.id ? `/tutors/${e.id}` : '/tutors'} className="h-11 px-3.5 rounded-btn border border-ink-200 hover:border-ink-300 bg-white text-ink-700 hover:text-ink-900 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center transition-colors">
           პროფილი
         </Link>
-        <Link href={e.id ? `/tutors/${e.id}` : '/tutors'} className="h-10 px-3.5 sm:px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors shadow-xs">
+        {/* ?rebook=1 opens the booking modal on arrival, so "დაიჯავშნე" is
+            honest — without it this was just a second profile link. */}
+        <Link href={e.id ? `/tutors/${e.id}?rebook=1` : '/tutors'} className="h-11 px-3.5 sm:px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors shadow-xs">
           დაიჯავშნე <Icon.arrow className="w-3.5 h-3.5" />
         </Link>
       </div>

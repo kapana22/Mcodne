@@ -14,9 +14,16 @@ type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname()
-  // Fetch once on mount to determine the user's role for the mobile bottom
-  // nav. `/api/me` returns `{ user: null }` for anonymous visitors, which we
-  // pass through as `null` — BottomNav short-circuits to render nothing.
+  // Determines the user's role for the mobile bottom nav. `/api/me` returns
+  // `{ user: null }` for anonymous visitors, which we pass through as `null`
+  // — BottomNav short-circuits to render nothing.
+  //
+  // Re-checked on every client-side route change (not just mount): AppShell
+  // lives in the root layout and never remounts across SPA navigations, so a
+  // fetch-once role would keep serving STALE tabs after any in-app session
+  // transition (impersonation, applicant→tutor promotion) until a hard
+  // reload. The previous role stays on screen while the re-check is in
+  // flight, so there's no flicker on ordinary navigations.
   const [role, setRole] = useState<Role | null>(null)
 
   useEffect(() => {
@@ -31,7 +38,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       })
       .catch(() => { if (!cancelled) setRole(null) })
     return () => { cancelled = true }
-  }, [])
+  }, [path])
 
   return (
     <ToastProvider>

@@ -35,3 +35,16 @@ export function fmtKaTime(d: Date): string {
 export function fmtKaDateTime(d: Date, opts?: KaDateOpts): string {
   return `${fmtKaDate(d, opts)} · ${fmtKaTime(d)}`
 }
+
+// Inbox-style timestamp that spends detail only where it disambiguates:
+// today → "14:05" · yesterday → "გუშინ" · <7 days → weekday ("სამ") ·
+// same year → "24 ივლ" · older → "24 ივლ 2025". `now` is injectable for tests
+// and for server components that want one consistent clock per render.
+export function fmtKaThreadTime(d: Date, now: Date = new Date()): string {
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86_400_000)
+  if (dayDiff <= 0) return fmtKaTime(d)
+  if (dayDiff === 1) return 'გუშინ'
+  if (dayDiff < 7) return KA_WEEKDAYS_SHORT[d.getDay()]
+  return fmtKaDate(d, { year: d.getFullYear() !== now.getFullYear() })
+}

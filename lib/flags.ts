@@ -16,6 +16,13 @@ export const FEATURE_PAYMENTS_V2 = false
 // actually charged until this flag is flipped on and the integration ships.
 export const PAYMENTS_LIVE = false
 
+// Canonical free-cancellation window: cancelling at least this many hours
+// before startAt is free (full refund once payments are live). The server
+// refund rule (app/api/bookings/[id]/cancel) and every copy string that
+// mentions the deadline must BOTH read from here — product copy previously
+// promised 24h while the server enforced 12h.
+export const CANCEL_CUTOFF_HOURS = 24
+
 // The single canonical commission percentage the platform takes from a paid
 // booking. Every copy string that mentions commission must read from here so
 // the "15% here / 10% there" mismatch can never regress.

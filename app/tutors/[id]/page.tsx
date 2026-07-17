@@ -399,7 +399,7 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
               <Icon.check className="w-4 h-4 text-brand-600" /> ხელით შერჩეული ექსპერტი
             </span>
             <span className="inline-flex items-center gap-1.5 text-[12px] font-display font-medium text-ink-700">
-              <Icon.shield className="w-4 h-4 text-brand-600" /> Escrow-დაცული გადახდა
+              <Icon.shield className="w-4 h-4 text-brand-600" /> {PAYMENTS_LIVE ? 'Escrow-დაცული გადახდა' : 'უფასო დაჯავშნა · გადახდები მალე'}
             </span>
             {tutor?.verified && (
               <span className="inline-flex items-center gap-1.5 text-[12px] font-display font-medium text-ink-700">
@@ -556,7 +556,7 @@ const Reviews = ({ reviews, rating, total, verified }: { reviews: ReviewItem[]; 
 /* Local Footer was orphan (had hardcoded fake nav) — replaced by shared components/Footer.tsx via SharedFooter. */
 
 /* ───── Mobile sticky booking bar ───── */
-const MobileBookingBar = ({ onBook, price, responseHours, sessionMin, signedIn, paused, availability = [] }: { onBook: () => void; price: number; responseHours: number; sessionMin: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[] }) => {
+const MobileBookingBar = ({ onBook, price, responseHours, sessionMin, signedIn, paused, availability = [], busySlots = [] }: { onBook: () => void; price: number; responseHours: number; sessionMin: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[]; busySlots?: BusyInput }) => {
   // Flag the body while this mobile CTA bar is mounted so the cookie banner
   // lifts above it (see globals.css) instead of covering the primary CTA.
   useEffect(() => {
@@ -564,20 +564,14 @@ const MobileBookingBar = ({ onBook, price, responseHours, sessionMin, signedIn, 
     return () => document.body.removeAttribute('data-mobile-cta')
   }, [])
 
-  // Earliest future free slot → "next available" hint. Mirrors the desktop
-  // StickyBookingCard's uniqueDays hint so mobile users get the same
-  // urgency/feasibility signal the right rail shows on desktop.
-  const nextFree = React.useMemo(() => {
-    const now = Date.now()
-    let best: Date | null = null
-    for (const s of availability) {
-      if (s.booked) continue
-      const d = new Date(s.startAt)
-      if (d.getTime() <= now) continue
-      if (!best || d < best) best = d
-    }
-    return best
-  }, [availability])
+  // Earliest actually-bookable start → "next available" hint. Uses the same
+  // busy-aware enumeration the booking modal runs (computeNextFreeStart), so
+  // the bar never advertises a time the modal then shows as taken. Mirrors the
+  // desktop StickyBookingCard's hint.
+  const nextFree = React.useMemo(
+    () => computeNextFreeStart(availability, busySlots, sessionMin),
+    [availability, busySlots, sessionMin],
+  )
 
   // The bar has three states the button must communicate on its own —
   // the explanatory banners live far up the page on mobile:
@@ -622,7 +616,7 @@ const MobileBookingBar = ({ onBook, price, responseHours, sessionMin, signedIn, 
         <>
           <span className="inline-flex items-center gap-1">
             <Icon.shield className="w-3 h-3 text-success-600" />
-            Escrow დაცული
+            {PAYMENTS_LIVE ? 'Escrow დაცული' : 'უფასო დაჯავშნა'}
           </span>
           <span className="text-ink-300">·</span>
           <span className="inline-flex items-center gap-1">
@@ -679,7 +673,7 @@ const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; inte
         </div>
         <p className="mt-4 text-[11px] text-ink-500 text-center inline-flex items-center gap-1.5 w-full justify-center">
           <Icon.shield className="w-3 h-3 text-success-600" />
-          გადახდა escrow-შია სესიის ბოლომდე
+          {PAYMENTS_LIVE ? 'გადახდა escrow-შია სესიის ბოლომდე' : 'დაჯავშნა უფასოა — გადახდები მალე'}
         </p>
       </div>
     </div>
@@ -791,7 +785,11 @@ const SpecsGrid = ({ tutor }: { tutor: TutorDetail | null }) => {
     { n: typeof tutor.sessionsCount === 'number' ? String(tutor.sessionsCount) : '—', l: 'სესია ჩატარებული', icon: <Icon.video className="w-3.5 h-3.5" /> },
     { n: typeof tutor.responseHours === 'number' ? `~ ${tutor.responseHours} სთ` : '~ 24 სთ', l: 'რეაგირება', icon: <Icon.clock className="w-3.5 h-3.5" /> },
     { n: typeof tutor.yearsExp === 'number' ? `${tutor.yearsExp} წ.` : '—', l: 'გამოცდილება', icon: <Icon.thumb className="w-3.5 h-3.5" /> },
-    { n: 'Escrow', l: 'TBC · BOG · SOLO', icon: <Icon.shield className="w-3.5 h-3.5" /> },
+    // Bank names must not render before the gateway is live — until then the
+    // honest spec is that booking costs nothing.
+    PAYMENTS_LIVE
+      ? { n: 'Escrow', l: 'TBC · BOG · SOLO', icon: <Icon.shield className="w-3.5 h-3.5" /> }
+      : { n: 'უფასო', l: 'გადახდები მალე', icon: <Icon.shield className="w-3.5 h-3.5" /> },
   ]
   return (
     // Compact fact strip — these repeat identity-row facts, so on desktop they
@@ -865,7 +863,7 @@ type ConsultationItem = {
   price: number
 }
 
-const ServicesSection = ({ consultations, onBook }: { consultations: ConsultationItem[]; onBook: () => void }) => {
+const ServicesSection = ({ consultations, onBook }: { consultations: ConsultationItem[]; onBook: (s: ConsultationItem) => void }) => {
   if (!consultations || consultations.length === 0) return null
   return (
     <section className="mt-14 lg:mt-16 pt-10 border-t border-ink-100">
@@ -888,7 +886,7 @@ const ServicesSection = ({ consultations, onBook }: { consultations: Consultatio
                 <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">{s.minutes} წუთი</div>
                 <div className="font-display text-[18px] font-bold text-ink-900 tabular-nums leading-none mt-1">₾{s.price}</div>
               </div>
-              <button type="button" onClick={onBook} className="h-11 px-4 rounded-btn bg-brand-50 hover:bg-brand-500 hover:text-white border border-brand-200 hover:border-brand-500 text-brand-700 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1 transition-colors">
+              <button type="button" onClick={() => onBook(s)} className="h-11 px-4 rounded-btn bg-brand-50 hover:bg-brand-500 hover:text-white border border-brand-200 hover:border-brand-500 text-brand-700 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1 transition-colors">
                 დაჯავშნა <Icon.arrow className="w-3 h-3" />
               </button>
             </div>
@@ -1013,6 +1011,7 @@ const CalendarTzLabel = () => {
 const StickyBookingCard = ({
   onOpen,
   availability = [],
+  busySlots = [],
   tutorPrice = TUTOR_DEFAULTS.price,
   sessionMin = TUTOR_DEFAULTS.durationMin,
   responseHours = TUTOR_DEFAULTS.responseHours,
@@ -1023,6 +1022,7 @@ const StickyBookingCard = ({
 }: {
   onOpen: () => void
   availability?: ApiSlot[]
+  busySlots?: BusyInput
   tutorPrice?: number
   sessionMin?: number
   responseHours?: number
@@ -1035,23 +1035,14 @@ const StickyBookingCard = ({
   const priceLabel = `₾${priceForDuration(tutorPrice, duration)}`
   const subLabel = `/ ${duration} წუთი`
 
-  // Soonest upcoming free day — powers the "next available" hint. The full
+  // Soonest actually-bookable start — powers the "next available" hint. Uses
+  // the same busy-aware enumeration the booking modal runs, so the rail never
+  // advertises a day whose windows the modal then shows as all taken. The full
   // day/time picker lives in the modal, so we only need the earliest here.
-  const uniqueDays: Date[] = React.useMemo(() => {
-    const now = Date.now()
-    const map = new Map<string, Date>()
-    for (const s of availability) {
-      if (s.booked) continue
-      const d = new Date(s.startAt)
-      if (d.getTime() < now) continue
-      const day = startOfDay(d)
-      const k = dayKey(day)
-      if (!map.has(k)) map.set(k, day)
-    }
-    return Array.from(map.values())
-      .sort((a, b) => a.getTime() - b.getTime())
-      .slice(0, 6)
-  }, [availability])
+  const nextFree: Date | null = React.useMemo(
+    () => computeNextFreeStart(availability, busySlots, sessionMin),
+    [availability, busySlots, sessionMin],
+  )
 
   return (
     <aside className="lg:sticky lg:top-[80px]">
@@ -1105,7 +1096,7 @@ const StickyBookingCard = ({
             inside the booking modal (opens on click) — the whole flow is one
             popup instead of an inline sidebar picker. */}
         <div className="px-6 pt-5 pb-4">
-          {uniqueDays.length === 0 ? (
+          {nextFree === null ? (
             <div className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 px-3 py-4 text-center text-[12px] text-ink-500 mb-4">
               ექსპერტს ჯერ არ აქვს გამოცხადებული სლოტები.
             </div>
@@ -1114,12 +1105,12 @@ const StickyBookingCard = ({
               <span className="w-7 h-7 rounded-full bg-brand-50 inline-flex items-center justify-center shrink-0">
                 <Icon.cal className="w-3.5 h-3.5 text-brand-600" />
               </span>
-              <span className="leading-snug">უახლოესი დრო: <span className="font-display font-bold text-ink-900">{DAY_NAMES_FULL[isoWeekday(uniqueDays[0])]}, {uniqueDays[0].getDate()} {KA_MONTHS_FULL[uniqueDays[0].getMonth()]}</span></span>
+              <span className="leading-snug">უახლოესი დრო: <span className="font-display font-bold text-ink-900">{DAY_NAMES_FULL[isoWeekday(nextFree)]}, {nextFree.getDate()} {KA_MONTHS_FULL[nextFree.getMonth()]}</span></span>
             </div>
           )}
           <button
             type="button"
-            disabled={uniqueDays.length === 0}
+            disabled={nextFree === null}
             onClick={onOpen}
             className="w-full h-12 rounded-btn bg-gradient-cta hover:brightness-105 disabled:bg-none disabled:bg-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-all shadow-brand-glow disabled:shadow-none"
           >
@@ -1140,7 +1131,7 @@ const StickyBookingCard = ({
           </span>
           <span className="inline-flex items-center gap-1.5 text-ink-600">
             <Icon.shield className="w-3 h-3 text-ink-400" />
-            Escrow დაცული
+            {PAYMENTS_LIVE ? 'Escrow დაცული' : 'უფასო დაჯავშნა'}
           </span>
         </div>
       </div>
@@ -1214,6 +1205,29 @@ const enumerateTimes = (
   return out
 }
 
+// Earliest actually-bookable start across every published slot — runs the SAME
+// enumeration the modal's picker uses (slot.booked + busy-overlap aware), so a
+// "next available" hint can never advertise a time the modal then shows as
+// taken. Returns null when nothing is bookable.
+const computeNextFreeStart = (
+  avail: ApiSlot[],
+  busy: BusyInput,
+  durationMin: number,
+): Date | null => {
+  const dayMap = new Map<string, Date>()
+  for (const s of avail) {
+    const day = startOfDay(new Date(s.startAt))
+    const k = dayKey(day)
+    if (!dayMap.has(k)) dayMap.set(k, day)
+  }
+  const days = Array.from(dayMap.values()).sort((a, b) => a.getTime() - b.getTime())
+  for (const day of days) {
+    const free = enumerateTimes(day, avail, busy, durationMin).find(t => !t.taken)
+    if (free) return free.start
+  }
+  return null
+}
+
 const Calendar = ({
   viewMonth,
   selected,
@@ -1242,6 +1256,16 @@ const Calendar = ({
 
   // Bound month nav so users can't scroll to arbitrary past months.
   const canPrev = new Date(year, month, 1).getTime() > new Date(today.getFullYear(), today.getMonth(), 1).getTime()
+  // …and symmetric forward: no paging past the last month that still contains
+  // a published slot (nothing to see there — every further page is empty).
+  let lastSlotMs = 0
+  for (const arr of slotsByDay.values()) {
+    for (const s of arr) {
+      const t = new Date(s.startAt).getTime()
+      if (t > lastSlotMs) lastSlotMs = t
+    }
+  }
+  const canNext = lastSlotMs > 0 && new Date(year, month + 1, 1).getTime() <= lastSlotMs
 
   return (
     <div>
@@ -1259,8 +1283,9 @@ const Calendar = ({
         <button
           type="button"
           onClick={onNext}
+          disabled={!canNext}
           aria-label="შემდეგი თვე"
-          className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors"
+          className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <Icon.chevR className="w-4 h-4" />
         </button>
@@ -1531,7 +1556,7 @@ const Step2Details = ({ value, onChange, summary }: { value: DetailsState; onCha
         <input type="checkbox" checked={value.preCall} onChange={e => onChange({ ...value, preCall: e.target.checked })} className="sr-only" />
         <div>
           <div className="font-display text-[13px] font-bold text-ink-900">pre-call მასალის გაგზავნა</div>
-          <p className="text-[12.5px] text-ink-600 mt-0.5 leading-[1.5]">გავუგზავნი pitch deck-ს, financial model-ს ან მონაცემებს ექსპერტს დასათვალიერებლად სესიამდე. დანახარჯი იგივეა.</p>
+          <p className="text-[12.5px] text-ink-600 mt-0.5 leading-[1.5]">გავუგზავნი დოკუმენტებს ან სხვა მასალას ექსპერტს დასათვალიერებლად სესიამდე. დანახარჯი იგივეა.</p>
         </div>
       </label>
     </div>
@@ -1685,6 +1710,7 @@ const OrderSummary = ({
   tutorName,
   tutorSpecialty,
   tutorAvatar,
+  serviceTitle,
 }: {
   start: Date | null
   duration: number
@@ -1693,6 +1719,9 @@ const OrderSummary = ({
   tutorName: string
   tutorSpecialty: string
   tutorAvatar?: string | null
+  /** Title of the consultation tier the user tapped in ServicesSection —
+      null for the generic flat-price flow. */
+  serviceTitle?: string | null
 }) => {
   const dayShort = start ? DAY_SHORT[isoWeekday(start)] : ''
   const dayLabel = start ? `${dayShort} ${start.getDate()} ${KA_MONTHS_FULL[start.getMonth()]}` : '— აირჩიე დღე'
@@ -1719,6 +1748,12 @@ const OrderSummary = ({
       </div>
 
       <dl className="mt-4 space-y-3 text-[12.5px]">
+        {serviceTitle && (
+          <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
+            <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">სერვისი</dt>
+            <dd className="font-display font-bold text-ink-900 leading-snug">{serviceTitle}</dd>
+          </div>
+        )}
         <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
           <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">დღე</dt>
           <dd className="font-display font-bold text-ink-900 tabular-nums">{dayLabel}</dd>
@@ -1788,6 +1823,7 @@ const BookingModal = ({
   availability = [],
   busySlots = [],
   sessionMin = TUTOR_DEFAULTS.durationMin,
+  service = null,
 }: {
   open: boolean
   onClose: () => void
@@ -1805,6 +1841,11 @@ const BookingModal = ({
   availability?: ApiSlot[]
   busySlots?: BusySlot[]
   sessionMin?: number
+  /** Consultation tier tapped in ServicesSection. When set, ITS minutes/price
+      drive the slot enumeration + summary, and the POST carries
+      consultationId so the server books the tier (its row is authoritative
+      server-side). Null = the generic flat tutor price/duration flow. */
+  service?: ConsultationItem | null
 }) => {
   // Payments aren't live yet — skip the (fake) card step entirely. The flow is
   // just pick-time → details → confirm; the expert accepts and no charge is made.
@@ -1842,6 +1883,9 @@ const BookingModal = ({
   })
   const [payment, setPayment] = useState<PaymentState>({ method: 'tbc', cardName: '', cardNum: '', cardExp: '', cardCvv: '', save: true })
   const [submitted, setSubmitted] = useState(false)
+  // Booking id from the POST response — powers the success screen's
+  // "ჯავშნის ნახვა" deep link so the flow doesn't dead-end in the modal.
+  const [createdId, setCreatedId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitUnverified, setSubmitUnverified] = useState(false)
@@ -1883,6 +1927,7 @@ const BookingModal = ({
       setSelectedStart(initialStart)
       setViewMonth(new Date((anchor ?? new Date()).getFullYear(), (anchor ?? new Date()).getMonth(), 1))
       setSubmitted(false)
+      setCreatedId(null)
       setSubmitError(null)
       // Refresh the topic each time the modal opens so rebook flows always
       // land on the passed-in topic, even after a close/reopen cycle.
@@ -1935,11 +1980,14 @@ const BookingModal = ({
 
   if (!open) return null
 
-  const duration = sessionMin
+  // A tapped consultation tier overrides the flat defaults: its minutes drive
+  // the slot enumeration step and its price is what the summary restates (the
+  // server re-reads both from the Consultation row via consultationId anyway).
+  const duration = service?.minutes ?? sessionMin
   // Flat, expert-set price — what the expert set is what the client pays. Kept
   // consistent with the /tutors QuickBookPopup via the shared priceForDuration
   // helper (duration is only a display label, not a multiplier).
-  const priceNum = priceForDuration(tutorPrice, duration)
+  const priceNum = priceForDuration(service?.price ?? tutorPrice, duration)
   const price = `₾${priceNum}`
   const total = `₾${priceNum}`
 
@@ -1971,6 +2019,10 @@ const BookingModal = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tutorId,
+          // Booking a tapped tier: the server validates ownership and uses the
+          // Consultation row's minutes/price as authoritative (undefined keys
+          // are dropped by JSON.stringify, so the generic flow is unchanged).
+          consultationId: service?.id,
           topic: details.topic || 'კონსულტაცია',
           studentNotes: details.goal || undefined,
           startAt: selectedStart.toISOString(),
@@ -2004,6 +2056,7 @@ const BookingModal = ({
         setSubmitError(msg)
         return
       }
+      setCreatedId(typeof data?.id === 'string' ? data.id : null)
       setSubmitted(true)
     } catch {
       setSubmitError('ქსელის შეცდომა. შეამოწმე კავშირი და სცადე თავიდან.')
@@ -2029,6 +2082,7 @@ const BookingModal = ({
       tutorName={tutorName}
       tutorSpecialty={tutorSpecialty}
       tutorAvatar={tutorAvatar ?? null}
+      serviceTitle={service?.title ?? null}
     />
   )
 
@@ -2071,7 +2125,9 @@ const BookingModal = ({
                 სესიის დაჯავშნა
               </div>
             </div>
-            <h2 className="font-display text-[20px] lg:text-[22px] font-bold text-ink-900 tracking-tight">{tutorName} · {tutorSpecialty}</h2>
+            {/* When a service tier was tapped, name IT here — the user must see
+                what they're booking from step 1 onward. */}
+            <h2 className="font-display text-[20px] lg:text-[22px] font-bold text-ink-900 tracking-tight">{tutorName} · {service ? service.title : tutorSpecialty}</h2>
             <div className="mt-4">
               <Steps step={step} total={totalSteps} />
             </div>
@@ -2094,11 +2150,21 @@ const BookingModal = ({
                 დაჯავშნა გაიგზავნა
               </h3>
               <p className="text-[14px] text-ink-600 mt-3 max-w-[440px] leading-[1.55] motion-safe:animate-rise-in" style={{ animationDelay: '200ms' }}>
-                {dayLabelFull}{selectedStart ? ` · ${fmtHM(selectedStart)}` : ''} · {tutorName}. ექსპერტი დაადასტურებს ჯავშანს — შემდეგ გაიგზავნება ვიდეო-ლინკი და ეს გამოჩნდება „ჩემი ჯავშნების" გვერდზე.
+                {dayLabelFull}{selectedStart ? ` · ${fmtHM(selectedStart)}` : ''} · {total} · {tutorName}. ექსპერტი დაადასტურებს ჯავშანს — შემდეგ გაიგზავნება ვიდეო-ლინკი და ეს გამოჩნდება „ჩემი ჯავშნების" გვერდზე.
               </p>
-              <button type="button" onClick={onClose} className="mt-7 h-11 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast motion-safe:animate-rise-in" style={{ animationDelay: '280ms' }}>
-                მზად ვარ
-              </button>
+              {/* Primary action leads to the created booking — closing into the
+                  profile was a dead end. Plain close stays as the secondary. */}
+              <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-2 motion-safe:animate-rise-in" style={{ animationDelay: '280ms' }}>
+                <Link
+                  href={createdId ? `/student/bookings/${createdId}` : '/student/bookings'}
+                  className="h-11 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast"
+                >
+                  ჯავშნის ნახვა <Icon.arrow className="w-4 h-4" />
+                </Link>
+                <button type="button" onClick={onClose} className="h-11 px-5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[13px] tracking-wide transition-colors">
+                  დახურვა
+                </button>
+              </div>
             </div>
           ) : step === 1 ? (
             <div className="grid lg:grid-cols-[360px_1fr] h-full">
@@ -2196,8 +2262,10 @@ const BookingModal = ({
                 <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500">არჩეული</div>
                 <div className="font-display font-bold text-ink-900 mt-0.5">
                   {selectedStart
-                    ? <>{dayLabelFull} · {fmtHM(selectedStart)} · <span className="tabular-nums">{duration}</span> წუთი · <span className="tabular-nums">{price}</span></>
-                    : '— აირჩიე დრო'}
+                    ? <>{service ? `${service.title} · ` : ''}{dayLabelFull} · {fmtHM(selectedStart)} · <span className="tabular-nums">{duration}</span> წუთი · <span className="tabular-nums">{price}</span></>
+                    : service
+                      ? <>{service.title} · <span className="font-medium text-ink-500">აირჩიე დრო</span></>
+                      : '— აირჩიე დრო'}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -2340,6 +2408,10 @@ function ExpertProfile() {
   const [bookingOpen, setBookingOpen] = useState(false)
   const [bookingMode, setBookingMode] = useState<BookingMode>('paid')
   const [bookingInit, setBookingInit] = useState<{ step: number; start: Date | null }>({ step: 1, start: null })
+  // Consultation tier tapped in ServicesSection — flows into BookingModal so
+  // the modal books THAT tier's minutes/price (via consultationId). Null for
+  // every generic CTA (sticky card, mobile bar), which books the flat default.
+  const [selectedService, setSelectedService] = useState<ConsultationItem | null>(null)
 
   // No-op when the tutor is paused (available === false). The banner above
   // explains the state; silently swallowing the click prevents any of the
@@ -2350,11 +2422,21 @@ function ExpertProfile() {
   const openPaid = () => {
     if (isPaused) return
     if (requireAuth('book')) return
+    setSelectedService(null)
+    setBookingMode('paid'); setBookingInit({ step: 1, start: null }); setBookingOpen(true)
+  }
+  // Service-card entry point: same gates as openPaid, but carries the tapped
+  // tier into the modal.
+  const openServiceBooking = (s: ConsultationItem) => {
+    if (isPaused) return
+    if (requireAuth('book')) return
+    setSelectedService(s)
     setBookingMode('paid'); setBookingInit({ step: 1, start: null }); setBookingOpen(true)
   }
   const continueFromSidebar = (start: Date, mode: BookingMode) => {
     if (isPaused) return
     if (requireAuth('book')) return
+    setSelectedService(null)
     setBookingMode(mode)
     setBookingInit({ step: 2, start })
     setBookingOpen(true)
@@ -2365,16 +2447,21 @@ function ExpertProfile() {
   // once — we track it with a guard state so React strict-mode double invokes
   // stay idempotent, and further modal opens/closes remain manual. Skip if
   // the tutor has paused their listing since the rebook link was generated.
+  // Anonymous visitors go through requireAuth instead of straight into the
+  // modal — the AuthPromptSheet's 'book' intent carries ?rebook=1 through
+  // sign-in, so the flow resumes here after auth.
   const [rebookConsumed, setRebookConsumed] = useState(false)
   useEffect(() => {
     if (!rebookAutoOpen || rebookConsumed) return
     if (loadState !== 'ok') return
     if (isPaused) { setRebookConsumed(true); return }
+    if (signedIn === null) return // wait for the /api/me probe to resolve
+    if (requireAuth('book')) { setRebookConsumed(true); return }
     setBookingMode('paid')
     setBookingInit({ step: 1, start: null })
     setBookingOpen(true)
     setRebookConsumed(true)
-  }, [rebookAutoOpen, rebookConsumed, loadState, isPaused])
+  }, [rebookAutoOpen, rebookConsumed, loadState, isPaused, signedIn, requireAuth])
 
   // Safe now — every hook above has already run unconditionally.
   if (loadState === 'not-found') {
@@ -2506,11 +2593,12 @@ function ExpertProfile() {
             <SpecsGrid tutor={tutorData} />
 
             <AboutSection tutor={tutorData} />
-            {/* ServicesSection intentionally NOT rendered: the product sells ONE
-                flat-priced session (the sticky booking card). The legacy
-                consultation tiers advertised per-tier prices the booking modal
-                never honored (it always books tutor.price) — a pricing lie on
-                the highest-intent page. Data stays in the API; UI stays honest. */}
+            {/* Consultation tiers. Rendered again (they were hidden while the
+                modal ignored per-tier prices): a tapped card now flows into
+                BookingModal, which enumerates slots by the tier's minutes,
+                restates ITS price and sends consultationId — the server books
+                the Consultation row's authoritative minutes/price. */}
+            <ServicesSection consultations={tutorData?.consultations ?? []} onBook={openServiceBooking} />
             <ExperienceSection items={tutorData?.experience ?? []} />
             <EducationSection items={tutorData?.education ?? []} />
             <CertificatesSection items={tutorData?.certificates ?? []} />
@@ -2532,6 +2620,7 @@ function ExpertProfile() {
             <StickyBookingCard
               onOpen={openPaid}
               availability={tutorData?.availability ?? []}
+              busySlots={tutorData?.busySlots ?? []}
               tutorPrice={tutorData?.price ?? TUTOR_DEFAULTS.price}
               sessionMin={tutorData?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin}
               responseHours={tutorData?.responseHours ?? TUTOR_DEFAULTS.responseHours}
@@ -2555,6 +2644,7 @@ function ExpertProfile() {
         signedIn={signedIn}
         paused={isPaused}
         availability={tutorData?.availability ?? []}
+        busySlots={tutorData?.busySlots ?? []}
       />
 
       {/* Point-of-tap auth prompt — replaces the old top-of-page banner. */}
@@ -2568,7 +2658,9 @@ function ExpertProfile() {
 
       <BookingModal
         open={bookingOpen}
-        onClose={() => setBookingOpen(false)}
+        // Closing drops the tapped tier too — the next generic open must not
+        // silently rebook the previous service.
+        onClose={() => { setBookingOpen(false); setSelectedService(null) }}
         mode={bookingMode}
         initialStep={bookingInit.step}
         initialStart={bookingInit.start}
@@ -2581,6 +2673,7 @@ function ExpertProfile() {
         availability={tutorData?.availability ?? []}
         busySlots={tutorData?.busySlots ?? []}
         sessionMin={tutorData?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin}
+        service={selectedService}
       />
     </div>
   )
