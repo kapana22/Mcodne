@@ -701,15 +701,18 @@ const SpecsGrid = ({ tutor }: { tutor: TutorDetail | null }) => {
     { n: 'Escrow', l: 'TBC · BOG · SOLO', icon: <Icon.shield className="w-3.5 h-3.5" /> },
   ]
   return (
-    <section className="mt-10 rounded-card border border-ink-200 bg-white overflow-hidden">
+    // Compact fact strip — these repeat identity-row facts, so on desktop they
+    // act as quiet confirmation, not a second hero. Half the old height keeps
+    // the About content (the real evaluation material) above the fold.
+    <section className="mt-8 rounded-card border border-ink-200 bg-white overflow-hidden">
       <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-ink-100">
         {items.map((it, i) => (
-          <div key={i} className={`p-4 sm:p-5 ${i === 0 ? 'border-l-0' : ''} ${i === 2 ? 'lg:border-l' : ''}`}>
+          <div key={i} className={`px-4 py-3 sm:px-5 ${i === 0 ? 'border-l-0' : ''} ${i === 2 ? 'lg:border-l' : ''}`}>
             <div className="inline-flex items-center gap-1.5 text-ink-500">
               {it.icon}
-              <span className="font-display text-[10px] font-semibold uppercase tracking-[0.18em]">{it.l}</span>
+              <span className="font-display text-[9.5px] font-semibold uppercase tracking-[0.16em]">{it.l}</span>
             </div>
-            <div className="mt-2 font-display text-[24px] sm:text-[28px] lg:text-[30px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">{it.n}</div>
+            <div className="mt-1 font-display text-[17px] sm:text-[19px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">{it.n}</div>
           </div>
         ))}
       </div>
@@ -1011,7 +1014,11 @@ const StickyBookingCard = ({
           >
             {signedIn === false ? 'შესვლა და დაჯავშნა' : 'დაჯავშნე'} <Icon.arrow className="w-4 h-4" />
           </button>
-          <p className="mt-2.5 text-[11px] text-ink-500 text-center leading-snug">აირჩიე დრო და დაასრულე ჯავშანი ერთ ფანჯარაში.</p>
+          {/* Decision-point reassurance: what happens next + the cancel safety
+              net — the two questions users ask right before clicking. */}
+          <p className="mt-2.5 text-[11px] text-ink-500 text-center leading-snug">
+            შემდეგ ეტაპზე აირჩევ ზუსტ დროს · გაუქმება უფასოა სესიამდე 24 სთ-ით ადრე
+          </p>
         </div>
 
         {/* Bottom strip */}

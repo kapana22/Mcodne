@@ -46,7 +46,7 @@ export function MarketingTopBar() {
           <Link href="/signin" className="hidden md:inline-flex h-9 px-3 rounded-btn font-medium text-[13px] text-ink-800 hover:bg-ink-50 items-center">
             შესვლა
           </Link>
-          <Link href="/signin?view=signup" className="h-9 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-semibold text-[12.5px] transition-colors inline-flex items-center gap-1.5">
+          <Link href="/signup" className="h-9 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-semibold text-[12.5px] transition-colors inline-flex items-center gap-1.5">
             დაიწყე
             <Icon.arrow className="w-3.5 h-3.5" />
           </Link>
@@ -81,7 +81,7 @@ export function MarketingTopBar() {
               </Link>
             </div>
             <div className="px-5 pb-5">
-              <Link href="/signin?view=signup"
+              <Link href="/signup"
                     className="w-full h-11 rounded-btn bg-brand-500 text-white font-display font-semibold text-[13px] inline-flex items-center justify-center gap-2">
                 დაიწყე
                 <Icon.arrow className="w-4 h-4" />

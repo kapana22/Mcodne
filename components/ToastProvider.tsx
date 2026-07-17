@@ -76,7 +76,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={value}>
       {children}
       <div
-        className="fixed bottom-4 right-4 z-[70] flex flex-col gap-2 pointer-events-none"
+        className="toast-host fixed bottom-4 right-4 z-[70] flex flex-col gap-2 pointer-events-none safe-area-bottom"
         aria-live="polite"
       >
         {items.map(t => (

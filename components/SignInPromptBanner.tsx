@@ -42,7 +42,7 @@ export function SignInPromptBanner({
       </Link>
       <span className="text-brand-400" aria-hidden="true">·</span>
       <Link
-        href={`/signin?view=signup&redirect=${enc}`}
+        href={`/signup?redirect=${enc}`}
         className="font-display text-[13px] font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 decoration-brand-300"
       >
         რეგისტრაცია

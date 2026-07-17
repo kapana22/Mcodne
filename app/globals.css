@@ -49,7 +49,11 @@ html, body {
   background-color: #FFFFFF;
   /* Warm near-black — never harsh #000. Softer for long-session reading. */
   color: #2E2A21;
-  overflow-x: hidden;
+  /* `clip` (not `hidden`): hidden turns body into a scroll container, which
+     silently defeats EVERY `position: sticky` descendant site-wide (app bars,
+     booking rail, editor side-nav). clip gives identical no-horizontal-scroll
+     behavior without creating a scroll container. */
+  overflow-x: clip;
   max-width: 100vw;
 }
 
@@ -404,8 +408,59 @@ html {
  * on screen — marketing/admin/session routes never get this padding.
  */
 @media (max-width: 1023px) {
-  body[data-bottom-nav="true"] {
+  /* BottomNav sets the attribute to "1" (same convention as data-mobile-cta
+     below) — matching any value here would also work, but keep the exact
+     value so the two attribute hooks stay symmetrical. */
+  body[data-bottom-nav="1"] {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ─────────── Toast host vs BottomNav ───────────
+ * The toast host (ToastProvider) is fixed to the bottom-right. When the
+ * mobile tab bar is on screen it would cover incoming toasts — lift the
+ * host clear of the 64px bar (plus home-indicator inset) so "saved" feedback
+ * is never hidden behind navigation.
+ */
+@media (max-width: 1023px) {
+  body[data-bottom-nav="1"] .toast-host {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ─────────── iOS input-zoom guard ───────────
+ * Mobile Safari auto-zooms the page when a focused input's font-size is
+ * under 16px. Page code sizes inputs at 13-14.5px via utility classes, so
+ * below the desktop breakpoint we force every text-entry control to 16px.
+ * `!important` is required: utility classes like `text-[14.5px]` would
+ * otherwise out-rank the bare `textarea`/`select` element selectors.
+ */
+@media (max-width: 1023px) {
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="number"],
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* ─────────── Cookie banner vs BottomNav ───────────
+ * Same idea for the mobile tab bar: don't let the consent banner sit on top
+ * of navigation. Declared BEFORE the data-mobile-cta rule so that when a
+ * page has both (signed-in user on an expert profile), the taller
+ * booking-bar offset wins.
+ */
+@media (max-width: 1023px) {
+  body[data-bottom-nav="1"] [aria-label="Cookie consent"] {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
 }
 

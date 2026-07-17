@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Logo } from '@/components/Logo'
 import { Icon } from '@/components/Icon'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { signOut as doSignOut } from '@/lib/signout'
 
 // Local mirror of lib/notify.ts PrefKey. Keeping this in-file so the Settings
 // page doesn't import from a server helper. All keys default to true when
@@ -302,10 +303,9 @@ export default function SettingsPage() {
     }
   }
 
-  const signOut = async () => {
-    await fetch('/api/auth/signout', { method: 'POST' }).catch(() => {})
-    window.location.href = '/'
-  }
+  // Funnel through the shared helper — location.replace drops the signed-in
+  // page from history so back-navigation can't resurrect stale authed UI.
+  const signOut = () => doSignOut()
 
   const [signOutOpen, setSignOutOpen] = useState(false)
   const [signOutBusy, setSignOutBusy] = useState(false)

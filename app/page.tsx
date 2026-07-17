@@ -111,7 +111,7 @@ const TopNav = () => {
             <Link href="/apply" className={`hidden md:inline-flex h-9 px-3 rounded-btn font-display font-medium tracking-wide text-[13px] items-center transition-colors text-ink-800 hover:bg-ink-50`}>გახდი ექსპერტი</Link>
             <div className="hidden md:block w-px h-5 bg-ink-200 mx-1.5" />
             <Link href="/signin" className="hidden md:inline-flex h-9 px-3 rounded-btn font-display font-medium tracking-wide text-[13px] text-ink-800 hover:bg-ink-50 items-center transition-colors">შესვლა</Link>
-            <Link href="/signin?view=signup" className="hidden sm:inline-flex font-display font-semibold text-[12.5px] tracking-wide bg-brand-500 hover:bg-brand-600 text-white h-9 px-3.5 sm:px-4 rounded-btn transition-colors items-center gap-1.5">
+            <Link href="/signup" className="hidden sm:inline-flex font-display font-semibold text-[12.5px] tracking-wide bg-brand-500 hover:bg-brand-600 text-white h-9 px-3.5 sm:px-4 rounded-btn transition-colors items-center gap-1.5">
               დაიწყე
               <Icon.arrow className="w-3.5 h-3.5" />
             </Link>
@@ -140,7 +140,7 @@ const TopNav = () => {
                 ))}
               </nav>
               <div className="px-5 py-4 border-t border-ink-200 shrink-0 space-y-2.5 bg-ink-50/40">
-                <Link href="/signin?view=signup" onClick={() => setMobOpen(false)} className="w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors">
+                <Link href="/signup" onClick={() => setMobOpen(false)} className="w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors">
                   დაიწყე უფასოდ <Icon.arrow className="w-3.5 h-3.5" />
                 </Link>
                 <Link href="/signin" onClick={() => setMobOpen(false)} className="w-full h-11 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center transition-colors">
@@ -272,6 +272,7 @@ type Expert = {
   next: string
   online: boolean
   video: boolean
+  verified: boolean
   photo: string
 }
 
@@ -305,11 +306,14 @@ function mapTutorToExpert(t: any): Expert {
     rate: typeof t?.rating === 'number' ? t.rating : 0,
     reviews: t?.reviewsCount ?? 0,
     sessions: t?.sessionsCount ?? 0,
-    price: t?.price ?? 60,
+    // Shared fallback — MUST match TUTOR_DEFAULTS.price (80) in the /tutors
+    // surfaces so the same missing-price row never shows two different numbers.
+    price: t?.price ?? 80,
     durationMin: t?.consultationDurationMin ?? 30,
     next: fmtNextShort(t?.nextSlotAt),
     online: false,
     video: Boolean(t?.videoUrl),
+    verified: t?.verified ?? false,
     // Fall back to the user's avatar URL, then to a neutral initials placeholder
     // (no unsplash stock photos — a stock photo tied to a real name reads as a
     // fake identity to crawlers and undermines the "hand-picked" trust claim).
@@ -451,7 +455,7 @@ const HomeHero = () => {
                   <div className="min-w-0 flex-1 pt-0.5">
                     <div className="flex items-center gap-1.5">
                       <span className="font-display text-[18px] font-bold text-ink-900 tracking-tight truncate">{featured.name}</span>
-                      <VerifiedMark size={16} />
+                      {featured.verified && <VerifiedMark size={16} />}
                     </div>
                     {featured.headline && (
                       <div className="mt-1 inline-flex items-center gap-1.5 h-5 px-2 rounded-pill bg-info-50 text-info-700 font-display text-[11px] font-semibold tracking-tight max-w-full truncate">
@@ -636,7 +640,7 @@ const ExpertCard = ({ e }: { e: Expert }) => (
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
               <h3 className="font-display text-[20px] font-bold text-ink-900 tracking-tight leading-[1.15]">{e.name}</h3>
-              <VerifiedMark size={14} />
+              {e.verified && <VerifiedMark size={14} />}
             </div>
             <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
               <span className="font-display text-[12px] font-semibold text-ink-700">{e.cat}</span>
@@ -674,7 +678,7 @@ const ExpertCard = ({ e }: { e: Expert }) => (
     <div className="sm:hidden px-4 pt-4 pb-3 flex flex-col min-w-0">
       <div className="flex items-center gap-1.5 min-w-0">
         <h3 className="font-display text-[18px] font-bold text-ink-900 tracking-tight leading-[1.15] truncate">{e.name}</h3>
-        <VerifiedMark size={14} />
+        {e.verified && <VerifiedMark size={14} />}
       </div>
       <div className="mt-1.5 flex items-center gap-1.5 flex-wrap min-w-0">
         <span className="font-display text-[12px] font-semibold text-ink-700">{e.cat}</span>
@@ -818,7 +822,7 @@ const HowItWorks = () => (
             ვიდრე უკვე გელაპარაკები.
           </h2>
           <p className="text-[15px] text-ink-600 mt-5 max-w-[400px] leading-relaxed">რეგისტრაცია — გაცნობა — სესია. 15 წუთიდან სრულ კონსულტაციამდე.</p>
-          <Link href="/signin?view=signup" className="mt-7 h-12 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
+          <Link href="/signup" className="mt-7 h-12 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
             დაიწყე ახლავე <Icon.arrow className="w-4 h-4" />
           </Link>
         </div>

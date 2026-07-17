@@ -550,24 +550,41 @@ const Wishlist = ({ onBook, onQuickView }: { onBook: (w: WishItem) => void; onQu
   }, [attempt])
 
   if (loadState === 'loading') return null
+  // Failure/empty here is secondary content — render a compact single-row
+  // notice, never a hero-sized card competing with the user's sessions.
   if (loadState === 'error') {
     return (
-      <EmptyState
-        icon={<Icon.warn className="w-6 h-6" />}
-        title="მოკლე-სია ვერ ჩაიტვირთა"
-        description="შენახული ექსპერტების სია ამჟამად მიუწვდომელია — სცადე თავიდან."
-        cta={{ label: 'სცადე თავიდან', onClick: () => setAttempt(a => a + 1) }}
-      />
+      <div role="alert" className="rounded-card border border-ink-200 bg-white px-4 sm:px-5 py-3 flex items-center gap-3 flex-wrap motion-safe:animate-fade-in">
+        <Icon.warn className="w-4 h-4 text-ink-400 shrink-0" />
+        <p className="flex-1 min-w-[220px] text-[12.5px] text-ink-600">
+          <span className="font-display font-semibold text-ink-800">მოკლე-სია ვერ ჩაიტვირთა</span> — შენახული ექსპერტების სია ამჟამად მიუწვდომელია.
+        </p>
+        <button
+          type="button"
+          onClick={() => setAttempt(a => a + 1)}
+          className="shrink-0 h-8 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+        >
+          <Icon.refresh className="w-3.5 h-3.5" />
+          სცადე თავიდან
+        </button>
+      </div>
     )
   }
   if (!items.length) {
     return (
-      <EmptyState
-        icon={<Icon.heart className="w-6 h-6" />}
-        title="მოკლე-სია ცარიელია"
-        description="შეინახე ექსპერტები კატალოგიდან — გამოჩნდებიან აქ გვერდიგვერდ შესადარებლად."
-        cta={{ label: 'ექსპერტების დათვალიერება', href: '/tutors' }}
-      />
+      <div className="rounded-card border border-dashed border-ink-200 bg-white px-4 sm:px-5 py-3 flex items-center gap-3 flex-wrap motion-safe:animate-fade-in">
+        <Icon.heart className="w-4 h-4 text-ink-400 shrink-0" />
+        <p className="flex-1 min-w-[220px] text-[12.5px] text-ink-600">
+          <span className="font-display font-semibold text-ink-800">მოკლე-სია ცარიელია</span> — შეინახე ექსპერტები კატალოგიდან შესადარებლად.
+        </p>
+        <Link
+          href="/tutors"
+          className="shrink-0 h-8 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+        >
+          ექსპერტების დათვალიერება
+          <Icon.arrow className="w-3 h-3" />
+        </Link>
+      </div>
     )
   }
 
@@ -682,7 +699,8 @@ const Wishlist = ({ onBook, onQuickView }: { onBook: (w: WishItem) => void; onQu
 
             <div className="hidden sm:flex items-baseline gap-1.5 shrink-0">
               <span className="font-display text-[16px] font-bold text-ink-900 tabular-nums tracking-tight">₾{w.price}</span>
-              <span className="text-[10.5px] text-ink-500">/ 60 წთ</span>
+              {/* Flat per-session price — durations vary per expert, so a hardcoded "60 წთ" lied for most. */}
+              <span className="text-[10.5px] text-ink-500">/ სესია</span>
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
@@ -750,7 +768,7 @@ const Wishlist = ({ onBook, onQuickView }: { onBook: (w: WishItem) => void; onQu
               </thead>
               <tbody className="font-display tabular-nums">
                 <tr className="border-t border-white/10">
-                  <td className="py-2.5 pr-3 text-white/60">ფასი / 60 წთ</td>
+                  <td className="py-2.5 pr-3 text-white/60">ფასი / სესია</td>
                   {items.map(w => <td key={w.id} className={`py-2.5 px-2 font-bold ${w.price === cheapest.price ? 'text-brand-300' : 'text-white'}`}>₾{w.price}</td>)}
                 </tr>
                 <tr className="border-t border-white/10">
@@ -842,15 +860,15 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
     <section className="rounded-card border border-ink-200 bg-white overflow-hidden">
       <div className="px-5 sm:px-6 py-5 border-b border-ink-100 flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1.5">გამოცადე</div>
-          <h2 className="font-display text-[18px] sm:text-[20px] font-bold text-ink-900 tracking-tight leading-tight">
+          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-1.5">გამოცადე</div>
+          <h2 className="font-display text-[16px] sm:text-[17px] font-bold text-ink-900 tracking-tight leading-tight">
             რეკომენდებული ექსპერტები
           </h2>
           <p className="text-[12.5px] text-ink-500 mt-1.5 max-w-[480px] leading-relaxed">
             გადამოწმებული ექსპერტები, რომლებიც უახლოეს დროში ხელმისაწვდომია.
           </p>
         </div>
-        <Link href="/tutors" className="h-9 px-3 rounded-btn bg-ink-900 hover:bg-ink-800 text-white font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors">
+        <Link href="/tutors" className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors">
           ყველა ექსპერტი <Icon.arrow className="w-3 h-3" />
         </Link>
       </div>
@@ -893,13 +911,16 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
           ))}
         </div>
       ) : failed ? (
-        <div className="py-10 px-6 text-center">
-          <div className="font-display text-[14.5px] font-bold text-ink-900 tracking-tight">ვერ ჩაიტვირთა</div>
-          <p className="text-[12.5px] text-ink-500 mt-1.5">ექსპერტების სია ამჟამად მიუწვდომელია — სცადე თავიდან.</p>
+        // Compact single-row failure notice — retryable, never hero-sized.
+        <div role="alert" className="px-5 sm:px-6 py-3.5 flex items-center gap-3 flex-wrap">
+          <Icon.warn className="w-4 h-4 text-ink-400 shrink-0" />
+          <p className="flex-1 min-w-[220px] text-[12.5px] text-ink-600">
+            <span className="font-display font-semibold text-ink-800">ვერ ჩაიტვირთა</span> — ექსპერტების სია ამჟამად მიუწვდომელია.
+          </p>
           <button
             type="button"
             onClick={() => setAttempt(a => a + 1)}
-            className="mt-4 h-9 px-3.5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+            className="shrink-0 h-8 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
           >
             <Icon.refresh className="w-3.5 h-3.5" />
             სცადე თავიდან
@@ -914,7 +935,9 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
         />
       ) : (
         <div className="p-5 sm:p-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {tutors.slice(0, 9).map(t => (
+          {/* Cap the dashboard preview at 6 — full catalog lives behind
+              the „ყველა ექსპერტი" link above. */}
+          {tutors.slice(0, 6).map(t => (
             <button
               key={t.id}
               type="button"
@@ -1177,7 +1200,8 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
       <div className="px-5 sm:px-6 pt-5 border-b border-ink-100">
         <div className="flex items-baseline justify-between flex-wrap gap-3">
           <div>
-            <h2 className="font-display text-[18px] sm:text-[20px] font-bold text-ink-900 tracking-tight">ჩემი სესიები</h2>
+            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">ჩემი აქტივობა</div>
+            <h2 className="font-display text-[20px] sm:text-[22px] font-bold text-ink-900 tracking-tight">ჩემი სესიები</h2>
             <p className="text-[12px] text-ink-500 mt-0.5">ყველა შენი ჯავშანი ერთ ადგილას · escrow დაცული</p>
           </div>
           <Link href="/student/bookings" className="font-display text-[12px] font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
@@ -1399,7 +1423,7 @@ const ExpertQuickModal = ({ open, onClose, expert, onBook }: { open: boolean; on
         <div className="mt-5 text-center">
           <div className="rounded-card border border-ink-200 px-3 py-3">
             <div className="font-display text-[9.5px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1">ფასი</div>
-            <div className="font-display text-[16px] font-bold text-ink-900 tabular-nums leading-none">₾{expert.price}<span className="text-[11px] font-medium text-ink-500 ml-1">/ 60 წთ</span></div>
+            <div className="font-display text-[16px] font-bold text-ink-900 tabular-nums leading-none">₾{expert.price}<span className="text-[11px] font-medium text-ink-500 ml-1">/ სესია</span></div>
           </div>
         </div>
       </div>
@@ -1488,19 +1512,21 @@ const HomeSection = ({ me, bookings, bookingsLoading, bookingsError, reload, ope
       <div className="mb-6">
         <NextSession bookings={bookings} loading={bookingsLoading} onOpenDetail={onOpenDetail} onOpenExpert={() => {}} />
       </div>
-      <div className="mb-8">
-        <Wishlist onBook={openBookingFor} onQuickView={onOpenExpert} />
-      </div>
-      <div className="mb-8">
-        <Discover onOpen={(t) => { window.location.href = `/tutors/${t.id}` }} />
-      </div>
-      <div className="grid lg:grid-cols-[1fr_340px] gap-6 xl:gap-8 items-start">
+      {/* Primary: the user's own sessions (+ quick-book rail) come FIRST —
+          discovery (recommendations, shortlist) follows below. */}
+      <div className="grid lg:grid-cols-[1fr_340px] gap-6 xl:gap-8 items-start mb-8">
         <div className="min-w-0 space-y-6">
           <SessionsPanel bookings={bookings} loading={bookingsLoading} loadError={bookingsError} reload={reload} onOpenSession={s => onOpenDetail(s.id)} />
         </div>
         <aside className="space-y-5 lg:sticky lg:top-[80px]">
           <BookAgain onBook={openBookingGeneric} />
         </aside>
+      </div>
+      <div className="mb-8">
+        <Discover onOpen={(t) => { window.location.href = `/tutors/${t.id}` }} />
+      </div>
+      <div>
+        <Wishlist onBook={openBookingFor} onQuickView={onOpenExpert} />
       </div>
     </main>
   </>

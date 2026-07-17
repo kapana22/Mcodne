@@ -122,7 +122,7 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, stats }:
     <section className="bg-white border-b border-ink-200">
       <div className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-8 pb-6">
         <nav aria-label="ნავიგაცია" className="flex items-center gap-1.5 text-[12px] text-ink-500 mb-4">
-          <Link href="/student" className="hover:text-ink-800 transition-colors">ჩემი სივრცე</Link>
+          <Link href="/" className="hover:text-ink-800 transition-colors">მთავარი</Link>
           <Icon.chevR className="w-3 h-3 text-ink-300" />
           <span className="font-display font-semibold text-ink-800">ექსპერტების ძიება</span>
         </nav>
@@ -1696,7 +1696,7 @@ const Footer = () => (
             { t: 'ექსპერტები', href: '/tutors' },
             { t: 'კატეგორიები', href: '/tutors' },
             { t: 'როგორ მუშაობს', href: '/#how' },
-            { t: 'დაწყება', href: '/signin?view=signup' },
+            { t: 'დაწყება', href: '/signup' },
           ]},
           { h: 'კომპანია', l: [
             { t: 'ჩვენ შესახებ', href: '/#about' },

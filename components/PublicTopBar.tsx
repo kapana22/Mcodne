@@ -116,7 +116,7 @@ export function PublicTopBar({ activeHref }: { activeHref?: string }) {
                 შესვლა
               </Link>
               <Link
-                href="/signin?view=signup"
+                href="/signup"
                 className="h-10 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-bold text-[12px] uppercase tracking-[0.06em] transition-all duration-fast ease-out-quart inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)]"
               >
                 დაწყება
@@ -201,7 +201,7 @@ export function PublicTopBar({ activeHref }: { activeHref?: string }) {
             {!me && (
               <div className="px-5 pb-5 pt-3 border-t border-ink-100">
                 <Link
-                  href="/signin?view=signup"
+                  href="/signup"
                   onClick={() => setMobOpen(false)}
                   className="w-full h-12 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-bold text-[13px] uppercase tracking-[0.06em] inline-flex items-center justify-center gap-2 shadow-brand-glow transition-all"
                 >

@@ -506,9 +506,14 @@ export default function TutorProfilePage() {
 
   return (
     <div className="min-h-screen bg-ink-50 flex flex-col">
+      {/* globals.css puts `overflow-x: hidden` on html/body, which turns body into
+          a scroll container and silently defeats every `position: sticky` on the
+          page (left rail AND app bar). `clip` clips horizontal overflow identically
+          but without creating a scroll container. Scoped to this page's mount. */}
+      <style>{`html, body { overflow-x: clip; }`}</style>
       <TutorAppBar user={me ? { name: me.fullName, avatar: me.avatarUrl ?? undefined } : undefined} />
 
-      <main className="flex-1 px-6 py-8 max-w-[900px] w-full mx-auto">
+      <main className="flex-1 px-6 py-8 max-w-[900px] lg:max-w-[1120px] w-full mx-auto">
         <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="font-display text-[26px] font-bold tracking-tight text-ink-900">პროფილი</h1>
@@ -537,26 +542,57 @@ export default function TutorProfilePage() {
             <span className="ml-3 text-[13px]">იტვირთება…</span>
           </div>
         ) : (
-          <div className="space-y-6">
-            {/* Profile completeness — always visible on the profile page so
-                tutors see immediate feedback as they fill in fields. */}
-            {profile && (
-              <ProfileCompleteness
-                profile={profile}
-                certificates={certificates.length}
-                education={education.length}
-                experience={experience.length}
-                avatarUrl={me?.avatarUrl ?? null}
-                variant="card"
-                alwaysShow
-              />
-            )}
+          <div className="lg:grid lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-8 lg:items-start">
+            {/* Left sticky rail — profile completeness + section navigation.
+                On mobile it stacks above the content (nav hidden, completeness
+                stays at the top exactly as before). */}
+            <aside className="mb-6 lg:mb-0 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto space-y-4">
+              {/* Profile completeness — always visible on the profile page so
+                  tutors see immediate feedback as they fill in fields. */}
+              {profile && (
+                <ProfileCompleteness
+                  profile={profile}
+                  certificates={certificates.length}
+                  education={education.length}
+                  experience={experience.length}
+                  avatarUrl={me?.avatarUrl ?? null}
+                  variant="card"
+                  alwaysShow
+                />
+              )}
 
-            <GroupLabel>ძირითადი ინფო</GroupLabel>
+              <nav aria-label="პროფილის სექციები" className="hidden lg:block p-4 rounded-card border border-ink-200 bg-white">
+                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-ink-400 mb-2 px-2">სექციები</div>
+                <ul className="space-y-0.5">
+                  {[
+                    { href: '#group-public',      label: 'საჯარო პროფილი' },
+                    { href: '#group-services',    label: 'სერვისები და ფასი' },
+                    { href: '#group-credentials', label: 'კვალიფიკაცია' },
+                    { href: '#group-account',     label: 'ანგარიში' },
+                  ].map(l => (
+                    <li key={l.href}>
+                      <a
+                        href={l.href}
+                        className="block px-2 py-1.5 rounded-btn font-display text-[13px] font-semibold text-ink-700 hover:text-brand-700 hover:bg-ink-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                      >
+                        {l.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            </aside>
+
+            {/* Main content column — 4 titled section groups */}
+            <div className="min-w-0 space-y-10">
+
+            {/* ——— Group 1: საჯარო პროფილი ——— */}
+            <div id="group-public" className="scroll-mt-24 space-y-6">
+            <GroupLabel>საჯარო პროფილი</GroupLabel>
 
             {/* Avatar block — hover overlay pattern, keyboard-focusable button.
                 Reuses the existing `uploadAvatar` handler and hidden file input. */}
-            <section id="section-avatar" className="p-6 rounded-card border border-ink-200 bg-white">
+            <section id="section-avatar" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white">
               <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-4">ავატარი</div>
               <div className="flex items-center gap-5">
                 <button
@@ -603,7 +639,7 @@ export default function TutorProfilePage() {
 
             {/* Public profile form */}
             {profile ? (
-              <form id="section-public-profile" onSubmit={saveProfile} className="p-6 rounded-card border border-ink-200 bg-white space-y-4">
+              <form id="section-public-profile" onSubmit={saveProfile} className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600">საჯარო პროფილი</div>
                   {dirty && (
@@ -692,11 +728,9 @@ export default function TutorProfilePage() {
               </div>
             )}
 
-            {profile && <GroupLabel>ვიდეო</GroupLabel>}
-
             {/* Intro video — optional YouTube link shown in tutor detail hero */}
             {profile && (
-              <section id="section-video" className="p-6 rounded-card border border-ink-200 bg-white space-y-4">
+              <section id="section-video" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-1">Intro ვიდეო · YouTube</div>
@@ -728,9 +762,9 @@ export default function TutorProfilePage() {
                     <p className="text-[11.5px] text-warning-700">ეს ვიდეო ძველი ატვირთვის სისტემიდანაა. სცადე ჩააგდო YouTube ბმული ქვემოთ — უფრო სწრაფად ჩაიტვირთება კლიენტებთან.</p>
                   </div>
                 ) : (
-                  <div className="p-6 rounded-card border border-dashed border-ink-300 bg-ink-50/40 text-center">
-                    <div className="font-display text-[13px] font-semibold text-ink-700 mb-2">ჯერ არ აქვს intro ვიდეო</div>
-                    <p className="text-[12px] text-ink-500 mb-4 max-w-[400px] mx-auto">გაუკეთე რეკ. თემა: „ვინ ვარ · რას ვაკეთებ · რომელ პრობლემას ვხსნი".</p>
+                  <div className="p-4 rounded-card border border-dashed border-ink-300 bg-ink-50/40 text-center">
+                    <div className="font-display text-[13px] font-semibold text-ink-700 mb-1">ჯერ არ აქვს intro ვიდეო</div>
+                    <p className="text-[12px] text-ink-500 max-w-[400px] mx-auto">გაუკეთე რეკ. თემა: „ვინ ვარ · რას ვაკეთებ · რომელ პრობლემას ვხსნი".</p>
                   </div>
                 )}
 
@@ -756,11 +790,16 @@ export default function TutorProfilePage() {
               </section>
             )}
 
-            {profile && <GroupLabel>ფასი და ხანგრძლივობა</GroupLabel>}
+            </div>
+
+            {/* ——— Group 2: სერვისები და ფასი ——— */}
+            {profile && (
+            <div id="group-services" className="scroll-mt-24 space-y-6">
+            <GroupLabel>სერვისები და ფასი</GroupLabel>
 
             {/* Service type + Available now (Type A) */}
             {profile && (
-              <div id="section-availability">
+              <div id="section-availability" className="scroll-mt-24">
                 <ServiceTypeAndAvailability
                   profile={profile}
                   onSaved={(next) => setProfile(next as any)}
@@ -770,7 +809,7 @@ export default function TutorProfilePage() {
 
             {/* Consultations */}
             {profile && (
-              <section id="section-consultations" className="p-6 rounded-card border border-ink-200 bg-white space-y-4">
+              <section id="section-consultations" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-1">კონსულტაციის ტიპები</div>
@@ -845,11 +884,17 @@ export default function TutorProfilePage() {
               </section>
             )}
 
-            {profile && <GroupLabel>განათლება, გამოცდილება და სერტიფიკატები</GroupLabel>}
+            </div>
+            )}
+
+            {/* ——— Group 3: კვალიფიკაცია ——— */}
+            {profile && (
+            <div id="group-credentials" className="scroll-mt-24 space-y-6">
+            <GroupLabel>კვალიფიკაცია</GroupLabel>
 
             {/* Certificates */}
             {profile && (
-              <section id="section-certificates" className="p-6 rounded-card border border-ink-200 bg-white space-y-4">
+              <section id="section-certificates" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
                 <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-2">სერტიფიკატები</div>
 
                 <div className="space-y-2">
@@ -929,7 +974,7 @@ export default function TutorProfilePage() {
 
             {/* Education */}
             {profile && (
-              <section id="section-education" className="p-6 rounded-card border border-ink-200 bg-white space-y-4">
+              <section id="section-education" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
                 <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-2">განათლება</div>
 
                 <div className="space-y-2">
@@ -994,7 +1039,7 @@ export default function TutorProfilePage() {
 
             {/* Experience */}
             {profile && (
-              <section id="section-experience" className="p-6 rounded-card border border-ink-200 bg-white space-y-4">
+              <section id="section-experience" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
                 <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-2">სამუშაო გამოცდილება</div>
 
                 <div className="space-y-2">
@@ -1058,11 +1103,16 @@ export default function TutorProfilePage() {
               </section>
             )}
 
-            <GroupLabel>ანგარიში და ხილვადობა</GroupLabel>
+            </div>
+            )}
+
+            {/* ——— Group 4: ანგარიში ——— */}
+            <div id="group-account" className="scroll-mt-24 space-y-6">
+            <GroupLabel>ანგარიში</GroupLabel>
 
             {/* Public visibility — pause self-listing without touching bookings */}
             {profile && (
-              <section id="section-visibility" className="p-6 rounded-card border border-ink-200 bg-white space-y-3">
+              <section id="section-visibility" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-3">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-1">პროფილის ხილვადობა</div>
@@ -1108,7 +1158,7 @@ export default function TutorProfilePage() {
 
             {/* Response-time promise — shown as trust badge on /tutors/[id] */}
             {profile && (
-              <section id="section-response-time" className="p-6 rounded-card border border-ink-200 bg-white space-y-3">
+              <section id="section-response-time" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-3">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="min-w-0">
                     <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-1">პასუხის დროის ვალდებულება</div>
@@ -1188,6 +1238,9 @@ export default function TutorProfilePage() {
                 </Btn>
               </div>
             </form>
+            </div>
+
+            </div>
           </div>
         )}
       </main>
@@ -1209,13 +1262,13 @@ export default function TutorProfilePage() {
   )
 }
 
-// Group heading between cards — chunks the long settings list into scannable
-// blocks (ძირითადი ინფო / ფასი / ვიდეო / კვალიფიკაცია / ანგარიში).
+// Group heading — titles each of the 4 section groups (საჯარო პროფილი /
+// სერვისები და ფასი / კვალიფიკაცია / ანგარიში) that the left-rail nav links to.
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="pt-3 font-display text-[12px] font-bold uppercase tracking-[0.22em] text-ink-400 select-none" aria-hidden="true">
+    <h2 className="pt-1 font-display text-[12px] font-bold uppercase tracking-[0.22em] text-ink-400 select-none">
       {children}
-    </div>
+    </h2>
   )
 }
 

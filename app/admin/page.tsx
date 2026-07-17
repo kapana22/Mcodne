@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { safeHttpUrl as safeDocHref } from '@/lib/safeUrl'
+import { signOut } from '@/lib/signout'
 import { fmtKaDate } from '@/lib/kaDate'
 
 // Tutor-supplied URLs (ID/selfie/certificate scans, LinkedIn, website) are
@@ -95,10 +96,7 @@ const TopBar = ({ active, onNav, pendingCount }: { active: AdminTab; onNav: (t: 
     <div className="flex items-center gap-2 shrink-0">
       <button
         type="button"
-        onClick={async () => {
-          await fetch('/api/auth/signout', { method: 'POST' }).catch(() => {})
-          window.location.href = '/'
-        }}
+        onClick={() => signOut()}
         className="hidden md:inline-flex h-9 px-3 rounded-btn text-ink-600 hover:text-danger-700 hover:bg-danger-50 font-display text-[12.5px] font-semibold items-center gap-1.5 transition-colors"
       >
         გათიშვა
@@ -131,11 +129,7 @@ const TopBar = ({ active, onNav, pendingCount }: { active: AdminTab; onNav: (t: 
           <div className="p-5 border-t border-ink-100">
             <button
               type="button"
-              onClick={async () => {
-                setMobOpen(false)
-                await fetch('/api/auth/signout', { method: 'POST' }).catch(() => {})
-                window.location.href = '/'
-              }}
+              onClick={() => { setMobOpen(false); signOut() }}
               className="w-full h-11 px-3 rounded-btn text-danger-700 hover:bg-danger-50 font-display font-semibold text-[13px] inline-flex items-center justify-center transition-colors border border-danger-200"
             >
               გათიშვა
