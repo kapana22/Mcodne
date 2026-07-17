@@ -419,8 +419,8 @@ const Step1 = ({ form, set }: StepProps) => (
       <div className="grid sm:grid-cols-2 gap-3">
         <Field l="სახელი" required><Input value={form.firstName} onChange={(e: any) => set({ firstName: e.target.value })} placeholder="სახელი" /></Field>
         <Field l="გვარი" required><Input value={form.lastName} onChange={(e: any) => set({ lastName: e.target.value })} placeholder="გვარი" /></Field>
-        <Field l="ელფოსტა" required><Input type="email" value={form.email} onChange={(e: any) => set({ email: e.target.value })} placeholder="you@example.com" /></Field>
-        <Field l="ტელეფონი" required><Input type="tel" value={form.phone} onChange={(e: any) => set({ phone: e.target.value })} placeholder="+995 5XX XX XX XX" /></Field>
+        <Field l="ელფოსტა" required><Input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} value={form.email} onChange={(e: any) => set({ email: e.target.value })} placeholder="you@example.com" /></Field>
+        <Field l="ტელეფონი" required><Input type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e: any) => set({ phone: e.target.value })} placeholder="+995 5XX XX XX XX" /></Field>
       </div>
     </FormSection>
   </>
@@ -1132,7 +1132,10 @@ const FormFooter = ({ step, setStep, completed, setCompleted, onSubmit, submitti
   }
   const back = () => { if (step > 1) setStep((step - 1) as StepId) }
   return (
-    <footer className="mt-8 pt-5 border-t border-ink-200">
+    // Sticky below lg: on a long step (expertise, services+KYC) the advance
+    // button would otherwise sit far off-screen — the #1 "am I stuck?" moment
+    // of the mobile application. Desktop keeps the in-flow footer.
+    <footer className="mt-8 pt-5 border-t border-ink-200 max-lg:sticky max-lg:bottom-0 max-lg:-mx-6 max-lg:px-6 max-lg:pb-3 max-lg:bg-white/95 max-lg:backdrop-blur max-lg:safe-area-bottom">
       <div className="flex items-center justify-between gap-3">
         <button type="button" onClick={back} disabled={step === 1} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 active:bg-ink-100 disabled:opacity-50 disabled:cursor-not-allowed text-ink-700 font-display font-semibold text-[13px] inline-flex items-center gap-1.5 transition-[background-color,border-color,transform] duration-fast motion-safe:active:scale-[0.97]">
           <Icon.chevL className="w-4 h-4" /> უკან

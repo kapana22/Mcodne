@@ -301,8 +301,14 @@ const AuthHeader = ({ view, setView }: { view: View; setView: (v: View) => void 
           </button>
         )}
       </nav>
-      <button type="button" onClick={() => setView('signup')} className="md:hidden h-9 px-3 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1 transition-colors">
-        რეგისტრაცია
+      {/* Mobile header CTA mirrors the desktop nav: always offers the
+          OTHER view, never the one already on screen. */}
+      <button
+        type="button"
+        onClick={() => setView(view === 'signup' ? 'signin' : 'signup')}
+        className="md:hidden h-10 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1 transition-colors"
+      >
+        {view === 'signup' ? 'შესვლა' : 'რეგისტრაცია'}
       </button>
     </div>
   </header>
@@ -450,7 +456,7 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
 
         <form onSubmit={submit} className="space-y-4">
           <Field label="ელფოსტა">
-            <input type="email" value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null) }} placeholder="anu@gmail.com" autoComplete="email" autoFocus className={inputCls} />
+            <input type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null) }} placeholder="anu@gmail.com" autoComplete="email" autoFocus className={inputCls} />
           </Field>
 
           <div>
@@ -478,7 +484,9 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
             // filled (mirrors signup, where validity gates the button too).
             // The empty-field check inside submit() stays as a fallback.
             disabled={submitting || !email.trim() || !pw}
-            className="w-full h-12 mt-6 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-brand-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+            // Disabled = clearly grey (same language as signup) — a branded
+            // "disabled" button reads as tappable and invites dead taps.
+            className="w-full h-12 mt-6 rounded-btn bg-gradient-cta hover:brightness-105 disabled:bg-none disabled:bg-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
           >
             {submitting ? (
               <>
@@ -489,6 +497,12 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
               <>შესვლა <Icon.arrow className="w-4 h-4" /></>
             )}
           </button>
+          {!submitting && (!email.trim() || !pw) && (
+            // Say WHY the button is off — otherwise it's a mystery dead CTA.
+            <p className="text-[11.5px] text-ink-500 text-center mt-2">
+              {!email.trim() && !pw ? 'შეიყვანე ელფოსტა და პაროლი' : !email.trim() ? 'შეიყვანე ელფოსტა' : 'შეიყვანე პაროლი'}
+            </p>
+          )}
         </form>
       </div>
 
@@ -502,10 +516,13 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
 }
 
 const SignInView = ({ setView }: { setView: (v: View) => void }) => (
-  <main id="main" className="relative max-w-[1280px] mx-auto px-5 sm:px-10 lg:px-12 pt-8 sm:pt-14 lg:pt-20 pb-16 sm:pb-20 lg:pb-24">
+  <main id="main" className="relative max-w-[1280px] mx-auto px-5 sm:px-10 lg:px-12 pt-6 sm:pt-14 lg:pt-20 pb-16 sm:pb-20 lg:pb-24">
+    {/* Mobile is form-first: the marketing intro (headline, avatars,
+        testimonial) drops BELOW the form so the email field is the first
+        thing on screen. Desktop keeps intro-left / form-right. */}
     <div className="grid lg:grid-cols-[1fr_minmax(0,520px)] gap-10 sm:gap-14 lg:gap-16 xl:gap-24 items-start">
-      <SignInIntro />
-      <SignInForm setView={setView} />
+      <div className="order-2 lg:order-1 min-w-0"><SignInIntro /></div>
+      <div className="order-1 lg:order-2 min-w-0"><SignInForm setView={setView} /></div>
     </div>
   </main>
 )
@@ -623,7 +640,7 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
         </Field>
 
         <Field label="ელფოსტა" required>
-          <input type="email" value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null) }} placeholder="anu@gmail.com" autoComplete="email" className={inputCls} />
+          <input type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null) }} placeholder="anu@gmail.com" autoComplete="email" className={inputCls} />
         </Field>
 
         <div>
@@ -666,6 +683,12 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
             <>ანგარიშის შექმნა <Icon.arrow className="w-4 h-4" /></>
           )}
         </button>
+        {!submitting && (!first || !email || pw.length < 8 || !agree) && (
+          // One next-step hint at a time — why the button is grey.
+          <p className="text-[11.5px] text-ink-500 text-center">
+            {!first ? 'შეიყვანე სახელი' : !email ? 'შეიყვანე ელფოსტა' : pw.length < 8 ? 'პაროლი — მინიმუმ 8 სიმბოლო' : 'დაეთანხმე წესებს გასაგრძელებლად'}
+          </p>
+        )}
 
         <p className="text-center text-[12.5px] text-ink-500 mt-2 leading-relaxed">
           ანგარიშის შექმნა უფასოა — პირველ სესიას დაჯავშნი <span className="font-display font-semibold text-brand-700">წუთებში</span>, escrow-ით დაცულად.
@@ -765,7 +788,7 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
           </div>
 
           <Field label="ელფოსტა" required>
-            <input type="email" value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null) }} placeholder="anu@gmail.com" autoComplete="email" className={inputCls} />
+            <input type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null) }} placeholder="anu@gmail.com" autoComplete="email" className={inputCls} />
           </Field>
 
           <div>
@@ -798,6 +821,11 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
               <>ანგარიშის შექმნა და გაგრძელება <Icon.arrow className="w-4 h-4" /></>
             )}
           </button>
+          {!submitting && (!first.trim() || !last.trim() || !email || pw.length < 8 || !agree) && (
+            <p className="text-[11.5px] text-ink-500 text-center">
+              {!first.trim() ? 'შეიყვანე სახელი' : !last.trim() ? 'შეიყვანე გვარი' : !email ? 'შეიყვანე ელფოსტა' : pw.length < 8 ? 'პაროლი — მინიმუმ 8 სიმბოლო' : 'დაეთანხმე წესებს გასაგრძელებლად'}
+            </p>
+          )}
 
           <p className="text-center text-[12.5px] text-ink-500 mt-2 leading-relaxed">
             შემდეგ ნაბიჯზე — ექსპერტის სრული განცხადება, <span className="font-display font-semibold text-brand-700">ერთხელ</span> შესავსები.
@@ -907,10 +935,12 @@ const SignUpIntro = ({ role }: { role: 'learn' | 'teach' }) => (
 const SignUpView = ({ setView }: { setView: (v: View) => void }) => {
   const [role, setRole] = useState<'learn' | 'teach'>('learn')
   return (
-    <main id="main" className="relative max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-12 pt-14 lg:pt-20 pb-16 lg:pb-20">
+    <main id="main" className="relative max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-12 pt-6 sm:pt-14 lg:pt-20 pb-16 lg:pb-20">
+      {/* Form-first on mobile (see SignInView) — the role switch + form come
+          before the pitch so signup starts immediately. */}
       <div className={`grid gap-12 lg:gap-20 items-start ${role === 'teach' ? 'lg:grid-cols-[1fr_1.15fr]' : 'lg:grid-cols-2'}`}>
-        <SignUpIntro role={role} />
-        <div>
+        <div className="order-2 lg:order-1 min-w-0"><SignUpIntro role={role} /></div>
+        <div className="order-1 lg:order-2 min-w-0">
           <RoleSwitch role={role} setRole={setRole} />
           {role === 'learn' ? <StudentSignUp setView={setView} /> : <TutorSignUp setView={setView} />}
         </div>
