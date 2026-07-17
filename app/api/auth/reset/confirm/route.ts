@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createHash } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
-import { hashPassword, createSession } from '@/lib/auth'
+import { hashPassword, createSession, postAuthHome } from '@/lib/auth'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 
 const Body = z.object({
@@ -48,5 +48,12 @@ export async function POST(req: Request) {
 
   await createSession(rec.userId)
   const user = await prisma.user.findUnique({ where: { id: rec.userId } })
-  return NextResponse.json({ ok: true, role: user?.role })
+  // A session now exists on THIS device (only other devices were revoked
+  // above) — return the landing so the done view can continue straight into
+  // the workspace instead of demanding a redundant re-login.
+  return NextResponse.json({
+    ok: true,
+    role: user?.role,
+    home: user ? await postAuthHome(user) : null,
+  })
 }

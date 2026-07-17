@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import crypto from 'node:crypto'
 import { prisma } from '@/lib/prisma'
-import { createSession, hashPassword } from '@/lib/auth'
+import { createSession, hashPassword, postAuthHome } from '@/lib/auth'
 import { oauthOrigin } from '@/lib/googleOauth'
+import { safeInternalPath } from '@/lib/roleHome'
 
 // GET /api/auth/google/callback — Google redirects here with ?code&state.
 export async function GET(req: Request) {
@@ -16,6 +17,11 @@ export async function GET(req: Request) {
   const jar = await cookies()
   const savedState = jar.get('g_oauth_state')?.value
   jar.delete('g_oauth_state')
+  // Deep-link destination persisted by the start route; single-use.
+  // Re-validated below even though the start route already checked it —
+  // the cookie is client-writable in principle.
+  const savedNext = jar.get('g_oauth_next')?.value
+  jar.delete('g_oauth_next')
 
   if (url.searchParams.get('error')) return fail('google_denied')
   if (!code || !state || !savedState || state !== savedState) return fail('google_state')
@@ -82,6 +88,8 @@ export async function GET(req: Request) {
   }
 
   await createSession(user.id)
-  const dest = user.role === 'ADMIN' ? '/admin' : user.role === 'TUTOR' ? '/tutor' : '/student'
+  // Explicit deep-link wins (matches password signin); otherwise the
+  // server-decided landing (role home, or /apply for pending applicants).
+  const dest = safeInternalPath(savedNext) ?? (await postAuthHome(user))
   return NextResponse.redirect(new URL(dest, origin))
 }

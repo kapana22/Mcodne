@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useRef, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { homeForRole, safeInternalPath } from '@/lib/roleHome'
 
 type View = 'signin' | 'signup' | 'verify' | 'reset' | 'onboarding'
 
@@ -99,11 +100,24 @@ function readRedirectParam(): string | null {
   return safeRedirect(url.searchParams.get('redirect') || url.searchParams.get('next'))
 }
 
-function redirectAfterSignin(role: string) {
+function redirectAfterSignin(role: string, home?: string | null) {
+  // Precedence: explicit ?redirect= deep-link → server-decided landing
+  // (`home` from the auth API — role home, or /apply for a pending expert
+  // applicant) → shared role map as the fallback.
   const explicit = readRedirectParam()
-  const dest = explicit
-    ?? (role === 'ADMIN' ? '/admin' : role === 'TUTOR' ? '/tutor' : '/student')
+  const dest = explicit ?? safeInternalPath(home) ?? homeForRole(role)
   window.location.href = dest
+}
+
+// Google SSO must not drop an in-flight ?redirect= deep-link: hand it to the
+// OAuth start route, which persists it across the round-trip in a short-lived
+// cookie. Plain <a href="/api/auth/google"> stays as the no-JS fallback.
+function startGoogleSignin(e: React.MouseEvent<HTMLAnchorElement>) {
+  const next = readRedirectParam()
+  if (next) {
+    e.preventDefault()
+    window.location.href = `/api/auth/google?redirect=${encodeURIComponent(next)}`
+  }
 }
 
 /* ───── Icons ───── */
@@ -261,7 +275,7 @@ const CodeInput = ({ value, onChange, length = 6 }: { value: string; onChange: (
           onChange={e => setOne(i, e.target.value)}
           onKeyDown={e => onKey(i, e)}
           aria-label={`ციფრი ${i + 1}`}
-          className={`w-11 h-13 sm:w-[52px] sm:h-14 rounded-card border-2 bg-white text-center font-display text-[22px] font-bold text-ink-900 tabular-nums focus:ring-2 focus:ring-brand-100 focus:outline-none transition-colors ${d ? 'border-brand-500' : 'border-ink-200 focus:border-brand-500'}`}
+          className={`w-11 h-12 sm:w-[52px] sm:h-14 rounded-card border-2 bg-white text-center font-display text-[22px] font-bold text-ink-900 tabular-nums focus:ring-2 focus:ring-brand-100 focus:outline-none transition-colors ${d ? 'border-brand-500' : 'border-ink-200 focus:border-brand-500'}`}
         />
       ))}
     </div>
@@ -306,7 +320,7 @@ const AuthHeader = ({ view, setView }: { view: View; setView: (v: View) => void 
       <button
         type="button"
         onClick={() => setView(view === 'signup' ? 'signin' : 'signup')}
-        className="md:hidden h-10 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1 transition-colors"
+        className="md:hidden h-11 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1 transition-colors"
       >
         {view === 'signup' ? 'შესვლა' : 'რეგისტრაცია'}
       </button>
@@ -422,7 +436,7 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
         setSubmitting(false)
         return
       }
-      redirectAfterSignin(data.role)
+      redirectAfterSignin(data.role, data.home)
     } catch {
       setErrMsg('ქსელის შეცდომა')
       setSubmitting(false)
@@ -439,7 +453,7 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
         </div>
 
         <div className="grid grid-cols-2 gap-2.5">
-          <a href="/api/auth/google" className="h-12 px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors">
+          <a href="/api/auth/google" onClick={startGoogleSignin} className="h-12 px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors">
             <GoogleMark /> Google
           </a>
           <button type="button" disabled aria-disabled title="მალე გახდება ხელმისაწვდომი" className="h-12 px-4 rounded-btn border border-ink-200 bg-ink-50 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-400 tracking-wide cursor-not-allowed">
@@ -622,7 +636,7 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
       {/* Google/Apple SSO are not wired yet — mirror the SignInForm treatment
           (disabled + "მალე" tooltip) so users don't get a dead click. */}
       <div className="grid grid-cols-2 gap-2.5">
-        <a href="/api/auth/google" className="h-12 px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors"><GoogleMark /> Google</a>
+        <a href="/api/auth/google" onClick={startGoogleSignin} className="h-12 px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors"><GoogleMark /> Google</a>
         <button type="button" disabled aria-disabled="true" title="მალე გახდება ხელმისაწვდომი" className="h-12 px-4 rounded-btn border border-ink-200 bg-ink-50 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-400 tracking-wide cursor-not-allowed">
           <AppleMark /> Apple
         </button>
@@ -765,7 +779,7 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
       <div className="p-6 lg:p-8">
         {/* SSO not wired yet — disabled to avoid a dead click (mirrors sign-in). */}
         <div className="grid grid-cols-2 gap-2.5">
-          <a href="/api/auth/google" className="h-12 px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors"><GoogleMark /> Google</a>
+          <a href="/api/auth/google" onClick={startGoogleSignin} className="h-12 px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors"><GoogleMark /> Google</a>
           <button type="button" disabled aria-disabled="true" title="მალე გახდება ხელმისაწვდომი" className="h-12 px-4 rounded-btn border border-ink-200 bg-ink-50 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-400 tracking-wide cursor-not-allowed">
             <AppleMark /> Apple
           </button>
@@ -990,10 +1004,10 @@ const VerifyView = ({ setView }: { setView: (v: View) => void }) => {
           setVerified(true)
           setTimeout(() => {
             // Respect explicit ?next= (from signup "teaching" goal) if it's
-            // an in-app path; otherwise route by role.
+            // an in-app path; otherwise the server-decided landing (`home`
+            // routes pending expert applicants to /apply), then role map.
             const nextRaw = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('next') : null
-            const safeNext = nextRaw && nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : null
-            const dest = safeNext ?? (body.role === 'ADMIN' ? '/admin' : body.role === 'TUTOR' ? '/tutor' : '/student')
+            const dest = safeInternalPath(nextRaw) ?? safeInternalPath(body.home) ?? homeForRole(body.role)
             window.location.href = dest
           }, 1200)
         } else {
@@ -1701,10 +1715,10 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
                     <div className="font-display text-[14px] font-bold text-ink-900 tabular-nums">ხუთ. 11 ივნ. · 14:00 — 15:00 · ₾80</div>
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" className="h-10 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors">
+                    <button type="button" className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors">
                       სხვა ვაჩვენო
                     </button>
-                    <button type="button" onClick={() => setView('signin')} className="h-10 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-2 transition-colors">
+                    <button type="button" onClick={() => setView('signin')} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-2 transition-colors">
                       <Icon.spark className="w-3.5 h-3.5" /> დაჯავშნე სესია
                     </button>
                   </div>

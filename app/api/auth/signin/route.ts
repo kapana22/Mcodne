@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { createSession, verifyPassword } from '@/lib/auth'
+import { createSession, postAuthHome, verifyPassword } from '@/lib/auth'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 
 const Body = z.object({
@@ -54,5 +54,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'BAD_CREDENTIALS' }, { status: 401 })
   }
   await createSession(user.id, { rememberMe: rememberMe !== false })
-  return NextResponse.json({ ok: true, role: user.role })
+  // `home` is the server-decided landing (role home, or /apply for a pending
+  // expert applicant). The client prefers it over its own role mapping; an
+  // explicit ?redirect= deep-link still wins client-side.
+  return NextResponse.json({ ok: true, role: user.role, home: await postAuthHome(user) })
 }

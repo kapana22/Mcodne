@@ -715,7 +715,7 @@ const ExpertCard = ({ e }: { e: Expert }) => (
         </span>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <Link href={e.id ? `/tutors/${e.id}` : '/tutors'} className="h-10 px-3.5 rounded-btn border border-ink-200 hover:border-ink-300 bg-white text-ink-700 hover:text-ink-900 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center transition-colors">
+        <Link href={e.id ? `/tutors/${e.id}` : '/tutors'} className="h-11 px-3.5 rounded-btn border border-ink-200 hover:border-ink-300 bg-white text-ink-700 hover:text-ink-900 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center transition-colors">
           პროფილი
         </Link>
         <Link href={e.id ? `/tutors/${e.id}` : '/tutors'} className="h-10 px-3.5 sm:px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors shadow-xs">
@@ -797,7 +797,7 @@ const FeaturedExperts = () => {
             <div className="lg:col-span-2 py-14 px-6 text-center rounded-card border border-dashed border-ink-200 bg-white">
               <div className="font-display text-[15px] font-bold text-ink-900">ჯერ არავინაა მონიშნული როგორც „featured"</div>
               <p className="text-[12.5px] text-ink-500 mt-1.5 max-w-[420px] mx-auto leading-relaxed">გადახედე ყველა ექსპერტს — მოდერაცია რჩეულ პროფესიონალებს მალე მოირჩევს.</p>
-              <Link href="/tutors" className="mt-4 inline-flex items-center gap-1.5 h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide transition-colors">
+              <Link href="/tutors" className="mt-4 inline-flex items-center gap-1.5 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide transition-colors">
                 ყველა ექსპერტი <Icon.arrow className="w-3.5 h-3.5" />
               </Link>
             </div>

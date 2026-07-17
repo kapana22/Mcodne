@@ -145,7 +145,7 @@ function AskInner() {
             <div className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 p-8 text-center">
               <div className="font-display text-[14px] font-bold text-ink-900">ზუსტი დამთხვევა ვერ ვიპოვე</div>
               <p className="text-[12.5px] text-ink-500 mt-1">გადახედე ყველა ექსპერტს ან დასვი კითხვა სხვანაირად.</p>
-              <Link href="/tutors" className="mt-4 inline-flex items-center gap-1.5 h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] transition-colors">ყველა ექსპერტი <Ic.arrow className="w-3.5 h-3.5" /></Link>
+              <Link href="/tutors" className="mt-4 inline-flex items-center gap-1.5 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] transition-colors">ყველა ექსპერტი <Ic.arrow className="w-3.5 h-3.5" /></Link>
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 gap-3">

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
-import { createSession } from '@/lib/auth'
+import { createSession, postAuthHome } from '@/lib/auth'
 
 const Body = z.object({
   email: z.string().email(),
@@ -50,5 +50,7 @@ export async function POST(req: Request) {
   ])
 
   await createSession(user.id)
-  return NextResponse.json({ ok: true, role: user.role })
+  // Same shape as /api/auth/signin: server-decided landing, so a pending
+  // expert applicant who verifies their email lands back on /apply.
+  return NextResponse.json({ ok: true, role: user.role, home: await postAuthHome(user) })
 }

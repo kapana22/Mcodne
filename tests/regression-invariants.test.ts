@@ -56,7 +56,9 @@ function check(name: string, ok: boolean, hint: string) {
   const { execSync } = require('child_process')
   let hits = ''
   try {
-    hits = execSync(`grep -rl "requireUser" "${join(root, 'app/api')}"`, { encoding: 'utf8' })
+    // Match actual imports only — comments may legitimately mention the name
+    // while explaining why it must not be used.
+    hits = execSync(`grep -rlE "import[^;]*\\brequireUser\\b" "${join(root, 'app/api')}"`, { encoding: 'utf8' })
   } catch {
     /* grep exits 1 on zero matches — that is the passing case */
   }
@@ -124,6 +126,46 @@ function check(name: string, ok: boolean, hint: string) {
     'G2: POST /api/bookings runs independent pre-checks in Promise.all',
     api.includes('Promise.all'),
     'tutor fetch / consultation fetch / covering-slot probe are independent and must fan out.',
+  )
+}
+
+// ── H. chat system invariants (2026-07-17 fixes) ─────────────────────────────
+{
+  const api = read('app/api/messages/route.ts')
+  check(
+    'H: GET /api/messages?bookingId stamps read receipts',
+    api.includes('readAt: null') && api.includes('readAt: new Date()'),
+    'readAt was NEVER written before — threads stayed "unread" forever.',
+  )
+  check(
+    'H2: POST /api/messages defers notify via after()',
+    /after\(\s*async/.test(api),
+    'notify + markRelatedRead cost 3 round-trips the sender must not wait on.',
+  )
+  const sInbox = read('app/student/messages/page.tsx')
+  const tInbox = read('app/tutor/messages/page.tsx')
+  check(
+    'H3: inboxes sort by last-message time, not booking.updatedAt',
+    sInbox.includes('messages[0]?.createdAt.getTime') && tInbox.includes('messages[0]?.createdAt.getTime'),
+    'booking.updatedAt is not bumped by messages — sorting on it buries fresh threads.',
+  )
+  check(
+    'H4: tutor inbox has no pravatar stock-face fallback',
+    // Match the actual URL, not the word — comments may mention it.
+    !tInbox.includes('i.pravatar.cc'),
+    'A random stock face next to a real client name reads as a fake identity.',
+  )
+  const sPane = read('app/student/bookings/[id]/page.tsx')
+  const tPane = read('app/tutor/bookings/[id]/page.tsx')
+  check(
+    'H5: both chat panes poll the thread while visible',
+    sPane.includes('/api/messages?bookingId=') && tPane.includes('/api/messages?bookingId='),
+    'Without polling, incoming messages only appeared on a full page reload.',
+  )
+  check(
+    'H6: both chat panes append optimistically (tmp- reconcile)',
+    sPane.includes("`tmp-${Date.now()}`") && tPane.includes("`tmp-${Date.now()}`"),
+    'Waiting for the POST (seconds on remote DB) before showing your own bubble feels broken.',
   )
 }
 

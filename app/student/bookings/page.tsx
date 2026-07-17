@@ -55,7 +55,7 @@ export default async function StudentBookingsPage({
             <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight">ჩემი სესიები</h1>
             <p className="text-[13.5px] text-ink-600 mt-1.5">ყველა შენი ჯავშანი ერთ ადგილას · escrow დაცული</p>
           </div>
-          <Link href="/tutors" className="h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 transition-colors">
+          <Link href="/tutors" className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 transition-colors">
             <Icon.plus className="w-3.5 h-3.5" /> ახალი ჯავშანი
           </Link>
         </div>

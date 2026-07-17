@@ -714,7 +714,7 @@ const RescheduleModal = ({ open, onClose, onSent, booking }: { open: boolean; on
 
         <div className="px-6 py-4 bg-ink-50/40 border-t border-ink-100 flex items-center justify-end gap-3">
           <button type="button" onClick={onClose} className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800">გაუქმება</button>
-          <button type="button" onClick={send} disabled={sending} className="h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 disabled:opacity-60">
+          <button type="button" onClick={send} disabled={sending} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 disabled:opacity-60">
             {sending ? 'იგზავნება…' : <>მოთხოვნის გაგზავნა <Icon.arrow className="w-3.5 h-3.5" /></>}
           </button>
         </div>
@@ -821,7 +821,7 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
 
         <div className="px-6 py-4 bg-ink-50/40 border-t border-ink-100 flex items-center justify-end gap-3 shrink-0">
           <button type="button" onClick={onClose} className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800">გაუქმება</button>
-          <button type="button" disabled={!reason || sending} onClick={send} className={`h-10 px-4 rounded-btn font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 ${!reason || sending ? 'bg-ink-100 text-ink-400 cursor-not-allowed' : 'bg-danger-500 hover:bg-danger-600 text-white'}`}>
+          <button type="button" disabled={!reason || sending} onClick={send} className={`h-11 px-4 rounded-btn font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 ${!reason || sending ? 'bg-ink-100 text-ink-400 cursor-not-allowed' : 'bg-danger-500 hover:bg-danger-600 text-white'}`}>
             <Icon.flag className="w-3.5 h-3.5" /> {sending ? 'იგზავნება…' : 'გააგზავნე'}
           </button>
         </div>
@@ -1132,7 +1132,7 @@ const RescheduleBanner = ({
               type="button"
               onClick={() => respond(false)}
               disabled={busy !== null}
-              className="h-10 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px]"
+              className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px]"
             >
               {busy === 'reject' ? '…' : 'უარი'}
             </button>
@@ -1140,7 +1140,7 @@ const RescheduleBanner = ({
               type="button"
               onClick={() => respond(true)}
               disabled={busy !== null}
-              className="h-10 px-4 rounded-btn bg-success-600 hover:bg-success-700 disabled:opacity-60 text-white font-display font-semibold text-[12.5px]"
+              className="h-11 px-4 rounded-btn bg-success-600 hover:bg-success-700 disabled:opacity-60 text-white font-display font-semibold text-[12.5px]"
             >
               {busy === 'accept' ? '…' : 'დადასტურება'}
             </button>

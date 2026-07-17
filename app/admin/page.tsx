@@ -173,10 +173,10 @@ const Hero = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button type="button" onClick={() => { window.location.hash = 'analytics' }} className="h-10 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors">
+          <button type="button" onClick={() => { window.location.hash = 'analytics' }} className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors">
             <Icon.doc className="w-3.5 h-3.5" /> ანალიტიკა
           </button>
-          <button type="button" onClick={() => { window.location.hash = 'moderation' }} className="h-10 px-4 rounded-btn bg-accent-900 hover:bg-accent-800 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-2 transition-colors">
+          <button type="button" onClick={() => { window.location.hash = 'moderation' }} className="h-11 px-4 rounded-btn bg-accent-900 hover:bg-accent-800 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-2 transition-colors">
             <Icon.bolt className="w-3.5 h-3.5" /> მოდერაცია <Icon.arrow className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -270,7 +270,7 @@ const OverviewSection = () => (
           <h3 className="font-display text-[18px] font-bold text-ink-900">ექსპერტის განცხადებები</h3>
           <p className="text-[13px] text-ink-500 mt-1">დაამტკიცე, უარყავი და მართე ახალი ექსპერტის მოთხოვნები.</p>
         </div>
-        <a href="#moderation" className="h-10 px-4 rounded-btn bg-accent-900 hover:bg-accent-800 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-2">
+        <a href="#moderation" className="h-11 px-4 rounded-btn bg-accent-900 hover:bg-accent-800 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-2">
           მოდერაცია <Icon.arrow className="w-4 h-4" />
         </a>
       </div>
@@ -661,8 +661,8 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => decide('approve')} disabled={busy} className="h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"><Icon.check className="w-3.5 h-3.5" /> {busy ? 'იგზავნება…' : 'დაამტკიცე'}</button>
-              <button type="button" onClick={() => decide('reject')} disabled={busy} className="h-10 px-4 rounded-btn bg-white border border-danger-200 hover:bg-danger-50 disabled:opacity-50 text-danger-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"><Icon.x className="w-3.5 h-3.5" /> უარყავი</button>
+              <button type="button" onClick={() => decide('approve')} disabled={busy} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"><Icon.check className="w-3.5 h-3.5" /> {busy ? 'იგზავნება…' : 'დაამტკიცე'}</button>
+              <button type="button" onClick={() => decide('reject')} disabled={busy} className="h-11 px-4 rounded-btn bg-white border border-danger-200 hover:bg-danger-50 disabled:opacity-50 text-danger-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"><Icon.x className="w-3.5 h-3.5" /> უარყავი</button>
             </div>
           </div>
           )}
@@ -1117,7 +1117,7 @@ const UsersSection = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[240px] max-w-[420px]">
             <Icon.search className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="სახელი ან email…" className="w-full h-10 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
+            <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="სახელი ან email…" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
           </div>
           <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200">
             {(['all','STUDENT','TUTOR','ADMIN'] as const).map(r => (
@@ -1304,7 +1304,7 @@ const BookingsSection = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[240px] max-w-[420px]">
             <Icon.search className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="topic, ref, სახელი…" className="w-full h-10 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
+            <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="topic, ref, სახელი…" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
           </div>
           <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200 overflow-x-auto">
             {BOOKING_STATUS_TABS.map(t => (
@@ -1605,7 +1605,7 @@ const ReviewsSection = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[240px] max-w-[420px]">
             <Icon.search className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="ტექსტი ან სახელი…" className="w-full h-10 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
+            <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="ტექსტი ან სახელი…" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
           </div>
           <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200">
             {[
@@ -1895,7 +1895,7 @@ const BroadcastSection = () => {
             onChange={e => setSubject(e.target.value)}
             maxLength={120}
             placeholder="მაგ. სამომხმარებლო შეთანხმების განახლება"
-            className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
+            className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
           />
         </div>
         <div>
@@ -1915,7 +1915,7 @@ const BroadcastSection = () => {
             type="button"
             onClick={doPreview}
             disabled={busy}
-            className="h-10 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-50 text-ink-800 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"
+            className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-50 text-ink-800 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"
           >
             <Icon.users className="w-3.5 h-3.5" /> მიმღების რაოდენობა
           </button>
@@ -1923,7 +1923,7 @@ const BroadcastSection = () => {
             type="button"
             onClick={doSend}
             disabled={busy || !subject.trim() || !body.trim()}
-            className="h-10 px-4 rounded-btn bg-accent-900 hover:bg-accent-800 disabled:bg-ink-200 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"
+            className="h-11 px-4 rounded-btn bg-accent-900 hover:bg-accent-800 disabled:bg-ink-200 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"
           >
             <Icon.arrow className="w-3.5 h-3.5" /> გაგზავნა
           </button>
@@ -2124,7 +2124,7 @@ const AuditSection = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[240px] max-w-[360px]">
             <Icon.search className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input type="text" value={actionFilter} onChange={e => setActionFilter(e.target.value)} placeholder="action prefix (booking, review, application…)" className="w-full h-10 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
+            <input type="text" value={actionFilter} onChange={e => setActionFilter(e.target.value)} placeholder="action prefix (booking, review, application…)" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
           </div>
         </div>
       </section>

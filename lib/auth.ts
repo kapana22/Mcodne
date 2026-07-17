@@ -3,7 +3,13 @@ import { redirect } from 'next/navigation'
 import { randomBytes, createHash } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
+import { homeForRole } from './roleHome'
 import type { Role } from '@prisma/client'
+
+// Re-exported so existing `import { homeForRole } from '@/lib/auth'` server
+// call sites keep working; the implementation lives in the client-safe
+// lib/roleHome so client components share the exact same map.
+export { homeForRole }
 
 const COOKIE = 'mcodne_session'
 const MAX_AGE = 60 * 60 * 24 * 30
@@ -108,9 +114,22 @@ export async function getImpersonatorId(): Promise<string | null> {
   return session.impersonatorId ?? null
 }
 
-// Where a signed-in user of a given role belongs by default.
-export function homeForRole(role: Role): string {
-  return role === 'ADMIN' ? '/admin' : role === 'TUTOR' ? '/tutor' : '/student'
+// Post-auth landing for a freshly signed-in user. Same as homeForRole, except
+// a STUDENT with an open expert application (DRAFT/SUBMITTED) is routed back
+// to /apply — applicants keep role STUDENT until an admin approves, so without
+// this they'd sign in and silently land on the student dashboard with no cue
+// that their application exists or where it stands. APPROVED means the role is
+// already TUTOR; REJECTED applicants get the normal student home (the /apply
+// status step still shows the outcome if they visit it themselves).
+export async function postAuthHome(user: { id: string; role: Role }): Promise<string> {
+  if (user.role === 'STUDENT') {
+    const app = await prisma.tutorApplication.findUnique({
+      where: { userId: user.id },
+      select: { status: true },
+    })
+    if (app && (app.status === 'DRAFT' || app.status === 'SUBMITTED')) return '/apply'
+  }
+  return homeForRole(user.role)
 }
 
 async function currentPath(): Promise<string | null> {

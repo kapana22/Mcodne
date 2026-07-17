@@ -176,7 +176,7 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
         </div>
         {/* fetch + navigate (NOT a native form POST): the signout endpoint
             returns JSON, so a form submit would render {"ok":true} as a page. */}
-        <button type="button" onClick={() => signOut()} className="h-10 px-4 rounded-btn bg-white border border-danger-300 text-danger-600 hover:bg-danger-50 font-display font-semibold text-[12.5px]">
+        <button type="button" onClick={() => signOut()} className="h-11 px-4 rounded-btn bg-white border border-danger-300 text-danger-600 hover:bg-danger-50 font-display font-semibold text-[12.5px]">
           გამოსვლა
         </button>
       </div>
@@ -187,7 +187,7 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
             <div className="font-display text-[13px] font-bold text-ink-900">გახდი ექსპერტი</div>
             <div className="text-[12.5px] text-ink-600 mt-0.5">გააზიარე ცოდნა, გამოიმუშავე შემოსავალი.</div>
           </div>
-          <a href="/apply" className="h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5">
+          <a href="/apply" className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5">
             განაცხადი <Icon.arrow className="w-3.5 h-3.5" />
           </a>
         </div>

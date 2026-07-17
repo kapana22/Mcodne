@@ -285,10 +285,10 @@ const PhotoUploader = ({ value, onChange }: { value?: string; onChange: (url?: s
         : <div className="w-24 h-24 rounded-full bg-ink-100 ring-2 ring-ink-200 shrink-0 inline-flex items-center justify-center text-ink-400"><Icon.user className="w-9 h-9" /></div>}
       <div className="flex-1">
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => ref.current?.click()} disabled={busy} className="h-10 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors disabled:opacity-60">
+          <button type="button" onClick={() => ref.current?.click()} disabled={busy} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors disabled:opacity-60">
             <Icon.upload className="w-3.5 h-3.5" /> {busy ? 'იტვირთება…' : value ? 'ცვლა' : 'ატვირთვა'}
           </button>
-          {value && <button type="button" onClick={() => onChange(undefined)} className="h-10 px-3 rounded-btn text-ink-500 hover:text-danger-700 font-display font-semibold text-[12px] transition-colors">წაშლა</button>}
+          {value && <button type="button" onClick={() => onChange(undefined)} className="h-11 px-3 rounded-btn text-ink-500 hover:text-danger-700 font-display font-semibold text-[12px] transition-colors">წაშლა</button>}
         </div>
         {err
           ? <p className="mt-2 text-[11.5px] text-danger-700">{err}</p>
@@ -614,7 +614,7 @@ const ListInput = ({ values, onChange, placeholder }: { values: string[]; onChan
       <button
         type="button"
         onClick={add}
-        className="h-10 px-3 rounded-btn border border-ink-200 hover:border-ink-400 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center gap-1 shrink-0"
+        className="h-11 px-3 rounded-btn border border-ink-200 hover:border-ink-400 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center gap-1 shrink-0"
       >
         <Icon.plus className="w-3.5 h-3.5" /> დაამატე
       </button>

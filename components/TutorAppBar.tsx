@@ -50,7 +50,7 @@ export function TutorAppBar({ user }: { user?: { name: string; avatar?: string |
                 key={item.href}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                className={`h-10 px-3.5 rounded-btn font-display text-[12px] font-semibold uppercase tracking-[0.06em] inline-flex items-center transition-colors duration-fast ${
+                className={`h-11 px-3.5 rounded-btn font-display text-[12px] font-semibold uppercase tracking-[0.06em] inline-flex items-center transition-colors duration-fast ${
                   active ? 'bg-brand-50 text-brand-800' : 'text-ink-700 hover:bg-ink-100/70 hover:text-ink-900'
                 }`}
               >

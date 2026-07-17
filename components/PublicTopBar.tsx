@@ -93,7 +93,7 @@ export function PublicTopBar({ activeHref }: { activeHref?: string }) {
                   key={item.href}
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
-                  className={`relative h-10 px-3.5 rounded-btn font-display text-[12px] font-semibold uppercase tracking-[0.06em] inline-flex items-center transition-colors duration-fast ease-out-quart ${
+                  className={`relative h-11 px-3.5 rounded-btn font-display text-[12px] font-semibold uppercase tracking-[0.06em] inline-flex items-center transition-colors duration-fast ease-out-quart ${
                     active ? 'text-brand-800 bg-brand-50' : 'text-ink-700 hover:text-ink-900 hover:bg-ink-100/70'
                   }`}
                 >
@@ -111,13 +111,13 @@ export function PublicTopBar({ activeHref }: { activeHref?: string }) {
             <>
               <Link
                 href="/signin"
-                className="hidden md:inline-flex h-10 px-4 rounded-btn font-display font-semibold text-[12px] uppercase tracking-[0.06em] text-ink-800 hover:bg-ink-100 items-center transition-colors duration-fast"
+                className="hidden md:inline-flex h-11 px-4 rounded-btn font-display font-semibold text-[12px] uppercase tracking-[0.06em] text-ink-800 hover:bg-ink-100 items-center transition-colors duration-fast"
               >
                 შესვლა
               </Link>
               <Link
                 href="/signup"
-                className="h-10 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-bold text-[12px] uppercase tracking-[0.06em] transition-all duration-fast ease-out-quart inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)]"
+                className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-bold text-[12px] uppercase tracking-[0.06em] transition-all duration-fast ease-out-quart inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)]"
               >
                 დაწყება
                 <Icon.arrow className="w-3.5 h-3.5" />

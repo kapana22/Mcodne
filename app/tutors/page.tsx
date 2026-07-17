@@ -1355,7 +1355,7 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
                           <div className="w-10 h-10 mx-auto rounded-full bg-ink-100 inline-flex items-center justify-center text-ink-500 mb-3"><Icon.cal className="w-4 h-4" /></div>
                           <div className="font-display text-[13.5px] font-semibold text-ink-900">უახლოესი თავისუფალი დრო ამ კვირის შემდეგაა</div>
                           <p className="text-[12px] text-ink-500 mt-1">სრული კალენდარი პროფილზეა — იქ ნებისმიერი მომავალი დღის არჩევა შეგიძლია.</p>
-                          <a href={`/tutors/${tutor.id}`} className="mt-4 inline-flex h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide items-center gap-1.5 transition-colors">
+                          <a href={`/tutors/${tutor.id}`} className="mt-4 inline-flex h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide items-center gap-1.5 transition-colors">
                             სრული კალენდარი <Icon.arrow className="w-3.5 h-3.5" />
                           </a>
                         </div>
@@ -1541,17 +1541,17 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {step > 1 ? (
-                      <button type="button" onClick={back} disabled={submitting} className="h-10 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors">
+                      <button type="button" onClick={back} disabled={submitting} className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors">
                         <Icon.chevL className="w-3.5 h-3.5" /> უკან
                       </button>
                     ) : (
-                      <button type="button" onClick={onClose} className="h-10 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] transition-colors">გაუქმება</button>
+                      <button type="button" onClick={onClose} className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] transition-colors">გაუქმება</button>
                     )}
                     <button
                       type="button"
                       onClick={next}
                       disabled={submitting || (step === 1 && (!time || !day))}
-                      className="h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-300 text-white font-display font-semibold text-[13px] inline-flex items-center gap-2 transition-colors"
+                      className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-300 text-white font-display font-semibold text-[13px] inline-flex items-center gap-2 transition-colors"
                     >
                       {submitting
                         ? 'იგზავნება…'
@@ -2205,10 +2205,10 @@ function Tutors() {
                     სცადე სხვა ფილტრი, საძიებო ტერმინი, ან განაცხადე დაჯავშნის მოთხოვნა — ჩვენ დაგიკავშირდებით.
                   </p>
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2 motion-safe:animate-rise-in" style={{ animationDelay: '180ms' }}>
-                    <button type="button" onClick={resetFilters} className="h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 shadow-xs hover:shadow-brand-glow transition-all duration-fast">
+                    <button type="button" onClick={resetFilters} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 shadow-xs hover:shadow-brand-glow transition-all duration-fast">
                       ფილტრების გასუფთავება
                     </button>
-                    <a href="mailto:hi@mcodne.ge?subject=%E1%83%A8%E1%83%94%E1%83%9B%E1%83%98%20%E1%83%9B%E1%83%9D%E1%83%97%E1%83%AE%E1%83%9D%E1%83%95%E1%83%9C%E1%83%90" className="h-10 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast">
+                    <a href="mailto:hi@mcodne.ge?subject=%E1%83%A8%E1%83%94%E1%83%9B%E1%83%98%20%E1%83%9B%E1%83%9D%E1%83%97%E1%83%AE%E1%83%9D%E1%83%95%E1%83%9C%E1%83%90" className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast">
                       გაგზავნე მოთხოვნა
                     </a>
                   </div>

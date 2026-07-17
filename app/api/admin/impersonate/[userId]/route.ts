@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole, destroySession, createSession } from '@/lib/auth'
+import { requireRole, destroySession, createSession, homeForRole } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 
 const Params = z.object({ userId: z.string().min(1).max(64) })
@@ -49,7 +49,7 @@ export async function POST(
   })
 
   // Only STUDENT/TUTOR reach here (ADMIN targets are rejected above).
-  const redirect = target.role === 'TUTOR' ? '/tutor' : '/student'
+  const redirect = homeForRole(target.role)
 
   return NextResponse.json({ ok: true, redirect })
 }

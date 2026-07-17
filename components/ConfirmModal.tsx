@@ -162,7 +162,7 @@ export function ConfirmModal({
             type="button"
             onClick={cancel}
             disabled={busy}
-            className="h-10 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink-300 disabled:opacity-50 disabled:pointer-events-none"
+            className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink-300 disabled:opacity-50 disabled:pointer-events-none"
           >
             {xLabel}
           </button>
@@ -170,7 +170,7 @@ export function ConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={busy || confirmDisabled}
-            className={`h-10 px-4 rounded-btn font-display font-semibold text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:pointer-events-none inline-flex items-center justify-center gap-2 ${TONE_CLS[tone]}`}
+            className={`h-11 px-4 rounded-btn font-display font-semibold text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:pointer-events-none inline-flex items-center justify-center gap-2 ${TONE_CLS[tone]}`}
           >
             {busy ? (
               <>

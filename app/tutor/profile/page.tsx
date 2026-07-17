@@ -775,7 +775,7 @@ export default function TutorProfilePage() {
                       onChange={e => { setVideoInput(e.target.value); if (videoErr) setVideoErr(null) }}
                       placeholder="https://youtube.com/watch?v=… ან youtu.be/…"
                       disabled={videoSaving}
-                      className="flex-1 min-w-[240px] h-10 px-3 rounded-btn border border-ink-200 focus:border-brand-500 focus:outline-none text-[13px] disabled:opacity-60"
+                      className="flex-1 min-w-[240px] h-11 px-3 rounded-btn border border-ink-200 focus:border-brand-500 focus:outline-none text-[13px] disabled:opacity-60"
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveIntroVideo() } }}
                     />
                     <Btn variant="primary" size="sm" onClick={saveIntroVideo} disabled={videoSaving || !videoInput.trim()}>
@@ -841,7 +841,7 @@ export default function TutorProfilePage() {
                   <div className="grid grid-cols-1 sm:grid-cols-[100px_1fr] gap-3">
                     <Field label="ტიპი">
                       <select value={consForm.tier} onChange={e => setConsForm({ ...consForm, tier: e.target.value as ConsultTier })}
-                              className="w-full h-10 px-2 rounded-field border border-ink-200 bg-white text-[13.5px] focus:border-brand-400 focus:outline-none">
+                              className="w-full h-11 px-2 rounded-field border border-ink-200 bg-white text-[13.5px] focus:border-brand-400 focus:outline-none">
                         <option value="QUICK">QUICK</option>
                         <option value="STANDARD">STANDARD</option>
                         <option value="DEEP">DEEP</option>
@@ -851,7 +851,7 @@ export default function TutorProfilePage() {
                       <input type="text" required maxLength={80} value={consForm.title}
                              onChange={e => setConsForm({ ...consForm, title: e.target.value })}
                              placeholder="მაგ. Pitch deck რევიუ"
-                             className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] focus:border-brand-400 focus:outline-none" />
+                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] focus:border-brand-400 focus:outline-none" />
                     </Field>
                   </div>
                   <Field label="აღწერა">
@@ -864,12 +864,12 @@ export default function TutorProfilePage() {
                     <Field label="ხანგრძლივობა (წუთი)">
                       <input type="number" required min={5} max={240} value={consForm.minutes}
                              onChange={e => setConsForm({ ...consForm, minutes: Number(e.target.value) })}
-                             className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums focus:border-brand-400 focus:outline-none" />
+                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <Field label="ფასი (₾)">
                       <input type="number" required min={0} max={10000} value={consForm.price}
                              onChange={e => setConsForm({ ...consForm, price: Number(e.target.value) })}
-                             className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums focus:border-brand-400 focus:outline-none" />
+                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums focus:border-brand-400 focus:outline-none" />
                     </Field>
                   </div>
                   {consErr && <div className="p-2.5 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[12.5px]">{consErr}</div>}
@@ -924,18 +924,18 @@ export default function TutorProfilePage() {
                       <input type="text" required maxLength={200} value={certForm.title}
                              onChange={e => setCertForm({ ...certForm, title: e.target.value })}
                              placeholder="მაგ. CFA Level III"
-                             className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <Field label="გამცემი">
                       <input type="text" required maxLength={200} value={certForm.issuer}
                              onChange={e => setCertForm({ ...certForm, issuer: e.target.value })}
                              placeholder="CFA Institute"
-                             className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <Field label="წელი">
                       <input type="number" required min={1900} max={2100} value={certForm.year}
                              onChange={e => setCertForm({ ...certForm, year: Number(e.target.value) })}
-                             className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
+                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <Field label="ფაილი — PDF ან სურათი (არასავალდებულო)">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -997,31 +997,31 @@ export default function TutorProfilePage() {
                       <input type="text" required maxLength={200} value={eduForm.school}
                              onChange={e => setEduForm({ ...eduForm, school: e.target.value })}
                              placeholder="ილიას სახ. უნივერსიტეტი"
-                             className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <Field label="ხარისხი">
                       <input type="text" required maxLength={200} value={eduForm.degree}
                              onChange={e => setEduForm({ ...eduForm, degree: e.target.value })}
                              placeholder="MBA / ბაკალავრი / მაგისტრი"
-                             className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <Field label="დარგი (არასავალდებულო)">
                       <input type="text" maxLength={200} value={eduForm.field}
                              onChange={e => setEduForm({ ...eduForm, field: e.target.value })}
                              placeholder="Business Administration"
-                             className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="დაწყების წელი">
                         <input type="number" required min={1900} max={2100} value={eduForm.startYear}
                                onChange={e => setEduForm({ ...eduForm, startYear: Number(e.target.value) })}
-                               className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
+                               className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
                       </Field>
                       <Field label="დასრულების წელი">
                         <input type="number" min={1900} max={2100} value={eduForm.endYear}
                                onChange={e => setEduForm({ ...eduForm, endYear: e.target.value })}
                                placeholder="ცარიელი — დღემდე"
-                               className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
+                               className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
                       </Field>
                     </div>
                   </div>
@@ -1063,25 +1063,25 @@ export default function TutorProfilePage() {
                       <input type="text" required maxLength={200} value={expForm.company}
                              onChange={e => setExpForm({ ...expForm, company: e.target.value })}
                              placeholder="McKinsey & Company"
-                             className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <Field label="პოზიცია">
                       <input type="text" required maxLength={200} value={expForm.role}
                              onChange={e => setExpForm({ ...expForm, role: e.target.value })}
                              placeholder="Senior Associate"
-                             className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="დაწყების წელი">
                         <input type="number" required min={1900} max={2100} value={expForm.startYear}
                                onChange={e => setExpForm({ ...expForm, startYear: Number(e.target.value) })}
-                               className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
+                               className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
                       </Field>
                       <Field label="დასრულების წელი">
                         <input type="number" min={1900} max={2100} value={expForm.endYear}
                                onChange={e => setExpForm({ ...expForm, endYear: e.target.value })}
                                placeholder="ცარიელი — ახლა"
-                               className="w-full h-10 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
+                               className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
                       </Field>
                     </div>
                     <Field label="აღწერა (არასავალდებულო)">

@@ -17,7 +17,7 @@ const BASE =
 const SIZES: Record<Size, string> = {
   sm: 'h-9 px-3.5 text-[12.5px]',
   md: 'h-11 px-5 text-[13.5px]',
-  lg: 'h-13 px-6 text-[14.5px]',
+  lg: 'h-12 px-6 text-[14.5px]',
 }
 
 // Each variant carries hover AND active tints so the press reads as a real,

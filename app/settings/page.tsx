@@ -637,13 +637,13 @@ export default function SettingsPage() {
                   onChange={e => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   maxLength={6}
                   placeholder="123456"
-                  className="flex-1 h-10 px-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14px] tabular-nums text-ink-900 transition-colors"
+                  className="flex-1 h-11 px-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14px] tabular-nums text-ink-900 transition-colors"
                 />
                 <button
                   type="button"
                   onClick={submitVerify}
                   disabled={verifyingBusy || verifyCode.length !== 6}
-                  className="h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[12.5px] transition-colors"
+                  className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[12.5px] transition-colors"
                 >
                   დადასტურება
                 </button>
@@ -651,7 +651,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={startVerify}
                   disabled={verifyingBusy}
-                  className="h-10 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 disabled:opacity-50 text-ink-700 font-display font-semibold text-[12.5px] transition-colors"
+                  className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 disabled:opacity-50 text-ink-700 font-display font-semibold text-[12.5px] transition-colors"
                 >
                   ხელახლა
                 </button>
@@ -669,7 +669,7 @@ export default function SettingsPage() {
             <button type="button" onClick={openDelete} className="font-display text-[12px] font-semibold text-danger-700 hover:text-danger-800 self-start transition-colors">
               ანგარიშის წაშლა
             </button>
-            <button type="button" onClick={() => setSignOutOpen(true)} className="h-10 px-4 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-[12.5px] transition-colors self-end sm:self-auto">
+            <button type="button" onClick={() => setSignOutOpen(true)} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-[12.5px] transition-colors self-end sm:self-auto">
               გამოსვლა
             </button>
           </div>
@@ -753,7 +753,7 @@ export default function SettingsPage() {
                 autoComplete="off"
                 autoCapitalize="characters"
                 spellCheck={false}
-                className="w-full mt-2 h-10 px-3 rounded-field border border-ink-200 focus:border-danger-500 focus:ring-2 focus:ring-danger-100 focus:outline-none text-[13.5px] font-mono tracking-wider text-ink-900 transition-colors"
+                className="w-full mt-2 h-11 px-3 rounded-field border border-ink-200 focus:border-danger-500 focus:ring-2 focus:ring-danger-100 focus:outline-none text-[13.5px] font-mono tracking-wider text-ink-900 transition-colors"
                 placeholder="DELETE"
                 disabled={deleteBusy}
               />

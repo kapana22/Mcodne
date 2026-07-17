@@ -379,6 +379,22 @@ export default function TutorBookingDetailPage() {
         body: msgText.trim() || (attachment ? `📎 ${attachment.name}` : ''),
       }
       if (attachment) { body.fileUrl = attachment.url; body.fileName = attachment.name }
+      // TRUE optimistic append — bubble shows instantly; the temp row is
+      // replaced by the server row on success, rolled back on failure with the
+      // draft restored (the POST takes seconds on the remote-DB dev setup).
+      const tempId = `tmp-${Date.now()}`
+      const sentText = msgText
+      const sentAttachment = attachment
+      setMsgs(prev => [...prev, {
+        id: tempId,
+        fromId: me!.id,
+        body: body.body,
+        createdAt: new Date().toISOString(),
+        fileUrl: sentAttachment?.url ?? null,
+        fileName: sentAttachment?.name ?? null,
+        from: { id: me!.id, fullName: me!.fullName, avatarUrl: me!.avatarUrl },
+      }])
+      setMsgText(''); setAttachment(null)
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -386,10 +402,12 @@ export default function TutorBookingDetailPage() {
       })
       const j = await res.json().catch(() => ({} as any))
       if (!res.ok || !j.ok) {
+        setMsgs(prev => prev.filter(m => m.id !== tempId))
+        setMsgText(sentText); setAttachment(sentAttachment)
         showFlash('err', 'შეტყობინება ვერ გაიგზავნა')
         return
       }
-      setMsgs(prev => [...prev, {
+      setMsgs(prev => prev.map(m => (m.id === tempId ? {
         id: j.message.id,
         fromId: j.message.fromId,
         body: j.message.body,
@@ -397,8 +415,7 @@ export default function TutorBookingDetailPage() {
         fileUrl: j.message.fileUrl,
         fileName: j.message.fileName,
         from: { id: me!.id, fullName: me!.fullName, avatarUrl: me!.avatarUrl },
-      }])
-      setMsgText(''); setAttachment(null)
+      } : m)))
       // Bubble the mutation up so `/tutor/messages` (server-rendered inbox)
       // reflects the new thread on next navigation instead of a stale cache.
       router.refresh()

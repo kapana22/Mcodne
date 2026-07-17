@@ -78,7 +78,7 @@ const TopBar = ({ me }: { me: MeData | null; onOpenMenu?: () => void; menuOpen?:
               { id: 'saved',    l: 'შენახული',        href: '/student/favorites' },
               { id: 'messages', l: 'მესიჯები',        href: '/student/messages' },
             ].map(it => (
-              <a key={it.id} href={it.href} className={`h-10 px-3.5 rounded-btn font-display text-[12px] font-semibold uppercase tracking-[0.06em] inline-flex items-center gap-1.5 transition-colors duration-fast ${
+              <a key={it.id} href={it.href} className={`h-11 px-3.5 rounded-btn font-display text-[12px] font-semibold uppercase tracking-[0.06em] inline-flex items-center gap-1.5 transition-colors duration-fast ${
                 it.active ? 'bg-brand-50 text-brand-800' : 'text-ink-700 hover:bg-ink-100/70 hover:text-ink-900'
               }`}>
                 {it.l}
@@ -1451,7 +1451,7 @@ const ExpertQuickModal = ({ open, onClose, expert, onBook }: { open: boolean; on
           სრული პროფილი
           <Icon.arrow className="w-3 h-3" />
         </Link>
-        <button type="button" onClick={() => onBook(expert)} className="h-10 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
+        <button type="button" onClick={() => onBook(expert)} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
           <Icon.cal className="w-4 h-4" />
           ჯავშნა
         </button>
@@ -1649,7 +1649,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => { checkAuth(); if (bookingsError) loadBookings() }}
-              className="mt-4 h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+              className="mt-4 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
             >
               <Icon.refresh className="w-3.5 h-3.5" />
               სცადე თავიდან

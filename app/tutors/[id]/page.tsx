@@ -502,6 +502,13 @@ const Reviews = ({ reviews, rating, total, verified }: { reviews: ReviewItem[]; 
                   </div>
                 )
               })}
+              {/* The bars are computed from the LOADED reviews (API returns the
+                  latest 8) while the big number/total are lifetime aggregates —
+                  without this caption the two visibly disagree and read as a
+                  fake rating. */}
+              {reviews.length > 0 && reviews.length < total && (
+                <div className="pt-1 text-[11px] text-ink-400">განაწილება ბოლო {reviews.length} შეფასების მიხედვით</div>
+              )}
             </div>
           </div>
 
@@ -2130,14 +2137,14 @@ const BookingModal = ({
                       <Link
                         href={`/signin?redirect=/tutors/${tutorId}`}
                         onClick={(e) => { e.preventDefault(); onClose(); if (tutorId) window.location.href = `/tutors/${tutorId}#contact` }}
-                        className="h-10 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+                        className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
                       >
                         დაუკავშირდი ექსპერტს
                       </Link>
                       <Link
                         href="/tutors"
                         onClick={() => onClose()}
-                        className="h-10 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center transition-colors"
+                        className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center transition-colors"
                       >
                         მსგავსი ექსპერტები
                       </Link>
@@ -2499,7 +2506,11 @@ function ExpertProfile() {
             <SpecsGrid tutor={tutorData} />
 
             <AboutSection tutor={tutorData} />
-            <ServicesSection consultations={tutorData?.consultations ?? []} onBook={openPaid} />
+            {/* ServicesSection intentionally NOT rendered: the product sells ONE
+                flat-priced session (the sticky booking card). The legacy
+                consultation tiers advertised per-tier prices the booking modal
+                never honored (it always books tutor.price) — a pricing lie on
+                the highest-intent page. Data stays in the API; UI stays honest. */}
             <ExperienceSection items={tutorData?.experience ?? []} />
             <EducationSection items={tutorData?.education ?? []} />
             <CertificatesSection items={tutorData?.certificates ?? []} />

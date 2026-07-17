@@ -31,9 +31,12 @@ export function Footer() {
         aria-hidden
         className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-200 to-transparent"
       />
-      <div className="pt-14 pb-8">
+      {/* Own container — pages drop this footer both inside and outside their
+          content wrappers, so without its own max-width/padding it ran
+          edge-to-edge and the bottom strip clipped at the viewport edge. */}
+      <div className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-14 pb-8">
         <div className="grid grid-cols-2 sm:grid-cols-[1.5fr_1fr_1fr_1fr] gap-8 sm:gap-10 mb-12">
-          <div>
+          <div className="col-span-2 sm:col-span-1">
             <Logo size="md" />
             <p className="text-[13.5px] text-ink-600 mt-5 leading-[1.6] max-w-sm">
               მცოდნე — ცოდნის არქივი, სადაც ხვდები ხელით შერჩეულ ქართველ ექსპერტებს.
