@@ -9,7 +9,6 @@ import { copyToClipboard } from '@/lib/clipboard'
 import { safeHttpUrl } from '@/lib/safeUrl'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { pushRecentTutor } from '@/components/RecentTutorsStrip'
-import { SignInPromptBanner } from '@/components/SignInPromptBanner'
 import { userTimezone, TBILISI } from '@/lib/tz'
 import { CountUp } from '@/components/CountUp'
 
@@ -298,7 +297,7 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
               onClick={toggleSave}
               disabled={savedBusy}
               aria-label={saved ? 'შენახული' : 'შენახვა'}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border inline-flex items-center justify-center transition-colors disabled:opacity-60 ${saved ? 'border-danger-300 bg-danger-50 text-danger-600' : 'border-ink-200 bg-white hover:border-ink-300 text-ink-600'}`}
+              className={`w-11 h-11 rounded-full border inline-flex items-center justify-center transition-colors disabled:opacity-60 ${saved ? 'border-danger-300 bg-danger-50 text-danger-600' : 'border-ink-200 bg-white hover:border-ink-300 text-ink-600'}`}
             >
               {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
             </button>
@@ -307,7 +306,7 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
               onClick={shareTutorLink}
               aria-label="ბმულის კოპირება"
               title="დააკოპირე ბმული"
-              className="h-9 sm:h-10 px-3 rounded-pill border border-ink-200 bg-white hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 text-ink-700 inline-flex items-center gap-1.5 font-display text-[12px] sm:text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+              className="h-11 px-3.5 rounded-pill border border-ink-200 bg-white hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 text-ink-700 inline-flex items-center gap-1.5 font-display text-[12px] sm:text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5" aria-hidden="true">
                 <path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1" />
@@ -550,13 +549,36 @@ const Reviews = ({ reviews, rating, total, verified }: { reviews: ReviewItem[]; 
 /* Local Footer was orphan (had hardcoded fake nav) — replaced by shared components/Footer.tsx via SharedFooter. */
 
 /* ───── Mobile sticky booking bar ───── */
-const MobileBookingBar = ({ onBook, price, responseHours, sessionMin, signedIn }: { onBook: () => void; price: number; responseHours: number; sessionMin: number; signedIn?: boolean | null }) => {
+const MobileBookingBar = ({ onBook, price, responseHours, sessionMin, signedIn, paused, availability = [] }: { onBook: () => void; price: number; responseHours: number; sessionMin: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[] }) => {
   // Flag the body while this mobile CTA bar is mounted so the cookie banner
   // lifts above it (see globals.css) instead of covering the primary CTA.
   useEffect(() => {
     document.body.setAttribute('data-mobile-cta', '1')
     return () => document.body.removeAttribute('data-mobile-cta')
   }, [])
+
+  // Earliest future free slot → "next available" hint. Mirrors the desktop
+  // StickyBookingCard's uniqueDays hint so mobile users get the same
+  // urgency/feasibility signal the right rail shows on desktop.
+  const nextFree = React.useMemo(() => {
+    const now = Date.now()
+    let best: Date | null = null
+    for (const s of availability) {
+      if (s.booked) continue
+      const d = new Date(s.startAt)
+      if (d.getTime() <= now) continue
+      if (!best || d < best) best = d
+    }
+    return best
+  }, [availability])
+
+  // The bar has three states the button must communicate on its own —
+  // the explanatory banners live far up the page on mobile:
+  //   paused   → expert stepped out; booking closed
+  //   noSlots  → live profile, but nothing bookable right now
+  //   bookable → normal CTA
+  const noSlots = !paused && nextFree === null
+  const disabled = paused || noSlots
   return (
   <div
     className="lg:hidden fixed bottom-0 left-0 right-0 z-[65] bg-white/95 backdrop-blur-md border-t border-ink-200 shadow-[0_-4px_20px_rgba(46,42,33,0.06)] motion-safe:animate-slide-in-b"
@@ -568,28 +590,92 @@ const MobileBookingBar = ({ onBook, price, responseHours, sessionMin, signedIn }
           <span className="font-display text-[22px] font-bold text-ink-900 tabular-nums leading-none tracking-tight">₾{priceForDuration(price, sessionMin)}</span>
           <span className="text-[11.5px] text-ink-500">/ {sessionMin} წთ</span>
         </div>
+        {!disabled && nextFree && (
+          <div className="mt-1 text-[11px] text-ink-500 leading-none truncate">
+            უახლოესი: <span className="font-display font-semibold text-ink-800">{DAY_NAMES_FULL[isoWeekday(nextFree)]}, {nextFree.getDate()} {KA_MONTHS_FULL[nextFree.getMonth()]}</span>
+          </div>
+        )}
       </div>
       <button
         type="button"
         onClick={onBook}
-        className="ml-auto shrink-0 h-12 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast"
+        disabled={disabled}
+        className="ml-auto shrink-0 h-12 px-5 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:bg-none disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed"
       >
-        {signedIn === false ? 'შესვლა და დაჯავშნა' : 'დაჯავშნა'}
-        <Icon.arrow className="w-4 h-4" />
+        {paused ? 'პაუზაზეა' : noSlots ? 'დროები არ არის' : signedIn === false ? 'შესვლა და დაჯავშნა' : 'დაჯავშნა'}
+        {!disabled && <Icon.arrow className="w-4 h-4" />}
       </button>
     </div>
     <div className="border-t border-ink-100 px-4 py-2 flex items-center justify-center gap-4 text-[10.5px] text-ink-500">
-      <span className="inline-flex items-center gap-1">
-        <Icon.shield className="w-3 h-3 text-success-600" />
-        Escrow დაცული
-      </span>
-      <span className="text-ink-300">·</span>
-      <span className="inline-flex items-center gap-1">
-        <Icon.clock className="w-3 h-3 text-ink-400" />
-        რეაგ. ~ {responseHours} სთ
-      </span>
+      {paused ? (
+        <span>ჯავშნები დროებით შეჩერებულია — პროფილი აქტიური დარჩება</span>
+      ) : noSlots ? (
+        <span>ახალი დროები მალე დაემატება — შეინახე პროფილი ❤ ღილაკით</span>
+      ) : (
+        <>
+          <span className="inline-flex items-center gap-1">
+            <Icon.shield className="w-3 h-3 text-success-600" />
+            Escrow დაცული
+          </span>
+          <span className="text-ink-300">·</span>
+          <span className="inline-flex items-center gap-1">
+            <Icon.clock className="w-3 h-3 text-ink-400" />
+            რეაგ. ~ {responseHours} სთ
+          </span>
+        </>
+      )}
     </div>
   </div>
+  )
+}
+
+/* ───── Auth prompt sheet — shown at the point of tap ─────
+ * When an anonymous visitor taps a booking CTA we open this bottom sheet
+ * right where they are, instead of scrolling them to a banner at the top of
+ * the page (disorienting on a long profile). After auth the redirect returns
+ * to this profile; a booking intent adds ?rebook=1 so the modal reopens by
+ * itself and the flow continues where it left off.
+ */
+const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; intent: 'book' | null; onDismiss: () => void }) => {
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onDismiss() }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [onDismiss])
+  const target = `/tutors/${tutorId}${intent === 'book' ? '?rebook=1' : ''}`
+  const q = `redirect=${encodeURIComponent(target)}`
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label="ავტორიზაცია საჭიროა">
+      <button type="button" aria-label="დახურვა" onClick={onDismiss} className="absolute inset-0 bg-ink-900/40 motion-safe:animate-fade-in cursor-default no-tap-shrink" />
+      <div className="relative w-full sm:max-w-[400px] bg-white rounded-t-card sm:rounded-card shadow-float p-6 pb-8 sm:pb-6 motion-safe:animate-slide-in-b safe-area-bottom">
+        <button type="button" onClick={onDismiss} aria-label="დახურვა" className="absolute top-3 right-3 w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-500 inline-flex items-center justify-center transition-colors">
+          <Icon.x className="w-5 h-5" />
+        </button>
+        <div className="font-display text-[18px] font-bold text-ink-900 tracking-tight pr-10">
+          {intent === 'book' ? 'შედი, რომ დაიჯავშნო' : 'შედი, რომ გააგრძელო'}
+        </div>
+        <p className="text-[13px] text-ink-600 mt-2 leading-[1.55]">
+          1 წუთში მორჩები — მერე ზუსტად აქ დაბრუნდები{intent === 'book' ? ' და ჯავშანი გაგრძელდება' : ''}.
+        </p>
+        <div className="mt-5 space-y-2.5">
+          <Link href={`/signin?${q}`} className="w-full h-12 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow transition-all">
+            შესვლა <Icon.arrow className="w-4 h-4" />
+          </Link>
+          <Link href={`/signup?${q}`} className="w-full h-12 rounded-btn border border-ink-200 hover:border-ink-300 hover:bg-ink-75 text-ink-800 font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center transition-colors">
+            რეგისტრაცია
+          </Link>
+        </div>
+        <p className="mt-4 text-[11px] text-ink-500 text-center inline-flex items-center gap-1.5 w-full justify-center">
+          <Icon.shield className="w-3 h-3 text-success-600" />
+          გადახდა escrow-შია სესიის ბოლომდე
+        </p>
+      </div>
+    </div>
   )
 }
 
@@ -722,11 +808,16 @@ const SpecsGrid = ({ tutor }: { tutor: TutorDetail | null }) => {
 
 /* ───── About ───── */
 const AboutSection = ({ tutor }: { tutor: TutorDetail | null }) => {
+  // A long bio is a wall of text on a phone. Below lg we clamp to ~8 lines
+  // and offer an explicit expand; desktop keeps the full text (the right
+  // rail balances it there). Hooks run unconditionally (before any return).
+  const [bioExpanded, setBioExpanded] = useState(false)
   if (!tutor) return null
   const bio = tutor.bio ?? tutor.user.bio
   if (!bio && !tutor.headline) return null
   // Split bio into paragraphs by double newline or period-space+capital.
   const paragraphs = bio ? bio.split(/\n\n+/).filter(p => p.trim()) : []
+  const isLong = (bio?.length ?? 0) > 420
   return (
     <section className="mt-14 lg:mt-16 pt-10 border-t border-ink-100">
       <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-4">ჩემ შესახებ</div>
@@ -736,9 +827,22 @@ const AboutSection = ({ tutor }: { tutor: TutorDetail | null }) => {
         </blockquote>
       )}
       {paragraphs.length > 0 && (
-        <div className="space-y-4 text-[14.5px] text-ink-700 leading-[1.65] max-w-[640px] whitespace-pre-wrap">
-          {paragraphs.map((p, i) => <p key={i}>{p}</p>)}
-        </div>
+        <>
+          <div className={`space-y-4 text-[14.5px] text-ink-700 leading-[1.65] max-w-[640px] whitespace-pre-wrap ${isLong && !bioExpanded ? 'max-lg:line-clamp-[8]' : ''}`}>
+            {paragraphs.map((p, i) => <p key={i}>{p}</p>)}
+          </div>
+          {isLong && (
+            <button
+              type="button"
+              onClick={() => setBioExpanded(v => !v)}
+              className="lg:hidden mt-3 h-11 -ml-1 px-1 inline-flex items-center gap-1.5 font-display text-[13px] font-semibold text-brand-700 no-caps"
+              aria-expanded={bioExpanded}
+            >
+              {bioExpanded ? 'ჩაკეცვა' : 'სრულად წაკითხვა'}
+              <Icon.chevD className={`w-4 h-4 transition-transform ${bioExpanded ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+        </>
       )}
     </section>
   )
@@ -777,7 +881,7 @@ const ServicesSection = ({ consultations, onBook }: { consultations: Consultatio
                 <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">{s.minutes} წუთი</div>
                 <div className="font-display text-[18px] font-bold text-ink-900 tabular-nums leading-none mt-1">₾{s.price}</div>
               </div>
-              <button type="button" onClick={onBook} className="h-9 px-3.5 rounded-btn bg-brand-50 hover:bg-brand-500 hover:text-white border border-brand-200 hover:border-brand-500 text-brand-700 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1 transition-colors">
+              <button type="button" onClick={onBook} className="h-11 px-4 rounded-btn bg-brand-50 hover:bg-brand-500 hover:text-white border border-brand-200 hover:border-brand-500 text-brand-700 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1 transition-colors">
                 დაჯავშნა <Icon.arrow className="w-3 h-3" />
               </button>
             </div>
@@ -819,8 +923,8 @@ const CertificatesSection = ({ items }: { items: CertItem[] }) => {
               </span>
             )}
             {safeHttpUrl(c.fileUrl) && (
-              <a href={safeHttpUrl(c.fileUrl)} target="_blank" rel="noopener noreferrer" className="text-ink-500 hover:text-ink-900" aria-label="ჩამოტვირთვა">
-                <Icon.download className="w-3.5 h-3.5" />
+              <a href={safeHttpUrl(c.fileUrl)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center w-9 h-9 -my-2 -mr-1.5 rounded-btn text-ink-500 hover:text-ink-900 hover:bg-ink-100 transition-colors" aria-label="ჩამოტვირთვა">
+                <Icon.download className="w-4 h-4" />
               </a>
             )}
           </div>
@@ -1010,7 +1114,7 @@ const StickyBookingCard = ({
             type="button"
             disabled={uniqueDays.length === 0}
             onClick={onOpen}
-            className="w-full h-12 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors"
+            className="w-full h-12 rounded-btn bg-gradient-cta hover:brightness-105 disabled:bg-none disabled:bg-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-all shadow-brand-glow disabled:shadow-none"
           >
             {signedIn === false ? 'შესვლა და დაჯავშნა' : 'დაჯავშნე'} <Icon.arrow className="w-4 h-4" />
           </button>
@@ -1140,7 +1244,7 @@ const Calendar = ({
           onClick={onPrev}
           disabled={!canPrev}
           aria-label="წინა თვე"
-          className="w-10 h-10 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <Icon.chevL className="w-4 h-4" />
         </button>
@@ -1149,7 +1253,7 @@ const Calendar = ({
           type="button"
           onClick={onNext}
           aria-label="შემდეგი თვე"
-          className="w-10 h-10 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors"
+          className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors"
         >
           <Icon.chevR className="w-4 h-4" />
         </button>
@@ -1965,7 +2069,7 @@ const BookingModal = ({
               <Steps step={step} total={totalSteps} />
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="დახურვა" className="w-10 h-10 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors shrink-0">
+          <button type="button" onClick={onClose} aria-label="დახურვა" className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors shrink-0">
             <Icon.x className="w-5 h-5" />
           </button>
         </header>
@@ -2105,7 +2209,7 @@ const BookingModal = ({
                   onClick={next}
                   disabled={submitting || (step === 1 && !canAdvanceFromStep1) || (onPaymentStep && !cardValid)}
                   aria-busy={submitting}
-                  className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+                  className="h-11 px-5 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
                 >
                   {submitting ? (
                     <>
@@ -2205,13 +2309,16 @@ function ExpertProfile() {
     })()
     return () => { cancelled = true }
   }, [])
-  const requireAuth = React.useCallback(() => {
+  // Which flow the visitor was in when the auth gate fired. 'book' makes the
+  // post-auth redirect carry ?rebook=1 so the booking modal reopens by itself.
+  const [authIntent, setAuthIntent] = useState<'book' | null>(null)
+  const requireAuth = React.useCallback((intent?: 'book') => {
     if (signedIn === false) {
+      setAuthIntent(intent ?? null)
       setNeedsAuth(true)
       setAuthDismissed(false)
-      if (typeof window !== 'undefined') {
-        try { window.scrollTo({ top: 0, behavior: 'smooth' }) } catch {}
-      }
+      // Deliberately NO scroll — the AuthPromptSheet opens at the point of
+      // tap; yanking the user to the top of a long profile was disorienting.
       return true
     }
     return false
@@ -2235,12 +2342,12 @@ function ExpertProfile() {
 
   const openPaid = () => {
     if (isPaused) return
-    if (requireAuth()) return
+    if (requireAuth('book')) return
     setBookingMode('paid'); setBookingInit({ step: 1, start: null }); setBookingOpen(true)
   }
   const continueFromSidebar = (start: Date, mode: BookingMode) => {
     if (isPaused) return
-    if (requireAuth()) return
+    if (requireAuth('book')) return
     setBookingMode(mode)
     setBookingInit({ step: 2, start })
     setBookingOpen(true)
@@ -2365,13 +2472,6 @@ function ExpertProfile() {
       <PublicTopBar />
 
       <main id="main" className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-4 sm:pt-7 lg:pt-9 pb-24 lg:pb-16">
-        {needsAuth && !authDismissed && signedIn === false && (
-          <SignInPromptBanner
-            onDismiss={() => setAuthDismissed(true)}
-            className="mb-4 sm:mb-6"
-          />
-        )}
-
         {/* Paused-profile banner. Shown when the tutor has toggled visibility
             off on /tutor/profile — the detail page still resolves (existing
             students may have deep links) but explicit CTAs (StickyBookingCard,
@@ -2442,7 +2542,18 @@ function ExpertProfile() {
         responseHours={tutorData?.responseHours ?? TUTOR_DEFAULTS.responseHours}
         sessionMin={tutorData?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin}
         signedIn={signedIn}
+        paused={isPaused}
+        availability={tutorData?.availability ?? []}
       />
+
+      {/* Point-of-tap auth prompt — replaces the old top-of-page banner. */}
+      {needsAuth && !authDismissed && signedIn === false && (
+        <AuthPromptSheet
+          tutorId={tutorId}
+          intent={authIntent}
+          onDismiss={() => setAuthDismissed(true)}
+        />
+      )}
 
       <BookingModal
         open={bookingOpen}
