@@ -1,209 +1,409 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Avatar } from '@/components/Avatar'
-import { StatusPill } from '@/components/StatusPill'
-import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
-import { fmtKaDateTime } from '@/lib/kaDate'
+import { ConfirmModal } from '@/components/ConfirmModal'
+import { EmptyState } from '@/components/EmptyState'
+import { Icon } from '@/components/Icon'
+import { StatusPill } from '@/components/StatusPill'
 import { useToast } from '@/components/ToastProvider'
+import { fmtKaDate, fmtKaTime } from '@/lib/kaDate'
+import { isBookingLive } from '@/lib/bookingLive'
+import { refreshNavBadges } from '@/components/tutor/useNavBadges'
+import {
+  type DashBooking as Booking,
+  toneOf,
+  awaitsClosure,
+  awaitsRescheduleAnswer,
+} from '../_components/types'
 
-type BookingStatus = 'PREPARING' | 'CONFIRMED' | 'LIVE' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW'
+type TabId = 'attention' | 'upcoming' | 'history'
 
-type Booking = {
-  id: string
-  ref: string
-  topic: string
-  status: BookingStatus
-  startAt: string
-  durationMin: number
-  price: number
-  student: { id: string; fullName: string; avatarUrl?: string | null } | null
-}
-
-const TABS: { id: BookingStatus | 'ALL'; label: string }[] = [
-  { id: 'ALL', label: 'ყველა' },
-  { id: 'PREPARING', label: 'მზადდება' },
-  { id: 'CONFIRMED', label: 'დადასტურდა' },
-  { id: 'LIVE', label: 'ცოცხალია' },
-  { id: 'COMPLETED', label: 'დასრულდა' },
-  { id: 'CANCELED', label: 'გაუქმდა' },
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'attention', label: 'საჭიროებს ყურადღებას' },
+  { id: 'upcoming', label: 'მოახლოებული' },
+  { id: 'history', label: 'ისტორია' },
 ]
 
-const toneOf = (s: BookingStatus) =>
-  s === 'PREPARING' ? 'preparing'
-  : s === 'CONFIRMED' ? 'confirmed'
-  : s === 'LIVE' ? 'live'
-  : s === 'COMPLETED' ? 'completed'
-  : s === 'CANCELED' ? 'canceled'
-  : 'noshow' as const
-
-const fmtDate = (iso: string) => {
-  try {
-    const d = new Date(iso)
-    return fmtKaDateTime(d)
-  } catch { return iso }
+// Legacy links (?tab=PREPARING from old dashboard/notifications/bookmarks)
+// map onto the new buckets instead of being ignored.
+const LEGACY_TAB: Record<string, TabId> = {
+  PREPARING: 'attention',
+  LIVE: 'upcoming',
+  CONFIRMED: 'upcoming',
+  COMPLETED: 'history',
+  CANCELED: 'history',
+  ALL: 'attention',
 }
 
-export default function TutorBookingsPage() {
+const dayLabel = (d: Date, now: Date) => {
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const diff = Math.round((startOf(d) - startOf(now)) / 86_400_000)
+  if (diff === 0) return 'დღეს'
+  if (diff === 1) return 'ხვალ'
+  return fmtKaDate(d, { weekday: true })
+}
+
+function BookingsPageInner() {
   const { toast } = useToast()
+  const searchParams = useSearchParams()
   const [bookings, setBookings] = useState<Booking[] | null>(null)
-  const [tab, setTab] = useState<BookingStatus | 'ALL'>('ALL')
   const [err, setErr] = useState<string | null>(null)
-  const [cancelingId, setCancelingId] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<{ kind: 'cancel' | 'no_show' | 'decline'; b: Booking } | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const bResp = await fetch('/api/tutor/bookings')
-        if (cancelled) return
-        // Expired session / wrong role → go to signin, not a misleading empty list.
-        if (bResp.status === 401 || bResp.status === 403) {
-          window.location.href = '/signin?redirect=/tutor/bookings'
-          return
-        }
-        const bRes = await bResp.json().catch(() => null)
-        setBookings(Array.isArray(bRes?.bookings) ? bRes.bookings : [])
-      } catch (e: any) {
-        if (!cancelled) setErr('მონაცემების ჩატვირთვა ვერ მოხერხდა')
-      }
-    })()
-    return () => { cancelled = true }
-  }, [])
-
-  const filtered = useMemo(() => {
-    if (!bookings) return []
-    if (tab === 'ALL') return bookings
-    return bookings.filter(b => b.status === tab)
-  }, [bookings, tab])
-
-  const counts = useMemo(() => {
-    const map: Record<string, number> = { ALL: bookings?.length ?? 0 }
-    for (const b of bookings ?? []) map[b.status] = (map[b.status] ?? 0) + 1
-    return map
-  }, [bookings])
-
-  const cancel = async (id: string) => {
-    if (!confirm('დაადასტურე ჯავშნის გაუქმება')) return
-    setCancelingId(id)
-    setErr(null)
+  const load = async () => {
     try {
-      const res = await fetch(`/api/bookings/${id}/cancel`, { method: 'POST' })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({} as any))
-        setErr(j?.error ? `გაუქმება ვერ მოხერხდა (${j.error})` : 'გაუქმება ვერ მოხერხდა')
+      const bResp = await fetch('/api/tutor/bookings')
+      // Expired session / wrong role → go to signin, not a misleading empty list.
+      if (bResp.status === 401 || bResp.status === 403) {
+        window.location.href = '/signin?redirect=/tutor/bookings'
         return
       }
-      setBookings(prev => prev?.map(b => b.id === id ? { ...b, status: 'CANCELED' } : b) ?? [])
-      toast('ჯავშანი გაუქმდა', 'success')
+      if (!bResp.ok) throw new Error('load failed')
+      const bRes = await bResp.json().catch(() => null)
+      setBookings(Array.isArray(bRes?.bookings) ? bRes.bookings : [])
+      setErr(null)
     } catch {
-      setErr('გაუქმება ვერ მოხერხდა — ქსელის შეცდომა')
+      setErr('მონაცემების ჩატვირთვა ვერ მოხერხდა')
+      setBookings(prev => prev ?? [])
+    }
+  }
+  useEffect(() => { load() }, [])
+
+  const now = Date.now()
+  const nowDate = new Date()
+
+  const buckets = useMemo(() => {
+    const all = bookings ?? []
+    const attention = all
+      .filter(b => b.status === 'PREPARING' || awaitsRescheduleAnswer(b) || awaitsClosure(b, now))
+      .sort((a, z) => new Date(a.startAt).getTime() - new Date(z.startAt).getTime()) // stalest first
+    const upcoming = all
+      .filter(b => (b.status === 'CONFIRMED' || b.status === 'LIVE') && !awaitsClosure(b, now) &&
+        (isBookingLive(b) || new Date(b.startAt).getTime() >= now))
+      .sort((a, z) => new Date(a.startAt).getTime() - new Date(z.startAt).getTime())
+    const history = all
+      .filter(b => b.status === 'COMPLETED' || b.status === 'CANCELED' || b.status === 'NO_SHOW')
+      .sort((a, z) => new Date(z.startAt).getTime() - new Date(a.startAt).getTime())
+    return { attention, upcoming, history }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings])
+
+  // URL-driven tab (fixes the long-standing bug where ?tab=PREPARING was
+  // ignored). No explicit param → attention if non-empty, else upcoming.
+  const rawTab = searchParams?.get('tab') ?? null
+  const tab: TabId =
+    rawTab && (TABS.some(t => t.id === rawTab) || LEGACY_TAB[rawTab])
+      ? ((TABS.some(t => t.id === rawTab) ? rawTab : LEGACY_TAB[rawTab]) as TabId)
+      : buckets.attention.length > 0 ? 'attention' : 'upcoming'
+
+  // Shallow URL update — router.replace would re-render the force-dynamic
+  // layout server-side (a full DB round-trip) just to switch a client tab.
+  // Next syncs useSearchParams from native history.replaceState.
+  const setTab = (t: TabId) => window.history.replaceState(null, '', `/tutor/bookings?tab=${t}`)
+
+  const act = async (b: Booking, action: 'accept' | 'decline' | 'complete' | 'no_show') => {
+    setBusy(b.id + action)
+    try {
+      const res = await fetch(`/api/bookings/${b.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const j = await res.json().catch(() => ({} as any))
+      if (!res.ok || !j.ok) {
+        toast(
+          j?.error === 'TOO_EARLY' ? 'სესია ჯერ არ დაწყებულა' :
+          j?.error === 'BAD_STATE' ? 'სტატუსი ამას აღარ უშვებს' : 'მოქმედება ვერ შესრულდა',
+          'error',
+        )
+        return
+      }
+      toast(
+        action === 'accept' ? 'დადასტურდა'
+        : action === 'decline' ? 'უარყოფილია'
+        : action === 'no_show' ? 'აღინიშნა: no-show'
+        : 'დასრულებულია',
+        'success',
+      )
+      refreshNavBadges()
+      await load()
+    } catch {
+      toast('ქსელის შეცდომა', 'error')
     } finally {
-      setCancelingId(null)
+      setBusy(null)
     }
   }
 
+  const cancel = async (b: Booking) => {
+    setBusy(b.id + 'cancel')
+    try {
+      const res = await fetch(`/api/bookings/${b.id}/cancel`, { method: 'POST' })
+      const j = await res.json().catch(() => ({} as any))
+      if (!res.ok || !j.ok) { toast('გაუქმება ვერ მოხერხდა', 'error'); return }
+      toast('ჯავშანი გაუქმდა', 'success')
+      refreshNavBadges()
+      await load()
+    } catch {
+      toast('ქსელის შეცდომა', 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const loading = bookings === null
+  const list = buckets[tab]
+
+  // Upcoming groups under day headers; other tabs render flat.
+  const grouped = useMemo(() => {
+    if (tab !== 'upcoming') return null
+    const groups: { label: string; items: Booking[] }[] = []
+    for (const b of list) {
+      const label = dayLabel(new Date(b.startAt), nowDate)
+      const last = groups[groups.length - 1]
+      if (last && last.label === label) last.items.push(b)
+      else groups.push({ label, items: [b] })
+    }
+    return groups
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, list])
+
   return (
     <div>
-        <div className="mb-6">
-          <h1 className="font-display text-[26px] font-bold tracking-tight text-ink-900">ჯავშნები</h1>
-          <p className="text-[13px] text-ink-500 mt-1">მიმდინარე და წარსული ჯავშნების მართვა</p>
-        </div>
+      <div className="mb-5">
+        <h1 className="font-display text-[24px] sm:text-[26px] font-bold tracking-tight text-ink-900">ჯავშნები</h1>
+        <p className="text-[13px] text-ink-500 mt-1">ერთ ადგილას: გადასაწყვეტი, მოახლოებული და წარსული სესიები</p>
+      </div>
 
-        <div className="flex flex-wrap gap-1 mb-5 border-b border-ink-200">
-          {TABS.map(t => {
-            const active = tab === t.id
-            const c = counts[t.id] ?? 0
-            return (
-              <button
-                key={t.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => setTab(t.id)}
-                className={`h-10 px-4 -mb-px border-b-2 font-display text-[13px] font-semibold tracking-tight inline-flex items-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 rounded-sm ${
-                  active ? 'border-brand-500 text-brand-800' : 'border-transparent text-ink-500 hover:text-ink-800'
-                }`}
-              >
-                {t.label}
-                {c > 0 && (
-                  <span className={`min-w-[20px] h-5 px-1.5 rounded-pill text-[10.5px] font-bold tabular-nums inline-flex items-center justify-center ${
-                    active ? 'bg-brand-500 text-white' : 'bg-ink-100 text-ink-600'
-                  }`}>{c}</span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-
-        {err && (
-          <div className="mb-4 p-4 rounded-card bg-danger-50 border border-danger-200 text-danger-700 text-[13px] flex items-start justify-between gap-3">
-            <span className="min-w-0">{err}</span>
+      {/* Bucket tabs — underline pattern from the student side */}
+      <div className="flex border-b border-ink-200 mb-5 overflow-x-auto scrollbar-hide">
+        {TABS.map(t => {
+          const on = t.id === tab
+          const c = loading ? 0 : buckets[t.id].length
+          return (
             <button
+              key={t.id}
               type="button"
-              onClick={() => setErr(null)}
-              aria-label="დახურვა"
-              className="shrink-0 -mr-1 -mt-1 w-7 h-7 inline-flex items-center justify-center rounded-btn text-danger-700 hover:bg-danger-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-300"
+              onClick={() => setTab(t.id)}
+              aria-pressed={on}
+              className={`relative inline-flex items-center gap-2 pb-3 px-1 mr-5 font-display text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                on ? 'text-ink-900' : 'text-ink-500 hover:text-ink-800'
+              }`}
             >
-              <Icon.close className="w-3.5 h-3.5" />
+              {t.label}
+              {c > 0 && (
+                <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill text-[10.5px] font-bold tabular-nums ${
+                  t.id === 'attention' && !on ? 'bg-brand-500 text-white' : on ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600'
+                }`}>{c}</span>
+              )}
+              {on && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-brand-500 rounded-full" />}
             </button>
-          </div>
-        )}
+          )
+        })}
+      </div>
 
-        {bookings === null ? (
-          <div className="p-12 rounded-card border border-ink-200 bg-white flex items-center justify-center text-ink-400">
-            <span className="inline-block w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-            <span className="ml-3 text-[13px]">იტვირთება…</span>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="p-12 rounded-card border border-ink-200 bg-white text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-ink-100 text-ink-500 flex items-center justify-center mb-3">
-              <Icon.calendar className="w-6 h-6" />
-            </div>
-            <div className="font-display text-[15px] font-semibold text-ink-800">ჯავშნები არ მოიძებნა</div>
-            <div className="text-[13px] text-ink-500 mt-1">ამ სტატუსში ჯერ არაფერია.</div>
-          </div>
+      {err && (
+        <div className="mb-4 p-4 rounded-card bg-danger-50 border border-danger-200 text-danger-700 text-[13px] flex items-center justify-between gap-3">
+          <span className="min-w-0">{err}</span>
+          <Btn variant="secondary" size="sm" onClick={() => { setErr(null); setBookings(null); load() }}>თავიდან</Btn>
+        </div>
+      )}
+
+      {loading ? (
+        <ul className="space-y-3" aria-busy="true">
+          {[0, 1, 2].map(i => (
+            <li key={i} className="p-5 rounded-card border border-ink-200 bg-white flex items-center gap-4">
+              <span className="w-11 h-11 rounded-full bg-ink-100 animate-pulse shrink-0" />
+              <span className="flex-1 space-y-2">
+                <span className="block h-3.5 w-1/3 rounded-pill bg-ink-100 animate-pulse" />
+                <span className="block h-3 w-2/3 rounded-pill bg-ink-100 animate-pulse" />
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : list.length === 0 ? (
+        tab === 'attention' ? (
+          <EmptyState
+            icon={<Icon.check className="w-6 h-6" />}
+            title="ყველაფერი დამუშავებულია"
+            description="ახალი მოთხოვნა ან გადასაწყვეტი საკითხი არ არის."
+          />
+        ) : tab === 'upcoming' ? (
+          <EmptyState
+            icon={<Icon.calendar className="w-6 h-6" />}
+            title="მოახლოებული სესია არ გაქვს"
+            description="გამოაქვეყნე თავისუფალი დროები, რომ კლიენტებმა დაგიჯავშნონ."
+            cta={{ label: 'დროების გამოქვეყნება', href: '/tutor/schedule' }}
+          />
         ) : (
-          <ul className="space-y-3">
-            {filtered.map(b => {
-              const future = new Date(b.startAt) > new Date()
-              const canCancel = future && (b.status === 'CONFIRMED' || b.status === 'PREPARING')
-              return (
-                <li key={b.id} className="p-4 sm:p-5 rounded-card border border-ink-200 bg-white shadow-xs">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <Avatar src={b.student?.avatarUrl ?? undefined} name={b.student?.fullName} size={44} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-display text-[14px] font-bold text-ink-900 truncate">
-                            {b.student?.fullName ?? 'უცნობი კლიენტი'}
-                          </span>
-                          <StatusPill tone={toneOf(b.status)} />
-                        </div>
-                        <div className="text-[13px] text-ink-600 truncate mt-0.5" title={b.topic}>{b.topic}</div>
-                        <div className="text-[12px] text-ink-500 mt-1 flex items-center gap-3 flex-wrap">
-                          <span className="inline-flex items-center gap-1"><Icon.calendar className="w-3.5 h-3.5" />{fmtDate(b.startAt)}</span>
-                          <span className="inline-flex items-center gap-1"><Icon.clock className="w-3.5 h-3.5" />{b.durationMin} წთ</span>
-                          <span className="font-display font-bold text-ink-800 tabular-nums">₾{b.price}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Btn variant="secondary" size="sm" href={`/tutor/bookings/${b.id}`}>დეტალები</Btn>
-                      <Btn variant="ghost" size="sm" href={`/tutor/messages/${b.id}`}>
-                        <Icon.chat className="w-4 h-4" /> მესიჯი
-                      </Btn>
-                      {canCancel && (
-                        <Btn variant="danger" size="sm" onClick={() => cancel(b.id)} disabled={cancelingId === b.id}>
-                          {cancelingId === b.id ? 'უქმდება…' : 'გაუქმება'}
-                        </Btn>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
+          <EmptyState
+            icon={<Icon.clock className="w-6 h-6" />}
+            title="ისტორია ცარიელია"
+            description="დასრულებული და გაუქმებული სესიები აქ გამოჩნდება."
+          />
+        )
+      ) : grouped ? (
+        <div className="space-y-6">
+          {grouped.map(g => (
+            <section key={g.label} aria-label={g.label}>
+              <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2.5">{g.label}</div>
+              <ul className="space-y-3">
+                {g.items.map(b => (
+                  <BookingRow key={b.id} b={b} now={now} busy={busy} onAct={act} onConfirm={setConfirming} />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {list.map(b => (
+            <BookingRow key={b.id} b={b} now={now} busy={busy} onAct={act} onConfirm={setConfirming} />
+          ))}
+        </ul>
+      )}
+
+      {!loading && tab === 'history' && list.length >= 30 && (
+        <p className="mt-4 text-center text-[11.5px] text-ink-400">ნაჩვენებია ბოლო ჯავშნები.</p>
+      )}
+
+      <ConfirmModal
+        open={!!confirming}
+        title={
+          confirming?.kind === 'cancel' ? 'ჯავშნის გაუქმება?'
+          : confirming?.kind === 'decline' ? 'უარი მოთხოვნაზე?'
+          : 'კლიენტი არ გამოცხადდა?'
+        }
+        body={
+          confirming?.kind === 'cancel'
+            ? 'სესიის დაწყებამდე 12 საათზე გვიან გაუქმება კლიენტისთვის სრულად ბრუნდება. კლიენტი მიიღებს შეტყობინებას.'
+            : confirming?.kind === 'decline'
+            ? `${confirming.b.student?.fullName ?? 'კლიენტის'} მოთხოვნა გაუქმდება. კლიენტი მიიღებს შეტყობინებას.`
+            : 'ჯავშანი აღინიშნება როგორც no-show და თანხა კლიენტს დაუბრუნდება.'
+        }
+        tone={confirming?.kind === 'decline' ? 'warning' : 'danger'}
+        confirmLabel={
+          confirming?.kind === 'cancel' ? 'გაუქმება'
+          : confirming?.kind === 'decline' ? 'უარყოფა'
+          : 'დადასტურება'
+        }
+        busy={!!confirming && busy === confirming.b.id + (confirming.kind === 'cancel' ? 'cancel' : confirming.kind)}
+        onConfirm={async () => {
+          if (!confirming) return
+          if (confirming.kind === 'cancel') await cancel(confirming.b)
+          else await act(confirming.b, confirming.kind)
+          setConfirming(null)
+        }}
+        onCancel={() => setConfirming(null)}
+      />
     </div>
+  )
+}
+
+/* One booking row: identity + meta on the left, ONE status-appropriate
+   primary action (plus quiet secondaries) on the right. */
+function BookingRow({
+  b,
+  now,
+  busy,
+  onAct,
+  onConfirm,
+}: {
+  b: Booking
+  now: number
+  busy: string | null
+  onAct: (b: Booking, action: 'accept' | 'complete') => void
+  onConfirm: (c: { kind: 'cancel' | 'no_show' | 'decline'; b: Booking }) => void
+}) {
+  const live = isBookingLive(b)
+  const needsClosure = awaitsClosure(b, now)
+  const reschedPending = awaitsRescheduleAnswer(b)
+  const future = new Date(b.startAt).getTime() > now
+  const terminal = b.status === 'COMPLETED' || b.status === 'CANCELED' || b.status === 'NO_SHOW'
+  const d = new Date(b.startAt)
+
+  const actions = terminal ? null : (
+    <div className="flex items-center gap-2 flex-wrap shrink-0">
+      {b.status === 'PREPARING' && !reschedPending && (
+        <>
+          <Btn variant="secondary" size="sm" onClick={() => onConfirm({ kind: 'decline', b })} disabled={busy === b.id + 'decline'}>
+            {busy === b.id + 'decline' ? '…' : 'უარი'}
+          </Btn>
+          <Btn variant="primary" size="sm" onClick={() => onAct(b, 'accept')} disabled={busy === b.id + 'accept'}>
+            {busy === b.id + 'accept' ? '…' : 'დადასტურება'}
+          </Btn>
+        </>
+      )}
+      {reschedPending && (
+        <Btn variant="primary" size="sm" href={`/tutor/bookings/${b.id}`}>პასუხი გადადებაზე</Btn>
+      )}
+      {live && (
+        <Btn variant="primary" size="sm" href={`/session/${b.id}`}>
+          <Icon.video className="w-4 h-4" /> ვიდეო-ოთახში შესვლა
+        </Btn>
+      )}
+      {needsClosure && !reschedPending && (
+        <>
+          <Btn variant="secondary" size="sm" onClick={() => onConfirm({ kind: 'no_show', b })} disabled={busy === b.id + 'no_show'}>
+            არ გამოცხადდა
+          </Btn>
+          <Btn variant="primary" size="sm" onClick={() => onAct(b, 'complete')} disabled={busy === b.id + 'complete'}>
+            {busy === b.id + 'complete' ? '…' : 'დასრულებულად მონიშვნა'}
+          </Btn>
+        </>
+      )}
+      {b.status === 'CONFIRMED' && future && !live && !reschedPending && (
+        <>
+          <Btn variant="ghost" size="sm" href={`/tutor/messages/${b.id}`}>
+            <Icon.chat className="w-4 h-4" /> მესიჯი
+          </Btn>
+          <Btn variant="secondary" size="sm" onClick={() => onConfirm({ kind: 'cancel', b })} disabled={busy === b.id + 'cancel'}>
+            გაუქმება
+          </Btn>
+        </>
+      )}
+    </div>
+  )
+
+  return (
+    <li className="rounded-card border border-ink-200 bg-white shadow-xs hover:border-ink-300 transition-colors">
+      <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+        <Link href={`/tutor/bookings/${b.id}`} className="flex items-center gap-3 min-w-0 flex-1 group">
+          <Avatar src={b.student?.avatarUrl ?? undefined} name={b.student?.fullName} size={44} />
+          <span className="min-w-0 flex-1 block">
+            <span className="flex items-center gap-2 flex-wrap">
+              <span className="font-display text-[14px] font-bold text-ink-900 truncate group-hover:text-brand-800 transition-colors">
+                {b.student?.fullName ?? 'უცნობი კლიენტი'}
+              </span>
+              <StatusPill tone={live ? 'live' : toneOf(b.status)} />
+              {reschedPending && (
+                <span className="inline-flex items-center h-6 px-2 rounded-pill bg-warning-50 border border-warning-200 text-warning-700 font-display text-[10.5px] font-bold uppercase tracking-[0.1em]">
+                  გადადება ელოდება
+                </span>
+              )}
+            </span>
+            <span className="block text-[13px] text-ink-600 truncate mt-0.5" title={b.topic}>{b.topic}</span>
+            <span className="text-[12px] text-ink-500 mt-1 flex items-center gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-1"><Icon.calendar className="w-3.5 h-3.5" />{fmtKaDate(d)} · {fmtKaTime(d)}</span>
+              <span className="inline-flex items-center gap-1"><Icon.clock className="w-3.5 h-3.5" />{b.durationMin} წთ</span>
+              <span className="font-display font-bold text-ink-800 tabular-nums">₾{b.price}</span>
+            </span>
+          </span>
+        </Link>
+        {actions}
+      </div>
+    </li>
+  )
+}
+
+// useSearchParams requires a Suspense boundary in Next 15.
+export default function TutorBookingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <BookingsPageInner />
+    </Suspense>
   )
 }
