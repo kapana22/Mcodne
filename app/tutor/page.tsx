@@ -7,6 +7,7 @@ import { FEATURE_PAYMENTS_V2 } from '@/lib/flags'
 import { isBookingLive } from '@/lib/bookingLive'
 import { fmtKaDate, KA_WEEKDAYS_LONG } from '@/lib/kaDate'
 import { ProfileCompleteness, type ProfileForCompleteness } from '@/components/ProfileCompleteness'
+import { PageHeader } from '@/components/tutor/PageHeader'
 import { AlertsStack } from './_components/AlertsStack'
 import { PendingRequests } from './_components/PendingRequests'
 import { SnapshotRow } from './_components/SnapshotRow'
@@ -122,9 +123,11 @@ export default function TutorHome() {
     return d >= startOfToday && d < startOfTomorrow && (b.status === 'CONFIRMED' || b.status === 'LIVE')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [bookings])
+  // „მოსალოდნელი" counts only sessions that will actually happen — CONFIRMED
+  // or already LIVE. PREPARING is still an unanswered request, not a session.
   const upcomingWeek = useMemo(() => (bookings ?? []).filter(b => {
     const d = new Date(b.startAt)
-    return d >= startOfToday && d < endOfWeek && (b.status === 'CONFIRMED' || b.status === 'PREPARING')
+    return d >= startOfToday && d < endOfWeek && (b.status === 'CONFIRMED' || b.status === 'LIVE')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [bookings])
   const nextSession = useMemo(() => (bookings ?? [])
@@ -143,22 +146,19 @@ export default function TutorHome() {
 
   return (
     <div>
-      {/* Greeting — sign-out lives in the UserMenu now */}
-      <div className="mb-6">
-        <div className="text-[12px] text-ink-500 mb-1 min-h-[18px]" suppressHydrationWarning>
-          {clientNow ? `${KA_WEEKDAYS_LONG[clientNow.getDay()]}, ${fmtKaDate(clientNow, { month: 'long' })}` : ''}
-        </div>
-        <h1 className="font-display text-[24px] sm:text-[28px] font-bold tracking-tight text-ink-900 motion-safe:animate-rise-in" suppressHydrationWarning>
-          {clientNow ? fmtGreeting() : 'გამარჯობა'}{me?.fullName ? `, ${me.fullName.split(' ')[0]}` : ''}
-        </h1>
-        <p className="text-[13.5px] text-ink-500 mt-1 motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>
-          {todaySessions.length > 0
-            ? `დღეს გაქვს ${todaySessions.length} სესია${pending.length > 0 ? `, ${pending.length} მოთხოვნა ელოდება პასუხს` : ''}.`
-            : pending.length > 0
-            ? `დღეს სესია არ გაქვს — ${pending.length} მოთხოვნა ელოდება პასუხს.`
-            : 'დღეს სესია და ახალი მოთხოვნა არ გაქვს.'}
-        </p>
-      </div>
+      {/* Greeting — sign-out lives in the UserMenu now. Canonical PageHeader
+          block; the date line rides the eyebrow slot (nbsp reserves the line
+          pre-mount so the header doesn't jump when the client clock lands). */}
+      <PageHeader
+        className="mb-6 motion-safe:animate-rise-in"
+        eyebrow={clientNow ? `${KA_WEEKDAYS_LONG[clientNow.getDay()]}, ${fmtKaDate(clientNow, { month: 'long' })}` : ' '}
+        title={`${clientNow ? fmtGreeting() : 'გამარჯობა'}${me?.fullName ? `, ${me.fullName.split(' ')[0]}` : ''}`}
+        sub={todaySessions.length > 0
+          ? `დღეს გაქვს ${todaySessions.length} სესია${pending.length > 0 ? `, ${pending.length} მოთხოვნა ელოდება პასუხს` : ''}.`
+          : pending.length > 0
+          ? `დღეს სესია არ გაქვს — ${pending.length} მოთხოვნა ელოდება პასუხს.`
+          : 'დღეს სესია და ახალი მოთხოვნა არ გაქვს.'}
+      />
 
       <AlertsStack bookings={bookings ?? []} upcomingSlots={upcomingSlots} />
 

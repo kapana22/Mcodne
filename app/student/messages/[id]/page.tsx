@@ -16,6 +16,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Icon } from '@/components/Icon'
 import { Skeleton } from '@/components/Skeleton'
+import { StatusPill } from '@/components/StatusPill'
 import { safeHttpUrl } from '@/lib/safeUrl'
 import { sanitizeMsgBody, MSG_MAX_LEN, sendErrorText } from '@/lib/msgText'
 import { fmtKaDate, fmtKaTime } from '@/lib/kaDate'
@@ -32,6 +33,12 @@ type BookingLite = {
 }
 
 const CHAT_POLL_MS = 15_000
+
+// DB status → shared StatusPill tone (same mapping as the bookings list).
+const STATUS_TONE: Record<string, 'preparing' | 'confirmed' | 'live' | 'completed' | 'canceled' | 'noshow'> = {
+  PREPARING: 'preparing', CONFIRMED: 'confirmed', LIVE: 'live',
+  COMPLETED: 'completed', CANCELED: 'canceled', NO_SHOW: 'noshow',
+}
 
 export default function StudentConversationPage() {
   const params = useParams<{ id: string }>()
@@ -189,6 +196,13 @@ export default function StudentConversationPage() {
                 <div className="font-display text-[14px] font-bold tracking-tight truncate">{peer.fullName}</div>
                 <div className="text-[11.5px] text-ink-500 truncate">{booking?.topic}</div>
               </div>
+              {/* Booking status at a glance — hidden on the narrowest screens
+                  where the h-14 header can't fit another pill. */}
+              {booking?.status && STATUS_TONE[booking.status] && (
+                <span className="hidden sm:inline-flex shrink-0">
+                  <StatusPill tone={STATUS_TONE[booking.status]} />
+                </span>
+              )}
               <Link
                 href={`/student/bookings/${bookingId}`}
                 className="shrink-0 h-9 px-3 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors"

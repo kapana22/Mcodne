@@ -131,7 +131,7 @@ export function ConfirmModal({
         aria-label={xLabel}
         onClick={cancel}
         tabIndex={-1}
-        className="absolute inset-0 bg-accent-900/55 backdrop-blur-sm"
+        className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm"
       />
       <div
         role="alertdialog"

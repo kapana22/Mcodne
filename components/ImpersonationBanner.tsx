@@ -51,7 +51,7 @@ export function ImpersonationBanner() {
         type="button"
         onClick={exit}
         disabled={busy}
-        className="h-8 px-3 rounded-btn bg-warning-900 hover:bg-accent-900 disabled:opacity-60 text-white font-display font-semibold text-[11.5px] inline-flex items-center gap-1 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-warning-100"
+        className="h-8 px-3 rounded-btn bg-warning-900 hover:bg-ink-900 disabled:opacity-60 text-white font-display font-semibold text-[11.5px] inline-flex items-center gap-1 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-warning-100"
       >
         {busy ? '…' : 'გამოსვლა'}
       </button>

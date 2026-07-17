@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import Link from 'next/link'
 
-type Variant = 'primary' | 'hero' | 'secondary' | 'ghost' | 'danger'
+type Variant = 'primary' | 'hero' | 'cta' | 'secondary' | 'ghost' | 'danger'
 type Size = 'sm' | 'md' | 'lg'
 
 const BASE =
@@ -25,6 +25,9 @@ const SIZES: Record<Size, string> = {
 const VARIANTS: Record<Variant, string> = {
   primary:   'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-xs hover:shadow-sm',
   hero:      'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)]',
+  // The gradient-cta token as a component variant — pages should reach for
+  // this instead of hand-rolling `bg-gradient-cta …` button classes.
+  cta:       'bg-gradient-cta text-white shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] hover:brightness-[1.04] active:brightness-95',
   secondary: 'bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 active:bg-ink-100 text-ink-900',
   ghost:     'text-ink-800 hover:bg-ink-100 active:bg-ink-200',
   danger:    'bg-white border border-danger-300 text-danger-600 hover:bg-danger-50 active:bg-danger-100',

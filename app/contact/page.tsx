@@ -33,17 +33,19 @@ const CHANNELS = [
     href: 'mailto:hi@mcodne.ge',
     hint: 'პასუხი 24 საათში',
   },
+  // Display values describe the actual destination (internal pages) — no
+  // fake subdomains/emails dressed up as links.
   {
     icon: <Icon.chat className="w-5 h-5" />,
     label: 'დახმარება',
-    value: 'help.mcodne.ge',
+    value: 'დახმარების ცენტრი',
     href: '/help',
     hint: 'FAQ და სახელმძღვანელო',
   },
   {
     icon: <Icon.user className="w-5 h-5" />,
     label: 'ექსპერტთა გაწევრიანება',
-    value: 'apply@mcodne.ge',
+    value: 'განაცხადის ფორმა',
     href: '/apply',
     hint: 'გახდი ექსპერტი 3 დღეში',
   },
@@ -247,9 +249,9 @@ export default function ContactPage() {
             </div>
           </aside>
         </div>
-
-        <Footer />
       </main>
+
+      <Footer />
     </div>
   )
 }

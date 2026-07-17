@@ -24,7 +24,7 @@ export default function Error({
       <span aria-hidden className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full bg-danger-100/30 blur-3xl pointer-events-none" />
 
       <div className="relative max-w-[520px] w-full text-center">
-        <div className="font-display font-bold tabular-nums leading-none tracking-[-0.03em] text-[120px] sm:text-[160px] bg-gradient-to-br from-danger-500 to-danger-700 bg-clip-text text-transparent motion-safe:animate-scale-in">
+        <div className="font-display font-bold tabular-nums leading-none tracking-[-0.03em] text-[120px] sm:text-[160px] bg-danger-500 bg-clip-text text-transparent motion-safe:animate-scale-in">
           500
         </div>
 

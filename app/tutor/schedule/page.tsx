@@ -6,6 +6,7 @@ import { Icon } from '@/components/Icon'
 import { Skeleton } from '@/components/Skeleton'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { useToast } from '@/components/ToastProvider'
+import { PageHeader } from '@/components/tutor/PageHeader'
 
 type Booking = {
   id: string
@@ -362,27 +363,26 @@ export default function TutorSchedulePage() {
 
   return (
     <div>
-        {/* Header: title → week nav → actions. On mobile each gets its own row
-            (the old single wrap-row overflowed 390px); on lg they collapse back
-            into one line. */}
+        {/* Header: canonical PageHeader (title/sub + week nav in the actions
+            slot, wrapping below on mobile), then the chips/actions row. */}
         <div className="mb-5 lg:mb-6 space-y-3">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-            <div>
-              <h1 className="font-display text-[26px] font-bold tracking-tight text-ink-900">გრაფიკი</h1>
-              <p className="text-[13px] text-ink-500 mt-1">კვირეული ხელმისაწვდომობა და ჯავშნები</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="წინა კვირა"
-                      className="h-11 w-11 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center">
-                <Icon.chevR className="w-4 h-4 rotate-180" />
-              </button>
-              <div className="flex-1 lg:flex-none text-center font-display text-[13px] font-semibold text-ink-800 tabular-nums px-2 whitespace-nowrap">{fmtRangeLabel(weekStart)}</div>
-              <button type="button" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="შემდეგი კვირა"
-                      className="h-11 w-11 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center">
-                <Icon.chevR className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+          <PageHeader
+            title="გრაფიკი"
+            sub="კვირეული ხელმისაწვდომობა და ჯავშნები"
+            actions={
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="წინა კვირა"
+                        className="h-11 w-11 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center">
+                  <Icon.chevR className="w-4 h-4 rotate-180" />
+                </button>
+                <div className="flex-1 lg:flex-none text-center font-display text-[13px] font-semibold text-ink-800 tabular-nums px-2 whitespace-nowrap">{fmtRangeLabel(weekStart)}</div>
+                <button type="button" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="შემდეგი კვირა"
+                        className="h-11 w-11 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center">
+                  <Icon.chevR className="w-4 h-4" />
+                </button>
+              </div>
+            }
+          />
           {/* Weekly template is the promoted flow — it's how availability
               actually gets published at scale; one-off slots and vacation
               are the quieter secondaries. */}
@@ -619,49 +619,70 @@ export default function TutorSchedulePage() {
                     const cellSlots = grid.slotsByCell[key] ?? []
                     const isTodayCol = addDays(weekStart, dayIdx).toDateString() === new Date().toDateString()
                     return (
-                      <button
+                      // Plain cell wrapper — never a <button>: the cell holds
+                      // booking <Link>s and slot delete <button>s, and nesting
+                      // interactives is invalid/inaccessible. The add-slot
+                      // affordance is an absolutely-positioned button filling
+                      // the cell background; pills/chips sit above it (z-10).
+                      <div
                         key={dayIdx}
-                        type="button"
-                        onClick={() => openModalFor(dayIdx, h)}
-                        className={`border-l border-ink-100 hover:bg-brand-50/40 transition-colors text-left p-1 group relative ${isTodayCol ? 'bg-brand-50/20' : ''}`}
+                        className={`border-l border-ink-100 p-1 group relative ${isTodayCol ? 'bg-brand-50/20' : ''}`}
                       >
+                        <button
+                          type="button"
+                          onClick={() => openModalFor(dayIdx, h)}
+                          aria-label={`სლოტის დამატება — ${DAY_LABELS[dayIdx]} ${addDays(weekStart, dayIdx).getDate()}, ${String(h).padStart(2, '0')}:00`}
+                          className="absolute inset-0 group-hover:bg-brand-50/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400"
+                        />
                         {cellBookings.map(b => (
-                          // Click booking pill → open booking detail. `stopPropagation`
-                          // so the outer cell's "add slot" handler doesn't fire.
+                          // Click booking pill → open booking detail. Sibling of
+                          // the add-slot button (not nested), lifted above it.
                           // White card + brand left bar: booked ≠ decorative wash.
                           <Link
                             key={b.id}
                             href={`/tutor/bookings/${b.id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="block rounded-field bg-white border border-ink-200 border-l-[3px] border-l-brand-500 text-ink-800 px-1.5 py-1 mb-1 hover:border-ink-300 hover:shadow-xs transition-all"
+                            className="relative z-10 block rounded-field bg-white border border-ink-200 border-l-[3px] border-l-brand-500 text-ink-800 px-1.5 py-1 mb-1 hover:border-ink-300 hover:shadow-xs transition-all"
                           >
                             <div className="text-[10.5px] font-display font-bold truncate">{b.student?.fullName ?? 'ჯავშანი'}</div>
                             <div className="text-[10px] truncate text-ink-500">{b.topic}</div>
                           </Link>
                         ))}
-                        {cellSlots.map(s => (
-                          <div
-                            key={s.id}
-                            onClick={(e) => { e.stopPropagation(); if (!s.booked) setConfirmDeleteId(s.id) }}
-                            className={`group/slot rounded-field px-1.5 py-1 mb-1 transition-colors ${
-                              s.booked
-                                ? 'bg-ink-50 border border-ink-200 text-ink-500 cursor-default'
-                                : 'bg-brand-50 border border-brand-100 text-brand-800 cursor-pointer hover:bg-danger-50 hover:border-danger-200 hover:text-danger-700'
-                            }`}
-                            title={s.booked ? 'დაჯავშნილი — ვერ წაიშლება' : 'დააკლიკე წასაშლელად'}
-                          >
+                        {cellSlots.map(s => {
+                          const chipInner = (
                             <div className="text-[10.5px] font-display font-bold flex items-center justify-between gap-1">
                               <span>{s.booked ? 'დაჯავშნილი' : 'თავისუფალი'}</span>
                               {!s.booked && (
                                 <span className="text-[9px] opacity-0 group-hover/slot:opacity-100 transition-opacity">{deletingId === s.id ? '…' : '×'}</span>
                               )}
                             </div>
-                          </div>
-                        ))}
+                          )
+                          // Free slots delete via a real button (keyboard +
+                          // screen-reader operable); booked ones stay inert.
+                          return s.booked ? (
+                            <div
+                              key={s.id}
+                              className="relative z-10 rounded-field px-1.5 py-1 mb-1 transition-colors bg-ink-50 border border-ink-200 text-ink-500 cursor-default"
+                              title="დაჯავშნილი — ვერ წაიშლება"
+                            >
+                              {chipInner}
+                            </div>
+                          ) : (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => setConfirmDeleteId(s.id)}
+                              aria-label={`სლოტის წაშლა — ${fmtTime(s.startAt)}`}
+                              title="დააკლიკე წასაშლელად"
+                              className="group/slot relative z-10 block w-full text-left rounded-field px-1.5 py-1 mb-1 transition-colors bg-brand-50 border border-brand-100 text-brand-800 cursor-pointer hover:bg-danger-50 hover:border-danger-200 hover:text-danger-700"
+                            >
+                              {chipInner}
+                            </button>
+                          )
+                        })}
                         {cellBookings.length === 0 && cellSlots.length === 0 && (
-                          <div className="opacity-0 group-hover:opacity-100 text-ink-400 text-[10px] p-1 transition">+ დამატება</div>
+                          <div className="pointer-events-none opacity-0 group-hover:opacity-100 text-ink-400 text-[10px] p-1 transition">+ დამატება</div>
                         )}
-                      </button>
+                      </div>
                     )
                   })}
                 </div>

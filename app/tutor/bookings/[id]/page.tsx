@@ -7,6 +7,7 @@ import { StatusPill } from '@/components/StatusPill'
 import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { useToast } from '@/components/ToastProvider'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
 import { BookingChat } from '@/components/chat/BookingChat'
 import { refreshNavBadges } from '@/components/tutor/useNavBadges'
@@ -96,7 +97,7 @@ export default function TutorBookingDetailPage() {
   const [notFound, setNotFound] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<'cancel' | 'no_show' | 'decline' | null>(null)
-  const [flash, setFlash] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const { toast } = useToast()
   // Post-session summary state — mirrored from the booking on first load.
   const [tutorNotes, setTutorNotes] = useState('')
   const [notesSaving, setNotesSaving] = useState(false)
@@ -136,7 +137,7 @@ export default function TutorBookingDetailPage() {
         setBooking(data)
         setTutorNotes(data.tutorNotes ?? '')
       } catch {
-        if (!cancelled) setFlash({ kind: 'err', text: 'მონაცემების ჩატვირთვა ვერ მოხერხდა' })
+        if (!cancelled) toast('მონაცემების ჩატვირთვა ვერ მოხერხდა', 'error')
       }
     })()
     return () => { cancelled = true }
@@ -148,9 +149,10 @@ export default function TutorBookingDetailPage() {
     }
   }, [booking?.id])
 
+  // Action feedback goes through the global toast host (same as the bookings
+  // list) — kept behind the old showFlash signature to keep call sites small.
   const showFlash = (kind: 'ok' | 'err', text: string) => {
-    setFlash({ kind, text })
-    setTimeout(() => setFlash(null), 3500)
+    toast(text, kind === 'ok' ? 'success' : 'error')
   }
 
   const act = async (action: 'accept' | 'decline' | 'complete' | 'no_show') => {
@@ -331,7 +333,11 @@ export default function TutorBookingDetailPage() {
   const canAcceptDecline = booking.status === 'PREPARING'
   const canCancel = future && (booking.status === 'CONFIRMED' || booking.status === 'PREPARING')
   const canComplete = booking.status === 'CONFIRMED' || booking.status === 'LIVE'
-  const canJoin = (booking.status === 'CONFIRMED' || booking.status === 'LIVE') && booking.meetingUrl
+  // Join always goes through the in-app video room (/session/{id}) — same
+  // surface as TodayHero and the bookings list. The CTA never disappears for
+  // a CONFIRMED/LIVE session; an external meetingUrl, if set, rides along as
+  // a quiet secondary link.
+  const canJoin = booking.status === 'CONFIRMED' || booking.status === 'LIVE'
   // "Student didn't show up" — only after the session's scheduled start.
   const canMarkNoShow = !future && (booking.status === 'CONFIRMED' || booking.status === 'LIVE')
   const showRemainingPill = booking.status !== 'CANCELED' && booking.status !== 'NO_SHOW'
@@ -355,20 +361,30 @@ export default function TutorBookingDetailPage() {
           </>
         )}
         {canJoin && (
-          <a
-            href={booking.meetingUrl!}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`inline-flex items-center justify-center gap-2 font-display font-medium tracking-wide transition-colors rounded-btn h-11 px-4 text-sm w-full ${
-              isLiveNow
-                ? 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-brand-glow'
-                : canAcceptDecline
-                ? 'border border-ink-200 hover:bg-ink-50 text-ink-800'
-                : 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-xs'
-            }`}
-          >
-            <Icon.video className="w-4 h-4" /> {isLiveNow ? 'ვიდეო-ოთახში შესვლა' : 'ვიდეო-ოთახი'}
-          </a>
+          <>
+            <Link
+              href={`/session/${booking.id}`}
+              className={`inline-flex items-center justify-center gap-2 font-display font-medium tracking-wide transition-colors rounded-btn h-11 px-4 text-sm w-full ${
+                isLiveNow
+                  ? 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-brand-glow'
+                  : canAcceptDecline
+                  ? 'border border-ink-200 hover:bg-ink-50 text-ink-800'
+                  : 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-xs'
+              }`}
+            >
+              <Icon.video className="w-4 h-4" /> {isLiveNow ? 'ვიდეო-ოთახში შესვლა' : 'ვიდეო-ოთახი'}
+            </Link>
+            {booking.meetingUrl && (
+              <a
+                href={booking.meetingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 text-[11.5px] font-display font-semibold text-ink-500 hover:text-ink-800 transition-colors min-h-[32px]"
+              >
+                <Icon.external className="w-3.5 h-3.5" /> გარე შეხვედრის ბმული
+              </a>
+            )}
+          </>
         )}
         {canComplete && !canAcceptDecline && !future && (
           <Btn variant="primary" size="md" onClick={() => act('complete')} disabled={busy !== null} className="w-full">
@@ -410,12 +426,6 @@ export default function TutorBookingDetailPage() {
           <span className="text-ink-300">·</span>
           <span className="font-mono text-[11.5px] text-ink-400">{booking.ref.slice(0, 12)}</span>
         </div>
-
-        {flash && (
-          <div className={`mb-4 p-3 rounded-btn text-[13px] border ${flash.kind === 'ok' ? 'bg-success-50 border-success-200 text-success-800' : 'bg-danger-50 border-danger-200 text-danger-700'}`}>
-            {flash.text}
-          </div>
-        )}
 
         {/* Pending reschedule proposal — banner drives the accept/reject
             decision when the other party proposed. Otherwise renders as a
@@ -589,7 +599,7 @@ export default function TutorBookingDetailPage() {
             type="button"
             aria-label="დახურვა"
             onClick={() => setRescheduleOpen(false)}
-            className="absolute inset-0 bg-accent-900/55 backdrop-blur-sm"
+            className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm"
           />
           <div role="dialog" className="relative w-full sm:max-w-[520px] bg-white sm:rounded-card shadow-float overflow-hidden">
             <div className="px-6 py-4 border-b border-ink-100">

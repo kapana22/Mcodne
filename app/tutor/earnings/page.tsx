@@ -4,6 +4,7 @@ import { CountUp } from '@/components/CountUp'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
+import { PageHeader } from '@/components/tutor/PageHeader'
 import { fmtKaDate, KA_MONTHS_LONG } from '@/lib/kaDate'
 
 type Tx = {
@@ -85,10 +86,11 @@ export default function TutorEarningsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="font-display text-[24px] sm:text-[26px] font-bold tracking-tight text-ink-900">შემოსავალი</h1>
-        <p className="text-[13px] text-ink-500 mt-1">დამუშავებული ჯავშნები და ტრანზაქციები · შენი წილი 85%</p>
-      </div>
+      <PageHeader
+        className="mb-6"
+        title="შემოსავალი"
+        sub="დამუშავებული ჯავშნები და ტრანზაქციები · შენი წილი 85%"
+      />
 
       {err && (
         <div className="mb-4 p-4 rounded-card bg-danger-50 border border-danger-200 text-danger-700 text-[13px] flex items-center justify-between gap-3">

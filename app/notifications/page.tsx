@@ -3,7 +3,10 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/Icon'
 import { Skeleton } from '@/components/Skeleton'
+import { EmptyState } from '@/components/EmptyState'
 import { useToast } from '@/components/ToastProvider'
+import { homeForRole } from '@/lib/roleHome'
+import { fmtKaDate, fmtKaTime } from '@/lib/kaDate'
 
 type Item = {
   id: string
@@ -15,8 +18,6 @@ type Item = {
   createdAt: string
 }
 
-const KA_MONTHS = ['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი']
-
 const dayKey = (iso: string) => {
   const d = new Date(iso)
   const today = new Date(); today.setHours(0,0,0,0)
@@ -24,22 +25,20 @@ const dayKey = (iso: string) => {
   const day = new Date(d); day.setHours(0,0,0,0)
   if (day.getTime() === today.getTime()) return 'დღეს'
   if (day.getTime() === yest.getTime()) return 'გუშინ'
-  return `${d.getDate()} ${KA_MONTHS[d.getMonth()]} ${d.getFullYear()}`
+  // "24 ივლისი 2026" — shared Georgian month names (lib/kaDate).
+  return fmtKaDate(d, { month: 'long', year: true })
 }
 
-const timeShort = (iso: string) => {
-  const d = new Date(iso)
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
-}
+const timeShort = (iso: string) => fmtKaTime(new Date(iso))
 
 const TYPE_LABEL: Record<string, { l: string; cls: string }> = {
   BOOKING_CREATED:    { l: 'ჯავშანი',      cls: 'bg-brand-50 text-brand-700 border-brand-200' },
   BOOKING_CANCELED:   { l: 'გაუქმება',     cls: 'bg-danger-50 text-danger-700 border-danger-200' },
-  MESSAGE_NEW:        { l: 'შეტყობინება',  cls: 'bg-accent-50 text-accent-700 border-accent-200' },
+  MESSAGE_NEW:        { l: 'შეტყობინება',  cls: 'bg-info-50 text-info-700 border-info-200' },
   REVIEW_NEW:         { l: 'შეფასება',     cls: 'bg-warning-50 text-warning-700 border-warning-200' },
   APPLICATION_STATUS: { l: 'განაცხადი',    cls: 'bg-success-50 text-success-700 border-success-200' },
   PAYOUT:             { l: 'ანგარიშსწორება', cls: 'bg-brand-50 text-brand-700 border-brand-200' },
-  ADMIN_BROADCAST:    { l: 'გუნდიდან',     cls: 'bg-accent-50 text-accent-700 border-accent-200' },
+  ADMIN_BROADCAST:    { l: 'გუნდიდან',     cls: 'bg-ink-100 text-ink-700 border-ink-200' },
   GENERIC:            { l: 'შეტყობინება',  cls: 'bg-ink-50 text-ink-700 border-ink-200' },
 }
 
@@ -49,6 +48,15 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  // Role drives the header's home link — this page is shared across roles.
+  const [role, setRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setRole(d?.user?.role ?? null))
+      .catch(() => {})
+  }, [])
 
   const load = async () => {
     setLoading(true)
@@ -76,7 +84,11 @@ export default function NotificationsPage() {
   }
 
   const markOne = async (id: string) => {
-    setItems(prev => prev.map(n => n.id === id ? { ...n, readAt: n.readAt ?? new Date().toISOString() } : n))
+    // On the „წაუკითხავი" filter a just-read item no longer belongs in the
+    // list — drop it immediately instead of leaving it until the next load.
+    setItems(prev => filter === 'unread'
+      ? prev.filter(n => n.id !== id)
+      : prev.map(n => n.id === id ? { ...n, readAt: n.readAt ?? new Date().toISOString() } : n))
     await fetch('/api/notifications/read', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids: [id] }),
@@ -116,21 +128,21 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen bg-ink-50/40">
       <header className="sticky top-0 z-40 bg-ink-50/90 backdrop-blur-md border-b border-ink-100">
-        <div className="max-w-[900px] mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-[820px] mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="inline-flex items-center" aria-label="მცოდნე">
             <img src="/logo.svg" alt="მცოდნე" className="h-6 w-auto object-contain" />
           </Link>
           <nav className="flex items-center gap-3 text-[13px] font-display font-semibold">
-            <Link href="/student" className="text-ink-700 hover:text-ink-900">დაშბორდი</Link>
+            <Link href={role ? homeForRole(role) : '/'} className="text-ink-700 hover:text-ink-900">მთავარი</Link>
             <Link href="/tutors" className="text-ink-700 hover:text-ink-900">ექსპერტები</Link>
           </nav>
         </div>
       </header>
 
-      <main className="max-w-[900px] mx-auto px-6 py-8 lg:py-12">
+      <main className="max-w-[820px] mx-auto px-6 py-8 lg:py-12">
         <div className="flex items-end justify-between gap-4 mb-6 flex-wrap">
           <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-1">Inbox</div>
+            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-1">შეტყობინებები</div>
             <h1 className="font-display text-[26px] sm:text-[32px] font-bold text-ink-900 tracking-tight leading-[1.05]">
               შეტყობინებები {unread > 0 && <span className="text-brand-600">({unread})</span>}
             </h1>
@@ -163,13 +175,11 @@ export default function NotificationsPage() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="py-16 text-center rounded-card border border-dashed border-ink-200 bg-white">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-ink-100 text-ink-500 mb-3">
-              <Icon.bell className="w-5 h-5" />
-            </div>
-            <div className="font-display text-[15px] font-bold text-ink-900">ცარიელი inbox</div>
-            <p className="text-[12.5px] text-ink-500 mt-1">როცა რაიმე მოხდება — ჯავშანი, შეტყობინება, შეფასება — აქ ჩნდება.</p>
-          </div>
+          <EmptyState
+            icon={<Icon.bell className="w-6 h-6" />}
+            title="ცარიელია"
+            description="როცა რაიმე მოხდება — ჯავშანი, შეტყობინება, შეფასება — აქ ჩნდება."
+          />
         ) : (
           <div className="space-y-6">
             {Object.entries(groups).map(([day, list]) => (

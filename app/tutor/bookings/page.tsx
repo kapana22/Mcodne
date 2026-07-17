@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { StatusPill } from '@/components/StatusPill'
 import { useToast } from '@/components/ToastProvider'
+import { PageHeader } from '@/components/tutor/PageHeader'
 import { fmtKaDate, fmtKaTime } from '@/lib/kaDate'
 import { isBookingLive } from '@/lib/bookingLive'
 import { refreshNavBadges } from '@/components/tutor/useNavBadges'
@@ -173,10 +174,11 @@ function BookingsPageInner() {
 
   return (
     <div>
-      <div className="mb-5">
-        <h1 className="font-display text-[24px] sm:text-[26px] font-bold tracking-tight text-ink-900">ჯავშნები</h1>
-        <p className="text-[13px] text-ink-500 mt-1">ერთ ადგილას: გადასაწყვეტი, მოახლოებული და წარსული სესიები</p>
-      </div>
+      <PageHeader
+        className="mb-5"
+        title="ჯავშნები"
+        sub="ერთ ადგილას: გადასაწყვეტი, მოახლოებული და წარსული სესიები"
+      />
 
       {/* Bucket tabs — underline pattern from the student side */}
       <div className="flex border-b border-ink-200 mb-5 overflow-x-auto scrollbar-hide">
@@ -315,7 +317,7 @@ function BookingRow({
   b: Booking
   now: number
   busy: string | null
-  onAct: (b: Booking, action: 'accept' | 'complete') => void
+  onAct: (b: Booking, action: 'accept' | 'decline' | 'complete' | 'no_show') => void
   onConfirm: (c: { kind: 'cancel' | 'no_show' | 'decline'; b: Booking }) => void
 }) {
   const live = isBookingLive(b)

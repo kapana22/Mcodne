@@ -23,11 +23,14 @@ export default async function StudentFavoritesPage() {
     orderBy: { createdAt: 'desc' },
   })
 
-  const items = favs.map(f => ({
+  // A deleted tutor leaves `tutor: null` on the favorite — skip those rows
+  // (a card without a bookable expert is a dead end). Empty photo falls back
+  // to the client's initials tile — never external stock-avatar URLs.
+  const items = favs.filter(f => f.tutor?.user).map(f => ({
     id: f.id,
     tutorId: f.tutor.id,
     name: f.tutor.user.fullName,
-    photo: f.tutor.user.avatarUrl ?? `https://i.pravatar.cc/320?u=${f.tutor.userId}`,
+    photo: f.tutor.user.avatarUrl ?? '',
     headline: f.tutor.headline,
     specialty: f.tutor.specialty,
     rating: f.tutor.rating,
@@ -39,7 +42,7 @@ export default async function StudentFavoritesPage() {
     <div className="font-sans bg-ink-50/40 min-h-screen flex flex-col">
       <StudentAppBar user={{ name: user.fullName, avatar: user.avatarUrl }} />
 
-      <main className="w-full max-w-[1120px] mx-auto px-6 sm:px-8 py-8 lg:py-10 flex-1">
+      <main className="w-full max-w-[1280px] mx-auto px-6 sm:px-8 py-8 lg:py-10 flex-1">
         <div className="mb-8">
           <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2 motion-safe:animate-rise-in">შენახული</div>
           <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>

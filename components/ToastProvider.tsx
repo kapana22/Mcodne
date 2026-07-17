@@ -76,7 +76,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={value}>
       {children}
       <div
-        className="toast-host fixed bottom-4 right-4 z-[70] flex flex-col gap-2 pointer-events-none safe-area-bottom"
+        // z-[95]: above page modals (z-[80]) and ConfirmModal (z-[90]) — a
+        // toast fired while a dialog is open must stay visible, not paint
+        // behind the scrim. Below only the skip-link (z-[100]).
+        className="toast-host fixed bottom-4 right-4 z-[95] flex flex-col gap-2 pointer-events-none safe-area-bottom"
         aria-live="polite"
       >
         {items.map(t => (

@@ -20,7 +20,6 @@ export const metadata: Metadata = {
 const ARTICLES = [
   {
     tag: 'ბიზნესი',
-    color: 'brand',
     title: 'როგორ ვიპოვოთ product-market fit ქართულ ბაზარზე',
     excerpt:
       '4 ეტაპიანი მეთოდი, რომელიც სტარტაპებს ეხმარება პირველი 100 მომხმარებლის შეძენაში — რეალური მაგალითებით.',
@@ -29,7 +28,6 @@ const ARTICLES = [
   },
   {
     tag: 'კარიერა',
-    color: 'accent',
     title: 'ხელფასზე მოლაპარაკება: 7 შეცდომა, რომელიც არ უნდა დაუშვა',
     excerpt:
       'ტოპ რეკრუტერების გამოცდილება — რა ითქვას ინტერვიუზე, როცა შენ გეკითხებიან „რამდენს ელოდები?"',
@@ -38,7 +36,6 @@ const ARTICLES = [
   },
   {
     tag: 'ფინანსები',
-    color: 'iris',
     title: 'IP სტატუსი vs. LLC — რა აირჩიო ფრილანსერმა 2026 წელს',
     excerpt:
       'დეტალური შედარება გადასახადების, ბუღალტერიის და საერთაშორისო ანგარიშსწორების პერსპექტივიდან.',
@@ -96,7 +93,7 @@ export default function BlogPage() {
               >
                 <div className="flex items-center gap-2 self-start">
                   <div
-                    className={`inline-flex items-center h-6 px-2.5 rounded-pill bg-${a.color}-50 text-${a.color}-700 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em]`}
+                    className="inline-flex items-center h-6 px-2.5 rounded-pill bg-brand-50 text-brand-700 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em]"
                   >
                     {a.tag}
                   </div>
@@ -130,15 +127,15 @@ export default function BlogPage() {
             </p>
             <Link
               href="/contact"
-              className="mt-6 inline-flex h-11 px-5 rounded-btn bg-ink-900 hover:bg-ink-800 text-white font-display font-semibold text-[13.5px] items-center gap-2 transition-colors"
+              className="mt-6 inline-flex h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] items-center gap-2 transition-colors"
             >
               მაცნობე გამოსვლისას <Icon.arrow className="w-4 h-4" />
             </Link>
           </div>
         </section>
-
-        <Footer />
       </main>
+
+      <Footer />
     </div>
   )
 }

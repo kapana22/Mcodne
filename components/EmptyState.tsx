@@ -5,7 +5,7 @@
 //   inline  — flush inside an existing panel (no outer border/background)
 
 import type { ReactNode, MouseEventHandler } from 'react'
-import Link from 'next/link'
+import { Btn } from './Btn'
 
 type Cta = {
   label: string
@@ -35,9 +35,6 @@ export function EmptyState({
       ? 'py-10 text-center motion-safe:animate-fade-in'
       : 'py-12 px-6 text-center rounded-card border border-dashed border-ink-200 bg-white motion-safe:animate-fade-in'
 
-  const ctaCls =
-    'mt-5 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 shadow-xs hover:shadow-brand-glow transition-all duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2'
-
   return (
     <div className={`${shell} ${className}`}>
       {icon && (
@@ -57,9 +54,10 @@ export function EmptyState({
           {description}
         </p>
       )}
-      {cta && (cta.href
-        ? <Link href={cta.href} className={ctaCls}>{cta.label}</Link>
-        : <button type="button" onClick={cta.onClick} className={ctaCls}>{cta.label}</button>
+      {cta && (
+        <Btn href={cta.href} onClick={cta.onClick} className="mt-5">
+          {cta.label}
+        </Btn>
       )}
     </div>
   )

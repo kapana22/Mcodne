@@ -56,11 +56,17 @@ export function BottomNav({ role }: { role: Role | null }) {
   const [unread, setUnread] = useState(0)
 
   const tabs = role ? TABS_BY_ROLE[role] : []
-  // Focused conversation screens (/student/messages/[id]) own the full
-  // viewport including the bottom edge (composer) — the tab bar would sit on
-  // top of the send box, so it steps aside there.
-  const isFocusedChat = /^\/student\/messages\/[^/]+$/.test(path)
-  const show = tabs.length > 0 && !isFocusedChat
+  // Focused screens own the full viewport including the bottom edge, so the
+  // tab bar steps aside there:
+  //  • conversation threads (student AND tutor) — the composer owns the
+  //    bottom edge;
+  //  • student booking detail — its fixed MobileActionBar (join/reschedule/
+  //    cancel) is the bottom surface; stacking the tab bar under it just
+  //    hides the tabs behind an action bar.
+  const isFocusedScreen =
+    /^\/(?:student|tutor)\/messages\/[^/]+$/.test(path) ||
+    /^\/student\/bookings\/[^/]+$/.test(path)
+  const show = tabs.length > 0 && !isFocusedScreen
 
   // Signal to globals.css that the bar is present so pages can reserve
   // extra bottom padding (only on the mobile breakpoints where the bar is

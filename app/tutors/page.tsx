@@ -394,7 +394,7 @@ const FiltersPanel = ({ filters, setFilters, total, onReset, variant = 'sidebar'
                     key={a.id}
                     type="button"
                     onClick={() => setFilters({ ...filters, available: toggleArr(filters.available, a.id) })}
-                    className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-pill text-[12px] font-display font-medium tracking-wide transition-colors ${on ? 'bg-accent-600 text-white' : 'bg-white text-ink-700 border border-ink-200 hover:bg-ink-50'}`}
+                    className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-pill text-[12px] font-display font-medium tracking-wide transition-colors ${on ? 'bg-brand-500 text-white' : 'bg-white text-ink-700 border border-ink-200 hover:bg-ink-50'}`}
                   >
                     {on && <Icon.check className="w-3 h-3" />}
                     {a.l}
@@ -811,7 +811,7 @@ const VideoPreview = ({ tutor, onClose, onBook }: { tutor: Tutor; onClose: () =>
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6 bg-ink-900/60 backdrop-blur-sm motion-safe:animate-fade-in-fast"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6 bg-ink-950/55 backdrop-blur-sm motion-safe:animate-fade-in-fast"
     >
       <div
         role="dialog"
@@ -2209,25 +2209,18 @@ function Tutors() {
                   ))}
                 </div>
               ) : visibleTutors.length === 0 ? (
-                <div className="py-16 px-6 text-center rounded-card border border-dashed border-ink-200 bg-white motion-safe:animate-fade-in">
-                  <div className="relative inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-50 text-brand-600 mb-4 motion-safe:animate-scale-in">
-                    <span aria-hidden className="absolute inset-0 rounded-full bg-brand-500/10 motion-safe:animate-pulse-soft" />
-                    <Icon.search className="relative w-6 h-6" />
+                // Compact canon empty state — icon + one line + one action.
+                // (The mailto helper card right below already covers "ask us".)
+                <div className="py-12 px-6 text-center rounded-card border border-dashed border-ink-200 bg-white motion-safe:animate-fade-in">
+                  <div className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-brand-50 text-brand-600 mb-3">
+                    <Icon.search className="w-5 h-5" />
                   </div>
-                  <h3 className="font-display text-[17px] font-bold text-ink-900 tracking-tight motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>
-                    ვერ ვიპოვეთ შესაფერისი ექსპერტი
-                  </h3>
-                  <p className="text-[13px] text-ink-500 mt-1.5 max-w-[380px] mx-auto leading-relaxed motion-safe:animate-rise-in" style={{ animationDelay: '120ms' }}>
-                    სცადე სხვა ფილტრი, საძიებო ტერმინი, ან განაცხადე დაჯავშნის მოთხოვნა — ჩვენ დაგიკავშირდებით.
-                  </p>
-                  <div className="mt-6 flex flex-wrap items-center justify-center gap-2 motion-safe:animate-rise-in" style={{ animationDelay: '180ms' }}>
-                    <button type="button" onClick={resetFilters} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 shadow-xs hover:shadow-brand-glow transition-all duration-fast">
-                      ფილტრების გასუფთავება
-                    </button>
-                    <a href="mailto:hi@mcodne.ge?subject=%E1%83%A8%E1%83%94%E1%83%9B%E1%83%98%20%E1%83%9B%E1%83%9D%E1%83%97%E1%83%AE%E1%83%9D%E1%83%95%E1%83%9C%E1%83%90" className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast">
-                      გაგზავნე მოთხოვნა
-                    </a>
+                  <div className="font-display text-[15.5px] font-bold text-ink-900 tracking-tight">
+                    ვერ ვიპოვეთ შესაფერისი ექსპერტი — სცადე სხვა ფილტრი ან ტერმინი
                   </div>
+                  <button type="button" onClick={resetFilters} className="mt-4 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 shadow-xs transition-colors duration-fast">
+                    ფილტრების გასუფთავება
+                  </button>
                 </div>
               ) : (
                 pagedTutors.map((t, i) => <TutorCard key={t.id} idx={i} t={t} onPreviewEnter={openPreview} onBook={openBook} saved={favIds.has(t.id)} onToggleFav={toggleFav} needsSignIn={authKnown && !signedIn} />)

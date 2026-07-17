@@ -45,7 +45,7 @@ export default async function StudentBookingsPage({
     <div className="font-sans bg-ink-50/40 min-h-screen flex flex-col">
       <StudentAppBar user={{ name: user.fullName, avatar: user.avatarUrl }} />
 
-      <main className="w-full max-w-[1120px] mx-auto px-6 sm:px-8 py-8 lg:py-10 flex-1">
+      <main className="w-full max-w-[1280px] mx-auto px-6 sm:px-8 py-8 lg:py-10 flex-1">
         <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
           <div>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">ჯავშნები</div>
@@ -68,8 +68,8 @@ export default async function StudentBookingsPage({
               <Link key={t.id} href={`/student/bookings?tab=${t.id}`}
                     className={`relative inline-flex items-center gap-2 pb-3 px-1 mr-4 font-display text-[13px] font-semibold ${on ? 'text-ink-900' : 'text-ink-500 hover:text-ink-800'}`}>
                 {t.l}
-                <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill text-[10.5px] font-bold tabular-nums ${on ? 'bg-accent-900 text-white' : 'bg-ink-100 text-ink-600'}`}>{t.c}</span>
-                {on && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-accent-900 rounded-full" />}
+                <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill text-[10.5px] font-bold tabular-nums ${on ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600'}`}>{t.c}</span>
+                {on && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-ink-900 rounded-full" />}
               </Link>
             )
           })}
@@ -87,6 +87,11 @@ export default async function StudentBookingsPage({
             {list.map(b => {
               const unread = b._count.messages
               const needsReview = b.status === 'COMPLETED' && !b.review
+              // A deleted tutor leaves `tutor: null` on the booking — never
+              // deref it unguarded (server crash) and never fall back to
+              // stock-photo avatar services.
+              const tutorUser = b.tutor?.user
+              const tutorName = tutorUser?.fullName ?? 'ექსპერტი აღარ არის ხელმისაწვდომი'
               return (
                 // Overlay-link card: the whole surface opens the detail, while
                 // the LIVE join button stays an independent link on top of it
@@ -95,8 +100,14 @@ export default async function StudentBookingsPage({
                      className="relative rounded-card bg-white border border-ink-200 hover:border-ink-300 hover:shadow-card transition-all overflow-hidden">
                   <Link href={`/student/bookings/${b.id}`} className="absolute inset-0" aria-label={b.topic} />
                   <div className="p-5 grid sm:grid-cols-[auto_1fr_auto] gap-4 sm:gap-5 items-center pointer-events-none">
-                    <div className="relative w-14 h-14 rounded-card overflow-hidden ring-1 ring-ink-200 shrink-0">
-                      <Image src={b.tutor.user.avatarUrl ?? `https://i.pravatar.cc/120?u=${b.tutor.userId}`} alt="" fill sizes="56px" className="object-cover" />
+                    <div className="relative w-14 h-14 rounded-card overflow-hidden ring-1 ring-ink-200 shrink-0 bg-brand-50">
+                      {tutorUser?.avatarUrl ? (
+                        <Image src={tutorUser.avatarUrl} alt="" fill sizes="56px" className="object-cover" />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center font-display text-[18px] font-bold text-brand-600/70">
+                          {(tutorUser?.fullName?.[0] ?? '?').toUpperCase()}
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -115,7 +126,7 @@ export default async function StudentBookingsPage({
                       </div>
                       <div className="font-display text-[14.5px] font-bold text-ink-900 truncate">{b.topic}</div>
                       <div className="text-[12px] text-ink-500 mt-0.5 truncate">
-                        {b.tutor.user.fullName} · {fmtKaDateTime(b.startAt, { year: true })}
+                        {tutorName} · {fmtKaDateTime(b.startAt, { year: true })}
                       </div>
                     </div>
                     <div className="text-right shrink-0">

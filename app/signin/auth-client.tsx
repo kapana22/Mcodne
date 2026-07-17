@@ -573,7 +573,6 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
   const [first, setFirst] = useState('')
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
-  const [topic, setTopic] = useState('ბიზნეს-სტრატეგია')
   const [agree, setAgree] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errMsg, setErrMsg] = useState<string | null>(null)
@@ -595,7 +594,10 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!first) { setErrMsg('შეიყვანე სახელი'); return }
+    if (!first.trim()) { setErrMsg('შეიყვანე სახელი'); return }
+    // Server requires fullName ≥ 2 chars — mirror it here so the user gets a
+    // specific message instead of the generic INVALID error.
+    if (first.trim().length < 2) { setErrMsg('სახელი — მინიმუმ 2 სიმბოლო'); return }
     if (!email) { setErrMsg('შეიყვანე ელფოსტა'); return }
     if (pw.length < 8) { setErrMsg('პაროლი მინიმუმ 8 სიმბოლო'); return }
     if (!agree) { setErrMsg('დაეთანხმე წესებს'); return }
@@ -604,7 +606,7 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName: first.trim(), email: email.trim().toLowerCase(), password: pw, role: 'STUDENT' }),
+        body: JSON.stringify({ fullName: first.trim(), email: email.trim().toLowerCase(), password: pw }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -663,16 +665,6 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
           <StrengthBar pw={pw} />
         </div>
 
-        <Field label="რა გაინტერესებს" optional>
-          <div className="flex flex-wrap gap-1.5">
-            {['ბიზნეს-სტრატეგია', 'კარიერა', 'საგადასახადო', 'მარკეტინგი', 'სამართალი', 'პროდუქტი'].map(t => (
-              <button key={t} type="button" onClick={() => setTopic(t)} className={`px-3 h-8 rounded-pill text-[12.5px] font-display font-medium tracking-wide transition-colors ${topic === t ? 'bg-accent-600 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'}`}>
-                {t}
-              </button>
-            ))}
-          </div>
-        </Field>
-
         <label className="flex items-start gap-2.5 cursor-pointer select-none pt-2">
           <span className={`mt-0.5 w-4 h-4 rounded border-[1.5px] inline-flex items-center justify-center shrink-0 transition-colors ${agree ? 'bg-brand-500 border-brand-500' : 'border-ink-300 bg-white hover:border-ink-400'}`}>
             {agree && <Icon.check className="w-3 h-3 text-white" />}
@@ -687,7 +679,7 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
           <div role="alert" className="rounded-field bg-danger-50 border border-danger-200 px-3 py-2 text-[12.5px] text-danger-700 leading-[1.45] break-words">{errMsg}</div>
         )}
 
-        <button type="submit" disabled={submitting || !agree || !first || !email || pw.length < 8} className="w-full h-12 mt-2 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
+        <button type="submit" disabled={submitting || !agree || first.trim().length < 2 || !email || pw.length < 8} className="w-full h-12 mt-2 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
           {submitting ? (
             <>
               <svg viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
@@ -697,10 +689,10 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
             <>ანგარიშის შექმნა <Icon.arrow className="w-4 h-4" /></>
           )}
         </button>
-        {!submitting && (!first || !email || pw.length < 8 || !agree) && (
+        {!submitting && (first.trim().length < 2 || !email || pw.length < 8 || !agree) && (
           // One next-step hint at a time — why the button is grey.
           <p className="text-[11.5px] text-ink-500 text-center">
-            {!first ? 'შეიყვანე სახელი' : !email ? 'შეიყვანე ელფოსტა' : pw.length < 8 ? 'პაროლი — მინიმუმ 8 სიმბოლო' : 'დაეთანხმე წესებს გასაგრძელებლად'}
+            {!first.trim() ? 'შეიყვანე სახელი' : first.trim().length < 2 ? 'სახელი — მინიმუმ 2 სიმბოლო' : !email ? 'შეიყვანე ელფოსტა' : pw.length < 8 ? 'პაროლი — მინიმუმ 8 სიმბოლო' : 'დაეთანხმე წესებს გასაგრძელებლად'}
           </p>
         )}
 
@@ -1246,11 +1238,11 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
               მოგვწერე ელფოსტა — დანარჩენი<br /> 30 წამში მოვაგვარებთ.
             </h1>
             <p className="mt-3 text-[14px] text-ink-600 leading-[1.55] max-w-[440px]">
-              ერთჯერად ბმულს გავუგზავნით ანგარიშის ელფოსტაზე. ბმული ცარიელდება 15 წუთში.
+              ერთჯერად ბმულს გავუგზავნით ანგარიშის ელფოსტაზე. ბმული ცარიელდება 1 საათში.
             </p>
             <label className="block mt-7">
               <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">ანგარიშის ელფოსტა</span>
-              <input type="email" autoFocus value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null) }} placeholder="anu@gmail.com" className="w-full mt-2 h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors" />
+              <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} autoFocus value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null) }} placeholder="anu@gmail.com" className="w-full mt-2 h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors" />
             </label>
             <button type="submit" disabled={!email || sending} className="mt-6 w-full h-12 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
               {sending ? (
@@ -1278,7 +1270,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
               ბმული გავუგზავნეთ —<br /><span className="text-ink-500 break-all">{email || 'შენ ელფოსტაზე'}</span>
             </h1>
             <p className="mt-3 text-[14px] text-ink-600 leading-[1.55]">
-              Inbox-ში ან Spam-ში გადახედე "მცოდნე · პაროლის აღდგენა"-ს. ბმული ცარიელდება 15 წუთში.
+              Inbox-ში ან Spam-ში გადახედე "მცოდნე · პაროლის აღდგენა"-ს. ბმული ცარიელდება 1 საათში.
             </p>
 
             <div className="mt-7 rounded-card border border-ink-200 bg-white overflow-hidden">
@@ -1296,7 +1288,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
                     <span className="inline-flex items-center h-4 px-1.5 rounded-pill bg-brand-50 border border-brand-200 text-brand-700 font-display text-[9px] font-bold uppercase tracking-[0.14em]">გადამოწმდა</span>
                   </div>
                   <div className="text-[12px] text-ink-700 mt-0.5 font-display font-semibold">პაროლის აღდგენის ბმული</div>
-                  <p className="text-[11.5px] text-ink-500 mt-0.5 leading-[1.4] line-clamp-1">დააწექი ღილაკს ქვემოთ ან გადადი ბმულზე — 15 წუთის განმავლობაში მუშაობს…</p>
+                  <p className="text-[11.5px] text-ink-500 mt-0.5 leading-[1.4] line-clamp-1">დააწექი ღილაკს ქვემოთ ან გადადი ბმულზე — 1 საათის განმავლობაში მუშაობს…</p>
                 </div>
               </div>
               <div className="px-4 py-3 border-t border-ink-100 flex items-center justify-between">

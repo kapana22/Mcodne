@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { PAYMENTS_LIVE, COMMISSION_PCT, TUTOR_PAYOUT_PCT } from '@/lib/flags'
 import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
 import { Footer } from '@/components/Footer'
+import { Avatar } from '@/components/Avatar'
 
 /* ───── Icons (shared) ───── */
 const Icon = {
@@ -55,19 +56,37 @@ const CatIcon = {
   psych:    <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7"><path d="M14 5a4 4 0 0 0-4 4 3.5 3.5 0 0 0-3 5.5A3.5 3.5 0 0 0 10 20a3 3 0 0 0 4 2.5V5Z" /><path d="M14 5a4 4 0 0 1 4 4 3.5 3.5 0 0 1 3 5.5A3.5 3.5 0 0 1 18 20a3 3 0 0 1-4 2.5V5Z" /></svg>,
 }
 
+// One brand treatment for every tile — the canon is the 3-color system, so no
+// per-category rainbow hues (and no safelist-dependent dynamic classes).
 const categories = [
-  { l: 'ბიზნესი',     d: 'სტრატეგია, ოპერაციები',   i: CatIcon.business,   c: 32, color: 'brand',   slug: 'business' },
-  { l: 'ფინანსები',   d: 'ბუღალტერია, გადასახადი',  i: CatIcon.finance,    c: 18, color: 'accent',  slug: 'finance' },
-  { l: 'კარიერა',     d: 'ზრდა, ინტერვიუ, CV',      i: CatIcon.career,     c: 24, color: 'iris',    slug: 'career' },
-  { l: 'სამართალი',   d: 'კონტრაქტი, კონსულტაცია',  i: CatIcon.law,        c: 12, color: 'warning', slug: 'law' },
-  { l: 'მარკეტინგი',  d: 'ბრენდი, რეკლამა, SMM',    i: CatIcon.marketing,  c: 21, color: 'flame',   slug: 'marketing' },
-  { l: 'ფსიქოლოგია',  d: 'ცხოვრება, ურთიერთობა',    i: CatIcon.psych,      c: 17, color: 'success', slug: 'psychology' },
+  { l: 'ბიზნესი',     d: 'სტრატეგია, ოპერაციები',   i: CatIcon.business,   c: 32, slug: 'business' },
+  { l: 'ფინანსები',   d: 'ბუღალტერია, გადასახადი',  i: CatIcon.finance,    c: 18, slug: 'finance' },
+  { l: 'კარიერა',     d: 'ზრდა, ინტერვიუ, CV',      i: CatIcon.career,     c: 24, slug: 'career' },
+  { l: 'სამართალი',   d: 'კონტრაქტი, კონსულტაცია',  i: CatIcon.law,        c: 12, slug: 'law' },
+  { l: 'მარკეტინგი',  d: 'ბრენდი, რეკლამა, SMM',    i: CatIcon.marketing,  c: 21, slug: 'marketing' },
+  { l: 'ფსიქოლოგია',  d: 'ცხოვრება, ურთიერთობა',    i: CatIcon.psych,      c: 17, slug: 'psychology' },
 ]
 
 /* ───── Top nav ───── */
+// Signed-in visitors see their avatar (→ role home) instead of შესვლა/დაწყება —
+// same /api/me probe pattern as components/PublicTopBar.
+type Me = { id: string; fullName: string; avatarUrl?: string | null; role: 'STUDENT' | 'TUTOR' | 'ADMIN' } | null
+
 const TopNav = () => {
   const [menu, setMenu] = useState<'cat' | null>(null)
   const [mobOpen, setMobOpen] = useState(false)
+  const [me, setMe] = useState<Me>(null)
+  const [authReady, setAuthReady] = useState(false)
+  useEffect(() => {
+    fetch('/api/me').then(r => (r.ok ? r.json() : null)).then(d => {
+      setMe(d?.user ?? null)
+      setAuthReady(true)
+    }).catch(() => setAuthReady(true))
+  }, [])
+  const roleHome = !me ? '/signin'
+    : me.role === 'TUTOR' ? '/tutor'
+    : me.role === 'ADMIN' ? '/admin'
+    : '/student'
   const navItems: { l: string; href: string }[] = [
     { l: 'ექსპერტები', href: '/tutors' },
     { l: 'პროცესი', href: '/#how' },
@@ -111,11 +130,22 @@ const TopNav = () => {
             </button>
             <Link href="/apply" className={`hidden md:inline-flex h-9 px-3 rounded-btn font-display font-medium tracking-wide text-[13px] items-center transition-colors text-ink-800 hover:bg-ink-50`}>გახდი ექსპერტი</Link>
             <div className="hidden md:block w-px h-5 bg-ink-200 mx-1.5" />
-            <Link href="/signin" className="hidden md:inline-flex h-9 px-3 rounded-btn font-display font-medium tracking-wide text-[13px] text-ink-800 hover:bg-ink-50 items-center transition-colors">შესვლა</Link>
-            <Link href="/signup" className="hidden sm:inline-flex font-display font-semibold text-[12.5px] tracking-wide bg-brand-500 hover:bg-brand-600 text-white h-9 px-3.5 sm:px-4 rounded-btn transition-colors items-center gap-1.5">
-              დაიწყე
-              <Icon.arrow className="w-3.5 h-3.5" />
-            </Link>
+            {!authReady ? (
+              // Reserve space so the layout doesn't jump when auth resolves.
+              <div className="hidden sm:block w-9 h-9" />
+            ) : me ? (
+              <Link href={roleHome} aria-label="ჩემი სივრცე" className="hidden sm:inline-flex rounded-full">
+                <Avatar src={me.avatarUrl ?? undefined} name={me.fullName} size={36} interactive />
+              </Link>
+            ) : (
+              <>
+                <Link href="/signin" className="hidden md:inline-flex h-9 px-3 rounded-btn font-display font-medium tracking-wide text-[13px] text-ink-800 hover:bg-ink-50 items-center transition-colors">შესვლა</Link>
+                <Link href="/signup" className="hidden sm:inline-flex font-display font-semibold text-[12.5px] tracking-wide bg-brand-500 hover:bg-brand-600 text-white h-9 px-3.5 sm:px-4 rounded-btn transition-colors items-center gap-1.5">
+                  დაწყება
+                  <Icon.arrow className="w-3.5 h-3.5" />
+                </Link>
+              </>
+            )}
             <button type="button" onClick={() => setMobOpen(o => !o)} aria-label="მენიუ" aria-expanded={mobOpen} className="lg:hidden w-10 h-10 rounded-btn border border-ink-200 bg-white text-ink-900 hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center transition-colors">
               {mobOpen ? <Icon.x className="w-5 h-5" /> : <Icon.menu className="w-5 h-5" />}
             </button>
@@ -141,12 +171,20 @@ const TopNav = () => {
                 ))}
               </nav>
               <div className="px-5 py-4 border-t border-ink-200 shrink-0 space-y-2.5 bg-ink-50/40">
-                <Link href="/signup" onClick={() => setMobOpen(false)} className="w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors">
-                  დაიწყე უფასოდ <Icon.arrow className="w-3.5 h-3.5" />
-                </Link>
-                <Link href="/signin" onClick={() => setMobOpen(false)} className="w-full h-11 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center transition-colors">
-                  შესვლა
-                </Link>
+                {me ? (
+                  <Link href={roleHome} onClick={() => setMobOpen(false)} className="w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors">
+                    ჩემი სივრცე <Icon.arrow className="w-3.5 h-3.5" />
+                  </Link>
+                ) : (
+                  <>
+                    <Link href="/signup" onClick={() => setMobOpen(false)} className="w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors">
+                      დაწყება <Icon.arrow className="w-3.5 h-3.5" />
+                    </Link>
+                    <Link href="/signin" onClick={() => setMobOpen(false)} className="w-full h-11 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center transition-colors">
+                      შესვლა
+                    </Link>
+                  </>
+                )}
               </div>
             </aside>
           </>
@@ -161,7 +199,7 @@ const TopNav = () => {
                   <div className="grid grid-cols-4 gap-1.5">
                     {categories.map(c => (
                       <Link key={c.l} href={`/tutors?category=${c.slug}`} onClick={() => setMenu(null)} className="group flex items-center gap-3 p-3 rounded-card hover:bg-ink-50 transition-colors text-left">
-                        <div className={`w-9 h-9 rounded-card flex items-center justify-center bg-${c.color}-50 text-${c.color}-700 shrink-0 group-hover:bg-${c.color}-500 group-hover:text-white transition-colors`}>{React.cloneElement(c.i, { className: 'w-4 h-4' })}</div>
+                        <div className="w-9 h-9 rounded-card flex items-center justify-center bg-brand-50 text-brand-700 shrink-0 group-hover:bg-brand-500 group-hover:text-white transition-colors">{React.cloneElement(c.i, { className: 'w-4 h-4' })}</div>
                         <div className="min-w-0">
                           <div className="font-display text-[13px] font-bold text-ink-900 leading-tight">{c.l}</div>
                           <div className="text-[11px] text-ink-500 mt-0.5">{c.d}</div>
@@ -548,9 +586,9 @@ const Categories = () => (
         {categories.map(c => (
           <Link key={c.l} href={`/tutors?category=${c.slug}`} className="group relative overflow-hidden rounded-card border border-ink-200 bg-white p-4 sm:p-6 shadow-xs hover:border-brand-200 hover-lift motion-safe:active:scale-[0.99] flex flex-col text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
             {/* Brand accent hairline — reveals on hover (matches /categories). */}
-            <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-gradient-to-r from-brand-500 to-brand-600 transition-transform duration-300 ease-out group-hover:scale-x-100" />
+            <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-brand-500 transition-transform duration-300 ease-out group-hover:scale-x-100" />
             <div className="flex items-start justify-between gap-3">
-              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-btn flex items-center justify-center shrink-0 bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-colors group-hover:text-brand-700">
+              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-btn flex items-center justify-center shrink-0 bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-colors group-hover:text-brand-700">
                 {React.cloneElement(c.i, { className: 'w-5 h-5 sm:w-7 sm:h-7' })}
               </div>
               <span className="font-display text-[10px] sm:text-[10.5px] font-semibold uppercase tracking-[0.14em] sm:tracking-[0.16em] text-ink-400 whitespace-nowrap pt-1">
@@ -785,7 +823,7 @@ const HowItWorks = () => (
           </h2>
           <p className="text-[15px] text-ink-600 mt-5 max-w-[400px] leading-relaxed">რეგისტრაცია — გაცნობა — სესია. 15 წუთიდან სრულ კონსულტაციამდე.</p>
           <Link href="/signup" className="mt-7 h-12 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
-            დაიწყე ახლავე <Icon.arrow className="w-4 h-4" />
+            დაწყება <Icon.arrow className="w-4 h-4" />
           </Link>
         </div>
         <div className="space-y-3">
@@ -924,15 +962,16 @@ const ExpertCta = () => (
           </div>
         </div>
         <div className="grid grid-cols-1 gap-3">
+          {/* One brand treatment for all stat tiles — no per-row hues. */}
           {[
-            { n: `${COMMISSION_PCT}%`, l: 'საკომისიო',    s: 'გამჭვირვალე · ერთი ციფრი',            tone: 'brand'   },
-            { n: `${TUTOR_PAYOUT_PCT}%`, l: 'შენი ნაწილი', s: 'დანარჩენი — შენს ჯიბეშია',            tone: 'accent'  },
-            { n: 'მალე', l: 'შემოსავალი',                 s: 'escrow-ის დანერგვის შემდეგ',           tone: 'success' },
+            { n: `${COMMISSION_PCT}%`, l: 'საკომისიო',    s: 'გამჭვირვალე · ერთი ციფრი'   },
+            { n: `${TUTOR_PAYOUT_PCT}%`, l: 'შენი ნაწილი', s: 'დანარჩენი — შენს ჯიბეშია'   },
+            { n: 'მალე', l: 'შემოსავალი',                 s: 'escrow-ის დანერგვის შემდეგ'  },
           ].map((s, i) => (
             <div key={i} className="rounded-card border border-ink-200 bg-white p-5 grid grid-cols-[auto_1fr] gap-5 items-baseline shadow-xs">
-              <div className={`font-display text-[40px] font-bold text-${s.tone}-600 tabular-nums tracking-tight leading-none`}>{s.n}</div>
+              <div className="font-display text-[40px] font-bold text-brand-600 tabular-nums tracking-tight leading-none">{s.n}</div>
               <div>
-                <div className={`font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-${s.tone}-700`}>{s.l}</div>
+                <div className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-700">{s.l}</div>
                 <div className="text-[12px] text-ink-600 mt-1.5 leading-snug">{s.s}</div>
               </div>
             </div>

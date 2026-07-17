@@ -26,7 +26,9 @@ const VALUES = [
   {
     icon: <Icon.wallet className="w-5 h-5" />,
     title: 'გამჭვირვალე ფასი',
-    body: 'ერთი ფასი, ერთი გვერდი. თანხა ინახება escrow-ში და ექსპერტს გადაერიცხება მხოლოდ სესიის შემდეგ.',
+    // Honest posture — payments are not live yet, so escrow is framed as the
+    // coming model (same „მალე" note as the home page), not a live fact.
+    body: 'ერთი ფასი, ერთი გვერდი — გადაიხდი მხოლოდ დაჯავშნისას. escrow-ით დაცული გადახდები მალე ამოქმედდება.',
   },
   {
     icon: <Icon.clock className="w-5 h-5" />,
@@ -122,7 +124,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="mt-20 rounded-card bg-accent-900 text-white p-10 lg:p-14 relative overflow-hidden">
+        <section className="mt-20 rounded-card bg-gradient-dark text-white p-10 lg:p-14 relative overflow-hidden">
           <div className="max-w-[560px] relative z-10">
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-300 mb-3">
               შემოგვიერთდი
@@ -150,9 +152,9 @@ export default function AboutPage() {
             </div>
           </div>
         </section>
-
-        <Footer />
       </main>
+
+      <Footer />
     </div>
   )
 }

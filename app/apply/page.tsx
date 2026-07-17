@@ -57,7 +57,7 @@ const TopBar = () => (
       <span className="hidden md:inline-block h-5 w-px bg-ink-200" />
       <span className="hidden md:inline-flex items-center gap-2">
         <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-400">ექსპერტი / განცხადება</span>
-        <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-accent-50 border border-accent-200 text-accent-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]">
+        <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-ink-50 border border-ink-200 text-ink-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]">
           <Icon.briefcase className="w-2.5 h-2.5" /> რეგისტრაცია
         </span>
       </span>
@@ -1346,7 +1346,7 @@ const StatusSideRail = ({ stage }: { stage: Stage }) => (
           <div className="min-w-0 flex-1"><div className="font-display text-[12.5px] font-semibold text-ink-900">დაწერე ჩვენ</div><div className="text-[10.5px] text-ink-500">~ 4 წთ პასუხი</div></div>
         </a>
         <a href="mailto:hi@mcodne.ge" className="flex items-center gap-2.5 p-2.5 rounded-btn hover:bg-ink-50 transition-colors">
-          <span className="w-7 h-7 rounded-btn bg-accent-50 text-accent-700 inline-flex items-center justify-center shrink-0"><Icon.mail className="w-3.5 h-3.5" /></span>
+          <span className="w-7 h-7 rounded-btn bg-ink-50 text-ink-700 inline-flex items-center justify-center shrink-0"><Icon.mail className="w-3.5 h-3.5" /></span>
           <div className="min-w-0 flex-1"><div className="font-display text-[12.5px] font-semibold text-ink-900">hi@mcodne.ge</div></div>
         </a>
       </div>

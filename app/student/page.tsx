@@ -761,7 +761,9 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
   const freeCancel = new Date(s.startAt).getTime() - Date.now() >= CANCEL_CUTOFF_HOURS * 3_600_000
   return (
   <>
-  <article onClick={() => onOpen(s)} className="cursor-pointer grid grid-cols-[auto_1fr_auto] sm:grid-cols-[64px_auto_1fr_auto] gap-4 sm:gap-5 items-center py-4 px-5 hover:bg-ink-50/50 transition-colors">
+  {/* Mobile: 2-col grid (avatar + text), actions wrap to their own full-width
+      row below — buttons squeezing the text column made 390px unreadable. */}
+  <article onClick={() => onOpen(s)} className="cursor-pointer grid grid-cols-[auto_1fr] sm:grid-cols-[64px_auto_1fr_auto] gap-x-4 gap-y-3 sm:gap-5 items-center py-4 px-5 hover:bg-ink-50/50 transition-colors">
     {/* Date pill (desktop) */}
     <div className="hidden sm:flex flex-col items-center justify-center w-16 h-16 rounded-card bg-white border border-ink-200">
       <span className="font-display text-[9.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">{s.day}</span>
@@ -818,7 +820,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
     </div>
 
     {/* Action */}
-    <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+    <div className="col-span-2 sm:col-span-1 flex items-center justify-end gap-1.5 shrink-0 flex-wrap" onClick={e => e.stopPropagation()}>
       {s.status === 'confirmed' && (
         <>
           <Link href={`/student/bookings/${s.id}#chat`} aria-label="ჩატი" className="hidden md:inline-flex h-9 w-9 rounded-btn border border-ink-200 hover:border-ink-300 text-ink-600 items-center justify-center transition-colors">
@@ -826,7 +828,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
           </Link>
           <Link href={`/session/${s.id}`} className="h-9 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors">
             <Icon.video className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">ოთახი</span>
+            <span>ოთახი</span>
           </Link>
           {onCancel && (
             <button type="button" disabled={cancelling} onClick={() => setAskCancel(true)} className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-[12px] tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
@@ -852,7 +854,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
           {!s.reviewed && (
             <Link href={`/student/bookings/${s.id}?review=1`} className="h-9 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors">
               <Icon.star className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">შეაფასე</span>
+              <span>შეაფასე</span>
             </Link>
           )}
           {/* Rebook mini-CTA — jumps back to the tutor profile with
@@ -866,7 +868,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
             className="h-9 px-3.5 rounded-btn bg-brand-50 border border-brand-200 hover:bg-brand-500 hover:text-white hover:border-brand-500 text-brand-800 font-display font-semibold text-[12px] tracking-wide transition-colors inline-flex items-center gap-1.5"
           >
             <Icon.refresh className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">დაჯავშნე ისევ</span>
+            <span>დაჯავშნე ისევ</span>
           </Link>
         </>
       )}

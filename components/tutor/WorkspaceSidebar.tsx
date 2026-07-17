@@ -80,7 +80,7 @@ export function WorkspaceSidebar({ badges }: { badges: NavBadges }) {
           </div>
           <div className="mt-2 h-1.5 w-full rounded-pill bg-white border border-brand-100 overflow-hidden">
             <div
-              className="h-full rounded-pill bg-gradient-to-r from-brand-500 to-brand-400 motion-safe:transition-[width] motion-safe:duration-slow"
+              className="h-full rounded-pill bg-brand-500 motion-safe:transition-[width] motion-safe:duration-slow"
               style={{ width: `${percent}%` }}
             />
           </div>

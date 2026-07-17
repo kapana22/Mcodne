@@ -6,6 +6,7 @@ import { Icon } from '@/components/Icon'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { useToast } from '@/components/ToastProvider'
 import { ProfileCompleteness } from '@/components/ProfileCompleteness'
+import { PageHeader } from '@/components/tutor/PageHeader'
 import { safeHttpUrl } from '@/lib/safeUrl'
 
 type Me = {
@@ -547,28 +548,22 @@ export default function TutorProfilePage() {
 
   return (
     <div>
-      {/* globals.css puts `overflow-x: hidden` on html/body, which turns body into
-          a scroll container and silently defeats every `position: sticky` on the
-          page (left rail AND workspace top bar). `clip` clips horizontal overflow
-          identically but without creating a scroll container. Scoped to this mount. */}
-      <style>{`html, body { overflow-x: clip; }`}</style>
-        <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="font-display text-[26px] font-bold tracking-tight text-ink-900">პროფილი</h1>
-            <p className="text-[13px] text-ink-500 mt-1">როგორ ხედავენ კლიენტები შენს პროფილს</p>
-          </div>
-          {profile && (
+        <PageHeader
+          className="mb-6"
+          title="პროფილი"
+          sub="როგორ ხედავენ კლიენტები შენს პროფილს"
+          actions={profile && (
             <a
               href={`/tutors/${profile.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-1 inline-flex items-center gap-1.5 h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               <Icon.external className="w-3.5 h-3.5" />
               იხილე პროფილი როგორც კლიენტი
             </a>
           )}
-        </div>
+        />
 
         {err && (
           <div className="mb-4 p-4 rounded-card bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>
@@ -860,7 +855,7 @@ export default function TutorProfilePage() {
                       <div key={c.id} className="flex items-start gap-3 p-3 rounded-card border border-ink-200 bg-ink-50/40">
                         <span className={`shrink-0 inline-flex items-center h-6 px-2 rounded-pill border font-display text-[10px] font-bold uppercase tracking-[0.14em] ${
                           c.tier === 'QUICK' ? 'bg-brand-50 border-brand-200 text-brand-700'
-                          : c.tier === 'DEEP' ? 'bg-iris-50 border-iris-200 text-iris-700'
+                          : c.tier === 'DEEP' ? 'bg-info-50 border-info-200 text-info-700'
                           : 'bg-ink-100 border-ink-200 text-ink-700'
                         }`}>{c.tier}</span>
                         <div className="flex-1 min-w-0">
@@ -949,7 +944,7 @@ export default function TutorProfilePage() {
                         {safeHttpUrl(c.fileUrl) && (
                           <a href={safeHttpUrl(c.fileUrl)} target="_blank" rel="noopener noreferrer" className="font-display text-[11px] font-semibold text-brand-700 hover:text-brand-800">გახსნა</a>
                         )}
-                        <button type="button" onClick={() => deleteCertificate(c.id)} className="font-display text-[11px] font-semibold text-ink-500 hover:text-danger-700">წაშლა</button>
+                        <button type="button" onClick={() => deleteCertificate(c.id)} aria-label="სერტიფიკატის წაშლა" className="min-h-[44px] -my-2 px-3 -mr-2 inline-flex items-center rounded-btn font-display text-[11px] font-semibold text-ink-500 hover:text-danger-700 hover:bg-danger-50 transition-colors">წაშლა</button>
                       </div>
                     ))
                   )}
@@ -1024,7 +1019,7 @@ export default function TutorProfilePage() {
                           <div className="text-[12px] text-ink-700">{e.degree}{e.field ? ` · ${e.field}` : ''}</div>
                           <div className="text-[11.5px] text-ink-500 tabular-nums">{e.startYear} – {e.endYear ?? 'დღემდე'}</div>
                         </div>
-                        <button type="button" onClick={() => deleteEducation(e.id)} className="font-display text-[11px] font-semibold text-ink-500 hover:text-danger-700">წაშლა</button>
+                        <button type="button" onClick={() => deleteEducation(e.id)} aria-label="განათლების ჩანაწერის წაშლა" className="min-h-[44px] -my-2 px-3 -mr-2 inline-flex items-center rounded-btn font-display text-[11px] font-semibold text-ink-500 hover:text-danger-700 hover:bg-danger-50 transition-colors">წაშლა</button>
                       </div>
                     ))
                   )}
@@ -1092,7 +1087,7 @@ export default function TutorProfilePage() {
                           <div className="text-[11.5px] text-ink-500 tabular-nums">{x.startYear} – {x.endYear ?? 'ახლა'}</div>
                           {x.description && <div className="mt-1 text-[12px] text-ink-600 leading-[1.5]">{x.description}</div>}
                         </div>
-                        <button type="button" onClick={() => deleteExperience(x.id)} className="font-display text-[11px] font-semibold text-ink-500 hover:text-danger-700">წაშლა</button>
+                        <button type="button" onClick={() => deleteExperience(x.id)} aria-label="გამოცდილების ჩანაწერის წაშლა" className="min-h-[44px] -my-2 px-3 -mr-2 self-center inline-flex items-center rounded-btn font-display text-[11px] font-semibold text-ink-500 hover:text-danger-700 hover:bg-danger-50 transition-colors">წაშლა</button>
                       </div>
                     ))
                   )}

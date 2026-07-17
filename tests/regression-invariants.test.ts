@@ -143,28 +143,38 @@ function check(name: string, ok: boolean, hint: string) {
     'notify + markRelatedRead cost 3 round-trips the sender must not wait on.',
   )
   const sInbox = read('app/student/messages/page.tsx')
-  const tInbox = read('app/tutor/messages/page.tsx')
+  // The tutor inbox moved to the two-pane messages center: the API computes
+  // `at` from the last message and ConversationList sorts on it.
+  const tList = read('app/tutor/messages/_components/ConversationList.tsx')
   check(
     'H3: inboxes sort by last-message time, not booking.updatedAt',
-    sInbox.includes('messages[0]?.createdAt.getTime') && tInbox.includes('messages[0]?.createdAt.getTime'),
+    sInbox.includes('messages[0]?.createdAt.getTime') &&
+      api.includes('at: (last?.createdAt') &&
+      tList.includes('new Date(z.at).getTime() - new Date(a.at).getTime()'),
     'booking.updatedAt is not bumped by messages — sorting on it buries fresh threads.',
   )
   check(
     'H4: tutor inbox has no pravatar stock-face fallback',
     // Match the actual URL, not the word — comments may mention it.
-    !tInbox.includes('i.pravatar.cc'),
+    !read('app/tutor/messages/page.tsx').includes('i.pravatar.cc') && !tList.includes('i.pravatar.cc'),
     'A random stock face next to a real client name reads as a fake identity.',
   )
+  // The tutor pane now renders the shared <BookingChat>, whose polling and
+  // optimistic append live in the useBookingThread hook — guard the hook plus
+  // the import, and the student pane's still-local implementation.
   const sPane = read('app/student/bookings/[id]/page.tsx')
   const tPane = read('app/tutor/bookings/[id]/page.tsx')
+  const hook = read('components/chat/useBookingThread.ts')
   check(
     'H5: both chat panes poll the thread while visible',
-    sPane.includes('/api/messages?bookingId=') && tPane.includes('/api/messages?bookingId='),
+    sPane.includes('/api/messages?bookingId=') &&
+      hook.includes('/api/messages?bookingId=') &&
+      tPane.includes('BookingChat'),
     'Without polling, incoming messages only appeared on a full page reload.',
   )
   check(
     'H6: both chat panes append optimistically (tmp- reconcile)',
-    sPane.includes("`tmp-${Date.now()}`") && tPane.includes("`tmp-${Date.now()}`"),
+    sPane.includes("`tmp-${Date.now()}`") && hook.includes("`tmp-${Date.now()}`"),
     'Waiting for the POST (seconds on remote DB) before showing your own bubble feels broken.',
   )
 }

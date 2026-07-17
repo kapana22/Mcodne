@@ -100,7 +100,7 @@ const tabOf = (s: ApiStatus) =>
 
 /* ───── Breadcrumb ───── */
 const Breadcrumb = ({ status, ref }: { status: ApiStatus; ref: string }) => (
-  <div className="max-w-[1240px] mx-auto px-6 lg:px-8 pt-6 flex items-center gap-2 text-[12px] text-ink-500">
+  <div className="max-w-[1280px] mx-auto px-6 lg:px-8 pt-6 flex items-center gap-2 text-[12px] text-ink-500">
     <Link href={`/student/bookings?tab=${status === 'COMPLETED' || status === 'NO_SHOW' ? 'past' : status === 'CANCELED' ? 'canceled' : 'upcoming'}`}
           className="hover:text-ink-900 font-display font-semibold inline-flex items-center gap-1">
       <Icon.chevL className="w-3 h-3" /> ჩემი ჯავშნები
@@ -200,7 +200,7 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
   const tutorSpecialty = booking.tutor.specialty ?? booking.tutor.category?.name ?? 'ექსპერტი'
 
   return (
-    <section className="max-w-[1240px] mx-auto px-6 lg:px-8 pt-5">
+    <section className="max-w-[1280px] mx-auto px-6 lg:px-8 pt-5">
       <div className="rounded-card overflow-hidden border border-ink-200 bg-white">
         {/* status banner */}
         <div className={`px-6 py-3 border-b ${m.cls} flex items-center justify-between gap-3 flex-wrap`}>
@@ -312,7 +312,7 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
             )}
 
             {(status === 'CONFIRMED' || status === 'LIVE') && cd && (
-              <div className="text-center p-4 rounded-card bg-accent-900 text-white">
+              <div className="text-center p-4 rounded-card bg-ink-900 text-white">
                 <div className="font-display text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-300 mb-2">
                   {status === 'LIVE' ? 'ცოცხალია' : 'დარჩა'}
                 </div>
@@ -723,7 +723,7 @@ const RescheduleModal = ({ open, onClose, onSent, booking }: { open: boolean; on
   if (!open) return null
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-accent-900/55 backdrop-blur-sm" />
+      <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm" />
       <div role="dialog" className="relative w-full sm:max-w-[520px] bg-white rounded-t-card sm:rounded-card shadow-float overflow-hidden motion-safe:animate-slide-in-b sm:motion-safe:animate-scale-in safe-area-bottom">
         <div className="px-6 py-4 border-b border-ink-100 flex items-start justify-between gap-4">
           <div>
@@ -828,7 +828,7 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-accent-900/55 backdrop-blur-sm" />
+      <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm" />
       <div role="dialog" className="relative w-full sm:max-w-[560px] bg-white rounded-t-card sm:rounded-card shadow-float overflow-hidden flex flex-col max-h-[85vh] motion-safe:animate-slide-in-b sm:motion-safe:animate-scale-in safe-area-bottom">
         <div className="px-6 py-4 border-b border-ink-100 flex items-start justify-between gap-4 shrink-0">
           <div>
@@ -925,7 +925,7 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
   }
 
   return (
-    <section id="leave-review" className="max-w-[1240px] mx-auto px-6 lg:px-8 mt-4 scroll-mt-24">
+    <section id="leave-review" className="max-w-[1280px] mx-auto px-6 lg:px-8 mt-4 scroll-mt-24">
       <div className="rounded-card border border-brand-200 bg-brand-50/50 p-5 lg:p-6">
         {existing && !editing ? (
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -1040,7 +1040,7 @@ const RescheduleBanner = ({
   }
 
   return (
-    <section className="max-w-[1240px] mx-auto px-6 lg:px-8 mt-4">
+    <section className="max-w-[1280px] mx-auto px-6 lg:px-8 mt-4">
       <div className="rounded-card border border-warning-200 bg-warning-50 p-5 flex items-start gap-4 flex-wrap">
         <div className="min-w-0 flex-1">
           <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-warning-800 mb-1">
@@ -1102,7 +1102,7 @@ const BookingBody = ({
   const canReschedule = (status === 'PREPARING' || status === 'CONFIRMED') && !booking.rescheduleRequest
 
   return (
-    <section className="max-w-[1240px] mx-auto px-6 lg:px-8 mt-6 grid lg:grid-cols-[1fr_360px] gap-6 pb-28 lg:pb-12">
+    <section className="max-w-[1280px] mx-auto px-6 lg:px-8 mt-6 grid lg:grid-cols-[1fr_360px] gap-6 pb-28 lg:pb-12">
       {/* On mobile the action rail comes FIRST — cancel/reschedule/receipt
           are why people open this page; burying them under the whole chat
           thread made them near-undiscoverable at 390px. Desktop keeps
@@ -1471,7 +1471,14 @@ export default function BookingDetail() {
     setCancelBusy(true)
     try {
       const res = await fetch(`/api/bookings/${booking.id}/cancel`, { method: 'POST' })
-      if (!res.ok) { toast('გაუქმება ვერ მოხერხდა', 'error'); return }
+      // Same error vocabulary as the dashboard's cancel flow — a BAD_STATE
+      // response means the session already finished or was cancelled, which
+      // deserves a specific message, not the generic one.
+      const data = await res.json().catch(() => ({} as any))
+      if (!res.ok || data?.ok === false) {
+        toast(data?.error === 'BAD_STATE' ? 'ეს სესია უკვე დასრულებული ან გაუქმებულია.' : 'გაუქმება ვერ მოხერხდა', 'error')
+        return
+      }
       setCancelConfirmOpen(false)
       await load()
       // Invalidate the server-cached bookings list so navigating back

@@ -154,9 +154,13 @@ summary:focus-visible {
  * reduced-motion block at the bottom of this file cancels everything for
  * users who opt out.
  */
+/* OPACITY-ONLY by contract (mirrors tailwind.config.js). fadeIn runs on the
+   AppShell page wrapper: a transform here would make that wrapper a containing
+   block for every position:fixed modal inside it. Use riseIn for entrances
+   that need movement. */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 @keyframes riseIn {
   from { opacity: 0; transform: translateY(12px); }

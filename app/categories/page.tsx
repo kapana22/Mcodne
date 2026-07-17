@@ -70,7 +70,8 @@ const SERVICE_PILL: Record<ServiceType, { label: string; cls: string }> = {
   },
   RECURRING: {
     label: 'მენტორინგი',
-    cls: 'bg-accent-50 text-accent-700 border-accent-100',
+    // Informational chip → info blue per canon (accent is deprecated).
+    cls: 'bg-info-50 text-info-700 border-info-100',
   },
 }
 
@@ -92,7 +93,7 @@ export default async function CategoriesPage() {
     <div className="min-h-screen bg-white">
       <MarketingTopBar />
 
-      <main className="max-w-[1200px] mx-auto px-6 sm:px-8 py-12 lg:py-16">
+      <main className="max-w-[1280px] mx-auto px-6 sm:px-8 py-12 lg:py-16">
         {/* Hero */}
         <section className="max-w-[720px] mb-10 lg:mb-12">
           <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
@@ -129,11 +130,11 @@ export default async function CategoriesPage() {
                   {/* Brand accent hairline — reveals on hover for a subtle premium cue. */}
                   <span
                     aria-hidden
-                    className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-gradient-to-r from-brand-500 to-brand-600 transition-transform duration-300 ease-out group-hover:scale-x-100"
+                    className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-brand-500 transition-transform duration-300 ease-out group-hover:scale-x-100"
                   />
 
                   <div className="flex items-start justify-between gap-3 mb-5">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-btn bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-colors duration-300 group-hover:text-brand-700">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-btn bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-colors duration-300 group-hover:text-brand-700">
                       <IconCmp className="w-6 h-6" />
                     </div>
                     <span
@@ -166,9 +167,9 @@ export default async function CategoriesPage() {
             })}
           </div>
         )}
-
-        <Footer />
       </main>
+
+      <Footer />
     </div>
   )
 }

@@ -168,6 +168,18 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
         </div>
       </form>
 
+      {/* Notification preferences live on /settings — link instead of
+          duplicating the prefs UI here. */}
+      <div className="rounded-card border border-ink-200 bg-white p-6 flex items-center justify-between gap-4">
+        <div>
+          <div className="font-display text-[13px] font-bold text-ink-900">შეტყობინებების პარამეტრები</div>
+          <div className="text-[12.5px] text-ink-600 mt-0.5">აირჩიე, რაზე მიიღო შეტყობინება.</div>
+        </div>
+        <a href="/settings" className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 shrink-0">
+          გახსნა <Icon.arrow className="w-3.5 h-3.5" />
+        </a>
+      </div>
+
       {/* Sign out */}
       <div className="rounded-card border border-danger-200 bg-white p-6 flex items-center justify-between">
         <div>

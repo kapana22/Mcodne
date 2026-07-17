@@ -361,7 +361,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-ink-50/50">
       <header className="sticky top-0 z-40 bg-ink-50/90 backdrop-blur-md border-b border-ink-100">
-        <div className="max-w-[840px] mx-auto px-6 h-16 flex items-center justify-between gap-6">
+        <div className="max-w-[820px] mx-auto px-6 h-16 flex items-center justify-between gap-6">
           <Link href={backHref} className="inline-flex items-center gap-2 text-ink-700 hover:text-ink-900 transition-colors">
             <Icon.chevR className="w-4 h-4 rotate-180" />
             <Logo size="sm" href={null} />
@@ -370,7 +370,14 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <main className="max-w-[720px] mx-auto px-6 py-10 space-y-8">
+      <main className="max-w-[820px] mx-auto px-6 py-10 space-y-8">
+        {/* Page header — the sticky utility bar above is chrome, not a
+            heading; this h1 is the page's actual title. */}
+        <div>
+          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">ანგარიში</div>
+          <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight">პარამეტრები</h1>
+        </div>
+
         {/* Profile section */}
         <section className="bg-white rounded-card border border-ink-200 p-6 lg:p-8">
           <div className="flex items-baseline justify-between gap-3 mb-6">

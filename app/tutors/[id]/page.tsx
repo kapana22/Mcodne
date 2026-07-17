@@ -130,6 +130,11 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
       try {
         const meRes = await fetch('/api/me')
         if (!meRes.ok || cancelled) return
+        // /api/me is 200 even for guests (user: null) — only probe the
+        // favorites endpoint for signed-in users, otherwise every guest
+        // visit logs a 401 in the console.
+        const me = await meRes.json().catch(() => null)
+        if (!me?.user || cancelled) return
         const res = await fetch('/api/favorites')
         if (!res.ok || cancelled) return
         const rows = await res.json()

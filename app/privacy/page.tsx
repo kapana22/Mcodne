@@ -186,9 +186,9 @@ export default function PrivacyPage() {
             </Link>
           </div>
         </div>
-
-        <Footer />
       </main>
+
+      <Footer />
     </div>
   )
 }

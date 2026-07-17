@@ -63,8 +63,8 @@ export default async function StudentMessagesPage() {
                   <ConversationRow
                     key={b.id}
                     href={`/student/messages/${b.id}`}
-                    name={b.tutor.user.fullName}
-                    avatarUrl={b.tutor.user.avatarUrl}
+                    name={b.tutor?.user?.fullName ?? 'ექსპერტი აღარ არის ხელმისაწვდომი'}
+                    avatarUrl={b.tutor?.user?.avatarUrl ?? null}
                     topic={b.topic}
                     lastBody={last?.body}
                     lastHasFile={!!last?.fileUrl}

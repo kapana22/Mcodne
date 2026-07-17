@@ -36,7 +36,7 @@ export default function NotFound() {
 
       <div className="relative max-w-[520px] w-full text-center">
         {/* Big 404 with brand gradient */}
-        <div className="font-display font-bold tabular-nums leading-none tracking-[-0.03em] text-[120px] sm:text-[160px] bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text text-transparent motion-safe:animate-scale-in">
+        <div className="font-display font-bold tabular-nums leading-none tracking-[-0.03em] text-[120px] sm:text-[160px] bg-gradient-cta bg-clip-text text-transparent motion-safe:animate-scale-in">
           404
         </div>
 

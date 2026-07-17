@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Icon } from '@/components/Icon'
+import { useToast } from '@/components/ToastProvider'
 
 type Item = {
   id: string
@@ -24,6 +25,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
   // competed with the user's sessions. Real API data only (no stock photos).
   const [compare, setCompare] = useState(false)
   const router = useRouter()
+  const { toast } = useToast()
 
   const cheapest = items.length ? items.reduce((a, b) => (a.price < b.price ? a : b), items[0]) : null
   const topRated = items.length ? items.reduce((a, b) => (a.rating > b.rating ? a : b), items[0]) : null
@@ -41,7 +43,13 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
         // Re-run the parent server component's data-fetch so returning to the
         // list after this mutation shows fresh state, not the cached snapshot.
         router.refresh()
+      } else {
+        // The list is only mutated on success (no optimistic removal), so a
+        // failure just needs to be surfaced — previously it was silent.
+        toast('ვერ მოიხერხდა წაშლა — სცადე თავიდან', 'error')
       }
+    } catch {
+      toast('ვერ მოიხერხდა წაშლა — სცადე თავიდან', 'error')
     } finally { setRemoving(null) }
   }
 

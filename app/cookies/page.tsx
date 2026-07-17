@@ -20,28 +20,24 @@ const CATEGORIES = [
   {
     name: 'აუცილებელი',
     tag: 'ყოველთვის აქტიური',
-    tone: 'brand',
     body: 'პლატფორმის ძირითადი მუშაობისთვის — ავტორიზაცია, სესია, უსაფრთხოება (CSRF). ამ ქუქიების გარეშე საიტი არ იმუშავებს.',
     examples: ['mcodne_session', 'csrf_token', 'auth_state'],
   },
   {
     name: 'პარამეტრები',
     tag: 'შენ აკონტროლებ',
-    tone: 'accent',
     body: 'გახსოვს შენი პირადი პარამეტრები — ენა, თემა, უკანასკნელი ძებნა. თუ გამორთავ, ინტერფეისი დაბრუნდება ნაგულისხმევზე.',
     examples: ['ui_locale', 'theme_pref', 'recent_filters'],
   },
   {
     name: 'ანალიტიკა',
     tag: 'შენ აკონტროლებ',
-    tone: 'iris',
     body: 'გვეხმარება გავიგოთ, თუ როგორ გამოიყენება პლატფორმა — რომელი გვერდები არის სასარგებლო და სად ხდება შეცდომები. მონაცემები აგრეგირებულია.',
     examples: ['_ga', '_gid', 'mcodne_analytics'],
   },
   {
     name: 'მარკეტინგი',
     tag: 'შენ აკონტროლებ',
-    tone: 'warning',
     body: 'გამოიყენება რეკლამის რელევანტურობის გასაუმჯობესებლად და კამპანიების ეფექტიანობის გასაზომად. თუ გამორთავ, რეკლამა მაინც გამოჩნდება, უბრალოდ ნაკლებად პერსონალიზებული.',
     examples: ['fbp', 'ads_click_id', 'mcodne_campaign'],
   },
@@ -77,7 +73,7 @@ export default function CookiesPage() {
                     <p className="mt-2 text-[14px] text-ink-600 leading-relaxed">{c.body}</p>
                   </div>
                   <span
-                    className={`inline-flex items-center h-6 px-2.5 rounded-pill bg-${c.tone}-50 text-${c.tone}-700 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] shrink-0`}
+                    className="inline-flex items-center h-6 px-2.5 rounded-pill bg-brand-50 text-brand-700 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] shrink-0"
                   >
                     {c.tag}
                   </span>
@@ -135,9 +131,9 @@ export default function CookiesPage() {
             .
           </p>
         </section>
-
-        <Footer />
       </main>
+
+      <Footer />
     </div>
   )
 }

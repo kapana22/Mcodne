@@ -55,12 +55,18 @@ export function PublicTopBar({ activeHref }: { activeHref?: string }) {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Lock body scroll while the mobile drawer is open.
+  // Lock body scroll while the mobile drawer is open; Escape closes it —
+  // the drawer is a dialog and needs a keyboard exit.
   useEffect(() => {
     if (!mobOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobOpen(false) }
+    document.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
   }, [mobOpen])
 
   const nav = !me
