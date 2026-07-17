@@ -363,9 +363,9 @@ const HomeHero = () => {
       <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-brand-50/25 via-white to-white pointer-events-none" />
       <div aria-hidden className="absolute top-0 right-0 w-[640px] h-[640px] -translate-y-1/3 translate-x-1/4 rounded-full bg-brand-100/20 blur-3xl pointer-events-none" />
 
-      <div className="relative max-w-[1280px] mx-auto px-6 sm:px-8 pt-14 lg:pt-20 pb-16 lg:pb-24">
+      <div className="relative max-w-[1280px] mx-auto px-6 sm:px-8 pt-8 sm:pt-14 lg:pt-20 pb-12 sm:pb-16 lg:pb-24">
         {/* Trust strip — clean, single line */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-10 lg:mb-12">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-6 sm:mb-10 lg:mb-12">
           <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-500">
             <Icon.shield className="w-3.5 h-3.5 text-ink-400" />
             <span>ხელით შერჩეული ბაზა · ინდივიდუალურად შემოწმებული</span>
@@ -375,9 +375,10 @@ const HomeHero = () => {
         <div className="grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 xl:gap-20 items-start">
           {/* Left — headline + search + stats */}
           <div className="min-w-0">
-            <h1 className="font-display font-bold text-ink-900 leading-[0.96] tracking-[-0.03em] text-[42px] sm:text-[58px] lg:text-[72px] motion-safe:animate-rise-in">
+            <h1 className="font-display font-bold text-ink-900 leading-[1.02] sm:leading-[0.96] tracking-[-0.03em] text-[34px] sm:text-[58px] lg:text-[72px] motion-safe:animate-rise-in">
               60 წუთი ექსპერტთან —<br />
-              <span className="text-brand-600">3 თვის გუგლის ნაცვლად.</span>
+              {/* The one gradient-signature moment on this page. */}
+              <span className="bg-gradient-signature bg-clip-text text-transparent">3 თვის გუგლის ნაცვლად.</span>
             </h1>
             <p className="mt-7 sm:mt-8 text-[16px] sm:text-[17.5px] text-ink-700 max-w-[540px] leading-[1.6] motion-safe:animate-rise-in" style={{ animationDelay: '80ms' }}>
               McKinsey, BCG, FAANG, BIG4 — ქართველი პროფესიონალები, რომლებიც გადასახადს, კარიერას ან Series A-ს ვიდეო-სესიით გადაგიწყვეტენ. <span className="font-display font-semibold text-ink-900">აირჩიე დრო, დაჯავშნე, შეხვდი.</span>
@@ -396,7 +397,7 @@ const HomeHero = () => {
                     className="w-full h-12 pl-11 pr-3 bg-transparent text-[15px] text-ink-900 placeholder:text-ink-400 focus:outline-none"
                   />
                 </div>
-                <button type="submit" className="h-12 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.4)] transition-all duration-fast">
+                <button type="submit" className="h-12 px-6 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.4)] transition-all duration-fast">
                   ექსპერტის ძიება
                   <Icon.arrow className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                 </button>
@@ -411,24 +412,28 @@ const HomeHero = () => {
               </div>
             </div>
 
-            {/* Quality anchors — honest framing, no fabricated stats */}
-            <div className="mt-12 lg:mt-14 pt-8 border-t border-ink-200 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 max-w-[540px] motion-safe:stagger">
+            {/* Quality anchors — honest framing, no fabricated stats. On
+                mobile: one compact 3-up row (labels only) instead of three
+                stacked rows — saves most of a screen of hero scroll. */}
+            <div className="mt-8 sm:mt-12 lg:mt-14 pt-6 sm:pt-8 border-t border-ink-200 grid grid-cols-3 gap-3 sm:gap-8 max-w-[540px] motion-safe:stagger">
               {[
                 { l: 'ხელით შერჩეული', d: 'ყოველი ექსპერტი ინდივიდუალურად შემოწმებული' },
                 { l: 'გამჭვირვალე ფასი', d: 'ერთი ნათელი განაკვეთი — გადაიხდი მხოლოდ დაჯავშნისას' },
                 { l: 'ვიდეო-სესია', d: 'HD ვიდეო-ოთახი, ჩატი, ფაილები' },
               ].map(s => (
                 <div key={s.l}>
-                  <div className="font-display text-[13px] font-bold text-ink-900 tracking-tight leading-snug">{s.l}</div>
-                  <div className="mt-1.5 text-[11.5px] text-ink-500 leading-snug">{s.d}</div>
+                  <div className="font-display text-[12px] sm:text-[13px] font-bold text-ink-900 tracking-tight leading-snug">{s.l}</div>
+                  <div className="mt-1.5 text-[11.5px] text-ink-500 leading-snug hidden sm:block">{s.d}</div>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Right — product preview: a live, premium expert booking card that
-              shows the actual product (Topmate / Intro pattern). */}
-          <div className="relative motion-safe:animate-scale-in" style={{ animationDelay: '240ms' }}>
+              shows the actual product (Topmate / Intro pattern). Desktop-only:
+              on mobile the REAL expert cards of FeaturedExperts are one scroll
+              away, and this preview cost ~2.5 screens of duplicate content. */}
+          <div className="relative motion-safe:animate-scale-in hidden lg:block" style={{ animationDelay: '240ms' }}>
             {/* Depth: a soft secondary card peeking behind the main one. */}
             <div aria-hidden className="absolute -top-3 left-6 right-6 h-24 rounded-card bg-white border border-ink-100 shadow-sm -z-10 hidden sm:block" />
 
@@ -578,7 +583,7 @@ const HomeHero = () => {
 
 const Categories = () => (
   <section className="bg-white border-b border-ink-200">
-    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-16 lg:py-20">
+    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-20">
       <div className="flex flex-wrap items-end justify-between gap-4 mb-8 sm:mb-10">
         <div className="max-w-[640px]">
           <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-3">კატეგორიები</div>
@@ -755,7 +760,7 @@ const FeaturedExperts = () => {
   ]
   return (
     <section className="bg-ink-50/60 border-b border-ink-200">
-      <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-16 lg:py-20">
+      <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-20">
         <div className="mb-8 lg:mb-10 max-w-[640px]">
           <div className="flex items-center gap-3 mb-3">
             <span className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700">ექსპერტები</span>
@@ -813,7 +818,7 @@ const FeaturedExperts = () => {
 
 const HowItWorks = () => (
   <section id="how" className="bg-ink-50 border-b border-ink-200 scroll-mt-24">
-    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-16 lg:py-24">
+    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-24">
       <div className="grid lg:grid-cols-[1fr_1.6fr] gap-12 items-start">
         <div>
           <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-3">როგორ მუშაობს</div>
@@ -850,7 +855,7 @@ const HowItWorks = () => (
 
 const WhyUs = () => (
   <section className="bg-white border-b border-ink-200">
-    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-16 lg:py-20">
+    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-20">
       <div className="max-w-[720px] mb-10">
         <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-3">რატომ მცოდნე</div>
         <h2 className="font-display text-[32px] sm:text-[44px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
@@ -880,7 +885,7 @@ const WhyUs = () => (
 
 const Testimonials = () => (
   <section className="bg-white border-b border-ink-200">
-    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-16 lg:py-20">
+    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-20">
       <div className="grid lg:grid-cols-[1fr_auto] items-end gap-6 mb-12">
         <div>
           <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-3">მიმოხილვები</div>
@@ -938,7 +943,7 @@ const Testimonials = () => (
 
 const ExpertCta = () => (
   <section className="relative bg-ink-50/50 border-y border-ink-200">
-    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-16 lg:py-24">
+    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-24">
       <div className="grid lg:grid-cols-[1.4fr_1fr] gap-12 items-center">
         <div>
           <div className="inline-flex items-center gap-2 rounded-pill bg-white border border-ink-200 pl-1 pr-3 py-1 mb-6 shadow-xs">

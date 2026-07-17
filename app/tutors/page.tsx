@@ -132,8 +132,13 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, stats }:
         </h1>
         <p className="text-[13.5px] text-ink-500 mt-2">ხელით გადამოწმებული პროფესიონალები · გამჭვირვალე ფასი · escrow-დაცული</p>
 
-        {/* Preply-style filter bar — labeled dropdown boxes */}
+        {/* Preply-style filter bar — labeled dropdown boxes on desktop.
+            Below lg the four dropdowns would stack into ~1.5 screens of
+            controls BEFORE the first result — so on mobile we show only the
+            search input plus a category chip rail; the full filter set lives
+            in the drawer (ფილტრები button in the results bar). */}
         <div className="mt-5 flex flex-col lg:flex-row lg:flex-wrap items-stretch gap-2.5">
+          <div className="hidden lg:contents">
           <FilterBox label="სფერო" value={catVal} active={filters.cats.length > 0}>
             {FILTER_CATS.map(c => <CheckOpt key={c.l} label={c.l} on={filters.cats.includes(c.l)} onToggle={() => setFilters({ ...filters, cats: toggleIn(filters.cats, c.l) })} />)}
           </FilterBox>
@@ -157,12 +162,38 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, stats }:
           <button type="button" onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })} className={`h-[52px] px-4 rounded-card border font-display text-[13px] font-bold inline-flex items-center gap-2 transition-all ${filters.superOnly ? 'border-brand-500 bg-brand-50/40 text-brand-800 ring-1 ring-brand-200' : 'border-ink-200 hover:border-ink-300 bg-white text-ink-800'}`}>
             <Icon.spark className="w-4 h-4 text-warning-500" /> Super
           </button>
+          </div>
           <div className="flex-1 min-w-[220px] bg-white rounded-card border border-ink-200 flex items-stretch focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100 transition-all">
             <div className="relative flex-1 min-w-0">
               <Icon.search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
               <input type="text" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') onSearch() }} placeholder="ძებნა სახელით ან თემით…" className="w-full h-[50px] pl-10 pr-3 bg-transparent text-[13.5px] text-ink-900 placeholder:text-ink-400 focus:outline-none" />
             </div>
           </div>
+        </div>
+
+        {/* Mobile category rail — one-tap refinement without opening the
+            drawer. Horizontal scroll, active chips in brand. */}
+        <div className="lg:hidden mt-3 -mx-6 px-6 flex gap-2 overflow-x-auto scrollbar-hide" role="group" aria-label="სფეროს ფილტრი">
+          <button
+            type="button"
+            onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })}
+            className={`shrink-0 h-10 px-3.5 rounded-pill border font-display text-[12.5px] font-semibold inline-flex items-center gap-1.5 transition-colors ${filters.superOnly ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-ink-200 bg-white text-ink-700'}`}
+          >
+            <Icon.spark className="w-3.5 h-3.5 text-warning-500" /> Super
+          </button>
+          {FILTER_CATS.map(c => {
+            const on = filters.cats.includes(c.l)
+            return (
+              <button
+                key={c.l}
+                type="button"
+                onClick={() => setFilters({ ...filters, cats: toggleIn(filters.cats, c.l) })}
+                className={`shrink-0 h-10 px-3.5 rounded-pill border font-display text-[12.5px] font-semibold transition-colors ${on ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-ink-200 bg-white text-ink-700'}`}
+              >
+                {c.l}
+              </button>
+            )
+          })}
         </div>
       </div>
     </section>

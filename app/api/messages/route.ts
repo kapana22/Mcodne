@@ -19,43 +19,82 @@ const Body = z.object({
   fileName: z.string().max(200).optional(),
 })
 
-// GET /api/messages — recent conversation threads for the signed-in user
-// (dashboard inbox widget). One row per booking-that-has-messages, newest first,
-// with the other party + last-message preview + unread flag.
-export async function GET() {
+// GET /api/messages — two modes:
+//
+// 1. ?bookingId=<id> — the live thread for one booking (chat-pane polling).
+//    Marks every message addressed to the caller in that booking as READ —
+//    the caller is literally looking at the thread, so the side effect is the
+//    read receipt working as users expect. This is the ONLY place readAt is
+//    ever set; before it existed threads stayed "unread" forever.
+// 2. no param — recent conversation threads for the signed-in user, ordered by
+//    LAST MESSAGE time (booking.updatedAt is NOT bumped by messages, so it
+//    mis-sorted threads), with per-thread unread counts.
+export async function GET(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
+
+  const bookingId = new URL(req.url).searchParams.get('bookingId')
+
+  if (bookingId) {
+    // Membership check first — never leak another pair's thread.
+    const b = await prisma.booking.findFirst({
+      where: { id: bookingId, OR: [{ studentId: user.id }, { tutor: { userId: user.id } }] },
+      select: { id: true },
+    })
+    if (!b) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
+
+    const [messages] = await Promise.all([
+      prisma.message.findMany({
+        where: { bookingId },
+        orderBy: { createdAt: 'asc' },
+        include: { from: { select: { id: true, fullName: true, avatarUrl: true } } },
+      }),
+      prisma.message.updateMany({
+        where: { bookingId, toId: user.id, readAt: null },
+        data: { readAt: new Date() },
+      }),
+    ])
+    return NextResponse.json({ ok: true, messages })
+  }
 
   const bookings = await prisma.booking.findMany({
     where: {
       OR: [{ studentId: user.id }, { tutor: { userId: user.id } }],
       messages: { some: {} },
     },
-    orderBy: { updatedAt: 'desc' },
-    take: 20,
+    take: 40,
     include: {
       tutor: { include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } },
       student: { select: { id: true, fullName: true, avatarUrl: true } },
       messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+      _count: { select: { messages: { where: { toId: user.id, readAt: null } } } },
     },
   })
 
-  const threads = bookings.map(b => {
-    const last = b.messages[0]
-    const iAmStudent = b.studentId === user.id
-    const other = iAmStudent ? b.tutor.user : b.student
-    return {
-      bookingId: b.id,
-      name: other.fullName,
-      avatarUrl: other.avatarUrl,
-      preview: last?.body ?? '',
-      at: (last?.createdAt ?? b.updatedAt),
-      unread: !!last && last.toId === user.id && !last.readAt,
-      href: iAmStudent ? `/student/bookings/${b.id}#chat` : `/tutor/bookings/${b.id}#chat`,
-    }
-  })
+  const threads = bookings
+    .map(b => {
+      const last = b.messages[0]
+      const iAmStudent = b.studentId === user.id
+      const other = iAmStudent ? b.tutor.user : b.student
+      return {
+        bookingId: b.id,
+        name: other.fullName,
+        avatarUrl: other.avatarUrl,
+        preview: last?.body ?? '',
+        at: (last?.createdAt ?? new Date(0)),
+        unread: b._count.messages > 0,
+        unreadCount: b._count.messages,
+        href: iAmStudent ? `/student/bookings/${b.id}#chat` : `/tutor/bookings/${b.id}#chat`,
+      }
+    })
+    .sort((a, z) => new Date(z.at).getTime() - new Date(a.at).getTime())
+    .slice(0, 20)
 
-  return NextResponse.json({ ok: true, threads, unreadCount: threads.filter(t => t.unread).length })
+  return NextResponse.json({
+    ok: true,
+    threads,
+    unreadCount: threads.reduce((n, t) => n + t.unreadCount, 0),
+  })
 }
 
 export async function POST(req: Request) {
