@@ -1,82 +1,18 @@
-import { requireRole } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { Icon } from '@/components/Icon'
-import { EmptyState } from '@/components/EmptyState'
-import { ConversationRow } from '@/components/ConversationRow'
 
-export const dynamic = 'force-dynamic'
-
-export default async function TutorMessagesPage() {
-  const user = await requireRole(['TUTOR', 'ADMIN'])
-
-  const rows = await prisma.booking.findMany({
-    where: {
-      tutor: { userId: user.id },
-      messages: { some: {} },
-    },
-    include: {
-      student: { select: { id: true, fullName: true, avatarUrl: true } },
-      messages: {
-        orderBy: { createdAt: 'desc' },
-        take: 1,
-      },
-      // Unread = messages addressed to me not yet read (readAt is stamped when
-      // I open the thread — GET /api/messages?bookingId side effect).
-      _count: { select: { messages: { where: { toId: user.id, readAt: null } } } },
-    },
-  })
-  // Order by LAST MESSAGE time — booking.updatedAt is not bumped by messages,
-  // so sorting on it left threads with fresh messages buried.
-  const bookings = rows.sort(
-    (a, z) => (z.messages[0]?.createdAt.getTime() ?? 0) - (a.messages[0]?.createdAt.getTime() ?? 0),
-  )
-  // One clock for the whole render so every row's relative label agrees.
-  const now = new Date()
-
+// Index route of the messages center: on desktop the right pane's "pick a
+// conversation" placeholder (the list renders from the layout); on mobile the
+// list IS the page, so this renders nothing visible (layout hides the pane).
+export default function TutorMessagesIndexPage() {
   return (
-    <div className="max-w-[820px] mx-auto">
-        <div className="mb-8">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">შეტყობინებები</div>
-          <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight">ჩატები კლიენტებთან</h1>
-        </div>
-
-        {bookings.length === 0 ? (
-          <EmptyState
-            icon={<Icon.chat className="w-6 h-6" />}
-            title="ჯერ არ გაქვს მიმოწერა"
-            description="როცა კლიენტი დაგიწერს, საუბარი აქ გამოჩნდება."
-            cta={{ label: 'ჩემი ჯავშნები', href: '/tutor/bookings' }}
-          />
-        ) : (
-          <>
-            {/* Initials fallback in rows — a random stock face next to a real
-                client name reads as a fake identity. */}
-            <div className="rounded-card border border-ink-200 bg-white overflow-hidden divide-y divide-ink-100">
-              {bookings.map(b => {
-                const last = b.messages[0]
-                return (
-                  <ConversationRow
-                    key={b.id}
-                    href={`/tutor/bookings/${b.id}#chat`}
-                    name={b.student.fullName}
-                    avatarUrl={b.student.avatarUrl}
-                    topic={b.topic}
-                    lastBody={last?.body}
-                    lastHasFile={!!last?.fileUrl}
-                    lastAt={last?.createdAt}
-                    lastFromMe={last?.fromId === user.id}
-                    unread={b._count.messages}
-                    now={now}
-                  />
-                )
-              })}
-            </div>
-            <p className="flex items-center justify-center gap-1.5 mt-4 text-[11.5px] text-ink-400">
-              <Icon.shield className="w-3.5 h-3.5 shrink-0" />
-              მიმოწერა ხილულია მხოლოდ შენთვის და კლიენტისთვის.
-            </p>
-          </>
-        )}
+    <div className="flex-1 hidden lg:flex flex-col items-center justify-center text-center p-8 bg-ink-50/40">
+      <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white border border-ink-200 text-ink-400 mb-3">
+        <Icon.chat className="w-6 h-6" />
+      </span>
+      <div className="font-display text-[14px] font-semibold text-ink-700">აირჩიე მიმოწერა სიიდან</div>
+      <p className="text-[12.5px] text-ink-500 mt-1 max-w-[280px]">
+        მიმოწერა ხილულია მხოლოდ შენთვის და კლიენტისთვის.
+      </p>
     </div>
   )
 }

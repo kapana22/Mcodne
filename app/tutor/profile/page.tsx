@@ -95,12 +95,15 @@ export default function TutorProfilePage() {
   const [consBusy, setConsBusy] = useState(false)
   const [consErr, setConsErr] = useState<string | null>(null)
 
-  // Unified confirm state for deleting a certificate / education / experience
-  // entry. Only one modal is on screen at a time, so a single state suffices.
+  // Unified confirm state for EVERY destructive action on this page —
+  // certificate / education / experience / consultation-service rows and the
+  // intro video. One modal, one busy flag, one paradigm (no native confirm()).
   type PendingDelete =
-    | { kind: 'cert'; id: string }
-    | { kind: 'edu';  id: string }
-    | { kind: 'exp';  id: string }
+    | { kind: 'cert';  id: string }
+    | { kind: 'edu';   id: string }
+    | { kind: 'exp';   id: string }
+    | { kind: 'cons';  id: string }
+    | { kind: 'video'; id?: string }
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const { toast } = useToast()
@@ -173,18 +176,8 @@ export default function TutorProfilePage() {
     finally { setConsBusy(false) }
   }
 
-  const deleteConsultation = async (id: string) => {
-    if (!confirm('წავშალო ეს სერვისი?')) return
-    try {
-      const res = await fetch(`/api/tutor/consultations/${id}`, { method: 'DELETE' })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) {
-        toast(j.error === 'IN_USE' ? `ვერ წაიშლება — ${j.count} აქტიური ჯავშანი` : 'წაშლა ვერ მოხერხდა', 'error')
-        return
-      }
-      setConsultations(prev => prev.filter(c => c.id !== id))
-      toast('სერვისი წაიშალა', 'success')
-    } catch { toast('ქსელის შეცდომა', 'error') }
+  const deleteConsultation = (id: string) => {
+    setPendingDelete({ kind: 'cons', id })
   }
 
   useEffect(() => {
@@ -299,20 +292,8 @@ export default function TutorProfilePage() {
     finally { setVideoSaving(false) }
   }
 
-  const removeIntroVideo = async () => {
-    if (!confirm('წავშალო intro ვიდეო?')) return
-    setVideoSaving(true)
-    setVideoErr(null)
-    try {
-      const res = await fetch('/api/me/tutor', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoUrl: null }),
-      })
-      if (!res.ok) { setVideoErr('წაშლა ვერ მოხერხდა'); return }
-      setProfile(prev => prev ? { ...prev, videoUrl: null } : prev)
-      toast('ვიდეო წაიშალა', 'success')
-    } finally { setVideoSaving(false) }
+  const removeIntroVideo = () => {
+    setPendingDelete({ kind: 'video' })
   }
 
   // Extract the YouTube ID from any stored canonical URL for iframe/thumbnail
@@ -362,7 +343,9 @@ export default function TutorProfilePage() {
       if (!j.ok) {
         setPwdMsg({ ok: false, text: j.error === 'BAD_CURRENT' ? 'მიმდინარე პაროლი არასწორია' : 'პაროლის შეცვლა ვერ მოხერხდა' })
       } else {
-        setPwdMsg({ ok: true, text: 'პაროლი შეიცვალა' })
+        // Success feedback is a toast everywhere on this page — inline slots
+        // stay reserved for field-level errors.
+        toast('პაროლი შეიცვალა', 'success')
         setPwd({ current: '', next: '', confirm: '' })
       }
     } catch {
@@ -479,24 +462,52 @@ export default function TutorProfilePage() {
     setPendingDelete({ kind: 'exp', id })
   }
 
-  // Endpoint + copy vary by entity — keep the mapping in one place so the
-  // modal below stays declarative.
-  const DELETE_META: Record<PendingDelete['kind'], { path: string; title: string; body: string }> = {
-    cert: { path: 'certificates', title: 'სერტიფიკატის წაშლა?', body: 'ეს მოქმედება შეუქცევადია.' },
-    edu:  { path: 'education',    title: 'განათლების ჩანაწერის წაშლა?', body: 'ეს მოქმედება შეუქცევადია.' },
-    exp:  { path: 'experience',   title: 'გამოცდილების წაშლა?', body: 'ეს მოქმედება შეუქცევადია.' },
+  // Copy varies by entity — keep the mapping in one place so the modal below
+  // stays declarative. `path` is only set for the /api/me/tutor/* entities;
+  // cons/video have their own endpoints handled in confirmDelete.
+  const DELETE_META: Record<PendingDelete['kind'], { path?: string; title: string; body: string }> = {
+    cert:  { path: 'certificates', title: 'სერტიფიკატის წაშლა?', body: 'ეს მოქმედება შეუქცევადია.' },
+    edu:   { path: 'education',    title: 'განათლების ჩანაწერის წაშლა?', body: 'ეს მოქმედება შეუქცევადია.' },
+    exp:   { path: 'experience',   title: 'გამოცდილების წაშლა?', body: 'ეს მოქმედება შეუქცევადია.' },
+    cons:  { title: 'სერვისის წაშლა?', body: 'კლიენტები ამ ტიპს ვეღარ დაჯავშნიან. აქტიური ჯავშნები არ იშლება.' },
+    video: { title: 'ინტრო ვიდეოს წაშლა?', body: 'პროფილიდან მოიხსნება — ახლის დამატება ნებისმიერ დროს შეგიძლია.' },
   }
 
   const confirmDelete = async () => {
     if (!pendingDelete || deleteBusy) return
-    const meta = DELETE_META[pendingDelete.kind]
     setDeleteBusy(true)
     try {
-      const res = await fetch(`/api/me/tutor/${meta.path}/${pendingDelete.id}`, { method: 'DELETE' })
+      if (pendingDelete.kind === 'cons') {
+        const res = await fetch(`/api/tutor/consultations/${pendingDelete.id}`, { method: 'DELETE' })
+        const j = await res.json().catch(() => ({} as any))
+        if (!res.ok || !j.ok) {
+          toast(j.error === 'IN_USE' ? `ვერ წაიშლება — ${j.count} აქტიური ჯავშანი` : 'წაშლა ვერ მოხერხდა', 'error')
+          return
+        }
+        setConsultations(prev => prev.filter(c => c.id !== pendingDelete.id))
+        setPendingDelete(null)
+        toast('სერვისი წაიშალა', 'success')
+        return
+      }
+      if (pendingDelete.kind === 'video') {
+        const res = await fetch('/api/me/tutor', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoUrl: null }),
+        })
+        if (!res.ok) { toast('წაშლა ვერ მოხერხდა', 'error'); return }
+        setProfile(prev => prev ? { ...prev, videoUrl: null } : prev)
+        setPendingDelete(null)
+        toast('ვიდეო წაიშალა', 'success')
+        return
+      }
+      const res = await fetch(`/api/me/tutor/${DELETE_META[pendingDelete.kind].path}/${pendingDelete.id}`, { method: 'DELETE' })
       if (!res.ok) { toast('წაშლა ვერ მოხერხდა', 'error'); return }
       setPendingDelete(null)
       await loadCredentials()
       toast('წაიშალა', 'success')
+    } catch {
+      toast('ქსელის შეცდომა', 'error')
     } finally {
       setDeleteBusy(false)
     }
@@ -731,7 +742,7 @@ export default function TutorProfilePage() {
                     <p className="text-[12px] text-ink-500 leading-snug max-w-[520px]">60-90 წამი შენს შესახებ. ჩანს პროფილის ბანერზე. Conversion 2-3x-ს ზრდის. ატვირთე YouTube-ზე და ჩააგდე აქ ბმული.</p>
                   </div>
                   {profile.videoUrl && !videoSaving && (
-                    <button type="button" onClick={removeIntroVideo} className="font-display text-[11.5px] font-semibold text-ink-500 hover:text-danger-700">წაშლა</button>
+                    <button type="button" onClick={removeIntroVideo} aria-label="ინტრო ვიდეოს წაშლა" className="min-h-[44px] -my-2 px-3 -mr-3 inline-flex items-center rounded-btn font-display text-[11.5px] font-semibold text-ink-500 hover:text-danger-700 hover:bg-danger-50 transition-colors">წაშლა</button>
                   )}
                 </div>
 
@@ -826,7 +837,7 @@ export default function TutorProfilePage() {
                           <div className="text-[12px] text-ink-700 leading-snug mt-0.5">{c.description}</div>
                           <div className="text-[11.5px] text-ink-500 tabular-nums mt-1">{c.minutes} წუთი · ₾{c.price}</div>
                         </div>
-                        <button type="button" onClick={() => deleteConsultation(c.id)} className="font-display text-[11px] font-semibold text-ink-500 hover:text-danger-700">წაშლა</button>
+                        <button type="button" onClick={() => deleteConsultation(c.id)} aria-label="სერვისის წაშლა" className="min-h-[44px] -my-2 px-3 -mr-2 self-center inline-flex items-center rounded-btn font-display text-[11px] font-semibold text-ink-500 hover:text-danger-700 hover:bg-danger-50 transition-colors">წაშლა</button>
                       </div>
                     ))
                   )}

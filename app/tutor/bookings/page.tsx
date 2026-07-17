@@ -189,7 +189,7 @@ export default function TutorBookingsPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Btn variant="secondary" size="sm" href={`/tutor/bookings/${b.id}`}>დეტალები</Btn>
-                      <Btn variant="ghost" size="sm" href={`/tutor/bookings/${b.id}#chat`}>
+                      <Btn variant="ghost" size="sm" href={`/tutor/messages/${b.id}`}>
                         <Icon.chat className="w-4 h-4" /> მესიჯი
                       </Btn>
                       {canCancel && (

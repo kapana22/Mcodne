@@ -7,7 +7,7 @@ import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
 import { safeHttpUrl } from '@/lib/safeUrl'
 import { fmtKaDate } from '@/lib/kaDate'
 import { sanitizeMsgBody, MSG_MAX_LEN } from '@/lib/msgText'
-import { useBookingThread, type ChatMessage, type ChatUser } from './useBookingThread'
+import { useBookingThread, type ChatMessage, type ChatUser, type ThreadBooking } from './useBookingThread'
 
 export type BookingChatProps = {
   bookingId: string
@@ -19,9 +19,11 @@ export type BookingChatProps = {
   /** embedded = card with a capped scroll area (booking detail);
       fill = flex column that fills its parent's height (messages center). */
   variant?: 'embedded' | 'fill'
-  /** Optional custom header node; embedded default renders the classic
-      "მიმოწერა კლიენტთან · N" bar. Pass null to hide entirely. */
-  header?: React.ReactNode
+  /** Optional custom header: a node, or a render function that receives the
+      booking summary from the thread GET (for context headers). The embedded
+      default renders the classic "მიმოწერა კლიენტთან · N" bar; pass null to
+      hide entirely. */
+  header?: React.ReactNode | ((booking: ThreadBooking | null) => React.ReactNode)
   /** Fired after a successful send and when polling brings new messages —
       callers refresh adjacent surfaces (inbox list, router cache). */
   onActivity?: () => void
@@ -93,7 +95,7 @@ export function BookingChat({
   className = '',
 }: BookingChatProps) {
   const {
-    msgs, loaded, draft, setDraft, attachment, setAttachment, attach,
+    msgs, booking, loaded, draft, setDraft, attachment, setAttachment, attach,
     uploading, send, sending, error,
   } = useBookingThread({ bookingId, me, initialMessages, onActivity })
 
@@ -137,7 +139,9 @@ export function BookingChat({
           : `rounded-card border border-ink-200 bg-white shadow-xs overflow-hidden ${className}`
       }
     >
-      {header === undefined ? (fill ? null : defaultHeader) : header}
+      {header === undefined
+        ? (fill ? null : defaultHeader)
+        : typeof header === 'function' ? header(booking) : header}
 
       <div className={`${fill ? 'flex-1 min-h-0' : 'max-h-[420px] min-h-[220px]'} overflow-y-auto p-4 sm:p-6 bg-ink-50/40`}>
         {!loaded && msgs.length === 0 ? (
@@ -244,7 +248,10 @@ export function BookingChat({
             maxLength={MSG_MAX_LEN}
             className="flex-1 min-h-[44px] max-h-[132px] resize-none rounded-btn border border-ink-200 px-3 py-2.5 text-[13.5px] focus:outline-none focus:ring-2 focus:ring-brand-400"
           />
-          <Btn type="submit" variant="primary" size="md" disabled={sending || uploading || (!draft.trim() && !attachment)}>
+          {/* Also disabled until the caller's identity (/api/me) has resolved —
+              send() bails on me=null, which would silently swallow an early
+              Enter-press on the slow remote-DB dev setup. */}
+          <Btn type="submit" variant="primary" size="md" disabled={!me || sending || uploading || (!draft.trim() && !attachment)}>
             {sending ? '…' : <><Icon.send className="w-4 h-4" /><span className="hidden sm:inline">გაგზავნა</span></>}
           </Btn>
         </div>

@@ -61,7 +61,9 @@ export async function GET(req: Request) {
       }),
       // Viewer is looking at the thread — clear their MESSAGE_NEW notifs for
       // this booking so the bell badge agrees with the chat's read state.
-      markRelatedRead(user.id, `/bookings/${bookingId}`, 'MESSAGE_NEW'),
+      // Matched on the bare bookingId: legacy hrefs are /…/bookings/{id}#chat,
+      // new tutor hrefs are /tutor/messages/{id} — the id appears in both.
+      markRelatedRead(user.id, bookingId, 'MESSAGE_NEW'),
     ])
     return NextResponse.json({
       ok: true,
@@ -97,11 +99,17 @@ export async function GET(req: Request) {
         bookingId: b.id,
         name: other.fullName,
         avatarUrl: other.avatarUrl,
+        topic: b.topic,
+        status: b.status,
         preview: last?.body ?? '',
+        lastFromMe: last?.fromId === user.id,
+        lastHasFile: !!last?.fileUrl,
         at: (last?.createdAt ?? new Date(0)),
         unread: b._count.messages > 0,
         unreadCount: b._count.messages,
-        href: iAmStudent ? `/student/bookings/${b.id}#chat` : `/tutor/bookings/${b.id}#chat`,
+        // Tutor threads open in the messages center; student side keeps the
+        // booking-page chat anchor.
+        href: iAmStudent ? `/student/bookings/${b.id}#chat` : `/tutor/messages/${b.id}`,
       }
     })
     .sort((a, z) => new Date(z.at).getTime() - new Date(a.at).getTime())
@@ -168,18 +176,19 @@ export async function POST(req: Request) {
   const isFromStudent = user.id === b.studentId
   const preview = msg.body.length > 80 ? msg.body.slice(0, 77) + '…' : msg.body
   after(async () => {
-    // Notify the recipient — booking-scoped chat surfaces are per-role, so
-    // link to the party's own booking-detail page (chat anchor).
+    // Notify the recipient — tutors land in the messages center thread,
+    // students on their booking page's chat anchor.
     await notify(toId, {
       type: 'MESSAGE_NEW',
       title: `ახალი შეტყობინება — ${msg.from.fullName}`,
       body: preview,
-      href: isFromStudent ? `/tutor/bookings/${b.id}#chat` : `/student/bookings/${b.id}#chat`,
+      href: isFromStudent ? `/tutor/messages/${b.id}` : `/student/bookings/${b.id}#chat`,
     })
     // Sender is actively in the thread — clear any outstanding MESSAGE_NEW
-    // notifs on their side for this booking. The path stem matches both the
-    // student and tutor chat hrefs.
-    await markRelatedRead(user.id, `/bookings/${b.id}`, 'MESSAGE_NEW')
+    // notifs on their side for this booking. Matched on the bare booking id
+    // so legacy (/…/bookings/{id}#chat) and new (/tutor/messages/{id}) hrefs
+    // both clear.
+    await markRelatedRead(user.id, b.id, 'MESSAGE_NEW')
   })
 
   return NextResponse.json({ ok: true, message: msg })
