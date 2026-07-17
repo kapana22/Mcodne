@@ -1,0 +1,536 @@
+// Prisma schema for მცოდნე platform
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  TUTOR
+  ADMIN
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum BookingStatus {
+  PREPARING
+  CONFIRMED
+  LIVE
+  COMPLETED
+  CANCELED
+  NO_SHOW
+}
+
+enum PayoutStatus {
+  PENDING
+  RELEASED
+  REFUNDED
+}
+
+enum ConsultationTier {
+  QUICK
+  STANDARD
+  DEEP
+}
+
+// Product pivot: two service shapes coexist on the platform.
+// CONSULTATION = one-off, "available now" experience (default going forward).
+// RECURRING    = weekly-schedule tutoring (existing behavior, default for legacy rows).
+enum ServiceType {
+  CONSULTATION
+  RECURRING
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  fullName      String
+  phone         String?
+  avatarUrl     String?
+  bio           String?
+  role          Role     @default(STUDENT)
+  locale        String   @default("ka")
+  emailVerified Boolean  @default(false)
+  // Per-type opt-outs for in-app Notification writes. Keyed by NotifType string
+  // (BOOKING_CREATED, MESSAGE_NEW, REVIEW_NEW, APPLICATION_STATUS,
+  // ADMIN_BROADCAST). `null` → all types enabled (default). Missing keys inside
+  // the JSON default to enabled — only explicit `false` disables.
+  notificationPrefs Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tutor             TutorProfile?
+  application       TutorApplication?
+  bookingsAsStudent Booking[]            @relation("StudentBookings")
+  sentMessages      Message[]            @relation("SentMessages")
+  receivedMessages  Message[]            @relation("ReceivedMessages")
+  reviewsGiven      Review[]             @relation("ReviewsGiven")
+  favorites         Favorite[]
+  notifications     Notification[]
+  sessions          Session[]
+  otpCodes          OtpCode[]
+  resetTokens       PasswordResetToken[]
+
+  // Admin filters + list order-by
+  @@index([role])
+  @@index([createdAt])
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  userId    String
+  code      String
+  purpose   String // "verify" | "reset"
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // reset-request deleteMany filters by userId — otherwise full scan
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  // When this session was created via admin impersonation, holds the original
+  // admin's userId. `null` for normal sessions. The impersonation "exit" flow
+  // restores THIS admin — bound server-side so a client-forged cookie can no
+  // longer mint an admin session.
+  impersonatorId String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // revokeOtherSessions + password-reset session wipes filter by userId
+  @@index([userId])
+  // Cleanup jobs use expiresAt; scanning expired sessions must be fast
+  @@index([expiresAt])
+}
+
+model Category {
+  id                 String         @id @default(cuid())
+  slug               String         @unique
+  name               String
+  icon               String?
+  count              Int            @default(0)
+  order              Int            @default(0)
+  // Sensible default that new tutors in this category inherit (they can override).
+  defaultServiceType ServiceType    @default(CONSULTATION)
+  // Admin can hide categories from public browse without deleting them.
+  isLive             Boolean        @default(true)
+  tutors             TutorProfile[]
+}
+
+model TutorProfile {
+  id                      String      @id @default(cuid())
+  userId                  String      @unique
+  headline                String
+  bio                     String?
+  specialty               String
+  yearsExp                Int         @default(0)
+  rating                  Float       @default(0)
+  reviewsCount            Int         @default(0)
+  sessionsCount           Int         @default(0)
+  price                   Int // GEL, flat price the expert sets per consultation — what they set is what the client pays (not re-derived from an hourly rate)
+  currency                String      @default("GEL")
+  verified                Boolean     @default(false)
+  available               Boolean     @default(true)
+  responseHours           Int         @default(24)
+  languages               String[]    @default(["ka"])
+  linkedinUrl             String?
+  websiteUrl              String?
+  professionData          Json?
+  // Product pivot fields — see enum ServiceType.
+  // New experts default to CONSULTATION (instant "available now"); legacy rows
+  // that predate this flip keep whatever value they were created with.
+  serviceType             ServiceType @default(CONSULTATION)
+  // Standard session length for this expert (15|30|60 min).
+  consultationDurationMin Int         @default(30)
+  // Optional 60-90s tutor intro video (data URL or hosted URL from /api/uploads?kind=video).
+  videoUrl                String?
+  // Admin-curated homepage featured slot — appears in landing hero when true.
+  featured                Boolean     @default(false)
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId    String?
+  category      Category?          @relation(fields: [categoryId], references: [id])
+  consultations Consultation[]
+  bookings      Booking[]
+  availability  AvailabilitySlot[]
+  reviews       Review[]
+  favorites     Favorite[]
+  certificates  Certificate[]
+  education     Education[]
+  experience    Experience[]
+
+  @@index([serviceType])
+  // Fast lookup for admin-curated hero on /
+  @@index([featured])
+}
+
+model Certificate {
+  id        String   @id @default(cuid())
+  tutorId   String
+  title     String
+  issuer    String
+  year      Int
+  fileUrl   String?
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+
+  @@index([tutorId])
+}
+
+model Education {
+  id        String   @id @default(cuid())
+  tutorId   String
+  school    String
+  degree    String
+  field     String?
+  startYear Int
+  endYear   Int?
+  createdAt DateTime @default(now())
+
+  tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+
+  @@index([tutorId])
+}
+
+model Experience {
+  id          String   @id @default(cuid())
+  tutorId     String
+  company     String
+  role        String
+  startYear   Int
+  endYear     Int?
+  description String?
+  createdAt   DateTime @default(now())
+
+  tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+
+  @@index([tutorId])
+}
+
+model Consultation {
+  id          String           @id @default(cuid())
+  tutorId     String
+  tier        ConsultationTier
+  title       String
+  description String
+  minutes     Int
+  price       Int
+  tutor       TutorProfile     @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+}
+
+model AvailabilitySlot {
+  id      String       @id @default(cuid())
+  tutorId String
+  startAt DateTime
+  endAt   DateTime
+  booked  Boolean      @default(false)
+  tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+
+  @@index([tutorId, startAt])
+}
+
+model Booking {
+  id             String        @id @default(cuid())
+  ref            String        @unique @default(cuid())
+  studentId      String
+  tutorId        String
+  consultationId String?
+  topic          String
+  status         BookingStatus @default(PREPARING)
+  startAt        DateTime
+  durationMin    Int
+  price          Int
+  // Snapshotted at booking time so a later tutor-type switch never rewrites history.
+  serviceType    ServiceType   @default(CONSULTATION)
+  // True when the cleanup cron auto-transitioned CONFIRMED/LIVE → COMPLETED
+  // because ≥48h passed after the scheduled end and nobody flipped it manually.
+  // Reviews API rejects submissions on auto-completed bookings — the session
+  // may not have actually happened, so a "we're not sure it took place" review
+  // is not trustworthy signal.
+  autoCompleted  Boolean       @default(false)
+  payoutStatus   PayoutStatus  @default(PENDING)
+  // The AvailabilitySlot this booking claimed at creation (scheduled/RECURRING
+  // only). Recorded so cancel/decline/reschedule free EXACTLY this slot instead
+  // of guessing via a time-containment scan (which could free an unrelated slot,
+  // or free a slot for an instant/trial booking that never held one). `null`
+  // for instant + trial bookings, which consume no slot.
+  heldSlotId     String?
+  studentNotes   String?
+  tutorNotes     String?
+  meetingUrl     String?
+  // Track cancellation source so admin can see tutor-cancel rate vs student.
+  cancelledBy    Role?
+  cancelReason   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // NOTE: student/tutor deliberately use the default Restrict (no onDelete).
+  // The self-delete flow (/api/me DELETE) relies on it to refuse deleting an
+  // account that has booking history — preserving the counterparty's records
+  // rather than cascade-wiping them. Do not switch these to Cascade.
+  student            User                @relation("StudentBookings", fields: [studentId], references: [id])
+  tutor              TutorProfile        @relation(fields: [tutorId], references: [id])
+  // A deleted consultation offering nulls the FK; the booking keeps its own
+  // snapshotted price/duration, so no data is lost.
+  consultation       Consultation?       @relation(fields: [consultationId], references: [id], onDelete: SetNull)
+  messages           Message[]
+  review             Review?
+  rescheduleRequests RescheduleRequest[]
+  dispute            Dispute?
+
+  @@index([serviceType])
+  @@index([studentId])
+  @@index([tutorId])
+  // FK lookups + "bookings for this consultation" scans
+  @@index([consultationId])
+  // Hot path: "tutor's upcoming/live bookings ordered by start"
+  @@index([tutorId, status, startAt])
+  // Sort order on both messages pages (list bookings-with-messages by recency)
+  @@index([updatedAt])
+  // Admin finance / analytics filter by createdAt for date-window aggregates
+  @@index([createdAt])
+}
+
+model Message {
+  id        String    @id @default(cuid())
+  bookingId String?
+  fromId    String
+  toId      String
+  body      String
+  fileUrl   String?
+  fileName  String?
+  // Recipient-side read receipt — set when the receiving user opens the
+  // conversation. Used for "N new" badges on the messages inbox.
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  // from/to keep the default Restrict so /api/me DELETE refuses to wipe an
+  // account that has message history (see Booking.student note).
+  from    User     @relation("SentMessages", fields: [fromId], references: [id])
+  to      User     @relation("ReceivedMessages", fields: [toId], references: [id])
+
+  @@index([bookingId, createdAt])
+  // Fast "unread messages for this user" query for the messages inbox badge.
+  @@index([toId, readAt])
+  // "messages I sent" + FK maintenance on user delete
+  @@index([fromId])
+}
+
+model Review {
+  id                String    @id @default(cuid())
+  bookingId         String    @unique
+  studentId         String
+  tutorId           String
+  rating            Int
+  body              String
+  // Multi-dimensional ratings (1..5). Overall `rating` is derived (avg).
+  ratingKnowledge   Int?
+  ratingClarity     Int?
+  ratingValue       Int?
+  ratingPunctuality Int?
+  tutorResponse     String?
+  respondedAt       DateTime?
+  anonymous         Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+
+  // Default Restrict — reviews are permanent record; /api/me DELETE refuses
+  // accounts with review history rather than cascade-deleting it.
+  booking Booking      @relation(fields: [bookingId], references: [id])
+  student User         @relation("ReviewsGiven", fields: [studentId], references: [id])
+  tutor   TutorProfile @relation(fields: [tutorId], references: [id])
+
+  @@index([tutorId, createdAt])
+  // "reviews written by this student" + FK maintenance on user delete
+  @@index([studentId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  tutorId   String
+  createdAt DateTime @default(now())
+
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tutorId])
+  // The composite unique is (userId, tutorId)-prefixed, so a tutorId-only
+  // lookup (cascade-delete favorites when a tutor is removed) can't use it.
+  @@index([tutorId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String?
+  href      String?
+  // Semantic type: BOOKING_CREATED, BOOKING_CANCELED, MESSAGE_NEW, REVIEW_NEW, APPLICATION_STATUS, PAYOUT
+  type      String    @default("GENERIC")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+// Append-only audit trail of admin actions. Every mutating admin action
+// (impersonate/exit, application approve/reject, booking cancel-as-admin,
+// review delete, category toggle, broadcast send) writes one row here.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String   // admin user id (or null for system)
+  action     String   // e.g. 'application.approve', 'booking.cancel', 'review.delete'
+  targetType String?  // e.g. 'Booking', 'Review', 'User', 'TutorApplication'
+  targetId   String?  // FK to the target; not enforced (targets may be soft-deleted later)
+  meta       Json?    // action-specific detail (reason, previous status, etc.)
+  createdAt  DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
+}
+
+// Reschedule proposal — one row per outstanding request. Either party may
+// propose; the other party accepts/declines. On accept, we swap the covering
+// availability slot in a transaction (see /api/bookings/[id]/reschedule).
+enum RescheduleStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+model RescheduleRequest {
+  id           String           @id @default(cuid())
+  bookingId    String
+  proposedBy   String           // userId of proposer (student or tutor)
+  newStartAt   DateTime
+  newDurationMin Int
+  reason       String?
+  status       RescheduleStatus @default(PENDING)
+  decidedAt    DateTime?
+  createdAt    DateTime         @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, status])
+  @@index([status, createdAt])
+}
+
+// Formal dispute filed by student against a booking. Different from cancel:
+// dispute keeps booking on the books, admin investigates, resolves with a
+// refund / partial refund / dismiss / redo.
+enum DisputeReason {
+  NO_SHOW
+  QUALITY
+  WRONG_TOPIC
+  UNPROFESSIONAL
+  TECHNICAL
+  OTHER
+}
+
+enum DisputeOutcome {
+  PENDING
+  REFUND_FULL
+  REFUND_PARTIAL
+  REDO_FREE
+  DISMISSED
+}
+
+model Dispute {
+  id         String          @id @default(cuid())
+  bookingId  String          @unique
+  studentId  String          // convenience — same as booking.studentId
+  tutorId    String          // convenience — same as booking.tutorId
+  reason     DisputeReason
+  details    String?
+  requested  DisputeOutcome  @default(PENDING) // what student wants
+  outcome    DisputeOutcome  @default(PENDING) // what admin decided
+  resolution String?         // admin notes
+  createdAt  DateTime        @default(now())
+  resolvedAt DateTime?
+  resolvedBy String?         // admin userId
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([outcome, createdAt])
+  @@index([tutorId, outcome])
+  // "disputes filed by this student"
+  @@index([studentId])
+}
+
+model TutorApplication {
+  id             String            @id @default(cuid())
+  userId         String            @unique
+  fullName       String
+  phone          String
+  city           String?
+  specialty      String
+  yearsExp       Int
+  hourlyRate     Int
+  motivation     String
+  linkedinUrl    String?
+  websiteUrl     String?
+  // YouTube intro-video — the applicant uploads to their YouTube channel
+  // (unlisted) and pastes the link. We keep both the raw URL (for admin
+  // display) and the extracted 11-char video ID (for embed iframes).
+  introVideoUrl  String?
+  introVideoId   String?
+  // Profession-specific answers captured on apply (e.g. bar number, CFA, exits count).
+  professionData Json?
+  // Verification documents — ADMIN-ONLY. Deliberately kept on the application
+  // (never copied to the public TutorProfile / professionData) because
+  // /api/tutors/[id] returns the whole profile, incl. professionData, publicly.
+  // idDoc = ID front photo, selfie = selfie-with-doc, certificates = list of
+  // { title, url } diploma/cert scans uploaded via /api/uploads.
+  idDocUrl       String?
+  selfieUrl      String?
+  certificates   Json?
+  status         ApplicationStatus @default(SUBMITTED)
+  moderatorNote  String?
+  createdAt      DateTime          @default(now())
+  reviewedAt     DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Admin moderation queue filters by status + sorts by recency
+  @@index([status])
+  @@index([createdAt])
+}

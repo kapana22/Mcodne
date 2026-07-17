@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.env
+.env.local
+*.log
+.DS_Store
+tsconfig.tsbuildinfo
+tests
+playwright-report
+test-results
+untitled
+mcodne-ge
+2
+.workstation

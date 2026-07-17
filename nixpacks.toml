@@ -1,0 +1,17 @@
+providers = ['node']
+
+[phases.setup]
+nixPkgs = ['nodejs_22', 'openssl']
+
+[phases.build]
+cmds = [
+  'npx prisma generate',
+  'npm run build',
+  'cp -r public .next/standalone/public 2>/dev/null || true',
+  'cp -r .next/static .next/standalone/.next/static'
+]
+
+[start]
+# Schema deltas are applied at first-request time by lib/dbBoot via raw SQL,
+# which works from inside the container where the internal DB URL resolves.
+cmd = 'node .next/standalone/server.js'

@@ -1,0 +1,72 @@
+'use client'
+// Toast — single toast presentation. Do not import directly; use `useToast()`
+// from ./ToastProvider, which stacks these in a corner and manages timers.
+
+import type { ReactNode } from 'react'
+
+export type ToastKind = 'info' | 'success' | 'error'
+
+const ACCENT: Record<ToastKind, string> = {
+  info:    'border-l-brand-500',
+  success: 'border-l-success-500',
+  error:   'border-l-danger-500',
+}
+
+const ICON_BG: Record<ToastKind, string> = {
+  info:    'bg-brand-50 text-brand-700',
+  success: 'bg-success-50 text-success-700',
+  error:   'bg-danger-50 text-danger-700',
+}
+
+// Inline SVG so no extra import cost. All 18×18, stroke-based to match Icon.tsx.
+const Icons: Record<ToastKind, ReactNode> = {
+  info: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8h.01M11 12h1v5h1" />
+    </svg>
+  ),
+  success: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+      <path d="m4 12 5 5L20 6" />
+    </svg>
+  ),
+  error: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+      <path d="M12 3 2 21h20L12 3Z" />
+      <path d="M12 10v5M12 18h0" />
+    </svg>
+  ),
+}
+
+export function Toast({
+  kind,
+  onDismiss,
+  children,
+}: {
+  kind: ToastKind
+  onDismiss: () => void
+  children: ReactNode
+}) {
+  return (
+    <div
+      role="status"
+      className={`select-none min-w-[260px] max-w-[380px] bg-white border border-ink-200 border-l-4 ${ACCENT[kind]} rounded-card shadow-pop pl-4 pr-3 py-3 flex items-start gap-3 text-[13.5px] text-ink-900 motion-safe:animate-slide-in-b`}
+    >
+      <span className={`shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full ${ICON_BG[kind]}`}>
+        {Icons[kind]}
+      </span>
+      <span className="flex-1 leading-snug pt-1">{children}</span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="დახურვა"
+        className="shrink-0 w-7 h-7 rounded-btn text-ink-400 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+          <path d="m6 6 12 12M18 6 6 18" />
+        </svg>
+      </button>
+    </div>
+  )
+}
