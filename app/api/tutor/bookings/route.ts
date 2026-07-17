@@ -19,9 +19,24 @@ export async function GET() {
     prisma.booking.aggregate({ _sum: { price: true }, where: { tutorId: profile.id, status: 'COMPLETED' } }),
   ])
 
+  // rescheduleRequest is a dbBoot-added JSONB column Prisma can't select —
+  // merge it via one raw query (same pattern as app/api/bookings/[id]/route.ts)
+  // so the dashboard/bookings list can surface pending reschedule decisions.
+  let reschedById = new Map<string, unknown>()
+  if (bookings.length > 0) {
+    try {
+      const ids = bookings.map(b => b.id)
+      const rows = await prisma.$queryRawUnsafe<{ id: string; rescheduleRequest: unknown }[]>(
+        `SELECT id, "rescheduleRequest" FROM "Booking" WHERE id = ANY($1) AND "rescheduleRequest" IS NOT NULL`,
+        ids,
+      )
+      reschedById = new Map(rows.map(r => [r.id, r.rescheduleRequest]))
+    } catch { /* column may not exist yet on a fresh DB — omit silently */ }
+  }
+
   return NextResponse.json({
     profile,
-    bookings,
+    bookings: bookings.map(b => ({ ...b, rescheduleRequest: reschedById.get(b.id) ?? null })),
     stats: {
       upcoming,
       completed,
