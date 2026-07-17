@@ -163,6 +163,26 @@ export default function TutorBookingDetailPage() {
     }
   }, [booking?.id])
 
+  // Poll the thread while the tab is visible — the client's messages used to
+  // appear only on a full page reload. The endpoint also stamps read receipts
+  // (we're looking at the thread), which clears inbox unread dots.
+  useEffect(() => {
+    if (!bookingId || !booking) return
+    let cancelled = false
+    const tick = async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const res = await fetch(`/api/messages?bookingId=${bookingId}`)
+        if (!res.ok || cancelled) return
+        const j = await res.json().catch(() => null)
+        if (!cancelled && j?.ok && Array.isArray(j.messages)) setMsgs(j.messages)
+      } catch {}
+    }
+    tick()
+    const id = setInterval(tick, 15_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [bookingId, booking?.id])
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [msgs.length])

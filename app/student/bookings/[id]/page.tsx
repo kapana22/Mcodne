@@ -6,7 +6,7 @@ import { ConfirmModal } from '@/components/ConfirmModal'
 import { useToast } from '@/components/ToastProvider'
 import { copyToClipboard } from '@/lib/clipboard'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
-import { fmtKaDate, fmtKaDateTime } from '@/lib/kaDate'
+import { fmtKaDate, fmtKaDateTime, fmtKaTime } from '@/lib/kaDate'
 import { safeHttpUrl } from '@/lib/safeUrl'
 
 /* ───── Minimal icon set ───── */
@@ -96,7 +96,7 @@ const TopBar = () => (
       <Link href="/student" className="inline-flex items-center" aria-label="მცოდნე">
         <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain select-none" draggable={false} />
       </Link>
-      <nav className="flex items-center gap-3">
+      <nav className="flex items-center gap-4 lg:gap-3 overflow-x-auto scrollbar-hide whitespace-nowrap min-w-0 ml-4">
         <Link href="/student" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">დაშბორდი</Link>
         <Link href="/student/bookings" className="text-[13px] font-display font-semibold text-brand-700 hover:text-brand-800">ჩემი ჯავშნები</Link>
         <Link href="/student/messages" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">შეტყობინებები</Link>
@@ -376,15 +376,50 @@ const Hero = ({ booking, onEnterRoom, onReview, onCopyRef }: { booking: Booking;
   )
 }
 
-/* ───── Chat pane (real messages) ───── */
-const BookingMessages = ({ booking, meId, onSent }: { booking: Booking; meId: string | null; onSent: () => void }) => {
+/* ───── Chat pane (real messages) ─────
+   Owns its message list locally: optimistic append on send (no full booking
+   reload — that cost 2-5s on the remote DB and made sending feel broken) and
+   a light 15s poll of GET /api/messages?bookingId= while the tab is visible,
+   which also stamps read receipts server-side. */
+const CHAT_POLL_MS = 15_000
+const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | null }) => {
+  const [msgs, setMsgs] = useState<BookingMsg[]>(booking.messages)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [attachment, setAttachment] = useState<{ url: string; name: string; type: string; size: number } | null>(null)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+  const scrollRef = React.useRef<HTMLDivElement | null>(null)
   const tutorName = booking.tutor.user.fullName
+
+  // Parent reloads (status changes etc.) re-seed the local list — server wins.
+  useEffect(() => { setMsgs(booking.messages) }, [booking.messages])
+
+  // Keep the newest message in view — the pane used to open scrolled to the
+  // OLDEST message and never followed new ones.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [msgs.length])
+
+  // Poll for the other side's messages + stamp read receipts. Runs once on
+  // mount (marks existing incoming as read) then every 15s while visible.
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const res = await fetch(`/api/messages?bookingId=${booking.id}`)
+        if (!res.ok || cancelled) return
+        const j = await res.json().catch(() => null)
+        if (!cancelled && j?.ok && Array.isArray(j.messages)) setMsgs(j.messages)
+      } catch {}
+    }
+    tick()
+    const id = setInterval(tick, CHAT_POLL_MS)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [booking.id])
 
   const pickFile = () => fileInputRef.current?.click()
 
@@ -429,9 +464,12 @@ const BookingMessages = ({ booking, meId, onSent }: { booking: Booking; meId: st
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      if (!res.ok) { setErr('შეცდომა გაგზავნაში'); return }
+      const j = await res.json().catch(() => null)
+      if (!res.ok || !j?.ok) { setErr('შეცდომა გაგზავნაში'); return }
+      // Optimistic append — the API returns the created row with `from`
+      // populated, so the message shows instantly (no 2-5s booking reload).
+      setMsgs(prev => [...prev, j.message])
       setText(''); setAttachment(null)
-      onSent()
     } catch { setErr('ქსელის შეცდომა') }
     finally { setSending(false) }
   }
@@ -448,20 +486,33 @@ const BookingMessages = ({ booking, meId, onSent }: { booking: Booking; meId: st
         </span>
       </div>
 
-      <div className="px-6 py-5 max-h-[420px] overflow-y-auto space-y-3">
-        {booking.messages.length === 0 ? (
+      <div ref={scrollRef} className="px-6 py-5 max-h-[420px] overflow-y-auto space-y-3">
+        {msgs.length === 0 ? (
           <div className="text-center py-6 text-[13px] text-ink-500">
             ჯერ არ არის შეტყობინებები — მიწერე პირველი კითხვა.
           </div>
         ) : (
-          booking.messages.map(m => {
+          msgs.map((m, i) => {
             const mine = m.fromId === meId
+            // Day separator when the calendar date changes — individual bubbles
+            // then only need the time, not a full date-time stamp each.
+            const d = new Date(m.createdAt)
+            const prev = i > 0 ? new Date(msgs[i - 1].createdAt) : null
+            const newDay = !prev || prev.toDateString() !== d.toDateString()
             // Defense-in-depth: even though the API now rejects unsafe schemes,
             // never render an attachment href that isn't a safe scheme (guards
             // against legacy rows written before the server-side check).
             const safeFile = safeHttpUrl(m.fileUrl)
             return (
-              <div key={m.id} className={`flex gap-2.5 ${mine ? 'flex-row-reverse' : ''}`}>
+              <React.Fragment key={m.id}>
+              {newDay && (
+                <div className="flex items-center gap-3 py-1" aria-hidden>
+                  <span className="flex-1 h-px bg-ink-100" />
+                  <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-400">{fmtKaDate(d)}</span>
+                  <span className="flex-1 h-px bg-ink-100" />
+                </div>
+              )}
+              <div className={`flex gap-2.5 ${mine ? 'flex-row-reverse' : ''}`}>
                 <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-semibold text-sm shrink-0 overflow-hidden">
                   {m.from.avatarUrl
                     ? <img src={m.from.avatarUrl} alt="" className="w-full h-full object-cover" />
@@ -493,10 +544,11 @@ const BookingMessages = ({ booking, meId, onSent }: { booking: Booking; meId: st
                     )}
                   </div>
                   <div className="mt-1 font-mono text-[10px] tabular-nums text-ink-400">
-                    {fmtKaDateTime(new Date(m.createdAt))}
+                    {fmtKaTime(d)}
                   </div>
                 </div>
               </div>
+              </React.Fragment>
             )
           })
         )}
@@ -808,9 +860,11 @@ const ReviewModal = ({ open, onClose, bookingId, tutorName, onSubmitted }: { ope
   const toggleTag = (t: string) => setTags(s => s.includes(t) ? s.filter(x => x !== t) : [...s, t])
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+    // Bottom sheet on mobile, centered on sm+ — matches the reschedule and
+    // dispute modals so all three booking dialogs share one ergonomic.
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-accent-900/55 backdrop-blur-sm" />
-      <div role="dialog" className="relative w-full max-w-[560px] bg-white rounded-card shadow-float overflow-hidden motion-safe:animate-scale-in">
+      <div role="dialog" className="relative w-full max-w-[560px] bg-white rounded-t-card sm:rounded-card shadow-float overflow-hidden max-h-[92dvh] overflow-y-auto motion-safe:animate-slide-in-b sm:motion-safe:animate-scale-in safe-area-bottom">
         <div className="px-7 py-5 border-b border-ink-100 flex items-start justify-between gap-4">
           <div>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">შეფასება</div>
@@ -1100,8 +1154,12 @@ const BookingBody = ({
 
   return (
     <section className="max-w-[1240px] mx-auto px-6 lg:px-8 mt-6 grid lg:grid-cols-[1fr_360px] gap-6 pb-12">
+      {/* On mobile the action rail comes FIRST — cancel/reschedule/receipt
+          are why people open this page; burying them under the whole chat
+          thread made them near-undiscoverable at 390px. Desktop keeps
+          content-left / rail-right. */}
       {/* Left — content */}
-      <div className="space-y-4 min-w-0">
+      <div className="space-y-4 min-w-0 order-2 lg:order-1">
         {/* Topic + notes */}
         <div className="rounded-card bg-white border border-ink-200 p-6">
           <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-2">თემა და მიზანი</div>
@@ -1131,11 +1189,11 @@ const BookingBody = ({
         </div>
 
         {/* Chat */}
-        <BookingMessages booking={booking} meId={meId} onSent={onRefresh} />
+        <BookingMessages booking={booking} meId={meId} />
       </div>
 
       {/* Right — actions + receipt */}
-      <aside className="space-y-4">
+      <aside className="space-y-4 order-1 lg:order-2">
         <div className="rounded-card bg-white border border-ink-200 p-5">
           <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-3">სწრაფი მოქმედებები</div>
           <div className="space-y-2">

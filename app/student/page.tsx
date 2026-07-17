@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { NotifBell } from '@/components/NotifBell'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import { CountUp } from '@/components/CountUp'
 import { EmptyState } from '@/components/EmptyState'
 import { FEATURE_PAYMENTS_V2 } from '@/lib/flags'
@@ -299,7 +300,7 @@ const Welcome = ({ me, bookings }: { me: MeData | null; bookings: any[] }) => {
 
   return (
     <section className="border-b border-ink-100 bg-white">
-      <div className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-10 lg:pt-12 pb-8">
+      <div className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-6 sm:pt-10 lg:pt-12 pb-6 sm:pb-8">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 mb-3 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-500">
@@ -310,7 +311,7 @@ const Welcome = ({ me, bookings }: { me: MeData | null; bookings: any[] }) => {
                 თბილისი
               </span>
             </div>
-            <h1 className="font-display text-[34px] sm:text-[42px] lg:text-[50px] font-bold tracking-[-0.028em] leading-[1.02] text-ink-900 motion-safe:animate-rise-in">
+            <h1 className="font-display text-[26px] sm:text-[42px] lg:text-[50px] font-bold tracking-[-0.028em] leading-[1.02] text-ink-900 motion-safe:animate-rise-in">
               {firstName ? `გამარჯობა, ${firstName}.` : 'გამარჯობა.'}
             </h1>
             <p className="mt-3 text-[14.5px] text-ink-600 max-w-[560px] leading-[1.55] motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>
@@ -419,7 +420,7 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
   const statusLabel = next.status === 'CONFIRMED' ? 'დადასტურდა' : next.status === 'LIVE' ? 'ცოცხალია' : 'მზადდება'
 
   return (
-    <article className="relative overflow-hidden rounded-card bg-ink-900 text-white">
+    <article className="relative overflow-hidden rounded-card bg-gradient-dark text-white">
       <div className="absolute inset-0 opacity-[0.18] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 85% 15%, rgba(12,172,151,.55), transparent 55%), radial-gradient(circle at 15% 100%, rgba(31,196,174,.45), transparent 60%)' }} />
       <div className="relative grid lg:grid-cols-[1fr_280px]">
         <div className="p-6 sm:p-8 lg:p-10">
@@ -1011,7 +1012,12 @@ const StatusBadge = ({ s }: { s: SessionStatus }) => {
   return <StatusPill tone={tone[s]} />
 }
 
-const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (s: Session) => void; onCancel?: (s: Session) => void; cancelling?: boolean }) => (
+const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (s: Session) => void; onCancel?: (s: Session) => void; cancelling?: boolean }) => {
+  // In-app confirm sheet instead of window.confirm — the native dialog is
+  // jarring on mobile and inconsistent with the rest of the product.
+  const [askCancel, setAskCancel] = useState(false)
+  return (
+  <>
   <article onClick={() => onOpen(s)} className="cursor-pointer grid grid-cols-[auto_1fr_auto] sm:grid-cols-[64px_auto_1fr_auto] gap-4 sm:gap-5 items-center py-4 px-5 hover:bg-ink-50/50 transition-colors">
     {/* Date pill (desktop) */}
     <div className="hidden sm:flex flex-col items-center justify-center w-16 h-16 rounded-card bg-white border border-ink-200">
@@ -1072,7 +1078,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
             <span className="hidden sm:inline">ოთახი</span>
           </Link>
           {onCancel && (
-            <button type="button" disabled={cancelling} onClick={() => { if (window.confirm('დარწმუნებული ხარ, რომ გინდა სესიის გაუქმება?')) onCancel(s) }} className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-[12px] tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <button type="button" disabled={cancelling} onClick={() => setAskCancel(true)} className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-[12px] tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {cancelling ? 'უუქმდება…' : 'გაუქმება'}
             </button>
           )}
@@ -1084,7 +1090,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
             დეტალები
           </button>
           {onCancel && (
-            <button type="button" disabled={cancelling} onClick={() => { if (window.confirm('დარწმუნებული ხარ, რომ გინდა სესიის გაუქმება?')) onCancel(s) }} className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-[12px] tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <button type="button" disabled={cancelling} onClick={() => setAskCancel(true)} className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-[12px] tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {cancelling ? 'უუქმდება…' : 'გაუქმება'}
             </button>
           )}
@@ -1123,7 +1129,20 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
       </button>
     </div>
   </article>
-)
+  <ConfirmModal
+    open={askCancel}
+    title="სესიის გაუქმება"
+    body={<>უქმდება <span className="font-display font-semibold">{s.topic}</span> — {s.date}, {s.time}. თანხა escrow-დან სრულად დაგიბრუნდება.</>}
+    confirmLabel="გაუქმება"
+    cancelLabel="დარჩეს"
+    tone="danger"
+    busy={cancelling}
+    onConfirm={() => { setAskCancel(false); onCancel?.(s) }}
+    onCancel={() => setAskCancel(false)}
+  />
+  </>
+  )
+}
 
 /* ───── Sessions panel with tabs ───── */
 type Tab = 'upcoming' | 'past' | 'cancelled'
