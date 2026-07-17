@@ -11,6 +11,8 @@ import { safeHttpUrl } from '@/lib/safeUrl'
 import { sanitizeMsgBody, MSG_MAX_LEN, sendErrorText } from '@/lib/msgText'
 import { PAYMENTS_LIVE, CANCEL_CUTOFF_HOURS } from '@/lib/flags'
 import { isBookingLive } from '@/lib/bookingLive'
+import { StudentAppBar } from '@/components/StudentAppBar'
+import { WorkspaceFooter } from '@/components/WorkspaceFooter'
 
 /* ───── Minimal icon set ───── */
 const Icon = {
@@ -86,31 +88,15 @@ const STATUS_MAP: Record<ApiStatus, { l: string; cls: string; dot?: string }> = 
   LIVE:      { l: 'სესია მიმდინარეობს', cls: 'bg-danger-50 text-danger-700 border-danger-200', dot: 'bg-danger-500' },
   COMPLETED: { l: 'სესია დასრულდა', cls: 'bg-success-50 text-success-700 border-success-200', dot: 'bg-success-500' },
   CANCELED:  { l: 'ჯავშანი გაუქმდა', cls: 'bg-ink-100 text-ink-700 border-ink-200' },
-  NO_SHOW:   { l: 'სესია არ შედგა', cls: 'bg-iris-50 text-iris-700 border-iris-200' },
+  // Neutral ink for terminal negative states — the violet iris accent sat
+  // outside the green/blue/neutral color system (design canon).
+  NO_SHOW:   { l: 'სესია არ შედგა', cls: 'bg-ink-100 text-ink-700 border-ink-200' },
 }
 
 const tabOf = (s: ApiStatus) =>
   s === 'COMPLETED' || s === 'NO_SHOW' ? 'დასრულებული'
   : s === 'CANCELED' ? 'გაუქმებული'
   : 'მომავალი'
-
-/* ───── Header ───── */
-const TopBar = () => (
-  <header className="sticky top-0 z-40 bg-ink-50/90 backdrop-blur-md border-b border-ink-100">
-    <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
-      <Link href="/student" className="inline-flex items-center" aria-label="მცოდნე">
-        <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain select-none" draggable={false} />
-      </Link>
-      <nav className="flex items-center gap-4 lg:gap-3 overflow-x-auto scrollbar-hide whitespace-nowrap min-w-0 ml-4">
-        <Link href="/student" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">დაშბორდი</Link>
-        <Link href="/student/bookings" className="text-[13px] font-display font-semibold text-brand-700 hover:text-brand-800">ჩემი ჯავშნები</Link>
-        <Link href="/student/messages" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">შეტყობინებები</Link>
-        <Link href="/student/favorites" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">შენახული</Link>
-        <Link href="/student/profile" className="text-[13px] font-display font-semibold text-ink-700 hover:text-ink-900">პროფილი</Link>
-      </nav>
-    </div>
-  </header>
-)
 
 /* ───── Breadcrumb ───── */
 const Breadcrumb = ({ status, ref }: { status: ApiStatus; ref: string }) => (
@@ -188,7 +174,7 @@ const useUserTz = (): string => {
 }
 
 /* ───── Hero ───── */
-const Hero = ({ booking, onEnterRoom, onReview, onCopyRef }: { booking: Booking; onEnterRoom: () => void; onReview: () => void; onCopyRef: () => void }) => {
+const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRoom: () => void; onCopyRef: () => void }) => {
   // LIVE is never written to the DB — derive the in-progress state from the
   // clock. Hero re-renders every second via useCountdown, so this stays fresh.
   const live = isBookingLive(booking)
@@ -305,7 +291,27 @@ const Hero = ({ booking, onEnterRoom, onReview, onCopyRef }: { booking: Booking;
 
           {/* Right rail — action */}
           <div className="shrink-0 w-full lg:w-[260px]">
-            {(status === 'PREPARING' || status === 'CONFIRMED' || status === 'LIVE') && cd && (
+            {/* PREPARING: the old rail showed a DISABLED join button as the
+                primary CTA — a dead end. The honest next step while waiting
+                for confirmation is writing to the expert. */}
+            {status === 'PREPARING' && (
+              <div className="p-4 rounded-card bg-white border border-warning-200">
+                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-warning-700 mb-2">ელოდება დადასტურებას</div>
+                <p className="text-[12.5px] text-ink-700 leading-[1.5]">
+                  ექსპერტი ჩვეულებრივ რამდენიმე საათში ადასტურებს — შეტყობინებას მიიღებ. სანამ ელოდები, შეგიძლია მისწერო.
+                </p>
+                <a href="#chat" className="mt-3 w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] inline-flex items-center justify-center gap-2 transition-colors">
+                  <Icon.chat className="w-4 h-4" /> მიწერე ექსპერტს
+                </a>
+                {cd && (
+                  <div className="mt-2 text-[11px] text-ink-500 tabular-nums text-center">
+                    სესიამდე დარჩა {cd.d > 0 ? `${cd.d} დღე ` : ''}{cd.h} სთ {cd.m} წთ
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(status === 'CONFIRMED' || status === 'LIVE') && cd && (
               <div className="text-center p-4 rounded-card bg-accent-900 text-white">
                 <div className="font-display text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-300 mb-2">
                   {status === 'LIVE' ? 'ცოცხალია' : 'დარჩა'}
@@ -326,12 +332,11 @@ const Hero = ({ booking, onEnterRoom, onReview, onCopyRef }: { booking: Booking;
                   </div>
                 )}
                 <button type="button" onClick={onEnterRoom}
-                        disabled={status === 'PREPARING'}
-                        className="mt-4 w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-white/10 disabled:cursor-not-allowed text-white font-display font-semibold text-[13px] inline-flex items-center justify-center gap-2 transition-colors">
+                        className="mt-4 w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] inline-flex items-center justify-center gap-2 transition-colors">
                   <Icon.video className="w-4 h-4" /> ვიდეო-ოთახში
                 </button>
                 <div className="mt-2 text-[10.5px] text-white/55">
-                  {status === 'PREPARING' ? 'ჯერ არ დაადასტურა ექსპერტმა' : status === 'LIVE' ? 'სესია ახლა მიმდინარეობს — შემოუერთდი' : 'გაიხსნება 5 წუთით ადრე'}
+                  {status === 'LIVE' ? 'სესია ახლა მიმდინარეობს — შემოუერთდი' : 'გაიხსნება 5 წუთით ადრე'}
                 </div>
               </div>
             )}
@@ -362,8 +367,8 @@ const Hero = ({ booking, onEnterRoom, onReview, onCopyRef }: { booking: Booking;
             )}
 
             {(status === 'CANCELED' || status === 'NO_SHOW') && (
-              <div className="p-4 rounded-card bg-iris-50 border border-iris-200">
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-iris-700 mb-2">
+              <div className="p-4 rounded-card bg-ink-50 border border-ink-200">
+                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-600 mb-2">
                   {status === 'NO_SHOW' ? 'სესია არ შედგა' : 'ჯავშანი გაუქმდა'}
                 </div>
                 <p className="text-[12.5px] text-ink-700 leading-[1.5]">
@@ -719,7 +724,7 @@ const RescheduleModal = ({ open, onClose, onSent, booking }: { open: boolean; on
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-accent-900/55 backdrop-blur-sm" />
-      <div role="dialog" className="relative w-full sm:max-w-[520px] bg-white sm:rounded-card shadow-float overflow-hidden motion-safe:animate-scale-in">
+      <div role="dialog" className="relative w-full sm:max-w-[520px] bg-white rounded-t-card sm:rounded-card shadow-float overflow-hidden motion-safe:animate-slide-in-b sm:motion-safe:animate-scale-in safe-area-bottom">
         <div className="px-6 py-4 border-b border-ink-100 flex items-start justify-between gap-4">
           <div>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">გადადება — უფასოდ {CANCEL_CUTOFF_HOURS}სთ-მდე</div>
@@ -824,7 +829,7 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-accent-900/55 backdrop-blur-sm" />
-      <div role="dialog" className="relative w-full sm:max-w-[560px] bg-white sm:rounded-card shadow-float overflow-hidden flex flex-col max-h-[85vh] motion-safe:animate-scale-in">
+      <div role="dialog" className="relative w-full sm:max-w-[560px] bg-white rounded-t-card sm:rounded-card shadow-float overflow-hidden flex flex-col max-h-[85vh] motion-safe:animate-slide-in-b sm:motion-safe:animate-scale-in safe-area-bottom">
         <div className="px-6 py-4 border-b border-ink-100 flex items-start justify-between gap-4 shrink-0">
           <div>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-danger-700 mb-1 inline-flex items-center gap-1.5"><Icon.flag className="w-3 h-3" /> საჩივარი</div>
@@ -1307,14 +1312,21 @@ const BookingBody = ({
               </>
             )}
 
-            <button type="button" onClick={onDispute} className="w-full flex items-center gap-2.5 h-9 px-3 rounded-btn text-ink-500 hover:text-danger-700 hover:bg-danger-50 font-display font-semibold text-[11.5px] transition-colors">
-              <Icon.flag className="w-3.5 h-3.5" />
-              <span>საჩივარი</span>
-            </button>
-            <a href={`/api/bookings/${booking.id}/ical`} className="w-full flex items-center gap-2.5 h-9 px-3 rounded-btn text-ink-500 hover:text-ink-900 hover:bg-ink-50 font-display font-semibold text-[11.5px] transition-colors">
-              <Icon.download className="w-3.5 h-3.5" />
-              <span>კალენდარში დამატება</span>
-            </a>
+            {/* Dispute only makes sense once a session ran (or should have run);
+                iCal only for sessions still ahead. State-blind actions read as
+                noise and invite mistakes. */}
+            {(status === 'LIVE' || status === 'COMPLETED' || status === 'NO_SHOW') && (
+              <button type="button" onClick={onDispute} className="w-full flex items-center gap-2.5 h-9 px-3 rounded-btn text-ink-500 hover:text-danger-700 hover:bg-danger-50 font-display font-semibold text-[11.5px] transition-colors">
+                <Icon.flag className="w-3.5 h-3.5" />
+                <span>საჩივარი</span>
+              </button>
+            )}
+            {(status === 'PREPARING' || status === 'CONFIRMED') && (
+              <a href={`/api/bookings/${booking.id}/ical`} className="w-full flex items-center gap-2.5 h-9 px-3 rounded-btn text-ink-500 hover:text-ink-900 hover:bg-ink-50 font-display font-semibold text-[11.5px] transition-colors">
+                <Icon.download className="w-3.5 h-3.5" />
+                <span>კალენდარში დამატება</span>
+              </a>
+            )}
           </div>
         </div>
 
@@ -1507,6 +1519,8 @@ export default function BookingDetail() {
   const router = useRouter()
   const [booking, setBooking] = useState<Booking | null>(null)
   const [meId, setMeId] = useState<string | null>(null)
+  // Header identity for the shared StudentAppBar (avatar + user menu).
+  const [me, setMe] = useState<{ name: string; avatar?: string | null } | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [rescheduleOpen, setRescheduleOpen] = useState(false)
   const [rescheduledOk, setRescheduledOk] = useState(false)
@@ -1532,6 +1546,7 @@ export default function BookingDetail() {
       // Drop stale responses.
       if (seq !== loadSeqRef.current) return
       setMeId(meRes?.user?.id ?? null)
+      setMe(meRes?.user ? { name: meRes.user.fullName, avatar: meRes.user.avatarUrl } : null)
       if (bRes.status === 404) { setNotFound(true); return }
       if (bRes.status === 401) { router.push('/signin'); return }
       if (!bRes.ok) return
@@ -1601,7 +1616,7 @@ export default function BookingDetail() {
   if (notFound) {
     return (
       <div className="min-h-screen bg-ink-50 flex flex-col">
-        <TopBar />
+        <StudentAppBar user={me ?? undefined} />
         <div className="flex-1 flex items-center justify-center px-6 py-16">
           <div className="max-w-[480px] w-full text-center">
             <h1 className="font-display text-[22px] font-bold text-ink-900">ჯავშანი ვერ მოიძებნა</h1>
@@ -1630,9 +1645,9 @@ export default function BookingDetail() {
 
   return (
     <div className="font-sans bg-ink-50/50 text-ink-900 antialiased min-h-screen">
-      <TopBar />
+      <StudentAppBar user={me ?? undefined} />
       <Breadcrumb status={booking.status} ref={booking.ref} />
-      <Hero booking={booking} onEnterRoom={enterRoom} onReview={() => setReviewOpen(true)} onCopyRef={copyRef} />
+      <Hero booking={booking} onEnterRoom={enterRoom} onCopyRef={copyRef} />
       {/* Inline review card — highest signal CTA post-session. Auto-collapses to
           a read-only summary once the student has submitted, with a small edit
           link (30-day window). */}

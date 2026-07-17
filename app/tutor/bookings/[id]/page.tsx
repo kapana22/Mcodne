@@ -6,8 +6,10 @@ import { Avatar } from '@/components/Avatar'
 import { StatusPill } from '@/components/StatusPill'
 import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
 import { BookingChat } from '@/components/chat/BookingChat'
+import { refreshNavBadges } from '@/components/tutor/useNavBadges'
 
 type BookingStatus = 'PREPARING' | 'CONFIRMED' | 'LIVE' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW'
 
@@ -93,6 +95,7 @@ export default function TutorBookingDetailPage() {
   const [booking, setBooking] = useState<Booking | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<'cancel' | 'no_show' | 'decline' | null>(null)
   const [flash, setFlash] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   // Post-session summary state — mirrored from the booking on first load.
   const [tutorNotes, setTutorNotes] = useState('')
@@ -172,6 +175,7 @@ export default function TutorBookingDetailPage() {
       // Invalidate the server-cached tutor bookings list so navigating back
       // reflects the new status (e.g. accepted booking moves out of Pending).
       router.refresh()
+      refreshNavBadges()
       const okMsg =
         action === 'accept' ? 'დადასტურდა'
         : action === 'decline' ? 'უარყოფილია'
@@ -280,7 +284,6 @@ export default function TutorBookingDetailPage() {
 
   const cancelBooking = async () => {
     if (!booking) return
-    if (!confirm('დაადასტურე ჯავშნის გაუქმება')) return
     setBusy('cancel')
     try {
       const res = await fetch(`/api/bookings/${booking.id}/cancel`, { method: 'POST' })
@@ -291,6 +294,7 @@ export default function TutorBookingDetailPage() {
       }
       setBooking(b => b ? { ...b, status: 'CANCELED' } : b)
       router.refresh()
+      refreshNavBadges()
       showFlash('ok', 'ჯავშანი გაუქმდა')
     } finally {
       setBusy(null)
@@ -331,9 +335,76 @@ export default function TutorBookingDetailPage() {
   // "Student didn't show up" — only after the session's scheduled start.
   const canMarkNoShow = !future && (booking.status === 'CONFIRMED' || booking.status === 'LIVE')
   const showRemainingPill = booking.status !== 'CANCELED' && booking.status !== 'NO_SHOW'
+  const isLiveNow = canJoin && !future
+
+  /* Status-driven action panel: ONE primary per state, quiet secondaries.
+     Rendered twice — above the fold on mobile, in the sticky rail on lg —
+     sharing the same handlers/busy state. */
+  const actionPanel = (
+    <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5">
+      <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-3">მოქმედებები</div>
+      <div className="flex flex-col gap-2">
+        {canAcceptDecline && (
+          <>
+            <Btn variant="primary" size="md" onClick={() => act('accept')} disabled={busy !== null} className="w-full">
+              {busy === 'accept' ? 'იგზავნება…' : 'დადასტურება'}
+            </Btn>
+            <Btn variant="secondary" size="md" onClick={() => setConfirming('decline')} disabled={busy !== null} className="w-full">
+              {busy === 'decline' ? 'იგზავნება…' : 'უარი'}
+            </Btn>
+          </>
+        )}
+        {canJoin && (
+          <a
+            href={booking.meetingUrl!}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`inline-flex items-center justify-center gap-2 font-display font-medium tracking-wide transition-colors rounded-btn h-11 px-4 text-sm w-full ${
+              isLiveNow
+                ? 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-brand-glow'
+                : canAcceptDecline
+                ? 'border border-ink-200 hover:bg-ink-50 text-ink-800'
+                : 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-xs'
+            }`}
+          >
+            <Icon.video className="w-4 h-4" /> {isLiveNow ? 'ვიდეო-ოთახში შესვლა' : 'ვიდეო-ოთახი'}
+          </a>
+        )}
+        {canComplete && !canAcceptDecline && !future && (
+          <Btn variant="primary" size="md" onClick={() => act('complete')} disabled={busy !== null} className="w-full">
+            {busy === 'complete' ? 'იგზავნება…' : 'დასრულებულად მონიშვნა'}
+          </Btn>
+        )}
+        {canMarkNoShow && (
+          <Btn variant="secondary" size="md" onClick={() => setConfirming('no_show')} disabled={busy !== null} className="w-full">
+            {busy === 'no_show' ? 'იგზავნება…' : 'კლიენტი არ გამოცხადდა'}
+          </Btn>
+        )}
+        {canCancel && !booking.rescheduleRequest && (
+          <Btn variant="secondary" size="md" onClick={openReschedule} disabled={busy !== null} className="w-full">
+            გადადება
+          </Btn>
+        )}
+        {canCancel && (
+          <Btn variant="danger" size="md" onClick={() => setConfirming('cancel')} disabled={busy !== null} className="w-full">
+            {busy === 'cancel' ? 'უქმდება…' : 'გაუქმება'}
+          </Btn>
+        )}
+        {booking.status === 'COMPLETED' && (
+          <div className="text-[13px] text-ink-500">ეს ჯავშანი დასრულებულია.</div>
+        )}
+        {booking.status === 'CANCELED' && (
+          <div className="text-[13px] text-ink-500">ეს ჯავშანი გაუქმებულია.</div>
+        )}
+        {booking.status === 'NO_SHOW' && (
+          <div className="text-[13px] text-danger-700">აღინიშნა: კლიენტი არ გამოცხადდა.</div>
+        )}
+      </div>
+    </div>
+  )
 
   return (
-    <div className="max-w-[900px] mx-auto">
+    <div>
         <div className="mb-5 flex items-center gap-3 text-[13px] text-ink-500">
           <Link href="/tutor/bookings" className="hover:text-ink-800 inline-flex items-center gap-1"><Icon.arrow className="w-3.5 h-3.5 rotate-180" /> ჯავშნების სია</Link>
           <span className="text-ink-300">·</span>
@@ -384,147 +455,130 @@ export default function TutorBookingDetailPage() {
           )
         })()}
 
-        <div className="rounded-card border border-ink-200 bg-white shadow-xs overflow-hidden">
-          <div className="p-5 sm:p-6 border-b border-ink-100">
-            <div className="flex items-start gap-4 flex-wrap">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-2">
-                  <StatusPill tone={toneOf(booking.status)} />
-                  {booking.status === 'PREPARING' && (
-                    <span className="text-[11.5px] text-warning-700 font-semibold">ელოდება თქვენს პასუხს</span>
-                  )}
+        {/* ── Operational panel: main column + sticky action rail ── */}
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+          <div className="min-w-0 space-y-5">
+
+            {/* Session header */}
+            <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5 sm:p-6">
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <StatusPill tone={toneOf(booking.status)} />
+                {booking.status === 'PREPARING' && (
+                  <span className="text-[11.5px] text-warning-700 font-semibold">ელოდება თქვენს პასუხს</span>
+                )}
+              </div>
+              <h1 className="font-display text-[21px] sm:text-[24px] font-bold tracking-tight text-ink-900">{booking.topic}</h1>
+              <div className="text-[13px] text-ink-500 mt-2 flex items-center gap-3 flex-wrap">
+                <span className="inline-flex items-center gap-1"><Icon.calendar className="w-3.5 h-3.5" />{fmtDateTime(booking.startAt, tz)}</span>
+                <span className="inline-flex items-center gap-1"><Icon.clock className="w-3.5 h-3.5" />{booking.durationMin} წუთი</span>
+              </div>
+              {tz !== TBILISI && (
+                <div className="mt-1 text-[11.5px] text-ink-400">
+                  (თბილისის დროით: {fmtDateTime(booking.startAt, TBILISI)})
                 </div>
-                <h1 className="font-display text-[22px] sm:text-[26px] font-bold tracking-tight text-ink-900">{booking.topic}</h1>
-                <div className="text-[13px] text-ink-500 mt-2 flex items-center gap-3 flex-wrap">
-                  <span className="inline-flex items-center gap-1"><Icon.calendar className="w-3.5 h-3.5" />{fmtDateTime(booking.startAt, tz)}</span>
-                  <span className="inline-flex items-center gap-1"><Icon.clock className="w-3.5 h-3.5" />{booking.durationMin} წუთი</span>
-                  <span className="font-display font-bold text-ink-800">₾{booking.price}</span>
+              )}
+              {showRemainingPill && remainingLabel && (
+                <div className="mt-3">
+                  <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-pill bg-brand-50 border border-brand-200 text-[12px] font-display font-semibold text-brand-800">
+                    <Icon.clock className="w-3 h-3" />
+                    {remainingLabel === 'დაწყებულია' || remainingLabel === 'დასრულებულია'
+                      ? remainingLabel
+                      : <>დაწყებამდე დარჩა · <span className="tabular-nums">{remainingLabel}</span></>}
+                  </span>
                 </div>
-                {tz !== TBILISI && (
-                  <div className="mt-1 text-[11.5px] text-ink-400">
-                    (თბილისის დროით: {fmtDateTime(booking.startAt, TBILISI)})
+              )}
+            </div>
+
+            {/* Actions surface above the fold on mobile; rail owns them on lg */}
+            <div className="lg:hidden">{actionPanel}</div>
+
+            {/* Status trail — where this booking sits in its lifecycle */}
+            <SessionTimeline status={booking.status} startAt={booking.startAt} durationMin={booking.durationMin} />
+
+            {/* Notes */}
+            {(booking.studentNotes || booking.status === 'COMPLETED') && (
+              <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5 sm:p-6 space-y-5">
+                {booking.studentNotes && (
+                  <div>
+                    <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">კლიენტის შენიშვნა</div>
+                    <div className="p-3 rounded-btn bg-ink-50 border border-ink-200 text-[13px] text-ink-700 whitespace-pre-wrap">
+                      {booking.studentNotes}
+                    </div>
                   </div>
                 )}
-                {showRemainingPill && remainingLabel && (
-                  <div className="mt-3">
-                    <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-pill bg-brand-50 border border-brand-200 text-[12px] font-display font-semibold text-brand-800">
-                      <Icon.clock className="w-3 h-3" />
-                      {remainingLabel === 'დაწყებულია' || remainingLabel === 'დასრულებულია'
-                        ? remainingLabel
-                        : <>დაწყებამდე დარჩა · <span className="tabular-nums">{remainingLabel}</span></>}
-                    </span>
+                {booking.status === 'COMPLETED' && (
+                  <div>
+                    <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">სესიის შემაჯამებელი</div>
+                    <h3 className="font-display text-[14px] font-bold text-ink-900 tracking-tight">დაუტოვე კლიენტს გამოხმაურება</h3>
+                    <p className="text-[12px] text-ink-500 mt-0.5">კლიენტი ნახავს ამ ჩანაწერს თავის ბუკინგის გვერდზე.</p>
+                    <textarea
+                      value={tutorNotes}
+                      onChange={(e) => setTutorNotes(e.target.value.slice(0, 1500))}
+                      rows={5}
+                      placeholder="რა გავიარეთ, რაზე უნდა იმუშაოს, რეკომენდაციები..."
+                      className="mt-2 w-full p-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[13.5px] resize-none leading-relaxed"
+                    />
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <span className="font-mono text-[10.5px] tabular-nums text-ink-400">{tutorNotes.length} / 1500</span>
+                      <Btn variant="primary" size="sm" onClick={saveTutorNotes} disabled={notesSaving}>
+                        {notesSaving ? 'ინახება…' : 'შენახვა'}
+                      </Btn>
+                    </div>
                   </div>
                 )}
               </div>
-              <div className="flex flex-col gap-2 shrink-0">
-                {canJoin && (
-                  <a href={booking.meetingUrl!} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 font-display font-medium tracking-wide transition-colors rounded-btn h-10 px-4 text-sm bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-xs">
-                    <Icon.video className="w-4 h-4" /> ვიდეო-ოთახი
-                  </a>
-                )}
-              </div>
-            </div>
+            )}
+
+            {/* #chat is a public contract: DB-stored notification hrefs and the
+                messages inbox deep-link to /tutor/bookings/{id}#chat forever. */}
+            <section id="chat" className="scroll-mt-24">
+              <BookingChat
+                variant="embedded"
+                bookingId={booking.id}
+                me={me}
+                counterparty={booking.student}
+                initialMessages={booking.messages}
+                onActivity={() => router.refresh()}
+              />
+            </section>
           </div>
 
-          <div className="p-5 sm:p-6 border-b border-ink-100">
-            <div className="text-[11.5px] text-ink-500 font-semibold uppercase tracking-wide mb-3">კლიენტი</div>
-            <div className="flex items-center gap-3">
-              <Avatar src={booking.student.avatarUrl ?? undefined} name={booking.student.fullName} size={56} />
-              <div className="min-w-0 flex-1">
-                <div className="font-display text-[15px] font-bold text-ink-900 truncate">{booking.student.fullName}</div>
-                <div className="text-[12.5px] text-ink-500 truncate">{booking.student.email}</div>
-              </div>
-            </div>
-            {booking.studentNotes && (
-              <div className="mt-4 p-3 rounded-btn bg-ink-50 border border-ink-200 text-[13px] text-ink-700 whitespace-pre-wrap">
-                <div className="text-[11.5px] text-ink-500 font-semibold uppercase tracking-wide mb-1.5">კლიენტის შენიშვნა</div>
-                {booking.studentNotes}
-              </div>
-            )}
-          </div>
-
-          <div className="p-5 sm:p-6 flex flex-wrap gap-2">
-            {canAcceptDecline && (
-              <>
-                <Btn variant="primary" size="md" onClick={() => act('accept')} disabled={busy !== null}>
-                  {busy === 'accept' ? 'იგზავნება…' : 'დადასტურება'}
-                </Btn>
-                <Btn variant="secondary" size="md" onClick={() => act('decline')} disabled={busy !== null}>
-                  {busy === 'decline' ? 'იგზავნება…' : 'უარი'}
-                </Btn>
-              </>
-            )}
-            {canComplete && !canAcceptDecline && (
-              <Btn variant="primary" size="md" onClick={() => act('complete')} disabled={busy !== null}>
-                {busy === 'complete' ? 'იგზავნება…' : 'დასრულებულად მონიშვნა'}
-              </Btn>
-            )}
-            {canCancel && (
-              <Btn variant="danger" size="md" onClick={cancelBooking} disabled={busy !== null}>
-                {busy === 'cancel' ? 'უქმდება…' : 'გაუქმება'}
-              </Btn>
-            )}
-            {canCancel && !booking.rescheduleRequest && (
-              <Btn variant="secondary" size="md" onClick={openReschedule} disabled={busy !== null}>
-                გადადება
-              </Btn>
-            )}
-            {canMarkNoShow && (
-              <Btn
-                variant="danger"
-                size="md"
-                onClick={() => {
-                  if (confirm('დაადასტურე: კლიენტი არ გამოცხადდა?')) act('no_show')
-                }}
-                disabled={busy !== null}
-              >
-                {busy === 'no_show' ? 'იგზავნება…' : 'კლიენტი არ გამოცხადდა'}
-              </Btn>
-            )}
-            {booking.status === 'COMPLETED' && (
-              <div className="text-[13px] text-ink-500">ეს ჯავშანი დასრულებულია.</div>
-            )}
-            {booking.status === 'COMPLETED' && (
-              <div className="w-full mt-4 pt-4 border-t border-ink-100">
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">სესიის შემაჯამებელი</div>
-                <h3 className="font-display text-[14px] font-bold text-ink-900 tracking-tight">დაუტოვე კლიენტს გამოხმაურება</h3>
-                <p className="text-[12px] text-ink-500 mt-0.5">კლიენტი ნახავს ამ ჩანაწერს თავის ბუკინგის გვერდზე.</p>
-                <textarea
-                  value={tutorNotes}
-                  onChange={(e) => setTutorNotes(e.target.value.slice(0, 1500))}
-                  rows={5}
-                  placeholder="რა გავიარეთ, რაზე უნდა იმუშაოს, რეკომენდაციები..."
-                  className="mt-2 w-full p-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[13.5px] resize-none leading-relaxed"
-                />
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <span className="font-mono text-[10.5px] tabular-nums text-ink-400">{tutorNotes.length} / 1500</span>
-                  <Btn variant="primary" size="sm" onClick={saveTutorNotes} disabled={notesSaving}>
-                    {notesSaving ? 'ინახება…' : 'შენახვა'}
-                  </Btn>
+          {/* Rail */}
+          <aside className="space-y-4 lg:sticky lg:top-[84px]">
+            {/* Client card */}
+            <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5">
+              <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-3">კლიენტი</div>
+              <div className="flex items-center gap-3">
+                <Avatar src={booking.student.avatarUrl ?? undefined} name={booking.student.fullName} size={48} />
+                <div className="min-w-0 flex-1">
+                  <div className="font-display text-[14.5px] font-bold text-ink-900 truncate">{booking.student.fullName}</div>
+                  <div className="text-[12px] text-ink-500 truncate">{booking.student.email}</div>
                 </div>
               </div>
-            )}
-            {booking.status === 'CANCELED' && (
-              <div className="text-[13px] text-ink-500">ეს ჯავშანი გაუქმებულია.</div>
-            )}
-            {booking.status === 'NO_SHOW' && (
-              <div className="text-[13px] text-danger-700">აღინიშნა: კლიენტი არ გამოცხადდა.</div>
-            )}
-          </div>
+              <a href="#chat" className="mt-3 flex items-center justify-center gap-2 h-9 rounded-btn border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] transition-colors">
+                <Icon.chat className="w-4 h-4" /> მესიჯის მიწერა
+              </a>
+            </div>
+
+            <div className="hidden lg:block">{actionPanel}</div>
+
+            {/* Payment / booking meta */}
+            <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5">
+              <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-3">ღირებულება</div>
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-[24px] font-bold text-ink-900 tabular-nums">₾{booking.price}</span>
+                <span className="text-[12px] text-ink-500">{booking.durationMin} წთ</span>
+              </div>
+              <p className="mt-2 text-[11.5px] text-ink-500 leading-snug">
+                ამჟამად ჯავშნები ტარდება უფასოდ — გადახდები მალე დაემატება.
+              </p>
+              <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between text-[11px]">
+                <span className="text-ink-400 uppercase tracking-[0.14em] font-display font-semibold">Ref</span>
+                <span className="font-mono text-ink-500">{booking.ref.slice(0, 12)}</span>
+              </div>
+            </div>
+          </aside>
         </div>
-
-        {/* #chat is a public contract: DB-stored notification hrefs and the
-            messages inbox deep-link to /tutor/bookings/{id}#chat forever. */}
-        <section id="chat" className="mt-6 scroll-mt-24">
-          <BookingChat
-            variant="embedded"
-            bookingId={booking.id}
-            me={me}
-            counterparty={booking.student}
-            initialMessages={booking.messages}
-            onActivity={() => router.refresh()}
-          />
-        </section>
 
       {/* Reschedule proposal modal — tutor picks a new date/time; server
           validates lead time and availability slot before writing the JSONB
@@ -603,6 +657,86 @@ export default function TutorBookingDetailPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirming !== null}
+        title={
+          confirming === 'cancel' ? 'ჯავშნის გაუქმება?'
+          : confirming === 'decline' ? 'უარი მოთხოვნაზე?'
+          : 'კლიენტი არ გამოცხადდა?'
+        }
+        body={
+          confirming === 'cancel'
+            ? 'სესიის დაწყებამდე 12 საათზე გვიან გაუქმება კლიენტისთვის სრულად ბრუნდება. კლიენტი მიიღებს შეტყობინებას.'
+            : confirming === 'decline'
+            ? 'კლიენტის მოთხოვნა გაუქმდება და ის მიიღებს შეტყობინებას.'
+            : 'ჯავშანი აღინიშნება როგორც no-show და თანხა კლიენტს დაუბრუნდება.'
+        }
+        tone={confirming === 'decline' ? 'warning' : 'danger'}
+        confirmLabel={
+          confirming === 'cancel' ? 'გაუქმება'
+          : confirming === 'decline' ? 'უარყოფა'
+          : 'დადასტურება'
+        }
+        busy={busy !== null}
+        onConfirm={async () => {
+          const kind = confirming
+          setConfirming(null)
+          if (kind === 'cancel') await cancelBooking()
+          else if (kind === 'decline') await act('decline')
+          else if (kind === 'no_show') await act('no_show')
+        }}
+        onCancel={() => setConfirming(null)}
+      />
+    </div>
+  )
+}
+
+/* Minimal 4-step lifecycle trail. Canceled/no-show render a terminal state
+   instead of fake progress. Pure presentation from status + clock. */
+function SessionTimeline({ status, startAt, durationMin }: { status: BookingStatus; startAt: string; durationMin: number }) {
+  if (status === 'CANCELED' || status === 'NO_SHOW') {
+    return (
+      <div className="rounded-card border border-ink-200 bg-ink-50/60 px-5 py-3.5 flex items-center gap-2.5">
+        <Icon.x className="w-4 h-4 text-ink-400 shrink-0" />
+        <span className="text-[12.5px] text-ink-500">
+          {status === 'CANCELED' ? 'ჯავშანი გაუქმდა — პროცესი შეწყვეტილია.' : 'სესია არ შედგა (no-show).'}
+        </span>
+      </div>
+    )
+  }
+  const ended = new Date(startAt).getTime() + durationMin * 60_000 < Date.now()
+  const doneCount =
+    status === 'COMPLETED' ? 4
+    : ended ? 3
+    : status !== 'PREPARING' ? 2
+    : 1
+  const STEPS = ['მოთხოვნა', 'დადასტურება', 'სესია', 'დასრულება']
+  return (
+    <div className="rounded-card border border-ink-200 bg-white shadow-xs px-5 py-4">
+      <ol className="flex items-center" aria-label="ჯავშნის ეტაპები">
+        {STEPS.map((label, i) => {
+          const done = i < doneCount
+          const current = i === doneCount
+          return (
+            <li key={label} className={`flex items-center ${i > 0 ? 'flex-1' : ''}`}>
+              {i > 0 && <span className={`flex-1 h-px mx-2 ${done ? 'bg-brand-400' : 'bg-ink-200'}`} aria-hidden />}
+              <span className="flex flex-col items-center gap-1.5 shrink-0">
+                <span className={`w-5 h-5 rounded-full inline-flex items-center justify-center border ${
+                  done ? 'bg-brand-500 border-brand-500 text-white'
+                  : current ? 'bg-white border-brand-400 text-brand-600'
+                  : 'bg-white border-ink-300 text-transparent'
+                }`}>
+                  {done ? <Icon.check className="w-3 h-3" /> : <span className={`w-1.5 h-1.5 rounded-full ${current ? 'bg-brand-500' : ''}`} />}
+                </span>
+                <span className={`font-display text-[10px] font-semibold uppercase tracking-[0.08em] ${done || current ? 'text-ink-800' : 'text-ink-400'}`}>
+                  {label}
+                </span>
+              </span>
+            </li>
+          )
+        })}
+      </ol>
     </div>
   )
 }

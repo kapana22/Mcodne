@@ -480,206 +480,51 @@ const SavedStrip = () => {
     )
   }
 
-  const cheapest = items.reduce((a, b) => (a.price < b.price ? a : b), items[0])
-  const soonest  = items[0]
-  const topRated = items.reduce((a, b) => (a.rating > b.rating ? a : b), items[0])
-
   return (
     <section className="rounded-card border border-ink-200 bg-white overflow-hidden">
-      {/* Header */}
-      <div className="px-5 sm:px-6 py-5 border-b border-ink-100">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="inline-flex items-center gap-2 mb-1.5">
-              <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700">მოკლე-სია</span>
-              <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill bg-ink-900 text-white text-[10.5px] font-display font-bold tabular-nums">{items.length}</span>
-            </div>
-            <h2 className="font-display text-[18px] sm:text-[20px] font-bold text-ink-900 tracking-tight leading-tight">
-              ვისაც <span className="text-brand-700">აკვირდები</span> — გადაწყვიტე და დაჯავშნე.
-            </h2>
-            <p className="text-[12.5px] text-ink-500 mt-1.5 max-w-[480px] leading-relaxed">
-              ექსპერტთა კატალოგიდან რომ შენახე — შეადარე გვერდიგვერდ და დაჯავშნე სესია ხელით შერჩეულ ექსპერტთან.
-            </p>
+      <div className="px-5 sm:px-6 py-5 border-b border-ink-100 flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <div className="inline-flex items-center gap-2 mb-1">
+            <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700">შენახული</span>
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill bg-ink-900 text-white text-[10.5px] font-display font-bold tabular-nums">{items.length}</span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setCompare(c => !c)}
-              className={`h-9 px-3.5 rounded-btn inline-flex items-center gap-1.5 font-display text-[12px] font-semibold tracking-wide transition-colors ${compare ? 'bg-ink-900 text-white' : 'bg-white border border-ink-200 hover:border-ink-300 text-ink-800'}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M8 3v18M16 3v18M3 8h5M16 16h5M3 16h5M16 8h5" /></svg>
-              გვერდიგვერდ შედარება
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                if (!items.length) return
-                if (!window.confirm('გავასუფთავო მოკლე-სია?')) return
-                const prev = items
-                setItems([])
-                try {
-                  await Promise.all(prev.map(w => fetch(`/api/favorites?tutorId=${w.id}`, { method: 'DELETE' })))
-                } catch {
-                  setItems(prev)
-                }
-              }}
-              className="hidden sm:inline-flex h-9 px-3 rounded-btn text-ink-500 hover:text-ink-900 hover:bg-ink-50 font-display text-[12px] font-medium transition-colors"
-            >
-              გასუფთავება
-            </button>
-          </div>
+          <h2 className="font-display text-[18px] sm:text-[20px] font-bold text-ink-900 tracking-tight leading-tight">შენახული ექსპერტები</h2>
         </div>
-
-        {/* Smart insights */}
-        <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          <div className="rounded-card border border-ink-100 bg-ink-50/50 px-3.5 py-2.5">
-            <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-0.5">უსწრაფესი</div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-display text-[13.5px] font-bold text-ink-900 truncate">{soonest.name}</span>
-              <span className="text-[11.5px] text-ink-500 tabular-nums whitespace-nowrap">· {soonest.next}</span>
-            </div>
-          </div>
-          <div className="rounded-card border border-ink-100 bg-ink-50/50 px-3.5 py-2.5">
-            <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-0.5">ხელსაყრელი ფასი</div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-display text-[13.5px] font-bold text-ink-900 truncate">{cheapest.name}</span>
-              <span className="text-[11.5px] text-ink-500 tabular-nums whitespace-nowrap">· ₾{cheapest.price}</span>
-            </div>
-          </div>
-          <div className="rounded-card border border-ink-100 bg-ink-50/50 px-3.5 py-2.5">
-            <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-0.5">საუკეთესო რეიტინგი</div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-display text-[13.5px] font-bold text-ink-900 truncate">{topRated.name}</span>
-              <span className="text-[11.5px] text-ink-500 tabular-nums whitespace-nowrap">· {topRated.rating.toFixed(2)} ★</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* List — editorial numbered */}
-      <ol className="divide-y divide-ink-100">
-        {items.map((w, i) => (
-          <li key={w.id} className="group grid grid-cols-[28px_auto_1fr_auto] sm:grid-cols-[36px_auto_1fr_auto_auto] items-center gap-3 sm:gap-4 px-5 sm:px-6 py-4 hover:bg-ink-50/40 transition-colors">
-            <span className="font-display text-[12px] font-bold text-ink-300 tabular-nums tracking-wide">{String(i + 1).padStart(2, '0')}</span>
-
-            <button type="button" onClick={() => onQuickView(w)} className="relative shrink-0 rounded-full hover:ring-2 hover:ring-brand-300 transition-all">
-              <img src={`https://i.pravatar.cc/96?img=${w.photo}`} alt={w.name} className="w-10 h-10 rounded-full object-cover" />
-              <span className="absolute -bottom-0.5 -right-0.5"><VerifiedMark size={13} /></span>
-            </button>
-
-            <button type="button" onClick={() => onQuickView(w)} className="min-w-0 text-left">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-display text-[14.5px] font-bold text-ink-900 tracking-tight truncate group-hover:text-brand-800 transition-colors">{w.name}</h3>
-                <span className="font-display text-[11.5px] font-semibold text-brand-700">{w.cat}</span>
-                <span className="hidden md:inline-flex items-center gap-1 px-1.5 h-5 rounded-pill bg-info-50 border border-info-200 text-[10px] font-display font-bold uppercase tracking-[0.1em] text-info-700 tabular-nums">
-                  {w.match}% match
-                </span>
-              </div>
-              <div className="mt-1 inline-flex items-center gap-x-3 gap-y-0.5 flex-wrap text-[11.5px] text-ink-500">
-                <span>{w.headline}</span>
-                <span className="hidden sm:inline-flex items-center gap-1 text-ink-600">
-                  <Icon.star className="w-3 h-3 text-warning-500" />
-                  <span className="font-display font-semibold tabular-nums">{w.rating.toFixed(2)}</span>
-                  <span className="text-ink-400 tabular-nums">({w.reviews})</span>
-                </span>
-                <span className="inline-flex items-center gap-1 text-ink-600">
-                  <Icon.clock className="w-3 h-3" />
-                  <span className="tabular-nums">{w.next}</span>
-                </span>
-              </div>
-            </button>
-
-            <div className="hidden sm:flex items-baseline gap-1.5 shrink-0">
-              <span className="font-display text-[16px] font-bold text-ink-900 tabular-nums tracking-tight">₾{w.price}</span>
-              {/* Flat per-session price — durations vary per expert, so a hardcoded "60 წთ" lied for most. */}
-              <span className="text-[10.5px] text-ink-500">/ სესია</span>
-            </div>
-
-            <div className="flex items-center gap-1 shrink-0">
-              <button type="button" onClick={() => onBook(w)} className="h-9 px-3 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors">
-                <Icon.cal className="w-3.5 h-3.5" />
-                ჯავშანი
-              </button>
-              <button
-                type="button"
-                aria-label="წაშლა მოკლე-სიიდან"
-                onClick={async () => {
-                  const prev = items
-                  setItems(p => p.filter(x => x.id !== w.id))
-                  try {
-                    const res = await fetch(`/api/favorites?tutorId=${w.id}`, { method: 'DELETE' })
-                    if (!res.ok) setItems(prev)
-                  } catch {
-                    setItems(prev)
-                  }
-                }}
-                className="h-9 w-9 rounded-btn text-ink-400 hover:text-danger-600 hover:bg-danger-50 inline-flex items-center justify-center transition-colors"
-              >
-                <Icon.x className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </li>
-        ))}
-      </ol>
-
-      {/* Add slot */}
-      <div className="px-5 sm:px-6 py-3.5 bg-ink-50/50 border-t border-ink-100 flex items-center justify-between flex-wrap gap-3">
-        <Link href="/tutors" className="inline-flex items-center gap-1.5 font-display text-[12px] font-semibold text-ink-700 hover:text-brand-700 transition-colors">
-          <Icon.plus className="w-3.5 h-3.5" />
-          დაამატე ექსპერტი მოკლე-სიაში
+        <Link href="/student/favorites" className="font-display text-[12px] font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
+          ყველა · გვერდიგვერდ შედარება
+          <Icon.arrow className="w-3 h-3" />
         </Link>
-        <span className="text-[11.5px] text-ink-500">
-          <Icon.spark className="w-3 h-3 inline -mt-0.5 mr-1 text-brand-600" />
-          ყველა აქ — ხელით შერჩეული და გადამოწმებული
-        </span>
       </div>
-
-      {/* Compare drawer (live, in same artboard) */}
-      {compare && (
-        <div className="border-t-2 border-ink-900 bg-ink-900 text-white">
-          <div className="px-5 sm:px-6 py-4 flex items-baseline justify-between">
-            <div className="font-display text-[13px] font-bold tracking-tight">გვერდიგვერდ — {items.length} ექსპერტი</div>
-            <button type="button" onClick={() => setCompare(false)} className="text-[11px] text-white/60 hover:text-white inline-flex items-center gap-1">
-              დახურვა <Icon.x className="w-3 h-3" />
-            </button>
-          </div>
-          <div className="px-5 sm:px-6 pb-5 overflow-x-auto">
-            <table className="w-full text-[12px] min-w-[540px]">
-              <thead>
-                <tr className="text-left text-white/40 font-display uppercase tracking-[0.14em] text-[10px]">
-                  <th className="font-medium py-2 pr-3 w-[120px]">პარამეტრი</th>
-                  {items.map(w => (
-                    <th key={w.id} className="font-medium py-2 px-2">
-                      <div className="inline-flex items-center gap-1.5 text-white normal-case tracking-normal">
-                        <img src={`https://i.pravatar.cc/64?img=${w.photo}`} alt="" className="w-5 h-5 rounded-full" />
-                        <span className="font-display text-[12px] font-bold">{w.name.split(' ')[0]}</span>
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="font-display tabular-nums">
-                <tr className="border-t border-white/10">
-                  <td className="py-2.5 pr-3 text-white/60">ფასი / სესია</td>
-                  {items.map(w => <td key={w.id} className={`py-2.5 px-2 font-bold ${w.price === cheapest.price ? 'text-brand-300' : 'text-white'}`}>₾{w.price}</td>)}
-                </tr>
-                <tr className="border-t border-white/10">
-                  <td className="py-2.5 pr-3 text-white/60">რეიტინგი</td>
-                  {items.map(w => <td key={w.id} className={`py-2.5 px-2 font-bold ${w.rating === topRated.rating ? 'text-brand-300' : 'text-white'}`}>{w.rating.toFixed(2)} ★</td>)}
-                </tr>
-                <tr className="border-t border-white/10">
-                  <td className="py-2.5 pr-3 text-white/60">უახლოესი</td>
-                  {items.map(w => <td key={w.id} className="py-2.5 px-2 text-white">{w.next}</td>)}
-                </tr>
-                <tr className="border-t border-white/10">
-                  <td className="py-2.5 pr-3 text-white/60">ენები</td>
-                  {items.map(w => <td key={w.id} className="py-2.5 px-2 text-white normal-case tracking-normal">{w.langs.join(' · ')}</td>)}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {items.slice(0, 4).map(w => (
+          <Link key={w.id} href={`/tutors/${w.id}`} className="group rounded-card border border-ink-200 hover:border-ink-300 hover:shadow-card transition-all p-4 min-w-0 bg-white">
+            <div className="flex items-center gap-3">
+              {w.avatar ? (
+                <img src={w.avatar} alt={w.name} className="w-11 h-11 rounded-full object-cover ring-1 ring-ink-200 shrink-0" />
+              ) : (
+                <span className="w-11 h-11 rounded-full bg-brand-100 text-brand-700 font-display font-bold inline-flex items-center justify-center ring-1 ring-ink-200 shrink-0">
+                  {w.name.slice(0, 1)}
+                </span>
+              )}
+              <div className="min-w-0">
+                <div className="font-display text-[13px] font-bold text-ink-900 truncate group-hover:text-brand-800 transition-colors">{w.name}</div>
+                <div className="text-[11px] text-ink-500 truncate">{w.cat}</div>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between text-[12px]">
+              <span className="inline-flex items-center gap-1 text-ink-600">
+                {w.rating > 0 && (
+                  <>
+                    <Icon.star className="w-3 h-3 text-warning-500" />
+                    <span className="font-display font-semibold tabular-nums">{w.rating.toFixed(1)}</span>
+                  </>
+                )}
+              </span>
+              <span className="font-display font-bold text-ink-900 tabular-nums">₾{w.price}</span>
+            </div>
+          </Link>
+        ))}
+      </div>
     </section>
   )
 }
@@ -1232,246 +1077,33 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
   )
 }
 
-/* ───── Sidebar: Book again CTA ───── */
-const BookAgain = ({ onBook }: { onBook: () => void }) => (
-  <section className="rounded-card overflow-hidden border border-ink-200 bg-white p-5">
-    <div className="inline-flex items-center gap-1.5 mb-2">
-      <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-brand-700">სწრაფი ჯავშანი</span>
-    </div>
-    <h3 className="font-display text-[18px] font-bold text-ink-900 tracking-tight leading-tight">
-      აირჩიე ექსპერტი —<br />დაჯავშნე ვიდეო-სესია.
-    </h3>
-    <p className="text-[12.5px] text-ink-600 mt-2 leading-relaxed">
-      მოგვწერე თემა — ჩვენი matching gun-ი დაგიფიქსირებს 3 ვარიანტს.
-    </p>
-    <div className="mt-4 space-y-1.5">
-      <button type="button" onClick={onBook} className="w-full h-10 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors">
-        <Icon.plus className="w-4 h-4" />
-        ახალი ჯავშანი
-      </button>
-      <button type="button" onClick={() => { window.location.href = '/tutors' }} className="w-full h-10 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors">
-        ექსპერტების ძებნა
-      </button>
-    </div>
-  </section>
-)
-
-/* ───── Sidebar: Wallet / escrow ─────
-   Gated behind FEATURE_PAYMENTS_V2 — the wallet/escrow balance backend
-   (Stripe/BOG/TBC ledger) hasn't shipped yet; showing mock values would
-   mislead users. Component is retained so flipping the flag re-enables it. */
-const Wallet = () => (
-  FEATURE_PAYMENTS_V2 ? (
-  <section className="rounded-card overflow-hidden border border-ink-200 bg-ink-900 text-white">
-    <div className="p-5">
-      <div className="inline-flex items-center gap-1.5 mb-3">
-        <Icon.shield className="w-3.5 h-3.5 text-brand-400" />
-        <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/60">escrow ბალანსი</span>
-      </div>
-      <div className="flex items-baseline gap-1.5">
-        <span className="font-display text-[34px] font-bold leading-none tabular-nums tracking-[-0.03em]">₾240</span>
-        <span className="text-[11.5px] text-white/50">/ 3 აქტიური სესია</span>
-      </div>
-      <div className="mt-5 space-y-2.5 text-[11.5px]">
-        <div className="flex items-center justify-between text-white/70">
-          <span>დაცული TBC-ში</span>
-          <span className="font-display font-semibold tabular-nums text-white">₾200</span>
-        </div>
-        <div className="flex items-center justify-between text-white/70">
-          <span>დაცული BOG-ში</span>
-          <span className="font-display font-semibold tabular-nums text-white">₾40</span>
-        </div>
-        <div className="h-px bg-white/10 my-2" />
-        <div className="flex items-center justify-between text-white/55">
-          <span>ბოლო შევსება · 6 ივნ.</span>
-          <span className="font-display font-semibold tabular-nums text-white/80">+₾80</span>
-        </div>
-      </div>
-    </div>
-    <div className="border-t border-white/10 grid grid-cols-2 divide-x divide-white/10">
-      <button type="button" className="h-11 font-display text-[12px] font-semibold text-white/85 hover:bg-white/5 transition-colors inline-flex items-center justify-center gap-1.5">
-        <Icon.plus className="w-3.5 h-3.5" />
-        შევსება
-      </button>
-      <button type="button" className="h-11 font-display text-[12px] font-semibold text-white/85 hover:bg-white/5 transition-colors inline-flex items-center justify-center gap-1.5">
-        <Icon.doc className="w-3.5 h-3.5" />
-        ისტორია
-      </button>
-    </div>
-  </section>
-  ) : null
-)
-
-/* ───── Modal shell ───── */
-const Modal = ({ open, onClose, children, size = 'md' }: { open: boolean; onClose: () => void; children: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' }) => {
-  if (!open) return null
-  const w = { sm: 'max-w-[460px]', md: 'max-w-[640px]', lg: 'max-w-[860px]', xl: 'max-w-[1040px]' }[size]
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6 overflow-y-auto">
-      <div onClick={onClose} className="fixed inset-0 bg-ink-900/65 backdrop-blur-[3px]" />
-      <div className={`relative w-full ${w} my-auto rounded-card bg-white shadow-float overflow-hidden`}>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-const ModalHeader = ({ eyebrow, title, sub, onClose, accent }: { eyebrow?: string; title: string; sub?: string; onClose: () => void; accent?: boolean }) => (
-  <div className={`px-6 sm:px-7 py-5 border-b border-ink-100 flex items-start justify-between gap-4 ${accent ? 'bg-ink-50/40' : ''}`}>
-    <div className="min-w-0">
-      {eyebrow && <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1.5">{eyebrow}</div>}
-      <h2 className="font-display text-[18px] sm:text-[20px] font-bold text-ink-900 tracking-tight leading-tight">{title}</h2>
-      {sub && <p className="text-[12.5px] text-ink-500 mt-1 leading-snug">{sub}</p>}
-    </div>
-    <button type="button" onClick={onClose} aria-label="დახურვა" className="shrink-0 w-9 h-9 rounded-btn hover:bg-ink-100 text-ink-500 hover:text-ink-900 inline-flex items-center justify-center transition-colors">
-      <Icon.x className="w-4 h-4" />
-    </button>
-  </div>
-)
-
-
-// SessionDetailModal was placeholder content (hardcoded topic/agenda/files) — replaced by
-// direct navigation to /student/bookings/[id], which renders the real detail page.
-
-/* ───── Expert quick modal ───── */
-const ExpertQuickModal = ({ open, onClose, expert, onBook }: { open: boolean; onClose: () => void; expert: WishItem | null; onBook: (w: WishItem) => void }) => {
-  if (!expert) return null
-  return (
-    <Modal open={open} onClose={onClose} size="md">
-      <ModalHeader
-        eyebrow="ექსპერტი"
-        title={expert.name}
-        sub={expert.headline || expert.cat}
-        onClose={onClose}
-      />
-      <div className="p-6 sm:p-7">
-        <div className="flex items-start gap-4">
-          <img src={`https://i.pravatar.cc/200?img=${expert.photo}`} alt={expert.name} className="w-20 h-20 rounded-card object-cover shrink-0" />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px]">
-              <span className="inline-flex items-center gap-1"><Icon.star className="w-3.5 h-3.5 text-warning-500" /><span className="font-display font-bold tabular-nums">{expert.rating.toFixed(2)}</span><span className="text-ink-500">({expert.reviews})</span></span>
-              <span className="text-ink-300">·</span>
-              <span className="text-ink-700">{expert.langs.join(' · ')}</span>
-            </div>
-            <p className="mt-3 text-[13px] text-ink-700 leading-[1.55]">{expert.headline}</p>
-          </div>
-        </div>
-
-        <div className="mt-5 text-center">
-          <div className="rounded-card border border-ink-200 px-3 py-3">
-            <div className="font-display text-[9.5px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1">ფასი</div>
-            <div className="font-display text-[16px] font-bold text-ink-900 tabular-nums leading-none">₾{expert.price}<span className="text-[11px] font-medium text-ink-500 ml-1">/ სესია</span></div>
-          </div>
-        </div>
-      </div>
-      <div className="px-6 sm:px-7 py-4 border-t border-ink-100 flex items-center justify-between gap-3">
-        <Link href={`/tutors/${expert.id}`} onClick={() => onClose()} className="font-display text-[12.5px] font-semibold text-ink-700 hover:text-ink-900 inline-flex items-center gap-1">
-          სრული პროფილი
-          <Icon.arrow className="w-3 h-3" />
-        </Link>
-        <button type="button" onClick={() => onBook(expert)} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
-          <Icon.cal className="w-4 h-4" />
-          ჯავშნა
-        </button>
-      </div>
-    </Modal>
-  )
-}
-
-/* ───── Footer (compact) ───── */
-const Footer = () => (
-  <footer className="mt-20 lg:mt-24 bg-white border-t border-ink-200">
-    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-      <div className="flex items-center gap-4">
-        <Logo />
-        <span className="text-[12px] text-ink-500">© 2026 · ყველა უფლება დაცულია.</span>
-      </div>
-      <div className="flex items-center gap-5 text-[12px] text-ink-500">
-        <Link href="/help" className="hover:text-ink-900">დახმარება</Link>
-        <Link href="/terms" className="hover:text-ink-900">წესები</Link>
-        <Link href="/privacy" className="hover:text-ink-900">კონფიდენციალურობა</Link>
-      </div>
-    </div>
-  </footer>
-)
-
-/* ───── User menu (popover) ───── */
-const UserMenu = ({ open, onClose, me }: { open: boolean; onClose: () => void; me: MeData | null }) => {
-  if (!open) return null
-  return (
-    <>
-      <div onClick={onClose} className="fixed inset-0 z-40" />
-      <div className="absolute right-6 sm:right-8 top-[68px] z-50 w-[260px] rounded-card border border-ink-200 bg-white shadow-float overflow-hidden">
-        <div className="px-4 py-4 border-b border-ink-100 flex items-center gap-3">
-          {me?.avatarUrl ? (
-            <img src={me.avatarUrl} alt={me.fullName} className="w-10 h-10 rounded-full object-cover" />
-          ) : (
-            <span className="w-10 h-10 rounded-full bg-brand-100 text-brand-700 font-display font-bold inline-flex items-center justify-center">{me?.fullName ? me.fullName.slice(0, 1) : '·'}</span>
-          )}
-          <div className="min-w-0">
-            <div className="font-display text-[13.5px] font-bold text-ink-900 tracking-tight truncate">{me?.fullName ?? '—'}</div>
-            <div className="text-[11.5px] text-ink-500 truncate">{me?.email ?? ''}</div>
-          </div>
-        </div>
-        <div className="py-1.5">
-          {[
-            { l: 'პროფილი', i: Icon.user, href: '/student/profile' },
-            { l: 'პარამეტრები', i: Icon.settings, href: '/settings' },
-            ...(FEATURE_PAYMENTS_V2 ? [{ l: 'გადახდის მეთოდები', i: Icon.card, href: '/settings#payments' }] : []),
-            { l: 'ექსპერტი გავხდე', i: Icon.spark, href: '/apply', accent: true },
-          ].map(it => (
-            <a key={it.l} href={it.href} onClick={onClose} className={`flex items-center gap-3 px-4 py-2 text-[13px] hover:bg-ink-50 ${it.accent ? 'text-brand-700 font-display font-semibold' : 'text-ink-800'}`}>
-              <it.i className="w-4 h-4" />
-              {it.l}
-            </a>
-          ))}
-        </div>
-        <div className="border-t border-ink-100 py-1.5">
-          {/* fetch + navigate (NOT a native form POST): the signout endpoint
-              returns JSON, so a form submit would render {"ok":true} as a page. */}
-          <button type="button" onClick={() => signOut()} className="flex items-center gap-3 px-4 py-2 text-[13px] text-ink-700 hover:bg-ink-50 w-full text-left">
-            <Icon.logout className="w-4 h-4" />
-            გასვლა
-          </button>
-        </div>
-      </div>
-    </>
-  )
-}
-
 /* ───── Page ───── */
 /* ───── Dashboard "home" section — wraps the original main content ───── */
-const HomeSection = ({ me, bookings, bookingsLoading, bookingsError, reload, openBookingFor, openBookingGeneric, onOpenDetail, onOpenExpert }: { me: MeData | null; bookings: any[]; bookingsLoading: boolean; bookingsError: string | null; reload: () => Promise<void> | void; openBookingFor: (w: WishItem) => void; openBookingGeneric: () => void; onOpenDetail: (id?: string) => void; onOpenExpert: (w: WishItem) => void }) => (
+const HomeSection = ({ me, bookings, bookingsLoading, bookingsError, reload, onOpenDetail }: { me: MeData | null; bookings: any[]; bookingsLoading: boolean; bookingsError: string | null; reload: () => Promise<void> | void; onOpenDetail: (id?: string) => void }) => (
   <>
     <Welcome me={me} bookings={bookings} />
     <OnboardingTour userId={me?.id} hasBookings={bookings.length > 0} joinedAt={(me as any)?.createdAt} />
     <main className="max-w-[1280px] mx-auto px-6 sm:px-8 py-8 lg:py-10">
+      {/* Primary: the user's own sessions come FIRST, full-width — the old
+          quick-book sidebar duplicated the hero search and is gone.
+          Discovery (recommendations, saved strip) follows below. */}
       <div className="mb-6">
         <NextSession bookings={bookings} loading={bookingsLoading} onOpenDetail={onOpenDetail} onOpenExpert={() => {}} />
       </div>
-      {/* Primary: the user's own sessions (+ quick-book rail) come FIRST —
-          discovery (recommendations, shortlist) follows below. */}
-      <div className="grid lg:grid-cols-[1fr_340px] gap-6 xl:gap-8 items-start mb-8">
-        <div className="min-w-0 space-y-6">
-          <SessionsPanel bookings={bookings} loading={bookingsLoading} loadError={bookingsError} reload={reload} onOpenSession={s => onOpenDetail(s.id)} />
-        </div>
-        <aside className="space-y-5 lg:sticky lg:top-[80px]">
-          <BookAgain onBook={openBookingGeneric} />
-        </aside>
+      <div className="mb-8">
+        <SessionsPanel bookings={bookings} loading={bookingsLoading} loadError={bookingsError} reload={reload} onOpenSession={s => onOpenDetail(s.id)} />
       </div>
       <div className="mb-8">
         <Discover onOpen={(t) => { window.location.href = `/tutors/${t.id}` }} />
       </div>
       <div>
-        <Wishlist onBook={openBookingFor} onQuickView={onOpenExpert} />
+        <SavedStrip />
       </div>
     </main>
   </>
 )
 
 export default function Dashboard() {
-  const [userMenu, setUserMenu] = useState(false)
-  const [expertOpen, setExpertOpen] = useState<WishItem | null>(null)
   const [me, setMe] = useState<MeData | null>(null)
   // 'checking' until /api/me resolves — we render a neutral loader, never the
   // authed shell, so unauthenticated visitors don't flash logged-in UI before
@@ -1543,11 +1175,6 @@ export default function Dashboard() {
     loadBookings()
   }, [checkAuth, loadBookings])
 
-  // Go straight to the expert's profile where the real booking modal lives —
-  // no intermediate (non-submitting) sheet. ?rebook=1 auto-opens the picker.
-  const openBookingFor = (w: WishItem) => { window.location.href = `/tutors/${w.id}?rebook=1` }
-  const openBookingGeneric = () => { window.location.href = '/tutors' }
-
   // Neutral gate while we confirm the session — no authed chrome, no redirect
   // flash. On failure this becomes a visible dead-end-free error card with a
   // retry, never an indefinite spinner.
@@ -1580,8 +1207,7 @@ export default function Dashboard() {
 
   return (
     <div className="font-sans bg-ink-50/40 text-ink-900 antialiased min-w-0">
-      <TopBar me={me} onOpenMenu={() => setUserMenu(o => !o)} menuOpen={userMenu} />
-      <UserMenu open={userMenu} onClose={() => setUserMenu(false)} me={me} />
+      <StudentAppBar user={me ? { name: me.fullName, avatar: me.avatarUrl } : undefined} />
 
       <HomeSection
         me={me}
@@ -1589,16 +1215,10 @@ export default function Dashboard() {
         bookingsLoading={bookingsLoading}
         bookingsError={bookingsError}
         reload={loadBookings}
-        openBookingFor={openBookingFor}
-        openBookingGeneric={openBookingGeneric}
         onOpenDetail={(id) => { if (id) window.location.href = `/student/bookings/${id}` }}
-        onOpenExpert={setExpertOpen}
       />
 
-      <Footer />
-
-      {/* Modals */}
-      <ExpertQuickModal open={!!expertOpen} onClose={() => setExpertOpen(null)} expert={expertOpen} onBook={(w) => { setExpertOpen(null); openBookingFor(w) }} />
+      <WorkspaceFooter />
     </div>
   )
 }
