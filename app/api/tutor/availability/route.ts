@@ -8,16 +8,37 @@ const Body = z.object({
   endAt: z.string().datetime(),
 })
 
-export async function GET() {
+export async function GET(req: Request) {
   const user = await requireRole(['TUTOR', 'ADMIN'])
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
-  if (!profile) return NextResponse.json({ slots: [] })
-  const slots = await prisma.availabilitySlot.findMany({
-    where: { tutorId: profile.id },
-    orderBy: { startAt: 'asc' },
-    take: 200,
-  })
-  return NextResponse.json({ slots })
+  if (!profile) return NextResponse.json({ slots: [], upcomingFreeCount: 0 })
+
+  // Optional window filter. take raised 200 → 500: a 12-week weekly template
+  // materializes ~480 rows, and the old cap silently hid the tail so the grid
+  // lied about published availability.
+  const url = new URL(req.url)
+  const from = url.searchParams.get('from')
+  const to = url.searchParams.get('to')
+  const fromDate = from ? new Date(from) : null
+  const toDate = to ? new Date(to) : null
+
+  const [slots, upcomingFreeCount] = await Promise.all([
+    prisma.availabilitySlot.findMany({
+      where: {
+        tutorId: profile.id,
+        ...(fromDate && !isNaN(fromDate.getTime()) ? { startAt: { gte: fromDate } } : {}),
+        ...(toDate && !isNaN(toDate.getTime()) ? { endAt: { lte: toDate } } : {}),
+      },
+      orderBy: { startAt: 'asc' },
+      take: 500,
+    }),
+    // Exact activation signal, independent of the list cap — the schedule
+    // banner and dashboard alert key off this.
+    prisma.availabilitySlot.count({
+      where: { tutorId: profile.id, booked: false, startAt: { gt: new Date() } },
+    }),
+  ])
+  return NextResponse.json({ slots, upcomingFreeCount })
 }
 
 export async function POST(req: Request) {

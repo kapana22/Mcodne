@@ -17,7 +17,10 @@ type Booking = {
 }
 type Slot = { id: string; startAt: string; endAt: string; booked: boolean }
 const DAY_LABELS = ['ორშ', 'სამ', 'ოთხ', 'ხუთ', 'პარ', 'შაბ', 'კვი']
-const HOURS = Array.from({ length: 13 }, (_, i) => 8 + i) // 8..20
+// Default visible band; "ყველა საათი" expands to the full range. Hours the
+// visible week actually occupies are always unioned in so nothing hides.
+const HOURS_DEFAULT: [number, number] = [9, 19]
+const HOURS_FULL: [number, number] = [8, 22]
 
 function startOfWeek(d: Date) {
   const day = (d.getDay() + 6) % 7 // Mon=0
@@ -79,6 +82,9 @@ export default function TutorSchedulePage() {
   const [tplSaving, setTplSaving] = useState(false)
   const [tplErr, setTplErr] = useState<string | null>(null)
   const [tplMsg, setTplMsg] = useState<string | null>(null)
+  const [allHours, setAllHours] = useState(false)
+  // Exact upcoming-free count from the server (independent of the list cap).
+  const [serverFreeCount, setServerFreeCount] = useState<number | null>(null)
 
   // Deletion is always confirmed through <ConfirmModal> (native confirm() is
   // banned in this codebase) — callers set confirmDeleteId, the modal calls this.
@@ -134,6 +140,7 @@ export default function TutorSchedulePage() {
       // Refresh slots list from server so the new rows appear in the grid.
       const sRes = await fetch('/api/tutor/availability').then(r => r.json()).catch(() => null)
       if (sRes?.slots) setSlots(sRes.slots)
+      if (typeof sRes?.upcomingFreeCount === 'number') setServerFreeCount(sRes.upcomingFreeCount)
       setTplMsg(`შეიქმნა ${j.created} სლოტი` + (j.skipped ? ` · ${j.skipped} გამოტოვდა (გადაფარვა)` : ''))
       toast(`შეიქმნა ${j.created} სლოტი`, 'success')
       // Auto-close on success after a beat so the user reads the count.
@@ -185,6 +192,7 @@ export default function TutorSchedulePage() {
         if (cancelled) return
         setBookings(bRes?.bookings ?? [])
         setSlots(sRes?.slots ?? [])
+        if (typeof sRes?.upcomingFreeCount === 'number') setServerFreeCount(sRes.upcomingFreeCount)
       } catch {
         if (!cancelled) setErr('მონაცემების ჩატვირთვა ვერ მოხერხდა')
       }
@@ -319,10 +327,38 @@ export default function TutorSchedulePage() {
 
   // Count of upcoming, still-free slots. Zero means clients literally cannot
   // book this expert — surfaced as an activation banner above the grid.
-  const upcomingFree = useMemo(
+  // Server count is exact (list is capped at 500 rows); fall back to the
+  // local list while loading.
+  const localFree = useMemo(
     () => (slots ?? []).filter(s => !s.booked && new Date(s.startAt).getTime() > Date.now()).length,
     [slots],
   )
+  const upcomingFree = serverFreeCount ?? localFree
+
+  // Booked sessions inside the visible week (summary chip).
+  const weekBooked = useMemo(() => {
+    const weekEnd = addDays(weekStart, 7)
+    return (bookings ?? []).filter(b => {
+      const d = new Date(b.startAt)
+      return d >= weekStart && d < weekEnd && (b.status === 'CONFIRMED' || b.status === 'LIVE' || b.status === 'PREPARING')
+    }).length
+  }, [bookings, weekStart])
+
+  // Dynamic hour band: default 9–19, expanded to 8–22 on demand, always
+  // unioned with hours the visible week actually occupies.
+  const hours = useMemo(() => {
+    let [lo, hi] = allHours ? HOURS_FULL : HOURS_DEFAULT
+    const weekEnd = addDays(weekStart, 7)
+    const consider = (iso: string) => {
+      const d = new Date(iso)
+      if (d < weekStart || d >= weekEnd) return
+      lo = Math.min(lo, d.getHours())
+      hi = Math.max(hi, d.getHours() + 1)
+    }
+    for (const b of bookings ?? []) consider(b.startAt)
+    for (const sl of slots ?? []) consider(sl.startAt)
+    return Array.from({ length: hi - lo }, (_, i) => lo + i)
+  }, [allHours, bookings, slots, weekStart])
 
   return (
     <div>
@@ -347,18 +383,34 @@ export default function TutorSchedulePage() {
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-2 lg:flex lg:items-center lg:justify-end gap-2">
-            <Btn variant="primary" size="md" className="col-span-2 lg:col-span-1 lg:h-9 lg:px-3.5 lg:text-[12.5px]" onClick={() => openModalFor(selectedDay, 9)}>
-              <Icon.plus className="w-4 h-4" /> სლოტის დამატება
-            </Btn>
-            <Btn variant="secondary" size="md" className="lg:h-9 lg:px-3.5 lg:text-[12.5px]" onClick={() => setTplOpen(true)}>
-              <span className="lg:hidden">განრიგი</span>
-              <span className="hidden lg:inline">ყოველკვირეული განრიგი</span>
-            </Btn>
-            <Btn variant="secondary" size="md" className="lg:h-9 lg:px-3.5 lg:text-[12.5px]" onClick={() => setBlockOpen(true)}>
-              <span className="lg:hidden">შვებულება</span>
-              <span className="hidden lg:inline">შვებულების პერიოდი</span>
-            </Btn>
+          {/* Weekly template is the promoted flow — it's how availability
+              actually gets published at scale; one-off slots and vacation
+              are the quieter secondaries. */}
+          <div className="flex flex-wrap items-center gap-2 lg:justify-between">
+            <div className="flex items-center gap-2 flex-wrap text-[12px]">
+              <span className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border font-display font-semibold ${
+                !loading && upcomingFree === 0
+                  ? 'bg-warning-50 border-warning-200 text-warning-800'
+                  : 'bg-brand-50 border-brand-200 text-brand-800'
+              }`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+                {loading ? '…' : `${upcomingFree} თავისუფალი სლოტი`}
+              </span>
+              <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border border-ink-200 bg-white text-ink-600 font-display font-semibold">
+                {loading ? '…' : `${weekBooked} ჯავშანი ამ კვირაში`}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 lg:flex lg:items-center gap-2 w-full lg:w-auto">
+              <Btn variant="primary" size="md" className="col-span-2 lg:col-span-1 lg:h-9 lg:px-3.5 lg:text-[12.5px]" onClick={() => setTplOpen(true)}>
+                <Icon.calendar className="w-4 h-4" /> ყოველკვირეული განრიგი
+              </Btn>
+              <Btn variant="secondary" size="md" className="lg:h-9 lg:px-3.5 lg:text-[12.5px]" onClick={() => openModalFor(selectedDay, 9)}>
+                <Icon.plus className="w-4 h-4" /> სლოტი
+              </Btn>
+              <Btn variant="ghost" size="md" className="lg:h-9 lg:px-3.5 lg:text-[12.5px]" onClick={() => setBlockOpen(true)}>
+                შვებულება
+              </Btn>
+            </div>
           </div>
         </div>
 
@@ -556,7 +608,7 @@ export default function TutorSchedulePage() {
               })}
             </div>
             <div className="max-h-[600px] overflow-y-auto">
-              {HOURS.map(h => (
+              {hours.map(h => (
                 <div key={h} className="grid grid-cols-[64px_repeat(7,1fr)] border-b border-ink-100 min-h-[64px]">
                   <div className="px-2 py-2 text-[11px] font-mono text-ink-400 border-r border-ink-100 tabular-nums">
                     {String(h).padStart(2, '0')}:00
@@ -565,41 +617,43 @@ export default function TutorSchedulePage() {
                     const key = `${dayIdx}-${h}`
                     const cellBookings = grid.bookingsByCell[key] ?? []
                     const cellSlots = grid.slotsByCell[key] ?? []
+                    const isTodayCol = addDays(weekStart, dayIdx).toDateString() === new Date().toDateString()
                     return (
                       <button
                         key={dayIdx}
                         type="button"
                         onClick={() => openModalFor(dayIdx, h)}
-                        className="border-l border-ink-100 hover:bg-brand-50/40 transition-colors text-left p-1 group relative"
+                        className={`border-l border-ink-100 hover:bg-brand-50/40 transition-colors text-left p-1 group relative ${isTodayCol ? 'bg-brand-50/20' : ''}`}
                       >
                         {cellBookings.map(b => (
                           // Click booking pill → open booking detail. `stopPropagation`
                           // so the outer cell's "add slot" handler doesn't fire.
+                          // White card + brand left bar: booked ≠ decorative wash.
                           <Link
                             key={b.id}
                             href={`/tutor/bookings/${b.id}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="block rounded-field bg-brand-50 border border-brand-200 text-brand-800 px-1.5 py-1 mb-1 hover:bg-brand-100 transition-colors"
+                            className="block rounded-field bg-white border border-ink-200 border-l-[3px] border-l-brand-500 text-ink-800 px-1.5 py-1 mb-1 hover:border-ink-300 hover:shadow-xs transition-all"
                           >
                             <div className="text-[10.5px] font-display font-bold truncate">{b.student?.fullName ?? 'ჯავშანი'}</div>
-                            <div className="text-[10px] truncate opacity-80">{b.topic}</div>
+                            <div className="text-[10px] truncate text-ink-500">{b.topic}</div>
                           </Link>
                         ))}
                         {cellSlots.map(s => (
                           <div
                             key={s.id}
                             onClick={(e) => { e.stopPropagation(); if (!s.booked) setConfirmDeleteId(s.id) }}
-                            className={`rounded-field border border-dashed px-1.5 py-1 mb-1 transition-colors ${
+                            className={`group/slot rounded-field px-1.5 py-1 mb-1 transition-colors ${
                               s.booked
-                                ? 'bg-brand-50 border-brand-300 text-brand-800 cursor-default'
-                                : 'bg-success-50 border-success-300 text-success-800 cursor-pointer hover:bg-danger-50 hover:border-danger-300 hover:text-danger-700'
+                                ? 'bg-ink-50 border border-ink-200 text-ink-500 cursor-default'
+                                : 'bg-brand-50 border border-brand-100 text-brand-800 cursor-pointer hover:bg-danger-50 hover:border-danger-200 hover:text-danger-700'
                             }`}
                             title={s.booked ? 'დაჯავშნილი — ვერ წაიშლება' : 'დააკლიკე წასაშლელად'}
                           >
                             <div className="text-[10.5px] font-display font-bold flex items-center justify-between gap-1">
-                              <span>{s.booked ? 'დაჯავშნილი' : 'ხელმისაწვდომია'}</span>
+                              <span>{s.booked ? 'დაჯავშნილი' : 'თავისუფალი'}</span>
                               {!s.booked && (
-                                <span className="text-[9px] opacity-70">{deletingId === s.id ? '…' : '×'}</span>
+                                <span className="text-[9px] opacity-0 group-hover/slot:opacity-100 transition-opacity">{deletingId === s.id ? '…' : '×'}</span>
                               )}
                             </div>
                           </div>
@@ -612,6 +666,16 @@ export default function TutorSchedulePage() {
                   })}
                 </div>
               ))}
+            </div>
+            <div className="border-t border-ink-100 px-3 py-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setAllHours(v => !v)}
+                className="text-[11.5px] font-display font-semibold text-ink-500 hover:text-ink-800 inline-flex items-center gap-1.5 transition-colors"
+              >
+                <Icon.clock className="w-3.5 h-3.5" />
+                {allHours ? 'ძირითადი საათები' : 'ყველა საათი (08–22)'}
+              </button>
             </div>
           </div>
           </div>

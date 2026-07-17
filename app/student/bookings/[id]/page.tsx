@@ -876,124 +876,6 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
   )
 }
 
-/* ───── Review modal — real POST /api/reviews ───── */
-const ReviewModal = ({ open, onClose, bookingId, tutorName, onSubmitted }: { open: boolean; onClose: () => void; bookingId: string; tutorName?: string; onSubmitted: () => void }) => {
-  const [rating, setRating] = useState(0)
-  const [comment, setComment] = useState('')
-  const [tags, setTags] = useState<string[]>([])
-  const [submitting, setSubmitting] = useState(false)
-  const [errMsg, setErrMsg] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    setRating(0); setComment(''); setTags([]); setErrMsg(null); setDone(false); setSubmitting(false)
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
-  }, [open, onClose])
-
-  const submit = async () => {
-    if (rating === 0 || submitting) return
-    setSubmitting(true); setErrMsg(null)
-    const body = tags.length > 0 && comment.trim()
-      ? `${comment.trim()}\n\n[${tags.join(', ')}]`
-      : tags.length > 0
-        ? `[${tags.join(', ')}]`
-        : comment.trim() || 'შეფასება'
-    try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, rating, body }),
-      })
-      const data = await res.json().catch(() => ({} as any))
-      if (!res.ok || data?.ok === false) {
-        setErrMsg(
-          data?.error === 'NOT_COMPLETED' ? 'სესია ჯერ არ არის დასრულებული.' :
-          data?.error === 'WINDOW_CLOSED' ? 'შეფასების ვადა ამოიწურა (30 დღე).' :
-          data?.error === 'FORBIDDEN' ? 'უფლება არ გაქვს ამ სესიის შესაფასებლად.' :
-          data?.error === 'INVALID' ? 'რეცენზია მინიმუმ 3 სიმბოლო უნდა იყოს.' :
-          'შეფასების გაგზავნა ვერ მოხერხდა.'
-        )
-        return
-      }
-      setDone(true)
-      onSubmitted()
-      setTimeout(onClose, 1400)
-    } catch { setErrMsg('ქსელის შეცდომა.') }
-    finally { setSubmitting(false) }
-  }
-
-  if (!open) return null
-  const TAGS = ['მკაფიო ახსნა', 'პრაქტიკული რჩევა', 'მომზადებული', 'პუნქტუალური', 'მეგობრული', 'ღრმა გამოცდილება']
-  const toggleTag = (t: string) => setTags(s => s.includes(t) ? s.filter(x => x !== t) : [...s, t])
-
-  return (
-    // Bottom sheet on mobile, centered on sm+ — matches the reschedule and
-    // dispute modals so all three booking dialogs share one ergonomic.
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-accent-900/55 backdrop-blur-sm" />
-      <div role="dialog" className="relative w-full max-w-[560px] bg-white rounded-t-card sm:rounded-card shadow-float overflow-hidden max-h-[92dvh] overflow-y-auto motion-safe:animate-slide-in-b sm:motion-safe:animate-scale-in safe-area-bottom">
-        <div className="px-7 py-5 border-b border-ink-100 flex items-start justify-between gap-4">
-          <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">შეფასება</div>
-            <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight">როგორი იყო შენი სესია{tutorName ? ` ${tutorName}-სთან` : ''}?</h2>
-          </div>
-          <button type="button" onClick={onClose} aria-label="დახურვა" className="w-9 h-9 rounded-btn text-ink-500 hover:bg-ink-100 inline-flex items-center justify-center transition-colors -mt-1 -mr-1">
-            <Icon.x className="w-4 h-4" />
-          </button>
-        </div>
-        {done ? (
-          <div className="px-7 py-14 text-center">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-success-500 text-white mb-4"><Icon.check className="w-6 h-6" /></div>
-            <div className="font-display text-[18px] font-bold text-ink-900">გმადლობთ შეფასებისთვის!</div>
-          </div>
-        ) : (<>
-          <div className="px-7 py-6 space-y-5">
-            <div>
-              <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">საერთო შეფასება</div>
-              <div className="flex items-center gap-1.5">
-                {[1,2,3,4,5].map(n => (
-                  <button key={n} type="button" onClick={() => setRating(n)} className={`w-10 h-10 rounded-btn inline-flex items-center justify-center transition-all ${rating >= n ? 'text-warning-500 hover:scale-110' : 'text-ink-200 hover:text-ink-400'}`}>
-                    <Icon.star className="w-7 h-7" />
-                  </button>
-                ))}
-                {rating > 0 && <span className="ml-2 font-display text-[12.5px] font-semibold text-ink-700 tabular-nums">{rating}.0 / 5</span>}
-              </div>
-            </div>
-            <div>
-              <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">რა მოგეწონა</div>
-              <div className="flex flex-wrap gap-1.5">
-                {TAGS.map(t => (
-                  <button key={t} type="button" onClick={() => toggleTag(t)} className={`h-8 px-3 rounded-pill border font-display text-[12px] font-medium transition-colors ${tags.includes(t) ? 'bg-brand-50 border-brand-300 text-brand-800' : 'bg-white border-ink-200 text-ink-700 hover:border-ink-300'}`}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">დაწერე რეცენზია <span className="text-ink-400 font-normal normal-case tracking-normal">— სურვილისამებრ</span></div>
-              <textarea value={comment} onChange={e => setComment(e.target.value.slice(0, 2000))} rows={4} placeholder="რა იყო ყველაზე სასარგებლო ნაწილი?" className="w-full px-3.5 py-2.5 rounded-field border border-ink-200 bg-white text-[13.5px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none resize-none leading-relaxed" />
-              <div className="text-right mt-1 font-mono text-[10.5px] tabular-nums text-ink-400">{comment.length} / 2000</div>
-            </div>
-            {errMsg && (
-              <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12.5px] font-medium">{errMsg}</div>
-            )}
-          </div>
-          <div className="px-7 py-5 bg-ink-50/40 border-t border-ink-100 flex items-center justify-between gap-3">
-            <button type="button" onClick={onClose} disabled={submitting} className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800 disabled:opacity-40">
-              მოგვიანებით
-            </button>
-            <button type="button" disabled={rating === 0 || submitting} onClick={submit} aria-busy={submitting} className={`h-11 px-5 rounded-btn font-display font-semibold text-[13px] inline-flex items-center gap-1.5 ${rating === 0 || submitting ? 'bg-ink-100 text-ink-400 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600 text-white'}`}>
-              {submitting ? 'იგზავნება…' : 'გავუგზავნო შეფასება'} {!submitting && <Icon.arrow className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-        </>)}
-      </div>
-    </div>
-  )
-}
-
 /* ───── Inline post-session review card — replaces the modal for
    discoverability. Shown below Hero on COMPLETED bookings. When a review
    already exists, renders read-only with an edit affordance. */
@@ -1205,7 +1087,6 @@ const BookingBody = ({
   onReschedule,
   onCancel,
   onDispute,
-  onReview,
 }: {
   booking: Booking
   meId: string | null
@@ -1213,7 +1094,6 @@ const BookingBody = ({
   onReschedule: () => void
   onCancel: () => void
   onDispute: () => void
-  onReview: () => void
 }) => {
   const status = booking.status
   const canCancel = status === 'PREPARING' || status === 'CONFIRMED'
@@ -1526,7 +1406,6 @@ export default function BookingDetail() {
   const [rescheduledOk, setRescheduledOk] = useState(false)
   const [disputeOpen, setDisputeOpen] = useState(false)
   const [disputeSent, setDisputeSent] = useState(false)
-  const [reviewOpen, setReviewOpen] = useState(false)
   const [cancelBusy, setCancelBusy] = useState(false)
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
   const { toast } = useToast()
@@ -1566,16 +1445,19 @@ export default function BookingDetail() {
 
   useEffect(() => { load() }, [params?.id])
 
-  // Auto-open ReviewModal ONCE when landing here with ?review=1 (from session-row
-  // CTA). Guarded by a ref so the post-submit reload() (which mutates `booking`
-  // and re-fires this effect) can't reopen the review the user just finished.
+  // ?review=1 (from session-row CTA) scrolls to the inline review card — the
+  // one and only review surface; the old duplicate ReviewModal is gone.
+  // Guarded by a ref so the post-submit reload() can't re-trigger the scroll.
   const reviewAutoOpenedRef = useRef(false)
   useEffect(() => {
     if (typeof window === 'undefined' || reviewAutoOpenedRef.current) return
     const sp = new URLSearchParams(window.location.search)
     if (sp.get('review') === '1' && booking && booking.status === 'COMPLETED') {
       reviewAutoOpenedRef.current = true
-      setReviewOpen(true)
+      // Next frame: the inline card mounts in the same render pass.
+      requestAnimationFrame(() => {
+        document.getElementById('leave-review')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
     }
   }, [booking])
 
@@ -1673,7 +1555,6 @@ export default function BookingDetail() {
         onReschedule={() => setRescheduleOpen(true)}
         onCancel={cancelBooking}
         onDispute={() => setDisputeOpen(true)}
-        onReview={() => setReviewOpen(true)}
       />
 
       <MobileActionBar
@@ -1682,13 +1563,8 @@ export default function BookingDetail() {
         onCancel={cancelBooking}
       />
 
-      <ReviewModal
-        open={reviewOpen}
-        onClose={() => setReviewOpen(false)}
-        bookingId={booking.id}
-        tutorName={booking.tutor.user.fullName.split(' ')[0]}
-        onSubmitted={reload}
-      />
+      <WorkspaceFooter />
+
       <RescheduleModal
         open={rescheduleOpen}
         onClose={() => setRescheduleOpen(false)}

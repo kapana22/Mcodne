@@ -26,7 +26,13 @@ export default async function StudentBookingsPage({
   const allBookings = await prisma.booking.findMany({
     where: { studentId: user.id },
     orderBy: { startAt: 'desc' },
-    include: { tutor: { include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } } },
+    include: {
+      tutor: { include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } },
+      // Actionable signals for the list cards: a pending review and unread
+      // chat messages (addressed to me, not yet read).
+      review: { select: { id: true } },
+      _count: { select: { messages: { where: { toId: user.id, readAt: null } } } },
+    },
   })
 
   const upcoming = allBookings.filter(b => ['PREPARING', 'CONFIRMED', 'LIVE'].includes(b.status))
@@ -78,30 +84,54 @@ export default async function StudentBookingsPage({
           />
         ) : (
           <div className="space-y-3">
-            {list.map(b => (
-              <Link key={b.id} href={`/student/bookings/${b.id}`}
-                    className="block rounded-card bg-white border border-ink-200 hover:border-ink-300 hover:shadow-card transition-all overflow-hidden">
-                <div className="p-5 grid sm:grid-cols-[auto_1fr_auto] gap-4 sm:gap-5 items-center">
-                  <div className="relative w-14 h-14 rounded-card overflow-hidden ring-1 ring-ink-200 shrink-0">
-                    <Image src={b.tutor.user.avatarUrl ?? `https://i.pravatar.cc/120?u=${b.tutor.userId}`} alt="" fill sizes="56px" className="object-cover" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <StatusPill tone={STATUS[b.status]} />
-                      <span className="ml-auto font-mono text-[10.5px] tabular-nums text-ink-400 truncate max-w-[80px]" title={b.ref}>#{b.ref.slice(0, 8)}</span>
+            {list.map(b => {
+              const unread = b._count.messages
+              const needsReview = b.status === 'COMPLETED' && !b.review
+              return (
+                // Overlay-link card: the whole surface opens the detail, while
+                // the LIVE join button stays an independent link on top of it
+                // (nested <a> is invalid HTML, hence the absolute cover link).
+                <div key={b.id}
+                     className="relative rounded-card bg-white border border-ink-200 hover:border-ink-300 hover:shadow-card transition-all overflow-hidden">
+                  <Link href={`/student/bookings/${b.id}`} className="absolute inset-0" aria-label={b.topic} />
+                  <div className="p-5 grid sm:grid-cols-[auto_1fr_auto] gap-4 sm:gap-5 items-center pointer-events-none">
+                    <div className="relative w-14 h-14 rounded-card overflow-hidden ring-1 ring-ink-200 shrink-0">
+                      <Image src={b.tutor.user.avatarUrl ?? `https://i.pravatar.cc/120?u=${b.tutor.userId}`} alt="" fill sizes="56px" className="object-cover" />
                     </div>
-                    <div className="font-display text-[14.5px] font-bold text-ink-900 truncate">{b.topic}</div>
-                    <div className="text-[12px] text-ink-500 mt-0.5 truncate">
-                      {b.tutor.user.fullName} · {fmtKaDateTime(b.startAt, { year: true })}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <StatusPill tone={STATUS[b.status]} />
+                        {unread > 0 && (
+                          <span className="inline-flex items-center gap-1 h-5 px-2 rounded-pill bg-brand-500 text-white text-[10.5px] font-display font-bold tabular-nums">
+                            <Icon.chat className="w-2.5 h-2.5" /> {unread}
+                          </span>
+                        )}
+                        {needsReview && (
+                          <span className="inline-flex items-center gap-1 h-5 px-2 rounded-pill bg-warning-50 border border-warning-200 text-warning-700 text-[10.5px] font-display font-bold uppercase tracking-[0.08em]">
+                            <Icon.star className="w-2.5 h-2.5" /> შეფასება ელოდება
+                          </span>
+                        )}
+                        <span className="ml-auto font-mono text-[10.5px] tabular-nums text-ink-400 truncate max-w-[80px]" title={b.ref}>#{b.ref.slice(0, 8)}</span>
+                      </div>
+                      <div className="font-display text-[14.5px] font-bold text-ink-900 truncate">{b.topic}</div>
+                      <div className="text-[12px] text-ink-500 mt-0.5 truncate">
+                        {b.tutor.user.fullName} · {fmtKaDateTime(b.startAt, { year: true })}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-display text-[16px] font-bold tabular-nums text-ink-900">₾{b.price}</div>
-                    <div className="text-[11px] font-mono text-ink-400 tabular-nums">{b.durationMin} წუთი</div>
+                    <div className="text-right shrink-0">
+                      <div className="font-display text-[16px] font-bold tabular-nums text-ink-900">₾{b.price}</div>
+                      <div className="text-[11px] font-mono text-ink-400 tabular-nums">{b.durationMin} წუთი</div>
+                      {b.status === 'LIVE' && (
+                        <Link href={`/session/${b.id}`}
+                              className="pointer-events-auto relative z-10 mt-2 h-9 px-3 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors">
+                          <Icon.video className="w-3.5 h-3.5" /> ოთახში შესვლა
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </Link>
-            ))}
+              )
+            })}
           </div>
         )}
       </main>
