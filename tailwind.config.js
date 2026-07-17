@@ -168,7 +168,12 @@ module.exports = {
 
       // ── Animation library — used with `motion-safe:animate-*` ──────────────
       animation: {
-        'fade-in':      'fadeIn 260ms cubic-bezier(0.16, 1, 0.3, 1) both',
+        // fade-in deliberately has NO fill mode: AppShell applies it to the
+        // wrapper around EVERY route, and a filling opacity animation keeps
+        // that wrapper a stacking context forever — which traps every fixed
+        // modal/sheet inside the page below the z-40 BottomNav (nav painted
+        // over ConfirmModal). End state == natural state, so no fill needed.
+        'fade-in':      'fadeIn 260ms cubic-bezier(0.16, 1, 0.3, 1)',
         'fade-in-fast': 'fadeIn 160ms cubic-bezier(0.25, 1, 0.5, 1) both',
         'rise-in':      'riseIn 320ms cubic-bezier(0.16, 1, 0.3, 1) both',
         'slide-in-r':   'slideInR 260ms cubic-bezier(0.16, 1, 0.3, 1) both',
