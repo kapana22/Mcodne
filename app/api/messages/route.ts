@@ -36,10 +36,16 @@ export async function GET(req: Request) {
   const bookingId = new URL(req.url).searchParams.get('bookingId')
 
   if (bookingId) {
-    // Membership check first — never leak another pair's thread.
+    // Membership check first — never leak another pair's thread. The widened
+    // select doubles as the thread's booking-context header (messages center)
+    // at zero extra queries.
     const b = await prisma.booking.findFirst({
       where: { id: bookingId, OR: [{ studentId: user.id }, { tutor: { userId: user.id } }] },
-      select: { id: true },
+      select: {
+        id: true, ref: true, topic: true, status: true, startAt: true, durationMin: true,
+        student: { select: { id: true, fullName: true, avatarUrl: true } },
+        tutor: { select: { user: { select: { id: true, fullName: true, avatarUrl: true } } } },
+      },
     })
     if (!b) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
 
@@ -57,7 +63,15 @@ export async function GET(req: Request) {
       // this booking so the bell badge agrees with the chat's read state.
       markRelatedRead(user.id, `/bookings/${bookingId}`, 'MESSAGE_NEW'),
     ])
-    return NextResponse.json({ ok: true, messages })
+    return NextResponse.json({
+      ok: true,
+      messages,
+      booking: {
+        id: b.id, ref: b.ref, topic: b.topic, status: b.status,
+        startAt: b.startAt, durationMin: b.durationMin,
+        student: b.student, tutorUser: b.tutor.user,
+      },
+    })
   }
 
   const bookings = await prisma.booking.findMany({

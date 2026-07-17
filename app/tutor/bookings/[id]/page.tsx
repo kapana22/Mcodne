@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Avatar } from '@/components/Avatar'
@@ -7,21 +7,11 @@ import { StatusPill } from '@/components/StatusPill'
 import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
-import { safeHttpUrl } from '@/lib/safeUrl'
-import { fmtKaDate } from '@/lib/kaDate'
-import { sanitizeMsgBody, MSG_MAX_LEN, sendErrorText } from '@/lib/msgText'
+import { BookingChat } from '@/components/chat/BookingChat'
 
 type BookingStatus = 'PREPARING' | 'CONFIRMED' | 'LIVE' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW'
 
-type Message = {
-  id: string
-  fromId: string
-  body: string
-  createdAt: string
-  from: { id: string; fullName: string; avatarUrl?: string | null }
-  fileUrl?: string | null
-  fileName?: string | null
-}
+import type { ChatMessage as Message } from '@/components/chat/useBookingThread'
 
 type ReschedulePayload = {
   proposedBy: 'STUDENT' | 'TUTOR'
@@ -104,13 +94,6 @@ export default function TutorBookingDetailPage() {
   const [notFound, setNotFound] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [flash, setFlash] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
-  const [msgText, setMsgText] = useState('')
-  const [sending, setSending] = useState(false)
-  const [msgs, setMsgs] = useState<Message[]>([])
-  const [attachment, setAttachment] = useState<{ url: string; name: string; type: string; size: number } | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const chatEndRef = useRef<HTMLDivElement | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
   // Post-session summary state — mirrored from the booking on first load.
   const [tutorNotes, setTutorNotes] = useState('')
   const [notesSaving, setNotesSaving] = useState(false)
@@ -148,7 +131,6 @@ export default function TutorBookingDetailPage() {
         if (!bRes.ok) { setNotFound(true); return }
         const data = await bRes.json()
         setBooking(data)
-        setMsgs(data.messages ?? [])
         setTutorNotes(data.tutorNotes ?? '')
       } catch {
         if (!cancelled) setFlash({ kind: 'err', text: 'მონაცემების ჩატვირთვა ვერ მოხერხდა' })
@@ -162,34 +144,6 @@ export default function TutorBookingDetailPage() {
       setTimeout(() => document.getElementById('chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200)
     }
   }, [booking?.id])
-
-  // Poll the thread while the tab is visible — the client's messages used to
-  // appear only on a full page reload. The endpoint also stamps read receipts
-  // (we're looking at the thread), which clears inbox unread dots.
-  useEffect(() => {
-    if (!bookingId || !booking) return
-    let cancelled = false
-    const tick = async () => {
-      if (document.visibilityState !== 'visible') return
-      try {
-        const res = await fetch(`/api/messages?bookingId=${bookingId}`)
-        if (!res.ok || cancelled) return
-        const j = await res.json().catch(() => null)
-        // Keep any in-flight optimistic bubbles (tmp-*) — a poll landing
-        // between append and the POST response must not wipe them.
-        if (!cancelled && j?.ok && Array.isArray(j.messages)) {
-          setMsgs(prev => [...j.messages, ...prev.filter(m => m.id.startsWith('tmp-'))])
-        }
-      } catch {}
-    }
-    tick()
-    const id = setInterval(tick, 15_000)
-    return () => { cancelled = true; clearInterval(id) }
-  }, [bookingId, booking?.id])
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [msgs.length])
 
   const showFlash = (kind: 'ok' | 'err', text: string) => {
     setFlash({ kind, text })
@@ -340,87 +294,6 @@ export default function TutorBookingDetailPage() {
       showFlash('ok', 'ჯავშანი გაუქმდა')
     } finally {
       setBusy(null)
-    }
-  }
-
-  const pickFile = () => fileInputRef.current?.click()
-
-  const onFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    e.target.value = ''
-    if (!f) return
-    if (f.size > 8 * 1024 * 1024) { showFlash('err', 'ფაილი 8 MB-ზე დიდია'); return }
-    setUploading(true)
-    try {
-      const form = new FormData()
-      form.append('file', f)
-      form.append('kind', 'attachment')
-      const res = await fetch('/api/uploads', { method: 'POST', body: form })
-      const j = await res.json().catch(() => ({} as any))
-      if (!res.ok || !j.ok) {
-        showFlash('err', j?.error === 'TOO_LARGE' ? 'ფაილი დიდია' : j?.error === 'BAD_TYPE' ? 'ფაილის ტიპი დაუშვებელია' : 'ატვირთვა ვერ მოხერხდა')
-        return
-      }
-      setAttachment({ url: j.url, name: j.fileName ?? f.name, type: f.type, size: f.size })
-    } catch {
-      showFlash('err', 'ქსელის შეცდომა ატვირთვის დროს')
-    } finally { setUploading(false) }
-  }
-
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    // `me` may be null if /api/me failed — bail rather than throw on me!.id
-    // when building the optimistic message row below.
-    if (!me || !booking || (!msgText.trim() && !attachment) || sending) return
-    setSending(true)
-    try {
-      const body: any = {
-        bookingId: booking.id,
-        body: msgText.trim() || (attachment ? `📎 ${attachment.name}` : ''),
-      }
-      if (attachment) { body.fileUrl = attachment.url; body.fileName = attachment.name }
-      // TRUE optimistic append — bubble shows instantly; the temp row is
-      // replaced by the server row on success, rolled back on failure with the
-      // draft restored (the POST takes seconds on the remote-DB dev setup).
-      const tempId = `tmp-${Date.now()}`
-      const sentText = msgText
-      const sentAttachment = attachment
-      setMsgs(prev => [...prev, {
-        id: tempId,
-        fromId: me!.id,
-        body: body.body,
-        createdAt: new Date().toISOString(),
-        fileUrl: sentAttachment?.url ?? null,
-        fileName: sentAttachment?.name ?? null,
-        from: { id: me!.id, fullName: me!.fullName, avatarUrl: me!.avatarUrl },
-      }])
-      setMsgText(''); setAttachment(null)
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const j = await res.json().catch(() => ({} as any))
-      if (!res.ok || !j.ok) {
-        setMsgs(prev => prev.filter(m => m.id !== tempId))
-        setMsgText(sentText); setAttachment(sentAttachment)
-        showFlash('err', sendErrorText(j?.error, j?.retryInSec))
-        return
-      }
-      setMsgs(prev => prev.map(m => (m.id === tempId ? {
-        id: j.message.id,
-        fromId: j.message.fromId,
-        body: j.message.body,
-        createdAt: j.message.createdAt,
-        fileUrl: j.message.fileUrl,
-        fileName: j.message.fileName,
-        from: { id: me!.id, fullName: me!.fullName, avatarUrl: me!.avatarUrl },
-      } : m)))
-      // Bubble the mutation up so `/tutor/messages` (server-rendered inbox)
-      // reflects the new thread on next navigation instead of a stale cache.
-      router.refresh()
-    } finally {
-      setSending(false)
     }
   }
 
@@ -640,144 +513,17 @@ export default function TutorBookingDetailPage() {
           </div>
         </div>
 
-        <section id="chat" className="mt-6 rounded-card border border-ink-200 bg-white shadow-xs overflow-hidden scroll-mt-24">
-          <div className="px-5 sm:px-6 py-4 border-b border-ink-100 flex items-center justify-between">
-            <div className="font-display text-[15px] font-bold tracking-tight text-ink-900">მიმოწერა კლიენტთან</div>
-            {msgs.length > 0 && (
-              <div className="text-[11.5px] text-ink-400 tabular-nums">{msgs.length} შეტყობინება</div>
-            )}
-          </div>
-          <div className="max-h-[420px] min-h-[220px] overflow-y-auto p-4 sm:p-6 bg-ink-50/40">
-            {msgs.length === 0 ? (
-              <div className="text-center py-8">
-                <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-50 text-brand-700 mb-3">
-                  <Icon.chat className="w-5 h-5" />
-                </span>
-                <div className="font-display text-[13.5px] font-semibold text-ink-800">მიმოწერა ჯერ არ არის</div>
-                <p className="text-[12.5px] text-ink-500 mt-1 max-w-[340px] mx-auto">
-                  მიესალმე კლიენტს ან დააზუსტე კონსულტაციის დეტალები — სწრაფი პასუხი ნდობას ზრდის.
-                </p>
-              </div>
-            ) : (
-              msgs.map((m, i) => {
-                const isMine = me?.id && m.fromId === me.id
-                const d = new Date(m.createdAt)
-                const prev = i > 0 ? msgs[i - 1] : null
-                const next = i < msgs.length - 1 ? msgs[i + 1] : null
-                // Day separator when the calendar date flips; bubbles then only
-                // carry the time. Runs from the same sender within 5 minutes
-                // collapse into one group: avatar first, timestamp last.
-                const newDay = !prev || new Date(prev.createdAt).toDateString() !== d.toDateString()
-                const GROUP_MS = 5 * 60_000
-                const groupedWithPrev = !newDay && !!prev && prev.fromId === m.fromId &&
-                  d.getTime() - new Date(prev.createdAt).getTime() < GROUP_MS
-                const groupedWithNext = !!next && next.fromId === m.fromId &&
-                  new Date(next.createdAt).getTime() - d.getTime() < GROUP_MS &&
-                  new Date(next.createdAt).toDateString() === d.toDateString()
-                // Never render an attachment href with an unsafe scheme (guards
-                // legacy rows predating the server-side scheme check).
-                const safeFile = safeHttpUrl(m.fileUrl)
-                return (
-                  <div key={m.id}>
-                    {newDay && (
-                      <div className={`flex items-center gap-3 py-1 ${i > 0 ? 'mt-4' : ''}`} aria-hidden>
-                        <span className="flex-1 h-px bg-ink-200/70" />
-                        <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-400">{fmtKaDate(d)}</span>
-                        <span className="flex-1 h-px bg-ink-200/70" />
-                      </div>
-                    )}
-                    <div className={`flex gap-2 ${isMine ? 'justify-end' : 'justify-start'} ${groupedWithPrev ? 'mt-1' : 'mt-3'}`}>
-                    {!isMine && (groupedWithPrev
-                      ? <span className="w-7 shrink-0" aria-hidden />
-                      : <Avatar src={m.from.avatarUrl ?? undefined} name={m.from.fullName} size={28} />)}
-                    <div className={`max-w-[85%] sm:max-w-[75%] rounded-card px-3 py-2 text-[13.5px] ${isMine ? 'bg-brand-500 text-white' : 'bg-white border border-ink-200 text-ink-800'}`}>
-                      <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{sanitizeMsgBody(m.body)}</div>
-                      {safeFile && (
-                        <div className={`mt-2 pt-2 border-t ${isMine ? 'border-white/25' : 'border-ink-200'}`}>
-                          {safeFile.startsWith('data:image/') ? (
-                            <a href={safeFile} target="_blank" rel="noopener noreferrer" className="block">
-                              <img src={safeFile} alt={m.fileName ?? 'attachment'} className="max-h-[200px] rounded-md object-cover" />
-                              {m.fileName && <div className={`mt-1 text-[11px] ${isMine ? 'text-white/85' : 'text-ink-500'} font-mono truncate`}>{m.fileName}</div>}
-                            </a>
-                          ) : (
-                            <a
-                              href={safeFile}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              download={m.fileName ?? undefined}
-                              className={`inline-flex items-center gap-2 text-[12.5px] ${isMine ? 'text-white hover:text-white' : 'text-brand-700 hover:text-brand-800'} font-display font-semibold underline underline-offset-2 decoration-dotted`}
-                            >
-                              <Icon.paperclip className="w-3.5 h-3.5" />
-                              {m.fileName ?? 'ფაილი'}
-                            </a>
-                          )}
-                        </div>
-                      )}
-                      {!groupedWithNext && (
-                        <div className={`text-[10.5px] mt-1 font-mono tabular-nums ${isMine ? 'text-white/70' : 'text-ink-400'}`}>{fmtTime(m.createdAt, tz)}</div>
-                      )}
-                    </div>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-            <div ref={chatEndRef} />
-          </div>
-          <form onSubmit={sendMessage} className="p-3 sm:p-4 border-t border-ink-100 bg-white flex flex-col gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf,image/jpeg,image/png,image/webp"
-              onChange={onFileChosen}
-              className="sr-only"
-            />
-            {attachment && (
-              <div className="flex items-center gap-2 rounded-btn border border-ink-200 bg-ink-50/40 px-3 py-2 text-[12.5px]">
-                <Icon.paperclip className="w-3.5 h-3.5 text-ink-500 shrink-0" />
-                <span className="flex-1 truncate font-display font-semibold text-ink-800">{attachment.name}</span>
-                <span className="font-mono text-[10.5px] text-ink-500 tabular-nums shrink-0">{(attachment.size / 1024).toFixed(0)} KB</span>
-                <button type="button" onClick={() => setAttachment(null)} aria-label="ფაილის მოხსნა" className="w-6 h-6 rounded-btn hover:bg-ink-100 text-ink-500 hover:text-danger-600 inline-flex items-center justify-center">
-                  <Icon.x className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-            <div className="flex items-end gap-2">
-              <button
-                type="button"
-                onClick={pickFile}
-                disabled={uploading}
-                aria-label="ფაილის მიბმა"
-                title="ფაილის მიბმა (PDF/JPG/PNG · max 8 MB)"
-                className="h-11 w-11 rounded-btn border border-ink-200 bg-white hover:border-ink-300 disabled:opacity-50 text-ink-600 hover:text-ink-900 inline-flex items-center justify-center transition-colors shrink-0"
-              >
-                {uploading ? <span className="inline-block w-4 h-4 border-2 border-ink-500 border-t-transparent rounded-full animate-spin" /> : <Icon.paperclip className="w-4 h-4" />}
-              </button>
-              <textarea
-                value={msgText}
-                onChange={(e) => {
-                  setMsgText(e.target.value)
-                  // Autosize: grow with content up to ~5 lines, then scroll inside.
-                  const el = e.currentTarget
-                  el.style.height = 'auto'
-                  el.style.height = `${Math.min(el.scrollHeight, 132)}px`
-                }}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e as any); (e.currentTarget as HTMLTextAreaElement).style.height = 'auto' } }}
-                placeholder={attachment ? 'დაწერე შეტყობინება ან უბრალოდ გააგზავნე ფაილი…' : 'დაწერე შეტყობინება…'}
-                rows={1}
-                maxLength={MSG_MAX_LEN}
-                className="flex-1 min-h-[44px] max-h-[132px] resize-none rounded-btn border border-ink-200 px-3 py-2.5 text-[13.5px] focus:outline-none focus:ring-2 focus:ring-brand-400"
-              />
-              <Btn type="submit" variant="primary" size="md" disabled={sending || uploading || (!msgText.trim() && !attachment)}>
-                {sending ? '…' : <><Icon.send className="w-4 h-4" /><span className="hidden sm:inline">გაგზავნა</span></>}
-              </Btn>
-            </div>
-            {msgText.length > MSG_MAX_LEN - 200 && (
-              <div className={`text-right font-mono text-[10.5px] tabular-nums ${msgText.length >= MSG_MAX_LEN ? 'text-danger-600' : 'text-ink-400'}`}>
-                {msgText.length} / {MSG_MAX_LEN}
-              </div>
-            )}
-          </form>
+        {/* #chat is a public contract: DB-stored notification hrefs and the
+            messages inbox deep-link to /tutor/bookings/{id}#chat forever. */}
+        <section id="chat" className="mt-6 scroll-mt-24">
+          <BookingChat
+            variant="embedded"
+            bookingId={booking.id}
+            me={me}
+            counterparty={booking.student}
+            initialMessages={booking.messages}
+            onActivity={() => router.refresh()}
+          />
         </section>
 
       {/* Reschedule proposal modal — tutor picks a new date/time; server
