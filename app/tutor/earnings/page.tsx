@@ -1,7 +1,5 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { TutorAppBar } from '@/components/TutorAppBar'
-import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 import { fmtKaDate } from '@/lib/kaDate'
 
@@ -24,8 +22,6 @@ type Earnings = {
   transactions: Tx[]
 }
 
-type Me = { fullName: string; avatarUrl?: string | null } | null
-
 const fmtGel = (n: number) => `₾${n.toLocaleString('en-US')}`
 const fmtDate = (iso: string) => {
   try {
@@ -39,7 +35,6 @@ const payoutLabel = (s: Tx['payoutStatus']) =>
   : { l: 'დაბრუნდა', cls: 'bg-ink-100 text-ink-700 border-ink-200' }
 
 export default function TutorEarningsPage() {
-  const [me, setMe] = useState<Me>(null)
   const [data, setData] = useState<Earnings | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
@@ -47,10 +42,7 @@ export default function TutorEarningsPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const [meRes, eRes] = await Promise.all([
-          fetch('/api/me').then(r => r.json()),
-          fetch('/api/tutor/earnings'),
-        ])
+        const eRes = await fetch('/api/tutor/earnings')
         if (cancelled) return
         // Expired session / wrong role → bounce to signin instead of crashing
         // on `data.transactions.length` with an error body.
@@ -60,7 +52,6 @@ export default function TutorEarningsPage() {
         }
         if (!eRes.ok) throw new Error('load failed')
         const e = await eRes.json()
-        setMe(meRes?.user ?? null)
         // Never trust the shape blindly — default the list so .map/.length are safe.
         setData({ ...e, transactions: Array.isArray(e?.transactions) ? e.transactions : [] })
       } catch {
@@ -71,10 +62,7 @@ export default function TutorEarningsPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-ink-50 flex flex-col">
-      <TutorAppBar user={me ? { name: me.fullName, avatar: me.avatarUrl ?? undefined } : undefined} />
-
-      <main className="flex-1 px-6 py-8 max-w-[1200px] w-full mx-auto">
+    <div>
         <div className="mb-6">
           <h1 className="font-display text-[26px] font-bold tracking-tight text-ink-900">შემოსავალი</h1>
           <p className="text-[13px] text-ink-500 mt-1">დამუშავებული ჯავშნები და ტრანზაქციები</p>
@@ -198,9 +186,6 @@ export default function TutorEarningsPage() {
             </div>
           </>
         )}
-      </main>
-
-      <Footer />
     </div>
   )
 }

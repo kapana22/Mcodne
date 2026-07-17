@@ -1,7 +1,5 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { TutorAppBar } from '@/components/TutorAppBar'
-import { Footer } from '@/components/Footer'
 import { Btn } from '@/components/Btn'
 import { Avatar } from '@/components/Avatar'
 import { Icon } from '@/components/Icon'
@@ -505,15 +503,12 @@ export default function TutorProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-ink-50 flex flex-col">
+    <div>
       {/* globals.css puts `overflow-x: hidden` on html/body, which turns body into
           a scroll container and silently defeats every `position: sticky` on the
-          page (left rail AND app bar). `clip` clips horizontal overflow identically
-          but without creating a scroll container. Scoped to this page's mount. */}
+          page (left rail AND workspace top bar). `clip` clips horizontal overflow
+          identically but without creating a scroll container. Scoped to this mount. */}
       <style>{`html, body { overflow-x: clip; }`}</style>
-      <TutorAppBar user={me ? { name: me.fullName, avatar: me.avatarUrl ?? undefined } : undefined} />
-
-      <main className="flex-1 px-6 py-8 max-w-[900px] lg:max-w-[1120px] w-full mx-auto">
         <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="font-display text-[26px] font-bold tracking-tight text-ink-900">პროფილი</h1>
@@ -546,7 +541,7 @@ export default function TutorProfilePage() {
             {/* Left sticky rail — profile completeness + section navigation.
                 On mobile it stacks above the content (nav hidden, completeness
                 stays at the top exactly as before). */}
-            <aside className="mb-6 lg:mb-0 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto space-y-4">
+            <aside className="mb-6 lg:mb-0 lg:sticky lg:top-[84px] lg:max-h-[calc(100vh-6.5rem)] lg:overflow-y-auto space-y-4">
               {/* Profile completeness — always visible on the profile page so
                   tutors see immediate feedback as they fill in fields. */}
               {profile && (
@@ -1239,9 +1234,6 @@ export default function TutorProfilePage() {
             </div>
           </div>
         )}
-      </main>
-
-      <Footer />
 
       <ConfirmModal
         open={!!pendingDelete}

@@ -1,8 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { TutorAppBar } from '@/components/TutorAppBar'
-import { Footer } from '@/components/Footer'
 import { Avatar } from '@/components/Avatar'
 import { StatusPill } from '@/components/StatusPill'
 import { Btn } from '@/components/Btn'
@@ -217,10 +215,7 @@ export default function TutorHome() {
   const loading = bookings === null
 
   return (
-    <div className="min-h-screen bg-ink-50 flex flex-col">
-      <TutorAppBar user={me ? { name: me.fullName, avatar: me.avatarUrl ?? undefined } : undefined} />
-
-      <main className="flex-1 max-w-[1200px] w-full mx-auto px-6 py-8 lg:py-10">
+    <div>
         <div className="mb-8 flex items-start justify-between flex-wrap gap-3">
           <div>
             <div className="text-[12px] text-ink-500 mb-1 min-h-[18px]" suppressHydrationWarning>{clientNow ? fmtDate(clientNow) : ''}</div>
@@ -391,7 +386,7 @@ export default function TutorHome() {
           </div>
 
           {/* Right rail */}
-          <aside className="space-y-4 lg:sticky lg:top-[80px]">
+          <aside className="space-y-4 lg:sticky lg:top-[84px]">
             {credCounts === null ? (
               <div className="rounded-card border border-brand-200 bg-brand-50/40 p-4 animate-pulse">
                 <div className="h-3 w-24 rounded-pill bg-brand-100" />
@@ -453,9 +448,6 @@ export default function TutorHome() {
             )}
           </aside>
         </div>
-      </main>
-
-      <Footer />
     </div>
   )
 }

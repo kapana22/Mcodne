@@ -1,16 +1,15 @@
 'use client'
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { NotifBell } from '@/components/NotifBell'
 import { ConfirmModal } from '@/components/ConfirmModal'
-import { CountUp } from '@/components/CountUp'
 import { EmptyState } from '@/components/EmptyState'
-import { FEATURE_PAYMENTS_V2, PAYMENTS_LIVE, CANCEL_CUTOFF_HOURS } from '@/lib/flags'
-import { TBILISI_TZ, bucketBookings, deriveSummary } from '@/lib/bookings'
+import { PAYMENTS_LIVE, CANCEL_CUTOFF_HOURS } from '@/lib/flags'
+import { bucketBookings, deriveSummary } from '@/lib/bookings'
 import { isBookingLive } from '@/lib/bookingLive'
 import { fmtKaDate, fmtKaTime, fmtKaDateTime, KA_WEEKDAYS_SHORT } from '@/lib/kaDate'
 import { StatusPill } from '@/components/StatusPill'
-import { signOut } from '@/lib/signout'
+import { StudentAppBar } from '@/components/StudentAppBar'
+import { WorkspaceFooter } from '@/components/WorkspaceFooter'
 
 /* ───── Icons ───── */
 const Icon = {
@@ -49,12 +48,6 @@ const Icon = {
   attach:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m21 11-9 9a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.5 5.5L9 16a2 2 0 0 1-3-3l8-8" /></svg>,
 }
 
-const Logo = () => (
-  <Link href="/" className="inline-flex items-center transition-transform duration-fast hover:scale-[1.03] active:scale-[0.98]" aria-label="მცოდნე">
-    <img src="/logo.svg" alt="მცოდნე" className="h-8 w-auto object-contain select-none" draggable={false} />
-  </Link>
-)
-
 type MeData = { id: string; fullName: string; email: string; avatarUrl?: string | null }
 
 const VerifiedMark = ({ size = 16 }: { size?: number }) => (
@@ -62,106 +55,6 @@ const VerifiedMark = ({ size = 16 }: { size?: number }) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" width={size * 0.55} height={size * 0.55}><path d="m4 12 5 5L20 6" /></svg>
   </span>
 )
-
-/* ───── Top bar (logged in) ───── */
-const TopBar = ({ me }: { me: MeData | null; onOpenMenu?: () => void; menuOpen?: boolean }) => {
-  const [mobOpen, setMobOpen] = useState(false)
-  return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-ink-100">
-      <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-7 lg:gap-10 min-w-0">
-          <Logo />
-          <nav className="hidden lg:flex items-center gap-1">
-            {[
-              { id: 'home',     l: 'ჩემი სივრცე',    href: '/student',            active: true },
-              { id: 'experts',  l: 'ექსპერტები',      href: '/tutors' },
-              { id: 'bookings', l: 'ჩემი ჯავშნები',  href: '/student/bookings' },
-              { id: 'saved',    l: 'შენახული',        href: '/student/favorites' },
-              { id: 'messages', l: 'მესიჯები',        href: '/student/messages' },
-            ].map(it => (
-              <a key={it.id} href={it.href} className={`h-11 px-3.5 rounded-btn font-display text-[12px] font-semibold uppercase tracking-[0.06em] inline-flex items-center gap-1.5 transition-colors duration-fast ${
-                it.active ? 'bg-brand-50 text-brand-800' : 'text-ink-700 hover:bg-ink-100/70 hover:text-ink-900'
-              }`}>
-                {it.l}
-              </a>
-            ))}
-          </nav>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Link href="/tutors" className="hidden md:inline-flex items-center gap-2 h-9 pl-3 pr-2 rounded-pill bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 transition-colors group">
-            <Icon.search className="w-3.5 h-3.5 text-ink-500 group-hover:text-brand-600 transition-colors" />
-            <span className="font-display text-[12px] text-ink-500 mr-2">ექსპერტი, თემა…</span>
-            <kbd className="font-mono text-[10px] text-ink-500 bg-ink-50 border border-ink-200 rounded px-1.5 py-0.5 leading-none">⌘K</kbd>
-          </Link>
-          <NotifBell />
-          <a href="/student/profile" aria-label="ჩემი პროფილი" className="ml-1 inline-flex items-center justify-center">
-            {me?.avatarUrl ? (
-              <img src={me.avatarUrl} alt="პროფილი" className="w-9 h-9 rounded-full object-cover ring-2 ring-ink-200 hover:ring-brand-300 transition-all" />
-            ) : (
-              <span className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 font-display font-bold inline-flex items-center justify-center ring-2 ring-ink-200">
-                {me?.fullName ? me.fullName.slice(0, 1) : '·'}
-              </span>
-            )}
-          </a>
-          <button type="button" onClick={() => setMobOpen(o => !o)} aria-label="მენიუ" aria-expanded={mobOpen} className="lg:hidden w-10 h-10 rounded-btn border border-ink-200 bg-white text-ink-900 hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center transition-colors">
-            {mobOpen ? <Icon.x className="w-5 h-5" /> : <Icon.menu className="w-5 h-5" />}
-          </button>
-        </div>
-      </div>
-      {mobOpen && (
-        <>
-          <button type="button" aria-label="დახურვა" onClick={() => setMobOpen(false)} className="lg:hidden fixed inset-0 z-50 bg-ink-900/50 backdrop-blur-sm" />
-          <aside className="lg:hidden fixed top-0 right-0 bottom-0 z-[51] w-[300px] max-w-[85vw] bg-white shadow-float flex flex-col">
-            <div className="h-16 px-5 flex items-center justify-between border-b border-ink-200 shrink-0">
-              <span className="font-display text-[10.5px] font-bold uppercase tracking-[0.22em] text-ink-500">მენიუ</span>
-              <button type="button" onClick={() => setMobOpen(false)} aria-label="დახურვა" className="w-10 h-10 rounded-btn text-ink-700 hover:bg-ink-100 inline-flex items-center justify-center transition-colors">
-                <Icon.x className="w-5 h-5" />
-              </button>
-            </div>
-            <nav className="flex-1 overflow-y-auto px-5 py-2 flex flex-col">
-              {[
-                { l: 'ჩემი სივრცე',   href: '/student',            active: true },
-                { l: 'ექსპერტები',    href: '/tutors' },
-                { l: 'ჩემი ჯავშნები', href: '/student/bookings' },
-                { l: 'შენახული',      href: '/student/favorites' },
-                { l: 'მესიჯები',      href: '/student/messages' },
-                { l: 'პროფილი',       href: '/student/profile' },
-              ].map(it => (
-                <a key={it.l} href={it.href} onClick={() => setMobOpen(false)} className={`h-12 flex items-center justify-between text-[15px] font-display font-medium border-b border-ink-100 last:border-b-0 ${it.active ? 'text-brand-700' : 'text-ink-800'}`}>
-                  <span className="inline-flex items-center gap-2">{it.l}</span>
-                  <Icon.chevR className="w-4 h-4 text-ink-300" />
-                </a>
-              ))}
-            </nav>
-            <div className="px-5 py-4 border-t border-ink-200 shrink-0 bg-ink-50/40">
-              <div className="flex items-center gap-3 mb-3">
-                {me?.avatarUrl ? (
-                  <img src={me.avatarUrl} alt={me.fullName} className="w-10 h-10 rounded-full object-cover ring-2 ring-white" />
-                ) : (
-                  <span className="w-10 h-10 rounded-full bg-brand-100 text-brand-700 font-display font-bold inline-flex items-center justify-center ring-2 ring-white">
-                    {me?.fullName ? me.fullName.slice(0, 1) : '·'}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="font-display text-[13.5px] font-bold text-ink-900 tracking-tight truncate">{me?.fullName ?? '—'}</div>
-                  <div className="text-[11.5px] text-ink-500 truncate">{me?.email ?? ''}</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <a href="/student/profile" onClick={() => setMobOpen(false)} className="h-10 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] inline-flex items-center justify-center gap-1.5 transition-colors">
-                  <Icon.settings className="w-3.5 h-3.5" /> ანგარიში
-                </a>
-                <button type="button" onClick={() => { setMobOpen(false); signOut() }} className="h-10 rounded-btn bg-white border border-ink-200 hover:bg-danger-50 hover:border-danger-200 text-ink-800 hover:text-danger-700 font-display font-semibold text-[12.5px] inline-flex items-center justify-center gap-1.5 transition-colors">
-                  <Icon.logout className="w-3.5 h-3.5" /> გასვლა
-                </button>
-              </div>
-            </div>
-          </aside>
-        </>
-      )}
-    </header>
-  )
-}
 
 /* ───── Search bar — dashboard primary CTA ───── */
 const DashboardSearch = () => {
@@ -294,16 +187,11 @@ const Welcome = ({ me, bookings }: { me: MeData | null; bookings: any[] }) => {
   const firstName = me?.fullName?.split(' ')[0] ?? ''
   // Single derivation shared with NextSession + SessionsPanel — see deriveSummary.
   const s = deriveSummary(bookings)
-  const nextToday = s.today[0]
-  const nextTodayLabel = nextToday
-    ? `${new Date(nextToday.startAt).toLocaleTimeString('ka-GE', { hour: '2-digit', minute: '2-digit', timeZone: TBILISI_TZ })} · ${nextToday.tutor?.user?.fullName?.split(' ')[0] ?? ''}`
-    : '—'
 
   return (
     <section className="border-b border-ink-100 bg-white">
       <div className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-6 sm:pt-10 lg:pt-12 pb-6 sm:pb-8">
-        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
-          <div className="min-w-0">
+        <div className="min-w-0">
             <div className="inline-flex items-center gap-2 mb-3 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-500">
               <span>{nowLabel || '—'}</span>
               <span className="text-ink-300">·</span>
@@ -336,33 +224,6 @@ const Welcome = ({ me, bookings }: { me: MeData | null; bookings: any[] }) => {
                 <Icon.globe className="w-3.5 h-3.5" /> ყველა ექსპერტი
               </Link>
             </div>
-          </div>
-
-          <div className="grid grid-cols-3 sm:flex sm:items-stretch gap-3 sm:gap-5 text-[12px] text-ink-600 shrink-0 motion-safe:animate-fade-in" style={{ animationDelay: '260ms' }}>
-            <div className="sm:min-w-[88px]">
-              <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-1">დღეს</div>
-              <div className="font-display text-[18px] sm:text-[20px] font-bold text-ink-900 tabular-nums leading-tight">
-                <CountUp value={s.todayCount} /> სესია
-              </div>
-              <div className="text-[10.5px] sm:text-[11px] text-ink-500 mt-0.5 truncate">{nextTodayLabel}</div>
-            </div>
-            <span className="hidden sm:block w-px bg-ink-200" />
-            <div className="sm:min-w-[88px]">
-              <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-1">კვირაში</div>
-              <div className="font-display text-[18px] sm:text-[20px] font-bold text-ink-900 tabular-nums leading-tight">
-                <CountUp value={s.weekCount} /> ჯავშანი
-              </div>
-              <div className="text-[10.5px] sm:text-[11px] text-ink-500 mt-0.5 truncate">{s.weekConfirmed} დადასტ. · {s.weekPending} ელოდ.</div>
-            </div>
-            <span className="hidden sm:block w-px bg-ink-200" />
-            <div className="sm:min-w-[88px]">
-              <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-1">ჯამში</div>
-              <div className="font-display text-[18px] sm:text-[20px] font-bold text-ink-900 tabular-nums leading-tight">
-                <CountUp value={s.completedCount} /> · <CountUp value={s.totalHours} decimals={1} suffix="სთ" />
-              </div>
-              <div className="text-[10.5px] sm:text-[11px] text-ink-500 mt-0.5 truncate">{s.uniqueTutors} ექსპერტი</div>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -440,9 +301,9 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
       ? 'დადასტურდა'
       : 'ელოდება დადასტურებას'
 
+  // gradient-dark is the named token — no ad-hoc washes on top (design canon).
   return (
     <article className="relative overflow-hidden rounded-card bg-gradient-dark text-white">
-      <div className="absolute inset-0 opacity-[0.18] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 85% 15%, rgba(12,172,151,.55), transparent 55%), radial-gradient(circle at 15% 100%, rgba(31,196,174,.45), transparent 60%)' }} />
       <div className="relative grid lg:grid-cols-[1fr_280px]">
         <div className="p-6 sm:p-8 lg:p-10">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-6 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em]">
@@ -490,11 +351,11 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
 
           <div className="mt-7 flex flex-wrap items-center gap-2.5">
             {joinable && (
-              <button type="button" onClick={() => { window.location.href = `/session/${next.id}` }} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-400 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 transition-colors">
+              <Link href={`/session/${next.id}`} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-400 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 transition-colors">
                 <Icon.video className="w-4 h-4" />
                 ვიდეო-ოთახში
                 <Icon.arrow className="w-3.5 h-3.5" />
-              </button>
+              </Link>
             )}
             <button type="button" onClick={() => onOpenDetail(next.id)} className="h-11 px-4 rounded-btn bg-white/10 hover:bg-white/15 backdrop-blur text-white font-display font-medium text-[13px] inline-flex items-center gap-1.5 transition-colors">
               სესიის დეტალები
@@ -532,24 +393,20 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
   )
 }
 
-/* ───── Wishlist ───── */
-type WishItem = {
+/* ───── Saved experts — compact strip. The full list (and the side-by-side
+   compare tool) lives at /student/favorites; here the shortlist only reminds
+   and links out, so the dashboard stays about the user's sessions. ───── */
+type SavedExpert = {
   id: string
   name: string
-  photo: number
+  avatar: string | null
   cat: string
-  headline: string
-  rating: number
-  reviews: number
   price: number
-  next: string
-  match: number
-  langs: string[]
+  rating: number
 }
 
-const Wishlist = ({ onBook, onQuickView }: { onBook: (w: WishItem) => void; onQuickView: (w: WishItem) => void }) => {
-  const [items, setItems] = useState<WishItem[]>([])
-  const [compare, setCompare] = useState(false)
+const SavedStrip = () => {
+  const [items, setItems] = useState<SavedExpert[]>([])
   // 'error' is distinct from an empty list: a failed request must NOT render
   // as "your shortlist is empty" (which would lie), it gets its own retry card.
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -565,18 +422,15 @@ const Wishlist = ({ onBook, onQuickView }: { onBook: (w: WishItem) => void; onQu
         const data = await res.json()
         if (!Array.isArray(data)) throw new Error('bad shape')
         if (cancelled) return
-        const mapped: WishItem[] = data.map((f, i) => ({
+        // Real API fields only — the old strip decorated favorites with stock
+        // pravatar photos and a hardcoded "90% match" badge, which lied.
+        const mapped: SavedExpert[] = data.map((f, i) => ({
           id: f.tutor?.id ?? String(i),
           name: f.tutor?.user?.fullName ?? 'ექსპერტი',
-          photo: 11 + i,
+          avatar: f.tutor?.user?.avatarUrl ?? null,
           cat: f.tutor?.category?.name ?? f.tutor?.specialty ?? '',
-          headline: f.tutor?.headline ?? '',
-          rating: f.tutor?.rating ?? 0,
-          reviews: f.tutor?.reviewsCount ?? 0,
           price: f.tutor?.price ?? 0,
-          next: 'შეთანხმებით',
-          match: 90,
-          langs: (f.tutor?.languages ?? ['ქარ']).slice(0, 2),
+          rating: f.tutor?.rating ?? 0,
         }))
         setItems(mapped)
         setLoadState('ready')

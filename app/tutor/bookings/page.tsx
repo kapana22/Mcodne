@@ -1,7 +1,5 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { TutorAppBar } from '@/components/TutorAppBar'
-import { Footer } from '@/components/Footer'
 import { Avatar } from '@/components/Avatar'
 import { StatusPill } from '@/components/StatusPill'
 import { Icon } from '@/components/Icon'
@@ -21,8 +19,6 @@ type Booking = {
   price: number
   student: { id: string; fullName: string; avatarUrl?: string | null } | null
 }
-
-type Me = { id: string; fullName: string; avatarUrl?: string | null } | null
 
 const TABS: { id: BookingStatus | 'ALL'; label: string }[] = [
   { id: 'ALL', label: 'ყველა' },
@@ -50,7 +46,6 @@ const fmtDate = (iso: string) => {
 
 export default function TutorBookingsPage() {
   const { toast } = useToast()
-  const [me, setMe] = useState<Me>(null)
   const [bookings, setBookings] = useState<Booking[] | null>(null)
   const [tab, setTab] = useState<BookingStatus | 'ALL'>('ALL')
   const [err, setErr] = useState<string | null>(null)
@@ -60,10 +55,7 @@ export default function TutorBookingsPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const [meRes, bResp] = await Promise.all([
-          fetch('/api/me').then(r => r.json()),
-          fetch('/api/tutor/bookings'),
-        ])
+        const bResp = await fetch('/api/tutor/bookings')
         if (cancelled) return
         // Expired session / wrong role → go to signin, not a misleading empty list.
         if (bResp.status === 401 || bResp.status === 403) {
@@ -71,7 +63,6 @@ export default function TutorBookingsPage() {
           return
         }
         const bRes = await bResp.json().catch(() => null)
-        setMe(meRes?.user ?? null)
         setBookings(Array.isArray(bRes?.bookings) ? bRes.bookings : [])
       } catch (e: any) {
         if (!cancelled) setErr('მონაცემების ჩატვირთვა ვერ მოხერხდა')
@@ -113,10 +104,7 @@ export default function TutorBookingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-ink-50 flex flex-col">
-      <TutorAppBar user={me ? { name: me.fullName, avatar: me.avatarUrl ?? undefined } : undefined} />
-
-      <main className="flex-1 px-6 py-8 max-w-[1200px] w-full mx-auto">
+    <div>
         <div className="mb-6">
           <h1 className="font-display text-[26px] font-bold tracking-tight text-ink-900">ჯავშნები</h1>
           <p className="text-[13px] text-ink-500 mt-1">მიმდინარე და წარსული ჯავშნების მართვა</p>
@@ -216,9 +204,6 @@ export default function TutorBookingsPage() {
             })}
           </ul>
         )}
-      </main>
-
-      <Footer />
     </div>
   )
 }

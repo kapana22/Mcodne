@@ -1,21 +1,22 @@
 'use client'
 import { useMemo } from 'react'
 import { Icon } from './Icon'
+import {
+  buildProfileChecks,
+  profilePercent,
+  type ProfileForCompleteness,
+} from '@/lib/profileScore'
 
 /* ProfileCompleteness — small, warm-tinted card that scores the tutor profile
    on nine fields + one "availability-toggled" signal, totalling 100%.
+   Scoring lives in lib/profileScore.ts so /api/tutor/nav-badges (sidebar
+   hint) computes the identical percent server-side.
 
    The check anchors below are IDs that the /tutor/profile page attaches to
    its sections (see mounting site). Missing anchors fall back to hash "#"
    which is a no-op — never a broken link. */
 
-export type ProfileForCompleteness = {
-  headline?: string | null
-  bio?: string | null
-  specialty?: string | null
-  price?: number | null
-  languages?: string[] | null
-} | null
+export type { ProfileForCompleteness }
 
 export type ProfileCompletenessProps = {
   profile: ProfileForCompleteness
@@ -29,40 +30,6 @@ export type ProfileCompletenessProps = {
   /** When true, the card renders even at 100% — profile page always shows. */
   alwaysShow?: boolean
   className?: string
-}
-
-type CheckItem = {
-  id: string
-  label: string
-  done: boolean
-  weight: number
-  anchor: string
-}
-
-const buildChecks = (
-  profile: ProfileForCompleteness,
-  certificates: number,
-  education: number,
-  experience: number,
-  avatarUrl?: string | null,
-): CheckItem[] => {
-  const headline = (profile?.headline ?? '').trim()
-  const bio = (profile?.bio ?? '').trim()
-  const specialty = (profile?.specialty ?? '').trim()
-  const price = Number(profile?.price ?? 0)
-  const languages = Array.isArray(profile?.languages) ? profile!.languages! : []
-
-  return [
-    { id: 'headline',    label: 'დაწერე მოკლე სათაური (მინ. 20 სიმბოლო)', done: headline.length >= 20, weight: 12, anchor: '#section-public-profile' },
-    { id: 'bio',         label: 'დაწერე ბიოგრაფია (მინ. 100 სიმბოლო)',      done: bio.length >= 100,     weight: 15, anchor: '#section-public-profile' },
-    { id: 'specialty',   label: 'მიუთითე სპეციალობა',                       done: specialty.length > 0,  weight: 8,  anchor: '#section-public-profile' },
-    { id: 'price',       label: 'დააფიქსირე საათობრივი ტარიფი',              done: price > 0,             weight: 10, anchor: '#section-public-profile' },
-    { id: 'languages',   label: 'აირჩიე მინ. ერთი ენა',                     done: languages.length >= 1, weight: 10, anchor: '#section-public-profile' },
-    { id: 'avatar',      label: 'ატვირთე პროფილის ფოტო',                    done: !!avatarUrl,           weight: 10, anchor: '#section-avatar' },
-    { id: 'certificates',label: 'დაამატე მინ. ერთი სერტიფიკატი',            done: certificates >= 1,     weight: 10, anchor: '#section-certificates' },
-    { id: 'education',   label: 'დაამატე განათლების ჩანაწერი',              done: education >= 1,        weight: 10, anchor: '#section-education' },
-    { id: 'experience',  label: 'დაამატე სამუშაო გამოცდილება',              done: experience >= 1,       weight: 10, anchor: '#section-experience' },
-  ]
 }
 
 const scrollToAnchor = (anchor: string) => {
@@ -91,15 +58,14 @@ export function ProfileCompleteness({
   className = '',
 }: ProfileCompletenessProps) {
   const checks = useMemo(
-    () => buildChecks(profile, certificates, education, experience, avatarUrl),
+    () => buildProfileChecks(profile, certificates, education, experience, avatarUrl),
     [profile, certificates, education, experience, avatarUrl],
   )
 
-  const { percent, undone } = useMemo(() => {
-    const total = checks.reduce((sum, c) => sum + (c.done ? c.weight : 0), 0)
-    const remaining = checks.filter(c => !c.done)
-    return { percent: Math.min(100, Math.max(0, total)), undone: remaining }
-  }, [checks])
+  const { percent, undone } = useMemo(
+    () => ({ percent: profilePercent(checks), undone: checks.filter(c => !c.done) }),
+    [checks],
+  )
 
   // Hide compact variant once profile is fully polished — dashboard shouldn't
   // nag when there's nothing to fix.

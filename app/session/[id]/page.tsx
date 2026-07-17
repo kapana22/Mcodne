@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Icon } from '@/components/Icon'
 import { Avatar } from '@/components/Avatar'
 import { Btn } from '@/components/Btn'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import { StatusPill } from '@/components/StatusPill'
 import { useToast } from '@/components/ToastProvider'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -54,6 +55,7 @@ export default function SessionRoom() {
   const [booking, setBooking] = useState<Booking | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [completing, setCompleting] = useState(false)
+  const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false)
   const [completeErr, setCompleteErr] = useState<string | null>(null)
   const [now, setNow] = useState<number>(Date.now())
   // Client-only browser tz; empty until the effect runs so SSR keeps Tbilisi.
@@ -92,9 +94,10 @@ export default function SessionRoom() {
     return () => clearInterval(t)
   }, [])
 
+  // Actual PATCH — fired from the ConfirmModal's confirm button (the native
+  // confirm() dialog was replaced by the app's shared modal for consistency).
   const complete = async () => {
     if (!booking || completing) return
-    if (!confirm('სესია დასრულებულად აღინიშნოს? კლიენტს გაეხსნება შეფასების საშუალება.')) return
     setCompleting(true)
     setCompleteErr(null)
     try {
@@ -119,6 +122,9 @@ export default function SessionRoom() {
       setCompleteErr('ქსელის შეცდომა')
     } finally {
       setCompleting(false)
+      // Close the dialog either way — success shows the COMPLETED banner,
+      // failure surfaces the inline error alert under the join button.
+      setCompleteConfirmOpen(false)
     }
   }
 
@@ -228,6 +234,16 @@ export default function SessionRoom() {
             {booking.status === 'COMPLETED' && (
               <div className="p-4 rounded-btn bg-success-50 border border-success-200 text-[13px] text-success-800 text-center">
                 სესია წარმატებით დასრულდა.
+                {!isTutor && (
+                  <div className="mt-3">
+                    <Link
+                      href={`/student/bookings/${booking.id}?review=1`}
+                      className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] transition-colors"
+                    >
+                      შეაფასე სესია
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
 
@@ -291,7 +307,7 @@ export default function SessionRoom() {
                             {completeErr}
                           </div>
                         )}
-                        <Btn variant="secondary" size="md" onClick={complete} disabled={completing}>
+                        <Btn variant="secondary" size="md" onClick={() => setCompleteConfirmOpen(true)} disabled={completing}>
                           {completing ? 'იგზავნება…' : 'დასრულებულად აღნიშვნა'}
                         </Btn>
                       </div>
@@ -307,6 +323,18 @@ export default function SessionRoom() {
           ვიდეო-ზარის შემდეგ — <Link href={backHref} className="text-brand-700 hover:text-brand-800 font-semibold">ჯავშნის დეტალები და მიმოწერა</Link>
         </div>
       </main>
+
+      <ConfirmModal
+        open={completeConfirmOpen}
+        title="სესიის დასრულება?"
+        body="სესია დასრულებულად აღინიშნება და კლიენტს გაეხსნება შეფასების საშუალება."
+        tone="brand"
+        confirmLabel="დასრულებულად აღნიშვნა"
+        cancelLabel="უკან"
+        onConfirm={complete}
+        onCancel={() => setCompleteConfirmOpen(false)}
+        busy={completing}
+      />
     </div>
   )
 }

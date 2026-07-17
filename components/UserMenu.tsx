@@ -1,8 +1,8 @@
 'use client'
 // UserMenu — avatar-triggered dropdown for signed-in users. Currently used
-// from TutorAppBar; the student dashboard has its own inline avatar menu.
-// Kept role-aware so future top-bars (admin, unified shell) can drop this in
-// without duplicating the menu logic.
+// from the tutor WorkspaceTopBar; the student dashboard has its own inline
+// avatar menu. Kept role-aware so future top-bars (admin, unified shell) can
+// drop this in without duplicating the menu logic.
 
 import Link from 'next/link'
 import { useEffect, useRef, useState, type ReactElement } from 'react'
@@ -29,8 +29,14 @@ const STUDENT_ITEMS = (onSignout: () => void): MenuItem[] => [
   { label: 'გამოსვლა',          icon: Icon.end, danger: true, onClick: onSignout },
 ]
 
+// გრაფიკი/შემოსავალი/კატალოგი live here because mobile has no sidebar and
+// BottomNav only carries 4 tabs — the menu is the phone's escape hatch to the
+// rest of the workspace (the old TutorAppBar chip rail is gone).
 const TUTOR_ITEMS = (onSignout: () => void): MenuItem[] => [
   { href: '/tutor/profile',     label: 'პროფილი',       icon: Icon.user },
+  { href: '/tutor/schedule',    label: 'გრაფიკი',       icon: Icon.clock },
+  { href: '/tutor/earnings',    label: 'შემოსავალი',    icon: Icon.wallet },
+  { href: '/tutors',            label: 'ექსპერტების კატალოგი', icon: Icon.search },
   { href: '/settings',          label: 'პარამეტრები',   icon: Icon.settings },
   { href: '/tutor/messages',    label: 'შეტყობინებები', icon: Icon.chat },
   { href: '/help',              label: 'დახმარება',     icon: Icon.doc },

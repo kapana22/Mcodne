@@ -1,8 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { TutorAppBar } from '@/components/TutorAppBar'
-import { Footer } from '@/components/Footer'
 import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
 import { Skeleton } from '@/components/Skeleton'
@@ -18,8 +16,6 @@ type Booking = {
   student?: { fullName: string } | null
 }
 type Slot = { id: string; startAt: string; endAt: string; booked: boolean }
-type Me = { fullName: string; avatarUrl?: string | null } | null
-
 const DAY_LABELS = ['ორშ', 'სამ', 'ოთხ', 'ხუთ', 'პარ', 'შაბ', 'კვი']
 const HOURS = Array.from({ length: 13 }, (_, i) => 8 + i) // 8..20
 
@@ -59,7 +55,6 @@ function fmtTime(iso: string) {
 
 export default function TutorSchedulePage() {
   const { toast } = useToast()
-  const [me, setMe] = useState<Me>(null)
   const [bookings, setBookings] = useState<Booking[] | null>(null)
   const [slots, setSlots] = useState<Slot[] | null>(null)
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()))
@@ -183,13 +178,11 @@ export default function TutorSchedulePage() {
     let cancelled = false
     ;(async () => {
       try {
-        const [meRes, bRes, sRes] = await Promise.all([
-          fetch('/api/me').then(r => r.json()),
+        const [bRes, sRes] = await Promise.all([
           fetch('/api/tutor/bookings').then(r => r.json()),
           fetch('/api/tutor/availability').then(r => r.json()),
         ])
         if (cancelled) return
-        setMe(meRes?.user ?? null)
         setBookings(bRes?.bookings ?? [])
         setSlots(sRes?.slots ?? [])
       } catch {
@@ -332,10 +325,7 @@ export default function TutorSchedulePage() {
   )
 
   return (
-    <div className="min-h-screen bg-ink-50 flex flex-col">
-      <TutorAppBar user={me ? { name: me.fullName, avatar: me.avatarUrl ?? undefined } : undefined} />
-
-      <main className="flex-1 px-6 py-8 max-w-[1200px] w-full mx-auto">
+    <div>
         {/* Header: title → week nav → actions. On mobile each gets its own row
             (the old single wrap-row overflowed 390px); on lg they collapse back
             into one line. */}
@@ -628,7 +618,6 @@ export default function TutorSchedulePage() {
           </div>
           </>
         )}
-      </main>
 
       {modalOpen && (
         <div
@@ -834,8 +823,6 @@ export default function TutorSchedulePage() {
         onConfirm={() => { if (confirmDeleteId) void deleteSlot(confirmDeleteId) }}
         onCancel={() => setConfirmDeleteId(null)}
       />
-
-      <Footer />
     </div>
   )
 }
