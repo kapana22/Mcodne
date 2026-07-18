@@ -571,7 +571,7 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
       </div>
 
       {/* Category chips */}
-      <div className="px-5 sm:px-6 py-3 border-b border-ink-100 flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+      <div className="px-5 sm:px-6 py-3 border-b border-ink-100 flex items-center gap-1.5 overflow-x-auto scrollbar-hide rail-fade-end">
         {CATS.map(c => {
           const on = cat === c.slug
           return (

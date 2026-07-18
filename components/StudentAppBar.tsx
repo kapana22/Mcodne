@@ -78,7 +78,7 @@ export function StudentAppBar({ user }: { user?: { name: string; avatar?: string
           TutorAppBar's rail. */}
       <nav
         aria-label="სამუშაო სივრცის ნავიგაცია"
-        className="lg:hidden border-t border-ink-100 px-4 sm:px-6 flex items-center gap-1.5 h-12 overflow-x-auto scrollbar-hide"
+        className="lg:hidden border-t border-ink-100 px-4 sm:px-6 flex items-center gap-1.5 h-12 overflow-x-auto scrollbar-hide rail-fade-end"
       >
         {NAV.map(item => {
           const active = isActive(path, item)

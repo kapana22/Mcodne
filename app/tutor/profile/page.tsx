@@ -595,7 +595,7 @@ export default function TutorProfilePage() {
                 </div>
               )}
 
-              <div className="flex border-b border-ink-200 mb-6 overflow-x-auto scrollbar-hide" role="tablist" aria-label="პროფილის სექციები">
+              <div className="flex border-b border-ink-200 mb-6 overflow-x-auto scrollbar-hide rail-fade-end" role="tablist" aria-label="პროფილის სექციები">
                 {['საჯარო პროფილი', 'სერვისები და ფასი', 'კვალიფიკაცია', 'ანგარიში'].map((label, i) => {
                   const on = activeTab === i
                   return (

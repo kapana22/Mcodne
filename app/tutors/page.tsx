@@ -171,7 +171,7 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, l
 
         {/* Mobile category rail — one-tap refinement without opening the
             drawer. Horizontal scroll, active chips in brand. */}
-        <div className="lg:hidden mt-3 -mx-6 px-6 flex gap-2 overflow-x-auto scrollbar-hide" role="group" aria-label="სფეროს ფილტრი">
+        <div className="lg:hidden mt-3 -mx-6 px-6 flex gap-2 overflow-x-auto scrollbar-hide rail-fade-end" role="group" aria-label="სფეროს ფილტრი">
           <button
             type="button"
             onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })}

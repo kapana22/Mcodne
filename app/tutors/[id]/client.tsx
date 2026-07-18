@@ -611,12 +611,14 @@ const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedI
     style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
   >
     <div className="px-4 py-3 flex items-center gap-3">
-      <div className="min-w-0">
+      {/* shrink-0 so the price keeps its width and the CTA never starves it
+          into breaking „₾NN-დან" at the hyphen (was a real 360px bug). */}
+      <div className="min-w-0 shrink-0">
         <div className="flex items-baseline gap-1.5">
           {/* From-price when tiers differ (1.2) — the exact price is chosen at
               the flow's service step; flat experts keep the "/ N წთ" label. */}
-          <span className="font-display text-[22px] font-bold text-ink-900 tabular-nums leading-none tracking-tight">{priceLabel}</span>
-          <span className="text-[11.5px] text-ink-500">{priceIsFrom ? '/ სესია' : `/ ${sessionMin} წთ`}</span>
+          <span className="font-display text-[22px] font-bold text-ink-900 tabular-nums leading-none tracking-tight whitespace-nowrap">{priceLabel}</span>
+          <span className="text-[11.5px] text-ink-500 whitespace-nowrap">{priceIsFrom ? '/ სესია' : `/ ${sessionMin} წთ`}</span>
         </div>
         {!disabled && nextFree && (
           <div className="mt-1 text-[11px] text-ink-500 leading-none truncate">
@@ -628,9 +630,11 @@ const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedI
         type="button"
         onClick={onBook}
         disabled={disabled}
-        className="ml-auto shrink-0 h-12 px-5 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:bg-none disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed"
+        className="ml-auto shrink min-w-0 h-12 px-4 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:bg-none disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed"
       >
-        {paused ? 'პაუზაზეა' : noSlots ? 'დროები არ არის' : signedIn === false ? 'შესვლა და დაჯავშნა' : 'დაჯავშნა'}
+        {/* Guest label kept short — tapping opens the auth sheet, which
+            explains the sign-in step. „შესვლა და დაჯავშნა" overflowed 360px. */}
+        <span className="truncate">{paused ? 'პაუზაზეა' : noSlots ? 'დროები არ არის' : 'დაჯავშნა'}</span>
         {!disabled && <Icon.arrow className="w-4 h-4" />}
       </button>
     </div>
@@ -1138,7 +1142,7 @@ const SectionNav = ({ items }: { items: { id: string; l: string }[] }) => {
   if (items.length < 2) return null
   return (
     <nav aria-label="პროფილის სექციები" className="sticky top-16 sm:top-20 z-30 bg-white/95 backdrop-blur-md border-b border-ink-100">
-      <div className="max-w-[1280px] mx-auto px-6 sm:px-8 flex items-center gap-5 overflow-x-auto scrollbar-hide h-11">
+      <div className="max-w-[1280px] mx-auto px-6 sm:px-8 flex items-center gap-5 overflow-x-auto scrollbar-hide rail-fade-end h-11">
         {items.map(it => (
           <a
             key={it.id}

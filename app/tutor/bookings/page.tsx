@@ -181,7 +181,7 @@ function BookingsPageInner() {
       />
 
       {/* Bucket tabs — underline pattern from the student side */}
-      <div className="flex border-b border-ink-200 mb-5 overflow-x-auto scrollbar-hide">
+      <div className="flex border-b border-ink-200 mb-5 overflow-x-auto scrollbar-hide rail-fade-end">
         {TABS.map(t => {
           const on = t.id === tab
           const c = loading ? 0 : buckets[t.id].length

@@ -74,7 +74,10 @@ const TopNav = () => {
       <div>
         <div className="max-w-[1280px] mx-auto px-6 sm:px-8 h-16 flex items-center justify-between gap-6">
           <div className="flex items-center gap-7 min-w-0">
-            <Link href="/" className="shrink-0"><Logo /></Link>
+            {/* Logo renders its own <Link> — don't wrap it in another (nested
+                <a>). Match the sm size every other top bar uses so the logo
+                doesn't visibly resize when navigating away from home. */}
+            <span className="shrink-0"><Logo size="sm" href="/" /></span>
             <nav className="hidden lg:flex items-center gap-0.5">
               <Link href="/tutors" className="h-9 px-3 rounded-btn font-display text-[13px] font-medium tracking-wide text-ink-800 hover:bg-ink-50 inline-flex items-center transition-colors">ექსპერტები</Link>
               <button
@@ -746,7 +749,7 @@ const FeaturedExperts = () => {
           </h2>
         </div>
 
-        <div className="flex items-center gap-2 mb-7 overflow-x-auto pb-1 -mx-6 sm:-mx-8 px-6 sm:px-8">
+        <div className="flex items-center gap-2 mb-7 overflow-x-auto scrollbar-hide rail-fade-end -mx-6 sm:-mx-8 px-6 sm:px-8">
           {filters.map(f => (
             <button key={f.k} type="button" onClick={() => setActive(f.k)} className={`shrink-0 h-9 px-4 rounded-pill font-display text-[12.5px] font-semibold tracking-wide inline-flex items-center transition-colors ${active === f.k ? 'bg-brand-500 text-white' : 'bg-white border border-ink-200 text-ink-700 hover:border-ink-300 hover:bg-ink-50'}`}>
               {f.l}
