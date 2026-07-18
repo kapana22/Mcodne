@@ -186,6 +186,23 @@ summary:focus-visible {
   from { background-position: -200% 0; }
   to   { background-position:  200% 0; }
 }
+/* Aurora drift — hero backdrop blobs breathe on a very slow cycle. Transform
+   lives entirely on the decorative blob (aria-hidden, no fixed descendants),
+   so the AppShell stacking-context contract is untouched. */
+@keyframes auroraA {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(-44px, 32px, 0) scale(1.12); }
+}
+@keyframes auroraB {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(48px, -26px, 0) scale(1.08); }
+}
+/* Gradient pan — makes a bg-clip-text gradient shimmer slowly across the
+   letters. Pair with `bg-gradient-signature` (the named token) only. */
+@keyframes gradientPan {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
 
 /* ─────────── Motion & depth utilities (motion-safe) ───────────
  * Short, calm transitions. Never bouncy — playful motion reads as loud on

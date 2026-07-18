@@ -22,10 +22,13 @@ export const metadata: Metadata = {
 }
 
 // Server component — Prisma-fed, no client JS needed for the browse view.
-// ISR: serve cached HTML and revalidate every 5 min instead of re-querying the
-// DB on every hit. Category counts don't need to be second-fresh, and this is a
-// public page — force-dynamic made every visit pay a DB round-trip for nothing.
-export const revalidate = 300
+// MUST stay force-dynamic. This page queries the DB (category counts), and on
+// Railway the DB (postgres.railway.internal) is ONLY reachable at runtime inside
+// the container — NOT during `next build`. Any static/ISR mode makes Next
+// prerender this at build time, which fails with "Can't reach database server"
+// and ships a broken static page. force-dynamic defers the query to runtime.
+// (Same constraint applies to every DB-querying page — never statically render one.)
+export const dynamic = 'force-dynamic'
 
 // Map arbitrary icon slug -> Icon.* key. Category.icon is a free-form string in
 // the schema (may reference a Lucide-ish name), so we take a best-effort match
