@@ -74,10 +74,7 @@ const TopNav = () => {
       <div>
         <div className="max-w-[1280px] mx-auto px-6 sm:px-8 h-16 flex items-center justify-between gap-6">
           <div className="flex items-center gap-7 min-w-0">
-            {/* Logo renders its own <Link> — don't wrap it in another (nested
-                <a>). Match the sm size every other top bar uses so the logo
-                doesn't visibly resize when navigating away from home. */}
-            <span className="shrink-0"><Logo size="sm" href="/" /></span>
+            <Link href="/" className="shrink-0"><Logo /></Link>
             <nav className="hidden lg:flex items-center gap-0.5">
               <Link href="/tutors" className="h-9 px-3 rounded-btn font-display text-[13px] font-medium tracking-wide text-ink-800 hover:bg-ink-50 inline-flex items-center transition-colors">ექსპერტები</Link>
               <button
