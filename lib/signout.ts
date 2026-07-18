@@ -39,6 +39,9 @@ export async function signOut(dest: string = '/'): Promise<void> {
     } catch {
       /* storage may be unavailable (private mode) — cookie teardown already happened */
     }
+    // Tell other open tabs to reload — they must not keep showing a signed-in
+    // shell after this tab logs out.
+    try { window.localStorage.setItem('mcodne:session-changed', String(Date.now())) } catch {}
     window.location.replace(dest)
   }
 }

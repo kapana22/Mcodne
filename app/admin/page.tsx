@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { safeHttpUrl as safeDocHref } from '@/lib/safeUrl'
 import { signOut } from '@/lib/signout'
+import { broadcastSessionChange } from '@/lib/sessionSignal'
 import { fmtKaDate, KA_MONTHS_LONG as KA_MONTHS } from '@/lib/kaDate'
 import { AdminConfirmDialog } from './_parts'
 import { Icon } from '@/components/Icon'
@@ -1128,7 +1129,9 @@ const UsersSection = () => {
     try {
       const res = await fetch(`/api/admin/impersonate/${pendImp.userId}`, { method: 'POST' })
       const data = await res.json().catch(() => ({} as any))
-      if (res.ok && data?.ok) { window.location.href = data.redirect ?? '/'; return }
+      // Session identity just changed (admin → impersonated user). Tell other
+      // tabs to reload so none keeps showing the admin panel, then hard-navigate.
+      if (res.ok && data?.ok) { broadcastSessionChange(); window.location.href = data.redirect ?? '/'; return }
       setErr('იმპერსონაცია ვერ მოხერხდა')
       setOpenUserId(null)
     } catch {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole, destroySession, createSession, homeForRole } from '@/lib/auth'
+import { requireRole, replaceSession, homeForRole } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 
 const Params = z.object({ userId: z.string().min(1).max(64) })
@@ -36,11 +36,11 @@ export async function POST(
     return NextResponse.json({ ok: false, error: 'CANNOT_IMPERSONATE_ADMIN' }, { status: 403 })
   }
 
-  // Destroy the admin's current session, then mint a fresh session for the
-  // target user carrying `impersonatorId = admin.id`. The banner + /exit read
-  // that value from the session row, so nothing client-forgeable is trusted.
-  await destroySession()
-  await createSession(target.id, { impersonatorId: admin.id })
+  // Atomically swap the admin's session for a fresh one for the target user,
+  // carrying `impersonatorId = admin.id`. The banner + /exit read that value
+  // from the session row, so nothing client-forgeable is trusted. replaceSession
+  // writes the cookie exactly once (no delete+set race — see lib/auth).
+  await replaceSession(target.id, { impersonatorId: admin.id })
 
   await audit(admin.id, 'user.impersonate.start', {
     targetType: 'User',

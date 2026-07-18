@@ -181,6 +181,52 @@ function check(name: string, ok: boolean, hint: string) {
   )
 }
 
+// ── I. admin cannot be demoted to TUTOR via the application flow ─────────────
+// A production incident: admin@mcodne.ge visited /apply (guard allowed ADMIN),
+// submitted an application, approved it, and the approve route blindly set
+// role='TUTOR' — demoting the only admin and locking everyone out of /admin.
+{
+  const applyLayout = read('app/apply/layout.tsx')
+  check(
+    'I: /apply layout admits STUDENT only (never ADMIN)',
+    /requireRole\(\[\s*'STUDENT'\s*\]\)/.test(applyLayout) && !/'ADMIN'/.test(applyLayout),
+    'An ADMIN reaching /apply can submit an application that, once approved, demotes them out of ADMIN.',
+  )
+  const submit = read('app/api/applications/route.ts')
+  check(
+    'I2: application submit rejects non-students',
+    submit.includes("role !== 'STUDENT'") && submit.includes('ONLY_STUDENTS_CAN_APPLY'),
+    'Only a STUDENT may apply — an ADMIN/TUTOR submission is a role-integrity hazard.',
+  )
+  const approve = read('app/api/applications/[id]/route.ts')
+  check(
+    'I3: application approve never promotes a non-student (no admin demotion)',
+    approve.includes("app.user.role !== 'STUDENT'") && approve.includes('CANNOT_PROMOTE_ADMIN'),
+    'Approve sets role=TUTOR; without a STUDENT-only guard it demotes an admin who applied.',
+  )
+}
+
+// ── J. impersonation swaps the session cookie exactly once ───────────────────
+// destroySession()+createSession() chained emits delete+set for the same cookie
+// in one response; browsers can apply them out of order, intermittently landing
+// the impersonated session on the wrong/empty identity. replaceSession writes once.
+{
+  const start = read('app/api/admin/impersonate/[userId]/route.ts')
+  const exit = read('app/api/admin/impersonate/exit/route.ts')
+  check(
+    'J: impersonate start/exit use replaceSession (no delete+set cookie race)',
+    start.includes('replaceSession') && !start.includes('destroySession') &&
+      exit.includes('replaceSession'),
+    'Chaining destroySession()+createSession() races the Set-Cookie ordering — use replaceSession.',
+  )
+  const me = read('app/api/me/route.ts')
+  check(
+    'J2: /api/me is no-store so the header never shows a stale role',
+    me.includes("dynamic = 'force-dynamic'") && me.includes('no-store'),
+    'A cached /api/me keeps the top bar showing the previous role after an impersonation swap.',
+  )
+}
+
 if (failures > 0) {
   console.error(`\n${failures} regression guard(s) FAILED`)
   process.exit(1)

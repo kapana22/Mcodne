@@ -4,9 +4,17 @@ import { z } from 'zod'
 import { getCurrentUser, hashPassword, verifyPassword, revokeOtherSessions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// The header/nav reads role from here to decide what to render. If the browser
+// serves a cached response, the top bar keeps showing the PREVIOUS role after
+// an admin impersonation swap or exit — no-store guarantees every read is live.
+export const dynamic = 'force-dynamic'
+
+// Applied to every response so no browser/proxy layer caches an identity.
+const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' }
+
 export async function GET() {
   const user = await getCurrentUser()
-  if (!user) return NextResponse.json({ user: null })
+  if (!user) return NextResponse.json({ user: null }, { headers: NO_STORE })
   return NextResponse.json({
     user: {
       id: user.id,
@@ -21,7 +29,7 @@ export async function GET() {
       // onboarding welcome banner for the first few days.
       createdAt: (user as any).createdAt ?? null,
     },
-  })
+  }, { headers: NO_STORE })
 }
 
 const Patch = z.object({

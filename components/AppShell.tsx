@@ -28,7 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/me', { credentials: 'include' })
+    fetch('/api/me', { credentials: 'include', cache: 'no-store' })
       .then(r => (r.ok ? r.json() : { user: null }))
       .then(d => {
         if (cancelled) return
@@ -39,6 +39,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       .catch(() => { if (!cancelled) setRole(null) })
     return () => { cancelled = true }
   }, [path])
+
+  // Cross-tab session guard. When the session identity changes in ANY tab
+  // (admin impersonation start/exit, sign-out), that tab writes the
+  // `mcodne:session-changed` key; every OTHER tab hard-reloads so it can never
+  // keep rendering a page for the previous identity — the exact "logged in as
+  // admin, still looking at the tutor dashboard as a student" cross-tab stale
+  // shell. The initiating tab does its own hard navigation, and `storage`
+  // doesn't fire in the tab that wrote it, so there's no double reload.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'mcodne:session-changed') window.location.reload()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   return (
     <ToastProvider>

@@ -34,6 +34,14 @@ export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
 
+  // Only STUDENTs apply to become experts. A TUTOR is already one; an ADMIN
+  // must never hold a pending application (approving it would demote them out
+  // of the admin role and lock everyone out of /admin — the exact bug this
+  // guards). Admins who want to inspect the flow can impersonate a student.
+  if (user.role !== 'STUDENT') {
+    return NextResponse.json({ ok: false, error: 'ONLY_STUDENTS_CAN_APPLY' }, { status: 403 })
+  }
+
   // Verified-email gate — applications become part of the tutor's public record;
   // require confirmed inbox before we take the submission.
   if (!(user as any).emailVerified) {

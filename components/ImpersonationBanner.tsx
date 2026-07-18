@@ -5,6 +5,7 @@
 // Clicking "exit" restores the admin's original session and redirects to /admin.
 
 import { useEffect, useState } from 'react'
+import { broadcastSessionChange } from '@/lib/sessionSignal'
 
 export function ImpersonationBanner() {
   const [active, setActive] = useState(false)
@@ -33,8 +34,12 @@ export function ImpersonationBanner() {
     try {
       const res = await fetch('/api/admin/impersonate/exit', { method: 'POST' })
       const d = await res.json().catch(() => ({} as any))
+      // Restored to the admin identity — reload other tabs off the impersonated
+      // shell before this tab navigates back to /admin.
+      broadcastSessionChange()
       window.location.href = (res.ok && d?.redirect) ? d.redirect : '/admin'
     } catch {
+      broadcastSessionChange()
       window.location.href = '/admin'
     }
   }

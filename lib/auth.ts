@@ -69,6 +69,27 @@ export async function destroySession() {
   jar.delete(COOKIE)
 }
 
+// Atomically swap the current session for a fresh one for `userId` (used by
+// admin impersonation start + exit). This deletes the OLD session's DB row by
+// its cookie token but DOES NOT call jar.delete() — createSession's jar.set()
+// overwrites the cookie in a single Set-Cookie. Chaining destroySession()
+// (which delete()s the cookie) with createSession() (which set()s it) emits BOTH
+// a deletion and a set for the same cookie name in one response; browsers/proxies
+// can apply those out of order, intermittently leaving the session cookie empty
+// or stale — the root of "impersonate sometimes lands on the wrong role". One
+// write only avoids that race entirely.
+export async function replaceSession(
+  userId: string,
+  opts?: { rememberMe?: boolean; impersonatorId?: string | null },
+) {
+  const jar = await cookies()
+  const oldRaw = jar.get(COOKIE)?.value
+  if (oldRaw) {
+    await prisma.session.deleteMany({ where: { token: tokenHash(oldRaw) } }).catch(() => {})
+  }
+  await createSession(userId, opts)
+}
+
 export async function currentSessionTokenHash(): Promise<string | null> {
   const jar = await cookies()
   const raw = jar.get(COOKIE)?.value

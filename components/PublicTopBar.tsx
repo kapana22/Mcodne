@@ -28,6 +28,7 @@ const ADMIN_NAV: { label: string; href: string }[] = [
 ]
 const PUBLIC_NAV: { label: string; href: string }[] = [
   { label: 'ექსპერტები',     href: '/tutors' },
+  { label: 'კატეგორიები',    href: '/categories' },
   { label: 'გახდი ექსპერტი', href: '/apply' },
   { label: 'დახმარება',      href: '/help' },
 ]
@@ -39,7 +40,9 @@ export function PublicTopBar({ activeHref }: { activeHref?: string }) {
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
-    fetch('/api/me').then(r => r.ok ? r.json() : null).then(d => {
+    // no-store so the bar never renders a stale role after an admin
+    // impersonation swap/exit (the /api/me response is no-store too).
+    fetch('/api/me', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
       setMe(d?.user ?? null)
       setReady(true)
     }).catch(() => setReady(true))

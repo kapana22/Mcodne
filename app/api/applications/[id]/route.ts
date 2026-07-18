@@ -26,11 +26,25 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     )
   }
 
-  // Only need userId to update; skip the full user include.
-  const app = await prisma.tutorApplication.findUnique({ where: { id } })
+  // Fetch the applicant's current role — approval promotes to TUTOR, and we
+  // must NEVER demote an ADMIN (or anyone non-STUDENT) that way. An admin who
+  // accidentally submitted an application and then approved it used to lose
+  // their admin role and lock everyone out of /admin — this guard prevents it.
+  const app = await prisma.tutorApplication.findUnique({
+    where: { id },
+    include: { user: { select: { role: true } } },
+  })
   if (!app) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
   if (action === 'approve') {
+    if (app.user.role !== 'STUDENT') {
+      // Only a STUDENT applicant can be promoted. ADMIN → refuse outright;
+      // an existing TUTOR is already an expert (nothing to promote).
+      return NextResponse.json(
+        { ok: false, error: app.user.role === 'ADMIN' ? 'CANNOT_PROMOTE_ADMIN' : 'ALREADY_EXPERT' },
+        { status: 400 },
+      )
+    }
     await prisma.$transaction([
       prisma.tutorApplication.update({
         where: { id },

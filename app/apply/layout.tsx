@@ -22,11 +22,13 @@ export const metadata: Metadata = {
 }
 
 export default async function ApplyLayout({ children }: { children: React.ReactNode }) {
-  // Applicants keep role STUDENT until an admin approves (see
+  // STUDENT only. Applicants keep role STUDENT until an admin approves (see
   // app/api/auth/signup/route.ts — every self-signup is STUDENT; the teach
-  // signup hands off here as a STUDENT). So an actual TUTOR re-applying is
-  // meaningless: requireRole sends them to their own home (/tutor). Guests get
-  // /signin?redirect=/apply via requireUser's x-current-path handling.
-  await requireRole(['STUDENT', 'ADMIN'])
+  // signup hands off here as a STUDENT). A TUTOR re-applying is meaningless
+  // (already an expert → /tutor). ADMINs are deliberately excluded: an admin
+  // who submits and then approves their own application demotes themselves to
+  // TUTOR and locks everyone out of /admin. requireRole redirects an admin to
+  // /admin. Guests get /signin?redirect=/apply via requireUser's x-current-path.
+  await requireRole(['STUDENT'])
   return children
 }

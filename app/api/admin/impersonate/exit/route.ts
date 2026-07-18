@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { destroySession, createSession, getCurrentUser, getImpersonatorId } from '@/lib/auth'
+import { destroySession, replaceSession, getCurrentUser, getImpersonatorId } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 
 // POST /api/admin/impersonate/exit
@@ -30,8 +30,7 @@ export async function POST() {
     return NextResponse.json({ ok: false, error: 'ORIGINAL_ADMIN_INVALID' }, { status: 400 })
   }
 
-  await destroySession()
-  await createSession(admin.id)
+  await replaceSession(admin.id)
 
   await audit(admin.id, 'user.impersonate.end', {
     targetType: 'User',
