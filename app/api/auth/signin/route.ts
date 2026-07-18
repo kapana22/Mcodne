@@ -53,6 +53,14 @@ export async function POST(req: Request) {
   if (!user || !passwordOk) {
     return NextResponse.json({ ok: false, error: 'BAD_CREDENTIALS' }, { status: 401 })
   }
+  // Admin-suspended accounts can't sign in. Checked only after the password
+  // verifies so suspension state isn't leaked to guessers.
+  if (user.suspendedAt) {
+    return NextResponse.json(
+      { ok: false, error: 'SUSPENDED', message: 'ანგარიში შეჩერებულია. დაგვიკავშირდი: hi@mcodne.ge' },
+      { status: 403 },
+    )
+  }
   await createSession(user.id, { rememberMe: rememberMe !== false })
   // `home` is the server-decided landing (role home, or /apply for a pending
   // expert applicant). The client prefers it over its own role mapping; an

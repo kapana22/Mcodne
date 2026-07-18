@@ -90,6 +90,11 @@ export default function TutorEarningsPage() {
         className="mb-6"
         title="შემოსავალი"
         sub="დამუშავებული ჯავშნები და ტრანზაქციები · შენი წილი 85%"
+        actions={
+          <Btn variant="secondary" size="sm" href="/api/tutor/earnings?format=csv">
+            CSV ექსპორტი
+          </Btn>
+        }
       />
 
       {err && (

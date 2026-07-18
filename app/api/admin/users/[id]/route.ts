@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { audit } from '@/lib/audit'
 
 // Full admin drilldown for a single user: profile + tutor row (if any) +
 // all bookings (as student and as tutor) + reviews written + reviews received
@@ -84,4 +86,57 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     reviewsReceived,
     recentNotifications,
   })
+}
+
+/* ── Admin safety actions: suspend / unsuspend ──
+   Guarded identically to every other /api/admin route (requireRole('ADMIN'))
+   and audit-logged, following app/api/admin/tutors/[id]/featured as the
+   pattern. Suspend requires a non-empty reason (kept in the audit meta). */
+const PatchBody = z.object({
+  action: z.enum(['suspend', 'unsuspend']),
+  reason: z.string().max(300).optional(),
+})
+
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const admin = await requireRole('ADMIN')
+  const { id } = await ctx.params
+  const parsed = PatchBody.safeParse(await req.json().catch(() => ({})))
+  if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+  const { action } = parsed.data
+  const reason = parsed.data.reason?.trim() || null
+
+  if (action === 'suspend' && !reason) {
+    return NextResponse.json(
+      { ok: false, error: 'REASON_REQUIRED', message: 'შეჩერების მიზეზი სავალდებულოა' },
+      { status: 400 },
+    )
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, role: true, suspendedAt: true },
+  })
+  if (!target) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
+  // Admins can't suspend admins (or themselves) — removes the foot-gun of
+  // locking the whole staff out via the UI.
+  if (action === 'suspend' && (target.role === 'ADMIN' || target.id === admin.id)) {
+    return NextResponse.json(
+      { ok: false, error: 'FORBIDDEN_TARGET', message: 'ადმინის ანგარიშის შეჩერება არ შეიძლება' },
+      { status: 400 },
+    )
+  }
+
+  const updated = await prisma.user.update({
+    where: { id },
+    data: { suspendedAt: action === 'suspend' ? new Date() : null },
+    select: { id: true, suspendedAt: true },
+  })
+
+  await audit(admin.id, action === 'suspend' ? 'user.suspend' : 'user.unsuspend', {
+    targetType: 'User',
+    targetId: id,
+    meta: { reason },
+  })
+
+  return NextResponse.json({ ok: true, user: updated })
 }

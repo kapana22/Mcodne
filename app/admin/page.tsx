@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { safeHttpUrl as safeDocHref } from '@/lib/safeUrl'
 import { signOut } from '@/lib/signout'
 import { fmtKaDate } from '@/lib/kaDate'
+import { AdminConfirmDialog } from './_parts'
 
 // Tutor-supplied URLs (ID/selfie/certificate scans, LinkedIn, website) are
 // rendered as clickable links in the moderation panel. React does NOT block
@@ -49,7 +50,7 @@ const Icon = {
 const Logo = () => (
   <Link href="/" className="inline-flex items-center gap-2.5" aria-label="მცოდნე admin">
     <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain select-none" draggable={false} />
-    <span className="inline-flex items-center h-5 px-1.5 rounded-pill bg-accent-900 text-white font-display text-[9.5px] font-bold uppercase tracking-[0.18em]">admin</span>
+    <span className="inline-flex items-center h-5 px-1.5 rounded-pill bg-ink-900 text-white font-display text-[9.5px] font-bold uppercase tracking-[0.18em]">admin</span>
   </Link>
 )
 
@@ -80,7 +81,7 @@ const TopBar = ({ active, onNav, pendingCount }: { active: AdminTab; onNav: (t: 
           const on = active === it.id
           return (
             <button key={it.id} type="button" onClick={() => onNav(it.id)} className={`h-9 px-3 rounded-btn font-display text-[13px] font-semibold tracking-tight inline-flex items-center gap-1.5 transition-colors ${
-              on ? 'bg-accent-900 text-white' : 'text-ink-700 hover:bg-ink-50'
+              on ? 'bg-ink-900 text-white' : 'text-ink-700 hover:bg-ink-50'
             }`}>
               {it.l}
               {it.badge ? <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-pill font-display text-[10px] font-bold tabular-nums ${
@@ -107,7 +108,7 @@ const TopBar = ({ active, onNav, pendingCount }: { active: AdminTab; onNav: (t: 
     </div>
     {mobOpen && (
       <>
-        <button type="button" aria-label="დახურვა" onClick={() => setMobOpen(false)} className="lg:hidden fixed inset-0 z-50 bg-accent-900/50 backdrop-blur-sm" />
+        <button type="button" aria-label="დახურვა" onClick={() => setMobOpen(false)} className="lg:hidden fixed inset-0 z-50 bg-ink-950/55 backdrop-blur-sm" />
         <aside className="lg:hidden fixed top-0 right-0 bottom-0 z-[51] w-[300px] max-w-[85vw] bg-white shadow-float flex flex-col">
           <div className="h-16 px-5 flex items-center justify-between border-b border-ink-200 shrink-0">
             <span className="font-display text-[10.5px] font-bold uppercase tracking-[0.22em] text-ink-500">მენიუ</span>
@@ -176,7 +177,7 @@ const Hero = () => {
           <button type="button" onClick={() => { window.location.hash = 'analytics' }} className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors">
             <Icon.doc className="w-3.5 h-3.5" /> ანალიტიკა
           </button>
-          <button type="button" onClick={() => { window.location.hash = 'moderation' }} className="h-11 px-4 rounded-btn bg-accent-900 hover:bg-accent-800 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-2 transition-colors">
+          <button type="button" onClick={() => { window.location.hash = 'moderation' }} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-2 transition-colors">
             <Icon.bolt className="w-3.5 h-3.5" /> მოდერაცია <Icon.arrow className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -185,32 +186,20 @@ const Hero = () => {
   )
 }
 
-/* ───── KPI Stat ───── */
-type Tone = 'brand' | 'accent' | 'success' | 'warning' | 'danger' | 'ink'
-type Stat = { label: string; value: string; sub: React.ReactNode; tone: Tone; spark: number[]; cat: string }
+/* ───── KPI Stat ─────
+   Sparklines were removed 2026-07: they rendered FABRICATED series (hardcoded
+   arrays) next to real numbers — decorative fiction an admin could mistake for
+   trend data. KPI cards now show only real values from /api/admin/stats. */
+type Stat = { label: string; value: string; sub: React.ReactNode; cat: string }
 
-const STATS: Stat[] = [
-  { cat: 'მოცულობა · 24სთ', label: 'სესია გათამაშდა',     value: '1,284', tone: 'brand',   spark: [98, 110, 124, 115, 128, 140, 152, 158, 168, 184, 192, 204], sub: <span>+12% გასულ კვირასთან · <span className="font-semibold text-success-700">პიკი 19:00</span></span> },
-  { cat: 'ფინანსები',       label: 'GMV დღეს',             value: '₾98,420', tone: 'accent',  spark: [40, 52, 48, 60, 65, 72, 78, 82, 88, 92, 95, 98], sub: <span>commission ₾9,842 · <span className="font-semibold text-ink-900">target ₾100K</span></span> },
-  { cat: 'queue · ცოცხალი', label: 'მოლოდინში',            value: '15',     tone: 'danger',  spark: [22, 18, 24, 28, 20, 16, 19, 14, 18, 12, 15, 15], sub: <span><span className="font-semibold text-danger-700">2 ვადა იწურა</span> · საშ. 1სთ 12წთ ლოდინი</span> },
-  { cat: 'ხარისხი',         label: 'საშ. session rating',  value: '4.87',   tone: 'success', spark: [4.7, 4.72, 4.78, 4.81, 4.82, 4.79, 4.83, 4.85, 4.84, 4.86, 4.85, 4.87], sub: <span>2,148 review · <span className="font-semibold text-warning-700">12 flagged</span></span> },
+// Skeleton card definitions — labels/categories only; values start blank ('—')
+// and are only ever filled from the real /api/admin/stats response.
+const STAT_DEFS: Pick<Stat, 'cat' | 'label'>[] = [
+  { cat: 'მოცულობა · სულ', label: 'ჯავშანი პლატფორმაზე' },
+  { cat: 'ფინანსები', label: 'GMV სულ' },
+  { cat: 'რიგი', label: 'მოლოდინში (განცხადება)' },
+  { cat: 'აქტიური', label: 'მომხმარებელი / ექსპერტი' },
 ]
-
-const Spark = ({ d, tone }: { d: number[]; tone: Tone }) => {
-  const w = 96, h = 28
-  const max = Math.max(...d), min = Math.min(...d)
-  const span = max - min || 1
-  const pts = d.map((v, i) => `${(i / (d.length - 1)) * w},${h - ((v - min) / span) * (h - 4) - 2}`).join(' ')
-  const stroke = tone === 'brand' ? '#0F8069' : tone === 'accent' ? '#159A82' : tone === 'success' ? '#197F56' : tone === 'warning' ? '#A87F1E' : tone === 'danger' ? '#9B2932' : '#4A4437'
-  return (
-    <svg width={w} height={h} className="overflow-visible">
-      <polyline points={pts} fill="none" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      {d.map((v, i) => (
-        <circle key={i} cx={(i / (d.length - 1)) * w} cy={h - ((v - min) / span) * (h - 4) - 2} r={i === d.length - 1 ? 2.5 : 0} fill={stroke} />
-      ))}
-    </svg>
-  )
-}
 
 const StatCard = ({ s, idx }: { s: Stat; idx: number }) => (
   <div className="relative p-5 rounded-card bg-white border border-ink-200 hover:border-ink-300 transition-colors">
@@ -219,19 +208,13 @@ const StatCard = ({ s, idx }: { s: Stat; idx: number }) => (
       <span className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 truncate">{s.cat}</span>
     </div>
     <div className="mt-4 font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">{s.label}</div>
-    <div className="mt-1 flex items-end justify-between gap-3">
-      <div className="font-display text-[30px] font-bold text-ink-900 tracking-tight tabular-nums leading-none">{s.value}</div>
-      <Spark d={s.spark} tone={s.tone} />
-    </div>
+    <div className="mt-1 font-display text-[30px] font-bold text-ink-900 tracking-tight tabular-nums leading-none">{s.value}</div>
     <div className="mt-4 pt-3 border-t border-ink-100 text-[11.5px] text-ink-600 leading-snug">{s.sub}</div>
   </div>
 )
 
 const Stats = () => {
-  // Never seed with the fabricated STATS values — an admin must not see invented
-  // GMV/rating numbers presented as live data. Start blank ('—') and only fill
-  // from the real /api/admin/stats response; keep '—' on failure.
-  const PLACEHOLDER: Stat[] = STATS.map(s => ({ ...s, value: '—', sub: <span className="text-ink-400">—</span> }))
+  const PLACEHOLDER: Stat[] = STAT_DEFS.map(s => ({ ...s, value: '—', sub: <span className="text-ink-400">—</span> }))
   const [live, setLive] = useState<Stat[] | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -240,10 +223,10 @@ const Stats = () => {
       .then((d: any) => {
         if (!d || cancelled) return
         setLive([
-          { cat: 'მოცულობა · სულ', label: 'ჯავშანი პლატფორმაზე', value: (d.bookings ?? 0).toLocaleString('ka-GE'), tone: 'brand', spark: STATS[0].spark, sub: <span><span className="font-semibold text-success-700">{d.completed ?? 0}</span> დასრულებული · {d.live ?? 0} ცოცხალი</span> },
-          { cat: 'ფინანსები', label: 'GMV სულ', value: `₾${(d.revenue ?? 0).toLocaleString('ka-GE')}`, tone: 'accent', spark: STATS[1].spark, sub: <span>commission ≈ ₾{Math.round((d.revenue ?? 0) * 0.15).toLocaleString('ka-GE')}</span> },
-          { cat: 'queue', label: 'მოლოდინში (განცხადება)', value: String(d.pendingApps ?? 0), tone: 'danger', spark: STATS[2].spark, sub: <span>ექსპერტთა განცხადება მოდერაციისთვის</span> },
-          { cat: 'აქტიური', label: 'მომხმარებელი / ექსპერტი', value: `${d.students ?? 0} / ${d.tutors ?? 0}`, tone: 'success', spark: STATS[3].spark, sub: <span>სულ {(d.users ?? 0).toLocaleString('ka-GE')} რეგისტრირებული</span> },
+          { ...STAT_DEFS[0], value: (d.bookings ?? 0).toLocaleString('ka-GE'), sub: <span><span className="font-semibold text-success-700">{d.completed ?? 0}</span> დასრულებული · {d.live ?? 0} ცოცხალი</span> },
+          { ...STAT_DEFS[1], value: `₾${(d.revenue ?? 0).toLocaleString('ka-GE')}`, sub: <span>კომისია ≈ ₾{Math.round((d.revenue ?? 0) * 0.15).toLocaleString('ka-GE')}</span> },
+          { ...STAT_DEFS[2], value: String(d.pendingApps ?? 0), sub: <span>ექსპერტთა განცხადება მოდერაციისთვის</span> },
+          { ...STAT_DEFS[3], value: `${d.students ?? 0} / ${d.tutors ?? 0}`, sub: <span>სულ {(d.users ?? 0).toLocaleString('ka-GE')} რეგისტრირებული</span> },
         ])
       })
       .catch(() => {})
@@ -270,7 +253,7 @@ const OverviewSection = () => (
           <h3 className="font-display text-[18px] font-bold text-ink-900">ექსპერტის განცხადებები</h3>
           <p className="text-[13px] text-ink-500 mt-1">დაამტკიცე, უარყავი და მართე ახალი ექსპერტის მოთხოვნები.</p>
         </div>
-        <a href="#moderation" className="h-11 px-4 rounded-btn bg-accent-900 hover:bg-accent-800 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-2">
+        <a href="#moderation" className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-2">
           მოდერაცია <Icon.arrow className="w-4 h-4" />
         </a>
       </div>
@@ -316,6 +299,9 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
   // loop runs; null when idle.
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
+  // Reject flows go through the shared confirm dialog with a REQUIRED reason
+  // ('single' → the open application, 'bulk' → every checked application).
+  const [pendReject, setPendReject] = useState<'single' | 'bulk' | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -327,7 +313,7 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
       const mapped: AppRow[] = submitted.map((a: any) => ({
         id: a.id, name: a.fullName, cat: a.specialty, yrs: a.yearsExp, rate: a.hourlyRate,
         city: a.city ?? '—',
-        sla: new Date(a.createdAt).toLocaleDateString('ka-GE'),
+        sla: fmtKaDate(new Date(a.createdAt), { year: true }),
         urgent: (Date.now() - new Date(a.createdAt).getTime()) > 24 * 3600 * 1000,
         motivation: a.motivation, email: a.user?.email,
         phone: a.phone, linkedinUrl: a.linkedinUrl, websiteUrl: a.websiteUrl,
@@ -361,7 +347,7 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
     setChecked(prev => prev.size === APPS.length ? new Set() : new Set(APPS.map(a => a.id)))
   }
 
-  const bulkDecide = async (action: 'approve' | 'reject') => {
+  const bulkDecide = async (action: 'approve' | 'reject', reason?: string) => {
     if (busy || checked.size === 0) return
     const ids = Array.from(checked)
     setBusy(true)
@@ -375,7 +361,7 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
         const res = await fetch(`/api/applications/${ids[i]}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action }),
+          body: JSON.stringify({ action, note: reason?.trim() || undefined }),
         })
         const data = await res.json().catch(() => ({} as any))
         if (res.ok && data?.ok !== false) ok++; else fail++
@@ -396,15 +382,18 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
     onDecision?.()
   }
 
-  const decide = async (action: 'approve' | 'reject') => {
+  const decide = async (action: 'approve' | 'reject', reasonArg?: string) => {
     if (busy || !sel) return
     setBusy(true)
     setFlash(null)
     try {
+      // Reject carries the dialog's required reason as the moderator note;
+      // approve keeps using the optional inline textarea.
+      const noteToSend = action === 'reject' ? reasonArg?.trim() : note.trim()
       const res = await fetch(`/api/applications/${sel}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, note: note.trim() || undefined }),
+        body: JSON.stringify({ action, note: noteToSend || undefined }),
       })
       const data = await res.json().catch(() => ({} as any))
       if (!res.ok || data?.ok === false) {
@@ -454,7 +443,7 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
                   type="checkbox"
                   checked={checked.size === APPS.length && APPS.length > 0}
                   onChange={toggleAll}
-                  className="w-4 h-4 rounded border-ink-300 text-accent-900 focus:ring-accent-500"
+                  className="w-5 h-5 rounded border-ink-300 text-ink-900 focus:ring-brand-500"
                 />
                 <span className="font-display text-[11.5px] font-semibold text-ink-700">
                   ყველას მონიშვნა{checked.size > 0 ? ` · ${checked.size} მონიშნული` : ''}
@@ -472,7 +461,7 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => bulkDecide('reject')}
+                    onClick={() => setPendReject('bulk')}
                     disabled={busy}
                     className="h-8 px-2.5 rounded-btn bg-white border border-danger-200 hover:bg-danger-50 disabled:opacity-50 text-danger-700 font-display font-semibold text-[11.5px] inline-flex items-center gap-1"
                   >
@@ -504,7 +493,7 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
                 aria-label={`მონიშვნა: ${a.name}`}
                 checked={checked.has(a.id)}
                 onChange={() => toggleCheck(a.id)}
-                className="mt-1 w-4 h-4 rounded border-ink-300 text-accent-900 focus:ring-accent-500 shrink-0"
+                className="mt-1 w-5 h-5 rounded border-ink-300 text-ink-900 focus:ring-brand-500 shrink-0"
               />
               <button type="button" onClick={() => setSel(a.id)} className="flex-1 min-w-0 text-left">
                 <div className="flex items-center justify-between gap-3">
@@ -662,12 +651,30 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => decide('approve')} disabled={busy} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"><Icon.check className="w-3.5 h-3.5" /> {busy ? 'იგზავნება…' : 'დაამტკიცე'}</button>
-              <button type="button" onClick={() => decide('reject')} disabled={busy} className="h-11 px-4 rounded-btn bg-white border border-danger-200 hover:bg-danger-50 disabled:opacity-50 text-danger-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"><Icon.x className="w-3.5 h-3.5" /> უარყავი</button>
+              <button type="button" onClick={() => setPendReject('single')} disabled={busy} className="h-11 px-4 rounded-btn bg-white border border-danger-200 hover:bg-danger-50 disabled:opacity-50 text-danger-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"><Icon.x className="w-3.5 h-3.5" /> უარყავი</button>
             </div>
           </div>
           )}
         </div>
       </section>
+      <AdminConfirmDialog
+        open={pendReject !== null}
+        title={pendReject === 'bulk' ? `${checked.size} განაცხადის უარყოფა` : 'განაცხადის უარყოფა'}
+        body={pendReject === 'bulk'
+          ? 'მიზეზი გაეგზავნება ყველა მონიშნულ განმცხადებელს.'
+          : <>მიზეზი გაეგზავნება განმცხადებელს: <span className="font-display font-semibold">{active?.name ?? ''}</span></>}
+        tone="danger"
+        reason="required"
+        confirmLabel="უარყავი"
+        busy={busy}
+        onCancel={() => setPendReject(null)}
+        onConfirm={async (reason) => {
+          const mode = pendReject
+          setPendReject(null)
+          if (mode === 'bulk') await bulkDecide('reject', reason)
+          else await decide('reject', reason)
+        }}
+      />
     </>
   )
 }
@@ -701,6 +708,7 @@ type UserDetail = {
     role: 'STUDENT' | 'TUTOR' | 'ADMIN';
     emailVerified: boolean; createdAt: string; avatarUrl: string | null;
     phone?: string | null; bio?: string | null;
+    suspendedAt?: string | null;
     tutor?: {
       id: string; headline: string; specialty: string; price: number;
       yearsExp: number; rating: number; reviewsCount: number;
@@ -738,6 +746,9 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
   const [tab, setTab] = useState<'profile' | 'bookings' | 'reviews' | 'activity'>('profile')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // Suspend/unsuspend flow — confirm dialog with a required reason on suspend.
+  const [pendSuspend, setPendSuspend] = useState(false)
+  const [suspBusy, setSuspBusy] = useState(false)
 
   useEffect(() => {
     if (!userId) { setData(null); setErr(null); setTab('profile'); return }
@@ -769,9 +780,36 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
   const u = data?.user
   const isTutor = !!u?.tutor
 
+  const doSuspendToggle = async (reason: string) => {
+    if (!u || suspBusy) return
+    setSuspBusy(true)
+    setErr(null)
+    const action = u.suspendedAt ? 'unsuspend' : 'suspend'
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, reason: reason || undefined }),
+      })
+      const j = await res.json().catch(() => ({} as any))
+      if (!res.ok || !j.ok) {
+        setErr(j?.message ?? 'ოპერაცია ვერ შესრულდა')
+        return
+      }
+      setData(prev => prev
+        ? { ...prev, user: { ...prev.user, suspendedAt: j.user?.suspendedAt ?? null } }
+        : prev)
+    } catch {
+      setErr('ქსელის შეცდომა')
+    } finally {
+      setSuspBusy(false)
+      setPendSuspend(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[80] flex items-start sm:items-center justify-center p-0 sm:p-6">
-      <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-accent-950/55 backdrop-blur-sm" />
+      <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm" />
       <div role="dialog" aria-modal="true" className="relative w-full sm:max-w-[880px] max-h-[95vh] bg-white sm:rounded-card shadow-float overflow-hidden flex flex-col motion-safe:animate-scale-in">
         {/* Header */}
         <div className="px-6 py-4 border-b border-ink-200 flex items-start justify-between gap-4 shrink-0">
@@ -793,6 +831,7 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
                     : 'bg-ink-50 border-ink-200 text-ink-600'
                   }`}>{u.role === 'STUDENT' ? 'კლიენტი' : u.role === 'TUTOR' ? 'ექსპერტი' : 'ადმინი'}</span>
                   {u.emailVerified && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-success-50 border border-success-200 text-success-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.check className="w-2.5 h-2.5" /> ვერიფ.</span>}
+                  {u.suspendedAt && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-danger-50 border border-danger-200 text-danger-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.pause className="w-2.5 h-2.5" /> შეჩერებული</span>}
                 </div>
                 <div className="text-[12px] text-ink-500 font-mono truncate mt-0.5">{u.email}</div>
               </div>
@@ -837,13 +876,13 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
                     <Stat label="რეგისტრაცია" value={fmtShort(u.createdAt)} />
                     <Stat label="ტელეფონი" value={u.phone ?? '—'} />
                     <Stat label="მიმოწერები" value={String(u._count.sentMessages)} />
-                    <Stat label="ჯავშნები (student)" value={String(u._count.bookingsAsStudent)} />
-                    <Stat label="შეფასებები (written)" value={String(u._count.reviewsGiven)} />
-                    <Stat label="favorites" value={String(u._count.favorites)} />
+                    <Stat label="ჯავშნები (კლიენტი)" value={String(u._count.bookingsAsStudent)} />
+                    <Stat label="დაწერილი შეფასებები" value={String(u._count.reviewsGiven)} />
+                    <Stat label="ფავორიტები" value={String(u._count.favorites)} />
                   </div>
                   {u.bio && (
                     <div>
-                      <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">Bio</div>
+                      <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">ბიო</div>
                       <p className="text-[13.5px] text-ink-700 whitespace-pre-wrap leading-[1.55]">{u.bio}</p>
                     </div>
                   )}
@@ -858,11 +897,11 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
                         <div><span className="text-ink-500">სპეც.:</span> <span className="font-display font-bold text-ink-900">{u.tutor.specialty}</span></div>
                         <div><span className="text-ink-500">ფასი:</span> <span className="font-display font-bold text-ink-900 tabular-nums">₾{u.tutor.price}</span></div>
                         <div><span className="text-ink-500">გამოცდილება:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{u.tutor.yearsExp} წ.</span></div>
-                        <div><span className="text-ink-500">Rating:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{u.tutor.rating.toFixed(2)}</span> <span className="text-ink-500 tabular-nums">({u.tutor.reviewsCount})</span></div>
+                        <div><span className="text-ink-500">რეიტინგი:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{u.tutor.rating.toFixed(2)}</span> <span className="text-ink-500 tabular-nums">({u.tutor.reviewsCount})</span></div>
                         <div><span className="text-ink-500">სესიები:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{u.tutor.sessionsCount}</span></div>
-                        <div><span className="text-ink-500">Intro ვიდეო:</span> <span className="font-display font-bold text-ink-900">{u.tutor.videoUrl ? '✓ ატვირთული' : '—'}</span></div>
+                        <div><span className="text-ink-500">ინტრო ვიდეო:</span> <span className="font-display font-bold text-ink-900">{u.tutor.videoUrl ? '✓ ატვირთული' : '—'}</span></div>
                       </div>
-                      <div className="mt-3 text-[12.5px] text-ink-700"><span className="font-display font-semibold">Headline:</span> {u.tutor.headline}</div>
+                      <div className="mt-3 text-[12.5px] text-ink-700"><span className="font-display font-semibold">სათაური:</span> {u.tutor.headline}</div>
                     </div>
                   )}
                 </div>
@@ -934,10 +973,24 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
           <div className="px-6 py-3 border-t border-ink-100 bg-ink-50/40 flex items-center justify-between gap-3 shrink-0">
             <div className="text-[11.5px] text-ink-500 font-mono">ID: {u.id}</div>
             <div className="flex items-center gap-2">
+              {u.role !== 'ADMIN' && (
+                <button
+                  type="button"
+                  onClick={() => setPendSuspend(true)}
+                  disabled={suspBusy}
+                  className={`h-9 px-3 rounded-btn font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 ${
+                    u.suspendedAt
+                      ? 'bg-white border border-success-200 hover:bg-success-50 text-success-700'
+                      : 'bg-white border border-danger-200 hover:bg-danger-50 text-danger-700'
+                  }`}
+                >
+                  <Icon.pause className="w-3.5 h-3.5" /> {u.suspendedAt ? 'შეჩერების მოხსნა' : 'შეჩერება'}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onImpersonate(u.id, u.fullName)}
-                className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-accent-50 hover:border-accent-300 text-ink-700 hover:text-accent-800 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors"
+                className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 hover:border-ink-300 text-ink-700 hover:text-ink-800 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors"
               >
                 <Icon.external className="w-3.5 h-3.5" /> შესვლა როგორც
               </button>
@@ -948,6 +1001,22 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
           </div>
         )}
       </div>
+      {u && (
+        <AdminConfirmDialog
+          open={pendSuspend}
+          title={u.suspendedAt ? 'შეჩერების მოხსნა' : 'ანგარიშის შეჩერება'}
+          body={u.suspendedAt
+            ? <>{u.fullName} კვლავ შეძლებს შესვლას.</>
+            : <>{u.fullName} ვეღარ შევა ანგარიშზე, სანამ შეჩერება არ მოიხსნება.</>}
+          tone={u.suspendedAt ? 'brand' : 'danger'}
+          reason={u.suspendedAt ? 'optional' : 'required'}
+          reasonLabel={u.suspendedAt ? 'მიზეზი (სურვ.)' : 'მიზეზი (სავალდებულო · ინახება აუდიტში)'}
+          confirmLabel={u.suspendedAt ? 'მოხსენი' : 'შეაჩერე'}
+          busy={suspBusy}
+          onCancel={() => setPendSuspend(false)}
+          onConfirm={doSuspendToggle}
+        />
+      )}
     </div>
   )
 }
@@ -980,9 +1049,9 @@ const FeaturedToggle = ({ tutorId, initial }: { tutorId: string; initial: boolea
           ? 'bg-warning-500 border-warning-500 text-white hover:bg-warning-600'
           : 'bg-white border-ink-300 text-ink-600 hover:border-warning-500 hover:text-warning-700'
       }`}
-      title="ჩართე Featured — გამოჩნდება landing hero-ში"
+      title="ჩართე რჩეული — გამოჩნდება მთავარი გვერდის hero-ში"
     >
-      <Icon.star className="w-3 h-3" /> {featured ? 'Featured' : 'Feature'}
+      <Icon.star className="w-3 h-3" /> რჩეული
     </button>
   )
 }
@@ -1084,14 +1153,27 @@ const UsersSection = () => {
 
   const roleLabel = (r: string) => r === 'STUDENT' ? 'კლიენტი' : r === 'TUTOR' ? 'ექსპერტი' : 'ადმინი'
 
-  const impersonate = async (userId: string, fullName: string) => {
-    if (!confirm(`შეხვიდე ${fullName}-ის სახელით?`)) return
+  // Impersonation goes through the shared confirm dialog (no native confirm()).
+  const [pendImp, setPendImp] = useState<{ userId: string; fullName: string } | null>(null)
+  const [impBusy, setImpBusy] = useState(false)
+  const impersonate = (userId: string, fullName: string) => setPendImp({ userId, fullName })
+  const doImpersonate = async () => {
+    if (!pendImp || impBusy) return
+    setImpBusy(true)
+    setErr(null)
     try {
-      const res = await fetch(`/api/admin/impersonate/${userId}`, { method: 'POST' })
+      const res = await fetch(`/api/admin/impersonate/${pendImp.userId}`, { method: 'POST' })
       const data = await res.json().catch(() => ({} as any))
-      if (res.ok && data?.ok) window.location.href = data.redirect ?? '/'
-      else alert('იმპერსონაცია ვერ მოხერხდა')
-    } catch { alert('ქსელის შეცდომა') }
+      if (res.ok && data?.ok) { window.location.href = data.redirect ?? '/'; return }
+      setErr('იმპერსონაცია ვერ მოხერხდა')
+      setOpenUserId(null)
+    } catch {
+      setErr('ქსელის შეცდომა')
+      setOpenUserId(null)
+    } finally {
+      setImpBusy(false)
+      setPendImp(null)
+    }
   }
 
   return (
@@ -1099,7 +1181,7 @@ const UsersSection = () => {
       <TabHeader
         eyebrow="მოდერაცია · მომხმარებლები"
         title={<>{users ? `${users.length} ` : '—'} ანგარიში</>}
-        sub="ძებნა და როლის ფილტრი — რეალურ დროში მუშავდება ბაზაზე. Click row → სრული პროფილი."
+        sub="ძებნა და როლის ფილტრი — რეალურ დროში მუშავდება ბაზაზე. დააკლიკე რიგს — სრული პროფილი."
         actions={users && users.length > 0 ? (
           <button
             type="button"
@@ -1109,7 +1191,7 @@ const UsersSection = () => {
             ])}
             className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors"
           >
-            <Icon.download className="w-3.5 h-3.5" /> Export CSV
+            <Icon.download className="w-3.5 h-3.5" /> CSV ექსპორტი
           </button>
         ) : undefined}
       />
@@ -1121,16 +1203,16 @@ const UsersSection = () => {
           </div>
           <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200">
             {(['all','STUDENT','TUTOR','ADMIN'] as const).map(r => (
-              <button key={r} type="button" onClick={() => setRole(r)} className={`h-8 px-3 rounded-pill font-display text-[11.5px] font-semibold tracking-wide transition-colors ${role === r ? 'bg-accent-900 text-white' : 'text-ink-600'}`}>{r === 'all' ? 'ყველა' : roleLabel(r)}</button>
+              <button key={r} type="button" onClick={() => setRole(r)} className={`h-8 px-3 rounded-pill font-display text-[11.5px] font-semibold tracking-wide transition-colors ${role === r ? 'bg-ink-900 text-white' : 'text-ink-600'}`}>{r === 'all' ? 'ყველა' : roleLabel(r)}</button>
             ))}
           </div>
           {loading && <span className="text-[11.5px] text-ink-500">იტვირთება…</span>}
         </div>
       </section>
       <section className="px-6 lg:px-8 py-6">
-        {err && <div className="mb-4 p-3 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>}
+        {err && <div role="alert" className="mb-4 p-3 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>}
         <div className="rounded-card border border-ink-200 bg-white overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-[13px] min-w-[720px]">
             <thead className="bg-ink-50/40 border-b border-ink-100">
               <tr className="text-left">
@@ -1189,7 +1271,7 @@ const UsersSection = () => {
                     <button
                       type="button"
                       onClick={() => setOpenUserId(u.id)}
-                      className="h-7 px-2 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[11px] inline-flex items-center gap-1 transition-colors"
+                      className="h-9 px-2.5 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[11px] inline-flex items-center gap-1 transition-colors"
                     >
                       დეტალები
                     </button>
@@ -1199,12 +1281,64 @@ const UsersSection = () => {
             </tbody>
           </table>
           </div>
+          {/* Mobile stacked-card fallback — same rows/states as the table. */}
+          <div className="block md:hidden">
+            {users === null ? (
+              <div className="px-4 py-10 text-center text-ink-500 text-[13px]">იტვირთება…</div>
+            ) : users.length === 0 ? (
+              <div className="px-4 py-10 text-center text-ink-500 text-[13px]">მომხმარებელი ვერ მოიძებნა</div>
+            ) : users.map(u => (
+              <div key={u.id} className="px-4 py-3 border-b border-ink-100 last:border-b-0">
+                <div className="flex items-center gap-3">
+                  {u.avatarUrl ? (
+                    <img src={u.avatarUrl} alt={u.fullName} className="w-9 h-9 rounded-full object-cover ring-1 ring-ink-200 shrink-0" />
+                  ) : (
+                    <span aria-hidden className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 ring-1 ring-ink-200 inline-flex items-center justify-center font-display font-semibold text-[13px] shrink-0">
+                      {(u.fullName ?? '?').slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-display text-[13px] font-bold text-ink-900 truncate">{u.fullName}</span>
+                      <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border font-display text-[10px] font-bold uppercase tracking-[0.14em] ${
+                        u.role === 'ADMIN' ? 'bg-iris-50 border-iris-200 text-iris-700'
+                        : u.role === 'TUTOR' ? 'bg-brand-50 border-brand-200 text-brand-700'
+                        : 'bg-ink-50 border-ink-200 text-ink-600'
+                      }`}>{roleLabel(u.role)}</span>
+                      {u.emailVerified && <span className="text-success-700"><Icon.check className="w-3.5 h-3.5 inline" /></span>}
+                    </div>
+                    <div className="font-mono text-[10.5px] tabular-nums text-ink-500 truncate mt-0.5">{u.email}</div>
+                    <div className="font-mono text-[10.5px] tabular-nums text-ink-500 mt-0.5">
+                      {u._count.bookingsAsStudent} ჯავშანი · {fmtKaDate(new Date(u.createdAt), { year: true })}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenUserId(u.id)}
+                    className="h-9 px-2.5 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[11px] shrink-0 transition-colors"
+                  >
+                    დეტალები
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
       <UserDetailModal
         userId={openUserId}
         onClose={() => setOpenUserId(null)}
         onImpersonate={impersonate}
+      />
+      <AdminConfirmDialog
+        open={pendImp !== null}
+        title={`შესვლა როგორც ${pendImp?.fullName ?? ''}?`}
+        body="გაიხსნება მისი ანგარიში ამავე ბრაუზერში. მოქმედება ინახება აუდიტში."
+        tone="warning"
+        confirmLabel="შესვლა"
+        busy={impBusy}
+        onCancel={() => setPendImp(null)}
+        onConfirm={doImpersonate}
       />
     </>
   )
@@ -1242,6 +1376,10 @@ const BookingsSection = () => {
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  // Action feedback (success/error) — separate from load errors so a reload
+  // doesn't wipe the "canceled" confirmation.
+  const [flash, setFlash] = useState<{ kind: 'success' | 'error'; msg: string } | null>(null)
+  const [pendCancel, setPendCancel] = useState<AdminBooking | null>(null)
 
   const load = async () => {
     setErr(null)
@@ -1261,23 +1399,23 @@ const BookingsSection = () => {
     return () => clearTimeout(t)
   }, [status, q])
 
-  const cancel = async (b: AdminBooking) => {
-    const reason = prompt(`ადმინის მიერ გაუქმება — მიზეზი (გამოჩნდება ორივე მხარისთვის):`)
-    if (reason === null) return
+  const cancel = async (b: AdminBooking, reason: string) => {
     setBusy(b.id)
+    setFlash(null)
     try {
       const res = await fetch(`/api/bookings/${b.id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: reason.trim() || undefined }),
+        body: JSON.stringify({ reason }),
       })
       const j = await res.json().catch(() => ({} as any))
       if (!res.ok || !j.ok) {
-        alert(j.error === 'BAD_STATE' ? 'ეს ჯავშანი უკვე დახურულია' : 'გაუქმება ვერ მოხერხდა')
+        setFlash({ kind: 'error', msg: j.error === 'BAD_STATE' ? 'ეს ჯავშანი უკვე დახურულია' : 'გაუქმება ვერ მოხერხდა' })
         return
       }
       await load()
-    } catch { alert('ქსელის შეცდომა') }
+      setFlash({ kind: 'success', msg: 'ჯავშანი გაუქმდა — ორივე მხარეს ეცნობა.' })
+    } catch { setFlash({ kind: 'error', msg: 'ქსელის შეცდომა' }) }
     finally { setBusy(null) }
   }
 
@@ -1296,7 +1434,7 @@ const BookingsSection = () => {
             ])}
             className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors"
           >
-            <Icon.download className="w-3.5 h-3.5" /> Export CSV
+            <Icon.download className="w-3.5 h-3.5" /> CSV ექსპორტი
           </button>
         ) : undefined}
       />
@@ -1304,19 +1442,24 @@ const BookingsSection = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[240px] max-w-[420px]">
             <Icon.search className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="topic, ref, სახელი…" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
+            <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="თემა, ref, სახელი…" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
           </div>
           <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200 overflow-x-auto">
             {BOOKING_STATUS_TABS.map(t => (
-              <button key={t.id} type="button" onClick={() => setStatus(t.id)} className={`shrink-0 h-8 px-3 rounded-pill font-display text-[11.5px] font-semibold tracking-wide transition-colors ${status === t.id ? 'bg-accent-900 text-white' : 'text-ink-600'}`}>{t.label}</button>
+              <button key={t.id} type="button" onClick={() => setStatus(t.id)} className={`shrink-0 h-8 px-3 rounded-pill font-display text-[11.5px] font-semibold tracking-wide transition-colors ${status === t.id ? 'bg-ink-900 text-white' : 'text-ink-600'}`}>{t.label}</button>
             ))}
           </div>
         </div>
       </section>
       <section className="px-6 lg:px-8 py-6">
-        {err && <div className="mb-4 p-3 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>}
+        {err && <div role="alert" className="mb-4 p-3 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>}
+        {flash && (
+          <div role="alert" className={`mb-4 rounded-btn border px-3 py-2 text-[12.5px] font-medium ${flash.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
+            {flash.msg}
+          </div>
+        )}
         <div className="rounded-card border border-ink-200 bg-white overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-[13px] min-w-[900px]">
               <thead className="bg-ink-50/40 border-b border-ink-100">
                 <tr className="text-left">
@@ -1365,9 +1508,9 @@ const BookingsSection = () => {
                       {(b.status === 'PREPARING' || b.status === 'CONFIRMED') && (
                         <button
                           type="button"
-                          onClick={() => cancel(b)}
+                          onClick={() => setPendCancel(b)}
                           disabled={busy === b.id}
-                          className="h-7 px-2 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:bg-danger-50 disabled:opacity-50 text-ink-700 hover:text-danger-700 font-display font-semibold text-[11px] transition-colors"
+                          className="h-9 px-2.5 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:bg-danger-50 disabled:opacity-50 text-ink-700 hover:text-danger-700 font-display font-semibold text-[11px] transition-colors"
                         >
                           {busy === b.id ? '…' : 'გაუქმება'}
                         </button>
@@ -1378,8 +1521,64 @@ const BookingsSection = () => {
               </tbody>
             </table>
           </div>
+          {/* Mobile stacked-card fallback — same rows/states as the table. */}
+          <div className="block md:hidden">
+            {items === null ? (
+              <div className="px-4 py-10 text-center text-ink-500 text-[13px]">იტვირთება…</div>
+            ) : items.length === 0 ? (
+              <div className="px-4 py-10 text-center text-ink-500 text-[13px]">ჯავშანი ვერ მოიძებნა</div>
+            ) : items.map(b => (
+              <div key={b.id} className="px-4 py-3 border-b border-ink-100 last:border-b-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-display text-[13px] font-bold text-ink-900 truncate">{b.topic}</div>
+                    <div className="font-mono text-[10.5px] tabular-nums text-ink-500">#{b.ref.slice(0, 8)} · {fmtDT(b.startAt)} · {b.durationMin} წუთი</div>
+                  </div>
+                  <span className={`shrink-0 inline-flex items-center h-5 px-1.5 rounded-pill font-display text-[10px] font-bold uppercase tracking-[0.14em] ${
+                    b.status === 'COMPLETED' ? 'bg-success-50 text-success-700 border border-success-200'
+                    : b.status === 'CANCELED' || b.status === 'NO_SHOW' ? 'bg-ink-100 text-ink-600 border border-ink-200'
+                    : b.status === 'LIVE' ? 'bg-danger-50 text-danger-700 border border-danger-200'
+                    : 'bg-brand-50 text-brand-700 border border-brand-200'
+                  }`}>{KA_STATUS[b.status] ?? b.status}</span>
+                </div>
+                <div className="mt-1.5 text-[11.5px] text-ink-600 truncate">
+                  <span className="font-display font-semibold">{b.student?.fullName ?? '—'}</span>
+                  {' → '}
+                  <span className="font-display font-semibold">{b.tutor?.user.fullName ?? '—'}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="font-display text-[13px] font-bold text-ink-900 tabular-nums">₾{b.price}</span>
+                  {(b.status === 'PREPARING' || b.status === 'CONFIRMED') && (
+                    <button
+                      type="button"
+                      onClick={() => setPendCancel(b)}
+                      disabled={busy === b.id}
+                      className="h-9 px-2.5 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:bg-danger-50 disabled:opacity-50 text-ink-700 hover:text-danger-700 font-display font-semibold text-[11px] transition-colors"
+                    >
+                      {busy === b.id ? '…' : 'გაუქმება'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
+      <AdminConfirmDialog
+        open={pendCancel !== null}
+        title="ჯავშნის გაუქმება"
+        body={pendCancel ? <>{pendCancel.topic} · {pendCancel.student?.fullName ?? '—'} → {pendCancel.tutor?.user.fullName ?? '—'}. მიზეზი გამოჩნდება ორივე მხარისთვის.</> : null}
+        tone="danger"
+        reason="required"
+        confirmLabel="გააუქმე"
+        busy={pendCancel !== null && busy === pendCancel.id}
+        onCancel={() => setPendCancel(null)}
+        onConfirm={async (reason) => {
+          const b = pendCancel
+          setPendCancel(null)
+          if (b) await cancel(b, reason)
+        }}
+      />
     </>
   )
 }
@@ -1425,6 +1624,9 @@ const DisputesSection = () => {
   const [outcome, setOutcome] = useState<string>('PENDING')
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [flash, setFlash] = useState<{ kind: 'success' | 'error'; msg: string } | null>(null)
+  // Pending resolution → confirm dialog with REQUIRED comment.
+  const [pend, setPend] = useState<{ d: AdminDispute; out: 'REFUND_FULL' | 'REFUND_PARTIAL' | 'REDO_FREE' | 'DISMISSED' } | null>(null)
 
   const load = async () => {
     setErr(null)
@@ -1439,31 +1641,30 @@ const DisputesSection = () => {
   }
   useEffect(() => { const t = setTimeout(load, 200); return () => clearTimeout(t) }, [outcome])
 
-  const resolve = async (d: AdminDispute, out: 'REFUND_FULL' | 'REFUND_PARTIAL' | 'REDO_FREE' | 'DISMISSED') => {
-    const label = OUTCOME_LABEL[out]
-    const resolution = prompt(`გადაწყვეტა: ${label}\n\nდაწერე კომენტარი (გამოჩნდება კლიენტისა და ექსპერტის ცნობებში):`)
-    if (resolution === null) return
+  const resolve = async (d: AdminDispute, out: 'REFUND_FULL' | 'REFUND_PARTIAL' | 'REDO_FREE' | 'DISMISSED', resolution: string) => {
     setBusy(d.id)
+    setFlash(null)
     try {
       const res = await fetch(`/api/admin/disputes/${d.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ outcome: out, resolution: resolution.trim() || undefined }),
+        body: JSON.stringify({ outcome: out, resolution }),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) { alert('გადაწყვეტა ვერ მოხერხდა'); return }
+      if (!res.ok || !j.ok) { setFlash({ kind: 'error', msg: 'გადაწყვეტა ვერ მოხერხდა' }); return }
       await load()
-    } catch { alert('ქსელის შეცდომა') }
+      setFlash({ kind: 'success', msg: `დავა გადაწყდა: ${OUTCOME_LABEL[out]}. ორივე მხარეს ეცნობა.` })
+    } catch { setFlash({ kind: 'error', msg: 'ქსელის შეცდომა' }) }
     finally { setBusy(null) }
   }
 
   const OUTCOME_TABS = [
     { id: 'PENDING', label: 'გახსნილი' },
     { id: 'ALL', label: 'ყველა' },
-    { id: 'REFUND_FULL', label: 'Refund 100%' },
-    { id: 'REFUND_PARTIAL', label: 'Refund 50%' },
-    { id: 'REDO_FREE', label: 'Redo' },
-    { id: 'DISMISSED', label: 'გამორიცხული' },
+    { id: 'REFUND_FULL', label: '100% დაბრუნება' },
+    { id: 'REFUND_PARTIAL', label: '50% დაბრუნება' },
+    { id: 'REDO_FREE', label: 'ხელახალი სესია' },
+    { id: 'DISMISSED', label: 'უარყოფილი' },
   ]
 
   return (
@@ -1476,12 +1677,17 @@ const DisputesSection = () => {
       <section className="px-6 lg:px-8 py-4 bg-ink-50/40 border-b border-ink-100 sticky top-16 z-20">
         <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200 overflow-x-auto">
           {OUTCOME_TABS.map(t => (
-            <button key={t.id} type="button" onClick={() => setOutcome(t.id)} className={`shrink-0 h-8 px-3 rounded-pill font-display text-[11.5px] font-semibold tracking-wide transition-colors ${outcome === t.id ? 'bg-accent-900 text-white' : 'text-ink-600'}`}>{t.label}</button>
+            <button key={t.id} type="button" onClick={() => setOutcome(t.id)} className={`shrink-0 h-8 px-3 rounded-pill font-display text-[11.5px] font-semibold tracking-wide transition-colors ${outcome === t.id ? 'bg-ink-900 text-white' : 'text-ink-600'}`}>{t.label}</button>
           ))}
         </div>
       </section>
       <section className="px-6 lg:px-8 py-6 space-y-3">
-        {err && <div className="p-3 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>}
+        {err && <div role="alert" className="p-3 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>}
+        {flash && (
+          <div role="alert" className={`rounded-btn border px-3 py-2 text-[12.5px] font-medium ${flash.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
+            {flash.msg}
+          </div>
+        )}
         {items === null ? (
           <div className="text-center py-10 text-[13px] text-ink-500">იტვირთება…</div>
         ) : items.length === 0 ? (
@@ -1516,16 +1722,32 @@ const DisputesSection = () => {
               </div>
               {d.outcome === 'PENDING' && (
                 <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                  <button type="button" disabled={busy === d.id} onClick={() => resolve(d, 'REFUND_FULL')} className="h-8 px-2 rounded-btn bg-danger-500 hover:bg-danger-600 disabled:opacity-50 text-white font-display text-[11px] font-semibold">Refund 100%</button>
-                  <button type="button" disabled={busy === d.id} onClick={() => resolve(d, 'REFUND_PARTIAL')} className="h-8 px-2 rounded-btn bg-warning-500 hover:bg-warning-600 disabled:opacity-50 text-white font-display text-[11px] font-semibold">Refund 50%</button>
-                  <button type="button" disabled={busy === d.id} onClick={() => resolve(d, 'REDO_FREE')} className="h-8 px-2 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-display text-[11px] font-semibold">Redo</button>
-                  <button type="button" disabled={busy === d.id} onClick={() => resolve(d, 'DISMISSED')} className="h-8 px-2 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-50 text-ink-700 font-display text-[11px] font-semibold">Dismiss</button>
+                  <button type="button" disabled={busy === d.id} onClick={() => setPend({ d, out: 'REFUND_FULL' })} className="h-9 px-2.5 rounded-btn bg-danger-500 hover:bg-danger-600 disabled:opacity-50 text-white font-display text-[11px] font-semibold">100% დაბრუნება</button>
+                  <button type="button" disabled={busy === d.id} onClick={() => setPend({ d, out: 'REFUND_PARTIAL' })} className="h-9 px-2.5 rounded-btn bg-warning-500 hover:bg-warning-600 disabled:opacity-50 text-white font-display text-[11px] font-semibold">50% დაბრუნება</button>
+                  <button type="button" disabled={busy === d.id} onClick={() => setPend({ d, out: 'REDO_FREE' })} className="h-9 px-2.5 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-display text-[11px] font-semibold">ხელახალი სესია</button>
+                  <button type="button" disabled={busy === d.id} onClick={() => setPend({ d, out: 'DISMISSED' })} className="h-9 px-2.5 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-50 text-ink-700 font-display text-[11px] font-semibold">უარყოფა</button>
                 </div>
               )}
             </div>
           </article>
         ))}
       </section>
+      <AdminConfirmDialog
+        open={pend !== null}
+        title={pend ? `გადაწყვეტა: ${OUTCOME_LABEL[pend.out]}` : ''}
+        body={pend ? <>{pend.d.booking.student.fullName} → {pend.d.booking.tutor.user.fullName} · {pend.d.booking.topic}. კომენტარი გამოჩნდება ორივე მხარის ცნობებში.</> : null}
+        tone={pend?.out === 'REFUND_FULL' || pend?.out === 'REFUND_PARTIAL' ? 'danger' : 'brand'}
+        reason="required"
+        reasonLabel="კომენტარი (სავალდებულო)"
+        confirmLabel="გადაწყვიტე"
+        busy={pend !== null && busy === pend.d.id}
+        onCancel={() => setPend(null)}
+        onConfirm={async (resolution) => {
+          const p = pend
+          setPend(null)
+          if (p) await resolve(p.d, p.out, resolution)
+        }}
+      />
     </>
   )
 }
@@ -1547,6 +1769,8 @@ const ReviewsSection = () => {
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [flash, setFlash] = useState<{ kind: 'success' | 'error'; msg: string } | null>(null)
+  const [pendDelete, setPendDelete] = useState<AdminReview | null>(null)
 
   const load = async () => {
     setErr(null)
@@ -1565,20 +1789,20 @@ const ReviewsSection = () => {
     return () => clearTimeout(t)
   }, [maxRating, q])
 
-  const remove = async (r: AdminReview) => {
-    const reason = prompt('წაშლის მიზეზი (audit-ისთვის):')
-    if (reason === null) return
+  const remove = async (r: AdminReview, reason: string) => {
     setBusy(r.id)
+    setFlash(null)
     try {
       const res = await fetch(`/api/admin/reviews?id=${r.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: reason.trim() || undefined }),
+        body: JSON.stringify({ reason }),
       })
       const j = await res.json().catch(() => ({} as any))
-      if (!res.ok || !j.ok) { alert('წაშლა ვერ მოხერხდა'); return }
+      if (!res.ok || !j.ok) { setFlash({ kind: 'error', msg: 'წაშლა ვერ მოხერხდა' }); return }
       await load()
-    } catch { alert('ქსელის შეცდომა') }
+      setFlash({ kind: 'success', msg: 'შეფასება წაიშალა — ექსპერტის რეიტინგი გადაითვალა.' })
+    } catch { setFlash({ kind: 'error', msg: 'ქსელის შეცდომა' }) }
     finally { setBusy(null) }
   }
 
@@ -1597,7 +1821,7 @@ const ReviewsSection = () => {
             ])}
             className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors"
           >
-            <Icon.download className="w-3.5 h-3.5" /> Export CSV
+            <Icon.download className="w-3.5 h-3.5" /> CSV ექსპორტი
           </button>
         ) : undefined}
       />
@@ -1614,13 +1838,18 @@ const ReviewsSection = () => {
               { v: 2, label: '≤ 2 ★' },
               { v: 1, label: '1 ★ (ცუდი)' },
             ].map(o => (
-              <button key={o.v} type="button" onClick={() => setMaxRating(o.v)} className={`h-8 px-3 rounded-pill font-display text-[11.5px] font-semibold tracking-wide transition-colors ${maxRating === o.v ? 'bg-accent-900 text-white' : 'text-ink-600'}`}>{o.label}</button>
+              <button key={o.v} type="button" onClick={() => setMaxRating(o.v)} className={`h-8 px-3 rounded-pill font-display text-[11.5px] font-semibold tracking-wide transition-colors ${maxRating === o.v ? 'bg-ink-900 text-white' : 'text-ink-600'}`}>{o.label}</button>
             ))}
           </div>
         </div>
       </section>
       <section className="px-6 lg:px-8 py-6 space-y-3">
-        {err && <div className="p-3 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>}
+        {err && <div role="alert" className="p-3 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>}
+        {flash && (
+          <div role="alert" className={`rounded-btn border px-3 py-2 text-[12.5px] font-medium ${flash.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
+            {flash.msg}
+          </div>
+        )}
         {items === null ? (
           <div className="text-center py-10 text-[13px] text-ink-500">იტვირთება…</div>
         ) : items.length === 0 ? (
@@ -1648,9 +1877,9 @@ const ReviewsSection = () => {
               <span className="font-mono text-[10.5px] tabular-nums text-ink-400">{fmtDT(r.createdAt)}</span>
               <button
                 type="button"
-                onClick={() => remove(r)}
+                onClick={() => setPendDelete(r)}
                 disabled={busy === r.id}
-                className="h-8 px-2.5 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:bg-danger-50 disabled:opacity-50 text-ink-700 hover:text-danger-700 font-display font-semibold text-[11.5px] transition-colors"
+                className="h-9 px-2.5 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:bg-danger-50 disabled:opacity-50 text-ink-700 hover:text-danger-700 font-display font-semibold text-[11.5px] transition-colors"
               >
                 {busy === r.id ? '…' : 'წაშლა'}
               </button>
@@ -1658,12 +1887,27 @@ const ReviewsSection = () => {
             <p className="mt-3 text-[13px] text-ink-700 leading-[1.55] whitespace-pre-wrap">{r.body}</p>
             {r.booking && (
               <div className="mt-2 text-[11.5px] text-ink-500">
-                <span className="font-display font-semibold">Booking:</span> {r.booking.topic}
+                <span className="font-display font-semibold">ჯავშანი:</span> {r.booking.topic}
               </div>
             )}
           </article>
         ))}
       </section>
+      <AdminConfirmDialog
+        open={pendDelete !== null}
+        title="შეფასების წაშლა"
+        body={pendDelete ? <>{pendDelete.student.fullName} → {pendDelete.tutor.user.fullName} · {pendDelete.rating}★. მიზეზი ინახება აუდიტში; ექსპერტის რეიტინგი გადაითვლება.</> : null}
+        tone="danger"
+        reason="required"
+        confirmLabel="წაშალე"
+        busy={pendDelete !== null && busy === pendDelete.id}
+        onCancel={() => setPendDelete(null)}
+        onConfirm={async (reason) => {
+          const r = pendDelete
+          setPendDelete(null)
+          if (r) await remove(r, reason)
+        }}
+      />
     </>
   )
 }
@@ -1701,7 +1945,7 @@ const FinanceSection = () => {
           <div className="p-4 rounded-card border border-ink-200 bg-white">
             <div className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">კომისია (15%)</div>
             <div className="mt-1 font-display text-[28px] font-bold text-success-700 tabular-nums leading-none">{data ? `₾${data.commission.toLocaleString()}` : '—'}</div>
-            <div className="mt-2 font-mono text-[10.5px] tabular-nums text-ink-500">15% take rate</div>
+            <div className="mt-2 font-mono text-[10.5px] tabular-nums text-ink-500">15% საკომისიო</div>
           </div>
           <div className="p-4 rounded-card border border-ink-200 bg-white">
             <div className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">ეს თვე</div>
@@ -1752,7 +1996,7 @@ const AnalyticsSection = () => {
         {err && <div className="p-3 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="p-4 rounded-card border border-ink-200 bg-white">
-            <div className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">Activation</div>
+            <div className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">აქტივაცია</div>
             <div className="mt-1 font-display text-[28px] font-bold text-ink-900 tabular-nums leading-none">{data ? `${data.activationPct}%` : '—'}</div>
             <div className="mt-2 font-mono text-[10.5px] tabular-nums text-ink-500">{data ? `${data.activatedStudents} კლიენტმა დაჯავშნა` : ''}</div>
           </div>
@@ -1813,6 +2057,8 @@ const BroadcastSection = () => {
   const [previewCount, setPreviewCount] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState<{ kind: 'success' | 'error'; msg: string } | null>(null)
+  // Send goes through the shared confirm dialog (no native confirm()).
+  const [pendSend, setPendSend] = useState(false)
 
   // Any change to the segment invalidates a previously-fetched preview count —
   // otherwise the user sees a "will send to 240" while the segment now says
@@ -1835,12 +2081,16 @@ const BroadcastSection = () => {
     } finally { setBusy(false) }
   }
 
-  const doSend = async () => {
+  const askSend = () => {
     if (!subject.trim() || !body.trim()) {
       setFlash({ kind: 'error', msg: 'სათაური და ტექსტი სავალდებულოა' })
       return
     }
-    if (!confirm(`გაიგზავნოს "${SEGMENT_LABEL[segment]}" სეგმენტში?`)) return
+    setPendSend(true)
+  }
+
+  const doSend = async () => {
+    setPendSend(false)
     setBusy(true); setFlash(null)
     try {
       const res = await fetch('/api/admin/broadcast/send', {
@@ -1882,7 +2132,7 @@ const BroadcastSection = () => {
                 key={s}
                 type="button"
                 onClick={() => setSegment(s)}
-                className={`h-8 px-3 rounded-pill font-display text-[11.5px] font-semibold tracking-wide transition-colors ${segment === s ? 'bg-accent-900 text-white' : 'text-ink-600'}`}
+                className={`h-8 px-3 rounded-pill font-display text-[11.5px] font-semibold tracking-wide transition-colors ${segment === s ? 'bg-ink-900 text-white' : 'text-ink-600'}`}
               >{SEGMENT_LABEL[s]}</button>
             ))}
           </div>
@@ -1921,9 +2171,9 @@ const BroadcastSection = () => {
           </button>
           <button
             type="button"
-            onClick={doSend}
+            onClick={askSend}
             disabled={busy || !subject.trim() || !body.trim()}
-            className="h-11 px-4 rounded-btn bg-accent-900 hover:bg-accent-800 disabled:bg-ink-200 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"
+            className="h-11 px-4 rounded-btn bg-ink-900 hover:bg-ink-800 disabled:bg-ink-200 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"
           >
             <Icon.arrow className="w-3.5 h-3.5" /> გაგზავნა
           </button>
@@ -1934,6 +2184,16 @@ const BroadcastSection = () => {
           )}
         </div>
       </section>
+      <AdminConfirmDialog
+        open={pendSend}
+        title="ბროდკასტის გაგზავნა"
+        body={<>სეგმენტი: <span className="font-display font-semibold">{SEGMENT_LABEL[segment]}</span>{previewCount !== null ? <> · {previewCount} მიმღები</> : null}. თითოეულს შეექმნება in-app შეტყობინება.</>}
+        tone="brand"
+        confirmLabel="გააგზავნე"
+        busy={busy}
+        onCancel={() => setPendSend(false)}
+        onConfirm={doSend}
+      />
     </>
   )
 }
@@ -1986,6 +2246,7 @@ const CategoriesSection = () => {
         body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error('patch failed')
+      setFlash({ kind: 'success', msg: 'ცვლილება შეინახა.' })
     } catch {
       setRows(before)
       setFlash({ kind: 'error', msg: 'ცვლილება ვერ შეინახა — სცადე თავიდან.' })
@@ -2079,8 +2340,13 @@ const ACTION_LABEL: Record<string, string> = {
   'application.reject': 'განაცხადი უარყოფილია',
   'booking.cancel': 'ჯავშანი გაუქმდა',
   'review.delete': 'შეფასება წაიშალა',
+  'dispute.resolve': 'დავა გადაწყდა',
   'user.impersonate.start': 'იმპერსონაცია დაიწყო',
   'user.impersonate.end': 'იმპერსონაცია დასრულდა',
+  'user.suspend': 'ანგარიში შეჩერდა',
+  'user.unsuspend': 'შეჩერება მოიხსნა',
+  'tutor.feature': 'ექსპერტი გახდა რჩეული',
+  'tutor.unfeature': 'ექსპერტს მოეხსნა რჩეული',
 }
 
 const AuditSection = () => {
@@ -2116,7 +2382,7 @@ const AuditSection = () => {
             ])}
             className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors"
           >
-            <Icon.download className="w-3.5 h-3.5" /> Export CSV
+            <Icon.download className="w-3.5 h-3.5" /> CSV ექსპორტი
           </button>
         ) : undefined}
       />
@@ -2124,22 +2390,22 @@ const AuditSection = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[240px] max-w-[360px]">
             <Icon.search className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input type="text" value={actionFilter} onChange={e => setActionFilter(e.target.value)} placeholder="action prefix (booking, review, application…)" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
+            <input type="text" value={actionFilter} onChange={e => setActionFilter(e.target.value)} placeholder="მოქმედების პრეფიქსი (booking, review, application…)" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
           </div>
         </div>
       </section>
       <section className="px-6 lg:px-8 py-6">
-        {err && <div className="mb-4 p-3 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>}
+        {err && <div role="alert" className="mb-4 p-3 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[13px]">{err}</div>}
         <div className="rounded-card border border-ink-200 bg-white overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-[13px] min-w-[800px]">
               <thead className="bg-ink-50/40 border-b border-ink-100">
                 <tr className="text-left">
                   <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">დრო</th>
-                  <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">Actor</th>
-                  <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">Action</th>
-                  <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">Target</th>
-                  <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">Meta</th>
+                  <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">ვინ</th>
+                  <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">მოქმედება</th>
+                  <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">ობიექტი</th>
+                  <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">დეტალი</th>
                 </tr>
               </thead>
               <tbody>
@@ -2164,6 +2430,36 @@ const AuditSection = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+          {/* Mobile stacked-card fallback — same rows/states as the table. */}
+          <div className="block md:hidden">
+            {items === null ? (
+              <div className="px-4 py-10 text-center text-ink-500 text-[13px]">იტვირთება…</div>
+            ) : items.length === 0 ? (
+              <div className="px-4 py-10 text-center text-ink-500 text-[13px]">ჩანაწერი არ არის.</div>
+            ) : items.map(i => (
+              <div key={i.id} className="px-4 py-3 border-b border-ink-100 last:border-b-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-display text-[12.5px] font-bold text-ink-900 truncate">{ACTION_LABEL[i.action] ?? i.action}</div>
+                    <div className="font-mono text-[10px] text-ink-400 tabular-nums truncate">{i.action}</div>
+                  </div>
+                  <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-ink-500">{fmtDT(i.createdAt)}</span>
+                </div>
+                <div className="mt-1 text-[11.5px] text-ink-600 truncate">
+                  <span className="font-display font-semibold">{i.actor?.fullName ?? i.actorId}</span>
+                  {i.actor?.email ? <span className="font-mono text-ink-500"> · {i.actor.email}</span> : null}
+                </div>
+                <div className="mt-0.5 font-mono text-[10.5px] tabular-nums text-ink-500 truncate">
+                  {i.targetType ?? '—'}{i.targetId ? ' · ' + i.targetId.slice(0, 12) : ''}
+                </div>
+                {i.meta ? (
+                  <div className="mt-0.5 font-mono text-[10px] tabular-nums text-ink-500 truncate" title={JSON.stringify(i.meta ?? {})}>
+                    {JSON.stringify(i.meta).slice(0, 80)}
+                  </div>
+                ) : null}
+              </div>
+            ))}
           </div>
         </div>
       </section>

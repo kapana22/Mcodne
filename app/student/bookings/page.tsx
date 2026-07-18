@@ -97,7 +97,7 @@ export default async function StudentBookingsPage({
                 // the LIVE join button stays an independent link on top of it
                 // (nested <a> is invalid HTML, hence the absolute cover link).
                 <div key={b.id}
-                     className="relative rounded-card bg-white border border-ink-200 hover:border-ink-300 hover:shadow-card transition-all overflow-hidden">
+                     className="relative rounded-card bg-white border border-ink-200 shadow-xs hover:border-ink-300 transition-colors overflow-hidden">
                   <Link href={`/student/bookings/${b.id}`} className="absolute inset-0" aria-label={b.topic} />
                   <div className="p-5 grid sm:grid-cols-[auto_1fr_auto] gap-4 sm:gap-5 items-center pointer-events-none">
                     <div className="relative w-14 h-14 rounded-card overflow-hidden ring-1 ring-ink-200 shrink-0 bg-brand-50">

@@ -373,7 +373,10 @@ const HomeHero = () => {
 
             {/* Search bar */}
             <div className="mt-9 sm:mt-10 motion-safe:animate-rise-in" style={{ animationDelay: '160ms' }}>
-              <form onSubmit={e => { e.preventDefault(); router.push(query ? `/ask?q=${encodeURIComponent(query)}` : '/tutors') }} className="rounded-card bg-white border border-ink-200 shadow-card p-2 flex flex-col sm:flex-row gap-2 focus-within:border-brand-400 focus-within:shadow-brand-glow transition-[box-shadow,border-color] duration-mid">
+              {/* Label/destination agreement (1.5): the button says „ექსპერტის
+                  ძიება", so the form goes to /tutors?q=…. /ask stays reachable
+                  via the secondary „დასვი კითხვა" link below. */}
+              <form onSubmit={e => { e.preventDefault(); router.push(query ? `/tutors?q=${encodeURIComponent(query)}` : '/tutors') }} className="rounded-card bg-white border border-ink-200 shadow-card p-2 flex flex-col sm:flex-row gap-2 focus-within:border-brand-400 focus-within:shadow-brand-glow transition-[box-shadow,border-color] duration-mid">
                 <div className="relative flex-1">
                   <Icon.search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
                   <input
@@ -396,6 +399,13 @@ const HomeHero = () => {
                     {t}
                   </Link>
                 ))}
+              </div>
+              <div className="mt-3 text-[12px] text-ink-500">
+                ან{' '}
+                <Link href={query ? `/ask?q=${encodeURIComponent(query)}` : '/ask'} className="font-display font-semibold text-brand-700 hover:underline">
+                  დასვი კითხვა
+                </Link>
+                {' '}— და ექსპერტები გიპასუხებენ
               </div>
             </div>
 
@@ -878,63 +888,10 @@ const WhyUs = () => (
   </section>
 )
 
-const Testimonials = () => (
-  <section className="bg-white border-b border-ink-200">
-    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-20">
-      <div className="grid lg:grid-cols-[1fr_auto] items-end gap-6 mb-12">
-        <div>
-          <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-3">მიმოხილვები</div>
-          <h2 className="font-display text-[32px] sm:text-[44px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
-            ფული, რომელიც დააბრუნდა.
-          </h2>
-        </div>
-        <div className="flex items-center gap-2 text-[13px]">
-          <span className="inline-flex items-center h-6 px-2.5 rounded-pill bg-warning-50 border border-warning-200 text-warning-800 font-display text-[10.5px] font-bold uppercase tracking-[0.14em]">
-            საილუსტრაციო · მაგალითი
-          </span>
-        </div>
-      </div>
-      <div className="grid lg:grid-cols-[1.4fr_1fr] gap-5">
-        <figure className="relative rounded-card border border-ink-200 bg-white p-8 lg:p-10">
-          <Icon.star className="absolute top-8 right-8 w-5 h-5 text-warning-500" />
-          <blockquote className="font-display text-[24px] sm:text-[28px] lg:text-[32px] leading-[1.3] tracking-tight font-medium text-ink-900 max-w-[640px]">
-            „გიორგი 80₾-ად მოგვცა იდეა, რომელიც 12,000₾ შემოსავალი გახდა 6 თვეში. შემდეგ Series A-ც გავიგრძელეთ მისი deck-ით."
-          </blockquote>
-          <figcaption className="mt-8 pt-6 border-t border-ink-100 flex items-center gap-4">
-            <img src="https://i.pravatar.cc/120?img=23" alt="" className="w-12 h-12 rounded-full object-cover" />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-display text-[15px] font-bold text-ink-900 tracking-tight">თამარ ხორავა</span>
-                <span className="inline-flex items-center h-5 px-2 rounded-pill bg-ink-100 text-ink-700 font-display text-[9.5px] font-bold uppercase tracking-[0.14em]">მაგალითი</span>
-              </div>
-              <div className="text-[12.5px] text-ink-500">Founder · Patika.ge</div>
-            </div>
-          </figcaption>
-        </figure>
-        <div className="grid grid-rows-2 gap-5">
-          {[
-            { n: 'ლუკა ბერიძე', role: 'SWE · Pulsar', img: 33, t: 'ნინომ მირჩია 3 პუნქტი — Google-ში 2 თვეში გადავედი.' },
-            { n: 'მარიამ კობახიძე', role: 'Designer · Adjar', img: 49, t: 'ლევანმა საგადასახადო 45 წუთში ამიხსნა. რეალურად შემიცვალა.' },
-          ].map((it, i) => (
-            <figure key={i} className="rounded-card border border-ink-200 bg-white p-6 flex flex-col">
-              <blockquote className="font-display text-[16px] text-ink-900 leading-[1.45] font-medium flex-1">„{it.t}"</blockquote>
-              <figcaption className="mt-4 pt-4 border-t border-ink-100 flex items-center gap-3">
-                <img src={`https://i.pravatar.cc/120?img=${it.img}`} alt="" className="w-9 h-9 rounded-full object-cover" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-display text-[13px] font-bold text-ink-900 truncate tracking-tight">{it.n}</span>
-                    <span className="inline-flex items-center h-4 px-1.5 rounded-pill bg-ink-100 text-ink-700 font-display text-[9px] font-bold uppercase tracking-[0.14em]">მაგალითი</span>
-                  </div>
-                  <div className="text-[11px] text-ink-500 truncate">{it.role}</div>
-                </div>
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-      </div>
-    </div>
-  </section>
-)
+/* Testimonials removed (Phase 0.2): the previous section showed invented
+   people with i.pravatar.cc stock faces and fabricated outcomes. It returns
+   only when real outcome-story reviews accumulate (role-attributed, quantified
+   quotes pulled from the Reviews system) — never seeded. */
 
 const ExpertCta = () => (
   <section className="relative bg-ink-50/50 border-y border-ink-200">
@@ -1038,7 +995,6 @@ const HomeView = () => (
     <FeaturedExperts />
     <HowItWorks />
     <WhyUs />
-    <Testimonials />
     <ExpertCta />
   </>
 )

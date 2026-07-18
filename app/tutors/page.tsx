@@ -7,6 +7,7 @@ import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
 import { SignInPromptBanner } from '@/components/SignInPromptBanner'
 import { Sheet } from '@/components/Sheet'
 import { PAYMENTS_LIVE } from '@/lib/flags'
+import { RISK_REVERSAL_LINE } from '@/lib/copy'
 import { userTimezone, TBILISI } from '@/lib/tz'
 
 /* ───── Icons ───── */
@@ -224,11 +225,14 @@ const FILTER_CATS = [
   { l: 'ფსიქოლოგია', c: 0 },
 ]
 
+// No counts here on purpose — the old hardcoded numbers (142/98/…) were
+// fabricated and rendered as if real. If per-language counts ever return,
+// they must be computed from the loaded result set.
 const FILTER_LANGS = [
-  { l: 'ქართული', c: 142 },
-  { l: 'English', c: 98 },
-  { l: 'Русский', c: 24 },
-  { l: 'Türkçe', c: 6 },
+  { l: 'ქართული' },
+  { l: 'English' },
+  { l: 'Русский' },
+  { l: 'Türkçe' },
 ]
 
 // The DB stores language CODES (ka/en/ru/tr); cards + the language filter work
@@ -378,7 +382,7 @@ const FiltersPanel = ({ filters, setFilters, total, onReset, variant = 'sidebar'
                 <CheckRow
                   key={l.l}
                   label={l.l}
-                  count={l.c}
+                  count={0}
                   on={filters.langs.includes(l.l)}
                   onToggle={() => setFilters({ ...filters, langs: toggleArr(filters.langs, l.l) })}
                 />
@@ -531,7 +535,7 @@ const TUTORS: Tutor[] = []
 
 // ───── Shared fallback defaults ─────
 // These MUST stay identical to the TUTOR_DEFAULTS block in
-// app/tutors/[id]/page.tsx so a search card and the expert's detail page never
+// app/tutors/[id]/client.tsx so a search card and the expert's detail page never
 // disagree on price / duration / name for the same missing fields. Duration is
 // aligned to the Prisma schema (`consultationDurationMin @default(30)`); price
 // has no schema default, so we pick one shared fallback used by both surfaces.
@@ -561,6 +565,14 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
   const bookable = isTutorBookable(t.nextSlotAt)
   return (
     <article className="group relative rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift overflow-hidden flex flex-col">
+      {/* Mobile: the whole card taps through to the profile (overlay-link
+          pattern from app/student/bookings). Explicit buttons opt out by
+          sitting above the overlay with relative z-10. */}
+      <Link
+        href={`/tutors/${t.id}`}
+        aria-label={`${t.name} — პროფილი`}
+        className="sm:hidden absolute inset-0 z-[1]"
+      />
       {/* Mobile photo banner */}
       <div className="sm:hidden relative aspect-[16/10] w-full bg-gradient-to-br from-brand-50 to-ink-100 overflow-hidden">
         <img src={photoSrc} alt={t.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover motion-safe:animate-fade-in-fast" />
@@ -580,8 +592,8 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
           <button
             type="button"
             aria-label="ვიდეო"
-            onClick={e => onPreviewEnter(t, e.currentTarget)}
-            className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white/95 backdrop-blur shadow-pop text-ink-900 flex items-center justify-center"
+            onClick={e => { e.stopPropagation(); onPreviewEnter(t, e.currentTarget) }}
+            className="absolute bottom-3 right-3 z-10 w-10 h-10 rounded-full bg-white/95 backdrop-blur shadow-pop text-ink-900 flex items-center justify-center"
           >
             <Icon.play className="w-4 h-4 ml-0.5" />
           </button>
@@ -590,7 +602,7 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
           type="button"
           onClick={() => onToggleFav(t.id)}
           aria-label={saved ? 'შენახული' : 'შენახვა'}
-          className={`absolute bottom-3 left-3 w-10 h-10 inline-flex items-center justify-center rounded-full backdrop-blur transition-colors ${saved ? 'text-danger-600 bg-white/95' : 'text-ink-700 bg-white/80 hover:bg-white'}`}
+          className={`absolute bottom-3 left-3 z-10 w-10 h-10 inline-flex items-center justify-center rounded-full backdrop-blur transition-colors ${saved ? 'text-danger-600 bg-white/95' : 'text-ink-700 bg-white/80 hover:bg-white'}`}
         >
           {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
         </button>
@@ -598,23 +610,28 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
 
       {/* Desktop — Preply-style horizontal card: photo │ content+stats │ price+CTA rail */}
       <div className="hidden sm:grid sm:grid-cols-[132px_1fr_216px] gap-5 p-5 sm:p-6">
-        {/* Photo + video */}
+        {/* Photo + video. The photo itself links to the profile — the
+            highest-frequency action on a listing card. The video preview is a
+            separate small stopPropagation target (the play circle only), so it
+            no longer swallows every click on the face. */}
         <div className="shrink-0">
           <div className="relative w-[132px] h-[132px] rounded-card overflow-hidden bg-ink-100 group/photo ring-1 ring-inset ring-ink-900/[0.06] shadow-xs">
-            <img src={photoSrc} alt={t.name} className="absolute inset-0 w-full h-full object-cover" />
-            {t.nextSlotAt && <span className="absolute top-2 right-2 w-3 h-3 rounded-full bg-success-500 ring-2 ring-white" title="ხელმისაწვდომია" />}
+            <Link href={`/tutors/${t.id}`} aria-label={`${t.name} — პროფილი`} className="absolute inset-0 block">
+              <img src={photoSrc} alt={t.name} className="absolute inset-0 w-full h-full object-cover" />
+            </Link>
+            {t.nextSlotAt && <span className="pointer-events-none absolute top-2 right-2 w-3 h-3 rounded-full bg-success-500 ring-2 ring-white" title="ხელმისაწვდომია" />}
             {t.video && (
-              <button
-                type="button"
-                aria-label="ვიდეო-გაცნობა"
-                onClick={e => onPreviewEnter(t, e.currentTarget)}
-                className="absolute inset-0 flex items-center justify-center bg-accent-950/10 hover:bg-accent-950/30 transition-colors"
-              >
-                <span className="w-10 h-10 rounded-full bg-white/95 shadow-pop ring-1 ring-black/5 inline-flex items-center justify-center group-hover/photo:scale-105 transition-transform">
+              <>
+                <button
+                  type="button"
+                  aria-label="ვიდეო-გაცნობა"
+                  onClick={e => { e.stopPropagation(); onPreviewEnter(t, e.currentTarget) }}
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 shadow-pop ring-1 ring-black/5 inline-flex items-center justify-center group-hover/photo:scale-105 transition-transform"
+                >
                   <Icon.play className="w-4 h-4 text-brand-700 ml-0.5" />
-                </span>
-                <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 h-4 px-1.5 rounded-pill bg-accent-950/70 backdrop-blur text-white font-display text-[8.5px] font-bold uppercase tracking-[0.12em]">ვიდეო</span>
-              </button>
+                </button>
+                <span className="pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 h-4 px-1.5 rounded-pill bg-accent-950/70 backdrop-blur text-white font-display text-[8.5px] font-bold uppercase tracking-[0.12em]">ვიდეო</span>
+              </>
             )}
           </div>
         </div>
@@ -622,7 +639,9 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
         {/* Content */}
         <div className="min-w-0 flex flex-col">
           <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-            <h3 className="font-display text-[19px] font-bold text-ink-900 tracking-tight leading-[1.15]">{t.name}</h3>
+            <h3 className="font-display text-[19px] font-bold text-ink-900 tracking-tight leading-[1.15]">
+              <Link href={`/tutors/${t.id}`} className="hover:text-brand-700 transition-colors">{t.name}</Link>
+            </h3>
             {t.verified && <VerifiedMark size={14} />}
             {t.superExpert && (
               <span className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-pill bg-warning-50 border border-warning-200 text-warning-700 font-display text-[9.5px] font-bold uppercase tracking-[0.12em]">
@@ -735,7 +754,8 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
             ₾{priceForDuration(t.price, dur)}<span className="text-[11.5px] font-medium text-ink-500 ml-1">· {dur}-წუთიანი სესია</span>
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        {/* relative z-10: explicit actions stay above the mobile overlay link */}
+        <div className="relative z-10 flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => onToggleFav(t.id)}
@@ -877,7 +897,7 @@ const VideoPreview = ({ tutor, onClose, onBook }: { tutor: Tutor; onClose: () =>
 type BookStep = 1 | 2 | 3 | 4
 
 // Flat, expert-authored price — MUST stay identical to the helper in
-// app/tutors/[id]/page.tsx. `base` is the exact price the expert set for their
+// app/tutors/[id]/client.tsx. `base` is the exact price the expert set for their
 // consultation: what they enter is what the client pays. The system does NOT
 // re-derive it from an hourly rate — `minutes` is only a display label. Kept
 // two-arg so existing call sites (which pass the duration for the "/ N წთ"
@@ -919,16 +939,29 @@ const DOW_LONG_KA = ['კვირა','ორშაბათი','სამშ�
 const MON_SHORT_KA = ['იან.','თებ.','მარ.','აპრ.','მაი.','ივნ.','ივლ.','აგვ.','სექ.','ოქტ.','ნოე.','დეკ.']
 const sameYMD = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 
-/* Small day-picker tz hint — the calendar computes times against the
-   visitor's browser tz, so remote users see "მისი ლოკალური დროით" while
-   Tbilisi users see nothing. Client-only so SSR/first paint stays stable. */
+/* Small day-picker tz hint. Slot times below are computed with Date#getHours —
+   the VIEWER's browser tz — so the label must say that or it lies. Mirrors the
+   profile BookingModal's TbilisiHint (same lib/tz userTimezone/TBILISI logic):
+   Tbilisi browsers see "GMT+4", remote browsers see "შენს დროზე".
+   Client-only so SSR/first paint stays stable. */
 const QuickBookTbilisiHint = () => {
   const [tz, setTz] = useState<string>(TBILISI)
   useEffect(() => { setTz(userTimezone()) }, [])
-  if (tz === TBILISI) return null
-  return (
-    <span className="text-[10.5px] text-ink-400">დროები თბილისის ცხრილშია</span>
-  )
+  if (tz === TBILISI) {
+    return <span className="text-[10.5px] text-ink-400 tabular-nums">GMT+4</span>
+  }
+  return <span className="text-[10.5px] text-ink-400">შენს დროზე</span>
+}
+
+/* Longer variant for the slot-grid footer — same truthfulness rule as the
+   profile's CalendarTzLabel: name the viewer's own zone when it isn't Tbilisi. */
+const QuickBookTzLabel = () => {
+  const [tz, setTz] = useState<string>(TBILISI)
+  useEffect(() => { setTz(userTimezone()) }, [])
+  if (tz === TBILISI) {
+    return <span>დროის ზონა: <span className="font-display font-semibold text-ink-700">თბილისი (GMT+4)</span></span>
+  }
+  return <span>დროის ზონა: <span className="font-display font-semibold text-ink-700">შენი ({tz})</span></span>
 }
 
 const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void }) => {
@@ -1235,6 +1268,10 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
               </button>
             </div>
           </div>
+          {/* Risk-reversal glued to the confirm CTA — one canonical line. */}
+          {step === lastInputStep && (
+            <p className="text-[11.5px] text-ink-500 text-center leading-snug">{RISK_REVERSAL_LINE}</p>
+          )}
         </div>
       ) : undefined}
     >
@@ -1285,16 +1322,16 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
               <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-1.5">შესახებ</div>
               <p className="text-[12.5px] text-ink-700 leading-[1.55] line-clamp-4">{tutor.bio}</p>
 
-              <div className="mt-5 grid grid-cols-2 gap-2 text-[11.5px]">
-                <div className="rounded-card bg-white border border-ink-200 p-2.5">
+              {/* Real response-time promise only (tutorProfile.responseHours).
+                  The old hardcoded „პასუხი < 2 სთ" / „დასრულება 98%" pair was
+                  fabricated for every expert; a completion metric returns only
+                  when a real one exists in the data. */}
+              {typeof tutor.responseHours === 'number' && (
+                <div className="mt-5 rounded-card bg-white border border-ink-200 p-2.5 text-[11.5px]">
                   <div className="font-display text-[9.5px] font-semibold uppercase tracking-[0.18em] text-ink-500">პასუხი</div>
-                  <div className="mt-0.5 font-display text-[14px] font-bold text-ink-900 tabular-nums">&lt; 2 სთ</div>
+                  <div className="mt-0.5 font-display text-[14px] font-bold text-ink-900 tabular-nums">~{tutor.responseHours} სთ</div>
                 </div>
-                <div className="rounded-card bg-white border border-ink-200 p-2.5">
-                  <div className="font-display text-[9.5px] font-semibold uppercase tracking-[0.18em] text-ink-500">დასრულება</div>
-                  <div className="mt-0.5 font-display text-[14px] font-bold text-ink-900 tabular-nums">98%</div>
-                </div>
-              </div>
+              )}
 
               {/* Live summary */}
               <div className="mt-5 pt-5 border-t border-ink-200">
@@ -1328,7 +1365,11 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
                 <div>
                   <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">დროის არჩევა</div>
                   <h2 className="font-display text-[22px] font-bold text-ink-900 tracking-tight leading-tight">აირჩიე თავისუფალი slot</h2>
-                  <p className="mt-1 text-[13px] text-ink-600 leading-[1.55]">დრო თბილისის ზონაში (GMT+4). slot-ი იჯავშნება 5 წუთის შემდეგ.</p>
+                  {/* Times are enumerated in the viewer's browser tz (Date#getHours),
+                      so the copy says so. The booking rule (API: PAST_DATE when
+                      start is >5 min gone) in plain Georgian — the old „slot-ი
+                      იჯავშნება 5 წუთის შემდეგ" line was incomprehensible. */}
+                  <p className="mt-1 text-[13px] text-ink-600 leading-[1.55]">დროები ნაჩვენებია შენს დროის ზონაში. დაჯავშნა შესაძლებელია არჩეული დროის დაწყებამდე.</p>
 
                   {/* Fixed consultation offering — the expert set the length and
                       the exact price; the client just picks a free slot. */}
@@ -1419,11 +1460,12 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
                           })}
                         </div>
 
+                        {/* Viewer-tz label (see QuickBookTzLabel). The old strip
+                            claimed „თბილისი (GMT+4)" for everyone and asserted
+                            the expert's own zone, which we don't actually know. */}
                         <div className="mt-4 flex items-center gap-2 text-[11px] text-ink-500">
                           <Icon.globe className="w-3.5 h-3.5" />
-                          დროის ზონა: <span className="font-display font-semibold text-ink-700">თბილისი (GMT+4)</span>
-                          <span className="text-ink-300 mx-1">·</span>
-                          ექსპერტი: <span className="font-display font-semibold text-ink-700">თბილისი</span>
+                          <QuickBookTzLabel />
                         </div>
                       </div>
                     )}
@@ -1518,13 +1560,15 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
                       <Icon.check className="w-7 h-7" />
                     </span>
                   </div>
-                  <h2 className="mt-6 font-display text-[26px] font-bold text-ink-900 tracking-tight leading-tight">დაჯავშნა დადასტურდა</h2>
+                  {/* Honest state: this is a REQUEST awaiting expert
+                      confirmation — never claim it is already confirmed. */}
+                  <h2 className="mt-6 font-display text-[26px] font-bold text-ink-900 tracking-tight leading-tight">მოთხოვნა გაგზავნილია</h2>
                   <p className="mt-2 text-[13.5px] text-ink-600 max-w-[420px] leading-[1.55]">
-                    {day ? `${day.dowFull}, ${day.dateNum} ${day.monthShort} · ${time} · ${duration} წუთი` : ''}<br />{tutor.name}-სთან. ვიდეო-რგოლი 5 წუთით ადრე გაიხსნება. დასტური გაიგზავნა ელფოსტაზე.
+                    {day ? `${day.dowFull}, ${day.dateNum} ${day.monthShort} · ${time} · ${duration} წუთი` : ''}<br />{tutor.name}-სთან. ექსპერტი მალე დაადასტურებს — შეტყობინებას მიიღებ.
                   </p>
                   <div className="mt-6 grid grid-cols-3 gap-2 w-full max-w-[440px] text-[11px]">
-                    <div className="p-3 rounded-card bg-ink-50 border border-ink-100"><div className="font-display text-[9.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">დაჯავშნა</div><div className="font-mono text-[12px] tabular-nums text-ink-900 mt-0.5">№ {bookingRef ?? '—'}</div></div>
-                    <div className="p-3 rounded-card bg-ink-50 border border-ink-100"><div className="font-display text-[9.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">სტატუსი</div><div className="font-mono text-[12px] tabular-nums text-ink-900 mt-0.5">მოსამზადებელი</div></div>
+                    <div className="p-3 rounded-card bg-ink-50 border border-ink-100"><div className="font-display text-[9.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">მოთხოვნა</div><div className="font-mono text-[12px] tabular-nums text-ink-900 mt-0.5">№ {bookingRef ?? '—'}</div></div>
+                    <div className="p-3 rounded-card bg-ink-50 border border-ink-100"><div className="font-display text-[9.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">სტატუსი</div><div className="font-mono text-[12px] text-ink-900 mt-0.5">ელოდება დადასტურებას</div></div>
                     <div className="p-3 rounded-card bg-ink-50 border border-ink-100"><div className="font-display text-[9.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">ფასი</div><div className="font-mono text-[12px] tabular-nums text-ink-900 mt-0.5">{priceL}</div></div>
                   </div>
                   <div className="mt-7 flex items-center gap-2">

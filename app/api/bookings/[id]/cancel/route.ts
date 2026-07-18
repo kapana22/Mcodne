@@ -21,6 +21,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   const reason = parsed.data.reason?.trim() || null
 
+  // ADMIN cancels act on other people's bookings — a reason is mandatory (it is
+  // shown to both parties and audited). Peer (student/tutor) cancels keep the
+  // reason optional: legacy clients POST an empty body.
+  if (user.role === 'ADMIN' && !reason) {
+    return NextResponse.json(
+      { ok: false, error: 'REASON_REQUIRED', message: 'გაუქმების მიზეზი სავალდებულოა' },
+      { status: 400 },
+    )
+  }
+
   const { id } = await ctx.params
   const bookingWhere = user.role === 'ADMIN'
     ? { id }

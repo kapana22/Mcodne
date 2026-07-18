@@ -157,6 +157,10 @@ export default function SessionRoom() {
   const startMs = new Date(booking.startAt).getTime()
   const msUntil = startMs - now
   const isBefore = msUntil > 5 * 60 * 1000
+  // Same cutoff as the API's meetingUrl masking: scheduled end + 30 minutes.
+  // Past it, a never-completed CONFIRMED/LIVE booking gets a terminal state
+  // instead of a dead countdown/join surface.
+  const isPastCutoff = now > startMs + (booking.durationMin + 30) * 60_000
   const isTutor = me?.id === booking.tutor.user.id
   const backHref = isTutor ? `/tutor/bookings/${booking.id}` : `/student/bookings/${booking.id}`
 
@@ -253,7 +257,20 @@ export default function SessionRoom() {
               </div>
             )}
 
-            {(booking.status === 'CONFIRMED' || booking.status === 'LIVE') && (
+            {(booking.status === 'CONFIRMED' || booking.status === 'LIVE') && isPastCutoff && (
+              <div className="text-center py-8">
+                <div className="mx-auto w-12 h-12 rounded-full bg-ink-100 text-ink-500 inline-flex items-center justify-center mb-3">
+                  <Icon.clock className="w-6 h-6" />
+                </div>
+                <div className="font-display text-[17px] font-bold text-ink-900">სესია დასრულდა</div>
+                <p className="text-[13px] text-ink-500 mt-1">ვიდეო-ოთახი დაიხურა — სესიის დრო ამოიწურა.</p>
+                <div className="mt-5">
+                  <Btn variant="secondary" size="md" href={backHref}>ჯავშნის დეტალები</Btn>
+                </div>
+              </div>
+            )}
+
+            {(booking.status === 'CONFIRMED' || booking.status === 'LIVE') && !isPastCutoff && (
               <>
                 {isBefore || !booking.meetingUrl ? (
                   <div className="text-center py-8 motion-safe:animate-fade-in">

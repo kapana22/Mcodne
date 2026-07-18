@@ -40,7 +40,7 @@ const Icon = {
 type ApiStatus = 'PREPARING' | 'CONFIRMED' | 'LIVE' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW'
 type MsgUser = { id: string; fullName: string; avatarUrl?: string | null }
 type BookingMsg = { id: string; body: string; fromId: string; createdAt: string; from: MsgUser; fileUrl?: string | null; fileName?: string | null }
-type ExistingReview = { id: string; rating: number; body: string; createdAt: string; studentId: string }
+type ExistingReview = { id: string; rating: number; body: string; createdAt: string; studentId: string; anonymous?: boolean }
 type ReschedulePayload = {
   proposedBy: 'STUDENT' | 'TUTOR'
   newStartAt: string
@@ -870,6 +870,99 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
   )
 }
 
+/* ───── Client no-show report — quiet escape hatch for a CONFIRMED booking
+   whose start passed 15+ minutes ago without the expert completing it.
+   Opens a small Sheet with the free-replacement promise + optional details,
+   then POST /api/disputes {reason:'NO_SHOW'}. 409 = already reported. */
+const NoShowReport = ({ bookingId }: { bookingId: string }) => {
+  const { toast } = useToast()
+  const [open, setOpen] = useState(false)
+  const [details, setDetails] = useState('')
+  const [sending, setSending] = useState(false)
+  const [reported, setReported] = useState(false)
+
+  const submit = async () => {
+    if (sending) return
+    setSending(true)
+    try {
+      const res = await fetch('/api/disputes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId, reason: 'NO_SHOW', details: details.trim() || undefined }),
+      })
+      const j = await res.json().catch(() => ({} as any))
+      if (res.status === 409) {
+        toast('უკვე გვაცნობე — ვამუშავებთ', 'info')
+        setReported(true); setOpen(false)
+        return
+      }
+      if (!res.ok || !j.ok) {
+        toast('გაგზავნა ვერ მოხერხდა — სცადე თავიდან', 'error')
+        return
+      }
+      toast('გვაცნობე — გუნდი მალე დაგიკავშირდება', 'success')
+      setReported(true); setOpen(false)
+    } catch { toast('ქსელის შეცდომა', 'error') }
+    finally { setSending(false) }
+  }
+
+  if (reported) {
+    return (
+      <div className="flex items-center gap-2.5 h-9 px-3 rounded-btn bg-ink-50 border border-ink-200 text-ink-600 font-display font-semibold text-[11.5px]">
+        <Icon.check className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+        <span>მოხსენებულია — ვამუშავებთ</span>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full flex items-center gap-2.5 h-9 px-3 rounded-btn text-ink-500 hover:text-ink-900 hover:bg-ink-50 font-display font-semibold text-[11.5px] transition-colors"
+      >
+        <Icon.flag className="w-3.5 h-3.5" />
+        <span>ექსპერტი არ გამოჩნდა?</span>
+      </button>
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        size="sm"
+        busy={sending}
+        eyebrow="ექსპერტი არ გამოჩნდა"
+        title="გვაცნობე — უფასოდ ჩავანაცვლებთ"
+        footer={
+          <>
+            <button type="button" onClick={() => setOpen(false)} className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800">დახურვა</button>
+            <button type="button" onClick={submit} disabled={sending} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-display font-semibold text-[12.5px]">
+              {sending ? 'იგზავნება…' : 'გაგზავნა'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-[13px] text-ink-700 leading-[1.6]">
+            თუ ექსპერტი სესიაზე არ გამოცხადდა, გვაცნობე — გუნდი განიხილავს და უფასოდ დაგეხმარებით შემცვლელი ექსპერტის ან ახალი დროის შერჩევაში.
+          </p>
+          <div>
+            <label className="block font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">
+              დეტალები <span className="text-ink-400 font-normal normal-case tracking-normal">— სურვილისამებრ</span>
+            </label>
+            <textarea
+              value={details}
+              onChange={e => setDetails(e.target.value.slice(0, 1000))}
+              rows={3}
+              placeholder="მაგ.: 15 წუთი ველოდე ოთახში, ექსპერტი არ შემოსულა…"
+              className="w-full p-3 rounded-field border border-ink-200 text-[13px] focus:border-brand-500 focus:outline-none resize-none leading-relaxed"
+            />
+          </div>
+        </div>
+      </Sheet>
+    </>
+  )
+}
+
 /* ───── Inline post-session review card — replaces the modal for
    discoverability. Shown below Hero on COMPLETED bookings. When a review
    already exists, renders read-only with an edit affordance. */
@@ -878,11 +971,13 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
   const [editing, setEditing] = useState(!existing)
   const [rating, setRating] = useState(existing?.rating ?? 0)
   const [body, setBody] = useState(existing?.body ?? '')
+  const [anonymous, setAnonymous] = useState(existing?.anonymous ?? false)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     setRating(existing?.rating ?? 0)
     setBody(existing?.body ?? '')
+    setAnonymous(existing?.anonymous ?? false)
     setEditing(!existing)
   }, [existing?.id])
 
@@ -898,7 +993,7 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
       const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId: booking.id, rating, body: body.trim() }),
+        body: JSON.stringify({ bookingId: booking.id, rating, body: body.trim(), anonymous }),
       })
       const j = await res.json().catch(() => ({} as any))
       if (!res.ok || j?.ok === false) {
@@ -972,6 +1067,18 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
               <span className="text-[11px] text-ink-500">30 დღიანი ვადა შენახვისთვის</span>
               <span className="font-mono text-[10.5px] tabular-nums text-ink-400">{body.length} / 2000</span>
             </div>
+            <label className="mt-3 flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={anonymous}
+                onChange={e => setAnonymous(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-ink-300 accent-brand-500 focus:ring-brand-400"
+              />
+              <span className="min-w-0">
+                <span className="block font-display text-[12.5px] font-semibold text-ink-800">ანონიმურად გამოქვეყნება</span>
+                <span className="block text-[11.5px] text-ink-500 mt-0.5">ექსპერტი შენს სახელს ვერ დაინახავს</span>
+              </span>
+            </label>
             <div className="mt-4 flex items-center gap-3">
               <button
                 type="button"
@@ -1200,6 +1307,13 @@ const BookingBody = ({
                 <Icon.download className="w-3.5 h-3.5" />
                 <span>კალენდარში დამატება</span>
               </a>
+            )}
+
+            {/* Expert no-show escape hatch — a CONFIRMED session whose start
+                passed 15+ minutes ago and was never completed. Quiet on
+                purpose: it must not compete with join/reschedule CTAs. */}
+            {status === 'CONFIRMED' && Date.now() > new Date(booking.startAt).getTime() + 15 * 60_000 && (
+              <NoShowReport bookingId={booking.id} />
             )}
           </div>
         </div>

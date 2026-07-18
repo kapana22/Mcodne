@@ -16,6 +16,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
+  // Resolution comment is mandatory — it is pushed to both parties' notifications
+  // and stored in the audit trail. UI enforces this too; server is the backstop.
+  if (!parsed.data.resolution?.trim()) {
+    return NextResponse.json(
+      { ok: false, error: 'REASON_REQUIRED', message: 'გადაწყვეტის კომენტარი სავალდებულოა' },
+      { status: 400 },
+    )
+  }
+
   const dispute = await prisma.dispute.findUnique({
     where: { id },
     include: { booking: { include: { tutor: { select: { userId: true } } } } },

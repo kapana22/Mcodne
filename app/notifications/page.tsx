@@ -37,6 +37,8 @@ const TYPE_LABEL: Record<string, { l: string; cls: string }> = {
   MESSAGE_NEW:        { l: 'შეტყობინება',  cls: 'bg-info-50 text-info-700 border-info-200' },
   REVIEW_NEW:         { l: 'შეფასება',     cls: 'bg-warning-50 text-warning-700 border-warning-200' },
   APPLICATION_STATUS: { l: 'განაცხადი',    cls: 'bg-success-50 text-success-700 border-success-200' },
+  BOOKING_REMINDER:   { l: 'შეხსენება',    cls: 'bg-brand-50 text-brand-700 border-brand-200' },
+  APPLICATION_NEW:    { l: 'განაცხადი',    cls: 'bg-info-50 text-info-700 border-info-200' },
   PAYOUT:             { l: 'ანგარიშსწორება', cls: 'bg-brand-50 text-brand-700 border-brand-200' },
   ADMIN_BROADCAST:    { l: 'გუნდიდან',     cls: 'bg-ink-100 text-ink-700 border-ink-200' },
   GENERIC:            { l: 'შეტყობინება',  cls: 'bg-ink-50 text-ink-700 border-ink-200' },

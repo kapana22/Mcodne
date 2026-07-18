@@ -144,10 +144,10 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
               aria-label="წაშლა შენახულიდან"
               className="absolute top-2 right-2 w-8 h-8 rounded-full inline-flex items-center justify-center bg-white/90 backdrop-blur hover:bg-white text-danger-600 disabled:opacity-50 shadow-xs transition-all"
             >
-              <Icon.heart className="w-4 h-4" style={{ fill: 'currentColor' }} />
+              <Icon.heart className="w-4 h-4" fill="currentColor" />
             </button>
           </Link>
-          <div className="p-3">
+          <div className="p-4">
             <div className="min-w-0">
               <div className="font-display text-[13.5px] font-bold text-ink-900 leading-tight truncate">{t.name}</div>
               <div className="text-[11.5px] text-ink-500 mt-0.5 truncate">{t.specialty}</div>

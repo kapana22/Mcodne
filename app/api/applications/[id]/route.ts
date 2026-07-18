@@ -17,6 +17,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!parsed.success) return NextResponse.json({ ok: false }, { status: 400 })
   const { action, note } = parsed.data
 
+  // Reject must carry a reason — it is sent to the applicant and kept in the
+  // audit trail. The admin UI enforces this too; the server is the backstop.
+  if (action === 'reject' && !note?.trim()) {
+    return NextResponse.json(
+      { ok: false, error: 'REASON_REQUIRED', message: 'უარყოფის მიზეზი სავალდებულოა' },
+      { status: 400 },
+    )
+  }
+
   // Only need userId to update; skip the full user include.
   const app = await prisma.tutorApplication.findUnique({ where: { id } })
   if (!app) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })

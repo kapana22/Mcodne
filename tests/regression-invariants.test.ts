@@ -106,7 +106,9 @@ function check(name: string, ok: boolean, hint: string) {
 
 // ── F. detail page keeps its error + retry state ─────────────────────────────
 {
-  const page = read('app/tutors/[id]/page.tsx')
+  // Interactive profile moved to client.tsx (page.tsx is now the thin SEO/SSR
+  // server wrapper — Phase 0.6 split).
+  const page = read('app/tutors/[id]/client.tsx')
   check(
     'F: expert profile has a dedicated error state with retry',
     page.includes("loadState === 'error'") && page.includes('სცადე თავიდან'),

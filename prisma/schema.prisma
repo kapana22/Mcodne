@@ -66,6 +66,9 @@ model User {
   // ADMIN_BROADCAST). `null` → all types enabled (default). Missing keys inside
   // the JSON default to enabled — only explicit `false` disables.
   notificationPrefs Json?
+  // Admin safety switch: non-null → account is suspended (signin blocked).
+  // Set/cleared via PATCH /api/admin/users/[id]; reason lives in the audit log.
+  suspendedAt   DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

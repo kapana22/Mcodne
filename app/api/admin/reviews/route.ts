@@ -47,6 +47,15 @@ export async function DELETE(req: Request) {
   const parsed = DelBody.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
+  // Deleting user-generated content requires a stated reason for the audit
+  // trail. UI enforces this too; server is the backstop.
+  if (!parsed.data.reason?.trim()) {
+    return NextResponse.json(
+      { ok: false, error: 'REASON_REQUIRED', message: 'წაშლის მიზეზი სავალდებულოა' },
+      { status: 400 },
+    )
+  }
+
   const review = await prisma.review.findUnique({
     where: { id },
     select: { id: true, tutorId: true, rating: true, studentId: true, body: true },

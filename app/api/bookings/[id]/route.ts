@@ -35,7 +35,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       // Include the student's post-session review (if any) so both parties can
       // render "already reviewed" state without a second round-trip.
       review: {
-        select: { id: true, rating: true, body: true, createdAt: true, studentId: true },
+        select: {
+          id: true, rating: true, body: true, createdAt: true, studentId: true,
+          // The expert's public reply (tutor detail renders + edits it) and the
+          // anonymity flag (seeds the student's edit form).
+          tutorResponse: true, respondedAt: true, anonymous: true,
+        },
       },
     },
   })
@@ -50,6 +55,18 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     // Fire-and-forget persist so we only do this once per booking. Not awaited
     // so it doesn't block the response.
     prisma.booking.update({ where: { id: booking.id }, data: { meetingUrl: url } }).catch(() => {})
+  }
+
+  // Join cutoff: a session that was never completed stops exposing its room
+  // link 30 minutes after the scheduled end — a stale CONFIRMED booking must
+  // not offer a joinable (deterministic, guessable-forever) meeting URL.
+  // Response-only masking; the stored meetingUrl is untouched.
+  if (
+    booking.meetingUrl &&
+    (booking.status === 'CONFIRMED' || booking.status === 'LIVE') &&
+    Date.now() > booking.startAt.getTime() + (booking.durationMin + 30) * 60_000
+  ) {
+    booking.meetingUrl = null
   }
 
   // Merge in the reschedule-request JSONB (not part of the Prisma-typed model —
