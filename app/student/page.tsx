@@ -9,6 +9,7 @@ import { bucketBookings, deriveSummary } from '@/lib/bookings'
 import { isBookingLive } from '@/lib/bookingLive'
 import { fmtKaDate, fmtKaTime, fmtKaDateTime, KA_WEEKDAYS_SHORT } from '@/lib/kaDate'
 import { StatusPill } from '@/components/StatusPill'
+import { Skeleton } from '@/components/Skeleton'
 import { StudentAppBar } from '@/components/StudentAppBar'
 import { VerifiedMark } from '@/components/Avatar'
 import { WorkspaceFooter } from '@/components/WorkspaceFooter'
@@ -1141,15 +1142,48 @@ export default function Dashboard() {
   // flash. On failure this becomes a visible dead-end-free error card with a
   // retry, never an indefinite spinner.
   if (authState !== 'authed') {
+    // Content-shaped skeleton shell instead of a centered spinner: the page
+    // reads as "already here, filling in" rather than "stuck loading" — the
+    // dev/slow-network multi-second /api/me wait stops feeling broken.
+    if (authState === 'checking') {
+      return (
+        <div className="min-h-screen bg-ink-50/40" aria-busy="true">
+          <div className="sticky top-0 z-40 bg-white/95 border-b border-ink-100">
+            <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+              <img src="/logo.svg" alt="მცოდნე" className="h-6 w-auto object-contain select-none" draggable={false} />
+              <div className="flex items-center gap-2">
+                <Skeleton className="w-10 h-10" />
+                <Skeleton.Avatar size={32} />
+              </div>
+            </div>
+          </div>
+          <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+            <Skeleton className="h-7 w-56 max-w-full mb-3" />
+            <Skeleton className="h-4 w-80 max-w-full mb-8" />
+            <div className="grid gap-4 sm:gap-5 sm:grid-cols-2 mb-6">
+              <Skeleton.Card />
+              <Skeleton.Card className="hidden sm:block" />
+            </div>
+            <div className="rounded-card border border-ink-200 bg-white overflow-hidden divide-y divide-ink-100">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="p-4 sm:p-5 flex items-center gap-3">
+                  <Skeleton.Avatar size={40} />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <Skeleton.Line width={35} />
+                    <Skeleton.Line width={65} className="h-3" />
+                  </div>
+                  <Skeleton className="h-8 w-20" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-ink-50/40 text-ink-900 px-6">
         <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain opacity-90 select-none" draggable={false} />
-        {authState === 'checking' ? (
-          <div className="inline-flex items-center gap-2 text-[12.5px] text-ink-500">
-            <svg aria-hidden viewBox="0 0 24 24" className="w-5 h-5 animate-spin text-ink-400" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
-            იტვირთება…
-          </div>
-        ) : (
+        {(
           <div className="text-center max-w-[360px]">
             <div className="font-display text-[16px] font-bold text-ink-900 tracking-tight">ვერ ჩაიტვირთა</div>
             <p className="text-[12.5px] text-ink-500 mt-1.5 leading-relaxed">კავშირი სერვერთან ვერ შედგა. შეამოწმე ინტერნეტი და სცადე თავიდან.</p>

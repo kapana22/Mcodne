@@ -170,6 +170,13 @@ summary:focus-visible {
   from { opacity: 0; transform: translateX(-8px); }
   to   { opacity: 1; transform: translateX(0); }
 }
+/* Right-side drawer entrance (mobile nav). A dedicated keyframe because
+   playing slideInR with animation-direction:reverse + fill both ends the
+   element at the FROM state — opacity 0, i.e. a permanently invisible menu. */
+@keyframes drawerInR {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
 @keyframes slideInB {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }

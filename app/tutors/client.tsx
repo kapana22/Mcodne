@@ -70,7 +70,9 @@ const FilterBox = ({ label, value, active, children }: { label: string; value: s
         <Icon.chevD className={`w-4 h-4 text-ink-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute z-40 top-full left-0 mt-2 w-[248px] rounded-card border border-ink-200 bg-white shadow-float p-2 max-h-[340px] overflow-y-auto">
+        // Mobile: the trigger is full-width, so the panel spans it (inset-x-0)
+        // and can never poke past the viewport; sm+ gets the fixed 248px card.
+        <div className="absolute z-40 top-full inset-x-0 sm:inset-x-auto sm:left-0 mt-2 sm:w-[248px] rounded-card border border-ink-200 bg-white shadow-float p-2 max-h-[340px] overflow-y-auto">
           {children}
         </div>
       )}

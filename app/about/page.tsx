@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
+import { Reveal } from '@/components/Reveal'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 
@@ -69,7 +70,7 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-10 pt-10 border-t border-ink-200">
+        <Reveal stagger className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-10 pt-10 border-t border-ink-200">
           {STATS.map(s => (
             <div key={s.l}>
               <div className="font-display text-3xl lg:text-4xl font-bold text-ink-900 tabular-nums tracking-tight">
@@ -78,14 +79,18 @@ export default function AboutPage() {
               <div className="mt-2 text-[13px] text-ink-500 leading-snug">{s.l}</div>
             </div>
           ))}
-        </div>
+        </Reveal>
 
         <section className="mt-20">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
-            რას გვჯერა
-          </div>
-          <h2 className="font-display text-3xl font-bold text-ink-900 tracking-tight">ჩვენი პრინციპები</h2>
-          <div className="mt-8 grid sm:grid-cols-2 gap-4 motion-safe:stagger">
+          <Reveal>
+            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
+              რას გვჯერა
+            </div>
+            <h2 className="font-display text-3xl font-bold text-ink-900 tracking-tight">ჩვენი პრინციპები</h2>
+          </Reveal>
+          {/* Reveal-stagger (scroll-triggered) instead of load-time .stagger,
+              which finished animating long before the user scrolled here. */}
+          <Reveal stagger className="mt-8 grid sm:grid-cols-2 gap-4">
             {VALUES.map(v => (
               <div key={v.title} className="rounded-card border border-ink-200 bg-white p-6 hover-lift">
                 <div className="w-10 h-10 rounded-btn bg-brand-50 text-brand-700 flex items-center justify-center">
@@ -95,9 +100,10 @@ export default function AboutPage() {
                 <p className="mt-2 text-[14px] text-ink-600 leading-relaxed">{v.body}</p>
               </div>
             ))}
-          </div>
+          </Reveal>
         </section>
 
+        <Reveal>
         <section className="mt-20 grid lg:grid-cols-[1fr_1.4fr] gap-10 lg:gap-16">
           <div>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
@@ -123,7 +129,9 @@ export default function AboutPage() {
             </p>
           </div>
         </section>
+        </Reveal>
 
+        <Reveal>
         <section className="mt-20 rounded-card bg-gradient-dark text-white p-10 lg:p-14 relative overflow-hidden">
           <div className="max-w-[560px] relative z-10">
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-300 mb-3">
@@ -152,6 +160,7 @@ export default function AboutPage() {
             </div>
           </div>
         </section>
+        </Reveal>
       </main>
 
       <Footer />

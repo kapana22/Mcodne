@@ -147,18 +147,24 @@ export function PublicTopBar({
 
       {mobOpen && (
         <>
+          {/* Explicit h-[100dvh] on scrim + drawer: the backdrop-blur header is
+              their containing block (backdrop-filter creates one for fixed
+              descendants), so inset-0/bottom-0 would size them to the 64px bar,
+              not the screen. An explicit height works either way. */}
           <button
             type="button"
             aria-label="დახურვა"
             onClick={() => setMobOpen(false)}
-            className="lg:hidden fixed inset-0 z-50 bg-ink-900/50 backdrop-blur-sm motion-safe:animate-fade-in-fast"
+            className="lg:hidden fixed inset-x-0 top-0 h-[100dvh] z-[69] bg-ink-900/50 backdrop-blur-sm motion-safe:animate-fade-in-fast"
           />
           <aside
             role="dialog"
             aria-modal="true"
             aria-label="მენიუ"
-            className="lg:hidden fixed top-0 right-0 bottom-0 z-[51] w-[320px] max-w-[86vw] bg-white shadow-float flex flex-col"
-            style={{ animation: 'slideInR 300ms cubic-bezier(0.16, 1, 0.3, 1) both', animationDirection: 'reverse' }}
+            // z-[70]: above the cookie banner (z-[60]) — an open nav dialog must
+            // cover the banner; still below Sheet (80) / ConfirmModal (90).
+            className="lg:hidden fixed top-0 right-0 h-[100dvh] z-[70] w-[320px] max-w-[86vw] bg-white shadow-float flex flex-col"
+            style={{ animation: 'drawerInR 300ms cubic-bezier(0.16, 1, 0.3, 1) both' }}
           >
             <div className="h-16 sm:h-20 px-5 flex items-center justify-between border-b border-ink-100 shrink-0">
               <span className="font-display text-[10.5px] font-bold uppercase tracking-[0.22em] text-ink-500">მენიუ</span>

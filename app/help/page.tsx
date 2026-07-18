@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { Metadata } from 'next'
 import { CANCEL_CUTOFF_HOURS, COMMISSION_PCT } from '@/lib/flags'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
+import { Reveal } from '@/components/Reveal'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 
@@ -157,7 +158,7 @@ export default function HelpPage() {
           . ვცდილობთ ვუპასუხოთ 24 საათში.
         </p>
 
-        <div className="mt-12 space-y-12">
+        <Reveal stagger className="mt-12 space-y-12">
           {GROUPS.map(g => (
             <section key={g.title}>
               <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-4">
@@ -178,8 +179,9 @@ export default function HelpPage() {
               </div>
             </section>
           ))}
-        </div>
+        </Reveal>
 
+        <Reveal>
         <section className="mt-16">
           <div className="text-center mb-8">
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">
@@ -215,6 +217,7 @@ export default function HelpPage() {
             </div>
           </div>
         </section>
+        </Reveal>
       </main>
 
       <Footer />
