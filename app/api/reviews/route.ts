@@ -8,6 +8,9 @@ const Body = z.object({
   bookingId: z.string(),
   rating: z.number().int().min(1).max(5),
   body: z.string().min(3).max(2000),
+  // Hide the reviewer's identity on the public tutor profile (the tutor still
+  // sees the review content; /api/tutors/[id] nulls `student` when set).
+  anonymous: z.boolean().optional(),
 })
 
 // Reviews only allowed within 30 days of session end.
@@ -52,10 +55,14 @@ export async function POST(req: Request) {
       tutorId: booking.tutorId,
       rating: parsed.data.rating,
       body,
+      anonymous: parsed.data.anonymous ?? false,
     },
     update: {
       rating: parsed.data.rating,
       body,
+      // Only touch the flag when the client sent it — a re-submit without the
+      // field keeps the original choice instead of silently de-anonymizing.
+      ...(parsed.data.anonymous === undefined ? {} : { anonymous: parsed.data.anonymous }),
     },
   })
 

@@ -8,16 +8,20 @@ export type NotifType =
   | 'BOOKING_CREATED'
   | 'BOOKING_CANCELED'
   | 'BOOKING_COMPLETED'
+  | 'BOOKING_REMINDER'
   | 'RESCHEDULE_REQUEST'
   | 'MESSAGE_NEW'
   | 'REVIEW_NEW'
   | 'APPLICATION_STATUS'
+  | 'APPLICATION_NEW'
   | 'ADMIN_BROADCAST'
   | 'PAYOUT'
   | 'GENERIC'
 
-// The 5 opt-outable categories. Types outside this list (PAYOUT, GENERIC) are
-// always delivered — they carry money/audit signal, not marketing.
+// The 5 opt-outable categories. Types outside this list (PAYOUT, GENERIC,
+// APPLICATION_NEW) are always delivered — they carry money/audit/ops signal,
+// not marketing. APPLICATION_NEW in particular goes only to admins as a
+// moderation-queue ping (same rationale as the GENERIC dispute pings).
 export type PrefKey =
   | 'BOOKING_CREATED'
   | 'MESSAGE_NEW'
@@ -26,9 +30,10 @@ export type PrefKey =
   | 'ADMIN_BROADCAST'
 
 // Group all booking lifecycle types under BOOKING_CREATED — one toggle for
-// "ჯავშნის ცვლილება" covers both new-request and canceled notifications.
+// "ჯავშნის ცვლილება" covers new-request, canceled, completed, reschedule AND
+// session-reminder notifications.
 function prefKeyForType(t: string): PrefKey | null {
-  if (t === 'BOOKING_CREATED' || t === 'BOOKING_CANCELED' || t === 'BOOKING_COMPLETED' || t === 'RESCHEDULE_REQUEST') return 'BOOKING_CREATED'
+  if (t === 'BOOKING_CREATED' || t === 'BOOKING_CANCELED' || t === 'BOOKING_COMPLETED' || t === 'BOOKING_REMINDER' || t === 'RESCHEDULE_REQUEST') return 'BOOKING_CREATED'
   if (t === 'MESSAGE_NEW') return 'MESSAGE_NEW'
   if (t === 'REVIEW_NEW') return 'REVIEW_NEW'
   if (t === 'APPLICATION_STATUS') return 'APPLICATION_STATUS'

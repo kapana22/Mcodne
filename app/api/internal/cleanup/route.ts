@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { notify } from '@/lib/notify'
-import { fmtKaDateTime } from '@/lib/kaDate'
+import { fmtKaDateTime, fmtKaTime } from '@/lib/kaDate'
 
 // Cleanup job for expired auth artifacts + stale bookings.
 //
@@ -11,21 +11,29 @@ import { fmtKaDateTime } from '@/lib/kaDate'
 //   - PasswordResetToken rows where consumed=true OR expiresAt < now
 //
 // Auto-transitions:
-//   - Booking PREPARING → CANCELED  (tutor never responded within 24h)
+//   - Booking PREPARING → CANCELED  (tutor never responded within 24h, OR the
+//     scheduled start time passed unanswered — whichever comes first).
 //     Frees the held AvailabilitySlot for someone else.
 //   - Booking CONFIRMED / LIVE → COMPLETED  (session ended ≥ 48h ago and
 //     nobody flagged NO_SHOW — benefit of the doubt).
+//
+// Reminders:
+//   - CONFIRMED bookings starting within 24h / within 1h → BOOKING_REMINDER to
+//     both parties (deduped via deterministic href markers — see below).
+//     NB: the 1h reminder only fires if a cron tick lands inside that hour, so
+//     schedule this endpoint at least every 15–30 min for it to be reliable.
 //
 // Auth: shared secret in the `Authorization: Bearer <CLEANUP_SECRET>` header,
 // OR `?secret=<CLEANUP_SECRET>` query param on the GET variant (simpler for
 // cron systems that only support HTTP GET pings).
 //
-// Recommended schedule: every 6 hours.
+// Recommended schedule: every 15 minutes (the 1h session reminder needs a
+// tick inside its window; everything else tolerates any cadence).
 //
 // Railway cron setup:
 //   1. Set env CLEANUP_SECRET=<random 32+ char string> in Variables
 //   2. Dashboard → Service → Cron → add job:
-//        Schedule: 0 */6 * * *
+//        Schedule: */15 * * * *
 //        Command:  curl -fsS "https://mcodne.ge/api/internal/cleanup?secret=$CLEANUP_SECRET"
 
 const PREPARING_TTL_HOURS = 24
@@ -60,12 +68,18 @@ export async function POST(req: Request) {
   ])
 
   // ── Booking auto-transitions ──────────────────────────────────────────
-  // PREPARING > 24h → CANCELED (+ free slot)
+  // PREPARING → CANCELED when EITHER deadline passes, whichever comes first:
+  //   (a) unanswered for 24h since creation, or
+  //   (b) the scheduled startAt itself has passed (a request the expert never
+  //       answered before the session time is dead regardless of age).
   const preparingCutoff = new Date(now.getTime() - PREPARING_TTL_HOURS * 3600_000)
   const stalePrepAll = await prisma.booking.findMany({
     where: {
       status: 'PREPARING',
-      createdAt: { lt: preparingCutoff },
+      OR: [
+        { createdAt: { lt: preparingCutoff } },
+        { startAt: { lt: now } },
+      ],
     },
     select: {
       id: true,
@@ -74,6 +88,7 @@ export async function POST(req: Request) {
       durationMin: true,
       topic: true,
       studentId: true,
+      heldSlotId: true,
       tutor: { select: { userId: true } },
     },
   })
@@ -95,23 +110,31 @@ export async function POST(req: Request) {
 
   let preparingCanceled = 0
   for (const b of stalePrep) {
-    const end = new Date(b.startAt.getTime() + b.durationMin * 60_000)
-    const heldSlot = await prisma.availabilitySlot.findFirst({
-      where: {
-        tutorId: b.tutorId,
-        startAt: { lte: b.startAt },
-        endAt:   { gte: end },
-        booked: true,
-      },
-      select: { id: true },
-    })
+    // Free the EXACT slot this booking claimed (heldSlotId) — same as the
+    // cancel/decline flows. The time-containment scan is a legacy fallback
+    // ONLY for rows created before heldSlotId existed (schema.prisma warns the
+    // scan can free an unrelated slot, so it must never be the primary path).
+    let slotId: string | null = b.heldSlotId
+    if (!slotId) {
+      const end = new Date(b.startAt.getTime() + b.durationMin * 60_000)
+      const legacySlot = await prisma.availabilitySlot.findFirst({
+        where: {
+          tutorId: b.tutorId,
+          startAt: { lte: b.startAt },
+          endAt:   { gte: end },
+          booked: true,
+        },
+        select: { id: true },
+      })
+      slotId = legacySlot?.id ?? null
+    }
     await prisma.$transaction(async tx => {
       await tx.booking.update({
         where: { id: b.id },
-        data: { status: 'CANCELED', payoutStatus: 'REFUNDED' },
+        data: { status: 'CANCELED', payoutStatus: 'REFUNDED', heldSlotId: null },
       })
-      if (heldSlot) {
-        await tx.availabilitySlot.update({ where: { id: heldSlot.id }, data: { booked: false } })
+      if (slotId) {
+        await tx.availabilitySlot.updateMany({ where: { id: slotId }, data: { booked: false } })
       }
     })
     preparingCanceled++
@@ -128,7 +151,7 @@ export async function POST(req: Request) {
     await notify(b.tutor.userId, {
       type: 'BOOKING_CANCELED',
       title: 'ჯავშანი გაუქმდა',
-      body: `${sessionRef} — მოთხოვნა 24 საათში უპასუხოდ დარჩა და ავტომატურად გაუქმდა`,
+      body: `${sessionRef} — მოთხოვნა უპასუხოდ დარჩა და ავტომატურად გაუქმდა`,
       href: `/tutor/bookings/${b.id}`,
     })
   }
@@ -195,6 +218,58 @@ export async function POST(req: Request) {
     }
   }
 
+  // ── Session reminders (24h / 1h before start) ─────────────────────────
+  // Both parties of a CONFIRMED booking get a BOOKING_REMINDER when the
+  // session starts within 24h; a second, more urgent one when it starts
+  // within 1h. Dedupe WITHOUT a schema change: the Notification model has no
+  // meta/JSONB column, but `href` is queryable — every reminder's href carries
+  // a deterministic `?reminder=24h|1h` marker, and we check for an existing
+  // (userId, type=BOOKING_REMINDER, href) row before sending. A notify()
+  // suppressed by the user's prefs inserts nothing, so the check simply
+  // re-runs (and stays silent) on the next tick — no duplicates either way.
+  const in24h = new Date(now.getTime() + 24 * 3600_000)
+  const upcoming = await prisma.booking.findMany({
+    where: { status: 'CONFIRMED', startAt: { gt: now, lte: in24h } },
+    select: {
+      id: true,
+      topic: true,
+      startAt: true,
+      studentId: true,
+      tutor: { select: { userId: true } },
+    },
+  })
+  let remindersSent = 0
+  if (upcoming.length > 0) {
+    type PlannedReminder = { userId: string; href: string; title: string; body: string }
+    const planned: PlannedReminder[] = []
+    for (const b of upcoming) {
+      // Within 1h → only the urgent kind (its own dedupe key, so a booking
+      // that already got the 24h reminder still gets the 1h one).
+      const kind = b.startAt.getTime() - now.getTime() <= 3600_000 ? '1h' : '24h'
+      const title = kind === '1h'
+        ? `სესია იწყება 1 საათში · ${fmtKaTime(b.startAt)}`
+        : `შეხსენება: სესია 24 საათში · ${fmtKaTime(b.startAt)}-ზე`
+      const body = `${b.topic} · ${fmtKaDateTime(b.startAt, { year: true })}`
+      planned.push({ userId: b.studentId, href: `/student/bookings/${b.id}?reminder=${kind}`, title, body })
+      planned.push({ userId: b.tutor.userId, href: `/tutor/bookings/${b.id}?reminder=${kind}`, title, body })
+    }
+    const existing = await prisma.notification.findMany({
+      where: { type: 'BOOKING_REMINDER', href: { in: planned.map(p => p.href) } },
+      select: { userId: true, href: true },
+    })
+    const alreadySent = new Set(existing.map(e => `${e.userId}|${e.href}`))
+    for (const p of planned) {
+      if (alreadySent.has(`${p.userId}|${p.href}`)) continue
+      await notify(p.userId, {
+        type: 'BOOKING_REMINDER',
+        title: p.title,
+        body: p.body,
+        href: p.href,
+      })
+      remindersSent++
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     deleted: {
@@ -205,6 +280,7 @@ export async function POST(req: Request) {
     bookings: {
       preparingCanceled,
       autoCompleted,
+      remindersSent,
     },
     at: now.toISOString(),
   })
@@ -239,8 +315,9 @@ export async function GET(req: Request) {
       'Delete expired Session rows',
       'Delete consumed/expired OtpCode rows',
       'Delete consumed/expired PasswordResetToken rows',
-      `Cancel PREPARING bookings older than ${PREPARING_TTL_HOURS}h + free their held slot`,
+      `Cancel PREPARING bookings unanswered for ${PREPARING_TTL_HOURS}h OR past their startAt + free their held slot`,
       `Auto-complete CONFIRMED/LIVE bookings past (startAt + duration + ${AUTO_COMPLETE_GRACE_HOURS}h)`,
+      'Send BOOKING_REMINDER (24h + 1h before start) to both parties of CONFIRMED bookings — run every 15–30 min for reliable 1h reminders',
     ],
     hint: configured
       ? 'Ping this endpoint on a schedule (e.g. every 6h) — POST with Bearer or GET with ?secret=…'

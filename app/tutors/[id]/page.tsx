@@ -11,6 +11,7 @@ import { PAYMENTS_LIVE } from '@/lib/flags'
 import { pushRecentTutor } from '@/components/RecentTutorsStrip'
 import { userTimezone, TBILISI } from '@/lib/tz'
 import { CountUp } from '@/components/CountUp'
+import { Sheet } from '@/components/Sheet'
 
 /* ───── Icons ───── */
 const Icon = {
@@ -643,29 +644,18 @@ const MobileBookingBar = ({ onBook, price, responseHours, sessionMin, signedIn, 
  * itself and the flow continues where it left off.
  */
 const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; intent: 'book' | null; onDismiss: () => void }) => {
-  useEffect(() => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onDismiss() }
-    window.addEventListener('keydown', onKey)
-    return () => {
-      document.body.style.overflow = prev
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [onDismiss])
+  // Escape / scroll-lock / focus trap come from the Sheet container.
   const target = `/tutors/${tutorId}${intent === 'book' ? '?rebook=1' : ''}`
   const q = `redirect=${encodeURIComponent(target)}`
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label="ავტორიზაცია საჭიროა">
-      <button type="button" aria-label="დახურვა" onClick={onDismiss} className="absolute inset-0 bg-ink-900/40 motion-safe:animate-fade-in cursor-default no-tap-shrink" />
-      <div className="relative w-full sm:max-w-[400px] bg-white rounded-t-card sm:rounded-card shadow-float p-6 pb-8 sm:pb-6 motion-safe:animate-slide-in-b safe-area-bottom">
-        <button type="button" onClick={onDismiss} aria-label="დახურვა" className="absolute top-3 right-3 w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-500 inline-flex items-center justify-center transition-colors">
-          <Icon.x className="w-5 h-5" />
-        </button>
-        <div className="font-display text-[18px] font-bold text-ink-900 tracking-tight pr-10">
-          {intent === 'book' ? 'შედი, რომ დაიჯავშნო' : 'შედი, რომ გააგრძელო'}
-        </div>
-        <p className="text-[13px] text-ink-600 mt-2 leading-[1.55]">
+    <Sheet
+      open
+      onClose={onDismiss}
+      size="sm"
+      ariaLabel="ავტორიზაცია საჭიროა"
+      title={intent === 'book' ? 'შედი, რომ დაიჯავშნო' : 'შედი, რომ გააგრძელო'}
+    >
+        <p className="text-[13px] text-ink-600 leading-[1.55]">
           1 წუთში მორჩები — მერე ზუსტად აქ დაბრუნდები{intent === 'book' ? ' და ჯავშანი გაგრძელდება' : ''}.
         </p>
         <div className="mt-5 space-y-2.5">
@@ -676,12 +666,11 @@ const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; inte
             რეგისტრაცია
           </Link>
         </div>
-        <p className="mt-4 text-[11px] text-ink-500 text-center inline-flex items-center gap-1.5 w-full justify-center">
+        <p className="mt-4 mb-2 text-[11px] text-ink-500 text-center inline-flex items-center gap-1.5 w-full justify-center">
           <Icon.shield className="w-3 h-3 text-success-600" />
           {PAYMENTS_LIVE ? 'გადახდა escrow-შია სესიის ბოლომდე' : 'დაჯავშნა უფასოა — გადახდები მალე'}
         </p>
-      </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -1859,8 +1848,6 @@ const BookingModal = ({
   const [step, setStep] = useState<number>(initialStep)
   // Accessible-dialog plumbing: trap focus inside the panel, restore it on
   // close, close on Esc, and lock body scroll while open (mirrors ConfirmModal).
-  const dialogRef = useRef<HTMLDivElement | null>(null)
-  const restoreFocusRef = useRef<HTMLElement | null>(null)
   const slotsByDay = React.useMemo(() => groupSlotsByDay(availability), [availability])
   const firstFreeDate = React.useMemo(() => {
     for (const s of availability) {
@@ -1942,46 +1929,8 @@ const BookingModal = ({
     }
   }, [open, initialStep, initialStart, firstFreeDate, initialTopic])
 
-  // Accessible modal behavior: lock body scroll, move focus into the panel,
-  // trap Tab within it, close on Esc, and restore focus to the trigger on close.
-  useEffect(() => {
-    if (!open) return
-    restoreFocusRef.current = (document.activeElement as HTMLElement | null) ?? null
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-
-    const FOCUSABLE = 'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])'
-    const focusFirst = window.setTimeout(() => {
-      const root = dialogRef.current
-      const first = root?.querySelector<HTMLElement>(FOCUSABLE)
-      first?.focus()
-    }, 20)
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); onClose(); return }
-      if (e.key !== 'Tab') return
-      const root = dialogRef.current
-      if (!root) return
-      const nodes = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE))
-        .filter(n => !n.hasAttribute('disabled') && n.tabIndex !== -1)
-      if (!nodes.length) return
-      const first = nodes[0]
-      const last = nodes[nodes.length - 1]
-      const active = document.activeElement as HTMLElement | null
-      if (e.shiftKey && (active === first || !root.contains(active))) {
-        e.preventDefault(); last.focus()
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault(); first.focus()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.clearTimeout(focusFirst)
-      window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prevOverflow
-      restoreFocusRef.current?.focus?.()
-    }
-  }, [open, onClose])
+  // Accessible modal behavior (scroll lock, focus trap + restore, Escape)
+  // now comes from the shared Sheet container.
 
   if (!open) return null
 
@@ -2114,36 +2063,97 @@ const BookingModal = ({
         : 'დაჯავშნე'
 
   return (
-    // Right-side sheet (desktop) / bottom sheet (mobile) — matches the
-    // /tutors listing's QuickBookPopup positioning so the modal doesn't
-    // obscure the tutor profile the user is booking from.
-    <div className="fixed inset-0 z-50 flex items-end sm:items-stretch justify-center sm:justify-end">
-      <button type="button" onClick={onClose} aria-label="დახურვა" className="absolute inset-0 bg-accent-950/45 backdrop-blur-sm motion-safe:animate-fade-in-fast" />
-
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`${tutorName} — დაჯავშნა`} className="relative bg-white shadow-float w-full sm:max-w-[880px] max-h-[calc(100vh-24px)] sm:max-h-none sm:h-full rounded-t-card sm:rounded-none sm:rounded-l-card overflow-hidden flex flex-col motion-safe:animate-slide-in-b sm:motion-safe:animate-slide-in-r">
-
-        {/* Header */}
-        <header className="px-4 sm:px-7 py-4 sm:py-5 border-b border-ink-200 flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700">
-                სესიის დაჯავშნა
+    // Right-side sheet (desktop) / bottom sheet (mobile) via the shared Sheet
+    // container — matches the /tutors listing's QuickBookPopup positioning so
+    // the modal doesn't obscure the tutor profile the user is booking from.
+    <Sheet
+      open={open}
+      onClose={onClose}
+      variant="side"
+      size="lg"
+      busy={submitting}
+      ariaLabel={`${tutorName} — დაჯავშნა`}
+      eyebrow="სესიის დაჯავშნა"
+      title={
+        <>
+          {/* When a service tier was tapped, name IT here — the user must see
+              what they're booking from step 1 onward. */}
+          <span className="text-[20px] lg:text-[22px]">{tutorName} · {service ? service.title : tutorSpecialty}</span>
+          <div className="mt-4 font-sans font-normal tracking-normal">
+            <Steps step={step} total={totalSteps} />
+          </div>
+        </>
+      }
+      footer={!submitted ? (
+        <div className="w-full flex flex-col gap-3">
+          {submitError && (
+            <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12.5px] font-medium">
+              {submitUnverified ? (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>დაჯავშნამდე დაადასტურე ელფოსტა</span>
+                  <span>·</span>
+                  <a href="/settings" className="underline font-semibold hover:text-danger-900">ბმული ვერიფიკაციაზე</a>
+                  <button
+                    type="button"
+                    onClick={resendVerify}
+                    disabled={resendingVerify}
+                    className="ml-auto h-7 px-2 rounded-btn bg-white border border-danger-200 hover:border-danger-300 disabled:opacity-50 text-danger-700 font-display font-semibold text-[11.5px] transition-colors"
+                  >
+                    {resendingVerify ? 'იგზავნება…' : 'კოდის ხელახლა გაგზავნა'}
+                  </button>
+                  {resendMsg && <div className="w-full text-[11.5px] text-danger-700 mt-0.5">{resendMsg}</div>}
+                </div>
+              ) : submitError}
+            </div>
+          )}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="text-[13px]">
+              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500">არჩეული</div>
+              <div className="font-display font-bold text-ink-900 mt-0.5">
+                {selectedStart
+                  ? <>{service ? `${service.title} · ` : ''}{dayLabelFull} · {fmtHM(selectedStart)} · <span className="tabular-nums">{duration}</span> წუთი · <span className="tabular-nums">{price}</span></>
+                  : service
+                    ? <>{service.title} · <span className="font-medium text-ink-500">აირჩიე დრო</span></>
+                    : '— აირჩიე დრო'}
               </div>
             </div>
-            {/* When a service tier was tapped, name IT here — the user must see
-                what they're booking from step 1 onward. */}
-            <h2 className="font-display text-[20px] lg:text-[22px] font-bold text-ink-900 tracking-tight">{tutorName} · {service ? service.title : tutorSpecialty}</h2>
-            <div className="mt-4">
-              <Steps step={step} total={totalSteps} />
+            <div className="flex items-center gap-2 shrink-0">
+              {step > 1 ? (
+                <button type="button" onClick={back} disabled={submitting} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  <Icon.chevL className="w-3.5 h-3.5" />
+                  უკან
+                </button>
+              ) : (
+                <button type="button" onClick={onClose} disabled={submitting} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display font-semibold text-[13px] tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  გაუქმება
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={next}
+                disabled={submitting || (step === 1 && !canAdvanceFromStep1) || (onPaymentStep && !cardValid)}
+                aria-busy={submitting}
+                className="h-11 px-5 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+              >
+                {submitting ? (
+                  <>
+                    <span aria-hidden className="inline-block w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent motion-safe:animate-spin" />
+                    იგზავნება…
+                  </>
+                ) : (
+                  <>
+                    {nextLabel}
+                    <Icon.arrow className="w-4 h-4" />
+                  </>
+                )}
+              </button>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="დახურვა" className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors shrink-0">
-            <Icon.x className="w-5 h-5" />
-          </button>
-        </header>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto">
+        </div>
+      ) : undefined}
+    >
+        {/* Body — full-bleed inside Sheet's padded scroll area */}
+        <div className="-mx-5 sm:-mx-6 -my-4">
           {submitted ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-7 py-14">
               <div className="relative w-20 h-20 rounded-full bg-success-100 inline-flex items-center justify-center text-success-700 mb-6 motion-safe:animate-scale-in">
@@ -2238,77 +2248,7 @@ const BookingModal = ({
             <Step3Payment value={payment} onChange={setPayment} summary={summary} />
           )}
         </div>
-
-        {/* Footer */}
-        {!submitted && (
-          <footer className="px-4 sm:px-7 py-4 sm:py-5 border-t border-ink-200 bg-ink-50/60 flex flex-col gap-3">
-            {submitError && (
-              <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12.5px] font-medium">
-                {submitUnverified ? (
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span>დაჯავშნამდე დაადასტურე ელფოსტა</span>
-                    <span>·</span>
-                    <a href="/settings" className="underline font-semibold hover:text-danger-900">ბმული ვერიფიკაციაზე</a>
-                    <button
-                      type="button"
-                      onClick={resendVerify}
-                      disabled={resendingVerify}
-                      className="ml-auto h-7 px-2 rounded-btn bg-white border border-danger-200 hover:border-danger-300 disabled:opacity-50 text-danger-700 font-display font-semibold text-[11.5px] transition-colors"
-                    >
-                      {resendingVerify ? 'იგზავნება…' : 'კოდის ხელახლა გაგზავნა'}
-                    </button>
-                    {resendMsg && <div className="w-full text-[11.5px] text-danger-700 mt-0.5">{resendMsg}</div>}
-                  </div>
-                ) : submitError}
-              </div>
-            )}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-              <div className="text-[13px]">
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500">არჩეული</div>
-                <div className="font-display font-bold text-ink-900 mt-0.5">
-                  {selectedStart
-                    ? <>{service ? `${service.title} · ` : ''}{dayLabelFull} · {fmtHM(selectedStart)} · <span className="tabular-nums">{duration}</span> წუთი · <span className="tabular-nums">{price}</span></>
-                    : service
-                      ? <>{service.title} · <span className="font-medium text-ink-500">აირჩიე დრო</span></>
-                      : '— აირჩიე დრო'}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {step > 1 ? (
-                  <button type="button" onClick={back} disabled={submitting} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    <Icon.chevL className="w-3.5 h-3.5" />
-                    უკან
-                  </button>
-                ) : (
-                  <button type="button" onClick={onClose} disabled={submitting} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display font-semibold text-[13px] tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    გაუქმება
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={next}
-                  disabled={submitting || (step === 1 && !canAdvanceFromStep1) || (onPaymentStep && !cardValid)}
-                  aria-busy={submitting}
-                  className="h-11 px-5 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
-                >
-                  {submitting ? (
-                    <>
-                      <span aria-hidden className="inline-block w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent motion-safe:animate-spin" />
-                      იგზავნება…
-                    </>
-                  ) : (
-                    <>
-                      {nextLabel}
-                      <Icon.arrow className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </footer>
-        )}
-      </div>
-    </div>
+    </Sheet>
   )
 }
 

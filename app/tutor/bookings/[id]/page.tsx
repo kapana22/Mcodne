@@ -7,6 +7,7 @@ import { StatusPill } from '@/components/StatusPill'
 import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { Sheet } from '@/components/Sheet'
 import { useToast } from '@/components/ToastProvider'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
 import { BookingChat } from '@/components/chat/BookingChat'
@@ -593,25 +594,35 @@ export default function TutorBookingDetailPage() {
       {/* Reschedule proposal modal — tutor picks a new date/time; server
           validates lead time and availability slot before writing the JSONB
           proposal blob. */}
-      {rescheduleOpen && (
-        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <button
-            type="button"
-            aria-label="დახურვა"
-            onClick={() => setRescheduleOpen(false)}
-            className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm"
-          />
-          <div role="dialog" className="relative w-full sm:max-w-[520px] bg-white sm:rounded-card shadow-float overflow-hidden">
-            <div className="px-6 py-4 border-b border-ink-100">
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">გადადება</div>
-              <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight">აირჩიე ახალი დრო</h2>
-              <div className="text-[12px] text-ink-500 mt-1">
+      <Sheet
+        open={rescheduleOpen}
+        onClose={() => setRescheduleOpen(false)}
+        size="md"
+        busy={rescheduleBusy !== null}
+        eyebrow="გადადება"
+        title="აირჩიე ახალი დრო"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setRescheduleOpen(false)}
+              disabled={rescheduleBusy !== null}
+              className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800 disabled:opacity-40"
+            >
+              გაუქმება
+            </button>
+            <Btn variant="primary" size="md" onClick={submitReschedule} disabled={rescheduleBusy !== null}>
+              {rescheduleBusy === 'send' ? 'იგზავნება…' : 'გაგზავნა'}
+            </Btn>
+          </>
+        }
+      >
+            <div className="space-y-4">
+              <div className="text-[12px] text-ink-500">
                 ამჟამინდელი: <span className="font-display font-semibold text-ink-900">
                   {fmtDateTime(booking.startAt, tz)}
                 </span>
               </div>
-            </div>
-            <div className="px-6 py-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">თარიღი</label>
@@ -651,22 +662,7 @@ export default function TutorBookingDetailPage() {
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 bg-ink-50/40 border-t border-ink-100 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setRescheduleOpen(false)}
-                disabled={rescheduleBusy !== null}
-                className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800 disabled:opacity-40"
-              >
-                გაუქმება
-              </button>
-              <Btn variant="primary" size="md" onClick={submitReschedule} disabled={rescheduleBusy !== null}>
-                {rescheduleBusy === 'send' ? 'იგზავნება…' : 'გაგზავნა'}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
+      </Sheet>
 
       <ConfirmModal
         open={confirming !== null}

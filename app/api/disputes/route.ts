@@ -28,8 +28,20 @@ export async function POST(req: Request) {
 
   // A dispute only makes sense once the session has actually happened (or was
   // flagged no-show). Reject disputes on bookings that never occurred —
-  // PREPARING/CONFIRMED/CANCELED — matching the review-eligibility rules.
-  if (booking.status !== 'COMPLETED' && booking.status !== 'NO_SHOW') {
+  // PREPARING/CANCELED — matching the review-eligibility rules.
+  //
+  // EXCEPTION — client-reported expert no-show: only the tutor could flag
+  // no_show before, so a student stood up by an expert had no recourse. A
+  // NO_SHOW dispute is allowed on a still-CONFIRMED/LIVE booking once 15 min
+  // have passed since the scheduled start (grace so nobody files at :01).
+  // The booking status is NOT touched — admins resolve the dispute and can
+  // cancel/refund from the dashboard.
+  const NO_SHOW_GRACE_MS = 15 * 60_000
+  const isClientNoShowReport =
+    parsed.data.reason === 'NO_SHOW' &&
+    (booking.status === 'CONFIRMED' || booking.status === 'LIVE') &&
+    Date.now() > booking.startAt.getTime() + NO_SHOW_GRACE_MS
+  if (booking.status !== 'COMPLETED' && booking.status !== 'NO_SHOW' && !isClientNoShowReport) {
     return NextResponse.json({ ok: false, error: 'NOT_DISPUTABLE' }, { status: 400 })
   }
 

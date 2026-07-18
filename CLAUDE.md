@@ -20,8 +20,8 @@ Georgian expert-consultation marketplace (Next.js 15 + Tailwind + Prisma). UI is
 - **Buttons**: default **h-11**; small **h-9**; large/hero **h-12**. Icon-buttons 40×40 (`w-10 h-10`) or 36×36. Radius `rounded-btn`. Prefer `<Btn>` (components/Btn.tsx) — variants primary/hero/secondary/ghost/danger, default `type="button"`, tactile press built in.
 - **Inputs/selects**: **h-11** standard; hero-search and auth fields may use **h-12** (the deliberate "prominent" tier — nothing between or above). Radius `rounded-field`, textarea `py-3`. Global focus glow exists in globals.css — don't add per-field rings.
 - **Cards**: radius `rounded-card`, border `border-ink-200`, padding `p-5 sm:p-6` (compact lists `p-4`; hero/section cards may use `p-8+`). Elevation: hairline border + `shadow-xs/card`; hover = `.hover-lift` or border warm-up — never shadow bloom.
-- **Chips/pills**: h-6/7/8 `rounded-pill`. Badges: verified = green circle+check; SUPER = warning-50 gold; pedigree = `bg-info-50 text-info-700`.
-- **Icons**: inline 16–18px, standalone 20–24px, one stroke family (1.6–2.2), line-only.
+- **Chips/pills**: h-6/7/8 `rounded-pill`; plus an **h-5 micro-chip tier** for inline badges (SUPER, unread counts, "შეფასება ელოდება"). Badges: verified = green circle+check; SUPER = warning-50 gold; pedigree = `bg-info-50 text-info-700`.
+- **Icons**: inline 16–18px, standalone 20–24px, plus a **12px (`w-3 h-3`) meta/inline-dense tier** for metadata rows and micro-chips (floor: 12px — never `w-2.5`). One stroke family (1.6–2.2), line-only. Single source: `components/Icon.tsx` — never define page-local icon sets.
 
 ## Layout & states
 - Sticky rails: `position: sticky` works because `html,body` use `overflow-x: clip` (NOT `hidden` — hidden kills sticky site-wide). Don't reintroduce `overflow-x: hidden` on body.

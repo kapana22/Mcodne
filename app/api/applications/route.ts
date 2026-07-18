@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { extractYouTubeId, canonicalYouTubeUrl } from '@/lib/youtube'
+import { notifyMany } from '@/lib/notify'
 
 const Body = z.object({
   fullName: z.string().min(2),
@@ -75,5 +76,20 @@ export async function POST(req: Request) {
     create: { ...data, userId: user.id, status: 'SUBMITTED' },
     update: { ...data, status: 'SUBMITTED' },
   })
+
+  // Ping every admin's bell — a submission (or re-submission after rejection)
+  // enters the moderation queue and previously sat there silently until an
+  // admin happened to open the dashboard. APPLICATION_NEW is deliberately not
+  // pref-gated (admin ops signal, like the GENERIC dispute pings).
+  try {
+    const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } })
+    await notifyMany(admins.map(a => a.id), {
+      type: 'APPLICATION_NEW',
+      title: 'ახალი განაცხადი',
+      body: `${parsed.data.fullName} · ${parsed.data.specialty}`,
+      href: '/admin#moderation',
+    })
+  } catch { /* notification is a side-effect — never fail the submit */ }
+
   return NextResponse.json({ ok: true, id: app.id })
 }

@@ -65,7 +65,10 @@ export function BottomNav({ role }: { role: Role | null }) {
   //    hides the tabs behind an action bar.
   const isFocusedScreen =
     /^\/(?:student|tutor)\/messages\/[^/]+$/.test(path) ||
-    /^\/student\/bookings\/[^/]+$/.test(path)
+    /^\/student\/bookings\/[^/]+$/.test(path) ||
+    // Expert profile: the fixed MobileBookingBar is the bottom surface for
+    // signed-in students — two stacked bottom layers just hide the tabs.
+    /^\/tutors\/[^/]+$/.test(path)
   const show = tabs.length > 0 && !isFocusedScreen
 
   // Signal to globals.css that the bar is present so pages can reserve

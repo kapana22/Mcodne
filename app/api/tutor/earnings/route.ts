@@ -2,15 +2,45 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
 import { TUTOR_PAYOUT_PCT } from '@/lib/flags'
+import { fmtKaDateTime } from '@/lib/kaDate'
 
 // Single source of truth for the tutor's cut — derived from the canonical
 // commission percentage in lib/flags.ts (was a hardcoded 0.85 that could drift).
 const TUTOR_SHARE = TUTOR_PAYOUT_PCT / 100
 
-export async function GET() {
+// ── CSV export (?format=csv) helpers — server-side twin of the admin
+// dashboard's client-side Blob helper (app/admin/page.tsx): RFC 4180 quoting
+// + UTF-8 BOM so Excel opens Georgian text correctly. Reimplemented here
+// because the admin helper lives in a 'use client' file.
+const escapeCsv = (v: unknown): string => {
+  if (v == null) return ''
+  const s = String(v)
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  return s
+}
+const csvResponse = (filename: string, rows: (string | number | null | undefined)[][]) => {
+  const csv = rows.map(r => r.map(escapeCsv).join(',')).join('\r\n')
+  return new NextResponse('\uFEFF' + csv, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'no-store',
+    },
+  })
+}
+const CSV_HEADER = ['თარიღი', 'თემა', 'კლიენტი', 'ხანგრძლივობა (წთ)', 'თანხა (₾)', 'ჩემი წილი (₾)', 'გადარიცხვა', 'ჯავშნის ID']
+const PAYOUT_KA: Record<string, string> = {
+  PENDING: 'მოლოდინში',
+  RELEASED: 'გადარიცხულია',
+  REFUNDED: 'დაბრუნებულია',
+}
+
+export async function GET(req: Request) {
   const user = await requireRole(['TUTOR', 'ADMIN'])
+  const wantsCsv = new URL(req.url).searchParams.get('format') === 'csv'
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
   if (!profile) {
+    if (wantsCsv) return csvResponse('mcodne-earnings.csv', [CSV_HEADER])
     return NextResponse.json({
       totalEarned: 0,
       pendingPayout: 0,
@@ -18,6 +48,31 @@ export async function GET() {
       thisMonth: { earned: 0, count: 0 },
       transactions: [],
     })
+  }
+
+  // Full export — ALL completed sessions (the JSON path's transactions list is
+  // capped at the recent 50 for display; an accounting export must not be).
+  if (wantsCsv) {
+    const all = await prisma.booking.findMany({
+      where: { tutorId: profile.id, status: 'COMPLETED' },
+      orderBy: { startAt: 'desc' },
+      take: 5000,
+      include: { student: { select: { fullName: true } } },
+    })
+    const filename = `mcodne-earnings-${new Date().toISOString().slice(0, 10)}.csv`
+    return csvResponse(filename, [
+      CSV_HEADER,
+      ...all.map(b => [
+        fmtKaDateTime(b.startAt, { year: true }),
+        b.topic,
+        b.student.fullName,
+        b.durationMin,
+        b.price,
+        Math.round(b.price * TUTOR_SHARE),
+        PAYOUT_KA[b.payoutStatus] ?? b.payoutStatus,
+        b.ref.slice(0, 8),
+      ]),
+    ])
   }
 
   // Month boundary in Tbilisi wall-clock (fixed UTC+4, no DST) — same manual

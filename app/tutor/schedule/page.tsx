@@ -5,6 +5,7 @@ import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
 import { Skeleton } from '@/components/Skeleton'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { Sheet } from '@/components/Sheet'
 import { useToast } from '@/components/ToastProvider'
 import { PageHeader } from '@/components/tutor/PageHeader'
 
@@ -704,21 +705,22 @@ export default function TutorSchedulePage() {
           </>
         )}
 
-      {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-ink-950/40 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => { setModalOpen(false); setModalErr(null) }}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full sm:max-w-md rounded-t-card sm:rounded-card bg-white shadow-float p-5 sm:p-6 pb-[max(20px,env(safe-area-inset-bottom))] sm:pb-6 max-h-[85vh] overflow-y-auto motion-safe:animate-scale-in" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-[18px] font-bold text-ink-900">ხელმისაწვდომობის სლოტი</h2>
-              <button type="button" aria-label="დახურვა" onClick={() => { setModalOpen(false); setModalErr(null) }} className="w-8 h-8 rounded-btn text-ink-500 hover:bg-ink-100 inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
-                <Icon.close className="w-4 h-4" />
-              </button>
-            </div>
-            <form onSubmit={submitSlot} className="space-y-4">
+      <Sheet
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setModalErr(null) }}
+        size="sm"
+        busy={saving}
+        title="ხელმისაწვდომობის სლოტი"
+        footer={
+          <>
+            <Btn variant="ghost" size="md" type="button" onClick={() => { setModalOpen(false); setModalErr(null) }}>გაუქმება</Btn>
+            <Btn variant="primary" size="md" type="submit" form="add-slot-form" disabled={saving}>
+              {saving ? 'ინახება…' : 'დამატება'}
+            </Btn>
+          </>
+        }
+      >
+            <form id="add-slot-form" onSubmit={submitSlot} className="space-y-4">
               <div>
                 <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1.5">დაწყება</label>
                 <input type="datetime-local" required value={form.startAt}
@@ -736,35 +738,28 @@ export default function TutorSchedulePage() {
                   {modalErr}
                 </div>
               )}
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <Btn variant="ghost" size="md" type="button" onClick={() => { setModalOpen(false); setModalErr(null) }}>გაუქმება</Btn>
-                <Btn variant="primary" size="md" type="submit" disabled={saving}>
-                  {saving ? 'ინახება…' : 'დამატება'}
-                </Btn>
-              </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Sheet>
 
-      {tplOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-ink-950/40 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => { setTplOpen(false); setTplErr(null); setTplMsg(null) }}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full sm:max-w-lg rounded-t-card sm:rounded-card bg-white shadow-float p-5 sm:p-6 pb-[max(20px,env(safe-area-inset-bottom))] sm:pb-6 max-h-[85vh] overflow-y-auto motion-safe:animate-scale-in" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-[18px] font-bold text-ink-900">ყოველკვირეული განრიგი</h2>
-              <button type="button" aria-label="დახურვა" onClick={() => { setTplOpen(false); setTplErr(null); setTplMsg(null) }} className="w-8 h-8 rounded-btn text-ink-500 hover:bg-ink-100 inline-flex items-center justify-center">
-                <Icon.close className="w-4 h-4" />
-              </button>
-            </div>
+      <Sheet
+        open={tplOpen}
+        onClose={() => { setTplOpen(false); setTplErr(null); setTplMsg(null) }}
+        size="md"
+        busy={tplSaving}
+        title="ყოველკვირეული განრიგი"
+        footer={
+          <>
+            <Btn variant="ghost" size="md" type="button" onClick={() => { setTplOpen(false); setTplErr(null); setTplMsg(null) }}>გაუქმება</Btn>
+            <Btn variant="primary" size="md" type="submit" form="weekly-template-form" disabled={tplSaving}>
+              {tplSaving ? 'იქმნება…' : 'შექმნა'}
+            </Btn>
+          </>
+        }
+      >
             <p className="text-[12.5px] text-ink-500 mb-4 leading-snug">
               მონიშნე დღეები და საათი — ეს ტემპლეიტი გამრავლდება მოცემული კვირების რაოდენობაზე. უკვე არსებული ან გადამფარავი სლოტები გამოტოვდება.
             </p>
-            <form onSubmit={submitTemplate} className="space-y-5">
+            <form id="weekly-template-form" onSubmit={submitTemplate} className="space-y-5">
               <div>
                 <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-2">დღეები</label>
                 <div className="grid grid-cols-7 gap-1.5">
@@ -843,33 +838,26 @@ export default function TutorSchedulePage() {
                   {tplMsg}
                 </div>
               )}
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <Btn variant="ghost" size="md" type="button" onClick={() => { setTplOpen(false); setTplErr(null); setTplMsg(null) }}>გაუქმება</Btn>
-                <Btn variant="primary" size="md" type="submit" disabled={tplSaving}>
-                  {tplSaving ? 'იქმნება…' : 'შექმნა'}
-                </Btn>
-              </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Sheet>
 
-      {blockOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-ink-950/40 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => { setBlockOpen(false); setBlockErr(null) }}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full sm:max-w-md rounded-t-card sm:rounded-card bg-white shadow-float p-5 sm:p-6 pb-[max(20px,env(safe-area-inset-bottom))] sm:pb-6 max-h-[85vh] overflow-y-auto motion-safe:animate-scale-in" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-[18px] font-bold text-ink-900">შვებულების პერიოდი</h2>
-              <button type="button" aria-label="დახურვა" onClick={() => { setBlockOpen(false); setBlockErr(null) }} className="w-8 h-8 rounded-btn text-ink-500 hover:bg-ink-100 inline-flex items-center justify-center">
-                <Icon.close className="w-4 h-4" />
-              </button>
-            </div>
+      <Sheet
+        open={blockOpen}
+        onClose={() => { setBlockOpen(false); setBlockErr(null) }}
+        size="sm"
+        busy={blocking}
+        title="შვებულების პერიოდი"
+        footer={
+          <>
+            <Btn variant="ghost" size="md" type="button" onClick={() => { setBlockOpen(false); setBlockErr(null) }}>გაუქმება</Btn>
+            <Btn variant="primary" size="md" type="submit" form="block-off-form" disabled={blocking}>
+              {blocking ? 'იშლება…' : 'დაბლოკვა'}
+            </Btn>
+          </>
+        }
+      >
             <p className="text-[12.5px] text-ink-500 mb-4 leading-snug">ამ პერიოდში არსებული ყველა <span className="font-display font-semibold text-ink-700">თავისუფალი</span> სლოტი წაიშლება. უკვე დაჯავშნილი სესიები არ დაზარალდება.</p>
-            <form onSubmit={submitBlockOff} className="space-y-4">
+            <form id="block-off-form" onSubmit={submitBlockOff} className="space-y-4">
               <div>
                 <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1.5">დაწყება</label>
                 <input type="date" required value={blockForm.from} min={new Date().toISOString().slice(0, 10)}
@@ -887,16 +875,8 @@ export default function TutorSchedulePage() {
                   {blockErr}
                 </div>
               )}
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <Btn variant="ghost" size="md" type="button" onClick={() => { setBlockOpen(false); setBlockErr(null) }}>გაუქმება</Btn>
-                <Btn variant="primary" size="md" type="submit" disabled={blocking}>
-                  {blocking ? 'იშლება…' : 'დაბლოკვა'}
-                </Btn>
-              </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Sheet>
 
       <ConfirmModal
         open={!!confirmDeleteId}

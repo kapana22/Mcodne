@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { PublicTopBar } from '@/components/PublicTopBar'
 import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
 import { SignInPromptBanner } from '@/components/SignInPromptBanner'
+import { Sheet } from '@/components/Sheet'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { userTimezone, TBILISI } from '@/lib/tz'
 
@@ -280,31 +281,31 @@ const FiltersPanel = ({ filters, setFilters, total, onReset, variant = 'sidebar'
   const isDrawer = variant === 'drawer'
 
   return (
-    <aside className={isDrawer ? 'h-full flex flex-col' : 'hidden lg:block lg:sticky lg:top-[80px]'}>
-      <div className={isDrawer ? 'flex-1 flex flex-col overflow-hidden' : 'bg-white rounded-card border border-ink-200'}>
-        <div className="px-5 py-4 border-b border-ink-100 flex items-center justify-between shrink-0">
-          <div className="inline-flex items-center gap-2">
-            <Icon.sliders className="w-4 h-4 text-ink-700" />
-            <span className="font-display text-[13px] font-bold text-ink-900 tracking-tight">ფილტრები</span>
-            {active > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill bg-brand-500 text-white text-[10.5px] font-display font-bold tabular-nums">
-                {active}
-              </span>
-            )}
+    // Drawer mode renders bare filter sections — the Sheet wrapper at the
+    // usage site supplies the pinned header (title + count) and footer
+    // (reset/apply), plus scroll/trap/Escape.
+    <aside className={isDrawer ? '' : 'hidden lg:block lg:sticky lg:top-[80px]'}>
+      <div className={isDrawer ? '' : 'bg-white rounded-card border border-ink-200'}>
+        {!isDrawer && (
+          <div className="px-5 py-4 border-b border-ink-100 flex items-center justify-between shrink-0">
+            <div className="inline-flex items-center gap-2">
+              <Icon.sliders className="w-4 h-4 text-ink-700" />
+              <span className="font-display text-[13px] font-bold text-ink-900 tracking-tight">ფილტრები</span>
+              {active > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill bg-brand-500 text-white text-[10.5px] font-display font-bold tabular-nums">
+                  {active}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              {active > 0 && (
+                <button type="button" onClick={onReset} className="font-display text-[11.5px] font-semibold text-ink-500 hover:text-ink-900 transition-colors">გასუფთავება</button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            {active > 0 && (
-              <button type="button" onClick={onReset} className="font-display text-[11.5px] font-semibold text-ink-500 hover:text-ink-900 transition-colors">გასუფთავება</button>
-            )}
-            {isDrawer && onClose && (
-              <button type="button" onClick={onClose} aria-label="დახურვა" className="w-9 h-9 rounded-btn text-ink-500 hover:bg-ink-100 inline-flex items-center justify-center transition-colors">
-                <Icon.x className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
+        )}
 
-        <div className={`px-5 ${isDrawer ? 'flex-1 overflow-y-auto' : ''}`}>
+        <div className={isDrawer ? '' : 'px-5'}>
           {/* Prominent Super-expert switch */}
           <label className="flex items-start gap-3 cursor-pointer select-none py-4 border-b border-ink-100">
             <button
@@ -425,35 +426,8 @@ const FiltersPanel = ({ filters, setFilters, total, onReset, variant = 'sidebar'
 
         </div>
 
-        {isDrawer && (
-          <div className="px-5 py-4 border-t border-ink-100 bg-ink-50/60 shrink-0">
-            <button type="button" onClick={onClose} className="w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
-              ნახე {total} შედეგი
-              <Icon.arrow className="w-4 h-4" />
-            </button>
-          </div>
-        )}
       </div>
     </aside>
-  )
-}
-
-/* ───── Mobile filters drawer wrapper ───── */
-const FiltersDrawer = ({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) => {
-  if (!open) return null
-  return (
-    <div className="lg:hidden fixed inset-0 z-[60] flex">
-      <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm motion-safe:animate-fade-in-fast" />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="ფილტრები"
-        className="relative ml-auto w-full max-w-[380px] bg-white shadow-float flex flex-col"
-        style={{ animation: 'slideInR 280ms cubic-bezier(0.16, 1, 0.3, 1) both', animationDirection: 'reverse' }}
-      >
-        {children}
-      </div>
-    </div>
   )
 }
 
@@ -980,11 +954,7 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
   // link on the success step (bookingRef is only the display short-code).
   const [bookingId, setBookingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  // Escape / focus trap / scroll-lock come from the Sheet container.
 
   // Fetch this tutor's real availability + busy bookings on open.
   useEffect(() => {
@@ -1177,18 +1147,19 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
   const back = () => setStep(s => (s > 1 ? (s - 1) as BookStep : s))
 
   return (
-    // Right-side sheet on desktop, bottom sheet on mobile. Previously the
-    // booking modal opened dead-center over the tutor list, which felt abrupt
-    // and hid the card the user just clicked. Anchoring to an edge keeps the
-    // context visible (you can still see the /tutors grid on the left) and
-    // reads as a follow-up panel, not a takeover.
-    <div className="fixed inset-0 z-50 flex items-end sm:items-stretch justify-center sm:justify-end">
-      <button type="button" onClick={onClose} aria-label="დახურვა" className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm motion-safe:animate-fade-in-fast" />
-
-      <div role="dialog" aria-modal="true" aria-label={`${tutor.name} — სწრაფი დაჯავშნა`} className="relative w-full sm:max-w-[880px] max-h-[calc(100vh-24px)] sm:max-h-none sm:h-full rounded-t-card sm:rounded-none sm:rounded-l-card bg-white shadow-float overflow-hidden flex flex-col motion-safe:animate-slide-in-b sm:motion-safe:animate-slide-in-r">
-
-        {/* Header */}
-        <header className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-ink-200 flex items-center justify-between gap-4">
+    // Right-side sheet on desktop, bottom sheet on mobile — the shared Sheet
+    // container (focus trap, Escape, scroll-lock, safe-area footer). Anchoring
+    // to an edge keeps the /tutors grid visible on the left, so it reads as a
+    // follow-up panel, not a takeover.
+    <Sheet
+      open
+      onClose={onClose}
+      variant="side"
+      size="lg"
+      busy={submitting}
+      ariaLabel={`${tutor.name} — სწრაფი დაჯავშნა`}
+      title={
+        <div className="font-sans font-normal tracking-normal flex items-center gap-4 min-w-0">
           <div className="flex items-center gap-3 min-w-0">
             <img src={tutor.avatarUrl || initialsAvatarSvg(tutor.name)} alt={tutor.name} className="w-9 h-9 rounded-full object-cover ring-1 ring-ink-200" />
             <div className="min-w-0">
@@ -1200,7 +1171,7 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-3 shrink-0">
             <StepDot n={1} l="დრო"        step={step} />
             <span className="w-5 h-px bg-ink-200" />
             <StepDot n={2} l="დეტალები"   step={step} />
@@ -1211,14 +1182,64 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
               </>
             )}
           </div>
-
-          <button type="button" onClick={onClose} aria-label="დახურვა" className="w-9 h-9 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors shrink-0">
-            <Icon.x className="w-4 h-4" />
-          </button>
-        </header>
-
-        {/* Body */}
-        <div className="grid lg:grid-cols-[330px_1fr] flex-1 min-h-0">
+        </div>
+      }
+      footer={step !== 4 ? (
+        <div className="w-full flex flex-col gap-2">
+          {bookingError && (
+            <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12.5px] font-medium">
+              {bookingUnverified ? (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>დაჯავშნამდე დაადასტურე ელფოსტა</span>
+                  <span>·</span>
+                  <a href="/settings" className="underline font-semibold hover:text-danger-900">ბმული ვერიფიკაციაზე</a>
+                  <button
+                    type="button"
+                    onClick={resendVerify}
+                    disabled={resendingVerify}
+                    className="ml-auto h-7 px-2 rounded-btn bg-white border border-danger-200 hover:border-danger-300 disabled:opacity-50 text-danger-700 font-display font-semibold text-[11.5px] transition-colors"
+                  >
+                    {resendingVerify ? 'იგზავნება…' : 'კოდის ხელახლა გაგზავნა'}
+                  </button>
+                  {resendMsg && <div className="w-full text-[11.5px] text-danger-700 mt-0.5">{resendMsg}</div>}
+                </div>
+              ) : bookingError}
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[12px] min-w-0">
+              <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">არჩეული</div>
+              <div className="font-display font-bold text-ink-900 tabular-nums truncate">
+                {day ? `${day.dow}. ${day.dateNum} ${day.monthShort}` : '—'} · {time || '—'} · {duration} წთ · {priceL}
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {step > 1 ? (
+                <button type="button" onClick={back} disabled={submitting} className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors">
+                  <Icon.chevL className="w-3.5 h-3.5" /> უკან
+                </button>
+              ) : (
+                <button type="button" onClick={onClose} className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] transition-colors">გაუქმება</button>
+              )}
+              <button
+                type="button"
+                onClick={next}
+                disabled={submitting || (step === 1 && (!time || !day))}
+                className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-300 text-white font-display font-semibold text-[13px] inline-flex items-center gap-2 transition-colors"
+              >
+                {submitting
+                  ? 'იგზავნება…'
+                  : (step === 1 ? 'შემდეგი — დეტალები' : step === lastInputStep ? `დაჯავშნა · ${priceL}` : 'შემდეგი — გადახდა')
+                }
+                <Icon.arrow className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : undefined}
+    >
+        {/* Body — full-bleed inside Sheet's padded scroll area */}
+        <div className="grid lg:grid-cols-[330px_1fr] -mx-5 sm:-mx-6 -my-4">
           {/* LEFT: tutor card + sticky summary */}
           <aside className="border-b lg:border-b-0 lg:border-r border-ink-200 bg-ink-50/50 flex flex-col">
             {/* Video preview — real YouTube iframe if the tutor has one, else
@@ -1518,64 +1539,9 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
               )}
             </div>
 
-            {/* Footer (steps 1-3) */}
-            {step !== 4 && (
-              <footer className="px-4 sm:px-6 py-3.5 sm:py-4 border-t border-ink-200 bg-ink-50/60 flex flex-col gap-2">
-                {bookingError && (
-                  <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12.5px] font-medium">
-                    {bookingUnverified ? (
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span>დაჯავშნამდე დაადასტურე ელფოსტა</span>
-                        <span>·</span>
-                        <a href="/settings" className="underline font-semibold hover:text-danger-900">ბმული ვერიფიკაციაზე</a>
-                        <button
-                          type="button"
-                          onClick={resendVerify}
-                          disabled={resendingVerify}
-                          className="ml-auto h-7 px-2 rounded-btn bg-white border border-danger-200 hover:border-danger-300 disabled:opacity-50 text-danger-700 font-display font-semibold text-[11.5px] transition-colors"
-                        >
-                          {resendingVerify ? 'იგზავნება…' : 'კოდის ხელახლა გაგზავნა'}
-                        </button>
-                        {resendMsg && <div className="w-full text-[11.5px] text-danger-700 mt-0.5">{resendMsg}</div>}
-                      </div>
-                    ) : bookingError}
-                  </div>
-                )}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[12px] min-w-0">
-                    <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">არჩეული</div>
-                    <div className="font-display font-bold text-ink-900 tabular-nums truncate">
-                      {day ? `${day.dow}. ${day.dateNum} ${day.monthShort}` : '—'} · {time || '—'} · {duration} წთ · {priceL}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {step > 1 ? (
-                      <button type="button" onClick={back} disabled={submitting} className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors">
-                        <Icon.chevL className="w-3.5 h-3.5" /> უკან
-                      </button>
-                    ) : (
-                      <button type="button" onClick={onClose} className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] transition-colors">გაუქმება</button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={next}
-                      disabled={submitting || (step === 1 && (!time || !day))}
-                      className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-300 text-white font-display font-semibold text-[13px] inline-flex items-center gap-2 transition-colors"
-                    >
-                      {submitting
-                        ? 'იგზავნება…'
-                        : (step === 1 ? 'შემდეგი — დეტალები' : step === lastInputStep ? `დაჯავშნა · ${priceL}` : 'შემდეგი — გადახდა')
-                      }
-                      <Icon.arrow className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </footer>
-            )}
           </div>
         </div>
-      </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -1784,11 +1750,7 @@ const Footer = () => (
 /* ───── Page ───── */
 /* ───── Quick-Compare modal ───── */
 const CompareModal = ({ open, tutors, onClose, onBook }: { open: boolean; tutors: Tutor[]; onClose: () => void; onBook: (t: Tutor) => void }) => {
-  useEffect(() => {
-    if (!open) return
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
-  }, [open, onClose])
+  // Escape / focus trap / scroll-lock come from the Sheet container.
   if (!open || tutors.length === 0) return null
 
   // Compute "best" per row for highlighting
@@ -1807,19 +1769,16 @@ const CompareModal = ({ open, tutors, onClose, onBook }: { open: boolean; tutors
   )
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-      <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-accent-900/55 backdrop-blur-sm" />
-      <div role="dialog" aria-modal="true" aria-label="ექსპერტების შედარება" className="relative w-full max-w-[1040px] max-h-[780px] bg-white rounded-card shadow-float overflow-hidden flex flex-col motion-safe:animate-scale-in">
-        <div className="px-6 py-4 border-b border-ink-100 flex items-center justify-between gap-4 shrink-0">
-          <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">სწრაფი შედარება</div>
-            <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight">ექსპერტი გვერდიგვერდ — {tutors.length} ვარიანტი</h2>
-          </div>
-          <button type="button" onClick={onClose} aria-label="დახურვა" className="w-10 h-10 rounded-btn text-ink-500 hover:bg-ink-100 inline-flex items-center justify-center transition-colors">
-            <Icon.x className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-auto">
+    <Sheet
+      open={open}
+      onClose={onClose}
+      size="lg"
+      ariaLabel="ექსპერტების შედარება"
+      eyebrow="სწრაფი შედარება"
+      title={`ექსპერტი გვერდიგვერდ — ${tutors.length} ვარიანტი`}
+    >
+        {/* Full-bleed, sideways-scrollable compare table inside the sheet body */}
+        <div className="overflow-x-auto -mx-5 sm:-mx-6 -my-4">
           <div className="grid" style={{ gridTemplateColumns: `repeat(${tutors.length}, minmax(220px, 1fr))` }}>
             {tutors.map(t => (
               <div key={t.id} className="border-r border-ink-100 last:border-r-0">
@@ -1844,8 +1803,7 @@ const CompareModal = ({ open, tutors, onClose, onBook }: { open: boolean; tutors
             ))}
           </div>
         </div>
-      </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -2267,8 +2225,36 @@ function Tutors() {
       {/* Quick-Compare modal — top 3 side-by-side */}
       <CompareModal open={compareOpen} tutors={visibleTutors.slice(0, 3)} onClose={() => setCompareOpen(false)} onBook={openBook} />
 
-      {/* Mobile filters drawer */}
-      <FiltersDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)}>
+      {/* Filters drawer — right-side sheet (bottom sheet on mobile) */}
+      <Sheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        variant="side"
+        size="sm"
+        ariaLabel="ფილტრები"
+        title={
+          <span className="inline-flex items-center gap-2">
+            <Icon.sliders className="w-4 h-4 text-ink-700" />
+            ფილტრები
+            {activeFilters.length > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill bg-brand-500 text-white text-[10.5px] font-display font-bold tabular-nums">
+                {activeFilters.length}
+              </span>
+            )}
+          </span>
+        }
+        footer={
+          <>
+            {activeFilters.length > 0 && (
+              <button type="button" onClick={resetFilters} className="mr-auto font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-900 transition-colors">გასუფთავება</button>
+            )}
+            <button type="button" onClick={() => setFiltersOpen(false)} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
+              ნახე {total} შედეგი
+              <Icon.arrow className="w-4 h-4" />
+            </button>
+          </>
+        }
+      >
         <FiltersPanel
           filters={filters}
           setFilters={setFilters}
@@ -2277,7 +2263,7 @@ function Tutors() {
           variant="drawer"
           onClose={() => setFiltersOpen(false)}
         />
-      </FiltersDrawer>
+      </Sheet>
     </div>
   )
 }

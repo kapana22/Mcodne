@@ -13,6 +13,7 @@ import { PAYMENTS_LIVE, CANCEL_CUTOFF_HOURS } from '@/lib/flags'
 import { isBookingLive } from '@/lib/bookingLive'
 import { StudentAppBar } from '@/components/StudentAppBar'
 import { WorkspaceFooter } from '@/components/WorkspaceFooter'
+import { Sheet } from '@/components/Sheet'
 
 /* ───── Minimal icon set ───── */
 const Icon = {
@@ -685,12 +686,11 @@ const RescheduleModal = ({ open, onClose, onSent, booking }: { open: boolean; on
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  // Escape/scroll-lock/focus now come from Sheet — only reset form state on open.
   useEffect(() => {
     if (!open) return
     setSending(false); setErr(null); setNote('')
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
-  }, [open, onClose])
+  }, [open])
 
   const send = async () => {
     if (sending) return
@@ -720,23 +720,25 @@ const RescheduleModal = ({ open, onClose, onSent, booking }: { open: boolean; on
     finally { setSending(false) }
   }
 
-  if (!open) return null
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm" />
-      <div role="dialog" className="relative w-full sm:max-w-[520px] bg-white rounded-t-card sm:rounded-card shadow-float overflow-hidden motion-safe:animate-slide-in-b sm:motion-safe:animate-scale-in safe-area-bottom">
-        <div className="px-6 py-4 border-b border-ink-100 flex items-start justify-between gap-4">
-          <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">გადადება — უფასოდ {CANCEL_CUTOFF_HOURS}სთ-მდე</div>
-            <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight">აირჩიე ახალი დრო</h2>
-            <div className="text-[12px] text-ink-500 mt-1">ამჟამინდელი: <span className="font-display font-semibold text-ink-900">{fmtDate(new Date(booking.startAt))} · {fmtTime(new Date(booking.startAt))} · {booking.tutor.user.fullName}</span></div>
-          </div>
-          <button type="button" onClick={onClose} aria-label="დახურვა" className="w-9 h-9 rounded-btn text-ink-500 hover:bg-ink-100 inline-flex items-center justify-center shrink-0">
-            <Icon.x className="w-4 h-4" />
+    <Sheet
+      open={open}
+      onClose={onClose}
+      size="md"
+      busy={sending}
+      eyebrow={`გადადება — უფასოდ ${CANCEL_CUTOFF_HOURS}სთ-მდე`}
+      title="აირჩიე ახალი დრო"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800">გაუქმება</button>
+          <button type="button" onClick={send} disabled={sending} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 disabled:opacity-60">
+            {sending ? 'იგზავნება…' : <>მოთხოვნის გაგზავნა <Icon.arrow className="w-3.5 h-3.5" /></>}
           </button>
-        </div>
-
-        <div className="px-6 py-5 space-y-4">
+        </>
+      }
+    >
+      <div className="space-y-4">
+          <div className="text-[12px] text-ink-500">ამჟამინდელი: <span className="font-display font-semibold text-ink-900">{fmtDate(new Date(booking.startAt))} · {fmtTime(new Date(booking.startAt))} · {booking.tutor.user.fullName}</span></div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">თარიღი</label>
@@ -756,16 +758,8 @@ const RescheduleModal = ({ open, onClose, onSent, booking }: { open: boolean; on
           </div>
           <p className="text-[11.5px] text-ink-500 leading-snug">მოთხოვნა გაიგზავნება ჩატში. ექსპერტის დადასტურების შემდეგ დრო შეიცვლება.</p>
           {err && <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12px] font-medium">{err}</div>}
-        </div>
-
-        <div className="px-6 py-4 bg-ink-50/40 border-t border-ink-100 flex items-center justify-end gap-3">
-          <button type="button" onClick={onClose} className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800">გაუქმება</button>
-          <button type="button" onClick={send} disabled={sending} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 disabled:opacity-60">
-            {sending ? 'იგზავნება…' : <>მოთხოვნის გაგზავნა <Icon.arrow className="w-3.5 h-3.5" /></>}
-          </button>
-        </div>
       </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -777,14 +771,12 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  // Escape/scroll-lock/focus now come from Sheet — only reset form state on open.
   useEffect(() => {
     if (!open) return
     setReason(null); setStory(''); setSending(false); setErr(null)
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
-  }, [open, onClose])
+  }, [open])
 
-  if (!open) return null
   const REASONS: { id: DisputeReason; l: string; sub: string }[] = [
     { id: 'no-show',        l: 'ექსპერტი არ მოვიდა',        sub: PAYMENTS_LIVE ? '100% დაბრუნება' : 'პრიორიტეტული განხილვა' },
     { id: 'quality',        l: 'დაბალი ხარისხი',           sub: 'ცოდნა/მომზადება' },
@@ -827,18 +819,28 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <button type="button" aria-label="დახურვა" onClick={onClose} className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm" />
-      <div role="dialog" className="relative w-full sm:max-w-[560px] bg-white rounded-t-card sm:rounded-card shadow-float overflow-hidden flex flex-col max-h-[85vh] motion-safe:animate-slide-in-b sm:motion-safe:animate-scale-in safe-area-bottom">
-        <div className="px-6 py-4 border-b border-ink-100 flex items-start justify-between gap-4 shrink-0">
-          <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-danger-700 mb-1 inline-flex items-center gap-1.5"><Icon.flag className="w-3 h-3" /> საჩივარი</div>
-            <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight">გვითხარი — რა მოხდა?</h2>
-          </div>
-          <button type="button" onClick={onClose} aria-label="დახურვა" className="w-9 h-9 rounded-btn text-ink-500 hover:bg-ink-100 inline-flex items-center justify-center shrink-0"><Icon.x className="w-4 h-4" /></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+    <Sheet
+      open={open}
+      onClose={onClose}
+      size="md"
+      busy={sending}
+      ariaLabel="საჩივარი"
+      title={
+        <>
+          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-danger-700 mb-1 inline-flex items-center gap-1.5"><Icon.flag className="w-3 h-3" /> საჩივარი</div>
+          <div>გვითხარი — რა მოხდა?</div>
+        </>
+      }
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800">გაუქმება</button>
+          <button type="button" disabled={!reason || sending} onClick={send} className={`h-11 px-4 rounded-btn font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 ${!reason || sending ? 'bg-ink-100 text-ink-400 cursor-not-allowed' : 'bg-danger-500 hover:bg-danger-600 text-white'}`}>
+            <Icon.flag className="w-3.5 h-3.5" /> {sending ? 'იგზავნება…' : 'გააგზავნე'}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-5">
           <div>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">მთავარი მიზეზი</div>
             <div className="grid sm:grid-cols-2 gap-1.5">
@@ -863,16 +865,8 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
           )}
 
           {err && <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12px] font-medium">{err}</div>}
-        </div>
-
-        <div className="px-6 py-4 bg-ink-50/40 border-t border-ink-100 flex items-center justify-end gap-3 shrink-0">
-          <button type="button" onClick={onClose} className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800">გაუქმება</button>
-          <button type="button" disabled={!reason || sending} onClick={send} className={`h-11 px-4 rounded-btn font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 ${!reason || sending ? 'bg-ink-100 text-ink-400 cursor-not-allowed' : 'bg-danger-500 hover:bg-danger-600 text-white'}`}>
-            <Icon.flag className="w-3.5 h-3.5" /> {sending ? 'იგზავნება…' : 'გააგზავნე'}
-          </button>
-        </div>
       </div>
-    </div>
+    </Sheet>
   )
 }
 
