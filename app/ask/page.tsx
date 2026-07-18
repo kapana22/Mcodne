@@ -6,6 +6,7 @@ import { PublicTopBar } from '@/components/PublicTopBar'
 import { Footer as SharedFooter } from '@/components/Footer'
 import { frameQuestion } from '@/lib/askFraming'
 import { fmtKaDate } from '@/lib/kaDate'
+import { fmtRating } from '@/lib/fmt'
 
 const Ic = {
   search: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
@@ -159,7 +160,7 @@ function AskInner() {
                     </div>
                     <div className="text-[12px] text-ink-600 truncate">{e.cat}{e.headline ? ` · ${e.headline}` : ''}</div>
                     <div className="mt-2 flex items-center gap-2.5 text-[11.5px] text-ink-500">
-                      <span className="inline-flex items-center gap-1 text-warning-600"><Ic.star className="w-3 h-3" /><span className="font-display font-bold text-ink-900 tabular-nums">{e.rating.toFixed(1)}</span></span>
+                      <span className="inline-flex items-center gap-1 text-warning-600"><Ic.star className="w-3 h-3" /><span className="font-display font-bold text-ink-900 tabular-nums">{fmtRating(e.rating)}</span></span>
                       <span className="text-ink-300">·</span>
                       <span className="font-display font-bold text-ink-900 tabular-nums">₾{e.price}</span>
                       <span className="text-ink-300">·</span>

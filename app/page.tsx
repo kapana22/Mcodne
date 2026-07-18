@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PAYMENTS_LIVE, COMMISSION_PCT, TUTOR_PAYOUT_PCT } from '@/lib/flags'
+import { fmtRating } from '@/lib/fmt'
 import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
 import { Footer } from '@/components/Footer'
 import { Avatar } from '@/components/Avatar'
@@ -472,7 +473,7 @@ const HomeHero = () => {
                 <div className="px-5 sm:px-6 pb-4 flex items-center gap-3 text-[12px] flex-wrap">
                   <span className="inline-flex items-center gap-1 text-ink-800">
                     <Icon.star className="w-3.5 h-3.5 text-warning-500" />
-                    <span className="font-display font-bold tabular-nums">{featured.rate.toFixed(2)}</span>
+                    <span className="font-display font-bold tabular-nums">{fmtRating(featured.rate)}</span>
                     <span className="text-ink-400 tabular-nums">({featured.reviews})</span>
                   </span>
                   <span className="w-px h-3.5 bg-ink-200" />
@@ -553,7 +554,7 @@ const HomeHero = () => {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="font-display text-[13px] font-semibold text-ink-900 tracking-tight">
-                  {stats ? `${stats.avg.toFixed(1)}★ საშუალო · ${stats.total} ექსპერტი` : 'გადახედე მთელ ბაზას'}
+                  {stats ? `${fmtRating(stats.avg)}★ საშუალო · ${stats.total} ექსპერტი` : 'გადახედე მთელ ბაზას'}
                 </div>
                 <Link href="/tutors" className="mt-0.5 inline-flex items-center gap-1 font-display text-[11.5px] font-semibold text-brand-700 hover:text-brand-800 transition-colors">
                   ყველა ექსპერტი <Icon.arrow className="w-3 h-3" />

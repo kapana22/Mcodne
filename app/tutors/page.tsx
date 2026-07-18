@@ -9,6 +9,7 @@ import { Sheet } from '@/components/Sheet'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { RISK_REVERSAL_LINE } from '@/lib/copy'
 import { userTimezone, TBILISI } from '@/lib/tz'
+import { fmtRating } from '@/lib/fmt'
 
 /* ───── Icons ───── */
 const Icon = {
@@ -62,7 +63,6 @@ const QUICK_CATS: { slug: string; label: string }[] = [
   { slug: 'psychology', label: 'ფსიქოლოგია' },
 ]
 
-type StatsData = { total: number; verifiedCount: number; avgRating: number; totalReviews: number }
 
 // Category identity is unified with the sidebar: both the hero chips and the
 // sidebar checkboxes toggle the SAME `filters.cats` (category NAMES) and are
@@ -115,8 +115,17 @@ const PRICE_OPTS: { min: number; l: string }[] = [
 
 const toggleIn = (arr: string[], v: string) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]
 
-const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, stats }: { filters: Filters; setFilters: (f: Filters) => void; search: string; setSearch: (v: string) => void; onSearch: () => void; stats: StatsData | null }) => {
+const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, loading }: { filters: Filters; setFilters: (f: Filters) => void; search: string; setSearch: (v: string) => void; onSearch: () => void; total: number; loading: boolean }) => {
   const catVal = filters.cats.length === 0 ? 'ყველა სფერო' : filters.cats.length === 1 ? filters.cats[0] : `${filters.cats.length} სფერო`
+  // Live result count as the page heading (DESIGN_FIX_PROMPT 1.9). The label
+  // reflects the active refinement: one category → its name; several → the
+  // count; a text query → the query itself. While loading show a neutral
+  // heading — never a stale or invented number.
+  const headingLabel =
+    filters.cats.length === 1 ? filters.cats[0]
+    : filters.cats.length > 1 ? `${filters.cats.length} სფერო`
+    : search.trim() ? `„${search.trim()}"`
+    : null
   const priceVal = filters.price[0] === 0 ? 'ნებისმიერი' : `₾${filters.price[0]}-დან`
   const langVal = filters.langs.length === 0 ? 'ნებისმიერი ენა' : filters.langs.length === 1 ? filters.langs[0] : `${filters.langs.length} ენა`
   const availVal = filters.available.length === 0 ? 'ნებისმიერ დროს' : filters.available.map(id => FILTER_AVAIL.find(a => a.id === id)?.l ?? id).join(', ')
@@ -129,8 +138,13 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, stats }:
           <span className="font-display font-semibold text-ink-800">ექსპერტების ძიება</span>
         </nav>
 
-        <h1 className="font-display text-[26px] sm:text-[34px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
-          {stats ? `${stats.verifiedCount}+ შემოწმებული ექსპერტი შენი მიზნისთვის` : 'იპოვე შენი ექსპერტი'}
+        {/* aria-live: filter/search changes re-announce the fresh count. */}
+        <h1 aria-live="polite" className="font-display text-[26px] sm:text-[34px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
+          {loading
+            ? 'იპოვე შენი ექსპერტი'
+            : headingLabel
+              ? <><span className="tabular-nums">{total}</span> ექსპერტი · {headingLabel}</>
+              : <><span className="tabular-nums">{total}</span> ექსპერტი შენთვის</>}
         </h1>
         {/* Honest by flag: only claim escrow once the payment gateway is live. */}
         <p className="text-[13.5px] text-ink-500 mt-2">ხელით გადამოწმებული პროფესიონალები · გამჭვირვალე ფასი · {PAYMENTS_LIVE ? 'escrow-დაცული' : 'დაჯავშნა უფასოა'}</p>
@@ -581,7 +595,7 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
           {t.rating > 0 ? (
             <>
               <Icon.star className="w-3 h-3 text-warning-500" />
-              <span className="font-display text-[12px] font-bold text-ink-900 tabular-nums leading-none">{t.rating.toFixed(2)}</span>
+              <span className="font-display text-[12px] font-bold text-ink-900 tabular-nums leading-none">{fmtRating(t.rating)}</span>
               <span className="text-[10px] text-ink-500 tabular-nums">({t.reviews})</span>
             </>
           ) : (
@@ -619,7 +633,8 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
             <Link href={`/tutors/${t.id}`} aria-label={`${t.name} — პროფილი`} className="absolute inset-0 block">
               <img src={photoSrc} alt={t.name} className="absolute inset-0 w-full h-full object-cover" />
             </Link>
-            {t.nextSlotAt && <span className="pointer-events-none absolute top-2 right-2 w-3 h-3 rounded-full bg-success-500 ring-2 ring-white" title="ხელმისაწვდომია" />}
+            {/* The old bare green availability dot moved into the right rail as
+                a worded next-slot line (same fmtNextSlot the mobile card uses). */}
             {t.video && (
               <>
                 <button
@@ -649,25 +664,27 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
               </span>
             )}
           </div>
+          {/* Accomplishment headline reads FIRST (consultation scan pattern);
+              the category label is secondary, muted. */}
           <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-            <span className="font-display text-[12px] font-semibold text-ink-700">{t.cat}</span>
             {t.headline && (
               <>
-                <span className="text-ink-300">·</span>
                 <span className="inline-flex items-center h-[22px] px-2 rounded-pill bg-info-50 text-info-700 font-display text-[11px] font-semibold tracking-tight max-w-full truncate">{t.headline}</span>
+                <span className="text-ink-300">·</span>
               </>
             )}
+            <span className="font-display text-[12px] font-medium text-ink-500">{t.cat}</span>
           </div>
-          {/* Stat trio — Preply's rating · sessions · experience */}
-          <div className="mt-2.5 flex items-center gap-x-4 gap-y-1 text-[11.5px] text-ink-600 flex-wrap">
-            {t.rating > 0 ? (
-              <span className="inline-flex items-center gap-1"><Icon.star className="w-3.5 h-3.5 text-warning-500" /><span className="font-display font-bold text-ink-900 tabular-nums">{t.rating.toFixed(1)}</span><span className="text-ink-400 tabular-nums">({t.reviews})</span></span>
-            ) : (
-              <span className="font-display font-semibold text-ink-500">ახალი ექსპერტი</span>
-            )}
-            <span className="tabular-nums"><span className="font-display font-bold text-ink-900">{t.sessions}</span> სესია</span>
-            {typeof t.responseHours === 'number' && <span className="tabular-nums">პასუხობს <span className="font-display font-bold text-ink-900">{t.responseHours}სთ</span>-ში</span>}
-          </div>
+          {/* Real-data demand proof: ჩატარებული სესია + response promise.
+              Each fragment renders only when the real value exists; rating
+              moved to the price rail (the scan anchor). */}
+          {(t.rating === 0 || t.sessions > 0 || typeof t.responseHours === 'number') && (
+            <div className="mt-2.5 flex items-center gap-x-4 gap-y-1 text-[11.5px] text-ink-600 flex-wrap">
+              {t.rating === 0 && <span className="font-display font-semibold text-ink-500">ახალი ექსპერტი</span>}
+              {t.sessions > 0 && <span className="tabular-nums"><span className="font-display font-bold text-ink-900">{t.sessions}</span> ჩატარებული სესია</span>}
+              {typeof t.responseHours === 'number' && <span className="tabular-nums">პასუხი ~<span className="font-display font-bold text-ink-900">{t.responseHours} სთ</span></span>}
+            </div>
+          )}
           <p className="mt-2.5 text-[13px] text-ink-700 leading-[1.5] line-clamp-2">{t.bio}</p>
           {t.sessions >= 50 && (
             <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-brand-700 font-display font-semibold">
@@ -676,18 +693,35 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
           )}
         </div>
 
-        {/* Right rail — price + dual CTA (Preply signature) */}
+        {/* Right rail — the scan anchor: price LARGE, session length small,
+            rating + review count under it (hidden until real reviews exist),
+            then the next-slot line and the booking CTA. */}
         <div className="flex flex-col justify-between border-l border-ink-100 pl-5">
           <div className="flex items-start justify-between gap-2">
             <div>
               <div className="font-display text-[24px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">₾{priceForDuration(t.price, dur)}</div>
-              <div className="mt-1 text-[11px] text-ink-500">{dur}-წუთიანი სესია</div>
+              <div className="mt-1 text-[11px] text-ink-500">სესია · {dur} წთ</div>
+              {t.rating > 0 && t.reviews > 0 && (
+                <div className="mt-2 inline-flex items-center gap-1 text-[12px]">
+                  <span className="font-display font-bold text-ink-900 tabular-nums">{fmtRating(t.rating)}</span>
+                  <Icon.star className="w-3.5 h-3.5 text-warning-500" />
+                  <span className="text-ink-500 tabular-nums">· {t.reviews} შეფასება</span>
+                </div>
+              )}
             </div>
             <button type="button" onClick={() => onToggleFav(t.id)} aria-label={saved ? 'შენახული' : 'შენახვა'} className={`h-8 w-8 rounded-btn inline-flex items-center justify-center transition-colors shrink-0 ${saved ? 'text-danger-600 bg-danger-50' : 'text-ink-400 hover:text-ink-700 hover:bg-ink-50'}`}>
               {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
             </button>
           </div>
           <div className="mt-3 space-y-2">
+            {/* Same computed next-slot line the mobile card shows — replaces
+                the unexplained green dot the photo used to carry. */}
+            {t.nextSlotAt && (
+              <div className="inline-flex items-center gap-1 text-[11px] text-success-700">
+                <Icon.clock className="w-3 h-3" />
+                უახლოესი <span className="font-display font-semibold">{fmtNextSlot(t.nextSlotAt)}</span>
+              </div>
+            )}
             {bookable ? (
               <button type="button" onClick={() => onBook(t)} className="w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors shadow-xs">
                 {needsSignIn ? 'შესვლა & ჯავშანი' : 'დაჯავშნე'}
@@ -697,9 +731,7 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
                 <Icon.clock className="w-3.5 h-3.5" /> ხელმისაწვდომობა მალე
               </button>
             )}
-            <Link href={`/tutors/${t.id}`} className="w-full h-11 rounded-btn border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors">
-              პროფილი
-            </Link>
+            {/* „პროფილი" button dropped — name and photo already link there. */}
           </div>
         </div>
       </div>
@@ -876,7 +908,7 @@ const VideoPreview = ({ tutor, onClose, onBook }: { tutor: Tutor; onClose: () =>
           <div className="flex items-center gap-2.5 text-[11px] text-white/65 min-w-0 flex-1">
             <span className="inline-flex items-center gap-1">
               <Icon.star className="w-3 h-3 text-warning-400" />
-              <span className="font-display font-bold text-white tabular-nums">{tutor.rating.toFixed(2)}</span>
+              <span className="font-display font-bold text-white tabular-nums">{fmtRating(tutor.rating)}</span>
             </span>
             <span className="text-white/25">·</span>
             <span className="font-display text-[12.5px] font-bold text-white tabular-nums">
@@ -1309,7 +1341,7 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
               </div>
 
               <div className="absolute left-3 right-3 bottom-2.5 flex items-center gap-3 text-[10.5px] text-white/85 font-mono tabular-nums pointer-events-none">
-                <span className="inline-flex items-center gap-1"><Icon.star className="w-2.5 h-2.5 text-warning-400" /><span className="font-display font-bold text-white">{tutor.rating.toFixed(2)}</span></span>
+                <span className="inline-flex items-center gap-1"><Icon.star className="w-2.5 h-2.5 text-warning-400" /><span className="font-display font-bold text-white">{fmtRating(tutor.rating)}</span></span>
                 <span className="text-white/40">·</span>
                 <span><span className="font-display font-semibold text-white">{tutor.sessions}</span> სესია</span>
                 <span className="text-white/40">·</span>
@@ -1593,19 +1625,22 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
    by live-now first (server-side). */
 
 /* ───── Sort + view ───── */
+// Worded sort labels — no ASCII arrows (they read as noise to screen readers
+// and mean nothing in Georgian). The default ('rating', highest first) is the
+// platform's recommendation, so it's named as such.
 const SORT_OPTS = [
-  { id: 'rating',   l: 'რეიტინგი ↓' },
-  { id: 'sessions', l: 'სესიების რაოდენ. ↓' },
-  { id: 'price-a',  l: 'ფასი ↑' },
-  { id: 'price-d',  l: 'ფასი ↓' },
-  { id: 'new',      l: 'ახალი' },
+  { id: 'rating',   l: 'ჩვენი რჩევით' },
+  { id: 'sessions', l: 'სესიებით, კლებადი' },
+  { id: 'price-a',  l: 'ფასით, ზრდადი' },
+  { id: 'price-d',  l: 'ფასით, კლებადი' },
+  { id: 'new',      l: 'ახალი ექსპერტები' },
 ] as const
 
 const SORT_LABEL: Record<string, string> = {
-  rating: 'რეიტინგით',
-  sessions: 'სესიების რაოდენობით',
-  'price-a': 'ფასით ↑',
-  'price-d': 'ფასით ↓',
+  rating: 'ჩვენი რჩევით',
+  sessions: 'სესიებით, კლებადი',
+  'price-a': 'ფასით, ზრდადი',
+  'price-d': 'ფასით, კლებადი',
   new: 'ახლის მიხედვით',
 }
 
@@ -1833,7 +1868,7 @@ const CompareModal = ({ open, tutors, onClose, onBook }: { open: boolean; tutors
                   <div className="text-[11px] text-ink-500 mt-0.5 truncate">{t.cat}</div>
                   {t.superExpert && <span className="inline-flex items-center gap-1 mt-2 px-1.5 h-5 rounded-pill bg-warning-50 border border-warning-200 text-warning-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.spark className="w-2.5 h-2.5" /> Super</span>}
                 </div>
-                <Row label="რეიტინგი" isBest={t.rating === best.rating} value={<span className="inline-flex items-center gap-1"><Icon.star className="w-3.5 h-3.5 text-warning-500" />{t.rating.toFixed(2)} · {t.reviews}</span>} />
+                <Row label="რეიტინგი" isBest={t.rating === best.rating} value={<span className="inline-flex items-center gap-1"><Icon.star className="w-3.5 h-3.5 text-warning-500" />{fmtRating(t.rating)} · {t.reviews}</span>} />
                 <Row label="ჩატარდა სესია" isBest={t.sessions === best.sessions} value={<>{t.sessions.toLocaleString()}</>} />
                 <Row label="ფასი"          isBest={t.price === best.price}      value={<>₾{t.price}</>} />
                 <Row label="ენები"          value={<span className="text-[12px] text-ink-700 font-normal">{t.langs.join(' · ')}</span>} />
@@ -1879,16 +1914,6 @@ function Tutors() {
   const [authKnown, setAuthKnown] = useState(false)
   const [needsAuth, setNeedsAuth] = useState(false)
   const [authDismissed, setAuthDismissed] = useState(false)
-  const [stats, setStats] = useState<StatsData | null>(null)
-
-  // Fetch public stats for the hero: total tutors, live-now count, avg rating.
-  useEffect(() => {
-    fetch('/api/tutors/stats')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setStats(d) })
-      .catch(() => {})
-  }, [])
-
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -2157,7 +2182,7 @@ function Tutors() {
     <div className="font-sans bg-white text-ink-900 antialiased">
       <PublicTopBar activeHref="/tutors" />
 
-      <SearchHero filters={filters} setFilters={setFilters} search={search} setSearch={setSearch} onSearch={runSearch} stats={stats} />
+      <SearchHero filters={filters} setFilters={setFilters} search={search} setSearch={setSearch} onSearch={runSearch} total={total} loading={loading} />
 
       <main id="main" className="max-w-[1280px] mx-auto px-6 sm:px-8 py-8 sm:py-10 lg:py-14">
         {needsAuth && !authDismissed && !signedIn && (
@@ -2293,7 +2318,7 @@ function Tutors() {
               <button type="button" onClick={resetFilters} className="mr-auto font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-900 transition-colors">გასუფთავება</button>
             )}
             <button type="button" onClick={() => setFiltersOpen(false)} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
-              ნახე {total} შედეგი
+              ნახე {total} ექსპერტი
               <Icon.arrow className="w-4 h-4" />
             </button>
           </>
