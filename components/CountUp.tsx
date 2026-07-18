@@ -9,9 +9,11 @@ import { useEffect, useRef, useState } from 'react'
 //   <CountUp value={42} />
 //   <CountUp value={128.5} decimals={1} suffix="ჰ" />
 //   <CountUp value={950} prefix="₾" />
+//   <CountUp value={20} from={0} />  — count up from 0 on mount (scroll-reveal)
 
 export function CountUp({
   value,
+  from,
   duration = 600,
   decimals = 0,
   prefix = '',
@@ -19,14 +21,15 @@ export function CountUp({
   className = '',
 }: {
   value: number
+  from?: number
   duration?: number
   decimals?: number
   prefix?: string
   suffix?: string
   className?: string
 }) {
-  const [display, setDisplay] = useState<number>(value)
-  const prevRef = useRef<number>(value)
+  const [display, setDisplay] = useState<number>(from ?? value)
+  const prevRef = useRef<number>(from ?? value)
   const frameRef = useRef<number | null>(null)
 
   useEffect(() => {

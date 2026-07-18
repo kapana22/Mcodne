@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
+import { Reveal } from '@/components/Reveal'
 import { Footer } from '@/components/Footer'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
@@ -120,7 +121,7 @@ export default async function CategoriesPage() {
             cta={{ label: 'ექსპერტების ძებნა', href: '/tutors' }}
           />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
+          <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
             {cats.map(c => {
               const IconCmp = iconFor(c.icon, c.slug)
               const pill = SERVICE_PILL[c.defaultServiceType as ServiceType]
@@ -138,7 +139,7 @@ export default async function CategoriesPage() {
                   />
 
                   <div className="flex items-start justify-between gap-3 mb-5">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-btn bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-colors duration-300 group-hover:text-brand-700">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-btn bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-all duration-300 ease-out group-hover:text-brand-700 motion-safe:group-hover:scale-110 motion-safe:group-hover:-rotate-3 motion-safe:group-active:scale-105 motion-safe:group-active:-rotate-2">
                       <IconCmp className="w-6 h-6" />
                     </div>
                     <span
@@ -169,7 +170,7 @@ export default async function CategoriesPage() {
                 </Link>
               )
             })}
-          </div>
+          </Reveal>
         )}
       </main>
 

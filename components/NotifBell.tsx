@@ -131,7 +131,13 @@ export function NotifBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[340px] max-w-[calc(100vw-32px)] bg-white border border-ink-200 rounded-card shadow-float z-50 overflow-hidden motion-safe:animate-scale-in origin-top-right">
+        /* Mobile: the bell sits mid-bar, so a right-0 anchored 340px panel
+           would hang off the LEFT edge of a phone screen. Below `sm` the panel
+           is fixed full-width just under the app bar (the sticky header is
+           always at viewport top, so these coordinates hold whether the
+           backdrop-blur header or the viewport is the containing block).
+           From `sm` up it re-anchors to the bell as before. */
+        <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[340px] bg-white border border-ink-200 rounded-card shadow-float z-50 overflow-hidden motion-safe:animate-scale-in origin-top sm:origin-top-right">
           <div className="flex items-center justify-between px-4 py-3 border-b border-ink-100">
             <div className="font-display text-[13px] font-bold text-ink-900">შეტყობინებები</div>
             <button
@@ -152,10 +158,13 @@ export function NotifBell() {
                   const isUnread = !n.readAt
                   return (
                     <li key={n.id}>
+                      {/* no-caps: rows are content (title + body sentences),
+                          not button labels — the global button→mtavruli rule
+                          made the whole inbox shout in caps. */}
                       <button
                         type="button"
                         onClick={() => clickItem(n)}
-                        className={`w-full text-left px-4 py-3 hover:bg-ink-50 transition-colors flex items-start gap-2.5 ${isUnread ? 'bg-brand-50/40' : ''}`}
+                        className={`no-caps w-full text-left px-4 py-3 hover:bg-ink-50 transition-colors flex items-start gap-2.5 ${isUnread ? 'bg-brand-50/40' : ''}`}
                       >
                         <span className={`shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full ${isUnread ? 'bg-brand-500' : 'bg-transparent'}`} />
                         <div className="min-w-0 flex-1">

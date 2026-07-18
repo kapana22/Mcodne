@@ -7,7 +7,7 @@ import { Footer as SharedFooter } from '@/components/Footer'
 import { useToast } from '@/components/ToastProvider'
 import { copyToClipboard } from '@/lib/clipboard'
 import { safeHttpUrl } from '@/lib/safeUrl'
-import { useMe, fetchMe } from '@/lib/me'
+import { useMe, fetchMe, type Me as PublicMe } from '@/lib/me'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { RISK_REVERSAL_LINE } from '@/lib/copy'
 import { pushRecentTutor } from '@/components/RecentTutorsStrip'
@@ -40,7 +40,7 @@ const VerifiedMark = ({ size = 20 }: { size?: number }) => (
   </span>
 )
 
-/* Local TopBar was orphan (never rendered) — page uses <PublicTopBar /> instead. Removed. */
+/* Local TopBar was orphan (never rendered) — page uses <PublicTopBar initialUser={initialUser} /> instead. Removed. */
 
 /* ───── Breadcrumb ───── */
 type TutorDetail = {
@@ -1160,15 +1160,15 @@ const SectionNav = ({ items }: { items: { id: string; l: string }[] }) => {
 /* ───── Page ─────
    Wrapped in <Suspense> because `useSearchParams` (used inside for rebook
    query params) must be inside a Suspense boundary in Next 15. */
-export default function ExpertProfilePage({ initialTutor }: { initialTutor?: any }) {
+export default function ExpertProfilePage({ initialTutor, initialUser }: { initialTutor?: any; initialUser?: PublicMe | null }) {
   return (
     <Suspense fallback={<div className="min-h-screen bg-white" />}>
-      <ExpertProfile initialTutor={initialTutor ?? null} />
+      <ExpertProfile initialTutor={initialTutor ?? null} initialUser={initialUser} />
     </Suspense>
   )
 }
 
-function ExpertProfile({ initialTutor }: { initialTutor: any }) {
+function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initialUser?: PublicMe | null }) {
   const params = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const tutorId = params?.id
@@ -1336,7 +1336,7 @@ function ExpertProfile({ initialTutor }: { initialTutor: any }) {
   if (loadState === 'not-found') {
     return (
       <div className="font-sans bg-white text-ink-900 antialiased min-h-screen flex flex-col">
-        <PublicTopBar />
+        <PublicTopBar initialUser={initialUser} />
         <div className="flex-1 flex items-center justify-center px-6 py-16">
           <div className="max-w-[480px] w-full text-center">
             <h1 className="font-display text-[22px] font-bold text-ink-900">ექსპერტი ვერ მოიძებნა</h1>
@@ -1356,7 +1356,7 @@ function ExpertProfile({ initialTutor }: { initialTutor: any }) {
   if (loadState === 'error') {
     return (
       <div className="font-sans bg-white text-ink-900 antialiased min-h-screen flex flex-col">
-        <PublicTopBar />
+        <PublicTopBar initialUser={initialUser} />
         <div className="flex-1 flex items-center justify-center px-6 py-16">
           <div className="max-w-[480px] w-full text-center">
             <div className="w-14 h-14 mx-auto rounded-full bg-warning-50 border border-warning-200 inline-flex items-center justify-center text-warning-700 mb-5">
@@ -1392,7 +1392,7 @@ function ExpertProfile({ initialTutor }: { initialTutor: any }) {
   if (loadState !== 'ok') {
     return (
       <div className="font-sans bg-white text-ink-900 antialiased">
-        <PublicTopBar />
+        <PublicTopBar initialUser={initialUser} />
         <main
           id="main"
           className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-4 sm:pt-7 lg:pt-9 pb-24 lg:pb-16"
@@ -1444,7 +1444,7 @@ function ExpertProfile({ initialTutor }: { initialTutor: any }) {
 
   return (
     <div className="font-sans bg-white text-ink-900 antialiased">
-      <PublicTopBar />
+      <PublicTopBar initialUser={initialUser} />
       <SectionNav items={navItems} />
 
       <main id="main" className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-4 sm:pt-7 lg:pt-9 pb-24 lg:pb-16">

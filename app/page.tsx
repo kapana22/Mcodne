@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { PAYMENTS_LIVE, COMMISSION_PCT, TUTOR_PAYOUT_PCT } from '@/lib/flags'
 import { fmtRating } from '@/lib/fmt'
 import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
+import { Reveal } from '@/components/Reveal'
+import { CountUp } from '@/components/CountUp'
 import { Footer } from '@/components/Footer'
 import { PublicTopBar } from '@/components/PublicTopBar'
 import { Icon, CatIcon } from '@/components/Icon'
@@ -148,9 +150,12 @@ const HomeHero = () => {
 
   return (
     <section className="relative bg-white overflow-hidden border-b border-ink-200">
-      {/* Restrained backdrop — barely-there brand tint, premium/clean. */}
+      {/* Restrained backdrop — barely-there brand tint, premium/clean.
+          Radial glow washes (NOT blur filters — Safari renders those as a
+          hard-edged square) drifting on a very slow aurora cycle. */}
       <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-brand-50/25 via-white to-white pointer-events-none" />
-      <div aria-hidden className="absolute top-0 right-0 w-[640px] h-[640px] -translate-y-1/3 translate-x-1/4 rounded-full bg-brand-100/20 blur-3xl pointer-events-none" />
+      <div aria-hidden className="glow-brand aurora-a absolute -top-64 -right-48 w-[760px] h-[760px] pointer-events-none" />
+      <div aria-hidden className="glow-info aurora-b absolute top-32 -left-64 w-[640px] h-[640px] pointer-events-none hidden sm:block" />
 
       <div className="relative max-w-[1280px] mx-auto px-6 sm:px-8 pt-8 sm:pt-14 lg:pt-20 pb-12 sm:pb-16 lg:pb-24">
         {/* Trust strip — clean, single line */}
@@ -189,7 +194,7 @@ const HomeHero = () => {
                     className="w-full h-12 pl-11 pr-3 bg-transparent text-[15px] text-ink-900 placeholder:text-ink-400 focus:outline-none"
                   />
                 </div>
-                <button type="submit" className="h-12 px-6 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.4)] transition-all duration-fast">
+                <button type="submit" className="btn-sheen h-12 px-6 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.4)] transition-all duration-fast">
                   ექსპერტის ძიება
                   <Icon.arrow className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                 </button>
@@ -308,7 +313,7 @@ const HomeHero = () => {
                   </div>
                   {/* ?rebook=1 opens the booking modal on arrival, so the CTA
                       label is honest — it books, not just views. */}
-                  <Link href={featured.id ? `/tutors/${featured.id}?rebook=1` : '/tutors'} className="shrink-0 h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] motion-safe:active:scale-[0.97] transition-all duration-fast">
+                  <Link href={featured.id ? `/tutors/${featured.id}?rebook=1` : '/tutors'} className="btn-sheen shrink-0 h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] motion-safe:active:scale-[0.97] transition-all duration-fast">
                     დაჯავშნა <Icon.arrow className="w-4 h-4" />
                   </Link>
                 </div>
@@ -342,7 +347,8 @@ const HomeHero = () => {
 
             {/* Avatar stack + see-all */}
             <div className="mt-5 flex items-center gap-3.5">
-              <div className="flex -space-x-2.5">
+              {/* Fans slightly apart on hover — a small "these are people" delight. */}
+              <div className="flex -space-x-2.5 hover:-space-x-1 [&>*]:transition-[margin] [&>*]:duration-300">
                 {sidekicks.length > 0 ? sidekicks.map((e, i) => (
                   <div key={i} className="relative">
                     <img src={e.photo} alt="" className="w-9 h-9 rounded-full object-cover ring-2 ring-white" />
@@ -387,20 +393,20 @@ const HomeHero = () => {
 const Categories = () => (
   <section className="bg-white border-b border-ink-200">
     <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-20">
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-8 sm:mb-10">
+      <Reveal className="flex flex-wrap items-end justify-between gap-4 mb-8 sm:mb-10">
         <div className="max-w-[640px]">
           <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-3">კატეგორიები</div>
           <h2 className="font-display text-[30px] sm:text-[40px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">აირჩიე სფერო, რომელშიც გჭირდება ცოდნა</h2>
           <p className="hidden sm:block mt-4 text-[14.5px] text-ink-600 leading-[1.55]">ხელით შერჩეული ექსპერტები 6 სფეროში — გადახედე, შეადარე და დაიჯავშნე ვიდეო-სესია.</p>
         </div>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
+      </Reveal>
+      <Reveal stagger className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
         {categories.map(c => (
           <Link key={c.l} href={`/tutors?category=${c.slug}`} className="group relative overflow-hidden rounded-card border border-ink-200 bg-white p-4 sm:p-6 shadow-xs hover:border-brand-200 hover-lift motion-safe:active:scale-[0.99] flex flex-col text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
             {/* Brand accent hairline — reveals on hover (matches /categories). */}
             <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-brand-500 transition-transform duration-300 ease-out group-hover:scale-x-100" />
             <div className="flex items-start justify-between gap-3">
-              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-btn flex items-center justify-center shrink-0 bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-colors group-hover:text-brand-700">
+              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-btn flex items-center justify-center shrink-0 bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-all duration-300 ease-out group-hover:text-brand-700 motion-safe:group-hover:scale-110 motion-safe:group-hover:-rotate-3 motion-safe:group-active:scale-105 motion-safe:group-active:-rotate-2">
                 {React.cloneElement(c.i, { className: 'w-5 h-5 sm:w-7 sm:h-7' })}
               </div>
               <span className="font-display text-[10px] sm:text-[10.5px] font-semibold uppercase tracking-[0.14em] sm:tracking-[0.16em] text-ink-400 whitespace-nowrap pt-1">
@@ -418,7 +424,7 @@ const Categories = () => (
             </div>
           </Link>
         ))}
-      </div>
+      </Reveal>
     </div>
   </section>
 )
@@ -568,7 +574,7 @@ const FeaturedExperts = () => {
   return (
     <section className="bg-ink-50/60 border-b border-ink-200">
       <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-20">
-        <div className="mb-8 lg:mb-10 max-w-[640px]">
+        <Reveal className="mb-8 lg:mb-10 max-w-[640px]">
           <div className="flex items-center gap-3 mb-3">
             <span className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700">ექსპერტები</span>
             <span className="inline-flex items-center gap-1.5 text-[11px] text-ink-500">
@@ -578,7 +584,7 @@ const FeaturedExperts = () => {
           <h2 className="font-display text-[28px] sm:text-[40px] lg:text-[48px] font-bold text-ink-900 tracking-[-0.025em] leading-[1.05]">
             ხელით შერჩეული ექსპერტები.
           </h2>
-        </div>
+        </Reveal>
 
         <div className="flex items-center gap-2 mb-7 overflow-x-auto scrollbar-hide rail-fade-end -mx-6 sm:-mx-8 px-6 sm:px-8">
           {filters.map(f => (
@@ -588,7 +594,7 @@ const FeaturedExperts = () => {
           ))}
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-4 sm:gap-5">
+        <Reveal stagger className="grid lg:grid-cols-2 gap-4 sm:gap-5">
           {experts === null ? (
             [0, 1, 2, 3].map(i => (
               <div key={i} className="rounded-card border border-ink-200 bg-white p-5 flex items-start gap-4 animate-pulse">
@@ -611,7 +617,7 @@ const FeaturedExperts = () => {
           ) : (
             experts.map((e, i) => <ExpertCard key={e.id ?? i} e={e} />)
           )}
-        </div>
+        </Reveal>
 
         <div className="mt-12 flex justify-center">
           <Link href="/tutors" className="h-12 px-6 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-900 font-display text-[13px] font-semibold tracking-wide inline-flex items-center gap-2 transition-colors">
@@ -627,7 +633,7 @@ const HowItWorks = () => (
   <section id="how" className="bg-ink-50 border-b border-ink-200 scroll-mt-24">
     <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-24">
       <div className="grid lg:grid-cols-[1fr_1.6fr] gap-12 items-start">
-        <div>
+        <Reveal>
           <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-3">როგორ მუშაობს</div>
           <h2 className="font-display text-[32px] sm:text-[44px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
             სამი ნაბიჯი —<br />
@@ -637,8 +643,8 @@ const HowItWorks = () => (
           <Link href="/signup" className="mt-7 h-12 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
             დაწყება <Icon.arrow className="w-4 h-4" />
           </Link>
-        </div>
-        <div className="space-y-3">
+        </Reveal>
+        <Reveal stagger className="space-y-3">
           {[
             { n: '01', t: 'აირჩიე ექსპერტი', d: 'გადახედე პროფილებს, რეიტინგებს და მოკლე ვიდეო-შესავალს. ფილტრები სფერო-ფასი-ხელმისაწვდომობაზე.' },
             { n: '02', t: 'აირჩიე დრო და დაჯავშნე', d: 'ექსპერტის კალენდრიდან აირჩიე თავისუფალი დრო — ის ადასტურებს მოთხოვნას. ხანგრძლივობა · 15, 30 ან 60 წუთი.' },
@@ -654,7 +660,7 @@ const HowItWorks = () => (
               </div>
             </div>
           ))}
-        </div>
+        </Reveal>
       </div>
     </div>
   </section>
@@ -663,14 +669,16 @@ const HowItWorks = () => (
 const WhyUs = () => (
   <section className="bg-white border-b border-ink-200">
     <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-20">
-      <div className="max-w-[720px] mb-10">
+      <Reveal className="max-w-[720px] mb-10">
         <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-3">რატომ მცოდნე</div>
         <h2 className="font-display text-[32px] sm:text-[44px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
           ცოდნა, რომელსაც ენდობი —<br className="hidden sm:inline" />
           <span className="text-ink-500">ფასი, რომელიც ღირს.</span>
         </h2>
-      </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-ink-200 border border-ink-200 rounded-card overflow-hidden">
+      </Reveal>
+      {/* Single-block reveal on purpose: the gap-px/overflow-hidden lattice
+          would clip per-cell staggered motion. */}
+      <Reveal delay={120} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-ink-200 border border-ink-200 rounded-card overflow-hidden">
         {[
           PAYMENTS_LIVE
             ? { t: 'Escrow უსაფრთხოება', d: 'თანხა escrow-ში დგას სანამ სესია არ ჩატარდება. გაუქმდე უფასოდ 24 სთ-ით ადრე.' }
@@ -685,7 +693,7 @@ const WhyUs = () => (
             <p className="text-[12.5px] text-ink-600 leading-[1.55]">{c.d}</p>
           </div>
         ))}
-      </div>
+      </Reveal>
     </div>
   </section>
 )
@@ -699,7 +707,7 @@ const ExpertCta = () => (
   <section className="relative bg-ink-50/50 border-y border-ink-200">
     <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-10 sm:py-16 lg:py-24">
       <div className="grid lg:grid-cols-[1.4fr_1fr] gap-12 items-center">
-        <div>
+        <Reveal>
           <div className="inline-flex items-center gap-2 rounded-pill bg-white border border-ink-200 pl-1 pr-3 py-1 mb-6 shadow-xs">
             <span className="inline-flex items-center gap-1.5 rounded-pill bg-brand-500 text-white px-2.5 py-1 text-[11px] font-display font-semibold tracking-wide">ექსპერტებისთვის</span>
             <span className="text-[12px] text-ink-700 font-medium">ღია განაცხადი · ხელით მოდერაცია</span>
@@ -719,23 +727,33 @@ const ExpertCta = () => (
               <Icon.play className="w-3.5 h-3.5 text-brand-600" /> 90 წამიანი ვიდეო
             </Link>
           </div>
-        </div>
-        <div className="grid grid-cols-1 gap-3">
-          {/* One brand treatment for all stat tiles — no per-row hues. */}
-          {[
-            { n: `${COMMISSION_PCT}%`, l: 'საკომისიო',    s: 'გამჭვირვალე · ერთი ციფრი'   },
-            { n: `${TUTOR_PAYOUT_PCT}%`, l: 'შენი ნაწილი', s: 'დანარჩენი — შენს ჯიბეშია'   },
-            { n: 'მალე', l: 'შემოსავალი',                 s: 'escrow-ის დანერგვის შემდეგ'  },
-          ].map((s, i) => (
-            <div key={i} className="rounded-card border border-ink-200 bg-white p-5 grid grid-cols-[auto_1fr] gap-5 items-baseline shadow-xs">
-              <div className="font-display text-[40px] font-bold text-brand-600 tabular-nums tracking-tight leading-none">{s.n}</div>
-              <div>
-                <div className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-700">{s.l}</div>
-                <div className="text-[12px] text-ink-600 mt-1.5 leading-snug">{s.s}</div>
+        </Reveal>
+        <Reveal stagger className="grid grid-cols-1 gap-3">
+          {visible => (
+            /* One brand treatment for all stat tiles — no per-row hues. The
+               numeric tiles count up on scroll-enter (CountUp snaps under
+               reduced motion). */
+            [
+              { n: COMMISSION_PCT as number | null, txt: '', l: 'საკომისიო', s: 'გამჭვირვალე · ერთი ციფრი' },
+              { n: TUTOR_PAYOUT_PCT as number | null, txt: '', l: 'შენი ნაწილი', s: 'დანარჩენი — შენს ჯიბეშია' },
+              { n: null, txt: 'მალე', l: 'შემოსავალი', s: 'escrow-ის დანერგვის შემდეგ' },
+            ].map((s, i) => (
+              <div key={i} className="rounded-card border border-ink-200 bg-white p-5 grid grid-cols-[auto_1fr] gap-5 items-baseline shadow-xs">
+                <div className="font-display text-[40px] font-bold text-brand-600 tabular-nums tracking-tight leading-none">
+                  {/* Static number until scroll-enter (SSR/crawlers always see
+                      the real value — never a fake 0%), then CountUp 0→n. */}
+                  {s.n !== null
+                    ? (visible ? <CountUp value={s.n} from={0} duration={900} suffix="%" /> : <span className="tabular-nums">{s.n}%</span>)
+                    : s.txt}
+                </div>
+                <div>
+                  <div className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-700">{s.l}</div>
+                  <div className="text-[12px] text-ink-600 mt-1.5 leading-snug">{s.s}</div>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))
+          )}
+        </Reveal>
       </div>
     </div>
   </section>

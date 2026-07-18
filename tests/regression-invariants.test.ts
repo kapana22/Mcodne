@@ -86,7 +86,9 @@ function check(name: string, ok: boolean, hint: string) {
 
 // ── D. price filter stays a min-floor ────────────────────────────────────────
 {
-  const tutors = read('app/tutors/page.tsx')
+  // The filter UI (PRICE_OPTS etc.) moved to client.tsx when /tutors was split
+  // into a server page.tsx (SSR seed) + client.tsx (interactive list).
+  const tutors = read('app/tutors/client.tsx')
   check(
     'D: /tutors PRICE_OPTS are min-floors ("₾N-დან"), not ranges',
     tutors.includes('-დან') && !/₾40\s*–\s*₾80/.test(tutors),

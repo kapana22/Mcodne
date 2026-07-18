@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { MarketingTopBar } from '@/components/MarketingTopBar'
+import { PublicTopBar } from '@/components/PublicTopBar'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 
@@ -89,7 +89,7 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <MarketingTopBar />
+      <PublicTopBar />
 
       <main className="max-w-[1080px] mx-auto px-6 sm:px-8 py-16 lg:py-24">
         <div className="max-w-[680px]">

@@ -67,7 +67,10 @@ export function ConversationRow({
           <span className={`flex items-center gap-1.5 min-w-0 text-[13px] ${isUnread ? 'text-ink-900 font-medium' : 'text-ink-500'}`}>
             {lastFromMe && <span className="text-ink-400 shrink-0">შენ:</span>}
             {preview.isAttachment && <Icon.paperclip className="w-3.5 h-3.5 text-ink-400 shrink-0" />}
-            <span className="truncate">{preview.text || (preview.isAttachment ? 'მიმაგრებული ფაილი' : '')}</span>
+            {/* min-w-0: a flex child defaults to min-width:auto, so without it
+                one long unbroken message blows the row out sideways (+13000px
+                overflow on mobile) instead of truncating. */}
+            <span className="truncate min-w-0">{preview.text || (preview.isAttachment ? 'მიმაგრებული ფაილი' : '')}</span>
           </span>
           {isUnread && (
             <span className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-brand-500 text-white font-display text-[11px] font-bold tabular-nums">

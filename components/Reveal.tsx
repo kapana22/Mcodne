@@ -30,6 +30,14 @@ export function Reveal({
       setVisible(true)
       return
     }
+    // Already on screen at mount (above-the-fold, anchor jump, restored
+    // scroll) → reveal immediately; only genuinely below-fold blocks wait
+    // for the observer. This is the "can never look broken" guarantee.
+    const r = el.getBoundingClientRect()
+    if (r.top < window.innerHeight && r.bottom > 0) {
+      setVisible(true)
+      return
+    }
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -37,9 +45,10 @@ export function Reveal({
           io.disconnect()
         }
       },
-      // Fire slightly before the block fully clears the fold so the motion is
-      // already underway as the user arrives — feels alive, never laggy.
-      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
+      // Any visible pixel triggers (threshold 0) — a ratio threshold can
+      // NEVER fire for sections taller than the viewport. Small negative
+      // bottom margin so the motion starts just after the edge appears.
+      { threshold: 0, rootMargin: '0px 0px -6% 0px' },
     )
     io.observe(el)
     return () => io.disconnect()

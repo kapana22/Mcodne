@@ -17,6 +17,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
 import ExpertProfilePage from './client'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
@@ -148,7 +149,10 @@ export default async function TutorProfileRoute(
   // SEO row (unchanged) for notFound + JSON-LD, plus the fuller first-paint
   // seed for the client. Both are React-cached; the seed adds one findUnique +
   // one consultation read, run in parallel.
-  const [tutor, initialTutor] = await Promise.all([getTutorSeo(id), getTutorInitial(id)])
+  const [tutor, initialTutor, viewer] = await Promise.all([getTutorSeo(id), getTutorInitial(id), getCurrentUser()])
+  const initialUser = viewer
+    ? { id: viewer.id, fullName: viewer.fullName, avatarUrl: viewer.avatarUrl, role: viewer.role }
+    : null
 
   // Missing id → real 404. DB error ('error') falls through: the client
   // component has its own error/retry state for that case.
@@ -192,7 +196,7 @@ export default async function TutorProfileRoute(
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <ExpertProfilePage initialTutor={initialTutor} />
+      <ExpertProfilePage initialTutor={initialTutor} initialUser={initialUser} />
     </>
   )
 }

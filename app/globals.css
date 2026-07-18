@@ -197,12 +197,6 @@ summary:focus-visible {
   0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
   50%      { transform: translate3d(48px, -26px, 0) scale(1.08); }
 }
-/* Gradient pan — makes a bg-clip-text gradient shimmer slowly across the
-   letters. Pair with `bg-gradient-signature` (the named token) only. */
-@keyframes gradientPan {
-  0%, 100% { background-position: 0% 50%; }
-  50%      { background-position: 100% 50%; }
-}
 
 /* ─────────── Motion & depth utilities (motion-safe) ───────────
  * Short, calm transitions. Never bouncy — playful motion reads as loud on
@@ -370,6 +364,78 @@ summary:focus-visible {
   input[type="radio"]:checked {
     animation: scaleIn 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
+
+  /* ── Scroll-reveal (components/Reveal.tsx flips .is-visible) ──────────
+   * Hidden state lives ONLY inside this motion-safe block: reduced-motion
+   * users and no-JS crawlers always see content — nothing can stay stuck
+   * invisible. Transitions (not fill-mode animations) so the settled state
+   * is `transform: none` — no lingering stacking-context/containing-block. */
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 480ms cubic-bezier(0.16, 1, 0.3, 1),
+                transform 480ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+  .reveal-stagger > * {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
+                transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .reveal-stagger.is-visible > * {
+    opacity: 1;
+    transform: none;
+  }
+  .reveal-stagger.is-visible > *:nth-child(2) { transition-delay: 60ms; }
+  .reveal-stagger.is-visible > *:nth-child(3) { transition-delay: 120ms; }
+  .reveal-stagger.is-visible > *:nth-child(4) { transition-delay: 180ms; }
+  .reveal-stagger.is-visible > *:nth-child(5) { transition-delay: 240ms; }
+  .reveal-stagger.is-visible > *:nth-child(6) { transition-delay: 300ms; }
+  .reveal-stagger.is-visible > *:nth-child(n+7) { transition-delay: 360ms; }
+
+  /* ── Aurora blobs — hero backdrop breathes (26s / 34s cycles). ── */
+  .aurora-a { animation: auroraA 26s ease-in-out infinite; }
+  .aurora-b { animation: auroraB 34s ease-in-out infinite; }
+
+  /* ── Button sheen — a soft light sweep across primary CTAs on hover.
+   * White-alpha highlight only (not a palette hue, so no gradient-token
+   * violation). Host must tolerate overflow:hidden. */
+  .btn-sheen {
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-sheen::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -60%;
+    width: 40%;
+    background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: skewX(-18deg);
+    transition: left 640ms cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+  }
+  .btn-sheen:hover::after {
+    left: 120%;
+  }
+}
+
+/* ── Hero glow washes — named decorative utilities (palette hues only).
+ * Radial gradients instead of `blur-3xl` filters: Safari renders large
+ * blur() filters as hard-edged rectangles, which read as a "square stain"
+ * over the hero. Radial gradients rasterize cleanly everywhere. Static
+ * color (not motion), so they live outside the motion-safe block; the
+ * aurora drift classes above add movement only when motion is allowed. */
+.glow-brand {
+  background: radial-gradient(closest-side, rgba(21, 154, 130, 0.13), rgba(21, 154, 130, 0));
+}
+.glow-info {
+  background: radial-gradient(closest-side, rgba(37, 99, 235, 0.09), rgba(37, 99, 235, 0));
 }
 
 /* Reduced-motion fallback: no transitions at all. */

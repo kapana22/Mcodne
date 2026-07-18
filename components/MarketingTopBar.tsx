@@ -1,16 +1,12 @@
-'use client'
-// MarketingTopBar — thin alias over PublicTopBar so the static marketing
-// pages (/about, /blog, /categories, /contact, /help, /privacy, /terms,
-// /cookies) share the exact same auth-aware chrome as the browse pages.
-//
-// Historically this was a separate, guest-only bar: signed-in users landing
-// on /about or /help kept seeing „შესვლა/დაიწყე" instead of their avatar,
-// nav taxonomy differed from /tutors, and the CTA label drifted. Delegating
-// kills all three drifts at once; keep the named export so call sites don't
-// churn.
+// MarketingTopBar — the marketing pages' header (/about, /blog, /categories,
+// /contact, /help, /privacy, /terms, /cookies). A server component that renders
+// the shared PublicHeader, so the auth state is server-resolved and the header
+// is correct on the first paint (no client-side flip). Same chrome as the
+// browse pages — one header everywhere. Named export kept so call sites (all
+// server components) don't churn.
 
-import { PublicTopBar } from './PublicTopBar'
+import { PublicHeader } from './PublicHeader'
 
 export function MarketingTopBar() {
-  return <PublicTopBar />
+  return <PublicHeader />
 }

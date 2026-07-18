@@ -4,38 +4,47 @@ import Link from 'next/link'
 import { Logo } from './Logo'
 import { Icon } from './Icon'
 import { Avatar } from './Avatar'
-import { useMe } from '@/lib/me'
+import { useMe, type Me } from '@/lib/me'
 
-// Top bar for the public browse pages (`/tutors`, `/tutors/[id]`, `/`).
-// Anonymous visitors probe /api/me client-side and render the right nav
-// for the actual role. Sticky with a soft elevation ramp on scroll.
+// The single public header. Rendered on every guest/browse/marketing page.
+//
+// STATIC BY DESIGN — it must NOT visibly change on load. Two things used to make
+// it "change unclearly":
+//   1. the nav items swapped by role once /api/me resolved (public → student/
+//      tutor nav), and
+//   2. the right side popped from empty → avatar/buttons.
+// Fixes: (1) the nav is now UNIFORM for everyone — logged-in users reach their
+// workspace via the avatar (→ role home), the marketing nav never rearranges;
+// (2) server-rendered pages pass `initialUser` so the auth state is correct on
+// the FIRST paint (no flip). Client-only pages fall back to the deduped
+// lib/me probe, but with the uniform nav there's no rearrange either way.
 
-const STUDENT_NAV: { label: string; href: string }[] = [
-  { label: 'ჩემი სივრცე',   href: '/student' },
-  { label: 'ექსპერტები',    href: '/tutors' },
-  { label: 'ჩემი ჯავშნები', href: '/student/bookings' },
-  { label: 'შენახული',      href: '/student/favorites' },
-  { label: 'შეტყობინებები', href: '/student/messages' },
-]
-const TUTOR_NAV: { label: string; href: string }[] = [
-  { label: 'ჩემი სივრცე', href: '/tutor' },
-  { label: 'ექსპერტები',     href: '/tutors' },
-]
-const ADMIN_NAV: { label: string; href: string }[] = [
-  { label: 'ადმინი',      href: '/admin' },
-  { label: 'ექსპერტები',  href: '/tutors' },
-]
-const PUBLIC_NAV: { label: string; href: string }[] = [
+// ONE nav for everyone — the professional marketplace pattern (Airbnb/Intro).
+const NAV: { label: string; href: string }[] = [
   { label: 'ექსპერტები',     href: '/tutors' },
   { label: 'კატეგორიები',    href: '/categories' },
   { label: 'გახდი ექსპერტი', href: '/apply' },
   { label: 'დახმარება',      href: '/help' },
 ]
 
-export function PublicTopBar({ activeHref }: { activeHref?: string }) {
+export function PublicTopBar({
+  activeHref,
+  initialUser,
+}: {
+  activeHref?: string
+  // `undefined` → not server-provided, use the client probe (home, ask…).
+  // `null`      → server says guest. An object → server-resolved user.
+  // When provided, the header is correct on first paint — no flip.
+  initialUser?: Me | null
+}) {
   // Shared identity source (lib/me) — no-store, deduped with AppShell + the
   // page so a public load makes ONE /api/me request instead of three.
-  const { me, ready } = useMe()
+  const { me: fetchedMe, ready: fetchedReady } = useMe()
+  // Prefer the client probe once it lands (catches in-tab session changes);
+  // before that, trust the server-provided initialUser so nothing flips.
+  const ssr = initialUser !== undefined
+  const me = fetchedReady ? fetchedMe : (ssr ? initialUser : null)
+  const ready = fetchedReady || ssr
   const [mobOpen, setMobOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
@@ -63,18 +72,14 @@ export function PublicTopBar({ activeHref }: { activeHref?: string }) {
     }
   }, [mobOpen])
 
-  const nav = !me
-    ? PUBLIC_NAV
-    : me.role === 'TUTOR'
-    ? TUTOR_NAV
-    : me.role === 'ADMIN'
-    ? ADMIN_NAV
-    : STUDENT_NAV
+  const nav = NAV
 
+  // The avatar links to the user's own workspace home (not a sub-page) — the
+  // single, predictable "back to my space" affordance from any public page.
   const profileHref = !me ? '/signin'
-    : me.role === 'TUTOR' ? '/tutor/profile'
+    : me.role === 'TUTOR' ? '/tutor'
     : me.role === 'ADMIN' ? '/admin'
-    : '/student/profile'
+    : '/student'
 
   return (
     <header
