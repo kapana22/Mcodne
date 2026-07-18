@@ -4,12 +4,11 @@ import Link from 'next/link'
 import { Logo } from './Logo'
 import { Icon } from './Icon'
 import { Avatar } from './Avatar'
+import { useMe } from '@/lib/me'
 
 // Top bar for the public browse pages (`/tutors`, `/tutors/[id]`, `/`).
 // Anonymous visitors probe /api/me client-side and render the right nav
 // for the actual role. Sticky with a soft elevation ramp on scroll.
-
-type Me = { id: string; fullName: string; avatarUrl?: string | null; role: 'STUDENT' | 'TUTOR' | 'ADMIN' } | null
 
 const STUDENT_NAV: { label: string; href: string }[] = [
   { label: 'ჩემი სივრცე',   href: '/student' },
@@ -34,19 +33,11 @@ const PUBLIC_NAV: { label: string; href: string }[] = [
 ]
 
 export function PublicTopBar({ activeHref }: { activeHref?: string }) {
-  const [me, setMe] = useState<Me>(null)
-  const [ready, setReady] = useState(false)
+  // Shared identity source (lib/me) — no-store, deduped with AppShell + the
+  // page so a public load makes ONE /api/me request instead of three.
+  const { me, ready } = useMe()
   const [mobOpen, setMobOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-
-  useEffect(() => {
-    // no-store so the bar never renders a stale role after an admin
-    // impersonation swap/exit (the /api/me response is no-store too).
-    fetch('/api/me', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
-      setMe(d?.user ?? null)
-      setReady(true)
-    }).catch(() => setReady(true))
-  }, [])
 
   // Scroll-driven elevation — hairline is always present; a soft shadow lifts
   // the bar off the page once we cross ~8px, an Airbnb-style detach cue.

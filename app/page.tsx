@@ -8,6 +8,7 @@ import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
 import { Footer } from '@/components/Footer'
 import { PublicTopBar } from '@/components/PublicTopBar'
 import { Icon, CatIcon } from '@/components/Icon'
+import { useMe } from '@/lib/me'
 
 
 const VerifiedMark = ({ size = 16 }: { size?: number }) => (
@@ -741,22 +742,10 @@ const ExpertCta = () => (
 )
 
 const AuthedRecentTutorsStrip = () => {
-  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  // Shared /api/me (lib/me) — deduped with the top bar + AppShell.
+  const { me } = useMe()
+  const signedIn = !!me
   const [hasItems, setHasItems] = useState(false)
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch('/api/me')
-        if (!res.ok || cancelled) { if (!cancelled) setSignedIn(false); return }
-        const body = await res.json().catch(() => ({}))
-        if (!cancelled) setSignedIn(!!body?.user)
-      } catch {
-        if (!cancelled) setSignedIn(false)
-      }
-    })()
-    return () => { cancelled = true }
-  }, [])
   useEffect(() => {
     if (typeof window === 'undefined') return
     const check = () => {

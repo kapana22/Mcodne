@@ -7,6 +7,7 @@ import { Footer as SharedFooter } from '@/components/Footer'
 import { useToast } from '@/components/ToastProvider'
 import { copyToClipboard } from '@/lib/clipboard'
 import { safeHttpUrl } from '@/lib/safeUrl'
+import { useMe, fetchMe } from '@/lib/me'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { RISK_REVERSAL_LINE } from '@/lib/copy'
 import { pushRecentTutor } from '@/components/RecentTutorsStrip'
@@ -98,13 +99,12 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
     let cancelled = false
     ;(async () => {
       try {
-        const meRes = await fetch('/api/me')
-        if (!meRes.ok || cancelled) return
-        // /api/me is 200 even for guests (user: null) — only probe the
-        // favorites endpoint for signed-in users, otherwise every guest
-        // visit logs a 401 in the console.
-        const me = await meRes.json().catch(() => null)
-        if (!me?.user || cancelled) return
+        // Shared /api/me (lib/me) — deduped with the top bar, AppShell and the
+        // profile's own auth probe. /api/me is 200 even for guests (null user);
+        // only probe favorites for signed-in users, else every guest visit
+        // logs a 401 in the console.
+        const me = await fetchMe()
+        if (!me || cancelled) return
         const res = await fetch('/api/favorites')
         if (!res.ok || cancelled) return
         const rows = await res.json()
@@ -1160,20 +1160,30 @@ const SectionNav = ({ items }: { items: { id: string; l: string }[] }) => {
 /* ───── Page ─────
    Wrapped in <Suspense> because `useSearchParams` (used inside for rebook
    query params) must be inside a Suspense boundary in Next 15. */
-export default function ExpertProfilePage() {
+export default function ExpertProfilePage({ initialTutor }: { initialTutor?: any }) {
   return (
     <Suspense fallback={<div className="min-h-screen bg-white" />}>
-      <ExpertProfile />
+      <ExpertProfile initialTutor={initialTutor ?? null} />
     </Suspense>
   )
 }
 
-function ExpertProfile() {
+function ExpertProfile({ initialTutor }: { initialTutor: any }) {
   const params = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const tutorId = params?.id
-  const [tutorData, setTutorData] = useState<any>(null)
-  const [loadState, setLoadState] = useState<'loading' | 'ok' | 'not-found' | 'error'>('loading')
+  // Seed from the server's already-loaded profile (page.tsx passes the same
+  // core fields it reads for SEO — name/avatar/headline/specialty/verified/
+  // rating/price/consultations). The hero, identity, specs, about and price
+  // then render on the FIRST paint instead of a blank skeleton. The fetch below
+  // still runs to hydrate what the seed omits (live availability, reviews,
+  // experience/education/certificates) and to refresh the core fields. When no
+  // seed is available (server DB error), we fall back to the pure client-fetch
+  // path — identical to before, incl. the skeleton + error/retry states.
+  const [tutorData, setTutorData] = useState<any>(initialTutor ?? null)
+  const [loadState, setLoadState] = useState<'loading' | 'ok' | 'not-found' | 'error'>(
+    initialTutor ? 'ok' : 'loading',
+  )
   // Bumping this refires the profile fetch — powers the error-state retry
   // button (the DB sits behind a remote proxy, so transient failures happen).
   const [loadAttempt, setLoadAttempt] = useState(0)
@@ -1191,17 +1201,23 @@ function ExpertProfile() {
 
   useEffect(() => {
     if (!tutorId) return
-    setLoadState('loading')
+    // Only drop to the skeleton when we have NOTHING seeded from the server —
+    // with a seed we keep the profile on screen while the fresh payload loads.
+    // Likewise a transient refetch failure must not blow a working seeded
+    // profile into the error screen (the server already had the data); it only
+    // downgrades to not-found/error on the pure client-fetch path.
+    const seeded = !!initialTutor
+    if (!seeded) setLoadState('loading')
     fetch(`/api/tutors/${tutorId}`)
       .then(async r => {
-        if (r.status === 404) { setLoadState('not-found'); return null }
-        if (!r.ok) { setLoadState('error'); return null }
+        if (r.status === 404) { if (!seeded) setLoadState('not-found'); return null }
+        if (!r.ok) { if (!seeded) setLoadState('error'); return null }
         // Non-JSON body (proxy error page, dead dev server) must land in the
         // error branch — not throw into an uncaught rejection.
-        return r.json().catch(() => { setLoadState('error'); return null })
+        return r.json().catch(() => { if (!seeded) setLoadState('error'); return null })
       })
       .then(d => { if (d) { setTutorData(d); setLoadState('ok') } })
-      .catch(() => setLoadState('error'))
+      .catch(() => { if (!seeded) setLoadState('error') })
   }, [tutorId, loadAttempt])
 
   // Push viewed tutor into local "recently viewed" cache (LRU, cap 5).
@@ -1217,23 +1233,14 @@ function ExpertProfile() {
   }, [tutorData, tutorId])
 
   // Soft sign-in prompt: replaces hard redirect for anon interactions.
-  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  // Shared /api/me (lib/me) — deduped with the top bar, AppShell and VideoHero.
+  // Tri-state preserved: null until the probe resolves (`ready`), then boolean —
+  // the rebook auto-open waits on `signedIn === null`, requireAuth gates on
+  // `=== false`.
+  const { me, ready: meReady } = useMe()
+  const signedIn: boolean | null = meReady ? !!me : null
   const [needsAuth, setNeedsAuth] = useState(false)
   const [authDismissed, setAuthDismissed] = useState(false)
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch('/api/me')
-        if (!res.ok || cancelled) { if (!cancelled) setSignedIn(false); return }
-        const body = await res.json().catch(() => ({}))
-        if (!cancelled) setSignedIn(!!body?.user)
-      } catch {
-        if (!cancelled) setSignedIn(false)
-      }
-    })()
-    return () => { cancelled = true }
-  }, [])
   // Which flow the visitor was in when the auth gate fired. 'book' makes the
   // post-auth redirect carry ?rebook=1 so the booking modal reopens by itself.
   const [authIntent, setAuthIntent] = useState<'book' | null>(null)

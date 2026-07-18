@@ -9,6 +9,7 @@ import { usePathname } from 'next/navigation'
 import { ToastProvider } from './ToastProvider'
 import { CookieConsent } from './CookieConsent'
 import { BottomNav } from './BottomNav'
+import { fetchMe } from '@/lib/me'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 
@@ -28,11 +29,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/me', { credentials: 'include', cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : { user: null }))
-      .then(d => {
+    // Shared probe (lib/me): concurrent mount-time callers on this page collapse
+    // to ONE /api/me request; a new pathname re-invokes it for a fresh role.
+    fetchMe()
+      .then(m => {
         if (cancelled) return
-        const r = d?.user?.role as Role | undefined
+        const r = m?.role as Role | undefined
         if (r === 'STUDENT' || r === 'TUTOR' || r === 'ADMIN') setRole(r)
         else setRole(null)
       })

@@ -45,6 +45,43 @@ const getTutorSeo = cache(async (id: string) => {
   }
 })
 
+// Core profile fields the client needs for FIRST PAINT, loaded server-side so
+// the interactive component (./client.tsx) renders the hero/identity/specs/
+// about/price immediately instead of a blank skeleton while its own
+// /api/tutors/[id] fetch is in flight. Deliberately scalar + relation-name
+// only: NO Date / availability / review-timestamp fields, which are viewer-tz
+// dependent and must stay client-computed to avoid an SSR hydration mismatch.
+// Those (live slots, reviews, experience/education/certificates) hydrate from
+// the client's existing fetch. Returns null on any DB error so the client
+// cleanly falls back to its pure client-fetch path (skeleton + retry).
+const getTutorInitial = cache(async (id: string) => {
+  try {
+    const [tutor, consultations] = await Promise.all([
+      prisma.tutorProfile.findUnique({
+        where: { id },
+        select: {
+          id: true, headline: true, bio: true, specialty: true, yearsExp: true,
+          rating: true, reviewsCount: true, sessionsCount: true, price: true,
+          verified: true, available: true, responseHours: true, languages: true,
+          videoUrl: true, consultationDurationMin: true,
+          user: { select: { id: true, fullName: true, avatarUrl: true, bio: true } },
+          category: { select: { id: true, slug: true, name: true, icon: true } },
+        },
+      }),
+      prisma.consultation.findMany({
+        where: { tutorId: id },
+        select: { id: true, tier: true, title: true, description: true, minutes: true, price: true },
+      }),
+    ])
+    if (!tutor) return null
+    // Shape matches /api/tutors/[id] for the seeded fields; the arrays the seed
+    // omits are read as `?? []` in the client, so their absence is safe.
+    return { ...tutor, consultations }
+  } catch {
+    return null
+  }
+})
+
 // Bio excerpt for meta description — first ~155 chars, cut at a word edge.
 function excerpt(text: string | null | undefined, max = 155): string | null {
   const t = text?.replace(/\s+/g, ' ').trim()
@@ -108,7 +145,10 @@ export default async function TutorProfileRoute(
   { params }: { params: Promise<Params> },
 ) {
   const { id } = await params
-  const tutor = await getTutorSeo(id)
+  // SEO row (unchanged) for notFound + JSON-LD, plus the fuller first-paint
+  // seed for the client. Both are React-cached; the seed adds one findUnique +
+  // one consultation read, run in parallel.
+  const [tutor, initialTutor] = await Promise.all([getTutorSeo(id), getTutorInitial(id)])
 
   // Missing id → real 404. DB error ('error') falls through: the client
   // component has its own error/retry state for that case.
@@ -152,7 +192,7 @@ export default async function TutorProfileRoute(
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <ExpertProfilePage />
+      <ExpertProfilePage initialTutor={initialTutor} />
     </>
   )
 }

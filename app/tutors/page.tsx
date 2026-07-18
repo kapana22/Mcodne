@@ -11,6 +11,7 @@ import { SignInPromptBanner } from '@/components/SignInPromptBanner'
 import { Sheet } from '@/components/Sheet'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { fmtRating } from '@/lib/fmt'
+import { useMe } from '@/lib/me'
 // ONE shared booking flow (DESIGN_FIX_PROMPT 1.1): the same component the
 // expert profile renders. It self-fetches /api/tutors/{id} on open, supports
 // consultation tiers (step 1) and the mandatory intake — QuickBookPopup's
@@ -1126,35 +1127,30 @@ function Tutors() {
   // shows the skeleton, not the empty-state message.
   const [loading, setLoading] = useState(true)
   const [favIds, setFavIds] = useState<Set<string>>(new Set())
-  const [signedIn, setSignedIn] = useState<boolean>(false)
-  // True once the /api/me auth probe has resolved. Used to relabel the booking
-  // CTA ("შესვლა & ჯავშანი") only for KNOWN-anonymous visitors, avoiding a
-  // sign-in flash for authed users before the probe returns.
-  const [authKnown, setAuthKnown] = useState(false)
+  // Shared /api/me (lib/me) — deduped with the top bar + AppShell. `authKnown`
+  // is the probe's `ready`: used to relabel the booking CTA ("შესვლა & ჯავშანი")
+  // only for KNOWN-anonymous visitors, avoiding a sign-in flash for authed
+  // users before the probe returns.
+  const { me, ready: authKnown } = useMe()
+  const signedIn = !!me
   const [needsAuth, setNeedsAuth] = useState(false)
   const [authDismissed, setAuthDismissed] = useState(false)
   useEffect(() => {
+    // Only probe favorites once the shared /api/me has confirmed a signed-in
+    // user — this avoids the console-spam 401 on /api/favorites for anon
+    // visitors browsing the public tutor list.
+    if (!me) return
     let cancelled = false
     ;(async () => {
       try {
-        // Check auth via /api/me first (always 200 with `{user: null}` for
-        // anon). This avoids the console-spam 401 on /api/favorites for
-        // unauthenticated visitors browsing the public tutor list.
-        const meRes = await fetch('/api/me')
-        if (!meRes.ok) { setSignedIn(false); return }
-        const meBody = await meRes.json().catch(() => ({}))
-        if (!meBody?.user) { setSignedIn(false); return }
-        setSignedIn(true)
-        if (cancelled) return
         const favRes = await fetch('/api/favorites')
         if (!favRes.ok || cancelled) return
         const rows = await favRes.json()
         if (Array.isArray(rows)) setFavIds(new Set(rows.map((r: any) => r.tutorId)))
       } catch {}
-      finally { if (!cancelled) setAuthKnown(true) }
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [me])
 
   const toggleFav = React.useCallback(async (tutorId: string) => {
     if (!signedIn) {
