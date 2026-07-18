@@ -117,6 +117,11 @@ export async function getCurrentUser() {
     include: { user: true },
   })
   if (!session || session.expiresAt < new Date()) return null
+  // A suspended account is treated as logged-out EVERYWHERE — this is the
+  // single choke-point that makes suspension actually revoke access. Without
+  // it, suspend only sets a flag while the live session cookie keeps working
+  // (and password-reset/OTP/Google re-auth would mint fresh working sessions).
+  if ((session.user as any).suspendedAt) return null
   return session.user
 }
 

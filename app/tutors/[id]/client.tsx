@@ -378,7 +378,7 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
             </span>
             {tutor?.verified && (
               <span className="inline-flex items-center gap-1.5 text-[12px] font-display font-medium text-ink-700">
-                <Icon.star className="w-4 h-4 text-brand-600" /> ID გადამოწმებული
+                <Icon.shieldCheck className="w-4 h-4 text-brand-600" /> ID გადამოწმებული
               </span>
             )}
           </div>

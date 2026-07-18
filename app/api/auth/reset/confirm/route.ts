@@ -46,8 +46,14 @@ export async function POST(req: Request) {
     prisma.session.deleteMany({ where: { userId: rec.userId } }),
   ])
 
-  await createSession(rec.userId)
   const user = await prisma.user.findUnique({ where: { id: rec.userId } })
+  // A suspended account can own its email and reset its password — but must not
+  // get a working session that way. Password is changed (above), no session is
+  // minted; getCurrentUser would reject them anyway, this just returns cleanly.
+  if ((user as any)?.suspendedAt) {
+    return NextResponse.json({ ok: false, error: 'SUSPENDED' }, { status: 403 })
+  }
+  await createSession(rec.userId)
   // A session now exists on THIS device (only other devices were revoked
   // above) — return the landing so the done view can continue straight into
   // the workspace instead of demanding a redundant re-login.

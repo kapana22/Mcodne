@@ -38,6 +38,8 @@ export const Icon = {
   cam: (p: IconProps) => (<svg {...S(p)}><rect x="2.5" y="6" width="13" height="12" rx="2" /><path d="m15.5 10 6-3v10l-6-3" /></svg>),
   share: (p: IconProps) => (<svg {...S(p)}><rect x="3" y="5" width="18" height="12" rx="2" /><path d="M8 21h8M12 17v4" /></svg>),
   end: (p: IconProps) => (<svg {...S(p)}><path d="M22 16.9v3a2 2 0 0 1-2 2 20 20 0 0 1-19-19 2 2 0 0 1 2-2h3a2 2 0 0 1 2 1.7l.6 3a2 2 0 0 1-.5 2L6.5 9.5a16 16 0 0 0 8 8l1.9-1.9a2 2 0 0 1 2-.5l3 .6a2 2 0 0 1 1.6 2Z" /></svg>),
+  home: (p: IconProps) => (<svg {...S(p)}><path d="m3 10 9-7 9 7" /><path d="M5 9v11a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9" /></svg>),
+  logout: (p: IconProps) => (<svg {...S(p)}><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 17l5-5-5-5M15 12H3" /></svg>),
   close: (p: IconProps) => (<svg {...S(p)} strokeWidth={2}><path d="m6 6 12 12M18 6 6 18" /></svg>),
   menu: (p: IconProps) => (<svg {...S(p)}><path d="M4 7h16M4 12h16M4 17h16" /></svg>),
   chevR: (p: IconProps) => (<svg {...S(p)}><path d="m9 6 6 6-6 6" /></svg>),

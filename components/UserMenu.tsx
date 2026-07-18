@@ -25,8 +25,8 @@ const STUDENT_ITEMS = (onSignout: () => void): MenuItem[] => [
   { href: '/student/profile',   label: 'პროფილი',       icon: Icon.user },
   { href: '/settings',          label: 'პარამეტრები',   icon: Icon.settings },
   { href: '/notifications',     label: 'შეტყობინებები', icon: Icon.bell },
-  { href: '/help',              label: 'დახმარება',     icon: Icon.doc },
-  { label: 'გამოსვლა',          icon: Icon.end, danger: true, onClick: onSignout },
+  { href: '/help',              label: 'დახმარება',     icon: Icon.info },
+  { label: 'გამოსვლა',          icon: Icon.logout, danger: true, onClick: onSignout },
 ]
 
 // გრაფიკი/შემოსავალი/კატალოგი live here because mobile has no sidebar and
@@ -39,15 +39,15 @@ const TUTOR_ITEMS = (onSignout: () => void): MenuItem[] => [
   { href: '/tutors',            label: 'ექსპერტების კატალოგი', icon: Icon.search },
   { href: '/settings',          label: 'პარამეტრები',   icon: Icon.settings },
   { href: '/tutor/messages',    label: 'შეტყობინებები', icon: Icon.chat },
-  { href: '/help',              label: 'დახმარება',     icon: Icon.doc },
-  { label: 'გამოსვლა',          icon: Icon.end, danger: true, onClick: onSignout },
+  { href: '/help',              label: 'დახმარება',     icon: Icon.info },
+  { label: 'გამოსვლა',          icon: Icon.logout, danger: true, onClick: onSignout },
 ]
 
 const ADMIN_ITEMS = (onSignout: () => void): MenuItem[] => [
   { href: '/admin',             label: 'ადმინი',        icon: Icon.shield },
   { href: '/settings',          label: 'პარამეტრები',   icon: Icon.settings },
-  { href: '/help',              label: 'დახმარება',     icon: Icon.doc },
-  { label: 'გამოსვლა',          icon: Icon.end, danger: true, onClick: onSignout },
+  { href: '/help',              label: 'დახმარება',     icon: Icon.info },
+  { label: 'გამოსვლა',          icon: Icon.logout, danger: true, onClick: onSignout },
 ]
 
 export function UserMenu({

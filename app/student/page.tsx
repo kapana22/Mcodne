@@ -181,7 +181,7 @@ const Welcome = ({ me, bookings }: { me: MeData | null; bookings: any[] }) => {
                 <Icon.cal className="w-3.5 h-3.5" /> ჩემი ჯავშნები
               </Link>
               <Link href="/tutors" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-btn bg-ink-50 hover:bg-ink-100 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
-                <Icon.globe className="w-3.5 h-3.5" /> ყველა ექსპერტი
+                <Icon.search className="w-3.5 h-3.5" /> ყველა ექსპერტი
               </Link>
             </div>
         </div>

@@ -87,6 +87,10 @@ export async function GET(req: Request) {
     await prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } })
   }
 
+  // A suspended account must not obtain a session via Google sign-in either.
+  if ((user as any).suspendedAt) {
+    return NextResponse.redirect(new URL('/signin?e=suspended', origin))
+  }
   await createSession(user.id)
   // Explicit deep-link wins (matches password signin); otherwise the
   // server-decided landing (role home, or /apply for pending applicants).

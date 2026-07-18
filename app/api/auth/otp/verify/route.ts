@@ -49,6 +49,10 @@ export async function POST(req: Request) {
     prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } }),
   ])
 
+  // A suspended account must not obtain a session via OTP verification.
+  if ((user as any).suspendedAt) {
+    return NextResponse.json({ ok: false, error: 'SUSPENDED' }, { status: 403 })
+  }
   await createSession(user.id)
   // Same shape as /api/auth/signin: server-decided landing, so a pending
   // expert applicant who verifies their email lands back on /apply.

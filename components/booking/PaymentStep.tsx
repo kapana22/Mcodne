@@ -45,7 +45,7 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
               >
                 <div className="flex items-center gap-2.5">
                   <span className={`w-9 h-9 rounded-card font-display font-bold text-[12px] tracking-wider inline-flex items-center justify-center ${toneCls}`}>
-                    {m.id === 'card' ? <Icon.cal className="w-4 h-4" /> : m.l.split(' ')[0].slice(0, 3).toUpperCase()}
+                    {m.id === 'card' ? <Icon.money className="w-4 h-4" /> : m.l.split(' ')[0].slice(0, 3).toUpperCase()}
                   </span>
                   <div className="min-w-0">
                     <div className="font-display text-[13px] font-bold text-ink-900 truncate">{m.l}</div>

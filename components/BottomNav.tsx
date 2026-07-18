@@ -30,7 +30,7 @@ const startsWith = (prefix: string) => (path: string) =>
   path === prefix || path.startsWith(prefix + '/')
 
 const STUDENT_TABS: Tab[] = [
-  { href: '/student',           label: 'მთავარი',      icon: Icon.category, match: p => p === '/student' },
+  { href: '/student',           label: 'მთავარი',      icon: Icon.home, match: p => p === '/student' },
   { href: '/tutors',            label: 'ექსპერტები',     icon: Icon.search,   match: startsWith('/tutors') },
   // Bookings — the core object of the product — earns the tab; notifications
   // stay reachable via the header bell and the profile red dot.
@@ -39,7 +39,7 @@ const STUDENT_TABS: Tab[] = [
 ]
 
 const TUTOR_TABS: Tab[] = [
-  { href: '/tutor',             label: 'მთავარი',      icon: Icon.category, match: p => p === '/tutor' },
+  { href: '/tutor',             label: 'მთავარი',      icon: Icon.home, match: p => p === '/tutor' },
   { href: '/tutor/bookings',    label: 'ჯავშნები',     icon: Icon.calendar, match: startsWith('/tutor/bookings') },
   { href: '/tutor/messages',    label: 'მესიჯები',      icon: Icon.chat,    match: startsWith('/tutor/messages') },
   { href: '/tutor/profile',     label: 'პროფილი',      icon: Icon.user,     match: startsWith('/tutor/profile') },

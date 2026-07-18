@@ -22,9 +22,10 @@ export const metadata: Metadata = {
 }
 
 // Server component — Prisma-fed, no client JS needed for the browse view.
-// Long-form server render on every hit keeps the counts fresh (categories are
-// small, the query is cheap; no need for ISR yet).
-export const dynamic = 'force-dynamic'
+// ISR: serve cached HTML and revalidate every 5 min instead of re-querying the
+// DB on every hit. Category counts don't need to be second-fresh, and this is a
+// public page — force-dynamic made every visit pay a DB round-trip for nothing.
+export const revalidate = 300
 
 // Map arbitrary icon slug -> Icon.* key. Category.icon is a free-form string in
 // the schema (may reference a Lucide-ish name), so we take a best-effort match

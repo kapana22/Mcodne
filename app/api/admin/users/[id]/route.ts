@@ -132,6 +132,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     select: { id: true, suspendedAt: true },
   })
 
+  // Revoke every live session so a suspended user is logged out immediately,
+  // not just blocked on next login. getCurrentUser also rejects suspended users
+  // defensively, but wiping sessions makes the lockout instant and clean.
+  if (action === 'suspend') {
+    await prisma.session.deleteMany({ where: { userId: id } }).catch(() => {})
+  }
+
   await audit(admin.id, action === 'suspend' ? 'user.suspend' : 'user.unsuspend', {
     targetType: 'User',
     targetId: id,

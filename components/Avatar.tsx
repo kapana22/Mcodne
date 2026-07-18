@@ -35,22 +35,29 @@ export function Avatar({
 
   return (
     <span className={`relative inline-block ${hoverCls} ${className}`} style={s}>
-      {src ? (
-        <Image
-          src={src}
-          alt={name ?? ''}
-          width={size}
-          height={size}
-          className="rounded-full object-cover ring-2 ring-white motion-safe:animate-fade-in-fast"
-        />
-      ) : (
-        <span
-          className="rounded-full bg-gradient-to-br from-brand-100 to-brand-200 text-brand-800 flex items-center justify-center font-display font-semibold ring-2 ring-white motion-safe:animate-fade-in-fast"
-          style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
-        >
-          {initial}
-        </span>
-      )}
+      {/* The image lives inside an overflow-hidden rounded-full clip so a
+          non-square photo (or any next/image intrinsic sizing) can NEVER show
+          square corners outside the circle — the reported "photo escapes the
+          frame" bug. The ring lives on the clip; the status dot stays a sibling
+          OUTSIDE it so the clip doesn't shave the dot. */}
+      <span className="block w-full h-full rounded-full overflow-hidden ring-2 ring-white" style={s}>
+        {src ? (
+          <Image
+            src={src}
+            alt={name ?? ''}
+            width={size}
+            height={size}
+            className="w-full h-full object-cover motion-safe:animate-fade-in-fast"
+          />
+        ) : (
+          <span
+            className="w-full h-full bg-gradient-to-br from-brand-100 to-brand-200 text-brand-800 flex items-center justify-center font-display font-semibold motion-safe:animate-fade-in-fast"
+            style={{ fontSize: Math.round(size * 0.4) }}
+          >
+            {initial}
+          </span>
+        )}
+      </span>
       {dot && (
         <span
           aria-hidden
