@@ -12,39 +12,11 @@ import { RISK_REVERSAL_LINE } from '@/lib/copy'
 import { pushRecentTutor } from '@/components/RecentTutorsStrip'
 import { userTimezone, TBILISI } from '@/lib/tz'
 import { fmtRating } from '@/lib/fmt'
-import { fmtKaDate } from '@/lib/kaDate'
+import { fmtKaDate, KA_MONTHS_LONG as KA_MONTHS_FULL } from '@/lib/kaDate'
 import { CountUp } from '@/components/CountUp'
 import { Sheet } from '@/components/Sheet'
+import { Icon } from '@/components/Icon'
 
-/* ───── Icons ───── */
-const Icon = {
-  arrow: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M5 12h14M13 5l7 7-7 7" /></svg>,
-  chevD: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m6 9 6 6 6-6" /></svg>,
-  chevR: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m9 6 6 6-6 6" /></svg>,
-  chevL: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m15 6-6 6 6 6" /></svg>,
-  check: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m4 12 5 5L20 6" /></svg>,
-  star: (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="m12 2 2.95 6.5L22 9.3l-5.2 4.9 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.3l7.05-.8L12 2Z" /></svg>,
-  play: (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M8 5v14l11-7L8 5Z" /></svg>,
-  pause: (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>,
-  shield: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" /><path d="m9 12 2 2 4-4" /></svg>,
-  clock: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>,
-  globe: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18" /></svg>,
-  spark: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></svg>,
-  heart: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 20s-7-4.4-9.5-9A5 5 0 0 1 12 6a5 5 0 0 1 9.5 5C19 15.6 12 20 12 20Z" /></svg>,
-  heartFilled: (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M12 20s-7-4.4-9.5-9A5 5 0 0 1 12 6a5 5 0 0 1 9.5 5C19 15.6 12 20 12 20Z" /></svg>,
-  share: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5 15.4 17.5M15.4 6.5 8.6 10.5" /></svg>,
-  flag: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M4 21V5a17 17 0 0 1 9 0 17 17 0 0 0 7 0v9a17 17 0 0 1-7 0 17 17 0 0 0-9 0" /></svg>,
-  cal: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="3.5" y="5" width="17" height="16" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>,
-  video: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="2" y="6" width="14" height="12" rx="2" /><path d="m16 10 6-3v10l-6-3" /></svg>,
-  x: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m6 6 12 12M18 6 6 18" /></svg>,
-  thumb: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M7 11V20H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Z" /><path d="M7 11V8a4 4 0 0 1 4-4l1.5 5h6a2 2 0 0 1 2 2.3l-1.3 7A2 2 0 0 1 17.2 20H7" /></svg>,
-  file: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M14 3v5h5" /></svg>,
-  download: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 4v12M7 11l5 5 5-5M5 20h14" /></svg>,
-  bell: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M6 9a6 6 0 0 1 12 0v4l2 3H4l2-3V9Z" /><path d="M10 19a2 2 0 1 0 4 0" /></svg>,
-  xC:       (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m6 6 12 12M18 6 6 18" /></svg>,
-  menu:     (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M4 7h16M4 12h16M4 17h16" /></svg>,
-  warn:     (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3 2 21h20L12 3Z" /><path d="M12 10v5M12 18h0" /></svg>,
-}
 
 const Logo = () => (
   <Link href="/" className="inline-flex items-center" aria-label="მცოდნე">
@@ -408,7 +380,7 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
               <Icon.check className="w-4 h-4 text-brand-600" /> ხელით შერჩეული ექსპერტი
             </span>
             <span className="inline-flex items-center gap-1.5 text-[12px] font-display font-medium text-ink-700">
-              <Icon.shield className="w-4 h-4 text-brand-600" /> {PAYMENTS_LIVE ? 'Escrow-დაცული გადახდა' : 'უფასო დაჯავშნა · გადახდები მალე'}
+              <Icon.shieldCheck className="w-4 h-4 text-brand-600" /> {PAYMENTS_LIVE ? 'Escrow-დაცული გადახდა' : 'უფასო დაჯავშნა · გადახდები მალე'}
             </span>
             {tutor?.verified && (
               <span className="inline-flex items-center gap-1.5 text-[12px] font-display font-medium text-ink-700">
@@ -711,7 +683,7 @@ const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; inte
           </Link>
         </div>
         <p className="mt-4 mb-2 text-[11px] text-ink-500 text-center inline-flex items-center gap-1.5 w-full justify-center">
-          <Icon.shield className="w-3 h-3 text-success-600" />
+          <Icon.shieldCheck className="w-3 h-3 text-success-600" />
           {PAYMENTS_LIVE ? 'გადახდა escrow-შია სესიის ბოლომდე' : 'დაჯავშნა უფასოა — გადახდები მალე'}
         </p>
     </Sheet>
@@ -826,8 +798,8 @@ const SpecsGrid = ({ tutor }: { tutor: TutorDetail | null }) => {
     // Bank names must not render before the gateway is live — until then the
     // honest spec is that booking costs nothing.
     PAYMENTS_LIVE
-      ? { n: 'Escrow', l: 'TBC · BOG · SOLO', icon: <Icon.shield className="w-3.5 h-3.5" /> }
-      : { n: 'უფასო', l: 'გადახდები მალე', icon: <Icon.shield className="w-3.5 h-3.5" /> },
+      ? { n: 'Escrow', l: 'TBC · BOG · SOLO', icon: <Icon.shieldCheck className="w-3.5 h-3.5" /> }
+      : { n: 'უფასო', l: 'გადახდები მალე', icon: <Icon.shieldCheck className="w-3.5 h-3.5" /> },
   ]
   return (
     // Compact fact strip — these repeat identity-row facts, so on desktop they
@@ -950,7 +922,7 @@ const CertificatesSection = ({ items }: { items: CertItem[] }) => {
           <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">დიპლომები და სერტიფიკატები</h2>
         </div>
         <span className="text-[11.5px] text-ink-500 font-display inline-flex items-center gap-1.5">
-          <Icon.shield className="w-3.5 h-3.5 text-brand-600" />
+          <Icon.shieldCheck className="w-3.5 h-3.5 text-brand-600" />
           ხელით გადამოწმებული
         </span>
       </div>
@@ -1169,7 +1141,7 @@ const StickyBookingCard = ({
             რეაგ. ~ {responseHours} სთ
           </span>
           <span className="inline-flex items-center gap-1.5 text-ink-600">
-            <Icon.shield className="w-3 h-3 text-ink-400" />
+            <Icon.shieldCheck className="w-3 h-3 text-ink-400" />
             {PAYMENTS_LIVE ? 'Escrow დაცული' : 'უფასო დაჯავშნა'}
           </span>
         </div>
@@ -1184,7 +1156,6 @@ type BookingMode = 'paid'
 const WEEK_HEADERS = ['ორშ', 'სამშ', 'ოთხ', 'ხუთ', 'პარ', 'შაბ', 'კვ']
 const DAY_NAMES_FULL = ['ორშაბათი', 'სამშაბათი', 'ოთხშაბათი', 'ხუთშაბათი', 'პარასკევი', 'შაბათი', 'კვირა']
 const DAY_SHORT = ['ორშ.', 'სამშ.', 'ოთხ.', 'ხუთ.', 'პარ.', 'შაბ.', 'კვ.']
-const KA_MONTHS_FULL = ['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი']
 const KA_MONTHS_SHORT = ['იან.','თებ.','მარტ.','აპრ.','მაი.','ივნ.','ივლ.','აგვ.','სექტ.','ოქტ.','ნოე.','დეკ.']
 
 // isoWeekday: Mon=0..Sun=6 (so it maps to WEEK_HEADERS index)
@@ -1722,7 +1693,7 @@ const Step3Payment = ({ value, onChange, summary }: { value: PaymentState; onCha
 
       {value.method !== 'card' && (
         <div className="rounded-card border border-ink-200 bg-ink-50/40 p-5 grid grid-cols-[auto_1fr] gap-3 items-start">
-          <Icon.shield className="w-4 h-4 mt-0.5 text-brand-700 shrink-0" />
+          <Icon.shieldCheck className="w-4 h-4 mt-0.5 text-brand-700 shrink-0" />
           <div>
             <div className="font-display text-[13px] font-bold text-ink-900">გადახდის გაგრძელება ბანკში</div>
             <p className="text-[12.5px] text-ink-600 mt-1 leading-[1.5]">
@@ -1822,7 +1793,7 @@ const OrderSummary = ({
       </div>
 
       <div className="mt-4 rounded-card bg-brand-50 border border-brand-100 p-3.5 grid grid-cols-[auto_1fr] gap-2.5 items-start">
-        <Icon.shield className="w-4 h-4 mt-0.5 text-brand-700 shrink-0" />
+        <Icon.shieldCheck className="w-4 h-4 mt-0.5 text-brand-700 shrink-0" />
         <div className="space-y-1">
           {PAYMENTS_LIVE ? (
             <>

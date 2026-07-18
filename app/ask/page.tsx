@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { PublicTopBar } from '@/components/PublicTopBar'
 import { Footer as SharedFooter } from '@/components/Footer'
 import { frameQuestion } from '@/lib/askFraming'
-import { fmtKaDate } from '@/lib/kaDate'
+import { fmtKaDate, fmtKaTime } from '@/lib/kaDate'
 import { fmtRating } from '@/lib/fmt'
 
 const Ic = {
@@ -42,7 +42,7 @@ function fmtSlot(iso: string | null): string {
   const now = new Date()
   const same = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
   const tom = new Date(now); tom.setDate(now.getDate() + 1)
-  const hm = d.toLocaleTimeString('ka-GE', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const hm = fmtKaTime(d)
   if (same(d, now)) return `დღეს ${hm}`
   if (same(d, tom)) return `ხვალ ${hm}`
   return fmtKaDate(d)

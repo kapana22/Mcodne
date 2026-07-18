@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { homeForRole, safeInternalPath } from '@/lib/roleHome'
+import { Icon } from '@/components/Icon'
 
 type View = 'signin' | 'signup' | 'verify' | 'reset' | 'onboarding'
 
@@ -120,34 +121,6 @@ function startGoogleSignin(e: React.MouseEvent<HTMLAnchorElement>) {
   }
 }
 
-/* ───── Icons ───── */
-const Icon = {
-  arrow:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M5 12h14M13 5l7 7-7 7" /></svg>,
-  back:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M19 12H5M11 19l-7-7 7-7" /></svg>,
-  check:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m4 12 5 5L20 6" /></svg>,
-  eye:     (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>,
-  eyeOff:  (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m3 3 18 18M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 7 10 7a17 17 0 0 1-3.1 4M6.4 7.6A17 17 0 0 0 2 12s3.5 7 10 7c1.3 0 2.5-.2 3.6-.7M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>,
-  star:    (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="m12 2 2.95 6.5L22 9.3l-5.2 4.9 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.3l7.05-.8L12 2Z" /></svg>,
-  lock:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="4.5" y="11" width="15" height="10" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg>,
-  shield:  (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" /><path d="m9 12 2 2 4-4" /></svg>,
-  mail:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 5.5L20 7" /></svg>,
-  phone:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M22 16.9v2.7a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.1-8.7A2 2 0 0 1 4.1 2h2.7a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.7a2 2 0 0 1-.5 2.1L7.1 10a16 16 0 0 0 6 6l1.5-1.5a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.7.6a2 2 0 0 1 1.7 2Z" /></svg>,
-  refresh: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 12a9 9 0 0 1 15.5-6L21 4M21 4v6h-6M21 12a9 9 0 0 1-15.5 6L3 20M3 20v-6h6" /></svg>,
-  warn:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3 2 21h20L12 3Z" /><path d="M12 10v5M12 18h0" /></svg>,
-  camera:  (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 8a2 2 0 0 1 2-2h2.5l1.5-2h6l1.5 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" /><circle cx="12" cy="13" r="3.5" /></svg>,
-  video:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="2" y="6" width="14" height="12" rx="2" /><path d="m16 10 6-3v10l-6-3" /></svg>,
-  play:    (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M8 5v14l11-7L8 5Z" /></svg>,
-  upload:  (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 16V4M7 9l5-5 5 5M5 20h14" /></svg>,
-  file:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M14 3v5h5" /></svg>,
-  plus:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 5v14M5 12h14" /></svg>,
-  x:       (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m6 6 12 12M18 6 6 18" /></svg>,
-  trash:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6" /></svg>,
-  spark:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></svg>,
-  globe:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18" /></svg>,
-  info:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9" /><path d="M12 16v-5M12 8v.01" /></svg>,
-  clock:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>,
-  heart:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 20s-7-4.4-9.5-9A5 5 0 0 1 12 6a5 5 0 0 1 9.5 5C19 15.6 12 20 12 20Z" /></svg>,
-}
 
 const Logo = ({ size = 'md' }: { size?: 'sm' | 'md' }) => (
   <div className="inline-flex items-center" aria-label="მცოდნე">
@@ -332,7 +305,7 @@ const AuthFooter = () => (
   <footer className="border-t border-ink-200 bg-white">
     <div className="max-w-[1280px] mx-auto px-6 sm:px-8 lg:px-12 py-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <div className="flex items-center gap-3 text-[12px] text-ink-500">
-        <Icon.shield className="w-3.5 h-3.5 text-ink-400" />
+        <Icon.shieldCheck className="w-3.5 h-3.5 text-ink-400" />
         <span>SSL · bcrypt · 2FA მზადაა</span>
         <span className="hidden sm:inline text-ink-300">·</span>
         <span className="hidden sm:inline">escrow: <span className="font-display font-semibold text-ink-700">TBC</span> · <span className="font-display font-semibold text-ink-700">BOG</span> · <span className="font-display font-semibold text-ink-700">SOLO</span></span>
@@ -356,7 +329,7 @@ const SignInIntro = () => (
   <div>
     {/* Trust pill */}
     <span className="inline-flex items-center gap-2 h-7 pl-2.5 pr-3 rounded-pill bg-white border border-ink-200 shadow-xs mb-8">
-      <Icon.shield className="w-3.5 h-3.5 text-brand-600" />
+      <Icon.shieldCheck className="w-3.5 h-3.5 text-brand-600" />
       <span className="text-[12px] text-ink-700">ხელით შერჩეული, გადამოწმებული ექსპერტები</span>
     </span>
 
@@ -1255,7 +1228,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
               )}
             </button>
             <div className="mt-5 grid grid-cols-[auto_1fr] gap-2.5 items-start p-3.5 rounded-card bg-ink-50/60 border border-ink-200">
-              <Icon.shield className="w-4 h-4 text-ink-500 mt-0.5" />
+              <Icon.shieldCheck className="w-4 h-4 text-ink-500 mt-0.5" />
               <p className="text-[11.5px] text-ink-600 leading-[1.5]">
                 თუ ანგარიში არ ჩანს ჩვენთან, არ მოგწერთ — უსაფრთხოებისთვის. შემოწმე ჯერ ნახე spam, შემდეგ მოგვწერე <a href="mailto:hi@mcodne.ge" className="text-brand-700 hover:text-brand-800 font-medium underline underline-offset-2 decoration-brand-300">hi@mcodne.ge</a>.
               </p>
@@ -1381,7 +1354,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
               უსაფრთხოებისთვის გავთიშეთ ყველა სხვა მოწყობილობა — სხვა ბრაუზერში ან iPad-ზე ახალი პაროლით შესვლა დაგჭირდება.
             </p>
             <div className="mt-7 rounded-card bg-brand-50/40 border border-brand-200 p-4 grid grid-cols-[auto_1fr] gap-3">
-              <Icon.shield className="w-4 h-4 text-brand-700 mt-0.5" />
+              <Icon.shieldCheck className="w-4 h-4 text-brand-700 mt-0.5" />
               <div>
                 <div className="font-display text-[12.5px] font-bold text-ink-900 mb-1">გირჩევთ — 2FA-ის ჩართვა</div>
                 <p className="text-[11.5px] text-ink-700 leading-[1.5]">SMS კოდი ან ავტენტიფიკატორი დაამატე — ერთჯერად პაროლი + 2-ე ფაქტორი ვერ გადააქცევს ვერავინ.</p>

@@ -7,33 +7,8 @@ import { fmtRating } from '@/lib/fmt'
 import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
 import { Footer } from '@/components/Footer'
 import { Avatar } from '@/components/Avatar'
+import { Icon, CatIcon } from '@/components/Icon'
 
-/* ───── Icons (shared) ───── */
-const Icon = {
-  search:  (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
-  arrow:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M5 12h14M13 5l7 7-7 7" /></svg>,
-  star:    (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="m12 2 2.95 6.5L22 9.3l-5.2 4.9 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.3l7.05-.8L12 2Z" /></svg>,
-  play:    (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M8 5v14l11-7L8 5Z" /></svg>,
-  chat:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 12c0 4.4-4 8-9 8a10 10 0 0 1-4-.8L3 21l1-4.4A8.2 8.2 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8Z" /></svg>,
-  check:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m4 12 5 5L20 6" /></svg>,
-  clock:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>,
-  shield:  (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" /><path d="m9 12 2 2 4-4" /></svg>,
-  video:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="2" y="6" width="14" height="12" rx="2" /><path d="m16 10 6-3v10l-6-3" /></svg>,
-  globe:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18" /></svg>,
-  spark:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></svg>,
-  chevD:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m6 9 6 6 6-6" /></svg>,
-  menu:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M4 7h16M4 12h16M4 17h16" /></svg>,
-  x:       (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m6 6 12 12M18 6 6 18" /></svg>,
-  mail:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 5.5L20 7" /></svg>,
-  phone:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.4 2.1L8 9.6a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.4c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2.3Z" /></svg>,
-  cal:     (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="3.5" y="5" width="17" height="16" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>,
-  wallet:  (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 7a2 2 0 0 1 2-2h11l4 4v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" /><circle cx="16" cy="14" r="1.4" fill="currentColor" stroke="none" /></svg>,
-  user:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>,
-  bolt:    (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m13 2-8 12h6l-1 8 8-12h-6l1-8Z" /></svg>,
-  users:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="9" cy="8" r="4" /><path d="M2 21c0-4 3-7 7-7s7 3 7 7M16 4a4 4 0 0 1 0 8M22 21c0-3-2-5.5-5-6.5" /></svg>,
-  trend:   (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 17 9 11l4 4 8-9M14 4h7v7" /></svg>,
-  quote:   (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M7 7h4v4H8c0 2 1 3 3 3v3c-3.5 0-6-2-6-6V7Zm9 0h4v4h-3c0 2 1 3 3 3v3c-3.5 0-6-2-6-6V7Z" opacity=".8" /></svg>,
-}
 
 const Logo = ({ inverse }: { inverse?: boolean }) => (
   <div className="inline-flex items-center" aria-label="მცოდნე">
@@ -48,14 +23,6 @@ const VerifiedMark = ({ size = 16 }: { size?: number }) => (
 )
 
 /* ───── Categories (shared data) ───── */
-const CatIcon = {
-  business: <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7"><rect x="3.5" y="9" width="21" height="14" rx="2" /><path d="M10 9V6.5A1.5 1.5 0 0 1 11.5 5h5A1.5 1.5 0 0 1 18 6.5V9" /><path d="M3.5 15.5h21" /><path d="M13 14.5v2.5" /></svg>,
-  finance:  <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7"><path d="M3.5 11 14 5l10.5 6" /><path d="M5 11v10h18V11" /><path d="M9 14v5M14 14v5M19 14v5" /><path d="M3.5 22h21" /></svg>,
-  career:   <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7"><path d="M14 4c4 3 6 7 6 11 0 2.5-1 4.5-2 6l-4 3-4-3c-1-1.5-2-3.5-2-6 0-4 2-8 6-11Z" /><circle cx="14" cy="13" r="2.5" /><path d="m9 21-2.5 3.5 4.5-1M19 21l2.5 3.5-4.5-1" /></svg>,
-  law:      <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7"><path d="M14 4v19" /><path d="M8.5 23h11" /><path d="M6 9h16" /><path d="M14 5.5c-2 1.5-5.5 2.5-8 3.5M14 5.5c2 1.5 5.5 2.5 8 3.5" /><path d="m7 9-3 6h6Z" /><path d="m21 9-3 6h6Z" /></svg>,
-  marketing:<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7"><path d="m22.5 5-13 5H5a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4.5l13 5V5Z" /><path d="M9.5 16v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3" /></svg>,
-  psych:    <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7"><path d="M14 5a4 4 0 0 0-4 4 3.5 3.5 0 0 0-3 5.5A3.5 3.5 0 0 0 10 20a3 3 0 0 0 4 2.5V5Z" /><path d="M14 5a4 4 0 0 1 4 4 3.5 3.5 0 0 1 3 5.5A3.5 3.5 0 0 1 18 20a3 3 0 0 1-4 2.5V5Z" /></svg>,
-}
 
 // One brand treatment for every tile — the canon is the 3-color system, so no
 // per-category rainbow hues (and no safelist-dependent dynamic classes).
@@ -355,7 +322,7 @@ const HomeHero = () => {
         {/* Trust strip — clean, single line */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-6 sm:mb-10 lg:mb-12">
           <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-500">
-            <Icon.shield className="w-3.5 h-3.5 text-ink-400" />
+            <Icon.shieldCheck className="w-3.5 h-3.5 text-ink-400" />
             <span>ხელით შერჩეული ბაზა · ინდივიდუალურად შემოწმებული</span>
           </span>
         </div>
@@ -438,7 +405,7 @@ const HomeHero = () => {
             {/* Floating live-availability pill — real aggregate, never faked. */}
             <div className="flex justify-center mb-4">
               <span className="inline-flex items-center gap-2 h-8 pl-3 pr-3.5 rounded-pill bg-white border border-ink-200 shadow-pop">
-                <Icon.shield className="w-3.5 h-3.5 text-brand-600" />
+                <Icon.shieldCheck className="w-3.5 h-3.5 text-brand-600" />
                 <span className="font-display text-[12px] font-semibold text-ink-800 tracking-tight tabular-nums">
                   {stats ? `${stats.total} გადამოწმებული ექსპერტი` : 'ხელით შერჩეული ბაზა'}
                 </span>
@@ -515,7 +482,7 @@ const HomeHero = () => {
                 {/* Trust footer */}
                 <div className="border-t border-ink-100 px-5 sm:px-6 py-3 flex items-center gap-4 text-[11px] text-ink-600">
                   <span className="inline-flex items-center gap-1.5">
-                    <Icon.shield className="w-3.5 h-3.5 text-brand-600" /> {PAYMENTS_LIVE ? 'Escrow-დაცული' : 'უსაფრთხო გადახდები · მალე'}
+                    <Icon.shieldCheck className="w-3.5 h-3.5 text-brand-600" /> {PAYMENTS_LIVE ? 'Escrow-დაცული' : 'უსაფრთხო გადახდები · მალე'}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Icon.check className="w-3.5 h-3.5 text-brand-600" /> ID + გადამოწმებული
@@ -565,7 +532,7 @@ const HomeHero = () => {
             {/* Trust callout */}
             <div className="mt-5 rounded-card bg-accent-950 text-white p-5 flex items-center gap-4">
               <div className="w-11 h-11 rounded-card bg-brand-500 inline-flex items-center justify-center shrink-0">
-                <Icon.shield className="w-5 h-5" />
+                <Icon.shieldCheck className="w-5 h-5" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="font-display text-[14px] font-bold tracking-tight">გადახდა მხოლოდ დაჯავშნისას</div>

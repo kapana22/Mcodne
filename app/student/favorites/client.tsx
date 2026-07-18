@@ -144,7 +144,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
               aria-label="წაშლა შენახულიდან"
               className="absolute top-2 right-2 w-8 h-8 rounded-full inline-flex items-center justify-center bg-white/90 backdrop-blur hover:bg-white text-danger-600 disabled:opacity-50 shadow-xs transition-all"
             >
-              <Icon.heart className="w-4 h-4" fill="currentColor" />
+              <Icon.heartFilled className="w-4 h-4" />
             </button>
           </Link>
           <div className="p-4">

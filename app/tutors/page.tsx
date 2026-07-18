@@ -3,6 +3,9 @@ import React, { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { PublicTopBar } from '@/components/PublicTopBar'
+import { Footer } from '@/components/Footer'
+import { Icon } from '@/components/Icon'
+import { KA_MONTHS_SHORT } from '@/lib/kaDate'
 import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
 import { SignInPromptBanner } from '@/components/SignInPromptBanner'
 import { Sheet } from '@/components/Sheet'
@@ -11,32 +14,6 @@ import { RISK_REVERSAL_LINE } from '@/lib/copy'
 import { userTimezone, TBILISI } from '@/lib/tz'
 import { fmtRating } from '@/lib/fmt'
 
-/* ───── Icons ───── */
-const Icon = {
-  search: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
-  arrow: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M5 12h14M13 5l7 7-7 7" /></svg>,
-  chevD: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m6 9 6 6 6-6" /></svg>,
-  chevR: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m9 6 6 6-6 6" /></svg>,
-  chevL: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m15 6-6 6 6 6" /></svg>,
-  check: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m4 12 5 5L20 6" /></svg>,
-  star: (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="m12 2 2.95 6.5L22 9.3l-5.2 4.9 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.3l7.05-.8L12 2Z" /></svg>,
-  play: (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M8 5v14l11-7L8 5Z" /></svg>,
-  heart: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 20s-7-4.4-9.5-9A5 5 0 0 1 12 6a5 5 0 0 1 9.5 5C19 15.6 12 20 12 20Z" /></svg>,
-  heartFilled: (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M12 20s-7-4.4-9.5-9A5 5 0 0 1 12 6a5 5 0 0 1 9.5 5C19 15.6 12 20 12 20Z" /></svg>,
-  globe: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18" /></svg>,
-  clock: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>,
-  spark: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></svg>,
-  shield: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" /><path d="m9 12 2 2 4-4" /></svg>,
-  chat: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 11.5a8.4 8.4 0 0 1-9 8.5 8.6 8.6 0 0 1-3.5-.7L3 21l1.7-5.5A8.5 8.5 0 1 1 21 11.5Z" /></svg>,
-  sliders: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M4 6h13M20 6h-2M4 12h7M14 12h6M4 18h10M17 18h3" /><circle cx="18" cy="6" r="2" fill="currentColor" /><circle cx="12.5" cy="12" r="2" fill="currentColor" /><circle cx="15.5" cy="18" r="2" fill="currentColor" /></svg>,
-  grid: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>,
-  list: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M8 6h13M8 12h13M8 18h13" /><circle cx="4" cy="6" r="1" fill="currentColor" /><circle cx="4" cy="12" r="1" fill="currentColor" /><circle cx="4" cy="18" r="1" fill="currentColor" /></svg>,
-  x: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m6 6 12 12M18 6 6 18" /></svg>,
-  cal: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="3.5" y="5" width="17" height="16" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>,
-  xC:       (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m6 6 12 12M18 6 6 18" /></svg>,
-  menu:     (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M4 7h16M4 12h16M4 17h16" /></svg>,
-  bell:     (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M6 9a6 6 0 0 1 12 0v4l2 3H4l2-3V9Z" /><path d="M10 19a2 2 0 1 0 4 0" /></svg>,
-}
 
 const Logo = () => (
   <Link href="/" className="inline-flex items-center" aria-label="მცოდნე">
@@ -517,7 +494,6 @@ function tutorYouTubeId(t: { videoUrl?: string | null }): string | null {
 // Georgian short months — spelled out manually because the runtime's Intl
 // often lacks `ka-GE` data and `toLocaleDateString('ka-GE',…)` silently falls
 // back to English ("Jul 24") in an otherwise-Georgian UI.
-const KA_MONTHS_SHORT = ['იან', 'თებ', 'მარ', 'აპრ', 'მაი', 'ივნ', 'ივლ', 'აგვ', 'სექ', 'ოქტ', 'ნოე', 'დეკ']
 
 function fmtNextSlot(iso: string): string {
   const d = new Date(iso)
@@ -1382,7 +1358,7 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
             </div>
 
             <div className="p-4 border-t border-ink-200 bg-white text-[11px] text-ink-600 leading-[1.5] flex gap-2">
-              <Icon.shield className="w-3.5 h-3.5 text-brand-700 mt-0.5 shrink-0" />
+              <Icon.shieldCheck className="w-3.5 h-3.5 text-brand-700 mt-0.5 shrink-0" />
               {PAYMENTS_LIVE
                 ? 'გადახდილი თანხა escrow-ში დარჩება სესიის დასრულებამდე. დაბრუნება — 24სთ-მდე.'
                 : 'ჯავშანი ამჟამად უფასოა — გადახდის სისტემა მალე ჩაირთვება. ექსპერტი დაგიდასტურებს მოთხოვნას.'}
@@ -1533,7 +1509,7 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
                     />
                     <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-ink-500 tabular-nums">
                       <span>{goal.length} / 500 სიმბოლო</span>
-                      <span className="inline-flex items-center gap-1"><Icon.shield className="w-3 h-3" /> კერძო · ხედავს მხოლოდ ექსპერტი</span>
+                      <span className="inline-flex items-center gap-1"><Icon.shieldCheck className="w-3 h-3" /> კერძო · ხედავს მხოლოდ ექსპერტი</span>
                     </div>
                   </div>
 
@@ -1559,7 +1535,7 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
                           <span className="block font-display text-[13.5px] font-bold text-ink-900 tracking-tight">{m.l}</span>
                           <span className="block text-[11.5px] text-ink-500">{m.sub}</span>
                         </span>
-                        <Icon.shield className="w-4 h-4 text-success-600 shrink-0" />
+                        <Icon.shieldCheck className="w-4 h-4 text-success-600 shrink-0" />
                       </label>
                     ))}
                   </div>
@@ -1578,7 +1554,7 @@ const QuickBookPopup = ({ tutor, onClose }: { tutor: Tutor; onClose: () => void 
                   </div>
 
                   <div className="mt-4 flex items-start gap-2 text-[11.5px] text-ink-600 leading-[1.5]">
-                    <Icon.shield className="w-3.5 h-3.5 text-brand-700 mt-0.5 shrink-0" />
+                    <Icon.shieldCheck className="w-3.5 h-3.5 text-brand-700 mt-0.5 shrink-0" />
                     გადახდით ეთანხმები <Link href="/terms" className="underline text-ink-800">სერვისის წესებს</Link> და <Link href="/terms" className="underline text-ink-800">დაბრუნების პოლიტიკას</Link>. გაუქმება სესიამდე 24სთ-მდე უფასოა.
                   </div>
                 </div>
@@ -1758,73 +1734,6 @@ const Pagination = ({ page, setPage, totalPages }: { page: number; setPage: (n: 
   )
 }
 
-/* ───── Footer ───── */
-const Footer = () => (
-  <footer className="mt-20 lg:mt-28 bg-white border-t border-ink-200">
-    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 py-14">
-      <div className="grid md:grid-cols-[1.6fr_1fr_1fr_1fr] gap-10 mb-12">
-        <div>
-          <Logo />
-          <p className="text-[13px] text-ink-600 mt-5 max-w-[280px] leading-relaxed">პირადი ვიდეო-კონსულტაცია ქართველ პროფესიონალებთან. ქართულ ბაზარზე, ქართულ ფასებზე.</p>
-          {/* Honest by flag: no bank names until the payment gateway is live. */}
-          <div className="mt-5 inline-flex items-center gap-2 text-[12px] text-ink-500">
-            <Icon.shield className="w-4 h-4 text-ink-400" />
-            {PAYMENTS_LIVE ? (
-              <>
-                <span>escrow:</span>
-                <span className="font-display font-semibold text-ink-700 tracking-wide">TBC</span>
-                <span className="text-ink-300">·</span>
-                <span className="font-display font-semibold text-ink-700 tracking-wide">BOG</span>
-                <span className="text-ink-300">·</span>
-                <span className="font-display font-semibold text-ink-700 tracking-wide">SOLO</span>
-              </>
-            ) : (
-              <span>უსაფრთხო გადახდები · <span className="font-display font-semibold text-ink-700">მალე</span></span>
-            )}
-          </div>
-        </div>
-        {[
-          { h: 'პროდუქტი', l: [
-            { t: 'ექსპერტები', href: '/tutors' },
-            { t: 'კატეგორიები', href: '/tutors' },
-            { t: 'როგორ მუშაობს', href: '/#how' },
-            { t: 'დაწყება', href: '/signup' },
-          ]},
-          { h: 'კომპანია', l: [
-            { t: 'ჩვენ შესახებ', href: '/#about' },
-            { t: 'ბლოგი', href: '/help' },
-            { t: 'კარიერა', href: '/help' },
-            { t: 'პრესა', href: '/help' },
-            { t: 'კონტაქტი', href: 'mailto:hi@mcodne.ge' },
-          ]},
-          { h: 'სამართალი', l: [
-            { t: 'წესები', href: '/terms' },
-            { t: 'კონფიდენციალურობა', href: '/privacy' },
-            { t: 'დაბრუნება', href: '/terms' },
-            { t: 'FAQ', href: '/help' },
-            { t: 'უსაფრთხოება', href: '/privacy' },
-          ]},
-        ].map((c, i) => (
-          <div key={i}>
-            <div className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-4">{c.h}</div>
-            <ul className="space-y-2.5">
-              {c.l.map(it => <li key={it.t}><a href={it.href} className="text-[13px] text-ink-700 hover:text-ink-900 inline-flex items-center min-h-[32px] py-1">{it.t}</a></li>)}
-            </ul>
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between pt-8 border-t border-ink-200 gap-4">
-        <div className="text-[12px] text-ink-500">© 2026 მცოდნე. ყველა უფლება დაცულია.</div>
-        <div className="flex items-center gap-3 text-[12px] text-ink-500">
-          {/* Language toggle inert until i18n lands — kept as static labels */}
-          <span className="text-ink-400">ქართული</span>
-          <span className="text-ink-300">·</span>
-          <span>თბილისი, საქართველო</span>
-        </div>
-      </div>
-    </div>
-  </footer>
-)
 
 /* ───── Page ───── */
 /* ───── Quick-Compare modal ───── */

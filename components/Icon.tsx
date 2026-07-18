@@ -13,19 +13,26 @@ const S = (props: IconProps) => ({
   ...props,
 })
 
+// Shared drawings referenced under more than one name (aliases stay one component).
+const calendar = (p: IconProps) => (<svg {...S(p)}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>)
+const category = (p: IconProps) => (<svg {...S(p)}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>)
+
 export const Icon = {
   search: (p: IconProps) => (<svg {...S(p)}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>),
   star: (p: IconProps) => (<svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="m12 2 2.95 6.5L22 9.3l-5.2 4.9 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.3l7.05-.8L12 2Z" /></svg>),
   check: (p: IconProps) => (<svg {...S(p)} strokeWidth={2.2}><path d="m4 12 5 5L20 6" /></svg>),
   arrow: (p: IconProps) => (<svg {...S(p)}><path d="M5 12h14M13 5l7 7-7 7" /></svg>),
+  back: (p: IconProps) => (<svg {...S(p)}><path d="M19 12H5M11 19l-7-7 7-7" /></svg>),
   lock: (p: IconProps) => (<svg {...S(p)}><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>),
-  calendar: (p: IconProps) => (<svg {...S(p)}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>),
+  calendar,
+  cal: calendar,
   clock: (p: IconProps) => (<svg {...S(p)}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>),
   video: (p: IconProps) => (<svg {...S(p)}><rect x="2.5" y="6" width="13" height="12" rx="2" /><path d="m15.5 10 6-3v10l-6-3" /></svg>),
-  chat: (p: IconProps) => (<svg {...S(p)}><path d="M4 5h16v11H8l-4 4V5Z" /></svg>),
+  chat: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M21 11.5a8.4 8.4 0 0 1-9 8.5 8.6 8.6 0 0 1-3.5-.7L3 21l1.7-5.5A8.5 8.5 0 1 1 21 11.5Z" /></svg>),
   user: (p: IconProps) => (<svg {...S(p)}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-7 8-7s8 3 8 7" /></svg>),
   bell: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M6 9a6 6 0 0 1 12 0v4l2 3H4l2-3V9Z" /><path d="M10 19a2 2 0 1 0 4 0" /></svg>),
   heart: (p: IconProps) => (<svg {...S(p)}><path d="M20.8 6.6a5.4 5.4 0 0 0-8.8-1.7 5.4 5.4 0 0 0-8.8 6.4c1.6 3.3 8.8 8.7 8.8 8.7s7.2-5.4 8.8-8.7a5.4 5.4 0 0 0 0-4.7Z" /></svg>),
+  heartFilled: (p: IconProps) => (<svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M20.8 6.6a5.4 5.4 0 0 0-8.8-1.7 5.4 5.4 0 0 0-8.8 6.4c1.6 3.3 8.8 8.7 8.8 8.7s7.2-5.4 8.8-8.7a5.4 5.4 0 0 0 0-4.7Z" /></svg>),
   settings: (p: IconProps) => (<svg {...S(p)}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.2-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.2 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.9-2.9l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.9 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1Z" /></svg>),
   mic: (p: IconProps) => (<svg {...S(p)}><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>),
   cam: (p: IconProps) => (<svg {...S(p)}><rect x="2.5" y="6" width="13" height="12" rx="2" /><path d="m15.5 10 6-3v10l-6-3" /></svg>),
@@ -34,11 +41,15 @@ export const Icon = {
   close: (p: IconProps) => (<svg {...S(p)} strokeWidth={2}><path d="m6 6 12 12M18 6 6 18" /></svg>),
   menu: (p: IconProps) => (<svg {...S(p)}><path d="M4 7h16M4 12h16M4 17h16" /></svg>),
   chevR: (p: IconProps) => (<svg {...S(p)}><path d="m9 6 6 6-6 6" /></svg>),
+  chevL: (p: IconProps) => (<svg {...S(p)}><path d="m15 6-6 6 6 6" /></svg>),
   chevD: (p: IconProps) => (<svg {...S(p)}><path d="m6 9 6 6 6-6" /></svg>),
   spark: (p: IconProps) => (<svg {...S(p)}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></svg>),
   money: (p: IconProps) => (<svg {...S(p)}><rect x="2.5" y="6" width="19" height="13" rx="2" /><circle cx="12" cy="12.5" r="2.5" /></svg>),
   doc: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z" /></svg>),
-  category: (p: IconProps) => (<svg {...S(p)}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>),
+  category,
+  grid: category,
+  list: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M8 6h13M8 12h13M8 18h13" /><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /></svg>),
+  sliders: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M4 6h13M20 6h-2M4 12h7M14 12h6M4 18h10M17 18h3" /><circle cx="18" cy="6" r="2" /><circle cx="12.5" cy="12" r="2" /><circle cx="15.5" cy="18" r="2" /></svg>),
   graph: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M3 17 9 11l4 4 8-9M14 4h7v7" /></svg>),
   plus: (p: IconProps) => (<svg {...S(p)} strokeWidth={2}><path d="M12 5v14M5 12h14" /></svg>),
   more: (p: IconProps) => (<svg viewBox="0 0 24 24" fill="currentColor" {...p}><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>),
@@ -46,9 +57,11 @@ export const Icon = {
   x: (p: IconProps) => (<svg {...S(p)} strokeWidth={2}><path d="m6 6 12 12M18 6 6 18" /></svg>),
   xC: (p: IconProps) => (<svg {...S(p)} strokeWidth={2}><path d="m6 6 12 12M18 6 6 18" /></svg>),
   download: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M12 4v12m0 0 5-5m-5 5-5-5M4 20h16" /></svg>),
+  upload: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M12 20V8m0 0 5 5m-5-5-5 5M4 20h16" /></svg>),
   users: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><circle cx="9" cy="8" r="4" /><path d="M2 21c0-4 3-7 7-7s7 3 7 7M16 4a4 4 0 0 1 0 8M22 21c0-3-2-5.5-5-6.5" /></svg>),
   shield: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" /></svg>),
-  wallet: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><rect x="2.5" y="6" width="19" height="13" rx="2" /><path d="M2.5 10h19" /></svg>),
+  shieldCheck: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" /><path d="m9 12 2 2 4-4" /></svg>),
+  wallet: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M3 7a2 2 0 0 1 2-2h11l4 4v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" /><circle cx="16" cy="14" r="1.4" /></svg>),
   flag: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M4 21V4M4 4h13l-2 4 2 4H4" /></svg>),
   pulse: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>),
   bolt: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="m13 2-8 12h6l-1 8 8-12h-6l1-8Z" /></svg>),
@@ -62,4 +75,34 @@ export const Icon = {
   camera: (p: IconProps) => (<svg {...S(p)}><path d="M3 8a2 2 0 0 1 2-2h2.5l1.5-2h6l1.5 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" /><circle cx="12" cy="13" r="3.5" /></svg>),
   paperclip: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="m20.5 11.5-8.2 8.2a5.3 5.3 0 0 1-7.5-7.5l8.5-8.5a3.5 3.5 0 0 1 5 5l-8.5 8.5a1.8 1.8 0 0 1-2.5-2.5l7.9-7.9" /></svg>),
   send: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M21 3 10 14M21 3l-7 18-3-8-8-3 18-7Z" /></svg>),
+  refresh: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M3 12a9 9 0 0 1 15.5-6L21 4M21 4v6h-6M21 12a9 9 0 0 1-15.5 6L3 20M3 20v-6h6" /></svg>),
+  pause: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M8 5v14M16 5v14" /></svg>),
+  play: (p: IconProps) => (<svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M8 5v14l11-7L8 5Z" /></svg>),
+  info: (p: IconProps) => (<svg {...S(p)}><circle cx="12" cy="12" r="9" /><path d="M12 16v-5M12 8v.01" /></svg>),
+  edit: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" /></svg>),
+  award: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><circle cx="12" cy="9" r="6" /><path d="m9 14-2 7 5-3 5 3-2-7" /></svg>),
+  briefcase: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><rect x="2.5" y="7" width="19" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>),
+  thumb: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M7 11V20H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Z" /><path d="M7 11V8a4 4 0 0 1 4-4l1.5 5h6a2 2 0 0 1 2 2.3l-1.3 7A2 2 0 0 1 17.2 20H7" /></svg>),
+  quote: (p: IconProps) => (<svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M7 7h4v4H8c0 2 1 3 3 3v3c-3.5 0-6-2-6-6V7Zm9 0h4v4h-3c0 2 1 3 3 3v3c-3.5 0-6-2-6-6V7Z" opacity=".8" /></svg>),
+}
+
+// Category glyphs (home page category grid). Native 28-grid drawings — kept as
+// ready-to-render elements to match call sites; stroke normalized to 1.7.
+const catS = {
+  viewBox: '0 0 28 28',
+  fill: 'none',
+  stroke: base,
+  strokeWidth: 1.7,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  className: 'w-7 h-7',
+}
+
+export const CatIcon = {
+  business: (<svg {...catS}><rect x="3.5" y="9" width="21" height="14" rx="2" /><path d="M10 9V6.5A1.5 1.5 0 0 1 11.5 5h5A1.5 1.5 0 0 1 18 6.5V9" /><path d="M3.5 15.5h21" /><path d="M13 14.5v2.5" /></svg>),
+  finance: (<svg {...catS}><path d="M3.5 11 14 5l10.5 6" /><path d="M5 11v10h18V11" /><path d="M9 14v5M14 14v5M19 14v5" /><path d="M3.5 22h21" /></svg>),
+  career: (<svg {...catS}><path d="M14 4c4 3 6 7 6 11 0 2.5-1 4.5-2 6l-4 3-4-3c-1-1.5-2-3.5-2-6 0-4 2-8 6-11Z" /><circle cx="14" cy="13" r="2.5" /><path d="m9 21-2.5 3.5 4.5-1M19 21l2.5 3.5-4.5-1" /></svg>),
+  law: (<svg {...catS}><path d="M14 4v19" /><path d="M8.5 23h11" /><path d="M6 9h16" /><path d="M14 5.5c-2 1.5-5.5 2.5-8 3.5M14 5.5c2 1.5 5.5 2.5 8 3.5" /><path d="m7 9-3 6h6Z" /><path d="m21 9-3 6h6Z" /></svg>),
+  marketing: (<svg {...catS}><path d="m22.5 5-13 5H5a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4.5l13 5V5Z" /><path d="M9.5 16v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3" /></svg>),
+  psych: (<svg {...catS}><path d="M14 5a4 4 0 0 0-4 4 3.5 3.5 0 0 0-3 5.5A3.5 3.5 0 0 0 10 20a3 3 0 0 0 4 2.5V5Z" /><path d="M14 5a4 4 0 0 1 4 4 3.5 3.5 0 0 1 3 5.5A3.5 3.5 0 0 1 18 20a3 3 0 0 1-4 2.5V5Z" /></svg>),
 }

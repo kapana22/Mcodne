@@ -27,7 +27,7 @@ const Icons: Record<ToastKind, ReactNode> = {
     </svg>
   ),
   success: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
       <path d="m4 12 5 5L20 6" />
     </svg>
   ),
