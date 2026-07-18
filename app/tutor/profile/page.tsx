@@ -647,7 +647,7 @@ export default function TutorProfilePage() {
                   )}
                   {avatarUploading && (
                     <span aria-hidden="true" className="absolute inset-0 rounded-full inline-flex items-center justify-center bg-black/55 text-white">
-                      <svg viewBox="0 0 24 24" className="w-5 h-5 motion-safe:animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <svg aria-hidden viewBox="0 0 24 24" className="w-5 h-5 motion-safe:animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2">
                         <path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" />
                       </svg>
                     </span>
@@ -1226,7 +1226,7 @@ export default function TutorProfilePage() {
                               toast('ქსელის შეცდომა', 'error')
                             }
                           }}
-                          className={`h-10 px-3 font-display text-[12.5px] font-semibold transition-colors ${
+                          className={`h-11 px-3 font-display text-[12.5px] font-semibold transition-colors ${
                             active ? 'bg-brand-500 text-white' : 'text-ink-700 hover:bg-ink-50'
                           }`}>
                           {opt.label}
@@ -1404,7 +1404,7 @@ function ServiceTypeAndAvailability({
             <button key={d} type="button"
               onClick={() => save({ consultationDurationMin: d })}
               disabled={busy}
-              className={`h-10 px-4 font-display text-[13px] font-semibold transition-colors ${
+              className={`h-11 px-4 font-display text-[13px] font-semibold transition-colors ${
                 duration === d ? 'bg-brand-500 text-white' : 'text-ink-700 hover:bg-ink-50'
               }`}>
               {d} წუთი
@@ -1414,7 +1414,7 @@ function ServiceTypeAndAvailability({
       </div>
 
       <div className="pt-4 border-t border-ink-100 text-[12.5px] text-ink-500 leading-[1.5]">
-        კვირის კალენდარი და ხელმისაწვდომობის სლოტები იმართება <a href="/tutor/schedule" className="font-display font-semibold text-brand-700 hover:text-brand-800">გრაფიკის</a> გვერდიდან.
+        კვირის კალენდარი და თავისუფალი დროები იმართება <a href="/tutor/schedule" className="font-display font-semibold text-brand-700 hover:text-brand-800">გრაფიკის</a> გვერდიდან.
       </div>
     </section>
   )

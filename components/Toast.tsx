@@ -21,18 +21,18 @@ const ICON_BG: Record<ToastKind, string> = {
 // Inline SVG so no extra import cost. All 18×18, stroke-based to match Icon.tsx.
 const Icons: Record<ToastKind, ReactNode> = {
   info: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
       <circle cx="12" cy="12" r="9" />
       <path d="M12 8h.01M11 12h1v5h1" />
     </svg>
   ),
   success: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
       <path d="m4 12 5 5L20 6" />
     </svg>
   ),
   error: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
       <path d="M12 3 2 21h20L12 3Z" />
       <path d="M12 10v5M12 18h0" />
     </svg>
@@ -63,7 +63,7 @@ export function Toast({
         aria-label="დახურვა"
         className="shrink-0 w-7 h-7 rounded-btn text-ink-400 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
           <path d="m6 6 12 12M18 6 6 18" />
         </svg>
       </button>

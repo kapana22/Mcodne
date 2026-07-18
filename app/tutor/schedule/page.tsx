@@ -102,7 +102,7 @@ export default function TutorSchedulePage() {
         return
       }
       setSlots(prev => (prev ?? []).filter(s => s.id !== slotId))
-      toast('სლოტი წაიშალა', 'success')
+      toast('თავისუფალი დრო წაიშალა', 'success')
     } catch { setErr('ქსელის შეცდომა') }
     finally { setDeletingId(null); setConfirmDeleteId(null) }
   }
@@ -143,8 +143,8 @@ export default function TutorSchedulePage() {
       const sRes = await fetch('/api/tutor/availability').then(r => r.json()).catch(() => null)
       if (sRes?.slots) setSlots(sRes.slots)
       if (typeof sRes?.upcomingFreeCount === 'number') setServerFreeCount(sRes.upcomingFreeCount)
-      setTplMsg(`შეიქმნა ${j.created} სლოტი` + (j.skipped ? ` · ${j.skipped} გამოტოვდა (გადაფარვა)` : ''))
-      toast(`შეიქმნა ${j.created} სლოტი`, 'success')
+      setTplMsg(`შეიქმნა ${j.created} თავისუფალი დრო` + (j.skipped ? ` · ${j.skipped} გამოტოვდა (გადაფარვა)` : ''))
+      toast(`შეიქმნა ${j.created} თავისუფალი დრო`, 'success')
       // Auto-close on success after a beat so the user reads the count.
       setTimeout(() => { setTplOpen(false); setTplMsg(null) }, 1600)
     } catch { setTplErr('ქსელის შეცდომა') }
@@ -167,7 +167,7 @@ export default function TutorSchedulePage() {
         return start >= from.getTime() && start <= to.getTime()
       })
       if (toDelete.length === 0) {
-        setBlockErr('ამ პერიოდში წასაშლელი (თავისუფალი) სლოტი არ არის'); return
+        setBlockErr('ამ პერიოდში წასაშლელი თავისუფალი დრო არ არის'); return
       }
       const results = await Promise.all(
         toDelete.map(s => fetch(`/api/tutor/availability/${s.id}`, { method: 'DELETE' })
@@ -178,7 +178,7 @@ export default function TutorSchedulePage() {
       setSlots(prev => (prev ?? []).filter(s => !okIds.has(s.id)))
       setBlockOpen(false)
       setBlockForm({ from: '', to: '' })
-      toast(`წაიშალა ${okIds.size} თავისუფალი სლოტი`, 'success')
+      toast(`წაიშალა ${okIds.size} თავისუფალი დრო`, 'success')
     } catch { setBlockErr('ქსელის შეცდომა') }
     finally { setBlocking(false) }
   }
@@ -294,7 +294,7 @@ export default function TutorSchedulePage() {
         setModalErr('დაწყების დრო უფრო ადრეა ვიდრე დასრულების'); return
       }
       if (start < new Date()) {
-        setModalErr('სლოტი წარსულში ვერ იქნება'); return
+        setModalErr('დრო წარსულში ვერ იქნება'); return
       }
       const res = await fetch('/api/tutor/availability', {
         method: 'POST',
@@ -308,16 +308,16 @@ export default function TutorSchedulePage() {
       if (!res.ok || !j.ok) {
         const map: Record<string, string> = {
           BAD_RANGE: 'დაწყების დრო უფრო ადრეა ვიდრე დასრულების',
-          PAST_DATE: 'სლოტი წარსულში ვერ იქნება',
-          OVERLAP: 'ეს დრო უკვე დაკავებულია სხვა სლოტით',
+          PAST_DATE: 'დრო წარსულში ვერ იქნება',
+          OVERLAP: 'ეს დრო უკვე დაკავებულია',
           NO_PROFILE: 'ექსპერტის პროფილი არ არსებობს',
         }
-        setModalErr(map[j.error] ?? 'სლოტის დამატება ვერ მოხერხდა')
+        setModalErr(map[j.error] ?? 'დროის დამატება ვერ მოხერხდა')
         return
       }
       setSlots(prev => [...(prev ?? []), j.slot])
       setModalOpen(false)
-      toast('სლოტი დაემატა', 'success')
+      toast('თავისუფალი დრო დაემატა', 'success')
     } catch {
       setModalErr('ქსელის შეცდომა — სცადე თავიდან')
     } finally {
@@ -395,7 +395,7 @@ export default function TutorSchedulePage() {
                   : 'bg-brand-50 border-brand-200 text-brand-800'
               }`}>
                 <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-                {loading ? '…' : `${upcomingFree} თავისუფალი სლოტი`}
+                {loading ? '…' : `${upcomingFree} თავისუფალი დრო`}
               </span>
               <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border border-ink-200 bg-white text-ink-600 font-display font-semibold">
                 {loading ? '…' : `${weekBooked} ჯავშანი ამ კვირაში`}
@@ -406,7 +406,7 @@ export default function TutorSchedulePage() {
                 <Icon.calendar className="w-4 h-4" /> ყოველკვირეული განრიგი
               </Btn>
               <Btn variant="secondary" size="md" className="lg:h-9 lg:px-3.5 lg:text-[12.5px]" onClick={() => openModalFor(selectedDay, 9)}>
-                <Icon.plus className="w-4 h-4" /> სლოტი
+                <Icon.plus className="w-4 h-4" /> დრო
               </Btn>
               <Btn variant="ghost" size="md" className="lg:h-9 lg:px-3.5 lg:text-[12.5px]" onClick={() => setBlockOpen(true)}>
                 შვებულება
@@ -438,12 +438,12 @@ export default function TutorSchedulePage() {
               </span>
               <div className="min-w-0">
                 <div className="font-display text-[14px] font-bold text-ink-900">მომავალი ხელმისაწვდომი დრო არ გაქვს</div>
-                <p className="text-[12.5px] text-ink-600 mt-0.5 leading-snug">სლოტების გარეშე კლიენტები ვერ დაგიჯავშნიან — ჯავშანი მხოლოდ გამოქვეყნებულ დროზეა შესაძლებელი. დაამატე ცალკეული სლოტი ან შექმენი ყოველკვირეული განრიგი.</p>
+                <p className="text-[12.5px] text-ink-600 mt-0.5 leading-snug">თავისუფალი დროის გარეშე კლიენტები ვერ დაგიჯავშნიან — ჯავშანი მხოლოდ გამოქვეყნებულ დროზეა შესაძლებელი. დაამატე ცალკეული დრო ან შექმენი ყოველკვირეული განრიგი.</p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0 flex-wrap">
               <Btn variant="primary" size="sm" onClick={() => openModalFor(selectedDay, 9)}>
-                <Icon.plus className="w-4 h-4" /> სლოტის დამატება
+                <Icon.plus className="w-4 h-4" /> დროის დამატება
               </Btn>
               <Btn variant="secondary" size="sm" onClick={() => setTplOpen(true)}>ყოველკვირეული განრიგი</Btn>
             </div>
@@ -530,9 +530,9 @@ export default function TutorSchedulePage() {
 
             {dayEntries.length === 0 ? (
               <div className="rounded-card border border-ink-200 bg-white p-6 text-center">
-                <p className="text-[13.5px] text-ink-600">ამ დღეს არც სლოტი გაქვს და არც ჯავშანი</p>
+                <p className="text-[13.5px] text-ink-600">ამ დღეს არც თავისუფალი დრო გაქვს და არც ჯავშანი</p>
                 <Btn variant="secondary" size="md" className="mt-4 w-full" onClick={() => openModalFor(selectedDay, 9)}>
-                  <Icon.plus className="w-4 h-4" /> სლოტის დამატება
+                  <Icon.plus className="w-4 h-4" /> დროის დამატება
                 </Btn>
               </div>
             ) : (
@@ -563,7 +563,7 @@ export default function TutorSchedulePage() {
                       </div>
                       <div className="min-w-0 flex-1 text-[13px]">
                         {e.slot.booked
-                          ? <span className="text-ink-500">დაჯავშნილი სლოტი</span>
+                          ? <span className="text-ink-500">დაჯავშნილი დრო</span>
                           : <span className="text-success-700 font-display font-semibold">ხელმისაწვდომია</span>}
                       </div>
                       {!e.slot.booked && (
@@ -571,7 +571,7 @@ export default function TutorSchedulePage() {
                           type="button"
                           onClick={() => setConfirmDeleteId(e.slot.id)}
                           disabled={deletingId === e.slot.id}
-                          aria-label="სლოტის წაშლა"
+                          aria-label="დროის წაშლა"
                           className="shrink-0 w-11 h-11 rounded-btn border border-ink-200 text-ink-500 hover:text-danger-600 hover:border-danger-300 hover:bg-danger-50 inline-flex items-center justify-center transition-colors disabled:opacity-50"
                         >
                           <Icon.close className="w-4 h-4" />
@@ -585,7 +585,7 @@ export default function TutorSchedulePage() {
                   onClick={() => openModalFor(selectedDay, 9)}
                   className="w-full p-4 min-h-[56px] text-[13px] font-display font-semibold text-brand-700 hover:bg-brand-50/50 active:bg-brand-50 inline-flex items-center justify-center gap-2 transition-colors"
                 >
-                  <Icon.plus className="w-4 h-4" /> სლოტის დამატება ამ დღეს
+                  <Icon.plus className="w-4 h-4" /> დროის დამატება ამ დღეს
                 </button>
               </div>
             )}
@@ -632,7 +632,7 @@ export default function TutorSchedulePage() {
                         <button
                           type="button"
                           onClick={() => openModalFor(dayIdx, h)}
-                          aria-label={`სლოტის დამატება — ${DAY_LABELS[dayIdx]} ${addDays(weekStart, dayIdx).getDate()}, ${String(h).padStart(2, '0')}:00`}
+                          aria-label={`დროის დამატება — ${DAY_LABELS[dayIdx]} ${addDays(weekStart, dayIdx).getDate()}, ${String(h).padStart(2, '0')}:00`}
                           className="absolute inset-0 group-hover:bg-brand-50/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400"
                         />
                         {cellBookings.map(b => (
@@ -672,7 +672,7 @@ export default function TutorSchedulePage() {
                               key={s.id}
                               type="button"
                               onClick={() => setConfirmDeleteId(s.id)}
-                              aria-label={`სლოტის წაშლა — ${fmtTime(s.startAt)}`}
+                              aria-label={`დროის წაშლა — ${fmtTime(s.startAt)}`}
                               title="დააკლიკე წასაშლელად"
                               className="group/slot relative z-10 block w-full text-left rounded-field px-1.5 py-1 mb-1 transition-colors bg-brand-50 border border-brand-100 text-brand-800 cursor-pointer hover:bg-danger-50 hover:border-danger-200 hover:text-danger-700"
                             >
@@ -710,7 +710,7 @@ export default function TutorSchedulePage() {
         onClose={() => { setModalOpen(false); setModalErr(null) }}
         size="sm"
         busy={saving}
-        title="ხელმისაწვდომობის სლოტი"
+        title="თავისუფალი დროის დამატება"
         footer={
           <>
             <Btn variant="ghost" size="md" type="button" onClick={() => { setModalOpen(false); setModalErr(null) }}>გაუქმება</Btn>
@@ -757,7 +757,7 @@ export default function TutorSchedulePage() {
         }
       >
             <p className="text-[12.5px] text-ink-500 mb-4 leading-snug">
-              მონიშნე დღეები და საათი — ეს ტემპლეიტი გამრავლდება მოცემული კვირების რაოდენობაზე. უკვე არსებული ან გადამფარავი სლოტები გამოტოვდება.
+              მონიშნე დღეები და საათი — ეს ტემპლეიტი გამრავლდება მოცემული კვირების რაოდენობაზე. უკვე არსებული ან გადამფარავი დროები გამოტოვდება.
             </p>
             <form id="weekly-template-form" onSubmit={submitTemplate} className="space-y-5">
               <div>
@@ -807,7 +807,7 @@ export default function TutorSchedulePage() {
                       key={w}
                       type="button"
                       onClick={() => setTplWeeks(w)}
-                      className={`h-10 flex-1 rounded-btn font-display font-bold text-[13px] tabular-nums border transition-colors ${
+                      className={`h-11 flex-1 rounded-btn font-display font-bold text-[13px] tabular-nums border transition-colors ${
                         tplWeeks === w
                           ? 'bg-brand-500 border-brand-500 text-white'
                           : 'bg-white border-ink-200 text-ink-700 hover:border-ink-300'
@@ -824,7 +824,7 @@ export default function TutorSchedulePage() {
                   const hours = Math.max(0, tplEndHour - tplStartHour)
                   const est = days * hours * tplWeeks
                   return est > 0
-                    ? <>დაახლ. <span className="font-display font-bold tabular-nums">{est}</span> სლოტი (1-საათიანი)</>
+                    ? <>დაახლ. <span className="font-display font-bold tabular-nums">{est}</span> თავისუფალი დრო (1-საათიანი)</>
                     : <>აირჩიე დღეები და დროის დიაპაზონი</>
                 })()}
               </div>
@@ -856,7 +856,7 @@ export default function TutorSchedulePage() {
           </>
         }
       >
-            <p className="text-[12.5px] text-ink-500 mb-4 leading-snug">ამ პერიოდში არსებული ყველა <span className="font-display font-semibold text-ink-700">თავისუფალი</span> სლოტი წაიშლება. უკვე დაჯავშნილი სესიები არ დაზარალდება.</p>
+            <p className="text-[12.5px] text-ink-500 mb-4 leading-snug">ამ პერიოდში არსებული ყველა <span className="font-display font-semibold text-ink-700">თავისუფალი</span> დრო წაიშლება. უკვე დაჯავშნილი სესიები არ დაზარალდება.</p>
             <form id="block-off-form" onSubmit={submitBlockOff} className="space-y-4">
               <div>
                 <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1.5">დაწყება</label>
@@ -880,7 +880,7 @@ export default function TutorSchedulePage() {
 
       <ConfirmModal
         open={!!confirmDeleteId}
-        title="წავშალო ეს სლოტი?"
+        title="წავშალო ეს დრო?"
         body="კლიენტები ამ დროს ვეღარ დაგიჯავშნიან. უკვე დაჯავშნილი სესიები არ იშლება."
         tone="danger"
         confirmLabel="წაშლა"

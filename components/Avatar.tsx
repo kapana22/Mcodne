@@ -68,10 +68,14 @@ export function VerifiedMark({ size = 18 }: { size?: number }) {
   const inner = Math.round(size * 0.55)
   return (
     <span
+      role="img"
+      aria-label="გადამოწმებული"
+      title="გადამოწმებული"
       className="inline-flex items-center justify-center rounded-full bg-brand-500 text-white motion-safe:animate-scale-in"
       style={{ width: size, height: size }}
     >
       <svg
+        aria-hidden
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"

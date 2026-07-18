@@ -10,12 +10,21 @@ import { safeHttpUrl } from '@/lib/safeUrl'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { RISK_REVERSAL_LINE } from '@/lib/copy'
 import { pushRecentTutor } from '@/components/RecentTutorsStrip'
-import { userTimezone, TBILISI } from '@/lib/tz'
 import { fmtRating } from '@/lib/fmt'
 import { fmtKaDate, KA_MONTHS_LONG as KA_MONTHS_FULL } from '@/lib/kaDate'
 import { CountUp } from '@/components/CountUp'
 import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/components/Icon'
+// Shared booking flow (DESIGN_FIX_PROMPT 1.1) — the ONE implementation, also
+// used by the /tutors listing. The slot math, tz labels and defaults that used
+// to live in this file are imported from components/booking now.
+import { BookingFlow, mapTutorPayload } from '@/components/booking/BookingFlow'
+import { InlineAvailability } from '@/components/booking/InlineAvailability'
+import {
+  TUTOR_DEFAULTS, priceForDuration, fromPriceLabel, computeNextFreeStart,
+  isoWeekday, DAY_NAMES_FULL,
+  type ApiSlot, type BusySlot, type ConsultationItem,
+} from '@/components/booking/slots'
 
 
 const Logo = () => (
@@ -67,24 +76,9 @@ const Breadcrumb = ({ tutor }: { tutor: TutorDetail | null }) => (
 
 const LANG_LABEL: Record<string, string> = { ka: 'ქარ', en: 'ENG', ru: 'RUS', tr: 'TUR' }
 
-// Flat, expert-authored price — MUST stay identical to the helper in
-// app/tutors/page.tsx. `base` is the exact price the expert set for their
-// consultation: what they enter is what the client pays. The system does NOT
-// re-derive it from an hourly rate — `minutes` is only a display label. We keep
-// the two-arg signature so existing call sites (which pass the duration for the
-// "/ N წთ" label) stay unchanged.
-function priceForDuration(base: number, _minutes: number): number {
-  return Math.max(0, Math.round(base || 0))
-}
-
-// ───── Shared fallback defaults ─────
-// These MUST stay identical to the TUTOR_DEFAULTS block in
-// app/tutors/page.tsx so the search card and this detail page never disagree on
-// price / duration / name for the same missing fields. Duration is aligned to
-// the Prisma schema (`consultationDurationMin @default(30)`); price has no
-// schema default, so we pick one shared fallback used by both surfaces.
-// Covered by tests/tutor-mapping.test.ts.
-const TUTOR_DEFAULTS = { price: 80, durationMin: 30, name: 'ექსპერტი', responseHours: 24 } as const
+/* priceForDuration + TUTOR_DEFAULTS moved to components/booking/slots.ts —
+   the old "MUST stay identical to app/tutors/page.tsx" twin blocks are now a
+   single import on both surfaces. Covered by tests/tutor-mapping.test.ts. */
 
 /* ───── Video hero — cover moment with overlapping avatar ───── */
 const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: TutorDetail | null; requireAuth?: () => boolean }) => {
@@ -495,7 +489,7 @@ const Reviews = ({ reviews, rating, total, verified }: { reviews: ReviewItem[]; 
   const shown = showAll ? rest : rest.slice(0, 6)
 
   return (
-    <section className="mt-14 lg:mt-16 pt-10 border-t border-ink-100">
+    <section id="reviews" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-32">
       <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-3">შეფასებები</div>
       <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">
         {total > 0 ? 'რას ამბობს მომხმარებელი' : 'ჯერ არ არის შეფასება'}
@@ -587,7 +581,7 @@ const Reviews = ({ reviews, rating, total, verified }: { reviews: ReviewItem[]; 
 /* Local Footer was orphan (had hardcoded fake nav) — replaced by shared components/Footer.tsx via SharedFooter. */
 
 /* ───── Mobile sticky booking bar ───── */
-const MobileBookingBar = ({ onBook, price, responseHours, sessionMin, signedIn, paused, availability = [], busySlots = [] }: { onBook: () => void; price: number; responseHours: number; sessionMin: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[]; busySlots?: BusyInput }) => {
+const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedIn, paused, availability = [], busySlots = [] }: { onBook: () => void; priceLabel: string; priceIsFrom: boolean; sessionMin: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[]; busySlots?: BusySlot[] }) => {
   // Flag the body while this mobile CTA bar is mounted so the cookie banner
   // lifts above it (see globals.css) instead of covering the primary CTA.
   useEffect(() => {
@@ -619,8 +613,10 @@ const MobileBookingBar = ({ onBook, price, responseHours, sessionMin, signedIn, 
     <div className="px-4 py-3 flex items-center gap-3">
       <div className="min-w-0">
         <div className="flex items-baseline gap-1.5">
-          <span className="font-display text-[22px] font-bold text-ink-900 tabular-nums leading-none tracking-tight">₾{priceForDuration(price, sessionMin)}</span>
-          <span className="text-[11.5px] text-ink-500">/ {sessionMin} წთ</span>
+          {/* From-price when tiers differ (1.2) — the exact price is chosen at
+              the flow's service step; flat experts keep the "/ N წთ" label. */}
+          <span className="font-display text-[22px] font-bold text-ink-900 tabular-nums leading-none tracking-tight">{priceLabel}</span>
+          <span className="text-[11.5px] text-ink-500">{priceIsFrom ? '/ სესია' : `/ ${sessionMin} წთ`}</span>
         </div>
         {!disabled && nextFree && (
           <div className="mt-1 text-[11px] text-ink-500 leading-none truncate">
@@ -834,7 +830,7 @@ const AboutSection = ({ tutor }: { tutor: TutorDetail | null }) => {
   const paragraphs = bio ? bio.split(/\n\n+/).filter(p => p.trim()) : []
   const isLong = (bio?.length ?? 0) > 420
   return (
-    <section className="mt-14 lg:mt-16 pt-10 border-t border-ink-100">
+    <section id="overview" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-32">
       <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-4">ჩემ შესახებ</div>
       {tutor.headline && (
         <blockquote className="font-display text-[22px] lg:text-[26px] leading-[1.35] font-medium tracking-tight text-ink-800 mb-7 max-w-[640px]">
@@ -863,20 +859,14 @@ const AboutSection = ({ tutor }: { tutor: TutorDetail | null }) => {
   )
 }
 
-/* ───── Services — takes tutor.consultations from API ───── */
-type ConsultationItem = {
-  id: string
-  tier: string
-  title: string
-  description: string | null
-  minutes: number
-  price: number
-}
-
+/* ───── Services — takes tutor.consultations from API ─────
+   ConsultationItem type comes from components/booking/slots (shared with the
+   booking flow's tier step). Each card's „აირჩიე" opens the shared flow with
+   that tier preselected (DESIGN_FIX_PROMPT 1.2). */
 const ServicesSection = ({ consultations, onBook }: { consultations: ConsultationItem[]; onBook: (s: ConsultationItem) => void }) => {
   if (!consultations || consultations.length === 0) return null
   return (
-    <section className="mt-14 lg:mt-16 pt-10 border-t border-ink-100">
+    <section id="services" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-32">
       <div className="flex items-baseline justify-between gap-4 flex-wrap">
         <div>
           <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-3">სერვისები</div>
@@ -897,7 +887,7 @@ const ServicesSection = ({ consultations, onBook }: { consultations: Consultatio
                 <div className="font-display text-[18px] font-bold text-ink-900 tabular-nums leading-none mt-1">₾{s.price}</div>
               </div>
               <button type="button" onClick={() => onBook(s)} className="h-11 px-4 rounded-btn bg-brand-50 hover:bg-brand-500 hover:text-white border border-brand-200 hover:border-brand-500 text-brand-700 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1 transition-colors">
-                დაჯავშნა <Icon.arrow className="w-3 h-3" />
+                აირჩიე <Icon.arrow className="w-3 h-3" />
               </button>
             </div>
           </article>
@@ -974,7 +964,7 @@ const EducationSection = ({ items }: { items: EduItem[] }) => {
 const ExperienceSection = ({ items }: { items: ExpItem[] }) => {
   if (!items || items.length === 0) return null
   return (
-    <section className="mt-14 lg:mt-16 pt-10 border-t border-ink-100">
+    <section id="experience" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-32">
       <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-3">გამოცდილება</div>
       <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">სამუშაო ისტორია</h2>
 
@@ -992,30 +982,8 @@ const ExperienceSection = ({ items }: { items: ExpItem[] }) => {
   )
 }
 
-/* Small hint chip next to the picker. `fmtHM` renders times in the browser's
-   local zone (uses Date#getHours), so the label must reflect that or it lies.
-   - Tbilisi visitors: show "GMT+4" (their local IS Tbilisi).
-   - Remote visitors: show "შენს დროზე" — they see their local wall-clock, not
-     Tbilisi time. Earlier copy said "თბილისის დროით" which was misleading. */
-const TbilisiHint = () => {
-  const [tz, setTz] = React.useState<string>(TBILISI)
-  React.useEffect(() => { setTz(userTimezone()) }, [])
-  if (tz === TBILISI) {
-    return <span className="text-[11px] text-ink-400 tabular-nums">GMT+4</span>
-  }
-  return <span className="text-[11px] text-ink-400">შენს დროზე</span>
-}
-
-/* Longer variant for the Calendar footer strip. Same truthfulness rule as
-   TbilisiHint — say "your zone" when the browser isn't Tbilisi. */
-const CalendarTzLabel = () => {
-  const [tz, setTz] = React.useState<string>(TBILISI)
-  React.useEffect(() => { setTz(userTimezone()) }, [])
-  if (tz === TBILISI) {
-    return <span>დროის ზონა: თბილისი (GMT+4)</span>
-  }
-  return <span>დროის ზონა: შენი ({tz})</span>
-}
+/* TbilisiHint / CalendarTzLabel moved to components/booking/TzLabels.tsx —
+   rendered by the shared Calendar inside the booking flow + inline schedule. */
 
 /* ───── Sticky booking card — live picker → opens modal at Details ───── */
 const StickyBookingCard = ({
@@ -1029,10 +997,11 @@ const StickyBookingCard = ({
   rating = 0,
   reviewsCount = 0,
   signedIn,
+  consultations = [],
 }: {
   onOpen: () => void
   availability?: ApiSlot[]
-  busySlots?: BusyInput
+  busySlots?: BusySlot[]
   tutorPrice?: number
   sessionMin?: number
   responseHours?: number
@@ -1040,10 +1009,16 @@ const StickyBookingCard = ({
   rating?: number
   reviewsCount?: number
   signedIn?: boolean | null
+  consultations?: ConsultationItem[]
 }) => {
   const duration = sessionMin
-  const priceLabel = `₾${priceForDuration(tutorPrice, duration)}`
-  const subLabel = `/ ${duration} წუთი`
+  // From-price when the expert's tiers differ (DESIGN_FIX_PROMPT 1.2) — the
+  // exact price is chosen at the flow's service step. Flat experts keep the
+  // familiar "₾N / N წუთი" pair.
+  const fromPrice = fromPriceLabel(consultations, tutorPrice)
+  const hasTiers = consultations.length >= 2
+  const priceLabel = fromPrice.label
+  const subLabel = fromPrice.isFrom ? '/ სესია' : `/ ${duration} წუთი`
 
   // Soonest actually-bookable start — powers the "next available" hint. Uses
   // the same busy-aware enumeration the booking modal runs, so the rail never
@@ -1129,7 +1104,7 @@ const StickyBookingCard = ({
           {/* Decision-point reassurance: what happens next + the canonical
               risk-reversal line (shared constant — one wording everywhere). */}
           <p className="mt-2.5 text-[11.5px] text-ink-500 text-center leading-snug">
-            შემდეგ ეტაპზე აირჩევ ზუსტ დროს
+            {hasTiers ? 'შემდეგ აირჩევ სერვისს და ზუსტ დროს' : 'შემდეგ ეტაპზე აირჩევ ზუსტ დროს'}
           </p>
           <p className="mt-1 text-[11.5px] text-ink-500 text-center leading-snug">{RISK_REVERSAL_LINE}</p>
         </div>
@@ -1151,1122 +1126,30 @@ const StickyBookingCard = ({
   )
 }
 
-type BookingMode = 'paid'
+/* Calendar / DayTimeline / Steps / intake / payment / OrderSummary /
+   BookingModal moved WHOLESALE to components/booking/* (BookingFlow) —
+   the shared implementation both this profile and /tutors render. */
 
-const WEEK_HEADERS = ['ორშ', 'სამშ', 'ოთხ', 'ხუთ', 'პარ', 'შაბ', 'კვ']
-const DAY_NAMES_FULL = ['ორშაბათი', 'სამშაბათი', 'ოთხშაბათი', 'ხუთშაბათი', 'პარასკევი', 'შაბათი', 'კვირა']
-const DAY_SHORT = ['ორშ.', 'სამშ.', 'ოთხ.', 'ხუთ.', 'პარ.', 'შაბ.', 'კვ.']
-const KA_MONTHS_SHORT = ['იან.','თებ.','მარტ.','აპრ.','მაი.','ივნ.','ივლ.','აგვ.','სექტ.','ოქტ.','ნოე.','დეკ.']
-
-// isoWeekday: Mon=0..Sun=6 (so it maps to WEEK_HEADERS index)
-const isoWeekday = (d: Date) => (d.getDay() + 6) % 7
-const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0,0,0,0); return x }
-const sameDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-
-export type ApiSlot = { id: string; startAt: string; endAt: string; booked: boolean }
-type BusyInput = { startAt: string; endAt: string }[]
-type TimeChoice = { start: Date; end: Date; taken: boolean }
-
-// Group availability into per-day buckets (local time).
-const groupSlotsByDay = (avail: ApiSlot[]): Map<string, ApiSlot[]> => {
-  const map = new Map<string, ApiSlot[]>()
-  for (const s of avail) {
-    const start = new Date(s.startAt)
-    const key = dayKey(start)
-    const arr = map.get(key) ?? []
-    arr.push(s)
-    map.set(key, arr)
-  }
-  return map
-}
-
-// Enumerate the bookable start times on a given date for a given duration,
-// stepping by `duration` within each availability slot that falls on that day.
-// A time is "taken" if it overlaps any busy booking OR falls inside a
-// booked availability slot.
-const enumerateTimes = (
-  date: Date,
-  avail: ApiSlot[],
-  busy: BusyInput,
-  durationMin: number,
-): TimeChoice[] => {
-  const out: TimeChoice[] = []
-  const now = Date.now()
-  const dayEnd = new Date(date); dayEnd.setHours(23, 59, 59, 999)
-  const busyMs = busy.map(b => ({ s: new Date(b.startAt).getTime(), e: new Date(b.endAt).getTime() }))
-
-  const daySlots = avail.filter(s => sameDay(new Date(s.startAt), date))
-  for (const slot of daySlots) {
-    const slotStart = new Date(slot.startAt).getTime()
-    const slotEnd = new Date(slot.endAt).getTime()
-    // Step by duration, staying within the availability window and this day.
-    for (let t = slotStart; t + durationMin * 60_000 <= Math.min(slotEnd, dayEnd.getTime()); t += durationMin * 60_000) {
-      const start = new Date(t)
-      const end = new Date(t + durationMin * 60_000)
-      // Skip past times.
-      if (end.getTime() < now) continue
-      const overlaps = slot.booked || busyMs.some(b => b.s < end.getTime() && b.e > t)
-      out.push({ start, end, taken: overlaps })
-    }
-  }
-  out.sort((a, b) => a.start.getTime() - b.start.getTime())
-  return out
-}
-
-// Earliest actually-bookable start across every published slot — runs the SAME
-// enumeration the modal's picker uses (slot.booked + busy-overlap aware), so a
-// "next available" hint can never advertise a time the modal then shows as
-// taken. Returns null when nothing is bookable.
-const computeNextFreeStart = (
-  avail: ApiSlot[],
-  busy: BusyInput,
-  durationMin: number,
-): Date | null => {
-  const dayMap = new Map<string, Date>()
-  for (const s of avail) {
-    const day = startOfDay(new Date(s.startAt))
-    const k = dayKey(day)
-    if (!dayMap.has(k)) dayMap.set(k, day)
-  }
-  const days = Array.from(dayMap.values()).sort((a, b) => a.getTime() - b.getTime())
-  for (const day of days) {
-    const free = enumerateTimes(day, avail, busy, durationMin).find(t => !t.taken)
-    if (free) return free.start
-  }
-  return null
-}
-
-const Calendar = ({
-  viewMonth,
-  selected,
-  slotsByDay,
-  onSelect,
-  onPrev,
-  onNext,
-}: {
-  viewMonth: Date
-  selected: Date | null
-  slotsByDay: Map<string, ApiSlot[]>
-  onSelect: (d: Date) => void
-  onPrev: () => void
-  onNext: () => void
-}) => {
-  const year = viewMonth.getFullYear()
-  const month = viewMonth.getMonth()
-  const first = new Date(year, month, 1)
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const startPad = isoWeekday(first)
-  const today = startOfDay(new Date())
-
-  const cells: (Date | null)[] = []
-  for (let i = 0; i < startPad; i++) cells.push(null)
-  for (let i = 1; i <= daysInMonth; i++) cells.push(new Date(year, month, i))
-
-  // Bound month nav so users can't scroll to arbitrary past months.
-  const canPrev = new Date(year, month, 1).getTime() > new Date(today.getFullYear(), today.getMonth(), 1).getTime()
-  // …and symmetric forward: no paging past the last month that still contains
-  // a published slot (nothing to see there — every further page is empty).
-  let lastSlotMs = 0
-  for (const arr of slotsByDay.values()) {
-    for (const s of arr) {
-      const t = new Date(s.startAt).getTime()
-      if (t > lastSlotMs) lastSlotMs = t
-    }
-  }
-  const canNext = lastSlotMs > 0 && new Date(year, month + 1, 1).getTime() <= lastSlotMs
-
+/* ───── In-page anchor nav (DESIGN_FIX_PROMPT 1.6) ─────
+   Light text links that stick just under the PublicTopBar (top-16/top-20 to
+   match its h-16 sm:h-20). Sections carry scroll-mt-32 so headings land clear
+   of the two sticky bars. Only sections that actually render get a link. */
+const SectionNav = ({ items }: { items: { id: string; l: string }[] }) => {
+  if (items.length < 2) return null
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <button
-          type="button"
-          onClick={onPrev}
-          disabled={!canPrev}
-          aria-label="წინა თვე"
-          className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <Icon.chevL className="w-4 h-4" />
-        </button>
-        <div className="font-display text-[15px] font-bold text-ink-900 tracking-tight">{KA_MONTHS_FULL[month]} {year}</div>
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={!canNext}
-          aria-label="შემდეგი თვე"
-          className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <Icon.chevR className="w-4 h-4" />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {WEEK_HEADERS.map(w => (
-          <div key={w} className="text-center font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 py-1">{w}</div>
+    <nav aria-label="პროფილის სექციები" className="sticky top-16 sm:top-20 z-30 bg-white/95 backdrop-blur-md border-b border-ink-100">
+      <div className="max-w-[1280px] mx-auto px-6 sm:px-8 flex items-center gap-5 overflow-x-auto scrollbar-hide h-11">
+        {items.map(it => (
+          <a
+            key={it.id}
+            href={`#${it.id}`}
+            className="shrink-0 font-display text-[12px] font-semibold text-ink-500 hover:text-ink-900 transition-colors no-caps"
+          >
+            {it.l}
+          </a>
         ))}
       </div>
-
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((d, i) => {
-          if (d === null) return <div key={i} className="aspect-square" />
-          const isToday = sameDay(d, today)
-          const isSelected = selected != null && sameDay(d, selected)
-          const isPast = d.getTime() < today.getTime()
-          const slots = slotsByDay.get(dayKey(d))?.filter(s => !s.booked).length ?? 0
-          const disabled = isPast || slots === 0
-          const dots = Math.min(Math.max(Math.ceil(slots / 2), slots > 0 ? 1 : 0), 4)
-
-          return (
-            <button
-              key={i}
-              type="button"
-              disabled={disabled}
-              onClick={() => onSelect(d)}
-              className={`relative aspect-square rounded-btn flex flex-col items-center justify-center font-display font-semibold transition-colors disabled:cursor-not-allowed ${
-                isSelected
-                  ? 'bg-brand-500 text-white'
-                  : isToday
-                    ? 'bg-white text-brand-800 ring-1 ring-brand-300'
-                    : disabled
-                      ? 'text-ink-300'
-                      : 'text-ink-800 hover:bg-ink-100'
-              }`}
-            >
-              <span className="text-[13.5px] tabular-nums leading-none">{d.getDate()}</span>
-              {!disabled && (
-                <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-0.5">
-                  {Array.from({ length: dots }).map((_, j) => (
-                    <span key={j} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/75' : 'bg-brand-400'}`} />
-                  ))}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="mt-6 pt-4 border-t border-ink-100 space-y-2 text-[11px] text-ink-500">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <span className="flex gap-0.5">
-              <span className="w-1 h-1 rounded-full bg-brand-400" />
-              <span className="w-1 h-1 rounded-full bg-brand-400" />
-              <span className="w-1 h-1 rounded-full bg-brand-400" />
-            </span>
-            <span>თავისუფალი სლოტები</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-white ring-1 ring-brand-300" />
-            <span>დღეს</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Icon.globe className="w-3.5 h-3.5 text-ink-400" />
-          <CalendarTzLabel />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-const TIME_BANDS = [
-  { id: 'morning',   l: 'დილა',    range: '00:00 – 12:00', from: 0,  to: 12 },
-  { id: 'afternoon', l: 'დღე',     range: '12:00 – 18:00', from: 12, to: 18 },
-  { id: 'evening',   l: 'საღამო',  range: '18:00 – 24:00', from: 18, to: 24 },
-] as const
-
-const fmtHM = (d: Date) =>
-  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-
-const DayTimeline = ({
-  date,
-  selected,
-  onSelect,
-  duration,
-  price,
-  timeChoices,
-}: {
-  date: Date
-  selected: Date | null
-  onSelect: (t: Date) => void
-  duration: number
-  price: string
-  timeChoices: TimeChoice[]
-}) => {
-  const dayLabel = DAY_NAMES_FULL[isoWeekday(date)]
-  const free = timeChoices.filter(s => !s.taken).length
-
-  if (timeChoices.length === 0) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-center px-6 py-12">
-        <div className="w-12 h-12 rounded-full bg-ink-100 inline-flex items-center justify-center text-ink-500 mb-4">
-          <Icon.cal className="w-5 h-5" />
-        </div>
-        <div className="font-display text-[15px] font-bold text-ink-900">ამ დღეს ხელმისაწვდომი სლოტი არ არის</div>
-        <p className="text-[13px] text-ink-500 mt-2 max-w-[280px]">აირჩიე სხვა დღე კალენდარში მარცხნივ.</p>
-      </div>
-    )
-  }
-
-  const bands = TIME_BANDS.map(b => ({
-    ...b,
-    slots: timeChoices.filter(s => {
-      const h = s.start.getHours()
-      return h >= b.from && h < b.to
-    }),
-  })).filter(b => b.slots.length > 0)
-
-  return (
-    <div>
-      <div className="mb-6">
-        <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-1.5">არჩეული დღე</div>
-        <h3 className="font-display text-[20px] font-bold text-ink-900 tracking-tight">{dayLabel}, {date.getDate()} {KA_MONTHS_FULL[date.getMonth()]}</h3>
-        <p className="text-[13px] text-ink-600 mt-1 tabular-nums">{timeChoices.length} სლოტი · {free} თავისუფალი · {timeChoices.length - free} დაჯავშნული</p>
-      </div>
-
-      <div className="space-y-6">
-        {bands.map(b => {
-          const bandFree = b.slots.filter(s => !s.taken).length
-          return (
-            <div key={b.id}>
-              <div className="flex items-baseline justify-between mb-2.5">
-                <div className="flex items-baseline gap-2.5">
-                  <span className="font-display text-[14px] font-bold text-ink-900 tracking-tight">{b.l}</span>
-                  <span className="font-mono text-[11px] tabular-nums text-ink-500">{b.range}</span>
-                </div>
-                <span className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-700 tabular-nums">{bandFree} თავისუფალი</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {b.slots.map((s, i) => {
-                  const active = selected != null && s.start.getTime() === selected.getTime() && !s.taken
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      disabled={s.taken}
-                      onClick={() => onSelect(s.start)}
-                      className={`p-3 rounded-card text-left border transition-all disabled:cursor-not-allowed motion-safe:active:scale-[0.98] ${
-                        s.taken
-                          ? 'border-ink-200 bg-ink-50/60'
-                          : active
-                            ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
-                            : 'border-ink-200 bg-white hover:border-brand-400 hover:bg-brand-50/40'
-                      }`}
-                    >
-                      <div className={`font-display text-[14px] font-bold tabular-nums tracking-tight ${s.taken ? 'text-ink-400 line-through' : 'text-ink-900'}`}>{fmtHM(s.start)} – {fmtHM(s.end)}</div>
-                      <div className="text-[11.5px] mt-0.5">
-                        {s.taken ? (
-                          <span className="text-ink-400 font-display font-medium">დაჯავშნული</span>
-                        ) : active ? (
-                          <span className="text-brand-700 font-display font-semibold">არჩეული · {duration} წუთი</span>
-                        ) : (
-                          <span className="text-ink-600 tabular-nums">{duration} წთ · {price}</span>
-                        )}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-const Steps = ({ step, total }: { step: number; total: number }) => {
-  const all = [
-    { n: 1, l: 'დრო' },
-    { n: 2, l: 'დეტალები' },
-    { n: 3, l: 'გადახდა' },
-  ]
-  const items = all.slice(0, total)
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {items.map((s, i) => {
-        const done = step > s.n
-        const active = step === s.n
-        return (
-          <React.Fragment key={s.n}>
-            <div className={`inline-flex items-center gap-1.5 ${active ? 'text-brand-700' : done ? 'text-success-600' : 'text-ink-400'}`}>
-              <span className={`w-5 h-5 rounded-full inline-flex items-center justify-center text-[11px] font-display font-bold ${active ? 'bg-brand-500 text-white' : done ? 'bg-success-500 text-white' : 'bg-ink-100 text-ink-500'}`}>
-                {done ? <Icon.check className="w-3 h-3" /> : s.n}
-              </span>
-              <span className="font-display text-[12px] font-semibold tracking-wide">{s.l}</span>
-            </div>
-            {i < items.length - 1 && <div className="w-6 h-px bg-ink-200" />}
-          </React.Fragment>
-        )
-      })}
-    </div>
-  )
-}
-
-/* ───── Step 2 — Details ───── */
-// Category-agnostic starter topics — the modal serves every expert sphere
-// (business, law, psychology, …), so these must read naturally for all of
-// them rather than assuming a VC/startup context.
-const TOPIC_OPTIONS = [
-  'კონკრეტული პრობლემის განხილვა',
-  'სტრატეგია და მიმართულება',
-  'უკუკავშირი ჩემს გეგმაზე',
-  'გადაწყვეტილების მიღება',
-  'სხვა თემა',
-]
-
-type DetailsState = { topic: string; goal: string; preCall: boolean }
-
-const Step2Details = ({ value, onChange, summary }: { value: DetailsState; onChange: (v: DetailsState) => void; summary: React.ReactNode }) => (
-  <div className="grid lg:grid-cols-[1fr_280px] gap-6 sm:gap-7 lg:gap-10 p-4 sm:p-7 lg:p-10">
-    <div className="space-y-7">
-      <div>
-        <div className="flex items-baseline justify-between mb-3">
-          <label className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">თემა</label>
-          <span className="text-[11px] text-ink-500">აირჩიე ექსპერტის სერვისიდან ან „სხვა თემა"</span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {TOPIC_OPTIONS.map(t => {
-            const on = value.topic === t
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => onChange({ ...value, topic: t })}
-                className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-pill text-[12.5px] font-display font-medium tracking-wide transition-colors ${on ? 'bg-accent-600 text-white' : 'bg-white text-ink-700 border border-ink-200 hover:bg-ink-50'}`}
-              >
-                {on && <Icon.check className="w-3 h-3" />}
-                {t}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      <div>
-        <div className="flex items-baseline justify-between mb-2">
-          <label className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">შენი ფოკუსი</label>
-          <span className="text-[11px] text-ink-500 tabular-nums">{value.goal.length} / 320</span>
-        </div>
-        <textarea
-          value={value.goal}
-          onChange={e => onChange({ ...value, goal: e.target.value.slice(0, 320) })}
-          rows={4}
-          placeholder="მაგ. მაქვს კონკრეტული სიტუაცია და მინდა გავიგო, როგორ მივუდგე — რა ნაბიჯები და რა რისკებია."
-          className="w-full px-3.5 py-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14px] text-ink-900 placeholder:text-ink-400 transition-colors leading-[1.5] resize-none"
-        />
-        <p className="mt-2 text-[11.5px] text-ink-500">რაც უფრო კონკრეტული, მით უფრო მომზადებული მოვა ექსპერტი სესიაზე.</p>
-      </div>
-
-      <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-card border border-ink-200 bg-white p-4 hover:border-ink-300 transition-colors">
-        <span className={`mt-0.5 w-4 h-4 rounded border-[1.5px] inline-flex items-center justify-center shrink-0 transition-colors ${value.preCall ? 'bg-brand-500 border-brand-500' : 'border-ink-300 bg-white'}`}>
-          {value.preCall && <Icon.check className="w-3 h-3 text-white" />}
-        </span>
-        <input type="checkbox" checked={value.preCall} onChange={e => onChange({ ...value, preCall: e.target.checked })} className="sr-only" />
-        <div>
-          <div className="font-display text-[13px] font-bold text-ink-900">pre-call მასალის გაგზავნა</div>
-          <p className="text-[12.5px] text-ink-600 mt-0.5 leading-[1.5]">გავუგზავნი დოკუმენტებს ან სხვა მასალას ექსპერტს დასათვალიერებლად სესიამდე. დანახარჯი იგივეა.</p>
-        </div>
-      </label>
-    </div>
-
-    <div className="lg:sticky lg:top-0">
-      {summary}
-    </div>
-  </div>
-)
-
-/* ───── Step 3 — Payment ───── */
-type PaymentMethod = 'tbc' | 'bog' | 'solo' | 'card'
-
-const METHODS: { id: PaymentMethod; l: string; sub: string; tone: 'ink' | 'brand' | 'accent' }[] = [
-  { id: 'tbc',  l: 'TBC Pay',     sub: 'Open Banking',   tone: 'accent' },
-  { id: 'bog',  l: 'BOG Pay',     sub: 'Open Banking',   tone: 'brand'  },
-  { id: 'solo', l: 'SOLO',        sub: 'TBC-ის სოლო',    tone: 'ink'    },
-  { id: 'card', l: 'ბარათი',      sub: 'Visa · MC · Amex', tone: 'ink'  },
-]
-
-type PaymentState = { method: PaymentMethod; cardName: string; cardNum: string; cardExp: string; cardCvv: string; save: boolean }
-
-const Step3Payment = ({ value, onChange, summary }: { value: PaymentState; onChange: (v: PaymentState) => void; summary: React.ReactNode }) => (
-  <div className="grid lg:grid-cols-[1fr_280px] gap-6 sm:gap-7 lg:gap-10 p-4 sm:p-7 lg:p-10">
-    <div className="space-y-7">
-      <div>
-        <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-3">გადახდის მეთოდი</label>
-        <div className="grid grid-cols-2 gap-2">
-          {METHODS.map(m => {
-            const on = value.method === m.id
-            const toneCls = m.tone === 'brand' ? 'bg-brand-50 text-brand-700' : m.tone === 'accent' ? 'bg-accent-50 text-accent-700' : 'bg-ink-100 text-ink-700'
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => onChange({ ...value, method: m.id })}
-                className={`relative text-left p-3.5 rounded-card border transition-all ${on ? 'border-brand-500 bg-brand-50/40 ring-2 ring-brand-200' : 'border-ink-200 bg-white hover:border-ink-400'}`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className={`w-9 h-9 rounded-card font-display font-bold text-[12px] tracking-wider inline-flex items-center justify-center ${toneCls}`}>
-                    {m.id === 'card' ? <Icon.cal className="w-4 h-4" /> : m.l.split(' ')[0].slice(0, 3).toUpperCase()}
-                  </span>
-                  <div className="min-w-0">
-                    <div className="font-display text-[13px] font-bold text-ink-900 truncate">{m.l}</div>
-                    <div className="text-[11px] text-ink-500 truncate">{m.sub}</div>
-                  </div>
-                </div>
-                {on && (
-                  <span className="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-brand-500 inline-flex items-center justify-center">
-                    <Icon.check className="w-2.5 h-2.5 text-white" />
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {value.method === 'card' && (
-        <div className="rounded-card border border-ink-200 bg-white p-5 space-y-4">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500">ბარათის მონაცემები</div>
-          <div>
-            <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-2">მფლობელის სახელი</label>
-            <input
-              type="text"
-              value={value.cardName}
-              onChange={e => onChange({ ...value, cardName: e.target.value })}
-              placeholder="GIORGI MELADZE"
-              className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors uppercase tracking-wide"
-            />
-          </div>
-          <div>
-            <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-2">ბარათის ნომერი</label>
-            <input
-              type="text"
-              value={value.cardNum}
-              onChange={e => {
-                const raw = e.target.value.replace(/\D/g, '').slice(0, 16)
-                const formatted = raw.match(/.{1,4}/g)?.join(' ') ?? ''
-                onChange({ ...value, cardNum: formatted })
-              }}
-              placeholder="0000 0000 0000 0000"
-              inputMode="numeric"
-              className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors tabular-nums tracking-wider"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-2">ვადა · MM/YY</label>
-              <input
-                type="text"
-                value={value.cardExp}
-                onChange={e => {
-                  const raw = e.target.value.replace(/\D/g, '').slice(0, 4)
-                  const formatted = raw.length > 2 ? `${raw.slice(0, 2)}/${raw.slice(2)}` : raw
-                  onChange({ ...value, cardExp: formatted })
-                }}
-                placeholder="12/28"
-                inputMode="numeric"
-                className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors tabular-nums"
-              />
-            </div>
-            <div>
-              <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-2">CVV</label>
-              <input
-                type="text"
-                value={value.cardCvv}
-                onChange={e => onChange({ ...value, cardCvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                placeholder="•••"
-                inputMode="numeric"
-                className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors tabular-nums"
-              />
-            </div>
-          </div>
-          <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
-            <span className={`w-4 h-4 rounded border-[1.5px] inline-flex items-center justify-center transition-colors ${value.save ? 'bg-brand-500 border-brand-500' : 'border-ink-300 bg-white'}`}>
-              {value.save && <Icon.check className="w-3 h-3 text-white" />}
-            </span>
-            <input type="checkbox" checked={value.save} onChange={e => onChange({ ...value, save: e.target.checked })} className="sr-only" />
-            <span className="text-[12.5px] text-ink-700">შემახსოვრე — შემდეგი ჯერ ერთი დაჭერით გადავიხდი</span>
-          </label>
-        </div>
-      )}
-
-      {value.method !== 'card' && (
-        <div className="rounded-card border border-ink-200 bg-ink-50/40 p-5 grid grid-cols-[auto_1fr] gap-3 items-start">
-          <Icon.shieldCheck className="w-4 h-4 mt-0.5 text-brand-700 shrink-0" />
-          <div>
-            <div className="font-display text-[13px] font-bold text-ink-900">გადახდის გაგრძელება ბანკში</div>
-            <p className="text-[12.5px] text-ink-600 mt-1 leading-[1.5]">
-              „გადახდა"-ს დაჭერით გადახვალ {METHODS.find(m => m.id === value.method)?.l}-ის უსაფრთხო გვერდზე ანგარიშის დასადასტურებლად. შემდეგ ავტომატურად დაბრუნდები აქ.
-            </p>
-          </div>
-        </div>
-      )}
-
-    </div>
-
-    <div className="lg:sticky lg:top-0">
-      {summary}
-    </div>
-  </div>
-)
-
-/* ───── Order summary card ───── */
-const OrderSummary = ({
-  start,
-  duration,
-  topic,
-  total,
-  tutorName,
-  tutorSpecialty,
-  tutorAvatar,
-  serviceTitle,
-}: {
-  start: Date | null
-  duration: number
-  topic: string
-  total: string
-  tutorName: string
-  tutorSpecialty: string
-  tutorAvatar?: string | null
-  /** Title of the consultation tier the user tapped in ServicesSection —
-      null for the generic flat-price flow. */
-  serviceTitle?: string | null
-}) => {
-  const dayShort = start ? DAY_SHORT[isoWeekday(start)] : ''
-  const dayLabel = start ? `${dayShort} ${start.getDate()} ${KA_MONTHS_FULL[start.getMonth()]}` : '— აირჩიე დღე'
-  const timeLabel = start
-    ? `${fmtHM(start)} · ${duration} წუთი`
-    : '—'
-
-  return (
-    <div className="rounded-card border border-ink-200 bg-ink-50/50 p-5">
-      <div className="font-display text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-500 mb-4">დაჯავშნის შეჯამება</div>
-
-      <div className="flex items-center gap-3 pb-4 border-b border-ink-200">
-        {tutorAvatar ? (
-          <img src={tutorAvatar} alt="" width={40} height={40} className="w-10 h-10 rounded-card object-cover" />
-        ) : (
-          <span className="w-10 h-10 rounded-card bg-brand-100 text-brand-700 inline-flex items-center justify-center font-display font-bold text-[13px]">
-            {tutorName.slice(0, 1)}
-          </span>
-        )}
-        <div className="min-w-0">
-          <div className="font-display text-[13.5px] font-bold text-ink-900 truncate">{tutorName}</div>
-          <div className="text-[11.5px] text-ink-500 truncate">{tutorSpecialty}</div>
-        </div>
-      </div>
-
-      <dl className="mt-4 space-y-3 text-[12.5px]">
-        {serviceTitle && (
-          <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
-            <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">სერვისი</dt>
-            <dd className="font-display font-bold text-ink-900 leading-snug">{serviceTitle}</dd>
-          </div>
-        )}
-        <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
-          <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">დღე</dt>
-          <dd className="font-display font-bold text-ink-900 tabular-nums">{dayLabel}</dd>
-        </div>
-        <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
-          <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">დრო</dt>
-          <dd className="font-display font-bold text-ink-900 tabular-nums">{timeLabel}</dd>
-        </div>
-        <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
-          <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">თემა</dt>
-          <dd className="font-display font-medium text-ink-800 leading-snug">{topic || '— ჯერ არ არჩეული'}</dd>
-        </div>
-        <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
-          <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">ფორმატი</dt>
-          <dd className="font-display font-bold text-ink-900 inline-flex items-center gap-1.5">
-            <Icon.video className="w-3.5 h-3.5" />
-            ვიდეო · 1-on-1
-          </dd>
-        </div>
-      </dl>
-
-      <div className="mt-5 pt-4 border-t border-ink-200">
-        <div className="flex items-baseline justify-between">
-          <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">ჯამი</span>
-          <span className="font-display text-[22px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">{total}</span>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-card bg-brand-50 border border-brand-100 p-3.5 grid grid-cols-[auto_1fr] gap-2.5 items-start">
-        <Icon.shieldCheck className="w-4 h-4 mt-0.5 text-brand-700 shrink-0" />
-        <div className="space-y-1">
-          {PAYMENTS_LIVE ? (
-            <>
-              <p className="font-display text-[12px] font-bold text-brand-800 leading-snug">Escrow-ით დაცული გადახდა</p>
-              <p className="text-[11.5px] text-ink-600 leading-[1.5]">
-                თანხა ინახება უსაფრთხოდ და ექსპერტს გადაერიცხება მხოლოდ სესიის შემდეგ.
-                თუ ექსპერტი არ გამოცხადდა — 100% ავტომატური დაბრუნება. გაუქმება უფასოა სესიამდე 24 საათით ადრე.
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="font-display text-[12px] font-bold text-brand-800 leading-snug">დაჯავშნა უფასოა</p>
-              <p className="text-[11.5px] text-ink-600 leading-[1.5]">
-                გადახდის სისტემა მალე ჩაირთვება — ამჟამად ჯავშანი უფასოა. ექსპერტი დაგიდასტურებს მოთხოვნას; გაუქმება ნებისმიერ დროს შესაძლებელია.
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-type BusySlot = { startAt: string; endAt: string }
-const BookingModal = ({
-  open,
-  onClose,
-  mode,
-  initialStep = 1,
-  initialStart = null,
-  initialTopic,
-  tutorId,
-  tutorPrice = TUTOR_DEFAULTS.price,
-  tutorName = TUTOR_DEFAULTS.name,
-  tutorSpecialty = 'კონსულტაცია',
-  tutorAvatar,
-  availability = [],
-  busySlots = [],
-  sessionMin = TUTOR_DEFAULTS.durationMin,
-  service = null,
-}: {
-  open: boolean
-  onClose: () => void
-  mode: BookingMode
-  initialStep?: number
-  initialStart?: Date | null
-  /** Pre-selected topic from ?topic= (rebook flow). Falls back to first
-      TOPIC_OPTIONS entry when unset or empty. */
-  initialTopic?: string | null
-  tutorId?: string
-  tutorPrice?: number
-  tutorName?: string
-  tutorSpecialty?: string
-  tutorAvatar?: string | null
-  availability?: ApiSlot[]
-  busySlots?: BusySlot[]
-  sessionMin?: number
-  /** Consultation tier tapped in ServicesSection. When set, ITS minutes/price
-      drive the slot enumeration + summary, and the POST carries
-      consultationId so the server books the tier (its row is authoritative
-      server-side). Null = the generic flat tutor price/duration flow. */
-  service?: ConsultationItem | null
-}) => {
-  // Payments aren't live yet — skip the (fake) card step entirely. The flow is
-  // just pick-time → details → confirm; the expert accepts and no charge is made.
-  // Restoring the 3rd step is a one-line flip once PAYMENTS_LIVE goes true.
-  const totalSteps = PAYMENTS_LIVE ? 3 : 2
-  const [step, setStep] = useState<number>(initialStep)
-  // Accessible-dialog plumbing: trap focus inside the panel, restore it on
-  // close, close on Esc, and lock body scroll while open (mirrors ConfirmModal).
-  const slotsByDay = React.useMemo(() => groupSlotsByDay(availability), [availability])
-  const firstFreeDate = React.useMemo(() => {
-    for (const s of availability) {
-      if (s.booked) continue
-      const d = new Date(s.startAt)
-      if (d.getTime() > Date.now()) return d
-    }
-    return null
-  }, [availability])
-  const [selectedDate, setSelectedDate] = useState<Date | null>(
-    initialStart ? startOfDay(initialStart) : firstFreeDate ? startOfDay(firstFreeDate) : null
-  )
-  const [viewMonth, setViewMonth] = useState<Date>(() => {
-    const anchor = initialStart ?? firstFreeDate ?? new Date()
-    return new Date(anchor.getFullYear(), anchor.getMonth(), 1)
-  })
-  const [selectedStart, setSelectedStart] = useState<Date | null>(initialStart)
-  // Seed topic from ?topic= when present so rebook flows land directly on
-  // the previous session's topic. Free-form topics that aren't in
-  // TOPIC_OPTIONS are still accepted — the Details step tolerates any string.
-  const [details, setDetails] = useState<DetailsState>({
-    topic: (initialTopic && initialTopic.trim()) || TOPIC_OPTIONS[0],
-    goal: '',
-    preCall: true,
-  })
-  const [payment, setPayment] = useState<PaymentState>({ method: 'tbc', cardName: '', cardNum: '', cardExp: '', cardCvv: '', save: true })
-  const [submitted, setSubmitted] = useState(false)
-  // Booking id from the POST response — powers the success screen's
-  // "ჯავშნის ნახვა" deep link so the flow doesn't dead-end in the modal.
-  const [createdId, setCreatedId] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const [submitUnverified, setSubmitUnverified] = useState(false)
-  const [resendingVerify, setResendingVerify] = useState(false)
-  const [resendMsg, setResendMsg] = useState<string | null>(null)
-
-  const resendVerify = async () => {
-    if (resendingVerify) return
-    setResendingVerify(true)
-    setResendMsg(null)
-    try {
-      const meRes = await fetch('/api/me')
-      const meData = await meRes.json().catch(() => ({} as any))
-      const email = meData?.user?.email
-      if (!email) { setResendMsg('სესია ვერ მოიძებნა.'); return }
-      const res = await fetch('/api/auth/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, purpose: 'verify' }),
-      })
-      const data = await res.json().catch(() => ({} as any))
-      if (!res.ok || data?.ok === false) {
-        setResendMsg(data?.error === 'RATE_LIMITED' ? 'ხშირად ცდი — მოგვიანებით სცადე.' : 'გაგზავნა ვერ მოხერხდა.')
-        return
-      }
-      setResendMsg('კოდი გაიგზავნა — შეამოწმე ინბოქსი.')
-    } catch {
-      setResendMsg('ქსელის შეცდომა.')
-    } finally {
-      setResendingVerify(false)
-    }
-  }
-
-  useEffect(() => {
-    if (open) {
-      setStep(initialStep)
-      const anchor = initialStart ?? firstFreeDate
-      setSelectedDate(anchor ? startOfDay(anchor) : null)
-      setSelectedStart(initialStart)
-      setViewMonth(new Date((anchor ?? new Date()).getFullYear(), (anchor ?? new Date()).getMonth(), 1))
-      setSubmitted(false)
-      setCreatedId(null)
-      setSubmitError(null)
-      // Refresh the topic each time the modal opens so rebook flows always
-      // land on the passed-in topic, even after a close/reopen cycle.
-      if (initialTopic && initialTopic.trim()) {
-        setDetails(d => ({ ...d, topic: initialTopic.trim() }))
-      }
-    }
-  }, [open, initialStep, initialStart, firstFreeDate, initialTopic])
-
-  // Accessible modal behavior (scroll lock, focus trap + restore, Escape)
-  // now comes from the shared Sheet container.
-
-  if (!open) return null
-
-  // A tapped consultation tier overrides the flat defaults: its minutes drive
-  // the slot enumeration step and its price is what the summary restates (the
-  // server re-reads both from the Consultation row via consultationId anyway).
-  const duration = service?.minutes ?? sessionMin
-  // Flat, expert-set price — what the expert set is what the client pays. Kept
-  // consistent with the /tutors QuickBookPopup via the shared priceForDuration
-  // helper (duration is only a display label, not a multiplier).
-  const priceNum = priceForDuration(service?.price ?? tutorPrice, duration)
-  const price = `₾${priceNum}`
-  const total = `₾${priceNum}`
-
-  const timeChoices = selectedDate
-    ? enumerateTimes(selectedDate, availability, busySlots, duration)
-    : []
-
-  const dayLabelFull = selectedStart
-    ? `${DAY_SHORT[isoWeekday(selectedStart)]} ${selectedStart.getDate()} ${KA_MONTHS_FULL[selectedStart.getMonth()]}`
-    : '— აირჩიე დღე'
-
-  const submitBooking = async () => {
-    if (!tutorId || submitting) return
-    if (!selectedStart) {
-      setSubmitError('აირჩიე კონკრეტული დრო.')
-      return
-    }
-    setSubmitting(true)
-    setSubmitError(null)
-    setSubmitUnverified(false)
-    setResendMsg(null)
-    try {
-      if (selectedStart.getTime() < Date.now()) {
-        setSubmitError('არჩეული დრო წარსულშია. აირჩიე მომავალი დრო.')
-        return
-      }
-      const res = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tutorId,
-          // Booking a tapped tier: the server validates ownership and uses the
-          // Consultation row's minutes/price as authoritative (undefined keys
-          // are dropped by JSON.stringify, so the generic flow is unchanged).
-          consultationId: service?.id,
-          topic: details.topic || 'კონსულტაცია',
-          studentNotes: details.goal || undefined,
-          startAt: selectedStart.toISOString(),
-          durationMin: duration,
-          price: priceNum,
-        }),
-      })
-      if (res.status === 401) {
-        const here = typeof window !== 'undefined' ? window.location.pathname + window.location.search : `/tutors/${tutorId}`
-        window.location.href = `/signin?redirect=${encodeURIComponent(here)}`
-        return
-      }
-      const data = await res.json().catch(() => ({} as any))
-      if (!res.ok || data?.ok === false) {
-        const code = data?.error as string | undefined
-        if (code === 'EMAIL_NOT_VERIFIED') {
-          setSubmitUnverified(true)
-          setResendMsg(null)
-          setSubmitError('დაჯავშნამდე დაადასტურე ელფოსტა.')
-          return
-        }
-        const msg =
-          code === 'SLOT_TAKEN' ? 'ეს დრო უკვე დაჯავშნილია. აირჩიე სხვა დრო.' :
-          code === 'NO_AVAILABILITY' ? 'ექსპერტი ამ დროზე არ არის ხელმისაწვდომი. აირჩიე მისი გამოცხადებული სლოტიდან.' :
-          code === 'PAST_DATE' ? 'არჩეული დრო წარსულშია.' :
-          code === 'SELF_BOOKING' ? 'ვერ დაიჯავშნი საკუთარ თავს.' :
-          code === 'TUTOR_NOT_FOUND' ? 'ექსპერტი ვერ მოიძებნა.' :
-          code === 'RATE_LIMIT' ? 'ხშირად ცდი ჯავშანს — ცოტა ხანში სცადე თავიდან.' :
-          code === 'INVALID' ? 'შეავსე ყველა აუცილებელი ველი.' :
-          'დაჯავშნა ვერ შესრულდა. სცადე თავიდან.'
-        setSubmitError(msg)
-        return
-      }
-      setCreatedId(typeof data?.id === 'string' ? data.id : null)
-      setSubmitted(true)
-    } catch {
-      setSubmitError('ქსელის შეცდომა. შეამოწმე კავშირი და სცადე თავიდან.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const next = () => {
-    if (step < totalSteps) setStep(step + 1)
-    else {
-      submitBooking()
-    }
-  }
-  const back = () => { if (step > 1) setStep(step - 1) }
-
-  const summary = (
-    <OrderSummary
-      start={selectedStart}
-      duration={duration}
-      topic={details.topic}
-      total={total}
-      tutorName={tutorName}
-      tutorSpecialty={tutorSpecialty}
-      tutorAvatar={tutorAvatar ?? null}
-      serviceTitle={service?.title ?? null}
-    />
-  )
-
-  const canAdvanceFromStep1 = selectedStart !== null
-
-  // Gate the pay step: when the user chose the card method, require complete,
-  // well-formed card details before the "pay" CTA activates. Redirect methods
-  // (TBC / BOG) carry their own hosted flow, so they don't need this.
-  const onPaymentStep = PAYMENTS_LIVE && step === totalSteps
-  const cardValid =
-    payment.method !== 'card' ||
-    (payment.cardName.trim().length > 1 &&
-      payment.cardNum.replace(/\s/g, '').length === 16 &&
-      /^(0[1-9]|1[0-2])\/\d{2}$/.test(payment.cardExp) &&
-      /^\d{3,4}$/.test(payment.cardCvv))
-
-  const nextLabel =
-    step < totalSteps
-      ? step === 1
-        ? 'შემდეგი — დეტალები'
-        : 'შემდეგი — გადახდა'
-      : PAYMENTS_LIVE
-        ? `${total}-ის გადახდა`
-        : 'დაჯავშნე'
-
-  return (
-    // Right-side sheet (desktop) / bottom sheet (mobile) via the shared Sheet
-    // container — matches the /tutors listing's QuickBookPopup positioning so
-    // the modal doesn't obscure the tutor profile the user is booking from.
-    <Sheet
-      open={open}
-      onClose={onClose}
-      variant="side"
-      size="lg"
-      busy={submitting}
-      ariaLabel={`${tutorName} — დაჯავშნა`}
-      eyebrow="სესიის დაჯავშნა"
-      title={
-        <>
-          {/* When a service tier was tapped, name IT here — the user must see
-              what they're booking from step 1 onward. */}
-          <span className="text-[20px] lg:text-[22px]">{tutorName} · {service ? service.title : tutorSpecialty}</span>
-          <div className="mt-4 font-sans font-normal tracking-normal">
-            <Steps step={step} total={totalSteps} />
-          </div>
-        </>
-      }
-      footer={!submitted ? (
-        <div className="w-full flex flex-col gap-3">
-          {submitError && (
-            <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12.5px] font-medium">
-              {submitUnverified ? (
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span>დაჯავშნამდე დაადასტურე ელფოსტა</span>
-                  <span>·</span>
-                  <a href="/settings" className="underline font-semibold hover:text-danger-900">ბმული ვერიფიკაციაზე</a>
-                  <button
-                    type="button"
-                    onClick={resendVerify}
-                    disabled={resendingVerify}
-                    className="ml-auto h-7 px-2 rounded-btn bg-white border border-danger-200 hover:border-danger-300 disabled:opacity-50 text-danger-700 font-display font-semibold text-[11.5px] transition-colors"
-                  >
-                    {resendingVerify ? 'იგზავნება…' : 'კოდის ხელახლა გაგზავნა'}
-                  </button>
-                  {resendMsg && <div className="w-full text-[11.5px] text-danger-700 mt-0.5">{resendMsg}</div>}
-                </div>
-              ) : submitError}
-            </div>
-          )}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-            <div className="text-[13px]">
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500">არჩეული</div>
-              <div className="font-display font-bold text-ink-900 mt-0.5">
-                {selectedStart
-                  ? <>{service ? `${service.title} · ` : ''}{dayLabelFull} · {fmtHM(selectedStart)} · <span className="tabular-nums">{duration}</span> წუთი · <span className="tabular-nums">{price}</span></>
-                  : service
-                    ? <>{service.title} · <span className="font-medium text-ink-500">აირჩიე დრო</span></>
-                    : '— აირჩიე დრო'}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {step > 1 ? (
-                <button type="button" onClick={back} disabled={submitting} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                  <Icon.chevL className="w-3.5 h-3.5" />
-                  უკან
-                </button>
-              ) : (
-                <button type="button" onClick={onClose} disabled={submitting} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display font-semibold text-[13px] tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                  გაუქმება
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={next}
-                disabled={submitting || (step === 1 && !canAdvanceFromStep1) || (onPaymentStep && !cardValid)}
-                aria-busy={submitting}
-                className="h-11 px-5 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
-              >
-                {submitting ? (
-                  <>
-                    <span aria-hidden className="inline-block w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent motion-safe:animate-spin" />
-                    იგზავნება…
-                  </>
-                ) : (
-                  <>
-                    {nextLabel}
-                    <Icon.arrow className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : undefined}
-    >
-        {/* Body — full-bleed inside Sheet's padded scroll area */}
-        <div className="-mx-5 sm:-mx-6 -my-4">
-          {submitted ? (
-            <div className="h-full flex flex-col items-center justify-center text-center px-7 py-14">
-              <div className="relative w-20 h-20 rounded-full bg-success-100 inline-flex items-center justify-center text-success-700 mb-6 motion-safe:animate-scale-in">
-                <span aria-hidden className="absolute inset-0 rounded-full bg-success-500/20 motion-safe:animate-pulse-soft" />
-                <span aria-hidden className="absolute -inset-2 rounded-full border-2 border-success-200 motion-safe:animate-pulse-soft" />
-                <Icon.check className="relative w-10 h-10" />
-              </div>
-              {/* One state = one truth: same wording as the listing QuickBook —
-                  a REQUEST awaiting expert confirmation, never "confirmed". */}
-              <h3 className="font-display text-[26px] font-bold text-ink-900 tracking-tight motion-safe:animate-rise-in" style={{ animationDelay: '120ms' }}>
-                მოთხოვნა გაგზავნილია
-              </h3>
-              <p className="text-[14px] text-ink-600 mt-3 max-w-[440px] leading-[1.55] motion-safe:animate-rise-in" style={{ animationDelay: '200ms' }}>
-                {dayLabelFull}{selectedStart ? ` · ${fmtHM(selectedStart)}` : ''} · {total} · {tutorName}. ექსპერტი მალე დაადასტურებს — შეტყობინებას მიიღებ. ჯავშანი გამოჩნდება „ჩემი ჯავშნების" გვერდზე.
-              </p>
-              {/* Primary action leads to the created booking — closing into the
-                  profile was a dead end. Plain close stays as the secondary. */}
-              <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-2 motion-safe:animate-rise-in" style={{ animationDelay: '280ms' }}>
-                <Link
-                  href={createdId ? `/student/bookings/${createdId}` : '/student/bookings'}
-                  className="h-11 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast"
-                >
-                  ჯავშნის ნახვა <Icon.arrow className="w-4 h-4" />
-                </Link>
-                <button type="button" onClick={onClose} className="h-11 px-5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[13px] tracking-wide transition-colors">
-                  დახურვა
-                </button>
-              </div>
-            </div>
-          ) : step === 1 ? (
-            <div className="grid lg:grid-cols-[360px_1fr] h-full">
-              <div className="border-b lg:border-b-0 lg:border-r border-ink-100 p-4 sm:p-6 overflow-y-auto">
-                <Calendar
-                  viewMonth={viewMonth}
-                  selected={selectedDate}
-                  slotsByDay={slotsByDay}
-                  onSelect={(d) => { setSelectedDate(d); setSelectedStart(null) }}
-                  onPrev={() => setViewMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-                  onNext={() => setViewMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-                />
-              </div>
-              <div className="p-4 sm:p-6 overflow-y-auto">
-                {selectedDate ? (
-                  <DayTimeline
-                    date={selectedDate}
-                    selected={selectedStart}
-                    onSelect={(t) => { setSelectedStart(t); if (submitError) setSubmitError(null) }}
-                    duration={duration}
-                    price={price}
-                    timeChoices={timeChoices}
-                  />
-                ) : availability.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center px-6 py-12">
-                    <div className="w-12 h-12 rounded-full bg-ink-100 inline-flex items-center justify-center text-ink-500 mb-4">
-                      <Icon.cal className="w-5 h-5" />
-                    </div>
-                    <div className="font-display text-[15px] font-bold text-ink-900">
-                      ექსპერტს ჯერ არ აქვს გამოცხადებული სლოტები
-                    </div>
-                    <p className="text-[13px] text-ink-500 mt-2 max-w-[320px]">
-                      მიწერე პირდაპირ — ექსპერტი ხშირად ხსნის ინდივიდუალურ დროს კონკრეტული მოთხოვნით.
-                    </p>
-                    <div className="mt-5 flex flex-col sm:flex-row gap-2 items-center">
-                      <Link
-                        href={`/signin?redirect=/tutors/${tutorId}`}
-                        onClick={(e) => { e.preventDefault(); onClose(); if (tutorId) window.location.href = `/tutors/${tutorId}#contact` }}
-                        className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
-                      >
-                        დაუკავშირდი ექსპერტს
-                      </Link>
-                      <Link
-                        href="/tutors"
-                        onClick={() => onClose()}
-                        className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center transition-colors"
-                      >
-                        მსგავსი ექსპერტები
-                      </Link>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center px-6 py-12">
-                    <div className="w-12 h-12 rounded-full bg-ink-100 inline-flex items-center justify-center text-ink-500 mb-4">
-                      <Icon.cal className="w-5 h-5" />
-                    </div>
-                    <div className="font-display text-[15px] font-bold text-ink-900">აირჩიე დღე კალენდარში</div>
-                    <p className="text-[13px] text-ink-500 mt-2 max-w-[280px]">შემდეგ გამოჩნდება ხელმისაწვდომი დროები.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : step === 2 ? (
-            <Step2Details value={details} onChange={setDetails} summary={summary} />
-          ) : (
-            <Step3Payment value={payment} onChange={setPayment} summary={summary} />
-          )}
-        </div>
-    </Sheet>
+    </nav>
   )
 }
 
@@ -2369,49 +1252,61 @@ function ExpertProfile() {
   // boundary. All hooks must run on every render.
 
   const [bookingOpen, setBookingOpen] = useState(false)
-  const [bookingMode, setBookingMode] = useState<BookingMode>('paid')
-  const [bookingInit, setBookingInit] = useState<{ step: number; start: Date | null }>({ step: 1, start: null })
-  // Consultation tier tapped in ServicesSection — flows into BookingModal so
-  // the modal books THAT tier's minutes/price (via consultationId). Null for
-  // every generic CTA (sticky card, mobile bar), which books the flat default.
+  // Pre-selected slot start — set by the inline „განრიგი" picker so the flow
+  // opens with that time already chosen. Null for generic CTAs.
+  const [bookingStart, setBookingStart] = useState<Date | null>(null)
+  // Consultation tier tapped in ServicesSection — flows into BookingFlow so
+  // it books THAT tier's minutes/price (via consultationId). Null for
+  // every generic CTA (sticky card, mobile bar), which books the flat default
+  // (or asks for a tier at step 1 when the expert has several).
   const [selectedService, setSelectedService] = useState<ConsultationItem | null>(null)
+
+  // The shared flow's payload, derived once per fetch from the SAME
+  // /api/tutors/[id] JSON this page already loaded (no extra request).
+  // Memoized: BookingFlow's reset logic must not see a new object per render.
+  const bookingTutorInfo = React.useMemo(
+    () => (tutorData ? mapTutorPayload(tutorData) : null),
+    [tutorData],
+  )
 
   // No-op when the tutor is paused (available === false). The banner above
   // explains the state; silently swallowing the click prevents any of the
-  // three booking entry points (sidebar, mobile bar, service cards) from
-  // opening the modal for a tutor who's stepped out.
+  // booking entry points (sidebar, mobile bar, service cards, inline
+  // schedule) from opening the flow for a tutor who's stepped out.
   const isPaused = tutorData?.available === false
 
   const openPaid = () => {
     if (isPaused) return
     if (requireAuth('book')) return
     setSelectedService(null)
-    setBookingMode('paid'); setBookingInit({ step: 1, start: null }); setBookingOpen(true)
+    setBookingStart(null)
+    setBookingOpen(true)
   }
   // Service-card entry point: same gates as openPaid, but carries the tapped
-  // tier into the modal.
+  // tier into the flow (tier step pre-answered).
   const openServiceBooking = (s: ConsultationItem) => {
     if (isPaused) return
     if (requireAuth('book')) return
     setSelectedService(s)
-    setBookingMode('paid'); setBookingInit({ step: 1, start: null }); setBookingOpen(true)
+    setBookingStart(null)
+    setBookingOpen(true)
   }
-  const continueFromSidebar = (start: Date, mode: BookingMode) => {
+  // Inline-schedule entry point (1.6): opens the flow with the tapped time
+  // preselected; multi-tier experts still answer the tier step first.
+  const openSlotBooking = (start: Date) => {
     if (isPaused) return
     if (requireAuth('book')) return
     setSelectedService(null)
-    setBookingMode(mode)
-    setBookingInit({ step: 2, start })
+    setBookingStart(start)
     setBookingOpen(true)
   }
 
-
-  // Auto-open the booking modal when the caller passed ?rebook=1. Only fire
+  // Auto-open the booking flow when the caller passed ?rebook=1. Only fire
   // once — we track it with a guard state so React strict-mode double invokes
-  // stay idempotent, and further modal opens/closes remain manual. Skip if
+  // stay idempotent, and further opens/closes remain manual. Skip if
   // the tutor has paused their listing since the rebook link was generated.
   // Anonymous visitors go through requireAuth instead of straight into the
-  // modal — the AuthPromptSheet's 'book' intent carries ?rebook=1 through
+  // flow — the AuthPromptSheet's 'book' intent carries ?rebook=1 through
   // sign-in, so the flow resumes here after auth.
   const [rebookConsumed, setRebookConsumed] = useState(false)
   useEffect(() => {
@@ -2420,8 +1315,8 @@ function ExpertProfile() {
     if (isPaused) { setRebookConsumed(true); return }
     if (signedIn === null) return // wait for the /api/me probe to resolve
     if (requireAuth('book')) { setRebookConsumed(true); return }
-    setBookingMode('paid')
-    setBookingInit({ step: 1, start: null })
+    setSelectedService(null)
+    setBookingStart(null)
     setBookingOpen(true)
     setRebookConsumed(true)
   }, [rebookAutoOpen, rebookConsumed, loadState, isPaused, signedIn, requireAuth])
@@ -2524,9 +1419,22 @@ function ExpertProfile() {
     )
   }
 
+  // Anchor-nav items — only the sections that actually render get a link.
+  const navItems: { id: string; l: string }[] = [
+    ...((tutorData?.bio || tutorData?.headline || tutorData?.user?.bio) ? [{ id: 'overview', l: 'მიმოხილვა' }] : []),
+    ...((tutorData?.consultations?.length ?? 0) > 0 ? [{ id: 'services', l: 'სერვისები' }] : []),
+    ...(!isPaused ? [{ id: 'schedule', l: 'განრიგი' }] : []),
+    { id: 'reviews', l: 'შეფასებები' },
+    ...((tutorData?.experience?.length ?? 0) > 0 ? [{ id: 'experience', l: 'გამოცდილება' }] : []),
+  ]
+
+  // From-price shared by the rail + mobile bar (1.2): „₾N-დან" when tiers differ.
+  const headlinePrice = fromPriceLabel(tutorData?.consultations ?? [], tutorData?.price ?? TUTOR_DEFAULTS.price)
+
   return (
     <div className="font-sans bg-white text-ink-900 antialiased">
       <PublicTopBar />
+      <SectionNav items={navItems} />
 
       <main id="main" className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-4 sm:pt-7 lg:pt-9 pb-24 lg:pb-16">
         {/* Paused-profile banner. Shown when the tutor has toggled visibility
@@ -2556,12 +1464,32 @@ function ExpertProfile() {
             <SpecsGrid tutor={tutorData} />
 
             <AboutSection tutor={tutorData} />
-            {/* Consultation tiers. Rendered again (they were hidden while the
-                modal ignored per-tier prices): a tapped card now flows into
-                BookingModal, which enumerates slots by the tier's minutes,
-                restates ITS price and sends consultationId — the server books
-                the Consultation row's authoritative minutes/price. */}
+            {/* Consultation tiers: a tapped card opens the shared BookingFlow
+                with that tier preselected — the flow enumerates by the tier's
+                minutes, restates ITS price and sends consultationId (the
+                server books the Consultation row's authoritative values). */}
             <ServicesSection consultations={tutorData?.consultations ?? []} onBook={openServiceBooking} />
+            {/* Inline availability (1.6) — the shared flow's calendar/slot
+                view rendered in-page, viewer-local tz. Tapping a time opens
+                the booking Sheet with the slot preselected. Hidden while the
+                expert is paused (booking is closed anyway). */}
+            {!isPaused && (
+              <section id="schedule" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-32">
+                <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-3">განრიგი</div>
+                <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">თავისუფალი დროები</h2>
+                <p className="mt-2 text-[13.5px] text-ink-500 max-w-[520px]">აირჩიე დრო პირდაპირ აქ — ჯავშნის ფანჯარა არჩეული დროით გაიხსნება.</p>
+                <div className="mt-6">
+                  <InlineAvailability
+                    availability={tutorData?.availability ?? []}
+                    busySlots={tutorData?.busySlots ?? []}
+                    sessionMin={tutorData?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin}
+                    priceLabel={headlinePrice.label}
+                    tutorName={tutorData?.user?.fullName ?? TUTOR_DEFAULTS.name}
+                    onPickSlot={openSlotBooking}
+                  />
+                </div>
+              </section>
+            )}
             <ExperienceSection items={tutorData?.experience ?? []} />
             <EducationSection items={tutorData?.education ?? []} />
             <CertificatesSection items={tutorData?.certificates ?? []} />
@@ -2591,6 +1519,7 @@ function ExpertProfile() {
               rating={tutorData?.rating ?? 0}
               reviewsCount={tutorData?.reviewsCount ?? 0}
               signedIn={signedIn}
+              consultations={tutorData?.consultations ?? []}
             />
           </div>
         </div>
@@ -2601,8 +1530,8 @@ function ExpertProfile() {
       {/* Mobile sticky bottom booking */}
       <MobileBookingBar
         onBook={openPaid}
-        price={tutorData?.price ?? TUTOR_DEFAULTS.price}
-        responseHours={tutorData?.responseHours ?? TUTOR_DEFAULTS.responseHours}
+        priceLabel={headlinePrice.label}
+        priceIsFrom={headlinePrice.isFrom}
         sessionMin={tutorData?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin}
         signedIn={signedIn}
         paused={isPaused}
@@ -2619,24 +1548,16 @@ function ExpertProfile() {
         />
       )}
 
-      <BookingModal
+      <BookingFlow
         open={bookingOpen}
-        // Closing drops the tapped tier too — the next generic open must not
-        // silently rebook the previous service.
-        onClose={() => { setBookingOpen(false); setSelectedService(null) }}
-        mode={bookingMode}
-        initialStep={bookingInit.step}
-        initialStart={bookingInit.start}
-        initialTopic={rebookTopic}
+        // Closing drops the tapped tier/slot too — the next generic open must
+        // not silently rebook the previous selection.
+        onClose={() => { setBookingOpen(false); setSelectedService(null); setBookingStart(null) }}
         tutorId={tutorId}
-        tutorPrice={tutorData?.price ?? TUTOR_DEFAULTS.price}
-        tutorName={tutorData?.user?.fullName ?? TUTOR_DEFAULTS.name}
-        tutorSpecialty={tutorData?.specialty ?? 'კონსულტაცია'}
-        tutorAvatar={tutorData?.user?.avatarUrl ?? null}
-        availability={tutorData?.availability ?? []}
-        busySlots={tutorData?.busySlots ?? []}
-        sessionMin={tutorData?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin}
-        service={selectedService}
+        tutor={bookingTutorInfo}
+        initialStart={bookingStart}
+        initialTopic={rebookTopic}
+        initialService={selectedService}
       />
     </div>
   )

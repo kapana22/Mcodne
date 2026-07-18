@@ -15,7 +15,7 @@ export default function StudentError({
     <div className="min-h-[60vh] flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-[420px] py-12 px-6 text-center rounded-card border border-ink-200 bg-white">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-ink-100 text-ink-500 mb-4">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+          <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
             <path d="M12 3 2 21h20L12 3Z" />
             <path d="M12 10v5M12 18h0" />
           </svg>

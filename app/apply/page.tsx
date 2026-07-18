@@ -2,19 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { extractYouTubeId } from '@/lib/youtube'
 import { Icon } from '@/components/Icon'
-
-
-const Logo = () => (
-  <a href="/" className="inline-flex items-center" aria-label="მცოდნე">
-    <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain select-none" draggable={false} />
-  </a>
-)
-
-const VerifiedMark = ({ size = 14 }: { size?: number }) => (
-  <span className="inline-flex items-center justify-center rounded-full bg-brand-500 text-white shrink-0" style={{ width: size, height: size }}>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" width={size * 0.55} height={size * 0.55}><path d="m4 12 5 5L20 6" /></svg>
-  </span>
-)
+import { Logo } from '@/components/Logo'
+import { VerifiedMark } from '@/components/Avatar'
 
 /* ───── Top bar ───── */
 const TopBar = () => (
@@ -298,7 +287,7 @@ const CertificateUploader = ({ items, onChange }: { items: { title: string; url:
       ))}
       <div className="flex items-center gap-2">
         <Input value={title} onChange={(e: any) => setTitle(e.target.value)} placeholder="სახელი (მაგ. MBA · INSEAD)" className="flex-1" />
-        <button type="button" onClick={() => ref.current?.click()} disabled={busy} className="h-10 px-4 shrink-0 rounded-btn border border-dashed border-ink-300 hover:border-brand-400 hover:bg-brand-50/30 text-ink-600 hover:text-brand-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-2 transition-colors disabled:opacity-60">
+        <button type="button" onClick={() => ref.current?.click()} disabled={busy} className="h-11 px-4 shrink-0 rounded-btn border border-dashed border-ink-300 hover:border-brand-400 hover:bg-brand-50/30 text-ink-600 hover:text-brand-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-2 transition-colors disabled:opacity-60">
           <Icon.plus className="w-4 h-4" /> {busy ? 'იტვირთება…' : 'დამატება'}
         </button>
       </div>
@@ -335,7 +324,7 @@ const LanguageEditor = ({ value, onChange }: { value: string[]; onChange: (list:
           placeholder="მაგ. English · C2"
           className="flex-1"
         />
-        <button type="button" onClick={add} className="h-10 px-3 shrink-0 rounded-btn border border-dashed border-ink-300 hover:border-ink-400 text-ink-500 hover:text-ink-800 font-display text-[11.5px] font-semibold inline-flex items-center gap-1 transition-colors">
+        <button type="button" onClick={add} className="h-11 px-3 shrink-0 rounded-btn border border-dashed border-ink-300 hover:border-ink-400 text-ink-500 hover:text-ink-800 font-display text-[11.5px] font-semibold inline-flex items-center gap-1 transition-colors">
           <Icon.plus className="w-3 h-3" /> დამატება
         </button>
       </div>
@@ -774,7 +763,7 @@ const YouTubeIntroInput = ({ value, onChange }: { value: string; onChange: (v: s
                 <img src={thumb} alt="YouTube preview" loading="lazy" className="absolute inset-0 w-full h-full object-cover motion-safe:animate-fade-in-fast" />
                 <span className="absolute inset-0 flex items-center justify-center bg-ink-900/20 group-hover:bg-ink-900/40 transition-colors">
                   <span className="w-14 h-14 rounded-full bg-white/95 shadow-float inline-flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-brand-700 ml-1">
+                    <svg aria-hidden viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-brand-700 ml-1">
                       <path d="M8 5v14l11-7z" />
                     </svg>
                   </span>
@@ -1080,7 +1069,7 @@ const LivePreview = ({ step, form }: { step: StepId; form: FormState }) => {
         <p className="mt-2.5 text-[12.5px] text-ink-700 leading-[1.45] line-clamp-3">{bio}</p>
 
         <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between text-[12px]">
-          <span className="inline-flex items-center gap-1"><Icon.star className="w-3 h-3 text-warning-500" /><span className="font-display font-bold tabular-nums text-ink-900">—</span><span className="text-ink-400 tabular-nums">(ახალი)</span></span>
+          <span className="inline-flex items-center gap-1"><Icon.star aria-hidden className="w-3 h-3 text-warning-500" /><span className="font-display font-bold tabular-nums text-ink-900">—</span><span className="text-ink-400 tabular-nums">(ახალი)</span></span>
           <span className="font-display text-[15px] font-bold text-ink-900 tabular-nums">₾{price}<span className="text-[11px] font-medium text-ink-500"> / სესია</span></span>
         </div>
         <div aria-hidden className="mt-3 w-full h-9 rounded-btn bg-brand-500 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center justify-center gap-1.5 select-none cursor-default shadow-xs" title="ეს არის პრევიუ — მოცემულ დროდე ასე ჩანს ჯავშნის ღილაკი კლიენტებისთვის"><Icon.cal className="w-3.5 h-3.5" /> დაიჯავშნე (პრევიუ)</div>
@@ -1187,7 +1176,7 @@ const StatusHero = ({ stage, countdown }: { stage: Stage; countdown: { h: number
         <div className={`w-20 h-20 mx-auto rounded-full ring-8 ${ring} text-white inline-flex items-center justify-center mb-5`}>
           {stage === 'approved' ? <Icon.check className="w-9 h-9" /> :
            stage === 'rejected' || stage === 'needs_info' ? <Icon.warn className="w-9 h-9" /> :
-           <svg viewBox="0 0 24 24" className="w-9 h-9 animate-spin" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>}
+           <svg aria-hidden viewBox="0 0 24 24" className="w-9 h-9 animate-spin" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>}
         </div>
         <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">{m.eyebrow}</div>
         <h1 className="font-display text-[34px] sm:text-[42px] lg:text-[52px] font-bold text-ink-900 tracking-[-0.025em] leading-[1.05] max-w-[760px] mx-auto">{m.title}</h1>
@@ -1221,7 +1210,7 @@ const StatusTimeline = ({ stage }: { stage: Stage }) => {
               'bg-white border-ink-300 text-ink-400'
             }`}>
               {s.state === 'past' ? <Icon.check className="w-3 h-3" /> :
-               s.state === 'active' ? <svg viewBox="0 0 24 24" className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg> :
+               s.state === 'active' ? <svg aria-hidden viewBox="0 0 24 24" className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg> :
                <span className="w-1.5 h-1.5 rounded-full bg-ink-300" />}
             </span>
             <div className="min-w-0 flex-1 pb-1">
@@ -1286,9 +1275,9 @@ const StatusSideRail = ({ stage }: { stage: Stage }) => (
     {stage === 'approved' && (
       <div className="rounded-card bg-success-500 text-white p-5">
         <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-success-100 mb-2">დადასტურდი</div>
-        <h3 className="font-display text-[18px] font-bold tracking-tight">გადადი დაშბორდზე</h3>
+        <h3 className="font-display text-[18px] font-bold tracking-tight">გადადი შენს სივრცეში</h3>
         <p className="mt-1 text-[12.5px] text-white/85">პროფილი ცოცხალია, საკომისიო 15%, payout ყოველი ორ კვირაში.</p>
-        <button type="button" className="mt-3 w-full h-10 rounded-btn bg-white text-success-700 hover:bg-success-50 font-display font-semibold text-[13px] inline-flex items-center justify-center gap-2">ჩემი დაშბორდი <Icon.arrow className="w-3.5 h-3.5" /></button>
+        <button type="button" className="mt-3 w-full h-10 rounded-btn bg-white text-success-700 hover:bg-success-50 font-display font-semibold text-[13px] inline-flex items-center justify-center gap-2">ჩემი სივრცე <Icon.arrow className="w-3.5 h-3.5" /></button>
       </div>
     )}
     <div className="rounded-card bg-white border border-ink-200 p-5">

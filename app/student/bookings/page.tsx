@@ -50,7 +50,7 @@ export default async function StudentBookingsPage({
           <div>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">ჯავშნები</div>
             <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight">ჩემი სესიები</h1>
-            <p className="text-[13.5px] text-ink-600 mt-1.5">{PAYMENTS_LIVE ? 'ყველა შენი ჯავშანი ერთ ადგილას · escrow დაცული' : 'ყველა შენი ჯავშანი ერთ ადგილას'}</p>
+            <p className="text-[13.5px] text-ink-600 mt-1.5">{PAYMENTS_LIVE ? 'ყველა შენი ჯავშანი ერთ ადგილას · დაცული გადახდით' : 'ყველა შენი ჯავშანი ერთ ადგილას'}</p>
           </div>
           <Link href="/tutors" className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 transition-colors">
             <Icon.plus className="w-3.5 h-3.5" /> ახალი ჯავშანი
@@ -119,7 +119,7 @@ export default async function StudentBookingsPage({
                         )}
                         {needsReview && (
                           <span className="inline-flex items-center gap-1 h-5 px-2 rounded-pill bg-warning-50 border border-warning-200 text-warning-700 text-[10.5px] font-display font-bold uppercase tracking-[0.08em]">
-                            <Icon.star className="w-2.5 h-2.5" /> შეფასება ელოდება
+                            <Icon.star aria-hidden className="w-2.5 h-2.5" /> შეფასება ელოდება
                           </span>
                         )}
                         <span className="ml-auto font-mono text-[10.5px] tabular-nums text-ink-400 truncate max-w-[80px]" title={b.ref}>#{b.ref.slice(0, 8)}</span>

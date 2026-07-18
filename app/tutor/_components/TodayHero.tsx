@@ -38,7 +38,7 @@ export function TodayHero({
           variant="inline"
           icon={<Icon.calendar className="w-5 h-5" />}
           title="დადასტურებული სესია არ გაქვს"
-          description="გამოაქვეყნე თავისუფალი დროები — კლიენტები მხოლოდ გამოცხადებულ სლოტებზე ჯავშნიან."
+          description="გამოაქვეყნე თავისუფალი დროები — კლიენტები მხოლოდ გამოცხადებულ დროზე ჯავშნიან."
           cta={{ label: 'გრაფიკის რედაქტირება', href: '/tutor/schedule' }}
         />
       </section>

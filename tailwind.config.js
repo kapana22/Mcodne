@@ -227,11 +227,10 @@ module.exports = {
       },
     },
   },
-  safelist: [
-    {
-      pattern: /(bg|text|border|ring)-(brand|accent|ink|success|warning|danger|info|iris|flame)-(50|75|100|200|300|400|500|600|700|800|900|950)/,
-      variants: ['hover', 'focus', 'active', 'group-hover', 'group-focus'],
-    },
-  ],
+  // No safelist: zero dynamically-constructed classnames exist (verified 2026-07 —
+  // no `bg-${…}`-style interpolation anywhere in app/, components/, lib/). All color
+  // classes appear literally in source, so the content scanner picks them up. If you
+  // ever build a classname at runtime, write the full class strings out explicitly
+  // (in a map) instead of re-adding a pattern safelist.
   plugins: [],
 }

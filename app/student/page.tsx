@@ -10,16 +10,11 @@ import { isBookingLive } from '@/lib/bookingLive'
 import { fmtKaDate, fmtKaTime, fmtKaDateTime, KA_WEEKDAYS_SHORT } from '@/lib/kaDate'
 import { StatusPill } from '@/components/StatusPill'
 import { StudentAppBar } from '@/components/StudentAppBar'
+import { VerifiedMark } from '@/components/Avatar'
 import { WorkspaceFooter } from '@/components/WorkspaceFooter'
 
 
 type MeData = { id: string; fullName: string; email: string; avatarUrl?: string | null }
-
-const VerifiedMark = ({ size = 16 }: { size?: number }) => (
-  <span title="გადამოწმებული" className="inline-flex items-center justify-center rounded-full bg-brand-500 text-white shrink-0" style={{ width: size, height: size }}>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" width={size * 0.55} height={size * 0.55}><path d="m4 12 5 5L20 6" /></svg>
-  </span>
-)
 
 /* ───── Search bar — dashboard primary CTA ───── */
 const DashboardSearch = () => {
@@ -283,7 +278,7 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
               {PAYMENTS_LIVE ? (
                 <>
                   <Icon.shieldCheck className="w-3 h-3" />
-                  escrow ₾{next.price}
+                  დაცული გადახდა ₾{next.price}
                 </>
               ) : (
                 <>₾{next.price}</>
@@ -480,8 +475,8 @@ const SavedStrip = () => {
               <span className="inline-flex items-center gap-1 text-ink-600">
                 {w.rating > 0 && (
                   <>
-                    <Icon.star className="w-3 h-3 text-warning-500" />
-                    <span className="font-display font-semibold tabular-nums">{w.rating.toFixed(1)}</span>
+                    <Icon.star aria-hidden className="w-3 h-3 text-warning-500" />
+                    <span role="img" aria-label={`${w.rating.toFixed(1)} 5-დან`} className="font-display font-semibold tabular-nums">{w.rating.toFixed(1)}</span>
                   </>
                 )}
               </span>
@@ -667,8 +662,8 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
                 <div className="inline-flex items-baseline gap-1.5">
                   {t.rating > 0 && (
                     <>
-                      <Icon.star className="w-3 h-3 text-warning-500 self-center" />
-                      <span className="font-display text-[12px] font-bold text-ink-900 tabular-nums">{t.rating.toFixed(2)}</span>
+                      <Icon.star aria-hidden className="w-3 h-3 text-warning-500 self-center" />
+                      <span role="img" aria-label={`${t.rating.toFixed(2)} 5-დან`} className="font-display text-[12px] font-bold text-ink-900 tabular-nums">{t.rating.toFixed(2)}</span>
                       <span className="font-mono text-[10.5px] text-ink-400 tabular-nums">({t.reviews})</span>
                     </>
                   )}
@@ -754,7 +749,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
         <StatusBadge s={s.status} />
         {s.status === 'completed' && !s.reviewed && (
           <span className="inline-flex items-center gap-1 px-2 h-5 rounded-pill bg-warning-50 border border-warning-200 text-[10.5px] font-display font-bold uppercase tracking-[0.12em] text-warning-700">
-            <Icon.star className="w-2.5 h-2.5" />
+            <Icon.star aria-hidden className="w-2.5 h-2.5" />
             შეფასების მოლოდინში
           </span>
         )}
@@ -775,7 +770,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
           {PAYMENTS_LIVE ? (
             <>
               <Icon.shieldCheck className="w-3 h-3 text-success-600" />
-              ₾{s.price} escrow
+              ₾{s.price} დაცული
             </>
           ) : (
             <>₾{s.price}</>
@@ -818,7 +813,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
         <>
           {!s.reviewed && (
             <Link href={`/student/bookings/${s.id}?review=1`} className="h-9 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors">
-              <Icon.star className="w-3.5 h-3.5" />
+              <Icon.star aria-hidden className="w-3.5 h-3.5" />
               <span>შეაფასე</span>
             </Link>
           )}
@@ -951,7 +946,7 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
           <div>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">ჩემი აქტივობა</div>
             <h2 className="font-display text-[20px] sm:text-[22px] font-bold text-ink-900 tracking-tight">ჩემი სესიები</h2>
-            <p className="text-[12px] text-ink-500 mt-0.5">{PAYMENTS_LIVE ? 'ყველა შენი ჯავშანი ერთ ადგილას · escrow დაცული' : 'ყველა შენი ჯავშანი ერთ ადგილას · დაჯავშნა უფასოა'}</p>
+            <p className="text-[12px] text-ink-500 mt-0.5">{PAYMENTS_LIVE ? 'ყველა შენი ჯავშანი ერთ ადგილას · დაცული გადახდით' : 'ყველა შენი ჯავშანი ერთ ადგილას · დაჯავშნა უფასოა'}</p>
           </div>
           <Link href="/student/bookings" className="font-display text-[12px] font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
             მთლიანი ისტორია
@@ -1151,7 +1146,7 @@ export default function Dashboard() {
         <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain opacity-90 select-none" draggable={false} />
         {authState === 'checking' ? (
           <div className="inline-flex items-center gap-2 text-[12.5px] text-ink-500">
-            <svg viewBox="0 0 24 24" className="w-5 h-5 animate-spin text-ink-400" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
+            <svg aria-hidden viewBox="0 0 24 24" className="w-5 h-5 animate-spin text-ink-400" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
             იტვირთება…
           </div>
         ) : (

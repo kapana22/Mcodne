@@ -200,7 +200,7 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
               className="inline-flex items-center gap-1 px-1.5 h-5 rounded-btn hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-300 transition-colors"
             >
               #{booking.ref.slice(0, 12)}
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 opacity-70">
+              <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 opacity-70">
                 <rect x="9" y="9" width="11" height="11" rx="2" />
                 <path d="M5 15V5a2 2 0 0 1 2-2h10" />
               </svg>
@@ -232,8 +232,8 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
               </div>
               {typeof booking.tutor.rating === 'number' && booking.tutor.rating > 0 && (
                 <span className="ml-auto sm:ml-3 inline-flex items-center gap-1 text-[12.5px] text-ink-700">
-                  <Icon.star className="w-3.5 h-3.5 text-warning-500" />
-                  <span className="font-display font-bold tabular-nums">{booking.tutor.rating.toFixed(2)}</span>
+                  <Icon.star aria-hidden className="w-3.5 h-3.5 text-warning-500" />
+                  <span role="img" aria-label={`${booking.tutor.rating.toFixed(2)} 5-დან`} className="font-display font-bold tabular-nums">{booking.tutor.rating.toFixed(2)}</span>
                   {booking.tutor.reviewsCount ? <span className="text-ink-500 tabular-nums">({booking.tutor.reviewsCount})</span> : null}
                 </span>
               )}
@@ -256,7 +256,7 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
               <div className="p-3 rounded-card border border-ink-200 bg-ink-50/50">
                 <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 inline-flex items-center gap-1.5"><Icon.wallet className="w-3 h-3" /> ფასი</div>
                 <div className="mt-1 font-display text-[14.5px] font-bold text-ink-900 tabular-nums">₾{booking.price}</div>
-                <div className="text-[11.5px] text-ink-500 tabular-nums">{PAYMENTS_LIVE ? 'escrow-ში' : 'გადახდები მალე'}</div>
+                <div className="text-[11.5px] text-ink-500 tabular-nums">{PAYMENTS_LIVE ? 'დაცულ გადახდაშია' : 'გადახდები მალე'}</div>
               </div>
             </div>
 
@@ -337,13 +337,13 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
                   <Icon.refresh className="w-4 h-4" /> დაჯავშნე ისევ
                 </Link>
                 {!booking.review ? (
-                  <a href="#leave-review" className="mt-2 w-full h-10 rounded-btn bg-white border border-brand-200 hover:bg-brand-50 text-brand-800 font-display font-semibold text-[12.5px] inline-flex items-center justify-center gap-2 transition-colors">
-                    <Icon.star className="w-4 h-4" /> შეფასების დატოვება
+                  <a href="#leave-review" className="mt-2 w-full h-11 rounded-btn bg-white border border-brand-200 hover:bg-brand-50 text-brand-800 font-display font-semibold text-[12.5px] inline-flex items-center justify-center gap-2 transition-colors">
+                    <Icon.star aria-hidden className="w-4 h-4" /> შეფასების დატოვება
                   </a>
                 ) : (
-                  <div className="mt-2 inline-flex items-center justify-center gap-1.5 w-full h-10 rounded-btn bg-warning-50 border border-warning-200 text-warning-800 font-display font-semibold text-[12.5px]">
-                    <Icon.star className="w-3.5 h-3.5 text-warning-500" />
-                    შეფასდა · {booking.review.rating}
+                  <div className="mt-2 inline-flex items-center justify-center gap-1.5 w-full h-11 rounded-btn bg-warning-50 border border-warning-200 text-warning-800 font-display font-semibold text-[12.5px]">
+                    <Icon.star aria-hidden className="w-3.5 h-3.5 text-warning-500" />
+                    შეფასდა · {booking.review.rating}<span className="sr-only"> 5-დან</span>
                   </div>
                 )}
               </div>
@@ -360,7 +360,7 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
                     : `${booking.cancelledBy === 'TUTOR' ? 'ექსპერტმა' : booking.cancelledBy === 'ADMIN' ? 'ადმინმა' : 'შენ'} გააუქმა ჯავშანი.`}
                   {' '}{PAYMENTS_LIVE ? 'Escrow თანხა დაბრუნებულია.' : 'გადასახდელი არაფერია — დაჯავშნა უფასოა.'}
                 </p>
-                <Link href="/tutors" className="mt-3 w-full h-10 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-900 font-display font-semibold text-[12.5px] inline-flex items-center justify-center transition-colors">
+                <Link href="/tutors" className="mt-3 w-full h-11 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-900 font-display font-semibold text-[12.5px] inline-flex items-center justify-center transition-colors">
                   ხელახლა დაჯავშნა
                 </Link>
               </div>
@@ -1002,8 +1002,8 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="min-w-0 flex-1">
               <div className="inline-flex items-center gap-2 h-6 px-2.5 rounded-pill bg-warning-50 border border-warning-200 text-warning-800 font-display text-[11px] font-bold">
-                შეფასდა · {existing.rating}
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-warning-500"><path d="m12 2 2.95 6.5L22 9.3l-5.2 4.9 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.3l7.05-.8L12 2Z" /></svg>
+                შეფასდა · {existing.rating}<span className="sr-only"> 5-დან</span>
+                <svg aria-hidden viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-warning-500"><path d="m12 2 2.95 6.5L22 9.3l-5.2 4.9 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.3l7.05-.8L12 2Z" /></svg>
               </div>
               <p className="mt-2 text-[13.5px] text-ink-800 leading-[1.6] whitespace-pre-wrap">{existing.body}</p>
               <div className="mt-2 font-mono text-[10.5px] tabular-nums text-ink-500">
@@ -1024,6 +1024,9 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
           <>
             <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">დატოვე შეფასება</div>
             <h3 className="font-display text-[17px] font-bold text-ink-900 tracking-tight">როგორი იყო სესია {booking.tutor.user.fullName.split(' ')[0]}-სთან?</h3>
+            {/* Outcome-inviting hint (2.5): nudge toward concrete results — no new DB fields,
+                the outcome lives in the same body text. */}
+            <p className="mt-1 text-[12px] text-ink-500 leading-snug">რა შედეგი მიიღე? კონკრეტული შედეგი ყველაზე მეტად ეხმარება სხვებს არჩევანში.</p>
             <div className="mt-4 flex items-center gap-1">
               {[1, 2, 3, 4, 5].map(n => (
                 <button
@@ -1033,7 +1036,7 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
                   aria-label={`${n} ვარსკვლავი`}
                   className={`w-10 h-10 rounded-btn inline-flex items-center justify-center transition-all ${rating >= n ? 'text-warning-500 hover:scale-110' : 'text-ink-300 hover:text-ink-400'}`}
                 >
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7"><path d="m12 2 2.95 6.5L22 9.3l-5.2 4.9 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.3l7.05-.8L12 2Z" /></svg>
+                  <svg aria-hidden viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7"><path d="m12 2 2.95 6.5L22 9.3l-5.2 4.9 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.3l7.05-.8L12 2Z" /></svg>
                 </button>
               ))}
               {rating > 0 && <span className="ml-2 font-display text-[13px] font-bold text-ink-900 tabular-nums">{rating}.0 / 5</span>}
@@ -1042,7 +1045,7 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
               value={body}
               onChange={e => setBody(e.target.value.slice(0, 2000))}
               rows={4}
-              placeholder="რა იყო ყველაზე სასარგებლო ნაწილი? მიეცი გამოხმაურება."
+              placeholder="მაგ.: ერთ სესიაში ამიხსნა, როგორ დავარეგისტრირო შპს — კონკრეტული ნაბიჯებით…"
               className="mt-3 w-full px-3.5 py-2.5 rounded-field border border-ink-200 bg-white text-[13.5px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none resize-none leading-relaxed"
             />
             <div className="mt-1 flex items-center justify-between">
@@ -1268,7 +1271,7 @@ const BookingBody = ({
                 </Link>
                 {!booking.review && (
                   <a href="#leave-review" className="w-full flex items-center gap-2.5 h-11 px-3 rounded-btn bg-warning-50 border border-warning-200 hover:bg-warning-100 text-warning-800 font-display font-semibold text-[12.5px] transition-colors">
-                    <Icon.star className="w-4 h-4" />
+                    <Icon.star aria-hidden className="w-4 h-4" />
                     <span className="flex-1 text-left">დატოვე შეფასება</span>
                   </a>
                 )}
@@ -1322,7 +1325,7 @@ const BookingBody = ({
             {PAYMENTS_LIVE
               ? (status === 'CANCELED' || status === 'NO_SHOW' ? 'თანხა დაბრუნებულია' :
                  status === 'COMPLETED' ? 'გათავისუფლდა ექსპერტზე' :
-                 'escrow-ში დაცული')
+                 'დაცული გადახდით')
               : 'დაჯავშნა უფასოა — გადახდები მალე'}
           </div>
         </div>
@@ -1335,12 +1338,12 @@ const BookingBody = ({
               {PAYMENTS_LIVE ? (
                 <>
                   <div className="font-display text-[12.5px] font-bold text-ink-900 tracking-tight mb-1">100% ფულის უკან-დაბრუნების გარანტია</div>
-                  <p className="text-[11.5px] text-ink-700 leading-[1.5]">თუ ექსპერტი არ მოვა ან სესია ვერ შესრულდება — escrow მთლიანად დაგიბრუნდება.</p>
+                  <p className="text-[11.5px] text-ink-700 leading-[1.5]">თუ ექსპერტი არ მოვა ან სესია ვერ შესრულდება — დაცული თანხა მთლიანად დაგიბრუნდება.</p>
                 </>
               ) : (
                 <>
                   <div className="font-display text-[12.5px] font-bold text-ink-900 tracking-tight mb-1">დაჯავშნა უფასოა</div>
-                  <p className="text-[11.5px] text-ink-700 leading-[1.5]">ამ ეტაპზე არაფერს იხდი — გადახდები და escrow დაცვა მალე ჩაირთვება. თუ ექსპერტი არ მოვა, დაგეხმარებით ახალი დროის შერჩევაში.</p>
+                  <p className="text-[11.5px] text-ink-700 leading-[1.5]">ამ ეტაპზე არაფერს იხდი — გადახდები და დაცული გადახდის სისტემა მალე ჩაირთვება. თუ ექსპერტი არ მოვა, დაგეხმარებით ახალი დროის შერჩევაში.</p>
                 </>
               )}
             </div>
@@ -1365,7 +1368,7 @@ const StatusTimeline = ({ booking }: { booking: Booking }) => {
     const s = booking.status
 
     const list: { at: Date | null; l: string; sub?: string; done: boolean }[] = []
-    list.push({ at: created, l: 'ჯავშანი შეიქმნა', done: true, sub: PAYMENTS_LIVE ? `₾${booking.price} escrow-ში` : 'დაჯავშნა უფასოა — გადახდები მალე' })
+    list.push({ at: created, l: 'ჯავშანი შეიქმნა', done: true, sub: PAYMENTS_LIVE ? `₾${booking.price} დაცულ გადახდაშია` : 'დაჯავშნა უფასოა — გადახდები მალე' })
 
     if (s === 'PREPARING') {
       list.push({ at: null, l: 'ველოდებით ექსპერტის დადასტურებას', done: false })
@@ -1379,13 +1382,13 @@ const StatusTimeline = ({ booking }: { booking: Booking }) => {
     }
 
     if (s === 'CANCELED') {
-      list.push({ at: null, l: `${booking.cancelledBy === 'TUTOR' ? 'ექსპერტმა' : booking.cancelledBy === 'ADMIN' ? 'ადმინმა' : 'შენ'} გააუქმა`, done: true, sub: PAYMENTS_LIVE ? 'escrow დაბრუნდა' : undefined })
+      list.push({ at: null, l: `${booking.cancelledBy === 'TUTOR' ? 'ექსპერტმა' : booking.cancelledBy === 'ADMIN' ? 'ადმინმა' : 'შენ'} გააუქმა`, done: true, sub: PAYMENTS_LIVE ? 'დაცული თანხა დაბრუნდა' : undefined })
     }
     if (s === 'NO_SHOW') {
-      list.push({ at: end, l: 'სესია არ შედგა', done: true, sub: PAYMENTS_LIVE ? 'escrow დაბრუნდა' : undefined })
+      list.push({ at: end, l: 'სესია არ შედგა', done: true, sub: PAYMENTS_LIVE ? 'დაცული თანხა დაბრუნდა' : undefined })
     }
     if (s === 'COMPLETED') {
-      list.push({ at: end, l: PAYMENTS_LIVE ? 'დასრულდა · escrow ექსპერტზე გათავისუფლდა' : 'დასრულდა', done: true })
+      list.push({ at: end, l: PAYMENTS_LIVE ? 'დასრულდა · დაცული თანხა ექსპერტს გადაეცა' : 'დასრულდა', done: true })
     }
     return list
   }, [booking])
@@ -1690,7 +1693,7 @@ export default function BookingDetail() {
         body={
           PAYMENTS_LIVE
             ? (hoursToStart >= CANCEL_CUTOFF_HOURS
-                ? `სესიის დაწყებამდე ${CANCEL_CUTOFF_HOURS} საათზე მეტია დარჩენილი — თანხა escrow-დან სრულად დაგიბრუნდება.`
+                ? `სესიის დაწყებამდე ${CANCEL_CUTOFF_HOURS} საათზე მეტია დარჩენილი — დაცული თანხა სრულად დაგიბრუნდება.`
                 : `სესიის დაწყებამდე ${CANCEL_CUTOFF_HOURS} საათზე ნაკლებია დარჩენილი — სრული დაბრუნება გარანტირებული აღარ არის.`)
             : 'გაუქმება უფასოა — ჯერ არაფერი გადაგიხდია. დრო გათავისუფლდება და ექსპერტს ეცნობება.'
         }

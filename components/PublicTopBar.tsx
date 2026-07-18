@@ -19,7 +19,7 @@ const STUDENT_NAV: { label: string; href: string }[] = [
   { label: 'შეტყობინებები', href: '/student/messages' },
 ]
 const TUTOR_NAV: { label: string; href: string }[] = [
-  { label: 'ჩემი dashboard', href: '/tutor' },
+  { label: 'ჩემი სივრცე', href: '/tutor' },
   { label: 'ექსპერტები',     href: '/tutors' },
 ]
 const ADMIN_NAV: { label: string; href: string }[] = [

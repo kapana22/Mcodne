@@ -31,6 +31,7 @@ Georgian expert-consultation marketplace (Next.js 15 + Tailwind + Prisma). UI is
 
 ## Product rules
 - Terminology: always „ექსპერტი" (never ტუტორი/რეპეტიტორი in UI). Support email: hi@mcodne.ge.
+- Lexicon (Georgian-first, UI copy only — never rename code identifiers/API fields): „ჩემი სივრცე" (not „dashboard/დაშბორდი"), „დრო/თავისუფალი დრო" (not „სლოტი"), „დაცული გადახდა/დაცული თანხა" (not „escrow"), „და" (not „&") inside Georgian strings.
 - Paid-only model: NO free-trial promises in copy (removed 2026-07). Free things that exist: registration, cancellation ≥24h before, no-show replacement.
 - Escrow/payments not yet live — bookings currently free; keep the honest "payments coming soon" notes until integration.
 - Trust signals live at decision points: verified/escrow/ID row on profiles, escrow line at checkout, reassurance under booking CTAs.

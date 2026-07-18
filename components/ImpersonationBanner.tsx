@@ -44,7 +44,7 @@ export function ImpersonationBanner() {
   return (
     <div className="sticky top-0 z-[60] bg-warning-100 border-b border-warning-300 text-warning-900 px-4 sm:px-6 py-2 flex items-center justify-between gap-3 text-[12.5px] font-display font-semibold">
       <span className="inline-flex items-center gap-2 min-w-0">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 shrink-0"><path d="M12 3 2 21h20L12 3Z" /><path d="M12 10v5M12 18h0" /></svg>
+        <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 shrink-0"><path d="M12 3 2 21h20L12 3Z" /><path d="M12 10v5M12 18h0" /></svg>
         <span className="truncate">ადმინის მიერ სხვის სახელით ხარ ავტორიზებული.</span>
       </span>
       <button

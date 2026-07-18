@@ -258,7 +258,7 @@ export default function TutorBookingDetailPage() {
       if (!res.ok || !j.ok) {
         setRescheduleErr(
           j?.error === 'TOO_SOON' ? 'დრო ძალიან ახლოსაა — მინიმუმ 1 საათი წინ'
-          : j?.error === 'NO_SLOT' ? 'ხელმისაწვდომობის სლოტი აქ არ არის'
+          : j?.error === 'NO_SLOT' ? 'ეს დრო ხელმისაწვდომი არ არის'
           : j?.error === 'BAD_STATE' ? 'ჯავშნის სტატუსი ამას აღარ უშვებს'
           : 'გაგზავნა ვერ მოხერხდა',
         )
@@ -764,9 +764,9 @@ function ReviewBlock({
     <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5 sm:p-6">
       <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">კლიენტის შეფასება</div>
       <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="inline-flex items-center gap-0.5">
+        <span role="img" aria-label={`${review.rating} 5-დან`} className="inline-flex items-center gap-0.5">
           {[1, 2, 3, 4, 5].map(n => (
-            <Icon.star key={n} className={`w-4 h-4 ${n <= review.rating ? 'text-warning-500' : 'text-ink-200'}`} />
+            <Icon.star aria-hidden key={n} className={`w-4 h-4 ${n <= review.rating ? 'text-warning-500' : 'text-ink-200'}`} />
           ))}
         </span>
         <span className="font-display text-[13px] font-bold text-ink-900 tabular-nums">{review.rating}.0</span>

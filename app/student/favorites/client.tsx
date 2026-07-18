@@ -63,7 +63,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
             aria-expanded={compare}
             className={`h-9 px-3.5 rounded-btn inline-flex items-center gap-1.5 font-display text-[12px] font-semibold tracking-wide transition-colors ${compare ? 'bg-ink-900 text-white' : 'bg-white border border-ink-200 hover:border-ink-300 text-ink-800'}`}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M8 3v18M16 3v18M3 8h5M16 16h5M3 16h5M16 8h5" /></svg>
+            <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M8 3v18M16 3v18M3 8h5M16 16h5M3 16h5M16 8h5" /></svg>
             გვერდიგვერდ შედარება
           </button>
         </div>
@@ -154,8 +154,8 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
               <div className="inline-flex items-center gap-1 text-[11.5px] text-ink-700">
-                <Icon.star className="w-3 h-3 text-warning-500" />
-                <span className="font-semibold tabular-nums">{t.rating.toFixed(1)}</span>
+                <Icon.star aria-hidden className="w-3 h-3 text-warning-500" />
+                <span role="img" aria-label={`${t.rating.toFixed(1)} 5-დან`} className="font-semibold tabular-nums">{t.rating.toFixed(1)}</span>
                 <span className="text-ink-400 tabular-nums">({t.reviews})</span>
               </div>
               {/* Flat expert-set price for the whole session — bare "₾X" had no

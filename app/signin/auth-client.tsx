@@ -3,6 +3,8 @@ import React, { useState, useRef, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { homeForRole, safeInternalPath } from '@/lib/roleHome'
 import { Icon } from '@/components/Icon'
+import { Logo } from '@/components/Logo'
+import { VerifiedMark } from '@/components/Avatar'
 
 type View = 'signin' | 'signup' | 'verify' | 'reset' | 'onboarding'
 
@@ -122,20 +124,8 @@ function startGoogleSignin(e: React.MouseEvent<HTMLAnchorElement>) {
 }
 
 
-const Logo = ({ size = 'md' }: { size?: 'sm' | 'md' }) => (
-  <div className="inline-flex items-center" aria-label="მცოდნე">
-    <img src="/logo.svg" alt="მცოდნე" className={`${size === 'sm' ? 'h-6' : 'h-7'} w-auto object-contain select-none`} draggable={false} />
-  </div>
-)
-
-const VerifiedMark = ({ size = 14 }: { size?: number }) => (
-  <span className="inline-flex items-center justify-center rounded-full bg-brand-500 text-white shrink-0" style={{ width: size, height: size }}>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" width={size * 0.55} height={size * 0.55}><path d="m4 12 5 5L20 6" /></svg>
-  </span>
-)
-
 const GoogleMark = () => (
-  <svg viewBox="0 0 24 24" className="w-4 h-4">
+  <svg aria-hidden viewBox="0 0 24 24" className="w-4 h-4">
     <path fill="#4285F4" d="M22.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h5.9a5.03 5.03 0 0 1-2.18 3.3v2.74h3.53c2.06-1.9 3.25-4.72 3.25-8.23Z" />
     <path fill="#34A853" d="M12 23c2.94 0 5.4-.98 7.2-2.65l-3.52-2.74c-.98.66-2.23 1.05-3.68 1.05a6.45 6.45 0 0 1-6.05-4.45H2.31v2.83A10.92 10.92 0 0 0 12 23Z" />
     <path fill="#FBBC05" d="M5.95 14.21A6.6 6.6 0 0 1 5.6 12c0-.77.13-1.51.35-2.21V6.96H2.31A11 11 0 0 0 1.08 12c0 1.78.43 3.46 1.23 4.99l3.64-2.78Z" />
@@ -144,7 +134,7 @@ const GoogleMark = () => (
 )
 
 const AppleMark = () => (
-  <svg viewBox="0 0 24 24" className="w-4 h-4 text-ink-900" fill="currentColor">
+  <svg aria-hidden viewBox="0 0 24 24" className="w-4 h-4 text-ink-900" fill="currentColor">
     <path d="M16.4 12.8c0-2.4 2-3.6 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.6.9-.8 0-1.9-.9-3.1-.8-1.6 0-3 .9-3.8 2.4-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.4 1.2 0 1.6-.7 3-.7 1.4 0 1.8.7 3.1.7 1.3 0 2.1-1.2 2.9-2.3.9-1.3 1.3-2.6 1.3-2.7 0-.1-2.5-.9-2.5-3.7ZM14 5.6c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2.1-.5 2.7-1.3Z" />
   </svg>
 )
@@ -259,7 +249,8 @@ const CodeInput = ({ value, onChange, length = 6 }: { value: string; onChange: (
 const AuthHeader = ({ view, setView }: { view: View; setView: (v: View) => void }) => (
   <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-ink-200">
     <div className="max-w-[1280px] mx-auto px-6 sm:px-8 lg:px-12 h-16 flex items-center justify-between gap-4">
-      <button type="button" onClick={() => setView('signin')}><Logo /></button>
+      {/* href={null}: the shared Logo defaults to a <Link>, which may not nest inside this button */}
+      <button type="button" onClick={() => setView('signin')}><Logo href={null} /></button>
       <nav className="hidden md:flex items-center gap-2">
         {/* Language toggle disabled until i18n lands — a button that does
             nothing is worse than absent chrome. */}
@@ -308,7 +299,7 @@ const AuthFooter = () => (
         <Icon.shieldCheck className="w-3.5 h-3.5 text-ink-400" />
         <span>SSL · bcrypt · 2FA მზადაა</span>
         <span className="hidden sm:inline text-ink-300">·</span>
-        <span className="hidden sm:inline">escrow: <span className="font-display font-semibold text-ink-700">TBC</span> · <span className="font-display font-semibold text-ink-700">BOG</span> · <span className="font-display font-semibold text-ink-700">SOLO</span></span>
+        <span className="hidden sm:inline">დაცული გადახდა: <span className="font-display font-semibold text-ink-700">TBC</span> · <span className="font-display font-semibold text-ink-700">BOG</span> · <span className="font-display font-semibold text-ink-700">SOLO</span></span>
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-ink-500">
         <a href="/terms" className="hover:text-ink-900 transition-colors min-h-[32px] inline-flex items-center">წესები</a>
@@ -358,7 +349,7 @@ const SignInIntro = () => (
     {/* Editorial testimonial */}
     <figure className="mt-9 lg:mt-10 pt-8 border-t border-ink-200">
       <span className="inline-flex items-center gap-0.5 text-warning-500 mb-4">
-        {Array.from({ length: 5 }).map((_, i) => <Icon.star key={i} className="w-4 h-4" />)}
+        {Array.from({ length: 5 }).map((_, i) => <Icon.star aria-hidden key={i} className="w-4 h-4" />)}
       </span>
       <blockquote className="font-display text-[20px] lg:text-[24px] leading-[1.35] font-medium tracking-[-0.005em] text-ink-800">
         „45 წუთში მივიღე პასუხი იმაზე, რასაც 3 თვე ვეძებდი. ფასი — ერთი ლანჩი."
@@ -477,7 +468,7 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
           >
             {submitting ? (
               <>
-                <svg viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
+                <svg aria-hidden viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
                 ვამოწმებთ…
               </>
             ) : (
@@ -655,7 +646,7 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
         <button type="submit" disabled={submitting || !agree || first.trim().length < 2 || !email || pw.length < 8} className="w-full h-12 mt-2 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
           {submitting ? (
             <>
-              <svg viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
+              <svg aria-hidden viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
               ვქმნით ანგარიშს…
             </>
           ) : (
@@ -670,7 +661,7 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
         )}
 
         <p className="text-center text-[12.5px] text-ink-500 mt-2 leading-relaxed">
-          ანგარიშის შექმნა უფასოა — პირველ სესიას დაჯავშნი <span className="font-display font-semibold text-brand-700">წუთებში</span>, escrow-ით დაცულად.
+          ანგარიშის შექმნა უფასოა — პირველ სესიას დაჯავშნი <span className="font-display font-semibold text-brand-700">წუთებში</span>, დაცული გადახდით.
         </p>
       </form>
     </div>
@@ -793,7 +784,7 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
           <button type="submit" disabled={submitting || !agree || !first.trim() || !last.trim() || !email || pw.length < 8} className="w-full h-12 mt-2 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
             {submitting ? (
               <>
-                <svg viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
+                <svg aria-hidden viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
                 ვქმნით ანგარიშს…
               </>
             ) : (
@@ -832,7 +823,7 @@ const SignUpIntro = ({ role }: { role: 'learn' | 'teach' }) => (
           <span className="text-brand-600">ფასი წინასწარ ცნობილია.</span>
         </h1>
         <p className="text-[16px] sm:text-[17px] text-ink-700 mt-6 sm:mt-7 leading-[1.6] max-w-[440px]">
-          ანგარიში წამში იქმნება. თანხა ინახება <span className="font-display font-semibold text-ink-900">escrow-ში</span> სესიის ბოლომდე — ფასი წინასწარ ცნობილია, გადაიხდი მხოლოდ შედეგზე.
+          ანგარიში წამში იქმნება. თანხა ინახება <span className="font-display font-semibold text-ink-900">დაცულ გადახდაში</span> სესიის ბოლომდე — ფასი წინასწარ ცნობილია, გადაიხდი მხოლოდ შედეგზე.
         </p>
 
         <ol className="mt-10 lg:mt-12 space-y-6">
@@ -872,7 +863,7 @@ const SignUpIntro = ({ role }: { role: 'learn' | 'teach' }) => (
           <span className="text-brand-600">შემოსავალი — 7 დღეში.</span>
         </h1>
         <p className="text-[16px] sm:text-[17px] text-ink-700 mt-6 sm:mt-7 leading-[1.6] max-w-[440px]">
-          შენ ირჩევ ფასს, დროს და თემას. ჩვენ ვუვლით escrow-ს, გადასახადებსა და მომხმარებლების მოძიებას. <span className="font-display font-semibold text-ink-900">15% საკომისიო</span> — საუკეთესო ბაზარზე.
+          შენ ირჩევ ფასს, დროს და თემას. ჩვენ ვუვლით დაცულ გადახდებს, გადასახადებსა და მომხმარებლების მოძიებას. <span className="font-display font-semibold text-ink-900">15% საკომისიო</span> — საუკეთესო ბაზარზე.
         </p>
 
         <dl className="mt-10 lg:mt-12 grid grid-cols-3 gap-x-6 sm:gap-x-8">
@@ -1042,7 +1033,7 @@ const VerifyView = ({ setView }: { setView: (v: View) => void }) => {
 
           {verifying && (
             <div className="mt-5 inline-flex items-center justify-center w-full gap-2 font-display text-[12.5px] font-semibold text-brand-700">
-              <svg viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
+              <svg aria-hidden viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
               ვამოწმებთ კოდს…
             </div>
           )}
@@ -1220,7 +1211,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
             <button type="submit" disabled={!email || sending} className="mt-6 w-full h-12 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
               {sending ? (
                 <>
-                  <svg viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
+                  <svg aria-hidden viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
                   ვუგზავნით…
                 </>
               ) : (
@@ -1331,7 +1322,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
             <button type="submit" disabled={!ok || submitting} className="mt-7 w-full h-12 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
               {submitting ? (
                 <>
-                  <svg viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
+                  <svg aria-hidden viewBox="0 0 24 24" className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 12a9 9 0 1 1-3-6.7" strokeLinecap="round" /></svg>
                   ვამოწმებთ…
                 </>
               ) : (
@@ -1642,7 +1633,7 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
                 ეს ემთხვევა შენ — 96%
               </h1>
               <p className="mt-3 text-[14.5px] text-ink-600 leading-[1.55] max-w-[540px]">
-                ბიზნეს-სტრატეგია · ფონდი/Series A · ხელმისაწვდომი ხუთშაბათ-პარასკევს · ₾80/სთ. ფასი წინასწარ ცნობილია — escrow-ით დაცული.
+                ბიზნეს-სტრატეგია · ფონდი/Series A · ხელმისაწვდომი ხუთშაბათ-პარასკევს · ₾80/სთ. ფასი წინასწარ ცნობილია — დაცული გადახდით.
               </p>
 
               <article className="mt-7 rounded-card border border-ink-200 bg-white overflow-hidden">
@@ -1660,8 +1651,8 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
                     <div className="text-[13px] text-ink-600 mt-0.5">ბიზნეს-სტრატეგია · ყოფ. McKinsey · 12 წ. გამოცდილება</div>
                     <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
                       <span className="inline-flex items-center gap-1">
-                        <Icon.star className="w-3.5 h-3.5 text-warning-500" />
-                        <span className="font-bold text-ink-900 tabular-nums">4.92</span>
+                        <Icon.star aria-hidden className="w-3.5 h-3.5 text-warning-500" />
+                        <span role="img" aria-label="4.92 5-დან" className="font-bold text-ink-900 tabular-nums">4.92</span>
                         <span className="text-ink-500">(187)</span>
                       </span>
                       <span className="text-ink-300">·</span>
