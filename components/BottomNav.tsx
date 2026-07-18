@@ -65,6 +65,9 @@ export function BottomNav({ role }: { role: Role | null }) {
   //    hides the tabs behind an action bar.
   const isFocusedScreen =
     /^\/(?:student|tutor)\/messages\/[^/]+$/.test(path) ||
+    // Pre-booking pair threads (/…/messages/u/[userId]) — the composer owns
+    // the bottom edge, same as booking threads.
+    /^\/(?:student|tutor)\/messages\/u\/[^/]+$/.test(path) ||
     /^\/student\/bookings\/[^/]+$/.test(path) ||
     // Expert profile: the fixed MobileBookingBar is the bottom surface for
     // signed-in students — two stacked bottom layers just hide the tabs.

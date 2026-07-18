@@ -22,18 +22,26 @@ export function ThreadHeader({
   booking,
   counterparty,
   backHref = '/tutor/messages',
+  alwaysBack = false,
 }: {
   booking: ThreadBooking | null
   counterparty?: { fullName: string; avatarUrl?: string | null } | null
   backHref?: string
+  /** Show the back chevron at every width (standalone full-screen thread).
+      Default hides it on lg where a conversation list sits beside the pane. */
+  alwaysBack?: boolean
 }) {
   const other = booking?.student ?? counterparty ?? null
+  // Pre-booking pair thread: no booking context. Show a subtle pre-inquiry
+  // label in place of the StatusPill so the tutor knows this is a prospect who
+  // hasn't booked yet, not a client with a live session.
+  const isPre = !booking && !!counterparty
   return (
     <div className="px-3 sm:px-5 py-3 border-b border-ink-100 bg-white flex items-center gap-3">
       <Link
         href={backHref}
         aria-label="უკან, მიმოწერების სია"
-        className="lg:hidden shrink-0 w-9 h-9 -ml-1 rounded-btn inline-flex items-center justify-center text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
+        className={`${alwaysBack ? '' : 'lg:hidden'} shrink-0 w-9 h-9 -ml-1 rounded-btn inline-flex items-center justify-center text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors`}
       >
         <Icon.chevR className="w-4.5 h-4.5 rotate-180" />
       </Link>
@@ -44,6 +52,11 @@ export function ThreadHeader({
             {other?.fullName ?? '—'}
           </span>
           {booking && <StatusPill tone={toneOf(booking.status)} />}
+          {isPre && (
+            <span className="inline-flex items-center h-5 px-2 rounded-pill bg-ink-100 text-ink-600 font-display text-[10.5px] font-semibold">
+              წინასწარი შეკითხვა
+            </span>
+          )}
         </div>
         {booking && (
           <div className="text-[12px] text-ink-500 truncate mt-0.5">

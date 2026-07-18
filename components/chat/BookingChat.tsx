@@ -7,10 +7,13 @@ import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
 import { safeHttpUrl } from '@/lib/safeUrl'
 import { fmtKaDate } from '@/lib/kaDate'
 import { sanitizeMsgBody, MSG_MAX_LEN } from '@/lib/msgText'
-import { useBookingThread, type ChatMessage, type ChatUser, type ThreadBooking } from './useBookingThread'
+import { useBookingThread, type ChatMessage, type ChatUser, type ThreadBooking, type ThreadPair } from './useBookingThread'
 
 export type BookingChatProps = {
-  bookingId: string
+  /** Booking-scoped thread. Provide EITHER bookingId or withUser (not both). */
+  bookingId?: string
+  /** Pre-booking pair thread — the other user's id. Drives ?withUser / toUserId. */
+  withUser?: string
   me: ChatUser | null
   /** Avatar/name fallback for the other party before the first poll lands. */
   counterparty?: ChatUser | null
@@ -20,10 +23,12 @@ export type BookingChatProps = {
       fill = flex column that fills its parent's height (messages center). */
   variant?: 'embedded' | 'fill'
   /** Optional custom header: a node, or a render function that receives the
-      booking summary from the thread GET (for context headers). The embedded
-      default renders the classic "მიმოწერა კლიენტთან · N" bar; pass null to
-      hide entirely. */
-  header?: React.ReactNode | ((booking: ThreadBooking | null) => React.ReactNode)
+      booking summary AND the pair summary from the thread GET (whichever the
+      mode returns). The embedded default renders the classic
+      "მიმოწერა კლიენტთან · N" bar; pass null to hide entirely. */
+  header?: React.ReactNode | ((booking: ThreadBooking | null, pair: ThreadPair | null) => React.ReactNode)
+  /** Override the empty-thread copy (the default is client-facing). */
+  emptyState?: { title: string; body: string }
   /** Fired after a successful send and when polling brings new messages —
       callers refresh adjacent surfaces (inbox list, router cache). */
   onActivity?: () => void
@@ -86,18 +91,20 @@ function MessageBubble({
 
 export function BookingChat({
   bookingId,
+  withUser,
   me,
   initialMessages,
   variant = 'embedded',
   header,
+  emptyState,
   onActivity,
   autoFocus = false,
   className = '',
 }: BookingChatProps) {
   const {
-    msgs, booking, loaded, draft, setDraft, attachment, setAttachment, attach,
+    msgs, booking, pair, loaded, draft, setDraft, attachment, setAttachment, attach,
     uploading, send, sending, error,
-  } = useBookingThread({ bookingId, me, initialMessages, onActivity })
+  } = useBookingThread({ bookingId, withUser, me, initialMessages, onActivity })
 
   const endRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -112,7 +119,7 @@ export function BookingChat({
 
   useEffect(() => {
     if (autoFocus) textareaRef.current?.focus()
-  }, [autoFocus, bookingId])
+  }, [autoFocus, bookingId, withUser])
 
   const submit = (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -141,7 +148,7 @@ export function BookingChat({
     >
       {header === undefined
         ? (fill ? null : defaultHeader)
-        : typeof header === 'function' ? header(booking) : header}
+        : typeof header === 'function' ? header(booking, pair) : header}
 
       <div className={`${fill ? 'flex-1 min-h-0' : 'max-h-[420px] min-h-[220px]'} overflow-y-auto p-4 sm:p-6 bg-ink-50/40`}>
         {!loaded && msgs.length === 0 ? (
@@ -155,9 +162,9 @@ export function BookingChat({
             <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-50 text-brand-700 mb-3">
               <Icon.chat className="w-5 h-5" />
             </span>
-            <div className="font-display text-[13.5px] font-semibold text-ink-800">მიმოწერა ჯერ არ არის</div>
+            <div className="font-display text-[13.5px] font-semibold text-ink-800">{emptyState?.title ?? 'მიმოწერა ჯერ არ არის'}</div>
             <p className="text-[12.5px] text-ink-500 mt-1 max-w-[340px] mx-auto">
-              მიესალმე კლიენტს ან დააზუსტე კონსულტაციის დეტალები — სწრაფი პასუხი ნდობას ზრდის.
+              {emptyState?.body ?? 'მიესალმე კლიენტს ან დააზუსტე კონსულტაციის დეტალები — სწრაფი პასუხი ნდობას ზრდის.'}
             </p>
           </div>
         ) : (

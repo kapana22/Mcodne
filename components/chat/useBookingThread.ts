@@ -27,23 +27,33 @@ export type ThreadBooking = {
 
 export type Attachment = { url: string; name: string; type: string; size: number }
 
-/* All thread logic for one booking-scoped conversation: 15s visibility-gated
-   polling (the GET also stamps read receipts server-side), true-optimistic
-   send with rollback + draft restore, and attachment upload. UI-free — the
-   BookingChat component renders on top of this. */
+export type ThreadPair = {
+  otherUser: { id: string; fullName: string; avatarUrl?: string | null; role: string }
+}
+
+/* All thread logic for one conversation — either a booking-scoped thread
+   (`bookingId`) OR a pre-booking pair thread (`withUser`, messages with
+   bookingId:null between a student and an expert-user). Whichever id is set
+   drives the fetch (GET ?bookingId / ?withUser) and the send (POST bookingId /
+   toUserId). 15s visibility-gated polling (the GET also stamps read receipts
+   server-side), true-optimistic send with rollback + draft restore, and
+   attachment upload. UI-free — the BookingChat component renders on top. */
 export function useBookingThread({
   bookingId,
+  withUser,
   me,
   initialMessages,
   onActivity,
 }: {
-  bookingId: string
+  bookingId?: string
+  withUser?: string
   me: ChatUser | null
   initialMessages?: ChatMessage[]
   onActivity?: () => void
 }) {
   const [msgs, setMsgs] = useState<ChatMessage[]>(initialMessages ?? [])
   const [booking, setBooking] = useState<ThreadBooking | null>(null)
+  const [pair, setPair] = useState<ThreadPair | null>(null)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -61,12 +71,17 @@ export function useBookingThread({
   // Poll while visible. Keeps in-flight optimistic bubbles (tmp-*) — a poll
   // landing between append and the POST response must not wipe them.
   useEffect(() => {
-    if (!bookingId) return
+    if (!bookingId && !withUser) return
+    // Booking mode keeps the exact `/api/messages?bookingId=` URL; pair mode
+    // targets the ?withUser endpoint. Whichever id is set drives the poll.
+    const url = withUser
+      ? `/api/messages?withUser=${withUser}`
+      : `/api/messages?bookingId=${bookingId}`
     let cancelled = false
     const tick = async () => {
       if (document.visibilityState !== 'visible') return
       try {
-        const res = await fetch(`/api/messages?bookingId=${bookingId}`)
+        const res = await fetch(url)
         if (!res.ok || cancelled) return
         const j = await res.json().catch(() => null)
         if (!cancelled && j?.ok && Array.isArray(j.messages)) {
@@ -76,6 +91,7 @@ export function useBookingThread({
             return next
           })
           if (j.booking) setBooking(j.booking)
+          if (j.pair) setPair(j.pair)
           setLoaded(true)
         }
       } catch {}
@@ -84,7 +100,7 @@ export function useBookingThread({
     const id = setInterval(tick, 15_000)
     return () => { cancelled = true; clearInterval(id) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId])
+  }, [bookingId, withUser])
 
   useEffect(() => () => { if (errTimer.current) clearTimeout(errTimer.current) }, [])
 
@@ -114,7 +130,8 @@ export function useBookingThread({
     setSending(true)
     try {
       const body: any = {
-        bookingId,
+        // Exactly one of bookingId / toUserId — matches the API contract.
+        ...(withUser ? { toUserId: withUser } : { bookingId }),
         body: draft.trim() || (attachment ? `📎 ${attachment.name}` : ''),
       }
       if (attachment) { body.fileUrl = attachment.url; body.fileName = attachment.name }
@@ -162,7 +179,7 @@ export function useBookingThread({
   }
 
   return {
-    msgs, booking, loaded,
+    msgs, booking, pair, loaded,
     draft, setDraft,
     attachment, setAttachment, attach, uploading,
     send, sending,

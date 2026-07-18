@@ -7,7 +7,11 @@ import { ConversationRow } from '@/components/ConversationRow'
 import { Skeleton } from '@/components/Skeleton'
 
 type Thread = {
-  bookingId: string
+  // Stable row key across booking (`b-<id>`) and pre-booking pair (`u-<id>`)
+  // threads — the two thread kinds share this list.
+  key: string
+  bookingId?: string
+  pre?: boolean
   name: string | null
   avatarUrl?: string | null
   topic: string
@@ -29,9 +33,15 @@ export function ConversationList() {
   const [threads, setThreads] = useState<Thread[] | null>(null)
   const [err, setErr] = useState(false)
   const [query, setQuery] = useState('')
-  const params = useParams<{ bookingId?: string }>()
+  const params = useParams<{ bookingId?: string; userId?: string }>()
   const path = usePathname()
-  const activeId = params?.bookingId ?? null
+  // Active row: the open booking thread (`b-<id>`) OR the open pair thread
+  // (`u-<userId>` for /tutor/messages/u/[userId]).
+  const activeKey = params?.userId
+    ? `u-${params.userId}`
+    : params?.bookingId
+      ? `b-${params.bookingId}`
+      : null
 
   useEffect(() => {
     let cancelled = false
@@ -137,7 +147,7 @@ export function ConversationList() {
       )}
       <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-ink-100">
         {sorted.map(t => (
-          <div key={t.bookingId} className={activeId === t.bookingId ? 'bg-brand-50/50' : ''}>
+          <div key={t.key} className={activeKey === t.key ? 'bg-brand-50/50' : ''}>
             <ConversationRow
               href={t.href}
               name={t.name}

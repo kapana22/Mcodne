@@ -16,6 +16,7 @@ import { fmtKaDate, KA_MONTHS_LONG as KA_MONTHS_FULL } from '@/lib/kaDate'
 import { CountUp } from '@/components/CountUp'
 import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/components/Icon'
+import { Btn } from '@/components/Btn'
 // Shared booking flow (DESIGN_FIX_PROMPT 1.1) — the ONE implementation, also
 // used by the /tutors listing. The slot math, tz labels and defaults that used
 // to live in this file are imported from components/booking now.
@@ -581,7 +582,7 @@ const Reviews = ({ reviews, rating, total, verified }: { reviews: ReviewItem[]; 
 /* Local Footer was orphan (had hardcoded fake nav) — replaced by shared components/Footer.tsx via SharedFooter. */
 
 /* ───── Mobile sticky booking bar ───── */
-const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedIn, paused, availability = [], busySlots = [] }: { onBook: () => void; priceLabel: string; priceIsFrom: boolean; sessionMin: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[]; busySlots?: BusySlot[] }) => {
+const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedIn, paused, availability = [], busySlots = [], canMessage = false, onMessage }: { onBook: () => void; priceLabel: string; priceIsFrom: boolean; sessionMin: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[]; busySlots?: BusySlot[]; canMessage?: boolean; onMessage?: () => void }) => {
   // Flag the body while this mobile CTA bar is mounted so the cookie banner
   // lifts above it (see globals.css) instead of covering the primary CTA.
   useEffect(() => {
@@ -626,17 +627,32 @@ const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedI
           </div>
         )}
       </div>
-      <button
-        type="button"
-        onClick={onBook}
-        disabled={disabled}
-        className="ml-auto shrink min-w-0 h-12 px-4 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:bg-none disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed"
-      >
-        {/* Guest label kept short — tapping opens the auth sheet, which
-            explains the sign-in step. „შესვლა და დაჯავშნა" overflowed 360px. */}
-        <span className="truncate">{paused ? 'პაუზაზეა' : noSlots ? 'დროები არ არის' : 'დაჯავშნა'}</span>
-        {!disabled && <Icon.arrow className="w-4 h-4" />}
-      </button>
+      <div className="ml-auto flex items-center gap-2 min-w-0">
+        {/* Pre-booking message — secondary, icon-only to protect „დაჯავშნა"'s
+            width on 360px. Allowed even when booking is paused. */}
+        {canMessage && onMessage && (
+          <button
+            type="button"
+            onClick={onMessage}
+            aria-label="მიწერე ექსპერტს"
+            title="მიწერე ექსპერტს"
+            className="h-12 w-12 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-700 hover:border-brand-300 hover:text-brand-700 inline-flex items-center justify-center transition-colors"
+          >
+            <Icon.chat className="w-5 h-5" />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onBook}
+          disabled={disabled}
+          className="shrink min-w-0 h-12 px-4 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:bg-none disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed"
+        >
+          {/* Guest label kept short — tapping opens the auth sheet, which
+              explains the sign-in step. „შესვლა და დაჯავშნა" overflowed 360px. */}
+          <span className="truncate">{paused ? 'პაუზაზეა' : noSlots ? 'დროები არ არის' : 'დაჯავშნა'}</span>
+          {!disabled && <Icon.arrow className="w-4 h-4" />}
+        </button>
+      </div>
     </div>
     <div className="border-t border-ink-100 px-4 py-2 flex items-center justify-center gap-4 text-[11.5px] text-ink-500">
       {paused ? (
@@ -659,7 +675,7 @@ const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedI
  * to this profile; a booking intent adds ?rebook=1 so the modal reopens by
  * itself and the flow continues where it left off.
  */
-const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; intent: 'book' | null; onDismiss: () => void }) => {
+const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; intent: 'book' | 'message' | null; onDismiss: () => void }) => {
   // Escape / scroll-lock / focus trap come from the Sheet container.
   const target = `/tutors/${tutorId}${intent === 'book' ? '?rebook=1' : ''}`
   const q = `redirect=${encodeURIComponent(target)}`
@@ -669,7 +685,7 @@ const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; inte
       onClose={onDismiss}
       size="sm"
       ariaLabel="ავტორიზაცია საჭიროა"
-      title={intent === 'book' ? 'შედი, რომ დაიჯავშნო' : 'შედი, რომ გააგრძელო'}
+      title={intent === 'book' ? 'შედი, რომ დაიჯავშნო' : intent === 'message' ? 'შედი, რომ მისწერო ექსპერტს' : 'შედი, რომ გააგრძელო'}
     >
         <p className="text-[13px] text-ink-600 leading-[1.55]">
           1 წუთში მორჩები — მერე ზუსტად აქ დაბრუნდები{intent === 'book' ? ' და ჯავშანი გაგრძელდება' : ''}.
@@ -1002,6 +1018,8 @@ const StickyBookingCard = ({
   reviewsCount = 0,
   signedIn,
   consultations = [],
+  canMessage = false,
+  onMessage,
 }: {
   onOpen: () => void
   availability?: ApiSlot[]
@@ -1014,6 +1032,8 @@ const StickyBookingCard = ({
   reviewsCount?: number
   signedIn?: boolean | null
   consultations?: ConsultationItem[]
+  canMessage?: boolean
+  onMessage?: () => void
 }) => {
   const duration = sessionMin
   // From-price when the expert's tiers differ (DESIGN_FIX_PROMPT 1.2) — the
@@ -1105,6 +1125,13 @@ const StickyBookingCard = ({
           >
             {signedIn === false ? 'შესვლა და დაჯავშნა' : 'დაჯავშნე'} <Icon.arrow className="w-4 h-4" />
           </button>
+          {/* Pre-booking messaging — secondary to the primary booking CTA. The
+              objection-handler: ask before committing to a ₾100+ session. */}
+          {canMessage && onMessage && (
+            <Btn variant="secondary" size="lg" onClick={onMessage} className="w-full mt-2.5">
+              <Icon.chat className="w-4 h-4" /> მიწერე ექსპერტს
+            </Btn>
+          )}
           {/* Decision-point reassurance: what happens next + the canonical
               risk-reversal line (shared constant — one wording everywhere). */}
           <p className="mt-2.5 text-[11.5px] text-ink-500 text-center leading-snug">
@@ -1243,8 +1270,8 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
   const [authDismissed, setAuthDismissed] = useState(false)
   // Which flow the visitor was in when the auth gate fired. 'book' makes the
   // post-auth redirect carry ?rebook=1 so the booking modal reopens by itself.
-  const [authIntent, setAuthIntent] = useState<'book' | null>(null)
-  const requireAuth = React.useCallback((intent?: 'book') => {
+  const [authIntent, setAuthIntent] = useState<'book' | 'message' | null>(null)
+  const requireAuth = React.useCallback((intent?: 'book' | 'message') => {
     if (signedIn === false) {
       setAuthIntent(intent ?? null)
       setNeedsAuth(true)
@@ -1310,6 +1337,21 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
     setSelectedService(null)
     setBookingStart(start)
     setBookingOpen(true)
+  }
+
+  // Pre-booking messaging — the objection-handler for high-stakes one-off
+  // consultations (Clarity/Topmate pattern). Guests hit the auth sheet (returns
+  // here after sign-in); logged-in students open the pair thread with this
+  // expert. Allowed even while paused — a prospect can still ask questions.
+  const router = useRouter()
+  const expertUserId: string | undefined = tutorData?.user?.id
+  // Show to guests (prospective students) and to signed-in students only —
+  // never to the expert on their own profile, or to other tutors/admins.
+  const canMessage = expertUserId != null && (signedIn === false || me?.role === 'STUDENT')
+  const onMessageExpert = () => {
+    if (requireAuth('message')) return
+    if (!expertUserId) return
+    router.push(`/student/messages/u/${expertUserId}`)
   }
 
   // Auto-open the booking flow when the caller passed ?rebook=1. Only fire
@@ -1531,6 +1573,8 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
               reviewsCount={tutorData?.reviewsCount ?? 0}
               signedIn={signedIn}
               consultations={tutorData?.consultations ?? []}
+              canMessage={canMessage}
+              onMessage={onMessageExpert}
             />
           </div>
         </div>
@@ -1548,6 +1592,8 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
         paused={isPaused}
         availability={tutorData?.availability ?? []}
         busySlots={tutorData?.busySlots ?? []}
+        canMessage={canMessage}
+        onMessage={onMessageExpert}
       />
 
       {/* Point-of-tap auth prompt — replaces the old top-of-page banner. */}
