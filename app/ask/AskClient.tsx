@@ -118,7 +118,7 @@ function AskInner() {
             <ul className="space-y-1.5">
               {framing.prepare.map((p, i) => (
                 <li key={i} className="flex items-start gap-2 text-[13px] text-ink-700">
-                  <span className="mt-0.5 w-4 h-4 rounded-full bg-brand-100 text-brand-700 inline-flex items-center justify-center shrink-0"><Icon.check className="w-2.5 h-2.5" /></span>
+                  <span className="mt-0.5 w-4 h-4 rounded-full bg-brand-100 text-brand-700 inline-flex items-center justify-center shrink-0"><Icon.check className="w-3 h-3" /></span>
                   <span>{p}</span>
                 </li>
               ))}

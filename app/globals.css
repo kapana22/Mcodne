@@ -632,6 +632,13 @@ h1, h2, h3, h4 {
 .range-thumb::-moz-range-thumb:active { cursor: grabbing; }
 .range-thumb:focus-visible::-webkit-slider-thumb { outline: 2px solid #2F9C86; outline-offset: 2px; }
 .range-thumb:focus-visible::-moz-range-thumb { outline: 2px solid #2F9C86; outline-offset: 2px; }
+/* Touch devices: the track is untappable (pointer-events:none keeps the two
+   overlaid handles independent), so the thumb IS the only hit target. Enlarge it
+   from 18px so it's grabbable with a finger. */
+@media (pointer: coarse) {
+  .range-thumb::-webkit-slider-thumb { width: 28px; height: 28px; }
+  .range-thumb::-moz-range-thumb { width: 28px; height: 28px; }
+}
 
 /* Rendered Markdown (blog posts + admin preview). Scoped so it never leaks into
    app UI. Mirrors the brand: ink text, green links, calm rhythm. */

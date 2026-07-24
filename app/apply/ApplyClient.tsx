@@ -17,7 +17,7 @@ const TopBar = () => (
       <span className="hidden md:inline-flex items-center gap-2">
         <Eyebrow as="span" tone="muted">ექსპერტი / განცხადება</Eyebrow>
         <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-ink-50 border border-ink-200 text-ink-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]">
-          <Icon.briefcase className="w-2.5 h-2.5" /> რეგისტრაცია
+          <Icon.briefcase className="w-3 h-3" /> რეგისტრაცია
         </span>
       </span>
     </div>
@@ -47,7 +47,7 @@ const ProgressNav = ({ step, setStep, completed }: { step: StepId; setStep: (s: 
   return (
     <aside className="hidden lg:flex flex-col w-[260px] shrink-0 border-r border-ink-200 bg-white p-6 sticky top-16 self-start lg:h-[836px]">
       <div className="inline-flex items-center gap-1.5 h-6 px-2.5 mb-3 self-start rounded-pill bg-brand-50 border border-brand-200 text-brand-700 font-display text-[9.5px] font-bold uppercase tracking-[0.16em]">
-        <Icon.shield className="w-2.5 h-2.5" /> ხელით შემოწმებული ქსელი
+        <Icon.shield className="w-3 h-3" /> ხელით შემოწმებული ქსელი
       </div>
       <Eyebrow tone="muted" className="mb-2">ნაბიჯი {step} / 5</Eyebrow>
       <h2 className="font-display text-[20px] font-bold text-ink-900 tracking-tight leading-tight mb-1">გახდი ექსპერტი მცოდნეზე</h2>
@@ -843,7 +843,7 @@ const YouTubeIntroInput = ({ value, onChange }: { value: string; onChange: (v: s
                   </span>
                 </span>
                 <span className="absolute top-2 left-2 inline-flex items-center gap-1 h-5 px-2 rounded-pill bg-white/95 backdrop-blur text-[10px] font-display font-bold uppercase tracking-[0.14em] text-ink-800">
-                  <Icon.external className="w-2.5 h-2.5" /> გახსენი YouTube-ზე
+                  <Icon.external className="w-3 h-3" /> გახსენი YouTube-ზე
                 </span>
               </a>
             </div>
@@ -1037,7 +1037,7 @@ const LivePreview = ({ step, form }: { step: StepId; form: FormState }) => {
 
         <div className="mt-2.5 inline-flex items-center gap-1.5 flex-wrap">
           <span className="inline-flex items-center gap-1 h-[22px] px-2 rounded-pill bg-brand-50 border border-brand-200 text-brand-800 font-display text-[10px] font-bold uppercase tracking-[0.12em]">
-            <Icon.award className="w-2.5 h-2.5" /> {primaryCat.slice(0, 22)}
+            <Icon.award className="w-3 h-3" /> {primaryCat.slice(0, 22)}
           </span>
         </div>
 
@@ -1505,7 +1505,7 @@ export default function TutorApply() {
           {/* Scarcity / vetting framing — sets a selective, prestigious tone */}
           <div className="lg:hidden flex items-center gap-2 mb-3">
             <span className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-pill bg-brand-50 border border-brand-200 text-brand-700 font-display text-[9.5px] font-bold uppercase tracking-[0.16em]">
-              <Icon.shield className="w-2.5 h-2.5" /> ხელით შემოწმებული ქსელი
+              <Icon.shield className="w-3 h-3" /> ხელით შემოწმებული ქსელი
             </span>
             <span className="text-[11px] text-ink-500 tabular-nums">ნაბიჯი {step} / 5</span>
           </div>

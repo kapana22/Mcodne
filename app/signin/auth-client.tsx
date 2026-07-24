@@ -1153,7 +1153,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
                   done ? 'bg-success-500 text-white' :
                   active ? 'bg-brand-500 text-white' :
                   'bg-ink-100 text-ink-500'
-                }`}>{done ? <Icon.check className="w-2.5 h-2.5" /> : i + 1}</span>
+                }`}>{done ? <Icon.check className="w-3 h-3" /> : i + 1}</span>
                 <span className={`font-display text-[11px] font-semibold tracking-wide ${active ? 'text-ink-900' : 'text-ink-500'}`}>{s.l}</span>
               </li>
               {i < RESET_STEPS.length - 1 && <span className={`w-4 h-px ${done ? 'bg-brand-300' : 'bg-ink-200'}`} />}
@@ -1287,7 +1287,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
                 ].map(r => (
                   <li key={r.l} className="flex items-center gap-2">
                     <span className={`w-4 h-4 rounded-full inline-flex items-center justify-center ${r.ok ? 'bg-success-500 text-white' : 'bg-ink-100 text-ink-400 border border-ink-200'}`}>
-                      {r.ok && <Icon.check className="w-2.5 h-2.5" />}
+                      {r.ok && <Icon.check className="w-3 h-3" />}
                     </span>
                     <span className={r.ok ? 'text-ink-700 line-through decoration-ink-300' : 'text-ink-700'}>{r.l}</span>
                   </li>
@@ -1621,7 +1621,7 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <h3 className="font-display text-[20px] font-bold text-ink-900 tracking-tight">გიორგი მელაძე</h3>
                       <VerifiedMark size={14} />
-                      <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-ink-900 text-white border-transparent font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.spark className="w-2.5 h-2.5" /> Super</span>
+                      <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-ink-900 text-white border-transparent font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.spark className="w-3 h-3" /> Super</span>
                     </div>
                     <div className="text-[13px] text-ink-600 mt-0.5">ბიზნეს-სტრატეგია · ყოფ. McKinsey · 12 წ. გამოცდილება</div>
                     <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">

@@ -33,14 +33,18 @@ export function NotifBell() {
   // lib/notifications now, so this component only reads + triggers mutations.
   const { items, unreadCount: unread } = useNotifications()
 
-  // Close dropdown on outside click.
+  // Close dropdown on outside click OR Escape (keyboard parity with UserMenu).
   useEffect(() => {
     if (!open) return
     const onClick = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) setOpen(false)
     }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setOpen(false); ref.current?.querySelector('button')?.focus() }
+    }
     document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onClick); document.removeEventListener('keydown', onKey) }
   }, [open])
 
   const markAllRead = async () => {
@@ -65,7 +69,7 @@ export function NotifBell() {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        aria-label="შეტყობინებები"
+        aria-label={unread > 0 ? `შეტყობინებები — ${unread} წაუკითხავი` : 'შეტყობინებები'}
         aria-expanded={open}
         className="relative w-10 h-10 rounded-btn text-ink-600 hover:text-ink-900 hover:bg-ink-100 inline-flex items-center justify-center transition-colors"
       >

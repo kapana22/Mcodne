@@ -82,7 +82,7 @@ const FilterBox = ({ label, value, active, children }: { label: string; value: s
   }, [open])
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen(o => !o)} className={`h-[52px] min-w-[140px] w-full sm:w-auto px-3.5 rounded-card border text-left flex items-center justify-between gap-2 transition-all ${active ? 'border-brand-500 bg-brand-50/40 ring-1 ring-brand-200' : 'border-ink-200 hover:border-ink-300 bg-white'}`}>
+      <button type="button" onClick={() => setOpen(o => !o)} className={`h-12 min-w-[140px] w-full sm:w-auto px-3.5 rounded-card border text-left flex items-center justify-between gap-2 transition-all ${active ? 'border-brand-500 bg-brand-50/40 ring-1 ring-brand-200' : 'border-ink-200 hover:border-ink-300 bg-white'}`}>
         <span className="min-w-0">
           <span className="block text-[10px] font-display font-semibold uppercase tracking-[0.1em] text-ink-500">{label}</span>
           <span className={`block font-display text-[13px] font-bold truncate ${active ? 'text-brand-800' : 'text-ink-900'}`}>{value}</span>
@@ -102,7 +102,7 @@ const FilterBox = ({ label, value, active, children }: { label: string; value: s
 
 const CheckOpt = ({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) => (
   <button type="button" onClick={onToggle} className="w-full flex items-center gap-2.5 px-2 py-2 rounded-btn hover:bg-ink-50 text-left transition-colors">
-    <span className={`w-4 h-4 rounded border-[1.5px] inline-flex items-center justify-center shrink-0 ${on ? 'bg-brand-500 border-brand-500 text-white' : 'border-ink-300'}`}>{on && <Icon.check className="w-2.5 h-2.5" />}</span>
+    <span className={`w-4 h-4 rounded border-[1.5px] inline-flex items-center justify-center shrink-0 ${on ? 'bg-brand-500 border-brand-500 text-white' : 'border-ink-300'}`}>{on && <Icon.check className="w-3 h-3" />}</span>
     <span className="text-[13px] text-ink-800">{label}</span>
   </button>
 )
@@ -236,14 +236,14 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, l
           <FilterBox label="ხელმისაწვდომობა" value={availVal} active={filters.available.length > 0}>
             {FILTER_AVAIL.map(a => <CheckOpt key={a.id} label={a.l} on={filters.available.includes(a.id)} onToggle={() => setFilters({ ...filters, available: toggleIn(filters.available, a.id) })} />)}
           </FilterBox>
-          <button type="button" onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })} className={`h-[52px] px-4 rounded-card border font-display text-[13px] font-bold inline-flex items-center gap-2 transition-all ${filters.superOnly ? 'border-brand-500 bg-brand-50/40 text-brand-800 ring-1 ring-brand-200' : 'border-ink-200 hover:border-ink-300 bg-white text-ink-800'}`}>
+          <button type="button" onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })} className={`h-12 px-4 rounded-card border font-display text-[13px] font-bold inline-flex items-center gap-2 transition-all ${filters.superOnly ? 'border-brand-500 bg-brand-50/40 text-brand-800 ring-1 ring-brand-200' : 'border-ink-200 hover:border-ink-300 bg-white text-ink-800'}`}>
             <Icon.spark className="w-4 h-4 text-ink-400" /> Super
           </button>
           </div>
           <div className="flex-1 min-w-[220px] bg-white rounded-card border border-ink-200 flex items-stretch focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100 transition-all">
             <div className="relative flex-1 min-w-0">
               <Icon.search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
-              <input type="text" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') onSearch() }} placeholder="ძებნა სახელით ან თემით…" className="w-full h-[50px] pl-10 pr-3 bg-transparent text-[13.5px] text-ink-900 placeholder:text-ink-400 focus:outline-none" />
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') onSearch() }} placeholder="ძებნა სახელით ან თემით…" className="w-full h-12 pl-10 pr-3 bg-transparent text-[13.5px] text-ink-900 placeholder:text-ink-400 focus:outline-none" />
             </div>
           </div>
         </div>
@@ -764,7 +764,7 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
             {t.verified && <VerifiedMark size={14} />}
             {t.superExpert && (
               <span className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-[9.5px] font-bold uppercase tracking-[0.12em]">
-                <Icon.spark className="w-2.5 h-2.5" /> Super
+                <Icon.spark className="w-3 h-3" /> Super
               </span>
             )}
           </div>
@@ -860,7 +860,7 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
           {t.verified && <VerifiedMark size={14} />}
           {t.superExpert && (
             <span className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-[9.5px] font-bold uppercase tracking-[0.12em]">
-              <Icon.spark className="w-2.5 h-2.5" />
+              <Icon.spark className="w-3 h-3" />
               Super
             </span>
           )}
@@ -1214,7 +1214,7 @@ const CompareModal = ({ open, tutors, onClose, onBook }: { open: boolean; tutors
                   <img src={t.avatarUrl || DEFAULT_AVATAR} alt={t.name} className="w-16 h-16 mx-auto rounded-full object-cover ring-2 ring-ink-200 mb-3" />
                   <div className="font-display text-[14px] font-bold text-ink-900 tracking-tight truncate">{t.name}</div>
                   <div className="text-[11px] text-ink-500 mt-0.5 truncate">{t.cat}</div>
-                  {t.superExpert && <span className="inline-flex items-center gap-1 mt-2 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.spark className="w-2.5 h-2.5" /> Super</span>}
+                  {t.superExpert && <span className="inline-flex items-center gap-1 mt-2 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.spark className="w-3 h-3" /> Super</span>}
                 </div>
                 <Row label="რეიტინგი" isBest={t.rating === best.rating} value={<span className="inline-flex items-center gap-1"><Icon.star className="w-3.5 h-3.5 text-warning-500" />{fmtRating(t.rating)} · {t.reviews}</span>} />
                 <Row label="ჩატარდა სესია" isBest={t.sessions === best.sessions} value={<>{t.sessions.toLocaleString()}</>} />

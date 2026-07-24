@@ -732,7 +732,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
         <StatusBadge s={s.status} />
         {s.status === 'completed' && !s.reviewed && (
           <span className="inline-flex items-center gap-1 px-2 h-5 rounded-pill bg-transparent border border-ink-200 text-[10.5px] font-display font-bold uppercase tracking-[0.12em] text-ink-500">
-            <Icon.star aria-hidden className="w-2.5 h-2.5" />
+            <Icon.star aria-hidden className="w-3 h-3" />
             შეფასების მოლოდინში
           </span>
         )}

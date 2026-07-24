@@ -108,12 +108,12 @@ export default async function StudentBookingsPage({
                         <StatusPill tone={STATUS[b.status]} />
                         {unread > 0 && (
                           <span className="inline-flex items-center gap-1 h-5 px-2 rounded-pill bg-brand-500 text-white text-[10.5px] font-display font-bold tabular-nums">
-                            <Icon.chat className="w-2.5 h-2.5" /> {unread}
+                            <Icon.chat className="w-3 h-3" /> {unread}
                           </span>
                         )}
                         {needsReview && (
                           <span className="inline-flex items-center gap-1 h-5 px-2 rounded-pill bg-transparent border border-warning-200 text-warning-700 text-[10.5px] font-display font-bold uppercase tracking-[0.08em]">
-                            <Icon.star aria-hidden className="w-2.5 h-2.5" /> შეფასება ელოდება
+                            <Icon.star aria-hidden className="w-3 h-3" /> შეფასება ელოდება
                           </span>
                         )}
                         <span className="ml-auto font-mono text-[10.5px] tabular-nums text-ink-400 truncate max-w-[80px]" title={b.ref}>#{b.ref.slice(0, 8)}</span>

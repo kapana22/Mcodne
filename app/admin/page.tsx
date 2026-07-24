@@ -543,7 +543,7 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
                     <div className="font-display text-[13px] font-semibold text-ink-900 truncate">{a.name}</div>
                     <div className="font-mono text-[10.5px] tabular-nums text-ink-400 mt-0.5">{a.id.slice(0, 8)} · {a.cat}</div>
                   </div>
-                  {a.urgent && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-danger-50 border border-danger-200 text-danger-700 font-display text-[9.5px] font-bold uppercase tracking-[0.14em]"><Icon.clock className="w-2.5 h-2.5" /> SLA</span>}
+                  {a.urgent && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-danger-50 border border-danger-200 text-danger-700 font-display text-[9.5px] font-bold uppercase tracking-[0.14em]"><Icon.clock className="w-3 h-3" /> SLA</span>}
                 </div>
                 <div className="mt-1.5 font-mono text-[10.5px] tabular-nums text-ink-500">{a.yrs} წ. გამოცდილება · ₾{a.rate}/სთ · {a.city} · {a.sla}</div>
               </button>
@@ -892,8 +892,8 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
                     : u.role === 'TUTOR' ? 'bg-brand-50 border-brand-200 text-brand-700'
                     : 'bg-ink-50 border-ink-200 text-ink-600'
                   }`}>{u.role === 'STUDENT' ? 'კლიენტი' : u.role === 'TUTOR' ? 'ექსპერტი' : 'ადმინი'}</span>
-                  {u.emailVerified && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-success-50 border border-success-200 text-success-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.check className="w-2.5 h-2.5" /> ვერიფ.</span>}
-                  {u.suspendedAt && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-danger-50 border border-danger-200 text-danger-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.pause className="w-2.5 h-2.5" /> შეჩერებული</span>}
+                  {u.emailVerified && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-success-50 border border-success-200 text-success-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.check className="w-3 h-3" /> ვერიფ.</span>}
+                  {u.suspendedAt && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-danger-50 border border-danger-200 text-danger-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.pause className="w-3 h-3" /> შეჩერებული</span>}
                 </div>
                 <div className="text-[12px] text-ink-500 font-mono truncate mt-0.5">{u.email}</div>
               </div>
