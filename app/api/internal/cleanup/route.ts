@@ -59,7 +59,8 @@ export async function POST(req: Request) {
   const now = new Date()
 
   // ── Auth-artifact deletes ─────────────────────────────────────────────
-  const [sessions, otps, resets] = await Promise.all([
+  const notifCutoff = new Date(now.getTime() - 120 * 24 * 3600_000) // 120 days
+  const [sessions, otps, resets, notifs] = await Promise.all([
     prisma.session.deleteMany({ where: { expiresAt: { lt: now } } }),
     prisma.otpCode.deleteMany({
       where: { OR: [{ consumed: true }, { expiresAt: { lt: now } }] },
@@ -67,6 +68,9 @@ export async function POST(req: Request) {
     prisma.passwordResetToken.deleteMany({
       where: { OR: [{ consumed: true }, { expiresAt: { lt: now } }] },
     }),
+    // Prune old READ notifications so the table (one row per booking event /
+    // message / broadcast) doesn't grow unbounded and slow the dedupe scans.
+    prisma.notification.deleteMany({ where: { readAt: { not: null }, createdAt: { lt: notifCutoff } } }),
   ])
 
   // ── Booking auto-transitions ──────────────────────────────────────────
@@ -293,6 +297,7 @@ export async function POST(req: Request) {
       sessions: sessions.count,
       otpCodes: otps.count,
       passwordResetTokens: resets.count,
+      notifications: notifs.count,
     },
     bookings: {
       preparingCanceled,

@@ -110,7 +110,11 @@ export async function GET(req: Request) {
       if (!rel) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
     }
 
-    const messages = await prisma.message.findMany({
+    // Initial load (no ?since) is capped to the most-recent 200 messages so a
+    // long thread's full base64 attachment history isn't re-downloaded on every
+    // open; the incremental ?since poll fetches only the (small) delta ascending.
+    const initialLoad = !sinceValid
+    const rowsPair = await prisma.message.findMany({
       where: {
         bookingId: null,
         ...sinceFilter,
@@ -119,12 +123,14 @@ export async function GET(req: Request) {
           { fromId: withUser, toId: user.id },
         ],
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: initialLoad ? 'desc' : 'asc' },
+      ...(initialLoad ? { take: 200 } : {}),
       // Avatars are NOT embedded per message — the client renders each sender's
       // avatar from the 2 thread participants (returned once). This stopped a
       // repeated avatar from multiplying the payload per message.
       include: { from: { select: { id: true, fullName: true } } },
     })
+    const messages = initialLoad ? rowsPair.reverse() : rowsPair
     // Read receipts + notif cleanup are UX side-effects the payload doesn't need
     // — defer them past the response so these WRITES never sit in the request's
     // critical path (they were a dominant source of chat latency + connection-
@@ -153,9 +159,13 @@ export async function GET(req: Request) {
     // independent reads, so this is one round-trip instead of two. Messages are
     // only RETURNED once membership passes, so a foreign bookingId leaks nothing
     // (same pattern as /api/bookings/[id]).
+    // Same cap as the pair thread: recent-200 on the initial load, full delta
+    // ascending on the ?since poll — bounds the base64-attachment payload.
+    const initialLoadB = !sinceValid
     const messagesPromise = prisma.message.findMany({
       where: { bookingId, ...sinceFilter },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: initialLoadB ? 'desc' : 'asc' },
+      ...(initialLoadB ? { take: 200 } : {}),
       // Avatars are NOT embedded per message — rendered client-side from the 2
       // participants in the header below (returned once, on the initial load).
       include: { from: { select: { id: true, fullName: true } } },
@@ -175,7 +185,8 @@ export async function GET(req: Request) {
       messagesPromise.catch(() => {}) // don't leak an unhandled rejection
       return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
     }
-    const messages = await messagesPromise
+    const messagesRaw = await messagesPromise
+    const messages = initialLoadB ? messagesRaw.reverse() : messagesRaw
     const tMsgs = performance.now()
 
     // Read receipts + notif cleanup were the chat's dominant latency: two WRITES
@@ -215,7 +226,12 @@ export async function GET(req: Request) {
       OR: [{ studentId: user.id }, { tutor: { userId: user.id } }],
       messages: { some: {} },
     },
-    take: 40,
+    // Deterministic order + a higher cap: without an orderBy Postgres returned an
+    // arbitrary 40, so an active thread (and its unread badge count) could vanish.
+    // The final list is re-sorted in memory by last-message time; this just makes
+    // the candidate set stable and wide enough not to drop a live conversation.
+    orderBy: { updatedAt: 'desc' },
+    take: 100,
     include: {
       // Only the counterparty's name+avatar is used below — `select` the nested
       // user instead of `include`-ing the whole (blob-carrying) TutorProfile.

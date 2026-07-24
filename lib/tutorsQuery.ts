@@ -95,7 +95,10 @@ export async function queryTutors(params: TutorsQueryParams = {}) {
     ? await prisma.availabilitySlot.findMany({
         where: { tutorId: { in: ids }, booked: false, startAt: { gt: now } },
         select: { tutorId: true, startAt: true },
-        orderBy: { startAt: 'asc' },
+        // Only the EARLIEST free slot per tutor is used — `distinct` fetches one
+        // row per tutor instead of every future slot (thousands of rows at scale).
+        orderBy: [{ tutorId: 'asc' }, { startAt: 'asc' }],
+        distinct: ['tutorId'],
       })
     : []
   const nextByTutor = new Map<string, Date>()

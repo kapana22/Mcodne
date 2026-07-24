@@ -28,8 +28,12 @@ export default async function StudentBookingsPage({
   const allBookings = await prisma.booking.findMany({
     where: { studentId: user.id },
     orderBy: { startAt: 'desc' },
+    // Cap (matches /api/student/bookings) + drop the heavy TutorProfile blobs the
+    // list cards never read, so this force-dynamic page doesn't transfer
+    // professionData/base64 video per row from the remote DB on every visit.
+    take: 500,
     include: {
-      tutor: { include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } },
+      tutor: { omit: { professionData: true, videoUrl: true }, include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } },
       // Actionable signals for the list cards: a pending review and unread
       // chat messages (addressed to me, not yet read).
       review: { select: { id: true } },

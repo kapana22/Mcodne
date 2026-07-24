@@ -72,14 +72,20 @@ export async function sendMessageReminders(): Promise<{ threads: number; emails:
     eligible.push(g)
   }
 
+  // Stamp BEFORE sending (dedup is per-thread regardless of send outcome). If
+  // the cron restarts mid-loop, the failure mode is a rare missed reminder — not
+  // re-emailing every recipient on the next tick, which stamping-after causes.
+  const stampedIds = eligible.flatMap(g => g.msgs.map(m => m.id))
+  if (stampedIds.length) {
+    await prisma.$executeRawUnsafe(
+      `UPDATE "Message" SET "reminderEmailSentAt" = NOW() WHERE id = ANY($1::text[])`,
+      stampedIds,
+    )
+  }
+
   let emails = 0
-  const stampedIds: string[] = []
   for (const g of eligible) {
     const latest = g.msgs[g.msgs.length - 1]
-    // Stamp every unread message in the thread regardless of send outcome — a
-    // failed/absent-email thread must not be reprocessed every 15 min.
-    stampedIds.push(...g.msgs.map(m => m.id))
-
     const [recipient, sender] = await Promise.all([
       prisma.user.findUnique({ where: { id: g.toId }, select: { email: true, fullName: true } }),
       prisma.user.findUnique({ where: { id: latest.fromId }, select: { fullName: true } }),
@@ -96,13 +102,6 @@ export async function sendMessageReminders(): Promise<{ threads: number; emails:
       href,
     })
     await sendMail({ to: recipient.email, subject, html }).then(() => { emails++ }).catch(() => {})
-  }
-
-  if (stampedIds.length) {
-    await prisma.$executeRawUnsafe(
-      `UPDATE "Message" SET "reminderEmailSentAt" = NOW() WHERE id = ANY($1::text[])`,
-      stampedIds,
-    )
   }
 
   return { threads: eligible.length, emails }

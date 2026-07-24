@@ -11,7 +11,11 @@ export async function GET() {
   // download several MB per resized doc × N applications.
   const apps = await prisma.tutorApplication.findMany({
     orderBy: { createdAt: 'desc' },
-    omit: { idDocUrl: true, selfieUrl: true, certificates: true },
+    // Also omit professionData (unbounded apply-flow JSON) — the detail panel
+    // lazy-loads the full record per id. Cap the list so it can't grow unbounded
+    // as applications accumulate.
+    take: 300,
+    omit: { idDocUrl: true, selfieUrl: true, certificates: true, professionData: true },
     include: { user: { select: { email: true, avatarUrl: true } } },
   })
   return NextResponse.json(apps)

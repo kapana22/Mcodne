@@ -45,6 +45,17 @@ export async function sendSessionReminders(): Promise<{ bookings: number; emails
     LIMIT 200
   `)
 
+  // Stamp BEFORE sending (policy is already "stamp even on failure"). If the
+  // cron request times out or the instance restarts mid-loop, the failure mode
+  // is a rare missed reminder — never re-emailing every recipient on the next
+  // tick, which stamping-after would cause.
+  if (rows.length) {
+    await prisma.$executeRawUnsafe(
+      `UPDATE "Booking" SET "sessionReminderSentAt" = NOW() WHERE id = ANY($1::text[])`,
+      rows.map(r => r.id),
+    )
+  }
+
   let emails = 0
   for (const r of rows) {
     const whenText = fmtKaDateTime(new Date(r.startAt), { year: false })
@@ -62,15 +73,6 @@ export async function sendSessionReminders(): Promise<{ bookings: number; emails
       })
       await sendMail({ to: r.tutor_email, subject, html }).then(() => { emails++ }).catch(() => {})
     }
-  }
-
-  // Stamp every processed booking so it's never reminded again — even if a send
-  // failed (reminders are best-effort; retry storms are worse than a rare miss).
-  if (rows.length) {
-    await prisma.$executeRawUnsafe(
-      `UPDATE "Booking" SET "sessionReminderSentAt" = NOW() WHERE id = ANY($1::text[])`,
-      rows.map(r => r.id),
-    )
   }
 
   return { bookings: rows.length, emails }
