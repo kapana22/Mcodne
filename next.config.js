@@ -14,5 +14,9 @@ const nextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: '2mb' },
   },
+  // Lint is a manual/CI step (`npm run lint`), never a deploy gate — `railway up`
+  // builds straight from the working tree and tsc is the authoritative check, so
+  // a lint warning must not be able to fail a production build.
+  eslint: { ignoreDuringBuilds: true },
 }
 module.exports = nextConfig

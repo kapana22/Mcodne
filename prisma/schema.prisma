@@ -485,6 +485,10 @@ enum RescheduleStatus {
   CANCELLED
 }
 
+// ⚠️ UNUSED — do not write to this model. The live reschedule feature stores its
+// pending proposal in Booking."rescheduleRequest" (a dbBoot-added JSONB column,
+// accessed via raw SQL), NOT in this relational table. Kept only to avoid a
+// destructive prod `db push` drop; treat the JSONB column as the source of truth.
 model RescheduleRequest {
   id           String           @id @default(cuid())
   bookingId    String

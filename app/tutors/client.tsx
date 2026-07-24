@@ -1087,6 +1087,7 @@ const ResultsBar = ({ total, loading, sort, setSort, activeFilters, removeFilter
           <select
             value={sort}
             onChange={e => setSort(e.target.value)}
+            aria-label="სორტირება"
             className="appearance-none max-w-full h-10 pl-3.5 pr-9 rounded-btn bg-white border border-ink-200 hover:border-ink-300 focus:border-brand-400 font-display text-[12.5px] font-medium text-ink-800 focus:outline-none cursor-pointer truncate"
           >
             {SORT_OPTS.map(o => <option key={o.id} value={o.id}>{o.l}</option>)}

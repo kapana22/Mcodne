@@ -137,15 +137,18 @@ const GoogleMark = () => (
 
 const inputCls = 'w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors'
 
+// The whole Field is a <label> wrapping its input, so the label is
+// programmatically associated (screen readers announce the real label, not the
+// placeholder) without threading ids through every call site.
 const Field = ({ label, hint, optional, required, children }: { label: string; hint?: string; optional?: boolean; required?: boolean; children: React.ReactNode }) => (
-  <div>
-    <label className="flex items-baseline gap-2 mb-2">
+  <label className="block">
+    <span className="flex items-baseline gap-2 mb-2">
       <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">{label}{required && <span className="text-danger-500 ml-0.5" aria-hidden>*</span>}</span>
       {optional && <span className="text-[10.5px] text-ink-400">სურვილისამებრ</span>}
-    </label>
+    </span>
     {children}
     {hint && <p className="mt-1.5 text-[11.5px] text-ink-500">{hint}</p>}
-  </div>
+  </label>
 )
 
 const PwInput = ({ value, onChange, placeholder = 'მინ. 8 სიმბოლო', autoComplete = 'new-password' }: { value: string; onChange: (v: string) => void; placeholder?: string; autoComplete?: string }) => {
