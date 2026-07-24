@@ -187,7 +187,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ? pending.prevStatus
       : 'CONFIRMED'
   await prisma.$executeRawUnsafe(
-    `UPDATE "Booking" SET "status" = $1::"BookingStatus", "rescheduleRequest" = NULL, "updatedAt" = NOW() WHERE id = $2`,
+    `UPDATE "Booking" SET "status" = $1::"BookingStatus", "rescheduleRequest" = NULL, "updatedAt" = NOW() WHERE id = $2 AND "status" = 'PREPARING'`,
     restoredStatus,
     booking.id,
   )

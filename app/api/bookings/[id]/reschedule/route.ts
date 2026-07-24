@@ -114,7 +114,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // flash until the other party responds. If the booking was already
   // PREPARING, this is a no-op status-wise.
   await prisma.$executeRawUnsafe(
-    `UPDATE "Booking" SET "rescheduleRequest" = $1::jsonb, "status" = 'PREPARING', "updatedAt" = NOW() WHERE id = $2`,
+    `UPDATE "Booking" SET "rescheduleRequest" = $1::jsonb, "status" = 'PREPARING', "updatedAt" = NOW() WHERE id = $2 AND "status" IN ('PREPARING', 'CONFIRMED')`,
     JSON.stringify(payload),
     booking.id,
   )

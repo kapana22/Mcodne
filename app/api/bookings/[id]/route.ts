@@ -173,10 +173,25 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // key; room URL is deterministic from the booking ref so both sides get
     // the same room. Room name is namespaced to reduce collision odds.
     const meetingUrl = booking.meetingUrl ?? (await newMeetingUrl())
-    const updated = await prisma.booking.update({
-      where: { id },
+    // Conditional claim (status-guarded), not a blind update: a concurrent
+    // /cancel or the */15 cleanup cron may have flipped this to CANCELED between
+    // our read and this write. updateMany + count===1 makes the transition
+    // fail-safe instead of resurrecting a canceled booking.
+    const claim = await prisma.booking.updateMany({
+      where: { id, status: 'PREPARING' },
       data: { status: 'CONFIRMED', meetingUrl, tutorNotes: tutorNotes ?? booking.tutorNotes },
     })
+    if (claim.count !== 1) {
+      return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 409 })
+    }
+    // If a reschedule proposal is still pending, its frozen `prevStatus` is the
+    // pre-accept PREPARING. Bump it to CONFIRMED so a later REJECT restores the
+    // now-confirmed booking instead of silently demoting it back to PREPARING
+    // (where the cleanup cron would auto-cancel this confirmed session).
+    await prisma.$executeRawUnsafe(
+      `UPDATE "Booking" SET "rescheduleRequest" = jsonb_set("rescheduleRequest", '{prevStatus}', '"CONFIRMED"') WHERE id = $1 AND "rescheduleRequest" IS NOT NULL`,
+      id,
+    )
     // Tell the student their booking is confirmed.
     await notify(booking.studentId, {
       type: 'BOOKING_CREATED',
@@ -207,7 +222,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         }
       } catch { /* email is best-effort */ }
     })
-    return NextResponse.json({ ok: true, status: updated.status, meetingUrl: updated.meetingUrl })
+    return NextResponse.json({ ok: true, status: 'CONFIRMED', meetingUrl })
   }
 
   if (action === 'decline') {
@@ -221,23 +236,33 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // Free the EXACT slot this booking claimed (if any) so someone else can
     // book it. Instant bookings hold no slot → heldSlotId is null.
     const heldSlotId = booking.heldSlotId
-    const updated = await prisma.$transaction(async tx => {
-      const u = await tx.booking.update({
-        where: { id },
-        data: {
-          status: 'CANCELED',
-          payoutStatus: 'REFUNDED',
-          cancelledBy: 'TUTOR',
-          tutorNotes: tutorNotes ?? booking.tutorNotes,
-          heldSlotId: null,
-        },
+    try {
+      await prisma.$transaction(async tx => {
+        // Status-guarded: bail if a concurrent write already moved this booking
+        // out of PREPARING (e.g. cleanup cron canceled it), so we never free a
+        // slot / overwrite a status that's no longer ours to change.
+        const claim = await tx.booking.updateMany({
+          where: { id, status: 'PREPARING' },
+          data: {
+            status: 'CANCELED',
+            payoutStatus: 'REFUNDED',
+            cancelledBy: 'TUTOR',
+            tutorNotes: tutorNotes ?? booking.tutorNotes,
+            heldSlotId: null,
+          },
+        })
+        if (claim.count !== 1) throw new Error('BAD_STATE')
+        if (heldSlotId) {
+          await tx.availabilitySlot.updateMany({ where: { id: heldSlotId }, data: { booked: false } })
+        }
+        await tx.$executeRawUnsafe(`UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`, id)
       })
-      if (heldSlotId) {
-        await tx.availabilitySlot.updateMany({ where: { id: heldSlotId }, data: { booked: false } })
+    } catch (e) {
+      if (e instanceof Error && e.message === 'BAD_STATE') {
+        return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 409 })
       }
-      await tx.$executeRawUnsafe(`UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`, id)
-      return u
-    })
+      throw e
+    }
     await notify(booking.studentId, {
       type: 'BOOKING_CANCELED',
       title: 'ჯავშანი უარყოფილია',
@@ -246,7 +271,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     })
     // Clear the tutor's "new request" bell entry — they've already answered.
     await markRelatedRead(user.id, `/tutor/bookings/${booking.id}`, 'BOOKING_CREATED')
-    return NextResponse.json({ ok: true, status: updated.status })
+    return NextResponse.json({ ok: true, status: 'CANCELED' })
   }
 
   if (action === 'no_show') {
@@ -261,21 +286,27 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (Date.now() < booking.startAt.getTime() + NO_SHOW_GRACE_MS) {
       return NextResponse.json({ ok: false, error: 'TOO_EARLY' }, { status: 400 })
     }
-    const updated = await prisma.booking.update({
-      where: { id },
+    const claim = await prisma.booking.updateMany({
+      where: { id, status: { in: ['CONFIRMED', 'LIVE'] } },
       data: {
         status: 'NO_SHOW',
         payoutStatus: 'REFUNDED',
         tutorNotes: tutorNotes ?? booking.tutorNotes,
       },
     })
+    if (claim.count !== 1) {
+      return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 409 })
+    }
+    // Clear any leftover reschedule proposal so a terminal booking never renders
+    // a stuck pending-reschedule banner with dead accept/reject buttons.
+    await prisma.$executeRawUnsafe(`UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`, id)
     await notify(booking.studentId, {
       type: 'BOOKING_CANCELED',
       title: 'აღინიშნა: გამოუცხადებლობა',
       body: `ექსპერტმა აღნიშნა, რომ არ გამოცხადდი — ${booking.topic}`,
       href: `/student/bookings/${booking.id}`,
     })
-    return NextResponse.json({ ok: true, status: updated.status })
+    return NextResponse.json({ ok: true, status: 'NO_SHOW' })
   }
 
   // action === 'complete'
@@ -288,15 +319,21 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (booking.startAt.getTime() > Date.now()) {
     return NextResponse.json({ ok: false, error: 'TOO_EARLY' }, { status: 400 })
   }
-  const updated = await prisma.booking.update({
-    where: { id },
+  const claim = await prisma.booking.updateMany({
+    where: { id, status: { in: ['CONFIRMED', 'LIVE'] } },
     data: { status: 'COMPLETED', payoutStatus: 'RELEASED', tutorNotes: tutorNotes ?? booking.tutorNotes },
   })
+  if (claim.count !== 1) {
+    return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 409 })
+  }
+  // Clear any leftover reschedule proposal so a completed booking never renders
+  // a stuck pending-reschedule banner.
+  await prisma.$executeRawUnsafe(`UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`, id)
   await notify(booking.studentId, {
     type: 'GENERIC',
     title: 'სესია დასრულდა',
     body: `${booking.topic} — დატოვე შეფასება`,
     href: `/student/bookings/${booking.id}`,
   })
-  return NextResponse.json({ ok: true, status: updated.status })
+  return NextResponse.json({ ok: true, status: 'COMPLETED' })
 }

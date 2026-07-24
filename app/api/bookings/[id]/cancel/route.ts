@@ -67,26 +67,41 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // student's own cancel is bound by the time-based cutoff.
   const refundClient = cancelledBy !== 'STUDENT' || fullRefund
 
-  await prisma.$transaction(async tx => {
-    await tx.booking.update({
-      where: { id },
-      data: {
-        status: 'CANCELED',
-        payoutStatus: refundClient ? 'REFUNDED' : 'PENDING',
-        cancelledBy,
-        // Clear any pending reschedule proposal so an accept can't resurrect
-        // this now-canceled booking (raw column — not in the Prisma model).
-        heldSlotId: null,
-      },
+  try {
+    await prisma.$transaction(async tx => {
+      // Re-read INSIDE the tx: a concurrent reschedule-accept swaps heldSlotId
+      // (frees the old slot, claims a new one), and the cleanup cron / complete
+      // can move status. Using the pre-read snapshot would free a stale slot and
+      // leave the newly-claimed one booked forever, or overwrite a terminal
+      // status. Bail if it's no longer ours to cancel.
+      const fresh = await tx.booking.findUnique({ where: { id }, select: { status: true, heldSlotId: true } })
+      if (!fresh || fresh.status === 'COMPLETED' || fresh.status === 'CANCELED' || fresh.status === 'NO_SHOW') {
+        throw new Error('BAD_STATE')
+      }
+      const claim = await tx.booking.updateMany({
+        where: { id, status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] } },
+        data: {
+          status: 'CANCELED',
+          payoutStatus: refundClient ? 'REFUNDED' : 'PENDING',
+          cancelledBy,
+          heldSlotId: null,
+        },
+      })
+      if (claim.count !== 1) throw new Error('BAD_STATE')
+      // Free the slot this booking currently holds (as of the in-tx read).
+      if (fresh.heldSlotId) {
+        await tx.availabilitySlot.updateMany({ where: { id: fresh.heldSlotId }, data: { booked: false } })
+      }
+      // Clear any pending reschedule proposal so an accept can't resurrect this
+      // now-canceled booking (raw column — not in the Prisma model).
+      await tx.$executeRawUnsafe(`UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`, id)
     })
-    if (heldSlotId) {
-      await tx.availabilitySlot.updateMany({ where: { id: heldSlotId }, data: { booked: false } })
+  } catch (e) {
+    if (e instanceof Error && e.message === 'BAD_STATE') {
+      return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 409 })
     }
-    await tx.$executeRawUnsafe(
-      `UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`,
-      id,
-    )
-  })
+    throw e
+  }
 
   // Audit — only for admin cancels; peer-cancel is expected UX, not admin action.
   if (cancelledBy === 'ADMIN') {
