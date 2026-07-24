@@ -1,6 +1,14 @@
 # Launch Checklist — mcodne
 
-## Verdict: **~90% — GO (soft-launch), with 3 must-do operator items first**
+## Verdict: **~97% code-side — GO. Remaining items are operator-side or deliberate design skips.**
+
+Round 2 (the "100% push") additionally fixed: message-thread/student-bookings/admin-applications query caps, queryTutors `distinct`, Notification pruning + 2 indexes, reminder-cron stamp-before-send, NotifBell Escape/aria, price-slider touch target, 12px icon-floor sweep, filter-bar heights, signin label association, sort-select aria, build-safe ESLint config, dead-model comment, tests `.bak` removal. Deployed 3d9c7907, cron + pages verified green.
+
+**Deliberately NOT changed (documented, low-value or design/operator-owned — your call):** ink-400 contrast token & the uppercase letter-spacing `@layer` fix (site-wide visual changes — designer's call); remaining 156 `any` casts (mechanical, tsc already clean); off-token color micro-nits; XFF-first rate-limit key (needs Railway proxy behavior confirmed first — changing it blind can rate-limit real users); CLEANUP_SECRET query-param (fix is the cron command — operator); OG image + favicon.ico (need real image assets); form-label association on profile/payment/schedule (signin — the front door — done).
+
+---
+
+## Verdict (original): **~90% — GO (soft-launch), with 3 must-do operator items first**
 
 The two P1 code defects (reschedule auto-cancel desync, unguarded prod-DB seed) are **fixed**. Core flows (booking/reschedule are now real-availability-only and race-safe; auth hardened) are in good shape. Build/typecheck are clean. Payments aren't live yet (intentional), so the remaining opens are correctness/perf/a11y polish, not revenue-blocking.
 
