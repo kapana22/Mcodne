@@ -46,8 +46,10 @@ export async function POST(req: Request) {
   const { name, email, topic, message } = parsed.data
   const topicLabel = TOPIC_LABELS[topic] ?? topic
 
-  // TODO: wire real deliverability (Resend / SES) + reply-to headers. Currently
-  // sendMail() falls back to console log when MAILER_MODE !== 'send'.
+  // Deliverability is live via lib/mailer: Gmail SMTP when GMAIL_USER/
+  // GMAIL_APP_PASSWORD are set (production default), else Resend when
+  // MAILER_MODE=send, else console-log. (Nice-to-have: a reply-to header set to
+  // the submitter's address so replies go straight back to them.)
   const html = `
     <div style="font-family:sans-serif;line-height:1.6;color:#181B20">
       <h2 style="margin:0 0 12px">ახალი შეტყობინება — მცოდნე</h2>

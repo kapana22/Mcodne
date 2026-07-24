@@ -441,9 +441,6 @@ summary:focus-visible {
 .glow-brand {
   background: radial-gradient(closest-side, rgba(47, 156, 134, 0.13), rgba(47, 156, 134, 0));
 }
-.glow-info {
-  background: radial-gradient(closest-side, rgba(37, 99, 235, 0.09), rgba(37, 99, 235, 0));
-}
 
 /* Reduced-motion fallback: no transitions at all. */
 @media (prefers-reduced-motion: reduce) {

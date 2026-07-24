@@ -10,7 +10,7 @@ Georgian expert-consultation marketplace (Next.js 15 + Tailwind + Prisma). UI is
 - Semantic `success`(=brand green)/`warning`(gold — ratings + genuine cautions ONLY, not decorative)/`danger` only at the point of meaning. No other hues, no ad-hoc hex in pages.
 - **No status dots and no decorative button arrows** anywhere (2026-07-19). Badges = hairline border + colored text, no pastel fill (SUPER = `bg-ink-900 text-white`).
 - Gradients: ONLY the four named tokens in tailwind config (`gradient-wash/dark/cta/signature`); `gradient-dark` is warm charcoal (not teal); never ad-hoc `from-/to-` in page code.
-- Buttons: `rounded-btn` = 10px (crisp/geometric, echoes logo). Comfortable date/time picking via `components/booking/DateTimePicker.tsx`.
+- Buttons: `rounded-btn` = 10px (crisp/geometric, echoes logo). Date/time picking: booking flow uses `components/booking/Calendar.tsx` + `DayTimeline.tsx` (real slots via `slots.ts`); reschedule uses `components/booking/RescheduleTimePicker.tsx` (real availability only).
 
 ## Type
 - FiraGO self-hosted (`public/fonts/firago-*.woff2`); never add font CDNs.
