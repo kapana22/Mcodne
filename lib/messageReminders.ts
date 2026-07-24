@@ -36,11 +36,16 @@ export async function sendMessageReminders(): Promise<{ threads: number; emails:
 
   // All outstanding unread messages, oldest first. LIMIT bounds a backlog after
   // downtime; grouping + the per-thread guards happen in JS below.
+  // Bound the scan to a 30-day recency window (KEEPING stamped-but-unread rows,
+  // which the per-thread dedup below relies on) so perpetually-unread ancient
+  // messages can't permanently fill the LIMIT window and starve fresh ones. A
+  // 30-min reminder is meaningless a month later anyway.
   const rows = await prisma.$queryRawUnsafe<Row[]>(`
     SELECT m.id, m."toId", m."fromId", m."bookingId", m.body,
            m."createdAt", m."reminderEmailSentAt"
     FROM "Message" m
     WHERE m."readAt" IS NULL
+      AND m."createdAt" > NOW() - interval '30 days'
     ORDER BY m."createdAt" ASC
     LIMIT 2000
   `)

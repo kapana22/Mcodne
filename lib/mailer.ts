@@ -27,6 +27,11 @@ function getGmailTransport(user: string, pass: string): Transporter {
     gmailTransport = nodemailer.createTransport({
       service: 'gmail',
       auth: { user, pass },
+      // Bound each send so one hung SMTP connection can't stall the reminder
+      // cron for minutes (nodemailer's socket default is 10 min).
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 30_000,
     })
   }
   return gmailTransport
@@ -69,6 +74,7 @@ export async function sendMail({ to, subject, html, text }: MailPayload): Promis
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ from, to, subject, html, text }),
+        signal: AbortSignal.timeout(15_000),
       })
       return { ok: res.ok, status: res.status, mode: 'resend' }
     } catch (err) {

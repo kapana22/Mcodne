@@ -47,36 +47,42 @@ export async function POST(req: Request) {
   }
 
   const body = parsed.data.body.trim()
-  const review = await prisma.review.upsert({
-    where: { bookingId: booking.id },
-    create: {
-      bookingId: booking.id,
-      studentId: user.id,
-      tutorId: booking.tutorId,
-      rating: parsed.data.rating,
-      body,
-      anonymous: parsed.data.anonymous ?? false,
-    },
-    update: {
-      rating: parsed.data.rating,
-      body,
-      // Only touch the flag when the client sent it — a re-submit without the
-      // field keeps the original choice instead of silently de-anonymizing.
-      ...(parsed.data.anonymous === undefined ? {} : { anonymous: parsed.data.anonymous }),
-    },
-  })
-
-  const agg = await prisma.review.aggregate({
-    where: { tutorId: booking.tutorId },
-    _avg: { rating: true },
-    _count: { rating: true },
-  })
-  await prisma.tutorProfile.update({
-    where: { id: booking.tutorId },
-    data: {
-      rating: agg._avg.rating ?? 0,
-      reviewsCount: agg._count.rating ?? 0,
-    },
+  // Upsert the review AND recompute the tutor's aggregate in one transaction
+  // (matching the admin delete path) so a mid-write failure can't leave the
+  // review saved while the profile's rating/reviewsCount stay stale — the public
+  // listing sorts by that rating.
+  const review = await prisma.$transaction(async tx => {
+    const r = await tx.review.upsert({
+      where: { bookingId: booking.id },
+      create: {
+        bookingId: booking.id,
+        studentId: user.id,
+        tutorId: booking.tutorId,
+        rating: parsed.data.rating,
+        body,
+        anonymous: parsed.data.anonymous ?? false,
+      },
+      update: {
+        rating: parsed.data.rating,
+        body,
+        // Only touch the flag when the client sent it — a re-submit without the
+        // field keeps the original choice instead of silently de-anonymizing.
+        ...(parsed.data.anonymous === undefined ? {} : { anonymous: parsed.data.anonymous }),
+      },
+    })
+    const agg = await tx.review.aggregate({
+      where: { tutorId: booking.tutorId },
+      _avg: { rating: true },
+      _count: { rating: true },
+    })
+    await tx.tutorProfile.update({
+      where: { id: booking.tutorId },
+      data: {
+        rating: agg._avg.rating ?? 0,
+        reviewsCount: agg._count.rating ?? 0,
+      },
+    })
+    return r
   })
 
   await notify(booking.tutor.userId, {

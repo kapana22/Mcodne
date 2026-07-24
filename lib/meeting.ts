@@ -37,6 +37,9 @@ async function dailyRoomUrl(): Promise<string | null> {
       headers: { Authorization: `Bearer ${DAILY_API_KEY}`, 'Content-Type': 'application/json' },
       // A prejoin screen lets each party check camera/mic before entering.
       body: JSON.stringify({ properties: { enable_prejoin_ui: true } }),
+      // Bounded — this sits in the booking-accept critical path; on timeout the
+      // catch falls back to the Jitsi room instead of hanging the request.
+      signal: AbortSignal.timeout(5_000),
     })
     if (!res.ok) return null
     const j = (await res.json().catch(() => null)) as { url?: string } | null
