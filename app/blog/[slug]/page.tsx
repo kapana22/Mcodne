@@ -21,13 +21,17 @@ async function getPost(slug: string) {
       where: { slug, status: 'PUBLISHED' },
       select: { slug: true, title: true, excerpt: true, body: true, tag: true, coverUrl: true, authorName: true, publishedAt: true },
     })
-  } catch { return null }
+  } catch {
+    // Sentinel (not null) so a transient DB blip yields a 5xx (Google retries)
+    // instead of a hard 404 that can deindex a live URL.
+    return 'error' as const
+  }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
   const post = await getPost(slug)
-  if (!post) return { title: 'ბლოგი — მცოდნე' }
+  if (!post || post === 'error') return { title: 'ბლოგი — მცოდნე' }
   const desc = post.excerpt || 'პრაქტიკული ცოდნა ქართველი ექსპერტებისგან.'
   return {
     title: `${post.title} — მცოდნე`,
@@ -46,6 +50,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const post = await getPost(slug)
+  if (post === 'error') throw new Error('blog post temporarily unavailable') // → 5xx, not a deindexing 404
   if (!post) notFound()
 
   return (

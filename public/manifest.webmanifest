@@ -1,26 +1,20 @@
 {
   "name": "მცოდნე",
   "short_name": "მცოდნე",
-  "description": "ცოდნის არქივი — შეხვდი საუკეთესო ექსპერტებს",
+  "description": "ბიზნეს კონსულტაცია ქართველ ექსპერტებთან — დაჯავშნე ვიდეოსესია",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FAF7F2",
-  "theme_color": "#159A82",
+  "theme_color": "#2F9C86",
   "lang": "ka",
   "dir": "ltr",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/logo.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/logo.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }

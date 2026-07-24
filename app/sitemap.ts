@@ -24,6 +24,7 @@ const STATIC_ROUTES: Array<{
   { path: '/tutors', changeFrequency: 'daily', priority: 0.9 },
   { path: '/categories', changeFrequency: 'weekly', priority: 0.7 },
   { path: '/apply', changeFrequency: 'monthly', priority: 0.7 },
+  { path: '/ask', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/blog', changeFrequency: 'weekly', priority: 0.6 },
   { path: '/contact', changeFrequency: 'monthly', priority: 0.5 },
@@ -31,7 +32,8 @@ const STATIC_ROUTES: Array<{
   { path: '/terms', changeFrequency: 'yearly', priority: 0.3 },
   { path: '/privacy', changeFrequency: 'yearly', priority: 0.3 },
   { path: '/cookies', changeFrequency: 'yearly', priority: 0.3 },
-  { path: '/signin', changeFrequency: 'yearly', priority: 0.4 },
+  // /signin is intentionally NOT here — it's noindex (app/signin/layout.tsx), and
+  // a sitemap should only list indexable URLs (Search Console flags the mismatch).
 ]
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

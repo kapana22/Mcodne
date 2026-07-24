@@ -26,7 +26,11 @@ async function getCategory(slug: string) {
       where: { slug, isLive: true },
       select: { id: true, slug: true, name: true },
     })
-  } catch { return null }
+  } catch {
+    // Sentinel (not null) so a transient DB blip yields a 5xx (Google retries)
+    // rather than a hard 404 that can deindex a live category URL.
+    return 'error' as const
+  }
 }
 
 const descFor = (name: string) =>
@@ -35,7 +39,7 @@ const descFor = (name: string) =>
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
   const cat = await getCategory(slug)
-  if (!cat) return { title: 'კატეგორია — მცოდნე' }
+  if (!cat || cat === 'error') return { title: 'კატეგორია — მცოდნე' }
   const desc = descFor(cat.name)
   return {
     title: `${cat.name} — იპოვე ექსპერტი და დაჯავშნე კონსულტაცია | მცოდნე`,
@@ -48,6 +52,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const cat = await getCategory(slug)
+  if (cat === 'error') throw new Error('category temporarily unavailable') // → 5xx, not a deindexing 404
   if (!cat) notFound()
 
   const experts = await queryTutors({ category: cat.slug, limit: 48 }).catch(() => [])
