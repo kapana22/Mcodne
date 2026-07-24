@@ -56,10 +56,11 @@ export async function GET(req: Request) {
   }
 
   // Fetch the verified profile (email, name, picture).
-  let gu: { email?: string; name?: string; picture?: string }
+  let gu: { email?: string; verified_email?: boolean; name?: string; picture?: string }
   try {
     const uRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(10_000),
     })
     if (!uRes.ok) return fail('google_userinfo')
     gu = await uRes.json()
@@ -67,6 +68,11 @@ export async function GET(req: Request) {
     return fail('google_userinfo')
   }
   if (!gu.email) return fail('google_noemail')
+  // Google accounts can exist with an UNVERIFIED email (e.g. "use my current
+  // email instead"). Matching an existing mcodne account purely by address would
+  // let someone claim victim@x.com at Google (unverified) and be logged into the
+  // victim's account. Require Google to have verified the address.
+  if (gu.verified_email !== true) return fail('google_unverified')
   const email = gu.email.toLowerCase().trim()
 
   // Find or create the account. Existing password-signup users are simply logged
@@ -74,18 +80,25 @@ export async function GET(req: Request) {
   let user = await prisma.user.findUnique({ where: { email } })
   const isNewUser = !user
   if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email,
-        fullName: gu.name?.trim() || email.split('@')[0],
-        avatarUrl: gu.picture || null,
-        // OAuth accounts have no usable password — store a random unusable hash
-        // (schema requires the column). They sign in only via Google.
-        passwordHash: await hashPassword(crypto.randomBytes(24).toString('hex')),
-        role: 'STUDENT',
-        emailVerified: true, // Google-verified email → skip our OTP step.
-      },
-    })
+    try {
+      user = await prisma.user.create({
+        data: {
+          email,
+          fullName: gu.name?.trim() || email.split('@')[0],
+          avatarUrl: gu.picture || null,
+          // OAuth accounts have no usable password — store a random unusable hash
+          // (schema requires the column). They sign in only via Google.
+          passwordHash: await hashPassword(crypto.randomBytes(24).toString('hex')),
+          role: 'STUDENT',
+          emailVerified: true, // Google-verified email → skip our OTP step.
+        },
+      })
+    } catch {
+      // Concurrent create with the same email (double-tap / race) → the unique
+      // constraint fired; the row now exists, so just log that user in.
+      user = await prisma.user.findUnique({ where: { email } })
+      if (!user) return fail('google_userinfo')
+    }
   } else {
     // Existing account signing in via Google: mark verified, and backfill the
     // avatar from the Google photo IF they don't already have one (never
@@ -100,7 +113,7 @@ export async function GET(req: Request) {
   }
 
   // A suspended account must not obtain a session via Google sign-in either.
-  if ((user as any).suspendedAt) {
+  if (user.suspendedAt) {
     return NextResponse.redirect(new URL('/signin?e=suspended', origin))
   }
   await createSession(user.id)

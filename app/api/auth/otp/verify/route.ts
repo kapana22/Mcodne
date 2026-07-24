@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   ])
 
   // A suspended account must not obtain a session via OTP verification.
-  if ((user as any).suspendedAt) {
+  if (user.suspendedAt) {
     return NextResponse.json({ ok: false, error: 'SUSPENDED' }, { status: 403 })
   }
   await createSession(user.id)

@@ -35,14 +35,25 @@ export async function POST(req: Request) {
   if (existing) {
     return NextResponse.json({ ok: false, error: 'EMAIL_TAKEN' }, { status: 409 })
   }
-  const user = await prisma.user.create({
-    data: {
-      email: emailLc,
-      fullName: fullName.trim(),
-      passwordHash: await hashPassword(password),
-      role: 'STUDENT',
-    },
-  })
+  let user
+  try {
+    user = await prisma.user.create({
+      data: {
+        email: emailLc,
+        fullName: fullName.trim(),
+        passwordHash: await hashPassword(password),
+        role: 'STUDENT',
+      },
+    })
+  } catch (e: unknown) {
+    // Concurrent duplicate signup (double-submit / race with the existence
+    // check) trips the @unique constraint → return the friendly 409 the client
+    // handles, not an opaque 500.
+    if (e && typeof e === 'object' && 'code' in e && (e as { code?: string }).code === 'P2002') {
+      return NextResponse.json({ ok: false, error: 'EMAIL_TAKEN' }, { status: 409 })
+    }
+    throw e
+  }
   await createSession(user.id)
 
   // Welcome email — fire-and-forget so a mail hiccup never blocks signup, and

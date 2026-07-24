@@ -18,6 +18,7 @@ import { notFound } from 'next/navigation'
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { stripAvatar } from '@/lib/stripTutorBlobs'
 import ExpertProfilePage from './client'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
@@ -78,7 +79,15 @@ const getTutorInitial = cache(async (id: string) => {
     if (!tutor) return null
     // Shape matches /api/tutors/[id] for the seeded fields; the arrays the seed
     // omits are read as `?? []` in the client, so their absence is safe.
-    return { ...tutor, consultations }
+    // Apply the SAME blob guards the /api/tutors/[id] route uses — otherwise a
+    // legacy `data:` base64 video or an oversized base64 avatar would be inlined
+    // raw into this high-traffic page's SSR HTML (blocking first byte).
+    const safe = {
+      ...tutor,
+      videoUrl: typeof tutor.videoUrl === 'string' && tutor.videoUrl.startsWith('data:') ? null : tutor.videoUrl,
+      user: stripAvatar(tutor.user),
+    }
+    return { ...safe, consultations }
   } catch {
     return null
   }

@@ -121,7 +121,7 @@ export async function getCurrentUser() {
   // single choke-point that makes suspension actually revoke access. Without
   // it, suspend only sets a flag while the live session cookie keeps working
   // (and password-reset/OTP/Google re-auth would mint fresh working sessions).
-  if ((session.user as any).suspendedAt) return null
+  if (session.user.suspendedAt) return null
   return session.user
 }
 
