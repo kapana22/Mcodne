@@ -7,11 +7,11 @@ import bcrypt from 'bcryptjs'
 // and 6 upcoming availability slots for the demo tutor. Safe to call repeatedly.
 // Only exposed on non-production or when SEED_ENABLED=1.
 export async function POST() {
-  // Hard gate: in production this endpoint is OFF unless SEED_ENABLED=1 is
-  // explicitly set. Previously the guard was an empty `if` block, so the seed
-  // ran for anyone in prod and reset the admin password to a known value —
-  // a full account-takeover hole. Fail closed with a 404 (don't advertise it).
-  if (process.env.NODE_ENV === 'production' && process.env.SEED_ENABLED !== '1') {
+  // Hard gate: OFF everywhere unless SEED_ENABLED=1 is explicitly set. A
+  // NODE_ENV check is NOT enough — local dev connects to the PROD DB (there is
+  // no sandbox), so a dev-mode call still writes production data. Fail closed
+  // with a 404 (don't advertise it) unless the operator opts in per-invocation.
+  if (process.env.SEED_ENABLED !== '1') {
     return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
   }
   await ensureDbReady()
@@ -30,7 +30,10 @@ export async function POST() {
 
   await prisma.user.upsert({
     where: { email: 'admin@mcodne.ge' },
-    update: { role: 'ADMIN', passwordHash: await bcrypt.hash('admin1234', 10), emailVerified: true },
+    // NEVER reset an existing admin's password on re-seed — only ensure the
+    // role/verification. Overwriting passwordHash here was an account-takeover
+    // footgun (reset the live admin to a known value on every call).
+    update: { role: 'ADMIN', emailVerified: true },
     create: {
       email: 'admin@mcodne.ge', fullName: 'ადმინი',
       passwordHash: await bcrypt.hash('admin1234', 10), role: 'ADMIN', emailVerified: true,

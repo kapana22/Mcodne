@@ -296,11 +296,20 @@ const TUTORS = [
 ]
 
 async function main() {
+  // Fail-closed guard: this seed WRITES and DELETES rows, and local dev connects
+  // to the PROD DB (there is no sandbox) — so a stray `npm run db:seed` would
+  // mutate production. Refuse to run unless the operator explicitly opts in.
+  if (process.env.SEED_ENABLED !== '1') {
+    console.error('✋ seed refused. Set SEED_ENABLED=1 to run (guards against writing the prod DB by accident).')
+    process.exit(1)
+  }
   console.log('🌱 Seeding...')
 
-  // Cleanup: remove QA/test junk accumulated on prod during audits.
-  // Match by common test-email patterns. This is idempotent — safe to re-run.
-  const junk = await prisma.user.findMany({
+  // Cleanup: remove QA/test junk. DESTRUCTIVE (cascades to bookings/reviews/
+  // messages) and doubly-gated behind CLEAN_TEST_USERS=1 — skipped by default,
+  // because the broad email patterns below (test*, qa*, @x.com) can match REAL
+  // customers on the shared prod DB.
+  const junk = process.env.CLEAN_TEST_USERS === '1' ? await prisma.user.findMany({
     where: {
       OR: [
         { email: { contains: '@example.com' } },
@@ -315,7 +324,7 @@ async function main() {
       ],
     },
     select: { id: true, email: true, fullName: true },
-  })
+  }) : []
   if (junk.length > 0) {
     console.log(`  cleaning ${junk.length} test users:`, junk.map(u => u.email).join(', '))
     const junkIds = junk.map(u => u.id)
