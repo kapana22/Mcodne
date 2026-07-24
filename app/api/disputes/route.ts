@@ -60,16 +60,20 @@ export async function POST(req: Request) {
   })
 
   // Notify tutor (so they can respond in chat) + all admins (queue signal).
-  await notify(booking.tutor.userId, {
-    type: 'GENERIC',
-    title: 'ჯავშანთან დაკავშირებული საჩივარი',
-    body: `მოსწავლემ დააფიქსირა: ${parsed.data.reason}`,
-    href: `/tutor/bookings/${booking.id}#chat`,
-  })
-  const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } })
+  // The tutor-notify and the admin lookup are independent, so fan them out
+  // together; only notifyMany depends on the admin list.
+  const [, admins] = await Promise.all([
+    notify(booking.tutor.userId, {
+      type: 'GENERIC',
+      title: 'ჯავშანთან დაკავშირებული საჩივარი',
+      body: `კლიენტმა დააფიქსირა: ${parsed.data.reason}`,
+      href: `/tutor/bookings/${booking.id}#chat`,
+    }),
+    prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } }),
+  ])
   await notifyMany(admins.map(a => a.id), {
     type: 'GENERIC',
-    title: 'ახალი dispute',
+    title: 'ახალი საჩივარი',
     body: `#${booking.ref.slice(0, 8)} · ${parsed.data.reason}`,
     href: '/admin#disputes',
   })

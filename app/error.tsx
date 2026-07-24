@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect } from 'react'
-import { Icon } from '@/components/Icon'
+import { reportClientError } from '@/lib/reportError'
 
 // Per-segment error boundary. Renders whenever any client-side page throws.
 // Reset re-mounts the segment, preserving parent layout state.
@@ -14,9 +14,9 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    // Log to the server-shipped error monitoring later; for now, console is enough.
     // eslint-disable-next-line no-console
     console.error('Page error boundary caught:', error)
+    reportClientError('render', error.message, error.stack, error.digest)
   }, [error])
 
   return (
@@ -32,7 +32,7 @@ export default function Error({
           დროებითი ხარვეზი
         </h1>
         <p className="mt-3 text-[14px] text-ink-600 leading-relaxed max-w-[420px] mx-auto motion-safe:animate-rise-in" style={{ animationDelay: '140ms' }}>
-          რაღაც არასწორად წავიდა ჩვენს მხარეს. ცოტა ხანში სცადე თავიდან, ან დაუბრუნდი მთავარს.
+          ჩვენს მხარეს რაღაც ხარვეზი მოხდა. ცოტა ხანში სცადე თავიდან, ან დაუბრუნდი მთავარს.
         </p>
         {error.digest && (
           <p className="mt-4 inline-block font-mono text-[11px] text-ink-500 bg-ink-100 px-2.5 py-1 rounded-btn motion-safe:animate-fade-in" style={{ animationDelay: '200ms' }}>
@@ -44,10 +44,9 @@ export default function Error({
           <button
             type="button"
             onClick={reset}
-            className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-tight inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast"
+            className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-tight inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] transition-all duration-fast"
           >
             თავიდან ცდა
-            <Icon.arrow className="w-4 h-4" />
           </button>
           <Link
             href="/"

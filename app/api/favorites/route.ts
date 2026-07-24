@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { stripTutorBlobs } from '@/lib/stripTutorBlobs'
 
 const Body = z.object({ tutorId: z.string() })
 
@@ -21,13 +22,17 @@ export async function GET() {
     },
     orderBy: { createdAt: 'desc' },
   })
-  return NextResponse.json(favs)
+  return NextResponse.json(
+    favs.map(f => ({ ...f, tutor: stripTutorBlobs(f.tutor) })),
+  )
 }
 
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
-  const parsed = Body.safeParse(await req.json())
+  // Saved-experts is a CLIENT feature — a TUTOR/ADMIN has no surface for it.
+  if (user.role !== 'STUDENT') return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
+  const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
   const tutor = await prisma.tutorProfile.findUnique({ where: { id: parsed.data.tutorId } })
@@ -44,6 +49,7 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
+  if (user.role !== 'STUDENT') return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
 
   // Accept tutorId from either JSON body OR query string (?tutorId=…),
   // since some HTTP clients strip DELETE request bodies.

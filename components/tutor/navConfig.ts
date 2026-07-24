@@ -21,14 +21,14 @@ export const WORKSPACE_NAV: NavItem[] = [
   { href: '/tutor',          label: 'მთავარი',    icon: 'category', match: p => p === '/tutor' },
   { href: '/tutor/bookings', label: 'ჯავშნები',   icon: 'calendar', match: startsWith('/tutor/bookings'), badgeKey: 'attention' },
   { href: '/tutor/schedule', label: 'გრაფიკი',    icon: 'clock',    match: startsWith('/tutor/schedule') },
-  { href: '/tutor/messages', label: 'მესიჯები',    icon: 'chat',     match: startsWith('/tutor/messages'), badgeKey: 'messages' },
+  { href: '/tutor/messages', label: 'მიმოწერა',    icon: 'chat',     match: startsWith('/tutor/messages'), badgeKey: 'messages' },
   { href: '/tutor/earnings', label: 'შემოსავალი', icon: 'wallet',   match: startsWith('/tutor/earnings') },
   { href: '/tutor/profile',  label: 'პროფილი',    icon: 'user',     match: startsWith('/tutor/profile') },
 ]
 
 // Outside the workspace proper — rendered below a divider in the sidebar.
 export const CATALOG_LINK: NavItem = {
-  href: '/tutors', label: 'ექსპერტების კატალოგი', icon: 'search', match: startsWith('/tutors'),
+  href: '/tutors', label: 'ექსპერტები', icon: 'search', match: startsWith('/tutors'),
 }
 
 /** Page title for the top bar: longest matching workspace destination. */

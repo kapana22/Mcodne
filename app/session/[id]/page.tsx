@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { Container } from '@/components/Container'
 import Link from 'next/link'
 import { Icon } from '@/components/Icon'
 import { Avatar } from '@/components/Avatar'
@@ -136,7 +137,7 @@ export default function SessionRoom() {
             <Icon.warn className="w-7 h-7" />
           </div>
           <h1 className="font-display text-[22px] font-bold text-ink-900">სესია ვერ მოიძებნა</h1>
-          <p className="text-[13.5px] text-ink-500 mt-2">შესაძლოა ჯავშანი წაიშალა, ან თქვენ არ ხართ მისი მონაწილე.</p>
+          <p className="text-[13.5px] text-ink-500 mt-2">შესაძლოა ჯავშანი წაიშალა, ან შენ არ ხარ მისი მონაწილე.</p>
           <div className="mt-6 flex justify-center gap-2">
             <Btn variant="secondary" href="/student/bookings">ჩემი ჯავშნები</Btn>
             <Btn variant="primary" href="/tutors">ექსპერტების ძებნა</Btn>
@@ -156,7 +157,11 @@ export default function SessionRoom() {
 
   const startMs = new Date(booking.startAt).getTime()
   const msUntil = startMs - now
-  const isBefore = msUntil > 5 * 60 * 1000
+  // Open the room as soon as the countdown reads „5 წთ" (which spans 5:00–5:59
+  // because the label floors minutes) — i.e. at ≤ 6 min out. Previously the gate
+  // was a hard 5:00, so the room looked "not open yet" the whole time it said
+  // „5 წთ". (Instant-call bypasses this gate entirely.)
+  const isBefore = msUntil > 6 * 60 * 1000
   // Same cutoff as the API's meetingUrl masking: scheduled end + 30 minutes.
   // Past it, a never-completed CONFIRMED/LIVE booking gets a terminal state
   // instead of a dead countdown/join surface.
@@ -180,17 +185,17 @@ export default function SessionRoom() {
   return (
     <div className="min-h-screen bg-ink-50 flex flex-col">
       <header className="bg-white border-b border-ink-200">
-        <div className="max-w-[900px] mx-auto px-6 h-14 flex items-center justify-between gap-4">
+        <Container size="content" className="h-14 flex items-center justify-between gap-4">
           <Link href="/" className="inline-flex items-center" aria-label="მცოდნე">
             <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain select-none" draggable={false} />
           </Link>
           <Link href={backHref} className="text-[13px] text-ink-500 hover:text-ink-900 inline-flex items-center gap-1">
             <Icon.arrow className="w-3.5 h-3.5 rotate-180" /> ჯავშნის დეტალები
           </Link>
-        </div>
+        </Container>
       </header>
 
-      <main className="flex-1 px-6 py-10 max-w-[900px] w-full mx-auto">
+      <Container as="main" size="content" className="flex-1 py-10 w-full">
         <div className="rounded-card border border-ink-200 bg-white overflow-hidden">
           <div className="p-6 sm:p-8 border-b border-ink-100">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -253,7 +258,7 @@ export default function SessionRoom() {
 
             {booking.status === 'PREPARING' && (
               <div className="p-4 rounded-btn bg-warning-50 border border-warning-200 text-[13px] text-warning-800 text-center">
-                ჯავშანი ჯერ არ დადასტურდა ექსპერტის მიერ. როცა დადასტურდება — გაიხსნება ვიდეო-ლინკი.
+                ჯავშანი ჯერ არ დადასტურდა ექსპერტის მიერ. როცა დადასტურდება — გაიხსნება ვიდეობმული.
               </div>
             )}
 
@@ -281,7 +286,7 @@ export default function SessionRoom() {
                       {humanCountdown(msUntil)}
                     </div>
                     <p className="text-[13px] text-ink-500 mt-4 max-w-[420px] mx-auto leading-relaxed motion-safe:animate-rise-in" style={{ animationDelay: '120ms' }}>
-                      ვიდეო-ოთახი გაიხსნება სესიის დაწყებამდე 5 წუთით ადრე. Jitsi Meet — ბრაუზერშივე იხსნება, აპლიკაცია არ სჭირდება.
+                      ვიდეო-ოთახი გაიხსნება სესიის დაწყებამდე 5 წუთით ადრე. ბრაუზერშივე იხსნება — აპლიკაცია არ სჭირდება.
                     </p>
                   </div>
                 ) : (
@@ -292,7 +297,7 @@ export default function SessionRoom() {
                         href={booking.meetingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 h-14 px-8 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-bold text-[16px] tracking-wide shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.4)] transition-all duration-fast"
+                        className="inline-flex items-center justify-center gap-2 h-14 px-8 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-bold text-[16px] tracking-wide shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.4)] transition-all duration-fast"
                       >
                         <Icon.video className="w-5 h-5" /> ვიდეო-ოთახში შესვლა
                       </a>
@@ -337,9 +342,9 @@ export default function SessionRoom() {
         </div>
 
         <div className="mt-4 text-center text-[12px] text-ink-400">
-          ვიდეო-ზარის შემდეგ — <Link href={backHref} className="text-brand-700 hover:text-brand-800 font-semibold">ჯავშნის დეტალები და მიმოწერა</Link>
+          ვიდეოზარის შემდეგ — <Link href={backHref} className="text-brand-700 hover:text-brand-800 font-semibold">ჯავშნის დეტალები და მიმოწერა</Link>
         </div>
-      </main>
+      </Container>
 
       <ConfirmModal
         open={completeConfirmOpen}

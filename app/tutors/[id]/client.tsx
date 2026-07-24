@@ -1,8 +1,10 @@
 'use client'
 import React, { useState, useEffect, useRef, Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { PublicTopBar } from '@/components/PublicTopBar'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { Footer as SharedFooter } from '@/components/Footer'
 import { useToast } from '@/components/ToastProvider'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -17,10 +19,19 @@ import { CountUp } from '@/components/CountUp'
 import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
+import { Container } from '@/components/Container'
+import { Eyebrow } from '@/components/Eyebrow'
 // Shared booking flow (DESIGN_FIX_PROMPT 1.1) — the ONE implementation, also
 // used by the /tutors listing. The slot math, tz labels and defaults that used
 // to live in this file are imported from components/booking now.
-import { BookingFlow, mapTutorPayload } from '@/components/booking/BookingFlow'
+// mapTutorPayload is a tiny pure mapper (used eagerly to memoize tutorInfo), so
+// import it statically from its own module. BookingFlow — the heavy calendar /
+// date-picker subtree — only mounts after a "book" click, so lazy-load it.
+import { mapTutorPayload } from '@/components/booking/mapTutorPayload'
+const BookingFlow = dynamic(
+  () => import('@/components/booking/BookingFlow').then(m => m.BookingFlow),
+  { ssr: false },
+)
 import { InlineAvailability } from '@/components/booking/InlineAvailability'
 import {
   TUTOR_DEFAULTS, priceForDuration, fromPriceLabel, computeNextFreeStart,
@@ -58,6 +69,8 @@ type TutorDetail = {
   responseHours?: number | null
   languages?: string[] | null
   videoUrl?: string | null
+  linkedinUrl?: string | null
+  websiteUrl?: string | null
   user: { id: string; fullName: string; avatarUrl?: string | null; bio?: string | null }
   category?: { id: string; slug: string; name: string; icon?: string | null } | null
 }
@@ -78,15 +91,27 @@ const Breadcrumb = ({ tutor }: { tutor: TutorDetail | null }) => (
 
 const LANG_LABEL: Record<string, string> = { ka: 'ქარ', en: 'ENG', ru: 'RUS', tr: 'TUR' }
 
+// Experts enter LinkedIn/website with or without a scheme ("linkedin.com/in/x").
+// Prepend https:// when missing, then run the safe-scheme guard so a
+// javascript:/data: value can never become a live href.
+function normExternalUrl(u?: string | null): string | undefined {
+  if (!u) return undefined
+  const t = u.trim()
+  if (!t) return undefined
+  return safeHttpUrl(/^https?:\/\//i.test(t) ? t : `https://${t}`)
+}
+
 /* priceForDuration + TUTOR_DEFAULTS moved to components/booking/slots.ts —
    the old "MUST stay identical to app/tutors/page.tsx" twin blocks are now a
    single import on both surfaces. Covered by tests/tutor-mapping.test.ts. */
 
 /* ───── Video hero — cover moment with overlapping avatar ───── */
-const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: TutorDetail | null; requireAuth?: () => boolean }) => {
+const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false }: { tutorId?: string; tutor: TutorDetail | null; requireAuth?: () => boolean; viewerCantFav?: boolean }) => {
   const [saved, setSaved] = useState(false)
   const [savedBusy, setSavedBusy] = useState(false)
   const [playing, setPlaying] = useState(false)
+  const [favConsumed, setFavConsumed] = useState(false)
+  const favSearchParams = useSearchParams()
   const { toast } = useToast()
   const shareTutorLink = async () => {
     if (!tutorId) return
@@ -115,6 +140,34 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
     return () => { cancelled = true }
   }, [tutorId])
 
+  // Resume a save that was interrupted by the auth wall: a logged-out heart tap
+  // bounces to /signin?redirect=/tutors/{id}?fav=1, and on return we re-apply the
+  // favorite (server upsert is idempotent) and clear the flag from the URL so a
+  // refresh doesn't re-trigger it. Mirrors the ?rebook=1 / ?intent=message resume.
+  useEffect(() => {
+    if (favConsumed || !tutorId || favSearchParams?.get('fav') !== '1') return
+    let cancelled = false
+    ;(async () => {
+      const me = await fetchMe()
+      if (cancelled || !me) { setFavConsumed(true); return }
+      try {
+        const res = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tutorId }),
+        })
+        if (res.ok && !cancelled) { setSaved(true); toast('შენახულია', 'success') }
+      } catch {}
+      if (!cancelled) setFavConsumed(true)
+      if (typeof window !== 'undefined') {
+        const u = new URL(window.location.href)
+        u.searchParams.delete('fav')
+        window.history.replaceState(null, '', u.pathname + u.search)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [favConsumed, tutorId, favSearchParams, toast])
+
   const toggleSave = async () => {
     if (!tutorId || savedBusy) return
     if (requireAuth && requireAuth()) return
@@ -131,8 +184,10 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
           })
       if (!res.ok) {
         if (res.status === 401) {
-          const here = typeof window !== 'undefined' ? window.location.pathname + window.location.search : `/tutors/${tutorId}`
-          window.location.href = `/signin?redirect=${encodeURIComponent(here)}`
+          // Carry a ?fav=1 resume flag so the save re-applies itself after auth
+          // (same pattern as ?rebook=1 / ?intent=message) — otherwise the heart
+          // silently drops and the user has to click it again.
+          window.location.href = `/signin?redirect=${encodeURIComponent(`/tutors/${tutorId}?fav=1`)}`
           return
         }
         setSaved(wasSaved) // revert
@@ -188,7 +243,7 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
             // Click-to-load facade — a raw autoplaying embed rendered as a black
             // box before playback (looked broken); Preply shows a poster + play
             // button. This also defers the heavy YouTube iframe until intent.
-            <button type="button" onClick={() => setPlaying(true)} aria-label="ჩართე ვიდეო-ვიზიტკა" className="group w-full aspect-[16/9] sm:aspect-[21/9] relative block bg-ink-900 overflow-hidden">
+            <button type="button" onClick={() => setPlaying(true)} aria-label="ჩართე ვიდეოგაცნობა" className="group w-full aspect-[16/9] sm:aspect-[21/9] relative block bg-ink-900 overflow-hidden">
               <img src={`https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-[1.03] transition-all duration-slow" loading="lazy" />
               <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink-950/60 via-transparent to-ink-950/10" />
               <span aria-hidden className="absolute inset-0 flex items-center justify-center">
@@ -197,7 +252,7 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
                 </span>
               </span>
               <span className="absolute top-4 left-4 sm:top-5 sm:left-5 inline-flex items-center gap-1.5 h-7 px-3 rounded-pill bg-white/15 backdrop-blur-sm ring-1 ring-white/25 text-white text-[11.5px] font-display font-semibold">
-                <Icon.video className="w-3.5 h-3.5" /> ვიდეო-ვიზიტკა
+                <Icon.video className="w-3.5 h-3.5" /> ვიდეოგაცნობა
               </span>
             </button>
           )
@@ -254,20 +309,18 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
           {/* Avatar */}
           <div className="relative shrink-0 -mt-12 sm:-mt-16">
             <div className="w-[88px] h-[88px] sm:w-[112px] sm:h-[112px] rounded-full overflow-hidden bg-brand-100 ring-4 ring-white shadow-card inline-flex items-center justify-center">
-              {tutor?.user.avatarUrl ? (
-                <img
-                  src={tutor.user.avatarUrl}
-                  alt={tutor.user.fullName}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="font-display text-[36px] font-bold text-brand-700">{tutor?.user?.fullName?.slice(0, 1) ?? '?'}</span>
-              )}
+              <img
+                src={tutor?.user.avatarUrl || DEFAULT_AVATAR}
+                alt={tutor?.user.fullName ?? ''}
+                className="w-full h-full object-cover"
+              />
             </div>
           </div>
 
           {/* Actions top-right */}
           <div className="ml-auto shrink-0 flex items-center gap-1.5">
+            {/* Save/favorite is client-only (server 403s non-students) — hidden for tutor/admin. */}
+            {!viewerCantFav && (
             <button
               type="button"
               onClick={toggleSave}
@@ -277,6 +330,7 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
             >
               {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
             </button>
+            )}
             <button
               type="button"
               onClick={shareTutorLink}
@@ -368,6 +422,28 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
             </p>
           )}
 
+          {/* External profiles the expert added on /apply — neutral link chips
+              (canon: no blue). Rendered only when present + scheme-safe. */}
+          {(() => {
+            const li = normExternalUrl(tutor?.linkedinUrl)
+            const web = normExternalUrl(tutor?.websiteUrl)
+            if (!li && !web) return null
+            return (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {li && (
+                  <a href={li} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 h-8 px-3 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 hover:border-ink-300 hover:text-ink-900 font-display text-[12px] font-semibold transition-colors">
+                    <Icon.external className="w-3.5 h-3.5" /> LinkedIn
+                  </a>
+                )}
+                {web && (
+                  <a href={web} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 h-8 px-3 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 hover:border-ink-300 hover:text-ink-900 font-display text-[12px] font-semibold transition-colors">
+                    <Icon.globe className="w-3.5 h-3.5" /> ვებგვერდი
+                  </a>
+                )}
+              </div>
+            )
+          })()}
+
           {/* Trust row — reassurance before booking. On a high-ticket, first-time
               purchase these three signals remove the biggest objections. */}
           <div className="mt-5 pt-4 border-t border-ink-100 flex flex-wrap items-center gap-x-5 gap-y-2.5">
@@ -375,7 +451,7 @@ const VideoHero = ({ tutorId, tutor, requireAuth }: { tutorId?: string; tutor: T
               <Icon.check className="w-4 h-4 text-brand-600" /> ხელით შერჩეული ექსპერტი
             </span>
             <span className="inline-flex items-center gap-1.5 text-[12px] font-display font-medium text-ink-700">
-              <Icon.shieldCheck className="w-4 h-4 text-brand-600" /> {PAYMENTS_LIVE ? 'Escrow-დაცული გადახდა' : 'უფასო დაჯავშნა · გადახდები მალე'}
+              <Icon.shieldCheck className="w-4 h-4 text-brand-600" /> {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'უფასო დაჯავშნა · გადახდები მალე'}
             </span>
             {tutor?.verified && (
               <span className="inline-flex items-center gap-1.5 text-[12px] font-display font-medium text-ink-700">
@@ -444,9 +520,9 @@ const ReviewArticle = ({ r }: { r: ReviewItem }) => {
     <article className="py-6 first:pt-0 last:pb-0">
       <div className="flex items-center gap-3 mb-3">
         {!anon && r.student?.avatarUrl ? (
-          <img src={r.student.avatarUrl} alt="" width={40} height={40} className="w-10 h-10 rounded-full object-cover shrink-0" />
+          <img src={r.student.avatarUrl} alt="" width={40} height={40} loading="lazy" decoding="async" className="w-10 h-10 rounded-full object-cover shrink-0" />
         ) : (
-          <span className="w-10 h-10 rounded-full bg-brand-100 text-brand-700 inline-flex items-center justify-center font-display font-bold shrink-0">{anon ? 'ა' : r.student?.fullName?.slice(0, 1) ?? 'ა'}</span>
+          <img src={DEFAULT_AVATAR} alt="" width={40} height={40} loading="lazy" decoding="async" className="w-10 h-10 rounded-full object-cover shrink-0" />
         )}
         <div className="min-w-0 flex-1">
           <div className="font-display text-[14px] font-bold text-ink-900 leading-tight truncate">{anon ? 'ანონიმური კლიენტი' : r.student?.fullName ?? 'ანონიმური კლიენტი'}</div>
@@ -472,7 +548,7 @@ const ReviewArticle = ({ r }: { r: ReviewItem }) => {
   )
 }
 
-const Reviews = ({ reviews, rating, total, verified }: { reviews: ReviewItem[]; rating: number; total: number; verified: boolean }) => {
+const Reviews = ({ reviews, rating, total, verified, expertFeatured }: { reviews: ReviewItem[]; rating: number; total: number; verified: boolean; expertFeatured: boolean }) => {
   const dist = [5, 4, 3, 2, 1].map(s => ({
     s,
     n: reviews.filter(r => Math.round(r.rating) === s).length,
@@ -491,7 +567,7 @@ const Reviews = ({ reviews, rating, total, verified }: { reviews: ReviewItem[]; 
 
   return (
     <section id="reviews" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-32">
-      <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-3">შეფასებები</div>
+      <Eyebrow className="mb-3">შეფასებები</Eyebrow>
       <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">
         {total > 0 ? 'რას ამბობს მომხმარებელი' : 'ჯერ არ არის შეფასება'}
       </h2>
@@ -524,8 +600,8 @@ const Reviews = ({ reviews, rating, total, verified }: { reviews: ReviewItem[]; 
                 <div className="mt-1.5 text-[12px] text-ink-500 tabular-nums">
                   <CountUp value={total} /> შეფასებიდან
                 </div>
-                {verified && rating >= 4.8 && (
-                  <div className="mt-1 text-[11px] font-display font-semibold uppercase tracking-[0.14em] text-brand-700">Super expert</div>
+                {verified && rating >= 4.8 && expertFeatured && (
+                  <Eyebrow className="mt-1">Super expert</Eyebrow>
                 )}
               </div>
             </div>
@@ -582,7 +658,7 @@ const Reviews = ({ reviews, rating, total, verified }: { reviews: ReviewItem[]; 
 /* Local Footer was orphan (had hardcoded fake nav) — replaced by shared components/Footer.tsx via SharedFooter. */
 
 /* ───── Mobile sticky booking bar ───── */
-const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedIn, paused, availability = [], busySlots = [], canMessage = false, onMessage }: { onBook: () => void; priceLabel: string; priceIsFrom: boolean; sessionMin: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[]; busySlots?: BusySlot[]; canMessage?: boolean; onMessage?: () => void }) => {
+const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedIn, paused, availability = [], busySlots = [], canMessage = false, onMessage, isOwnProfile = false, viewerCantBook = false }: { onBook: () => void; priceLabel: string; priceIsFrom: boolean; sessionMin: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[]; busySlots?: BusySlot[]; canMessage?: boolean; onMessage?: () => void; isOwnProfile?: boolean; viewerCantBook?: boolean }) => {
   // Flag the body while this mobile CTA bar is mounted so the cookie banner
   // lifts above it (see globals.css) instead of covering the primary CTA.
   useEffect(() => {
@@ -608,12 +684,12 @@ const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedI
   const disabled = paused || noSlots
   return (
   <div
-    className="lg:hidden fixed bottom-0 left-0 right-0 z-[65] bg-white/95 backdrop-blur-md border-t border-ink-200 shadow-[0_-4px_20px_rgba(46,42,33,0.06)] motion-safe:animate-slide-in-b"
+    className="lg:hidden fixed bottom-0 left-0 right-0 z-[65] bg-white border-t border-ink-200 shadow-[0_-4px_20px_rgba(46,42,33,0.06)] motion-safe:animate-slide-in-b"
     style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
   >
     <div className="px-4 py-3 flex items-center gap-3">
       {/* shrink-0 so the price keeps its width and the CTA never starves it
-          into breaking „₾NN-დან" at the hyphen (was a real 360px bug). */}
+          into breaking „₾NN-დან“ at the hyphen (was a real 360px bug). */}
       <div className="min-w-0 shrink-0">
         <div className="flex items-baseline gap-1.5">
           {/* From-price when tiers differ (1.2) — the exact price is chosen at
@@ -628,7 +704,7 @@ const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedI
         )}
       </div>
       <div className="ml-auto flex items-center gap-2 min-w-0">
-        {/* Pre-booking message — secondary, icon-only to protect „დაჯავშნა"'s
+        {/* Pre-booking message — secondary, icon-only to protect „დაჯავშნა“'s
             width on 360px. Allowed even when booking is paused. */}
         {canMessage && onMessage && (
           <button
@@ -641,24 +717,33 @@ const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedI
             <Icon.chat className="w-5 h-5" />
           </button>
         )}
-        <button
-          type="button"
-          onClick={onBook}
-          disabled={disabled}
-          className="shrink min-w-0 h-12 px-4 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:bg-none disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed"
-        >
-          {/* Guest label kept short — tapping opens the auth sheet, which
-              explains the sign-in step. „შესვლა და დაჯავშნა" overflowed 360px. */}
-          <span className="truncate">{paused ? 'პაუზაზეა' : noSlots ? 'დროები არ არის' : 'დაჯავშნა'}</span>
-          {!disabled && <Icon.arrow className="w-4 h-4" />}
-        </button>
+        {isOwnProfile ? (
+          <Link href="/tutor/profile" className="shrink min-w-0 h-12 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
+            <span className="truncate">პროფილის რედაქტირება</span>
+          </Link>
+        ) : viewerCantBook ? (
+          <span className="shrink min-w-0 h-12 px-4 rounded-btn bg-ink-75 border border-ink-200 text-ink-400 font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center">
+            <span className="truncate">ჯავშანი მხოლოდ კლიენტს</span>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onBook}
+            disabled={disabled}
+            className="shrink min-w-0 h-12 px-4 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] transition-all duration-fast disabled:bg-none disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed"
+          >
+            {/* Guest label kept short — tapping opens the auth sheet, which
+                explains the sign-in step. „შესვლა და დაჯავშნა“ overflowed 360px. */}
+            <span className="truncate">{paused ? 'პაუზაზეა' : noSlots ? 'დროები არ არის' : 'დაჯავშნა'}</span>
+          </button>
+        )}
       </div>
     </div>
     <div className="border-t border-ink-100 px-4 py-2 flex items-center justify-center gap-4 text-[11.5px] text-ink-500">
       {paused ? (
         <span>ჯავშნები დროებით შეჩერებულია — პროფილი აქტიური დარჩება</span>
       ) : noSlots ? (
-        <span>ახალი დროები მალე დაემატება — შეინახე პროფილი ❤ ღილაკით</span>
+        <span>ჯერ არ არის გამოცხადებული დრო — მიწერე ექსპერტს ან შეინახე ❤ ღილაკით</span>
       ) : (
         // Canonical risk-reversal line under the CTA (shared constant).
         <span className="text-center leading-snug">{RISK_REVERSAL_LINE}</span>
@@ -677,7 +762,7 @@ const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, signedI
  */
 const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; intent: 'book' | 'message' | null; onDismiss: () => void }) => {
   // Escape / scroll-lock / focus trap come from the Sheet container.
-  const target = `/tutors/${tutorId}${intent === 'book' ? '?rebook=1' : ''}`
+  const target = `/tutors/${tutorId}${intent === 'book' ? '?rebook=1' : intent === 'message' ? '?intent=message' : ''}`
   const q = `redirect=${encodeURIComponent(target)}`
   return (
     <Sheet
@@ -692,7 +777,7 @@ const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; inte
         </p>
         <div className="mt-5 space-y-2.5">
           <Link href={`/signin?${q}`} className="w-full h-12 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow transition-all">
-            შესვლა <Icon.arrow className="w-4 h-4" />
+            შესვლა
           </Link>
           <Link href={`/signup?${q}`} className="w-full h-12 rounded-btn border border-ink-200 hover:border-ink-300 hover:bg-ink-75 text-ink-800 font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center transition-colors">
             რეგისტრაცია
@@ -700,7 +785,7 @@ const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; inte
         </div>
         <p className="mt-4 mb-2 text-[11px] text-ink-500 text-center inline-flex items-center gap-1.5 w-full justify-center">
           <Icon.shieldCheck className="w-3 h-3 text-success-600" />
-          {PAYMENTS_LIVE ? 'გადახდა escrow-შია სესიის ბოლომდე' : 'დაჯავშნა უფასოა — გადახდები მალე'}
+          {PAYMENTS_LIVE ? 'გადახდა დაცულია სესიის ბოლომდე' : 'დაჯავშნა უფასოა — გადახდები მალე'}
         </p>
     </Sheet>
   )
@@ -747,13 +832,15 @@ const SimilarExperts = ({ excludeId, categorySlug, categoryName }: { excludeId?:
       .catch(() => setTutors([]))
   }, [excludeId, categorySlug])
 
-  if (tutors === null || tutors.length === 0) return null
+  // Hide below 2: a single tile renders at 1/4 width in the 4-col grid — a
+  // lonely, broken-looking row on a small/cold category.
+  if (tutors === null || tutors.length < 2) return null
 
   return (
     <section className="mt-14 lg:mt-16 pt-10 border-t border-ink-100">
       <div className="flex items-baseline justify-between gap-4 flex-wrap mb-6">
         <div>
-          <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-3">ასევე შესთავაზე</div>
+          <Eyebrow className="mb-3">ასევე შესთავაზე</Eyebrow>
           <h2 className="font-display text-[22px] lg:text-[26px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">მსგავსი ექსპერტები</h2>
         </div>
         <Link href={`/tutors${categorySlug ? `?category=${categorySlug}` : ''}`} className="text-[12px] text-ink-600 hover:text-ink-900 font-display font-semibold inline-flex items-center gap-1 transition-colors">
@@ -770,11 +857,7 @@ const SimilarExperts = ({ excludeId, categorySlug, categoryName }: { excludeId?:
             className="shrink-0 sm:shrink w-[260px] sm:w-auto text-left rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift p-4 snap-start"
           >
             <div className="flex items-start gap-3">
-              {t.avatar ? (
-                <img src={t.avatar} alt="" width={52} height={52} className="w-[52px] h-[52px] rounded-full object-cover shrink-0 ring-2 ring-ink-100" />
-              ) : (
-                <span className="w-[52px] h-[52px] rounded-full bg-brand-100 text-brand-700 inline-flex items-center justify-center font-display font-bold text-[18px] shrink-0 ring-2 ring-ink-100">{t.name.slice(0, 1)}</span>
-              )}
+              <img src={t.avatar || DEFAULT_AVATAR} alt="" width={52} height={52} loading="lazy" decoding="async" className="w-[52px] h-[52px] rounded-full object-cover shrink-0 ring-2 ring-ink-100" />
               <div className="min-w-0 flex-1">
                 <div className="font-display text-[14px] font-bold text-ink-900 tracking-tight truncate">{t.name}</div>
                 <div className="text-[11.5px] text-ink-500 truncate mt-0.5">{t.specialty}</div>
@@ -809,12 +892,12 @@ const SpecsGrid = ({ tutor }: { tutor: TutorDetail | null }) => {
   if (!tutor) return null
   const items = [
     { n: typeof tutor.sessionsCount === 'number' ? String(tutor.sessionsCount) : '—', l: 'სესია ჩატარებული', icon: <Icon.video className="w-3.5 h-3.5" /> },
-    { n: typeof tutor.responseHours === 'number' ? `~ ${tutor.responseHours} სთ` : '~ 24 სთ', l: 'რეაგირება', icon: <Icon.clock className="w-3.5 h-3.5" /> },
+    { n: typeof tutor.responseHours === 'number' ? `~ ${tutor.responseHours} სთ` : '—', l: 'რეაგირება', icon: <Icon.clock className="w-3.5 h-3.5" /> },
     { n: typeof tutor.yearsExp === 'number' ? `${tutor.yearsExp} წ.` : '—', l: 'გამოცდილება', icon: <Icon.thumb className="w-3.5 h-3.5" /> },
     // Bank names must not render before the gateway is live — until then the
     // honest spec is that booking costs nothing.
     PAYMENTS_LIVE
-      ? { n: 'Escrow', l: 'TBC · BOG · SOLO', icon: <Icon.shieldCheck className="w-3.5 h-3.5" /> }
+      ? { n: 'დაცული გადახდა', l: 'TBC · BOG · SOLO', icon: <Icon.shieldCheck className="w-3.5 h-3.5" /> }
       : { n: 'უფასო', l: 'გადახდები მალე', icon: <Icon.shieldCheck className="w-3.5 h-3.5" /> },
   ]
   return (
@@ -851,10 +934,10 @@ const AboutSection = ({ tutor }: { tutor: TutorDetail | null }) => {
   const isLong = (bio?.length ?? 0) > 420
   return (
     <section id="overview" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-32">
-      <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-4">ჩემ შესახებ</div>
+      <Eyebrow className="mb-4">ჩემ შესახებ</Eyebrow>
       {tutor.headline && (
         <blockquote className="font-display text-[22px] lg:text-[26px] leading-[1.35] font-medium tracking-tight text-ink-800 mb-7 max-w-[640px]">
-          „{tutor.headline}"
+          „{tutor.headline}“
         </blockquote>
       )}
       {paragraphs.length > 0 && (
@@ -881,7 +964,7 @@ const AboutSection = ({ tutor }: { tutor: TutorDetail | null }) => {
 
 /* ───── Services — takes tutor.consultations from API ─────
    ConsultationItem type comes from components/booking/slots (shared with the
-   booking flow's tier step). Each card's „აირჩიე" opens the shared flow with
+   booking flow's tier step). Each card's „აირჩიე“ opens the shared flow with
    that tier preselected (DESIGN_FIX_PROMPT 1.2). */
 const ServicesSection = ({ consultations, onBook }: { consultations: ConsultationItem[]; onBook: (s: ConsultationItem) => void }) => {
   if (!consultations || consultations.length === 0) return null
@@ -889,7 +972,7 @@ const ServicesSection = ({ consultations, onBook }: { consultations: Consultatio
     <section id="services" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-32">
       <div className="flex items-baseline justify-between gap-4 flex-wrap">
         <div>
-          <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-3">სერვისები</div>
+          <Eyebrow className="mb-3">სერვისები</Eyebrow>
           <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">რას გავუკეთებ შენთვის</h2>
         </div>
         <span className="text-[11.5px] text-ink-500 font-display tabular-nums">{consultations.length} პროდუქტი · ფიქსირებული ფასი</span>
@@ -903,11 +986,11 @@ const ServicesSection = ({ consultations, onBook }: { consultations: Consultatio
             {s.description && <p className="text-[13px] text-ink-600 mt-2 leading-[1.55] flex-1">{s.description}</p>}
             <div className="mt-4 pt-4 border-t border-ink-100 flex items-center justify-between">
               <div>
-                <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">{s.minutes} წუთი</div>
+                <Eyebrow tone="muted">{s.minutes} წუთი</Eyebrow>
                 <div className="font-display text-[18px] font-bold text-ink-900 tabular-nums leading-none mt-1">₾{s.price}</div>
               </div>
               <button type="button" onClick={() => onBook(s)} className="h-11 px-4 rounded-btn bg-brand-50 hover:bg-brand-500 hover:text-white border border-brand-200 hover:border-brand-500 text-brand-700 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1 transition-colors">
-                აირჩიე <Icon.arrow className="w-3 h-3" />
+                აირჩიე
               </button>
             </div>
           </article>
@@ -928,7 +1011,7 @@ const CertificatesSection = ({ items }: { items: CertItem[] }) => {
     <section className="mt-14 lg:mt-16 pt-10 border-t border-ink-100">
       <div className="flex items-baseline justify-between gap-4 flex-wrap">
         <div>
-          <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-3">სერტიფიკატები</div>
+          <Eyebrow className="mb-3">სერტიფიკატები</Eyebrow>
           <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">დიპლომები და სერტიფიკატები</h2>
         </div>
         <span className="text-[11.5px] text-ink-500 font-display inline-flex items-center gap-1.5">
@@ -963,7 +1046,7 @@ const EducationSection = ({ items }: { items: EduItem[] }) => {
   if (!items || items.length === 0) return null
   return (
     <section className="mt-14 lg:mt-16 pt-10 border-t border-ink-100">
-      <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-3">განათლება</div>
+      <Eyebrow className="mb-3">განათლება</Eyebrow>
       <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">ფორმალური საფუძველი</h2>
 
       <ol className="mt-6 relative space-y-5 pl-6">
@@ -985,7 +1068,7 @@ const ExperienceSection = ({ items }: { items: ExpItem[] }) => {
   if (!items || items.length === 0) return null
   return (
     <section id="experience" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-32">
-      <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-3">გამოცდილება</div>
+      <Eyebrow className="mb-3">გამოცდილება</Eyebrow>
       <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">სამუშაო ისტორია</h2>
 
       <div className="mt-6 grid sm:grid-cols-2 gap-3">
@@ -1020,6 +1103,8 @@ const StickyBookingCard = ({
   consultations = [],
   canMessage = false,
   onMessage,
+  isOwnProfile = false,
+  viewerCantBook = false,
 }: {
   onOpen: () => void
   availability?: ApiSlot[]
@@ -1034,6 +1119,8 @@ const StickyBookingCard = ({
   consultations?: ConsultationItem[]
   canMessage?: boolean
   onMessage?: () => void
+  isOwnProfile?: boolean
+  viewerCantBook?: boolean
 }) => {
   const duration = sessionMin
   // From-price when the expert's tiers differ (DESIGN_FIX_PROMPT 1.2) — the
@@ -1107,7 +1194,7 @@ const StickyBookingCard = ({
         <div className="px-6 pt-5 pb-4">
           {nextFree === null ? (
             <div className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 px-3 py-4 text-center text-[12px] text-ink-500 mb-4">
-              ექსპერტს ჯერ არ აქვს გამოცხადებული სლოტები.
+              ექსპერტს ჯერ არ აქვს გამოცხადებული თავისუფალი დრო.
             </div>
           ) : (
             <div className="flex items-center gap-2.5 text-[12.5px] text-ink-700 mb-4">
@@ -1117,14 +1204,24 @@ const StickyBookingCard = ({
               <span className="leading-snug">უახლოესი დრო: <span className="font-display font-bold text-ink-900">{DAY_NAMES_FULL[isoWeekday(nextFree)]}, {nextFree.getDate()} {KA_MONTHS_FULL[nextFree.getMonth()]}</span></span>
             </div>
           )}
-          <button
-            type="button"
-            disabled={nextFree === null}
-            onClick={onOpen}
-            className="w-full h-12 rounded-btn bg-gradient-cta hover:brightness-105 disabled:bg-none disabled:bg-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-all shadow-brand-glow disabled:shadow-none"
-          >
-            {signedIn === false ? 'შესვლა და დაჯავშნა' : 'დაჯავშნე'} <Icon.arrow className="w-4 h-4" />
-          </button>
+          {isOwnProfile ? (
+            <Link href="/tutor/profile" className="w-full h-12 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
+              პროფილის რედაქტირება
+            </Link>
+          ) : viewerCantBook ? (
+            <div className="w-full h-12 rounded-btn bg-ink-75 border border-ink-200 text-ink-500 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center">
+              ჯავშანი მხოლოდ კლიენტის ანგარიშით
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={nextFree === null}
+              onClick={onOpen}
+              className="w-full h-12 rounded-btn bg-gradient-cta hover:brightness-105 disabled:bg-none disabled:bg-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-all shadow-brand-glow disabled:shadow-none"
+            >
+              {signedIn === false ? 'შესვლა და დაჯავშნა' : 'დაჯავშნე'}
+            </button>
+          )}
           {/* Pre-booking messaging — secondary to the primary booking CTA. The
               objection-handler: ask before committing to a ₾100+ session. */}
           {canMessage && onMessage && (
@@ -1148,7 +1245,7 @@ const StickyBookingCard = ({
           </span>
           <span className="inline-flex items-center gap-1.5 text-ink-600">
             <Icon.shieldCheck className="w-3 h-3 text-ink-400" />
-            {PAYMENTS_LIVE ? 'Escrow დაცული' : 'უფასო დაჯავშნა'}
+            {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'უფასო დაჯავშნა'}
           </span>
         </div>
       </div>
@@ -1168,18 +1265,29 @@ const StickyBookingCard = ({
 const SectionNav = ({ items }: { items: { id: string; l: string }[] }) => {
   if (items.length < 2) return null
   return (
-    <nav aria-label="პროფილის სექციები" className="sticky top-16 sm:top-20 z-30 bg-white/95 backdrop-blur-md border-b border-ink-100">
-      <div className="max-w-[1280px] mx-auto px-6 sm:px-8 flex items-center gap-5 overflow-x-auto scrollbar-hide rail-fade-end h-11">
+    <nav aria-label="პროფილის სექციები" className="sticky top-16 sm:top-20 z-30 bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100">
+      <Container className="flex items-center gap-5 overflow-x-auto scrollbar-hide rail-fade-end h-11">
         {items.map(it => (
           <a
             key={it.id}
             href={`#${it.id}`}
+            // Smooth-glide to the section instead of a hard jump. scrollIntoView
+            // honors each section's scroll-mt-32, so the heading lands clear of
+            // the two sticky bars. Fall back to the native hash jump if the
+            // target isn't found.
+            onClick={(e) => {
+              const el = document.getElementById(it.id)
+              if (!el) return
+              e.preventDefault()
+              el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              history.replaceState(null, '', `#${it.id}`)
+            }}
             className="shrink-0 font-display text-[12px] font-semibold text-ink-500 hover:text-ink-900 transition-colors no-caps"
           >
             {it.l}
           </a>
         ))}
-      </div>
+      </Container>
     </nav>
   )
 }
@@ -1225,6 +1333,10 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
   void searchParams?.get('duration')
   void searchParams?.get('price')
   const rebookAutoOpen = searchParams?.get('rebook') === '1'
+  // Deep-link from a slot-less expert's card CTA ("მიწერე ექსპერტს"): open the
+  // message flow on arrival — auth-gated for guests, straight to the thread for
+  // signed-in students. Same one-shot pattern as ?rebook=1 for booking.
+  const messageAutoOpen = searchParams?.get('intent') === 'message'
 
   useEffect(() => {
     if (!tutorId) return
@@ -1345,9 +1457,21 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
   // expert. Allowed even while paused — a prospect can still ask questions.
   const router = useRouter()
   const expertUserId: string | undefined = tutorData?.user?.id
-  // Show to guests (prospective students) and to signed-in students only —
-  // never to the expert on their own profile, or to other tutors/admins.
-  const canMessage = expertUserId != null && (signedIn === false || me?.role === 'STUDENT')
+  // The expert viewing their OWN public profile must not see a "book/message
+  // yourself" control — swap it for an edit-profile link.
+  const isOwnProfile = !!(me?.id && expertUserId && me.id === expertUserId)
+  // Dual-role model (2026-07-23): anyone who can act as a CLIENT may message or
+  // book another expert — guests, students, AND a promoted expert (role TUTOR)
+  // consulting a DIFFERENT expert. The backend permits it (bookings API now
+  // refuses only ADMIN; messages API allows TUTOR→TUTOR pre-booking inquiries),
+  // so the only viewers excluded are the expert on their own profile
+  // (isOwnProfile) and ADMIN (no client space). Messaging is allowed even while
+  // the listing is paused — a prospect can still ask questions.
+  const canMessage = expertUserId != null && !isOwnProfile && me?.role !== 'ADMIN'
+  const viewerCantBook = me?.role === 'ADMIN'
+  // Favorites remain STUDENT-only (the favorites API still 403s a TUTOR), so the
+  // save button uses a separate flag from booking (which a dual-role TUTOR can do).
+  const viewerCantFav = !!(me?.role && me.role !== 'STUDENT')
   const onMessageExpert = () => {
     if (requireAuth('message')) return
     if (!expertUserId) return
@@ -1374,6 +1498,24 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
     setRebookConsumed(true)
   }, [rebookAutoOpen, rebookConsumed, loadState, isPaused, signedIn, requireAuth])
 
+  // Same one-shot resolution for the ?intent=message deep-link (slot-less card
+  // CTA): guests hit the auth sheet with a 'message' intent, signed-in students
+  // go straight to the pair thread.
+  const [messageConsumed, setMessageConsumed] = useState(false)
+  useEffect(() => {
+    if (!messageAutoOpen || messageConsumed) return
+    if (loadState !== 'ok' || signedIn === null) return
+    // Guests: fire the auth sheet (doesn't need the expert's user id).
+    if (signedIn === false) { setMessageConsumed(true); requireAuth('message'); return }
+    // Signed-in student: the SSR seed carries no `user.id` (SEO fields only), so
+    // wait for the client payload to fill `expertUserId` before redirecting —
+    // do NOT consume early, or the redirect is lost. The effect re-runs when
+    // expertUserId lands (it's a dep).
+    if (!expertUserId) return
+    setMessageConsumed(true)
+    router.push(`/student/messages/u/${expertUserId}`)
+  }, [messageAutoOpen, messageConsumed, loadState, signedIn, requireAuth, expertUserId, router])
+
   // Safe now — every hook above has already run unconditionally.
   if (loadState === 'not-found') {
     return (
@@ -1384,7 +1526,7 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
             <h1 className="font-display text-[22px] font-bold text-ink-900">ექსპერტი ვერ მოიძებნა</h1>
             <p className="text-[13.5px] text-ink-500 mt-2">შესაძლოა პროფილი წაიშალა ან ბმული არასწორია.</p>
             <Link href="/tutors" className="mt-6 inline-flex h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] items-center gap-2">
-              ყველა ექსპერტი <Icon.arrow className="w-4 h-4" />
+              ყველა ექსპერტი
             </Link>
           </div>
         </div>
@@ -1435,9 +1577,9 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
     return (
       <div className="font-sans bg-white text-ink-900 antialiased">
         <PublicTopBar initialUser={initialUser} />
-        <main
+        <Container as="main"
           id="main"
-          className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-4 sm:pt-7 lg:pt-9 pb-24 lg:pb-16"
+          className="pt-4 sm:pt-7 lg:pt-9 pb-24 lg:pb-16"
           aria-busy="true"
           aria-live="polite"
         >
@@ -1467,7 +1609,7 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
             </div>
           </div>
           <span className="sr-only">იტვირთება…</span>
-        </main>
+        </Container>
       </div>
     )
   }
@@ -1489,7 +1631,7 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
       <PublicTopBar initialUser={initialUser} />
       <SectionNav items={navItems} />
 
-      <main id="main" className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-4 sm:pt-7 lg:pt-9 pb-24 lg:pb-16">
+      <Container as="main" id="main" className="pt-4 sm:pt-7 lg:pt-9 pb-24 lg:pb-16">
         {/* Paused-profile banner. Shown when the tutor has toggled visibility
             off on /tutor/profile — the detail page still resolves (existing
             students may have deep links) but explicit CTAs (StickyBookingCard,
@@ -1512,7 +1654,7 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
 
           {/* Left: scrollable content */}
           <div className="min-w-0">
-            <VideoHero tutorId={tutorId} tutor={tutorData} requireAuth={requireAuth} />
+            <VideoHero tutorId={tutorId} tutor={tutorData} requireAuth={requireAuth} viewerCantFav={viewerCantFav} />
 
             <SpecsGrid tutor={tutorData} />
 
@@ -1528,7 +1670,7 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
                 expert is paused (booking is closed anyway). */}
             {!isPaused && (
               <section id="schedule" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-32">
-                <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-700 mb-3">განრიგი</div>
+                <Eyebrow className="mb-3">განრიგი</Eyebrow>
                 <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">თავისუფალი დროები</h2>
                 <p className="mt-2 text-[13.5px] text-ink-500 max-w-[520px]">აირჩიე დრო პირდაპირ აქ — ჯავშნის ფანჯარა არჩეული დროით გაიხსნება.</p>
                 <div className="mt-6">
@@ -1551,6 +1693,7 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
               rating={tutorData?.rating ?? 0}
               total={tutorData?.reviewsCount ?? 0}
               verified={!!tutorData?.verified}
+              expertFeatured={!!tutorData?.featured}
             />
             <SimilarExperts
               excludeId={tutorId}
@@ -1575,10 +1718,12 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
               consultations={tutorData?.consultations ?? []}
               canMessage={canMessage}
               onMessage={onMessageExpert}
+              isOwnProfile={isOwnProfile}
+              viewerCantBook={viewerCantBook}
             />
           </div>
         </div>
-      </main>
+      </Container>
 
       <SharedFooter />
 
@@ -1594,6 +1739,8 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
         busySlots={tutorData?.busySlots ?? []}
         canMessage={canMessage}
         onMessage={onMessageExpert}
+        isOwnProfile={isOwnProfile}
+        viewerCantBook={viewerCantBook}
       />
 
       {/* Point-of-tap auth prompt — replaces the old top-of-page banner. */}

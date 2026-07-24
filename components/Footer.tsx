@@ -1,11 +1,15 @@
 import Link from 'next/link'
 import { Logo } from './Logo'
 import { TrustStrip } from './TrustStrip'
+import { Container } from '@/components/Container'
+import { Eyebrow } from '@/components/Eyebrow'
+import { ApplyCtaGate } from './ApplyCtaGate'
+import { SiteText } from '@/components/SiteTextProvider'
 
 const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   { title: 'პროდუქტი', links: [
     { label: 'ექსპერტების ძებნა', href: '/tutors' },
-    { label: 'სფეროები', href: '/categories' },
+    { label: 'კატეგორიები', href: '/categories' },
     { label: 'გახდი ექსპერტი', href: '/apply' },
     { label: 'როგორ მუშაობს', href: '/#how' },
   ]},
@@ -17,7 +21,7 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   ]},
   { title: 'სამართალი', links: [
     { label: 'წესები', href: '/terms' },
-    { label: 'პრივატულობა', href: '/privacy' },
+    { label: 'კონფიდენციალურობა', href: '/privacy' },
     { label: 'ქუქიები', href: '/cookies' },
   ]},
 ]
@@ -34,12 +38,12 @@ export function Footer() {
       {/* Own container — pages drop this footer both inside and outside their
           content wrappers, so without its own max-width/padding it ran
           edge-to-edge and the bottom strip clipped at the viewport edge. */}
-      <div className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-14 pb-8">
+      <Container className="pt-14 pb-8">
         <div className="grid grid-cols-2 sm:grid-cols-[1.5fr_1fr_1fr_1fr] gap-8 sm:gap-10 mb-12">
           <div className="col-span-2 sm:col-span-1">
             <Logo size="md" />
             <p className="text-[13.5px] text-ink-600 mt-5 leading-[1.6] max-w-sm">
-              მცოდნე — ცოდნის არქივი, სადაც ხვდები ხელით შერჩეულ ქართველ ექსპერტებს.
+              <SiteText k="footer.tagline" />
             </p>
             <a
               href="mailto:hi@mcodne.ge"
@@ -50,18 +54,22 @@ export function Footer() {
           </div>
           {COLS.map(col => (
             <div key={col.title}>
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-ink-500 mb-4">{col.title}</div>
+              <Eyebrow tone="muted" className="mb-4">{col.title}</Eyebrow>
               <ul className="space-y-2.5">
-                {col.links.map(l => (
-                  <li key={l.href}>
-                    <Link
-                      href={l.href}
-                      className="text-[13.5px] text-ink-700 hover:text-brand-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 rounded-sm inline-block"
-                    >
-                      {l.label}
-                    </Link>
-                  </li>
-                ))}
+                {col.links.map(l => {
+                  const li = (
+                    <li key={l.href}>
+                      <Link
+                        href={l.href}
+                        className="text-[13.5px] text-ink-700 hover:text-brand-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 rounded-sm inline-block"
+                      >
+                        {l.label}
+                      </Link>
+                    </li>
+                  )
+                  // "გახდი ექსპერტი" is meaningless for an existing expert.
+                  return l.href === '/apply' ? <ApplyCtaGate key={l.href}>{li}</ApplyCtaGate> : li
+                })}
               </ul>
             </div>
           ))}
@@ -74,7 +82,7 @@ export function Footer() {
             <span>თბილისი, საქართველო</span>
           </div>
         </div>
-      </div>
+      </Container>
     </footer>
   )
 }

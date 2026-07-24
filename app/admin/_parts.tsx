@@ -8,7 +8,23 @@
 //   reason="none"     → plain confirm (default)
 // onConfirm receives the trimmed reason text (empty string when none).
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+
+// Shared section header for every admin tab — consistent eyebrow + title + sub,
+// with an optional right-aligned actions slot. Single source so all sections
+// (including blog/texts) read identically.
+export const TabHeader = ({ eyebrow, title, sub, actions }: { eyebrow: string; title: ReactNode; sub: string; actions?: ReactNode }) => (
+  <section className="px-6 lg:px-8 pt-7 pb-5 border-b border-ink-100 bg-white">
+    <div className="flex items-end justify-between gap-4 flex-wrap">
+      <div className="min-w-0 max-w-[680px]">
+        <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-900 mb-1.5">{eyebrow}</div>
+        <h1 className="font-display text-[24px] lg:text-[28px] font-bold text-ink-900 tracking-tight leading-[1.1]">{title}</h1>
+        <p className="mt-2 text-[13px] text-ink-600 leading-[1.55]">{sub}</p>
+      </div>
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+    </div>
+  </section>
+)
 
 type Tone = 'danger' | 'brand' | 'warning'
 

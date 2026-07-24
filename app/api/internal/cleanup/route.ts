@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { notify } from '@/lib/notify'
 import { fmtKaDateTime, fmtKaTime } from '@/lib/kaDate'
+import { sendSessionReminders } from '@/lib/sessionReminders'
+import { sendMessageReminders } from '@/lib/messageReminders'
 
 // Cleanup job for expired auth artifacts + stale bookings.
 //
@@ -200,22 +202,26 @@ export async function POST(req: Request) {
     autoCompleted = res.count
 
     // Both parties learn the session was closed automatically — otherwise the
-    // status flips silently and neither side knows why.
-    for (const b of overdue) {
+    // status flips silently and neither side knows why. State is already
+    // committed above, so these are pure side-effects — fan them out in one
+    // batch instead of one serial round-trip per party.
+    await Promise.all(overdue.flatMap(b => {
       const sessionRef = `${b.topic} · ${fmtKaDateTime(b.startAt, { year: true })}`
-      await notify(b.studentId, {
-        type: 'BOOKING_COMPLETED',
-        title: 'სესია დასრულებულად ჩაითვალა',
-        body: `${sessionRef} — ავტომატურად მოინიშნა დასრულებულად`,
-        href: `/student/bookings/${b.id}`,
-      })
-      await notify(b.tutor.userId, {
-        type: 'BOOKING_COMPLETED',
-        title: 'სესია დასრულებულად ჩაითვალა',
-        body: `${sessionRef} — ავტომატურად მოინიშნა დასრულებულად`,
-        href: `/tutor/bookings/${b.id}`,
-      })
-    }
+      return [
+        notify(b.studentId, {
+          type: 'BOOKING_COMPLETED',
+          title: 'სესია დასრულებულად ჩაითვალა',
+          body: `${sessionRef} — ავტომატურად მოინიშნა დასრულებულად`,
+          href: `/student/bookings/${b.id}`,
+        }),
+        notify(b.tutor.userId, {
+          type: 'BOOKING_COMPLETED',
+          title: 'სესია დასრულებულად ჩაითვალა',
+          body: `${sessionRef} — ავტომატურად მოინიშნა დასრულებულად`,
+          href: `/tutor/bookings/${b.id}`,
+        }),
+      ]
+    }))
   }
 
   // ── Session reminders (24h / 1h before start) ─────────────────────────
@@ -258,17 +264,28 @@ export async function POST(req: Request) {
       select: { userId: true, href: true },
     })
     const alreadySent = new Set(existing.map(e => `${e.userId}|${e.href}`))
-    for (const p of planned) {
-      if (alreadySent.has(`${p.userId}|${p.href}`)) continue
-      await notify(p.userId, {
-        type: 'BOOKING_REMINDER',
-        title: p.title,
-        body: p.body,
-        href: p.href,
-      })
-      remindersSent++
-    }
+    const toSend = planned.filter(p => !alreadySent.has(`${p.userId}|${p.href}`))
+    // Reminders are independent side-effects — send them in one batch.
+    await Promise.all(toSend.map(p => notify(p.userId, {
+      type: 'BOOKING_REMINDER',
+      title: p.title,
+      body: p.body,
+      href: p.href,
+    })))
+    remindersSent += toSend.length
   }
+
+  // Email session reminders ride this same */15 cron (best-effort — a mail
+  // failure must never break the cleanup job). Separate from the in-app
+  // `remindersSent` above; deduped by its own sessionReminderSentAt column.
+  let emailReminders = { bookings: 0, emails: 0 }
+  try { emailReminders = await sendSessionReminders() } catch { /* best-effort */ }
+
+  // Delayed unread-message reminders ride the same cron — email a message that's
+  // sat unread for ~30 min, at most once per unread streak. Deduped by its own
+  // Message.reminderEmailSentAt column.
+  let messageReminders = { threads: 0, emails: 0 }
+  try { messageReminders = await sendMessageReminders() } catch { /* best-effort */ }
 
   return NextResponse.json({
     ok: true,
@@ -282,6 +299,8 @@ export async function POST(req: Request) {
       autoCompleted,
       remindersSent,
     },
+    emailReminders,
+    messageReminders,
     at: now.toISOString(),
   })
 }

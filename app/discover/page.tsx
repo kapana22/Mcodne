@@ -2,12 +2,10 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { PublicTopBar } from '@/components/PublicTopBar'
+import { Container } from '@/components/Container'
 import { Footer as SharedFooter } from '@/components/Footer'
-
-const Ic = {
-  arrow: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M5 12h14M13 5l7 7-7 7" /></svg>,
-  compass: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9" /><path d="m16 8-2.5 5.5L8 16l2.5-5.5L16 8Z" /></svg>,
-}
+import { Icon } from '@/components/Icon'
+import { Eyebrow } from '@/components/Eyebrow'
 
 type Item = { q: string; snippet: string; cat: string; slug: string }
 
@@ -46,10 +44,10 @@ export default function DiscoverPage() {
     <div className="font-sans bg-white text-ink-900 antialiased min-h-screen flex flex-col">
       <PublicTopBar />
 
-      <main className="flex-1 max-w-[880px] w-full mx-auto px-6 sm:px-8 py-8 lg:py-12">
-        <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-3 inline-flex items-center gap-2">
-          <Ic.compass className="w-4 h-4" /> აღმოაჩინე
-        </div>
+      <Container as="main" size="content" className="flex-1 w-full py-8 lg:py-12">
+        <Eyebrow className="mb-3 inline-flex items-center gap-2">
+          <Icon.globe className="w-4 h-4" /> აღმოაჩინე
+        </Eyebrow>
         <h1 className="font-display text-[28px] sm:text-[36px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
           პოპულარული კითხვები
         </h1>
@@ -60,7 +58,7 @@ export default function DiscoverPage() {
         {/* Category chips */}
         <div className="mt-6 flex flex-wrap gap-1.5">
           {CHIPS.map(c => (
-            <button key={c.slug} type="button" onClick={() => setFilter(c.slug)} className={`h-8 px-3.5 rounded-pill font-display text-[12.5px] font-semibold tracking-wide transition-colors ${filter === c.slug ? 'bg-brand-500 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200'}`}>
+            <button key={c.slug} type="button" onClick={() => setFilter(c.slug)} className={`h-8 px-3.5 rounded-pill font-display text-[12.5px] font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 ${filter === c.slug ? 'bg-brand-500 text-white' : 'bg-white border border-ink-200 text-ink-700 hover:border-ink-300 hover:bg-ink-50'}`}>
               {c.l}
             </button>
           ))}
@@ -75,14 +73,13 @@ export default function DiscoverPage() {
               </div>
               <h3 className="font-display text-[15px] font-bold text-ink-900 leading-snug group-hover:text-brand-700 transition-colors">{it.q}</h3>
               <p className="mt-1.5 text-[12.5px] text-ink-600 leading-[1.5] line-clamp-2">{it.snippet}</p>
-              <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between">
+              <div className="mt-3 pt-3 border-t border-ink-100 flex items-center">
                 <span className="font-display text-[11px] font-semibold text-ink-500 group-hover:text-brand-700 transition-colors">ვინ პასუხობს</span>
-                <span className="w-6 h-6 rounded-full bg-ink-100 group-hover:bg-brand-500 group-hover:text-white text-ink-500 inline-flex items-center justify-center transition-colors"><Ic.arrow className="w-3.5 h-3.5" /></span>
               </div>
             </Link>
           ))}
         </div>
-      </main>
+      </Container>
 
       <SharedFooter />
     </div>

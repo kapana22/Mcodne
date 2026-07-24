@@ -148,6 +148,37 @@ model Category {
   tutors             TutorProfile[]
 }
 
+// Blog post — DB-backed so content is edited in the admin panel, not in code.
+// `status` is a plain string ('DRAFT' | 'PUBLISHED'); only PUBLISHED posts (with
+// a publishedAt) show on the public /blog. `body` is Markdown, rendered via
+// lib/markdown. Created via dbBoot inline DDL (see lib/dbBoot).
+model Post {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  excerpt     String?
+  body        String    @default("")
+  coverUrl    String?
+  tag         String?
+  status      String    @default("DRAFT")
+  authorName  String?
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, publishedAt])
+}
+
+// Editable site copy — a key → value override store. The full list of editable
+// keys (with labels, defaults, grouping) lives in code at lib/siteTextDefs; a
+// row here overrides the code default. Missing row → the default is used, so
+// the site works with an empty table. Created via dbBoot inline DDL.
+model SiteText {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model TutorProfile {
   id                      String      @id @default(cuid())
   userId                  String      @unique
@@ -195,6 +226,10 @@ model TutorProfile {
   @@index([serviceType])
   // Fast lookup for admin-curated hero on /
   @@index([featured])
+  // Public browse + hero: filter `available` then sort `verified desc, rating desc`.
+  // Equality on `available` + a backward scan satisfies the sort, so the take:N
+  // reads the top rows directly instead of scanning+sorting the whole table.
+  @@index([available, verified, rating])
 }
 
 model Certificate {
@@ -263,6 +298,8 @@ model AvailabilitySlot {
   tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
 
   @@index([tutorId, startAt])
+  // Browse "next free slot": tutorId IN (...) AND booked=false AND startAt > now.
+  @@index([tutorId, booked, startAt])
 }
 
 model Booking {
@@ -317,6 +354,10 @@ model Booking {
   @@index([serviceType])
   @@index([studentId])
   @@index([tutorId])
+  // Student dashboard: where studentId, orderBy startAt desc (up to 500 rows).
+  @@index([studentId, startAt])
+  // Cleanup cron + admin finance: filter by status within a startAt range.
+  @@index([status, startAt])
   // FK lookups + "bookings for this consultation" scans
   @@index([consultationId])
   // Hot path: "tutor's upcoming/live bookings ordered by start"
@@ -351,6 +392,8 @@ model Message {
   @@index([toId, readAt])
   // "messages I sent" + FK maintenance on user delete
   @@index([fromId])
+  // Pre-booking inbox: (fromId=me) arm ordered by createdAt desc.
+  @@index([fromId, createdAt])
 }
 
 model Review {
@@ -394,6 +437,8 @@ model Favorite {
   // The composite unique is (userId, tutorId)-prefixed, so a tutorId-only
   // lookup (cascade-delete favorites when a tutor is removed) can't use it.
   @@index([tutorId])
+  // "my favorites, newest first" — filter userId, sort createdAt desc.
+  @@index([userId, createdAt])
 }
 
 model Notification {

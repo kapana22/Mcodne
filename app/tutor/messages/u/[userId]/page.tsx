@@ -62,7 +62,7 @@ export default function TutorPairThreadPage() {
       autoFocus
       header={(_booking, pair) => <ThreadHeader booking={null} counterparty={pair?.otherUser} backHref="/tutor/messages" />}
       emptyState={{
-        title: 'პროსპექტმა დაგისვა შეკითხვა',
+        title: 'პოტენციურმა კლიენტმა დაგისვა შეკითხვა',
         body: 'უპასუხე დაჯავშნამდე — სწრაფი პასუხი კონსულტაციის დაჯავშნის ალბათობას ზრდის.',
       }}
       onActivity={() => window.dispatchEvent(new Event('mcodne:threads-refresh'))}

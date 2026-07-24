@@ -1,8 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { createSession, hashPassword } from '@/lib/auth'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
+import { sendMail } from '@/lib/mailer'
+import { welcomeEmail } from '@/lib/emailTemplates'
 
 // NB: `role` is intentionally NOT accepted from the client. Every self-signup
 // creates a STUDENT; promotion to TUTOR happens only through the moderated
@@ -23,7 +25,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const parsed = Body.safeParse(await req.json())
+  const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   }
@@ -42,5 +44,13 @@ export async function POST(req: Request) {
     },
   })
   await createSession(user.id)
+
+  // Welcome email — fire-and-forget so a mail hiccup never blocks signup, and
+  // registration itself is NOT gated on it (no verification wall).
+  after(async () => {
+    const { subject, html } = welcomeEmail(user.fullName)
+    await sendMail({ to: user.email, subject, html }).catch(() => {})
+  })
+
   return NextResponse.json({ ok: true, role: user.role, userId: user.id })
 }

@@ -68,36 +68,64 @@ export function useBookingThread({
     errTimer.current = setTimeout(() => setError(null), 4000)
   }
 
+  // Latest msgs snapshot for the poller (avoids re-subscribing the interval on
+  // every message) + a flag marking the first full fetch as done.
+  const msgsRef = useRef<ChatMessage[]>(msgs)
+  useEffect(() => { msgsRef.current = msgs }, [msgs])
+  const fetchedRef = useRef(false)
+
   // Poll while visible. Keeps in-flight optimistic bubbles (tmp-*) — a poll
   // landing between append and the POST response must not wipe them.
   useEffect(() => {
     if (!bookingId && !withUser) return
+    fetchedRef.current = false // fresh thread → next fetch is a full load
     // Booking mode keeps the exact `/api/messages?bookingId=` URL; pair mode
     // targets the ?withUser endpoint. Whichever id is set drives the poll.
-    const url = withUser
+    const base = withUser
       ? `/api/messages?withUser=${withUser}`
       : `/api/messages?bookingId=${bookingId}`
     let cancelled = false
     const tick = async () => {
       if (document.visibilityState !== 'visible') return
       try {
-        const res = await fetch(url)
+        // After the first full fetch, request ONLY messages newer than the
+        // latest real one we hold — a poll with nothing new is a few bytes, not
+        // the whole thread. Optimistic tmp-* rows don't count toward `since`.
+        const reals = msgsRef.current.filter(m => !m.id.startsWith('tmp-'))
+        const since = fetchedRef.current && reals.length ? reals[reals.length - 1].createdAt : null
+        const res = await fetch(since ? `${base}&since=${encodeURIComponent(since)}` : base)
         if (!res.ok || cancelled) return
         const j = await res.json().catch(() => null)
-        if (!cancelled && j?.ok && Array.isArray(j.messages)) {
+        if (cancelled || !j?.ok || !Array.isArray(j.messages)) return
+        if (since) {
+          // Incremental: append only genuinely-new rows; keep optimistic bubbles.
+          if (j.messages.length) {
+            setMsgs(prev => {
+              const have = new Set(prev.map((m: ChatMessage) => m.id))
+              const fresh = j.messages.filter((m: ChatMessage) => !have.has(m.id))
+              if (!fresh.length) return prev
+              const tmp = prev.filter((m: ChatMessage) => m.id.startsWith('tmp-'))
+              const real = prev.filter((m: ChatMessage) => !m.id.startsWith('tmp-'))
+              if (onActivity) onActivity()
+              return [...real, ...fresh, ...tmp]
+            })
+          }
+        } else {
           setMsgs(prev => {
             const next = [...j.messages, ...prev.filter((m: ChatMessage) => m.id.startsWith('tmp-'))]
             if (next.length > prev.length && onActivity) onActivity()
             return next
           })
-          if (j.booking) setBooking(j.booking)
-          if (j.pair) setPair(j.pair)
-          setLoaded(true)
         }
+        // Header (booking/pair) only arrives on the initial full fetch.
+        if (j.booking) setBooking(j.booking)
+        if (j.pair) setPair(j.pair)
+        fetchedRef.current = true
+        setLoaded(true)
       } catch {}
     }
     tick()
-    const id = setInterval(tick, 15_000)
+    const id = setInterval(tick, 20_000)
     return () => { cancelled = true; clearInterval(id) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId, withUser])
@@ -178,11 +206,42 @@ export function useBookingThread({
     }
   }
 
+  // Instant call: post a video-call invite into the thread (booking threads
+  // only). The server mints/reuses the room URL; we append the returned invite
+  // message so the sender sees it immediately (the recipient gets it on the
+  // next 15s poll + a bell notification).
+  const [calling, setCalling] = useState(false)
+  const requestCall = async () => {
+    if (!me || !bookingId || calling) return
+    setCalling(true)
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}/call`, { method: 'POST' })
+      const j = await res.json().catch(() => ({} as any))
+      if (!res.ok || !j.ok) {
+        flashError(j?.error === 'RATE_LIMIT' ? 'ცოტა ხანში სცადე ხელახლა.' : 'ზარის მოთხოვნა ვერ გაიგზავნა.')
+        return
+      }
+      setMsgs(prev => [...prev, {
+        id: j.message.id,
+        fromId: j.message.fromId,
+        body: j.message.body,
+        createdAt: j.message.createdAt,
+        fileUrl: j.message.fileUrl,
+        fileName: j.message.fileName,
+        from: { id: me.id, fullName: me.fullName, avatarUrl: me.avatarUrl },
+      }])
+      onActivity?.()
+    } finally {
+      setCalling(false)
+    }
+  }
+
   return {
     msgs, booking, pair, loaded,
     draft, setDraft,
     attachment, setAttachment, attach, uploading,
     send, sending,
+    requestCall, calling,
     error,
   }
 }

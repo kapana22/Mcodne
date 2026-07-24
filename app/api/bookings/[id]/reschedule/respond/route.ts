@@ -72,6 +72,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     if (Number.isNaN(newStart.getTime())) {
       return NextResponse.json({ ok: false, error: 'INVALID_STATE' }, { status: 400 })
     }
+    // A proposal accepted late must still land in the future — otherwise a
+    // stale proposal could set startAt in the past (propose only enforced
+    // future AT proposal time, not at accept time).
+    if (newStart.getTime() <= Date.now()) {
+      return NextResponse.json({ ok: false, error: 'STALE_PROPOSAL' }, { status: 400 })
+    }
     const newEnd = new Date(newStart.getTime() + booking.durationMin * 60_000)
     const oldHeldSlotId = booking.heldSlotId
 
@@ -93,6 +99,22 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         })
         const overlaps = others.some(o => o.startAt.getTime() + o.durationMin * 60_000 > newStart.getTime())
         if (overlaps) throw new SlotConflict()
+
+        // Also re-check the STUDENT's own calendar — create-time rejects a
+        // student double-booking themselves (route.ts selfCandidates), but a
+        // reschedule moving one booking onto another of the student's sessions
+        // would otherwise slip past. Same overlap math, excluding this booking.
+        const selfCandidates = await tx.booking.findMany({
+          where: {
+            studentId: booking.studentId,
+            status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] },
+            id: { not: booking.id },
+            startAt: { lt: newEnd },
+          },
+          select: { startAt: true, durationMin: true },
+        })
+        const selfOverlap = selfCandidates.some(c => c.startAt.getTime() + c.durationMin * 60_000 > newStart.getTime())
+        if (selfOverlap) throw new SlotConflict()
 
         // Find + claim a covering slot for the new window (may differ from
         // the one validated at propose time if it got booked meanwhile).
@@ -153,7 +175,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ? `/student/bookings/${booking.id}`
       : `/tutor/bookings/${booking.id}`
     await markRelatedRead(user.id, responderHref, 'RESCHEDULE_REQUEST')
-    return NextResponse.json({ ok: true, accepted: true, newStartAt: newStart.toISOString() })
+    return NextResponse.json({ ok: true, accepted: true, status: 'CONFIRMED', newStartAt: newStart.toISOString() })
   }
 
   // Reject: keep original startAt, clear the proposal, and restore the status
@@ -185,5 +207,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     ? `/student/bookings/${booking.id}`
     : `/tutor/bookings/${booking.id}`
   await markRelatedRead(user.id, responderHrefR, 'RESCHEDULE_REQUEST')
-  return NextResponse.json({ ok: true, accepted: false })
+  // Return the RESTORED status (PREPARING or CONFIRMED) so the client doesn't
+  // wrongly assume CONFIRMED — a rejected reschedule on a not-yet-accepted
+  // (PREPARING) booking must stay PREPARING and keep its accept/decline actions.
+  return NextResponse.json({ ok: true, accepted: false, status: restoredStatus })
 }

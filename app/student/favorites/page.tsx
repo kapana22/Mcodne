@@ -3,8 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { Icon } from '@/components/Icon'
 import { EmptyState } from '@/components/EmptyState'
 import { FavoritesClient } from './client'
-import { StudentAppBar } from '@/components/StudentAppBar'
-import { WorkspaceFooter } from '@/components/WorkspaceFooter'
+import { Container } from '@/components/Container'
+import { PageHeader } from '@/components/PageHeader'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,16 +39,12 @@ export default async function StudentFavoritesPage() {
   }))
 
   return (
-    <div className="font-sans bg-ink-50/40 min-h-screen flex flex-col">
-      <StudentAppBar user={{ name: user.fullName, avatar: user.avatarUrl }} />
-
-      <main className="w-full max-w-[1280px] mx-auto px-6 sm:px-8 py-8 lg:py-10 flex-1">
-        <div className="mb-8">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2 motion-safe:animate-rise-in">შენახული</div>
-          <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>
-            შენახული ექსპერტები <span className="text-ink-400 font-normal">({items.length})</span>
-          </h1>
-        </div>
+    <Container as="main" className="w-full py-8 lg:py-10 flex-1">
+        <PageHeader
+          className="mb-8"
+          eyebrow="პირადი სია"
+          title={<>შენახული ექსპერტები <span className="text-ink-400 font-normal">({items.length})</span></>}
+        />
 
         {items.length === 0 ? (
           <EmptyState
@@ -60,9 +56,6 @@ export default async function StudentFavoritesPage() {
         ) : (
           <FavoritesClient items={items} />
         )}
-      </main>
-
-      <WorkspaceFooter />
-    </div>
+    </Container>
   )
 }

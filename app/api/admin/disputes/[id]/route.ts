@@ -53,16 +53,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     parsed.data.outcome === 'REFUND_FULL' ? '100% ფულის დაბრუნება' :
     parsed.data.outcome === 'REFUND_PARTIAL' ? '50% ფულის დაბრუნება' :
     parsed.data.outcome === 'REDO_FREE' ? 'უფასო ხელახლა სესია' :
-    'გადაწყდა (Dismissed)'
+    'საჩივარი არ დაკმაყოფილდა'
   await notify(dispute.studentId, {
     type: 'GENERIC',
-    title: 'შენი საჩივარი განიხილა',
+    title: 'შენი საჩივარი განიხილულია',
     body: outcomeLabel + (parsed.data.resolution ? ` — ${parsed.data.resolution}` : ''),
     href: `/student/bookings/${dispute.bookingId}`,
   })
   await notify(dispute.booking.tutor.userId, {
     type: 'GENERIC',
-    title: 'Dispute გადაწყდა',
+    title: 'საჩივარი გადაწყდა',
     body: outcomeLabel,
     href: `/tutor/bookings/${dispute.bookingId}`,
   })

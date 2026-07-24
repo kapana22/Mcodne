@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { Container } from '@/components/Container'
+import { Eyebrow } from '@/components/Eyebrow'
 import Link from 'next/link'
 import { Avatar } from '@/components/Avatar'
 import { StatusPill } from '@/components/StatusPill'
@@ -8,6 +10,7 @@ import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { Sheet } from '@/components/Sheet'
+import { RescheduleTimePicker } from '@/components/booking/RescheduleTimePicker'
 import { useToast } from '@/components/ToastProvider'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
 import { fmtKaDate } from '@/lib/kaDate'
@@ -101,12 +104,17 @@ const useRemainingLabel = (startAtIso: string, durationMin: number): string => {
   return `${totalMin} წუთი`
 }
 
+// Stale-while-revalidate cache per booking id (same pattern as lib/me.ts) —
+// `/api/bookings/[id]` is the slowest endpoint, so re-opening a booking renders
+// instantly from cache while a fresh copy loads.
+const tutorBookingCache = new Map<string, Booking>()
+
 export default function TutorBookingDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const bookingId = params?.id
   const [me, setMe] = useState<Me>(null)
-  const [booking, setBooking] = useState<Booking | null>(null)
+  const [booking, setBooking] = useState<Booking | null>(() => (bookingId ? tutorBookingCache.get(bookingId) ?? null : null))
   const [notFound, setNotFound] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<'cancel' | 'no_show' | 'decline' | null>(null)
@@ -132,6 +140,9 @@ export default function TutorBookingDetailPage() {
 
   useEffect(() => {
     if (!bookingId) return
+    // Swap to the cached copy instantly (no spinner on revisit), then revalidate.
+    setBooking(tutorBookingCache.get(bookingId) ?? null)
+    setNotFound(false)
     let cancelled = false
     ;(async () => {
       try {
@@ -147,6 +158,7 @@ export default function TutorBookingDetailPage() {
         // error JSON as `booking` (which renders Invalid Date + undefined topic).
         if (!bRes.ok) { setNotFound(true); return }
         const data = await bRes.json()
+        tutorBookingCache.set(bookingId, data)
         setBooking(data)
         setTutorNotes(data.tutorNotes ?? '')
       } catch {
@@ -181,7 +193,7 @@ export default function TutorBookingDetailPage() {
       if (!res.ok || !j.ok) {
         const msg =
           j.error === 'BAD_STATE' ? 'ჯავშნის სტატუსი ამას აღარ უშვებს'
-          : j.error === 'TOO_EARLY' ? 'სესია ჯერ არ დაწყებულა — no-show ჯერ ვერ მოინიშნება'
+          : j.error === 'TOO_EARLY' ? 'გამოუცხადებლობა დაწყებიდან 15 წუთის შემდეგ მოინიშნება — მიეცი კლიენტს დრო'
           : 'მოქმედება ვერ შესრულდა'
         showFlash('err', msg)
         return
@@ -194,7 +206,7 @@ export default function TutorBookingDetailPage() {
       const okMsg =
         action === 'accept' ? 'დადასტურდა'
         : action === 'decline' ? 'უარყოფილია'
-        : action === 'no_show' ? 'აღინიშნა როგორც no-show'
+        : action === 'no_show' ? 'აღინიშნა გამოუცხადებლობა'
         : 'დასრულებულია'
       showFlash('ok', okMsg)
     } catch {
@@ -258,7 +270,7 @@ export default function TutorBookingDetailPage() {
       if (!res.ok || !j.ok) {
         setRescheduleErr(
           j?.error === 'TOO_SOON' ? 'დრო ძალიან ახლოსაა — მინიმუმ 1 საათი წინ'
-          : j?.error === 'NO_SLOT' ? 'ეს დრო ხელმისაწვდომი არ არის'
+          : j?.error === 'NO_SLOT' ? 'ამ დროს სხვა ჯავშანი ემთხვევა — აირჩიე თავისუფალი დრო'
           : j?.error === 'BAD_STATE' ? 'ჯავშნის სტატუსი ამას აღარ უშვებს'
           : 'გაგზავნა ვერ მოხერხდა',
         )
@@ -287,7 +299,10 @@ export default function TutorBookingDetailPage() {
       // Clear the pending request locally; if accepted, patch startAt too.
       setBooking(b => {
         if (!b) return b
-        const next: Booking = { ...b, rescheduleRequest: null, status: 'CONFIRMED' }
+        // Trust the server's resulting status — on reject it may be PREPARING
+        // (restored), NOT always CONFIRMED. Falling back to CONFIRMED only if
+        // the server didn't send it (older builds).
+        const next: Booking = { ...b, rescheduleRequest: null, status: j.status ?? 'CONFIRMED' }
         if (accept && j.newStartAt) next.startAt = j.newStartAt
         return next
       })
@@ -318,41 +333,48 @@ export default function TutorBookingDetailPage() {
 
   if (notFound) {
     return (
-      <div className="max-w-[720px] mx-auto">
+      <Container size="content">
           <div className="p-12 rounded-card border border-ink-200 bg-white text-center">
             <div className="mx-auto w-12 h-12 rounded-full bg-ink-100 text-ink-500 flex items-center justify-center mb-3">
               <Icon.warn className="w-6 h-6" />
             </div>
             <div className="font-display text-[17px] font-semibold text-ink-800">ჯავშანი ვერ მოიძებნა</div>
-            <div className="text-[13px] text-ink-500 mt-1">შესაძლოა წაიშალა, ან არ არის თქვენი.</div>
+            <div className="text-[13px] text-ink-500 mt-1">შესაძლოა წაიშალა, ან არ არის შენი.</div>
             <div className="mt-5"><Btn href="/tutor/bookings" variant="secondary" size="sm">ჯავშნების სია</Btn></div>
           </div>
-      </div>
+      </Container>
     )
   }
 
   if (!booking) {
     return (
-      <div className="max-w-[900px] mx-auto">
+      <Container size="content">
           <div className="p-12 rounded-card border border-ink-200 bg-white flex items-center justify-center text-ink-400">
             <span className="inline-block w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
             <span className="ml-3 text-[13px]">იტვირთება…</span>
           </div>
-      </div>
+      </Container>
     )
   }
 
   const future = new Date(booking.startAt) > new Date()
   const canAcceptDecline = booking.status === 'PREPARING'
-  const canCancel = future && (booking.status === 'CONFIRMED' || booking.status === 'PREPARING')
+  // A not-yet-accepted request rejects via "decline" — offering "cancel" AND
+  // "reschedule" there too gave an unanswered request four overlapping actions.
+  // Cancel + reschedule belong to an already-CONFIRMED booking only.
+  const canCancel = future && booking.status === 'CONFIRMED'
   const canComplete = booking.status === 'CONFIRMED' || booking.status === 'LIVE'
   // Join always goes through the in-app video room (/session/{id}) — same
   // surface as TodayHero and the bookings list. The CTA never disappears for
   // a CONFIRMED/LIVE session; an external meetingUrl, if set, rides along as
   // a quiet secondary link.
   const canJoin = booking.status === 'CONFIRMED' || booking.status === 'LIVE'
-  // "Student didn't show up" — only after the session's scheduled start.
-  const canMarkNoShow = !future && (booking.status === 'CONFIRMED' || booking.status === 'LIVE')
+  // "Student didn't show up" — only after the 15-min grace past the start (the
+  // server enforces the same window and returns TOO_EARLY otherwise). Gating the
+  // button on the grace, not just `!future`, stops an enabled button that fails.
+  const NO_SHOW_GRACE_MS = 15 * 60 * 1000
+  const graceOver = Date.now() >= new Date(booking.startAt).getTime() + NO_SHOW_GRACE_MS
+  const canMarkNoShow = graceOver && (booking.status === 'CONFIRMED' || booking.status === 'LIVE')
   const showRemainingPill = booking.status !== 'CANCELED' && booking.status !== 'NO_SHOW'
   const isLiveNow = canJoin && !future
 
@@ -361,7 +383,7 @@ export default function TutorBookingDetailPage() {
      sharing the same handlers/busy state. */
   const actionPanel = (
     <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5">
-      <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-3">მოქმედებები</div>
+      <Eyebrow tone="muted" className="mb-3">მოქმედებები</Eyebrow>
       <div className="flex flex-col gap-2">
         {canAcceptDecline && (
           <>
@@ -461,7 +483,7 @@ export default function TutorBookingDetailPage() {
                     </span>
                   )}
                 </div>
-                {req.reason && <p className="mt-1 text-[13px] text-ink-700 leading-[1.5] whitespace-pre-wrap">„{req.reason}"</p>}
+                {req.reason && <p className="mt-1 text-[13px] text-ink-700 leading-[1.5] whitespace-pre-wrap">„{req.reason}“</p>}
                 {iProposed && <p className="mt-1 text-[12px] text-ink-500">ველოდებით კლიენტის დადასტურებას.</p>}
               </div>
               {!iProposed && (
@@ -487,7 +509,7 @@ export default function TutorBookingDetailPage() {
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <StatusPill tone={toneOf(booking.status)} />
                 {booking.status === 'PREPARING' && (
-                  <span className="text-[11.5px] text-warning-700 font-semibold">ელოდება თქვენს პასუხს</span>
+                  <span className="text-[11.5px] text-warning-700 font-semibold">ელოდება შენს პასუხს</span>
                 )}
               </div>
               <h1 className="font-display text-[21px] sm:text-[24px] font-bold tracking-tight text-ink-900">{booking.topic}</h1>
@@ -523,7 +545,7 @@ export default function TutorBookingDetailPage() {
               <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5 sm:p-6 space-y-5">
                 {booking.studentNotes && (
                   <div>
-                    <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">კლიენტის შენიშვნა</div>
+                    <Eyebrow tone="muted" className="mb-2">კლიენტის შენიშვნა</Eyebrow>
                     <div className="p-3 rounded-btn bg-ink-50 border border-ink-200 text-[13px] text-ink-700 whitespace-pre-wrap">
                       {booking.studentNotes}
                     </div>
@@ -531,9 +553,9 @@ export default function TutorBookingDetailPage() {
                 )}
                 {booking.status === 'COMPLETED' && (
                   <div>
-                    <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">სესიის შემაჯამებელი</div>
+                    <Eyebrow className="mb-1">სესიის შემაჯამებელი</Eyebrow>
                     <h3 className="font-display text-[14px] font-bold text-ink-900 tracking-tight">დაუტოვე კლიენტს გამოხმაურება</h3>
-                    <p className="text-[12px] text-ink-500 mt-0.5">კლიენტი ნახავს ამ ჩანაწერს თავის ბუკინგის გვერდზე.</p>
+                    <p className="text-[12px] text-ink-500 mt-0.5">კლიენტი ნახავს ამ ჩანაწერს თავის ჯავშნის გვერდზე.</p>
                     <textarea
                       value={tutorNotes}
                       onChange={(e) => setTutorNotes(e.target.value.slice(0, 1500))}
@@ -581,7 +603,7 @@ export default function TutorBookingDetailPage() {
           <aside className="space-y-4 lg:sticky lg:top-[84px]">
             {/* Client card */}
             <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5">
-              <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-3">კლიენტი</div>
+              <Eyebrow tone="muted" className="mb-3">კლიენტი</Eyebrow>
               <div className="flex items-center gap-3">
                 <Avatar src={booking.student.avatarUrl ?? undefined} name={booking.student.fullName} size={48} />
                 <div className="min-w-0 flex-1">
@@ -590,7 +612,7 @@ export default function TutorBookingDetailPage() {
                 </div>
               </div>
               <a href="#chat" className="mt-3 flex items-center justify-center gap-2 h-9 rounded-btn border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] transition-colors">
-                <Icon.chat className="w-4 h-4" /> მესიჯის მიწერა
+                <Icon.chat className="w-4 h-4" /> მიწერა
               </a>
             </div>
 
@@ -598,7 +620,7 @@ export default function TutorBookingDetailPage() {
 
             {/* Payment / booking meta */}
             <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5">
-              <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-3">ღირებულება</div>
+              <Eyebrow tone="muted" className="mb-3">ღირებულება</Eyebrow>
               <div className="flex items-baseline justify-between">
                 <span className="font-display text-[24px] font-bold text-ink-900 tabular-nums">₾{booking.price}</span>
                 <span className="text-[12px] text-ink-500">{booking.durationMin} წთ</span>
@@ -646,31 +668,11 @@ export default function TutorBookingDetailPage() {
                   {fmtDateTime(booking.startAt, tz)}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">თარიღი</label>
-                  <input
-                    type="date"
-                    value={rescheduleDate}
-                    min={new Date().toISOString().slice(0, 10)}
-                    onChange={(e) => setRescheduleDate(e.target.value)}
-                    className="w-full h-11 px-3 rounded-field border border-ink-200 text-[13.5px] focus:border-brand-500 focus:outline-none tabular-nums"
-                  />
-                </div>
-                <div>
-                  <label className="block font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">დრო</label>
-                  <input
-                    type="time"
-                    value={rescheduleTime}
-                    onChange={(e) => setRescheduleTime(e.target.value)}
-                    className="w-full h-11 px-3 rounded-field border border-ink-200 text-[13.5px] focus:border-brand-500 focus:outline-none tabular-nums"
-                  />
-                </div>
-              </div>
+              <RescheduleTimePicker tutorId={booking.tutor.id} durationMin={booking.durationMin} dateStr={rescheduleDate} timeStr={rescheduleTime} onDate={setRescheduleDate} onTime={setRescheduleTime} />
               <div>
-                <label className="block font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">
+                <Eyebrow as="label" tone="muted" className="block mb-2">
                   მიზეზი <span className="text-ink-400 font-normal normal-case tracking-normal">— სურვილისამებრ</span>
-                </label>
+                </Eyebrow>
                 <textarea
                   value={rescheduleReason}
                   onChange={(e) => setRescheduleReason(e.target.value.slice(0, 500))}
@@ -696,10 +698,10 @@ export default function TutorBookingDetailPage() {
         }
         body={
           confirming === 'cancel'
-            ? 'სესიის დაწყებამდე 12 საათზე გვიან გაუქმება კლიენტისთვის სრულად ბრუნდება. კლიენტი მიიღებს შეტყობინებას.'
+            ? 'ჯავშნის გაუქმებისას კლიენტს დაცული თანხა სრულად უბრუნდება და მიიღებს შეტყობინებას.'
             : confirming === 'decline'
             ? 'კლიენტის მოთხოვნა გაუქმდება და ის მიიღებს შეტყობინებას.'
-            : 'ჯავშანი აღინიშნება როგორც no-show და თანხა კლიენტს დაუბრუნდება.'
+            : 'ჯავშანი აღინიშნება როგორც გამოუცხადებლობა და თანხა კლიენტს დაუბრუნდება.'
         }
         tone={confirming === 'decline' ? 'warning' : 'danger'}
         confirmLabel={
@@ -762,7 +764,7 @@ function ReviewBlock({
 
   return (
     <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5 sm:p-6">
-      <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">კლიენტის შეფასება</div>
+      <Eyebrow tone="muted" className="mb-2">კლიენტის შეფასება</Eyebrow>
       <div className="flex items-center gap-1.5 flex-wrap">
         <span role="img" aria-label={`${review.rating} 5-დან`} className="inline-flex items-center gap-0.5">
           {[1, 2, 3, 4, 5].map(n => (
@@ -777,7 +779,7 @@ function ReviewBlock({
       <div className="mt-4 pt-4 border-t border-ink-100">
         {review.tutorResponse && !editing ? (
           <>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-1.5">შენი პასუხი</div>
+            <Eyebrow className="mb-1.5">შენი პასუხი</Eyebrow>
             <blockquote className="border-l-2 border-brand-300 pl-3 text-[13px] text-ink-800 leading-[1.6] whitespace-pre-wrap">
               {review.tutorResponse}
             </blockquote>
@@ -796,9 +798,9 @@ function ReviewBlock({
           </>
         ) : editing ? (
           <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">
+            <Eyebrow tone="muted" className="mb-2">
               {review.tutorResponse ? 'პასუხის რედაქტირება' : 'პასუხი შეფასებაზე'}
-            </div>
+            </Eyebrow>
             <textarea
               value={text}
               onChange={e => setText(e.target.value.slice(0, 600))}
@@ -841,7 +843,7 @@ function SessionTimeline({ status, startAt, durationMin }: { status: BookingStat
       <div className="rounded-card border border-ink-200 bg-ink-50/60 px-5 py-3.5 flex items-center gap-2.5">
         <Icon.x className="w-4 h-4 text-ink-400 shrink-0" />
         <span className="text-[12.5px] text-ink-500">
-          {status === 'CANCELED' ? 'ჯავშანი გაუქმდა — პროცესი შეწყვეტილია.' : 'სესია არ შედგა (no-show).'}
+          {status === 'CANCELED' ? 'ჯავშანი გაუქმდა — პროცესი შეწყვეტილია.' : 'სესია არ შედგა (გამოუცხადებლობა).'}
         </span>
       </div>
     )

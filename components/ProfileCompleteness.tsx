@@ -1,6 +1,7 @@
 'use client'
 import { useMemo } from 'react'
 import { Icon } from './Icon'
+import { Eyebrow } from '@/components/Eyebrow'
 import {
   buildProfileChecks,
   profilePercent,
@@ -83,11 +84,11 @@ export function ProfileCompleteness({
     >
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-brand-700">
+          <Eyebrow>
             {label}
-          </div>
+          </Eyebrow>
           <div className={`font-display font-bold text-ink-900 tracking-tight mt-1 ${variant === 'compact' ? 'text-[14px]' : 'text-[16px]'}`}>
-            {percent >= 100 ? 'პროფილი 100% სრულია' : `დარჩენილია ${undone.length} აქტივობა`}
+            {percent >= 100 ? 'პროფილი 100% სრულია' : `დარჩენილია ${undone.length} ნაბიჯი`}
           </div>
         </div>
         <div className="font-display font-bold text-brand-700 tabular-nums leading-none text-[22px]">
@@ -151,7 +152,7 @@ export function ProfileCompleteness({
 
       {percent < 100 && variant === 'card' && (
         <p className="mt-4 text-[11.5px] text-ink-500 leading-snug">
-          სრული პროფილი უფრო მეტ კლიენტს იზიდავს — მოაწესრიგე დარჩენილი აქტივობა.
+          სრული პროფილი უფრო მეტ კლიენტს იზიდავს — დაასრულე დარჩენილი ნაბიჯები.
         </p>
       )}
     </section>

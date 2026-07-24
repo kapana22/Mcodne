@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   const tutor = await prisma.tutorProfile.findUnique({ where: { userId: user.id }, select: { id: true } })
   if (!tutor) return NextResponse.json({ ok: false, error: 'NO_TUTOR_PROFILE' }, { status: 400 })
 
-  const parsed = CreateBody.safeParse(await req.json())
+  const parsed = CreateBody.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
   const c = await prisma.consultation.create({

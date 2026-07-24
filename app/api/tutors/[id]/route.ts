@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { stripTutorBlobs } from '@/lib/stripTutorBlobs'
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params
@@ -51,7 +52,13 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       orderBy: { startAt: 'asc' },
       take: 200,
     }),
-    prisma.certificate.findMany({ where: { tutorId: id }, orderBy: [{ year: 'desc' }, { createdAt: 'desc' }] }),
+    prisma.certificate.findMany({ where: { tutorId: id }, orderBy: [{ year: 'desc' }, { createdAt: 'desc' }] }).then(rows => rows.map(c => ({
+      ...c,
+      // The public profile only links http(s) cert scans (safeHttpUrl rejects
+      // data: URIs), so a base64 scan is never rendered here — strip it so it
+      // can't bloat the payload. Same defense as the review avatars above.
+      fileUrl: c.fileUrl && c.fileUrl.startsWith('data:') ? null : c.fileUrl,
+    }))),
     prisma.education.findMany({ where: { tutorId: id }, orderBy: [{ startYear: 'desc' }, { createdAt: 'desc' }] }),
     prisma.experience.findMany({ where: { tutorId: id }, orderBy: [{ startYear: 'desc' }, { createdAt: 'desc' }] }),
     prisma.booking.findMany({
@@ -73,7 +80,13 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   }))
 
   return NextResponse.json({
-    ...tutor,
+    // Strip the unbounded apply-flow `professionData` JSON (PII, never rendered
+    // on the profile) and any legacy base64 `videoUrl` blob before serializing —
+    // this is the single most-hit profile endpoint and the same payload-bloat
+    // class as the 9.4MB-avatar speed incident. Small fields (headline, price,
+    // rating, YouTube videoUrl, category) are preserved; the detail client does
+    // not read professionData.
+    ...stripTutorBlobs(tutor),
     consultations,
     reviews,
     availability,

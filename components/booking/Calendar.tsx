@@ -3,6 +3,7 @@
 // app/tutors/[id]/client.tsx (DESIGN_FIX_PROMPT 1.1). Viewer-local dates.
 import React from 'react'
 import { Icon } from '@/components/Icon'
+import { Eyebrow } from '@/components/Eyebrow'
 import { KA_MONTHS_LONG as KA_MONTHS_FULL } from '@/lib/kaDate'
 import { WEEK_HEADERS, isoWeekday, startOfDay, sameDay, dayKey, type ApiSlot } from './slots'
 import { CalendarTzLabel } from './TzLabels'
@@ -72,7 +73,7 @@ export const Calendar = ({
 
       <div className="grid grid-cols-7 gap-1 mb-2">
         {WEEK_HEADERS.map(w => (
-          <div key={w} className="text-center font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 py-1">{w}</div>
+          <Eyebrow key={w} tone="muted" className="text-center py-1">{w}</Eyebrow>
         ))}
       </div>
 

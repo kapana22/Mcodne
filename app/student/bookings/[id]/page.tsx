@@ -3,18 +3,20 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { useToast } from '@/components/ToastProvider'
 import { copyToClipboard } from '@/lib/clipboard'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
 import { fmtKaDate, fmtKaDateTime, fmtKaTime } from '@/lib/kaDate'
-import { safeHttpUrl } from '@/lib/safeUrl'
-import { sanitizeMsgBody, MSG_MAX_LEN, sendErrorText } from '@/lib/msgText'
+import { BookingChat } from '@/components/chat/BookingChat'
 import { PAYMENTS_LIVE, CANCEL_CUTOFF_HOURS } from '@/lib/flags'
 import { isBookingLive } from '@/lib/bookingLive'
-import { StudentAppBar } from '@/components/StudentAppBar'
-import { WorkspaceFooter } from '@/components/WorkspaceFooter'
 import { Sheet } from '@/components/Sheet'
+import { Eyebrow } from '@/components/Eyebrow'
 import { Icon } from '@/components/Icon'
+import { RescheduleTimePicker } from '@/components/booking/RescheduleTimePicker'
+import { CallInviteCard } from '@/components/chat/CallInviteCard'
+import { Container } from '@/components/Container'
 
 /* ───── Minimal icon set ───── */
 
@@ -65,15 +67,16 @@ const fmtDate = (d: Date) => `${KA_WEEKDAY_SHORT[d.getDay()]} ${d.getDate()} ${K
 const fmtTime = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 
 /* ───── Status badge ───── */
-const STATUS_MAP: Record<ApiStatus, { l: string; cls: string; dot?: string }> = {
-  PREPARING: { l: 'ჯავშანი ელოდება ექსპერტის დადასტურებას', cls: 'bg-warning-50 text-warning-700 border-warning-200', dot: 'bg-warning-500' },
-  CONFIRMED: { l: 'ექსპერტმა დაადასტურა — ვიდეო-ოთახი გამზადებულია', cls: 'bg-brand-50 text-brand-800 border-brand-200', dot: 'bg-brand-500' },
-  LIVE:      { l: 'სესია მიმდინარეობს', cls: 'bg-danger-50 text-danger-700 border-danger-200', dot: 'bg-danger-500' },
-  COMPLETED: { l: 'სესია დასრულდა', cls: 'bg-success-50 text-success-700 border-success-200', dot: 'bg-success-500' },
-  CANCELED:  { l: 'ჯავშანი გაუქმდა', cls: 'bg-ink-100 text-ink-700 border-ink-200' },
-  // Neutral ink for terminal negative states — the violet iris accent sat
-  // outside the green/blue/neutral color system (design canon).
-  NO_SHOW:   { l: 'სესია არ შედგა', cls: 'bg-ink-100 text-ink-700 border-ink-200' },
+// Quiet header strip: a single neutral shade for every state, with the state
+// conveyed by colored TEXT at the point of meaning (canon: no pastel status
+// fills, no status dots). The label copy itself already carries the state.
+const STATUS_MAP: Record<ApiStatus, { l: string; cls: string }> = {
+  PREPARING: { l: 'ჯავშანი ელოდება ექსპერტის დადასტურებას', cls: 'bg-ink-50/60 text-warning-800 border-ink-200' },
+  CONFIRMED: { l: 'ექსპერტმა დაადასტურა — ვიდეო-ოთახი გამზადებულია', cls: 'bg-ink-50/60 text-brand-700 border-ink-200' },
+  LIVE:      { l: 'სესია მიმდინარეობს', cls: 'bg-ink-50/60 text-danger-700 border-ink-200' },
+  COMPLETED: { l: 'სესია დასრულდა', cls: 'bg-ink-50/60 text-brand-700 border-ink-200' },
+  CANCELED:  { l: 'ჯავშანი გაუქმდა', cls: 'bg-ink-50/60 text-ink-600 border-ink-200' },
+  NO_SHOW:   { l: 'სესია არ შედგა', cls: 'bg-ink-50/60 text-ink-600 border-ink-200' },
 }
 
 const tabOf = (s: ApiStatus) =>
@@ -83,7 +86,7 @@ const tabOf = (s: ApiStatus) =>
 
 /* ───── Breadcrumb ───── */
 const Breadcrumb = ({ status, ref }: { status: ApiStatus; ref: string }) => (
-  <div className="max-w-[1280px] mx-auto px-6 lg:px-8 pt-6 flex items-center gap-2 text-[12px] text-ink-500">
+  <Container className="pt-6 flex items-center gap-2 text-[12px] text-ink-500">
     <Link href={`/student/bookings?tab=${status === 'COMPLETED' || status === 'NO_SHOW' ? 'past' : status === 'CANCELED' ? 'canceled' : 'upcoming'}`}
           className="hover:text-ink-900 font-display font-semibold inline-flex items-center gap-1">
       <Icon.chevL className="w-3 h-3" /> ჩემი ჯავშნები
@@ -92,7 +95,7 @@ const Breadcrumb = ({ status, ref }: { status: ApiStatus; ref: string }) => (
     <span className="font-display font-semibold text-ink-700">{tabOf(status)}</span>
     <Icon.chevR className="w-3 h-3 text-ink-300" />
     <span className="font-mono tabular-nums text-ink-500">#{ref.slice(0, 8)}</span>
-  </div>
+  </Container>
 )
 
 /* ───── Countdown to a date ───── */
@@ -179,16 +182,20 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
   // Only show the "დაწყებამდე დარჩა" pill for non-terminal bookings — cancelled
   // and no-show sessions never start, so a countdown there is noise.
   const showRemainingPill = status !== 'CANCELED' && status !== 'NO_SHOW'
+  // The session's time has fully passed. When the tutor hasn't yet marked it
+  // complete (and the auto-complete cron may not be running), the booking is
+  // still CONFIRMED — but a "დარჩა 00:00:00" countdown + a join button to an
+  // empty room is misleading, so past-end sessions get an honest closing state.
+  const sessionOver = Date.now() > end.getTime()
   const tutorFullName = booking.tutor.user.fullName
   const tutorSpecialty = booking.tutor.specialty ?? booking.tutor.category?.name ?? 'ექსპერტი'
 
   return (
-    <section className="max-w-[1280px] mx-auto px-6 lg:px-8 pt-5">
+    <Container as="section" className="pt-5">
       <div className="rounded-card overflow-hidden border border-ink-200 bg-white">
         {/* status banner */}
         <div className={`px-6 py-3 border-b ${m.cls} flex items-center justify-between gap-3 flex-wrap`}>
           <div className="flex items-center gap-2 min-w-0">
-            {m.dot && <span className="relative inline-flex"><span className={`absolute inset-0 rounded-full ${m.dot} opacity-50 animate-ping`} /><span className={`relative w-2 h-2 rounded-full ${m.dot}`} /></span>}
             <span className="font-display text-[13px] font-bold tracking-tight">{m.l}</span>
           </div>
           <span className="font-mono text-[11px] tabular-nums opacity-65 inline-flex items-center gap-1.5">
@@ -209,20 +216,16 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
           </span>
         </div>
 
-        <div className="p-6 lg:p-7 grid lg:grid-cols-[1fr_auto] gap-6 items-start">
+        <div className="p-6 lg:p-7 grid lg:grid-cols-[1fr_360px] gap-6 items-start">
           <div className="min-w-0">
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">სესია</div>
+            <Eyebrow className="mb-2">სესია</Eyebrow>
             <h1 className="font-display text-[26px] lg:text-[32px] font-bold text-ink-900 tracking-tight leading-[1.1]">
               {booking.topic}
             </h1>
 
             <div className="mt-4 flex items-center gap-3 flex-wrap">
               <div className="w-12 h-12 rounded-full overflow-hidden ring-1 ring-ink-200 shrink-0 bg-brand-100 inline-flex items-center justify-center">
-                {booking.tutor.user.avatarUrl ? (
-                  <img src={booking.tutor.user.avatarUrl} alt={tutorFullName} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="font-display font-bold text-brand-700 text-[15px]">{tutorFullName.slice(0, 1)}</span>
-                )}
+                <img src={booking.tutor.user.avatarUrl || DEFAULT_AVATAR} alt={tutorFullName} className="w-full h-full object-cover" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
@@ -241,12 +244,12 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
 
             <div className="mt-5 grid sm:grid-cols-3 gap-2.5">
               <div className="p-3 rounded-card border border-ink-200 bg-ink-50/50">
-                <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 inline-flex items-center gap-1.5"><Icon.cal className="w-3 h-3" /> თარიღი</div>
+                <Eyebrow tone="muted" className="inline-flex items-center gap-1.5"><Icon.cal className="w-3 h-3" /> თარიღი</Eyebrow>
                 <div className="mt-1 font-display text-[14.5px] font-bold text-ink-900 tabular-nums">{fmtDate(start)}</div>
                 <div className="text-[11.5px] text-ink-500 tabular-nums">{start.getFullYear()} · თბილისი (GMT+4)</div>
               </div>
               <div className="p-3 rounded-card border border-ink-200 bg-ink-50/50">
-                <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 inline-flex items-center gap-1.5"><Icon.clock className="w-3 h-3" /> დრო</div>
+                <Eyebrow tone="muted" className="inline-flex items-center gap-1.5"><Icon.clock className="w-3 h-3" /> დრო</Eyebrow>
                 <div className="mt-1 font-display text-[14.5px] font-bold text-ink-900 tabular-nums">{fmtTime(start)} — {fmtTime(end)}</div>
                 <div className="text-[11.5px] text-ink-500 tabular-nums">{booking.durationMin} წუთი</div>
                 {showTzHint && (
@@ -254,7 +257,7 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
                 )}
               </div>
               <div className="p-3 rounded-card border border-ink-200 bg-ink-50/50">
-                <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 inline-flex items-center gap-1.5"><Icon.wallet className="w-3 h-3" /> ფასი</div>
+                <Eyebrow tone="muted" className="inline-flex items-center gap-1.5"><Icon.wallet className="w-3 h-3" /> ფასი</Eyebrow>
                 <div className="mt-1 font-display text-[14.5px] font-bold text-ink-900 tabular-nums">₾{booking.price}</div>
                 <div className="text-[11.5px] text-ink-500 tabular-nums">{PAYMENTS_LIVE ? 'დაცულ გადახდაშია' : 'გადახდები მალე'}</div>
               </div>
@@ -278,8 +281,8 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
                 primary CTA — a dead end. The honest next step while waiting
                 for confirmation is writing to the expert. */}
             {status === 'PREPARING' && (
-              <div className="p-4 rounded-card bg-white border border-warning-200">
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-warning-700 mb-2">ელოდება დადასტურებას</div>
+              <div className="p-4 rounded-card bg-white border border-ink-200">
+                <Eyebrow tone="muted" className="mb-2">ელოდება დადასტურებას</Eyebrow>
                 <p className="text-[12.5px] text-ink-700 leading-[1.5]">
                   ექსპერტი ჩვეულებრივ რამდენიმე საათში ადასტურებს — შეტყობინებას მიიღებ. სანამ ელოდები, შეგიძლია მისწერო.
                 </p>
@@ -294,7 +297,19 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
               </div>
             )}
 
-            {(status === 'CONFIRMED' || status === 'LIVE') && cd && (
+            {status === 'CONFIRMED' && sessionOver && (
+              <div className="p-4 rounded-card bg-white border border-ink-200">
+                <Eyebrow tone="muted" className="mb-2">სესიის დრო გავიდა</Eyebrow>
+                <p className="text-[12.5px] text-ink-700 leading-[1.5]">
+                  ექსპერტი მალე დახურავს სესიას — შემდეგ შეფასების დატოვებას შეძლებ. თუ სესია არ შედგა, მიწერე ექსპერტს ან დაიწყე დავა.
+                </p>
+                <a href="#chat" className="mt-3 w-full h-11 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[13px] inline-flex items-center justify-center gap-2 transition-colors">
+                  <Icon.chat className="w-4 h-4" /> მიწერე ექსპერტს
+                </a>
+              </div>
+            )}
+
+            {(status === 'CONFIRMED' || status === 'LIVE') && cd && !sessionOver && (
               <div className="text-center p-4 rounded-card bg-ink-900 text-white">
                 <div className="font-display text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-300 mb-2">
                   {status === 'LIVE' ? 'ცოცხალია' : 'დარჩა'}
@@ -326,7 +341,7 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
 
             {status === 'COMPLETED' && (
               <div className="p-4 rounded-card bg-brand-50 border border-brand-200">
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">სესია დასრულდა</div>
+                <Eyebrow className="mb-2">სესია დასრულდა</Eyebrow>
                 <p className="text-[12.5px] text-ink-700 leading-[1.5]">
                   {booking.review ? 'შენ უკვე შეაფასე ეს სესია.' : 'დაჯავშნე იგივე ექსპერტთან ან დატოვე შეფასება.'}
                 </p>
@@ -351,311 +366,27 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
 
             {(status === 'CANCELED' || status === 'NO_SHOW') && (
               <div className="p-4 rounded-card bg-ink-50 border border-ink-200">
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-600 mb-2">
+                <Eyebrow tone="muted" className="mb-2">
                   {status === 'NO_SHOW' ? 'სესია არ შედგა' : 'ჯავშანი გაუქმდა'}
-                </div>
+                </Eyebrow>
                 <p className="text-[12.5px] text-ink-700 leading-[1.5]">
                   {status === 'NO_SHOW'
                     ? 'ექსპერტმა აღნიშნა, რომ არ გამოცხადდი.'
                     : `${booking.cancelledBy === 'TUTOR' ? 'ექსპერტმა' : booking.cancelledBy === 'ADMIN' ? 'ადმინმა' : 'შენ'} გააუქმა ჯავშანი.`}
-                  {' '}{PAYMENTS_LIVE ? 'Escrow თანხა დაბრუნებულია.' : 'გადასახდელი არაფერია — დაჯავშნა უფასოა.'}
+                  {' '}{PAYMENTS_LIVE ? 'დაცული თანხა დაბრუნებულია.' : 'გადასახდელი არაფერია — დაჯავშნა უფასოა.'}
                 </p>
                 <Link href="/tutors" className="mt-3 w-full h-11 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-900 font-display font-semibold text-[12.5px] inline-flex items-center justify-center transition-colors">
-                  ხელახლა დაჯავშნა
+                  ხელახლა დაჯავშნე
                 </Link>
               </div>
             )}
           </div>
         </div>
       </div>
-    </section>
+    </Container>
   )
 }
 
-/* ───── Chat pane (real messages) ─────
-   Owns its message list locally: optimistic append on send (no full booking
-   reload — that cost 2-5s on the remote DB and made sending feel broken) and
-   a light 15s poll of GET /api/messages?bookingId= while the tab is visible,
-   which also stamps read receipts server-side. */
-const CHAT_POLL_MS = 15_000
-const BookingMessages = ({ booking, meId }: { booking: Booking; meId: string | null }) => {
-  const [msgs, setMsgs] = useState<BookingMsg[]>(booking.messages)
-  const [text, setText] = useState('')
-  const [sending, setSending] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [attachment, setAttachment] = useState<{ url: string; name: string; type: string; size: number } | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
-  const scrollRef = React.useRef<HTMLDivElement | null>(null)
-  const tutorName = booking.tutor.user.fullName
-
-  // Parent reloads (status changes etc.) re-seed the local list — server wins.
-  useEffect(() => { setMsgs(booking.messages) }, [booking.messages])
-
-  // Keep the newest message in view — the pane used to open scrolled to the
-  // OLDEST message and never followed new ones.
-  useEffect(() => {
-    const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [msgs.length])
-
-  // Poll for the other side's messages + stamp read receipts. Runs once on
-  // mount (marks existing incoming as read) then every 15s while visible.
-  useEffect(() => {
-    let cancelled = false
-    const tick = async () => {
-      if (document.visibilityState !== 'visible') return
-      try {
-        const res = await fetch(`/api/messages?bookingId=${booking.id}`)
-        if (!res.ok || cancelled) return
-        const j = await res.json().catch(() => null)
-        // Keep any in-flight optimistic bubbles (tmp-*) — a poll landing
-        // between append and the POST response must not wipe them.
-        if (!cancelled && j?.ok && Array.isArray(j.messages)) {
-          setMsgs(prev => [...j.messages, ...prev.filter(m => m.id.startsWith('tmp-'))])
-        }
-      } catch {}
-    }
-    tick()
-    const id = setInterval(tick, CHAT_POLL_MS)
-    return () => { cancelled = true; clearInterval(id) }
-  }, [booking.id])
-
-  const pickFile = () => fileInputRef.current?.click()
-
-  const onFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    e.target.value = ''
-    if (!f) return
-    if (f.size > 8 * 1024 * 1024) {
-      setErr('ფაილი 8 MB-ზე დიდია')
-      return
-    }
-    setUploading(true); setErr(null)
-    try {
-      const form = new FormData()
-      form.append('file', f)
-      form.append('kind', 'attachment')
-      const res = await fetch('/api/uploads', { method: 'POST', body: form })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) {
-        setErr(j?.error === 'TOO_LARGE' ? 'ფაილი დიდია' : j?.error === 'BAD_TYPE' ? 'ფაილის ტიპი დაუშვებელია (PDF/JPG/PNG)' : 'ატვირთვა ვერ მოხერხდა')
-        return
-      }
-      setAttachment({ url: j.url, name: j.fileName ?? f.name, type: f.type, size: f.size })
-    } catch {
-      setErr('ქსელის შეცდომა ატვირთვის დროს')
-    } finally { setUploading(false) }
-  }
-
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault()
-    // Allow send when EITHER text or attachment present.
-    if ((!text.trim() && !attachment) || sending) return
-    setSending(true); setErr(null)
-    try {
-      const body: any = {
-        bookingId: booking.id,
-        body: text.trim() || (attachment ? `📎 ${attachment.name}` : ''),
-      }
-      if (attachment) { body.fileUrl = attachment.url; body.fileName = attachment.name }
-      // TRUE optimistic append — the bubble shows the instant you hit send
-      // (the POST itself takes seconds on the remote-DB dev setup). The temp
-      // row is replaced by the server row on success, rolled back on failure
-      // with the draft restored so nothing the user typed is lost.
-      const tempId = `tmp-${Date.now()}`
-      const sentText = text
-      const sentAttachment = attachment
-      setMsgs(prev => [...prev, {
-        id: tempId,
-        body: body.body,
-        fromId: meId ?? booking.student.id,
-        createdAt: new Date().toISOString(),
-        from: booking.student,
-        fileUrl: sentAttachment?.url ?? null,
-        fileName: sentAttachment?.name ?? null,
-      }])
-      setText(''); setAttachment(null)
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const j = await res.json().catch(() => null)
-      if (!res.ok || !j?.ok) {
-        setMsgs(prev => prev.filter(m => m.id !== tempId))
-        setText(sentText); setAttachment(sentAttachment)
-        setErr(sendErrorText(j?.error, j?.retryInSec))
-        return
-      }
-      setMsgs(prev => prev.map(m => (m.id === tempId ? j.message : m)))
-    } catch { setErr('ქსელის შეცდომა — შეამოწმე კავშირი და სცადე თავიდან.') }
-    finally { setSending(false) }
-  }
-
-  return (
-    <div id="chat" className="rounded-card bg-white border border-ink-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-ink-100 flex items-center justify-between">
-        <div>
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-0.5">შეტყობინებები</div>
-          <h3 className="font-display text-[16px] font-bold text-ink-900 tracking-tight">{tutorName}-სთან ჩატი</h3>
-        </div>
-        <span className="inline-flex items-center gap-1.5 h-5 px-2 rounded-pill bg-brand-50 border border-brand-200 text-brand-700 font-display text-[10px] font-bold uppercase tracking-[0.16em]">
-          <span className="w-1.5 h-1.5 rounded-full bg-success-500" /> ცოცხალი
-        </span>
-      </div>
-
-      <div ref={scrollRef} className="px-4 sm:px-6 py-5 max-h-[420px] overflow-y-auto">
-        {msgs.length === 0 ? (
-          <div className="text-center py-8">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-50 text-brand-700 mb-3">
-              <Icon.chat className="w-5 h-5" />
-            </span>
-            <div className="font-display text-[13.5px] font-semibold text-ink-800">დაიწყე საუბარი {tutorName}-სთან</div>
-            <p className="text-[12.5px] text-ink-500 mt-1 max-w-[340px] mx-auto">
-              აღუწერე შენი საკითხი ან დასვი კითხვა კონსულტაციამდე — რაც უფრო კონკრეტულია, მით უკეთ მოემზადება ექსპერტი.
-            </p>
-          </div>
-        ) : (
-          msgs.map((m, i) => {
-            const mine = m.fromId === meId
-            // Day separator when the calendar date changes — individual bubbles
-            // then only need the time, not a full date-time stamp each.
-            const d = new Date(m.createdAt)
-            const prev = i > 0 ? msgs[i - 1] : null
-            const next = i < msgs.length - 1 ? msgs[i + 1] : null
-            const newDay = !prev || new Date(prev.createdAt).toDateString() !== d.toDateString()
-            // Runs of messages from the same sender within 5 minutes collapse
-            // into one visual group: avatar on the first, timestamp on the last.
-            const GROUP_MS = 5 * 60_000
-            const groupedWithPrev = !newDay && !!prev && prev.fromId === m.fromId &&
-              d.getTime() - new Date(prev.createdAt).getTime() < GROUP_MS
-            const groupedWithNext = !!next && next.fromId === m.fromId &&
-              new Date(next.createdAt).getTime() - d.getTime() < GROUP_MS &&
-              new Date(next.createdAt).toDateString() === d.toDateString()
-            // Defense-in-depth: even though the API now rejects unsafe schemes,
-            // never render an attachment href that isn't a safe scheme (guards
-            // against legacy rows written before the server-side check).
-            const safeFile = safeHttpUrl(m.fileUrl)
-            return (
-              <React.Fragment key={m.id}>
-              {newDay && (
-                <div className={`flex items-center gap-3 py-1 ${i > 0 ? 'mt-4' : ''}`} aria-hidden>
-                  <span className="flex-1 h-px bg-ink-100" />
-                  <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-400">{fmtKaDate(d)}</span>
-                  <span className="flex-1 h-px bg-ink-100" />
-                </div>
-              )}
-              <div className={`flex gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${groupedWithPrev ? 'mt-1' : 'mt-3'}`}>
-                {groupedWithPrev ? (
-                  <span className="w-8 shrink-0" aria-hidden />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-semibold text-sm shrink-0 overflow-hidden">
-                    {m.from.avatarUrl
-                      ? <img src={m.from.avatarUrl} alt="" className="w-full h-full object-cover" />
-                      : m.from.fullName.slice(0, 1)}
-                  </div>
-                )}
-                <div className={`max-w-[85%] sm:max-w-[78%] ${mine ? 'flex flex-col items-end' : ''}`}>
-                  <div className={`px-3.5 py-2.5 rounded-card text-[13.5px] leading-[1.55] whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${mine ? 'bg-brand-500 text-white rounded-tr-sm' : 'bg-ink-50 border border-ink-200 rounded-tl-sm text-ink-900'}`}>
-                    {sanitizeMsgBody(m.body)}
-                    {safeFile && (
-                      <div className={`mt-2 pt-2 border-t ${mine ? 'border-white/25' : 'border-ink-200'}`}>
-                        {safeFile.startsWith('data:image/') ? (
-                          <a href={safeFile} target="_blank" rel="noopener noreferrer" className="block">
-                            <img src={safeFile} alt={m.fileName ?? 'attachment'} className="max-h-[200px] rounded-md object-cover" />
-                            {m.fileName && <div className={`mt-1 text-[11px] ${mine ? 'text-white/85' : 'text-ink-500'} font-mono truncate`}>{m.fileName}</div>}
-                          </a>
-                        ) : (
-                          <a
-                            href={safeFile}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download={m.fileName ?? undefined}
-                            className={`inline-flex items-center gap-2 text-[12.5px] ${mine ? 'text-white hover:text-white' : 'text-brand-700 hover:text-brand-800'} font-display font-semibold underline underline-offset-2 decoration-dotted`}
-                          >
-                            <Icon.download className="w-3.5 h-3.5" />
-                            {m.fileName ?? 'ფაილი'}
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {!groupedWithNext && (
-                    <div className="mt-1 font-mono text-[10px] tabular-nums text-ink-400">
-                      {fmtKaTime(d)}
-                    </div>
-                  )}
-                </div>
-              </div>
-              </React.Fragment>
-            )
-          })
-        )}
-      </div>
-
-      <form onSubmit={send} className="px-6 py-4 border-t border-ink-100 bg-ink-50/40 flex flex-col gap-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/pdf,image/jpeg,image/png,image/webp"
-          onChange={onFileChosen}
-          className="sr-only"
-        />
-        {attachment && (
-          <div className="flex items-center gap-2 rounded-btn border border-ink-200 bg-white px-3 py-2 text-[12.5px]">
-            <Icon.paperclip className="w-3.5 h-3.5 text-ink-500 shrink-0" />
-            <span className="flex-1 truncate font-display font-semibold text-ink-800">{attachment.name}</span>
-            <span className="font-mono text-[10.5px] text-ink-500 tabular-nums shrink-0">{(attachment.size / 1024).toFixed(0)} KB</span>
-            <button type="button" onClick={() => setAttachment(null)} aria-label="ფაილის მოხსნა" className="w-6 h-6 rounded-btn hover:bg-ink-100 text-ink-500 hover:text-danger-600 inline-flex items-center justify-center">
-              <Icon.x className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-        <div className="flex items-end gap-2">
-          <button
-            type="button"
-            onClick={pickFile}
-            disabled={uploading}
-            aria-label="ფაილის მიბმა"
-            title="ფაილის მიბმა (PDF/JPG/PNG · max 8 MB)"
-            className="h-11 w-11 rounded-btn border border-ink-200 bg-white hover:border-ink-300 disabled:opacity-50 text-ink-600 hover:text-ink-900 inline-flex items-center justify-center transition-colors shrink-0"
-          >
-            {uploading ? (
-              <span className="inline-block w-4 h-4 border-2 border-ink-500 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Icon.paperclip className="w-4 h-4" />
-            )}
-          </button>
-          <textarea
-            value={text}
-            maxLength={MSG_MAX_LEN}
-            onChange={e => {
-              setText(e.target.value)
-              // Autosize: grow with content up to ~5 lines, then scroll inside.
-              const el = e.currentTarget
-              el.style.height = 'auto'
-              el.style.height = `${Math.min(el.scrollHeight, 132)}px`
-            }}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e as any); (e.currentTarget as HTMLTextAreaElement).style.height = 'auto' } }}
-            rows={1}
-            placeholder={attachment ? 'დაწერე შეტყობინება ან უბრალოდ გააგზავნე ფაილი…' : 'მიუწერე შეტყობინება…'}
-            className="flex-1 min-h-[44px] max-h-[132px] px-3 py-2.5 rounded-btn border border-ink-200 bg-white text-[13.5px] resize-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none"
-          />
-          <button type="submit" aria-label="გაგზავნა" disabled={sending || uploading || (!text.trim() && !attachment)} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors shrink-0">
-            {sending ? '…' : (<><Icon.send className="w-4 h-4" /><span className="hidden sm:inline">გაგზავნა</span></>)}
-          </button>
-        </div>
-        {text.length > MSG_MAX_LEN - 200 && (
-          <div className={`text-right font-mono text-[10.5px] tabular-nums ${text.length >= MSG_MAX_LEN ? 'text-danger-600' : 'text-ink-400'}`}>
-            {text.length} / {MSG_MAX_LEN}
-          </div>
-        )}
-      </form>
-      {err && <div className="px-6 pb-3 text-[12px] text-danger-600">{err}</div>}
-    </div>
-  )
-}
 
 /* ───── Reschedule modal — POST /api/bookings/[id]/reschedule ───── */
 const RescheduleModal = ({ open, onClose, onSent, booking }: { open: boolean; onClose: () => void; onSent: () => void; booking: Booking }) => {
@@ -714,31 +445,20 @@ const RescheduleModal = ({ open, onClose, onSent, booking }: { open: boolean; on
         <>
           <button type="button" onClick={onClose} className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800">გაუქმება</button>
           <button type="button" onClick={send} disabled={sending} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 disabled:opacity-60">
-            {sending ? 'იგზავნება…' : <>მოთხოვნის გაგზავნა <Icon.arrow className="w-3.5 h-3.5" /></>}
+            {sending ? 'იგზავნება…' : 'მოთხოვნის გაგზავნა'}
           </button>
         </>
       }
     >
       <div className="space-y-4">
           <div className="text-[12px] text-ink-500">ამჟამინდელი: <span className="font-display font-semibold text-ink-900">{fmtDate(new Date(booking.startAt))} · {fmtTime(new Date(booking.startAt))} · {booking.tutor.user.fullName}</span></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">თარიღი</label>
-              <input type="date" value={dateStr} min={new Date().toISOString().slice(0, 10)} onChange={e => setDateStr(e.target.value)}
-                     className="w-full h-11 px-3 rounded-field border border-ink-200 text-[13.5px] focus:border-brand-500 focus:outline-none tabular-nums" />
-            </div>
-            <div>
-              <label className="block font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">დრო</label>
-              <input type="time" value={timeStr} onChange={e => setTimeStr(e.target.value)}
-                     className="w-full h-11 px-3 rounded-field border border-ink-200 text-[13.5px] focus:border-brand-500 focus:outline-none tabular-nums" />
-            </div>
-          </div>
+          <RescheduleTimePicker tutorId={booking.tutor.id} durationMin={booking.durationMin} dateStr={dateStr} timeStr={timeStr} onDate={setDateStr} onTime={setTimeStr} />
           <div>
-            <label className="block font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">დამატებით <span className="text-ink-400 font-normal normal-case tracking-normal">— სურვილისამებრ</span></label>
+            <Eyebrow as="label" tone="muted" className="block mb-2">დამატებით <span className="text-ink-400 font-normal normal-case tracking-normal">— სურვილისამებრ</span></Eyebrow>
             <textarea value={note} onChange={e => setNote(e.target.value.slice(0, 600))} rows={3} placeholder="მიზეზი, დამატებითი კონტექსტი..."
                       className="w-full p-3 rounded-field border border-ink-200 text-[13px] focus:border-brand-500 focus:outline-none resize-none leading-relaxed" />
           </div>
-          <p className="text-[11.5px] text-ink-500 leading-snug">მოთხოვნა გაიგზავნება ჩატში. ექსპერტის დადასტურების შემდეგ დრო შეიცვლება.</p>
+          <p className="text-[11.5px] text-ink-500 leading-snug">მოთხოვნა გაიგზავნება მიმოწერაში. ექსპერტის დადასტურების შემდეგ დრო შეიცვლება.</p>
           {err && <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12px] font-medium">{err}</div>}
       </div>
     </Sheet>
@@ -763,9 +483,9 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
     { id: 'no-show',        l: 'ექსპერტი არ მოვიდა',        sub: PAYMENTS_LIVE ? '100% დაბრუნება' : 'პრიორიტეტული განხილვა' },
     { id: 'quality',        l: 'დაბალი ხარისხი',           sub: 'ცოდნა/მომზადება' },
     { id: 'wrong-topic',    l: 'არასწორი თემა',            sub: 'სხვა რაზე ვისაუბრეთ' },
-    { id: 'unprofessional', l: 'არაპროფესიული ქცევა',      sub: 'უპატივცემლობა · დაგვიანება' },
+    { id: 'unprofessional', l: 'არაპროფესიული ქცევა',      sub: 'უპატივცემულობა · დაგვიანება' },
     { id: 'tech',           l: 'ტექნიკური პრობლემა',        sub: 'ვიდეო/აუდიო არ მუშაობდა' },
-    { id: 'other',          l: 'სხვა',                     sub: 'ჩამეწერა თავად' },
+    { id: 'other',          l: 'სხვა',                     sub: 'თავად ჩავწერ' },
   ]
 
   const send = async () => {
@@ -824,7 +544,7 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
     >
       <div className="space-y-5">
           <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">მთავარი მიზეზი</div>
+            <Eyebrow tone="muted" className="mb-2">მთავარი მიზეზი</Eyebrow>
             <div className="grid sm:grid-cols-2 gap-1.5">
               {REASONS.map(r => {
                 const on = reason === r.id
@@ -840,7 +560,7 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
 
           {reason && (
             <div>
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">დეტალურად <span className="text-ink-400 font-normal normal-case tracking-normal">— სურვილისამებრ</span></div>
+              <Eyebrow tone="muted" className="mb-2">დეტალურად <span className="text-ink-400 font-normal normal-case tracking-normal">— სურვილისამებრ</span></Eyebrow>
               <textarea value={story} onChange={e => setStory(e.target.value.slice(0, 1000))} rows={4} placeholder="რა მოხდა, რა იყო მოლოდინი, რა მიიღე..." className="w-full p-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:outline-none text-[13px] resize-none leading-relaxed" />
               <p className="mt-1 text-[11px] text-ink-500 text-right tabular-nums">{story.length} / 1000</p>
             </div>
@@ -928,9 +648,9 @@ const NoShowReport = ({ bookingId }: { bookingId: string }) => {
             თუ ექსპერტი სესიაზე არ გამოცხადდა, გვაცნობე — გუნდი განიხილავს და უფასოდ დაგეხმარებით შემცვლელი ექსპერტის ან ახალი დროის შერჩევაში.
           </p>
           <div>
-            <label className="block font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2">
+            <Eyebrow as="label" tone="muted" className="block mb-2">
               დეტალები <span className="text-ink-400 font-normal normal-case tracking-normal">— სურვილისამებრ</span>
-            </label>
+            </Eyebrow>
             <textarea
               value={details}
               onChange={e => setDetails(e.target.value.slice(0, 1000))}
@@ -969,7 +689,7 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
 
   const submit = async () => {
     if (submitting || rating === 0) return
-    if (body.trim().length < 3) { toast('რეცენზია მინიმუმ 3 სიმბოლო უნდა იყოს', 'error'); return }
+    if (body.trim().length < 3) { toast('შეფასება მინიმუმ 3 სიმბოლო უნდა იყოს', 'error'); return }
     setSubmitting(true)
     try {
       const res = await fetch('/api/reviews', {
@@ -982,6 +702,7 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
         toast(
           j?.error === 'WINDOW_CLOSED' ? 'შეფასების ვადა ამოიწურა' :
           j?.error === 'NOT_COMPLETED' ? 'სესია ჯერ არ დასრულებულა' :
+          j?.error === 'AUTO_COMPLETED' ? 'ეს სესია ავტომატურად დაიხურა — შეფასება მხოლოდ ხელით დადასტურებულ სესიებზეა შესაძლებელი' :
           'შენახვა ვერ მოხერხდა',
           'error',
         )
@@ -996,7 +717,7 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
   }
 
   return (
-    <section id="leave-review" className="max-w-[1280px] mx-auto px-6 lg:px-8 mt-4 scroll-mt-24">
+    <Container as="section" id="leave-review" className="mt-4 scroll-mt-24">
       <div className="rounded-card border border-brand-200 bg-brand-50/50 p-5 lg:p-6">
         {existing && !editing ? (
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -1022,7 +743,7 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
           </div>
         ) : (
           <>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-1">დატოვე შეფასება</div>
+            <Eyebrow className="mb-1">დატოვე შეფასება</Eyebrow>
             <h3 className="font-display text-[17px] font-bold text-ink-900 tracking-tight">როგორი იყო სესია {booking.tutor.user.fullName.split(' ')[0]}-სთან?</h3>
             {/* Outcome-inviting hint (2.5): nudge toward concrete results — no new DB fields,
                 the outcome lives in the same body text. */}
@@ -1049,7 +770,7 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
               className="mt-3 w-full px-3.5 py-2.5 rounded-field border border-ink-200 bg-white text-[13.5px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none resize-none leading-relaxed"
             />
             <div className="mt-1 flex items-center justify-between">
-              <span className="text-[11px] text-ink-500">30 დღიანი ვადა შენახვისთვის</span>
+              <span className="text-[11px] text-ink-500">30-დღიანი ვადა შენახვისთვის</span>
               <span className="font-mono text-[10.5px] tabular-nums text-ink-400">{body.length} / 2000</span>
             </div>
             <label className="mt-3 flex items-start gap-2.5 cursor-pointer select-none">
@@ -1086,7 +807,7 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
           </>
         )}
       </div>
-    </section>
+    </Container>
   )
 }
 
@@ -1126,7 +847,7 @@ const RescheduleBanner = ({
   }
 
   return (
-    <section className="max-w-[1280px] mx-auto px-6 lg:px-8 mt-4">
+    <Container as="section" className="mt-4">
       <div className="rounded-card border border-warning-200 bg-warning-50 p-5 flex items-start gap-4 flex-wrap">
         <div className="min-w-0 flex-1">
           <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-warning-800 mb-1">
@@ -1135,7 +856,7 @@ const RescheduleBanner = ({
           <div className="font-display text-[14.5px] font-bold text-ink-900">
             ახალი დრო: {fmtKaDateTime(proposedTime, { month: 'long', weekday: true })}
           </div>
-          {req.reason && <p className="mt-1 text-[13px] text-ink-700 leading-[1.5] whitespace-pre-wrap">„{req.reason}"</p>}
+          {req.reason && <p className="mt-1 text-[13px] text-ink-700 leading-[1.5] whitespace-pre-wrap">„{req.reason}“</p>}
           {iProposed && (
             <p className="mt-1 text-[12px] text-ink-500">ველოდებით მეორე მხარის დადასტურებას.</p>
           )}
@@ -1161,7 +882,7 @@ const RescheduleBanner = ({
           </div>
         )}
       </div>
-    </section>
+    </Container>
   )
 }
 
@@ -1188,7 +909,7 @@ const BookingBody = ({
   const canReschedule = (status === 'PREPARING' || status === 'CONFIRMED') && !booking.rescheduleRequest
 
   return (
-    <section className="max-w-[1280px] mx-auto px-6 lg:px-8 mt-6 grid lg:grid-cols-[1fr_360px] gap-6 pb-28 lg:pb-12">
+    <Container as="section" className="mt-6 grid lg:grid-cols-[1fr_360px] gap-6 pb-28 lg:pb-12">
       {/* On mobile the action rail comes FIRST — cancel/reschedule/receipt
           are why people open this page; burying them under the whole chat
           thread made them near-undiscoverable at 390px. Desktop keeps
@@ -1197,7 +918,7 @@ const BookingBody = ({
       <div className="space-y-4 min-w-0 order-2 lg:order-1">
         {/* Topic + notes */}
         <div className="rounded-card bg-white border border-ink-200 p-6">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-2">თემა და მიზანი</div>
+          <Eyebrow tone="muted" className="mb-2">თემა და მიზანი</Eyebrow>
           <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight mb-3">{booking.topic}</h2>
           {booking.studentNotes ? (
             <p className="text-[13.5px] text-ink-700 leading-[1.6] whitespace-pre-wrap">{booking.studentNotes}</p>
@@ -1210,7 +931,7 @@ const BookingBody = ({
             filled in `tutorNotes` after marking the session complete. */}
         {status === 'COMPLETED' && booking.tutorNotes && (
           <div className="rounded-card bg-brand-50/40 border border-brand-200 p-6">
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">ექსპერტისგან</div>
+            <Eyebrow className="mb-2">ექსპერტისგან</Eyebrow>
             <blockquote className="border-l-2 border-brand-300 pl-3 text-[13.5px] text-ink-800 leading-[1.6] whitespace-pre-wrap italic">
               {booking.tutorNotes}
             </blockquote>
@@ -1219,22 +940,41 @@ const BookingBody = ({
 
         {/* Status timeline */}
         <div className="rounded-card bg-white border border-ink-200 p-6">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-3">ისტორია</div>
+          <Eyebrow tone="muted" className="mb-3">ისტორია</Eyebrow>
           <StatusTimeline booking={booking} />
         </div>
 
-        {/* Chat */}
-        <BookingMessages booking={booking} meId={meId} />
+        {/* Chat — the SHARED component, so the booking page and the messages
+            center render the exact same thread (bubbles, composer, instant
+            video-call). #chat is a public anchor: DB notification hrefs and
+            inbox deep-links point here forever. */}
+        <div id="chat" className="scroll-mt-24">
+          <BookingChat
+            bookingId={booking.id}
+            me={booking.student}
+            counterparty={booking.tutor?.user ?? null}
+            variant="embedded"
+            initialMessages={booking.messages}
+            onActivity={onRefresh}
+            header={
+              <div className="px-5 sm:px-6 py-4 border-b border-ink-100">
+                <Eyebrow className="mb-0.5">შეტყობინებები</Eyebrow>
+                <h3 className="font-display text-[16px] font-bold text-ink-900 tracking-tight">{booking.tutor?.user?.fullName ?? 'ექსპერტი'}-სთან მიმოწერა</h3>
+              </div>
+            }
+            emptyState={{ title: 'დაიწყე საუბარი', body: 'მიწერე ექსპერტს კითხვა ან დააზუსტე დეტალები კონსულტაციამდე — სწრაფი, კონკრეტული შეტყობინება უკეთეს პასუხს იძლევა.' }}
+          />
+        </div>
       </div>
 
       {/* Right — actions + receipt */}
       <aside className="space-y-4 order-1 lg:order-2">
         <div className="rounded-card bg-white border border-ink-200 p-5">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-3">სწრაფი მოქმედებები</div>
+          <Eyebrow tone="muted" className="mb-3">სწრაფი მოქმედებები</Eyebrow>
           <div className="space-y-2">
             <a href="#chat" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
               <Icon.chat className="w-4 h-4 text-ink-500" />
-              <span className="flex-1">ჩატი {booking.tutor.user.fullName.split(' ')[0]}-სთან</span>
+              <span className="flex-1">მიმოწერა {booking.tutor.user.fullName.split(' ')[0]}-სთან</span>
               {booking.messages.length > 0 && <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-ink-100 text-ink-600 font-display text-[10px] font-bold tabular-nums">{booking.messages.length}</span>}
             </a>
 
@@ -1305,7 +1045,7 @@ const BookingBody = ({
 
         {/* Receipt */}
         <div className="rounded-card bg-white border border-ink-200 p-5">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-3">ანგარიში</div>
+          <Eyebrow tone="muted" className="mb-3">ანგარიში</Eyebrow>
           <div className="space-y-1.5 text-[12.5px] mb-4">
             <div className="flex justify-between">
               <span className="text-ink-600">{booking.topic}</span>
@@ -1350,7 +1090,7 @@ const BookingBody = ({
           </div>
         </div>
       </aside>
-    </section>
+    </Container>
   )
 }
 
@@ -1443,7 +1183,7 @@ const MobileActionBar = ({ booking, onReschedule, onCancel }: { booking: Booking
 
   return (
     <div
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-[65] bg-white/95 backdrop-blur-md border-t border-ink-200 shadow-[0_-4px_20px_rgba(46,42,33,0.06)]"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-[65] bg-white border-t border-ink-200 shadow-[0_-4px_20px_rgba(46,42,33,0.06)]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="px-4 py-3 flex items-center gap-2.5">
@@ -1487,10 +1227,16 @@ const MobileActionBar = ({ booking, onReschedule, onCancel }: { booking: Booking
 }
 
 /* ───── Page ───── */
+// Last-seen booking per id, cached at module scope (stale-while-revalidate, the
+// same pattern as lib/me.ts). `/api/bookings/[id]` is the slowest endpoint
+// (heavy DB), so re-opening a booking you already viewed renders instantly from
+// cache while a fresh copy loads in the background — no more spinner wait.
+const bookingCache = new Map<string, Booking>()
+
 export default function BookingDetail() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
-  const [booking, setBooking] = useState<Booking | null>(null)
+  const [booking, setBooking] = useState<Booking | null>(() => (params?.id ? bookingCache.get(params.id) ?? null : null))
   const [meId, setMeId] = useState<string | null>(null)
   // Header identity for the shared StudentAppBar (avatar + user menu).
   const [me, setMe] = useState<{ name: string; avatar?: string | null } | null>(null)
@@ -1524,6 +1270,7 @@ export default function BookingDetail() {
       if (!bRes.ok) return
       const b = await bRes.json()
       if (seq !== loadSeqRef.current) return
+      bookingCache.set(idAtCall, b)
       setBooking(b)
     } catch {}
   }
@@ -1536,7 +1283,13 @@ export default function BookingDetail() {
     router.refresh()
   }
 
-  useEffect(() => { load() }, [params?.id])
+  useEffect(() => {
+    // On id change, swap to the new booking's cached copy instantly (or clear
+    // to the loading state) so B never flashes A's content, then revalidate.
+    if (params?.id) { setBooking(bookingCache.get(params.id) ?? null); setNotFound(false) }
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params?.id])
 
   // ?review=1 (from session-row CTA) scrolls to the inline review card — the
   // one and only review surface; the old duplicate ReviewModal is gone.
@@ -1597,17 +1350,14 @@ export default function BookingDetail() {
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-ink-50 flex flex-col">
-        <StudentAppBar user={me ?? undefined} />
-        <div className="flex-1 flex items-center justify-center px-6 py-16">
+      <div className="flex-1 flex items-center justify-center px-6 py-16">
           <div className="max-w-[480px] w-full text-center">
             <h1 className="font-display text-[22px] font-bold text-ink-900">ჯავშანი ვერ მოიძებნა</h1>
-            <p className="text-[13.5px] text-ink-500 mt-2">შესაძლოა წაიშალა, ან თქვენ არ ხართ მისი მონაწილე.</p>
+            <p className="text-[13.5px] text-ink-500 mt-2">შესაძლოა წაიშალა, ან შენ არ ხარ მისი მონაწილე.</p>
             <Link href="/student/bookings" className="mt-6 inline-flex h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] items-center gap-2">
               ჩემი ჯავშნები
             </Link>
           </div>
-        </div>
       </div>
     )
   }
@@ -1626,8 +1376,7 @@ export default function BookingDetail() {
   const hoursToStart = (new Date(booking.startAt).getTime() - Date.now()) / 3_600_000
 
   return (
-    <div className="font-sans bg-ink-50/50 text-ink-900 antialiased min-h-screen">
-      <StudentAppBar user={me ?? undefined} />
+    <>
       <Breadcrumb status={booking.status} ref={booking.ref} />
       <Hero booking={booking} onEnterRoom={enterRoom} onCopyRef={copyRef} />
       {/* Inline review card — highest signal CTA post-session. Auto-collapses to
@@ -1662,8 +1411,6 @@ export default function BookingDetail() {
         onReschedule={() => setRescheduleOpen(true)}
         onCancel={cancelBooking}
       />
-
-      <WorkspaceFooter />
 
       <RescheduleModal
         open={rescheduleOpen}
@@ -1704,6 +1451,6 @@ export default function BookingDetail() {
         onCancel={() => setCancelConfirmOpen(false)}
         busy={cancelBusy}
       />
-    </div>
+    </>
   )
 }

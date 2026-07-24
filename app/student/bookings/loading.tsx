@@ -3,19 +3,20 @@
 // (same pattern/density as app/student/messages/loading.tsx).
 import Link from 'next/link'
 import { Skeleton } from '@/components/Skeleton'
+import { Container } from '@/components/Container'
 
 export default function Loading() {
   return (
     <div className="font-sans bg-ink-50/40 min-h-screen">
-      <header className="sticky top-0 z-40 bg-ink-50/90 backdrop-blur-md border-b border-ink-100">
-        <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-ink-50 lg:bg-ink-50/90 lg:backdrop-blur-md border-b border-ink-100">
+        <Container className="h-16 flex items-center justify-between">
           <Link href="/student" className="inline-flex items-center" aria-label="მცოდნე">
             <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain select-none" draggable={false} />
           </Link>
-        </div>
+        </Container>
       </header>
 
-      <main className="max-w-[1280px] mx-auto px-6 sm:px-8 py-8 lg:py-10" aria-busy="true">
+      <Container as="main" className="py-8 lg:py-10" aria-busy="true">
         <div className="mb-8 space-y-2">
           <Skeleton.Line width={12} className="h-2.5" />
           <Skeleton.Line width={30} className="h-6" />
@@ -41,7 +42,7 @@ export default function Loading() {
             </div>
           ))}
         </div>
-      </main>
+      </Container>
     </div>
   )
 }

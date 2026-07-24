@@ -10,6 +10,7 @@ export async function GET(req: Request) {
   const rawRole = searchParams.get('role')
   const role = rawRole === 'STUDENT' || rawRole === 'TUTOR' || rawRole === 'ADMIN' ? rawRole : null
   const limit = Math.min(Number(searchParams.get('limit') ?? 50), 200)
+  const cursor = searchParams.get('cursor')?.trim() || undefined
 
   const where: any = {}
   if (role) where.role = role
@@ -20,9 +21,12 @@ export async function GET(req: Request) {
     ]
   }
 
-  const users = await prisma.user.findMany({
+  // Cursor pagination (mirror of the bookings route): fetch one extra row to
+  // detect "has more", then hand back the last id as the next cursor.
+  const rows = await prisma.user.findMany({
     where,
-    take: limit,
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     orderBy: { createdAt: 'desc' },
     select: {
       id: true, email: true, fullName: true, role: true, emailVerified: true,
@@ -31,5 +35,7 @@ export async function GET(req: Request) {
     },
   })
 
-  return NextResponse.json(users)
+  const hasMore = rows.length > limit
+  const items = hasMore ? rows.slice(0, limit) : rows
+  return NextResponse.json({ items, nextCursor: hasMore ? items[items.length - 1].id : null })
 }

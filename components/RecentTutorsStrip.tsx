@@ -1,6 +1,8 @@
 'use client'
 import React, { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { Eyebrow } from '@/components/Eyebrow'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 
 // Client-side "Recently viewed tutors" cache. localStorage-only, no backend.
 // Kept as a stand-alone component so app/tutors, app/tutors/[id], and
@@ -104,12 +106,12 @@ export function RecentTutorsStrip({ className = '' }: { className?: string }) {
       className={`w-full ${className}`}
     >
       <div className="flex items-center gap-2 mb-2">
-        <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-ink-500">
+        <Eyebrow as="span" tone="muted">
           ბოლოს ნახე
-        </span>
+        </Eyebrow>
         <span className="h-px flex-1 bg-ink-100" aria-hidden="true" />
       </div>
-      <ul className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1 motion-safe:scroll-smooth">
+      <ul className="flex gap-2 overflow-x-auto scrollbar-hide rail-fade-end -mx-1 px-1 pb-1 motion-safe:scroll-smooth">
         {items.map(t => (
           <li key={t.id} className="shrink-0">
             <div className="group relative inline-flex items-center gap-2 h-11 pl-1.5 pr-8 rounded-pill border border-ink-200 bg-white hover:border-ink-300 hover:shadow-xs transition-all">
@@ -119,14 +121,8 @@ export function RecentTutorsStrip({ className = '' }: { className?: string }) {
                 title={t.name}
               >
                 <span className="w-7 h-7 rounded-full overflow-hidden bg-brand-100 text-brand-700 inline-flex items-center justify-center shrink-0">
-                  {t.avatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={t.avatar} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="font-display text-[11px] font-bold">
-                      {t.name.slice(0, 1)}
-                    </span>
-                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={t.avatar || DEFAULT_AVATAR} alt="" className="w-full h-full object-cover" />
                 </span>
                 <span className="font-display text-[12.5px] font-semibold text-ink-800 whitespace-nowrap">
                   {truncate(t.name, 14)}

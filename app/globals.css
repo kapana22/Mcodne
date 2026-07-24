@@ -73,7 +73,7 @@ body {
 
 /* Warm text-selection color — no default cold blue. */
 ::selection {
-  background-color: #159A8226; /* brand-500 @ ~15% */
+  background-color: #2F9C8626; /* brand-500 @ ~15% */
   color: #2E2A21;
 }
 
@@ -144,7 +144,7 @@ a:focus-visible,
 button:focus-visible,
 [role="button"]:focus-visible,
 summary:focus-visible {
-  outline: 2px solid #159A82; /* brand-500 (tone B) */
+  outline: 2px solid #2F9C86; /* brand-500 (tone B) */
   outline-offset: 2px;
 }
 
@@ -352,7 +352,7 @@ summary:focus-visible {
   input[type="time"]:focus,
   textarea:focus,
   select:focus {
-    box-shadow: 0 0 0 4px rgba(21,154,130, 0.12);
+    box-shadow: 0 0 0 4px rgba(47,156,134, 0.12);
   }
 
   /* Checkbox tick — a native <input type="checkbox"> can't animate its
@@ -360,7 +360,7 @@ summary:focus-visible {
      when it flips to :checked. Applies globally. */
   input[type="checkbox"],
   input[type="radio"] {
-    accent-color: #159A82;
+    accent-color: #2F9C86;
     transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
   }
   input[type="checkbox"]:active,
@@ -439,7 +439,7 @@ summary:focus-visible {
  * color (not motion), so they live outside the motion-safe block; the
  * aurora drift classes above add movement only when motion is allowed. */
 .glow-brand {
-  background: radial-gradient(closest-side, rgba(21, 154, 130, 0.13), rgba(21, 154, 130, 0));
+  background: radial-gradient(closest-side, rgba(47, 156, 134, 0.13), rgba(47, 156, 134, 0));
 }
 .glow-info {
   background: radial-gradient(closest-side, rgba(37, 99, 235, 0.09), rgba(37, 99, 235, 0));
@@ -607,3 +607,57 @@ h1, h2, h3, h4 {
     bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* ── Dual-handle price range slider (app/tutors price filter) ──────────────
+ * Native <input type=range> thumbs can't be styled with Tailwind. The track is
+ * transparent (the visible track + filled segment are drawn by wrapping divs);
+ * only the thumb is styled here. Two inputs overlay each other, so the input
+ * itself is pointer-events:none and only the thumb is pointer-events:auto —
+ * that keeps BOTH handles independently draggable. Brand green #2F9C86.
+ */
+.range-thumb { -webkit-appearance: none; appearance: none; background: transparent; pointer-events: none; }
+.range-thumb::-webkit-slider-runnable-track { background: transparent; border: none; }
+.range-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; border-radius: 9999px;
+  background: #2F9C86; border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(46, 42, 33, 0.28);
+  cursor: grab; pointer-events: auto;
+}
+.range-thumb::-webkit-slider-thumb:active { cursor: grabbing; }
+.range-thumb::-moz-range-track { background: transparent; border: none; }
+.range-thumb::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 9999px;
+  background: #2F9C86; border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(46, 42, 33, 0.28);
+  cursor: grab; pointer-events: auto;
+}
+.range-thumb::-moz-range-thumb:active { cursor: grabbing; }
+.range-thumb:focus-visible::-webkit-slider-thumb { outline: 2px solid #2F9C86; outline-offset: 2px; }
+.range-thumb:focus-visible::-moz-range-thumb { outline: 2px solid #2F9C86; outline-offset: 2px; }
+
+/* Rendered Markdown (blog posts + admin preview). Scoped so it never leaks into
+   app UI. Mirrors the brand: ink text, green links, calm rhythm. */
+.prose-post > :first-child { margin-top: 0; }
+.prose-post p { margin: 0 0 1.1em; }
+.prose-post h1, .prose-post h2, .prose-post h3 {
+  font-family: var(--font-display, inherit);
+  font-weight: 800; color: #1c1a17; letter-spacing: -0.01em;
+  line-height: 1.25; margin: 1.6em 0 0.6em;
+}
+.prose-post h1 { font-size: 1.6em; }
+.prose-post h2 { font-size: 1.35em; }
+.prose-post h3 { font-size: 1.15em; }
+.prose-post ul, .prose-post ol { margin: 0 0 1.1em; padding-left: 1.4em; }
+.prose-post ul { list-style: disc; }
+.prose-post ol { list-style: decimal; }
+.prose-post li { margin: 0.35em 0; }
+.prose-post a { color: #2F9C86; text-decoration: underline; }
+.prose-post a:hover { color: #237a68; }
+.prose-post strong { font-weight: 700; color: #1c1a17; }
+.prose-post blockquote {
+  margin: 1.2em 0; padding: 0.4em 1.1em; border-left: 3px solid #2F9C86;
+  color: #57534e; font-style: italic;
+}
+.prose-post hr { margin: 2em 0; border: none; border-top: 1px solid #e6e4e0; }
+.prose-post code { font-size: 0.92em; }

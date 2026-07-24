@@ -62,12 +62,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     : booking.studentId === user.id ? 'STUDENT'
     : 'TUTOR'
 
+  // A tutor- or admin-initiated cancel is NOT the client's fault → the client is
+  // refunded in full regardless of how close to start time it is. Only a
+  // student's own cancel is bound by the time-based cutoff.
+  const refundClient = cancelledBy !== 'STUDENT' || fullRefund
+
   await prisma.$transaction(async tx => {
     await tx.booking.update({
       where: { id },
       data: {
         status: 'CANCELED',
-        payoutStatus: fullRefund ? 'REFUNDED' : 'PENDING',
+        payoutStatus: refundClient ? 'REFUNDED' : 'PENDING',
         cancelledBy,
         // Clear any pending reschedule proposal so an accept can't resurrect
         // this now-canceled booking (raw column — not in the Prisma model).
@@ -123,5 +128,5 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     })
   }
 
-  return NextResponse.json({ ok: true, fullRefund })
+  return NextResponse.json({ ok: true, fullRefund: refundClient })
 }

@@ -1,22 +1,20 @@
 import { requireUser } from '@/lib/auth'
 import { ProfileClient } from './client'
-import { StudentAppBar } from '@/components/StudentAppBar'
-import { WorkspaceFooter } from '@/components/WorkspaceFooter'
+import { Container } from '@/components/Container'
+import { PageHeader } from '@/components/PageHeader'
 
 export const dynamic = 'force-dynamic'
 
 export default async function StudentProfilePage() {
   const user = await requireUser()
   return (
-    <div className="font-sans bg-ink-50/40 min-h-screen flex flex-col">
-      <StudentAppBar user={{ name: user.fullName, avatar: user.avatarUrl }} />
-
-      <main className="w-full max-w-[820px] mx-auto px-6 sm:px-8 py-8 lg:py-10 flex-1">
-        <div className="mb-8">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">პროფილი</div>
-          <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight">ჩემი პროფილი</h1>
-          <p className="text-[13.5px] text-ink-600 mt-1.5">შეცვალე შენი ინფორმაცია, ავატარი და პაროლი.</p>
-        </div>
+    <Container as="main" size="content" className="w-full py-8 lg:py-10 flex-1">
+        <PageHeader
+          className="mb-8"
+          eyebrow="პროფილი"
+          title="ჩემი პროფილი"
+          sub="შეცვალე შენი ინფორმაცია, ავატარი და პაროლი."
+        />
 
         <ProfileClient
           initialName={user.fullName}
@@ -26,9 +24,6 @@ export default async function StudentProfilePage() {
           initialAvatar={user.avatarUrl}
           role={user.role}
         />
-      </main>
-
-      <WorkspaceFooter />
-    </div>
+    </Container>
   )
 }

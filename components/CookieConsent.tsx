@@ -9,6 +9,7 @@
 // Mounted at layout level. See app/layout.tsx.
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 
 const STORAGE_KEY = 'mcodne:cookie-consent'
@@ -35,17 +36,24 @@ export function CookieConsent() {
   // Without it we'd hydrate a banner state that mismatches the server output.
   const [mounted, setMounted] = useState(false)
   const [visible, setVisible] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     setMounted(true)
     if (readStored() === null) setVisible(true)
   }, [])
 
+  // The consent banner is for public visitors — it's noise inside the admin
+  // panel (the site owner's own tooling), so never render it there.
+  if (pathname?.startsWith('/admin')) return null
   if (!mounted || !visible) return null
 
   const decide = (choice: Decision) => {
     writeStored(choice)
     setVisible(false)
+    // Let listeners (Analytics) react immediately — GA starts on 'accepted'
+    // without waiting for the next full page load.
+    try { window.dispatchEvent(new CustomEvent('mcodne:consent', { detail: choice })) } catch { /* ignore */ }
   }
 
   return (
@@ -54,11 +62,11 @@ export function CookieConsent() {
       aria-label="Cookie consent"
       className="fixed bottom-3 left-3 right-3 sm:left-4 sm:right-auto sm:bottom-4 sm:max-w-md z-[60] motion-safe:animate-[fadeIn_220ms_ease-out]"
     >
-      <div className="rounded-card border border-warning-200 bg-warning-50 shadow-pop p-4 sm:p-4">
+      <div className="rounded-card border border-ink-200 bg-white shadow-pop p-4 sm:p-4">
         <p className="text-[12.5px] leading-[1.55] text-ink-800">
-          ვიყენებთ cookie-ებს პლატფორმის მუშაობისთვის.{' '}
+          ვიყენებთ ქუქიებს პლატფორმის მუშაობისთვის.{' '}
           <Link href="/cookies" className="font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 decoration-brand-300">
-            წესები
+            ქუქიების პოლიტიკა
           </Link>
         </p>
         <div className="mt-3 flex items-center gap-2 justify-end flex-wrap">

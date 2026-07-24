@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Icon } from '@/components/Icon'
 import { Logo } from '@/components/Logo'
+import { Eyebrow } from '@/components/Eyebrow'
 import { WORKSPACE_NAV, CATALOG_LINK, type NavItem } from './navConfig'
 import type { NavBadges } from './useNavBadges'
 
@@ -47,9 +48,9 @@ export function WorkspaceSidebar({ badges }: { badges: NavBadges }) {
   return (
     <aside className="hidden lg:flex flex-col w-[240px] shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-ink-100 bg-white px-4 py-5">
       <div className="px-3">
-        <Logo size="sm" href="/tutor" />
+        <Logo size="sm" />
         <div className="mt-2 flex items-center gap-1.5">
-          <span className="font-display text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-400">ექსპერტი</span>
+          <Eyebrow as="span" tone="muted">ექსპერტი</Eyebrow>
           <span className="text-ink-300">/</span>
           <span className="font-display text-[10px] font-bold text-ink-700 uppercase tracking-[0.1em]">სამუშაო სივრცე</span>
         </div>
@@ -73,9 +74,9 @@ export function WorkspaceSidebar({ badges }: { badges: NavBadges }) {
           className="mt-4 block rounded-card border border-brand-200 bg-brand-50/40 p-3.5 hover:bg-brand-50/70 transition-colors duration-fast"
         >
           <div className="flex items-baseline justify-between gap-2">
-            <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-brand-700">
+            <Eyebrow as="span">
               პროფილის სისრულე
-            </span>
+            </Eyebrow>
             <span className="font-display text-[13px] font-bold text-brand-700 tabular-nums">{percent}%</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-pill bg-white border border-brand-100 overflow-hidden">

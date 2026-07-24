@@ -5,6 +5,8 @@ import { homeForRole, safeInternalPath } from '@/lib/roleHome'
 import { Icon } from '@/components/Icon'
 import { Logo } from '@/components/Logo'
 import { VerifiedMark } from '@/components/Avatar'
+import { Container } from '@/components/Container'
+import { Eyebrow } from '@/components/Eyebrow'
 
 type View = 'signin' | 'signup' | 'verify' | 'reset' | 'onboarding'
 
@@ -133,12 +135,6 @@ const GoogleMark = () => (
   </svg>
 )
 
-const AppleMark = () => (
-  <svg aria-hidden viewBox="0 0 24 24" className="w-4 h-4 text-ink-900" fill="currentColor">
-    <path d="M16.4 12.8c0-2.4 2-3.6 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.6.9-.8 0-1.9-.9-3.1-.8-1.6 0-3 .9-3.8 2.4-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.4 1.2 0 1.6-.7 3-.7 1.4 0 1.8.7 3.1.7 1.3 0 2.1-1.2 2.9-2.3.9-1.3 1.3-2.6 1.3-2.7 0-.1-2.5-.9-2.5-3.7ZM14 5.6c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2.1-.5 2.7-1.3Z" />
-  </svg>
-)
-
 const inputCls = 'w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors'
 
 const Field = ({ label, hint, optional, required, children }: { label: string; hint?: string; optional?: boolean; required?: boolean; children: React.ReactNode }) => (
@@ -247,8 +243,8 @@ const CodeInput = ({ value, onChange, length = 6 }: { value: string; onChange: (
 
 /* ───── Auth shell — header + footer ───── */
 const AuthHeader = ({ view, setView }: { view: View; setView: (v: View) => void }) => (
-  <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-ink-200">
-    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 lg:px-12 h-16 flex items-center justify-between gap-4">
+  <header className="sticky top-0 z-30 bg-white lg:bg-white/95 lg:backdrop-blur border-b border-ink-200">
+    <Container className="h-16 flex items-center justify-between gap-4">
       {/* href={null}: the shared Logo defaults to a <Link>, which may not nest inside this button */}
       <button type="button" onClick={() => setView('signin')}><Logo href={null} /></button>
       <nav className="hidden md:flex items-center gap-2">
@@ -263,14 +259,14 @@ const AuthHeader = ({ view, setView }: { view: View; setView: (v: View) => void 
           <>
             <span className="text-[12.5px] text-ink-600">პირველად აქ ხარ?</span>
             <button type="button" onClick={() => setView('signup')} className="h-9 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors">
-              შექმენი ანგარიში <Icon.arrow className="w-3.5 h-3.5" />
+              შექმენი ანგარიში
             </button>
           </>
         ) : view === 'signup' ? (
           <>
             <span className="text-[12.5px] text-ink-600">გყავს ანგარიში?</span>
             <button type="button" onClick={() => setView('signin')} className="h-9 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors">
-              შესვლა <Icon.arrow className="w-3.5 h-3.5" />
+              შესვლა
             </button>
           </>
         ) : (
@@ -288,18 +284,16 @@ const AuthHeader = ({ view, setView }: { view: View; setView: (v: View) => void 
       >
         {view === 'signup' ? 'შესვლა' : 'რეგისტრაცია'}
       </button>
-    </div>
+    </Container>
   </header>
 )
 
 const AuthFooter = () => (
   <footer className="border-t border-ink-200 bg-white">
-    <div className="max-w-[1280px] mx-auto px-6 sm:px-8 lg:px-12 py-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <Container className="py-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <div className="flex items-center gap-3 text-[12px] text-ink-500">
         <Icon.shieldCheck className="w-3.5 h-3.5 text-ink-400" />
-        <span>SSL · bcrypt · 2FA მზადაა</span>
-        <span className="hidden sm:inline text-ink-300">·</span>
-        <span className="hidden sm:inline">დაცული გადახდა: <span className="font-display font-semibold text-ink-700">TBC</span> · <span className="font-display font-semibold text-ink-700">BOG</span> · <span className="font-display font-semibold text-ink-700">SOLO</span></span>
+        <span>SSL-დაშიფვრა · პაროლი დაცულია bcrypt-ით</span>
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-ink-500">
         <a href="/terms" className="hover:text-ink-900 transition-colors min-h-[32px] inline-flex items-center">წესები</a>
@@ -308,7 +302,7 @@ const AuthFooter = () => (
         <span className="text-ink-300">·</span>
         <span>© 2026 მცოდნე</span>
       </div>
-    </div>
+    </Container>
   </footer>
 )
 
@@ -332,36 +326,26 @@ const SignInIntro = () => (
       ხელით შერჩეული ექსპერტები გელოდება. შესვლა წამში — სესია 60 წამში. სადაც გაჩერდი, იქიდან განაგრძე.
     </p>
 
-    {/* Avatar stack + count */}
-    <div className="mt-10 lg:mt-12 pt-8 border-t border-ink-200 flex items-center gap-3.5">
-      <div className="flex -space-x-2.5">
-        {[12, 33, 47, 5, 22].map(i => (
-          <img key={i} src={`https://i.pravatar.cc/80?img=${i}`} alt="" className="w-9 h-9 rounded-full object-cover ring-2 ring-white" />
-        ))}
-        <div className="w-9 h-9 rounded-full bg-ink-100 ring-2 ring-white inline-flex items-center justify-center font-display text-[10.5px] font-bold tabular-nums text-ink-700">+133</div>
-      </div>
-      <div className="text-[13px] text-ink-700">
-        <div className="font-display font-semibold text-ink-900">+138 ექსპერტი ხელმისაწვდომი</div>
-        <div className="text-[11.5px] text-ink-500 mt-0.5">დღეს · საშუალო პასუხის დრო 4 წთ</div>
-      </div>
-    </div>
-
-    {/* Editorial testimonial */}
-    <figure className="mt-9 lg:mt-10 pt-8 border-t border-ink-200">
-      <span className="inline-flex items-center gap-0.5 text-warning-500 mb-4">
-        {Array.from({ length: 5 }).map((_, i) => <Icon.star aria-hidden key={i} className="w-4 h-4" />)}
-      </span>
-      <blockquote className="font-display text-[20px] lg:text-[24px] leading-[1.35] font-medium tracking-[-0.005em] text-ink-800">
-        „45 წუთში მივიღე პასუხი იმაზე, რასაც 3 თვე ვეძებდი. ფასი — ერთი ლანჩი."
-      </blockquote>
-      <figcaption className="mt-5 flex items-center gap-3">
-        <img src="https://i.pravatar.cc/120?img=47" alt="" className="w-9 h-9 rounded-full object-cover ring-1 ring-ink-200" />
-        <div className="min-w-0">
-          <div className="font-display text-[13.5px] font-bold text-ink-900 tracking-tight">ანი ბერიძე</div>
-          <div className="text-[11.5px] text-ink-500">Founder · Solo</div>
-        </div>
-      </figcaption>
-    </figure>
+    {/* Honest value points — no invented counts or stock (pravatar) faces. The
+        landing and /tutors deliberately removed exactly that pattern; sign-in,
+        the last screen before a booking, must not reintroduce a trust lie. */}
+    <ul className="mt-10 lg:mt-12 pt-8 border-t border-ink-200 space-y-4">
+      {[
+        { icon: Icon.users, t: 'ხელით შერჩეული ექსპერტები', s: 'თითოეული პროფილი გადამოწმებულია' },
+        { icon: Icon.shieldCheck, t: 'უფასო დაჯავშნა', s: 'გადაწყვეტილება ჯავშნის შემდეგ მიიღე' },
+        { icon: Icon.clock, t: 'იქიდან განაგრძე, სადაც გაჩერდი', s: 'ჯავშნები და მიმოწერა ერთ ადგილას' },
+      ].map((r, i) => (
+        <li key={i} className="flex items-start gap-3.5">
+          <span className="w-9 h-9 rounded-btn bg-brand-50 text-brand-700 inline-flex items-center justify-center shrink-0">
+            <r.icon className="w-4 h-4" />
+          </span>
+          <div className="pt-0.5">
+            <div className="font-display text-[14px] font-semibold text-ink-900">{r.t}</div>
+            <div className="text-[12.5px] text-ink-500 mt-0.5">{r.s}</div>
+          </div>
+        </li>
+      ))}
+    </ul>
   </div>
 )
 
@@ -395,7 +379,7 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
           data.error === 'BAD_CREDENTIALS' ? 'არასწორი ელფოსტა ან პაროლი' :
           data.error === 'INVALID' ? 'პაროლი მინიმუმ 8 სიმბოლო' :
           data.error === 'RATE_LIMITED' ? `ბევრი მცდელობა — სცადე ${Math.ceil((data.retryInSec ?? 60)/60)} წუთში` :
-          'შეცდომა, ცადეთ თავიდან'
+          'შეცდომა, სცადე თავიდან'
         )
         setSubmitting(false)
         return
@@ -411,24 +395,18 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
     <div className="w-full">
       <div className="bg-white rounded-card border border-ink-200 shadow-card p-7 sm:p-8 lg:p-9 motion-safe:animate-scale-in" style={{ animationDelay: '160ms' }}>
         <div className="mb-7 lg:mb-8">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">შესვლა · 30 წამში</div>
+          <Eyebrow className="mb-2">შესვლა · 30 წამში</Eyebrow>
           <div className="font-display text-[20px] font-bold text-ink-900 tracking-tight">აქტიური ანგარიში</div>
           <p className="text-[13px] text-ink-500 mt-1.5 leading-snug">გააგრძელე იქიდან, სადაც გაჩერდი.</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <a href="/api/auth/google" onClick={startGoogleSignin} className="h-12 px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors">
-            <GoogleMark /> Google
-          </a>
-          <button type="button" disabled aria-disabled title="მალე გახდება ხელმისაწვდომი" className="h-12 px-4 rounded-btn border border-ink-200 bg-ink-50 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-400 tracking-wide cursor-not-allowed">
-            <AppleMark /> Apple
-            <span className="text-[9.5px] font-semibold uppercase tracking-widest text-ink-400 ml-1">მალე</span>
-          </button>
-        </div>
+        <a href="/api/auth/google" onClick={startGoogleSignin} className="h-12 w-full px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors">
+          <GoogleMark /> Google-ით გაგრძელება
+        </a>
 
         <div className="flex items-center gap-3 my-7">
           <div className="flex-1 h-px bg-ink-200" />
-          <span className="font-display text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-400">ან ელფოსტით</span>
+          <Eyebrow as="span" tone="muted">ან ელფოსტით</Eyebrow>
           <div className="flex-1 h-px bg-ink-200" />
         </div>
 
@@ -472,7 +450,7 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
                 ვამოწმებთ…
               </>
             ) : (
-              <>შესვლა <Icon.arrow className="w-4 h-4" /></>
+              <>შესვლა</>
             )}
           </button>
           {!submitting && (!email.trim() || !pw) && (
@@ -494,7 +472,7 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
 }
 
 const SignInView = ({ setView }: { setView: (v: View) => void }) => (
-  <main id="main" className="relative max-w-[1280px] mx-auto px-5 sm:px-10 lg:px-12 pt-6 sm:pt-14 lg:pt-20 pb-16 sm:pb-20 lg:pb-24">
+  <Container as="main" id="main" className="relative pt-6 sm:pt-14 lg:pt-20 pb-16 sm:pb-20 lg:pb-24">
     {/* Mobile is form-first: the marketing intro (headline, avatars,
         testimonial) drops BELOW the form so the email field is the first
         thing on screen. Desktop keeps intro-left / form-right. */}
@@ -502,7 +480,7 @@ const SignInView = ({ setView }: { setView: (v: View) => void }) => (
       <div className="order-2 lg:order-1 min-w-0"><SignInIntro /></div>
       <div className="order-1 lg:order-2 min-w-0"><SignInForm setView={setView} /></div>
     </div>
-  </main>
+  </Container>
 )
 
 /* ═══════════════════════════════════════════════════════════════════ */
@@ -578,19 +556,17 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
           data.error === 'EMAIL_TAKEN' ? 'ეს ელფოსტა უკვე გამოყენებულია' :
           data.error === 'INVALID' ? 'შეავსე ყველა ველი (პაროლი მინიმუმ 8 სიმბოლო)' :
           data.error === 'RATE_LIMITED' ? `ბევრი მცდელობა — სცადე ${Math.ceil((data.retryInSec ?? 60)/60)} წუთში` :
-          'შეცდომა, ცადეთ თავიდან'
+          'შეცდომა, სცადე თავიდან'
         )
         setSubmitting(false)
         return
       }
-      // Kick off email verification (non-blocking) and redirect to verify view.
-      fetch('/api/auth/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), purpose: 'verify' }),
-      }).catch(() => {})
+      // The signup route already created the session (createSession) and email
+      // verification is NOT required to use the platform — so skip the OTP
+      // interstitial entirely (no verification email, no extra step) and go
+      // straight where the user was headed (deep-link) or their workspace home.
       clearSignupDraft()
-      window.location.href = `/signin?view=verify&email=${encodeURIComponent(email.trim().toLowerCase())}`
+      redirectAfterSignin(data.role)
     } catch {
       setErrMsg('ქსელის შეცდომა')
       setSubmitting(false)
@@ -599,18 +575,12 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
 
   return (
     <div>
-      {/* Google/Apple SSO are not wired yet — mirror the SignInForm treatment
-          (disabled + "მალე" tooltip) so users don't get a dead click. */}
-      <div className="grid grid-cols-2 gap-2.5">
-        <a href="/api/auth/google" onClick={startGoogleSignin} className="h-12 px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors"><GoogleMark /> Google</a>
-        <button type="button" disabled aria-disabled="true" title="მალე გახდება ხელმისაწვდომი" className="h-12 px-4 rounded-btn border border-ink-200 bg-ink-50 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-400 tracking-wide cursor-not-allowed">
-          <AppleMark /> Apple
-        </button>
-      </div>
+      {/* Google is the only SSO. */}
+      <a href="/api/auth/google" onClick={startGoogleSignin} className="h-12 w-full px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors"><GoogleMark /> Google-ით გაგრძელება</a>
 
       <div className="flex items-center gap-3 my-6">
         <div className="flex-1 h-px bg-ink-200" />
-        <span className="font-display text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-400">ან შეავსე</span>
+        <Eyebrow as="span" tone="muted">ან შეავსე</Eyebrow>
         <div className="flex-1 h-px bg-ink-200" />
       </div>
 
@@ -650,7 +620,7 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
               ვქმნით ანგარიშს…
             </>
           ) : (
-            <>ანგარიშის შექმნა <Icon.arrow className="w-4 h-4" /></>
+            <>ანგარიშის შექმნა</>
           )}
         </button>
         {!submitting && (first.trim().length < 2 || !email || pw.length < 8 || !agree) && (
@@ -701,18 +671,15 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
           data.error === 'EMAIL_TAKEN' ? 'ეს ელფოსტა უკვე გამოყენებულია' :
           data.error === 'INVALID' ? 'შეავსე ყველა ველი (პაროლი მინიმუმ 8 სიმბოლო)' :
           data.error === 'RATE_LIMITED' ? `ბევრი მცდელობა — სცადე ${Math.ceil((data.retryInSec ?? 60)/60)} წუთში` :
-          'შეცდომა, ცადეთ თავიდან'
+          'შეცდომა, სცადე თავიდან'
         )
         setSubmitting(false)
         return
       }
-      // Fire off email verification (non-blocking), then hand off to /apply —
-      // the single expert-onboarding form. No expert data is collected here.
-      fetch('/api/auth/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), purpose: 'verify' }),
-      }).catch(() => {})
+      // Hand off to /apply — the single expert-onboarding form. It now prefills
+      // name + email from this new account, so the expert doesn't re-type them.
+      // (No OTP: /apply doesn't require email verification, so sending one here
+      // was a wasted email the user never acted on.)
       window.location.href = '/apply'
     } catch {
       setErrMsg('ქსელის შეცდომა')
@@ -733,17 +700,12 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
       </div>
 
       <div className="p-6 lg:p-8">
-        {/* SSO not wired yet — disabled to avoid a dead click (mirrors sign-in). */}
-        <div className="grid grid-cols-2 gap-2.5">
-          <a href="/api/auth/google" onClick={startGoogleSignin} className="h-12 px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors"><GoogleMark /> Google</a>
-          <button type="button" disabled aria-disabled="true" title="მალე გახდება ხელმისაწვდომი" className="h-12 px-4 rounded-btn border border-ink-200 bg-ink-50 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-400 tracking-wide cursor-not-allowed">
-            <AppleMark /> Apple
-          </button>
-        </div>
+        {/* Google is the only SSO. */}
+        <a href="/api/auth/google" onClick={startGoogleSignin} className="h-12 w-full px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-[13px] text-ink-800 tracking-wide transition-colors"><GoogleMark /> Google-ით გაგრძელება</a>
 
         <div className="flex items-center gap-3 my-6">
           <div className="flex-1 h-px bg-ink-200" />
-          <span className="font-display text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-400">ან შეავსე</span>
+          <Eyebrow as="span" tone="muted">ან შეავსე</Eyebrow>
           <div className="flex-1 h-px bg-ink-200" />
         </div>
 
@@ -788,7 +750,7 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
                 ვქმნით ანგარიშს…
               </>
             ) : (
-              <>ანგარიშის შექმნა და გაგრძელება <Icon.arrow className="w-4 h-4" /></>
+              <>ანგარიშის შექმნა და გაგრძელება</>
             )}
           </button>
           {!submitting && (!first.trim() || !last.trim() || !email || pw.length < 8 || !agree) && (
@@ -812,7 +774,7 @@ const SignUpIntro = ({ role }: { role: 'learn' | 'teach' }) => (
     <span className="inline-flex items-center gap-2 h-7 pl-1.5 pr-3 rounded-pill bg-white border border-ink-200 shadow-xs mb-8">
       <span className="inline-flex items-center gap-1 h-4 px-1.5 rounded-pill bg-brand-500 text-white font-display text-[9px] font-bold uppercase tracking-[0.14em]">{role === 'learn' ? '60წმ' : '12წთ'}</span>
       <span className="text-[12px] text-ink-700 font-display font-medium">
-        {role === 'learn' ? 'მცოდნე-ის რეგისტრაცია' : 'ექსპერტის განცხადება'}
+        {role === 'learn' ? 'მცოდნის რეგისტრაცია' : 'ექსპერტის განცხადება'}
       </span>
     </span>
 
@@ -829,8 +791,8 @@ const SignUpIntro = ({ role }: { role: 'learn' | 'teach' }) => (
         <ol className="mt-10 lg:mt-12 space-y-6">
           {[
             { n: '01', t: 'ფასი წინასწარ ცნობილია', d: 'ერთი ფასი, ერთი გვერდი — გადაიხდი მხოლოდ დაჯავშნისას.' },
-            { n: '02', t: 'Escrow დაცვა',        d: 'თანხა გადადის მხოლოდ წარმატებული სესიის შემდეგ.' },
-            { n: '03', t: 'ხელით გადამოწმებული', d: 'ყოველი ექსპერტი ინდივიდუალურად ვამოწმებთ — CV, პორტფოლიო, ვიდეო-გასაუბრება.' },
+            { n: '02', t: 'დაცული გადახდა',       d: 'თანხა გადადის მხოლოდ წარმატებული სესიის შემდეგ.' },
+            { n: '03', t: 'ხელით გადამოწმებული', d: 'ყოველ ექსპერტს ინდივიდუალურად ვამოწმებთ — CV, პორტფოლიო, ვიდეოგასაუბრება.' },
           ].map(b => (
             <li key={b.n} className="grid grid-cols-[48px_1fr] gap-4 items-baseline">
               <span className="font-display text-[24px] font-bold text-brand-700 tabular-nums leading-none">{b.n}</span>
@@ -842,17 +804,15 @@ const SignUpIntro = ({ role }: { role: 'learn' | 'teach' }) => (
           ))}
         </ol>
 
-        {/* Avatar proof */}
+        {/* Honest trust line — no fabricated faces/counts (the canon removed those
+            from the landing + tutors; a real, verifiable promise reads stronger). */}
         <div className="mt-10 lg:mt-12 pt-8 border-t border-ink-200 flex items-center gap-3.5">
-          <div className="flex -space-x-2.5">
-            {[12, 33, 47, 5].map(i => (
-              <img key={i} src={`https://i.pravatar.cc/80?img=${i}`} alt="" className="w-9 h-9 rounded-full object-cover ring-2 ring-white" />
-            ))}
-            <div className="w-9 h-9 rounded-full bg-ink-100 ring-2 ring-white inline-flex items-center justify-center font-display text-[10.5px] font-bold tabular-nums text-ink-700">+138</div>
-          </div>
+          <span className="w-10 h-10 rounded-full bg-brand-50 text-brand-700 inline-flex items-center justify-center shrink-0">
+            <Icon.shieldCheck className="w-5 h-5" />
+          </span>
           <div className="text-[12.5px] text-ink-700">
-            <div className="font-display font-semibold text-ink-900">3,200+ მომხმარებელი უკვე გვერდითაა</div>
-            <div className="text-[11px] text-ink-500 mt-0.5">საშუალო შეფასება <span className="font-display font-semibold text-ink-700">4.94</span> · 2,400+ მიმოხილვა</div>
+            <div className="font-display font-semibold text-ink-900">ყოველი ექსპერტი ხელით გადამოწმებული</div>
+            <div className="text-[11px] text-ink-500 mt-0.5">CV, პორტფოლიო და ვიდეოგასაუბრება — სანამ პლატფორმაზე მოვა.</div>
           </div>
         </div>
       </>
@@ -860,17 +820,17 @@ const SignUpIntro = ({ role }: { role: 'learn' | 'teach' }) => (
       <>
         <h1 className="font-display text-[44px] lg:text-[64px] font-bold leading-[0.96] tracking-[-0.03em] text-ink-900">
           გახდი მცოდნე.<br />
-          <span className="text-brand-600">შემოსავალი — 7 დღეში.</span>
+          <span className="text-brand-600">შენი ცოდნა — შენი შემოსავალი.</span>
         </h1>
         <p className="text-[16px] sm:text-[17px] text-ink-700 mt-6 sm:mt-7 leading-[1.6] max-w-[440px]">
-          შენ ირჩევ ფასს, დროს და თემას. ჩვენ ვუვლით დაცულ გადახდებს, გადასახადებსა და მომხმარებლების მოძიებას. <span className="font-display font-semibold text-ink-900">15% საკომისიო</span> — საუკეთესო ბაზარზე.
+          შენ ირჩევ ფასს, დროს და თემას. ჩვენ ვუვლით მომხმარებლების მოძიებას — და მალე დაცულ გადახდებსაც. <span className="font-display font-semibold text-ink-900">15% საკომისიო</span>, დანარჩენი შენია.
         </p>
 
         <dl className="mt-10 lg:mt-12 grid grid-cols-3 gap-x-6 sm:gap-x-8">
           {[
-            { n: '15%',    l: 'საკომისიო',     d: 'ბაზრის ნორმა · 25%' },
-            { n: '₾2 400', l: 'საშ. შემოს. / თვე', d: 'მე-3 თვიდან' },
-            { n: '94%',    l: 'ბრუნდება',       d: 'მე-2 თვეშიც' },
+            { n: '15%',   l: 'საკომისიო',   d: 'დანარჩენი შენია' },
+            { n: 'შენ',   l: 'ადგენ ფასს',  d: 'დროსა და თემას' },
+            { n: '1 სთ',  l: 'კონსულტაცია', d: 'ვიდეოზარით' },
           ].map(k => (
             <div key={k.l}>
               <dt className="font-display text-[26px] lg:text-[32px] font-bold tabular-nums tracking-[-0.025em] text-ink-900 leading-none">{k.n}</dt>
@@ -884,10 +844,10 @@ const SignUpIntro = ({ role }: { role: 'learn' | 'teach' }) => (
           <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-700 mb-4">პროცესი · 4 ნაბიჯი</div>
           <ol className="space-y-4">
             {[
-              { n: '01', t: 'შეავსე განცხადება',  d: '~12 წუთი' },
-              { n: '02', t: 'ჩვენი რევიუ',         d: '48 საათში' },
+              { n: '01', t: 'შეავსე განცხადება',  d: 'რამდენიმე წუთი' },
+              { n: '02', t: 'ჩვენი რევიუ',         d: '24–48 საათი' },
               { n: '03', t: 'პროფილი ცოცხალდება',  d: 'დასტურის შემდეგ' },
-              { n: '04', t: 'პირველი გადარიცხვა',  d: '7 დღეში' },
+              { n: '04', t: 'პირველი ჯავშანი',     d: 'დაამატე დროები' },
             ].map(s => (
               <li key={s.n} className="grid grid-cols-[32px_1fr_auto] gap-3 items-baseline">
                 <span className="font-display font-bold text-brand-700 tabular-nums text-[12px]">{s.n}</span>
@@ -904,18 +864,33 @@ const SignUpIntro = ({ role }: { role: 'learn' | 'teach' }) => (
 
 const SignUpView = ({ setView }: { setView: (v: View) => void }) => {
   const [role, setRole] = useState<'learn' | 'teach'>('learn')
+  const params = useSearchParams()
+  const redirect = params?.get('redirect') || params?.get('next') || ''
+  // Arriving from a "book / message this expert" tap (redirect points at a
+  // profile) → the visitor is unambiguously a CLIENT. Drop the learn/teach fork
+  // (the only real decision on this form) and remind them why they're here, so
+  // the highest-intent signup has zero extra choices to make.
+  const bookingIntent = redirect.includes('/tutors/')
+  const effectiveRole = bookingIntent ? 'learn' : role
   return (
-    <main id="main" className="relative max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-12 pt-6 sm:pt-14 lg:pt-20 pb-16 lg:pb-20">
+    <Container as="main" id="main" className="relative pt-6 sm:pt-14 lg:pt-20 pb-16 lg:pb-20">
       {/* Form-first on mobile (see SignInView) — the role switch + form come
           before the pitch so signup starts immediately. */}
-      <div className={`grid gap-12 lg:gap-20 items-start ${role === 'teach' ? 'lg:grid-cols-[1fr_1.15fr]' : 'lg:grid-cols-2'}`}>
-        <div className="order-2 lg:order-1 min-w-0"><SignUpIntro role={role} /></div>
+      <div className={`grid gap-12 lg:gap-20 items-start ${effectiveRole === 'teach' ? 'lg:grid-cols-[1fr_1.15fr]' : 'lg:grid-cols-2'}`}>
+        <div className="order-2 lg:order-1 min-w-0"><SignUpIntro role={effectiveRole} /></div>
         <div className="order-1 lg:order-2 min-w-0">
-          <RoleSwitch role={role} setRole={setRole} />
-          {role === 'learn' ? <StudentSignUp setView={setView} /> : <TutorSignUp setView={setView} />}
+          {bookingIntent ? (
+            <div className="mb-5 rounded-card border border-ink-200 bg-ink-50/60 px-4 py-3">
+              <div className="font-display text-[13px] font-bold text-ink-900">ერთი ნაბიჯიღა დარჩა</div>
+              <p className="text-[12px] text-ink-600 mt-0.5">დაასრულე რეგისტრაცია და ჯავშანი იქიდანვე გაგრძელდება.</p>
+            </div>
+          ) : (
+            <RoleSwitch role={role} setRole={setRole} />
+          )}
+          {effectiveRole === 'learn' ? <StudentSignUp setView={setView} /> : <TutorSignUp setView={setView} />}
         </div>
       </div>
-    </main>
+    </Container>
   )
 }
 
@@ -991,7 +966,7 @@ const VerifyView = ({ setView }: { setView: (v: View) => void }) => {
   }
 
   return (
-    <main id="main" className="relative max-w-[520px] mx-auto px-6 lg:px-8 pt-14 lg:pt-20 pb-20">
+    <Container as="main" size="narrow" id="main" className="relative pt-14 lg:pt-20 pb-20">
       <div className="flex items-baseline justify-between gap-3 mb-10 pb-5 border-b border-ink-100">
         <span className="font-display text-[10px] font-semibold uppercase tracking-[0.24em] text-ink-500 tabular-nums">№ 03/04 · ნაბიჯი</span>
         <span className="font-mono text-[10px] tabular-nums text-ink-400">VERIFY · 06/13</span>
@@ -1006,11 +981,11 @@ const VerifyView = ({ setView }: { setView: (v: View) => void }) => {
           <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-success-700 mb-2">დადასტურდი</div>
           <h1 className="font-display text-[34px] lg:text-[40px] font-bold text-ink-900 tracking-tight leading-[1.1]">
             ელფოსტა მზადაა — <br />
-            <span className="text-ink-500">დაიწყე მცოდნე-ზე.</span>
+            <span className="text-ink-500">დაიწყე მცოდნეზე.</span>
           </h1>
           <p className="mt-4 text-[14px] text-ink-600 leading-[1.6]">პირველი სესია დაჯავშნე წუთებში — ექსპერტები მზად არიან.</p>
           <button type="button" onClick={() => setView('onboarding')} className="mt-7 h-12 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] inline-flex items-center gap-2 transition-colors">
-            გავაგრძელოთ <Icon.arrow className="w-4 h-4" />
+            გავაგრძელოთ
           </button>
         </div>
       ) : (
@@ -1018,13 +993,13 @@ const VerifyView = ({ setView }: { setView: (v: View) => void }) => {
           <div className="w-16 h-16 rounded-full bg-brand-50 text-brand-700 inline-flex items-center justify-center mb-6">
             <Icon.mail className="w-7 h-7" />
           </div>
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">ელფოსტის დადასტურება</div>
+          <Eyebrow className="mb-2">ელფოსტის დადასტურება</Eyebrow>
           <h1 className="font-display text-[34px] lg:text-[40px] font-bold text-ink-900 tracking-tight leading-[1.1]">
             6-ციფრიანი კოდი —<br />
-            <span className="text-ink-500 break-all">{email || 'შენ ელფოსტაზე'}</span>
+            <span className="text-ink-500 break-all">{email || 'შენს ელფოსტაზე'}</span>
           </h1>
           <p className="mt-4 text-[14px] text-ink-600 leading-[1.6] max-w-[400px]">
-            შემოვა 30 წამში — შეამოწმე inbox და spam. გამგზავნი — <span className="font-display font-semibold text-ink-700">no-reply@mcodne.ge</span>
+            შემოვა 30 წამში — შეამოწმე ელფოსტა და spam. გამგზავნი — <span className="font-display font-semibold text-ink-700">no-reply@mcodne.ge</span>
           </p>
 
           <div className="mt-8 flex items-center justify-center">
@@ -1058,7 +1033,7 @@ const VerifyView = ({ setView }: { setView: (v: View) => void }) => {
           </div>
         </>
       )}
-    </main>
+    </Container>
   )
 }
 
@@ -1164,7 +1139,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
   }
 
   return (
-    <main id="main" className="relative max-w-[560px] mx-auto px-6 lg:px-8 pt-14 lg:pt-20 pb-20">
+    <Container as="main" size="narrow" id="main" className="relative pt-14 lg:pt-20 pb-20">
       {/* Steps indicator */}
       <ol className="flex items-center gap-1.5 mb-8">
         {RESET_STEPS.map((s, i) => {
@@ -1197,7 +1172,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
 
         {step === 'request' && (
           <form onSubmit={e => { e.preventDefault(); submitRequest() }}>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">დაგვიწყდა პაროლი</div>
+            <Eyebrow className="mb-2">დაგვიწყდა პაროლი</Eyebrow>
             <h1 className="font-display text-[28px] lg:text-[34px] font-bold text-ink-900 tracking-tight leading-[1.1]">
               მოგვწერე ელფოსტა — დანარჩენი<br /> 30 წამში მოვაგვარებთ.
             </h1>
@@ -1215,7 +1190,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
                   ვუგზავნით…
                 </>
               ) : (
-                <>გავაგზავნოთ ბმული <Icon.arrow className="w-4 h-4" /></>
+                <>გავაგზავნოთ ბმული</>
               )}
             </button>
             <div className="mt-5 grid grid-cols-[auto_1fr] gap-2.5 items-start p-3.5 rounded-card bg-ink-50/60 border border-ink-200">
@@ -1229,17 +1204,17 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
 
         {step === 'check' && (
           <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">შემოწმე შენი Inbox</div>
+            <Eyebrow className="mb-2">შემოწმე ელფოსტა</Eyebrow>
             <h1 className="font-display text-[28px] lg:text-[34px] font-bold text-ink-900 tracking-tight leading-[1.1]">
-              ბმული გავუგზავნეთ —<br /><span className="text-ink-500 break-all">{email || 'შენ ელფოსტაზე'}</span>
+              ბმული გავუგზავნეთ —<br /><span className="text-ink-500 break-all">{email || 'შენს ელფოსტაზე'}</span>
             </h1>
             <p className="mt-3 text-[14px] text-ink-600 leading-[1.55]">
-              Inbox-ში ან Spam-ში გადახედე "მცოდნე · პაროლის აღდგენა"-ს. ბმული ცარიელდება 1 საათში.
+              შემოსულში ან Spam-ში მოძებნე „მცოდნე · პაროლის აღდგენა“. ბმული ცარიელდება 1 საათში.
             </p>
 
             <div className="mt-7 rounded-card border border-ink-200 bg-white overflow-hidden">
               <div className="px-4 py-3 border-b border-ink-100 bg-ink-50/50 flex items-center justify-between text-[11px] text-ink-500 tabular-nums font-mono">
-                <span className="inline-flex items-center gap-1.5"><Icon.mail className="w-3 h-3" /> inbox · 1 ახალი</span>
+                <span className="inline-flex items-center gap-1.5"><Icon.mail className="w-3 h-3" /> შემოსული · 1 ახალი</span>
                 <span>ახლა · 14:32</span>
               </div>
               <div className="p-4 flex items-start gap-3">
@@ -1258,7 +1233,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
               <div className="px-4 py-3 border-t border-ink-100 flex items-center justify-between">
                 <span className="font-mono text-[10.5px] tabular-nums text-ink-400">to: {email || 'you@gmail.com'}</span>
                 <button type="button" onClick={() => setStep('reset')} className="h-8 px-3 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[11.5px] inline-flex items-center gap-1.5 transition-colors">
-                  ბმულის გახსნა <Icon.arrow className="w-3 h-3" />
+                  ბმულის გახსნა
                 </button>
               </div>
             </div>
@@ -1277,7 +1252,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
 
         {step === 'reset' && (
           <form onSubmit={e => { e.preventDefault(); submitReset() }}>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">ახალი პაროლი</div>
+            <Eyebrow className="mb-2">ახალი პაროლი</Eyebrow>
             <h1 className="font-display text-[28px] lg:text-[34px] font-bold text-ink-900 tracking-tight leading-[1.1]">
               აირჩიე პაროლი — <br /><span className="text-ink-500">გაუმეორებელი, მტკიცე.</span>
             </h1>
@@ -1348,7 +1323,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
               <Icon.shieldCheck className="w-4 h-4 text-brand-700 mt-0.5" />
               <div>
                 <div className="font-display text-[12.5px] font-bold text-ink-900 mb-1">გირჩევთ — 2FA-ის ჩართვა</div>
-                <p className="text-[11.5px] text-ink-700 leading-[1.5]">SMS კოდი ან ავტენტიფიკატორი დაამატე — ერთჯერად პაროლი + 2-ე ფაქტორი ვერ გადააქცევს ვერავინ.</p>
+                <p className="text-[11.5px] text-ink-700 leading-[1.5]">SMS კოდი ან აუთენტიფიკატორი დაამატე — ერთჯერადი პაროლისა და მე-2 ფაქტორის გვერდის ავლას ვერავინ შეძლებს.</p>
               </div>
             </div>
             <button
@@ -1359,7 +1334,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
               onClick={() => { if (doneDest) window.location.href = doneDest; else setView('signin') }}
               className="mt-7 w-full h-12 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors"
             >
-              {doneDest ? 'გაგრძელება' : 'შესვლა ახალი პაროლით'} <Icon.arrow className="w-4 h-4" />
+              {doneDest ? 'გაგრძელება' : 'შესვლა ახალი პაროლით'}
             </button>
           </div>
         )}
@@ -1369,7 +1344,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
         დახმარება გჭირდება?{' '}
         <a href="mailto:hi@mcodne.ge" className="font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 decoration-brand-300">hi@mcodne.ge</a>
       </p>
-    </main>
+    </Container>
   )
 }
 
@@ -1380,7 +1355,7 @@ const ResetView = ({ setView }: { setView: (v: View) => void }) => {
 const ONB_STEPS = [
   { id: 1, l: 'სფეროები',    s: 'რას ეძებ' },
   { id: 2, l: 'შენი ფონი',   s: 'რომელ ეტაპზე ხარ' },
-  { id: 3, l: 'ხელმისაწვდომი', s: 'როდის გელოდი' },
+  { id: 3, l: 'ხელმისაწვდომი', s: 'როდის ხარ თავისუფალი' },
   { id: 4, l: 'პირველი მატჩი', s: 'შერჩეული ექსპერტი' },
 ] as const
 
@@ -1397,8 +1372,8 @@ const AREAS = [
 
 const LEVELS = [
   { id: 'pre',    l: 'წინასწარ',  sub: 'იდეა მაქვს, ჯერ ბიზნესი არ მაქვს' },
-  { id: 'early',  l: 'ადრეული',   sub: 'სტარტაპი 1—2 წელია, MVP ან მცირე revenue' },
-  { id: 'growth', l: 'მზარდი',    sub: 'team 5—25, revenue გვაქვს, ფონდს ვძებნით' },
+  { id: 'early',  l: 'ადრეული',   sub: 'სტარტაპი 1—2 წელია, MVP ან მცირე შემოსავალი' },
+  { id: 'growth', l: 'მზარდი',    sub: 'გუნდი 5—25, შემოსავალი გვაქვს, ფონდს ვეძებთ' },
   { id: 'scale',  l: 'მასშტაბი',   sub: 'Series A+, 30+ ადამიანი, საერთაშორისო' },
 ]
 
@@ -1431,13 +1406,13 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
   }
 
   return (
-    <main id="main" className="relative max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-12 pt-10 lg:pt-14 pb-20">
+    <Container as="main" id="main" className="relative pt-10 lg:pt-14 pb-20">
       <div className="grid lg:grid-cols-[260px_1fr] gap-10 lg:gap-14">
         {/* Sidebar */}
         <aside className="lg:sticky lg:top-24 lg:self-start">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-2">ნაბიჯი {step} / 4</div>
+          <Eyebrow tone="muted" className="mb-2">ნაბიჯი {step} / 4</Eyebrow>
           <h2 className="font-display text-[22px] font-bold text-ink-900 tracking-tight leading-tight mb-1">გაცნობა — 2 წუთში</h2>
-          <p className="text-[12.5px] text-ink-600 leading-[1.5] mb-6">პასუხები → შენი მატჩი 142 ექსპერტში.</p>
+          <p className="text-[12.5px] text-ink-600 leading-[1.5] mb-6">პასუხები და შენი მატჩი 142 ექსპერტში.</p>
 
           <ol className="relative space-y-1">
             <span className="absolute left-[18px] top-3 bottom-3 w-px bg-ink-200" aria-hidden />
@@ -1465,7 +1440,7 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
           </ol>
 
           <button type="button" onClick={() => setView('signin')} className="mt-7 inline-flex items-center gap-1.5 text-[12px] text-ink-500 hover:text-ink-800 transition-colors">
-            გადახტომა <Icon.arrow className="w-3.5 h-3.5" />
+            გადახტომა
           </button>
         </aside>
 
@@ -1481,12 +1456,12 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
 
           {step === 1 && (
             <div className="max-w-[720px]">
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">№ 01 — სფეროები</div>
+              <Eyebrow className="mb-2">№ 01 — სფეროები</Eyebrow>
               <h1 className="font-display text-[32px] lg:text-[40px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
                 რაში გჭირდება ცოდნა?
               </h1>
               <p className="mt-3 text-[14.5px] text-ink-600 leading-[1.55] max-w-[520px]">
-                აირჩიე 1—4 სფერო. შემოგატავოთ მხოლოდ ის ექსპერტები. <span className="font-display font-semibold text-ink-900">{areas.length}/4</span> ნიშნი.
+                აირჩიე 1—4 სფერო. მხოლოდ იმ ექსპერტებს გაჩვენებთ. <span className="font-display font-semibold text-ink-900">{areas.length}/4</span> არჩეული.
               </p>
 
               <div className="mt-7 grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -1523,7 +1498,7 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
 
           {step === 2 && (
             <div className="max-w-[720px]">
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">№ 02 — შენი ფონი</div>
+              <Eyebrow className="mb-2">№ 02 — შენი ფონი</Eyebrow>
               <h1 className="font-display text-[32px] lg:text-[40px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
                 რომელ ეტაპზე ხარ?
               </h1>
@@ -1566,16 +1541,16 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
 
           {step === 3 && (
             <div className="max-w-[720px]">
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">№ 03 — ხელმისაწვდომი</div>
+              <Eyebrow className="mb-2">№ 03 — ხელმისაწვდომი</Eyebrow>
               <h1 className="font-display text-[32px] lg:text-[40px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
-                როდის გელოდი ექსპერტი?
+                როდის გელოდები ექსპერტს?
               </h1>
               <p className="mt-3 text-[14.5px] text-ink-600 leading-[1.55] max-w-[520px]">
-                შენ დროზე მოვძებნი — შაბ-კვ. შენი მოგებაა.
+                შენს დროზე მოგიძებნი — შაბ-კვ. შენი მოგებაა.
               </p>
 
               <div className="mt-7">
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2.5">დღეები</div>
+                <Eyebrow tone="muted" className="mb-2.5">დღეები</Eyebrow>
                 <div className="grid grid-cols-7 gap-1.5">
                   {['ორშ', 'სამშ', 'ოთხ', 'ხუთ', 'პარ', 'შაბ', 'კვ'].map(d => {
                     const on = avail.includes(d)
@@ -1596,7 +1571,7 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
               </div>
 
               <div className="mt-7">
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2.5">სასურველი დრო</div>
+                <Eyebrow tone="muted" className="mb-2.5">სასურველი დრო</Eyebrow>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { l: 'დილით', sub: '08—12' },
@@ -1615,7 +1590,7 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
 
               <div className="mt-7">
                 <div className="flex items-baseline justify-between mb-2.5">
-                  <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500">სასურველი ფასი / სთ</div>
+                  <Eyebrow tone="muted">სასურველი ფასი / სთ</Eyebrow>
                   <div className="font-display text-[16px] font-bold text-ink-900 tabular-nums">₾{budget}<span className="text-[11.5px] font-medium text-ink-500"> / სთ</span></div>
                 </div>
                 <input type="range" min={30} max={200} step={10} value={budget} onChange={e => setBudget(Number(e.target.value))} className="w-full accent-brand-500" />
@@ -1628,7 +1603,7 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
 
           {step === 4 && (
             <div className="max-w-[720px]">
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">№ 04 — შენი მატჩი</div>
+              <Eyebrow className="mb-2">№ 04 — შენი მატჩი</Eyebrow>
               <h1 className="font-display text-[32px] lg:text-[40px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
                 ეს ემთხვევა შენ — 96%
               </h1>
@@ -1646,7 +1621,7 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <h3 className="font-display text-[20px] font-bold text-ink-900 tracking-tight">გიორგი მელაძე</h3>
                       <VerifiedMark size={14} />
-                      <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-warning-50 border border-warning-200 text-warning-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.spark className="w-2.5 h-2.5" /> Super</span>
+                      <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-ink-900 text-white border-transparent font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.spark className="w-2.5 h-2.5" /> Super</span>
                     </div>
                     <div className="text-[13px] text-ink-600 mt-0.5">ბიზნეს-სტრატეგია · ყოფ. McKinsey · 12 წ. გამოცდილება</div>
                     <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
@@ -1660,11 +1635,11 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
                       <span className="text-ink-300">·</span>
                       <span className="text-ink-600 inline-flex items-center gap-1"><Icon.clock className="w-3 h-3" /> ხუთ. 14:00</span>
                     </div>
-                    <p className="mt-3 text-[13px] text-ink-700 leading-snug">"10 წელი ვაშენე და ვყიდე კომპანიები — გეტყვი ნამდვილ ცდომილებებს, არა სახელმძღვანელოს."</p>
+                    <p className="mt-3 text-[13px] text-ink-700 leading-snug">„10 წელი ვაშენე და გავყიდე კომპანიები — გეტყვი ნამდვილ შეცდომებს, არა სახელმძღვანელოს.“</p>
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       {[
                         { l: 'სფერო', v: 'ბიზნეს-სტრატ.' },
-                        { l: 'ფონი', v: 'ადრეული → მზარდი' },
+                        { l: 'ფონი', v: 'ადრეული–მზარდი' },
                         { l: 'ხელმისაწვ.', v: 'ხუთ-პარ' },
                         { l: 'ფასი', v: `₾80 ≤ ₾${budget}` },
                       ].map(r => (
@@ -1679,7 +1654,7 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
 
                 <div className="px-5 py-4 border-t border-ink-100 bg-ink-50/40 grid sm:grid-cols-[1fr_auto] gap-3 items-center">
                   <div>
-                    <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500">პირველი ხელმისაწვდომი</div>
+                    <Eyebrow tone="muted">პირველი ხელმისაწვდომი</Eyebrow>
                     <div className="font-display text-[14px] font-bold text-ink-900 tabular-nums">ხუთ. 11 ივნ. · 14:00 — 15:00 · ₾80</div>
                   </div>
                   <div className="flex gap-2">
@@ -1702,7 +1677,7 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
             </button>
             {step < 4 ? (
               <button type="button" onClick={() => setStep(step + 1)} disabled={step === 1 && areas.length === 0} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
-                შემდეგი <Icon.arrow className="w-4 h-4" />
+                შემდეგი
               </button>
             ) : (
               <button type="button" onClick={finish} disabled={areas.length === 0} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
@@ -1712,7 +1687,7 @@ const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
           </div>
         </div>
       </div>
-    </main>
+    </Container>
   )
 }
 

@@ -2,19 +2,12 @@
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Icon } from './Icon'
+import { useNotifications, markAllNotificationsRead, markNotificationRead, type NotifItem } from '@/lib/notifications'
 
 // Notification bell + dropdown panel.
-// Polls /api/notifications on mount + every 60s (cheap, ~30 rows returned).
-// Clicking a notification marks it read and navigates to its href.
-
-type NotifItem = {
-  id: string
-  title: string
-  body: string | null
-  href: string | null
-  readAt: string | null
-  createdAt: string
-}
+// Notifications come from the shared lib/notifications store (ONE poller for the
+// whole app — bell + user menu + bottom nav share it). Clicking a notification
+// marks it read (optimistic, via the store) and navigates to its href.
 
 const KA_MONTHS_SHORT = ['იან.','თებ.','მარ.','აპრ.','მაი.','ივნ.','ივლ.','აგვ.','სექ.','ოქტ.','ნოე.','დეკ.']
 
@@ -34,35 +27,11 @@ const timeAgo = (iso: string): string => {
 
 export function NotifBell() {
   const [open, setOpen] = useState(false)
-  const [items, setItems] = useState<NotifItem[]>([])
-  const [unread, setUnread] = useState(0)
   const [loading, setLoading] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
-
-  const load = async () => {
-    try {
-      const res = await fetch('/api/notifications')
-      if (!res.ok) return
-      const d = await res.json()
-      setItems(d.items ?? [])
-      setUnread(d.unreadCount ?? 0)
-    } catch {}
-  }
-
-  useEffect(() => {
-    load()
-    // Poll every 60s so users see new notifications without a full page refresh.
-    const t = setInterval(load, 60_000)
-    // Cross-tab: refresh when another tab marks anything read.
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'mcodne:notif-check') load()
-    }
-    window.addEventListener('storage', onStorage)
-    return () => {
-      clearInterval(t)
-      window.removeEventListener('storage', onStorage)
-    }
-  }, [])
+  // Shared store — the poll, visibility gating and cross-tab sync all live in
+  // lib/notifications now, so this component only reads + triggers mutations.
+  const { items, unreadCount: unread } = useNotifications()
 
   // Close dropdown on outside click.
   useEffect(() => {
@@ -74,41 +43,19 @@ export function NotifBell() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [open])
 
-  // Bump the cross-tab sync key so the BottomNav profile dot and UserMenu
-  // avatar dot in other tabs re-poll and update their unread counts.
-  const pingCrossTab = () => {
-    try { localStorage.setItem('mcodne:notif-check', String(Date.now())) } catch {}
-  }
-
   const markAllRead = async () => {
     if (unread === 0) return
     setLoading(true)
     try {
-      await fetch('/api/notifications/read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ all: true }),
-      })
-      setItems(prev => prev.map(n => n.readAt ? n : { ...n, readAt: new Date().toISOString() }))
-      setUnread(0)
-      pingCrossTab()
+      await markAllNotificationsRead()
     } finally {
       setLoading(false)
     }
   }
 
   const clickItem = async (n: NotifItem) => {
-    // Mark this one read (optimistic), then navigate.
-    if (!n.readAt) {
-      setItems(prev => prev.map(x => x.id === n.id ? { ...x, readAt: new Date().toISOString() } : x))
-      setUnread(u => Math.max(0, u - 1))
-      fetch('/api/notifications/read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: [n.id] }),
-      }).catch(() => {})
-      pingCrossTab()
-    }
+    // Mark this one read (optimistic, via the store), then navigate.
+    if (!n.readAt) markNotificationRead(n.id)
     if (n.href) window.location.href = n.href
     else setOpen(false)
   }
@@ -151,7 +98,7 @@ export function NotifBell() {
           </div>
           <div className="max-h-[420px] overflow-y-auto">
             {items.length === 0 ? (
-              <div className="py-10 text-center text-[13px] text-ink-500">ცარიელი inbox</div>
+              <div className="py-10 text-center text-[13px] text-ink-500">შემოსული ცარიელია</div>
             ) : (
               <ul className="divide-y divide-ink-100">
                 {items.map(n => {

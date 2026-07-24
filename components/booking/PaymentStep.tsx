@@ -4,6 +4,7 @@
 // intake step and no charge is implied anywhere.
 import React from 'react'
 import { Icon } from '@/components/Icon'
+import { Eyebrow } from '@/components/Eyebrow'
 
 export type PaymentMethod = 'tbc' | 'bog' | 'solo' | 'card'
 
@@ -35,7 +36,7 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
         <div className="grid grid-cols-2 gap-2">
           {METHODS.map(m => {
             const on = value.method === m.id
-            const toneCls = m.tone === 'brand' ? 'bg-brand-50 text-brand-700' : m.tone === 'accent' ? 'bg-accent-50 text-accent-700' : 'bg-ink-100 text-ink-700'
+            const toneCls = m.tone === 'brand' ? 'bg-brand-50 text-brand-700' : 'bg-ink-100 text-ink-700'
             return (
               <button
                 key={m.id}
@@ -65,7 +66,7 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
 
       {value.method === 'card' && (
         <div className="rounded-card border border-ink-200 bg-white p-5 space-y-4">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500">ბარათის მონაცემები</div>
+          <Eyebrow tone="muted">ბარათის მონაცემები</Eyebrow>
           <div>
             <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-2">მფლობელის სახელი</label>
             <input
@@ -124,7 +125,7 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
               {value.save && <Icon.check className="w-3 h-3 text-white" />}
             </span>
             <input type="checkbox" checked={value.save} onChange={e => onChange({ ...value, save: e.target.checked })} className="sr-only" />
-            <span className="text-[12.5px] text-ink-700">შემახსოვრე — შემდეგი ჯერ ერთი დაჭერით გადავიხდი</span>
+            <span className="text-[12.5px] text-ink-700">შემახსოვრე — შემდეგ ჯერზე ერთი დაჭერით გადავიხდი</span>
           </label>
         </div>
       )}
@@ -135,7 +136,7 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
           <div>
             <div className="font-display text-[13px] font-bold text-ink-900">გადახდის გაგრძელება ბანკში</div>
             <p className="text-[12.5px] text-ink-600 mt-1 leading-[1.5]">
-              „გადახდა"-ს დაჭერით გადახვალ {METHODS.find(m => m.id === value.method)?.l}-ის უსაფრთხო გვერდზე ანგარიშის დასადასტურებლად. შემდეგ ავტომატურად დაბრუნდები აქ.
+              „გადახდა“-ს დაჭერით გადახვალ {METHODS.find(m => m.id === value.method)?.l}-ის უსაფრთხო გვერდზე გადახდის დასადასტურებლად. შემდეგ ავტომატურად დაბრუნდები აქ.
             </p>
           </div>
         </div>

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { Btn } from '@/components/Btn'
+import { Eyebrow } from '@/components/Eyebrow'
 import { Avatar } from '@/components/Avatar'
 import { Icon } from '@/components/Icon'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -596,7 +597,7 @@ export default function TutorProfilePage() {
               )}
 
               <div className="flex border-b border-ink-200 mb-6 overflow-x-auto scrollbar-hide rail-fade-end" role="tablist" aria-label="პროფილის სექციები">
-                {['საჯარო პროფილი', 'სერვისები და ფასი', 'კვალიფიკაცია', 'ანგარიში'].map((label, i) => {
+                {['საჯარო პროფილი', 'სერვისები და კვალიფიკაცია', 'ანგარიში'].map((label, i) => {
                   const on = activeTab === i
                   return (
                     <button
@@ -624,7 +625,7 @@ export default function TutorProfilePage() {
             {/* Avatar block — hover overlay pattern, keyboard-focusable button.
                 Reuses the existing `uploadAvatar` handler and hidden file input. */}
             <section id="section-avatar" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white">
-              <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-4">ავატარი</div>
+              <Eyebrow tone="muted" className="mb-4">ავატარი</Eyebrow>
               <div className="flex items-center gap-5">
                 <button
                   type="button"
@@ -671,12 +672,9 @@ export default function TutorProfilePage() {
             {/* Public profile form */}
             {profile ? (
               <form id="section-public-profile" onSubmit={saveProfile} className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600">საჯარო პროფილი</div>
-                  {dirty && (
-                    <span className="text-[11.5px] font-display font-semibold text-warning-700">შეუნახავი ცვლილებები</span>
-                  )}
-                </div>
+                {/* One dirty indicator only — the sticky save bar below owns it
+                    („შეუნახავი ცვლილებები / შენახულია ✓“). */}
+                <Eyebrow className="mb-2">საჯარო პროფილი</Eyebrow>
 
                 <Field label="სათაური (headline)">
                   <input type="text" required maxLength={200}
@@ -702,11 +700,11 @@ export default function TutorProfilePage() {
                            value={form.yearsExp} onChange={e => setForm({ ...form, yearsExp: Number(e.target.value) })}
                            className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none tabular-nums" />
                   </Field>
-                  <Field label="საათობრივი ტარიფი (₾)">
+                  <Field label="სესიის ფასი (₾)">
                     <input type="number" min={1} max={10000} required
                            value={form.hourlyRate} onChange={e => setForm({ ...form, hourlyRate: Number(e.target.value) })}
                            className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none tabular-nums" />
-                    <p className="mt-1.5 text-[11px] text-ink-500 leading-snug">ცვლილება მოქმედებს მხოლოდ ახალ ჯავშანზე — უკვე დაჯავშნილი სესიების ფასი უცვლელი რჩება.</p>
+                    <p className="mt-1.5 text-[11px] text-ink-500 leading-snug">ფიქსირებული ფასი ერთ სესიაზე (არა საათში). თუ ქვემოთ „კონსულტაციის ტიპებს“ დაამატებ, კლიენტი კონკრეტულ ტიპსა და მის ფასს ირჩევს — თუ არა, მოქმედებს ეს ფასი. ცვლილება მხოლოდ ახალ ჯავშანზე მოქმედებს.</p>
                   </Field>
                 </div>
 
@@ -764,8 +762,8 @@ export default function TutorProfilePage() {
               <section id="section-video" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
-                    <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-1">Intro ვიდეო · YouTube</div>
-                    <p className="text-[12px] text-ink-500 leading-snug max-w-[520px]">60-90 წამი შენს შესახებ. ჩანს პროფილის ბანერზე. Conversion 2-3x-ს ზრდის. ატვირთე YouTube-ზე და ჩააგდე აქ ბმული.</p>
+                    <Eyebrow tone="muted" className="mb-1">ინტრო ვიდეო · YouTube</Eyebrow>
+                    <p className="text-[12px] text-ink-500 leading-snug max-w-[520px]">60-90 წამი შენს შესახებ. ჩანს პროფილის ბანერზე. კონვერსიას 2-3x-ს ზრდის. ატვირთე YouTube-ზე და ჩააგდე აქ ბმული.</p>
                   </div>
                   {profile.videoUrl && !videoSaving && (
                     <button type="button" onClick={removeIntroVideo} aria-label="ინტრო ვიდეოს წაშლა" className="min-h-[44px] -my-2 px-3 -mr-3 inline-flex items-center rounded-btn font-display text-[11.5px] font-semibold text-ink-500 hover:text-danger-700 hover:bg-danger-50 transition-colors">წაშლა</button>
@@ -776,7 +774,7 @@ export default function TutorProfilePage() {
                   <div className="rounded-card overflow-hidden bg-black aspect-video">
                     <iframe
                       src={`https://www.youtube-nocookie.com/embed/${currentYouTubeId}?rel=0&modestbranding=1`}
-                      title="Intro video"
+                      title="ინტრო ვიდეო"
                       loading="lazy"
                       referrerPolicy="strict-origin-when-cross-origin"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -794,8 +792,8 @@ export default function TutorProfilePage() {
                   </div>
                 ) : (
                   <div className="p-4 rounded-card border border-dashed border-ink-300 bg-ink-50/40 text-center">
-                    <div className="font-display text-[13px] font-semibold text-ink-700 mb-1">ჯერ არ აქვს intro ვიდეო</div>
-                    <p className="text-[12px] text-ink-500 max-w-[400px] mx-auto">გაუკეთე რეკ. თემა: „ვინ ვარ · რას ვაკეთებ · რომელ პრობლემას ვხსნი".</p>
+                    <div className="font-display text-[13px] font-semibold text-ink-700 mb-1">ჯერ არ აქვს ინტრო ვიდეო</div>
+                    <p className="text-[12px] text-ink-500 max-w-[400px] mx-auto">რეკომენდებული სტრუქტურა: „ვინ ვარ · რას ვაკეთებ · რომელ პრობლემას ვხსნი“.</p>
                   </div>
                 )}
 
@@ -842,8 +840,8 @@ export default function TutorProfilePage() {
               <section id="section-consultations" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
-                    <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-1">კონსულტაციის ტიპები</div>
-                    <p className="text-[12px] text-ink-500 leading-snug max-w-[520px]">გამოაქვეყნე რამდენიმე პროდუქტი — QUICK (15 წთ), STANDARD (60 წთ), DEEP (90 წთ). გამოჩნდება „სერვისები"-ს განყოფილებაში შენს პროფილზე.</p>
+                    <Eyebrow tone="muted" className="mb-1">კონსულტაციის ტიპები</Eyebrow>
+                    <p className="text-[12px] text-ink-500 leading-snug max-w-[520px]">გამოაქვეყნე რამდენიმე პროდუქტი — QUICK (15 წთ), STANDARD (60 წთ), DEEP (90 წთ). გამოჩნდება „სერვისები“-ს განყოფილებაში შენს პროფილზე.</p>
                   </div>
                 </div>
 
@@ -855,7 +853,7 @@ export default function TutorProfilePage() {
                       <div key={c.id} className="flex items-start gap-3 p-3 rounded-card border border-ink-200 bg-ink-50/40">
                         <span className={`shrink-0 inline-flex items-center h-6 px-2 rounded-pill border font-display text-[10px] font-bold uppercase tracking-[0.14em] ${
                           c.tier === 'QUICK' ? 'bg-brand-50 border-brand-200 text-brand-700'
-                          : c.tier === 'DEEP' ? 'bg-info-50 border-info-200 text-info-700'
+                          : c.tier === 'DEEP' ? 'bg-ink-75 border-ink-200 text-ink-700'
                           : 'bg-ink-100 border-ink-200 text-ink-700'
                         }`}>{c.tier}</span>
                         <div className="flex-1 min-w-0">
@@ -917,14 +915,16 @@ export default function TutorProfilePage() {
             </TabPanel>
             )}
 
-            {/* ——— Group 3: კვალიფიკაცია ——— */}
+            {/* ——— კვალიფიკაცია — merged into the „სერვისები და კვალიფიკაცია“
+                tab (activeTab === 1): services + credentials are one intent
+                („what I offer and why I'm qualified“), so 4 tabs collapse to 3. ——— */}
             {profile && (
-            <TabPanel active={activeTab === 2}>
+            <TabPanel active={activeTab === 1}>
 
             {/* Certificates */}
             {profile && (
               <section id="section-certificates" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
-                <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-2">სერტიფიკატები</div>
+                <Eyebrow tone="muted" className="mb-2">სერტიფიკატები</Eyebrow>
 
                 <div className="space-y-2">
                   {certificates.length === 0 ? (
@@ -984,7 +984,6 @@ export default function TutorProfilePage() {
                         </Btn>
                         {certForm.fileUrl && (
                           <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-700 truncate max-w-[240px]">
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-success-500" />
                             {certForm.fileName || 'ატვირთულია'}
                             <button type="button" onClick={() => setCertForm({ ...certForm, fileUrl: '', fileName: '' })} className="ml-1 text-ink-400 hover:text-danger-600 text-[14px]" aria-label="მოხსნა">×</button>
                           </span>
@@ -1006,7 +1005,7 @@ export default function TutorProfilePage() {
             {/* Education */}
             {profile && (
               <section id="section-education" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
-                <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-2">განათლება</div>
+                <Eyebrow tone="muted" className="mb-2">განათლება</Eyebrow>
 
                 <div className="space-y-2">
                   {education.length === 0 ? (
@@ -1073,7 +1072,7 @@ export default function TutorProfilePage() {
             {/* Experience */}
             {profile && (
               <section id="section-experience" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
-                <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-2">სამუშაო გამოცდილება</div>
+                <Eyebrow tone="muted" className="mb-2">სამუშაო გამოცდილება</Eyebrow>
 
                 <div className="space-y-2">
                   {experience.length === 0 ? (
@@ -1141,22 +1140,22 @@ export default function TutorProfilePage() {
             </TabPanel>
             )}
 
-            {/* ——— Group 4: ანგარიში ——— */}
-            <TabPanel active={activeTab === 3}>
+            {/* ——— Group 3: ანგარიში ——— */}
+            <TabPanel active={activeTab === 2}>
 
             {/* Public visibility — pause self-listing without touching bookings */}
             {profile && (
               <section id="section-visibility" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-3">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-1">პროფილის ხილვადობა</div>
+                    <Eyebrow tone="muted" className="mb-1">პროფილის ხილვადობა</Eyebrow>
                     <div className="font-display text-[14px] font-semibold text-ink-900">
                       {profile.available === false ? 'პროფილი დამალულია' : 'პროფილი საჯაროა'}
                     </div>
                     <p className="text-[12px] text-ink-500 mt-1 leading-snug max-w-[480px]">
                       {profile.available === false
                         ? 'ძებნაში აღარ ჩანხარ. უკვე დაჯავშნილი სესიები აქტიური რჩება — კლიენტს ხედავს, დაწერს, შედის ვიდეო-ოთახში. ახლიდან ვერავინ დაგიჯავშნის.'
-                        : 'შენ ჩანხარ ძებნის სიაში. გამორთე თუ დროებით შესვენება გინდა (მაგ. შვებულება, workload full) — არსებული ჯავშნები არ დაზარალდება.'}
+                        : 'შენ ჩანხარ ძებნის სიაში. გამორთე თუ დროებით შესვენება გინდა (მაგ. შვებულება, დიდი დატვირთვა) — არსებული ჯავშნები არ დაზარალდება.'}
                     </p>
                   </div>
                   <button type="button"
@@ -1183,7 +1182,7 @@ export default function TutorProfilePage() {
                     }}
                     className={`relative w-14 h-8 rounded-full transition-colors shrink-0 ${profile.available !== false ? 'bg-success-500' : 'bg-ink-300'}`}
                     aria-pressed={profile.available !== false}
-                    aria-label="ხილვადობის toggle">
+                    aria-label="ხილვადობის გადამრთველი">
                     <span className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-xs transition-all ${profile.available !== false ? 'left-7' : 'left-1'}`} />
                   </button>
                 </div>
@@ -1195,8 +1194,8 @@ export default function TutorProfilePage() {
               <section id="section-response-time" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-3">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="min-w-0">
-                    <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-1">პასუხის დროის ვალდებულება</div>
-                    <p className="text-[12px] text-ink-500 leading-snug max-w-[480px]">რამდენ საათში ვპასუხობ ჯავშნის მოთხოვნას. ეს badge-ი ჩანს ჩემი პროფილის გვერდზე და ძებნის სიაში — trust signal კლიენტისთვის ჯავშნის წინ.</p>
+                    <Eyebrow tone="muted" className="mb-1">პასუხის დროის ვალდებულება</Eyebrow>
+                    <p className="text-[12px] text-ink-500 leading-snug max-w-[480px]">რამდენ საათში ვპასუხობ ჯავშნის მოთხოვნას. ეს ნიშანი ჩანს ჩემი პროფილის გვერდზე და ძებნის სიაში — სანდოობის სიგნალი კლიენტისთვის ჯავშნის წინ.</p>
                   </div>
                   <div className="inline-flex rounded-btn border border-ink-200 overflow-hidden shrink-0">
                     {RESPONSE_HOUR_OPTIONS.map(opt => {
@@ -1240,7 +1239,7 @@ export default function TutorProfilePage() {
 
             {/* Password */}
             <form onSubmit={changePassword} className="p-6 rounded-card border border-ink-200 bg-white space-y-4">
-              <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600 mb-2">პაროლის შეცვლა</div>
+              <Eyebrow tone="muted" className="mb-2">პაროლის შეცვლა</Eyebrow>
 
               <Field label="მიმდინარე პაროლი">
                 <input type="password" required
@@ -1346,7 +1345,7 @@ function AddDisclosure({ label, forceOpen, children }: { label: string; forceOpe
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1.5">{label}</span>
+      <Eyebrow as="span" tone="muted" className="block mb-1.5">{label}</Eyebrow>
       {children}
     </label>
   )
@@ -1392,7 +1391,7 @@ function ServiceTypeAndAvailability({
     <section className="p-6 rounded-card border border-ink-200 bg-white space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600">კონსულტაციის ხანგრძლივობა</div>
+          <Eyebrow tone="muted">კონსულტაციის ხანგრძლივობა</Eyebrow>
           <p className="text-[12.5px] text-ink-500 mt-1">ერთი სტანდარტული სესიის ხანგრძლივობა. ხელმისაწვდომი დროებს კალენდარში აქვეყნებ.</p>
         </div>
         {flash && <span className="text-[12px] font-display font-semibold text-success-700">{flash}</span>}

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { notify } from '@/lib/notify'
 import { fmtKaDateTime } from '@/lib/kaDate'
+import { rateLimit } from '@/lib/rateLimit'
 
 // Party proposes a new session time. Only students or tutors of the booking
 // may propose. The counter-party then accepts/rejects via /respond.
@@ -23,6 +24,12 @@ const MIN_LEAD_MS = 60 * 60 * 1000 // 1 hour
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
+
+  // Each proposal overwrites the pending one, force-demotes a CONFIRMED booking
+  // to PREPARING and locks the held slot (cleanup skips pending-reschedule rows),
+  // so an unthrottled loop is a real griefing vector — cap proposals per user.
+  const rl = rateLimit(`resched:${user.id}`, 10, 60 * 60)
+  if (!rl.ok) return NextResponse.json({ ok: false, error: 'RATE_LIMITED', retryInSec: rl.retryInSec }, { status: 429 })
 
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
@@ -47,6 +54,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (booking.status !== 'PREPARING' && booking.status !== 'CONFIRMED') {
     return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 400 })
   }
+  // Can't reschedule a session whose start has already passed — proposing
+  // demotes CONFIRMED→PREPARING, which would let a no-show student dodge the
+  // tutor's no_show flag by repeatedly proposing after the clock runs out.
+  // Past-start sessions must resolve via complete / no_show / cancel.
+  if (booking.startAt.getTime() <= Date.now()) {
+    return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 400 })
+  }
 
   const proposedBy: 'STUDENT' | 'TUTOR' = booking.studentId === user.id ? 'STUDENT' : 'TUTOR'
 
@@ -65,6 +79,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     select: { id: true },
   })
   if (!slot) {
+    // BOTH parties may only reschedule onto a real, unbooked slot the expert has
+    // ALREADY published on their schedule — we never invent availability the
+    // expert didn't declare (the reschedule picker only offers real free times,
+    // so this is the server-side guard behind it). A new time must be added to
+    // the schedule first.
     return NextResponse.json({ ok: false, error: 'NO_SLOT' }, { status: 400 })
   }
 
@@ -103,7 +122,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const otherPartyUserId = proposedBy === 'STUDENT' ? booking.tutor.userId : booking.studentId
   await notify(otherPartyUserId, {
     type: 'RESCHEDULE_REQUEST',
-    title: proposedBy === 'STUDENT' ? 'მოსწავლემ ითხოვა გადადება' : 'ექსპერტმა ითხოვა გადადება',
+    title: proposedBy === 'STUDENT' ? 'კლიენტმა გადადება ითხოვა' : 'ექსპერტმა გადადება ითხოვა',
     body: `ახალი დრო: ${fmtKaDateTime(newStart, { year: true })}`,
     href: proposedBy === 'STUDENT'
       ? `/tutor/bookings/${booking.id}`

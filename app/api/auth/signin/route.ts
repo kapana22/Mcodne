@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const parsed = Body.safeParse(await req.json())
+  const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   }

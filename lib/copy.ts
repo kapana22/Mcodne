@@ -8,4 +8,4 @@
 
 import { CANCEL_CUTOFF_HOURS } from '@/lib/flags'
 
-export const RISK_REVERSAL_LINE = `გაუქმება უფასოა სესიამდე ${CANCEL_CUTOFF_HOURS} სთ-ით ადრე · no-show-ის შემთხვევაში ჩანაცვლება უფასოა`
+export const RISK_REVERSAL_LINE = `გაუქმება უფასოა სესიამდე ${CANCEL_CUTOFF_HOURS} სთ-ით ადრე · გამოუცხადებლობის შემთხვევაში ჩანაცვლება უფასოა`

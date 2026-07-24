@@ -29,7 +29,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!c) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
   if (forbidden) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
 
-  const parsed = UpdateBody.safeParse(await req.json())
+  const parsed = UpdateBody.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
   const updated = await prisma.consultation.update({ where: { id }, data: parsed.data })

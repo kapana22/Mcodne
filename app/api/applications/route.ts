@@ -30,6 +30,19 @@ const Body = z.object({
   })).max(20).optional().nullable(),
 })
 
+// GET — the caller's own application status, so /apply can show a real
+// "under review" / "rejected (reason)" screen instead of a blank form to
+// someone who already applied. Returns { application: null } if none.
+export async function GET() {
+  const user = await getCurrentUser()
+  if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
+  const application = await prisma.tutorApplication.findUnique({
+    where: { userId: user.id },
+    select: { status: true, moderatorNote: true, createdAt: true, reviewedAt: true },
+  })
+  return NextResponse.json({ application })
+}
+
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
@@ -42,13 +55,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'ONLY_STUDENTS_CAN_APPLY' }, { status: 403 })
   }
 
-  // Verified-email gate — applications become part of the tutor's public record;
-  // require confirmed inbox before we take the submission.
-  if (!(user as any).emailVerified) {
-    return NextResponse.json({ ok: false, error: 'EMAIL_NOT_VERIFIED' }, { status: 403 })
-  }
+  // Email verification is intentionally NOT required to apply (removed
+  // 2026-07-20) — the application is moderated by an admin regardless.
 
-  const parsed = Body.safeParse(await req.json())
+  const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
   const { linkedinUrl, websiteUrl, introVideoUrl, professionData, idDocUrl, selfieUrl, certificates, ...rest } = parsed.data

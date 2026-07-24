@@ -3,6 +3,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Avatar } from '@/components/Avatar'
 import { Btn } from '@/components/Btn'
+import { Card } from '@/components/Card'
+import { Eyebrow } from '@/components/Eyebrow'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { Icon } from '@/components/Icon'
 import { SkeletonRow } from '@/components/Skeleton'
@@ -41,28 +43,28 @@ export function PendingRequests({
         body: JSON.stringify({ action }),
       })
       if (res.status === 401) { redirectToSignin(); return }
-      if (res.status >= 500) { toast('სერვერის შეცდომა — სცადეთ თავიდან', 'error'); return }
+      if (res.status >= 500) { toast('სერვერის შეცდომა — სცადე თავიდან', 'error'); return }
       const j = await res.json().catch(() => ({} as any))
       if (!res.ok || !j.ok) { toast('მოქმედება ვერ შესრულდა', 'error'); return }
       toast(action === 'accept' ? 'დადასტურდა' : 'უარყოფილია', 'success')
       refreshNavBadges()
       await onChanged()
     } catch {
-      toast('ქსელის შეცდომა — შეამოწმეთ კავშირი', 'error')
+      toast('ქსელის შეცდომა — შეამოწმე კავშირი', 'error')
     } finally {
       setBusy(null)
     }
   }
 
   return (
-    <section className="rounded-card border border-ink-200 bg-white overflow-hidden">
+    <Card as="section" padding="none" className="overflow-hidden">
       <div className="px-5 sm:px-6 py-4 border-b border-ink-100 flex items-center justify-between">
         <div>
-          <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500">ჯავშნა-მოთხოვნები</div>
+          <Eyebrow tone="muted">ჯავშნის მოთხოვნები</Eyebrow>
           <div className="font-display text-[15px] font-bold text-ink-900 mt-0.5">{loading ? '—' : `${pending.length} მოთხოვნა`}</div>
         </div>
         <Link href="/tutor/bookings?tab=attention" className="text-[12px] text-brand-700 hover:text-brand-800 font-semibold inline-flex items-center gap-1">
-          ყველა <Icon.arrow className="w-3.5 h-3.5" />
+          ყველა
         </Link>
       </div>
       {loading ? (
@@ -102,7 +104,7 @@ export function PendingRequests({
       )}
       {pending.length > 6 && (
         <div className="px-5 py-3 border-t border-ink-100 text-center">
-          <Link href="/tutor/bookings?tab=attention" className="text-[12.5px] text-brand-700 hover:text-brand-800 font-semibold">დანარჩენი {pending.length - 6} მოთხოვნის ნახვა →</Link>
+          <Link href="/tutor/bookings?tab=attention" className="text-[12.5px] text-brand-700 hover:text-brand-800 font-semibold">დანარჩენი {pending.length - 6} მოთხოვნის ნახვა</Link>
         </div>
       )}
 
@@ -120,6 +122,6 @@ export function PendingRequests({
         }}
         onCancel={() => setConfirmDecline(null)}
       />
-    </section>
+    </Card>
   )
 }

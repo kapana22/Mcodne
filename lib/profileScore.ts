@@ -35,7 +35,7 @@ export const buildProfileChecks = (
     { id: 'headline',    label: 'დაწერე მოკლე სათაური (მინ. 20 სიმბოლო)', done: headline.length >= 20, weight: 12, anchor: '#section-public-profile' },
     { id: 'bio',         label: 'დაწერე ბიოგრაფია (მინ. 100 სიმბოლო)',      done: bio.length >= 100,     weight: 15, anchor: '#section-public-profile' },
     { id: 'specialty',   label: 'მიუთითე სპეციალობა',                       done: specialty.length > 0,  weight: 8,  anchor: '#section-public-profile' },
-    { id: 'price',       label: 'დააფიქსირე საათობრივი ტარიფი',              done: price > 0,             weight: 10, anchor: '#section-public-profile' },
+    { id: 'price',       label: 'დააფიქსირე კონსულტაციის ფასი',              done: price > 0,             weight: 10, anchor: '#section-public-profile' },
     { id: 'languages',   label: 'აირჩიე მინ. ერთი ენა',                     done: languages.length >= 1, weight: 10, anchor: '#section-public-profile' },
     { id: 'avatar',      label: 'ატვირთე პროფილის ფოტო',                    done: !!avatarUrl,           weight: 10, anchor: '#section-avatar' },
     { id: 'certificates',label: 'დაამატე მინ. ერთი სერტიფიკატი',            done: certificates >= 1,     weight: 10, anchor: '#section-certificates' },

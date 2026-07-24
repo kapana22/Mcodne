@@ -16,6 +16,7 @@
 // quick-book) while staying a bottom sheet on mobile.
 
 import { useEffect, useRef, type ReactNode } from 'react'
+import { Eyebrow } from '@/components/Eyebrow'
 
 type Props = {
   open: boolean
@@ -129,9 +130,9 @@ export function Sheet({
           <div className="px-5 sm:px-6 pt-5 pb-3 border-b border-ink-100 shrink-0 flex items-start justify-between gap-4">
             <div className="min-w-0">
               {eyebrow && (
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-1">
+                <Eyebrow className="mb-1">
                   {eyebrow}
-                </div>
+                </Eyebrow>
               )}
               {title && (
                 <div className="font-display text-[16px] font-bold text-ink-900 tracking-tight">

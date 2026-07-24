@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const rl = rateLimit(`resetconfirm:${ip}`, 10, 60 * 60)
   if (!rl.ok) return NextResponse.json({ ok: false, error: 'RATE_LIMITED', retryInSec: rl.retryInSec }, { status: 429 })
 
-  const parsed = Body.safeParse(await req.json())
+  const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
   const tokenHash = createHash('sha256').update(parsed.data.token).digest('hex')

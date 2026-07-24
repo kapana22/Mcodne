@@ -37,6 +37,7 @@ const getTutorSeo = cache(async (id: string) => {
         bio: true,
         rating: true,
         reviewsCount: true,
+        price: true,
         category: { select: { name: true } },
         user: { select: { fullName: true, avatarUrl: true } },
       },
@@ -159,12 +160,14 @@ export default async function TutorProfileRoute(
   if (tutor === null) notFound()
 
   let jsonLd: Record<string, unknown> | null = null
+  let breadcrumbLd: Record<string, unknown> | null = null
   if (tutor && tutor !== 'error') {
     const name = tutor.user?.fullName?.trim() || 'ექსპერტი'
     const jobTitle = tutor.specialty?.trim() || tutor.category?.name?.trim()
     const description = excerpt(tutor.bio)
     const image = absoluteAvatar(tutor.user?.avatarUrl)
     const hasRealRating = (tutor.rating ?? 0) > 0 && (tutor.reviewsCount ?? 0) > 0
+    const price = typeof tutor.price === 'number' && tutor.price > 0 ? tutor.price : null
     jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'Person',
@@ -173,6 +176,10 @@ export default async function TutorProfileRoute(
       ...(jobTitle ? { jobTitle } : {}),
       ...(description ? { description } : {}),
       ...(image ? { image } : {}),
+      // Real price → an Offer, so Google can surface it. Never fabricated.
+      ...(price
+        ? { makesOffer: { '@type': 'Offer', priceCurrency: 'GEL', price, category: 'კონსულტაცია', availability: 'https://schema.org/InStock' } }
+        : {}),
       // Only when a real rating exists — never fabricated.
       ...(hasRealRating
         ? {
@@ -186,6 +193,15 @@ export default async function TutorProfileRoute(
           }
         : {}),
     }
+    breadcrumbLd = {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'მთავარი', item: SITE_URL },
+        { '@type': 'ListItem', position: 2, name: 'ექსპერტები', item: `${SITE_URL}/tutors` },
+        { '@type': 'ListItem', position: 3, name },
+      ],
+    }
   }
 
   return (
@@ -194,6 +210,12 @@ export default async function TutorProfileRoute(
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      {breadcrumbLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
         />
       )}
       <ExpertProfilePage initialTutor={initialTutor} initialUser={initialUser} />

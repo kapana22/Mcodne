@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const rl = rateLimit(`pwchange:${user.id}`, 5, 15 * 60)
   if (!rl.ok) return NextResponse.json({ ok: false, error: 'RATE_LIMITED', retryInSec: rl.retryInSec }, { status: 429 })
 
-  const parsed = Body.safeParse(await req.json())
+  const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
   const ok = await verifyPassword(parsed.data.currentPassword, user.passwordHash)

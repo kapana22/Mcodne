@@ -4,6 +4,9 @@
 // throw in any /student page took down the whole tree with the default
 // unstyled crash screen. Compact per canon: icon + one line + one action.
 
+import { useEffect } from 'react'
+import { reportClientError } from '@/lib/reportError'
+
 export default function StudentError({
   error,
   reset,
@@ -11,6 +14,9 @@ export default function StudentError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    reportClientError('render', error.message, error.stack, error.digest)
+  }, [error])
   return (
     <div className="min-h-[60vh] flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-[420px] py-12 px-6 text-center rounded-card border border-ink-200 bg-white">

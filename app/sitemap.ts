@@ -5,6 +5,14 @@ import { prisma } from '@/lib/prisma'
 // for public routes, then splice in tutor detail pages sourced directly from
 // Prisma. A hard cap of 5000 keeps the file well under the 50k / 50MB limit
 // even if the tutor catalog grows.
+//
+// force-dynamic: generate at REQUEST time, never at build. Railway's build
+// container can't reach the DB, so a statically-built sitemap silently drops
+// every tutor profile + blog post (the try/catch below returns []) and ships
+// only the static routes — exactly the "experts aren't in the sitemap" bug.
+// Reading per-request (crawlers hit this rarely) guarantees the full catalog.
+export const dynamic = 'force-dynamic'
+
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
 const STATIC_ROUTES: Array<{
@@ -14,6 +22,7 @@ const STATIC_ROUTES: Array<{
 }> = [
   { path: '/', changeFrequency: 'daily', priority: 1.0 },
   { path: '/tutors', changeFrequency: 'daily', priority: 0.9 },
+  { path: '/categories', changeFrequency: 'weekly', priority: 0.7 },
   { path: '/apply', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/blog', changeFrequency: 'weekly', priority: 0.6 },
@@ -54,5 +63,42 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     tutorEntries = []
   }
 
-  return [...staticEntries, ...tutorEntries]
+  // Published blog posts (admin CMS). Same DB-unreachable fallback as tutors.
+  let postEntries: MetadataRoute.Sitemap = []
+  try {
+    const posts = await prisma.post.findMany({
+      where: { status: 'PUBLISHED' },
+      select: { slug: true, updatedAt: true },
+      orderBy: { publishedAt: 'desc' },
+      take: 1000,
+    })
+    postEntries = posts.map((p) => ({
+      url: `${SITE_URL}/blog/${p.slug}`,
+      lastModified: p.updatedAt ?? now,
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    }))
+  } catch {
+    postEntries = []
+  }
+
+  // Category landing pages (/categories/[slug]) — live categories only.
+  let categoryEntries: MetadataRoute.Sitemap = []
+  try {
+    const cats = await prisma.category.findMany({
+      where: { isLive: true },
+      select: { slug: true },
+      take: 500,
+    })
+    categoryEntries = cats.map((c) => ({
+      url: `${SITE_URL}/categories/${c.slug}`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    }))
+  } catch {
+    categoryEntries = []
+  }
+
+  return [...staticEntries, ...tutorEntries, ...postEntries, ...categoryEntries]
 }

@@ -1,22 +1,34 @@
 'use client'
 import React, { useState, useEffect, Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { PublicTopBar } from '@/components/PublicTopBar'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
+import { StudentAppBar } from '@/components/StudentAppBar'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 import { KA_MONTHS_SHORT } from '@/lib/kaDate'
 import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
 import { SignInPromptBanner } from '@/components/SignInPromptBanner'
 import { Sheet } from '@/components/Sheet'
+import { Container } from '@/components/Container'
+import { Eyebrow } from '@/components/Eyebrow'
 import { PAYMENTS_LIVE } from '@/lib/flags'
+import { frameQuestion } from '@/lib/askFraming'
 import { fmtRating } from '@/lib/fmt'
 import { useMe, type Me } from '@/lib/me'
 // ONE shared booking flow (DESIGN_FIX_PROMPT 1.1): the same component the
 // expert profile renders. It self-fetches /api/tutors/{id} on open, supports
 // consultation tiers (step 1) and the mandatory intake — QuickBookPopup's
 // diverging copy of all this was deleted.
-import { BookingFlow } from '@/components/booking/BookingFlow'
+// Lazy: the booking flow (calendar + date picker + steps) only mounts after a
+// "book" click, so it must not weigh down the initial browse-list JS. ssr:false
+// because it's a click-triggered modal — nothing to server-render.
+const BookingFlow = dynamic(
+  () => import('@/components/booking/BookingFlow').then(m => m.BookingFlow),
+  { ssr: false },
+)
 import { TUTOR_DEFAULTS, priceForDuration } from '@/components/booking/slots'
 
 
@@ -37,12 +49,20 @@ const VerifiedMark = ({ size = 18 }: { size?: number }) => (
 // filter client-side by category NAME (label). `slug` is retained only to map
 // legacy /tutors?category=<slug> deep links back to their label on load.
 const QUICK_CATS: { slug: string; label: string }[] = [
-  { slug: 'business',   label: 'ბიზნესი' },
-  { slug: 'finance',    label: 'ფინანსები' },
-  { slug: 'career',     label: 'კარიერა' },
-  { slug: 'marketing',  label: 'მარკეტინგი' },
-  { slug: 'law',        label: 'სამართალი' },
-  { slug: 'psychology', label: 'ფსიქოლოგია' },
+  { slug: 'business',    label: 'ბიზნესი' },
+  { slug: 'tax',         label: 'გადასახადები' },
+  { slug: 'finance',     label: 'ფინანსები' },
+  { slug: 'law',         label: 'სამართალი' },
+  { slug: 'marketing',   label: 'მარკეტინგი' },
+  { slug: 'sales',       label: 'გაყიდვები' },
+  { slug: 'it',          label: 'IT' },
+  { slug: 'product',     label: 'პროდაქტი' },
+  { slug: 'design',      label: 'დიზაინი' },
+  { slug: 'career',      label: 'კარიერა' },
+  { slug: 'hr',          label: 'HR' },
+  { slug: 'real-estate', label: 'უძრავი ქონება' },
+  { slug: 'relocation',  label: 'რელოკაცია' },
+  { slug: 'crypto',      label: 'კრიპტო' },
 ]
 
 
@@ -87,15 +107,77 @@ const CheckOpt = ({ label, on, onToggle }: { label: string; on: boolean; onToggl
   </button>
 )
 
-// Price filter is a MINIMUM floor only — the apply logic filters on
-// `t.price < filters.price[0]` and ignores the upper bound, so these options
-// are floors (not ranges). Labels say "from ₾N" to match what actually happens.
-const PRICE_OPTS: { min: number; l: string }[] = [
-  { min: 0, l: 'ნებისმიერი ფასი' },
-  { min: 40, l: '₾40-დან' },
-  { min: 80, l: '₾80-დან' },
-  { min: 120, l: '₾120-დან' },
+// Price filter is now a BUDGET BAND (min + max), so budget-sensitive buyers
+// (law / therapy / finance) can cap spend, not just set a floor. NO_CAP is the
+// "no upper bound" sentinel; the apply logic honors both bounds.
+const NO_CAP = 99999
+const PRICE_OPTS: { min: number; max: number; l: string }[] = [
+  { min: 0, max: NO_CAP, l: 'ნებისმიერი ფასი' },
+  { min: 0, max: 50, l: '₾50-მდე' },
+  { min: 50, max: 100, l: '₾50–100' },
+  { min: 100, max: NO_CAP, l: '₾100+' },
 ]
+const priceBandActive = (lo: number, hi: number) => lo > 0 || hi < NO_CAP
+function priceBandLabel(lo: number, hi: number): string {
+  if (!priceBandActive(lo, hi)) return 'ნებისმიერი'
+  const match = PRICE_OPTS.find(o => o.min === lo && o.max === hi)
+  if (match) return match.l
+  if (hi >= NO_CAP) return `₾${lo}+`
+  if (lo === 0) return `₾${hi}-მდე`
+  return `₾${lo}–${hi}`
+}
+
+// Draggable dual-handle budget slider. Prices sit ~₾60–150 today, so 0–300 with
+// a ₾10 step covers the range with headroom; the top handle at PRICE_MAX means
+// "no upper bound" (NO_CAP). The apply logic already honours arbitrary [lo,hi],
+// so nothing downstream changes — this just replaces the preset radio/pills.
+const PRICE_MIN = 0
+const PRICE_MAX = 300
+const PRICE_STEP = 10
+
+function PriceRange({ value, onChange }: { value: [number, number]; onChange: (v: [number, number]) => void }) {
+  const [lo, hiRaw] = value
+  const hi = hiRaw >= NO_CAP ? PRICE_MAX : hiRaw
+  const active = priceBandActive(lo, hiRaw)
+  const setLo = (n: number) => onChange([Math.max(PRICE_MIN, Math.min(n, hi - PRICE_STEP)), hiRaw])
+  const setHi = (n: number) => {
+    const next = Math.max(n, lo + PRICE_STEP)
+    onChange([lo, next >= PRICE_MAX ? NO_CAP : next])
+  }
+  return (
+    <div className="px-1 pt-1 pb-1.5">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[13px] font-display font-bold text-ink-900 tabular-nums">
+          {active ? `₾${lo} – ${hiRaw >= NO_CAP ? `₾${PRICE_MAX}+` : `₾${hiRaw}`}` : 'ნებისმიერი'}
+        </span>
+        {active && (
+          <button type="button" onClick={() => onChange([0, NO_CAP])} className="text-[11.5px] font-display font-semibold text-ink-500 hover:text-ink-800 transition-colors">
+            გასუფთავება
+          </button>
+        )}
+      </div>
+      <div className="relative h-6">
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-ink-200" />
+        <div className="absolute top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-brand-500" style={{ left: `${(lo / PRICE_MAX) * 100}%`, right: `${100 - (hi / PRICE_MAX) * 100}%` }} />
+        <input
+          aria-label="მინიმალური ფასი" type="range" min={PRICE_MIN} max={PRICE_MAX} step={PRICE_STEP} value={lo}
+          onChange={e => setLo(Number(e.target.value))}
+          className="range-thumb absolute inset-x-0 top-0 w-full h-6"
+          style={{ zIndex: lo >= PRICE_MAX - PRICE_STEP ? 5 : 3 }}
+        />
+        <input
+          aria-label="მაქსიმალური ფასი" type="range" min={PRICE_MIN} max={PRICE_MAX} step={PRICE_STEP} value={hi}
+          onChange={e => setHi(Number(e.target.value))}
+          className="range-thumb absolute inset-x-0 top-0 w-full h-6" style={{ zIndex: 4 }}
+        />
+      </div>
+      <div className="flex items-center justify-between mt-2 text-[11px] text-ink-400 tabular-nums">
+        <span>₾{PRICE_MIN}</span>
+        <span>₾{PRICE_MAX}+</span>
+      </div>
+    </div>
+  )
+}
 
 const toggleIn = (arr: string[], v: string) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]
 
@@ -108,14 +190,14 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, l
   const headingLabel =
     filters.cats.length === 1 ? filters.cats[0]
     : filters.cats.length > 1 ? `${filters.cats.length} სფერო`
-    : search.trim() ? `„${search.trim()}"`
+    : search.trim() ? `„${search.trim()}“`
     : null
-  const priceVal = filters.price[0] === 0 ? 'ნებისმიერი' : `₾${filters.price[0]}-დან`
+  const priceVal = priceBandLabel(filters.price[0], filters.price[1])
   const langVal = filters.langs.length === 0 ? 'ნებისმიერი ენა' : filters.langs.length === 1 ? filters.langs[0] : `${filters.langs.length} ენა`
   const availVal = filters.available.length === 0 ? 'ნებისმიერ დროს' : filters.available.map(id => FILTER_AVAIL.find(a => a.id === id)?.l ?? id).join(', ')
   return (
     <section className="bg-white border-b border-ink-200">
-      <div className="max-w-[1280px] mx-auto px-6 sm:px-8 pt-8 pb-6">
+      <Container className="pt-8 pb-6">
         <nav aria-label="ნავიგაცია" className="flex items-center gap-1.5 text-[12px] text-ink-500 mb-4">
           <Link href="/" className="hover:text-ink-800 transition-colors">მთავარი</Link>
           <Icon.chevR className="w-3 h-3 text-ink-300" />
@@ -131,7 +213,7 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, l
               : <><span className="tabular-nums">{total}</span> ექსპერტი შენთვის</>}
         </h1>
         {/* Honest by flag: only claim escrow once the payment gateway is live. */}
-        <p className="text-[13.5px] text-ink-500 mt-2">ხელით გადამოწმებული პროფესიონალები · გამჭვირვალე ფასი · {PAYMENTS_LIVE ? 'escrow-დაცული' : 'დაჯავშნა უფასოა'}</p>
+        <p className="text-[13.5px] text-ink-500 mt-2">ხელით გადამოწმებული პროფესიონალები · გამჭვირვალე ფასი · {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'დაჯავშნა უფასოა'}</p>
 
         {/* Preply-style filter bar — labeled dropdown boxes on desktop.
             Below lg the four dropdowns would stack into ~1.5 screens of
@@ -143,16 +225,10 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, l
           <FilterBox label="სფერო" value={catVal} active={filters.cats.length > 0}>
             {FILTER_CATS.map(c => <CheckOpt key={c.l} label={c.l} on={filters.cats.includes(c.l)} onToggle={() => setFilters({ ...filters, cats: toggleIn(filters.cats, c.l) })} />)}
           </FilterBox>
-          <FilterBox label="ფასი / სესია" value={priceVal} active={filters.price[0] > 0}>
-            {PRICE_OPTS.map(o => {
-              const on = filters.price[0] === o.min
-              return (
-                <button key={o.l} type="button" onClick={() => setFilters({ ...filters, price: [o.min, 200] })} className="w-full flex items-center gap-2.5 px-2 py-2 rounded-btn hover:bg-ink-50 text-left transition-colors">
-                  <span className={`w-4 h-4 rounded-full border-[1.5px] inline-flex items-center justify-center shrink-0 ${on ? 'border-brand-500' : 'border-ink-300'}`}>{on && <span className="w-2 h-2 rounded-full bg-brand-500" />}</span>
-                  <span className="text-[13px] text-ink-800">{o.l}</span>
-                </button>
-              )
-            })}
+          <FilterBox label="ფასი / სესია" value={priceVal} active={priceBandActive(filters.price[0], filters.price[1])}>
+            <div className="w-[240px] max-w-[calc(100vw-3rem)]">
+              <PriceRange value={filters.price} onChange={p => setFilters({ ...filters, price: p })} />
+            </div>
           </FilterBox>
           <FilterBox label="ენა" value={langVal} active={filters.langs.length > 0}>
             {FILTER_LANGS.map(l => <CheckOpt key={l.l} label={l.l} on={filters.langs.includes(l.l)} onToggle={() => setFilters({ ...filters, langs: toggleIn(filters.langs, l.l) })} />)}
@@ -161,7 +237,7 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, l
             {FILTER_AVAIL.map(a => <CheckOpt key={a.id} label={a.l} on={filters.available.includes(a.id)} onToggle={() => setFilters({ ...filters, available: toggleIn(filters.available, a.id) })} />)}
           </FilterBox>
           <button type="button" onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })} className={`h-[52px] px-4 rounded-card border font-display text-[13px] font-bold inline-flex items-center gap-2 transition-all ${filters.superOnly ? 'border-brand-500 bg-brand-50/40 text-brand-800 ring-1 ring-brand-200' : 'border-ink-200 hover:border-ink-300 bg-white text-ink-800'}`}>
-            <Icon.spark className="w-4 h-4 text-warning-500" /> Super
+            <Icon.spark className="w-4 h-4 text-ink-400" /> Super
           </button>
           </div>
           <div className="flex-1 min-w-[220px] bg-white rounded-card border border-ink-200 flex items-stretch focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100 transition-all">
@@ -180,7 +256,7 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, l
             onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })}
             className={`shrink-0 h-10 px-3.5 rounded-pill border font-display text-[12.5px] font-semibold inline-flex items-center gap-1.5 transition-colors ${filters.superOnly ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-ink-200 bg-white text-ink-700'}`}
           >
-            <Icon.spark className="w-3.5 h-3.5 text-warning-500" /> Super
+            <Icon.spark className="w-3.5 h-3.5 text-ink-400" /> Super
           </button>
           {FILTER_CATS.map(c => {
             const on = filters.cats.includes(c.l)
@@ -196,7 +272,7 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, l
             )
           })}
         </div>
-      </div>
+      </Container>
     </section>
   )
 }
@@ -216,11 +292,19 @@ type Filters = {
 // otherwise the client-side filter won't match anything.
 const FILTER_CATS = [
   { l: 'ბიზნესი', c: 0 },
+  { l: 'გადასახადები', c: 0 },
   { l: 'ფინანსები', c: 0 },
-  { l: 'კარიერა', c: 0 },
-  { l: 'მარკეტინგი', c: 0 },
   { l: 'სამართალი', c: 0 },
-  { l: 'ფსიქოლოგია', c: 0 },
+  { l: 'მარკეტინგი', c: 0 },
+  { l: 'გაყიდვები', c: 0 },
+  { l: 'IT', c: 0 },
+  { l: 'პროდაქტი', c: 0 },
+  { l: 'დიზაინი', c: 0 },
+  { l: 'კარიერა', c: 0 },
+  { l: 'HR', c: 0 },
+  { l: 'უძრავი ქონება', c: 0 },
+  { l: 'რელოკაცია', c: 0 },
+  { l: 'კრიპტო', c: 0 },
 ]
 
 // No counts here on purpose — the old hardcoded numbers (142/98/…) were
@@ -278,7 +362,7 @@ const FiltersPanel = ({ filters, setFilters, total, onReset, variant = 'sidebar'
     filters.cats.length + filters.langs.length + filters.available.length +
     (filters.minRating > 0 ? 1 : 0) +
     (filters.superOnly ? 1 : 0) +
-    (filters.price[0] > 0 ? 1 : 0)
+    (priceBandActive(filters.price[0], filters.price[1]) ? 1 : 0)
 
   const isDrawer = variant === 'drawer'
 
@@ -322,7 +406,7 @@ const FiltersPanel = ({ filters, setFilters, total, onReset, variant = 'sidebar'
             </button>
             <div className="min-w-0 flex-1">
               <div className="font-display text-[12.5px] font-bold text-ink-900 inline-flex items-center gap-1.5">
-                <Icon.spark className="w-3 h-3 text-warning-500" />
+                <Icon.spark className="w-3 h-3 text-ink-400" />
                 მხოლოდ Super-ექსპერტი
               </div>
               <p className="text-[11.5px] text-ink-500 mt-0.5 leading-snug">100+ სესია · 4.9+ · გადამოწმებული</p>
@@ -343,35 +427,10 @@ const FiltersPanel = ({ filters, setFilters, total, onReset, variant = 'sidebar'
             </div>
           </FilterSection>
 
-          {/* Minimum-only price slider. Only a lower bound is applied — there is
-              no upper ceiling, so expensive experts are never silently hidden
-              (the old default [40,200] dropped everyone priced above ₾200). */}
+          {/* Budget bands (min + max) — mirrors the desktop dropdown so mobile
+              buyers can cap spend, not just set a floor. */}
           <FilterSection title="ფასი" defaultOpen={false}>
-            <div className="flex items-baseline justify-between mb-3">
-              <span className="font-display text-[15px] font-bold text-ink-900 tabular-nums">{filters.price[0] > 0 ? `₾${filters.price[0]}+` : 'ნებისმიერი'}</span>
-              <span className="text-[11px] text-ink-500">მინ. ფასი</span>
-            </div>
-            <div className="relative h-6 flex items-center">
-              <div className="absolute left-0 right-0 h-1 rounded-pill bg-ink-100" />
-              <div
-                className="absolute h-1 rounded-pill bg-brand-500"
-                style={{
-                  left:  `${(filters.price[0] / 300) * 100}%`,
-                  right: 0,
-                }}
-              />
-              <input
-                type="range" min={0} max={300} step={5}
-                value={filters.price[0]}
-                onChange={e => setFilters({ ...filters, price: [Number(e.target.value), filters.price[1]] })}
-                className="absolute inset-0 w-full appearance-none bg-transparent cursor-pointer accent-brand-500"
-                style={{ pointerEvents: 'auto' }}
-              />
-            </div>
-            <div className="mt-2 flex items-center justify-between text-[11px] text-ink-500 tabular-nums">
-              <span>₾0</span>
-              <span>₾300+</span>
-            </div>
+            <PriceRange value={filters.price} onChange={p => setFilters({ ...filters, price: p })} />
           </FilterSection>
 
           <FilterSection title="ენა" defaultOpen={false}>
@@ -517,11 +576,8 @@ function fmtNextSlot(iso: string): string {
 
 // Neutral initials-avatar SVG for tutors without an uploaded photo. Kept as a
 // data URI so no external round-trip and no stock-photo tied to a real name.
-function initialsAvatarSvg(name: string): string {
-  const initials = (name || 'ე ე').split(' ').map(s => s[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()
-  return `data:image/svg+xml;utf8,${encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400'><rect width='400' height='400' fill='#e5e5e9'/><text x='200' y='240' font-family='sans-serif' font-size='150' fill='#7a7a82' text-anchor='middle'>${initials}</text></svg>`,
-  )}`
+function initialsAvatarSvg(_name: string): string {
+  return DEFAULT_AVATAR
 }
 
 // The FIRST-PAINT list is now seeded by the server (app/tutors/page.tsx calls
@@ -557,9 +613,11 @@ function mapTutorRow(t: any, i: number): Tutor {
     // Only show the play button when we have a real video URL.
     video: Boolean(t.videoUrl),
     verified: t.verified ?? false,
-    // Super = verified AND consistently top-rated — same rule as the
-    // detail page's "Super expert" label (verified && rating ≥ 4.8).
-    superExpert: (t.verified ?? false) && (t.rating ?? 0) >= 4.8,
+    // Super is now admin-gated: an expert must be verified, top-rated AND
+    // admin-featured — so the badge is a deliberate distinction (controlled via
+    // the admin FeaturedToggle), not something that lands on everyone with a
+    // high rating.
+    superExpert: (t.verified ?? false) && (t.rating ?? 0) >= 4.8 && Boolean(t.featured),
     nextSlotAt: t.nextSlotAt ?? null,
     consultationDurationMin: typeof t.consultationDurationMin === 'number' ? t.consultationDurationMin : TUTOR_DEFAULTS.durationMin,
     responseHours: typeof t.responseHours === 'number' ? t.responseHours : undefined,
@@ -585,10 +643,20 @@ function isTutorBookable(nextSlotAt?: string | null): boolean {
 
 /*/* ───── "Available now" pill — instant-booking indicator ───── */
 /* ───── Tutor card — mirrors landing.tsx ExpertCard ───── */
-const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSignIn }: { t: Tutor; idx: number; onPreviewEnter: (t: Tutor, anchor: HTMLElement) => void; onBook: (t: Tutor) => void; saved: boolean; onToggleFav: (tutorId: string) => void; needsSignIn?: boolean }) => {
+// Language code → Georgian display name for the card's „ენები" line.
+const LANG_NAMES: Record<string, string> = {
+  ka: 'ქართული', en: 'English', ru: 'რუსული', de: 'გერმანული', fr: 'ფრანგული',
+  es: 'ესპანური', it: 'იტალიური', tr: 'თურქული', hy: 'სომხური', az: 'აზერბ.',
+}
+const fmtLangs = (langs: string[]) => (langs ?? []).map(l => LANG_NAMES[l] ?? l).join(', ')
+
+const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSignIn, viewerCantBook = false, viewerCantFav = false }: { t: Tutor; idx: number; onPreviewEnter: (t: Tutor, anchor: HTMLElement) => void; onBook: (t: Tutor) => void; saved: boolean; onToggleFav: (tutorId: string) => void; needsSignIn?: boolean; viewerCantBook?: boolean; viewerCantFav?: boolean }) => {
   // Prefer the tutor's real avatar; fall back to an initials placeholder so we
   // never render a random pravatar face over a real name (crawler-safe).
   const photoSrc = t.avatarUrl || initialsAvatarSvg(t.name)
+  // Inline video-on-hover (Preply-style). Only the hovered card mounts an
+  // (muted, looping) iframe, so we never autoplay every video at once.
+  const [vhover, setVhover] = useState(false)
   // Advertise the expert's real consultation length + their flat, self-set
   // price (t.price is exactly what the expert charges — see priceForDuration).
   const dur = t.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin
@@ -596,6 +664,9 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
   // StickyBookingCard uses — so the card never promises a booking the profile
   // will deny with "no published slots".
   const bookable = isTutorBookable(t.nextSlotAt)
+  // Video plays INLINE inside the photo on hover (Preply-style) — no permanent
+  // panel cluttering the list. Play button opens the full VideoPreview modal.
+  const ytId = tutorYouTubeId(t)
   return (
     <article className="group relative rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift overflow-hidden flex flex-col">
       {/* Mobile: the whole card taps through to the profile (overlay-link
@@ -631,14 +702,17 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
             <Icon.play className="w-4 h-4 ml-0.5" />
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => onToggleFav(t.id)}
-          aria-label={saved ? 'შენახული' : 'შენახვა'}
-          className={`absolute bottom-3 left-3 z-10 w-10 h-10 inline-flex items-center justify-center rounded-full backdrop-blur transition-colors ${saved ? 'text-danger-600 bg-white/95' : 'text-ink-700 bg-white/80 hover:bg-white'}`}
-        >
-          {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
-        </button>
+        {/* Save/favorite is a client-only feature (server 403s non-students). */}
+        {!viewerCantFav && (
+          <button
+            type="button"
+            onClick={() => onToggleFav(t.id)}
+            aria-label={saved ? 'შენახული' : 'შენახვა'}
+            className={`absolute bottom-3 left-3 z-10 w-10 h-10 inline-flex items-center justify-center rounded-full backdrop-blur transition-colors ${saved ? 'text-danger-600 bg-white/95' : 'text-ink-700 bg-white/80 hover:bg-white'}`}
+          >
+            {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
+          </button>
+        )}
       </div>
 
       {/* Desktop — Preply-style horizontal card: photo │ content+stats │ price+CTA rail */}
@@ -648,23 +722,34 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
             separate small stopPropagation target (the play circle only), so it
             no longer swallows every click on the face. */}
         <div className="shrink-0">
-          <div className="relative w-[132px] h-[132px] rounded-card overflow-hidden bg-ink-100 group/photo ring-1 ring-inset ring-ink-900/[0.06] shadow-xs">
+          <div
+            className="relative w-[132px] h-[132px] rounded-card overflow-hidden bg-ink-100 group/photo ring-1 ring-inset ring-ink-900/[0.06] shadow-xs"
+            onMouseEnter={() => { if (t.video && ytId) setVhover(true) }}
+            onMouseLeave={() => setVhover(false)}
+          >
             <Link href={`/tutors/${t.id}`} aria-label={`${t.name} — პროფილი`} className="absolute inset-0 block">
-              <img src={photoSrc} alt={t.name} className="absolute inset-0 w-full h-full object-cover" />
+              <img src={photoSrc} alt={t.name} decoding="async" className="absolute inset-0 w-full h-full object-cover" />
             </Link>
-            {/* The old bare green availability dot moved into the right rail as
-                a worded next-slot line (same fmtNextSlot the mobile card uses). */}
             {t.video && (
               <>
+                {/* Hover → the intro video plays right inside the photo. */}
+                {vhover && ytId && (
+                  <iframe
+                    className="absolute inset-0 w-full h-full z-10 pointer-events-none"
+                    src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&playsinline=1&rel=0`}
+                    allow="autoplay; encrypted-media"
+                    title={`${t.name} — ვიდეო`}
+                  />
+                )}
+                {/* Play badge: hints a video exists; click opens the full modal. */}
                 <button
                   type="button"
-                  aria-label="ვიდეო-გაცნობა"
+                  aria-label="ვიდეოგაცნობა"
                   onClick={e => { e.stopPropagation(); onPreviewEnter(t, e.currentTarget) }}
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 shadow-pop ring-1 ring-black/5 inline-flex items-center justify-center group-hover/photo:scale-105 transition-transform"
+                  className="absolute bottom-1.5 right-1.5 z-20 w-8 h-8 rounded-full bg-brand-500 text-white shadow-brand-glow inline-flex items-center justify-center group-hover/photo:scale-105 transition-transform"
                 >
-                  <Icon.play className="w-4 h-4 text-brand-700 ml-0.5" />
+                  <Icon.play className="w-3.5 h-3.5 ml-0.5" />
                 </button>
-                <span className="pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 h-4 px-1.5 rounded-pill bg-accent-950/70 backdrop-blur text-white font-display text-[8.5px] font-bold uppercase tracking-[0.12em]">ვიდეო</span>
               </>
             )}
           </div>
@@ -678,7 +763,7 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
             </h3>
             {t.verified && <VerifiedMark size={14} />}
             {t.superExpert && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-pill bg-warning-50 border border-warning-200 text-warning-700 font-display text-[9.5px] font-bold uppercase tracking-[0.12em]">
+              <span className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-[9.5px] font-bold uppercase tracking-[0.12em]">
                 <Icon.spark className="w-2.5 h-2.5" /> Super
               </span>
             )}
@@ -688,12 +773,18 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
           <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
             {t.headline && (
               <>
-                <span className="inline-flex items-center h-[22px] px-2 rounded-pill bg-info-50 text-info-700 font-display text-[11px] font-semibold tracking-tight max-w-full truncate">{t.headline}</span>
+                <span className="inline-flex items-center h-[22px] px-2 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 font-display text-[11px] font-semibold tracking-tight max-w-full truncate">{t.headline}</span>
                 <span className="text-ink-300">·</span>
               </>
             )}
             <span className="font-display text-[12px] font-medium text-ink-500">{t.cat}</span>
           </div>
+          {t.langs && t.langs.length > 0 && (
+            <div className="mt-1.5 inline-flex items-center gap-1.5 text-[11.5px] text-ink-500 max-w-full">
+              <Icon.globe className="w-3.5 h-3.5 text-ink-400 shrink-0" />
+              <span className="truncate">{fmtLangs(t.langs)}</span>
+            </div>
+          )}
           {/* Real-data demand proof: ჩატარებული სესია + response promise.
               Each fragment renders only when the real value exists; rating
               moved to the price rail (the scan anchor). */}
@@ -728,29 +819,36 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
                 </div>
               )}
             </div>
-            <button type="button" onClick={() => onToggleFav(t.id)} aria-label={saved ? 'შენახული' : 'შენახვა'} className={`h-8 w-8 rounded-btn inline-flex items-center justify-center transition-colors shrink-0 ${saved ? 'text-danger-600 bg-danger-50' : 'text-ink-400 hover:text-ink-700 hover:bg-ink-50'}`}>
-              {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
-            </button>
+            {!viewerCantFav && (
+              <button type="button" onClick={() => onToggleFav(t.id)} aria-label={saved ? 'შენახული' : 'შენახვა'} className={`h-8 w-8 rounded-btn inline-flex items-center justify-center transition-colors shrink-0 ${saved ? 'text-danger-600 bg-danger-50' : 'text-ink-400 hover:text-ink-700 hover:bg-ink-50'}`}>
+                {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
+              </button>
+            )}
           </div>
+          {/* Two-button CTA: booking is the primary niche, messaging the
+              secondary. A non-student (tutor/admin) can't book OR message, so
+              they get a single neutral note instead of dead-end buttons. */}
           <div className="mt-3 space-y-2">
-            {/* Same computed next-slot line the mobile card shows — replaces
-                the unexplained green dot the photo used to carry. */}
-            {t.nextSlotAt && (
-              <div className="inline-flex items-center gap-1 text-[11px] text-success-700">
-                <Icon.clock className="w-3 h-3" />
-                უახლოესი <span suppressHydrationWarning className="font-display font-semibold">{fmtNextSlot(t.nextSlotAt)}</span>
+            {viewerCantBook ? (
+              <div className="w-full h-11 rounded-btn bg-ink-75 border border-ink-200 text-ink-400 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center">
+                ჯავშანი მხოლოდ კლიენტს
               </div>
-            )}
-            {bookable ? (
-              <button type="button" onClick={() => onBook(t)} className="w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors shadow-xs">
-                {needsSignIn ? 'შესვლა & ჯავშანი' : 'დაჯავშნე'}
-              </button>
             ) : (
-              <button type="button" disabled title="ექსპერტს ჯერ არ აქვს გამოცხადებული სლოტები" className="w-full h-11 rounded-btn bg-ink-100 text-ink-400 font-display font-semibold text-[12px] tracking-wide inline-flex items-center justify-center gap-1.5 cursor-not-allowed">
-                <Icon.clock className="w-3.5 h-3.5" /> ხელმისაწვდომობა მალე
-              </button>
+              <>
+                {bookable ? (
+                  <button type="button" onClick={() => onBook(t)} className="w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors shadow-xs">
+                    {needsSignIn ? 'შესვლა და ჯავშანი' : 'დაჯავშნე'}
+                  </button>
+                ) : (
+                  <button type="button" disabled title="ამ ექსპერტს ჯერ არ აქვს გამოქვეყნებული თავისუფალი დრო — მიწერე პირდაპირ" className="w-full h-11 rounded-btn bg-ink-75 text-ink-400 border border-ink-200 cursor-not-allowed font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-1.5">
+                    დაჯავშნე
+                  </button>
+                )}
+                <Link href={`/tutors/${t.id}?intent=message`} className="w-full h-11 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors">
+                  <Icon.chat className="w-4 h-4" /> მიწერე ექსპერტს
+                </Link>
+              </>
             )}
-            {/* „პროფილი" button dropped — name and photo already link there. */}
           </div>
         </div>
       </div>
@@ -761,7 +859,7 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
           <h3 className="font-display text-[18px] font-bold text-ink-900 tracking-tight leading-[1.15] truncate">{t.name}</h3>
           {t.verified && <VerifiedMark size={14} />}
           {t.superExpert && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-pill bg-warning-50 border border-warning-200 text-warning-700 font-display text-[9.5px] font-bold uppercase tracking-[0.12em]">
+            <span className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-[9.5px] font-bold uppercase tracking-[0.12em]">
               <Icon.spark className="w-2.5 h-2.5" />
               Super
             </span>
@@ -772,7 +870,7 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
           {t.headline && (
             <>
               <span className="text-ink-300">·</span>
-              <span className="inline-flex items-center h-[22px] px-2 rounded-pill bg-info-50 text-info-700 font-display text-[11px] font-semibold tracking-tight max-w-full truncate">
+              <span className="inline-flex items-center h-[22px] px-2 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 font-display text-[11px] font-semibold tracking-tight max-w-full truncate">
                 {t.headline}
               </span>
             </>
@@ -781,18 +879,6 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
         <p className="mt-3 text-[13px] text-ink-700 leading-[1.55] line-clamp-2">{t.bio}</p>
         <div className="mt-3 pt-3 border-t border-ink-100 flex items-center gap-x-3 gap-y-1.5 text-[11px] text-ink-500 flex-wrap">
           <span className="tabular-nums"><span className="font-display font-semibold text-ink-800">{t.sessions}</span> სესია</span>
-          <span className="text-ink-300">·</span>
-          {t.nextSlotAt ? (
-            <span className="inline-flex items-center gap-1 text-success-700">
-              <Icon.clock className="w-3 h-3" />
-              უახლოესი <span suppressHydrationWarning className="font-display font-semibold ml-0.5">{fmtNextSlot(t.nextSlotAt)}</span>
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-ink-400">
-              <Icon.clock className="w-3 h-3" />
-              ხელმისაწვდომობა მალე
-            </span>
-          )}
         </div>
       </div>
 
@@ -805,33 +891,33 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
             ₾{priceForDuration(t.price, dur)}<span className="text-[11.5px] font-medium text-ink-500 ml-1">· {dur}-წუთიანი სესია</span>
           </span>
         </div>
-        {/* relative z-10: explicit actions stay above the mobile overlay link */}
+        {/* relative z-10: explicit actions stay above the mobile overlay link.
+            Two buttons — message (secondary) always present, book (primary)
+            disabled when the expert has no published slots. */}
         <div className="relative z-10 flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => onToggleFav(t.id)}
-            aria-label={saved ? 'შენახული' : 'შენახვა'}
-            className={`hidden sm:inline-flex h-10 w-10 rounded-btn border items-center justify-center transition-colors ${saved ? 'border-danger-200 bg-danger-50 text-danger-600' : 'border-ink-200 bg-white hover:border-ink-300 text-ink-500 hover:text-ink-800'}`}
-          >
-            {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
-          </button>
-          <Link href={`/tutors/${t.id}`} aria-label="ექსპერტის დეტალები" className="h-10 w-10 rounded-btn border border-ink-200 hover:border-ink-300 bg-white text-ink-500 hover:text-ink-800 inline-flex items-center justify-center transition-colors">
-            <Icon.arrow className="w-4 h-4" />
-          </Link>
-          {bookable ? (
-            <button type="button" onClick={() => onBook(t)} className="h-11 px-3.5 sm:px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast shadow-xs hover:shadow-sm">
-              {needsSignIn ? 'შესვლა & ჯავშანი' : 'დაიჯავშნე'} <Icon.arrow className="w-3.5 h-3.5" />
-            </button>
+          {viewerCantBook ? (
+            <span className="h-11 px-3.5 rounded-btn bg-ink-75 border border-ink-200 text-ink-400 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center">
+              მხოლოდ კლიენტს
+            </span>
           ) : (
-            <button
-              type="button"
-              disabled
-              title="ექსპერტს ჯერ არ აქვს გამოცხადებული სლოტები"
-              aria-label="ხელმისაწვდომობა მალე — ჯერ არ არის გამოცხადებული სლოტები"
-              className="h-11 px-3.5 sm:px-4 rounded-btn bg-ink-100 text-ink-400 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 cursor-not-allowed"
-            >
-              <Icon.clock className="w-3.5 h-3.5" /> ხელმისაწვდომობა მალე
-            </button>
+            <>
+              <Link
+                href={`/tutors/${t.id}?intent=message`}
+                aria-label="მიწერე ექსპერტს"
+                className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+              >
+                <Icon.chat className="w-3.5 h-3.5" /> მიწერე
+              </Link>
+              {bookable ? (
+                <button type="button" onClick={() => onBook(t)} className="h-11 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast shadow-xs hover:shadow-sm">
+                  {needsSignIn ? 'შესვლა და ჯავშანი' : 'დაჯავშნე'}
+                </button>
+              ) : (
+                <button type="button" disabled aria-label="დაჯავშნა მიუწვდომელია — თავისუფალი დრო არ არის" className="h-11 px-3.5 rounded-btn bg-ink-75 text-ink-400 border border-ink-200 cursor-not-allowed font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5">
+                  დაჯავშნე
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -887,7 +973,7 @@ const VideoPreview = ({ tutor, onClose, onBook }: { tutor: Tutor; onClose: () =>
             // unreachable when `t.video` gates the play button correctly, but
             // rendered defensively.
             <img
-              src={tutor.avatarUrl || initialsAvatarSvg(tutor.name)}
+              src={tutor.avatarUrl || DEFAULT_AVATAR}
               alt={tutor.name}
               className="absolute inset-0 w-full h-full object-cover"
             />
@@ -911,7 +997,7 @@ const VideoPreview = ({ tutor, onClose, onBook }: { tutor: Tutor; onClose: () =>
 
           {/* Tutor strip (over gradient) */}
           <div className="absolute left-3 right-3 bottom-2.5 flex items-center gap-2 pointer-events-none">
-            <img src={tutor.avatarUrl || initialsAvatarSvg(tutor.name)} alt={tutor.name} className="w-7 h-7 rounded-full ring-2 ring-white/30 object-cover" />
+            <img src={tutor.avatarUrl || DEFAULT_AVATAR} alt={tutor.name} className="w-7 h-7 rounded-full ring-2 ring-white/30 object-cover" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="font-display text-[12.5px] font-bold text-white tracking-tight truncate">{tutor.name}</span>
@@ -936,7 +1022,7 @@ const VideoPreview = ({ tutor, onClose, onBook }: { tutor: Tutor; onClose: () =>
           </div>
           <button type="button" onClick={() => { onBook(tutor); onClose() }} className="h-8 px-3 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[11.5px] tracking-wide inline-flex items-center gap-1 transition-colors shrink-0">
             <Icon.cal className="w-3 h-3" />
-            დაჯავშნა
+            დაჯავშნე
           </button>
         </div>
       </div>
@@ -1104,7 +1190,7 @@ const CompareModal = ({ open, tutors, onClose, onBook }: { open: boolean; tutors
 
   const Row = ({ label, value, isBest }: { label: string; value: React.ReactNode; isBest?: boolean }) => (
     <div className={`px-3 py-2.5 ${isBest ? 'bg-brand-50/60' : ''}`}>
-      <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-1">{label}</div>
+      <Eyebrow tone="muted" className="mb-1">{label}</Eyebrow>
       <div className={`font-display text-[14px] font-semibold tabular-nums ${isBest ? 'text-brand-800' : 'text-ink-900'}`}>{value}</div>
     </div>
   )
@@ -1125,19 +1211,18 @@ const CompareModal = ({ open, tutors, onClose, onBook }: { open: boolean; tutors
               <div key={t.id} className="border-r border-ink-100 last:border-r-0">
                 {/* Header */}
                 <div className="px-4 py-5 border-b border-ink-100 text-center">
-                  <img src={t.avatarUrl || initialsAvatarSvg(t.name)} alt={t.name} className="w-16 h-16 mx-auto rounded-full object-cover ring-2 ring-ink-200 mb-3" />
+                  <img src={t.avatarUrl || DEFAULT_AVATAR} alt={t.name} className="w-16 h-16 mx-auto rounded-full object-cover ring-2 ring-ink-200 mb-3" />
                   <div className="font-display text-[14px] font-bold text-ink-900 tracking-tight truncate">{t.name}</div>
                   <div className="text-[11px] text-ink-500 mt-0.5 truncate">{t.cat}</div>
-                  {t.superExpert && <span className="inline-flex items-center gap-1 mt-2 px-1.5 h-5 rounded-pill bg-warning-50 border border-warning-200 text-warning-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.spark className="w-2.5 h-2.5" /> Super</span>}
+                  {t.superExpert && <span className="inline-flex items-center gap-1 mt-2 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.spark className="w-2.5 h-2.5" /> Super</span>}
                 </div>
                 <Row label="რეიტინგი" isBest={t.rating === best.rating} value={<span className="inline-flex items-center gap-1"><Icon.star className="w-3.5 h-3.5 text-warning-500" />{fmtRating(t.rating)} · {t.reviews}</span>} />
                 <Row label="ჩატარდა სესია" isBest={t.sessions === best.sessions} value={<>{t.sessions.toLocaleString()}</>} />
                 <Row label="ფასი"          isBest={t.price === best.price}      value={<>₾{t.price}</>} />
                 <Row label="ენები"          value={<span className="text-[12px] text-ink-700 font-normal">{t.langs.join(' · ')}</span>} />
-                <Row label="უახლოესი დრო"  value={<span className="text-[12px] text-ink-700 font-normal">{t.next}</span>} />
                 <div className="p-3 border-t border-ink-100">
                   <button type="button" onClick={() => { onClose(); onBook(t) }} className="w-full h-10 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center justify-center gap-1.5 transition-colors">
-                    დაიჯავშნე <Icon.arrow className="w-3.5 h-3.5" />
+                    დაჯავშნე
                   </button>
                 </div>
               </div>
@@ -1174,6 +1259,9 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   // No skeleton on first paint — the seed already has data. Only a mount-time
   // `q` refetch (or a later search) flips this true.
   const [loading, setLoading] = useState(false)
+  // When a free-text search has no exact match, we show a category's experts as
+  // a fallback; this holds that category's label for the "showing X instead" note.
+  const [searchFallback, setSearchFallback] = useState<string | null>(null)
   const [favIds, setFavIds] = useState<Set<string>>(new Set())
   // Shared /api/me (lib/me) — deduped with the top bar + AppShell. `authKnown`
   // is the probe's `ready`: used to relabel the booking CTA ("შესვლა & ჯავშანი")
@@ -1181,6 +1269,14 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   // users before the probe returns.
   const { me, ready: authKnown } = useMe()
   const signedIn = !!me
+  // Dual-role model (2026-07-23): a TUTOR may act as a CLIENT and book another
+  // expert, so only an ADMIN truly can't book — mirror the detail page's guard.
+  // Favorites, however, remain STUDENT-only (the favorites API still 403s a
+  // TUTOR), so the two affordances need SEPARATE flags. Uses initialUser too so
+  // SSR doesn't flash the wrong control for a known role.
+  const viewerRoleForBook = (me ?? initialUser)?.role
+  const viewerCantBook = viewerRoleForBook === 'ADMIN'
+  const viewerCantFav = !!(viewerRoleForBook && viewerRoleForBook !== 'STUDENT')
   const [needsAuth, setNeedsAuth] = useState(false)
   const [authDismissed, setAuthDismissed] = useState(false)
   useEffect(() => {
@@ -1240,13 +1336,33 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   const fetchTutors = React.useCallback(async (q: string) => {
     setLoading(true)
     try {
+      const query = q.trim()
       const params = new URLSearchParams()
-      if (q.trim()) params.set('q', q.trim())
+      if (query) params.set('q', query)
       const res = await fetch(`/api/tutors${params.toString() ? `?${params}` : ''}`)
       if (!res.ok) return
       const data = await res.json()
       if (!Array.isArray(data)) return
+      // Free-text query with ZERO substring matches would dead-end on the empty
+      // state — but the placeholder actively invites natural-language phrasing
+      // ("გადასახადი", "კარიერული ნაბიჯი"). Fall back to the same rule-based
+      // category detection /ask uses and show that category's experts instead.
+      if (query && data.length === 0) {
+        const framing = frameQuestion(query)
+        if (framing.categorySlug) {
+          const catRes = await fetch(`/api/tutors?category=${encodeURIComponent(framing.categorySlug)}`)
+          if (catRes.ok) {
+            const catData = await catRes.json()
+            if (Array.isArray(catData) && catData.length > 0) {
+              setLiveTutors(mapRows(catData))
+              setSearchFallback(framing.categoryLabel)
+              return
+            }
+          }
+        }
+      }
       setLiveTutors(mapRows(data))
+      setSearchFallback(null)
     } catch {
       // keep whatever we had
     } finally {
@@ -1280,6 +1396,10 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   /* Shared booking flow — opens without leaving the page */
   const [quickBook, setQuickBook] = useState<Tutor | null>(null)
   const openBook = (t: Tutor) => {
+    // A signed-in non-student (TUTOR/ADMIN) can't book — the server 403s. Never
+    // open the flow for them (the cards also hide/relabel the CTA); guard here so
+    // every entry point (card, video preview, compare) is safe.
+    if (viewerCantBook) return
     if (!signedIn) {
       // Anonymous book-tap: previously this discarded the click, scrolled to
       // top and showed a banner far from the card. Instead carry the intent to
@@ -1323,12 +1443,12 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
       available: csv('avail'),
       minRating: num('minRating', 0),
       superOnly: p?.get('super') === '1',
-      price: [num('priceMin', 0), num('priceMax', 200)],
+      price: [num('priceMin', 0), num('priceMax', NO_CAP)],
     }
   })
 
   const resetFilters = () => setFilters({
-    cats: [], minRate: 0, langs: [], available: [], minRating: 0, superOnly: false, price: [0, 200],
+    cats: [], minRate: 0, langs: [], available: [], minRating: 0, superOnly: false, price: [0, NO_CAP],
   })
 
   // Category chip handlers — shared by the hero chips and (implicitly) the
@@ -1349,6 +1469,7 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
     if (filters.minRating > 0) url.set('minRating', String(filters.minRating))
     if (filters.superOnly) url.set('super', '1')
     if (filters.price[0] > 0) url.set('priceMin', String(filters.price[0]))
+    if (filters.price[1] < NO_CAP) url.set('priceMax', String(filters.price[1]))
     const qs = url.toString()
     router.replace(qs ? `/tutors?${qs}` : '/tutors', { scroll: false })
   }, [search, sort, filters, router])
@@ -1359,7 +1480,7 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
     if (k === 'avail') setFilters({ ...filters, available: filters.available.filter(x => x !== v) })
     if (k === 'rate')  setFilters({ ...filters, minRating: 0 })
     if (k === 'super') setFilters({ ...filters, superOnly: false })
-    if (k === 'price') setFilters({ ...filters, price: [0, 200] })
+    if (k === 'price') setFilters({ ...filters, price: [0, NO_CAP] })
   }
 
   const activeFilters: { k: string; v: string }[] = [
@@ -1368,7 +1489,7 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
     ...filters.available.map(a => ({ k: 'avail', v: a })),
     ...(filters.minRating > 0 ? [{ k: 'rate', v: `${filters.minRating}+ ★` }] : []),
     ...(filters.superOnly ? [{ k: 'super', v: 'Super-ექსპერტი' }] : []),
-    ...(filters.price[0] > 0 ? [{ k: 'price', v: `მინ. ₾${filters.price[0]}` }] : []),
+    ...(priceBandActive(filters.price[0], filters.price[1]) ? [{ k: 'price', v: priceBandLabel(filters.price[0], filters.price[1]) }] : []),
   ]
 
   // Apply sidebar filters + sort client-side on top of the API-loaded list.
@@ -1378,9 +1499,8 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
     let out = liveTutors.filter(t => {
       if (filters.superOnly && !t.superExpert) return false
       if (filters.minRating > 0 && (t.rating ?? 0) < filters.minRating) return false
-      // Minimum-only price filter — no upper ceiling, so expensive experts are
-      // never silently hidden.
-      if (t.price < filters.price[0]) return false
+      // Budget band — honor both the floor and the cap (NO_CAP = no ceiling).
+      if (t.price < filters.price[0] || t.price > filters.price[1]) return false
       if (filters.cats.length > 0 && !filters.cats.includes(t.cat)) return false
       if (filters.langs.length > 0) {
         const hasLang = t.langs.some(l => filters.langs.includes(l))
@@ -1420,13 +1540,23 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   useEffect(() => { if (page > totalPages) setPage(totalPages) }, [totalPages, page])
   const pagedTutors = visibleTutors.slice((page - 1) * PER_PAGE, page * PER_PAGE)
 
+  // A signed-in STUDENT browsing the catalog keeps THEIR workspace shell (with
+  // „ექსპერტები" active + Logo→/student) instead of the public header — so they
+  // never feel they left their account and always have a way back. Guests and
+  // tutors/admins keep the public header. `initialUser` seeds SSR so the header
+  // doesn't flip on hydration; `me` refreshes it after the /api/me probe.
+  const viewer = me ?? initialUser ?? null
+  const studentShell = viewer?.role === 'STUDENT'
+
   return (
     <div className="font-sans bg-white text-ink-900 antialiased">
-      <PublicTopBar activeHref="/tutors" initialUser={initialUser} />
+      {studentShell
+        ? <StudentAppBar user={viewer ? { name: viewer.fullName, avatar: viewer.avatarUrl } : undefined} />
+        : <PublicTopBar activeHref="/tutors" initialUser={initialUser} />}
 
       <SearchHero filters={filters} setFilters={setFilters} search={search} setSearch={setSearch} onSearch={runSearch} total={total} loading={loading} />
 
-      <main id="main" className="max-w-[1280px] mx-auto px-6 sm:px-8 py-8 sm:py-10 lg:py-14">
+      <Container as="main" id="main" className="py-8 sm:py-10 lg:py-14">
         {needsAuth && !authDismissed && !signedIn && (
           <SignInPromptBanner
             onDismiss={() => setAuthDismissed(true)}
@@ -1448,6 +1578,18 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
               onOpenFilters={() => setFiltersOpen(true)}
               activeCount={activeFilters.length}
             />
+
+            {/* Search fallback note — the query had no exact match, so we're
+                showing a detected category's experts instead of a dead end. */}
+            {searchFallback && !loading && (
+              <div className="mb-4 flex items-start gap-2.5 rounded-card border border-ink-200 bg-ink-50/60 px-4 py-3 text-[12.5px] text-ink-700">
+                <Icon.search className="w-4 h-4 mt-0.5 text-ink-400 shrink-0" />
+                <span>
+                  {search.trim() && <>„<span className="font-display font-semibold text-ink-900">{search.trim()}</span>“ — ზუსტი დამთხვევა არ არის. </>}
+                  ვაჩვენებთ <span className="font-display font-semibold text-ink-900">{searchFallback}</span>-ის ექსპერტებს.
+                </span>
+              </div>
+            )}
 
             <div className={`relative space-y-3 motion-safe:transition-opacity ${loading && liveTutors.length > 0 ? 'opacity-60' : ''}`}>
               {/* Refetch indicator — the first-paint skeleton below only covers
@@ -1478,21 +1620,40 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
                   ))}
                 </div>
               ) : visibleTutors.length === 0 ? (
-                // Compact canon empty state — icon + one line + one action.
-                // (The mailto helper card right below already covers "ask us".)
-                <div className="py-12 px-6 text-center rounded-card border border-dashed border-ink-200 bg-white motion-safe:animate-fade-in">
-                  <div className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-brand-50 text-brand-600 mb-3">
-                    <Icon.search className="w-5 h-5" />
+                // Compact canon empty state — icon + one line + one action. Two
+                // distinct cases: a COLD marketplace (no experts exist at all →
+                // "clear filters" would be a dead no-op) vs a filter/search that
+                // matched nothing (offer the reset).
+                liveTutors.length === 0 ? (
+                  <div className="py-12 px-6 text-center rounded-card border border-dashed border-ink-200 bg-white motion-safe:animate-fade-in">
+                    <div className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-ink-100 text-ink-500 mb-3">
+                      <Icon.search className="w-5 h-5" />
+                    </div>
+                    <div className="font-display text-[15.5px] font-bold text-ink-900 tracking-tight">
+                      ექსპერტები მალე დაემატება
+                    </div>
+                    <p className="text-[12.5px] text-ink-500 mt-1.5 max-w-[360px] mx-auto leading-snug">
+                      ბაზა იზრდება — დაგვიტოვე კითხვა და მოგწერთ, როგორც კი შესაფერისი ექსპერტი გამოჩნდება.
+                    </p>
+                    <a href="/ask" className="mt-4 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 shadow-xs transition-colors duration-fast">
+                      დასვი კითხვა
+                    </a>
                   </div>
-                  <div className="font-display text-[15.5px] font-bold text-ink-900 tracking-tight">
-                    ვერ ვიპოვეთ შესაფერისი ექსპერტი — სცადე სხვა ფილტრი ან ტერმინი
+                ) : (
+                  <div className="py-12 px-6 text-center rounded-card border border-dashed border-ink-200 bg-white motion-safe:animate-fade-in">
+                    <div className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-brand-50 text-brand-600 mb-3">
+                      <Icon.search className="w-5 h-5" />
+                    </div>
+                    <div className="font-display text-[15.5px] font-bold text-ink-900 tracking-tight">
+                      ვერ ვიპოვეთ შესაფერისი ექსპერტი — სცადე სხვა ფილტრი ან ტერმინი
+                    </div>
+                    <button type="button" onClick={resetFilters} className="mt-4 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 shadow-xs transition-colors duration-fast">
+                      ფილტრების გასუფთავება
+                    </button>
                   </div>
-                  <button type="button" onClick={resetFilters} className="mt-4 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 shadow-xs transition-colors duration-fast">
-                    ფილტრების გასუფთავება
-                  </button>
-                </div>
+                )
               ) : (
-                pagedTutors.map((t, i) => <TutorCard key={t.id} idx={i} t={t} onPreviewEnter={openPreview} onBook={openBook} saved={favIds.has(t.id)} onToggleFav={toggleFav} needsSignIn={authKnown && !signedIn} />)
+                pagedTutors.map((t, i) => <TutorCard key={t.id} idx={i} t={t} onPreviewEnter={openPreview} onBook={openBook} saved={favIds.has(t.id)} onToggleFav={toggleFav} needsSignIn={authKnown && !signedIn} viewerCantBook={viewerCantBook} viewerCantFav={viewerCantFav} />)
               )}
             </div>
 
@@ -1506,24 +1667,24 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
                   <div className="font-display text-[13.5px] font-bold text-ink-900 tracking-tight">ვერ იპოვე შესაფერისი?</div>
                   <p className="text-[12px] text-ink-600 mt-0.5 leading-snug">მოგვწერე — 24 საათში შემოგთავაზებთ 3 ვარიანტს შენი კონტექსტიდან.</p>
                 </div>
-                <Icon.arrow className="w-4 h-4 mt-1 text-ink-400 group-hover:text-ink-800 group-hover:translate-x-0.5 transition-all shrink-0" />
               </a>
-              <button type="button" onClick={() => setCompareOpen(true)} className="group text-left rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift p-5 flex items-start gap-4">
-                <span className="w-10 h-10 shrink-0 rounded-btn bg-ink-100 text-ink-700 inline-flex items-center justify-center">
-                  <Icon.sliders className="w-4 h-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="font-display text-[13.5px] font-bold text-ink-900 tracking-tight">შეადარე ტოპ 3-ი გვერდიგვერდ</div>
-                  <p className="text-[12px] text-ink-600 mt-0.5 leading-snug">რეიტინგი, ფასი, სლოტები, ენები — ერთი ცხრილით.</p>
-                </div>
-                <Icon.arrow className="w-4 h-4 mt-1 text-ink-400 group-hover:text-ink-800 group-hover:translate-x-0.5 transition-all shrink-0" />
-              </button>
+              {liveTutors.length >= 2 && (
+                <button type="button" onClick={() => setCompareOpen(true)} className="group text-left rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift p-5 flex items-start gap-4">
+                  <span className="w-10 h-10 shrink-0 rounded-btn bg-ink-100 text-ink-700 inline-flex items-center justify-center">
+                    <Icon.sliders className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-display text-[13.5px] font-bold text-ink-900 tracking-tight">შეადარე ტოპ 3-ი გვერდიგვერდ</div>
+                    <p className="text-[12px] text-ink-600 mt-0.5 leading-snug">რეიტინგი, ფასი, თავისუფალი დრო, ენები — ერთი ცხრილით.</p>
+                  </div>
+                </button>
+              )}
             </div>
 
             <Pagination page={page} setPage={setPage} totalPages={totalPages} />
           </div>
         </div>
-      </main>
+      </Container>
 
       <Footer />
 
@@ -1562,7 +1723,6 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
             )}
             <button type="button" onClick={() => setFiltersOpen(false)} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
               ნახე {total} ექსპერტი
-              <Icon.arrow className="w-4 h-4" />
             </button>
           </>
         }

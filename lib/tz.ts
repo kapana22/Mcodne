@@ -23,14 +23,6 @@ export function userTimezone(): string {
   }
 }
 
-// Should we append the "თბილისის დროით" hint? Only when the caller is
-// rendering Tbilisi wall-clock time from the viewpoint of a non-Tbilisi
-// browser — otherwise the label is noise.
-export function shouldShowTzLabel(tz?: string): boolean {
-  const t = tz ?? userTimezone()
-  return t !== TBILISI
-}
-
 // Format an ISO timestamp in the requested tz (defaults to browser tz, or
 // Tbilisi on server). Returns { local } — the formatted string — and
 // { tzLabel } — either the Georgian Tbilisi label when the user's tz differs

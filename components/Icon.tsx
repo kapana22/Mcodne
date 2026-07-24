@@ -107,4 +107,8 @@ export const CatIcon = {
   law: (<svg {...catS}><path d="M14 4v19" /><path d="M8.5 23h11" /><path d="M6 9h16" /><path d="M14 5.5c-2 1.5-5.5 2.5-8 3.5M14 5.5c2 1.5 5.5 2.5 8 3.5" /><path d="m7 9-3 6h6Z" /><path d="m21 9-3 6h6Z" /></svg>),
   marketing: (<svg {...catS}><path d="m22.5 5-13 5H5a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4.5l13 5V5Z" /><path d="M9.5 16v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3" /></svg>),
   psych: (<svg {...catS}><path d="M14 5a4 4 0 0 0-4 4 3.5 3.5 0 0 0-3 5.5A3.5 3.5 0 0 0 10 20a3 3 0 0 0 4 2.5V5Z" /><path d="M14 5a4 4 0 0 1 4 4 3.5 3.5 0 0 1 3 5.5A3.5 3.5 0 0 1 18 20a3 3 0 0 1-4 2.5V5Z" /></svg>),
+  // Receipt — taxes / accounting.
+  tax: (<svg {...catS}><path d="M7 4h11a1 1 0 0 1 1 1v19l-3-2-2.5 2-2.5-2-2.5 2L6 24V5a1 1 0 0 1 1-1Z" /><path d="M10 10h6M10 14h6M10 18h3.5" /></svg>),
+  // Code brackets — IT / programming.
+  it: (<svg {...catS}><path d="m9.5 9-5 5 5 5M18.5 9l5 5-5 5M16 5.5l-4 17" /></svg>),
 }

@@ -1,5 +1,7 @@
 'use client'
 import { CountUp } from '@/components/CountUp'
+import { Card } from '@/components/Card'
+import { Eyebrow } from '@/components/Eyebrow'
 import { SkeletonKpi } from '@/components/Skeleton'
 import { FEATURE_PAYMENTS_V2 } from '@/lib/flags'
 
@@ -37,16 +39,16 @@ export function SnapshotRow({
     },
   ]
   return (
-    <section aria-label="სტატისტიკა" className="rounded-card border border-ink-200 bg-white shadow-xs grid grid-cols-2 sm:grid-cols-4 sm:divide-x divide-ink-100">
+    <Card as="section" aria-label="სტატისტიკა" padding="none" className="shadow-xs grid grid-cols-2 sm:grid-cols-4 sm:divide-x divide-ink-100">
       {cells.map((c, i) => (
         <div key={c.label} className={`p-4 sm:p-5 ${i >= 2 ? 'border-t sm:border-t-0 border-ink-100' : ''} ${i === 1 ? 'border-l sm:border-l-0 border-ink-100' : ''} ${i === 3 ? 'border-l sm:border-l-0 border-ink-100' : ''}`}>
-          <div className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500">{c.label}</div>
+          <Eyebrow tone="muted">{c.label}</Eyebrow>
           <div className="font-display text-[22px] font-bold text-ink-900 tabular-nums mt-1 leading-none">
             <CountUp value={c.value} prefix={c.prefix ?? ''} />
           </div>
           {c.sub && <div className="text-[11px] text-ink-500 mt-1.5">{c.sub}</div>}
         </div>
       ))}
-    </section>
+    </Card>
   )
 }

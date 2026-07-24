@@ -1,9 +1,12 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
+import { Container } from '@/components/Container'
 import { Reveal } from '@/components/Reveal'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
+import { Eyebrow } from '@/components/Eyebrow'
+import { ApplyCtaGate } from '@/components/ApplyCtaGate'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -29,7 +32,7 @@ const VALUES = [
     title: 'გამჭვირვალე ფასი',
     // Honest posture — payments are not live yet, so escrow is framed as the
     // coming model (same „მალე" note as the home page), not a live fact.
-    body: 'ერთი ფასი, ერთი გვერდი — გადაიხდი მხოლოდ დაჯავშნისას. escrow-ით დაცული გადახდები მალე ამოქმედდება.',
+    body: 'ერთი ფასი, ერთი გვერდი — გადაიხდი მხოლოდ დაჯავშნისას. დაცული გადახდები მალე ამოქმედდება.',
   },
   {
     icon: <Icon.clock className="w-5 h-5" />,
@@ -55,11 +58,11 @@ export default function AboutPage() {
     <div className="min-h-screen bg-white">
       <MarketingTopBar />
 
-      <main className="max-w-[1080px] mx-auto px-6 sm:px-8 py-16 lg:py-24">
+      <Container as="main" size="wide" className="py-16 lg:py-24">
         <div className="max-w-[720px]">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
+          <Eyebrow className="mb-3">
             ჩვენს შესახებ
-          </div>
+          </Eyebrow>
           <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05] motion-safe:animate-rise-in">
             ცოდნა, რომელსაც შენ ენდობი
           </h1>
@@ -83,9 +86,9 @@ export default function AboutPage() {
 
         <section className="mt-20">
           <Reveal>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
+            <Eyebrow className="mb-3">
               რას გვჯერა
-            </div>
+            </Eyebrow>
             <h2 className="font-display text-3xl font-bold text-ink-900 tracking-tight">ჩვენი პრინციპები</h2>
           </Reveal>
           {/* Reveal-stagger (scroll-triggered) instead of load-time .stagger,
@@ -106,9 +109,9 @@ export default function AboutPage() {
         <Reveal>
         <section className="mt-20 grid lg:grid-cols-[1fr_1.4fr] gap-10 lg:gap-16">
           <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
+            <Eyebrow className="mb-3">
               ისტორია
-            </div>
+            </Eyebrow>
             <h2 className="font-display text-3xl font-bold text-ink-900 tracking-tight leading-tight">
               როგორ დაიწყო მცოდნე
             </h2>
@@ -125,12 +128,13 @@ export default function AboutPage() {
             </p>
             <p>
               დღეს მცოდნე არის ცოდნის არქივი ქართული საზოგადოებისთვის — სადაც ერთი 40-წუთიანი საუბარი შეიძლება
-              შენს პროექტს, კარიერას ან ცხოვრებას შეცვლის.
+              შენს პროექტს, კარიერას ან ცხოვრებას შეცვალოს.
             </p>
           </div>
         </section>
         </Reveal>
 
+        <ApplyCtaGate>
         <Reveal>
         <section className="mt-20 rounded-card bg-gradient-dark text-white p-10 lg:p-14 relative overflow-hidden">
           <div className="max-w-[560px] relative z-10">
@@ -149,7 +153,7 @@ export default function AboutPage() {
                 href="/apply"
                 className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] inline-flex items-center gap-2 transition-colors"
               >
-                გახდი ექსპერტი <Icon.arrow className="w-4 h-4" />
+                გახდი ექსპერტი
               </Link>
               <Link
                 href="/contact"
@@ -161,7 +165,8 @@ export default function AboutPage() {
           </div>
         </section>
         </Reveal>
-      </main>
+        </ApplyCtaGate>
+      </Container>
 
       <Footer />
     </div>

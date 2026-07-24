@@ -1,14 +1,16 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { requireUser } from '@/lib/auth'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { prisma } from '@/lib/prisma'
 import { Icon } from '@/components/Icon'
 import { fmtKaDateTime } from '@/lib/kaDate'
 import { StatusPill } from '@/components/StatusPill'
 import { EmptyState } from '@/components/EmptyState'
-import { StudentAppBar } from '@/components/StudentAppBar'
-import { WorkspaceFooter } from '@/components/WorkspaceFooter'
+import { Container } from '@/components/Container'
+import { PageHeader } from '@/components/PageHeader'
+import { Btn } from '@/components/Btn'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,20 +44,14 @@ export default async function StudentBookingsPage({
   const list = tab === 'past' ? past : tab === 'canceled' ? canceled : upcoming
 
   return (
-    <div className="font-sans bg-ink-50/40 min-h-screen flex flex-col">
-      <StudentAppBar user={{ name: user.fullName, avatar: user.avatarUrl }} />
-
-      <main className="w-full max-w-[1280px] mx-auto px-6 sm:px-8 py-8 lg:py-10 flex-1">
-        <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
-          <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">ჯავშნები</div>
-            <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight">ჩემი სესიები</h1>
-            <p className="text-[13.5px] text-ink-600 mt-1.5">{PAYMENTS_LIVE ? 'ყველა შენი ჯავშანი ერთ ადგილას · დაცული გადახდით' : 'ყველა შენი ჯავშანი ერთ ადგილას'}</p>
-          </div>
-          <Link href="/tutors" className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 transition-colors">
-            <Icon.plus className="w-3.5 h-3.5" /> ახალი ჯავშანი
-          </Link>
-        </div>
+    <Container as="main" className="w-full py-8 lg:py-10 flex-1">
+        <PageHeader
+          className="mb-8"
+          eyebrow="ჯავშნები"
+          title="ჩემი სესიები"
+          sub={PAYMENTS_LIVE ? 'ყველა შენი ჯავშანი ერთ ადგილას · დაცული გადახდით' : 'ყველა შენი ჯავშანი ერთ ადგილას'}
+          actions={<Btn href="/tutors" iconLeft={<Icon.plus className="w-3.5 h-3.5" />}>ახალი ჯავშანი</Btn>}
+        />
 
         <div className="flex items-center gap-1 mb-6 border-b border-ink-200">
           {[
@@ -101,13 +97,7 @@ export default async function StudentBookingsPage({
                   <Link href={`/student/bookings/${b.id}`} className="absolute inset-0" aria-label={b.topic} />
                   <div className="p-5 grid sm:grid-cols-[auto_1fr_auto] gap-4 sm:gap-5 items-center pointer-events-none">
                     <div className="relative w-14 h-14 rounded-card overflow-hidden ring-1 ring-ink-200 shrink-0 bg-brand-50">
-                      {tutorUser?.avatarUrl ? (
-                        <Image src={tutorUser.avatarUrl} alt="" fill sizes="56px" className="object-cover" />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center font-display text-[18px] font-bold text-brand-600/70">
-                          {(tutorUser?.fullName?.[0] ?? '?').toUpperCase()}
-                        </div>
-                      )}
+                      <Image src={tutorUser?.avatarUrl || DEFAULT_AVATAR} alt="" fill sizes="56px" unoptimized={(tutorUser?.avatarUrl || DEFAULT_AVATAR).startsWith('data:')} className="object-cover" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -118,7 +108,7 @@ export default async function StudentBookingsPage({
                           </span>
                         )}
                         {needsReview && (
-                          <span className="inline-flex items-center gap-1 h-5 px-2 rounded-pill bg-warning-50 border border-warning-200 text-warning-700 text-[10.5px] font-display font-bold uppercase tracking-[0.08em]">
+                          <span className="inline-flex items-center gap-1 h-5 px-2 rounded-pill bg-transparent border border-warning-200 text-warning-700 text-[10.5px] font-display font-bold uppercase tracking-[0.08em]">
                             <Icon.star aria-hidden className="w-2.5 h-2.5" /> შეფასება ელოდება
                           </span>
                         )}
@@ -145,9 +135,6 @@ export default async function StudentBookingsPage({
             })}
           </div>
         )}
-      </main>
-
-      <WorkspaceFooter />
-    </div>
+    </Container>
   )
 }

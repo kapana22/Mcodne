@@ -1,13 +1,15 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Avatar } from '@/components/Avatar'
 import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
+import { Eyebrow } from '@/components/Eyebrow'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
 import { safeHttpUrl } from '@/lib/safeUrl'
 import { fmtKaDate } from '@/lib/kaDate'
 import { sanitizeMsgBody, MSG_MAX_LEN } from '@/lib/msgText'
 import { useBookingThread, type ChatMessage, type ChatUser, type ThreadBooking, type ThreadPair } from './useBookingThread'
+import { CallInviteCard } from './CallInviteCard'
 
 export type BookingChatProps = {
   /** Booking-scoped thread. Provide EITHER bookingId or withUser (not both). */
@@ -42,23 +44,41 @@ const fmtTime = (iso: string, tz: string) => {
 }
 
 function MessageBubble({
-  m, mine, tz, groupedWithPrev, groupedWithNext,
+  m, mine, tz, groupedWithPrev, groupedWithNext, avatarSrc,
 }: {
   m: ChatMessage
   mine: boolean
   tz: string
   groupedWithPrev: boolean
   groupedWithNext: boolean
+  /** Sender avatar resolved from the thread participants (avatars are no longer
+      embedded per message). Falls back to any avatar on the message itself
+      (optimistic bubbles carry `me`'s). */
+  avatarSrc?: string | null
 }) {
+  const senderAvatar = avatarSrc ?? m.from.avatarUrl
   // Never render an attachment href with an unsafe scheme (guards legacy rows
   // predating the server-side scheme check).
   const safeFile = safeHttpUrl(m.fileUrl)
+
+  // Instant-call invite (fileName sentinel) → a join card, not a normal bubble.
+  if (m.fileName === '__call__') {
+    return (
+      <div className={`flex gap-2 ${mine ? 'justify-end' : 'justify-start'} ${groupedWithPrev ? 'mt-1' : 'mt-3'}`}>
+        {!mine && (groupedWithPrev
+          ? <span className="w-7 shrink-0" aria-hidden />
+          : <Avatar src={senderAvatar ?? undefined} name={m.from.fullName} size={28} />)}
+        <CallInviteCard fileUrl={m.fileUrl} fromName={m.from.fullName} mine={mine} time={fmtTime(m.createdAt, tz)} />
+      </div>
+    )
+  }
+
   return (
     <div className={`flex gap-2 ${mine ? 'justify-end' : 'justify-start'} ${groupedWithPrev ? 'mt-1' : 'mt-3'}`}>
       {!mine && (groupedWithPrev
         ? <span className="w-7 shrink-0" aria-hidden />
         : <Avatar src={m.from.avatarUrl ?? undefined} name={m.from.fullName} size={28} />)}
-      <div className={`max-w-[85%] sm:max-w-[75%] rounded-card px-3 py-2 text-[13.5px] ${mine ? 'bg-brand-500 text-white' : 'bg-white border border-ink-200 text-ink-800'}`}>
+      <div className={`max-w-[85%] sm:max-w-[75%] rounded-card px-3 py-2 text-[13.5px] ${mine ? 'bg-brand-500 text-white shadow-xs' : 'bg-white border border-ink-200 text-ink-800 shadow-xs'}`}>
         <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{sanitizeMsgBody(m.body)}</div>
         {safeFile && (
           <div className={`mt-2 pt-2 border-t ${mine ? 'border-white/25' : 'border-ink-200'}`}>
@@ -93,6 +113,7 @@ export function BookingChat({
   bookingId,
   withUser,
   me,
+  counterparty,
   initialMessages,
   variant = 'embedded',
   header,
@@ -103,8 +124,20 @@ export function BookingChat({
 }: BookingChatProps) {
   const {
     msgs, booking, pair, loaded, draft, setDraft, attachment, setAttachment, attach,
-    uploading, send, sending, error,
+    uploading, send, sending, requestCall, calling, error,
   } = useBookingThread({ bookingId, withUser, me, initialMessages, onActivity })
+
+  // Sender avatars, resolved once from the thread's two participants — the API
+  // no longer embeds an avatar on every message (that repetition made payloads
+  // multi-MB). `counterparty` seeds the other party before the first poll lands.
+  const avatarOf = useMemo(() => {
+    const map = new Map<string, string | null | undefined>()
+    if (me) map.set(me.id, me.avatarUrl)
+    if (counterparty) map.set(counterparty.id, counterparty.avatarUrl)
+    if (booking) { map.set(booking.student.id, booking.student.avatarUrl); map.set(booking.tutorUser.id, booking.tutorUser.avatarUrl) }
+    if (pair) map.set(pair.otherUser.id, pair.otherUser.avatarUrl)
+    return map
+  }, [me, counterparty, booking, pair])
 
   const endRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -188,11 +221,11 @@ export function BookingChat({
                 {newDay && (
                   <div className={`flex items-center gap-3 py-1 ${i > 0 ? 'mt-4' : ''}`} aria-hidden>
                     <span className="flex-1 h-px bg-ink-200/70" />
-                    <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-400">{fmtKaDate(d)}</span>
+                    <Eyebrow as="span" tone="muted">{fmtKaDate(d)}</Eyebrow>
                     <span className="flex-1 h-px bg-ink-200/70" />
                   </div>
                 )}
-                <MessageBubble m={m} mine={mine} tz={tz} groupedWithPrev={groupedWithPrev} groupedWithNext={groupedWithNext} />
+                <MessageBubble m={m} mine={mine} tz={tz} groupedWithPrev={groupedWithPrev} groupedWithNext={groupedWithNext} avatarSrc={avatarOf.get(m.fromId)} />
               </div>
             )
           })
@@ -228,17 +261,34 @@ export function BookingChat({
             </button>
           </div>
         )}
-        <div className="flex items-end gap-2">
+        {/* One cohesive composer surface: the ghost icon actions and the send
+            button live INSIDE the input pill so nothing overflows the row and
+            the whole bar reads as a single control (focus ring on the wrapper,
+            not per-field). */}
+        <div className="flex items-end gap-1 rounded-2xl border border-ink-200 bg-white pl-1.5 pr-1.5 py-1.5 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/25 transition-colors">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
             aria-label="ფაილის მიბმა"
             title="ფაილის მიბმა (PDF/JPG/PNG · max 8 MB)"
-            className="h-11 w-11 rounded-btn border border-ink-200 bg-white hover:border-ink-300 disabled:opacity-50 text-ink-600 hover:text-ink-900 inline-flex items-center justify-center transition-colors shrink-0"
+            className="h-9 w-9 rounded-full text-ink-500 hover:text-ink-900 hover:bg-ink-100 disabled:opacity-50 inline-flex items-center justify-center transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           >
             {uploading ? <span className="inline-block w-4 h-4 border-2 border-ink-500 border-t-transparent rounded-full animate-spin" /> : <Icon.paperclip className="w-4 h-4" />}
           </button>
+          {/* Instant „let's meet now“ call — booking threads only. */}
+          {bookingId && (
+            <button
+              type="button"
+              onClick={requestCall}
+              disabled={calling || !me}
+              aria-label="ვიდეოზარის მოთხოვნა"
+              title="ვიდეოზარის მოთხოვნა — ახლავე შეხვდი"
+              className="h-9 w-9 rounded-full text-brand-600 hover:text-brand-700 hover:bg-brand-50 disabled:opacity-50 inline-flex items-center justify-center transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+            >
+              {calling ? <span className="inline-block w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /> : <Icon.video className="w-4 h-4" />}
+            </button>
+          )}
           <textarea
             ref={textareaRef}
             value={draft}
@@ -250,17 +300,23 @@ export function BookingChat({
               el.style.height = `${Math.min(el.scrollHeight, 132)}px`
             }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() } }}
-            placeholder={attachment ? 'დაწერე შეტყობინება ან უბრალოდ გააგზავნე ფაილი…' : 'დაწერე შეტყობინება…'}
+            placeholder="შეტყობინება…"
             rows={1}
             maxLength={MSG_MAX_LEN}
-            className="flex-1 min-h-[44px] max-h-[132px] resize-none rounded-btn border border-ink-200 px-3 py-2.5 text-[13.5px] focus:outline-none focus:ring-2 focus:ring-brand-400"
+            className="flex-1 min-w-0 min-h-[36px] max-h-[132px] resize-none bg-transparent border-0 px-2 py-1.5 text-[13.5px] leading-relaxed text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-0"
           />
-          {/* Also disabled until the caller's identity (/api/me) has resolved —
-              send() bails on me=null, which would silently swallow an early
-              Enter-press on the slow remote-DB dev setup. */}
-          <Btn type="submit" variant="primary" size="md" disabled={!me || sending || uploading || (!draft.trim() && !attachment)}>
-            {sending ? '…' : <><Icon.send className="w-4 h-4" /><span className="hidden sm:inline">გაგზავნა</span></>}
-          </Btn>
+          {/* Icon-only send — matches the ghost actions' footprint, never
+              overflows, and Enter also sends. Disabled until /api/me resolves
+              (send() bails on me=null, which would swallow an early Enter). */}
+          <button
+            type="submit"
+            disabled={!me || sending || uploading || (!draft.trim() && !attachment)}
+            aria-label="გაგზავნა"
+            title="გაგზავნა"
+            className="h-9 w-9 shrink-0 rounded-full bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1"
+          >
+            {sending ? <span className="inline-block w-4 h-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin" /> : <Icon.send className="w-4 h-4" />}
+          </button>
         </div>
         {draft.length > MSG_MAX_LEN - 200 && (
           <div className={`text-right font-mono text-[10.5px] tabular-nums ${draft.length >= MSG_MAX_LEN ? 'text-danger-600' : 'text-ink-400'}`}>

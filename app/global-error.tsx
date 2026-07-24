@@ -4,6 +4,9 @@
 // if the root layout / html tree itself throws). Deliberately inline-styled
 // (no Tailwind), since a failure this deep may have taken down the CSS bundle.
 
+import { useEffect } from 'react'
+import { reportClientError } from '@/lib/reportError'
+
 export default function GlobalError({
   error,
   reset,
@@ -11,6 +14,9 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    reportClientError('render', error?.message ?? 'global-error', error?.stack, error?.digest)
+  }, [error])
   return (
     <html lang="ka">
       <body style={{
@@ -28,7 +34,7 @@ export default function GlobalError({
           <div style={{ fontSize: 72, fontWeight: 700, color: '#9B2932', lineHeight: 1 }}>500</div>
           <h1 style={{ marginTop: 16, fontSize: 22, fontWeight: 700 }}>დროებითი ხარვეზი</h1>
           <p style={{ marginTop: 12, color: '#4A4437', fontSize: 14, lineHeight: 1.5 }}>
-            გვერდი ვერ აისახა. სცადე თავიდან, ან დაუბრუნდი მთავარს.
+            გვერდი ვერ ჩაიტვირთა. სცადე თავიდან, ან დაუბრუნდი მთავარს.
           </p>
           {error?.digest && (
             <p style={{ marginTop: 12, fontFamily: 'ui-monospace, monospace', fontSize: 11, color: '#9C9488' }}>
@@ -39,7 +45,7 @@ export default function GlobalError({
             <button
               onClick={reset}
               style={{
-                background: '#159A82',
+                background: '#2F9C86',
                 color: '#fff',
                 border: 'none',
                 borderRadius: 10,

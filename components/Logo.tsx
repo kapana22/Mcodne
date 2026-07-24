@@ -1,3 +1,4 @@
+'use client'
 import Link from 'next/link'
 
 type Size = 'sm' | 'md' | 'lg'
@@ -10,7 +11,13 @@ const HEIGHTS: Record<Size, string> = {
   lg: 'h-9',
 }
 
-export function Logo({ size = 'md', href = '/' }: { size?: Size; href?: string | null }) {
+/* `href` behaviour:
+   - omitted (undefined) → the public landing „/“ (the main page) for EVERYONE,
+     signed-in or not. Users expect "click the logo → go to the main page"
+     (2026-07-24: reverted from role-aware workspace-home — felt less comfortable).
+   - explicit string → that path.
+   - null → no link (brand mark only, e.g. the auth screen). */
+export function Logo({ size = 'md', href }: { size?: Size; href?: string | null }) {
   const inner = (
     <span className="inline-flex items-center transition-transform duration-fast ease-out-quart hover:scale-[1.03] active:scale-[0.98]">
       <img
@@ -21,9 +28,10 @@ export function Logo({ size = 'md', href = '/' }: { size?: Size; href?: string |
       />
     </span>
   )
-  if (!href) return inner
+  if (href === null) return inner
+  const dest = href ?? '/'
   return (
-    <Link href={href} aria-label="მცოდნე" className="inline-flex rounded-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
+    <Link href={dest} aria-label="მცოდნე — მთავარზე" className="inline-flex rounded-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
       {inner}
     </Link>
   )

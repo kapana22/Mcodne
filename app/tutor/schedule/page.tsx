@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Btn } from '@/components/Btn'
+import { Eyebrow } from '@/components/Eyebrow'
 import { Icon } from '@/components/Icon'
 import { Skeleton } from '@/components/Skeleton'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -21,8 +22,10 @@ type Slot = { id: string; startAt: string; endAt: string; booked: boolean }
 const DAY_LABELS = ['ორშ', 'სამ', 'ოთხ', 'ხუთ', 'პარ', 'შაბ', 'კვი']
 // Default visible band; "ყველა საათი" expands to the full range. Hours the
 // visible week actually occupies are always unioned in so nothing hides.
-const HOURS_DEFAULT: [number, number] = [9, 19]
-const HOURS_FULL: [number, number] = [8, 22]
+const HOURS_DEFAULT: [number, number] = [8, 22]
+// „ყველა საათი" shows the FULL 24h grid — a tutor must be able to publish any
+// time (early morning, late night), not just a daytime band.
+const HOURS_FULL: [number, number] = [0, 24]
 
 function startOfWeek(d: Date) {
   const day = (d.getDay() + 6) % 7 // Mon=0
@@ -97,7 +100,7 @@ export default function TutorSchedulePage() {
       const res = await fetch(`/api/tutor/availability/${slotId}`, { method: 'DELETE' })
       const j = await res.json().catch(() => ({} as any))
       if (!res.ok || !j.ok) {
-        const m = j.error === 'SLOT_BOOKED' ? 'ეს დროზე უკვე დაჯავშნილია — წაშლა შეუძლებელია' : 'წაშლა ვერ მოხერხდა'
+        const m = j.error === 'SLOT_BOOKED' ? 'ეს დრო უკვე დაჯავშნილია — წაშლა შეუძლებელია' : 'წაშლა ვერ მოხერხდა'
         setErr(m)
         return
       }
@@ -158,7 +161,7 @@ export default function TutorSchedulePage() {
       const from = new Date(blockForm.from + 'T00:00:00')
       const to = new Date(blockForm.to + 'T23:59:59')
       if (isNaN(from.getTime()) || isNaN(to.getTime()) || to < from) {
-        setBlockErr('არასწორი თარიღი — from ≤ to'); return
+        setBlockErr('არასწორი თარიღი — დაწყება ≤ დასრულება'); return
       }
       // Grab unbooked slots inside the range from local state, delete each server-side.
       const toDelete = (slots ?? []).filter(s => {
@@ -291,7 +294,7 @@ export default function TutorSchedulePage() {
         setModalErr('არასწორი თარიღი'); return
       }
       if (end <= start) {
-        setModalErr('დაწყების დრო უფრო ადრეა ვიდრე დასრულების'); return
+        setModalErr('დასრულების დრო დაწყებაზე გვიან უნდა იყოს'); return
       }
       if (start < new Date()) {
         setModalErr('დრო წარსულში ვერ იქნება'); return
@@ -307,7 +310,7 @@ export default function TutorSchedulePage() {
       const j = await res.json()
       if (!res.ok || !j.ok) {
         const map: Record<string, string> = {
-          BAD_RANGE: 'დაწყების დრო უფრო ადრეა ვიდრე დასრულების',
+          BAD_RANGE: 'დასრულების დრო დაწყებაზე გვიან უნდა იყოს',
           PAST_DATE: 'დრო წარსულში ვერ იქნება',
           OVERLAP: 'ეს დრო უკვე დაკავებულია',
           NO_PROFILE: 'ექსპერტის პროფილი არ არსებობს',
@@ -394,7 +397,6 @@ export default function TutorSchedulePage() {
                   ? 'bg-warning-50 border-warning-200 text-warning-800'
                   : 'bg-brand-50 border-brand-200 text-brand-800'
               }`}>
-                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
                 {loading ? '…' : `${upcomingFree} თავისუფალი დრო`}
               </span>
               <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border border-ink-200 bg-white text-ink-600 font-display font-semibold">
@@ -519,9 +521,9 @@ export default function TutorSchedulePage() {
                   >
                     <span className={`font-display text-[10px] font-semibold uppercase tracking-[0.1em] ${sel ? 'text-white/70' : 'text-ink-500'}`}>{d}</span>
                     <span className={`text-[14px] font-bold tabular-nums leading-none ${!sel && isToday ? 'text-brand-700' : ''}`}>{day.getDate()}</span>
-                    <span className="flex gap-0.5 h-1">
-                      {c.bookings > 0 && <span className={`w-1 h-1 rounded-full ${sel ? 'bg-white' : 'bg-brand-500'}`} />}
-                      {c.free > 0 && <span className={`w-1 h-1 rounded-full ${sel ? 'bg-white/50' : 'bg-ink-300'}`} />}
+                    <span className="flex gap-0.5 h-1 items-center">
+                      {c.bookings > 0 && <span className={`w-2 h-[3px] rounded-pill ${sel ? 'bg-white' : 'bg-brand-500'}`} />}
+                      {c.free > 0 && <span className={`w-2 h-[3px] rounded-pill ${sel ? 'bg-white/50' : 'bg-ink-300'}`} />}
                     </span>
                   </button>
                 )
@@ -602,7 +604,7 @@ export default function TutorSchedulePage() {
                 const isToday = day.toDateString() === new Date().toDateString()
                 return (
                   <div key={d} className="px-2 py-3 text-center border-l border-ink-200">
-                    <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">{d}</div>
+                    <Eyebrow tone="muted">{d}</Eyebrow>
                     <div className={`text-[13px] font-bold tabular-nums ${isToday ? 'text-brand-700' : 'text-ink-800'}`}>{day.getDate()}</div>
                   </div>
                 )
@@ -696,7 +698,7 @@ export default function TutorSchedulePage() {
                 className="text-[11.5px] font-display font-semibold text-ink-500 hover:text-ink-800 inline-flex items-center gap-1.5 transition-colors"
               >
                 <Icon.clock className="w-3.5 h-3.5" />
-                {allHours ? 'ძირითადი საათები' : 'ყველა საათი (08–22)'}
+                {allHours ? 'ძირითადი საათები (08–22)' : 'ყველა საათი (24სთ)'}
               </button>
             </div>
           </div>
@@ -722,13 +724,13 @@ export default function TutorSchedulePage() {
       >
             <form id="add-slot-form" onSubmit={submitSlot} className="space-y-4">
               <div>
-                <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1.5">დაწყება</label>
+                <Eyebrow as="label" tone="muted" className="block mb-1.5">დაწყება</Eyebrow>
                 <input type="datetime-local" required value={form.startAt}
                        onChange={e => setForm({ ...form, startAt: e.target.value })}
                        className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none" />
               </div>
               <div>
-                <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1.5">დასრულება</label>
+                <Eyebrow as="label" tone="muted" className="block mb-1.5">დასრულება</Eyebrow>
                 <input type="datetime-local" required value={form.endAt}
                        onChange={e => setForm({ ...form, endAt: e.target.value })}
                        className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none" />
@@ -757,11 +759,11 @@ export default function TutorSchedulePage() {
         }
       >
             <p className="text-[12.5px] text-ink-500 mb-4 leading-snug">
-              მონიშნე დღეები და საათი — ეს ტემპლეიტი გამრავლდება მოცემული კვირების რაოდენობაზე. უკვე არსებული ან გადამფარავი დროები გამოტოვდება.
+              მონიშნე დღეები და საათი — ეს შაბლონი გამრავლდება მოცემული კვირების რაოდენობაზე. უკვე არსებული ან გადამფარავი დროები გამოტოვდება.
             </p>
             <form id="weekly-template-form" onSubmit={submitTemplate} className="space-y-5">
               <div>
-                <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-2">დღეები</label>
+                <Eyebrow as="label" tone="muted" className="block mb-2">დღეები</Eyebrow>
                 <div className="grid grid-cols-7 gap-1.5">
                   {DAY_LABELS.map((d, i) => (
                     <button
@@ -781,7 +783,7 @@ export default function TutorSchedulePage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1.5">დაწყება</label>
+                  <Eyebrow as="label" tone="muted" className="block mb-1.5">დაწყება</Eyebrow>
                   <select value={tplStartHour} onChange={e => setTplStartHour(Number(e.target.value))}
                           className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none">
                     {Array.from({ length: 24 }, (_, h) => (
@@ -790,7 +792,7 @@ export default function TutorSchedulePage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1.5">დასრულება</label>
+                  <Eyebrow as="label" tone="muted" className="block mb-1.5">დასრულება</Eyebrow>
                   <select value={tplEndHour} onChange={e => setTplEndHour(Number(e.target.value))}
                           className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none">
                     {Array.from({ length: 24 }, (_, h) => h + 1).map(h => (
@@ -800,7 +802,7 @@ export default function TutorSchedulePage() {
                 </div>
               </div>
               <div>
-                <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1.5">კვირების რაოდენობა</label>
+                <Eyebrow as="label" tone="muted" className="block mb-1.5">კვირების რაოდენობა</Eyebrow>
                 <div className="flex gap-1.5">
                   {[1, 2, 4, 8, 12].map(w => (
                     <button
@@ -859,13 +861,13 @@ export default function TutorSchedulePage() {
             <p className="text-[12.5px] text-ink-500 mb-4 leading-snug">ამ პერიოდში არსებული ყველა <span className="font-display font-semibold text-ink-700">თავისუფალი</span> დრო წაიშლება. უკვე დაჯავშნილი სესიები არ დაზარალდება.</p>
             <form id="block-off-form" onSubmit={submitBlockOff} className="space-y-4">
               <div>
-                <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1.5">დაწყება</label>
+                <Eyebrow as="label" tone="muted" className="block mb-1.5">დაწყება</Eyebrow>
                 <input type="date" required value={blockForm.from} min={new Date().toISOString().slice(0, 10)}
                        onChange={e => setBlockForm({ ...blockForm, from: e.target.value })}
                        className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none" />
               </div>
               <div>
-                <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-1.5">დასრულება</label>
+                <Eyebrow as="label" tone="muted" className="block mb-1.5">დასრულება</Eyebrow>
                 <input type="date" required value={blockForm.to} min={blockForm.from || new Date().toISOString().slice(0, 10)}
                        onChange={e => setBlockForm({ ...blockForm, to: e.target.value })}
                        className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none" />

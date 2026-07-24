@@ -26,7 +26,7 @@ export default function NotFound() {
     : me?.role === 'STUDENT' ? '/student'
     : '/'
   const homeLabel = me
-    ? (me.role === 'TUTOR' ? 'ჩემი დაშბორდი' : me.role === 'ADMIN' ? 'ადმინი' : 'ჩემი დაშბორდი')
+    ? (me.role === 'TUTOR' ? 'ჩემი სივრცე' : me.role === 'ADMIN' ? 'ადმინი' : 'ჩემი სივრცე')
     : 'მთავარი'
 
   return (
@@ -44,16 +44,15 @@ export default function NotFound() {
           გვერდი ვერ მოიძებნა
         </h1>
         <p className="mt-3 text-[14px] text-ink-600 leading-relaxed max-w-[420px] mx-auto motion-safe:animate-rise-in" style={{ animationDelay: '140ms' }}>
-          შესაძლოა ლინკი შეიცვალა ან გვერდი წაიშალა. სცადე ერთ-ერთი ქვემოდან:
+          შესაძლოა ბმული შეიცვალა ან გვერდი წაიშალა. სცადე ერთ-ერთი ქვემოდან:
         </p>
 
         <div className="mt-7 flex flex-wrap items-center justify-center gap-2 motion-safe:animate-rise-in" style={{ animationDelay: '200ms' }}>
           <Link
             href={homeHref}
-            className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-tight inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast"
+            className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-tight inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] transition-all duration-fast"
           >
             {homeLabel}
-            <Icon.arrow className="w-4 h-4" />
           </Link>
           <Link
             href="/tutors"

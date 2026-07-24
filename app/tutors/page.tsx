@@ -12,9 +12,25 @@
 // "Can't reach database server". force-dynamic defers the query to request time.
 export const dynamic = 'force-dynamic'
 
+import type { Metadata } from 'next'
 import { queryTutors } from '@/lib/tutorsQuery'
 import { getCurrentUser } from '@/lib/auth'
 import { TutorsClient } from './client'
+
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
+const TUTORS_DESC = 'დაათვალიერე ხელით შერჩეული ქართველი ექსპერტები — ბიზნესი, კარიერა, იურიდიული, ფინანსური და ფსიქოლოგიური კონსულტაცია. გაფილტრე კატეგორიით, ფასითა და ენით, დაჯავშნე ვიდეოსესია.'
+
+export const metadata: Metadata = {
+  title: 'ექსპერტები — იპოვე და დაჯავშნე კონსულტაცია | მცოდნე',
+  description: TUTORS_DESC,
+  alternates: { canonical: '/tutors' },
+  openGraph: {
+    title: 'ექსპერტები — მცოდნე',
+    description: TUTORS_DESC,
+    url: `${SITE_URL}/tutors`,
+    type: 'website',
+  },
+}
 
 export default async function TutorsPage() {
   // Default unfiltered list — matches what the client fetched on first mount

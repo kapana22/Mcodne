@@ -2,38 +2,56 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AppShell } from '@/components/AppShell'
 import { ImpersonationBanner } from '@/components/ImpersonationBanner'
+import { Analytics } from '@/components/Analytics'
+import { SiteTextProvider } from '@/components/SiteTextProvider'
+import { getSiteTextMap } from '@/lib/siteText'
+import { CodeInjector } from '@/components/CodeInjector'
+import { getIntegrations } from '@/lib/integrations'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'მცოდნე — ცოდნის არქივი',
+    default: 'მცოდნე — ბიზნეს კონსულტაცია ქართველ ექსპერტებთან',
     template: '%s',
   },
-  description: 'ექსპერტების პლატფორმა',
+  description: 'ქართული ექსპერტ-კონსულტაციის პლატფორმა — დაჯავშნე ვიდეოსესია ბიზნესის, კარიერის, იურიდიულ და ფინანსურ საკითხებზე ხელით შერჩეულ ექსპერტებთან.',
   manifest: '/manifest.webmanifest',
+  // Square monogram mark — the wide wordmark (logo.png, 2.6:1) squished into a
+  // tab favicon read as an ugly smear; a compact „მ" square is legible at 16px.
   icons: {
-    icon: '/logo.png',
-    shortcut: '/logo.png',
-    apple: '/logo.png',
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
   },
   openGraph: {
-    title: 'მცოდნე',
-    description: 'ცოდნის არქივი — შეხვდი საუკეთესო ექსპერტებს.',
+    title: 'მცოდნე — ბიზნეს კონსულტაცია ექსპერტებთან',
+    description: 'დაჯავშნე ვიდეო-კონსულტაცია ხელით შერჩეულ ქართველ ექსპერტებთან.',
     images: ['/logo.png'],
     locale: 'ka_GE',
     type: 'website',
     url: SITE_URL,
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'მცოდნე — ბიზნეს კონსულტაცია ექსპერტებთან',
+    description: 'დაჯავშნე ვიდეო-კონსულტაცია ხელით შერჩეულ ქართველ ექსპერტებთან.',
+    images: ['/logo.png'],
+  },
 }
 
 // Next 15 moved themeColor / colorScheme out of `metadata` into `viewport`.
 export const viewport: Viewport = {
-  themeColor: '#159A82',
+  themeColor: '#2F9C86',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Editable site copy resolved once per request (defaults if DB is down), then
+  // handed to the client provider so <SiteText>/useSiteText work everywhere.
+  const siteTexts = await getSiteTextMap()
+  // Admin-managed integrations (GA id + raw header/footer code).
+  const integrations = await getIntegrations()
   return (
     <html lang="ka">
       <head>
@@ -59,7 +77,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           გადადი მთავარ შიგთავსზე
         </a>
         <ImpersonationBanner />
-        <AppShell>{children}</AppShell>
+        <Analytics gaId={integrations.gaId} />
+        <CodeInjector header={integrations.headerHtml} footer={integrations.footerHtml} />
+        <SiteTextProvider value={siteTexts}>
+          <AppShell>{children}</AppShell>
+        </SiteTextProvider>
       </body>
     </html>
   )

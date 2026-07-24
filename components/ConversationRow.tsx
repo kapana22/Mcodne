@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Icon } from './Icon'
 import { fmtKaThreadTime } from '@/lib/kaDate'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { msgPreview } from '@/lib/msgText'
 
 /* One conversation in the messages inbox — shared by the student and tutor
@@ -44,13 +45,7 @@ export function ConversationRow({
       {isUnread && <span aria-hidden className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-brand-500" />}
 
       <div className="relative w-12 h-12 rounded-full overflow-hidden ring-1 ring-ink-200 shrink-0">
-        {avatarUrl ? (
-          <Image src={avatarUrl} alt="" fill sizes="48px" className="object-cover" />
-        ) : (
-          <span className="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand-100 to-brand-200 text-brand-800 font-display font-semibold text-[18px]">
-            {name?.trim()?.slice(0, 1).toUpperCase() ?? 'მ'}
-          </span>
-        )}
+        <Image src={avatarUrl || DEFAULT_AVATAR} alt="" fill sizes="48px" unoptimized={(avatarUrl || DEFAULT_AVATAR).startsWith('data:')} className="object-cover" />
       </div>
 
       <div className="min-w-0 flex-1">

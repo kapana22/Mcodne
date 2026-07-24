@@ -3,9 +3,11 @@ import type { ReactNode } from 'react'
 import type { Metadata } from 'next'
 import { CANCEL_CUTOFF_HOURS, COMMISSION_PCT } from '@/lib/flags'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
+import { Container } from '@/components/Container'
 import { Reveal } from '@/components/Reveal'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
+import { Eyebrow } from '@/components/Eyebrow'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -35,7 +37,7 @@ const GROUPS: FaqGroup[] = [
       },
       {
         q: 'როგორ ვიპოვო შესაფერისი ექსპერტი?',
-        a: 'გვერდზე „ექსპერტები" შეგიძლია გაფილტრო კატეგორიით, ფასით და შეფასებით. თითოეულ პროფილში ნახავ ვიდეო-ინტროს, გამოცდილებასა და ბოლო შეფასებებს.',
+        a: 'გვერდზე „ექსპერტები“ შეგიძლია გაფილტრო კატეგორიით, ფასით და შეფასებით. თითოეულ პროფილში ნახავ ვიდეო-ინტროს, გამოცდილებასა და ბოლო შეფასებებს.',
       },
       {
         q: 'რა ჯდება პირველი გაცნობა?',
@@ -69,7 +71,7 @@ const GROUPS: FaqGroup[] = [
     items: [
       {
         q: 'უსაფრთხოა თუ არა გადახდა?',
-        a: 'ონლაინ გადახდები მალე ამოქმედდება — ამჟამად სესიის დაჯავშნა უფასოა და ბარათს არ გთხოვთ. გაშვების შემდეგ თანხა escrow პრინციპით იქნება დაცული: ექსპერტს გადაერიცხება მხოლოდ სესიის წარმატებით დასრულების შემდეგ, ბარათის დეტალები კი ჩვენთან არ შეინახება.',
+        a: 'ონლაინ გადახდები მალე ამოქმედდება — ამჟამად სესიის დაჯავშნა უფასოა და ბარათს არ გთხოვთ. გაშვების შემდეგ თანხა დაცულ ანგარიშზე შეინახება: ექსპერტს გადაერიცხება მხოლოდ სესიის წარმატებით დასრულების შემდეგ, ბარათის დეტალები კი ჩვენთან არ შეინახება.',
       },
       {
         q: 'რომელი გადახდის მეთოდები მიიღება?',
@@ -86,7 +88,7 @@ const GROUPS: FaqGroup[] = [
     items: [
       {
         q: 'როგორ ვხდები ექსპერტი?',
-        a: '„გახდი ექსპერტი" გვერდზე შეავსე განაცხადი — გამოცდილება, სპეციალიზაცია, პორტფოლიო. 3 დღეში მიიღებ პასუხს. მოწმდება: მინიმუმ 5 წლის გამოცდილება და პროფესიული რეპუტაცია.',
+        a: '„გახდი ექსპერტი“ გვერდზე შეავსე განაცხადი — გამოცდილება, სპეციალიზაცია, პორტფოლიო. 3 დღეში მიიღებ პასუხს. მოწმდება: მინიმუმ 5 წლის გამოცდილება და პროფესიული რეპუტაცია.',
       },
       {
         q: 'რა კომისიას იღებს პლატფორმა?',
@@ -103,11 +105,11 @@ const GROUPS: FaqGroup[] = [
     items: [
       {
         q: 'როგორ დავიცვა ჩემი ანგარიში?',
-        a: 'ჩართე 2FA „პარამეტრები → უსაფრთხოებაში", გამოიყენე ძლიერი პაროლი და არასდროს გაუზიარო წვდომა სხვას. ეჭვის შემთხვევაში დაუყოვნებლივ დაგვიკავშირდი.',
+        a: 'ჩართე 2FA „პარამეტრები → უსაფრთხოებაში“, გამოიყენე ძლიერი პაროლი და არასდროს გაუზიარო წვდომა სხვას. ეჭვის შემთხვევაში დაუყოვნებლივ დაგვიკავშირდი.',
       },
       {
         q: 'როგორ წავშალო ანგარიში?',
-        a: '„პარამეტრები → ანგარიში → ანგარიშის დახურვა". წაშლის შემდეგ მონაცემები ინახება 90 დღე (grace period), შემდეგ სრულად შორდება სისტემას.',
+        a: '„პარამეტრები → ანგარიში → ანგარიშის დახურვა“. წაშლის შემდეგ მონაცემები ინახება 90 დღე (საშეღავათო პერიოდი), შემდეგ სრულად შორდება სისტემას.',
       },
       {
         q: 'რა ხდება, თუ ექსპერტი დისკრიმინაციულად მოიქცა?',
@@ -135,14 +137,26 @@ const CHANNELS: Channel[] = [
 ]
 
 export default function HelpPage() {
+  // FAQPage structured data — every Q/A across all groups. Eligible for Google's
+  // collapsible-FAQ rich result.
+  const faqLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: GROUPS.flatMap(g => g.items).map(it => ({
+      '@type': 'Question',
+      name: it.q,
+      acceptedAnswer: { '@type': 'Answer', text: it.a },
+    })),
+  }
   return (
     <div className="min-h-screen bg-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
       <MarketingTopBar />
 
-      <main className="max-w-[880px] mx-auto px-6 py-16 lg:py-20">
-        <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
+      <Container as="main" size="content" className="py-16 lg:py-20">
+        <Eyebrow className="mb-3">
           დახმარება
-        </div>
+        </Eyebrow>
         <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05] motion-safe:animate-rise-in">
           ხშირად დასმული კითხვები
         </h1>
@@ -161,9 +175,9 @@ export default function HelpPage() {
         <Reveal stagger className="mt-12 space-y-12">
           {GROUPS.map(g => (
             <section key={g.title}>
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-4">
+              <Eyebrow className="mb-4">
                 {g.title}
-              </div>
+              </Eyebrow>
               <div className="rounded-card border border-ink-200 bg-white divide-y divide-ink-200">
                 {g.items.map((f, i) => (
                   <details key={i} className="group">
@@ -184,9 +198,9 @@ export default function HelpPage() {
         <Reveal>
         <section className="mt-16">
           <div className="text-center mb-8">
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">
+            <Eyebrow className="mb-2">
               პასუხი ვერ იპოვე?
-            </div>
+            </Eyebrow>
             <h2 className="font-display text-[28px] lg:text-[32px] font-bold text-ink-900 tracking-tight">
               დაგვიკავშირდი
             </h2>
@@ -205,7 +219,7 @@ export default function HelpPage() {
                     c.primary ? 'bg-brand-500 hover:bg-brand-600 text-white' : 'bg-white border border-ink-200 hover:bg-ink-50 text-ink-800'
                   }`}
                 >
-                  {c.cta} <Icon.arrow className="w-3.5 h-3.5" />
+                  {c.cta}
                 </a>
               </div>
             ))}
@@ -218,7 +232,7 @@ export default function HelpPage() {
           </div>
         </section>
         </Reveal>
-      </main>
+      </Container>
 
       <Footer />
     </div>

@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
+import { Container } from '@/components/Container'
 import { Footer } from '@/components/Footer'
+import { Eyebrow } from '@/components/Eyebrow'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -48,10 +50,10 @@ export default function CookiesPage() {
     <div className="min-h-screen bg-white">
       <MarketingTopBar />
 
-      <main className="max-w-[820px] mx-auto px-6 py-16 lg:py-20">
-        <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
+      <Container as="main" size="content" className="py-16 lg:py-20">
+        <Eyebrow className="mb-3">
           სამართალი
-        </div>
+        </Eyebrow>
         <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05]">
           ქუქი-ფაილების პოლიტიკა
         </h1>
@@ -79,9 +81,9 @@ export default function CookiesPage() {
                   </span>
                 </div>
                 <div className="mt-4 pt-4 border-t border-ink-100">
-                  <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-2">
+                  <Eyebrow tone="muted" className="mb-2">
                     მაგალითები
-                  </div>
+                  </Eyebrow>
                   <div className="flex flex-wrap gap-1.5">
                     {c.examples.map(x => (
                       <code
@@ -131,7 +133,7 @@ export default function CookiesPage() {
             .
           </p>
         </section>
-      </main>
+      </Container>
 
       <Footer />
     </div>

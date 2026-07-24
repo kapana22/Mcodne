@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { notify } from '@/lib/notify'
 import { rateLimit } from '@/lib/rateLimit'
+import { stripTutorBlobs } from '@/lib/stripTutorBlobs'
 
 const Body = z.object({
   tutorId: z.string(),
@@ -32,18 +33,29 @@ export async function GET() {
       consultation: true,
     },
   })
-  return NextResponse.json(bookings)
+  return NextResponse.json(
+    bookings.map(b => ({ ...b, tutor: stripTutorBlobs(b.tutor) })),
+  )
 }
 
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
 
-  // Verified-email gate — bookings require a confirmed inbox so payout receipts,
-  // reminders, and cancellation notices reach a real address.
-  if (!(user as any).emailVerified) {
-    return NextResponse.json({ ok: false, error: 'EMAIL_NOT_VERIFIED' }, { status: 403 })
+  // Dual-role model (2026-07-23): a TUTOR may also act as a CLIENT and book
+  // another expert. The /student/* surfaces + space switcher are now wired for
+  // it, and the booking is reached via the client space. Booking is keyed off
+  // User.id (studentId), independent of the tutor's TutorProfile, so a promoted
+  // expert's client bookings never collide with their expert bookings. The only
+  // thing refused is booking YOURSELF — enforced by the SELF_BOOKING check below
+  // (tutor.userId === user.id). ADMIN has no client space, so keep it out.
+  if (user.role === 'ADMIN') {
+    return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
   }
+
+  // Email verification is intentionally NOT required to book — the confirmation
+  // step was friction with no payoff at this stage (no payments yet, and the
+  // in-app notifications reach the user regardless). Removed 2026-07-20.
 
   // Rate-limit per authenticated user: 10 bookings per hour is more than any
   // real student would create; higher rates are almost certainly abuse.
@@ -55,7 +67,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const parsed = Body.safeParse(await req.json())
+  const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   const { tutorId, consultationId, topic, studentNotes } = parsed.data
 
@@ -101,6 +113,10 @@ export async function POST(req: Request) {
   ])
 
   if (!tutor) return NextResponse.json({ ok: false, error: 'TUTOR_NOT_FOUND' }, { status: 404 })
+
+  // (Active-booking cap removed 2026-07-19 per owner — too much friction. The
+  // per-tutor + per-student overlap checks below still prevent real conflicts;
+  // no-show abuse is a policy/penalty concern to revisit when payments land.)
 
   if (tutor.userId === user.id) {
     return NextResponse.json({ ok: false, error: 'SELF_BOOKING' }, { status: 400 })
@@ -155,6 +171,7 @@ export async function POST(req: Request) {
   // longer both pass: the loser hits a conditional-claim miss or a Postgres
   // serialization failure and is rejected with SLOT_TAKEN.
   class SlotTaken extends Error {}
+  class StudentOverlap extends Error {}
   let booking: {
     id: string
     ref: string
@@ -179,6 +196,23 @@ export async function POST(req: Request) {
         return cEnd > start
       })
       if (overlaps) throw new SlotTaken()
+
+      // Reject the student double-booking THEMSELVES for an overlapping time —
+      // two simultaneous sessions waste an expert's slot and guarantee a
+      // no-show on one side. (The check above only covers the same tutor.)
+      const selfCandidates = await tx.booking.findMany({
+        where: {
+          studentId: user.id,
+          status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] },
+          startAt: { lt: end },
+        },
+        select: { startAt: true, durationMin: true },
+      })
+      const selfOverlap = selfCandidates.some(c => {
+        const cEnd = new Date(c.startAt.getTime() + c.durationMin * 60 * 1000)
+        return cEnd > start
+      })
+      if (selfOverlap) throw new StudentOverlap()
 
       // Conditionally claim the covering slot — only succeeds if it's still free.
       if (coveringSlotId) {
@@ -211,6 +245,9 @@ export async function POST(req: Request) {
   } catch (e: any) {
     if (e instanceof SlotTaken) {
       return NextResponse.json({ ok: false, error: 'SLOT_TAKEN' }, { status: 409 })
+    }
+    if (e instanceof StudentOverlap) {
+      return NextResponse.json({ ok: false, error: 'STUDENT_OVERLAP' }, { status: 409 })
     }
     // P2034 = serialization failure — a concurrent booking won the race.
     if (e?.code === 'P2034') {

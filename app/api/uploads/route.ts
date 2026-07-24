@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import sharp from 'sharp'
 import { getCurrentUser } from '@/lib/auth'
 import { rateLimit } from '@/lib/rateLimit'
 import { prisma } from '@/lib/prisma'
+
+export const runtime = 'nodejs'
 
 // Byte limits — kept in sync with client-side gates so the UX matches what
 // the server actually enforces. Images cover avatars + apply-flow ID / selfie
@@ -95,11 +98,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'BAD_CONTENT' }, { status: 400 })
   }
 
-  const dataUrl = `data:${file.type};base64,${buf.toString('base64')}`
+  // ── Downscale images BEFORE base64-encoding ──────────────────────────────
+  // Files are stored inline as `data:` URIs (no object storage yet), so an
+  // un-resized upload becomes a multi-MB row that is then EMBEDDED in every API
+  // payload the user/file appears in. A single 9.4 MB base64 avatar made chat
+  // threads 7.5 MB (the sender's avatar is repeated per message) and 30-40s to
+  // load. Cap every stored image: avatars to a 256px square (they render ≤64px),
+  // other photos to 1600px. PDFs and GIFs pass through untouched.
+  const realMime = sniffMime(buf)
+  let outBuf: Buffer = buf
+  let outType = file.type
+  if (kind === 'avatar' && realMime?.startsWith('image/')) {
+    try {
+      outBuf = await sharp(buf).rotate().resize(256, 256, { fit: 'cover' }).webp({ quality: 82 }).toBuffer()
+      outType = 'image/webp'
+    } catch { /* fall back to the original bytes if sharp can't decode it */ }
+  } else if (realMime?.startsWith('image/') && realMime !== 'image/gif') {
+    // Attachments / ID / selfie / certificate photos — bound the longest edge so
+    // a phone photo isn't a multi-MB base64 blob. Keep aspect; never upscale.
+    try {
+      outBuf = await sharp(buf).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer()
+      outType = 'image/jpeg'
+    } catch { /* fall back to the original bytes */ }
+  }
+  const dataUrl = `data:${outType};base64,${outBuf.toString('base64')}`
 
   if (kind === 'avatar') {
     await prisma.user.update({ where: { id: user.id }, data: { avatarUrl: dataUrl } })
     return NextResponse.json({ ok: true, url: dataUrl })
   }
-  return NextResponse.json({ ok: true, url: dataUrl, fileName: file.name, size: file.size, type: file.type })
+  return NextResponse.json({ ok: true, url: dataUrl, fileName: file.name, size: outBuf.length, type: outType })
 }

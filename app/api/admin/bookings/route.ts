@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { stripTutorBlobs, stripAvatar } from '@/lib/stripTutorBlobs'
 
 // Admin-wide booking list with filters: status, date-range, tutor, student, q(topic).
 // Cursor pagination via `?cursor=<lastId>&limit=<n>`.
@@ -47,5 +48,8 @@ export async function GET(req: Request) {
   const items = hasMore ? bookings.slice(0, limit) : bookings
   const nextCursor = hasMore ? items[items.length - 1].id : null
 
-  return NextResponse.json({ items, nextCursor })
+  return NextResponse.json({
+    items: items.map(b => ({ ...b, tutor: stripTutorBlobs(b.tutor), student: stripAvatar(b.student) })),
+    nextCursor,
+  })
 }

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
 import { audit } from '@/lib/audit'
+import { stripTutorBlobs, stripAvatar } from '@/lib/stripTutorBlobs'
 
 // Full admin drilldown for a single user: profile + tutor row (if any) +
 // all bookings (as student and as tutor) + reviews written + reviews received
@@ -78,12 +79,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   // Never leak passwordHash to admin UI either.
   const { passwordHash: _ph, ...safeUser } = user as any
 
+  // Each counterparty row carries a full TutorProfile / User — strip the blobs
+  // so this one-shot modal call doesn't drag ~45 avatars/profession blobs along.
   return NextResponse.json({
     user: safeUser,
-    bookingsAsStudent,
-    bookingsAsTutor,
-    reviewsWritten,
-    reviewsReceived,
+    bookingsAsStudent: bookingsAsStudent.map(b => ({ ...b, tutor: stripTutorBlobs(b.tutor) })),
+    bookingsAsTutor: bookingsAsTutor.map(b => ({ ...b, student: stripAvatar(b.student) })),
+    reviewsWritten: reviewsWritten.map(r => ({ ...r, tutor: stripTutorBlobs(r.tutor) })),
+    reviewsReceived: reviewsReceived.map(r => ({ ...r, student: stripAvatar(r.student) })),
     recentNotifications,
   })
 }
@@ -93,7 +96,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
    and audit-logged, following app/api/admin/tutors/[id]/featured as the
    pattern. Suspend requires a non-empty reason (kept in the audit meta). */
 const PatchBody = z.object({
-  action: z.enum(['suspend', 'unsuspend']),
+  action: z.enum(['suspend', 'unsuspend', 'makeAdmin', 'revokeAdmin']),
   reason: z.string().max(300).optional(),
 })
 
@@ -117,6 +120,35 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     select: { id: true, role: true, suspendedAt: true },
   })
   if (!target) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
+
+  // ── Role changes (grant / revoke ADMIN) ──────────────────────────────────
+  // Guarded hard because of the 2026-07-18 incident where a demotion left ZERO
+  // admins and locked everyone out: you can never demote yourself, and never
+  // demote the last remaining admin.
+  if (action === 'makeAdmin' || action === 'revokeAdmin') {
+    if (action === 'makeAdmin' && target.role === 'ADMIN') {
+      return NextResponse.json({ ok: false, error: 'ALREADY_ADMIN', message: 'უკვე ადმინია' }, { status: 400 })
+    }
+    if (action === 'revokeAdmin') {
+      if (target.role !== 'ADMIN') {
+        return NextResponse.json({ ok: false, error: 'NOT_ADMIN', message: 'ეს მომხმარებელი ადმინი არ არის' }, { status: 400 })
+      }
+      if (target.id === admin.id) {
+        return NextResponse.json({ ok: false, error: 'CANNOT_DEMOTE_SELF', message: 'საკუთარ თავს ვერ მოხსნი ადმინობას' }, { status: 400 })
+      }
+      const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } })
+      if (adminCount <= 1) {
+        return NextResponse.json({ ok: false, error: 'LAST_ADMIN', message: 'ბოლო ადმინს ვერ მოხსნი — ჯერ სხვა ადმინი დანიშნე' }, { status: 400 })
+      }
+    }
+    const newRole = action === 'makeAdmin' ? 'ADMIN' : 'STUDENT'
+    const u = await prisma.user.update({ where: { id }, data: { role: newRole }, select: { id: true, role: true } })
+    // Demotion: wipe sessions so the ex-admin's shell drops its admin access now.
+    if (action === 'revokeAdmin') await prisma.session.deleteMany({ where: { userId: id } }).catch(() => {})
+    await audit(admin.id, action === 'makeAdmin' ? 'user.makeAdmin' : 'user.revokeAdmin', { targetType: 'User', targetId: id })
+    return NextResponse.json({ ok: true, user: u })
+  }
+
   // Admins can't suspend admins (or themselves) — removes the foot-gun of
   // locking the whole staff out via the UI.
   if (action === 'suspend' && (target.role === 'ADMIN' || target.id === admin.id)) {

@@ -2,11 +2,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/Icon'
+import { Card } from '@/components/Card'
+import { Eyebrow } from '@/components/Eyebrow'
 import { useToast } from '@/components/ToastProvider'
-import { FEATURE_PAYMENTS_V2 } from '@/lib/flags'
 import { isBookingLive } from '@/lib/bookingLive'
 import { fmtKaDate, KA_WEEKDAYS_LONG } from '@/lib/kaDate'
-import { ProfileCompleteness, type ProfileForCompleteness } from '@/components/ProfileCompleteness'
 import { PageHeader } from '@/components/tutor/PageHeader'
 import { AlertsStack } from './_components/AlertsStack'
 import { PendingRequests } from './_components/PendingRequests'
@@ -39,8 +39,6 @@ export default function TutorHome() {
   // Profile completeness — loaded in parallel with dashboard data; the widget
   // hides itself once the score hits 100%, so the extra fetch is cheap and
   // never renders a stale nag.
-  const [tutorProfile, setTutorProfile] = useState<ProfileForCompleteness>(null)
-  const [credCounts, setCredCounts] = useState<{ cert: number; edu: number; exp: number } | null>(null)
   // Count of upcoming, still-free availability slots. Since booking REQUIRES
   // a published slot, an expert with zero upcoming slots is invisible — the
   // alerts stack nags them to publish availability. null = not loaded yet.
@@ -66,7 +64,7 @@ export default function TutorHome() {
       }
       // Any 5xx → surface Georgian error toast instead of silently hiding.
       if (meRes.status >= 500 || bRes.status >= 500 || eRes.status >= 500) {
-        toast('სერვერის შეცდომა — სცადეთ თავიდან', 'error')
+        toast('სერვერის შეცდომა — სცადე თავიდან', 'error')
         setBookings([])
         return
       }
@@ -78,36 +76,25 @@ export default function TutorHome() {
       if (eJson) setEarnings({ totalEarned: eJson.totalEarned, pendingPayout: eJson.pendingPayout, completedCount: eJson.completedCount })
     } catch {
       setBookings([])
-      toast('ქსელის შეცდომა — შეამოწმეთ კავშირი', 'error')
+      toast('ქსელის შეცდომა — შეამოწმე კავშირი', 'error')
     }
   }
   useEffect(() => { load() }, [])
 
-  // Fetch tutor profile + credential counts for the completeness widget.
-  // Failures are silent — the widget just renders nothing.
+  // Upcoming free-slot count for the snapshot. (Profile/credential fetches that
+  // once fed a dashboard completeness widget were removed — completeness now
+  // lives once, in the persistent sidebar.)
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const [pRes, cRes, eRes, xRes, aRes] = await Promise.all([
-          fetch('/api/me/tutor').then(r => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/me/tutor/certificates').then(r => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/me/tutor/education').then(r => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/me/tutor/experience').then(r => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/tutor/availability').then(r => r.ok ? r.json() : null).catch(() => null),
-        ])
+        const aRes = await fetch('/api/tutor/availability').then(r => r.ok ? r.json() : null).catch(() => null)
         if (cancelled) return
-        setTutorProfile(pRes?.profile ?? null)
-        setCredCounts({
-          cert: Array.isArray(cRes?.items) ? cRes.items.length : 0,
-          edu: Array.isArray(eRes?.items) ? eRes.items.length : 0,
-          exp: Array.isArray(xRes?.items) ? xRes.items.length : 0,
-        })
         // /api/tutor/availability returns the raw slot list (array or {slots}).
         const slotList: any[] = Array.isArray(aRes) ? aRes : (Array.isArray(aRes?.slots) ? aRes.slots : [])
         const nowMs = Date.now()
         setUpcomingSlots(slotList.filter(s => !s?.booked && new Date(s?.startAt).getTime() > nowMs).length)
-      } catch { /* keep widget invisible on failure */ }
+      } catch { /* leave the snapshot at 0 on failure */ }
     })()
     return () => { cancelled = true }
   }, [])
@@ -179,33 +166,12 @@ export default function TutorHome() {
           />
         </div>
 
-        {/* Right rail */}
+        {/* Right rail — profile-completeness lives ONCE, in the persistent
+            sidebar (it was duplicated here); payments-status lives ONCE, on the
+            earnings page. This rail stays to just the quick actions. */}
         <aside className="space-y-4 lg:sticky lg:top-[84px]">
-          {credCounts === null ? (
-            <div className="rounded-card border border-brand-200 bg-brand-50/40 p-4 animate-pulse">
-              <div className="h-3 w-24 rounded-pill bg-brand-100" />
-              <div className="h-4 w-40 rounded-pill bg-brand-100 mt-2" />
-              <div className="h-2 w-full rounded-pill bg-brand-100 mt-3" />
-              <div className="mt-4 space-y-2">
-                <div className="h-3 w-full rounded-pill bg-brand-100" />
-                <div className="h-3 w-5/6 rounded-pill bg-brand-100" />
-                <div className="h-3 w-4/6 rounded-pill bg-brand-100" />
-              </div>
-            </div>
-          ) : (
-            tutorProfile && (
-              <ProfileCompleteness
-                profile={tutorProfile}
-                certificates={credCounts.cert}
-                education={credCounts.edu}
-                experience={credCounts.exp}
-                avatarUrl={me?.avatarUrl ?? null}
-                variant="compact"
-              />
-            )
-          )}
-          <div className="rounded-card border border-ink-200 bg-white p-5">
-            <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-3">სწრაფი მოქმედებები</div>
+          <Card padding="none" className="p-5">
+            <Eyebrow tone="muted" className="mb-3">სწრაფი მოქმედებები</Eyebrow>
             <div className="space-y-2">
               <Link href="/tutor/schedule" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
                 <Icon.calendar className="w-4 h-4 text-ink-500" /> გრაფიკის რედაქტ.
@@ -214,19 +180,10 @@ export default function TutorHome() {
                 <Icon.user className="w-4 h-4 text-ink-500" /> პროფილის რედაქტ.
               </Link>
               <Link href="/tutors" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
-                <Icon.search className="w-4 h-4 text-ink-500" /> ექსპერტების კატალოგი
+                <Icon.search className="w-4 h-4 text-ink-500" /> ექსპერტები
               </Link>
             </div>
-          </div>
-
-          <div className="rounded-card border border-ink-200 bg-brand-50/40 p-5">
-            <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 mb-2">გადახდები</div>
-            <p className="text-[12.5px] text-ink-700 leading-[1.55]">
-              {FEATURE_PAYMENTS_V2
-                ? 'გადახდის ინტეგრაცია მალე დაემატება — ამჟამად ჯავშნები ტარდება უფასოდ.'
-                : 'ამჟამად ჯავშნები ტარდება უფასოდ. გადახდები მალე დაემატება.'}
-            </p>
-          </div>
+          </Card>
         </aside>
       </div>
     </div>

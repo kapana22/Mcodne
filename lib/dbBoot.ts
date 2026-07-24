@@ -38,7 +38,10 @@ async function runMigrations() {
     ALTER TABLE "Booking"
       ADD COLUMN IF NOT EXISTS "serviceType" "ServiceType" NOT NULL DEFAULT 'CONSULTATION',
       ADD COLUMN IF NOT EXISTS "rescheduleRequest" JSONB,
-      ADD COLUMN IF NOT EXISTS "autoCompleted" BOOLEAN NOT NULL DEFAULT false;
+      ADD COLUMN IF NOT EXISTS "autoCompleted" BOOLEAN NOT NULL DEFAULT false,
+      -- Set once the ~1h-before session reminder email has been sent, so the
+      -- reminder cron never emails the same booking twice.
+      ADD COLUMN IF NOT EXISTS "sessionReminderSentAt" TIMESTAMP;
   `)
 
   // Category — default type + public visibility toggle.
@@ -61,6 +64,50 @@ async function runMigrations() {
   await prisma.$executeRawUnsafe(`
     ALTER TABLE "User"
       ADD COLUMN IF NOT EXISTS "notificationPrefs" JSONB;
+  `)
+
+  // Message — stamp for the delayed "unread message" reminder email. Set once a
+  // thread's outstanding unread burst has been reminded, so the */15 cron emails
+  // a missed message at most once per unread streak (reset when the recipient
+  // opens the thread and readAt is stamped). See lib/messageReminders.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Message"
+      ADD COLUMN IF NOT EXISTS "reminderEmailSentAt" TIMESTAMP;
+  `)
+
+  // Post — DB-backed blog. Content is authored in the admin panel instead of
+  // hardcoded in the page. `status` = 'DRAFT' | 'PUBLISHED'; public /blog shows
+  // only PUBLISHED. `body` is Markdown. id/updatedAt are supplied by Prisma on
+  // write; the column defaults cover any raw insert.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Post" (
+      "id"          TEXT PRIMARY KEY,
+      "slug"        TEXT NOT NULL UNIQUE,
+      "title"       TEXT NOT NULL,
+      "excerpt"     TEXT,
+      "body"        TEXT NOT NULL DEFAULT '',
+      "coverUrl"    TEXT,
+      "tag"         TEXT,
+      "status"      TEXT NOT NULL DEFAULT 'DRAFT',
+      "authorName"  TEXT,
+      "publishedAt" TIMESTAMP,
+      "createdAt"   TIMESTAMP NOT NULL DEFAULT now(),
+      "updatedAt"   TIMESTAMP NOT NULL DEFAULT now()
+    );
+  `)
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "Post_status_publishedAt_idx" ON "Post"("status","publishedAt");`,
+  )
+
+  // SiteText — editable marketing copy (key → value override). A missing row
+  // falls back to the code default in lib/siteTextDefs, so an empty table is
+  // fine. See lib/siteText.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "SiteText" (
+      "key"       TEXT PRIMARY KEY,
+      "value"     TEXT NOT NULL,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
+    );
   `)
 
   // TutorApplication — YouTube intro-video reference + admin-only verification

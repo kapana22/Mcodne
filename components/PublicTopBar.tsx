@@ -3,8 +3,11 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Logo } from './Logo'
 import { Icon } from './Icon'
-import { Avatar } from './Avatar'
+import { NotifBell } from './NotifBell'
+import { UserMenu } from './UserMenu'
+import { Container } from '@/components/Container'
 import { useMe, type Me } from '@/lib/me'
+import { showApplyCta } from '@/lib/roleHome'
 
 // The single public header. Rendered on every guest/browse/marketing page.
 //
@@ -72,24 +75,22 @@ export function PublicTopBar({
     }
   }, [mobOpen])
 
-  const nav = NAV
-
-  // The avatar links to the user's own workspace home (not a sub-page) — the
-  // single, predictable "back to my space" affordance from any public page.
-  const profileHref = !me ? '/signin'
-    : me.role === 'TUTOR' ? '/tutor'
-    : me.role === 'ADMIN' ? '/admin'
-    : '/student'
+  // Hide the "გახდი ექსპერტი" (→/apply) item from users who are already an
+  // expert/admin. showApplyCta(null) is true, so anon + not-yet-resolved keep
+  // it (no flash-in for real visitors); only a known TUTOR/ADMIN drops it.
+  const nav = NAV.filter(i => i.href !== '/apply' || showApplyCta(me?.role))
 
   return (
     <header
-      className={`sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
+      className={`sticky top-0 z-40 bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
         scrolled ? 'shadow-sm' : ''
       }`}
     >
-      <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4 lg:gap-8">
+      <Container className="h-16 sm:h-20 flex items-center justify-between gap-4 lg:gap-8">
         <div className="flex items-center gap-7 lg:gap-10 min-w-0">
-          <Logo size="sm" href="/" />
+          {/* Omit href → Logo auto-routes to the viewer's role-home (a signed-in
+              expert lands on /tutor, not the anonymous marketing page). */}
+          <Logo size="sm" />
           <nav className="hidden lg:flex items-center gap-1">
             {nav.map(item => {
               const active = activeHref === item.href
@@ -122,16 +123,28 @@ export function PublicTopBar({
               </Link>
               <Link
                 href="/signup"
-                className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-bold text-[12px] uppercase tracking-[0.06em] transition-all duration-fast ease-out-quart inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)]"
+                className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-bold text-[12px] uppercase tracking-[0.06em] transition-all duration-fast ease-out-quart inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)]"
               >
                 დაწყება
-                <Icon.arrow className="w-3.5 h-3.5" />
               </Link>
             </>
           ) : (
-            <Link href={profileHref} aria-label="პროფილი" className="inline-flex rounded-full">
-              <Avatar src={me.avatarUrl ?? undefined} name={me.fullName} size={40} interactive />
-            </Link>
+            // Signed-in: mirror the workspace bar so a logged-in visitor on a
+            // public page (home/browse) keeps their real controls — saved,
+            // notifications, account menu — instead of a lone avatar.
+            <>
+              {me.role === 'STUDENT' && (
+                <Link
+                  href="/student/favorites"
+                  aria-label="შენახული"
+                  className="hidden sm:inline-flex w-10 h-10 rounded-btn text-ink-600 hover:text-ink-900 hover:bg-ink-100 items-center justify-center transition-colors"
+                >
+                  <Icon.heart className="w-[18px] h-[18px]" />
+                </Link>
+              )}
+              <NotifBell />
+              <UserMenu user={{ name: me.fullName, avatar: me.avatarUrl }} role={me.role} />
+            </>
           )}
           <button
             type="button"
@@ -143,7 +156,7 @@ export function PublicTopBar({
             {mobOpen ? <Icon.xC className="w-5 h-5" /> : <Icon.menu className="w-5 h-5" />}
           </button>
         </div>
-      </div>
+      </Container>
 
       {mobOpen && (
         <>
@@ -217,7 +230,6 @@ export function PublicTopBar({
                   className="w-full h-12 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-bold text-[13px] uppercase tracking-[0.06em] inline-flex items-center justify-center gap-2 shadow-brand-glow transition-all"
                 >
                   დაწყება
-                  <Icon.arrow className="w-4 h-4" />
                 </Link>
               </div>
             )}

@@ -14,21 +14,21 @@ module.exports = {
         //   as visual accents.
         // ─────────────────────────────────────────────────────────────────────
 
-        // ── Brand · teal-green (PRIMARY, #159A82) ───────────────────────────
+        // ── Brand · teal-green (PRIMARY, #2F9C86) ───────────────────────────
         // The primary color. Used with restraint (premium): CTAs, key accents,
         // brand moments — not everywhere. Blue (`info`) is the secondary accent.
         brand: {
-          50:  '#EAF7F3',
-          100: '#CCEEE2',
-          200: '#9BDCC5',
-          300: '#65C9A6',
-          400: '#33B48A',
-          500: '#159A82',
-          600: '#0F8069',
-          700: '#0C6553',
-          800: '#0A4E41',
-          900: '#083A30',
-          950: '#04241E',
+          50:  '#ECF7F3',
+          100: '#D3ECE4',
+          200: '#ADDBCF',
+          300: '#7FC7B4',
+          400: '#52B29E',
+          500: '#2F9C86',
+          600: '#26806E',
+          700: '#1E6656',
+          800: '#184F43',
+          900: '#123A31',
+          950: '#0A2420',
         },
 
         // ── Ink · neutral ramp (WHITE canvas → near-black) ──────────────────
@@ -68,13 +68,13 @@ module.exports = {
         },
 
         // ── Semantic states — MUTED, meaning-only. Never decorative. ────────
-        // Success = the same brand green (#159A82) so every positive/trust
+        // Success = the same brand green (#2F9C86) so every positive/trust
         // signal — verified, live, escrow, success states — reads as ONE
         // consistent green rather than two competing tones.
         success: {
-          50: '#EAF7F3', 100: '#CCEEE2', 200: '#9BDCC5', 300: '#65C9A6',
-          400: '#33B48A', 500: '#159A82', 600: '#0F8069', 700: '#0C6553',
-          800: '#0A4E41', 900: '#083A30', 950: '#04241E',
+          50: '#ECF7F3', 100: '#D3ECE4', 200: '#ADDBCF', 300: '#7FC7B4',
+          400: '#52B29E', 500: '#2F9C86', 600: '#26806E', 700: '#1E6656',
+          800: '#184F43', 900: '#123A31', 950: '#0A2420',
         },
         warning: {
           50: '#FBF6EC', 100: '#F4E7C8', 200: '#E9CE8E', 300: '#D9B055',
@@ -93,12 +93,14 @@ module.exports = {
         // badges). Reach for `info-*` when you want blue, not brand.
         info:  { 50: '#EEF4FF', 100: '#DAE6FF', 200: '#BDD2FF', 300: '#90B4FF', 400: '#5B8DFB', 500: '#2563EB', 600: '#1D4FD8', 700: '#1B43B5', 800: '#1B3A8F', 900: '#1C3472', 950: '#131F45' },
         iris:  { 50: '#EEE9E0', 100: '#DFD8CB', 200: '#C6BCA9', 300: '#9C9488', 400: '#6E6759', 500: '#4A4437', 600: '#2E2A21', 700: '#1D1B15', 800: '#0F0E0A', 900: '#050503', 950: '#050503' },
-        flame: { 50: '#EAF7F3', 100: '#CCEEE2', 200: '#9BDCC5', 300: '#65C9A6', 400: '#33B48A', 500: '#159A82', 600: '#0F8069', 700: '#0C6553', 800: '#0A4E41', 900: '#083A30', 950: '#04241E' },
+        flame: { 50: '#ECF7F3', 100: '#D3ECE4', 200: '#ADDBCF', 300: '#7FC7B4', 400: '#52B29E', 500: '#2F9C86', 600: '#26806E', 700: '#1E6656', 800: '#184F43', 900: '#123A31', 950: '#0A2420' },
       },
 
       borderRadius: {
         field: '12px',
-        btn:   '14px',
+        // Buttons crisper (14px → 10px, 2026-07-19) to echo the logo's
+        // geometric, angular character while staying friendly/legible.
+        btn:   '10px',
         card:  '20px',
         pill:  '9999px',
       },
@@ -111,7 +113,7 @@ module.exports = {
         'card-hover': '0 10px 24px rgba(46, 42, 33, 0.08), 0 3px 6px rgba(46, 42, 33, 0.04)',
         pop:          '0 6px 16px rgba(46, 42, 33, 0.08), 0 2px 4px rgba(46, 42, 33, 0.04)',
         float:        '0 16px 40px rgba(46, 42, 33, 0.10), 0 4px 12px rgba(46, 42, 33, 0.05)',
-        'brand-glow': '0 8px 28px rgba(21, 154, 130, 0.26)',
+        'brand-glow': '0 8px 28px rgba(47, 156, 134, 0.26)',
         'inset-hairline': 'inset 0 1px 0 rgba(255, 255, 255, 0.5)',
       },
 
@@ -122,16 +124,18 @@ module.exports = {
       backgroundImage: {
         // Section/hero wash — white canvas melting into brand-50. Barely
         // visible by design; use on hero and section backgrounds only.
-        'gradient-wash': 'linear-gradient(180deg, #FFFFFF 0%, #EAF7F3 100%)',
-        // Deep surface — ink-900 with a dark brand-green undertone. For
-        // dark hero blocks and the next-session card; richer than flat black.
-        'gradient-dark': 'linear-gradient(160deg, #0F0E0A 0%, #04241E 100%)',
+        'gradient-wash': 'linear-gradient(180deg, #FFFFFF 0%, #ECF7F3 100%)',
+        // Deep surface — warm charcoal (heavy green undertone removed
+        // 2026-07-19; the old #04241E teal read too harsh). Barely-there warmth
+        // instead of green. For dark hero blocks and the next-session card.
+        'gradient-dark': 'linear-gradient(155deg, #17150F 0%, #0B0A07 100%)',
         // Primary CTA — brand-500 → brand-600, vertical. Pair with
         // shadow-brand-glow. Primary actions only; secondary buttons stay flat.
-        'gradient-cta': 'linear-gradient(180deg, #159A82 0%, #0F8069 100%)',
-        // Signature text accent — brand-600 → info-500 (the one green→blue
-        // moment). Use with bg-clip-text in AT MOST one place per page.
-        'gradient-signature': 'linear-gradient(90deg, #0F8069 0%, #2563EB 100%)',
+        'gradient-cta': 'linear-gradient(180deg, #2F9C86 0%, #26806E 100%)',
+        // Signature text accent — brand-600 → ink-700 (green melting into
+        // near-black). Blue removed from the palette (2026-07-19). Use with
+        // bg-clip-text in AT MOST one place per page.
+        'gradient-signature': 'linear-gradient(90deg, #26806E 0%, #2E2A21 100%)',
       },
 
       fontSize: {

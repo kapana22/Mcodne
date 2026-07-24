@@ -24,10 +24,10 @@ const SIZES: Record<Size, string> = {
 // physical state change rather than a flat color the whole time.
 const VARIANTS: Record<Variant, string> = {
   primary:   'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-xs hover:shadow-sm',
-  hero:      'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)]',
+  hero:      'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)]',
   // The gradient-cta token as a component variant — pages should reach for
   // this instead of hand-rolling `bg-gradient-cta …` button classes.
-  cta:       'bg-gradient-cta text-white shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] hover:brightness-[1.04] active:brightness-95',
+  cta:       'bg-gradient-cta text-white shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] hover:brightness-[1.04] active:brightness-95',
   secondary: 'bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 active:bg-ink-100 text-ink-900',
   ghost:     'text-ink-800 hover:bg-ink-100 active:bg-ink-200',
   danger:    'bg-white border border-danger-300 text-danger-600 hover:bg-danger-50 active:bg-danger-100',
@@ -67,7 +67,11 @@ export function Btn({
       ) : (
         iconLeft
       )}
-      <span className={loading ? 'opacity-70' : ''}>{children}</span>
+      {/* inline-flex + items-center so an icon placed INSIDE children (next to
+          the label, not via iconLeft/iconRight) still centers vertically
+          instead of sitting on the text baseline — fixes icon-in-label buttons
+          everywhere at once. Harmless for plain-text labels. */}
+      <span className={`inline-flex items-center gap-2 ${loading ? 'opacity-70' : ''}`}>{children}</span>
       {!loading && iconRight}
     </>
   )

@@ -11,6 +11,15 @@ export function homeForRole(role: string | null | undefined): string {
   return role === 'ADMIN' ? '/admin' : role === 'TUTOR' ? '/tutor' : '/student'
 }
 
+// Single gate for every "become an expert" / apply CTA (nav, footer, marketing
+// sections). Only anonymous visitors and STUDENTs should ever be invited to
+// /apply — telling an existing TUTOR (or ADMIN) to "become an expert" is
+// nonsensical. Use this everywhere instead of hand-rolling role checks so the
+// whole surface gates uniformly and the bug can't reappear per-surface.
+export function showApplyCta(role: string | null | undefined): boolean {
+  return !role || role === 'STUDENT'
+}
+
 // Shared guard for client-supplied post-auth destinations: app-internal
 // absolute paths only. Blocks external hosts (`https://…`), protocol-relative
 // `//evil.com`, and backslash tricks — the open-redirect classics.

@@ -4,6 +4,7 @@
 // viewer's local tz; the Calendar footer carries the honest tz label.
 import React from 'react'
 import { Icon } from '@/components/Icon'
+import { Eyebrow } from '@/components/Eyebrow'
 import { KA_MONTHS_LONG as KA_MONTHS_FULL } from '@/lib/kaDate'
 import { DAY_NAMES_FULL, TIME_BANDS, isoWeekday, fmtHM, type TimeChoice } from './slots'
 
@@ -48,7 +49,7 @@ export const DayTimeline = ({
   return (
     <div>
       <div className="mb-6">
-        <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-1.5">არჩეული დღე</div>
+        <Eyebrow tone="muted" className="mb-1.5">არჩეული დღე</Eyebrow>
         <h3 className="font-display text-[20px] font-bold text-ink-900 tracking-tight">{dayLabel}, {date.getDate()} {KA_MONTHS_FULL[date.getMonth()]}</h3>
         <p className="text-[13px] text-ink-600 mt-1 tabular-nums">{timeChoices.length} დრო · {free} თავისუფალი · {timeChoices.length - free} დაჯავშნული</p>
       </div>
@@ -63,7 +64,7 @@ export const DayTimeline = ({
                   <span className="font-display text-[14px] font-bold text-ink-900 tracking-tight">{b.l}</span>
                   <span className="font-mono text-[11px] tabular-nums text-ink-500">{b.range}</span>
                 </div>
-                <span className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-700 tabular-nums">{bandFree} თავისუფალი</span>
+                <Eyebrow as="span" className="tabular-nums">{bandFree} თავისუფალი</Eyebrow>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {b.slots.map((s, i) => {

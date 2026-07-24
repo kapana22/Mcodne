@@ -52,7 +52,7 @@ export function SignInPromptBanner({
           type="button"
           onClick={onDismiss}
           aria-label="დახურვა"
-          className="ml-auto w-7 h-7 inline-flex items-center justify-center rounded-full text-brand-700 hover:bg-brand-100 motion-safe:transition-colors"
+          className="ml-auto w-9 h-9 -m-1 inline-flex items-center justify-center rounded-full text-brand-700 hover:bg-brand-100 motion-safe:transition-colors"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14" aria-hidden="true">
             <path d="m6 6 12 12M18 6 6 18" />

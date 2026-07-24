@@ -11,8 +11,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, type ReactElement } from 'react'
 import { Icon } from './Icon'
+import { useNotifications } from '@/lib/notifications'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 
@@ -32,16 +33,18 @@ const startsWith = (prefix: string) => (path: string) =>
 const STUDENT_TABS: Tab[] = [
   { href: '/student',           label: 'მთავარი',      icon: Icon.home, match: p => p === '/student' },
   { href: '/tutors',            label: 'ექსპერტები',     icon: Icon.search,   match: startsWith('/tutors') },
-  // Bookings — the core object of the product — earns the tab; notifications
-  // stay reachable via the header bell and the profile red dot.
+  // Bookings — the core object of the product — earns a tab.
   { href: '/student/bookings',  label: 'ჯავშნები',     icon: Icon.calendar, match: startsWith('/student/bookings') },
+  // Messages — a marketplace conversation surface earns its own tab (mirrors
+  // the tutor nav). „შენახული" stays in the StudentAppBar rail + profile.
+  { href: '/student/messages',  label: 'მიმოწერა',      icon: Icon.chat,     match: startsWith('/student/messages') },
   { href: '/student/profile',   label: 'პროფილი',      icon: Icon.user,     match: startsWith('/student/profile') },
 ]
 
 const TUTOR_TABS: Tab[] = [
   { href: '/tutor',             label: 'მთავარი',      icon: Icon.home, match: p => p === '/tutor' },
   { href: '/tutor/bookings',    label: 'ჯავშნები',     icon: Icon.calendar, match: startsWith('/tutor/bookings') },
-  { href: '/tutor/messages',    label: 'მესიჯები',      icon: Icon.chat,    match: startsWith('/tutor/messages') },
+  { href: '/tutor/messages',    label: 'მიმოწერა',      icon: Icon.chat,    match: startsWith('/tutor/messages') },
   { href: '/tutor/profile',     label: 'პროფილი',      icon: Icon.user,     match: startsWith('/tutor/profile') },
 ]
 
@@ -53,7 +56,9 @@ const TABS_BY_ROLE: Record<Role, Tab[]> = {
 
 export function BottomNav({ role }: { role: Role | null }) {
   const path = usePathname() ?? ''
-  const [unread, setUnread] = useState(0)
+  // Shared store (one poll app-wide, visibility-gated + cross-tab). Reads the
+  // unread count for the profile/messages dot.
+  const { unreadCount: unread } = useNotifications()
 
   const tabs = role ? TABS_BY_ROLE[role] : []
   // Focused screens own the full viewport including the bottom edge, so the
@@ -71,7 +76,15 @@ export function BottomNav({ role }: { role: Role | null }) {
     /^\/student\/bookings\/[^/]+$/.test(path) ||
     // Expert profile: the fixed MobileBookingBar is the bottom surface for
     // signed-in students — two stacked bottom layers just hide the tabs.
-    /^\/tutors\/[^/]+$/.test(path)
+    /^\/tutors\/[^/]+$/.test(path) ||
+    // The /apply expert-application wizard owns the bottom edge with its own
+    // back/next footer — the tab bar (+ cookie banner) stacked under it hid the
+    // "next" button and read as a broken double bar.
+    /^\/apply(?:\/|$)/.test(path) ||
+    // /ask owns the bottom edge with its sticky follow-up submit bar; the fixed
+    // tab bar (z-40) stacked over it (z-30) covered the input and made it
+    // unusable on mobile.
+    /^\/ask(?:\/|$)/.test(path)
   const show = tabs.length > 0 && !isFocusedScreen
 
   // Signal to globals.css that the bar is present so pages can reserve
@@ -84,41 +97,15 @@ export function BottomNav({ role }: { role: Role | null }) {
     return () => document.body.removeAttribute('data-bottom-nav')
   }, [show])
 
-  // Fetch unread count so the profile tab can show a red dot. Cheap: the
-  // notifications endpoint returns a summary object with `unreadCount`.
-  useEffect(() => {
-    if (!show) return
-    let cancelled = false
-    const load = () => {
-      fetch('/api/notifications')
-        .then(r => (r.ok ? r.json() : null))
-        .then(d => { if (!cancelled) setUnread(d?.unreadCount ?? 0) })
-        .catch(() => {})
-    }
-    load()
-    // Cross-tab: when another tab marks something read, refresh here.
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'mcodne:notif-check') load()
-    }
-    window.addEventListener('storage', onStorage)
-    // Also poll occasionally so a long-lived tab still catches new pushes.
-    const t = setInterval(load, 90_000)
-    return () => {
-      cancelled = true
-      clearInterval(t)
-      window.removeEventListener('storage', onStorage)
-    }
-  }, [show])
-
   if (!show) return null
 
   return (
     <nav
       aria-label="მთავარი ნავიგაცია"
-      className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-white/98 backdrop-blur border-t border-ink-200"
+      className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-ink-200"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="grid grid-cols-4 h-16">
+      <ul className={`grid h-16 ${tabs.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
         {tabs.map(tab => {
           const active = tab.match ? tab.match(path) : path === tab.href
           const IconComp = tab.icon
@@ -137,10 +124,14 @@ export function BottomNav({ role }: { role: Role | null }) {
                 <span className="relative inline-flex">
                   <IconComp className="w-[22px] h-[22px]" />
                   {showDot && (
+                    // Unread COUNT micro-chip (canon blesses count chips; not a
+                    // bare status dot). Caps at 9+ so it never overflows the tab.
                     <span
-                      aria-hidden
-                      className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-danger-500 ring-2 ring-white"
-                    />
+                      aria-label={`${unread} წაუკითხავი`}
+                      className="absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-danger-500 text-white ring-2 ring-white text-[9px] font-display font-bold leading-none inline-flex items-center justify-center tabular-nums"
+                    >
+                      {unread > 9 ? '9+' : unread}
+                    </span>
                   )}
                 </span>
                 {tab.label}

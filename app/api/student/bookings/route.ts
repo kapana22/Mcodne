@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { stripTutorBlobs } from '@/lib/stripTutorBlobs'
 
 export async function GET() {
   const user = await getCurrentUser()
@@ -28,5 +29,9 @@ export async function GET() {
       review: { select: { id: true, rating: true } },
     },
   })
-  return NextResponse.json(bookings)
+  // Up to 500 rows, each carrying the tutor's full profile — strip the heavy
+  // blobs (professionData JSON, legacy base64 video/avatar) before shipping.
+  return NextResponse.json(
+    bookings.map(b => ({ ...b, tutor: stripTutorBlobs(b.tutor) })),
+  )
 }

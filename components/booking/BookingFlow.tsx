@@ -15,10 +15,11 @@
 //     already-fetched /api/tutors/[id] JSON) — no extra request.
 //   - self-fetch: the listing passes only `tutorId`; the flow fetches
 //     /api/tutors/[id] on open (same payload the profile uses).
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/components/Icon'
+import { Eyebrow } from '@/components/Eyebrow'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { RISK_REVERSAL_LINE } from '@/lib/copy'
 import { KA_MONTHS_LONG as KA_MONTHS_FULL } from '@/lib/kaDate'
@@ -33,36 +34,11 @@ import { IntakeStep, TOPIC_OPTIONS, MIN_INTAKE_CHARS, type DetailsState } from '
 import { PaymentStep, INITIAL_PAYMENT, isPaymentValid, type PaymentState } from './PaymentStep'
 import { OrderSummary } from './OrderSummary'
 import { TierStep } from './TierStep'
-
-export type BookingTutorInfo = {
-  id: string
-  name: string
-  specialty: string
-  avatarUrl: string | null
-  price: number
-  sessionMin: number
-  availability: ApiSlot[]
-  busySlots: BusySlot[]
-  consultations: ConsultationItem[]
-}
-
-// Map the /api/tutors/[id] JSON to the flow's payload. The profile page calls
-// this on its already-loaded data; the self-fetch path calls it on the fresh
-// response — ONE mapping, so the two entry points can't resolve different
-// fallbacks (same TUTOR_DEFAULTS as the card mapper; tests/tutor-mapping).
-export function mapTutorPayload(d: any): BookingTutorInfo {
-  return {
-    id: d?.id ?? '',
-    name: d?.user?.fullName ?? TUTOR_DEFAULTS.name,
-    specialty: d?.specialty ?? 'კონსულტაცია',
-    avatarUrl: d?.user?.avatarUrl ?? null,
-    price: d?.price ?? TUTOR_DEFAULTS.price,
-    sessionMin: typeof d?.consultationDurationMin === 'number' ? d.consultationDurationMin : TUTOR_DEFAULTS.durationMin,
-    availability: Array.isArray(d?.availability) ? d.availability : [],
-    busySlots: Array.isArray(d?.busySlots) ? d.busySlots : [],
-    consultations: Array.isArray(d?.consultations) ? d.consultations : [],
-  }
-}
+// mapTutorPayload / BookingTutorInfo moved to ./mapTutorPayload so the profile
+// page can import the tiny mapper without bundling this whole component. Kept
+// re-exported here so existing `from '.../BookingFlow'` imports still resolve.
+import { mapTutorPayload, type BookingTutorInfo } from './mapTutorPayload'
+export { mapTutorPayload, type BookingTutorInfo }
 
 /* Step rail — dynamic labels because the tier and payment steps come and go. */
 const Steps = ({ step, labels }: { step: number; labels: string[] }) => (
@@ -158,6 +134,26 @@ export const BookingFlow = ({
     return new Date(anchor.getFullYear(), anchor.getMonth(), 1)
   })
   const [selectedStart, setSelectedStart] = useState<Date | null>(initialStart)
+  // Mobile: after the user taps a day, auto-scroll the (single-column) sheet
+  // down to the time grid so the freshly-revealed slots come into view without
+  // a manual scroll. Only fires on an explicit calendar tap (flag), never on
+  // open, and only below lg where the layout is stacked (desktop shows both
+  // panes side by side, so nothing to scroll).
+  const timePaneRef = useRef<HTMLDivElement | null>(null)
+  const scrollToTimesRef = useRef(false)
+  useEffect(() => {
+    if (!scrollToTimesRef.current || !selectedDate) return
+    scrollToTimesRef.current = false
+    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 1023px)').matches) return
+    requestAnimationFrame(() => timePaneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }, [selectedDate])
+  // Reset the sheet's scroll to the top of the content on every step change —
+  // otherwise advancing from the (auto-scrolled) slot step leaves the details
+  // step opening mid-content, which reads as "it scrolled by itself".
+  const stepTopRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    stepTopRef.current?.scrollIntoView({ block: 'start' })
+  }, [step])
   const [details, setDetails] = useState<DetailsState>({
     topic: (initialTopic && initialTopic.trim()) || TOPIC_OPTIONS[0],
     goal: '',
@@ -247,7 +243,7 @@ export const BookingFlow = ({
         setResendMsg(data?.error === 'RATE_LIMITED' ? 'ხშირად ცდი — მოგვიანებით სცადე.' : 'გაგზავნა ვერ მოხერხდა.')
         return
       }
-      setResendMsg('კოდი გაიგზავნა — შეამოწმე ინბოქსი.')
+      setResendMsg('კოდი გაიგზავნა — შეამოწმე ელფოსტა.')
     } catch {
       setResendMsg('ქსელის შეცდომა.')
     } finally {
@@ -313,12 +309,11 @@ export const BookingFlow = ({
       const data = await res.json().catch(() => ({} as any))
       if (!res.ok || data?.ok === false) {
         const code = data?.error as string | undefined
-        if (code === 'EMAIL_NOT_VERIFIED') {
-          setSubmitUnverified(true)
-          setResendMsg(null)
-          setSubmitError('დაჯავშნამდე დაადასტურე ელფოსტა.')
-          return
-        }
+        // NB: student signup deliberately skips email verification (2026-07-20),
+        // and no API route returns EMAIL_NOT_VERIFIED today. The old branch here
+        // walled the booking at submit — the worst possible moment — if the two
+        // ever diverged. Removed: any such code now falls through to the generic
+        // error below, never a hard verification wall.
         const msg =
           code === 'SLOT_TAKEN' ? 'ეს დრო უკვე დაჯავშნილია. აირჩიე სხვა დრო.' :
           code === 'NO_AVAILABILITY' ? 'ექსპერტი ამ დროზე არ არის ხელმისაწვდომი. აირჩიე მისი გამოცხადებული დროებიდან.' :
@@ -328,8 +323,12 @@ export const BookingFlow = ({
           code === 'CONSULTATION_NOT_FOUND' ? 'ეს სერვისი ვეღარ მოიძებნა — აირჩიე თავიდან.' :
           code === 'TUTOR_UNAVAILABLE' ? 'ექსპერტი ამჟამად პაუზაზეა — ახალი ჯავშანი ვერ შეიქმნება.' :
           code === 'RATE_LIMIT' ? 'ხშირად ცდი ჯავშანს — ცოტა ხანში სცადე თავიდან.' :
+          code === 'STUDENT_OVERLAP' ? 'ამ დროს უკვე გაქვს სხვა ჯავშანი. აირჩიე თავისუფალი დრო.' :
           code === 'INVALID' ? 'შეავსე ყველა აუცილებელი ველი.' :
-          'დაჯავშნა ვერ შესრულდა. სცადე თავიდან.'
+          code === 'FORBIDDEN' ? 'ჯავშანი მხოლოდ კლიენტის ანგარიშს შეუძლია — ექსპერტის/ადმინის ანგარიშით ვერ დაჯავშნი.' :
+          // Surface the raw code when unmapped so a failure is never a silent
+          // "try again" with no clue what went wrong.
+          `დაჯავშნა ვერ შესრულდა${code ? ` (${code})` : ''}. სცადე თავიდან.`
         setSubmitError(msg)
         return
       }
@@ -429,7 +428,7 @@ export const BookingFlow = ({
           )}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <div className="text-[13px]">
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500">არჩეული</div>
+              <Eyebrow tone="muted">არჩეული</Eyebrow>
               <div className="font-display font-bold text-ink-900 mt-0.5">
                 {selectedStart
                   ? <>{selectedService ? `${selectedService.title} · ` : ''}{dayLabelFull} · {fmtHM(selectedStart)} · <span className="tabular-nums">{duration}</span> წუთი · <span className="tabular-nums">{price}</span></>
@@ -454,7 +453,7 @@ export const BookingFlow = ({
                 onClick={next}
                 disabled={submitting || !canAdvance || (onPaymentStep && !cardValid)}
                 aria-busy={submitting}
-                className="h-11 px-5 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+                className="h-11 px-5 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] transition-all duration-fast disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
               >
                 {submitting ? (
                   <>
@@ -462,10 +461,7 @@ export const BookingFlow = ({
                     იგზავნება…
                   </>
                 ) : (
-                  <>
-                    {nextLabel}
-                    <Icon.arrow className="w-4 h-4" />
-                  </>
+                  nextLabel
                 )}
               </button>
             </div>
@@ -479,6 +475,8 @@ export const BookingFlow = ({
     >
         {/* Body — full-bleed inside Sheet's padded scroll area */}
         <div className="-mx-5 sm:-mx-6 -my-4">
+          {/* Scroll anchor: step-change effect scrolls this to the top of the sheet. */}
+          <div ref={stepTopRef} aria-hidden />
           {!info ? (
             fetchState === 'error' ? (
               <div className="flex flex-col items-center justify-center text-center px-6 py-16">
@@ -518,14 +516,14 @@ export const BookingFlow = ({
                 მოთხოვნა გაგზავნილია
               </h3>
               <p className="text-[14px] text-ink-600 mt-3 max-w-[440px] leading-[1.55] motion-safe:animate-rise-in" style={{ animationDelay: '200ms' }}>
-                {dayLabelFull}{selectedStart ? ` · ${fmtHM(selectedStart)}` : ''} · {total} · {info.name}. ექსპერტი მალე დაადასტურებს — შეტყობინებას მიიღებ. ჯავშანი გამოჩნდება „ჩემი ჯავშნების" გვერდზე.
+                {dayLabelFull}{selectedStart ? ` · ${fmtHM(selectedStart)}` : ''} · {total} · {info.name}. ექსპერტი მალე დაადასტურებს — შეტყობინებას მიიღებ. ჯავშანი გამოჩნდება „ჩემი ჯავშნების“ გვერდზე.
               </p>
               <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-2 motion-safe:animate-rise-in" style={{ animationDelay: '280ms' }}>
                 <Link
                   href={createdId ? `/student/bookings/${createdId}` : '/student/bookings'}
-                  className="h-11 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(21,154,130,0.36)] transition-all duration-fast"
+                  className="h-11 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] transition-all duration-fast"
                 >
-                  ჯავშნის ნახვა <Icon.arrow className="w-4 h-4" />
+                  ჯავშნის ნახვა
                 </Link>
                 <button type="button" onClick={onClose} className="h-11 px-5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[13px] tracking-wide transition-colors">
                   დახურვა
@@ -539,29 +537,49 @@ export const BookingFlow = ({
               onSelect={s => { setSelectedService(s); if (submitError) setSubmitError(null) }}
             />
           ) : step === slotStepN ? (
-            <div className="grid lg:grid-cols-[360px_1fr] h-full">
-              <div className="border-b lg:border-b-0 lg:border-r border-ink-100 p-4 sm:p-6 overflow-y-auto">
+            // Mobile: one natural scroll through the Sheet body (calendar →
+            // time grid). Desktop (lg+): fixed-height two-pane with each column
+            // scrolling independently. The h-full + per-pane overflow only kick
+            // in at lg so mobile never gets the janky nested double-scroll.
+            <div className="grid lg:grid-cols-[360px_1fr] lg:h-full">
+              <div className="border-b lg:border-b-0 lg:border-r border-ink-100 p-4 sm:p-6 lg:overflow-y-auto">
                 <Calendar
                   viewMonth={viewMonth}
                   selected={selectedDate}
                   slotsByDay={slotsByDay}
-                  onSelect={(d) => { setSelectedDate(d); setSelectedStart(null) }}
+                  onSelect={(d) => { setSelectedDate(d); setSelectedStart(null); scrollToTimesRef.current = true }}
                   onPrev={() => setViewMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
                   onNext={() => setViewMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
                 />
               </div>
-              <div className="p-4 sm:p-6 overflow-y-auto">
+              <div ref={timePaneRef} className="p-4 sm:p-6 lg:overflow-y-auto scroll-mt-4">
                 {selectedDate ? (
-                  <DayTimeline
-                    date={selectedDate}
-                    selected={selectedStart}
-                    onSelect={(t) => { setSelectedStart(t); if (submitError) setSubmitError(null) }}
-                    duration={duration}
-                    price={price}
-                    timeChoices={timeChoices}
-                  />
+                  <>
+                    <DayTimeline
+                      date={selectedDate}
+                      selected={selectedStart}
+                      onSelect={(t) => { setSelectedStart(t); if (submitError) setSubmitError(null) }}
+                      duration={duration}
+                      price={price}
+                      timeChoices={timeChoices}
+                    />
+                    {/* Persistent escape hatch: the expert HAS slots, but if none
+                        of them suit the client there's no need to abandon the
+                        sheet — offer the direct-message path right here. */}
+                    {bookTutorId && (
+                      <div className="mt-5 pt-4 border-t border-ink-100 text-center">
+                        <Link
+                          href={`/tutors/${bookTutorId}?intent=message`}
+                          onClick={() => onClose()}
+                          className="text-[12.5px] text-ink-500 hover:text-brand-700 font-display font-medium transition-colors"
+                        >
+                          არცერთი დრო არ მაწყობს? მიწერე ექსპერტს
+                        </Link>
+                      </div>
+                    )}
+                  </>
                 ) : availability.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center px-6 py-12">
+                  <div className="lg:h-full min-h-[260px] flex flex-col items-center justify-center text-center px-6 py-12">
                     <div className="w-12 h-12 rounded-full bg-ink-100 inline-flex items-center justify-center text-ink-500 mb-4">
                       <Icon.cal className="w-5 h-5" />
                     </div>
@@ -573,8 +591,8 @@ export const BookingFlow = ({
                     </p>
                     <div className="mt-5 flex flex-col sm:flex-row gap-2 items-center">
                       <Link
-                        href={`/signin?redirect=/tutors/${bookTutorId}`}
-                        onClick={(e) => { e.preventDefault(); onClose(); if (bookTutorId) window.location.href = `/tutors/${bookTutorId}#contact` }}
+                        href={`/tutors/${bookTutorId}?intent=message`}
+                        onClick={(e) => { e.preventDefault(); onClose(); if (bookTutorId) window.location.href = `/tutors/${bookTutorId}?intent=message` }}
                         className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
                       >
                         დაუკავშირდი ექსპერტს
@@ -589,7 +607,7 @@ export const BookingFlow = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center px-6 py-12">
+                  <div className="lg:h-full min-h-[260px] flex flex-col items-center justify-center text-center px-6 py-12">
                     <div className="w-12 h-12 rounded-full bg-ink-100 inline-flex items-center justify-center text-ink-500 mb-4">
                       <Icon.cal className="w-5 h-5" />
                     </div>

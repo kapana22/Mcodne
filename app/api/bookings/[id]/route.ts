@@ -1,12 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { notify } from '@/lib/notify'
 import { markRelatedRead } from '@/lib/notifClear'
-
-// Deterministic Jitsi room URL — same for both parties, derived from ref.
-const meetingUrlFor = (ref: string) => `https://meet.jit.si/mcodne-${ref.slice(0, 16)}`
+import { newMeetingUrl, isStaleMeetingUrl } from '@/lib/meeting'
+import { sendMail } from '@/lib/mailer'
+import { bookingConfirmedEmail } from '@/lib/emailTemplates'
+import { fmtKaDateTime } from '@/lib/kaDate'
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
@@ -15,6 +16,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const where = user.role === 'ADMIN'
     ? { id }
     : { id, OR: [{ studentId: user.id }, { tutor: { userId: user.id } }] }
+  // Kick off the reschedule-request read BEFORE the main query so the two run
+  // concurrently instead of as two sequential round-trips (each round-trip to
+  // the DB is the dominant cost). Result is only used once the booking loads +
+  // auth passes below, so fetching it for an inaccessible id leaks nothing.
+  const reschedulePromise = prisma.$queryRawUnsafe<{ rescheduleRequest: unknown }[]>(
+    `SELECT "rescheduleRequest" FROM "Booking" WHERE id = $1 LIMIT 1`,
+    id,
+  ).catch(() => [] as { rescheduleRequest: unknown }[])
   const booking = await prisma.booking.findFirst({
     where,
     include: {
@@ -22,7 +31,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       // passwordHash / phone / email should never leave the server.
       tutor: {
         include: {
-          user: { select: { id: true, fullName: true, avatarUrl: true, email: true } },
+          // Expert email is NOT selected: no UI renders it and returning it to
+          // the (any-authenticated) requester who booked a free slot is an
+          // email-harvesting vector. Student email below stays — the tutor's
+          // booking-detail page renders it as their contact for the session.
+          user: { select: { id: true, fullName: true, avatarUrl: true } },
           category: { select: { id: true, slug: true, name: true } },
         },
       },
@@ -30,7 +43,10 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       consultation: true,
       messages: {
         orderBy: { createdAt: 'asc' },
-        include: { from: { select: { id: true, fullName: true, avatarUrl: true } } },
+        // Avatars are NOT embedded per message — BookingChat renders each
+        // sender's avatar from the 2 thread participants. Embedding a (base64)
+        // avatar per message once made this payload multi-MB.
+        include: { from: { select: { id: true, fullName: true } } },
       },
       // Include the student's post-session review (if any) so both parties can
       // render "already reviewed" state without a second round-trip.
@@ -46,11 +62,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   })
   if (!booking) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
 
-  // Backfill: bookings that were accepted before the meetingUrl feature landed
-  // have `meetingUrl: null`. Fill it in with the deterministic URL for any
-  // non-terminal booking so the "video-room" button always renders.
-  if (!booking.meetingUrl && (booking.status === 'CONFIRMED' || booking.status === 'LIVE')) {
-    const url = meetingUrlFor(booking.ref)
+  // Backfill / migrate: a missing room, OR a legacy meet.jit.si room (which now
+  // hits the moderator gate), gets a fresh current-provider room the first time
+  // a non-terminal booking is opened — so the join button always works.
+  if (isStaleMeetingUrl(booking.meetingUrl) && (booking.status === 'CONFIRMED' || booking.status === 'LIVE')) {
+    const url = await newMeetingUrl()
     booking.meetingUrl = url
     // Fire-and-forget persist so we only do this once per booking. Not awaited
     // so it doesn't block the response.
@@ -72,14 +88,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   // Merge in the reschedule-request JSONB (not part of the Prisma-typed model —
   // lives as a boot-time-added column, queried raw). Null when no proposal is
   // pending; small enough to keep with the booking response payload.
-  let rescheduleRequest: unknown = null
-  try {
-    const rows = await prisma.$queryRawUnsafe<{ rescheduleRequest: unknown }[]>(
-      `SELECT "rescheduleRequest" FROM "Booking" WHERE id = $1 LIMIT 1`,
-      booking.id,
-    )
-    rescheduleRequest = rows?.[0]?.rescheduleRequest ?? null
-  } catch { /* column missing during first-boot race — treat as null */ }
+  const rescheduleRows = await reschedulePromise
+  const rescheduleRequest = rescheduleRows?.[0]?.rescheduleRequest ?? null
 
   return NextResponse.json({ ...booking, rescheduleRequest })
 }
@@ -162,7 +172,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // Provision a Jitsi Meet room per booking. Public Jitsi requires no API
     // key; room URL is deterministic from the booking ref so both sides get
     // the same room. Room name is namespaced to reduce collision odds.
-    const meetingUrl = booking.meetingUrl ?? `https://meet.jit.si/mcodne-${booking.ref.slice(0, 16)}`
+    const meetingUrl = booking.meetingUrl ?? (await newMeetingUrl())
     const updated = await prisma.booking.update({
       where: { id },
       data: { status: 'CONFIRMED', meetingUrl, tutorNotes: tutorNotes ?? booking.tutorNotes },
@@ -177,11 +187,35 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // Tutor already acted — clear their "new request" bell entry so it doesn't
     // keep sitting as unread.
     await markRelatedRead(user.id, `/tutor/bookings/${booking.id}`, 'BOOKING_CREATED')
+    // Confirmation email to the student — fire-and-forget (extra lookups for the
+    // names/email run off the response path).
+    after(async () => {
+      try {
+        const [student, profile] = await Promise.all([
+          prisma.user.findUnique({ where: { id: booking.studentId }, select: { email: true, fullName: true } }),
+          prisma.tutorProfile.findUnique({ where: { id: booking.tutorId }, select: { user: { select: { fullName: true } } } }),
+        ])
+        if (student?.email) {
+          const { subject, html } = bookingConfirmedEmail({
+            studentName: student.fullName,
+            expertName: profile?.user.fullName || 'ექსპერტი',
+            topic: booking.topic,
+            whenText: fmtKaDateTime(booking.startAt, { year: true }),
+            bookingId: booking.id,
+          })
+          await sendMail({ to: student.email, subject, html })
+        }
+      } catch { /* email is best-effort */ }
+    })
     return NextResponse.json({ ok: true, status: updated.status, meetingUrl: updated.meetingUrl })
   }
 
   if (action === 'decline') {
-    if (booking.status === 'COMPLETED' || booking.status === 'CANCELED') {
+    // Decline = rejecting a PENDING request only. Once CONFIRMED (or past), the
+    // tutor must use cancel — declining a confirmed/already-happened session
+    // would erase it (→ CANCELED) and dodge a review. The UI only ever offers
+    // decline on PREPARING, so this just hardens the API against direct calls.
+    if (booking.status !== 'PREPARING') {
       return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 400 })
     }
     // Free the EXACT slot this booking claimed (if any) so someone else can
@@ -216,12 +250,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   if (action === 'no_show') {
-    // Tutor flags "student didn't turn up". Only allowed after the session's
-    // scheduled start time to prevent premature flagging.
+    // Tutor flags "student didn't turn up". Only allowed once a GRACE window
+    // past the scheduled start has elapsed — otherwise a tutor could flag the
+    // instant the clock hits startAt, before the student could plausibly join.
+    // Mirrors the 15-min grace on the student's own no-show report (disputes).
+    const NO_SHOW_GRACE_MS = 15 * 60 * 1000
     if (booking.status !== 'CONFIRMED' && booking.status !== 'LIVE') {
       return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 400 })
     }
-    if (booking.startAt.getTime() > Date.now()) {
+    if (Date.now() < booking.startAt.getTime() + NO_SHOW_GRACE_MS) {
       return NextResponse.json({ ok: false, error: 'TOO_EARLY' }, { status: 400 })
     }
     const updated = await prisma.booking.update({
@@ -234,7 +271,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     })
     await notify(booking.studentId, {
       type: 'BOOKING_CANCELED',
-      title: 'აღინიშნა: no-show',
+      title: 'აღინიშნა: გამოუცხადებლობა',
       body: `ექსპერტმა აღნიშნა, რომ არ გამოცხადდი — ${booking.topic}`,
       href: `/student/bookings/${booking.id}`,
     })

@@ -3,6 +3,8 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { getCurrentUser, hashPassword, verifyPassword, revokeOtherSessions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { normalizeAvatar } from '@/lib/normalizeAvatar'
+import { rateLimit } from '@/lib/rateLimit'
 
 // The header/nav reads role from here to decide what to render. If the browser
 // serves a cached response, the top bar keeps showing the PREVIOUS role after
@@ -57,12 +59,19 @@ export async function PATCH(req: Request) {
   if (fullName !== undefined) data.fullName = fullName.trim()
   if (phone !== undefined) data.phone = phone.trim() || null
   if (bio !== undefined) data.bio = bio.trim() || null
-  if (avatarUrl !== undefined) data.avatarUrl = avatarUrl
+  // Downscale an inbound base64 avatar to a 256px webp (same as /api/uploads)
+  // so this write path can't persist a multi-MB avatar. null clears it.
+  if (avatarUrl !== undefined) data.avatarUrl = avatarUrl ? await normalizeAvatar(avatarUrl) : null
 
   if (newPassword) {
     if (!currentPassword) {
       return NextResponse.json({ ok: false, error: 'CURRENT_PASSWORD_REQUIRED' }, { status: 400 })
     }
+    // Throttle password changes here too — this PATCH is a second path to the
+    // same operation as /api/me/password, so share the `pwchange` budget (an
+    // attacker with a live session shouldn't get unlimited current-password guesses).
+    const rl = rateLimit(`pwchange:${user.id}`, 5, 15 * 60)
+    if (!rl.ok) return NextResponse.json({ ok: false, error: 'RATE_LIMITED', retryInSec: rl.retryInSec }, { status: 429 })
     const fresh = await prisma.user.findUnique({ where: { id: user.id }, select: { passwordHash: true } })
     if (!fresh) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
     const ok = await verifyPassword(currentPassword, fresh.passwordHash)
@@ -139,7 +148,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({
         ok: false,
         error: 'HAS_HISTORY',
-        hint: 'ანგარიშს აქვს დასრულებული ჯავშნები ან შეტყობინებები. მიმართე support-ს ხელით წაშლისთვის.',
+        hint: 'ანგარიშს აქვს დასრულებული ჯავშნები ან შეტყობინებები. მიმართე მხარდაჭერას ხელით წასაშლელად.',
       }, { status: 409 })
     }
     throw e

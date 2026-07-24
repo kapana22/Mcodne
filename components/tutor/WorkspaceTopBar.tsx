@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { Logo } from '@/components/Logo'
 import { NotifBell } from '@/components/NotifBell'
 import { UserMenu } from '@/components/UserMenu'
-import { titleForPath } from './navConfig'
 
 /* Compact workspace header: page title (from nav config) + bell + user menu.
    The old TutorAppBar's 7-link nav lives in WorkspaceSidebar on desktop;
@@ -22,18 +21,16 @@ export function WorkspaceTopBar({ user }: { user?: { name: string; avatar?: stri
 
   return (
     <header
-      className={`sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
+      className={`sticky top-0 z-40 bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
         scrolled ? 'shadow-sm' : ''
       }`}
     >
       <div className="px-4 sm:px-6 lg:px-8 h-14 lg:h-16 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
+          {/* No page title — the sidebar shows the active section. Mobile logo only. */}
           <span className="lg:hidden shrink-0">
-            <Logo size="sm" href="/tutor" />
+            <Logo size="sm" />
           </span>
-          <h1 className="font-display text-[15px] font-bold text-ink-900 truncate">
-            {titleForPath(path)}
-          </h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <NotifBell />

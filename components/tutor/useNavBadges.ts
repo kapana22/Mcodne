@@ -47,7 +47,7 @@ export function useNavBadges(): NavBadges {
         .catch(() => {})
     }
     load()
-    const t = setInterval(load, 60_000)
+    const t = setInterval(load, 90_000)
     const onStorage = (e: StorageEvent) => {
       if (e.key === 'mcodne:notif-check') load()
     }

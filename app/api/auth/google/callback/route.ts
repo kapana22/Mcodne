@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { cookies } from 'next/headers'
 import crypto from 'node:crypto'
 import { prisma } from '@/lib/prisma'
 import { createSession, hashPassword, postAuthHome } from '@/lib/auth'
 import { oauthOrigin } from '@/lib/googleOauth'
 import { safeInternalPath } from '@/lib/roleHome'
+import { sendMail } from '@/lib/mailer'
+import { welcomeEmail } from '@/lib/emailTemplates'
 
 // GET /api/auth/google/callback — Google redirects here with ?code&state.
 export async function GET(req: Request) {
@@ -70,6 +72,7 @@ export async function GET(req: Request) {
   // Find or create the account. Existing password-signup users are simply logged
   // in (Google is an additional way in, not a duplicate account).
   let user = await prisma.user.findUnique({ where: { email } })
+  const isNewUser = !user
   if (!user) {
     user = await prisma.user.create({
       data: {
@@ -83,8 +86,17 @@ export async function GET(req: Request) {
         emailVerified: true, // Google-verified email → skip our OTP step.
       },
     })
-  } else if (!user.emailVerified) {
-    await prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } })
+  } else {
+    // Existing account signing in via Google: mark verified, and backfill the
+    // avatar from the Google photo IF they don't already have one (never
+    // overwrite a user-set avatar). Otherwise a pre-existing account that logs
+    // in with Google would keep a blank photo forever.
+    const patch: { emailVerified?: boolean; avatarUrl?: string } = {}
+    if (!user.emailVerified) patch.emailVerified = true
+    if (!user.avatarUrl && gu.picture) patch.avatarUrl = gu.picture
+    if (Object.keys(patch).length > 0) {
+      user = await prisma.user.update({ where: { id: user.id }, data: patch })
+    }
   }
 
   // A suspended account must not obtain a session via Google sign-in either.
@@ -92,6 +104,17 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL('/signin?e=suspended', origin))
   }
   await createSession(user.id)
+
+  // First-time Google sign-up → welcome email (fire-and-forget). Existing
+  // accounts logging in via Google get nothing.
+  if (isNewUser) {
+    const u = user
+    after(async () => {
+      const { subject, html } = welcomeEmail(u.fullName)
+      await sendMail({ to: u.email, subject, html }).catch(() => {})
+    })
+  }
+
   // Explicit deep-link wins (matches password signin); otherwise the
   // server-decided landing (role home, or /apply for pending applicants).
   const dest = safeInternalPath(savedNext) ?? (await postAuthHome(user))

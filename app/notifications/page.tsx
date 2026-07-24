@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { Container } from '@/components/Container'
 import Link from 'next/link'
 import { Icon } from '@/components/Icon'
 import { Skeleton } from '@/components/Skeleton'
@@ -7,6 +8,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { useToast } from '@/components/ToastProvider'
 import { homeForRole } from '@/lib/roleHome'
 import { fmtKaDate, fmtKaTime } from '@/lib/kaDate'
+import { Eyebrow } from '@/components/Eyebrow'
 
 type Item = {
   id: string
@@ -34,11 +36,11 @@ const timeShort = (iso: string) => fmtKaTime(new Date(iso))
 const TYPE_LABEL: Record<string, { l: string; cls: string }> = {
   BOOKING_CREATED:    { l: 'ჯავშანი',      cls: 'bg-brand-50 text-brand-700 border-brand-200' },
   BOOKING_CANCELED:   { l: 'გაუქმება',     cls: 'bg-danger-50 text-danger-700 border-danger-200' },
-  MESSAGE_NEW:        { l: 'შეტყობინება',  cls: 'bg-info-50 text-info-700 border-info-200' },
+  MESSAGE_NEW:        { l: 'შეტყობინება',  cls: 'bg-ink-75 text-ink-700 border-ink-200' },
   REVIEW_NEW:         { l: 'შეფასება',     cls: 'bg-warning-50 text-warning-700 border-warning-200' },
   APPLICATION_STATUS: { l: 'განაცხადი',    cls: 'bg-success-50 text-success-700 border-success-200' },
   BOOKING_REMINDER:   { l: 'შეხსენება',    cls: 'bg-brand-50 text-brand-700 border-brand-200' },
-  APPLICATION_NEW:    { l: 'განაცხადი',    cls: 'bg-info-50 text-info-700 border-info-200' },
+  APPLICATION_NEW:    { l: 'განაცხადი',    cls: 'bg-ink-75 text-ink-700 border-ink-200' },
   PAYOUT:             { l: 'ანგარიშსწორება', cls: 'bg-brand-50 text-brand-700 border-brand-200' },
   ADMIN_BROADCAST:    { l: 'გუნდიდან',     cls: 'bg-ink-100 text-ink-700 border-ink-200' },
   GENERIC:            { l: 'შეტყობინება',  cls: 'bg-ink-50 text-ink-700 border-ink-200' },
@@ -129,8 +131,8 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen bg-ink-50/40">
-      <header className="sticky top-0 z-40 bg-ink-50/90 backdrop-blur-md border-b border-ink-100">
-        <div className="max-w-[820px] mx-auto px-6 h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-ink-50 lg:bg-ink-50/90 lg:backdrop-blur-md border-b border-ink-100">
+        <Container size="content" className="h-16 flex items-center justify-between">
           <Link href="/" className="inline-flex items-center" aria-label="მცოდნე">
             <img src="/logo.svg" alt="მცოდნე" className="h-6 w-auto object-contain" />
           </Link>
@@ -138,13 +140,13 @@ export default function NotificationsPage() {
             <Link href={role ? homeForRole(role) : '/'} className="text-ink-700 hover:text-ink-900">მთავარი</Link>
             <Link href="/tutors" className="text-ink-700 hover:text-ink-900">ექსპერტები</Link>
           </nav>
-        </div>
+        </Container>
       </header>
 
-      <main className="max-w-[820px] mx-auto px-6 py-8 lg:py-12">
+      <Container as="main" size="content" className="py-8 lg:py-12">
         <div className="flex items-end justify-between gap-4 mb-6 flex-wrap">
           <div>
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-1">შეტყობინებები</div>
+            <Eyebrow tone="muted" className="mb-1">შეტყობინებები</Eyebrow>
             <h1 className="font-display text-[26px] sm:text-[32px] font-bold text-ink-900 tracking-tight leading-[1.05]">
               შეტყობინებები {unread > 0 && <span className="text-brand-600">({unread})</span>}
             </h1>
@@ -186,7 +188,7 @@ export default function NotificationsPage() {
           <div className="space-y-6">
             {Object.entries(groups).map(([day, list]) => (
               <section key={day}>
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-500 mb-2">{day}</div>
+                <Eyebrow tone="muted" className="mb-2">{day}</Eyebrow>
                 <ul className="rounded-card border border-ink-200 bg-white overflow-hidden divide-y divide-ink-100">
                   {list.map(n => {
                     const meta = TYPE_LABEL[n.type] ?? TYPE_LABEL.GENERIC
@@ -207,7 +209,7 @@ export default function NotificationsPage() {
                             <div className="mt-2 flex items-center gap-3">
                               {n.href && (
                                 <Link href={n.href} onClick={() => markOne(n.id)} className="font-display text-[12px] font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
-                                  ნახვა <Icon.arrow className="w-3 h-3" />
+                                  ნახვა
                                 </Link>
                               )}
                               {isUnread && (
@@ -226,7 +228,7 @@ export default function NotificationsPage() {
             ))}
           </div>
         )}
-      </main>
+      </Container>
     </div>
   )
 }

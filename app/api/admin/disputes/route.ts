@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { stripTutorBlobs, stripAvatar } from '@/lib/stripTutorBlobs'
 
 // List disputes with optional status filter. Includes booking + student +
 // tutor names so the admin table doesn't need N+1 lookups.
@@ -26,5 +27,12 @@ export async function GET(req: Request) {
       },
     },
   })
-  return NextResponse.json(items)
+  return NextResponse.json(
+    items.map(d => ({
+      ...d,
+      booking: d.booking
+        ? { ...d.booking, tutor: stripTutorBlobs(d.booking.tutor), student: stripAvatar(d.booking.student) }
+        : d.booking,
+    })),
+  )
 }

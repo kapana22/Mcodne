@@ -9,6 +9,7 @@
 // ships in /api/tutors/[id], it can gate the tag.
 import React from 'react'
 import { Icon } from '@/components/Icon'
+import { Eyebrow } from '@/components/Eyebrow'
 import type { ConsultationItem } from './slots'
 
 export const TierStep = ({
@@ -21,7 +22,7 @@ export const TierStep = ({
   onSelect: (c: ConsultationItem) => void
 }) => (
   <div className="p-4 sm:p-7 lg:p-10">
-    <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">სესიის ტიპი</div>
+    <Eyebrow className="mb-2">სესიის ტიპი</Eyebrow>
     <h3 className="font-display text-[20px] font-bold text-ink-900 tracking-tight leading-tight">აირჩიე სერვისი</h3>
     <p className="mt-1 text-[13px] text-ink-600 leading-[1.55]">ფასი ფიქსირებულია — რასაც აქ ხედავ, ზუსტად იმას იხდი.</p>
 
@@ -46,7 +47,7 @@ export const TierStep = ({
               <p className="text-[12.5px] text-ink-600 mt-1.5 leading-[1.55] flex-1">{c.description}</p>
             )}
             <div className="mt-4 pt-3.5 border-t border-ink-100 flex items-baseline justify-between">
-              <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500 tabular-nums">{c.minutes} წუთი</span>
+              <Eyebrow as="span" tone="muted" className="tabular-nums">{c.minutes} წუთი</Eyebrow>
               <span className="font-display text-[18px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">₾{c.price}</span>
             </div>
             {on && (

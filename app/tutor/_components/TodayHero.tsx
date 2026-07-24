@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Avatar } from '@/components/Avatar'
 import { Btn } from '@/components/Btn'
+import { Card } from '@/components/Card'
+import { Eyebrow } from '@/components/Eyebrow'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { StatusPill } from '@/components/StatusPill'
@@ -30,10 +32,8 @@ export function TodayHero({
 
   if (!next) {
     return (
-      <section className="rounded-card border border-ink-200 bg-white p-5 sm:p-6">
-        <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-4">
-          უახლოესი სესია
-        </div>
+      <Card as="section">
+        <Eyebrow tone="muted" className="mb-4">უახლოესი სესია</Eyebrow>
         <EmptyState
           variant="inline"
           icon={<Icon.calendar className="w-5 h-5" />}
@@ -41,7 +41,7 @@ export function TodayHero({
           description="გამოაქვეყნე თავისუფალი დროები — კლიენტები მხოლოდ გამოცხადებულ დროზე ჯავშნიან."
           cta={{ label: 'გრაფიკის რედაქტირება', href: '/tutor/schedule' }}
         />
-      </section>
+      </Card>
     )
   }
 
@@ -108,8 +108,7 @@ export function TodayHero({
             <div className="relative bg-white/[0.06] border-t lg:border-t-0 lg:border-l border-white/10 p-6 flex flex-col justify-center">
               <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/50 mb-2.5">ახლა</div>
               <div className="inline-flex items-center gap-2.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-brand-400 motion-safe:animate-pulse-soft" />
-                <span className="font-display text-[22px] font-bold leading-none tracking-[-0.02em] text-white">მიმდინარეობს</span>
+                <span className="font-display text-[22px] font-bold leading-none tracking-[-0.02em] text-brand-300">მიმდინარეობს</span>
               </div>
             </div>
           ) : (
@@ -133,9 +132,9 @@ export function TodayHero({
       </article>
 
       {todayRest.length > 0 && (
-        <div className="mt-3 rounded-card border border-ink-200 bg-white overflow-hidden">
-          <div className="px-5 py-3 border-b border-ink-100 font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500">
-            კიდევ დღეს
+        <Card padding="none" className="mt-3 overflow-hidden">
+          <div className="px-5 py-3 border-b border-ink-100">
+            <Eyebrow tone="muted">კიდევ დღეს</Eyebrow>
           </div>
           <ul className="divide-y divide-ink-100">
             {todayRest.map(b => (
@@ -150,7 +149,7 @@ export function TodayHero({
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
       )}
     </section>
   )

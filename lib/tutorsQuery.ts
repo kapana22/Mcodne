@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { expandQuery } from '@/lib/searchSynonyms'
+import { stripTutorBlobs } from '@/lib/stripTutorBlobs'
 
 // Single source of truth for the public expert-list query. Both the JSON API
 // (app/api/tutors/route.ts) and the server-rendered /tutors page
@@ -26,7 +27,11 @@ export async function queryTutors(params: TutorsQueryParams = {}) {
       ? params.serviceType
       : null
   const onlyFeatured = params.onlyFeatured ?? false
-  const limit = Math.min(params.limit ?? 40, 100)
+  // Coerce defensively: a non-numeric ?limit=abc reaches here as NaN, and
+  // `?? 40` does NOT catch NaN (it's not null/undefined) → `take: NaN` would
+  // reach Prisma. Clamp to [1, 100] with a 40 default.
+  const rawLimit = typeof params.limit === 'number' && Number.isFinite(params.limit) ? params.limit : 40
+  const limit = Math.min(Math.max(1, rawLimit), 100)
 
   const where: any = {
     // Tutors can pause their public listing via the visibility toggle on
@@ -97,7 +102,9 @@ export async function queryTutors(params: TutorsQueryParams = {}) {
   for (const s of upcoming) if (!nextByTutor.has(s.tutorId)) nextByTutor.set(s.tutorId, s.startAt)
 
   const shaped = tutors.map(t => ({
-    ...t,
+    // Drop the unbounded professionData JSON, legacy base64 video, and any
+    // oversized base64 avatar before this list (also SSR-embedded) ships.
+    ...stripTutorBlobs(t)!,
     nextSlotAt: nextByTutor.get(t.id)?.toISOString() ?? null,
   }))
   // Stable sort keeps the DB verified+rating order WITHIN each group, but lifts

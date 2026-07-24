@@ -30,14 +30,18 @@ export function middleware(req: NextRequest) {
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      // script-src: 'self' + Next hydration inline/eval, plus Google Tag Manager
+      // (gtag.js) for the admin-managed Google Analytics integration.
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googletagmanager.com",
       "style-src 'self' 'unsafe-inline'",
       // img-src: pravatar (fallback), unsplash (marketing photos), Google
-      // Cloud Storage (video previews), and YouTube's thumbnail CDN (used by
-      // the apply/admin YouTube preview cards).
-      "img-src 'self' data: blob: https://i.pravatar.cc https://images.unsplash.com https://commondatastorage.googleapis.com https://img.youtube.com https://i.ytimg.com",
+      // Cloud Storage (video previews), YouTube's thumbnail CDN (apply/admin
+      // preview cards), and GA/GTM (measurement beacons sent as image pixels).
+      "img-src 'self' data: blob: https://i.pravatar.cc https://images.unsplash.com https://commondatastorage.googleapis.com https://img.youtube.com https://i.ytimg.com https://*.googleusercontent.com https://*.google-analytics.com https://*.googletagmanager.com",
       "font-src 'self' data:",
-      "connect-src 'self'",
+      // connect-src: 'self' + GA4 measurement endpoints (google-analytics.com,
+      // regionN.google-analytics.com, analytics.google.com) it beacons to.
+      "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
       // frame-src: allow YouTube's nocookie embed domain so the intro-video
       // iframe on /tutors/[id] and /tutor/profile can load. `frame-ancestors`
       // stays 'none' — that governs *who can embed us*, not *what we embed*.

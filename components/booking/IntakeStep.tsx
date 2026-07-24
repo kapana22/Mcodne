@@ -19,43 +19,42 @@ export const TOPIC_OPTIONS = [
   'სხვა თემა',
 ]
 
-// Intake starters spanning ALL 6 categories (ბიზნესი/ფინანსები/კარიერა/
-// მარკეტინგი/სამართალი/ფსიქოლოგია) — tapping one seeds the textarea so the
-// client only has to finish the sentence. Never startup-only examples.
-export const INTAKE_STARTERS: { cat: string; text: string }[] = [
-  { cat: 'ბიზნესი',    text: 'მაქვს ბიზნესი/იდეა და მინდა განვიხილო ' },
-  { cat: 'ფინანსები',  text: 'მჭირდება რჩევა ფინანსურ საკითხზე — ' },
-  { cat: 'კარიერა',    text: 'ვფიქრობ კარიერულ ნაბიჯზე და მინდა ' },
-  { cat: 'მარკეტინგი', text: 'მინდა უკუკავშირი ჩემს მარკეტინგზე — ' },
-  { cat: 'სამართალი',  text: 'მაქვს იურიდიული შეკითხვა: ' },
-  { cat: 'ფსიქოლოგია', text: 'მინდა ვისაუბრო იმაზე, რაც ბოლო დროს მაწუხებს — ' },
-]
-
 export const MIN_INTAKE_CHARS = 10
 export const MAX_INTAKE_CHARS = 500
 
 export type DetailsState = { topic: string; goal: string; preCall: boolean }
 
+// The last option ("სხვა თემა") switches the topic to a free-text field so the
+// client can name their OWN topic instead of being forced into a preset.
+const PRESET_TOPICS = TOPIC_OPTIONS.slice(0, -1)
+const OTHER_TOPIC = TOPIC_OPTIONS[TOPIC_OPTIONS.length - 1]
+
 export const IntakeStep = ({ value, onChange, summary }: { value: DetailsState; onChange: (v: DetailsState) => void; summary: React.ReactNode }) => {
   const goalLen = value.goal.trim().length
   const goalValid = goalLen >= MIN_INTAKE_CHARS
+  // "Other" mode = the topic isn't one of the presets (custom string, or empty
+  // right after tapping "სხვა თემა"). Then we show a text input to type it.
+  const otherMode = !PRESET_TOPICS.includes(value.topic)
   return (
     <div className="grid lg:grid-cols-[1fr_280px] gap-6 sm:gap-7 lg:gap-10 p-4 sm:p-7 lg:p-10">
       <div className="space-y-7">
         <div>
           <div className="flex items-baseline justify-between mb-3">
             <label className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">თემა</label>
-            <span className="text-[11px] text-ink-500">აირჩიე ან „სხვა თემა"</span>
+            <span className="text-[11px] text-ink-500">აირჩიე ან დაასახელე შენი</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {TOPIC_OPTIONS.map(t => {
-              const on = value.topic === t
+              const isOtherChip = t === OTHER_TOPIC
+              const on = isOtherChip ? otherMode : value.topic === t
               return (
                 <button
                   key={t}
                   type="button"
-                  onClick={() => onChange({ ...value, topic: t })}
-                  className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-pill text-[12.5px] font-display font-medium tracking-wide transition-colors ${on ? 'bg-accent-600 text-white' : 'bg-white text-ink-700 border border-ink-200 hover:bg-ink-50'}`}
+                  // Tapping "სხვა თემა" clears topic → the input below appears so
+                  // the client types their own. Preset chips set the topic directly.
+                  onClick={() => onChange({ ...value, topic: isOtherChip ? (otherMode ? value.topic : '') : t })}
+                  className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-pill text-[12.5px] font-display font-medium tracking-wide transition-colors ${on ? 'bg-brand-500 text-white' : 'bg-white text-ink-700 border border-ink-200 hover:bg-ink-50'}`}
                 >
                   {on && <Icon.check className="w-3 h-3" />}
                   {t}
@@ -63,30 +62,29 @@ export const IntakeStep = ({ value, onChange, summary }: { value: DetailsState; 
               )
             })}
           </div>
+          {otherMode && (
+            <input
+              type="text"
+              value={value.topic}
+              onChange={e => onChange({ ...value, topic: e.target.value.slice(0, 120) })}
+              autoFocus
+              placeholder="ჩაწერე შენი თემა"
+              className="mt-2.5 w-full h-11 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14px] text-ink-900 placeholder:text-ink-400 transition-colors"
+            />
+          )}
         </div>
 
         <div>
           <div className="flex items-baseline justify-between mb-2">
-            <label htmlFor="booking-intake" className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">
-              რისი განხილვა გინდა? <span className="text-danger-600" aria-hidden>*</span>
+            <label htmlFor="booking-intake" className="inline-flex items-center gap-2 font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">
+              რისი განხილვა გინდა?
+              <span className="inline-flex items-center h-[18px] px-1.5 rounded-pill border border-danger-200 text-danger-700 text-[9px] font-bold uppercase tracking-[0.1em] no-caps">
+                სავალდებულო
+              </span>
             </label>
             <span className="text-[11px] text-ink-500 tabular-nums">{value.goal.length} / {MAX_INTAKE_CHARS}</span>
           </div>
           <p className="mb-2.5 text-[12px] text-ink-600">ეს ეხმარება ექსპერტს მოემზადოს — რაც უფრო კონკრეტული ხარ, მით უკეთეს შედეგს მიიღებ.</p>
-
-          {/* Starter chips — one per category, seed the textarea. */}
-          <div className="mb-2.5 flex flex-wrap gap-1.5">
-            {INTAKE_STARTERS.map(s => (
-              <button
-                key={s.cat}
-                type="button"
-                onClick={() => onChange({ ...value, goal: s.text })}
-                className="inline-flex items-center h-7 px-2.5 rounded-pill border border-ink-200 bg-white hover:border-brand-300 hover:bg-brand-50 text-[11.5px] font-display font-medium text-ink-600 hover:text-brand-800 transition-colors"
-              >
-                {s.cat}
-              </button>
-            ))}
-          </div>
 
           <textarea
             id="booking-intake"
@@ -100,9 +98,9 @@ export const IntakeStep = ({ value, onChange, summary }: { value: DetailsState; 
           />
           <div className="mt-2 flex items-center justify-between gap-3 text-[11.5px]">
             {goalValid ? (
-              <span className="text-ink-500">ამ ტექსტს ექსპერტი სესიამდე ნახავს.</span>
+              <span className="inline-flex items-center gap-1 text-brand-700"><Icon.check className="w-3 h-3" /> ამ ტექსტს ექსპერტი სესიამდე ნახავს.</span>
             ) : (
-              <span className="text-ink-500">სავალდებულოა — მინ. {MIN_INTAKE_CHARS} სიმბოლო{goalLen > 0 ? ` (დარჩა ${MIN_INTAKE_CHARS - goalLen})` : ''}.</span>
+              <span className="font-medium text-danger-600">შესავსებია — მინ. {MIN_INTAKE_CHARS} სიმბოლო{goalLen > 0 ? ` (დარჩა ${MIN_INTAKE_CHARS - goalLen})` : ''}.</span>
             )}
             <span className="inline-flex items-center gap-1 text-ink-500 shrink-0"><Icon.shieldCheck className="w-3 h-3" /> ხედავს მხოლოდ ექსპერტი</span>
           </div>

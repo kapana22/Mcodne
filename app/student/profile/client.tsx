@@ -1,6 +1,8 @@
 'use client'
 import { useState, useRef } from 'react'
 import { Icon } from '@/components/Icon'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
+import { Eyebrow } from '@/components/Eyebrow'
 import { signOut } from '@/lib/signout'
 
 type Props = {
@@ -76,11 +78,11 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
     <div className="space-y-6">
       {/* Avatar + basic info */}
       <form onSubmit={saveProfile} className="rounded-card border border-ink-200 bg-white p-6 space-y-5">
-        <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600">პირადი ინფორმაცია</div>
+        <Eyebrow>პირადი ინფორმაცია</Eyebrow>
 
         <div className="flex items-center gap-5">
           <div className="relative w-20 h-20 rounded-full bg-brand-100 text-brand-700 overflow-hidden flex items-center justify-center font-display font-bold text-2xl">
-            {avatar ? <img src={avatar} alt={name} className="w-full h-full object-cover" /> : name.slice(0, 1)}
+            {avatar ? <img src={avatar} alt={name} className="w-full h-full object-cover" /> : <img src={DEFAULT_AVATAR} alt={name} className="w-full h-full object-cover" />}
           </div>
           <div>
             <input
@@ -102,24 +104,24 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
           <div>
             <label className="text-[12px] font-medium text-ink-700 mb-1.5 block">სახელი გვარი</label>
             <input value={name} onChange={e => setName(e.target.value)} required minLength={2}
-                   className="w-full h-11 px-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-sm" />
+                   className="w-full h-11 px-3 rounded-field border border-ink-200 focus:border-brand-500 focus:outline-none text-sm" />
           </div>
           <div>
             <label className="text-[12px] font-medium text-ink-700 mb-1.5 block">ტელეფონი</label>
             <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+995 555 000 000"
-                   className="w-full h-11 px-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-sm" />
+                   className="w-full h-11 px-3 rounded-field border border-ink-200 focus:border-brand-500 focus:outline-none text-sm" />
           </div>
           <div className="sm:col-span-2">
             <label className="text-[12px] font-medium text-ink-700 mb-1.5 block">ელფოსტა</label>
             <input value={initialEmail} disabled
                    className="w-full h-11 px-3 rounded-field border border-ink-200 bg-ink-50 text-ink-500 text-sm cursor-not-allowed" />
-            <div className="text-[11px] text-ink-500 mt-1.5">ელფოსტის შესაცვლელად დაუკავშირდით hi@mcodne.ge</div>
+            <div className="text-[11px] text-ink-500 mt-1.5">ელფოსტის შესაცვლელად დაუკავშირდი hi@mcodne.ge</div>
           </div>
           <div className="sm:col-span-2">
             <label className="text-[12px] font-medium text-ink-700 mb-1.5 block">შესახებ</label>
             <textarea value={bio} onChange={e => setBio(e.target.value)} rows={4} maxLength={500}
                       placeholder="მოკლედ შენ შესახებ..."
-                      className="w-full p-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-sm resize-none" />
+                      className="w-full p-3 rounded-field border border-ink-200 focus:border-brand-500 focus:outline-none text-sm resize-none" />
           </div>
         </div>
 
@@ -139,18 +141,18 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
 
       {/* Password change */}
       <form onSubmit={changePassword} className="rounded-card border border-ink-200 bg-white p-6 space-y-4">
-        <div className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-600">პაროლის შეცვლა</div>
+        <Eyebrow>პაროლის შეცვლა</Eyebrow>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="text-[12px] font-medium text-ink-700 mb-1.5 block">მიმდინარე პაროლი</label>
             <input type="password" value={curPw} onChange={e => setCurPw(e.target.value)} required minLength={6}
-                   className="w-full h-11 px-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-sm" />
+                   className="w-full h-11 px-3 rounded-field border border-ink-200 focus:border-brand-500 focus:outline-none text-sm" />
           </div>
           <div>
             <label className="text-[12px] font-medium text-ink-700 mb-1.5 block">ახალი პაროლი</label>
             <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} required minLength={6}
-                   className="w-full h-11 px-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-sm" />
+                   className="w-full h-11 px-3 rounded-field border border-ink-200 focus:border-brand-500 focus:outline-none text-sm" />
           </div>
         </div>
 
@@ -163,7 +165,7 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
         <div className="flex justify-end">
           <button type="submit" disabled={pwSaving || !curPw || newPw.length < 6}
                   className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 text-white font-display font-semibold text-[13px]">
-            {pwSaving ? 'შენახვა...' : 'პაროლის შეცვლა'}
+            {pwSaving ? 'შენახვა…' : 'პაროლის შეცვლა'}
           </button>
         </div>
       </form>
@@ -176,7 +178,7 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
           <div className="text-[12.5px] text-ink-600 mt-0.5">აირჩიე, რაზე მიიღო შეტყობინება.</div>
         </div>
         <a href="/settings" className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 shrink-0">
-          გახსნა <Icon.arrow className="w-3.5 h-3.5" />
+          გახსნა
         </a>
       </div>
 
@@ -200,7 +202,7 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
             <div className="text-[12.5px] text-ink-600 mt-0.5">გააზიარე ცოდნა, გამოიმუშავე შემოსავალი.</div>
           </div>
           <a href="/apply" className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5">
-            განაცხადი <Icon.arrow className="w-3.5 h-3.5" />
+            განაცხადი
           </a>
         </div>
       )}

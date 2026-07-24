@@ -11,13 +11,16 @@ import { Logo } from './Logo'
 import { NotifBell } from './NotifBell'
 import { UserMenu } from './UserMenu'
 import { Icon } from './Icon'
+import { Container } from '@/components/Container'
 
+// „შენახული" is NOT a text nav item — it lives as a heart icon in the right
+// cluster (left of the bell), so the saved list is one glanceable tap on every
+// screen without eating nav width.
 const NAV = [
   { label: 'მთავარი',    href: '/student',           exact: true },
   { label: 'ექსპერტები', href: '/tutors' },
   { label: 'ჯავშნები',   href: '/student/bookings' },
-  { label: 'მესიჯები',    href: '/student/messages' },
-  { label: 'შენახული',   href: '/student/favorites' },
+  { label: 'მიმოწერა',    href: '/student/messages' },
 ]
 
 const isActive = (path: string, item: (typeof NAV)[number]) =>
@@ -25,6 +28,7 @@ const isActive = (path: string, item: (typeof NAV)[number]) =>
 
 export function StudentAppBar({ user }: { user?: { name: string; avatar?: string | null } }) {
   const path = usePathname() ?? ''
+  const savedActive = path === '/student/favorites' || path.startsWith('/student/favorites/')
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -36,13 +40,13 @@ export function StudentAppBar({ user }: { user?: { name: string; avatar?: string
 
   return (
     <header
-      className={`sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
+      className={`sticky top-0 z-40 bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
         scrolled ? 'shadow-sm' : ''
       }`}
     >
-      <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+      <Container className="h-16 sm:h-20 flex items-center justify-between gap-4">
         <div className="flex items-center gap-7 lg:gap-9 min-w-0">
-          <Logo size="sm" href="/student" />
+          <Logo size="sm" />
           <nav className="hidden lg:flex items-center gap-1">
             {NAV.map(item => {
               const active = isActive(path, item)
@@ -69,10 +73,23 @@ export function StudentAppBar({ user }: { user?: { name: string; avatar?: string
             <Icon.search className="w-3.5 h-3.5 text-ink-500 group-hover:text-brand-600 transition-colors" />
             <span className="font-display text-[12px] text-ink-500">ექსპერტი, თემა…</span>
           </Link>
+          {/* Saved — heart icon left of the bell (replaces the „შენახული“ text nav). */}
+          <Link
+            href="/student/favorites"
+            aria-label="შენახული"
+            aria-current={savedActive ? 'page' : undefined}
+            className={`w-10 h-10 rounded-btn inline-flex items-center justify-center transition-colors ${
+              savedActive ? 'text-brand-600 bg-brand-50' : 'text-ink-600 hover:text-ink-900 hover:bg-ink-100'
+            }`}
+          >
+            {savedActive
+              ? <Icon.heartFilled className="w-[18px] h-[18px]" />
+              : <Icon.heart className="w-[18px] h-[18px]" />}
+          </Link>
           <NotifBell />
           <UserMenu user={user} role="STUDENT" />
         </div>
-      </div>
+      </Container>
       {/* Mobile chip rail — BottomNav carries only 4 tabs, so Messages /
           Saved / Browse need a visible home on a phone. Same pattern as
           TutorAppBar's rail. */}

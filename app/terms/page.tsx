@@ -2,7 +2,9 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { CANCEL_CUTOFF_HOURS, COMMISSION_PCT } from '@/lib/flags'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
+import { Container } from '@/components/Container'
 import { Footer } from '@/components/Footer'
+import { Eyebrow } from '@/components/Eyebrow'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -22,8 +24,8 @@ const SECTIONS = [
     id: 'introduction',
     title: '1. ზოგადი დებულებები',
     body: [
-      'მცოდნე (შემდგომ — „პლატფორმა") არის ონლაინ საკონსულტაციო სივრცე, რომელიც აკავშირებს მომხმარებლებს გადამოწმებულ ექსპერტებთან. პლატფორმაზე რეგისტრაციით ან მისი გამოყენებით შენ თანხმდები წინამდებარე პირობებზე.',
-      'თუ არ ეთანხმები რომელიმე პუნქტს, გთხოვთ, არ გამოიყენო პლატფორმა. ცვლილებების შემთხვევაში წინასწარ გაცნობებთ ელფოსტით ან საიტზე გამოქვეყნებით.',
+      'მცოდნე (შემდგომ — „პლატფორმა“) არის ონლაინ საკონსულტაციო სივრცე, რომელიც აკავშირებს მომხმარებლებს გადამოწმებულ ექსპერტებთან. პლატფორმაზე რეგისტრაციით ან მისი გამოყენებით შენ თანხმდები წინამდებარე პირობებზე.',
+      'თუ არ ეთანხმები რომელიმე პუნქტს, გთხოვ, არ გამოიყენო პლატფორმა. ცვლილებების შემთხვევაში წინასწარ გაცნობებთ ელფოსტით ან საიტზე გამოქვეყნებით.',
     ],
   },
   {
@@ -44,11 +46,11 @@ const SECTIONS = [
   },
   {
     id: 'payments',
-    title: '4. გადახდა და escrow',
+    title: '4. გადახდა და დაცული თანხა',
     body: [
       // Payments are not live yet (PAYMENTS_LIVE=false) — the escrow model is
       // stated as the model that WILL apply once online payments launch.
-      'ონლაინ გადახდები პლატფორმაზე ჯერ არ არის ამოქმედებული — ამჟამად სესიის დაჯავშნა უფასოა. ონლაინ გადახდების ამოქმედების შემდეგ გადახდა განხორციელდება წინასწარ, სესიის დაჯავშნისას: თანხა შეინახება უსაფრთხო escrow პრინციპით და ექსპერტს გადაერიცხება მხოლოდ სესიის წარმატებით დასრულების შემდეგ.',
+      'ონლაინ გადახდები პლატფორმაზე ჯერ არ არის ამოქმედებული — ამჟამად სესიის დაჯავშნა უფასოა. ონლაინ გადახდების ამოქმედების შემდეგ გადახდა განხორციელდება წინასწარ, სესიის დაჯავშნისას: თანხა დაცულ ანგარიშზე შეინახება და ექსპერტს გადაერიცხება მხოლოდ სესიის წარმატებით დასრულების შემდეგ.',
       `ფასიანი სესიებიდან პლატფორმა დაიტოვებს კომისიას — ${COMMISSION_PCT}%-ს ექსპერტის შემოსავლიდან. ეს კომისია მოიცავს ტექნიკურ ინფრასტრუქტურას, გადახდის დამუშავებას და მხარდაჭერას.`,
     ],
   },
@@ -81,7 +83,7 @@ const SECTIONS = [
     id: 'liability',
     title: '8. პასუხისმგებლობის შეზღუდვა',
     body: [
-      'პლატფორმა უზრუნველყოფს მომსახურებას „როგორც არის" პრინციპით. მაქსიმალურ ფარგლებში, კანონით დაშვებულ ფარგლებში, არ ვართ პასუხისმგებელი არაპირდაპირ, შემთხვევით ან შედეგობრივ ზიანზე.',
+      'პლატფორმა უზრუნველყოფს მომსახურებას „როგორც არის“ პრინციპით. მაქსიმალურ ფარგლებში, კანონით დაშვებულ ფარგლებში, არ ვართ პასუხისმგებელი არაპირდაპირ, შემთხვევით ან შედეგობრივ ზიანზე.',
       'ჩვენი მაქსიმალური პასუხისმგებლობა შემოიფარგლება ბოლო 12 თვის განმავლობაში შენს მიერ გადახდილი თანხით.',
     ],
   },
@@ -107,24 +109,24 @@ export default function TermsPage() {
     <div className="min-h-screen bg-white">
       <MarketingTopBar />
 
-      <main className="max-w-[820px] mx-auto px-6 py-16 lg:py-20">
-        <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
+      <Container as="main" size="content" className="py-16 lg:py-20">
+        <Eyebrow className="mb-3">
           სამართალი
-        </div>
+        </Eyebrow>
         <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05]">
           გამოყენების წესები
         </h1>
         <p className="mt-2 text-[12.5px] text-ink-500 tabular-nums">ბოლო განახლება: 2026 წლის 1 ივლისი</p>
 
         <p className="mt-6 text-[16px] text-ink-700 leading-relaxed">
-          წინამდებარე პირობები არეგულირებს მცოდნე პლატფორმის გამოყენებას. გთხოვთ, ყურადღებით წაიკითხოთ — ეს
+          წინამდებარე პირობები არეგულირებს მცოდნე პლატფორმის გამოყენებას. გთხოვ, ყურადღებით წაიკითხე — ეს
           დოკუმენტი ეხება როგორც კლიენტებს, ისე ექსპერტებს.
         </p>
 
         <nav className="mt-8 rounded-card border border-ink-200 bg-ink-50/50 p-5">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-600 mb-3">
+          <Eyebrow tone="muted" className="mb-3">
             შინაარსი
-          </div>
+          </Eyebrow>
           <ol className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-[13px] text-ink-700">
             {SECTIONS.map(s => (
               <li key={s.id}>
@@ -158,15 +160,15 @@ export default function TermsPage() {
           <div className="text-[12.5px] text-ink-500">
             იხილე ასევე{' '}
             <Link href="/privacy" className="text-brand-700 hover:text-brand-800 font-semibold">
-              პრივატულობა
+              კონფიდენციალურობა
             </Link>{' '}
             და{' '}
             <Link href="/cookies" className="text-brand-700 hover:text-brand-800 font-semibold">
-              ქუქიები
+              ქუქიების პოლიტიკა
             </Link>
           </div>
         </div>
-      </main>
+      </Container>
 
       <Footer />
     </div>

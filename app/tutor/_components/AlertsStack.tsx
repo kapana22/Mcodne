@@ -61,7 +61,7 @@ export function AlertsStack({
         tone: 'info',
         icon: 'check',
         text: `სესია დასრულდა — ${b.student?.fullName ?? 'კლიენტი'}`,
-        sub: 'მონიშნე დასრულებულად ან no-show-დ.',
+        sub: 'მონიშნე დასრულებულად ან გამოუცხადებლობად.',
         cta: { label: 'დახურვა', href: `/tutor/bookings/${b.id}` },
       })
     }
@@ -84,7 +84,7 @@ export function AlertsStack({
             }`}
           >
             <span className={`w-8 h-8 rounded-btn inline-flex items-center justify-center shrink-0 ${
-              warning ? 'bg-warning-100 text-warning-700' : 'bg-info-50 text-info-700'
+              warning ? 'bg-warning-100 text-warning-700' : 'bg-ink-100 text-ink-600'
             }`}>
               <IconComp className="w-4 h-4" />
             </span>
@@ -101,7 +101,7 @@ export function AlertsStack({
       {rest > 0 && (
         <div className="text-right">
           <Link href="/tutor/bookings?tab=attention" className="text-[12.5px] text-brand-700 hover:text-brand-800 font-display font-semibold">
-            კიდევ {rest} ყურადღების საკითხი →
+            კიდევ {rest} ყურადღების საკითხი
           </Link>
         </div>
       )}

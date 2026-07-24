@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
 import { audit } from '@/lib/audit'
+import { stripTutorBlobs, stripAvatar } from '@/lib/stripTutorBlobs'
 
 // List reviews with filters — flagged (rating < 2 by default), search body/authors.
 export async function GET(req: Request) {
@@ -11,6 +12,7 @@ export async function GET(req: Request) {
   const maxRating = Number(searchParams.get('maxRating') ?? '5')
   const q = searchParams.get('q')?.trim()
   const limit = Math.min(Number(searchParams.get('limit') ?? 100), 300)
+  const cursor = searchParams.get('cursor')?.trim() || undefined
 
   const where: any = {}
   if (maxRating < 5) where.rating = { lte: maxRating }
@@ -22,17 +24,23 @@ export async function GET(req: Request) {
     ]
   }
 
-  const reviews = await prisma.review.findMany({
+  const rows = await prisma.review.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    take: limit,
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     include: {
       student: { select: { id: true, fullName: true, avatarUrl: true } },
       tutor: { include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } },
       booking: { select: { id: true, topic: true, ref: true } },
     },
   })
-  return NextResponse.json(reviews)
+  const hasMore = rows.length > limit
+  const page = hasMore ? rows.slice(0, limit) : rows
+  return NextResponse.json({
+    items: page.map(r => ({ ...r, tutor: stripTutorBlobs(r.tutor), student: stripAvatar(r.student) })),
+    nextCursor: hasMore ? page[page.length - 1].id : null,
+  })
 }
 
 const DelBody = z.object({ reason: z.string().max(300).optional() })

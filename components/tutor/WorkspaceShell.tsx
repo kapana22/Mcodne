@@ -1,6 +1,7 @@
 'use client'
 import { WorkspaceSidebar } from './WorkspaceSidebar'
 import { WorkspaceTopBar } from './WorkspaceTopBar'
+import { WorkspaceFooter } from '@/components/WorkspaceFooter'
 import { useNavBadges } from './useNavBadges'
 
 /* Visual shell for every /tutor/* page: desktop = sticky sidebar + top bar,
@@ -21,9 +22,13 @@ export function WorkspaceShell({
       <WorkspaceSidebar badges={badges} />
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         <WorkspaceTopBar user={user} />
-        <main className="flex-1 w-full max-w-[1120px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        {/* Column matches the canon Container ("wide" = 1280, gutter px-6 sm:px-8)
+            so the tutor and student workspaces line up edge-for-edge — they were
+            1120/px-4 vs the student's 1280/px-6 before. */}
+        <main className="flex-1 w-full max-w-[1280px] mx-auto px-6 sm:px-8 py-6 lg:py-8">
           {children}
         </main>
+        <WorkspaceFooter />
       </div>
     </div>
   )

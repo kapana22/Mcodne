@@ -1,17 +1,19 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
+import { Container } from '@/components/Container'
 import { Footer } from '@/components/Footer'
+import { Eyebrow } from '@/components/Eyebrow'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
 export const metadata: Metadata = {
-  title: 'პრივატულობა — მცოდნე',
-  description: 'როგორ ვაგროვებთ, ვიყენებთ და ვიცავთ თქვენს პირად მონაცემებს.',
+  title: 'კონფიდენციალურობა — მცოდნე',
+  description: 'როგორ ვაგროვებთ, ვიყენებთ და ვიცავთ შენს პირად მონაცემებს.',
   alternates: { canonical: `${SITE_URL}/privacy` },
   openGraph: {
-    title: 'პრივატულობა — მცოდნე',
-    description: 'როგორ ვაგროვებთ, ვიყენებთ და ვიცავთ თქვენს პირად მონაცემებს.',
+    title: 'კონფიდენციალურობა — მცოდნე',
+    description: 'როგორ ვაგროვებთ, ვიყენებთ და ვიცავთ შენს პირად მონაცემებს.',
     url: `${SITE_URL}/privacy`,
   },
 }
@@ -21,14 +23,14 @@ const SECTIONS = [
     id: 'summary',
     title: 'მოკლედ',
     body: [
-      'ვცავთ თქვენს პირად მონაცემებს GDPR და საქართველოს კანონმდებლობის შესაბამისად. მონაცემებს ვაგროვებთ მხოლოდ იმდენს, რაც სერვისისთვის საჭიროა და არასდროს ვყიდით.',
+      'ვიცავთ შენს პირად მონაცემებს GDPR და საქართველოს კანონმდებლობის შესაბამისად. მონაცემებს ვაგროვებთ მხოლოდ იმდენს, რაც სერვისისთვის საჭიროა და არასდროს ვყიდით.',
     ],
   },
   {
     id: 'controller',
     title: '1. ვინ არის მონაცემთა კონტროლიორი',
     body: [
-      'მონაცემთა კონტროლიორია შპს „მცოდნე", რეგისტრირებული საქართველოში. კონტაქტი პრივატულობის საკითხებზე: privacy@mcodne.ge',
+      'მონაცემთა კონტროლიორია შპს „მცოდნე“, რეგისტრირებული საქართველოში. კონტაქტი კონფიდენციალურობის საკითხებზე: privacy@mcodne.ge',
     ],
   },
   {
@@ -73,7 +75,7 @@ const SECTIONS = [
     id: 'retention',
     title: '6. რამდენ ხანს ვინახავთ',
     body: [
-      'ანგარიშის მონაცემები ინახება მანამ, სანამ ანგარიში აქტიურია. წაშლის შემდეგ — 90 დღე „grace period", შემდეგ სრული წაშლა.',
+      'ანგარიშის მონაცემები ინახება მანამ, სანამ ანგარიში აქტიურია. წაშლის შემდეგ — 90 დღე „grace period“, შემდეგ სრული წაშლა.',
       'გადახდის ჩანაწერები ინახება 7 წელი (საგადასახადო ვალდებულებით).',
       'შეტყობინებების ლოგები — 12 თვე უსაფრთხოების მიზნებისთვის.',
     ],
@@ -112,7 +114,7 @@ const SECTIONS = [
     id: 'contact',
     title: '11. კონტაქტი',
     body: [
-      'პრივატულობის საკითხებზე: privacy@mcodne.ge',
+      'კონფიდენციალურობის საკითხებზე: privacy@mcodne.ge',
       'ზოგადი შეკითხვები: hi@mcodne.ge',
     ],
   },
@@ -123,12 +125,12 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-white">
       <MarketingTopBar />
 
-      <main className="max-w-[820px] mx-auto px-6 py-16 lg:py-20">
-        <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
+      <Container as="main" size="content" className="py-16 lg:py-20">
+        <Eyebrow className="mb-3">
           კონფიდენციალურობა
-        </div>
+        </Eyebrow>
         <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05]">
-          პრივატულობის პოლიტიკა
+          კონფიდენციალურობის პოლიტიკა
         </h1>
         <p className="mt-2 text-[12.5px] text-ink-500 tabular-nums">ბოლო განახლება: 2026 წლის 1 ივლისი</p>
 
@@ -142,9 +144,9 @@ export default function PrivacyPage() {
         </p>
 
         <nav className="mt-8 rounded-card border border-ink-200 bg-ink-50/50 p-5">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-600 mb-3">
+          <Eyebrow tone="muted" className="mb-3">
             შინაარსი
-          </div>
+          </Eyebrow>
           <ol className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-[13px] text-ink-700">
             {SECTIONS.map(s => (
               <li key={s.id}>
@@ -182,11 +184,11 @@ export default function PrivacyPage() {
             </Link>{' '}
             და{' '}
             <Link href="/cookies" className="text-brand-700 hover:text-brand-800 font-semibold">
-              ქუქიები
+              ქუქიების პოლიტიკა
             </Link>
           </div>
         </div>
-      </main>
+      </Container>
 
       <Footer />
     </div>

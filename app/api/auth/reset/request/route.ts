@@ -13,10 +13,18 @@ export async function POST(req: Request) {
   const rl = rateLimit(`reset:${ip}`, 5, 60 * 60)
   if (!rl.ok) return NextResponse.json({ ok: false, error: 'RATE_LIMITED', retryInSec: rl.retryInSec }, { status: 429 })
 
-  const parsed = Body.safeParse(await req.json())
+  const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
   const email = parsed.data.email.toLowerCase().trim()
+
+  // Per-email cap in addition to the IP cap above. The IP key is derived from
+  // client-controlled X-Forwarded-For, so a header-rotating attacker can dodge
+  // it and mail-bomb one victim's inbox; this limiter is keyed on the target
+  // address and can't be spoofed away.
+  const rlEmail = rateLimit(`reset-email:${email}`, 5, 60 * 60)
+  if (!rlEmail.ok) return NextResponse.json({ ok: true })
+
   const user = await prisma.user.findUnique({ where: { email } })
   // Do not leak existence
   if (!user) return NextResponse.json({ ok: true })

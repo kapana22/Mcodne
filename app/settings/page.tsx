@@ -1,12 +1,15 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Container } from '@/components/Container'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import Link from 'next/link'
 import { Logo } from '@/components/Logo'
 import { Icon } from '@/components/Icon'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { signOut as doSignOut } from '@/lib/signout'
 import { homeForRole } from '@/lib/roleHome'
+import { Eyebrow } from '@/components/Eyebrow'
 
 // Local mirror of lib/notify.ts PrefKey. Keeping this in-file so the Settings
 // page doesn't import from a server helper. All keys default to true when
@@ -22,10 +25,10 @@ const DEFAULT_PREFS: PrefsMap = {
 }
 const PREF_ROWS: Array<{ key: PrefKey; label: string; hint: string }> = [
   { key: 'BOOKING_CREATED',    label: 'ჯავშნის ცვლილება',      hint: 'ახალი ჯავშანი, გაუქმება, დადასტურება' },
-  { key: 'MESSAGE_NEW',        label: 'ახალი შეტყობინება',     hint: 'ჩატში მიღებული ტექსტი' },
+  { key: 'MESSAGE_NEW',        label: 'ახალი შეტყობინება',     hint: 'მიმოწერაში მიღებული ტექსტი' },
   { key: 'REVIEW_NEW',         label: 'ახალი შეფასება',        hint: 'კლიენტმა დატოვა შეფასება' },
   { key: 'APPLICATION_STATUS', label: 'განაცხადის სტატუსი',   hint: 'ექსპერტად რეგისტრაციის მოდერაცია' },
-  { key: 'ADMIN_BROADCAST',    label: 'პლატფორმის სიახლეები', hint: 'ადმინის რასაქმევი გაგზავნები' },
+  { key: 'ADMIN_BROADCAST',    label: 'პლატფორმის სიახლეები', hint: 'ადმინისტრაციის მნიშვნელოვანი განცხადებები' },
 ]
 
 type Me = {
@@ -154,7 +157,7 @@ export default function SettingsPage() {
         return
       }
       setVerifyStage('sent')
-      setVerifyMsg({ kind: 'success', text: 'კოდი გაიგზავნა — შეამოწმე ინბოქსი.' })
+      setVerifyMsg({ kind: 'success', text: 'კოდი გაიგზავნა — შეამოწმე ელფოსტა.' })
     } catch {
       setVerifyMsg({ kind: 'error', text: 'ქსელის შეცდომა.' })
     } finally {
@@ -265,7 +268,11 @@ export default function SettingsPage() {
       if (res.ok) {
         setAvatarUrl(null)
         setProfileMsg({ kind: 'success', text: 'ავატარი წაიშალა' })
+      } else {
+        setProfileMsg({ kind: 'error', text: 'ვერ წაიშალა — სცადე თავიდან' })
       }
+    } catch {
+      setProfileMsg({ kind: 'error', text: 'ვერ წაიშალა — სცადე თავიდან' })
     } finally {
       setUploading(false)
     }
@@ -322,7 +329,7 @@ export default function SettingsPage() {
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteAcknowledged, setDeleteAcknowledged] = useState('')
   const [deleteErr, setDeleteErr] = useState<string | null>(null)
-  const canDelete = deleteAcknowledged.trim().toUpperCase() === 'DELETE'
+  const canDelete = deleteAcknowledged.trim() === 'წაშლა'
   const openDelete = () => { setDeleteAcknowledged(''); setDeleteErr(null); setDeleteOpen(true) }
   const confirmDelete = async () => {
     if (!canDelete || deleteBusy) return
@@ -360,21 +367,21 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-ink-50/50">
-      <header className="sticky top-0 z-40 bg-ink-50/90 backdrop-blur-md border-b border-ink-100">
-        <div className="max-w-[820px] mx-auto px-6 h-16 flex items-center justify-between gap-6">
+      <header className="sticky top-0 z-40 bg-ink-50 lg:bg-ink-50/90 lg:backdrop-blur-md border-b border-ink-100">
+        <Container size="content" className="h-16 flex items-center justify-between gap-6">
           <Link href={backHref} className="inline-flex items-center gap-2 text-ink-700 hover:text-ink-900 transition-colors">
             <Icon.chevR className="w-4 h-4 rotate-180" />
             <Logo size="sm" href={null} />
           </Link>
           <span className="font-display text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500">პარამეტრები</span>
-        </div>
+        </Container>
       </header>
 
-      <main className="max-w-[820px] mx-auto px-6 py-10 space-y-8">
+      <Container as="main" size="content" className="py-10 space-y-8">
         {/* Page header — the sticky utility bar above is chrome, not a
             heading; this h1 is the page's actual title. */}
         <div>
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-2">ანგარიში</div>
+          <Eyebrow className="mb-2">ანგარიში</Eyebrow>
           <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight">პარამეტრები</h1>
         </div>
 
@@ -401,13 +408,7 @@ export default function SettingsPage() {
                 aria-label="ავატარის შეცვლა"
                 className="group relative w-20 h-20 rounded-full overflow-hidden bg-ink-100 ring-1 ring-ink-200 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-wait"
               >
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={me.fullName} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="w-full h-full inline-flex items-center justify-center text-ink-500 font-display font-bold text-[26px]">
-                    {(fullName || me.email).charAt(0).toUpperCase()}
-                  </span>
-                )}
+                <img src={avatarUrl || DEFAULT_AVATAR} alt={me.fullName} className="w-full h-full object-cover" />
                 {/* Desktop: overlay on hover; Mobile: overlay always visible (opacity-100). */}
                 {!uploading && (
                   <span
@@ -634,7 +635,7 @@ export default function SettingsPage() {
           {!me.emailVerified && verifyStage === 'sent' && (
             <div className="mt-4 rounded-btn border border-ink-200 bg-ink-50/60 p-4">
               <div className="text-[12.5px] text-ink-700 mb-2">
-                შეიყვანე ინბოქსში მიღებული 6-ციფრიანი კოდი
+                შეიყვანე ელფოსტაზე მიღებული 6-ციფრიანი კოდი
               </div>
               <div className="flex gap-2">
                 <input
@@ -687,7 +688,7 @@ export default function SettingsPage() {
         <section className="bg-white rounded-card border border-ink-200 p-6 lg:p-8">
           <div className="mb-5">
             <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight">შეტყობინებების პარამეტრები</h2>
-            <p className="text-[12.5px] text-ink-500 mt-0.5">აირჩიე — რომელი ტიპის შეტყობინებები გინდა ხედვა</p>
+            <p className="text-[12.5px] text-ink-500 mt-0.5">აირჩიე, რომელი ტიპის შეტყობინებების მიღება გინდა</p>
           </div>
 
           {!prefs ? (
@@ -727,7 +728,7 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
-      </main>
+      </Container>
 
       <ConfirmModal
         open={signOutOpen}
@@ -751,18 +752,17 @@ export default function SettingsPage() {
               ყველა შენი ჯავშანი, შეტყობინება და პროფილი წაიშლება სამუდამოდ.
             </p>
             <label className="block">
-              <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-600">
-                დასადასტურებლად აკრიფე <span className="font-mono text-danger-700">DELETE</span>
-              </span>
+              <Eyebrow as="span" tone="muted">
+                დასადასტურებლად აკრიფე <span className="font-display font-bold text-danger-700">წაშლა</span>
+              </Eyebrow>
               <input
                 type="text"
                 value={deleteAcknowledged}
                 onChange={e => setDeleteAcknowledged(e.target.value)}
                 autoComplete="off"
-                autoCapitalize="characters"
                 spellCheck={false}
-                className="w-full mt-2 h-11 px-3 rounded-field border border-ink-200 focus:border-danger-500 focus:ring-2 focus:ring-danger-100 focus:outline-none text-[13.5px] font-mono tracking-wider text-ink-900 transition-colors"
-                placeholder="DELETE"
+                className="w-full mt-2 h-11 px-3 rounded-field border border-ink-200 focus:border-danger-500 focus:ring-2 focus:ring-danger-100 focus:outline-none text-[13.5px] text-ink-900 transition-colors"
+                placeholder="წაშლა"
                 disabled={deleteBusy}
               />
             </label>
@@ -773,7 +773,7 @@ export default function SettingsPage() {
             )}
             {!canDelete && (
               <p className="text-[11.5px] text-ink-500">
-                ღილაკი გააქტიურდება, როცა აკრეფ სიტყვას <span className="font-mono">DELETE</span>.
+                ღილაკი გააქტიურდება, როცა აკრეფ სიტყვას <span className="font-display font-bold">წაშლა</span>.
               </p>
             )}
           </div>

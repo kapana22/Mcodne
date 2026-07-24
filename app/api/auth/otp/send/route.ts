@@ -17,10 +17,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'RATE_LIMITED', retryInSec: rl.retryInSec }, { status: 429 })
   }
 
-  const parsed = Body.safeParse(await req.json())
+  const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
   const email = parsed.data.email.toLowerCase().trim()
+
+  // Per-email cap alongside the IP cap. The IP key comes from client-controlled
+  // X-Forwarded-For and is spoofable, so without this a header-rotating attacker
+  // could bomb a single inbox with OTP mail. Keyed on the target address.
+  const rlEmail = rateLimit(`otp-email:${email}`, 5, 15 * 60)
+  if (!rlEmail.ok) return NextResponse.json({ ok: true })
+
   const user = await prisma.user.findUnique({ where: { email } })
   // Do not leak existence — return ok regardless
   if (!user) return NextResponse.json({ ok: true })
@@ -40,8 +47,8 @@ export async function POST(req: Request) {
   const mailResult = await sendMail({
     to: email,
     subject: parsed.data.purpose === 'verify' ? 'დაადასტურე ელფოსტა — მცოდნე' : 'პაროლის აღდგენა — მცოდნე',
-    html: `<p>თქვენი კოდი: <b>${code}</b></p><p>ვადა: 10 წუთი</p>`,
-    text: `თქვენი კოდი: ${code}. ვადა 10 წუთი.`,
+    html: `<p>შენი კოდი: <b>${code}</b></p><p>ვადა: 10 წუთი</p>`,
+    text: `შენი კოდი: ${code}. ვადა 10 წუთი.`,
   })
 
   if (!mailResult.ok) {

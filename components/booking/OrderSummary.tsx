@@ -4,6 +4,7 @@
 import React from 'react'
 import { Icon } from '@/components/Icon'
 import { PAYMENTS_LIVE } from '@/lib/flags'
+import { Eyebrow } from '@/components/Eyebrow'
 import { KA_MONTHS_LONG as KA_MONTHS_FULL } from '@/lib/kaDate'
 import { DAY_SHORT, isoWeekday, fmtHM } from './slots'
 
@@ -36,7 +37,7 @@ export const OrderSummary = ({
 
   return (
     <div className="rounded-card border border-ink-200 bg-ink-50/50 p-5">
-      <div className="font-display text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-500 mb-4">დაჯავშნის შეჯამება</div>
+      <Eyebrow tone="muted" className="mb-4">დაჯავშნის შეჯამება</Eyebrow>
 
       <div className="flex items-center gap-3 pb-4 border-b border-ink-200">
         {tutorAvatar ? (
@@ -75,7 +76,7 @@ export const OrderSummary = ({
           <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">ფორმატი</dt>
           <dd className="font-display font-bold text-ink-900 inline-flex items-center gap-1.5">
             <Icon.video className="w-3.5 h-3.5" />
-            ვიდეო · 1-on-1
+            ვიდეო · ინდივიდუალური
           </dd>
         </div>
       </dl>
@@ -92,7 +93,7 @@ export const OrderSummary = ({
         <div className="space-y-1">
           {PAYMENTS_LIVE ? (
             <>
-              <p className="font-display text-[12px] font-bold text-brand-800 leading-snug">Escrow-ით დაცული გადახდა</p>
+              <p className="font-display text-[12px] font-bold text-brand-800 leading-snug">დაცული გადახდა</p>
               <p className="text-[11.5px] text-ink-600 leading-[1.5]">
                 თანხა ინახება უსაფრთხოდ და ექსპერტს გადაერიცხება მხოლოდ სესიის შემდეგ.
                 თუ ექსპერტი არ გამოცხადდა — 100% ავტომატური დაბრუნება. გაუქმება უფასოა სესიამდე 24 საათით ადრე.

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Avatar } from '@/components/Avatar'
 import { Btn } from '@/components/Btn'
+import { Eyebrow } from '@/components/Eyebrow'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
@@ -117,7 +118,7 @@ function BookingsPageInner() {
       const j = await res.json().catch(() => ({} as any))
       if (!res.ok || !j.ok) {
         toast(
-          j?.error === 'TOO_EARLY' ? 'სესია ჯერ არ დაწყებულა' :
+          j?.error === 'TOO_EARLY' ? 'გამოუცხადებლობა დაწყებიდან 15 წუთის შემდეგ მოინიშნება' :
           j?.error === 'BAD_STATE' ? 'სტატუსი ამას აღარ უშვებს' : 'მოქმედება ვერ შესრულდა',
           'error',
         )
@@ -126,7 +127,7 @@ function BookingsPageInner() {
       toast(
         action === 'accept' ? 'დადასტურდა'
         : action === 'decline' ? 'უარყოფილია'
-        : action === 'no_show' ? 'აღინიშნა: no-show'
+        : action === 'no_show' ? 'აღინიშნა: გამოუცხადებლობა'
         : 'დასრულებულია',
         'success',
       )
@@ -251,7 +252,7 @@ function BookingsPageInner() {
         <div className="space-y-6">
           {grouped.map(g => (
             <section key={g.label} aria-label={g.label}>
-              <div className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-2.5">{g.label}</div>
+              <Eyebrow tone="muted" className="mb-2.5">{g.label}</Eyebrow>
               <ul className="space-y-3">
                 {g.items.map(b => (
                   <BookingRow key={b.id} b={b} now={now} busy={busy} onAct={act} onConfirm={setConfirming} />
@@ -281,10 +282,10 @@ function BookingsPageInner() {
         }
         body={
           confirming?.kind === 'cancel'
-            ? 'სესიის დაწყებამდე 12 საათზე გვიან გაუქმება კლიენტისთვის სრულად ბრუნდება. კლიენტი მიიღებს შეტყობინებას.'
+            ? 'ჯავშნის გაუქმებისას კლიენტს დაცული თანხა სრულად უბრუნდება და მიიღებს შეტყობინებას.'
             : confirming?.kind === 'decline'
             ? `${confirming.b.student?.fullName ?? 'კლიენტის'} მოთხოვნა გაუქმდება. კლიენტი მიიღებს შეტყობინებას.`
-            : 'ჯავშანი აღინიშნება როგორც no-show და თანხა კლიენტს დაუბრუნდება.'
+            : 'ჯავშანი აღინიშნება როგორც გამოუცხადებლობა და თანხა კლიენტს დაუბრუნდება.'
         }
         tone={confirming?.kind === 'decline' ? 'warning' : 'danger'}
         confirmLabel={
@@ -360,7 +361,7 @@ function BookingRow({
       {b.status === 'CONFIRMED' && future && !live && !reschedPending && (
         <>
           <Btn variant="ghost" size="sm" href={`/tutor/messages/${b.id}`}>
-            <Icon.chat className="w-4 h-4" /> მესიჯი
+            <Icon.chat className="w-4 h-4" /> მიმოწერა
           </Btn>
           <Btn variant="secondary" size="sm" onClick={() => onConfirm({ kind: 'cancel', b })} disabled={busy === b.id + 'cancel'}>
             გაუქმება
@@ -382,7 +383,7 @@ function BookingRow({
               </span>
               <StatusPill tone={live ? 'live' : toneOf(b.status)} />
               {reschedPending && (
-                <span className="inline-flex items-center h-6 px-2 rounded-pill bg-warning-50 border border-warning-200 text-warning-700 font-display text-[10.5px] font-bold uppercase tracking-[0.1em]">
+                <span className="inline-flex items-center h-6 px-2 rounded-pill bg-transparent border border-ink-200 text-ink-500 font-display text-[10.5px] font-bold uppercase tracking-[0.1em]">
                   გადადება ელოდება
                 </span>
               )}

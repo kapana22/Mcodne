@@ -9,6 +9,8 @@ import { usePathname } from 'next/navigation'
 import { ToastProvider } from './ToastProvider'
 import { CookieConsent } from './CookieConsent'
 import { BottomNav } from './BottomNav'
+import { NavProgress } from './NavProgress'
+import { ClientErrorReporter } from './ClientErrorReporter'
 import { fetchMe } from '@/lib/me'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
@@ -42,6 +44,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true }
   }, [path])
 
+  // Scroll to top on every client-side navigation. Next's default scroll-reset
+  // doesn't reliably fire with our pathname-keyed fade-in wrapper, so a new page
+  // could open scrolled to wherever the previous one was — a jarring UX. Skip
+  // when the URL carries a hash: an in-page anchor (#chat, etc.) owns its scroll.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !window.location.hash) {
+      window.scrollTo(0, 0)
+    }
+  }, [path])
+
   // Cross-tab session guard. When the session identity changes in ANY tab
   // (admin impersonation start/exit, sign-out), that tab writes the
   // `mcodne:session-changed` key; every OTHER tab hard-reloads so it can never
@@ -59,6 +71,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastProvider>
+      <NavProgress />
+      <ClientErrorReporter />
       {/* Keyed on pathname so every client-side route change remounts the
           subtree and re-plays the `.page-in` fade. Server-side navigations
           get the same effect naturally on initial paint. */}

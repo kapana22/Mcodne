@@ -6,6 +6,8 @@ import { Reveal } from '@/components/Reveal'
 import { Footer } from '@/components/Footer'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
+import { Container } from '@/components/Container'
+import { Eyebrow } from '@/components/Eyebrow'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -75,8 +77,8 @@ const SERVICE_PILL: Record<ServiceType, { label: string; cls: string }> = {
   },
   RECURRING: {
     label: 'მენტორინგი',
-    // Informational chip → info blue per canon (accent is deprecated).
-    cls: 'bg-info-50 text-info-700 border-info-100',
+    // Informational chip → neutral ink per canon.
+    cls: 'bg-ink-75 text-ink-700 border-ink-200',
   },
 }
 
@@ -98,18 +100,18 @@ export default async function CategoriesPage() {
     <div className="min-h-screen bg-white">
       <MarketingTopBar />
 
-      <main className="max-w-[1280px] mx-auto px-6 sm:px-8 py-12 lg:py-16">
+      <Container as="main" className="py-12 lg:py-16">
         {/* Hero */}
         <section className="max-w-[720px] mb-10 lg:mb-12">
-          <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-700 mb-3">
+          <Eyebrow className="mb-3">
             სფეროები
-          </div>
+          </Eyebrow>
           <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05]">
             აირჩიე შენი სფერო
           </h1>
           <p className="mt-4 text-[15px] lg:text-[16px] text-ink-600 leading-relaxed">
-            თითოეული სფერო ხელით არის ცოცხალი გამოცდილი ექსპერტებით. აირჩიე მიმართულება
-            — და დაუყოვნებლივ ნახე ვინც ხელმისაწვდომია.
+            თითოეული სფერო ხელით შერჩეული, გამოცდილი ექსპერტებითაა დაკომპლექტებული. აირჩიე მიმართულება
+            — და დაუყოვნებლივ ნახე, ვინც ხელმისაწვდომია.
           </p>
         </section>
 
@@ -129,7 +131,7 @@ export default async function CategoriesPage() {
               return (
                 <Link
                   key={c.id}
-                  href={`/tutors?category=${encodeURIComponent(c.slug)}`}
+                  href={`/categories/${encodeURIComponent(c.slug)}`}
                   className="group relative flex flex-col overflow-hidden rounded-card border border-ink-200 bg-white p-5 lg:p-6 shadow-xs hover-lift hover:border-brand-200 motion-safe:active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
                 >
                   {/* Brand accent hairline — reveals on hover for a subtle premium cue. */}
@@ -164,7 +166,6 @@ export default async function CategoriesPage() {
                   <div className="mt-5 pt-4 border-t border-ink-100">
                     <span className="inline-flex items-center gap-1.5 text-[12.5px] font-display font-semibold text-brand-700 transition-all duration-200 group-hover:gap-2.5">
                       ნახე ექსპერტები
-                      <Icon.arrow className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
                     </span>
                   </div>
                 </Link>
@@ -172,7 +173,7 @@ export default async function CategoriesPage() {
             })}
           </Reveal>
         )}
-      </main>
+      </Container>
 
       <Footer />
     </div>

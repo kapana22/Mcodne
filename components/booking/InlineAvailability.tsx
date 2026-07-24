@@ -29,7 +29,7 @@ export const InlineAvailability = ({
   busySlots: BusySlot[]
   sessionMin: number
   /** Price string for the slot cards — the flat price, or the honest
-      „₾N-დან" from-price when tiers differ. */
+      „₾N-დან“ from-price when tiers differ. */
   priceLabel: string
   tutorName: string
   onPickSlot: (start: Date) => void
@@ -57,13 +57,13 @@ export const InlineAvailability = ({
         </div>
         <div className="font-display text-[15px] font-bold text-ink-900">თავისუფალი დროები ჯერ არ არის</div>
         <p className="text-[12.5px] text-ink-500 mt-1.5 max-w-[360px] mx-auto leading-snug">
-          მიწერე მოთხოვნა შეკითხვისთვის — გუნდი ექსპერტს დაუკავშირდება და დრო ხშირად ინდივიდუალურად იხსნება.
+          მოგვწერე შენი შეკითხვა — გუნდი ექსპერტს დაუკავშირდება და დრო ხშირად ინდივიდუალურად იხსნება.
         </p>
         <a
           href={`mailto:hi@mcodne.ge?subject=${encodeURIComponent(`დროის მოთხოვნა — ${tutorName}`)}`}
           className="mt-4 inline-flex h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide items-center gap-1.5 transition-colors"
         >
-          მიწერე მოთხოვნა <Icon.arrow className="w-3.5 h-3.5" />
+          მოგვწერე <Icon.arrow className="w-3.5 h-3.5" />
         </a>
       </div>
     )

@@ -3,12 +3,14 @@
 Georgian expert-consultation marketplace (Next.js 15 + Tailwind + Prisma). UI is Georgian.
 **Every new/edited surface must follow this canon — public, auth, student, tutor, admin alike.**
 
-## Color (strict 3-color system)
-- **PRIMARY green `brand` (#159A82)** — used with restraint: primary CTAs, verified, live, escrow, key accents. Never decorative washes on cards/forms.
-- **SECONDARY blue `info` (#2563EB)** — informational accents only: pedigree/credential chips, links-as-info.
+## Color (strict 2-color system — blue removed 2026-07-19)
+- **PRIMARY green `brand` (#2F9C86)** — the logo teal (aligned to the wordmark 2026-07-19; was #159A82). Used with restraint: primary CTAs, verified, live, escrow, key accents. Never decorative washes on cards/forms.
+- **NO BLUE.** The `info` token still exists for backwards-compat but must NOT be used as an accent — pedigree/credential/notification chips are neutral `bg-ink-75 text-ink-700 border-ink-200`.
 - **NEUTRAL `ink` ramp** — dominant: text, borders (`border-ink-200`), hairlines (`border-ink-100`), backgrounds.
-- Semantic `success`(=brand green)/`warning`(gold, ratings)/`danger` only at the point of meaning. No other hues, no ad-hoc hex in pages.
-- Gradients: ONLY the four named tokens in tailwind config (`gradient-wash/dark/cta/signature`); never ad-hoc `from-/to-` in page code.
+- Semantic `success`(=brand green)/`warning`(gold — ratings + genuine cautions ONLY, not decorative)/`danger` only at the point of meaning. No other hues, no ad-hoc hex in pages.
+- **No status dots and no decorative button arrows** anywhere (2026-07-19). Badges = hairline border + colored text, no pastel fill (SUPER = `bg-ink-900 text-white`).
+- Gradients: ONLY the four named tokens in tailwind config (`gradient-wash/dark/cta/signature`); `gradient-dark` is warm charcoal (not teal); never ad-hoc `from-/to-` in page code.
+- Buttons: `rounded-btn` = 10px (crisp/geometric, echoes logo). Comfortable date/time picking via `components/booking/DateTimePicker.tsx`.
 
 ## Type
 - FiraGO self-hosted (`public/fonts/firago-*.woff2`); never add font CDNs.

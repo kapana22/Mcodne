@@ -12,11 +12,18 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
-  const updated = await prisma.tutorProfile.update({
-    where: { id },
-    data: { featured: parsed.data.featured },
-    select: { id: true, featured: true },
-  })
+  let updated
+  try {
+    updated = await prisma.tutorProfile.update({
+      where: { id },
+      data: { featured: parsed.data.featured },
+      select: { id: true, featured: true },
+    })
+  } catch (e: any) {
+    // P2025 = record to update not found → 404, not an unhandled 500.
+    if (e?.code === 'P2025') return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
+    throw e
+  }
 
   await audit(admin.id, parsed.data.featured ? 'tutor.feature' : 'tutor.unfeature', {
     targetType: 'TutorProfile',

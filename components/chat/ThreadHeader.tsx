@@ -21,17 +21,25 @@ const toneOf = (s: string) =>
 export function ThreadHeader({
   booking,
   counterparty,
+  peer,
   backHref = '/tutor/messages',
+  bookingHref,
   alwaysBack = false,
 }: {
   booking: ThreadBooking | null
   counterparty?: { fullName: string; avatarUrl?: string | null } | null
+  /** Explicit peer to show — the party across the conversation. The tutor side
+      defaults to `booking.student`; the student side passes `booking.tutorUser`
+      here (its `booking.student` is the viewer themselves). */
+  peer?: { fullName: string; avatarUrl?: string | null } | null
   backHref?: string
+  /** Where „ჯავშნის ნახვა" points — defaults to the tutor booking page. */
+  bookingHref?: string
   /** Show the back chevron at every width (standalone full-screen thread).
       Default hides it on lg where a conversation list sits beside the pane. */
   alwaysBack?: boolean
 }) {
-  const other = booking?.student ?? counterparty ?? null
+  const other = peer ?? booking?.student ?? counterparty ?? null
   // Pre-booking pair thread: no booking context. Show a subtle pre-inquiry
   // label in place of the StatusPill so the tutor knows this is a prospect who
   // hasn't booked yet, not a client with a live session.
@@ -65,7 +73,7 @@ export function ThreadHeader({
         )}
       </div>
       {booking && (
-        <Btn variant="ghost" size="sm" href={`/tutor/bookings/${booking.id}`} className="shrink-0">
+        <Btn variant="ghost" size="sm" href={bookingHref ?? `/tutor/bookings/${booking.id}`} className="shrink-0">
           <span className="hidden sm:inline">ჯავშნის ნახვა</span>
           <Icon.external className="w-4 h-4 sm:hidden" />
         </Btn>

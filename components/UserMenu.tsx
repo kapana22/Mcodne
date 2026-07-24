@@ -5,10 +5,14 @@
 // drop this in without duplicating the menu logic.
 
 import Link from 'next/link'
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { usePathname } from 'next/navigation'
+import { Fragment, useEffect, useRef, useState, type ReactElement } from 'react'
 import { Avatar } from './Avatar'
 import { Icon } from './Icon'
+import { Eyebrow } from '@/components/Eyebrow'
 import { signOut as doSignOut } from '@/lib/signout'
+import { useNotifications } from '@/lib/notifications'
+import { useMe } from '@/lib/me'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 
@@ -19,6 +23,11 @@ type MenuItem = {
   // If true, item is treated as a destructive action (e.g. sign out).
   danger?: boolean
   onClick?: () => void | Promise<void>
+  // Workspace-section shortcut shown ONLY on mobile (< lg). On desktop the
+  // sidebar already lists these, so surfacing them here too would duplicate
+  // the nav. Hidden with `lg:hidden` so the desktop dropdown stays a clean
+  // account menu.
+  mobileOnly?: boolean
 }
 
 const STUDENT_ITEMS = (onSignout: () => void): MenuItem[] => [
@@ -29,16 +38,19 @@ const STUDENT_ITEMS = (onSignout: () => void): MenuItem[] => [
   { label: 'გამოსვლა',          icon: Icon.logout, danger: true, onClick: onSignout },
 ]
 
-// გრაფიკი/შემოსავალი/კატალოგი live here because mobile has no sidebar and
-// BottomNav only carries 4 tabs — the menu is the phone's escape hatch to the
-// rest of the workspace (the old TutorAppBar chip rail is gone).
+// Two logical groups, in order:
+//  1. Mobile escape-hatch — the workspace sections the 4-tab BottomNav can't
+//     hold (schedule/earnings/catalog). `mobileOnly` hides them on desktop,
+//     where the sidebar already lists them, so the dropdown isn't a duplicate
+//     of the sidebar. Messages/Home/Bookings are omitted entirely — they're in
+//     the BottomNav on mobile and the sidebar on desktop.
+//  2. Account menu — profile/settings/help/sign-out, shown at every breakpoint.
 const TUTOR_ITEMS = (onSignout: () => void): MenuItem[] => [
+  { href: '/tutor/schedule',    label: 'გრაფიკი',       icon: Icon.clock,  mobileOnly: true },
+  { href: '/tutor/earnings',    label: 'შემოსავალი',    icon: Icon.wallet, mobileOnly: true },
+  { href: '/tutors',            label: 'ექსპერტები', icon: Icon.search, mobileOnly: true },
   { href: '/tutor/profile',     label: 'პროფილი',       icon: Icon.user },
-  { href: '/tutor/schedule',    label: 'გრაფიკი',       icon: Icon.clock },
-  { href: '/tutor/earnings',    label: 'შემოსავალი',    icon: Icon.wallet },
-  { href: '/tutors',            label: 'ექსპერტების კატალოგი', icon: Icon.search },
   { href: '/settings',          label: 'პარამეტრები',   icon: Icon.settings },
-  { href: '/tutor/messages',    label: 'შეტყობინებები', icon: Icon.chat },
   { href: '/help',              label: 'დახმარება',     icon: Icon.info },
   { label: 'გამოსვლა',          icon: Icon.logout, danger: true, onClick: onSignout },
 ]
@@ -58,30 +70,22 @@ export function UserMenu({
   role: Role
 }) {
   const [open, setOpen] = useState(false)
-  const [unread, setUnread] = useState(0)
   const [busy, setBusy] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
 
-  // Unread indicator on the avatar (small red dot) — same source of truth
-  // as NotifBell / BottomNav so all three stay in sync across tabs.
-  useEffect(() => {
-    let cancelled = false
-    const load = () => {
-      fetch('/api/notifications')
-        .then(r => (r.ok ? r.json() : null))
-        .then(d => { if (!cancelled) setUnread(d?.unreadCount ?? 0) })
-        .catch(() => {})
-    }
-    load()
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'mcodne:notif-check') load()
-    }
-    window.addEventListener('storage', onStorage)
-    return () => {
-      cancelled = true
-      window.removeEventListener('storage', onStorage)
-    }
-  }, [])
+  // Unread indicator on the avatar (small red dot) — reads the shared
+  // lib/notifications store so bell / user menu / bottom nav stay in sync
+  // (one app-wide poll, cross-tab aware).
+  const { unreadCount: unread } = useNotifications()
+  const pathname = usePathname() ?? ''
+  // Real role from the shared identity (the shell may hardcode the `role` prop,
+  // e.g. the student shell always passes "STUDENT" even when the viewer is a
+  // TUTOR consulting/viewing as a client). An approved expert (TUTOR) was a
+  // STUDENT first, so they can hold both an expert workspace AND client-side
+  // bookings/messages — give them a switch between the two spaces.
+  const { me } = useMe()
+  const isDualRole = me?.role === 'TUTOR'
+  const inClientSpace = pathname.startsWith('/student')
 
   // Close on outside click / Escape.
   useEffect(() => {
@@ -111,10 +115,21 @@ export function UserMenu({
     setBusy(false)
   }
 
-  const items =
+  const baseItems =
     role === 'ADMIN'   ? ADMIN_ITEMS(signOut) :
     role === 'STUDENT' ? STUDENT_ITEMS(signOut) :
                          TUTOR_ITEMS(signOut)
+
+  // Space switcher for a dual-role user (expert who also has a client side).
+  // Sits at the top of the menu: „კლიენტის სივრცე" from the expert workspace,
+  // „ექსპერტის სივრცე" from the client space — so student-side messages/bookings
+  // stay reachable after becoming an expert (they used to be locked away).
+  const switchItem: MenuItem | null = isDualRole
+    ? inClientSpace
+      ? { href: '/tutor', label: 'ექსპერტის სივრცე', icon: Icon.briefcase }
+      : { href: '/student', label: 'კლიენტის სივრცე', icon: Icon.user }
+    : null
+  const items = switchItem ? [switchItem, ...baseItems] : baseItems
 
   const initialName = user?.name ?? ''
 
@@ -146,53 +161,57 @@ export function UserMenu({
           {initialName && (
             <div className="px-4 pt-3 pb-2 border-b border-ink-100">
               <div className="font-display text-[13px] font-bold text-ink-900 truncate">{initialName}</div>
-              <div className="text-[10.5px] font-display font-semibold uppercase tracking-[0.18em] text-ink-500 mt-0.5">
+              <Eyebrow tone="muted" className="mt-0.5">
                 {role === 'TUTOR' ? 'ექსპერტი' : role === 'ADMIN' ? 'ადმინი' : 'კლიენტი'}
-              </div>
+              </Eyebrow>
             </div>
           )}
           <ul className="py-1.5">
-            {items.map(item => {
+            {items.map((item, idx) => {
               const IconComp = item.icon
               const showDot = item.href === '/notifications' || item.href?.endsWith('/messages')
               const dot = showDot && unread > 0
+              // Divider between the mobile escape-hatch group and the account
+              // group — mobile-only, since the escape-hatch group is hidden on
+              // desktop and the divider would otherwise dangle at the top.
+              const needsDivider = !item.mobileOnly && idx > 0 && !!items[idx - 1]?.mobileOnly
+              const liCls = item.mobileOnly ? 'lg:hidden' : ''
               const cls = `w-full text-left px-4 h-10 inline-flex items-center gap-3 text-[13.5px] font-display font-medium transition-colors ${
                 item.danger
                   ? 'text-danger-700 hover:bg-danger-50'
                   : 'text-ink-800 hover:bg-ink-50'
               }`
-              if (item.href) {
-                return (
-                  <li key={item.href} role="none">
-                    <Link
-                      href={item.href}
-                      role="menuitem"
-                      onClick={() => setOpen(false)}
-                      className={cls}
-                    >
-                      <IconComp className="w-4 h-4 text-ink-500 shrink-0" />
-                      <span className="flex-1">{item.label}</span>
-                      {dot && <span className="w-2 h-2 rounded-full bg-danger-500" />}
-                    </Link>
-                  </li>
-                )
-              }
+              const body = item.href ? (
+                <Link
+                  href={item.href}
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className={cls}
+                >
+                  <IconComp className="w-4 h-4 text-ink-500 shrink-0" />
+                  <span className="flex-1">{item.label}</span>
+                  {dot && <span className="w-2 h-2 rounded-full bg-danger-500" />}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy}
+                  onClick={() => {
+                    setOpen(false)
+                    item.onClick?.()
+                  }}
+                  className={`${cls} disabled:opacity-60 disabled:cursor-not-allowed`}
+                >
+                  <IconComp className="w-4 h-4 text-danger-500 shrink-0" />
+                  <span className="flex-1">{item.label}</span>
+                </button>
+              )
               return (
-                <li key={item.label} role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    disabled={busy}
-                    onClick={() => {
-                      setOpen(false)
-                      item.onClick?.()
-                    }}
-                    className={`${cls} disabled:opacity-60 disabled:cursor-not-allowed`}
-                  >
-                    <IconComp className="w-4 h-4 text-danger-500 shrink-0" />
-                    <span className="flex-1">{item.label}</span>
-                  </button>
-                </li>
+                <Fragment key={item.href ?? item.label}>
+                  {needsDivider && <li aria-hidden className="lg:hidden my-1.5 border-t border-ink-100" />}
+                  <li role="none" className={liCls}>{body}</li>
+                </Fragment>
               )
             })}
           </ul>

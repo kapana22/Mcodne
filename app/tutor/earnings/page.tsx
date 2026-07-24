@@ -2,10 +2,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CountUp } from '@/components/CountUp'
 import { EmptyState } from '@/components/EmptyState'
+import { Eyebrow } from '@/components/Eyebrow'
 import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
 import { PageHeader } from '@/components/tutor/PageHeader'
 import { fmtKaDate, KA_MONTHS_LONG } from '@/lib/kaDate'
+import { TUTOR_PAYOUT_PCT } from '@/lib/flags'
 
 type Tx = {
   id: string
@@ -35,7 +37,7 @@ const fmtDate = (iso: string) => {
 }
 
 const payoutLabel = (s: Tx['payoutStatus']) =>
-  s === 'PENDING' ? { l: 'მოლოდინში', cls: 'bg-warning-50 text-warning-700 border-warning-200' }
+  s === 'PENDING' ? { l: 'მოლოდინში', cls: 'bg-transparent text-ink-500 border-ink-200' }
   : s === 'RELEASED' ? { l: 'გადარიცხულია', cls: 'bg-success-50 text-success-700 border-success-200' }
   : { l: 'დაბრუნდა', cls: 'bg-ink-100 text-ink-700 border-ink-200' }
 
@@ -89,7 +91,7 @@ export default function TutorEarningsPage() {
       <PageHeader
         className="mb-6"
         title="შემოსავალი"
-        sub="დამუშავებული ჯავშნები და ტრანზაქციები · შენი წილი 85%"
+        sub={`დამუშავებული ჯავშნები და ტრანზაქციები · შენი წილი ${TUTOR_PAYOUT_PCT}%`}
         actions={
           <Btn variant="secondary" size="sm" href="/api/tutor/earnings?format=csv">
             CSV ექსპორტი
@@ -105,6 +107,9 @@ export default function TutorEarningsPage() {
       )}
 
       {data === null ? (
+        // Show the skeleton only while genuinely loading — when a fetch error is
+        // showing above, an endless pulsing skeleton under it is a false signal.
+        err ? null : (
         <div aria-busy="true">
           <div className="rounded-card bg-ink-100 animate-pulse h-[140px] mb-4" />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -114,6 +119,7 @@ export default function TutorEarningsPage() {
             {[0, 1, 2, 3].map(i => <div key={i} className="h-10 rounded-btn bg-ink-100 animate-pulse" />)}
           </div>
         </div>
+        )
       ) : (
         <>
           {/* Balance hero — the number the expert is waiting on leads. */}
@@ -121,10 +127,10 @@ export default function TutorEarningsPage() {
             <div className="p-6 sm:p-7 grid sm:grid-cols-[1fr_auto] gap-5 items-end">
               <div>
                 <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/50 mb-2">
-                  გადარიცხვის მოლოდინში
+                  სულ გამომუშავებული
                 </div>
                 <div className="font-display text-[40px] sm:text-[48px] font-bold leading-none tabular-nums tracking-[-0.03em]">
-                  <CountUp value={data.pendingPayout} prefix="₾" />
+                  <CountUp value={data.totalEarned} prefix="₾" />
                 </div>
                 <p className="mt-3 text-[12px] text-white/60 leading-snug max-w-[420px]">
                   გადარიცხვები მალე ამოქმედდება — ამჟამად ჯავშნები ტარდება უფასოდ.
@@ -132,12 +138,12 @@ export default function TutorEarningsPage() {
               </div>
               <div className="flex sm:flex-col gap-4 sm:gap-2 sm:text-right">
                 <div>
-                  <div className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">სულ გამომუშავებული</div>
-                  <div className="font-display text-[18px] font-bold tabular-nums">{fmtGel(data.totalEarned)}</div>
-                </div>
-                <div>
                   <div className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">ამ თვეში</div>
                   <div className="font-display text-[18px] font-bold tabular-nums">{fmtGel(data.thisMonth?.earned ?? 0)}</div>
+                </div>
+                <div>
+                  <div className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">გადარიცხვის მოლოდინში</div>
+                  <div className="font-display text-[18px] font-bold tabular-nums">{fmtGel(data.pendingPayout)}</div>
                 </div>
               </div>
             </div>
@@ -150,7 +156,7 @@ export default function TutorEarningsPage() {
                 <span className="w-8 h-8 rounded-btn bg-brand-50 text-brand-700 inline-flex items-center justify-center">
                   <Icon.wallet className="w-4 h-4" />
                 </span>
-                <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">ამ თვეში</span>
+                <Eyebrow as="span" tone="muted">ამ თვეში</Eyebrow>
               </div>
               <div className="font-display text-[24px] font-bold text-ink-900 tabular-nums">{fmtGel(data.thisMonth?.earned ?? 0)}</div>
               <div className="text-[11.5px] text-ink-500 mt-1">{data.thisMonth?.count ?? 0} სესია</div>
@@ -160,20 +166,20 @@ export default function TutorEarningsPage() {
                 <span className="w-8 h-8 rounded-btn bg-success-50 text-success-700 inline-flex items-center justify-center">
                   <Icon.check className="w-4 h-4" />
                 </span>
-                <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">დასრულებული სესიები</span>
+                <Eyebrow as="span" tone="muted">დასრულებული სესიები</Eyebrow>
               </div>
               <div className="font-display text-[24px] font-bold text-ink-900 tabular-nums">{data.completedCount}</div>
               <div className="text-[11.5px] text-ink-500 mt-1">მთელი პერიოდი</div>
             </div>
             <div className="p-5 rounded-card border border-ink-200 bg-white shadow-xs">
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-8 h-8 rounded-btn bg-info-50 text-info-700 inline-flex items-center justify-center">
+                <span className="w-8 h-8 rounded-btn bg-ink-100 text-ink-600 inline-flex items-center justify-center">
                   <Icon.trend className="w-4 h-4" />
                 </span>
-                <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">საშუალო სესიაზე</span>
+                <Eyebrow as="span" tone="muted">საშუალო სესიაზე</Eyebrow>
               </div>
               <div className="font-display text-[24px] font-bold text-ink-900 tabular-nums">{fmtGel(avgPerSession)}</div>
-              <div className="text-[11.5px] text-ink-500 mt-1">ნეტო, 85% წილით</div>
+              <div className="text-[11.5px] text-ink-500 mt-1">ნეტო, {TUTOR_PAYOUT_PCT}% წილით</div>
             </div>
           </div>
 
@@ -197,7 +203,7 @@ export default function TutorEarningsPage() {
               <>
                 {hasRefunded && (
                   <div className="px-5 py-2 border-b border-ink-100 text-[11.5px] text-ink-500 bg-ink-50/40">
-                    „დაბრუნდა" — გაუქმებული ან no-show სესია, თანხა კლიენტს დაუბრუნდა.
+                    „დაბრუნდა“ — გაუქმებული ან გამოუცხადებლობის სესია, თანხა კლიენტს დაუბრუნდა.
                   </div>
                 )}
                 {/* Mobile: card rows under month headers */}
@@ -205,7 +211,7 @@ export default function TutorEarningsPage() {
                   {groups.map(g => (
                     <div key={g.key}>
                       <div className="px-5 py-2 bg-ink-50/60 border-y border-ink-100 first:border-t-0 flex items-center justify-between">
-                        <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">{g.label}</span>
+                        <Eyebrow as="span" tone="muted">{g.label}</Eyebrow>
                         <span className="font-display text-[11.5px] font-bold text-ink-700 tabular-nums">{fmtGel(g.net)} · {g.items.length}</span>
                       </div>
                       <div className="divide-y divide-ink-100">
