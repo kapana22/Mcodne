@@ -4,6 +4,7 @@ import { notify } from '@/lib/notify'
 import { fmtKaDateTime, fmtKaTime } from '@/lib/kaDate'
 import { sendSessionReminders } from '@/lib/sessionReminders'
 import { sendMessageReminders } from '@/lib/messageReminders'
+import { cronAuth } from '@/lib/cronAuth'
 
 // Cleanup job for expired auth artifacts + stale bookings.
 //
@@ -28,9 +29,9 @@ import { sendMessageReminders } from '@/lib/messageReminders'
 //     NB: the 1h reminder only fires if a cron tick lands inside that hour, so
 //     schedule this endpoint at least every 15–30 min for it to be reliable.
 //
-// Auth: shared secret in the `Authorization: Bearer <CLEANUP_SECRET>` header,
-// OR `?secret=<CLEANUP_SECRET>` query param on the GET variant (simpler for
-// cron systems that only support HTTP GET pings).
+// Auth: see lib/cronAuth. Prefer `Authorization: Bearer <CLEANUP_SECRET>`; the
+// `?secret=` query form still works on GET only, for the live cron, and is
+// being retired (a secret in a URL lands in access logs).
 //
 // Recommended schedule: every 15 minutes (the 1h session reminder needs a
 // tick inside its window; everything else tolerates any cadence).
@@ -39,7 +40,8 @@ import { sendMessageReminders } from '@/lib/messageReminders'
 //   1. Set env CLEANUP_SECRET=<random 32+ char string> in Variables
 //   2. Dashboard → Service → Cron → add job:
 //        Schedule: */15 * * * *
-//        Command:  curl -fsS "https://mcodne.ge/api/internal/cleanup?secret=$CLEANUP_SECRET"
+//        Command:  curl -fsS -X POST -H "Authorization: Bearer $CLEANUP_SECRET" \
+//                    https://mcodne.ge/api/internal/cleanup
 
 const PREPARING_TTL_HOURS = 24
 const AUTO_COMPLETE_GRACE_HOURS = 48
@@ -53,19 +55,8 @@ const AUTO_COMPLETE_GRACE_HOURS = 48
 const RESCHEDULE_PROPOSAL_TTL_HOURS = 48
 
 export async function POST(req: Request) {
-  const auth = req.headers.get('authorization') || ''
-  const provided = auth.startsWith('Bearer ') ? auth.slice(7) : null
-  const expected = process.env.CLEANUP_SECRET
-
-  if (!expected) {
-    return NextResponse.json(
-      { ok: false, error: 'DISABLED', hint: 'Set CLEANUP_SECRET in env to enable this endpoint.' },
-      { status: 503 },
-    )
-  }
-  if (!provided || provided !== expected) {
-    return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
-  }
+  const gate = cronAuth(req)
+  if (!gate.ok) return NextResponse.json(gate.body, { status: gate.status })
 
   const now = new Date()
 
@@ -435,12 +426,11 @@ export async function POST(req: Request) {
 // (convenience for cron systems that can only ping GET URLs, e.g. Railway UI
 // cron). Otherwise return a self-doc JSON.
 export async function GET(req: Request) {
-  const url = new URL(req.url)
-  const querySecret = url.searchParams.get('secret')
   const expected = process.env.CLEANUP_SECRET
 
-  // Actual cleanup path when secret is supplied AND matches.
-  if (querySecret && expected && querySecret === expected) {
+  // Actual cleanup path — header preferred, legacy `?secret=` still honoured
+  // here (and ONLY here) so the live Railway cron keeps working.
+  if (cronAuth(req, { allowQuery: true }).ok) {
     // Reconstruct a POST-shaped Request and defer to the POST handler so we
     // don't duplicate the whole cleanup logic block.
     return POST(new Request(req.url, {
@@ -453,8 +443,8 @@ export async function GET(req: Request) {
   return NextResponse.json({
     ok: true,
     endpoint: '/api/internal/cleanup',
-    methods: ['POST (Bearer)', 'GET ?secret=…'],
-    auth: 'Authorization: Bearer <CLEANUP_SECRET> — or query ?secret=<CLEANUP_SECRET>',
+    methods: ['POST (Bearer) — preferred', 'GET ?secret=… — legacy, being retired'],
+    auth: 'Authorization: Bearer <CLEANUP_SECRET>',
     configured,
     actions: [
       'Delete expired Session rows',
@@ -466,7 +456,7 @@ export async function GET(req: Request) {
       'Send BOOKING_REMINDER (24h + 1h before start) to both parties of CONFIRMED bookings — run every 15–30 min for reliable 1h reminders',
     ],
     hint: configured
-      ? 'Ping this endpoint on a schedule (e.g. every 6h) — POST with Bearer or GET with ?secret=…'
+      ? 'Ping this endpoint every 15 min — POST with an Authorization: Bearer header'
       : 'CLEANUP_SECRET is NOT set — endpoint is disabled. Set it in Railway env to enable.',
   })
 }
