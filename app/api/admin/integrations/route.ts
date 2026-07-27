@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { audit } from '@/lib/audit'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { INTEGRATION_KEYS } from '@/lib/integrations'
 
@@ -25,6 +26,11 @@ export async function GET() {
     gaId: byKey.get(FIELD_KEY.gaId) ?? '',
     headerHtml: byKey.get(FIELD_KEY.headerHtml) ?? '',
     footerHtml: byKey.get(FIELD_KEY.footerHtml) ?? '',
+    // components/Analytics.tsx falls back to NEXT_PUBLIC_GA_ID when the DB value
+    // is empty — so clearing the field here does NOT necessarily turn GA off.
+    // Surface the env id (a public measurement id, not a secret) so the panel
+    // can say so instead of claiming „გამორთული".
+    envGaId: (process.env.NEXT_PUBLIC_GA_ID ?? '').trim(),
   })
 }
 
@@ -37,16 +43,26 @@ const Body = z.object({
 })
 
 export async function PATCH(req: Request) {
-  await requireRole('ADMIN')
+  const admin = await requireRole('ADMIN')
   await ensureDbReady()
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   const { field, reset } = parsed.data
   const value = (parsed.data.value ?? '').trim()
   const key = FIELD_KEY[field as Field]
+  // headerHtml/footerHtml run raw HTML+JS on EVERY visitor's page — the single
+  // most dangerous switch in the panel, so every set/clear is audited. The
+  // payload itself can be 20k chars; we log its length + a short head so the
+  // trail stays readable while still identifying WHAT was injected.
+  const isCodeInjection = field === 'headerHtml' || field === 'footerHtml'
 
   if (reset || value === '') {
     await prisma.siteText.deleteMany({ where: { key } })
+    await audit(admin.id, 'integration.clear', {
+      targetType: 'SiteText',
+      targetId: key,
+      meta: { field, codeInjection: isCodeInjection },
+    })
     return NextResponse.json({ ok: true, cleared: true })
   }
 
@@ -55,5 +71,16 @@ export async function PATCH(req: Request) {
   }
 
   await prisma.siteText.upsert({ where: { key }, update: { value }, create: { key, value } })
+  await audit(admin.id, 'integration.set', {
+    targetType: 'SiteText',
+    targetId: key,
+    meta: {
+      field,
+      codeInjection: isCodeInjection,
+      length: value.length,
+      // GA id is short and harmless to store verbatim; injected code is not.
+      value: isCodeInjection ? `${value.slice(0, 200)}${value.length > 200 ? '…' : ''}` : value,
+    },
+  })
   return NextResponse.json({ ok: true })
 }

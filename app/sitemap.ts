@@ -49,6 +49,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let tutorEntries: MetadataRoute.Sitemap = []
   try {
     const tutors = await prisma.tutorProfile.findMany({
+      // Must mirror the public visibility rule in lib/tutorsQuery.ts EXACTLY,
+      // otherwise we submit profiles that no public listing links to:
+      //   available: true      — self-paused experts are pulled from browse
+      //   suspendedAt: null    — admin-suspended experts 404 on /tutors/[id]
+      //   category.isLive      — hidden-category (and categoryId-null) experts
+      //                          are unreachable from browse and unbookable
+      where: {
+        available: true,
+        user: { is: { suspendedAt: null } },
+        category: { is: { isLive: true } },
+      },
       select: { id: true, updatedAt: true },
       orderBy: { updatedAt: 'desc' },
       take: 5000,

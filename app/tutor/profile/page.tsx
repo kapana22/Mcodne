@@ -8,7 +8,9 @@ import { ConfirmModal } from '@/components/ConfirmModal'
 import { useToast } from '@/components/ToastProvider'
 import { ProfileCompleteness } from '@/components/ProfileCompleteness'
 import { PageHeader } from '@/components/tutor/PageHeader'
+import { PriceField } from '@/components/PriceField'
 import { safeHttpUrl } from '@/lib/safeUrl'
+import { LANGUAGES, normalizeLangs } from '@/lib/languages'
 
 type Me = {
   id: string
@@ -28,12 +30,16 @@ type TutorProfile = {
   languages: string[]
   serviceType?: 'CONSULTATION' | 'RECURRING'
   consultationDurationMin?: number
+  bufferMin?: number
   videoUrl?: string | null
   available?: boolean
   linkedinUrl?: string | null
   websiteUrl?: string | null
   responseHours?: number
+  categoryId?: string | null
 } | null
+
+type Category = { id: string; slug: string; name: string }
 
 const RESPONSE_HOUR_OPTIONS: { value: 4 | 12 | 24 | 48; label: string }[] = [
   { value: 4,  label: '4 საათში' },
@@ -46,14 +52,14 @@ type Certificate = { id: string; title: string; issuer: string; year: number; fi
 type Education = { id: string; school: string; degree: string; field: string | null; startYear: number; endYear: number | null }
 type Experience = { id: string; company: string; role: string; startYear: number; endYear: number | null; description: string | null }
 
-const LANG_OPTIONS = [
-  { code: 'ka', label: 'ქართული' },
-  { code: 'en', label: 'ინგლისური' },
-  { code: 'ru', label: 'რუსული' },
-  { code: 'de', label: 'გერმანული' },
-  { code: 'fr', label: 'ფრანგული' },
-  { code: 'tr', label: 'თურქული' },
-]
+// Single source of truth — the same list the approval path normalizes onto, so
+// a chip can never disagree with what's stored (lib/languages.ts).
+const LANG_OPTIONS = LANGUAGES
+
+// Password policy — mirrors /api/me/password (min 8). Kept in one place so the
+// inline check, the input `minLength` and the copy can never drift apart again.
+const PWD_MIN = 8
+const PWD_MIN_MSG = 'პაროლი უნდა იყოს მინიმუმ 8 სიმბოლო'
 
 export default function TutorProfilePage() {
   const [me, setMe] = useState<Me>(null)
@@ -70,11 +76,13 @@ export default function TutorProfilePage() {
   const [videoErr, setVideoErr] = useState<string | null>(null)
   const [pwdMsg, setPwdMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
+  const [categories, setCategories] = useState<Category[]>([])
   const [form, setForm] = useState({
     headline: '', bio: '', specialty: '',
     yearsExp: 0, hourlyRate: 0,
     languages: [] as string[],
     linkedinUrl: '', websiteUrl: '',
+    categoryId: '' as string,
   })
   // Snapshot of the last-saved form values. `dirty` drives the save button:
   // active "შეინახე ცვლილებები" when there are unsaved edits, disabled
@@ -83,19 +91,37 @@ export default function TutorProfilePage() {
   const [savedForm, setSavedForm] = useState<typeof form | null>(null)
   const dirty = savedForm !== null && JSON.stringify(form) !== JSON.stringify(savedForm)
   const [pwd, setPwd] = useState({ current: '', next: '', confirm: '' })
+  // Display name lives on the account (user.fullName), edited via /api/me —
+  // NOT the tutor-profile PATCH. Seeded from the /api/me load below.
+  const [fullNameInput, setFullNameInput] = useState('')
+  const [savingName, setSavingName] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   const [certificates, setCertificates] = useState<Certificate[]>([])
   const [education, setEducation] = useState<Education[]>([])
   const [experience, setExperience] = useState<Experience[]>([])
+  // Upcoming free-slot count — feeds the ProfileCompleteness „თავისუფალი დრო"
+  // check. Booking is slot-gated, so 0 slots keeps that step incomplete.
+  // Best-effort: stays 0 if the availability fetch fails.
+  const [slotCount, setSlotCount] = useState(0)
   type ConsultTier = 'QUICK' | 'STANDARD' | 'DEEP'
   type Consultation = { id: string; tier: ConsultTier; title: string; description: string; minutes: number; price: number }
   const [consultations, setConsultations] = useState<Consultation[]>([])
-  const [consForm, setConsForm] = useState<{ tier: ConsultTier; title: string; description: string; minutes: number; price: number }>({
-    tier: 'STANDARD', title: '', description: '', minutes: 60, price: 80,
+  // The QUICK/STANDARD/DEEP tier is a backend enum — never surfaced to the
+  // expert. It's derived from the chosen minutes at submit time so the saved
+  // data shape stays valid while the UI only ever shows title/minutes/price.
+  const tierFromMinutes = (m: number): ConsultTier => (m <= 20 ? 'QUICK' : m <= 45 ? 'STANDARD' : 'DEEP')
+  const [consForm, setConsForm] = useState<{ title: string; description: string; minutes: number; price: number }>({
+    title: '', description: '', minutes: 60, price: 80,
   })
   const [consBusy, setConsBusy] = useState(false)
   const [consErr, setConsErr] = useState<string | null>(null)
+  // Inline edit of a single existing service row. `consEdit` holds the id +
+  // prefilled fields of the row being edited (null = none). Same fields as the
+  // add-form; tier is derived server-side on PATCH so we never surface it.
+  const [consEdit, setConsEdit] = useState<{ id: string; title: string; description: string; minutes: number; price: number } | null>(null)
+  const [consEditBusy, setConsEditBusy] = useState(false)
+  const [consEditErr, setConsEditErr] = useState<string | null>(null)
 
   // Unified confirm state for EVERY destructive action on this page —
   // certificate / education / experience / consultation-service rows and the
@@ -179,16 +205,20 @@ export default function TutorProfilePage() {
 
   const loadCredentials = async () => {
     try {
-      const [c, e, x, co] = await Promise.all([
+      const [c, e, x, co, av] = await Promise.all([
         fetch('/api/me/tutor/certificates').then(r => r.json()),
         fetch('/api/me/tutor/education').then(r => r.json()),
         fetch('/api/me/tutor/experience').then(r => r.json()),
         fetch('/api/tutor/consultations').then(r => r.json()),
+        // Future free-slot count for the completeness checklist. Best-effort:
+        // the availability GET returns { upcomingFreeCount }; default 0 on fail.
+        fetch('/api/tutor/availability').then(r => r.ok ? r.json() : null).catch(() => null),
       ])
       setCertificates(c?.items ?? [])
       setEducation(e?.items ?? [])
       setExperience(x?.items ?? [])
       setConsultations(co?.items ?? [])
+      setSlotCount(Number(av?.upcomingFreeCount ?? 0))
     } catch {}
   }
 
@@ -199,12 +229,12 @@ export default function TutorProfilePage() {
       const res = await fetch('/api/tutor/consultations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(consForm),
+        body: JSON.stringify({ ...consForm, tier: tierFromMinutes(consForm.minutes) }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) { setConsErr('ვერ დაემატა'); return }
       setConsultations(prev => [...prev, j.item])
-      setConsForm({ tier: 'STANDARD', title: '', description: '', minutes: 60, price: 80 })
+      setConsForm({ title: '', description: '', minutes: 60, price: 80 })
       toast('სერვისი დაემატა', 'success')
     } catch { setConsErr('ქსელის შეცდომა') }
     finally { setConsBusy(false) }
@@ -214,16 +244,44 @@ export default function TutorProfilePage() {
     setPendingDelete({ kind: 'cons', id })
   }
 
+  const startEditConsultation = (c: Consultation) => {
+    setConsEditErr(null)
+    setConsEdit({ id: c.id, title: c.title, description: c.description, minutes: c.minutes, price: c.price })
+  }
+  const cancelEditConsultation = () => { setConsEdit(null); setConsEditErr(null) }
+  const saveConsultation = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!consEdit) return
+    const { id, ...body } = consEdit
+    setConsEditBusy(true); setConsEditErr(null)
+    try {
+      const res = await fetch(`/api/tutor/consultations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.ok) { setConsEditErr('ვერ შეინახა'); return }
+      setConsultations(prev => prev.map(c => (c.id === id ? j.item : c)))
+      setConsEdit(null)
+      toast('სერვისი განახლდა', 'success')
+    } catch { setConsEditErr('ქსელის შეცდომა') }
+    finally { setConsEditBusy(false) }
+  }
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const [meRes, tRes] = await Promise.all([
+        const [meRes, tRes, catRes] = await Promise.all([
           fetch('/api/me').then(r => r.json()),
           fetch('/api/me/tutor').then(r => r.json()),
+          fetch('/api/categories').then(r => r.json()).catch(() => []),
         ])
         if (cancelled) return
         setMe(meRes?.user ?? null)
+        setFullNameInput(meRes?.user?.fullName ?? '')
+        setCategories(Array.isArray(catRes) ? catRes : (catRes?.items ?? []))
         const p = tRes?.profile ?? null
         setProfile(p)
         if (p) {
@@ -233,9 +291,13 @@ export default function TutorProfilePage() {
             specialty: p.specialty ?? '',
             yearsExp: p.yearsExp ?? 0,
             hourlyRate: p.price ?? 0,
-            languages: p.languages ?? [],
+            // Legacy rows (and pre-fix approvals) hold Georgian NAMES instead of
+            // codes — normalizing on load lights up the right chips instead of
+            // none, and stops a re-pick from saving both spellings side by side.
+            languages: normalizeLangs(p.languages),
             linkedinUrl: p.linkedinUrl ?? '',
             websiteUrl: p.websiteUrl ?? '',
+            categoryId: p.categoryId ?? '',
           }
           setForm(initial)
           setSavedForm(initial)
@@ -266,6 +328,7 @@ export default function TutorProfilePage() {
           languages: form.languages,
           linkedinUrl: form.linkedinUrl,
           websiteUrl: form.websiteUrl,
+          categoryId: form.categoryId || null,
         }),
       })
       const j = await res.json()
@@ -292,7 +355,7 @@ export default function TutorProfilePage() {
         setMe(prev => prev ? { ...prev, avatarUrl: j.url } : prev)
         toast('ავატარი განახლდა', 'success')
       } else {
-        toast(j.error === 'TOO_LARGE' ? 'ფაილი ძალიან დიდია (მაქს. 500KB)' : 'ატვირთვა ვერ მოხერხდა', 'error')
+        toast(j.error === 'TOO_LARGE' ? 'ფაილი ძალიან დიდია (მაქს. 8MB)' : 'ატვირთვა ვერ მოხერხდა', 'error')
       }
     } catch {
       toast('ქსელის შეცდომა — სცადე თავიდან', 'error')
@@ -355,11 +418,45 @@ export default function TutorProfilePage() {
     } catch { return null }
   })()
 
+  // Save the account display name to /api/me (min 2 chars). Distinct from the
+  // tutor-profile PATCH — this is how students see the expert's name.
+  const saveName = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const name = fullNameInput.trim()
+    if (name.length < 2) {
+      toast('სახელი ძალიან მოკლეა', 'error')
+      return
+    }
+    setSavingName(true)
+    try {
+      const res = await fetch('/api/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullName: name }),
+      })
+      const j = await res.json().catch(() => ({} as any))
+      if (!res.ok || !j.ok) {
+        toast('შენახვა ვერ მოხერხდა', 'error')
+        return
+      }
+      setMe(prev => prev ? { ...prev, fullName: name } : prev)
+      setFullNameInput(name)
+      toast('სახელი შენახულია', 'success')
+    } catch {
+      toast('ქსელის შეცდომა — სცადე თავიდან', 'error')
+    } finally {
+      setSavingName(false)
+    }
+  }
+
   const changePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setPwdMsg(null)
-    if (pwd.next.length < 6) {
-      setPwdMsg({ ok: false, text: 'პაროლი უნდა იყოს მინიმუმ 6 სიმბოლო' })
+    // Min 8 — the SAME policy /api/me/password enforces (and signup/reset). The
+    // client used to allow 6, so a 7-char password was rejected server-side with
+    // a generic error the expert couldn't act on.
+    if (pwd.next.length < PWD_MIN) {
+      setPwdMsg({ ok: false, text: PWD_MIN_MSG })
       return
     }
     if (pwd.next !== pwd.confirm) {
@@ -375,7 +472,9 @@ export default function TutorProfilePage() {
       })
       const j = await res.json()
       if (!j.ok) {
-        setPwdMsg({ ok: false, text: j.error === 'BAD_CURRENT' ? 'მიმდინარე პაროლი არასწორია' : 'პაროლის შეცვლა ვერ მოხერხდა' })
+        // INVALID = the body failed the server's schema, which in practice only
+        // ever means „too short" here — surface the real rule, not a shrug.
+        setPwdMsg({ ok: false, text: j.error === 'BAD_CURRENT' ? 'მიმდინარე პაროლი არასწორია' : j.error === 'INVALID' ? PWD_MIN_MSG : 'პაროლის შეცვლა ვერ მოხერხდა' })
       } else {
         // Success feedback is a toast everywhere on this page — inline slots
         // stay reserved for field-level errors.
@@ -500,11 +599,11 @@ export default function TutorProfilePage() {
   // stays declarative. `path` is only set for the /api/me/tutor/* entities;
   // cons/video have their own endpoints handled in confirmDelete.
   const DELETE_META: Record<PendingDelete['kind'], { path?: string; title: string; body: string }> = {
-    cert:  { path: 'certificates', title: 'სერტიფიკატის წაშლა?', body: 'ეს მოქმედება შეუქცევადია.' },
-    edu:   { path: 'education',    title: 'განათლების ჩანაწერის წაშლა?', body: 'ეს მოქმედება შეუქცევადია.' },
-    exp:   { path: 'experience',   title: 'გამოცდილების წაშლა?', body: 'ეს მოქმედება შეუქცევადია.' },
-    cons:  { title: 'სერვისის წაშლა?', body: 'კლიენტები ამ ტიპს ვეღარ დაჯავშნიან. აქტიური ჯავშნები არ იშლება.' },
-    video: { title: 'ინტრო ვიდეოს წაშლა?', body: 'პროფილიდან მოიხსნება — ახლის დამატება ნებისმიერ დროს შეგიძლია.' },
+    cert:  { path: 'certificates', title: 'სერტიფიკატის წაშლა?', body: 'შეუქცევადია.' },
+    edu:   { path: 'education',    title: 'განათლების წაშლა?', body: 'შეუქცევადია.' },
+    exp:   { path: 'experience',   title: 'გამოცდილების წაშლა?', body: 'შეუქცევადია.' },
+    cons:  { title: 'სერვისის წაშლა?', body: 'ამ ტიპს ვეღარ დაჯავშნიან. ჯავშნები არ იშლება.' },
+    video: { title: 'ინტრო ვიდეოს წაშლა?', body: 'პროფილიდან მოიხსნება.' },
   }
 
   const confirmDelete = async () => {
@@ -552,16 +651,16 @@ export default function TutorProfilePage() {
         <PageHeader
           className="mb-6"
           title="პროფილი"
-          sub="როგორ ხედავენ კლიენტები შენს პროფილს"
+          sub="როგორ გხედავენ სტუდენტები"
           actions={profile && (
             <a
-              href={`/tutors/${profile.id}`}
+              href={`/tutors/${profile.id}?preview=1`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               <Icon.external className="w-3.5 h-3.5" />
-              იხილე პროფილი როგორც კლიენტი
+              ნახე შენი პროფილი
             </a>
           )}
         />
@@ -590,6 +689,7 @@ export default function TutorProfilePage() {
                     education={education.length}
                     experience={experience.length}
                     avatarUrl={me?.avatarUrl ?? null}
+                    slotCount={slotCount}
                     variant="compact"
                     alwaysShow
                   />
@@ -597,7 +697,7 @@ export default function TutorProfilePage() {
               )}
 
               <div className="flex border-b border-ink-200 mb-6 overflow-x-auto scrollbar-hide rail-fade-end" role="tablist" aria-label="პროფილის სექციები">
-                {['საჯარო პროფილი', 'სერვისები და კვალიფიკაცია', 'ანგარიში'].map((label, i) => {
+                {['პროფილი', 'სესიები', 'კვალიფიკაცია', 'ანგარიში'].map((label, i) => {
                   const on = activeTab === i
                   return (
                     <button
@@ -617,9 +717,21 @@ export default function TutorProfilePage() {
                 })}
               </div>
 
+              {/* One-line orientation for the active tab — each tab is now a
+                  single clear theme, so a plain-Georgian sub tells the expert
+                  what belongs here. */}
+              <p className="-mt-3 mb-6 text-[12.5px] text-ink-500 leading-snug">
+                {[
+                  'ვინ ხარ — ფოტო, სათაური, ბიო.',
+                  'რას სთავაზობ — ფასი, ხანგრძლივობა და თავისუფალი დრო.',
+                  'სერტიფიკატები, განათლება და გამოცდილება — არასავალდებულო, მაგრამ ნდობას მატებს.',
+                  'ხილვადობა და პარამეტრები.',
+                ][activeTab]}
+              </p>
+
               <div className="space-y-10">
 
-            {/* ——— Group 1: საჯარო პროფილი ——— */}
+            {/* ——— Tab 0: პროფილი ——— */}
             <TabPanel active={activeTab === 0}>
 
             {/* Avatar block — hover overlay pattern, keyboard-focusable button.
@@ -658,6 +770,7 @@ export default function TutorProfilePage() {
                   <div className="font-display text-[15px] font-bold text-ink-900">{me?.fullName}</div>
                   <div className="text-[12.5px] text-ink-500 truncate">{me?.email}</div>
                   <div className="mt-1 text-[11px] text-ink-500">ავატარი მაქს. 500KB · JPG/PNG/WEBP/GIF</div>
+                  <div className="mt-1 text-[11px] text-ink-500 leading-[1.5]">სუფთა ფონი, კარგი განათება, სახე ცენტრში და ნათლად ჩანდეს — პროფესიული სურათი ნდობას ზრდის.</div>
                 </div>
                 <input
                   ref={fileRef}
@@ -676,16 +789,41 @@ export default function TutorProfilePage() {
                     („შეუნახავი ცვლილებები / შენახულია ✓“). */}
                 <Eyebrow className="mb-2">საჯარო პროფილი</Eyebrow>
 
-                <Field label="სათაური (headline)">
+                <Field label="სათაური">
                   <input type="text" required maxLength={200}
                          value={form.headline} onChange={e => setForm({ ...form, headline: e.target.value })}
                          className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                  <p className="mt-1.5 text-[11px] text-ink-500 leading-snug">პირველი ფრაზა, რასაც სტუდენტი ხედავს.</p>
                 </Field>
 
                 <Field label="სპეციალობა">
                   <input type="text" required maxLength={200}
                          value={form.specialty} onChange={e => setForm({ ...form, specialty: e.target.value })}
                          className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                  <p className="mt-1.5 text-[11px] text-ink-500 leading-snug">მაგ. ფინანსური კონსულტანტი, ფსიქოლოგი, იურისტი.</p>
+                </Field>
+
+                {/* Category — REQUIRED for public discovery. Without a live category
+                    the browse query hides the expert entirely, so surface a quiet
+                    inline warning while it's unset. Saved via the shared saveProfile
+                    PATCH (categoryId is part of `form`). */}
+                <Field label="კატეგორია">
+                  <select
+                    value={form.categoryId}
+                    onChange={e => setForm({ ...form, categoryId: e.target.value })}
+                    className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none"
+                  >
+                    <option value="">აირჩიე კატეგორია</option>
+                    {categories.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  {!form.categoryId && (
+                    <p className="mt-1.5 flex items-start gap-1.5 text-[11.5px] text-warning-700 leading-snug">
+                      <Icon.warn className="w-3.5 h-3.5 shrink-0 mt-px" />
+                      <span>მის გარეშე პროფილი ვერ გამოჩნდება.</span>
+                    </p>
+                  )}
                 </Field>
 
                 <Field label="ბიოგრაფია">
@@ -704,7 +842,7 @@ export default function TutorProfilePage() {
                     <input type="number" min={1} max={10000} required
                            value={form.hourlyRate} onChange={e => setForm({ ...form, hourlyRate: Number(e.target.value) })}
                            className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none tabular-nums" />
-                    <p className="mt-1.5 text-[11px] text-ink-500 leading-snug">ფიქსირებული ფასი ერთ სესიაზე (არა საათში). თუ ქვემოთ „კონსულტაციის ტიპებს“ დაამატებ, კლიენტი კონკრეტულ ტიპსა და მის ფასს ირჩევს — თუ არა, მოქმედებს ეს ფასი. ცვლილება მხოლოდ ახალ ჯავშანზე მოქმედებს.</p>
+                    <p className="mt-1.5 text-[11px] text-ink-500 leading-snug">ნაგულისხმევი ფასი — ტიპების დამატებისას ჩანაცვლდება.</p>
                   </Field>
                 </div>
 
@@ -741,7 +879,7 @@ export default function TutorProfilePage() {
                     disabled "შენახულია ✓" doubles as saved-state confirmation. */}
                 <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-4 rounded-b-card border-t border-ink-100 bg-white flex items-center justify-between gap-3">
                   <span className={`text-[12px] font-display font-semibold ${dirty ? 'text-warning-700' : 'text-ink-400'}`} aria-live="polite">
-                    {savingProfile ? 'ინახება…' : dirty ? 'გაქვს შეუნახავი ცვლილებები' : 'ყველა ცვლილება შენახულია'}
+                    {savingProfile ? 'ინახება…' : dirty ? 'შეუნახავი ცვლილებები' : 'ყველაფერი შენახულია'}
                   </span>
                   <Btn variant="primary" size="md" type="submit" disabled={savingProfile || !dirty}>
                     {savingProfile ? 'ინახება…' : dirty ? 'შეინახე ცვლილებები' : 'შენახულია ✓'}
@@ -752,7 +890,7 @@ export default function TutorProfilePage() {
               <div className="p-6 rounded-card border border-warning-200 bg-warning-50 text-warning-800 text-[13px] flex items-start gap-3">
                 <Icon.warn className="w-5 h-5 shrink-0 mt-0.5" />
                 <div>
-                  ჯერ არ გაქვს ექსპერტის პროფილი. გაიარე განაცხადის პროცედურა და დაელოდე დადასტურებას.
+                  ჯერ არ გაქვს ექსპერტის პროფილი — შეავსე განაცხადი.
                 </div>
               </div>
             )}
@@ -763,7 +901,7 @@ export default function TutorProfilePage() {
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <Eyebrow tone="muted" className="mb-1">ინტრო ვიდეო · YouTube</Eyebrow>
-                    <p className="text-[12px] text-ink-500 leading-snug max-w-[520px]">60-90 წამი შენს შესახებ. ჩანს პროფილის ბანერზე. კონვერსიას 2-3x-ს ზრდის. ატვირთე YouTube-ზე და ჩააგდე აქ ბმული.</p>
+                    <p className="text-[12px] text-ink-500 leading-snug max-w-[520px]">60–90 წამი შენ შესახებ. ჩანს პროფილის ბანერზე.</p>
                   </div>
                   {profile.videoUrl && !videoSaving && (
                     <button type="button" onClick={removeIntroVideo} aria-label="ინტრო ვიდეოს წაშლა" className="min-h-[44px] -my-2 px-3 -mr-3 inline-flex items-center rounded-btn font-display text-[11.5px] font-semibold text-ink-500 hover:text-danger-700 hover:bg-danger-50 transition-colors">წაშლა</button>
@@ -788,12 +926,12 @@ export default function TutorProfilePage() {
                   // remove-and-replace flow will null it out on next save.
                   <div className="space-y-2">
                     <video src={profile.videoUrl} controls className="w-full max-h-[300px] rounded-card bg-black" />
-                    <p className="text-[11.5px] text-warning-700">ეს ვიდეო ძველი ატვირთვის სისტემიდანაა. სცადე ჩააგდო YouTube ბმული ქვემოთ — უფრო სწრაფად ჩაიტვირთება კლიენტებთან.</p>
+                    <p className="text-[11.5px] text-warning-700">ძველი ატვირთვა — ჩააგდე YouTube ბმული ქვემოთ.</p>
                   </div>
                 ) : (
                   <div className="p-4 rounded-card border border-dashed border-ink-300 bg-ink-50/40 text-center">
-                    <div className="font-display text-[13px] font-semibold text-ink-700 mb-1">ჯერ არ აქვს ინტრო ვიდეო</div>
-                    <p className="text-[12px] text-ink-500 max-w-[400px] mx-auto">რეკომენდებული სტრუქტურა: „ვინ ვარ · რას ვაკეთებ · რომელ პრობლემას ვხსნი“.</p>
+                    <div className="font-display text-[13px] font-semibold text-ink-700 mb-1">ინტრო ვიდეო არ არის</div>
+                    <p className="text-[12px] text-ink-500 max-w-[400px] mx-auto">ვინ ვარ · რას ვაკეთებ · რომელ პრობლემას ვხსნი.</p>
                   </div>
                 )}
 
@@ -812,7 +950,7 @@ export default function TutorProfilePage() {
                       {videoSaving ? 'ინახება…' : profile.videoUrl ? 'ჩანაცვლება' : 'შენახვა'}
                     </Btn>
                   </div>
-                  <span className="text-[11px] text-ink-500">ატვირთე YouTube-ზე (public ან unlisted) და ჩააგდე ბმული. Shorts-ის ბმულიც მუშაობს.</span>
+                  <span className="text-[11px] text-ink-500">YouTube-ის ბმული (Shorts-იც მუშაობს).</span>
                 </div>
 
                 {videoErr && <div className="p-2.5 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[12.5px]">{videoErr}</div>}
@@ -821,7 +959,7 @@ export default function TutorProfilePage() {
 
             </TabPanel>
 
-            {/* ——— Group 2: სერვისები და ფასი ——— */}
+            {/* ——— Tab 1: სესიები (availability + consultation types) ——— */}
             {profile && (
             <TabPanel active={activeTab === 1}>
 
@@ -830,6 +968,7 @@ export default function TutorProfilePage() {
               <div id="section-availability" className="scroll-mt-24">
                 <ServiceTypeAndAvailability
                   profile={profile}
+                  servicesCount={consultations.length}
                   onSaved={(next) => setProfile(next as any)}
                 />
               </div>
@@ -841,7 +980,7 @@ export default function TutorProfilePage() {
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <Eyebrow tone="muted" className="mb-1">კონსულტაციის ტიპები</Eyebrow>
-                    <p className="text-[12px] text-ink-500 leading-snug max-w-[520px]">გამოაქვეყნე რამდენიმე პროდუქტი — QUICK (15 წთ), STANDARD (60 წთ), DEEP (90 წთ). გამოჩნდება „სერვისები“-ს განყოფილებაში შენს პროფილზე.</p>
+                    <p className="text-[12px] text-ink-500 leading-snug max-w-[520px]">თითოეულს თავისი ხანგრძლივობა და ფასი — ჩაანაცვლებს ნაგულისხმევს.</p>
                   </div>
                 </div>
 
@@ -850,58 +989,85 @@ export default function TutorProfilePage() {
                     <div className="text-[12.5px] text-ink-500">ჯერ არაფერი დამატებულა.</div>
                   ) : (
                     consultations.map(c => (
+                      consEdit?.id === c.id ? (
+                        <form key={c.id} onSubmit={saveConsultation} className="p-3 rounded-card border border-brand-200 bg-white space-y-3">
+                          <Field label="სათაური">
+                            <input type="text" required maxLength={80} value={consEdit.title}
+                                   onChange={e => setConsEdit({ ...consEdit, title: e.target.value })}
+                                   placeholder="მაგ. 1-1 კონსულტაცია"
+                                   className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] focus:border-brand-400 focus:outline-none" />
+                          </Field>
+                          <Field label="აღწერა">
+                            <textarea rows={2} required maxLength={400} value={consEdit.description}
+                                      onChange={e => setConsEdit({ ...consEdit, description: e.target.value })}
+                                      placeholder="რას მოიცავს სესია"
+                                      className="w-full px-3 py-2 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-400 focus:outline-none resize-y" />
+                          </Field>
+                          <Field label="ხანგრძლივობა (წუთი)">
+                            <input type="number" required min={5} max={240} value={consEdit.minutes}
+                                   onChange={e => setConsEdit({ ...consEdit, minutes: Number(e.target.value) })}
+                                   className="w-full sm:max-w-[200px] h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums focus:border-brand-400 focus:outline-none" />
+                          </Field>
+                          {/* Same price control as /apply — this editor previously
+                              had no guidance and no earnings preview at all. */}
+                          <PriceField
+                            className="pt-3 border-t border-ink-100"
+                            value={consEdit.price}
+                            onChange={price => setConsEdit({ ...consEdit, price })}
+                            minutes={consEdit.minutes}
+                            required
+                          />
+                          {consEditErr && <div className="p-2.5 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[12.5px]">{consEditErr}</div>}
+                          <div className="flex justify-end gap-2">
+                            <Btn variant="ghost" size="sm" type="button" onClick={cancelEditConsultation} disabled={consEditBusy}>გაუქმება</Btn>
+                            <Btn variant="primary" size="sm" type="submit" disabled={consEditBusy}>
+                              {consEditBusy ? 'ინახება…' : 'შენახვა'}
+                            </Btn>
+                          </div>
+                        </form>
+                      ) : (
                       <div key={c.id} className="flex items-start gap-3 p-3 rounded-card border border-ink-200 bg-ink-50/40">
-                        <span className={`shrink-0 inline-flex items-center h-6 px-2 rounded-pill border font-display text-[10px] font-bold uppercase tracking-[0.14em] ${
-                          c.tier === 'QUICK' ? 'bg-brand-50 border-brand-200 text-brand-700'
-                          : c.tier === 'DEEP' ? 'bg-ink-75 border-ink-200 text-ink-700'
-                          : 'bg-ink-100 border-ink-200 text-ink-700'
-                        }`}>{c.tier}</span>
+                        <span className="shrink-0 inline-flex items-center h-6 px-2 rounded-pill border border-ink-200 bg-ink-75 text-ink-700 font-display text-[10px] font-bold uppercase tracking-[0.12em] tabular-nums">{c.minutes} წთ</span>
                         <div className="flex-1 min-w-0">
                           <div className="font-display text-[13.5px] font-bold text-ink-900 truncate">{c.title}</div>
                           <div className="text-[12px] text-ink-700 leading-snug mt-0.5">{c.description}</div>
-                          <div className="text-[11.5px] text-ink-500 tabular-nums mt-1">{c.minutes} წუთი · ₾{c.price}</div>
+                          <div className="text-[11.5px] text-ink-500 tabular-nums mt-1">₾{c.price}</div>
                         </div>
-                        <button type="button" onClick={() => deleteConsultation(c.id)} aria-label="სერვისის წაშლა" className="min-h-[44px] -my-2 px-3 -mr-2 self-center inline-flex items-center rounded-btn font-display text-[11px] font-semibold text-ink-500 hover:text-danger-700 hover:bg-danger-50 transition-colors">წაშლა</button>
+                        <div className="shrink-0 self-center flex items-center">
+                          <button type="button" onClick={() => startEditConsultation(c)} aria-label="სერვისის რედაქტირება" className="min-h-[44px] -my-2 px-3 inline-flex items-center rounded-btn font-display text-[11px] font-semibold text-ink-500 hover:text-ink-900 hover:bg-ink-100 transition-colors">რედაქტირება</button>
+                          <button type="button" onClick={() => deleteConsultation(c.id)} aria-label="სერვისის წაშლა" className="min-h-[44px] -my-2 px-3 -mr-2 inline-flex items-center rounded-btn font-display text-[11px] font-semibold text-ink-500 hover:text-danger-700 hover:bg-danger-50 transition-colors">წაშლა</button>
+                        </div>
                       </div>
+                      )
                     ))
                   )}
                 </div>
 
                 <form onSubmit={addConsultation} className="pt-3 border-t border-ink-100 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-[100px_1fr] gap-3">
-                    <Field label="ტიპი">
-                      <select value={consForm.tier} onChange={e => setConsForm({ ...consForm, tier: e.target.value as ConsultTier })}
-                              className="w-full h-11 px-2 rounded-field border border-ink-200 bg-white text-[13.5px] focus:border-brand-400 focus:outline-none">
-                        <option value="QUICK">QUICK</option>
-                        <option value="STANDARD">STANDARD</option>
-                        <option value="DEEP">DEEP</option>
-                      </select>
-                    </Field>
-                    <Field label="სათაური">
-                      <input type="text" required maxLength={80} value={consForm.title}
-                             onChange={e => setConsForm({ ...consForm, title: e.target.value })}
-                             placeholder="მაგ. Pitch deck რევიუ"
-                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] focus:border-brand-400 focus:outline-none" />
-                    </Field>
-                  </div>
+                  <Field label="სათაური">
+                    <input type="text" required maxLength={80} value={consForm.title}
+                           onChange={e => setConsForm({ ...consForm, title: e.target.value })}
+                           placeholder="მაგ. 1-1 კონსულტაცია"
+                           className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] focus:border-brand-400 focus:outline-none" />
+                  </Field>
                   <Field label="აღწერა">
                     <textarea rows={2} required maxLength={400} value={consForm.description}
                               onChange={e => setConsForm({ ...consForm, description: e.target.value })}
-                              placeholder="მოკლე აღწერა რას მოიცავს სესია"
+                              placeholder="რას მოიცავს სესია"
                               className="w-full px-3 py-2 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-400 focus:outline-none resize-y" />
                   </Field>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="ხანგრძლივობა (წუთი)">
-                      <input type="number" required min={5} max={240} value={consForm.minutes}
-                             onChange={e => setConsForm({ ...consForm, minutes: Number(e.target.value) })}
-                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums focus:border-brand-400 focus:outline-none" />
-                    </Field>
-                    <Field label="ფასი (₾)">
-                      <input type="number" required min={0} max={10000} value={consForm.price}
-                             onChange={e => setConsForm({ ...consForm, price: Number(e.target.value) })}
-                             className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums focus:border-brand-400 focus:outline-none" />
-                    </Field>
-                  </div>
+                  <Field label="ხანგრძლივობა (წუთი)">
+                    <input type="number" required min={5} max={240} value={consForm.minutes}
+                           onChange={e => setConsForm({ ...consForm, minutes: Number(e.target.value) })}
+                           className="w-full sm:max-w-[200px] h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] tabular-nums focus:border-brand-400 focus:outline-none" />
+                  </Field>
+                  <PriceField
+                    className="pt-3 border-t border-ink-100"
+                    value={consForm.price}
+                    onChange={price => setConsForm({ ...consForm, price })}
+                    minutes={consForm.minutes}
+                    required
+                  />
                   {consErr && <div className="p-2.5 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[12.5px]">{consErr}</div>}
                   <div className="flex justify-end">
                     <Btn variant="primary" size="sm" type="submit" disabled={consBusy}>
@@ -915,11 +1081,11 @@ export default function TutorProfilePage() {
             </TabPanel>
             )}
 
-            {/* ——— კვალიფიკაცია — merged into the „სერვისები და კვალიფიკაცია“
-                tab (activeTab === 1): services + credentials are one intent
-                („what I offer and why I'm qualified“), so 4 tabs collapse to 3. ——— */}
+            {/* ——— Tab 2: კვალიფიკაცია — now its own tab, separate from სესიები:
+                certificates + education + experience. Each tab is one clear
+                theme (was crammed into the old „სერვისები და კვალიფიკაცია“). ——— */}
             {profile && (
-            <TabPanel active={activeTab === 1}>
+            <TabPanel active={activeTab === 2}>
 
             {/* Certificates */}
             {profile && (
@@ -956,13 +1122,13 @@ export default function TutorProfilePage() {
                     <Field label="სახელი">
                       <input type="text" required maxLength={200} value={certForm.title}
                              onChange={e => setCertForm({ ...certForm, title: e.target.value })}
-                             placeholder="მაგ. CFA Level III"
+                             placeholder="მაგ. სერტიფიკატის სახელი"
                              className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <Field label="გამცემი">
                       <input type="text" required maxLength={200} value={certForm.issuer}
                              onChange={e => setCertForm({ ...certForm, issuer: e.target.value })}
-                             placeholder="CFA Institute"
+                             placeholder="მაგ. გამცემი ორგანიზაცია"
                              className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <Field label="წელი">
@@ -1036,13 +1202,13 @@ export default function TutorProfilePage() {
                     <Field label="ხარისხი">
                       <input type="text" required maxLength={200} value={eduForm.degree}
                              onChange={e => setEduForm({ ...eduForm, degree: e.target.value })}
-                             placeholder="MBA / ბაკალავრი / მაგისტრი"
+                             placeholder="მაგ. ბაკალავრი / მაგისტრი"
                              className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <Field label="დარგი (არასავალდებულო)">
                       <input type="text" maxLength={200} value={eduForm.field}
                              onChange={e => setEduForm({ ...eduForm, field: e.target.value })}
-                             placeholder="Business Administration"
+                             placeholder="მაგ. დარგი"
                              className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <div className="grid grid-cols-2 gap-3">
@@ -1098,13 +1264,13 @@ export default function TutorProfilePage() {
                     <Field label="კომპანია">
                       <input type="text" required maxLength={200} value={expForm.company}
                              onChange={e => setExpForm({ ...expForm, company: e.target.value })}
-                             placeholder="McKinsey & Company"
+                             placeholder="მაგ. კომპანია"
                              className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <Field label="პოზიცია">
                       <input type="text" required maxLength={200} value={expForm.role}
                              onChange={e => setExpForm({ ...expForm, role: e.target.value })}
-                             placeholder="Senior Associate"
+                             placeholder="მაგ. პოზიცია"
                              className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-400 focus:outline-none" />
                     </Field>
                     <div className="grid grid-cols-2 gap-3">
@@ -1140,8 +1306,28 @@ export default function TutorProfilePage() {
             </TabPanel>
             )}
 
-            {/* ——— Group 3: ანგარიში ——— */}
-            <TabPanel active={activeTab === 2}>
+            {/* ——— Tab 3: ანგარიში (visibility + response-time + password) ——— */}
+            <TabPanel active={activeTab === 3}>
+
+            {/* Display name — the account name (user.fullName), saved to /api/me
+                (a DIFFERENT endpoint from the tutor-profile PATCH). Most
+                fundamental account field, so it sits at the top of the tab. */}
+            <form onSubmit={saveName} className="p-6 rounded-card border border-ink-200 bg-white space-y-4">
+              <Eyebrow tone="muted" className="mb-2">სახელი</Eyebrow>
+
+              <Field label="სახელი და გვარი">
+                <input type="text" required minLength={2} maxLength={80}
+                       value={fullNameInput} onChange={e => setFullNameInput(e.target.value)}
+                       className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                <p className="mt-1.5 text-[11px] text-ink-500 leading-snug">შენი სახელი — ასე გამოჩნდები სტუდენტებთან.</p>
+              </Field>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-ink-100">
+                <Btn variant="primary" size="md" type="submit" disabled={savingName || fullNameInput.trim().length < 2}>
+                  {savingName ? 'ინახება…' : 'შენახვა'}
+                </Btn>
+              </div>
+            </form>
 
             {/* Public visibility — pause self-listing without touching bookings */}
             {profile && (
@@ -1154,8 +1340,8 @@ export default function TutorProfilePage() {
                     </div>
                     <p className="text-[12px] text-ink-500 mt-1 leading-snug max-w-[480px]">
                       {profile.available === false
-                        ? 'ძებნაში აღარ ჩანხარ. უკვე დაჯავშნილი სესიები აქტიური რჩება — კლიენტს ხედავს, დაწერს, შედის ვიდეო-ოთახში. ახლიდან ვერავინ დაგიჯავშნის.'
-                        : 'შენ ჩანხარ ძებნის სიაში. გამორთე თუ დროებით შესვენება გინდა (მაგ. შვებულება, დიდი დატვირთვა) — არსებული ჯავშნები არ დაზარალდება.'}
+                        ? 'ძებნაში აღარ ჩანხარ. არსებული ჯავშნები აქტიურია; ახლიდან ვერავინ დაგიჯავშნის.'
+                        : 'ჩანხარ ძებნის სიაში. გამორთე დროებითი შესვენებისთვის — ჯავშნები არ დაზარალდება.'}
                     </p>
                   </div>
                   <button type="button"
@@ -1194,8 +1380,8 @@ export default function TutorProfilePage() {
               <section id="section-response-time" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-3">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="min-w-0">
-                    <Eyebrow tone="muted" className="mb-1">პასუხის დროის ვალდებულება</Eyebrow>
-                    <p className="text-[12px] text-ink-500 leading-snug max-w-[480px]">რამდენ საათში ვპასუხობ ჯავშნის მოთხოვნას. ეს ნიშანი ჩანს ჩემი პროფილის გვერდზე და ძებნის სიაში — სანდოობის სიგნალი კლიენტისთვის ჯავშნის წინ.</p>
+                    <Eyebrow tone="muted" className="mb-1">პასუხის დრო</Eyebrow>
+                    <p className="text-[12px] text-ink-500 leading-snug max-w-[480px]">რამდენ ხანში პასუხობ მოთხოვნას. ჩანს პროფილსა და ძებნაში.</p>
                   </div>
                   <div className="inline-flex rounded-btn border border-ink-200 overflow-hidden shrink-0">
                     {RESPONSE_HOUR_OPTIONS.map(opt => {
@@ -1248,12 +1434,13 @@ export default function TutorProfilePage() {
               </Field>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="ახალი პაროლი">
-                  <input type="password" required minLength={6}
+                  <input type="password" required minLength={PWD_MIN}
                          value={pwd.next} onChange={e => setPwd({ ...pwd, next: e.target.value })}
                          className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] focus:border-brand-400 focus:outline-none" />
+                  <p className="mt-1.5 text-[11.5px] text-ink-500">მინიმუმ 8 სიმბოლო</p>
                 </Field>
                 <Field label="დაადასტურე ახალი პაროლი">
-                  <input type="password" required minLength={6}
+                  <input type="password" required minLength={PWD_MIN}
                          value={pwd.confirm} onChange={e => setPwd({ ...pwd, confirm: e.target.value })}
                          className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] focus:border-brand-400 focus:outline-none" />
                 </Field>
@@ -1273,6 +1460,18 @@ export default function TutorProfilePage() {
             </form>
             </TabPanel>
 
+              {/* Bottom step navigation — walk the tabs like a wizard
+                  (fill → შემდეგი), not only via the top tab bar. Scrolls to the
+                  top of the new tab so you always land at its start. */}
+              <div className="flex items-center justify-between gap-3 pt-5 mt-2 border-t border-ink-100">
+                {activeTab > 0
+                  ? <Btn variant="secondary" size="md" onClick={() => { setActiveTab(activeTab - 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>უკან</Btn>
+                  : <span />}
+                {activeTab < 3
+                  ? <Btn variant="primary" size="md" onClick={() => { setActiveTab(activeTab + 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>შემდეგი</Btn>
+                  : (profile && <a href={`/tutors/${profile.id}?preview=1`} target="_blank" rel="noopener noreferrer" className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] inline-flex items-center gap-2 transition-colors"><Icon.external className="w-4 h-4" /> ნახე შენი პროფილი</a>)}
+              </div>
+
               </div>
             </div>
 
@@ -1285,6 +1484,7 @@ export default function TutorProfilePage() {
                   education={education.length}
                   experience={experience.length}
                   avatarUrl={me?.avatarUrl ?? null}
+                  slotCount={slotCount}
                   variant="card"
                   alwaysShow
                 />
@@ -1353,12 +1553,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function ServiceTypeAndAvailability({
   profile,
+  servicesCount,
   onSaved,
 }: {
   profile: NonNullable<TutorProfile>
+  servicesCount: number
   onSaved: (next: NonNullable<TutorProfile>) => void
 }) {
   const [duration, setDuration] = useState<number>(profile.consultationDurationMin ?? 30)
+  const [buffer, setBuffer] = useState<number>(profile.bufferMin ?? 0)
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
 
@@ -1375,6 +1578,7 @@ function ServiceTypeAndAvailability({
       if (j.ok) {
         onSaved(j.profile)
         setDuration(j.profile.consultationDurationMin ?? 30)
+        setBuffer(j.profile.bufferMin ?? 0)
         setFlash('შენახულია')
         setTimeout(() => setFlash(null), 2500)
       } else {
@@ -1390,9 +1594,17 @@ function ServiceTypeAndAvailability({
   return (
     <section className="p-6 rounded-card border border-ink-200 bg-white space-y-5">
       <div className="flex items-center justify-between">
-        <div>
-          <Eyebrow tone="muted">კონსულტაციის ხანგრძლივობა</Eyebrow>
-          <p className="text-[12.5px] text-ink-500 mt-1">ერთი სტანდარტული სესიის ხანგრძლივობა. ხელმისაწვდომი დროებს კალენდარში აქვეყნებ.</p>
+        <div className="min-w-0">
+          <Eyebrow tone="muted">ნაგულისხმევი ხანგრძლივობა</Eyebrow>
+          {/* This length is a DEFAULT, not a calendar grid: the schedule holds
+              free WINDOWS and bookable starts are derived from the service the
+              client picks (see lib/availability.ts). The old copy — and the old
+              behavior — implied it chopped the calendar into fixed pieces. */}
+          <p className="text-[12.5px] text-ink-500 mt-1 max-w-[520px] leading-snug">
+            {servicesCount > 0
+              ? 'ტიპები თავად განსაზღვრავს ხანგრძლივობასა და ფასს. ეს ნაგულისხმევი მხოლოდ მათ გარეშე მოქმედებს.'
+              : 'ერთი სესიის ნაგულისხმევი ხანგრძლივობა. ტიპების დამატებისას აღარ იმოქმედებს.'}
+          </p>
         </div>
         {flash && <span className="text-[12px] font-display font-semibold text-success-700">{flash}</span>}
       </div>
@@ -1410,10 +1622,34 @@ function ServiceTypeAndAvailability({
             </button>
           ))}
         </div>
+        <p className="text-[12px] text-ink-500 mt-2 max-w-[520px] leading-snug">
+          გრაფიკს არ ჭრის — შენ თავისუფალ შუალედებს აქვეყნებ, დაწყების დროები კი კლიენტის არჩეული სერვისის ხანგრძლივობით გამოითვლება.
+        </p>
+      </div>
+
+      {/* Buffer — a gap RESERVED around every booked session, so back-to-back
+          bookings become impossible. 0 = today's behavior (back-to-back allowed). */}
+      <div className="pt-5 border-t border-ink-100">
+        <Eyebrow tone="muted">შესვენება სესიებს შორის</Eyebrow>
+        <p className="text-[12.5px] text-ink-500 mt-1 mb-3 max-w-[520px] leading-snug">
+          ყოველი დაჯავშნილი სესიის წინ და შემდეგ დაცული ინტერვალი — ზედიზედ ჯავშნები ვეღარ დაგიდგება.
+        </p>
+        <div className="inline-flex rounded-btn border border-ink-200 overflow-hidden">
+          {[0, 5, 10, 15, 30].map(b => (
+            <button key={b} type="button"
+              onClick={() => save({ bufferMin: b })}
+              disabled={busy}
+              className={`h-11 px-4 font-display text-[13px] font-semibold transition-colors ${
+                buffer === b ? 'bg-brand-500 text-white' : 'text-ink-700 hover:bg-ink-50'
+              }`}>
+              {b === 0 ? 'გარეშე' : `${b} წთ`}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="pt-4 border-t border-ink-100 text-[12.5px] text-ink-500 leading-[1.5]">
-        კვირის კალენდარი და თავისუფალი დროები იმართება <a href="/tutor/schedule" className="font-display font-semibold text-brand-700 hover:text-brand-800">გრაფიკის</a> გვერდიდან.
+        თავისუფალი შუალედები იმართება <a href="/tutor/schedule" className="font-display font-semibold text-brand-700 hover:text-brand-800">გრაფიკის</a> გვერდზე.
       </div>
     </section>
   )

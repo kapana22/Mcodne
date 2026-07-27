@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { CANCEL_CUTOFF_HOURS, COMMISSION_PCT } from '@/lib/flags'
+import { CANCEL_CUTOFF_HOURS, COMMISSION_PCT, PAYMENTS_LIVE } from '@/lib/flags'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
 import { Container } from '@/components/Container'
 import { Footer } from '@/components/Footer'
 import { Eyebrow } from '@/components/Eyebrow'
+import { LEGAL_EMAIL } from '@/lib/supportEmails'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -24,7 +25,7 @@ const SECTIONS = [
     id: 'introduction',
     title: '1. ზოგადი დებულებები',
     body: [
-      'მცოდნე (შემდგომ — „პლატფორმა“) არის ონლაინ საკონსულტაციო სივრცე, რომელიც აკავშირებს მომხმარებლებს გადამოწმებულ ექსპერტებთან. პლატფორმაზე რეგისტრაციით ან მისი გამოყენებით შენ თანხმდები წინამდებარე პირობებზე.',
+      'მცოდნე (შემდგომ — „პლატფორმა“) არის ონლაინ საკონსულტაციო სივრცე, რომელიც აკავშირებს მომხმარებლებს ხელით შერჩეულ ექსპერტებთან. პლატფორმაზე რეგისტრაციით ან მისი გამოყენებით შენ თანხმდები წინამდებარე პირობებზე.',
       'თუ არ ეთანხმები რომელიმე პუნქტს, გთხოვ, არ გამოიყენო პლატფორმა. ცვლილებების შემთხვევაში წინასწარ გაცნობებთ ელფოსტით ან საიტზე გამოქვეყნებით.',
     ],
   },
@@ -51,7 +52,14 @@ const SECTIONS = [
       // Payments are not live yet (PAYMENTS_LIVE=false) — the escrow model is
       // stated as the model that WILL apply once online payments launch.
       'ონლაინ გადახდები პლატფორმაზე ჯერ არ არის ამოქმედებული — ამჟამად სესიის დაჯავშნა უფასოა. ონლაინ გადახდების ამოქმედების შემდეგ გადახდა განხორციელდება წინასწარ, სესიის დაჯავშნისას: თანხა დაცულ ანგარიშზე შეინახება და ექსპერტს გადაერიცხება მხოლოდ სესიის წარმატებით დასრულების შემდეგ.',
-      `ფასიანი სესიებიდან პლატფორმა დაიტოვებს კომისიას — ${COMMISSION_PCT}%-ს ექსპერტის შემოსავლიდან. ეს კომისია მოიცავს ტექნიკურ ინფრასტრუქტურას, გადახდის დამუშავებას და მხარდაჭერას.`,
+      // The commission clause STAYS (it is a legal obligation) — only its
+      // applicability is made accurate: the percentage always reads
+      // COMMISSION_PCT, and while PAYMENTS_LIVE is false nothing is withheld,
+      // because nothing is charged. Flipping the flag restores the present
+      // tense without touching this file.
+      PAYMENTS_LIVE
+        ? `ფასიანი სესიებიდან პლატფორმა იტოვებს კომისიას — ${COMMISSION_PCT}%-ს ექსპერტის შემოსავლიდან. ეს კომისია მოიცავს ტექნიკურ ინფრასტრუქტურას, გადახდის დამუშავებას და მხარდაჭერას.`
+        : `ონლაინ გადახდების ამოქმედების შემდეგ ფასიანი სესიებიდან პლატფორმა დაიტოვებს კომისიას — ${COMMISSION_PCT}%-ს ექსპერტის შემოსავლიდან. ეს კომისია მოიცავს ტექნიკურ ინფრასტრუქტურას, გადახდის დამუშავებას და მხარდაჭერას. სანამ ონლაინ გადახდები არ ამოქმედდება, ჯავშნა უფასოა, კომისია არ იკავებება და ექსპერტი იღებს სრულ თანხას.`,
     ],
   },
   {
@@ -68,7 +76,10 @@ const SECTIONS = [
     id: 'conduct',
     title: '6. ქცევის წესები',
     body: [
-      'პლატფორმაზე იკრძალება: შეურაცხყოფა, დისკრიმინაცია, სპამი, ცრუ ინფორმაცია, უკანონო კონსულტაცია, ინტელექტუალური საკუთრების დარღვევა, პლატფორმის მიღმა კონტაქტის დამყარების მცდელობა კომისიის თავიდან ასაცილებლად.',
+      // Anti-circumvention stays in force as written; the parenthetical only
+      // clarifies that it also binds after online payments (and the commission)
+      // go live — it is not a statement that money changes hands today.
+      `პლატფორმაზე იკრძალება: შეურაცხყოფა, დისკრიმინაცია, სპამი, ცრუ ინფორმაცია, უკანონო კონსულტაცია, ინტელექტუალური საკუთრების დარღვევა, პლატფორმის მიღმა გარიგების ან ანგარიშსწორების მცდელობა პლატფორმის საკომისიოს გვერდის ავლის მიზნით${PAYMENTS_LIVE ? '' : ' — მათ შორის მას შემდეგ, რაც ონლაინ გადახდები ამოქმედდება'}.`,
       'დარღვევის შემთხვევაში ვიტოვებთ უფლებას შევზღუდოთ ან წავშალოთ ანგარიში წინასწარი გაფრთხილების გარეშე.',
     ],
   },
@@ -99,7 +110,7 @@ const SECTIONS = [
     title: '10. მოქმედი კანონმდებლობა',
     body: [
       'წინამდებარე პირობები რეგულირდება საქართველოს კანონმდებლობით. დავები განიხილება თბილისის საქალაქო სასამართლოში.',
-      'კონტაქტი: legal@mcodne.ge',
+      `კონტაქტი: ${LEGAL_EMAIL}`,
     ],
   },
 ]
@@ -120,7 +131,7 @@ export default function TermsPage() {
 
         <p className="mt-6 text-[16px] text-ink-700 leading-relaxed">
           წინამდებარე პირობები არეგულირებს მცოდნე პლატფორმის გამოყენებას. გთხოვ, ყურადღებით წაიკითხე — ეს
-          დოკუმენტი ეხება როგორც კლიენტებს, ისე ექსპერტებს.
+          დოკუმენტი ეხება როგორც სტუდენტებს, ისე ექსპერტებს.
         </p>
 
         <nav className="mt-8 rounded-card border border-ink-200 bg-ink-50/50 p-5">

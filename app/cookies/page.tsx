@@ -4,6 +4,7 @@ import { MarketingTopBar } from '@/components/MarketingTopBar'
 import { Container } from '@/components/Container'
 import { Footer } from '@/components/Footer'
 import { Eyebrow } from '@/components/Eyebrow'
+import { PRIVACY_EMAIL } from '@/lib/supportEmails'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -123,8 +124,8 @@ export default function CookiesPage() {
           <h2 className="font-display text-xl font-bold text-ink-900 tracking-tight">კითხვები?</h2>
           <p className="mt-3 text-[14px] text-ink-600 leading-relaxed">
             თუ გაქვს კითხვა ქუქიების ან პირადი მონაცემების შესახებ, დაწერე{' '}
-            <a href="mailto:privacy@mcodne.ge" className="text-brand-700 hover:text-brand-800 font-semibold">
-              privacy@mcodne.ge
+            <a href={`mailto:${PRIVACY_EMAIL}`} className="text-brand-700 hover:text-brand-800 font-semibold">
+              {PRIVACY_EMAIL}
             </a>
             . დამატებით ინფორმაცია იხილე{' '}
             <Link href="/privacy" className="text-brand-700 hover:text-brand-800 font-semibold">

@@ -19,6 +19,7 @@ enum ApplicationStatus {
   SUBMITTED
   APPROVED
   REJECTED
+  NEEDS_REVISION
 }
 
 enum BookingStatus {
@@ -202,8 +203,16 @@ model TutorProfile {
   // New experts default to CONSULTATION (instant "available now"); legacy rows
   // that predate this flip keep whatever value they were created with.
   serviceType             ServiceType @default(CONSULTATION)
-  // Standard session length for this expert (15|30|60 min).
+  // Standard session length for this expert (15|30|60 min). Only a DEFAULT for
+  // the browse "soonest bookable time" hint and the picker — an individual
+  // service (Consultation.minutes) carries its own length, and openness is
+  // always derived against THAT (see lib/availability).
   consultationDurationMin Int         @default(30)
+  // Required gap around every session, in minutes. 0 = back-to-back allowed,
+  // which is exactly today's behavior. Read wherever bookable starts are
+  // derived (lib/availability implements it by fattening each busy interval on
+  // both sides). Also added idempotently in lib/dbBoot.
+  bufferMin               Int         @default(0)
   // Optional 60-90s tutor intro video (data URL or hosted URL from /api/uploads?kind=video).
   videoUrl                String?
   // Admin-curated homepage featured slot — appears in landing hero when true.
@@ -230,6 +239,9 @@ model TutorProfile {
   // Equality on `available` + a backward scan satisfies the sort, so the take:N
   // reads the top rows directly instead of scanning+sorting the whole table.
   @@index([available, verified, rating])
+  // Postgres doesn't auto-index FKs: every category-filtered browse and the
+  // /categories counts scanned the whole table without this. Also in dbBoot.
+  @@index([categoryId])
 }
 
 model Certificate {
@@ -287,18 +299,30 @@ model Consultation {
   price       Int
   tutor       TutorProfile     @relation(fields: [tutorId], references: [id], onDelete: Cascade)
   bookings    Booking[]
+
+  // FK lookup behind "this expert's offerings" on every profile view. Also in dbBoot.
+  @@index([tutorId])
 }
 
+// A row is a WINDOW of published availability, never a pre-sliced ticket. Start
+// times are derived at request time (windows − active bookings − service length
+// − buffer) by lib/availability; exactly-touching rows merge, so legacy
+// pre-sliced rows keep working with no migration.
 model AvailabilitySlot {
-  id      String       @id @default(cuid())
+  id      String   @id @default(cuid())
   tutorId String
   startAt DateTime
   endAt   DateTime
+  // LEGACY. Nothing claims a window any more — a booking's own [startAt, end)
+  // is the single source of "busy". Kept only so old rows (and the wire shape
+  // /api/tutors/[id] still emits) stay valid; never written true for new rows.
   booked  Boolean      @default(false)
   tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
 
   @@index([tutorId, startAt])
-  // Browse "next free slot": tutorId IN (...) AND booked=false AND startAt > now.
+  // Legacy companion of the `booked` column (the old browse "next free slot"
+  // query). Kept so no db push is needed; the new browse query rides
+  // [tutorId, startAt] above.
   @@index([tutorId, booked, startAt])
 }
 
@@ -322,11 +346,10 @@ model Booking {
   // is not trustworthy signal.
   autoCompleted  Boolean       @default(false)
   payoutStatus   PayoutStatus  @default(PENDING)
-  // The AvailabilitySlot this booking claimed at creation (scheduled/RECURRING
-  // only). Recorded so cancel/decline/reschedule free EXACTLY this slot instead
-  // of guessing via a time-containment scan (which could free an unrelated slot,
-  // or free a slot for an instant/trial booking that never held one). `null`
-  // for instant + trial bookings, which consume no slot.
+  // LEGACY. Bookings no longer claim an AvailabilitySlot — availability rows are
+  // windows and this booking's own [startAt, startAt+durationMin) IS the busy
+  // interval. Always `null` for new bookings; kept (and still released) so old
+  // rows that DID flip a slot's `booked` get it freed on cancel/decline/cleanup.
   heldSlotId     String?
   studentNotes   String?
   tutorNotes     String?
@@ -334,6 +357,13 @@ model Booking {
   // Track cancellation source so admin can see tutor-cancel rate vs student.
   cancelledBy    Role?
   cancelReason   String?
+  // These two columns are created at boot by lib/dbBoot.ts and accessed via raw
+  // SQL only. They MUST be declared here so a `prisma db push` treats them as
+  // source-of-truth and does NOT drop them (dropping rescheduleRequest wipes all
+  // pending reschedule proposals; dropping sessionReminderSentAt double-sends
+  // reminder emails). See lib/dbBoot.ts.
+  rescheduleRequest     Json?
+  sessionReminderSentAt DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -352,8 +382,8 @@ model Booking {
   dispute            Dispute?
 
   @@index([serviceType])
-  @@index([studentId])
-  @@index([tutorId])
+  // NOTE: no single-column [studentId] / [tutorId] indexes — each is a strict
+  // prefix of the composites below, so they only cost write amplification.
   // Student dashboard: where studentId, orderBy startAt desc (up to 500 rows).
   @@index([studentId, startAt])
   // Cleanup cron + admin finance: filter by status within a startAt range.
@@ -379,6 +409,10 @@ model Message {
   // Recipient-side read receipt — set when the receiving user opens the
   // conversation. Used for "N new" badges on the messages inbox.
   readAt    DateTime?
+  // Created at boot by lib/dbBoot.ts, accessed via raw SQL only — declared here
+  // so `prisma db push` won't drop it (dropping it re-sends unread-message
+  // reminder emails). See lib/dbBoot.ts.
+  reminderEmailSentAt DateTime?
   createdAt DateTime  @default(now())
 
   booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
@@ -390,10 +424,15 @@ model Message {
   @@index([bookingId, createdAt])
   // Fast "unread messages for this user" query for the messages inbox badge.
   @@index([toId, readAt])
-  // "messages I sent" + FK maintenance on user delete
-  @@index([fromId])
-  // Pre-booking inbox: (fromId=me) arm ordered by createdAt desc.
+  // Pre-booking inbox: (fromId=me) arm ordered by createdAt desc. Covers the
+  // plain fromId lookups ("messages I sent" + FK maintenance) too, so no
+  // separate single-column [fromId] index is declared.
   @@index([fromId, createdAt])
+  // …and the (toId=me) arm of the same OR-query, which otherwise had to sort.
+  @@index([toId, createdAt])
+  // Created by lib/dbBoot.ts — declared here so `prisma db push` won't drop it.
+  // Serves the message-reminder cron's unread-window scan.
+  @@index([readAt, createdAt])
 }
 
 model Review {
@@ -456,6 +495,9 @@ model Notification {
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
+  // Created by lib/dbBoot.ts — declared here so `prisma db push` won't drop it.
+  // Serves the cleanup cron's BOOKING_REMINDER dedupe (type=… AND href IN …).
+  @@index([type, href])
 }
 
 // Append-only audit trail of admin actions. Every mutating admin action

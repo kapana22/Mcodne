@@ -6,6 +6,7 @@ import { Card } from '@/components/Card'
 import { Eyebrow } from '@/components/Eyebrow'
 import { useToast } from '@/components/ToastProvider'
 import { isBookingLive } from '@/lib/bookingLive'
+import { subtractIntervals } from '@/lib/availability'
 import { fmtKaDate, KA_WEEKDAYS_LONG } from '@/lib/kaDate'
 import { PageHeader } from '@/components/tutor/PageHeader'
 import { AlertsStack } from './_components/AlertsStack'
@@ -39,10 +40,14 @@ export default function TutorHome() {
   // Profile completeness — loaded in parallel with dashboard data; the widget
   // hides itself once the score hits 100%, so the extra fetch is cheap and
   // never renders a stale nag.
-  // Count of upcoming, still-free availability slots. Since booking REQUIRES
-  // a published slot, an expert with zero upcoming slots is invisible — the
-  // alerts stack nags them to publish availability. null = not loaded yet.
-  const [upcomingSlots, setUpcomingSlots] = useState<number | null>(null)
+  // Published availability WINDOWS (raw rows) + the server's cap-proof count of
+  // upcoming ones. A row is a window, possibly hours long, and nothing writes
+  // the legacy `booked` flag any more — so counting rows answers nothing. What
+  // decides whether this expert is bookable is how much free TIME is left:
+  // windows − active bookings (derived below, same as /tutor/schedule).
+  // null = not loaded yet.
+  const [slots, setSlots] = useState<{ startAt: string; endAt: string }[] | null>(null)
+  const [serverFreeCount, setServerFreeCount] = useState<number | null>(null)
   // Server has UTC clock; client has the visitor's local clock. Rendering
   // greeting/date during SSR causes a hydration mismatch (server picks a
   // different time-of-day bucket than the browser). Defer to a client-only
@@ -81,20 +86,20 @@ export default function TutorHome() {
   }
   useEffect(() => { load() }, [])
 
-  // Upcoming free-slot count for the snapshot. (Profile/credential fetches that
-  // once fed a dashboard completeness widget were removed — completeness now
-  // lives once, in the persistent sidebar.)
+  // Published availability, for the „nobody can book you" alert. (Profile/
+  // credential fetches that once fed a dashboard completeness widget were
+  // removed — completeness now lives once, in the persistent sidebar.)
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
         const aRes = await fetch('/api/tutor/availability').then(r => r.ok ? r.json() : null).catch(() => null)
         if (cancelled) return
-        // /api/tutor/availability returns the raw slot list (array or {slots}).
+        // /api/tutor/availability returns the raw window list (array or {slots}).
         const slotList: any[] = Array.isArray(aRes) ? aRes : (Array.isArray(aRes?.slots) ? aRes.slots : [])
-        const nowMs = Date.now()
-        setUpcomingSlots(slotList.filter(s => !s?.booked && new Date(s?.startAt).getTime() > nowMs).length)
-      } catch { /* leave the snapshot at 0 on failure */ }
+        setSlots(slotList.map(s => ({ startAt: s?.startAt, endAt: s?.endAt })))
+        if (typeof aRes?.upcomingFreeCount === 'number') setServerFreeCount(aRes.upcomingFreeCount)
+      } catch { /* stay silent — the alert simply doesn't render */ }
     })()
     return () => { cancelled = true }
   }, [])
@@ -131,6 +136,40 @@ export default function TutorHome() {
 
   const loading = bookings === null
 
+  /* ── Is anyone able to book this expert at all? ──────────────────────────
+   * Free availability is a DURATION, not a row count: one 3-hour window is not
+   * „1 თავისუფალი დრო", and a window with a session inside it is not free.
+   * Bookings are already in hand (loaded above), so the honest figure costs no
+   * extra fetch — it is exactly the subtraction /tutor/schedule shows, and the
+   * client-facing picker does server-side (lib/availability.ts). */
+  const freeMinutes = useMemo(() => {
+    if (slots === null) return null
+    const nowMs = Date.now()
+    const windows = slots.map(s => ({ start: new Date(s.startAt), end: new Date(s.endAt) }))
+    const busy = (bookings ?? [])
+      .filter(b => b.status === 'PREPARING' || b.status === 'CONFIRMED' || b.status === 'LIVE')
+      .map(b => {
+        const st = new Date(b.startAt)
+        return { start: st, end: new Date(st.getTime() + b.durationMin * 60_000) }
+      })
+    let ms = 0
+    for (const iv of subtractIntervals(windows, busy)) {
+      const s = Math.max(iv.start.getTime(), nowMs)
+      if (iv.end.getTime() > s) ms += iv.end.getTime() - s
+    }
+    return Math.round(ms / 60_000)
+  }, [slots, bookings])
+
+  // AlertsStack consults only the ZERO-ness of this number ("დროის გარეშე
+  // ვერავინ დაგიჯავშნის"), so it gets the free-minutes figure rather than a
+  // meaningless row count. The server count is the same safety net the schedule
+  // banner uses — the row list is capped at 500 oldest-first, so a legacy expert
+  // with hundreds of past rows must not be told they published nothing — which
+  // also keeps this alert and the banner behind its CTA in agreement.
+  const bookable = freeMinutes === null
+    ? null
+    : freeMinutes === 0 && (serverFreeCount ?? 0) === 0 ? 0 : Math.max(1, freeMinutes)
+
   return (
     <div>
       {/* Greeting — sign-out lives in the UserMenu now. Canonical PageHeader
@@ -141,13 +180,13 @@ export default function TutorHome() {
         eyebrow={clientNow ? `${KA_WEEKDAYS_LONG[clientNow.getDay()]}, ${fmtKaDate(clientNow, { month: 'long' })}` : ' '}
         title={`${clientNow ? fmtGreeting() : 'გამარჯობა'}${me?.fullName ? `, ${me.fullName.split(' ')[0]}` : ''}`}
         sub={todaySessions.length > 0
-          ? `დღეს გაქვს ${todaySessions.length} სესია${pending.length > 0 ? `, ${pending.length} მოთხოვნა ელოდება პასუხს` : ''}.`
+          ? `${todaySessions.length} სესია დღეს${pending.length > 0 ? ` · ${pending.length} მოთხოვნა ელოდება` : ''}`
           : pending.length > 0
-          ? `დღეს სესია არ გაქვს — ${pending.length} მოთხოვნა ელოდება პასუხს.`
-          : 'დღეს სესია და ახალი მოთხოვნა არ გაქვს.'}
+          ? `${pending.length} მოთხოვნა ელოდება`
+          : 'დღეს სესია არ გაქვს'}
       />
 
-      <AlertsStack bookings={bookings ?? []} upcomingSlots={upcomingSlots} />
+      <AlertsStack bookings={bookings ?? []} upcomingSlots={bookable} />
 
       <div className="grid lg:grid-cols-[1fr_320px] gap-6 items-start">
         {/* Left */}
@@ -171,13 +210,13 @@ export default function TutorHome() {
             earnings page. This rail stays to just the quick actions. */}
         <aside className="space-y-4 lg:sticky lg:top-[84px]">
           <Card padding="none" className="p-5">
-            <Eyebrow tone="muted" className="mb-3">სწრაფი მოქმედებები</Eyebrow>
+            <Eyebrow tone="muted" className="mb-3">მოქმედებები</Eyebrow>
             <div className="space-y-2">
               <Link href="/tutor/schedule" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
-                <Icon.calendar className="w-4 h-4 text-ink-500" /> გრაფიკის რედაქტ.
+                <Icon.calendar className="w-4 h-4 text-ink-500" /> გრაფიკი
               </Link>
               <Link href="/tutor/profile" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
-                <Icon.user className="w-4 h-4 text-ink-500" /> პროფილის რედაქტ.
+                <Icon.user className="w-4 h-4 text-ink-500" /> პროფილი
               </Link>
               <Link href="/tutors" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
                 <Icon.search className="w-4 h-4 text-ink-500" /> ექსპერტები

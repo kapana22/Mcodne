@@ -73,7 +73,7 @@ export function UserMenu({
   const [busy, setBusy] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
 
-  // Unread indicator on the avatar (small red dot) — reads the shared
+  // Unread indicator on the avatar (count chip — canon bans status dots) — reads the shared
   // lib/notifications store so bell / user menu / bottom nav stay in sync
   // (one app-wide poll, cross-tab aware).
   const { unreadCount: unread } = useNotifications()
@@ -121,13 +121,13 @@ export function UserMenu({
                          TUTOR_ITEMS(signOut)
 
   // Space switcher for a dual-role user (expert who also has a client side).
-  // Sits at the top of the menu: „კლიენტის სივრცე" from the expert workspace,
+  // Sits at the top of the menu: „სტუდენტის სივრცე" from the expert workspace,
   // „ექსპერტის სივრცე" from the client space — so student-side messages/bookings
   // stay reachable after becoming an expert (they used to be locked away).
   const switchItem: MenuItem | null = isDualRole
     ? inClientSpace
       ? { href: '/tutor', label: 'ექსპერტის სივრცე', icon: Icon.briefcase }
-      : { href: '/student', label: 'კლიენტის სივრცე', icon: Icon.user }
+      : { href: '/student', label: 'სტუდენტის სივრცე', icon: Icon.home }
     : null
   const items = switchItem ? [switchItem, ...baseItems] : baseItems
 
@@ -138,18 +138,23 @@ export function UserMenu({
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        aria-label="მომხმარებლის მენიუ"
+        aria-label={unread > 0 ? `მომხმარებლის მენიუ — ${unread} წაუკითხავი` : 'მომხმარებლის მენიუ'}
         aria-expanded={open}
         aria-haspopup="menu"
         className="relative inline-flex items-center gap-2 h-10 pl-1 pr-2 rounded-btn hover:bg-ink-100 transition-colors"
       >
         <Avatar src={user?.avatar ?? undefined} name={initialName} size={32} />
         <Icon.chevD className="w-3.5 h-3.5 text-ink-500" />
+        {/* Count chip, not a status dot (canon) — the same badge the bell uses,
+            so the two unread surfaces read identically. A number also says how
+            much is waiting, which the dot never did. */}
         {unread > 0 && (
           <span
             aria-hidden
-            className="absolute top-0.5 left-6 w-2.5 h-2.5 rounded-full bg-danger-500 ring-2 ring-white"
-          />
+            className="absolute top-0.5 left-[18px] min-w-[16px] h-[16px] px-1 rounded-full bg-danger-500 text-white font-display text-[9.5px] font-bold tabular-nums inline-flex items-center justify-center ring-2 ring-white motion-safe:animate-scale-in"
+          >
+            {unread > 9 ? '9+' : unread}
+          </span>
         )}
       </button>
 
@@ -162,15 +167,15 @@ export function UserMenu({
             <div className="px-4 pt-3 pb-2 border-b border-ink-100">
               <div className="font-display text-[13px] font-bold text-ink-900 truncate">{initialName}</div>
               <Eyebrow tone="muted" className="mt-0.5">
-                {role === 'TUTOR' ? 'ექსპერტი' : role === 'ADMIN' ? 'ადმინი' : 'კლიენტი'}
+                {role === 'TUTOR' ? 'ექსპერტი' : role === 'ADMIN' ? 'ადმინი' : 'სტუდენტი'}
               </Eyebrow>
             </div>
           )}
           <ul className="py-1.5">
             {items.map((item, idx) => {
               const IconComp = item.icon
-              const showDot = item.href === '/notifications' || item.href?.endsWith('/messages')
-              const dot = showDot && unread > 0
+              const showsUnread = item.href === '/notifications' || !!item.href?.endsWith('/messages')
+              const itemUnread = showsUnread && unread > 0 ? unread : 0
               // Divider between the mobile escape-hatch group and the account
               // group — mobile-only, since the escape-hatch group is hidden on
               // desktop and the divider would otherwise dangle at the top.
@@ -189,8 +194,14 @@ export function UserMenu({
                   className={cls}
                 >
                   <IconComp className="w-4 h-4 text-ink-500 shrink-0" />
-                  <span className="flex-1">{item.label}</span>
-                  {dot && <span className="w-2 h-2 rounded-full bg-danger-500" />}
+                  {/* Unread = bold label + count chip, the ConversationRow /
+                      notifications treatment. No status dots (canon). */}
+                  <span className={`flex-1 ${itemUnread > 0 ? 'font-bold text-ink-900' : ''}`}>{item.label}</span>
+                  {itemUnread > 0 && (
+                    <span className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-brand-500 text-white font-display text-[11px] font-bold tabular-nums">
+                      {itemUnread > 9 ? '9+' : itemUnread}
+                    </span>
+                  )}
                 </Link>
               ) : (
                 <button

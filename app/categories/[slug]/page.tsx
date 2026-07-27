@@ -7,9 +7,12 @@ import { Container } from '@/components/Container'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
+import { EmptyState } from '@/components/EmptyState'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { queryTutors } from '@/lib/tutorsQuery'
+import { categorySeo, fallbackSeo } from '@/lib/categorySeo'
+import { jsonLdString } from '@/lib/jsonLd'
 
 // SEO landing page per category — a crawlable, keyword-targeted URL
 // (/categories/ბიზნეს-კონსულტაცია) with a unique H1 + description + the real
@@ -33,19 +36,17 @@ async function getCategory(slug: string) {
   }
 }
 
-const descFor = (name: string) =>
-  `„${name}" კატეგორიაში იპოვი გადამოწმებულ ქართველ ექსპერტებს ონლაინ ვიდეო-კონსულტაციისთვის. ნახე შეფასებები და ფასი, აირჩიე დრო და დაჯავშნე 60-წუთიანი სესია.`
-
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
   const cat = await getCategory(slug)
   if (!cat || cat === 'error') return { title: 'კატეგორია — მცოდნე' }
-  const desc = descFor(cat.name)
+  const seo = categorySeo[cat.slug] ?? fallbackSeo(cat.name)
+  const desc = seo.intro
   return {
-    title: `${cat.name} — იპოვე ექსპერტი და დაჯავშნე კონსულტაცია | მცოდნე`,
+    title: `${seo.keyword} — იპოვე ექსპერტი და დაჯავშნე | მცოდნე`,
     description: desc,
     alternates: { canonical: `${SITE_URL}/categories/${cat.slug}` },
-    openGraph: { title: `${cat.name} — ექსპერტები | მცოდნე`, description: desc, url: `${SITE_URL}/categories/${cat.slug}`, type: 'website' },
+    openGraph: { title: `${seo.keyword} | მცოდნე`, description: desc, url: `${SITE_URL}/categories/${cat.slug}`, type: 'website' },
   }
 }
 
@@ -56,6 +57,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
   if (!cat) notFound()
 
   const experts = await queryTutors({ category: cat.slug, limit: 48 }).catch(() => [])
+  const seo = categorySeo[cat.slug] ?? fallbackSeo(cat.name)
 
   const breadcrumbLd = {
     '@context': 'https://schema.org',
@@ -82,11 +84,22 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
       })),
     },
   }
+  // FAQPage structured data — eligible for Google's collapsible-FAQ rich result.
+  const faqLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: seo.faq.map(f => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  }
 
   return (
     <div className="min-h-screen bg-white">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(itemListLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(faqLd) }} />
       <MarketingTopBar />
 
       <Container as="main" size="wide" className="py-14 lg:py-20">
@@ -101,15 +114,28 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
         <div className="max-w-[720px]">
           <Eyebrow className="mb-3">კატეგორია</Eyebrow>
           <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05]">
-            „{cat.name}" ექსპერტები
+            „{cat.name}“ ექსპერტები
           </h1>
-          <p className="mt-5 text-[16.5px] text-ink-600 leading-relaxed">{descFor(cat.name)}</p>
+          <p className="mt-5 text-[16.5px] text-ink-600 leading-relaxed">{seo.intro}</p>
         </div>
 
         {experts.length === 0 ? (
-          <div className="mt-12 rounded-card border border-dashed border-ink-200 bg-ink-50/40 p-10 text-center max-w-[560px]">
-            <p className="text-[14px] text-ink-600">ამ კატეგორიაში ჯერ ხელმისაწვდომი ექსპერტი არ არის.</p>
-            <Link href="/tutors" className="mt-4 inline-flex h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] items-center gap-2 transition-colors">ყველა ექსპერტი</Link>
+          // Cold-start sphere: warm, honest empty state (icon + one line +
+          // action) rather than a bare "no experts" note. Supply is genuinely
+          // growing, so „მალე დაემატება" is fair; the secondary link invites
+          // the first expert in this sphere.
+          <div className="mt-12 max-w-[560px]">
+            <EmptyState
+              icon={<Icon.users className="w-6 h-6" />}
+              title="ამ სფეროში ჯერ არ არის ექსპერტი"
+              description="მალე დაემატება. სანამ ელოდები, გადახედე სხვა სფეროების ექსპერტებს."
+              cta={{ label: 'ნახე ყველა ექსპერტი', href: '/tutors' }}
+            />
+            <div className="mt-3 text-center">
+              <Link href="/apply" className="inline-flex items-center gap-1.5 text-[13px] font-display font-semibold text-brand-700 hover:text-brand-800 transition-colors">
+                გახდი პირველი ექსპერტი
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -142,6 +168,24 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
         <div className="mt-12">
           <Link href="/tutors" className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-brand-700 hover:underline">ყველა კატეგორიის ექსპერტი <Icon.arrow className="w-3.5 h-3.5" /></Link>
         </div>
+
+        {/* Keyword-targeted FAQ — matches the /help accordion pattern, feeds the
+            FAQPage JSON-LD above. Placed below the expert list so it doesn't push
+            the real supply down. */}
+        <section className="mt-16 lg:mt-20 max-w-[760px]">
+          <Eyebrow className="mb-4">ხშირად დასმული კითხვები</Eyebrow>
+          <div className="rounded-card border border-ink-200 bg-white divide-y divide-ink-200">
+            {seo.faq.map((f, i) => (
+              <details key={i} className="group">
+                <summary className="flex items-center justify-between p-5 cursor-pointer list-none gap-4">
+                  <span className="text-[15px] font-display font-semibold text-ink-900 leading-snug">{f.q}</span>
+                  <Icon.chevD className="w-4 h-4 text-ink-500 group-open:rotate-180 transition-transform shrink-0" />
+                </summary>
+                <div className="px-5 pb-5 text-[14px] text-ink-600 leading-relaxed max-w-prose">{f.a}</div>
+              </details>
+            ))}
+          </div>
+        </section>
       </Container>
 
       <Footer />

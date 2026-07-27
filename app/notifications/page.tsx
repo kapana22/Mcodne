@@ -6,9 +6,13 @@ import { Icon } from '@/components/Icon'
 import { Skeleton } from '@/components/Skeleton'
 import { EmptyState } from '@/components/EmptyState'
 import { useToast } from '@/components/ToastProvider'
-import { homeForRole } from '@/lib/roleHome'
 import { fmtKaDate, fmtKaTime } from '@/lib/kaDate'
 import { Eyebrow } from '@/components/Eyebrow'
+import { Logo } from '@/components/Logo'
+import { NotifBell } from '@/components/NotifBell'
+import { UserMenu } from '@/components/UserMenu'
+
+type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 
 type Item = {
   id: string
@@ -33,17 +37,26 @@ const dayKey = (iso: string) => {
 
 const timeShort = (iso: string) => fmtKaTime(new Date(iso))
 
+// Badge canon (2026-07-19): hairline border + colored text, NO pastel fill.
+// These chips all carried a `bg-*-50` wash, which turned a dense list into a
+// field of pastel blocks. The type stays legible from its label plus the border/
+// text hue — green for booking lifecycle, gold for ratings, red for a
+// cancellation, neutral for everything conversational.
 const TYPE_LABEL: Record<string, { l: string; cls: string }> = {
-  BOOKING_CREATED:    { l: 'ჯავშანი',      cls: 'bg-brand-50 text-brand-700 border-brand-200' },
-  BOOKING_CANCELED:   { l: 'გაუქმება',     cls: 'bg-danger-50 text-danger-700 border-danger-200' },
-  MESSAGE_NEW:        { l: 'შეტყობინება',  cls: 'bg-ink-75 text-ink-700 border-ink-200' },
-  REVIEW_NEW:         { l: 'შეფასება',     cls: 'bg-warning-50 text-warning-700 border-warning-200' },
-  APPLICATION_STATUS: { l: 'განაცხადი',    cls: 'bg-success-50 text-success-700 border-success-200' },
-  BOOKING_REMINDER:   { l: 'შეხსენება',    cls: 'bg-brand-50 text-brand-700 border-brand-200' },
-  APPLICATION_NEW:    { l: 'განაცხადი',    cls: 'bg-ink-75 text-ink-700 border-ink-200' },
-  PAYOUT:             { l: 'ანგარიშსწორება', cls: 'bg-brand-50 text-brand-700 border-brand-200' },
-  ADMIN_BROADCAST:    { l: 'გუნდიდან',     cls: 'bg-ink-100 text-ink-700 border-ink-200' },
-  GENERIC:            { l: 'შეტყობინება',  cls: 'bg-ink-50 text-ink-700 border-ink-200' },
+  BOOKING_CREATED:    { l: 'ჯავშანი',      cls: 'border-brand-200 text-brand-700' },
+  BOOKING_CANCELED:   { l: 'გაუქმება',     cls: 'border-danger-200 text-danger-700' },
+  BOOKING_COMPLETED:  { l: 'დასრულდა',     cls: 'border-success-200 text-success-700' },
+  // Reschedule traffic (request, and the „უარყოფილია" answer) — neutral, not
+  // danger: the session itself is untouched either way.
+  RESCHEDULE_REQUEST: { l: 'გადადება',     cls: 'border-ink-200 text-ink-600' },
+  MESSAGE_NEW:        { l: 'შეტყობინება',  cls: 'border-ink-200 text-ink-700' },
+  REVIEW_NEW:         { l: 'შეფასება',     cls: 'border-warning-200 text-warning-700' },
+  APPLICATION_STATUS: { l: 'განაცხადი',    cls: 'border-success-200 text-success-700' },
+  BOOKING_REMINDER:   { l: 'შეხსენება',    cls: 'border-brand-200 text-brand-700' },
+  APPLICATION_NEW:    { l: 'განაცხადი',    cls: 'border-ink-200 text-ink-700' },
+  PAYOUT:             { l: 'ანგარიშსწორება', cls: 'border-brand-300 text-brand-800' },
+  ADMIN_BROADCAST:    { l: 'გუნდიდან',     cls: 'border-ink-300 text-ink-800' },
+  GENERIC:            { l: 'შეტყობინება',  cls: 'border-ink-200 text-ink-500' },
 }
 
 export default function NotificationsPage() {
@@ -51,14 +64,21 @@ export default function NotificationsPage() {
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  // A failed load used to fall through to the „ცარიელია" empty state, so a 500
+  // told the user they had no notifications. Distinct state, distinct copy.
+  const [loadFailed, setLoadFailed] = useState(false)
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
-  // Role drives the header's home link — this page is shared across roles.
-  const [role, setRole] = useState<string | null>(null)
+  // This page is shared across roles — the authed top bar (bell + user menu)
+  // needs the viewer's identity, so we hold name/avatar/role, not just role.
+  const [me, setMe] = useState<{ name: string; avatar: string | null; role: Role } | null>(null)
 
   useEffect(() => {
     fetch('/api/me')
       .then(r => r.ok ? r.json() : null)
-      .then(d => setRole(d?.user?.role ?? null))
+      .then(d => {
+        const u = d?.user
+        if (u?.role) setMe({ name: u.fullName ?? '', avatar: u.avatarUrl ?? null, role: u.role })
+      })
       .catch(() => {})
   }, [])
 
@@ -67,13 +87,19 @@ export default function NotificationsPage() {
     try {
       const res = await fetch(`/api/notifications?limit=100${filter === 'unread' ? '&onlyUnread=1' : ''}`)
       if (res.status === 401) { window.location.href = '/signin?redirect=/notifications'; return }
-      if (!res.ok) return
+      // A 5xx is NOT "you have nothing" — returning here left the empty state
+      // rendering „ცარიელია", which is a lie about the user's account.
+      if (!res.ok) { setLoadFailed(true); return }
       // Anonymous hits get a 307 → fetch follows it to /signin and returns its
       // HTML with 200, so res.ok can't catch it — json() would throw. Treat an
       // unparsable body as "not signed in" and route to signin.
       const d = await res.json().catch(() => null)
       if (!d) { window.location.href = '/signin?redirect=/notifications'; return }
       setItems(d.items ?? [])
+      setLoadFailed(false)
+    } catch {
+      // Offline / dropped connection — same honest state as a 5xx.
+      setLoadFailed(true)
     } finally {
       setLoading(false)
     }
@@ -108,7 +134,7 @@ export default function NotificationsPage() {
         body: JSON.stringify({ all: true }),
       })
       if (!res.ok) {
-        toast('ვერ მოხერხდა — სცადეთ თავიდან', 'error')
+        toast('ვერ მოხერხდა — სცადე თავიდან', 'error')
         return
       }
       toast('ყველა შეტყობინება წაკითხულია', 'success')
@@ -131,15 +157,23 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen bg-ink-50/40">
-      <header className="sticky top-0 z-40 bg-ink-50 lg:bg-ink-50/90 lg:backdrop-blur-md border-b border-ink-100">
-        <Container size="content" className="h-16 flex items-center justify-between">
-          <Link href="/" className="inline-flex items-center" aria-label="მცოდნე">
-            <img src="/logo.svg" alt="მცოდნე" className="h-6 w-auto object-contain" />
-          </Link>
-          <nav className="flex items-center gap-3 text-[13px] font-display font-semibold">
-            <Link href={role ? homeForRole(role) : '/'} className="text-ink-700 hover:text-ink-900">მთავარი</Link>
-            <Link href="/tutors" className="text-ink-700 hover:text-ink-900">ექსპერტები</Link>
-          </nav>
+      {/* Same authed workspace chrome the rest of the signed-in app uses:
+          logo → „/“, saved (heart), notification bell, user menu. No sidebar on
+          this standalone page, so the logo stays visible at every breakpoint. */}
+      <header className="sticky top-0 z-40 bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100">
+        <Container size="content" className="h-14 lg:h-16 flex items-center justify-between gap-4">
+          <Logo size="sm" href="/" />
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/student/favorites"
+              aria-label="შენახული ექსპერტები"
+              className="w-10 h-10 rounded-btn inline-flex items-center justify-center text-ink-500 hover:text-ink-900 hover:bg-ink-100 transition-colors"
+            >
+              <Icon.heart className="w-[18px] h-[18px]" />
+            </Link>
+            <NotifBell />
+            {me && <UserMenu user={{ name: me.name, avatar: me.avatar }} role={me.role} />}
+          </div>
         </Container>
       </header>
 
@@ -166,7 +200,6 @@ export default function NotificationsPage() {
           <div className="rounded-card border border-ink-200 bg-white overflow-hidden divide-y divide-ink-100" aria-busy="true" aria-label="იტვირთება">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="p-4 flex items-start gap-3 min-h-[92px]">
-                <Skeleton className="h-2 w-2 mt-1.5 rounded-full" rounded="" />
                 <div className="flex-1 min-w-0 space-y-2">
                   <div className="flex items-center gap-2">
                     <Skeleton className="h-4 w-16" rounded="rounded-pill" />
@@ -177,6 +210,25 @@ export default function NotificationsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : loadFailed ? (
+          /* Load error ≠ empty inbox. Compact per canon: icon + one line + one
+             action, neutral (not brand) so it never reads as a real result. */
+          <div className="py-10 px-6 text-center rounded-card border border-ink-200 bg-white" role="alert">
+            <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-ink-100 text-ink-500 mb-3">
+              <Icon.warn className="w-6 h-6" />
+            </span>
+            <div className="font-display text-[15px] font-semibold text-ink-800">შეტყობინებები ვერ ჩაიტვირთა</div>
+            <p className="text-[12.5px] text-ink-500 mt-1">დროებითი შეფერხებაა — სცადე თავიდან.</p>
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => { setLoadFailed(false); void load() }}
+                className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+              >
+                თავიდან ცდა
+              </button>
+            </div>
           </div>
         ) : items.length === 0 ? (
           <EmptyState
@@ -194,12 +246,14 @@ export default function NotificationsPage() {
                     const meta = TYPE_LABEL[n.type] ?? TYPE_LABEL.GENERIC
                     const isUnread = !n.readAt
                     return (
-                      <li key={n.id} className={isUnread ? 'bg-brand-50/30' : ''}>
+                      <li key={n.id} className={`relative ${isUnread ? 'bg-brand-50/30' : ''}`}>
+                        {/* Unread = left accent bar + bold title, the same
+                            treatment ConversationRow uses. No status dots. */}
+                        {isUnread && <span aria-hidden className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-brand-500" />}
                         <div className="p-4 flex items-start gap-3">
-                          <span className={`shrink-0 mt-1 w-2 h-2 rounded-full ${isUnread ? 'bg-brand-500' : 'bg-transparent'}`} />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-baseline gap-2 flex-wrap">
-                              <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border font-display text-[10px] font-bold uppercase tracking-[0.14em] shrink-0 ${meta.cls}`}>{meta.l}</span>
+                              <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border bg-transparent font-display text-[10px] font-bold uppercase tracking-[0.14em] shrink-0 ${meta.cls}`}>{meta.l}</span>
                               <span className={`font-display text-[13.5px] tracking-tight line-clamp-1 min-w-0 flex-1 ${isUnread ? 'font-bold text-ink-900' : 'font-medium text-ink-800'}`}>{n.title}</span>
                               <span className="ml-auto text-[10.5px] text-ink-400 font-mono tabular-nums shrink-0">{timeShort(n.createdAt)}</span>
                             </div>

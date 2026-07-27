@@ -33,12 +33,36 @@ const Body = z.object({
 // GET — the caller's own application status, so /apply can show a real
 // "under review" / "rejected (reason)" screen instead of a blank form to
 // someone who already applied. Returns { application: null } if none.
+//
+// Also returns the applicant's own submitted TEXT fields (never the heavy
+// base64 verification media — that stays admin-only and, like the localStorage
+// draft, is not persisted across sessions). This lets the „needs revision"
+// re-edit seed the wizard server-side, so an applicant returning from another
+// device — or after the 7-day draft expired — isn't forced to retype everything.
 export async function GET() {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
   const application = await prisma.tutorApplication.findUnique({
     where: { userId: user.id },
-    select: { status: true, moderatorNote: true, createdAt: true, reviewedAt: true },
+    select: {
+      status: true,
+      moderatorNote: true,
+      createdAt: true,
+      reviewedAt: true,
+      fullName: true,
+      phone: true,
+      city: true,
+      specialty: true,
+      yearsExp: true,
+      hourlyRate: true,
+      motivation: true,
+      linkedinUrl: true,
+      websiteUrl: true,
+      introVideoUrl: true,
+      // Small structured JSON (languages / headline / services / requested
+      // category) — safe to return; the heavy media fields are omitted above.
+      professionData: true,
+    },
   })
   return NextResponse.json({ application })
 }

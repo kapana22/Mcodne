@@ -1,13 +1,16 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import type { Metadata } from 'next'
-import { CANCEL_CUTOFF_HOURS, COMMISSION_PCT } from '@/lib/flags'
+import { CANCEL_CUTOFF_HOURS, COMMISSION_PCT, PAYMENTS_LIVE } from '@/lib/flags'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
 import { Container } from '@/components/Container'
 import { Reveal } from '@/components/Reveal'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
+import { jsonLdString } from '@/lib/jsonLd'
+import { SiteText } from '@/components/SiteTextProvider'
+import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -33,15 +36,20 @@ const GROUPS: FaqGroup[] = [
     items: [
       {
         q: 'რა არის მცოდნე?',
-        a: 'მცოდნე არის ცოდნის არქივი — პლატფორმა, სადაც შენ ხვდები გადამოწმებულ ექსპერტებთან 40-წუთიან 1-1 კონსულტაციაზე ბიზნესის, ფინანსების, კარიერის, სამართლისა და სხვა სფეროებში.',
+        a: 'პლატფორმა, სადაც ხელით შერჩეულ ექსპერტებთან იჯავშნი 1-1 ვიდეოკონსულტაციას — ბიზნესი, ფინანსები, კარიერა, სამართალი და სხვა.',
       },
       {
         q: 'როგორ ვიპოვო შესაფერისი ექსპერტი?',
-        a: 'გვერდზე „ექსპერტები“ შეგიძლია გაფილტრო კატეგორიით, ფასით და შეფასებით. თითოეულ პროფილში ნახავ ვიდეო-ინტროს, გამოცდილებასა და ბოლო შეფასებებს.',
+        a: 'გვერდზე „ექსპერტები“ გაფილტრე კატეგორიით, ფასითა და შეფასებით. პროფილში ნახავ ვიდეო-ინტროს, გამოცდილებასა და შეფასებებს.',
       },
       {
         q: 'რა ჯდება პირველი გაცნობა?',
-        a: 'ფასი წინასწარ ცნობილია — გადაიხდი მხოლოდ დაჯავშნისას. სესია 40 წუთია, ფასი მერყეობს 40₾-დან 300₾-მდე ექსპერტის დონისა და სფეროს მიხედვით.',
+        // Payment tense is gated on PAYMENTS_LIVE — the same flag the „გადახდა“
+        // section below reads. While it's off a booking costs nothing, so the
+        // page must not imply a charge.
+        a: PAYMENTS_LIVE
+          ? 'ფასს ადგენს ექსპერტი და წინასწარ ხედავ — გადაიხდი მხოლოდ დაჯავშნისას.'
+          : 'ფასს ადგენს ექსპერტი და წინასწარ ხედავ. ონლაინ გადახდა ჯერ არ არის — დაჯავშნა ახლა უფასოა, ბარათს არ ვთხოვთ.',
       },
     ],
   },
@@ -50,19 +58,23 @@ const GROUPS: FaqGroup[] = [
     items: [
       {
         q: 'როგორ დავჯავშნო სესია?',
-        a: 'შედი ექსპერტის პროფილში, აირჩიე თარიღი და დრო კალენდარში, გადაიხადე — მიიღებ დადასტურებას ელფოსტით და კალენდარულ მოწვევას.',
+        a: PAYMENTS_LIVE
+          ? 'პროფილში აირჩიე თარიღი და დრო, გადაიხადე — დადასტურება ელფოსტით მოვა.'
+          : 'პროფილში აირჩიე თარიღი და დრო — დადასტურება ელფოსტით მოვა. გადახდის ეტაპი ჯერ არ არის, დაჯავშნა ახლა უფასოა.',
       },
       {
         q: 'სად ტარდება სესია?',
-        a: 'ვიდეო ზარი ტარდება პირდაპირ პლატფორმაზე — არ გჭირდება Zoom-ის ან სხვა აპლიკაციის ჩამოტვირთვა. საკმარისია ბრაუზერი და კამერა.',
+        a: 'პირდაპირ პლატფორმაზე — არ გჭირდება Zoom ან სხვა აპლიკაცია. საკმარისია ბრაუზერი და კამერა.',
       },
       {
         q: 'შეიძლება თუ არა გავაუქმო ან გადავიტანო?',
-        a: `დიახ — სესიის დაწყებამდე ${CANCEL_CUTOFF_HOURS} საათით ადრე შესაძლებელია უფასო გაუქმება ან გადატანა. ${CANCEL_CUTOFF_HOURS} საათზე ნაკლებ დროში გაუქმებისას თანხა არ ბრუნდება, გარდა დასაბუთებული გამონაკლისებისა.`,
+        a: PAYMENTS_LIVE
+          ? `დიახ — ${CANCEL_CUTOFF_HOURS} საათით ადრე უფასოა. ამის შემდეგ თანხა აღარ ბრუნდება, გარდა დასაბუთებული გამონაკლისისა.`
+          : `დიახ — ${CANCEL_CUTOFF_HOURS} საათით ადრე უფასოა. ახლა დაჯავშნა უფასოა, ამიტომ დასაბრუნებელი თანხა არ არსებობს; გადახდების ამოქმედების შემდეგ ამ ვადის შემდეგ თანხა აღარ დაბრუნდება, გარდა დასაბუთებული გამონაკლისისა.`,
       },
       {
         q: 'რა მოხდება, თუ ექსპერტი არ გამოცხადდა?',
-        a: 'შემოგთავაზებთ გადატანას ან ჩანაცვლებას სხვა ექსპერტით — უფასოდ. ონლაინ გადახდების ამოქმედების შემდეგ ასეთ შემთხვევაში გადახდილი თანხა სრულად დაბრუნდება. გამოუცხადებლობა გავლენას ახდენს ექსპერტის რეიტინგზე.',
+        a: 'უფასოდ შემოგთავაზებთ გადატანას ან სხვა ექსპერტს. გადახდის ამოქმედების შემდეგ თანხა სრულად დაბრუნდება.',
       },
     ],
   },
@@ -71,15 +83,15 @@ const GROUPS: FaqGroup[] = [
     items: [
       {
         q: 'უსაფრთხოა თუ არა გადახდა?',
-        a: 'ონლაინ გადახდები მალე ამოქმედდება — ამჟამად სესიის დაჯავშნა უფასოა და ბარათს არ გთხოვთ. გაშვების შემდეგ თანხა დაცულ ანგარიშზე შეინახება: ექსპერტს გადაერიცხება მხოლოდ სესიის წარმატებით დასრულების შემდეგ, ბარათის დეტალები კი ჩვენთან არ შეინახება.',
+        a: 'ახლა დაჯავშნა უფასოა, ბარათს არ ვთხოვთ. გაშვების შემდეგ თანხა დაცული იქნება — ექსპერტს მხოლოდ სესიის შემდეგ გადაერიცხება.',
       },
       {
         q: 'რომელი გადახდის მეთოდები მიიღება?',
-        a: 'ონლაინ გადახდები ჯერ არ არის ჩართული — ამჟამად დაჯავშნა უფასოა. ამოქმედებისთანავე აქვე გამოვაქვეყნებთ მხარდაჭერილი მეთოდების სრულ სიას.',
+        a: 'ონლაინ გადახდა ჯერ არ არის — ახლა დაჯავშნა უფასოა. მეთოდების სიას ამოქმედებისთანავე გამოვაქვეყნებთ.',
       },
       {
         q: 'შემიძლია მივიღო ინვოისი?',
-        a: 'ინვოისები ონლაინ გადახდებთან ერთად ამოქმედდება — ყოველი გადახდის შემდეგ ინვოისი ავტომატურად გაიგზავნება ელფოსტაზე. მანამდე დაჯავშნა უფასოა და ინვოისი არ გჭირდება.',
+        a: 'ინვოისები გადახდებთან ერთად ამოქმედდება — ავტომატურად მოვა ელფოსტაზე. მანამდე დაჯავშნა უფასოა.',
       },
     ],
   },
@@ -88,15 +100,19 @@ const GROUPS: FaqGroup[] = [
     items: [
       {
         q: 'როგორ ვხდები ექსპერტი?',
-        a: '„გახდი ექსპერტი“ გვერდზე შეავსე განაცხადი — გამოცდილება, სპეციალიზაცია, პორტფოლიო. 3 დღეში მიიღებ პასუხს. მოწმდება: მინიმუმ 5 წლის გამოცდილება და პროფესიული რეპუტაცია.',
+        a: '„გახდი ექსპერტი“ გვერდზე შეავსე განაცხადი — გამოცდილება, სპეციალიზაცია, პორტფოლიო. პასუხს 24–48 საათში მიიღებ.',
       },
       {
         q: 'რა კომისიას იღებს პლატფორმა?',
-        a: `პლატფორმა იტოვებს ${COMMISSION_PCT}% ექსპერტის შემოსავლიდან. ეს მოიცავს ტექნიკურ ინფრასტრუქტურას, გადახდის დამუშავებას, მხარდაჭერას და მარკეტინგს.`,
+        // Present tense only when money actually moves — today no booking is
+        // charged, so nothing is withheld from the expert.
+        a: PAYMENTS_LIVE
+          ? `პლატფორმა იტოვებს ${COMMISSION_PCT}%-ს. ეს მოიცავს ინფრასტრუქტურას, გადახდას, მხარდაჭერასა და მარკეტინგს.`
+          : `ახლა დაჯავშნა უფასოა და საკომისიოს არ ვიკავებთ — ექსპერტი სრულ თანხას იღებს. ონლაინ გადახდების ამოქმედების შემდეგ პლატფორმა ${COMMISSION_PCT}%-ს დაიტოვებს; ეს მოიცავს ინფრასტრუქტურას, გადახდას, მხარდაჭერასა და მარკეტინგს.`,
       },
       {
         q: 'როდის მივიღებ თანხას?',
-        a: 'ონლაინ გადახდები და გადმორიცხვები მალე ამოქმედდება — მანამდე სესიები უფასოდ იჯავშნება და გადმორიცხვები არ ხდება. გაშვების შემდეგ შემოსავალი რეგულარული, წინასწარ ცნობილი გრაფიკით გადმოირიცხება შენს ანგარიშზე — დეტალებს გაშვებამდე შეგატყობინებთ.',
+        a: 'გადახდები მალე ამოქმედდება — მანამდე სესიები უფასოა. გაშვების შემდეგ შემოსავალი რეგულარული გრაფიკით გადმოგერიცხება.',
       },
     ],
   },
@@ -105,15 +121,24 @@ const GROUPS: FaqGroup[] = [
     items: [
       {
         q: 'როგორ დავიცვა ჩემი ანგარიში?',
-        a: 'ჩართე 2FA „პარამეტრები → უსაფრთხოებაში“, გამოიყენე ძლიერი პაროლი და არასდროს გაუზიარო წვდომა სხვას. ეჭვის შემთხვევაში დაუყოვნებლივ დაგვიკავშირდი.',
+        // Only controls that actually exist: /settings has „პაროლის შეცვლა“
+        // (min. 8 characters) and Google-ით შესვლა. There is no 2FA anywhere in
+        // the product — don't send people looking for a switch that isn't there.
+        a: `გამოიყენე ძლიერი, უნიკალური პაროლი (მინიმუმ 8 სიმბოლო) და არავის გაუზიარო წვდომა. პაროლს ნებისმიერ დროს შეცვლი „პარამეტრები → პაროლის შეცვლა“-ში. თუ ეჭვი გაქვს, რომ ვინმემ ანგარიშთან წვდომა მოიპოვა, მაშინვე შეცვალე პაროლი და მოგვწერე ${SUPPORT_EMAIL}.`,
       },
       {
         q: 'როგორ წავშალო ანგარიში?',
-        a: '„პარამეტრები → ანგარიში → ანგარიშის დახურვა“. წაშლის შემდეგ მონაცემები ინახება 90 დღე (საშეღავათო პერიოდი), შემდეგ სრულად შორდება სისტემას.',
+        // The DELETE in app/api/me/route.ts runs prisma.user.delete() straight
+        // away — no grace period, no restore. It refuses only when live bookings
+        // or historical records exist (then support handles it by hand).
+        a: `„პარამეტრები → ანგარიში → ანგარიშის წაშლა“. წაშლა მყისიერია და შეუქცევადი — მონაცემები აღდგენას აღარ ექვემდებარება. თუ დაგეგმილი ან მიმდინარე ჯავშანი გაქვს, ჯერ გააუქმე; თუ ანგარიშს დასრულებული ჯავშნები ან მიმოწერა აქვს, წაშლა ავტომატურად არ სრულდება — მოგვწერე ${SUPPORT_EMAIL}.`,
       },
       {
         q: 'რა ხდება, თუ ექსპერტი დისკრიმინაციულად მოიქცა?',
-        a: 'დაუყოვნებლივ დაწერე report@mcodne.ge — გამოვიძიებთ 48 საათში. სერიოზული დარღვევის შემთხვევაში ექსპერტს ვხურავთ ანგარიშს და ვაბრუნებთ თანხას სრულად.',
+        // Was report@mcodne.ge — an address that appeared nowhere else in the
+        // product and had no inbox behind it, so abuse reports went nowhere.
+        // Route to the one support address that is actually monitored.
+        a: `დაწერე ${SUPPORT_EMAIL} — გამოვიძიებთ 48 საათში. სერიოზული დარღვევისას ანგარიშს ვხურავთ და თანხას სრულად ვაბრუნებთ.`,
       },
     ],
   },
@@ -132,7 +157,7 @@ type Channel = {
 // Honest channels only — no invented chat widget or placeholder phone number.
 // Support today is email + the contact form; hours match the canonical schedule.
 const CHANNELS: Channel[] = [
-  { icon: <Icon.mail className="w-6 h-6" />, t: 'ელფოსტა', d: 'hi@mcodne.ge · პასუხი 24 საათში', hours: 'ორშ – პარ 10:00 – 19:00 · შაბ – კვ ელფოსტა', cta: 'წერილის გაგზავნა', href: 'mailto:hi@mcodne.ge', primary: true },
+  { icon: <Icon.mail className="w-6 h-6" />, t: 'ელფოსტა', d: `${SUPPORT_EMAIL} · პასუხი 24 საათში`, hours: 'ორშ – პარ 10:00 – 19:00 · შაბ – კვ ელფოსტა', cta: 'წერილის გაგზავნა', href: `mailto:${SUPPORT_EMAIL}`, primary: true },
   { icon: <Icon.chat className="w-6 h-6" />, t: 'საკონტაქტო ფორმა', d: 'აღწერე საკითხი დეტალურად', hours: 'პასუხი 24 საათში', cta: 'ფორმის გახსნა', href: '/contact' },
 ]
 
@@ -150,7 +175,7 @@ export default function HelpPage() {
   }
   return (
     <div className="min-h-screen bg-white">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(faqLd) }} />
       <MarketingTopBar />
 
       <Container as="main" size="content" className="py-16 lg:py-20">
@@ -158,12 +183,12 @@ export default function HelpPage() {
           დახმარება
         </Eyebrow>
         <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05] motion-safe:animate-rise-in">
-          ხშირად დასმული კითხვები
+          <SiteText k="help.hero.title" />
         </h1>
         <p className="mt-6 text-[16px] text-ink-600 leading-relaxed max-w-[640px]">
           თუ ვერ იპოვე პასუხი აქ, დაწერე{' '}
-          <a href="mailto:hi@mcodne.ge" className="text-brand-700 hover:text-brand-800 font-semibold">
-            hi@mcodne.ge
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="text-brand-700 hover:text-brand-800 font-semibold">
+            {SUPPORT_EMAIL}
           </a>{' '}
           ან{' '}
           <Link href="/contact" className="text-brand-700 hover:text-brand-800 font-semibold">
@@ -202,9 +227,9 @@ export default function HelpPage() {
               პასუხი ვერ იპოვე?
             </Eyebrow>
             <h2 className="font-display text-[28px] lg:text-[32px] font-bold text-ink-900 tracking-tight">
-              დაგვიკავშირდი
+              <SiteText k="help.contact.title" />
             </h2>
-            <p className="mt-2 text-[13.5px] text-ink-600">ჩვენი გუნდი პასუხობს ორშ – პარ 10:00 – 19:00.</p>
+            <p className="mt-2 text-[13.5px] text-ink-600"><SiteText k="help.contact.sub" /></p>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             {CHANNELS.map(c => (
@@ -227,7 +252,7 @@ export default function HelpPage() {
           <div className="mt-8 p-5 rounded-card bg-ink-50/50 border border-ink-200 text-center">
             <div className="font-mono text-[11.5px] tabular-nums text-ink-600">
               <Icon.star className="w-3.5 h-3.5 inline-block mr-1.5 text-warning-500" />
-              ხელით მოდერაცია · ადმინისტრაცია პასუხობს პირად შემთხვევებზე
+              ხელით მოდერაცია · პასუხობს ადმინისტრაცია
             </div>
           </div>
         </section>

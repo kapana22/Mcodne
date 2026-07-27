@@ -39,9 +39,8 @@ export const IntakeStep = ({ value, onChange, summary }: { value: DetailsState; 
     <div className="grid lg:grid-cols-[1fr_280px] gap-6 sm:gap-7 lg:gap-10 p-4 sm:p-7 lg:p-10">
       <div className="space-y-7">
         <div>
-          <div className="flex items-baseline justify-between mb-3">
+          <div className="mb-3">
             <label className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">თემა</label>
-            <span className="text-[11px] text-ink-500">აირჩიე ან დაასახელე შენი</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {TOPIC_OPTIONS.map(t => {
@@ -84,7 +83,6 @@ export const IntakeStep = ({ value, onChange, summary }: { value: DetailsState; 
             </label>
             <span className="text-[11px] text-ink-500 tabular-nums">{value.goal.length} / {MAX_INTAKE_CHARS}</span>
           </div>
-          <p className="mb-2.5 text-[12px] text-ink-600">ეს ეხმარება ექსპერტს მოემზადოს — რაც უფრო კონკრეტული ხარ, მით უკეთეს შედეგს მიიღებ.</p>
 
           <textarea
             id="booking-intake"
@@ -93,12 +91,12 @@ export const IntakeStep = ({ value, onChange, summary }: { value: DetailsState; 
             rows={5}
             required
             aria-required="true"
-            placeholder="მაგ. მაქვს კონკრეტული სიტუაცია და მინდა გავიგო, როგორ მივუდგე — რა ნაბიჯები და რა რისკებია."
+            placeholder="მაგ. მაქვს კონკრეტული სიტუაცია — მინდა გავიგო, როგორ მივუდგე."
             className="w-full px-3.5 py-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14px] text-ink-900 placeholder:text-ink-400 transition-colors leading-[1.5] resize-none"
           />
           <div className="mt-2 flex items-center justify-between gap-3 text-[11.5px]">
             {goalValid ? (
-              <span className="inline-flex items-center gap-1 text-brand-700"><Icon.check className="w-3 h-3" /> ამ ტექსტს ექსპერტი სესიამდე ნახავს.</span>
+              <span className="inline-flex items-center gap-1 text-brand-700"><Icon.check className="w-3 h-3" /> მზადაა</span>
             ) : (
               <span className="font-medium text-danger-600">შესავსებია — მინ. {MIN_INTAKE_CHARS} სიმბოლო{goalLen > 0 ? ` (დარჩა ${MIN_INTAKE_CHARS - goalLen})` : ''}.</span>
             )}
@@ -112,8 +110,7 @@ export const IntakeStep = ({ value, onChange, summary }: { value: DetailsState; 
           </span>
           <input type="checkbox" checked={value.preCall} onChange={e => onChange({ ...value, preCall: e.target.checked })} className="sr-only" />
           <div>
-            <div className="font-display text-[13px] font-bold text-ink-900">მასალის გაგზავნა სესიამდე</div>
-            <p className="text-[12.5px] text-ink-600 mt-0.5 leading-[1.5]">გავუგზავნი დოკუმენტებს ან სხვა მასალას ექსპერტს დასათვალიერებლად სესიამდე. ფასი იგივეა.</p>
+            <div className="font-display text-[13px] font-bold text-ink-900">მასალის გაზიარება სესიამდე</div>
           </div>
         </label>
       </div>

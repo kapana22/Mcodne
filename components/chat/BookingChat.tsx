@@ -5,10 +5,10 @@ import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
-import { safeHttpUrl } from '@/lib/safeUrl'
+import { safeStoredFileUrl } from '@/lib/safeUrl'
 import { fmtKaDate } from '@/lib/kaDate'
 import { sanitizeMsgBody, MSG_MAX_LEN } from '@/lib/msgText'
-import { useBookingThread, type ChatMessage, type ChatUser, type ThreadBooking, type ThreadPair } from './useBookingThread'
+import { useBookingThread, type ChatMessage, type ChatUser, type ThreadBooking, type ThreadPair, type ThreadPre } from './useBookingThread'
 import { CallInviteCard } from './CallInviteCard'
 
 export type BookingChatProps = {
@@ -25,10 +25,11 @@ export type BookingChatProps = {
       fill = flex column that fills its parent's height (messages center). */
   variant?: 'embedded' | 'fill'
   /** Optional custom header: a node, or a render function that receives the
-      booking summary AND the pair summary from the thread GET (whichever the
-      mode returns). The embedded default renders the classic
-      "მიმოწერა კლიენტთან · N" bar; pass null to hide entirely. */
-  header?: React.ReactNode | ((booking: ThreadBooking | null, pair: ThreadPair | null) => React.ReactNode)
+      booking summary, the pair summary, and (booking mode) the earlier
+      pre-booking thread with the same partner, from the thread GET. The embedded
+      default renders the classic "მიმოწერა სტუდენტთან · N" bar; pass null to
+      hide entirely. */
+  header?: React.ReactNode | ((booking: ThreadBooking | null, pair: ThreadPair | null, preThread: ThreadPre | null) => React.ReactNode)
   /** Override the empty-thread copy (the default is client-facing). */
   emptyState?: { title: string; body: string }
   /** Fired after a successful send and when polling brings new messages —
@@ -58,8 +59,11 @@ function MessageBubble({
 }) {
   const senderAvatar = avatarSrc ?? m.from.avatarUrl
   // Never render an attachment href with an unsafe scheme (guards legacy rows
-  // predating the server-side scheme check).
-  const safeFile = safeHttpUrl(m.fileUrl)
+  // predating the server-side scheme check). Uses the STORED-file guard — the
+  // same allow-list POST /api/messages enforces — so an inline PDF renders as
+  // the file/download row below instead of silently disappearing, while
+  // `mailto:`/relative/`javascript:` values stay non-navigable.
+  const safeFile = safeStoredFileUrl(m.fileUrl)
 
   // Instant-call invite (fileName sentinel) → a join card, not a normal bubble.
   if (m.fileName === '__call__') {
@@ -77,7 +81,7 @@ function MessageBubble({
     <div className={`flex gap-2 ${mine ? 'justify-end' : 'justify-start'} ${groupedWithPrev ? 'mt-1' : 'mt-3'}`}>
       {!mine && (groupedWithPrev
         ? <span className="w-7 shrink-0" aria-hidden />
-        : <Avatar src={m.from.avatarUrl ?? undefined} name={m.from.fullName} size={28} />)}
+        : <Avatar src={senderAvatar ?? undefined} name={m.from.fullName} size={28} />)}
       <div className={`max-w-[85%] sm:max-w-[75%] rounded-card px-3 py-2 text-[13.5px] ${mine ? 'bg-brand-500 text-white shadow-xs' : 'bg-white border border-ink-200 text-ink-800 shadow-xs'}`}>
         <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{sanitizeMsgBody(m.body)}</div>
         {safeFile && (
@@ -123,7 +127,7 @@ export function BookingChat({
   className = '',
 }: BookingChatProps) {
   const {
-    msgs, booking, pair, loaded, draft, setDraft, attachment, setAttachment, attach,
+    msgs, booking, pair, preThread, loaded, draft, setDraft, attachment, setAttachment, attach,
     uploading, send, sending, requestCall, calling, error,
   } = useBookingThread({ bookingId, withUser, me, initialMessages, onActivity })
 
@@ -154,6 +158,21 @@ export function BookingChat({
     if (autoFocus) textareaRef.current?.focus()
   }, [autoFocus, bookingId, withUser])
 
+  // Full-screen thread: the composer owns the bottom of the viewport, so lift
+  // the cookie banner above it (reuse the shared `data-mobile-cta` signal that
+  // globals.css already uses to raise the banner over bottom bars). Without this
+  // the banner covers the composer on a first visit and blocks sending the very
+  // first message. Only for the `fill` variant — `embedded` sits inside a page
+  // that has its own bottom chrome.
+  useEffect(() => {
+    if (variant !== 'fill') return
+    // „lift" (not „1") — the composer is IN FLOW, not fixed, so it needs the
+    // banner lift but NOT the body bottom-reserve that „1" adds for fixed bars;
+    // „1" here left a ~124px blank tail under every thread. See globals.css.
+    document.body.setAttribute('data-mobile-cta', 'lift')
+    return () => { document.body.removeAttribute('data-mobile-cta') }
+  }, [variant])
+
   const submit = (e?: React.FormEvent) => {
     e?.preventDefault()
     void send()
@@ -164,7 +183,7 @@ export function BookingChat({
 
   const defaultHeader = (
     <div className="px-5 sm:px-6 py-4 border-b border-ink-100 flex items-center justify-between">
-      <div className="font-display text-[15px] font-bold tracking-tight text-ink-900">მიმოწერა კლიენტთან</div>
+      <div className="font-display text-[15px] font-bold tracking-tight text-ink-900">მიმოწერა სტუდენტთან</div>
       {msgs.length > 0 && (
         <div className="text-[11.5px] text-ink-400 tabular-nums">{msgs.length} შეტყობინება</div>
       )}
@@ -181,7 +200,7 @@ export function BookingChat({
     >
       {header === undefined
         ? (fill ? null : defaultHeader)
-        : typeof header === 'function' ? header(booking, pair) : header}
+        : typeof header === 'function' ? header(booking, pair, preThread) : header}
 
       <div className={`${fill ? 'flex-1 min-h-0' : 'max-h-[420px] min-h-[220px]'} overflow-y-auto p-4 sm:p-6 bg-ink-50/40`}>
         {!loaded && msgs.length === 0 ? (
@@ -191,13 +210,13 @@ export function BookingChat({
             ))}
           </div>
         ) : msgs.length === 0 ? (
-          <div className="text-center py-8">
+          <div className="h-full flex flex-col items-center justify-center text-center py-8">
             <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-50 text-brand-700 mb-3">
               <Icon.chat className="w-5 h-5" />
             </span>
             <div className="font-display text-[13.5px] font-semibold text-ink-800">{emptyState?.title ?? 'მიმოწერა ჯერ არ არის'}</div>
             <p className="text-[12.5px] text-ink-500 mt-1 max-w-[340px] mx-auto">
-              {emptyState?.body ?? 'მიესალმე კლიენტს ან დააზუსტე კონსულტაციის დეტალები — სწრაფი პასუხი ნდობას ზრდის.'}
+              {emptyState?.body ?? 'მიესალმე ან დააზუსტე დეტალები.'}
             </p>
           </div>
         ) : (
@@ -256,7 +275,7 @@ export function BookingChat({
             <Icon.paperclip className="w-3.5 h-3.5 text-ink-500 shrink-0" />
             <span className="flex-1 truncate font-display font-semibold text-ink-800">{attachment.name}</span>
             <span className="font-mono text-[10.5px] text-ink-500 tabular-nums shrink-0">{(attachment.size / 1024).toFixed(0)} KB</span>
-            <button type="button" onClick={() => setAttachment(null)} aria-label="ფაილის მოხსნა" className="w-6 h-6 rounded-btn hover:bg-ink-100 text-ink-500 hover:text-danger-600 inline-flex items-center justify-center">
+            <button type="button" onClick={() => setAttachment(null)} aria-label="ფაილის მოხსნა" className="w-8 h-8 shrink-0 rounded-btn hover:bg-ink-100 text-ink-500 hover:text-danger-600 inline-flex items-center justify-center">
               <Icon.x className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -271,20 +290,24 @@ export function BookingChat({
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
             aria-label="ფაილის მიბმა"
-            title="ფაილის მიბმა (PDF/JPG/PNG · max 8 MB)"
-            className="h-9 w-9 rounded-full text-ink-500 hover:text-ink-900 hover:bg-ink-100 disabled:opacity-50 inline-flex items-center justify-center transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+            // Two numbers because they genuinely differ: a photo is downscaled
+            // server-side, a PDF is stored byte-for-byte and hits the API's
+            // stored-URL ceiling far sooner (see MAX_STORED_URL_CHARS).
+            title="ფაილის მიბმა (PDF/JPG/PNG · სურათი მაქს. 8 MB, PDF მაქს. 2 MB)"
+            className="h-10 w-10 rounded-full text-ink-500 hover:text-ink-900 hover:bg-ink-100 disabled:opacity-50 inline-flex items-center justify-center transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           >
             {uploading ? <span className="inline-block w-4 h-4 border-2 border-ink-500 border-t-transparent rounded-full animate-spin" /> : <Icon.paperclip className="w-4 h-4" />}
           </button>
-          {/* Instant „let's meet now“ call — booking threads only. */}
-          {bookingId && (
+          {/* Instant „let's meet now“ call — booking threads only, and ONLY the
+              expert can start it (the student joins, never initiates). */}
+          {bookingId && booking && me?.id === booking.tutorUser?.id && (
             <button
               type="button"
               onClick={requestCall}
               disabled={calling || !me}
-              aria-label="ვიდეოზარის მოთხოვნა"
-              title="ვიდეოზარის მოთხოვნა — ახლავე შეხვდი"
-              className="h-9 w-9 rounded-full text-brand-600 hover:text-brand-700 hover:bg-brand-50 disabled:opacity-50 inline-flex items-center justify-center transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+              aria-label="ვიდეოზარის დაწყება"
+              title="დაიწყე ვიდეოზარი — სტუდენტი შემოუერთდება"
+              className="h-10 w-10 rounded-full text-brand-600 hover:text-brand-700 hover:bg-brand-50 disabled:opacity-50 inline-flex items-center justify-center transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
             >
               {calling ? <span className="inline-block w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /> : <Icon.video className="w-4 h-4" />}
             </button>
@@ -313,7 +336,7 @@ export function BookingChat({
             disabled={!me || sending || uploading || (!draft.trim() && !attachment)}
             aria-label="გაგზავნა"
             title="გაგზავნა"
-            className="h-9 w-9 shrink-0 rounded-full bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1"
+            className="h-10 w-10 shrink-0 rounded-full bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1"
           >
             {sending ? <span className="inline-block w-4 h-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin" /> : <Icon.send className="w-4 h-4" />}
           </button>

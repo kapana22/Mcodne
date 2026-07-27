@@ -4,6 +4,7 @@ import { Icon } from '@/components/Icon'
 import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { Eyebrow } from '@/components/Eyebrow'
 import { signOut } from '@/lib/signout'
+import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 
 type Props = {
   initialName: string
@@ -115,12 +116,12 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
             <label className="text-[12px] font-medium text-ink-700 mb-1.5 block">ელფოსტა</label>
             <input value={initialEmail} disabled
                    className="w-full h-11 px-3 rounded-field border border-ink-200 bg-ink-50 text-ink-500 text-sm cursor-not-allowed" />
-            <div className="text-[11px] text-ink-500 mt-1.5">ელფოსტის შესაცვლელად დაუკავშირდი hi@mcodne.ge</div>
+            <div className="text-[11px] text-ink-500 mt-1.5">შესაცვლელად: {SUPPORT_EMAIL}</div>
           </div>
           <div className="sm:col-span-2">
             <label className="text-[12px] font-medium text-ink-700 mb-1.5 block">შესახებ</label>
             <textarea value={bio} onChange={e => setBio(e.target.value)} rows={4} maxLength={500}
-                      placeholder="მოკლედ შენ შესახებ..."
+                      placeholder="მოკლედ შენ შესახებ…"
                       className="w-full p-3 rounded-field border border-ink-200 focus:border-brand-500 focus:outline-none text-sm resize-none" />
           </div>
         </div>
@@ -174,8 +175,8 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
           duplicating the prefs UI here. */}
       <div className="rounded-card border border-ink-200 bg-white p-6 flex items-center justify-between gap-4">
         <div>
-          <div className="font-display text-[13px] font-bold text-ink-900">შეტყობინებების პარამეტრები</div>
-          <div className="text-[12.5px] text-ink-600 mt-0.5">აირჩიე, რაზე მიიღო შეტყობინება.</div>
+          <div className="font-display text-[13px] font-bold text-ink-900">შეტყობინებები</div>
+          <div className="text-[12.5px] text-ink-600 mt-0.5">აირჩიე, რაზე მიიღო.</div>
         </div>
         <a href="/settings" className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 shrink-0">
           გახსნა
@@ -186,7 +187,7 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
       <div className="rounded-card border border-danger-200 bg-white p-6 flex items-center justify-between">
         <div>
           <div className="font-display text-[13px] font-bold text-ink-900">გამოსვლა</div>
-          <div className="text-[12.5px] text-ink-600 mt-0.5">ამ მოწყობილობიდან სესია დასრულდება.</div>
+          <div className="text-[12.5px] text-ink-600 mt-0.5">სესია დასრულდება.</div>
         </div>
         {/* fetch + navigate (NOT a native form POST): the signout endpoint
             returns JSON, so a form submit would render {"ok":true} as a page. */}
@@ -199,7 +200,7 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
         <div className="rounded-card border border-brand-200 bg-brand-50/40 p-6 flex items-center justify-between">
           <div>
             <div className="font-display text-[13px] font-bold text-ink-900">გახდი ექსპერტი</div>
-            <div className="text-[12.5px] text-ink-600 mt-0.5">გააზიარე ცოდნა, გამოიმუშავე შემოსავალი.</div>
+            <div className="text-[12.5px] text-ink-600 mt-0.5">გააზიარე ცოდნა, გამოიმუშავე.</div>
           </div>
           <a href="/apply" className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5">
             განაცხადი

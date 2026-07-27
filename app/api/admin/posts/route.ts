@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { audit } from '@/lib/audit'
 import { slugify } from '@/lib/slug'
 import { ensureDbReady } from '@/lib/dbBoot'
 
@@ -27,14 +28,16 @@ export async function GET() {
 const CreateBody = z.object({ title: z.string().trim().min(2).max(160) })
 
 export async function POST(req: Request) {
-  await requireRole('ADMIN')
+  const admin = await requireRole('ADMIN')
   await ensureDbReady()
   const parsed = CreateBody.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   }
   const { title } = parsed.data
-  const base = slugify(title)
+  // `|| 'post'` mirrors the PATCH sibling: an untransliterable title slugifies to
+  // '' and would otherwise take the loop's `base-2` stub instead of a real slug.
+  const base = slugify(title) || 'post'
   let slug = base
   for (let i = 2; await prisma.post.findUnique({ where: { slug } }); i++) {
     slug = `${base}-${i}`
@@ -46,6 +49,11 @@ export async function POST(req: Request) {
       coverUrl: true, tag: true, status: true, authorName: true,
       publishedAt: true, updatedAt: true,
     },
+  })
+  await audit(admin.id, 'post.create', {
+    targetType: 'Post',
+    targetId: created.id,
+    meta: { title: created.title, slug: created.slug },
   })
   return NextResponse.json({ ok: true, post: created }, { status: 201 })
 }

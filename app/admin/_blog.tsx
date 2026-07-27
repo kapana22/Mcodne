@@ -27,6 +27,9 @@ export const BlogSection = () => {
   const [saving, setSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [pendDelete, setPendDelete] = useState<Post | null>(null)
+  // Unpublishing pulls a live, indexed page off /blog — confirm it like every
+  // other destructive admin action. Publishing stays one click.
+  const [pendUnpublish, setPendUnpublish] = useState<Post | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -43,13 +46,17 @@ export const BlogSection = () => {
 
   const selected = rows?.find(r => r.id === selId) ?? null
 
+  // Single source for „post row → editable draft" so a saved post can re-seed the
+  // form from the SERVER's version (the slug it actually stored, not what was typed).
+  const draftOf = (p: Post): Draft => ({
+    title: p.title, slug: p.slug, tag: p.tag ?? '', authorName: p.authorName ?? '',
+    excerpt: p.excerpt ?? '', coverUrl: p.coverUrl ?? '', body: p.body ?? '',
+  })
+
   const select = (p: Post) => {
     setSelId(p.id)
     setShowPreview(false)
-    setDraft({
-      title: p.title, slug: p.slug, tag: p.tag ?? '', authorName: p.authorName ?? '',
-      excerpt: p.excerpt ?? '', coverUrl: p.coverUrl ?? '', body: p.body ?? '',
-    })
+    setDraft(draftOf(p))
   }
 
   const create = async () => {
@@ -79,6 +86,10 @@ export const BlogSection = () => {
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) throw new Error()
       setRows(prev => (prev ?? []).map(r => r.id === selected.id ? j.post : r))
+      // Re-seed the form from the response: the server re-slugifies + de-duplicates,
+      // so the typed slug and the live URL can differ. Without this the field kept
+      // showing the typed value and lied about where the post actually lives.
+      setDraft(draftOf(j.post))
       setFlash({ kind: 'success', msg: 'შენახულია.' })
     } catch { setFlash({ kind: 'error', msg: 'ვერ შეინახა — სცადე თავიდან.' }) }
     finally { setSaving(false) }
@@ -173,7 +184,7 @@ export const BlogSection = () => {
                   {live && <a href={`/blog/${selected.slug}`} target="_blank" rel="noopener noreferrer" className="text-[12px] text-brand-700 hover:underline inline-flex items-center gap-1">ნახვა <Icon.external className="w-3 h-3" /></a>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button type="button" onClick={() => togglePublish(selected)} className={`h-8 px-3 rounded-btn font-display text-[12px] font-semibold transition-colors ${live ? 'bg-ink-100 text-ink-700 hover:bg-ink-200' : 'bg-brand-500 text-white hover:bg-brand-600'}`}>
+                  <button type="button" onClick={() => live ? setPendUnpublish(selected) : togglePublish(selected)} className={`h-8 px-3 rounded-btn font-display text-[12px] font-semibold transition-colors ${live ? 'bg-ink-100 text-ink-700 hover:bg-ink-200' : 'bg-brand-500 text-white hover:bg-brand-600'}`}>
                     {live ? 'დამალვა' : 'გამოქვეყნება'}
                   </button>
                   <button type="button" onClick={() => setPendDelete(selected)} aria-label="წაშლა" className="h-8 w-8 grid place-items-center rounded-btn text-ink-400 hover:text-danger-600 hover:bg-danger-50 transition-colors"><Icon.close className="w-4 h-4" /></button>
@@ -226,11 +237,22 @@ export const BlogSection = () => {
         </div>
       </section>
 
+      {pendUnpublish && (
+        <AdminConfirmDialog
+          open
+          title="სტატიის დამალვა"
+          body={`„${pendUnpublish.title}“ /blog-იდან გაქრება — ბმული და საძიებოში დაინდექსებული გვერდი აღარ იმუშავებს. ტექსტი რჩება დრაფტად.`}
+          confirmLabel="დამალე"
+          tone="danger"
+          onConfirm={() => { const p = pendUnpublish; setPendUnpublish(null); togglePublish(p) }}
+          onCancel={() => setPendUnpublish(null)}
+        />
+      )}
       {pendDelete && (
         <AdminConfirmDialog
           open
           title="სტატიის წაშლა"
-          body={`დარწმუნებული ხარ? „${pendDelete.title}" სამუდამოდ წაიშლება.`}
+          body={`დარწმუნებული ხარ? „${pendDelete.title}“ სამუდამოდ წაიშლება.`}
           confirmLabel="წაშლა"
           tone="danger"
           onConfirm={() => { const id = pendDelete.id; setPendDelete(null); remove(id) }}

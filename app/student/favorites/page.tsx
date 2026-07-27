@@ -14,6 +14,10 @@ export default async function StudentFavoritesPage() {
     where: { userId: user.id },
     include: {
       tutor: {
+        // Drop the heavy blobs at the DB level — the cards below map ~8 small
+        // fields and never render the intro video or professionData. Mirrors the
+        // API sibling (app/api/favorites/route.ts).
+        omit: { professionData: true, videoUrl: true },
         include: {
           user: { select: { id: true, fullName: true, avatarUrl: true } },
           category: { select: { id: true, slug: true, name: true } },
@@ -21,6 +25,8 @@ export default async function StudentFavoritesPage() {
       },
     },
     orderBy: { createdAt: 'desc' },
+    // Bound the SSR payload — a saved list this long is already past useful.
+    take: 200,
   })
 
   // A deleted tutor leaves `tutor: null` on the favorite — skip those rows
@@ -49,9 +55,9 @@ export default async function StudentFavoritesPage() {
         {items.length === 0 ? (
           <EmptyState
             icon={<Icon.heart className="w-6 h-6" />}
-            title="ჯერ არაფერი გაქვს შენახული"
-            description="დააჭირე გულის ღილაკს ექსპერტის ბარათზე — შენს პირად სიაში დაემატება."
-            cta={{ label: 'დაათვალიერე ექსპერტები', href: '/tutors' }}
+            title="შენახული ცარიელია"
+            description="დააჭირე გულს ბარათზე — აქ დაემატება."
+            cta={{ label: 'ექსპერტების ნახვა', href: '/tutors' }}
           />
         ) : (
           <FavoritesClient items={items} />

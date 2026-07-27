@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/Icon'
+import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 type Me = { role: Role; fullName?: string } | null
@@ -31,8 +32,10 @@ export default function NotFound() {
 
   return (
     <main className="relative min-h-screen flex items-center justify-center px-6 bg-ink-50 overflow-hidden">
-      {/* Soft brand halo behind content */}
-      <span aria-hidden className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full bg-brand-100/30 blur-3xl pointer-events-none" />
+      {/* Soft brand halo behind content — the named radial-gradient utility from
+          globals.css, never `blur-3xl`: Safari renders large blur() filters as a
+          hard-edged square stain. */}
+      <span aria-hidden className="glow-brand absolute top-1/3 left-1/2 -translate-x-1/2 w-[560px] h-[560px] pointer-events-none" />
 
       <div className="relative max-w-[520px] w-full text-center">
         {/* Big 404 with brand gradient */}
@@ -65,7 +68,7 @@ export default function NotFound() {
 
         <div className="mt-8 text-[12.5px] text-ink-500 motion-safe:animate-fade-in" style={{ animationDelay: '280ms' }}>
           თუ ეს ბმული სადმე გინახე — {' '}
-          <a href="mailto:hi@mcodne.ge" className="font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2">
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2">
             მოგვწერე
           </a>
         </div>

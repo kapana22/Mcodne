@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from 'react'
 import Link from 'next/link'
 
 type Variant = 'primary' | 'hero' | 'cta' | 'secondary' | 'ghost' | 'danger'
@@ -75,7 +75,27 @@ export function Btn({
       {!loading && iconRight}
     </>
   )
-  if (href) return <Link href={href} className={cls}>{content}</Link>
+  if (href) {
+    // A link that declares itself disabled/loading must not stay clickable.
+    // `disabled:` utilities only match a real :disabled element, so the link
+    // branch renders a non-interactive control instead of a live <a> that
+    // silently ignores its own state.
+    if (disabled || loading) {
+      return (
+        <span role="link" aria-disabled="true" tabIndex={-1} className={`${cls} opacity-50 pointer-events-none`}>
+          {content}
+        </span>
+      )
+    }
+    // Forward the rest of the props (onClick, aria-*, data-*, target/rel, …) —
+    // they used to be dropped on the floor here, which broke every call site
+    // that combined `href` with a handler (EmptyState's CTA among them).
+    // The cast only re-keys React's element-typed handlers (HTMLButtonElement →
+    // HTMLAnchorElement); the component's public API stays ButtonHTMLAttributes
+    // so no existing call site has to change.
+    const anchorProps = props as unknown as Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'className'>
+    return <Link href={href} className={cls} {...anchorProps}>{content}</Link>
+  }
   return (
     // Default to type="button" so a <Btn> dropped inside a <form> never submits
     // it by accident — callers opt into submit explicitly with type="submit".

@@ -5,6 +5,7 @@ import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
 import { ApplyCtaGate } from './ApplyCtaGate'
 import { SiteText } from '@/components/SiteTextProvider'
+import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 
 const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   { title: 'პროდუქტი', links: [
@@ -46,10 +47,10 @@ export function Footer() {
               <SiteText k="footer.tagline" />
             </p>
             <a
-              href="mailto:hi@mcodne.ge"
+              href={`mailto:${SUPPORT_EMAIL}`}
               className="inline-flex items-center gap-1.5 mt-4 text-[12.5px] text-ink-700 hover:text-brand-700 transition-colors font-display font-medium"
             >
-              hi@mcodne.ge
+              {SUPPORT_EMAIL}
             </a>
           </div>
           {COLS.map(col => (
@@ -75,7 +76,7 @@ export function Footer() {
           ))}
         </div>
         <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-4 pt-6 border-t border-ink-100 text-[12px] text-ink-500">
-          <div className="tabular-nums">© {new Date().getFullYear()} მცოდნე. ყველა უფლება დაცულია.</div>
+          <div className="tabular-nums">© {new Date().getFullYear()} მცოდნე</div>
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
             <TrustStrip />
             <span className="hidden sm:inline text-ink-300">·</span>

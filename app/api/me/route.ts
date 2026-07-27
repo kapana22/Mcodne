@@ -27,6 +27,11 @@ export async function GET() {
       phone: user.phone,
       bio: (user as any).bio,
       emailVerified: (user as any).emailVerified,
+      // Whether the account has a usable password. SSO-only accounts (Google)
+      // carry a random unusable hash, but for surfaces like account-deletion the
+      // client needs to know whether to collect a current-password. Kept as a
+      // boolean so the hash itself never leaves the server.
+      hasPassword: !!user.passwordHash,
       // Exposed so the client can detect "brand-new account" and show the
       // onboarding welcome banner for the first few days.
       createdAt: (user as any).createdAt ?? null,
@@ -100,8 +105,12 @@ export async function PATCH(req: Request) {
 }
 
 const DeleteBody = z.object({
-  currentPassword: z.string().min(6),
-  confirm: z.literal('DELETE'),
+  // Optional: SSO-only accounts have no usable password to re-enter. When a
+  // password account submits one it is still verified below.
+  currentPassword: z.string().min(1).optional(),
+  // Accept the ASCII sentinel or the Georgian word the delete modal collects
+  // („წაშლა") so the typed confirmation actually reaches the server.
+  confirm: z.union([z.literal('DELETE'), z.literal('წაშლა')]),
 })
 
 export async function DELETE(req: Request) {
@@ -111,8 +120,17 @@ export async function DELETE(req: Request) {
   const parsed = DeleteBody.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
-  const ok = await verifyPassword(parsed.data.currentPassword, user.passwordHash)
-  if (!ok) return NextResponse.json({ ok: false, error: 'BAD_CURRENT_PASSWORD' }, { status: 400 })
+  // Password accounts must re-enter their password; SSO-only accounts (no usable
+  // passwordHash) delete on the typed confirmation alone. Never weaken the check
+  // for accounts that do have a password.
+  const hasPassword = !!user.passwordHash
+  if (hasPassword) {
+    if (!parsed.data.currentPassword) {
+      return NextResponse.json({ ok: false, error: 'CURRENT_PASSWORD_REQUIRED' }, { status: 400 })
+    }
+    const ok = await verifyPassword(parsed.data.currentPassword, user.passwordHash)
+    if (!ok) return NextResponse.json({ ok: false, error: 'BAD_CURRENT_PASSWORD' }, { status: 400 })
+  }
 
   // Refuse if the account has live obligations (upcoming/live sessions in either role).
   const [asStudent, asTutor] = await Promise.all([

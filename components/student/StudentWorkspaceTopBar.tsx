@@ -41,7 +41,7 @@ export function StudentWorkspaceTopBar({ user }: { user?: { name: string; avatar
         <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/student/favorites"
-            aria-label="შენახული ექსპერტები"
+            aria-label="შენახული"
             aria-current={savedActive ? 'page' : undefined}
             className={`w-10 h-10 rounded-btn inline-flex items-center justify-center transition-colors ${
               savedActive ? 'text-brand-700 bg-brand-50' : 'text-ink-500 hover:text-ink-900 hover:bg-ink-100'

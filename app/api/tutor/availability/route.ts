@@ -8,6 +8,11 @@ const Body = z.object({
   endAt: z.string().datetime(),
 })
 
+// A window may now legitimately be many hours long (it is no longer sliced into
+// one-session pieces), but a whole day in one row is almost always a fat-finger
+// on the date field rather than a real 24h shift — cap it.
+const MAX_WINDOW_MS = 12 * 60 * 60 * 1000
+
 export async function GET(req: Request) {
   const user = await requireRole(['TUTOR', 'ADMIN'])
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
@@ -33,9 +38,11 @@ export async function GET(req: Request) {
       take: 500,
     }),
     // Exact activation signal, independent of the list cap — the schedule
-    // banner and dashboard alert key off this.
+    // banner and dashboard alert key off this. No `booked` filter any more:
+    // rows are WINDOWS, and a window overlapped by a booking is still published
+    // availability (the free part of it remains bookable). `booked` is legacy.
     prisma.availabilitySlot.count({
-      where: { tutorId: profile.id, booked: false, startAt: { gt: new Date() } },
+      where: { tutorId: profile.id, startAt: { gt: new Date() } },
     }),
   ])
   return NextResponse.json({ slots, upcomingFreeCount })
@@ -58,8 +65,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'PAST_DATE' }, { status: 400 })
   }
 
-  // Reject overlap with any existing slot for this tutor.
-  // Two intervals [a,b] and [c,d] overlap iff a < d AND c < b.
+  // The range is stored as ONE window row — no slicing. Pre-slicing by the
+  // profile's `consultationDurationMin` was the origin of the whole inventory
+  // bug: a service longer than a piece consumed only the first one (the rest
+  // still advertised as free but unbookable), a shorter one destroyed the
+  // piece's remaining minutes. Bookable starts are now DERIVED from the window
+  // at request time (lib/availability), so one row sells as many sessions as
+  // actually fit, at whatever length each service needs.
+  if (endAt.getTime() - startAt.getTime() > MAX_WINDOW_MS) {
+    return NextResponse.json({ ok: false, error: 'TOO_LONG' }, { status: 400 })
+  }
+
+  // Reject overlap with any existing row for this tutor — publishing the same
+  // hours twice would just duplicate a window (harmless to the math, confusing
+  // on the schedule grid). Two intervals [a,b] and [c,d] overlap iff a < d AND c < b.
   const conflict = await prisma.availabilitySlot.findFirst({
     where: {
       tutorId: profile.id,
@@ -74,5 +93,7 @@ export async function POST(req: Request) {
   const slot = await prisma.availabilitySlot.create({
     data: { tutorId: profile.id, startAt, endAt },
   })
-  return NextResponse.json({ ok: true, slot })
+  // `slots` kept alongside `slot` for wire compatibility — the schedule grid
+  // appends whatever the server returns, and it used to be many rows.
+  return NextResponse.json({ ok: true, slots: [slot], slot })
 }

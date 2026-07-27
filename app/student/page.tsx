@@ -36,7 +36,7 @@ const DashboardSearch = () => {
           type="text"
           value={q}
           onChange={e => setQ(e.target.value)}
-          placeholder="ეძებე ექსპერტი, სფერო, თემა..."
+          placeholder="ეძებე ექსპერტი, სფერო, თემა…"
           aria-label="ექსპერტის ძებნა"
           className="w-full h-11 pl-10 pr-3 bg-transparent text-[14px] text-ink-900 placeholder:text-ink-400 focus:outline-none"
         />
@@ -76,9 +76,9 @@ const OnboardingTour = ({ userId, hasBookings, joinedAt }: { userId?: string; ha
     setDismissed(true)
   }
   const steps = [
-    { n: 1, l: 'იპოვე ექსპერტი', d: 'აირჩიე კონკრეტული საკითხი — საგადასახადო, სამართალი, ან რაც გჭირდება.', href: '/tutors' },
-    { n: 2, l: 'აირჩიე დრო და დაჯავშნე', d: 'ექსპერტის კალენდრიდან აირჩიე თავისუფალი დრო — ის ადასტურებს მოთხოვნას.', href: '/tutors' },
-    { n: 3, l: 'შედი ვიდეო-ოთახში', d: 'დანიშნულ დროზე ერთი კლიკით ხდები კავშირზე. აპლიკაცია არ სჭირდება.', href: null as string | null },
+    { n: 1, l: 'იპოვე ექსპერტი', d: 'აირჩიე საკითხი — საგადასახადო, სამართალი, ან სხვა.', href: '/tutors' },
+    { n: 2, l: 'აირჩიე დრო და დაჯავშნე', d: 'აირჩიე დრო კალენდარში — ექსპერტი ადასტურებს.', href: '/tutors' },
+    { n: 3, l: 'შედი ვიდეო-ოთახში', d: 'დანიშნულ დროზე ერთი დაწკაპუნებით — აპლიკაცია არ გჭირდება.', href: null as string | null },
   ]
   return (
     <Container as="section" className="mt-6 motion-safe:animate-scale-in">
@@ -166,8 +166,8 @@ const Welcome = ({ me, bookings }: { me: MeData | null; bookings: any[] }) => {
             </h1>
             <p className="mt-3 text-[14.5px] text-ink-600 max-w-[560px] leading-[1.55] motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>
               {s.upcomingCount > 0
-                ? <>დაჯავშნილი გაქვს <span className="font-display font-semibold text-ink-900">{s.upcomingCount} სესია</span>. ყველა ჯავშანი ერთ ადგილას.</>
-                : <>ჯერ არ გაქვს დაჯავშნილი სესია — მოძებნე შენი პირველი ექსპერტი.</>}
+                ? <>დაჯავშნილი გაქვს <span className="font-display font-semibold text-ink-900">{s.upcomingCount} სესია</span>.</>
+                : <>ჯერ არ გაქვს ჯავშანი — მოძებნე პირველი ექსპერტი.</>}
             </p>
 
             {/* Search bar — primary CTA on the dashboard */}
@@ -243,8 +243,8 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
       <EmptyState
         icon={<Icon.cal className="w-6 h-6" />}
         title="უახლოესი ჯავშანი არ არის"
-        description="დაიწყე — აირჩიე ექსპერტი და დაჯავშნე ვიდეოსესია."
-        cta={{ label: 'ექსპერტების ძებნა', href: '/tutors' }}
+        description="აირჩიე ექსპერტი და დაჯავშნე."
+        cta={{ label: 'ექსპერტები', href: '/tutors' }}
       />
     )
   }
@@ -318,7 +318,7 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
               </Link>
             )}
             <button type="button" onClick={() => onOpenDetail(next.id)} className="h-11 px-4 rounded-btn bg-white/10 hover:bg-white/15 backdrop-blur text-white font-display font-medium text-[13px] inline-flex items-center gap-1.5 transition-colors">
-              სესიის დეტალები
+              დეტალები
             </button>
           </div>
         </div>
@@ -408,7 +408,7 @@ const SavedStrip = () => {
       <div role="alert" className="rounded-card border border-ink-200 bg-white px-4 sm:px-5 py-3 flex items-center gap-3 flex-wrap motion-safe:animate-fade-in">
         <Icon.warn className="w-4 h-4 text-ink-400 shrink-0" />
         <p className="flex-1 min-w-[220px] text-[12.5px] text-ink-600">
-          <span className="font-display font-semibold text-ink-800">რჩეულების სია ვერ ჩაიტვირთა</span> — შენახული ექსპერტების სია ამჟამად მიუწვდომელია.
+          <span className="font-display font-semibold text-ink-800">რჩეულების სია ვერ ჩაიტვირთა</span> — სცადე ცოტა ხანში.
         </p>
         <button
           type="button"
@@ -426,13 +426,13 @@ const SavedStrip = () => {
       <div className="rounded-card border border-dashed border-ink-200 bg-white px-4 sm:px-5 py-3 flex items-center gap-3 flex-wrap motion-safe:animate-fade-in">
         <Icon.heart className="w-4 h-4 text-ink-400 shrink-0" />
         <p className="flex-1 min-w-[220px] text-[12.5px] text-ink-600">
-          <span className="font-display font-semibold text-ink-800">რჩეულების სია ცარიელია</span> — შეინახე ექსპერტები კატალოგიდან შესადარებლად.
+          <span className="font-display font-semibold text-ink-800">რჩეულების სია ცარიელია</span> — შეინახე ექსპერტები შესადარებლად.
         </p>
         <Link
           href="/tutors"
           className="shrink-0 h-8 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
         >
-          ექსპერტების დათვალიერება
+          ექსპერტების ნახვა
         </Link>
       </div>
     )
@@ -449,7 +449,7 @@ const SavedStrip = () => {
           <h2 className="font-display text-[18px] sm:text-[20px] font-bold text-ink-900 tracking-tight leading-tight">შენახული ექსპერტები</h2>
         </div>
         <Link href="/student/favorites" className="font-display text-[12px] font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
-          ყველა · გვერდიგვერდ შედარება
+          ყველა · შედარება
         </Link>
       </div>
       <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -553,7 +553,7 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
             რეკომენდებული ექსპერტები
           </h2>
           <p className="text-[12.5px] text-ink-500 mt-1.5 max-w-[480px] leading-relaxed">
-            გადამოწმებული ექსპერტები, რომლებიც უახლოეს დროში ხელმისაწვდომია.
+            გადახედე და დაჯავშნე.
           </p>
         </div>
         <Link href="/tutors" className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors">
@@ -603,7 +603,7 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
         <div role="alert" className="px-5 sm:px-6 py-3.5 flex items-center gap-3 flex-wrap">
           <Icon.warn className="w-4 h-4 text-ink-400 shrink-0" />
           <p className="flex-1 min-w-[220px] text-[12.5px] text-ink-600">
-            <span className="font-display font-semibold text-ink-800">ვერ ჩაიტვირთა</span> — ექსპერტების სია ამჟამად მიუწვდომელია.
+            <span className="font-display font-semibold text-ink-800">ვერ ჩაიტვირთა</span> — სცადე ცოტა ხანში.
           </p>
           <button
             type="button"
@@ -619,7 +619,7 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
           variant="inline"
           icon={<Icon.search className="w-6 h-6" />}
           title="ამ კატეგორიაში ჯერ არ არის ექსპერტი"
-          description="სცადე სხვა კატეგორია ან იხილე ყველა ექსპერტი."
+          description="სცადე სხვა კატეგორია."
         />
       ) : (
         <div className="p-5 sm:p-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -708,7 +708,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
   <>
   {/* Mobile: 2-col grid (avatar + text), actions wrap to their own full-width
       row below — buttons squeezing the text column made 390px unreadable. */}
-  <article onClick={() => onOpen(s)} className="cursor-pointer grid grid-cols-[auto_1fr] sm:grid-cols-[64px_auto_minmax(0,1fr)_auto_auto] gap-x-4 gap-y-4 sm:gap-x-8 items-center py-9 sm:py-12 px-5 sm:px-9 hover:bg-ink-50/40 transition-colors">
+  <article onClick={() => onOpen(s)} className="cursor-pointer grid grid-cols-[auto_1fr] sm:grid-cols-[64px_auto_minmax(0,1fr)_auto_auto] gap-x-4 gap-y-4 sm:gap-x-8 items-center py-4 sm:py-5 px-5 sm:px-6 hover:bg-ink-50/40 transition-colors">
     {/* Date pill (desktop) — soft, borderless tile: a hairline-boxed white card
         read as heavy/„ugly“; a quiet ink-50 fill with a brand-tinted weekday
         and a well-proportioned day number scans cleaner. */}
@@ -825,7 +825,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
           ხელახლა
         </Link>
       )}
-      <button type="button" onClick={() => onOpen(s)} aria-label="მეტი" className="h-9 w-9 rounded-btn hover:bg-ink-100 text-ink-500 inline-flex items-center justify-center transition-colors">
+      <button type="button" onClick={() => onOpen(s)} aria-label="მეტი" className="h-10 w-10 rounded-btn hover:bg-ink-100 text-ink-500 inline-flex items-center justify-center transition-colors">
         <Icon.more className="w-4 h-4" />
       </button>
     </div>
@@ -837,10 +837,10 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
       უქმდება <span className="font-display font-semibold">{s.topic}</span> — {s.date}, {s.time}.{' '}
       {PAYMENTS_LIVE ? (
         freeCancel
-          ? <>დაწყებამდე {CANCEL_CUTOFF_HOURS} საათზე მეტია დარჩენილი — თანხა სრულად დაგიბრუნდება.</>
-          : <>დაწყებამდე {CANCEL_CUTOFF_HOURS} საათზე ნაკლებია დარჩენილი — თანხის სრული დაბრუნება გარანტირებული აღარ არის.</>
+          ? <>დაწყებამდე {CANCEL_CUTOFF_HOURS} საათზე მეტია — თანხა სრულად დაგიბრუნდება.</>
+          : <>დაწყებამდე {CANCEL_CUTOFF_HOURS} საათზე ნაკლებია — სრული დაბრუნება აღარ არის გარანტირებული.</>
       ) : (
-        <>გაუქმება უფასოა — დრო ისევ ექსპერტს დაუბრუნდება.</>
+        <>გაუქმება უფასოა.</>
       )}
     </>}
     confirmLabel="გაუქმება"
@@ -955,16 +955,16 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
       <div className="px-5 sm:px-6 pt-5 border-b border-ink-100">
         <div className="flex items-baseline justify-between flex-wrap gap-3">
           <div>
-            <Eyebrow className="mb-1">ჩემი აქტივობა</Eyebrow>
+            <Eyebrow className="mb-1">აქტივობა</Eyebrow>
             <h2 className="font-display text-[20px] sm:text-[22px] font-bold text-ink-900 tracking-tight">ჩემი სესიები</h2>
-            <p className="text-[12px] text-ink-500 mt-0.5">{PAYMENTS_LIVE ? 'ყველა შენი ჯავშანი ერთ ადგილას · დაცული გადახდით' : 'ყველა შენი ჯავშანი ერთ ადგილას · დაჯავშნა უფასოა'}</p>
+            <p className="text-[12px] text-ink-500 mt-0.5">{PAYMENTS_LIVE ? 'ყველა ჯავშანი · დაცული გადახდით' : 'ყველა ჯავშანი · დაჯავშნა უფასოა'}</p>
           </div>
           <Link href="/student/bookings" className="font-display text-[12px] font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
             მთლიანი ისტორია
           </Link>
         </div>
 
-        <div className="mt-5 -mb-px flex items-center gap-1">
+        <div className="mt-5 -mb-px flex items-center gap-1 overflow-x-auto scrollbar-hide">
           {tabs.map(t => {
             const on = tab === t.id
             return (
@@ -1024,10 +1024,10 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
             title={tab === 'past' ? 'დასრულებული სესია ჯერ არ გაქვს' : tab === 'cancelled' ? 'გაუქმებული ჯავშანი არ არის' : 'მომავალი სესია არ გაქვს'}
             description={
               tab === 'past'
-                ? 'როცა კონსულტაცია დასრულდება, აქ გამოჩნდება — შეფასების საშუალებით.'
+                ? 'დასრულებული სესიები აქ გამოჩნდება.'
                 : tab === 'cancelled'
-                  ? 'კარგი ამბავია — არცერთი ჯავშანი არ გაგიუქმებია.'
-                  : 'აირჩიე ექსპერტი და დაჯავშნე კონსულტაცია — დადასტურებული ჯავშნები აქ გამოჩნდება.'
+                  ? 'არცერთი ჯავშანი არ გაგიუქმებია.'
+                  : 'აირჩიე ექსპერტი და დაჯავშნე.'
             }
             cta={tab === 'upcoming' ? { label: 'იპოვე ექსპერტი', href: '/tutors' } : undefined}
           />
@@ -1201,7 +1201,7 @@ export default function Dashboard() {
         {(
           <div className="text-center max-w-[360px]">
             <div className="font-display text-[16px] font-bold text-ink-900 tracking-tight">ვერ ჩაიტვირთა</div>
-            <p className="text-[12.5px] text-ink-500 mt-1.5 leading-relaxed">კავშირი სერვერთან ვერ შედგა. შეამოწმე ინტერნეტი და სცადე თავიდან.</p>
+            <p className="text-[12.5px] text-ink-500 mt-1.5 leading-relaxed">შეამოწმე ინტერნეტი და სცადე თავიდან.</p>
             <button
               type="button"
               onClick={() => { checkAuth(); if (bookingsError) loadBookings() }}

@@ -84,6 +84,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           status: 'CANCELED',
           payoutStatus: refundClient ? 'REFUNDED' : 'PENDING',
           cancelledBy,
+          // Persist the reason so it shows to both parties (admin UI promises
+          // „მიზეზი გამოჩნდება ორივე მხარისთვის"). null when none was given.
+          cancelReason: reason,
           heldSlotId: null,
         },
       })

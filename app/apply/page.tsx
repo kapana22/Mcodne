@@ -6,7 +6,7 @@ import TutorApply from './ApplyClient'
 // client'). Targets "become an expert / consultant" intent.
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
-const DESC = 'გახდი ექსპერტი მცოდნეზე — გაუზიარე ცოდნა და გამოიმუშავე ვიდეო-კონსულტაციებით. მარტივი განაცხადი, დროის შენ განსაზღვრავ, ფასს შენ ადგენ.'
+const DESC = 'გახდი ექსპერტი მცოდნეზე — გაუზიარე ცოდნა და გამოიმუშავე ვიდეო-კონსულტაციებით. დროსა და ფასს შენ ადგენ.'
 
 export const metadata: Metadata = {
   title: 'გახდი ექსპერტი — გამოიმუშავე კონსულტაციებით | მცოდნე',

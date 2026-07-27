@@ -12,6 +12,9 @@ export type BookingTutorInfo = {
   avatarUrl: string | null
   price: number
   sessionMin: number
+  /** Required gap around a session, in minutes. 0 until the profile/payload
+      carries it — an absent field must never break the derivation. */
+  bufferMin: number
   availability: ApiSlot[]
   busySlots: BusySlot[]
   consultations: ConsultationItem[]
@@ -26,6 +29,7 @@ export function mapTutorPayload(d: any): BookingTutorInfo {
     avatarUrl: d?.user?.avatarUrl ?? null,
     price: d?.price ?? TUTOR_DEFAULTS.price,
     sessionMin: typeof d?.consultationDurationMin === 'number' ? d.consultationDurationMin : TUTOR_DEFAULTS.durationMin,
+    bufferMin: typeof d?.bufferMin === 'number' && d.bufferMin > 0 ? d.bufferMin : 0,
     availability: Array.isArray(d?.availability) ? d.availability : [],
     busySlots: Array.isArray(d?.busySlots) ? d.busySlots : [],
     consultations: Array.isArray(d?.consultations) ? d.consultations : [],

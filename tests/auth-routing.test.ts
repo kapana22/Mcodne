@@ -84,7 +84,10 @@ function check(name: string, ok: boolean, hint: string) {
 // ── C. guarded + force-dynamic layouts ───────────────────────────────────────
 {
   const cases: Array<[string, RegExp]> = [
-    ['app/student/layout.tsx', /requireRole\(\['STUDENT', 'ADMIN'\]\)/],
+    // TUTOR is deliberate, not a leak: a dual-role user (expert who is also a
+    // client) reaches their OWN client-side bookings/messages here. Data is
+    // scoped by ?space=student|tutor, not by the layout guard.
+    ['app/student/layout.tsx', /requireRole\(\['STUDENT', 'TUTOR', 'ADMIN'\]\)/],
     ['app/tutor/layout.tsx', /requireRole\(\['TUTOR', 'ADMIN'\]\)/],
     ['app/admin/layout.tsx', /requireRole\('ADMIN'\)/],
     ['app/settings/layout.tsx', /requireUser\(\)/],

@@ -24,10 +24,13 @@ export async function GET() {
     },
   })
   if (!profile) {
-    return NextResponse.json({ ok: true, requests: 0, messages: 0, reschedules: 0, profilePercent: 0 })
+    // noAvailability is NULL, not false, when there is no profile at all (an
+    // ADMIN browsing the expert workspace) — „unknown", so the nudge neither
+    // fires nor retires itself for that browser.
+    return NextResponse.json({ ok: true, requests: 0, messages: 0, reschedules: 0, profilePercent: 0, noAvailability: null })
   }
 
-  const [requests, bookingUnread, preUnreadRows, preInitiators, reschedRows] = await Promise.all([
+  const [requests, bookingUnread, preUnreadRows, preInitiators, reschedRows, slotCount, futureSlot] = await Promise.all([
     prisma.booking.count({ where: { tutorId: profile.id, status: 'PREPARING' } }),
     // EXPERT-space unread only. A dual-role user (STUDENT promoted to TUTOR) also
     // has client-side unread (bookings where they're the student, inquiries they
@@ -38,6 +41,12 @@ export async function GET() {
     // Unread pre-booking messages addressed to me (from = the partner). No 200
     // cap here — it's an unread count, and unread messages are few even for busy
     // experts; capping could undercount the badge.
+    // Counted even when the partner also has a booking with me: /api/messages
+    // suppresses that pre thread from the inbox but FOLDS its unread into the
+    // booking thread, and opening the booking now stamps those messages read —
+    // so this number always has a thread behind it that can clear it. (Before
+    // the fold the inbox dropped the count while this badge kept it, leaving a
+    // „მიმოწერა N" pill nothing could clear.)
     prisma.message.findMany({
       where: { bookingId: null, toId: user.id, readAt: null },
       select: { fromId: true },
@@ -55,11 +64,28 @@ export async function GET() {
          AND "rescheduleRequest"->>'proposedBy' = 'STUDENT'`,
       profile.id,
     ).catch(() => [{ count: 0 }]),
+    // Future availability slots — the profile-completeness „თავისუფალი დრო"
+    // check. Booking is slot-gated, so zero upcoming slots leaves the expert
+    // unbookable; this keeps the sidebar percent honest about that.
+    prisma.availabilitySlot.count({ where: { tutorId: profile.id, startAt: { gte: new Date() } } }),
+    // „Has the expert published ANY time that hasn't passed yet?" — the signal
+    // behind the workspace nudge. Rows are WINDOWS (one row can be hours long)
+    // and `booked` is legacy/meaningless, so the honest test is „ends in the
+    // future", not startAt and not booked=false. findFirst = LIMIT 1 on the
+    // [tutorId, …] index — this endpoint is polled per open tab, so it must
+    // never grow into a full fetch.
+    prisma.availabilitySlot.findFirst({
+      where: { tutorId: profile.id, endAt: { gt: new Date() } },
+      select: { id: true },
+    }),
   ])
 
   // Count an unread pre-booking message toward the EXPERT badge only when the
   // partner OPENED the thread (they're the client, I'm the responder/expert).
   // Unread in threads I opened is client-side and belongs to the student badge.
+  // This is the SAME space rule /api/messages?space=tutor applies to pre threads
+  // (initiator = client, checked before any booking dedup), so the badge total
+  // and the inbox's summed `unreadCount` describe the same set of messages.
   let preUnread = 0
   for (const m of preUnreadRows) {
     if (preInitiators.get(m.fromId) === m.fromId) preUnread++
@@ -72,6 +98,7 @@ export async function GET() {
     profile._count.education,
     profile._count.experience,
     user.avatarUrl,
+    slotCount,
   ))
 
   return NextResponse.json({
@@ -80,5 +107,6 @@ export async function GET() {
     messages,
     reschedules: reschedRows?.[0]?.count ?? 0,
     profilePercent: percent,
+    noAvailability: !futureSlot,
   })
 }

@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { fmtKaDate } from '@/lib/kaDate'
 import { renderMarkdown } from '@/lib/markdown'
+import { jsonLdString } from '@/lib/jsonLd'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -53,8 +54,25 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   if (post === 'error') throw new Error('blog post temporarily unavailable') // → 5xx, not a deindexing 404
   if (!post) notFound()
 
+  // BlogPosting structured data — eligible for Google's article rich results
+  // (headline, image, date, author). Omit fields that are null so we never
+  // emit an empty schema property.
+  const published = post.publishedAt ? new Date(post.publishedAt).toISOString() : undefined
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    ...(post.excerpt ? { description: post.excerpt } : {}),
+    ...(post.coverUrl ? { image: post.coverUrl } : {}),
+    ...(published ? { datePublished: published, dateModified: published } : {}),
+    author: { '@type': 'Person', name: post.authorName || 'მცოდნე' },
+    publisher: { '@type': 'Organization', name: 'მცოდნე', logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.png` } },
+    mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE_URL}/blog/${post.slug}` },
+  }
+
   return (
     <div className="min-h-screen bg-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
       <MarketingTopBar />
 
       <Container as="main" size="content" className="py-12 lg:py-16">

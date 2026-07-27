@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
-import { TUTOR_PAYOUT_PCT } from '@/lib/flags'
+import { PAYMENTS_LIVE, TUTOR_PAYOUT_PCT } from '@/lib/flags'
 import { fmtKaDateTime } from '@/lib/kaDate'
 
 // Single source of truth for the tutor's cut — derived from the canonical
-// commission percentage in lib/flags.ts (was a hardcoded 0.85 that could drift).
-const TUTOR_SHARE = TUTOR_PAYOUT_PCT / 100
+// commission percentage in lib/flags.ts (never a hardcoded 0.85 that could drift).
+// Online payments aren't live yet and the platform withholds NOTHING today, so
+// while PAYMENTS_LIVE is false the expert's share is the full amount: gross IS
+// what they'd receive. The commission-aware branch stays here so flipping the
+// flag restores net-after-commission everywhere at once.
+const TUTOR_SHARE = PAYMENTS_LIVE ? TUTOR_PAYOUT_PCT / 100 : 1
 
 // ── CSV export (?format=csv) helpers — server-side twin of the admin
 // dashboard's client-side Blob helper (app/admin/page.tsx): RFC 4180 quoting
@@ -28,12 +32,17 @@ const csvResponse = (filename: string, rows: (string | number | null | undefined
     },
   })
 }
-const CSV_HEADER = ['თარიღი', 'თემა', 'კლიენტი', 'ხანგრძლივობა (წთ)', 'თანხა (₾)', 'ჩემი წილი (₾)', 'გადარიცხვა', 'ჯავშნის ID']
-const PAYOUT_KA: Record<string, string> = {
-  PENDING: 'მოლოდინში',
-  RELEASED: 'გადარიცხულია',
-  REFUNDED: 'დაბრუნებულია',
-}
+// While payments aren't live, gross === share, so the second money column
+// would just repeat the first — drop it until the commission actually applies.
+const CSV_HEADER = [
+  'თარიღი', 'თემა', 'სტუდენტი', 'ხანგრძლივობა (წთ)', 'თანხა (₾)',
+  ...(PAYMENTS_LIVE ? ['ჩემი წილი (₾)'] : []),
+  'სტატუსი', 'ჯავშნის ID',
+]
+// Payout wording asserts that money moved — only true once payments are live.
+const PAYOUT_KA: Record<string, string> = PAYMENTS_LIVE
+  ? { PENDING: 'მოლოდინში', RELEASED: 'გადარიცხულია', REFUNDED: 'დაბრუნებულია' }
+  : { PENDING: 'მოლოდინში', RELEASED: 'დასრულდა', REFUNDED: 'ანულირდა' }
 
 export async function GET(req: Request) {
   const user = await requireRole(['TUTOR', 'ADMIN'])
@@ -68,7 +77,7 @@ export async function GET(req: Request) {
         b.student.fullName,
         b.durationMin,
         b.price,
-        Math.round(b.price * TUTOR_SHARE),
+        ...(PAYMENTS_LIVE ? [Math.round(b.price * TUTOR_SHARE)] : []),
         PAYOUT_KA[b.payoutStatus] ?? b.payoutStatus,
         b.ref.slice(0, 8),
       ]),
@@ -91,6 +100,11 @@ export async function GET(req: Request) {
       take: 50,
       include: { student: { select: { id: true, fullName: true, avatarUrl: true } } },
     }),
+    // NOTE: structurally always 0 today — every path that sets status COMPLETED
+    // (bookings/[id] complete + no_show, internal/cleanup auto-complete, admin
+    // dispute release) also sets payoutStatus RELEASED, so a COMPLETED booking
+    // is never PENDING. The field is kept for the payout-queue era (and because
+    // /tutor reads it); the earnings UI must NOT present it as a live metric.
     prisma.booking.aggregate({
       _sum: { price: true },
       where: { tutorId: profile.id, status: 'COMPLETED', payoutStatus: 'PENDING' },

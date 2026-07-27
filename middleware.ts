@@ -41,7 +41,9 @@ export function middleware(req: NextRequest) {
       "font-src 'self' data:",
       // connect-src: 'self' + GA4 measurement endpoints (google-analytics.com,
       // regionN.google-analytics.com, analytics.google.com) it beacons to.
-      "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
+      // www.google.com is added because GA4 also fires a /g/collect beacon there
+      // (ads/conversion linker) — without it those beacons are CSP-refused.
+      "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://www.google.com",
       // frame-src: allow YouTube's nocookie embed domain so the intro-video
       // iframe on /tutors/[id] and /tutor/profile can load. `frame-ancestors`
       // stays 'none' — that governs *who can embed us*, not *what we embed*.

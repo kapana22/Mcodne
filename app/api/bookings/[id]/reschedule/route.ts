@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { notify } from '@/lib/notify'
 import { fmtKaDateTime } from '@/lib/kaDate'
 import { rateLimit } from '@/lib/rateLimit'
+import { isStartOpen } from '@/lib/availability'
 
 // Party proposes a new session time. Only students or tutors of the booking
 // may propose. The counter-party then accepts/rejects via /respond.
@@ -20,14 +21,17 @@ const Body = z.object({
 
 // Minimum lead time — no last-minute reschedule bombs.
 const MIN_LEAD_MS = 60 * 60 * 1000 // 1 hour
+// Availability rows are pulled from a wide neighbourhood so a chain of LEGACY
+// pre-sliced rows merges whole (see app/api/bookings/route.ts).
+const WINDOW_LOOKAROUND_MS = 7 * 24 * 60 * 60 * 1000
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
 
-  // Each proposal overwrites the pending one, force-demotes a CONFIRMED booking
-  // to PREPARING and locks the held slot (cleanup skips pending-reschedule rows),
-  // so an unthrottled loop is a real griefing vector — cap proposals per user.
+  // Each proposal overwrites the pending one and force-demotes a CONFIRMED
+  // booking to PREPARING (cleanup skips pending-reschedule rows), so an
+  // unthrottled loop is a real griefing vector — cap proposals per user.
   const rl = rateLimit(`resched:${user.id}`, 10, 60 * 60)
   if (!rl.ok) return NextResponse.json({ ok: false, error: 'RATE_LIMITED', retryInSec: rl.retryInSec }, { status: 429 })
 
@@ -48,7 +52,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       id,
       OR: [{ studentId: user.id }, { tutor: { userId: user.id } }],
     },
-    include: { tutor: { select: { userId: true } } },
+    include: { tutor: { select: { userId: true, bufferMin: true } } },
   })
   if (!booking) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
   if (booking.status !== 'PREPARING' && booking.status !== 'CONFIRMED') {
@@ -64,22 +68,48 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const proposedBy: 'STUDENT' | 'TUTOR' = booking.studentId === user.id ? 'STUDENT' : 'TUTOR'
 
-  // Verify the tutor has a free availability slot covering the requested
-  // window. ALL bookings claim a slot at creation (regardless of serviceType),
-  // so every reschedule must land on the availability grid too — otherwise
-  // accepting would move startAt while claiming nothing and desync the grid.
+  // Verify the proposed time is genuinely bookable on the expert's published
+  // availability. Rows are WINDOWS, not tickets: openness = windows − active
+  // bookings − this service's length (+buffer), derived by lib/availability.
+  // Nothing is claimed here, so an abandoned proposal can no longer brick
+  // inventory — the booking's own [startAt, end) is the only busy interval.
+  const bufferMin = booking.tutor.bufferMin ?? 0
   const newEnd = new Date(newStart.getTime() + booking.durationMin * 60_000)
-  const slot = await prisma.availabilitySlot.findFirst({
-    where: {
-      tutorId: booking.tutorId,
-      startAt: { lte: newStart },
-      endAt: { gte: newEnd },
-      booked: false,
-    },
-    select: { id: true },
+  const [windowRows, activeBookings] = await Promise.all([
+    prisma.availabilitySlot.findMany({
+      where: {
+        tutorId: booking.tutorId,
+        endAt: { gt: new Date(newStart.getTime() - WINDOW_LOOKAROUND_MS) },
+        startAt: { lt: new Date(newEnd.getTime() + WINDOW_LOOKAROUND_MS) },
+      },
+      select: { startAt: true, endAt: true },
+      orderBy: { startAt: 'asc' },
+      take: 2000,
+    }),
+    // Everything live on this expert's calendar EXCEPT the booking being moved —
+    // it must not block its own new time. Upper bound is end+buffer so a later
+    // session can still block us through its buffer.
+    prisma.booking.findMany({
+      where: {
+        tutorId: booking.tutorId,
+        id: { not: booking.id },
+        status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] },
+        startAt: { lt: new Date(newEnd.getTime() + bufferMin * 60_000) },
+      },
+      select: { startAt: true, durationMin: true },
+    }),
+  ])
+  const open = isStartOpen(newStart, {
+    windows: windowRows.map(w => ({ start: w.startAt, end: w.endAt })),
+    busy: activeBookings.map(b => ({
+      start: b.startAt,
+      end: new Date(b.startAt.getTime() + b.durationMin * 60_000),
+    })),
+    serviceMin: booking.durationMin,
+    bufferMin,
   })
-  if (!slot) {
-    // BOTH parties may only reschedule onto a real, unbooked slot the expert has
+  if (!open) {
+    // BOTH parties may only reschedule onto a real, free time the expert has
     // ALREADY published on their schedule — we never invent availability the
     // expert didn't declare (the reschedule picker only offers real free times,
     // so this is the server-side guard behind it). A new time must be added to
@@ -122,7 +152,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const otherPartyUserId = proposedBy === 'STUDENT' ? booking.tutor.userId : booking.studentId
   await notify(otherPartyUserId, {
     type: 'RESCHEDULE_REQUEST',
-    title: proposedBy === 'STUDENT' ? 'კლიენტმა გადადება ითხოვა' : 'ექსპერტმა გადადება ითხოვა',
+    title: proposedBy === 'STUDENT' ? 'სტუდენტმა გადადება ითხოვა' : 'ექსპერტმა გადადება ითხოვა',
     body: `ახალი დრო: ${fmtKaDateTime(newStart, { year: true })}`,
     href: proposedBy === 'STUDENT'
       ? `/tutor/bookings/${booking.id}`

@@ -82,7 +82,14 @@ export function PublicTopBar({
 
   return (
     <header
-      className={`sticky top-0 z-40 bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
+      // The header is `sticky` WITH a z-index, so it opens its own stacking
+      // context — every z-[…] inside it (scrim, drawer) is resolved against
+      // sibling headers/banners at THIS value, not at the root. That's why the
+      // drawer's own z-[70] alone could never beat the cookie banner: at the
+      // root the whole header still counted as 40. While the drawer is open we
+      // raise the header above the banner (z-[60]) — and still below Sheet (80)
+      // / ConfirmModal (90), which is where the drawer belongs.
+      className={`sticky top-0 ${mobOpen ? 'z-[70]' : 'z-40'} bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
         scrolled ? 'shadow-sm' : ''
       }`}
     >
@@ -174,8 +181,10 @@ export function PublicTopBar({
             role="dialog"
             aria-modal="true"
             aria-label="მენიუ"
-            // z-[70]: above the cookie banner (z-[60]) — an open nav dialog must
-            // cover the banner; still below Sheet (80) / ConfirmModal (90).
+            // z-[70] inside the header's own stacking context (the header is
+            // raised to z-[70] while open, see above) — an open nav dialog must
+            // cover the cookie banner (z-[60]); still below Sheet (80) /
+            // ConfirmModal (90).
             className="lg:hidden fixed top-0 right-0 h-[100dvh] z-[70] w-[320px] max-w-[86vw] bg-white shadow-float flex flex-col"
             style={{ animation: 'drawerInR 300ms cubic-bezier(0.16, 1, 0.3, 1) both' }}
           >

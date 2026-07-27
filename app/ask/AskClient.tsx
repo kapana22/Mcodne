@@ -83,6 +83,19 @@ function AskInner() {
     return () => { cancelled = true }
   }, [q, framing.categorySlug])
 
+  // The follow-up composer is pinned to the bottom of the viewport, and /ask
+  // renders neither BottomNav nor a fixed CTA bar — so without a signal the
+  // cookie banner (fixed, bottom) lands directly ON the input and a first-time
+  // mobile visitor cannot ask a follow-up at all. Same fix as the full-screen
+  // chat composer (components/chat/BookingChat.tsx).
+  // Value „lift" (not „1"): the bar is `sticky`, i.e. already in flow — it wants
+  // the banner lifted but NOT the body bottom-reserve that `1` adds
+  // (see app/globals.css, data-mobile-cta value contract).
+  useEffect(() => {
+    document.body.setAttribute('data-mobile-cta', 'lift')
+    return () => { document.body.removeAttribute('data-mobile-cta') }
+  }, [])
+
   const goAsk = (question: string) => {
     const v = question.trim()
     if (!v) return

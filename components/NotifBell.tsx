@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Icon } from './Icon'
 import { useNotifications, markAllNotificationsRead, markNotificationRead, type NotifItem } from '@/lib/notifications'
 
@@ -29,6 +30,7 @@ export function NotifBell() {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
+  const router = useRouter()
   // Shared store — the poll, visibility gating and cross-tab sync all live in
   // lib/notifications now, so this component only reads + triggers mutations.
   const { items, unreadCount: unread } = useNotifications()
@@ -57,11 +59,15 @@ export function NotifBell() {
     }
   }
 
-  const clickItem = async (n: NotifItem) => {
+  const clickItem = (n: NotifItem) => {
     // Mark this one read (optimistic, via the store), then navigate.
+    // Client transition, not a full reload — the read POST is fire-and-forget
+    // and now survives the navigation instead of racing an unload. The
+    // explicit refresh() replaces what the reload used to give us for free:
+    // fresh server data even when the href is the route we're already on.
     if (!n.readAt) markNotificationRead(n.id)
-    if (n.href) window.location.href = n.href
-    else setOpen(false)
+    setOpen(false)
+    if (n.href) { router.push(n.href); router.refresh() }
   }
 
   return (
@@ -115,9 +121,11 @@ export function NotifBell() {
                       <button
                         type="button"
                         onClick={() => clickItem(n)}
-                        className={`no-caps w-full text-left px-4 py-3 hover:bg-ink-50 transition-colors flex items-start gap-2.5 ${isUnread ? 'bg-brand-50/40' : ''}`}
+                        className={`no-caps relative w-full text-left px-4 py-3 hover:bg-ink-50 transition-colors flex items-start gap-2.5 ${isUnread ? 'bg-brand-50/40' : ''}`}
                       >
-                        <span className={`shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full ${isUnread ? 'bg-brand-500' : 'bg-transparent'}`} />
+                        {/* Unread = left accent bar + bold title (same as
+                            ConversationRow). No status dots — canon. */}
+                        {isUnread && <span aria-hidden className="absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-r-full bg-brand-500" />}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-2">
                             <span className={`font-display text-[13px] truncate ${isUnread ? 'font-bold text-ink-900' : 'font-medium text-ink-700'}`}>

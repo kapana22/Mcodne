@@ -27,15 +27,43 @@ export type ThreadBooking = {
 
 export type Attachment = { url: string; name: string; type: string; size: number }
 
+// POST /api/messages caps `fileUrl` at 3M chars (see the zod schema there) —
+// attachments are stored inline as base64 data URLs, not in a bucket. Images
+// come back downscaled and land far under it; a PDF is stored byte-for-byte, so
+// anything over ~2 MB blows the cap. Checking the encoded length here turns a
+// confusing generic „INVALID" from the send into an honest message at attach
+// time, before the user has typed anything.
+const MAX_STORED_URL_CHARS = 3_000_000
+
+/* An earlier pre-booking („შეკითხვა ჯავშნამდე") conversation with the same
+   partner. The inbox suppresses that thread once a booking exists (one person =
+   one row), so its history has no entry point of its own — the booking thread
+   surfaces this link instead. Present only when the API found one in this space,
+   and only on the initial (non-`since`) load. */
+export type ThreadPre = { userId: string; href: string }
+
 export type ThreadPair = {
-  otherUser: { id: string; fullName: string; avatarUrl?: string | null; role: string }
+  // tutorProfileId + price are present only when the peer is an EXPERT (TUTOR) —
+  // they drive the price + „დაჯავშნე" CTA on the student-side pre-booking header.
+  otherUser: { id: string; fullName: string; avatarUrl?: string | null; role: string; tutorProfileId?: string | null; price?: number | null }
+}
+
+/* Append a server row exactly ONCE. The 20s poll and the POST/call response can
+   deliver the same message, so a blind append (or a tmp→real rename while the
+   real row is already in the list) leaves two bubbles sharing one id — React
+   then warns on the duplicate key and the user sees their message twice. When
+   the id is already present the incoming row is dropped and any optimistic
+   `tmpId` is simply removed instead of renamed. */
+const upsert = (prev: ChatMessage[], row: ChatMessage, tmpId?: string): ChatMessage[] => {
+  const rest = tmpId ? prev.filter(m => m.id !== tmpId) : prev
+  return rest.some(m => m.id === row.id) ? rest : [...rest, row]
 }
 
 /* All thread logic for one conversation — either a booking-scoped thread
    (`bookingId`) OR a pre-booking pair thread (`withUser`, messages with
    bookingId:null between a student and an expert-user). Whichever id is set
    drives the fetch (GET ?bookingId / ?withUser) and the send (POST bookingId /
-   toUserId). 15s visibility-gated polling (the GET also stamps read receipts
+   toUserId). 20s visibility-gated polling (the GET also stamps read receipts
    server-side), true-optimistic send with rollback + draft restore, and
    attachment upload. UI-free — the BookingChat component renders on top. */
 export function useBookingThread({
@@ -54,6 +82,7 @@ export function useBookingThread({
   const [msgs, setMsgs] = useState<ChatMessage[]>(initialMessages ?? [])
   const [booking, setBooking] = useState<ThreadBooking | null>(null)
   const [pair, setPair] = useState<ThreadPair | null>(null)
+  const [preThread, setPreThread] = useState<ThreadPre | null>(null)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -120,6 +149,9 @@ export function useBookingThread({
         // Header (booking/pair) only arrives on the initial full fetch.
         if (j.booking) setBooking(j.booking)
         if (j.pair) setPair(j.pair)
+        // Booking mode, initial load only. `null` is a meaningful answer (no
+        // earlier pre-booking thread), so only overwrite when the key is present.
+        if ('preThread' in (j ?? {})) setPreThread(j.preThread ?? null)
         fetchedRef.current = true
         setLoaded(true)
       } catch {}
@@ -145,6 +177,13 @@ export function useBookingThread({
         flashError(j?.error === 'TOO_LARGE' ? 'ფაილი დიდია' : j?.error === 'BAD_TYPE' ? 'ფაილის ტიპი დაუშვებელია' : 'ატვირთვა ვერ მოხერხდა')
         return
       }
+      // A PDF is stored as-is, so an otherwise-legal 8 MB file can still exceed
+      // the API's stored-URL cap and would only fail later, on send, with a
+      // generic error. Refuse it here instead.
+      if (typeof j.url === 'string' && j.url.length > MAX_STORED_URL_CHARS) {
+        flashError('ფაილი მიბმისთვის ძალიან დიდია — სცადე შეკუმშული ვერსია (PDF-ისთვის მაქს. 2 MB).')
+        return
+      }
       setAttachment({ url: j.url, name: j.fileName ?? f.name, type: f.type, size: f.size })
     } catch {
       flashError('ქსელის შეცდომა ატვირთვის დროს')
@@ -156,6 +195,23 @@ export function useBookingThread({
     // when building the optimistic message row below.
     if (!me || (!draft.trim() && !attachment) || sending) return
     setSending(true)
+    // TRUE optimistic append — bubble shows instantly; the temp row is
+    // replaced by the server row on success, rolled back on failure with the
+    // draft restored (the POST takes seconds on the remote-DB dev setup).
+    const tempId = `tmp-${Date.now()}`
+    const sentText = draft
+    const sentAttachment = attachment
+    // ONE rollback for BOTH failure paths. An error status and a fetch that
+    // REJECTS (offline, dropped connection) must look identical to the user:
+    // without this, a rejection escaped the try/finally, the optimistic bubble
+    // stayed forever (both poll branches deliberately preserve tmp-* rows), the
+    // composer had already been cleared — and the message was silently lost
+    // while the UI showed it as sent.
+    const rollback = (text: string) => {
+      setMsgs(prev => prev.filter(m => m.id !== tempId))
+      setDraft(sentText); setAttachment(sentAttachment)
+      flashError(text)
+    }
     try {
       const body: any = {
         // Exactly one of bookingId / toUserId — matches the API contract.
@@ -163,12 +219,6 @@ export function useBookingThread({
         body: draft.trim() || (attachment ? `📎 ${attachment.name}` : ''),
       }
       if (attachment) { body.fileUrl = attachment.url; body.fileName = attachment.name }
-      // TRUE optimistic append — bubble shows instantly; the temp row is
-      // replaced by the server row on success, rolled back on failure with the
-      // draft restored (the POST takes seconds on the remote-DB dev setup).
-      const tempId = `tmp-${Date.now()}`
-      const sentText = draft
-      const sentAttachment = attachment
       setMsgs(prev => [...prev, {
         id: tempId,
         fromId: me.id,
@@ -186,12 +236,12 @@ export function useBookingThread({
       })
       const j = await res.json().catch(() => ({} as any))
       if (!res.ok || !j.ok) {
-        setMsgs(prev => prev.filter(m => m.id !== tempId))
-        setDraft(sentText); setAttachment(sentAttachment)
-        flashError(sendErrorText(j?.error, j?.retryInSec))
+        rollback(sendErrorText(j?.error, j?.retryInSec))
         return
       }
-      setMsgs(prev => prev.map(m => (m.id === tempId ? {
+      // Swap tmp → server row. If a poll already delivered that row, `upsert`
+      // drops the duplicate and just removes the optimistic bubble.
+      setMsgs(prev => upsert(prev, {
         id: j.message.id,
         fromId: j.message.fromId,
         body: j.message.body,
@@ -199,8 +249,12 @@ export function useBookingThread({
         fileUrl: j.message.fileUrl,
         fileName: j.message.fileName,
         from: { id: me.id, fullName: me.fullName, avatarUrl: me.avatarUrl },
-      } : m)))
+      }, tempId))
       onActivity?.()
+    } catch {
+      // The fetch itself failed (offline / connection dropped) — same rollback
+      // as an error response, so the draft is never lost with nothing sent.
+      rollback('ქსელის შეცდომა — შეტყობინება ვერ გაიგზავნა. სცადე თავიდან.')
     } finally {
       setSending(false)
     }
@@ -209,7 +263,7 @@ export function useBookingThread({
   // Instant call: post a video-call invite into the thread (booking threads
   // only). The server mints/reuses the room URL; we append the returned invite
   // message so the sender sees it immediately (the recipient gets it on the
-  // next 15s poll + a bell notification).
+  // next 20s poll + a bell notification).
   const [calling, setCalling] = useState(false)
   const requestCall = async () => {
     if (!me || !bookingId || calling) return
@@ -221,7 +275,9 @@ export function useBookingThread({
         flashError(j?.error === 'RATE_LIMIT' ? 'ცოტა ხანში სცადე ხელახლა.' : 'ზარის მოთხოვნა ვერ გაიგზავნა.')
         return
       }
-      setMsgs(prev => [...prev, {
+      // Same id-dedupe as send(): a poll can land the invite row before this
+      // response does, and appending blind would show the card twice.
+      setMsgs(prev => upsert(prev, {
         id: j.message.id,
         fromId: j.message.fromId,
         body: j.message.body,
@@ -229,7 +285,7 @@ export function useBookingThread({
         fileUrl: j.message.fileUrl,
         fileName: j.message.fileName,
         from: { id: me.id, fullName: me.fullName, avatarUrl: me.avatarUrl },
-      }])
+      }))
       onActivity?.()
     } finally {
       setCalling(false)
@@ -237,7 +293,7 @@ export function useBookingThread({
   }
 
   return {
-    msgs, booking, pair, loaded,
+    msgs, booking, pair, preThread, loaded,
     draft, setDraft,
     attachment, setAttachment, attach, uploading,
     send, sending,

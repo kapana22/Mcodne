@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AppShell } from '@/components/AppShell'
+import { SkipLink } from '@/components/SkipLink'
 import { ImpersonationBanner } from '@/components/ImpersonationBanner'
 import { Analytics } from '@/components/Analytics'
 import { SiteTextProvider } from '@/components/SiteTextProvider'
@@ -12,6 +13,10 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').repla
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  // Google Search Console ownership verification — Next renders this as
+  // <meta name="google-site-verification" content="…"> in every page <head>.
+  // Do NOT remove it, or Search Console will lose verification.
+  verification: { google: 'd52ikKfhRDBsgsbzX-ZfC9lE-jPW4BGVpPeNLERiVpo' },
   title: {
     default: 'მცოდნე — ბიზნეს კონსულტაცია ქართველ ექსპერტებთან',
     template: '%s',
@@ -28,7 +33,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'მცოდნე — ბიზნეს კონსულტაცია ექსპერტებთან',
     description: 'დაჯავშნე ვიდეო-კონსულტაცია ხელით შერჩეულ ქართველ ექსპერტებთან.',
-    images: ['/logo.png'],
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'მცოდნე' }],
     locale: 'ka_GE',
     type: 'website',
     url: SITE_URL,
@@ -37,7 +42,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'მცოდნე — ბიზნეს კონსულტაცია ექსპერტებთან',
     description: 'დაჯავშნე ვიდეო-კონსულტაცია ხელით შერჩეულ ქართველ ექსპერტებთან.',
-    images: ['/logo.png'],
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'მცოდნე' }],
   },
 }
 
@@ -69,13 +74,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className="font-sans bg-ink-50 text-ink-900 antialiased min-h-screen">
-        {/* Skip-to-content: visible only when keyboard-focused. */}
-        <a
-          href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:h-11 focus:px-4 focus:rounded-btn focus:bg-brand-500 focus:text-white focus:font-display focus:font-semibold focus:text-[13px] focus:inline-flex focus:items-center focus:shadow-float"
-        >
-          გადადი მთავარ შიგთავსზე
-        </a>
+        {/* Skip-to-content: visible only when keyboard-focused. Finds the page's
+            landmark at click time — a static #main anchor was dead on every
+            route that never declared the id (all but three). */}
+        <SkipLink />
         <ImpersonationBanner />
         <Analytics gaId={integrations.gaId} />
         <CodeInjector header={integrations.headerHtml} footer={integrations.footerHtml} />

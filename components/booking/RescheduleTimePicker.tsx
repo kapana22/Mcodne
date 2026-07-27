@@ -3,13 +3,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { KA_WEEKDAYS_SHORT, KA_MONTHS_SHORT, KA_MONTHS_LONG } from '@/lib/kaDate'
-import { enumerateTimes, groupSlotsByDay, startOfDay, fmtHM, type ApiSlot, type BusySlot } from './slots'
+import { openStartsByDay, startsOnDay, toTimeChoices, fmtHM, type ApiSlot, type BusySlot } from './slots'
 
 // Reschedule picker driven by the expert's REAL published availability (same
 // AvailabilitySlot rows the booking flow uses) — NOT a synthetic 09:00–21:00
-// grid. Only days/times the expert actually declared as free are selectable, so
-// a reschedule can never propose a time the expert never opened. Same value
-// contract as DateTimePicker (dateStr "YYYY-MM-DD" + timeStr "HH:MM").
+// grid. Starts are DERIVED for THIS booking's own service length
+// (windows − bookings − durationMin), so a reschedule can never propose a time
+// the expert never opened or one that no longer fits. Same value contract as
+// DateTimePicker (dateStr "YYYY-MM-DD" + timeStr "HH:MM").
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const toISODate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -27,6 +28,7 @@ export function RescheduleTimePicker({
 }) {
   const [avail, setAvail] = useState<ApiSlot[] | null>(null)
   const [busy, setBusy] = useState<BusySlot[]>([])
+  const [bufferMin, setBufferMin] = useState(0)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
@@ -39,29 +41,36 @@ export function RescheduleTimePicker({
         if (!d) { setFailed(true); setAvail([]); return }
         setAvail(Array.isArray(d.availability) ? d.availability : [])
         setBusy(Array.isArray(d.busySlots) ? d.busySlots : [])
+        // Absent until the profile carries it — 0 keeps the derivation honest.
+        setBufferMin(typeof d.bufferMin === 'number' && d.bufferMin > 0 ? d.bufferMin : 0)
       })
       .catch(() => { if (!cancelled) { setFailed(true); setAvail([]) } })
     return () => { cancelled = true }
   }, [tutorId])
 
-  // Days that have ≥1 genuinely free time for this duration.
+  // ONE derivation — bookable starts for THIS booking's length, by day.
+  const startsByDay = useMemo(
+    () => openStartsByDay(avail ?? [], busy, durationMin, { bufferMin }),
+    [avail, busy, durationMin, bufferMin],
+  )
+
+  // Days that have ≥1 genuinely bookable start.
   const days = useMemo(() => {
-    if (!avail) return []
     const out: Date[] = []
-    for (const [, slots] of groupSlotsByDay(avail)) {
-      const day = startOfDay(new Date(slots[0].startAt))
-      if (enumerateTimes(day, avail, busy, durationMin).some(t => !t.taken)) out.push(day)
+    for (const arr of startsByDay.values()) {
+      const first = arr[0]
+      if (first) out.push(new Date(first.getFullYear(), first.getMonth(), first.getDate()))
     }
     out.sort((a, b) => a.getTime() - b.getTime())
     return out
-  }, [avail, busy, durationMin])
+  }, [startsByDay])
 
   const selDay = days.find(d => toISODate(d) === dateStr) ?? days[0] ?? null
 
-  const times = useMemo(() => {
-    if (!selDay) return []
-    return enumerateTimes(selDay, avail ?? [], busy, durationMin).filter(t => !t.taken)
-  }, [selDay, avail, busy, durationMin])
+  const times = useMemo(
+    () => toTimeChoices(startsOnDay(startsByDay, selDay), durationMin),
+    [startsByDay, selDay, durationMin],
+  )
 
   // Keep the parent's selection valid: snap to the first real day/time when the
   // current one isn't on the availability grid.
@@ -75,17 +84,16 @@ export function RescheduleTimePicker({
   }, [times])
 
   if (avail === null) {
-    return <div className="py-8 text-center text-[13px] text-ink-400">იტვირთება ხელმისაწვდომი დროები…</div>
+    return <div className="py-8 text-center text-[13px] text-ink-400">იტვირთება…</div>
   }
   if (failed) {
-    return <div className="py-6 text-center text-[13px] text-danger-700">დროების ჩატვირთვა ვერ მოხერხდა.</div>
+    return <div className="py-6 text-center text-[13px] text-danger-700">დროები ვერ ჩაიტვირთა.</div>
   }
   if (!days.length) {
     return (
       <div className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 p-6 text-center">
         <Icon.cal className="w-5 h-5 text-ink-400 mx-auto mb-2" />
-        <p className="text-[13px] text-ink-600">ექსპერტს ამჟამად გამოცხადებული თავისუფალი დრო არ აქვს.</p>
-        <p className="text-[11.5px] text-ink-400 mt-1">გადადება მხოლოდ ექსპერტის ხელმისაწვდომ დროზეა შესაძლებელი.</p>
+        <p className="text-[13px] text-ink-600">ექსპერტს ახლა თავისუფალი დრო არ აქვს.</p>
       </div>
     )
   }
@@ -128,7 +136,7 @@ export function RescheduleTimePicker({
           {durationLabel && <span className="text-[11.5px] text-ink-400">{durationLabel}</span>}
         </div>
         {times.length === 0 ? (
-          <p className="text-[12px] text-ink-400 py-3">ამ დღეს თავისუფალი დრო აღარ დარჩა — აირჩიე სხვა დღე.</p>
+          <p className="text-[12px] text-ink-400 py-3">ამ დღეს დრო აღარ დარჩა — აირჩიე სხვა.</p>
         ) : (
           <div className="grid grid-cols-4 gap-2 max-h-[148px] overflow-y-auto pr-0.5">
             {times.map(t => {

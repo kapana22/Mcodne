@@ -23,11 +23,30 @@ async function runMigrations() {
     END $$;
   `)
 
-  // TutorProfile — service type + standard session length.
+  // ApplicationStatus.NEEDS_REVISION — the enum TYPE predates this value, so
+  // prod only has DRAFT/SUBMITTED/APPROVED/REJECTED while schema.prisma (and
+  // the admin „შესწორება" action in api/applications/[id]) already writes
+  // NEEDS_REVISION. `ADD VALUE IF NOT EXISTS` is idempotent (PG 9.6+).
+  //
+  // Deliberately NOT wrapped in a `DO $$ … $$` block like the CREATE TYPE above:
+  // `ALTER TYPE … ADD VALUE` cannot run inside a transaction block on PG < 12,
+  // and a DO block is one. It's issued as its own statement and guarded in JS
+  // so an old server refusing it logs instead of aborting the whole boot.
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TYPE "ApplicationStatus" ADD VALUE IF NOT EXISTS 'NEEDS_REVISION';`)
+  } catch (err) {
+    console.error('[dbBoot] ApplicationStatus NEEDS_REVISION add failed:', err)
+  }
+
+  // TutorProfile — service type + standard session length + session buffer.
+  // `bufferMin` is the required gap around every session, consumed by
+  // lib/availability when deriving bookable starts. Default 0 reproduces
+  // today's back-to-back behavior exactly, so no backfill is needed.
   await prisma.$executeRawUnsafe(`
     ALTER TABLE "TutorProfile"
       ADD COLUMN IF NOT EXISTS "serviceType" "ServiceType" NOT NULL DEFAULT 'CONSULTATION',
-      ADD COLUMN IF NOT EXISTS "consultationDurationMin" INTEGER NOT NULL DEFAULT 30;
+      ADD COLUMN IF NOT EXISTS "consultationDurationMin" INTEGER NOT NULL DEFAULT 30,
+      ADD COLUMN IF NOT EXISTS "bufferMin" INTEGER NOT NULL DEFAULT 0;
   `)
 
   // Booking — snapshot column + reschedule proposal blob.
@@ -186,7 +205,10 @@ async function runMigrations() {
 
   // Missing FK / filter indexes flagged by the audit.
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Booking_consultationId_idx" ON "Booking"("consultationId");`)
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Message_fromId_idx" ON "Message"("fromId");`)
+  // NOTE: "Message_fromId_idx" used to be created here. It is a strict prefix of
+  // "Message_fromId_createdAt_idx" (below), so it only cost write amplification —
+  // no longer created, and no longer declared in schema.prisma, so the next
+  // `prisma db push` retires the copy that still exists in prod.
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Review_studentId_idx" ON "Review"("studentId");`)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Dispute_studentId_idx" ON "Dispute"("studentId");`)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Favorite_tutorId_idx" ON "Favorite"("tutorId");`)
@@ -194,6 +216,16 @@ async function runMigrations() {
   // and the message-reminder scan's unread window — both grow with history.
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Notification_type_href_idx" ON "Notification"("type", "href");`)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Message_readAt_createdAt_idx" ON "Message"("readAt", "createdAt");`)
+
+  // Hot-path indexes (also declared in schema.prisma so a db push keeps them).
+  // Postgres does NOT auto-index FKs, so each of these was a sequential scan.
+  // Category-filtered browse + /categories counts filter TutorProfile.categoryId.
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TutorProfile_categoryId_idx" ON "TutorProfile"("categoryId");`)
+  // Inbox query is `OR: [{fromId:me},{toId:me}] ORDER BY createdAt DESC` — the
+  // fromId arm had its composite, the toId arm had to sort. See lib/preThreadInitiators.
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Message_toId_createdAt_idx" ON "Message"("toId", "createdAt");`)
+  // Every expert profile view loads that expert's consultation offerings.
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Consultation_tutorId_idx" ON "Consultation"("tutorId");`)
 }
 
 export function ensureDbReady(): Promise<void> {

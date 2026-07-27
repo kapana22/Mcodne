@@ -7,6 +7,28 @@ import { StatusPill } from '@/components/StatusPill'
 import { fmtKaDateTime } from '@/lib/kaDate'
 import type { ThreadBooking } from './useBookingThread'
 
+/* Quiet doorway back into the pre-booking („შეკითხვა ჯავშნამდე") conversation
+   with this same partner. Once a booking exists the inbox suppresses that thread
+   so one person never occupies two rows — which left its Q&A history reachable
+   only by hand-typing /…/messages/u/<id>. This is the explicit way in, rendered
+   directly under the thread header (only when such a thread actually exists, so
+   it never advertises an empty conversation) and deliberately understated: a
+   hairline strip, not a CTA. */
+export function PreThreadLink({ href }: { href: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-2 px-3 sm:px-5 py-2 border-b border-ink-100 bg-ink-50/60 hover:bg-ink-100/70 transition-colors group"
+    >
+      <Icon.chat className="w-3.5 h-3.5 text-ink-400 shrink-0" />
+      <span className="text-[12px] text-ink-600 truncate">ჯავშნამდე უკვე მიწერეთ ერთმანეთს</span>
+      <span className="ml-auto shrink-0 font-display text-[12px] font-semibold text-brand-700 group-hover:text-brand-800">
+        ნახე
+      </span>
+    </Link>
+  )
+}
+
 const toneOf = (s: string) =>
   s === 'PREPARING' ? 'preparing'
   : s === 'CONFIRMED' ? 'confirmed'
@@ -25,9 +47,10 @@ export function ThreadHeader({
   backHref = '/tutor/messages',
   bookingHref,
   alwaysBack = false,
+  showBookCta = false,
 }: {
   booking: ThreadBooking | null
-  counterparty?: { fullName: string; avatarUrl?: string | null } | null
+  counterparty?: { fullName: string; avatarUrl?: string | null; price?: number | null; tutorProfileId?: string | null } | null
   /** Explicit peer to show — the party across the conversation. The tutor side
       defaults to `booking.student`; the student side passes `booking.tutorUser`
       here (its `booking.student` is the viewer themselves). */
@@ -38,12 +61,22 @@ export function ThreadHeader({
   /** Show the back chevron at every width (standalone full-screen thread).
       Default hides it on lg where a conversation list sits beside the pane. */
   alwaysBack?: boolean
+  /** Student side only: when the pre-booking peer is an EXPERT, show their
+      session price + a „დაჯავშნე" button. Left off on the tutor side (the
+      expert must never see their own price/CTA in the prospect thread). */
+  showBookCta?: boolean
 }) {
   const other = peer ?? booking?.student ?? counterparty ?? null
   // Pre-booking pair thread: no booking context. Show a subtle pre-inquiry
   // label in place of the StatusPill so the tutor knows this is a prospect who
   // hasn't booked yet, not a client with a live session.
   const isPre = !booking && !!counterparty
+  // Only in a pre-booking thread where the peer is an expert (has a profile id +
+  // price) AND the viewer is the student side (showBookCta). Never on the tutor
+  // side or a non-expert peer.
+  const bookHref = isPre && showBookCta && counterparty?.tutorProfileId
+    ? `/tutors/${counterparty.tutorProfileId}` : null
+  const bookPrice = bookHref && typeof counterparty?.price === 'number' ? counterparty.price : null
   return (
     <div className="px-3 sm:px-5 py-3 border-b border-ink-100 bg-white flex items-center gap-3">
       <Link
@@ -62,7 +95,7 @@ export function ThreadHeader({
           {booking && <StatusPill tone={toneOf(booking.status)} />}
           {isPre && (
             <span className="inline-flex items-center h-5 px-2 rounded-pill bg-ink-100 text-ink-600 font-display text-[10.5px] font-semibold">
-              წინასწარი შეკითხვა
+              შეკითხვა ჯავშნამდე
             </span>
           )}
         </div>
@@ -77,6 +110,16 @@ export function ThreadHeader({
           <span className="hidden sm:inline">ჯავშნის ნახვა</span>
           <Icon.external className="w-4 h-4 sm:hidden" />
         </Btn>
+      )}
+      {bookHref && (
+        <div className="shrink-0 flex items-center gap-2.5">
+          {bookPrice != null && (
+            <span className="font-display text-[12.5px] font-semibold text-ink-500 tabular-nums whitespace-nowrap">
+              ₾{bookPrice}<span className="hidden sm:inline"> · სესია</span>
+            </span>
+          )}
+          <Btn variant="primary" size="sm" href={bookHref} className="shrink-0">დაჯავშნე</Btn>
+        </div>
       )}
     </div>
   )

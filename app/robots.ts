@@ -31,8 +31,14 @@ export default function robots(): MetadataRoute.Robots {
           '/api/dev/*',
           '/student',
           '/student/*',
-          '/tutor',
-          '/tutor/*',
+          // The expert WORKSPACE only. A bare '/tutor' is a PREFIX rule: it also
+          // matches /tutors and /tutors/{id} — the whole public catalog. Google
+          // resolves that by longest-match against the Allow rules above, but a
+          // first-match crawler would block the entire catalog. '/tutor$' pins the
+          // exact route; '/tutor/' covers everything under it without touching
+          // '/tutors…'. Never reintroduce a bare '/tutor' or '/tutor*'.
+          '/tutor$',
+          '/tutor/',
           '/session/*',
           '/notifications',
           '/settings',

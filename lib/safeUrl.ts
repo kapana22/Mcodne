@@ -30,12 +30,20 @@ export function safeHttpUrl(u?: string | null): string | undefined {
 
 /**
  * Server-side scheme guard for stored URLs (e.g. message `fileUrl`). Stricter
- * than the render guard: only `http(s):` and inline `data:image/*` are accepted
- * — `mailto:`/`tel:`/relative paths make no sense for a stored attachment and
- * are rejected. Returns `null` when the URL is unsafe so the caller can 400.
+ * than the render guard on navigable schemes — `mailto:`/`tel:`/relative paths
+ * make no sense for a stored attachment and are rejected — and limited to the
+ * exact inline forms /api/uploads emits: `data:image/*` previews and base64
+ * PDFs. The PDF form is required because the composer advertises (and
+ * /api/uploads accepts) PDF attachments, while this guard used to reject them,
+ * so every PDF send 400'd with UNSAFE_FILE_URL after a full 8 MB round-trip.
+ * `;base64,` is mandatory on the PDF branch: a bare `data:application/pdf,…`
+ * text payload is nothing we ever store, and the strict anchored form keeps the
+ * allow-list from widening in any other direction (`data:text/html` and every
+ * other `data:` type stay rejected). Returns `null` when the URL is unsafe so
+ * the caller can 400.
  */
 export function safeStoredFileUrl(u?: string | null): string | null {
   if (!u) return null
   const trimmed = u.trim()
-  return /^(https?:\/\/|data:image\/)/i.test(trimmed) ? trimmed : null
+  return /^(https?:\/\/|data:image\/|data:application\/pdf;base64,)/i.test(trimmed) ? trimmed : null
 }

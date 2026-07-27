@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { sendMail } from '@/lib/mailer'
+import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 
 const Body = z.object({
@@ -48,8 +49,15 @@ export async function POST(req: Request) {
 
   // Deliverability is live via lib/mailer: Gmail SMTP when GMAIL_USER/
   // GMAIL_APP_PASSWORD are set (production default), else Resend when
-  // MAILER_MODE=send, else console-log. (Nice-to-have: a reply-to header set to
-  // the submitter's address so replies go straight back to them.)
+  // MAILER_MODE=send, else console-log.
+  //
+  // Reply-To = the submitter, so hitting Reply in the inbox answers the person
+  // who wrote in instead of the shared address. It is user input, so it becomes
+  // a header only after CR/LF stripping + the same email check the body used —
+  // an unvalidated string here is a header-injection hole.
+  const cleanEmail = email.replace(/[\r\n]/g, '').trim()
+  const replyTo = z.string().email().safeParse(cleanEmail).success ? cleanEmail : undefined
+
   const html = `
     <div style="font-family:sans-serif;line-height:1.6;color:#181B20">
       <h2 style="margin:0 0 12px">ახალი შეტყობინება — მცოდნე</h2>
@@ -63,8 +71,12 @@ export async function POST(req: Request) {
   const text = `ახალი შეტყობინება — მცოდნე\n\nსახელი: ${name}\nელფოსტა: ${email}\nთემა: ${topicLabel}\n\n${message}`
 
   await sendMail({
-    to: process.env.CONTACT_INBOX || 'hi@mcodne.ge',
-    subject: `[მცოდნე] ${topicLabel} — ${name}`,
+    // CONTACT_INBOX overrides; the fallback is the one advertised support
+    // address. Both must be a mailbox the domain can actually RECEIVE at —
+    // see the note at the top of lib/mailer.ts.
+    to: process.env.CONTACT_INBOX || SUPPORT_EMAIL,
+    replyTo,
+    subject: `[მცოდნე] ${topicLabel} — ${name.replace(/[\r\n]+/g, ' ').trim()}`,
     html,
     text,
   })

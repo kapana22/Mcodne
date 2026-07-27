@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { audit } from '@/lib/audit'
 
 // PATCH /api/admin/categories/[id]
 // Partial update — either or both of `isLive` (browse visibility) and
@@ -21,7 +22,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  await requireRole('ADMIN')
+  const admin = await requireRole('ADMIN')
   const { id } = await params
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) {
@@ -39,6 +40,16 @@ export async function PATCH(
         isLive: true,
         _count: { select: { tutors: true } },
       },
+    })
+    // Flipping isLive delists/relists every expert in the category on the public
+    // site, so it gets its own action string (with the affected expert count).
+    const action = parsed.data.isLive === false ? 'category.hide'
+      : parsed.data.isLive === true ? 'category.show'
+      : 'category.update'
+    await audit(admin.id, action, {
+      targetType: 'Category',
+      targetId: id,
+      meta: { name: updated.name, slug: updated.slug, tutorCount: updated._count.tutors, changes: parsed.data },
     })
     return NextResponse.json({
       ok: true,
@@ -59,13 +70,18 @@ export async function PATCH(
 // DELETE /api/admin/categories/[id] — only when no experts are attached (a
 // category with tutors can be hidden via isLive instead, never orphaned).
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireRole('ADMIN')
+  const admin = await requireRole('ADMIN')
   const { id } = await params
-  const cat = await prisma.category.findUnique({ where: { id }, select: { _count: { select: { tutors: true } } } })
+  const cat = await prisma.category.findUnique({ where: { id }, select: { name: true, slug: true, _count: { select: { tutors: true } } } })
   if (!cat) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
   if (cat._count.tutors > 0) {
     return NextResponse.json({ ok: false, error: 'HAS_TUTORS' }, { status: 409 })
   }
   await prisma.category.delete({ where: { id } })
+  await audit(admin.id, 'category.delete', {
+    targetType: 'Category',
+    targetId: id,
+    meta: { name: cat.name, slug: cat.slug },
+  })
   return NextResponse.json({ ok: true })
 }

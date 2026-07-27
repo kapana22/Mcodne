@@ -2,6 +2,11 @@
 // Per-day time picker (band-grouped) — moved verbatim from
 // app/tutors/[id]/client.tsx (DESIGN_FIX_PROMPT 1.1). Times render in the
 // viewer's local tz; the Calendar footer carries the honest tz label.
+//
+// Every `timeChoices` entry is BOOKABLE: openness is derived (windows − busy −
+// service length), so a taken time simply yields no start. The old
+// struck-through „დაჯავშნული" tile is gone with the `taken` flag — on a 15-min
+// grid it would have painted a wall of dead tiles around every booking.
 import React from 'react'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
@@ -24,7 +29,7 @@ export const DayTimeline = ({
   timeChoices: TimeChoice[]
 }) => {
   const dayLabel = DAY_NAMES_FULL[isoWeekday(date)]
-  const free = timeChoices.filter(s => !s.taken).length
+  const free = timeChoices.length
 
   if (timeChoices.length === 0) {
     return (
@@ -33,7 +38,7 @@ export const DayTimeline = ({
           <Icon.cal className="w-5 h-5" />
         </div>
         <div className="font-display text-[15px] font-bold text-ink-900">ამ დღეს თავისუფალი დრო არ არის</div>
-        <p className="text-[13px] text-ink-500 mt-2 max-w-[280px]">აირჩიე სხვა დღე კალენდარში.</p>
+        <p className="text-[13px] text-ink-500 mt-2 max-w-[280px]">აირჩიე სხვა დღე.</p>
       </div>
     )
   }
@@ -51,12 +56,12 @@ export const DayTimeline = ({
       <div className="mb-6">
         <Eyebrow tone="muted" className="mb-1.5">არჩეული დღე</Eyebrow>
         <h3 className="font-display text-[20px] font-bold text-ink-900 tracking-tight">{dayLabel}, {date.getDate()} {KA_MONTHS_FULL[date.getMonth()]}</h3>
-        <p className="text-[13px] text-ink-600 mt-1 tabular-nums">{timeChoices.length} დრო · {free} თავისუფალი · {timeChoices.length - free} დაჯავშნული</p>
+        <p className="text-[13px] text-ink-600 mt-1 tabular-nums">{free} თავისუფალი დრო</p>
       </div>
 
       <div className="space-y-6">
         {bands.map(b => {
-          const bandFree = b.slots.filter(s => !s.taken).length
+          const bandFree = b.slots.length
           return (
             <div key={b.id}>
               <div className="flex items-baseline justify-between mb-2.5">
@@ -68,26 +73,21 @@ export const DayTimeline = ({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {b.slots.map((s, i) => {
-                  const active = selected != null && s.start.getTime() === selected.getTime() && !s.taken
+                  const active = selected != null && s.start.getTime() === selected.getTime()
                   return (
                     <button
                       key={i}
                       type="button"
-                      disabled={s.taken}
                       onClick={() => onSelect(s.start)}
-                      className={`p-3 rounded-card text-left border transition-all disabled:cursor-not-allowed motion-safe:active:scale-[0.98] ${
-                        s.taken
-                          ? 'border-ink-200 bg-ink-50/60'
-                          : active
-                            ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
-                            : 'border-ink-200 bg-white hover:border-brand-400 hover:bg-brand-50/40'
+                      className={`p-3 rounded-card text-left border transition-all motion-safe:active:scale-[0.98] ${
+                        active
+                          ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
+                          : 'border-ink-200 bg-white hover:border-brand-400 hover:bg-brand-50/40'
                       }`}
                     >
-                      <div className={`font-display text-[14px] font-bold tabular-nums tracking-tight ${s.taken ? 'text-ink-400 line-through' : 'text-ink-900'}`}>{fmtHM(s.start)} – {fmtHM(s.end)}</div>
+                      <div className="font-display text-[14px] font-bold tabular-nums tracking-tight text-ink-900">{fmtHM(s.start)} – {fmtHM(s.end)}</div>
                       <div className="text-[11.5px] mt-0.5">
-                        {s.taken ? (
-                          <span className="text-ink-400 font-display font-medium">დაჯავშნული</span>
-                        ) : active ? (
+                        {active ? (
                           <span className="text-brand-700 font-display font-semibold">არჩეული · {duration} წუთი</span>
                         ) : (
                           <span className="text-ink-600 tabular-nums">{duration} წთ · {price}</span>

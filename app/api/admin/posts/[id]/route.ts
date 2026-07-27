@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { audit } from '@/lib/audit'
 import { slugify } from '@/lib/slug'
 import { ensureDbReady } from '@/lib/dbBoot'
 
@@ -28,7 +29,7 @@ const Body = z
   .refine(v => Object.keys(v).length > 0, { message: 'EMPTY_BODY' })
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireRole('ADMIN')
+  const admin = await requireRole('ADMIN')
   await ensureDbReady()
   const { id } = await params
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
@@ -58,6 +59,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   try {
     const updated = await prisma.post.update({ where: { id }, data, select: SELECT })
+    // Publishing/unpublishing is what actually changes the public site, so it
+    // gets its own action string; plain edits log which fields moved.
+    const action = parsed.data.status === 'PUBLISHED' ? 'post.publish'
+      : parsed.data.status === 'DRAFT' ? 'post.unpublish'
+      : 'post.update'
+    await audit(admin.id, action, {
+      targetType: 'Post',
+      targetId: id,
+      meta: { title: updated.title, slug: updated.slug, fields: Object.keys(parsed.data) },
+    })
     return NextResponse.json({ ok: true, post: updated })
   } catch {
     return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
@@ -66,11 +77,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 // DELETE /api/admin/posts/[id]
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireRole('ADMIN')
+  const admin = await requireRole('ADMIN')
   await ensureDbReady()
   const { id } = await params
   try {
+    // Read before deleting — the audit row must still name what disappeared.
+    const before = await prisma.post.findUnique({ where: { id }, select: { title: true, slug: true, status: true } })
     await prisma.post.delete({ where: { id } })
+    await audit(admin.id, 'post.delete', {
+      targetType: 'Post',
+      targetId: id,
+      meta: { title: before?.title ?? null, slug: before?.slug ?? null, status: before?.status ?? null },
+    })
     return NextResponse.json({ ok: true })
   } catch {
     return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })

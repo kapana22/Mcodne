@@ -28,11 +28,13 @@ export default function TutorPairThreadPage() {
   }, [])
 
   // Cheap membership probe — a foreign/invalid pair shows a clear state
-  // instead of an eternally-loading chat.
+  // instead of an eternally-loading chat. `&probe=1` runs the same
+  // role/relationship guards and returns just `{ ok }`, so this no longer
+  // duplicates the full thread fetch BookingChat fires on mount.
   useEffect(() => {
     if (!userId) return
     let cancelled = false
-    fetch(`/api/messages?withUser=${userId}`)
+    fetch(`/api/messages?withUser=${userId}&probe=1`)
       .then(r => { if (!cancelled && (r.status === 403 || r.status === 404)) setDenied(true) })
       .catch(() => {})
     return () => { cancelled = true }
@@ -47,8 +49,8 @@ export default function TutorPairThreadPage() {
           <Icon.warn className="w-6 h-6" />
         </span>
         <div className="font-display text-[15px] font-semibold text-ink-800">მიმოწერა ვერ მოიძებნა</div>
-        <p className="text-[12.5px] text-ink-500 mt-1">შესაძლოა წაიშალა, ან არ არის შენი.</p>
-        <div className="mt-4"><Btn variant="secondary" size="sm" href="/tutor/messages">მიმოწერების სია</Btn></div>
+        <p className="text-[12.5px] text-ink-500 mt-1">წაიშალა, ან არ არის შენი.</p>
+        <div className="mt-4"><Btn variant="secondary" size="sm" href="/tutor/messages">სიაში დაბრუნება</Btn></div>
       </div>
     )
   }
@@ -62,8 +64,8 @@ export default function TutorPairThreadPage() {
       autoFocus
       header={(_booking, pair) => <ThreadHeader booking={null} counterparty={pair?.otherUser} backHref="/tutor/messages" />}
       emptyState={{
-        title: 'პოტენციურმა კლიენტმა დაგისვა შეკითხვა',
-        body: 'უპასუხე დაჯავშნამდე — სწრაფი პასუხი კონსულტაციის დაჯავშნის ალბათობას ზრდის.',
+        title: 'შეკითხვა დაჯავშნამდე',
+        body: 'უპასუხე — სწრაფი პასუხი ხშირად ჯავშნად იქცევა.',
       }}
       onActivity={() => window.dispatchEvent(new Event('mcodne:threads-refresh'))}
     />

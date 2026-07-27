@@ -69,20 +69,24 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ bookingId: 
   }
 
   const tutorId = review.tutorId
-  await prisma.review.delete({ where: { bookingId } })
-
-  // Recompute tutor rating aggregate after removal.
-  const agg = await prisma.review.aggregate({
-    where: { tutorId },
-    _avg: { rating: true },
-    _count: { rating: true },
-  })
-  await prisma.tutorProfile.update({
-    where: { id: tutorId },
-    data: {
-      rating: agg._avg.rating ?? 0,
-      reviewsCount: agg._count.rating ?? 0,
-    },
+  // Delete AND recompute the tutor's aggregate in one transaction (matching the
+  // create path and the admin delete path) so a mid-write failure can't leave the
+  // review gone while the profile's rating/reviewsCount keep counting it — the
+  // public listing sorts by that rating.
+  await prisma.$transaction(async tx => {
+    await tx.review.delete({ where: { bookingId } })
+    const agg = await tx.review.aggregate({
+      where: { tutorId },
+      _avg: { rating: true },
+      _count: { rating: true },
+    })
+    await tx.tutorProfile.update({
+      where: { id: tutorId },
+      data: {
+        rating: agg._avg.rating ?? 0,
+        reviewsCount: agg._count.rating ?? 0,
+      },
+    })
   })
 
   return NextResponse.json({ ok: true })

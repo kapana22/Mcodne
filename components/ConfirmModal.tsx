@@ -18,11 +18,15 @@
 //   • Focus goes to cancel button on open (safer default for confirmations)
 //   • Tab / Shift+Tab cycles inside the modal (focus trap)
 //   • Escape or backdrop click → cancel (disabled while `busy`)
+//   • Page scroll locked while open (vertical axis only — see Sheet)
 //   • `motion-safe:animate-[fadeIn_180ms_ease-out]` — respects prefers-reduced-motion
 //   • Tone drives confirm-button color: danger/brand/warning
 //   • busy → both buttons disabled + confirm shows "ინახება…"
 
 import { useCallback, useEffect, useRef } from 'react'
+// Same reference-counted, vertical-axis-only page lock the Sheet uses, so a
+// confirm opened on top of a sheet can't unlock the page underneath it.
+import { lockPageScroll } from './Sheet'
 
 type Tone = 'danger' | 'brand' | 'warning'
 
@@ -82,11 +86,17 @@ export function ConfirmModal({
   useEffect(() => {
     if (!open) return
     restoreRef.current = (document.activeElement as HTMLElement | null) ?? null
+    // Lock the page behind the dialog — without this the content scrolled
+    // under „ჯავშნის გაუქმება?" on iOS while the modal sat still.
+    const unlock = lockPageScroll()
     // Focus the cancel button — for confirmations we want the safe default.
     // Slight delay lets the modal render + animate in before we grab focus.
-    const t = window.setTimeout(() => cancelBtnRef.current?.focus(), 20)
+    // preventScroll — the dialog is a fixed overlay; focusing into it must not
+    // drag the locked page behind it to a different scroll position.
+    const t = window.setTimeout(() => cancelBtnRef.current?.focus({ preventScroll: true }), 20)
     return () => {
       window.clearTimeout(t)
+      unlock()
       restoreRef.current?.focus?.()
     }
   }, [open])

@@ -20,7 +20,7 @@ export default function StudentMessagesLayout({ children }: { children: React.Re
       <PageHeader
         className={`mb-4 lg:mb-5 ${threadOpen ? 'hidden lg:block' : ''}`}
         eyebrow="შეტყობინებები"
-        title="მიმოწერა ექსპერტებთან"
+        title="მიმოწერა"
       />
 
       {/* Mobile heights: on the list view the BottomNav is present; on an open
@@ -39,8 +39,8 @@ export default function StudentMessagesLayout({ children }: { children: React.Re
         <div className={`${threadOpen ? 'hidden lg:flex' : 'flex'} flex-col min-h-0 h-full lg:border-r lg:border-ink-100`}>
           <ConversationList
             empty={{
-              title: 'ჯერ არ გაქვს მიმოწერა',
-              description: 'როცა ექსპერტს მისწერ, საუბარი აქ გამოჩნდება.',
+              title: 'მიმოწერა ჯერ არ გაქვს',
+              description: 'მიწერე ექსპერტს — საუბარი აქ გამოჩნდება.',
               cta: { label: 'იპოვე ექსპერტი', href: '/tutors' },
             }}
           />

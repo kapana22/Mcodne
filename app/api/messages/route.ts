@@ -25,8 +25,9 @@ const Body = z.object({
   // NOTE: zod's `.url()` accepts `javascript:` and `data:text/html` — both are
   // valid URLs per WHATWG — so it does NOT stop a stored-XSS payload from being
   // saved and later rendered as a clickable <a href>. The scheme is re-checked
-  // with `safeStoredFileUrl` below (only http(s)/data:image/* pass); the render
-  // side also guards with `safeHttpUrl` as defense in depth.
+  // with `safeStoredFileUrl` below (only http(s)/data:image/* and base64
+  // data:application/pdf pass — the exact forms /api/uploads emits); the render
+  // side runs the same guard as defense in depth.
   // Attachments come from /api/uploads already downscaled (1600px jpeg) — a
   // resized data:image is well under this ceiling. The cap stops a client from
   // POSTing a raw multi-MB base64 blob straight into a message row (which would
@@ -70,6 +71,15 @@ export async function GET(req: Request) {
   // header the client already holds — so a 20s poll with nothing new is a few
   // bytes instead of the whole thread.
   const sinceParam = params.get('since')
+  // ?probe=1 — MEMBERSHIP CHECK ONLY, no message rows, no read-receipt writes.
+  // The four thread pages need a synchronous "am I allowed in here?" answer so a
+  // foreign/deleted thread renders „მიმოწერა ვერ მოიძებნა" instead of an eternal
+  // skeleton. They used to get it by re-issuing the EXACT thread GET the chat
+  // hook already fires on mount (up to 200 messages, base64 attachments and all)
+  // purely to read its status code — every thread open fetched the whole
+  // conversation twice. The probe runs the identical guards and returns `{ ok }`,
+  // so the 403/404 semantics are unchanged and the payload is a few bytes.
+  const probe = params.get('probe') === '1'
   const sinceDate = sinceParam ? new Date(sinceParam) : null
   const sinceValid = !!sinceDate && !isNaN(sinceDate.getTime())
   const sinceFilter = sinceValid ? { createdAt: { gt: sinceDate! } } : {}
@@ -84,7 +94,13 @@ export async function GET(req: Request) {
     }
     const other = await prisma.user.findUnique({
       where: { id: withUser },
-      select: { id: true, fullName: true, avatarUrl: true, role: true },
+      select: {
+        id: true, fullName: true, avatarUrl: true, role: true, suspendedAt: true,
+        // Expert profile id + flat consultation price — surfaced on the pair
+        // header so the student can see the price they saw on the profile and
+        // book straight from the chat. Null for a non-expert peer. No email/phone.
+        tutor: { select: { id: true, price: true } },
+      },
     })
     if (!other) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
     // A pre-booking consultation thread needs an EXPERT to consult, so at least
@@ -98,17 +114,26 @@ export async function GET(req: Request) {
     }
 
     // PII gate: the `pair.otherUser` header (name + avatar) is returned below. A
-    // TUTOR is public (anyone may open a fresh inquiry to one), but a STUDENT's
-    // identity must NOT be resolvable by id alone — so if the counterparty is not
-    // a TUTOR, require a real message relationship first. Without this, any
-    // expert could enumerate arbitrary students' names/avatars via ?withUser.
-    if (other.role !== 'TUTOR') {
+    // LIVE TUTOR is public (anyone may open a fresh inquiry to one), but a
+    // STUDENT's identity must NOT be resolvable by id alone — so if the
+    // counterparty is not a TUTOR, require a real message relationship first.
+    // Without this, any expert could enumerate arbitrary students' names/avatars
+    // via ?withUser. A SUSPENDED expert goes through the same gate: they are
+    // off-platform everywhere else (public profile 404s them, browse filters
+    // them, booking POST refuses them), so a cold ?withUser probe must not
+    // resolve them either — while an EXISTING thread still passes (the check is
+    // "do we already talk?"), so history never breaks under a suspension.
+    if (other.role !== 'TUTOR' || other.suspendedAt) {
       const rel = await prisma.message.findFirst({
         where: { bookingId: null, OR: [{ fromId: user.id, toId: withUser }, { fromId: withUser, toId: user.id }] },
         select: { id: true },
       })
       if (!rel) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
     }
+
+    // Every gate above has passed — that IS the probe's answer. Stop before the
+    // thread read so the page's membership check costs nothing.
+    if (probe) return NextResponse.json({ ok: true })
 
     // Initial load (no ?since) is capped to the most-recent 200 messages so a
     // long thread's full base64 attachment history isn't re-downloaded on every
@@ -150,11 +175,31 @@ export async function GET(req: Request) {
       ok: true,
       messages,
       // Header only on the initial (non-incremental) load; the client keeps it.
-      ...(sinceValid ? {} : { pair: { otherUser: other } }),
+      ...(sinceValid ? {} : {
+        pair: {
+          otherUser: {
+            id: other.id, fullName: other.fullName, avatarUrl: other.avatarUrl, role: other.role,
+            tutorProfileId: other.tutor?.id ?? null,
+            price: other.tutor?.price ?? null,
+          },
+        },
+      }),
     })
   }
 
   if (bookingId) {
+    // Probe: the SAME membership predicate the full branch uses, and nothing
+    // else — no messages, no header, no read-receipt writes. Same 403 on a
+    // foreign/missing booking.
+    if (probe) {
+      const member = await prisma.booking.findFirst({
+        where: { id: bookingId, OR: [{ studentId: user.id }, { tutor: { userId: user.id } }] },
+        select: { id: true },
+      })
+      if (!member) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
+      return NextResponse.json({ ok: true })
+    }
+
     // Fetch the thread in PARALLEL with the membership/header query — both are
     // independent reads, so this is one round-trip instead of two. Messages are
     // only RETURNED once membership passes, so a foreign bookingId leaks nothing
@@ -185,24 +230,73 @@ export async function GET(req: Request) {
       messagesPromise.catch(() => {}) // don't leak an unhandled rejection
       return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
     }
-    const messagesRaw = await messagesPromise
+    const iAmStudent = b.student.id === user.id
+    const otherId = iAmStudent ? b.tutor.user.id : b.student.id
+    // The EARLIEST pre-booking („შეკითხვა ჯავშნამდე") message with this same
+    // partner — one indexed read, initial load only, fanned out alongside the
+    // thread fetch so it adds no latency. It answers two things at once:
+    //   • does a pre-booking conversation exist at all (it is SUPPRESSED from the
+    //     inbox once a booking exists, so without a link from here its history is
+    //     reachable only by typing /…/messages/u/<id> by hand); and
+    //   • who opened it — the initiator is the client, which is the same rule the
+    //     inbox files pre threads by. Surface/clear it only when that hat matches
+    //     the one I wear in THIS booking, so a dual-role user's client-side
+    //     inquiry is never exposed (or marked read) from an expert-side booking.
+    const preFirstPromise = initialLoadB
+      ? prisma.message.findFirst({
+          where: { bookingId: null, OR: [{ fromId: user.id, toId: otherId }, { fromId: otherId, toId: user.id }] },
+          orderBy: { createdAt: 'asc' },
+          select: { fromId: true },
+        }).catch(() => null)
+      : Promise.resolve(null)
+    const [messagesRaw, preFirst] = await Promise.all([messagesPromise, preFirstPromise])
     const messages = initialLoadB ? messagesRaw.reverse() : messagesRaw
     const tMsgs = performance.now()
+    const preThread = preFirst && (preFirst.fromId === user.id) === iAmStudent
+      ? { userId: otherId, href: `/${iAmStudent ? 'student' : 'tutor'}/messages/u/${otherId}` }
+      : null
 
     // Read receipts + notif cleanup were the chat's dominant latency: two WRITES
     // in the request's critical path, fired on EVERY 20s poll from BOTH parties,
     // holding a connection each time and exhausting the pool on the slow DB.
     // They're pure UX side-effects the payload doesn't need — defer past the
     // response, and skip entirely when nothing is actually unread (most polls).
-    if (messages.some(m => m.toId === user.id && m.readAt === null)) {
+    //
+    // The initial open ALSO clears this partner's pre-booking („წინასწარი
+    // შეკითხვა") messages: the inbox folds that thread into this one once a
+    // booking exists (see the threads mode below), so it is no longer openable
+    // on its own and its unread would otherwise stick in the badge forever.
+    // Only on a real open (never on a ?since poll), and only when the pre thread
+    // sits in the SAME space as this booking — a dual-role user's client-side
+    // inquiry must not be marked read by opening a booking where they're the
+    // expert (the inbox still lists that inquiry in the other space).
+    const hasUnreadHere = messages.some(m => m.toId === user.id && m.readAt === null)
+    if (hasUnreadHere || preThread) {
       after(async () => {
-        await Promise.all([
-          prisma.message.updateMany({
-            where: { bookingId, toId: user.id, readAt: null },
-            data: { readAt: new Date() },
-          }),
-          markRelatedRead(user.id, bookingId, 'MESSAGE_NEW'),
-        ]).catch(() => {})
+        const tasks: Promise<unknown>[] = []
+        if (hasUnreadHere) {
+          tasks.push(
+            prisma.message.updateMany({
+              where: { bookingId, toId: user.id, readAt: null },
+              data: { readAt: new Date() },
+            }),
+            markRelatedRead(user.id, bookingId, 'MESSAGE_NEW'),
+          )
+        }
+        // `preThread` already encodes both conditions this used to re-query for (a pre
+        // thread exists AND its initiator puts it in the same space as this
+        // booking), so the two deferred lookups that stood here are gone. The
+        // updateMany is a no-op when nothing is actually unread.
+        if (preThread) {
+          tasks.push(
+            prisma.message.updateMany({
+              where: { bookingId: null, fromId: otherId, toId: user.id, readAt: null },
+              data: { readAt: new Date() },
+            }),
+            markRelatedRead(user.id, `messages/u/${otherId}`, 'MESSAGE_NEW'),
+          )
+        }
+        await Promise.all(tasks).catch(() => {})
       })
     }
     const res = NextResponse.json({
@@ -215,23 +309,50 @@ export async function GET(req: Request) {
           startAt: b.startAt, durationMin: b.durationMin,
           student: b.student, tutorUser: b.tutor.user,
         },
+        // `{ userId, href }` when an earlier pre-booking conversation with this
+        // same partner exists in this space, else null. The inbox suppresses that
+        // thread (no-duplicate-conversation rule) — this is how the UI offers a
+        // way back into its history. Non-null only on the initial load.
+        preThread,
       }),
     })
     res.headers.set('Server-Timing', `auth;dur=${(tAuth - t0).toFixed(0)}, booking;dur=${(tBooking - tAuth).toFixed(0)}, msgs;dur=${(tMsgs - tBooking).toFixed(0)}`)
     return res
   }
 
-  const bookings = await prisma.booking.findMany({
+  // Candidate bookings = the 100 whose LAST MESSAGE is most recent. The window
+  // used to be `orderBy: booking.updatedAt` — but updatedAt is NOT bumped by
+  // messages (the same fact that made the in-memory re-sort necessary), so for a
+  // heavy user an actively-chatting thread whose booking row hadn't been touched
+  // in months fell outside the 100 and vanished from the inbox AND from the
+  // unreadCount badge. Ranking the candidates by real conversation activity is
+  // the only ordering that can't drop a live thread. Still bounded (no unbounded
+  // query on this route), and the aggregate reads only createdAt — no message
+  // bodies, no `fileUrl`.
+  const activeBookings = await prisma.message.groupBy({
+    by: ['bookingId'],
     where: {
-      OR: [{ studentId: user.id }, { tutor: { userId: user.id } }],
-      messages: { some: {} },
+      bookingId: { not: null },
+      OR: [{ fromId: user.id }, { toId: user.id }],
     },
-    // Deterministic order + a higher cap: without an orderBy Postgres returned an
-    // arbitrary 40, so an active thread (and its unread badge count) could vanish.
-    // The final list is re-sorted in memory by last-message time; this just makes
-    // the candidate set stable and wide enough not to drop a live conversation.
-    orderBy: { updatedAt: 'desc' },
+    _max: { createdAt: true },
+    orderBy: { _max: { createdAt: 'desc' } },
     take: 100,
+  })
+  const activeBookingIds = activeBookings
+    .map(g => g.bookingId)
+    .filter((id): id is string => !!id)
+
+  const bookings = await prisma.booking.findMany({
+    // Membership stays on the query (load-bearing): every id above already comes
+    // from a message I'm a party to, but the predicate is the auth boundary and
+    // must not be inferred away.
+    where: {
+      id: { in: activeBookingIds },
+      OR: [{ studentId: user.id }, { tutor: { userId: user.id } }],
+    },
+    // The final list is re-sorted in memory by last-message time; `activeBookingIds`
+    // already bounds this to ≤100 rows, so no separate take is needed.
     include: {
       // Only the counterparty's name+avatar is used below — `select` the nested
       // user instead of `include`-ing the whole (blob-carrying) TutorProfile.
@@ -259,6 +380,7 @@ export async function GET(req: Request) {
         key: `b-${b.id}`,
         bookingId: b.id,
         pre: false,
+        otherId: other.id,
         name: other.fullName,
         avatarUrl: other.avatarUrl,
         topic: b.topic,
@@ -274,6 +396,16 @@ export async function GET(req: Request) {
         href: iAmStudent ? `/student/messages/${b.id}` : `/tutor/messages/${b.id}`,
       }
     })
+
+  // Dedup the inbox: once a partner has a booking thread, their pre-booking
+  // („წინასწარი შეკითხვა") thread is suppressed below — the conversation now
+  // lives in the booking thread, so the same person never appears twice.
+  // Suppressed ≠ dropped: the pre thread's unread is FOLDED into the surviving
+  // booking thread (see the fold loop below) and opening that booking stamps
+  // those pre-booking messages read too (see the ?bookingId branch). Dropping
+  // the count outright left the sidebar badge stuck at N with no thread the
+  // user could open to clear it.
+  const bookingPartnerIds = new Set(bookingThreads.map(t => t.otherId))
 
   // ── Pre-booking PAIR threads ─────────────────────────────────────────────
   // Messages with bookingId:null involving me, grouped by the OTHER participant.
@@ -318,10 +450,17 @@ export async function GET(req: Request) {
     // preMsgs, so the partner is always present); if it were ever absent, an
     // undefined initiator is !== me → the thread files under the expert space.
     .filter(g => {
+      // Space FIRST: a pre thread belongs to the space its initiator gives me,
+      // independent of any booking with the same partner. (Order matters — a
+      // dual-role user can be the client here and the expert in the booking;
+      // suppressing before the space check would fold a client-side inquiry
+      // into an expert-side booking thread and count it in the wrong space.)
       const iAmClient = preInitiators.get(g.other.id) === user.id
-      if (space === 'student') return iAmClient
-      if (space === 'tutor') return !iAmClient
-      return true
+      if (space === 'student' && !iAmClient) return false
+      if (space === 'tutor' && iAmClient) return false
+      // Then suppress: a booking thread with this same person already exists,
+      // so the conversation shows there — folded, not dropped (below).
+      return !bookingPartnerIds.has(g.other.id)
     })
     .map(g => {
       // Deep-link into the space that matches my hat in THIS thread, not my
@@ -345,6 +484,24 @@ export async function GET(req: Request) {
         href: `/${area}/messages/u/${g.other.id}`,
       }
     })
+
+  // Fold each SUPPRESSED pre thread's unread into the booking thread that
+  // replaced it (the most recent one when a partner has several bookings with
+  // me) — same space rule as the filter above, so a count is never moved into
+  // the other hat. Without this the unread simply vanished from the inbox while
+  // the sidebar badge kept counting it: a badge pointing at nothing.
+  for (const g of preByPartner.values()) {
+    if (!g.unread) continue
+    const iAmClient = preInitiators.get(g.other.id) === user.id
+    if (space === 'student' && !iAmClient) continue
+    if (space === 'tutor' && iAmClient) continue
+    const host = bookingThreads
+      .filter(t => t.otherId === g.other.id)
+      .sort((a, z) => new Date(z.at).getTime() - new Date(a.at).getTime())[0]
+    if (!host) continue
+    host.unreadCount += g.unread
+    host.unread = true
+  }
 
   const allThreads = [...bookingThreads, ...preThreads]
     .sort((a, z) => new Date(z.at).getTime() - new Date(a.at).getTime())
@@ -375,8 +532,9 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
   // Reject attachment URLs whose scheme could execute on the recipient's click
-  // (javascript:, data:text/html, …). Only http(s) links and inline
-  // data:image/* previews are allowed. Absent fileUrl is fine (text-only msg).
+  // (javascript:, data:text/html, …). Only http(s) links, inline data:image/*
+  // previews and base64 data:application/pdf files (both of which /api/uploads
+  // accepts) are allowed. Absent fileUrl is fine (text-only msg).
   let safeFileUrl: string | undefined
   if (parsed.data.fileUrl) {
     const cleaned = safeStoredFileUrl(parsed.data.fileUrl)
@@ -392,7 +550,7 @@ export async function POST(req: Request) {
     }
     const other = await prisma.user.findUnique({
       where: { id: toUserId },
-      select: { id: true, fullName: true, role: true },
+      select: { id: true, fullName: true, role: true, suspendedAt: true },
     })
     if (!other) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
 
@@ -415,10 +573,14 @@ export async function POST(req: Request) {
     const isNewThread = !firstMsg
     const iInitiated = isNewThread || firstMsg!.fromId === user.id
 
-    // Opening a NEW thread is a CLIENT action — I must be messaging an expert.
+    // Opening a NEW thread is a CLIENT action — I must be messaging an expert,
+    // and a LIVE one: a suspended expert is unreachable everywhere else (public
+    // profile 404s them, browse filters them, booking POST refuses them), so a
+    // fresh inquiry must not slip through here either.
     // This stops an expert cold-opening to a client (the old "reply-only" rule);
-    // once a client has opened the thread, either side may continue freely.
-    if (isNewThread && other.role !== 'TUTOR') {
+    // once a client has opened the thread, either side may continue freely —
+    // an already-open conversation keeps working even if the expert is suspended.
+    if (isNewThread && (other.role !== 'TUTOR' || other.suspendedAt)) {
       return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
     }
 
@@ -470,7 +632,9 @@ export async function POST(req: Request) {
       id: bookingId,
       OR: [{ studentId: user.id }, { tutor: { userId: user.id } }],
     },
-    include: { tutor: true },
+    // Only the tutor's userId is needed to route the message — never pull the
+    // full TutorProfile (professionData JSON + legacy base64 videoUrl) for it.
+    select: { id: true, studentId: true, tutor: { select: { userId: true } } },
   })
   if (!b) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
   const toId = user.id === b.studentId ? b.tutor.userId : b.studentId

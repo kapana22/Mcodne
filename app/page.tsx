@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Landing from './HomeClient'
+import { jsonLdString } from '@/lib/jsonLd'
 
 // Home is a client component (HomeClient) for its interactivity, so this thin
 // server wrapper carries the SEO: a strong title/description, a self-canonical,
@@ -7,17 +8,17 @@ import Landing from './HomeClient'
 // box). Without this the homepage inherited the weak layout defaults.
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
-const DESC = 'დაჯავშნე ვიდეო-კონსულტაცია ხელით შერჩეულ ქართველ ექსპერტებთან — ბიზნესი, კარიერა, იურიდიული და ფინანსური საკითხები. აირჩიე დრო, დაჯავშნე, შეხვდი 60 წუთში.'
+const DESC = 'დაჯავშნე ონლაინ კონსულტაცია ქართველ ექსპერტთან — ბიზნესი, ფინანსები, კარიერა და სამართალი. ხელით შერჩეული ბაზა, ვიდეოსესია, გამჭვირვალე ფასი.'
 
 export const metadata: Metadata = {
-  title: 'მცოდნე — ბიზნეს კონსულტაცია ქართველ ექსპერტებთან',
+  title: 'ბიზნეს კონსულტაცია ონლაინ — ქართველ ექსპერტებთან | მცოდნე',
   description: DESC,
   alternates: { canonical: '/' },
   openGraph: {
     title: 'მცოდნე — ბიზნეს კონსულტაცია ექსპერტებთან',
     description: DESC,
     url: SITE_URL,
-    images: ['/logo.png'],
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'მცოდნე' }],
     locale: 'ka_GE',
     type: 'website',
   },
@@ -53,7 +54,7 @@ const jsonLd = {
 export default function Page() {
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
       <Landing />
     </>
   )

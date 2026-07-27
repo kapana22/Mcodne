@@ -19,6 +19,7 @@ import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { stripAvatar } from '@/lib/stripTutorBlobs'
+import { jsonLdString } from '@/lib/jsonLd'
 import ExpertProfilePage from './client'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
@@ -30,7 +31,7 @@ type Params = { id: string }
 // outage degrades to generic metadata + client render instead of a false 404.
 const getTutorSeo = cache(async (id: string) => {
   try {
-    return await prisma.tutorProfile.findUnique({
+    const t = await prisma.tutorProfile.findUnique({
       where: { id },
       select: {
         specialty: true,
@@ -40,9 +41,14 @@ const getTutorSeo = cache(async (id: string) => {
         reviewsCount: true,
         price: true,
         category: { select: { name: true } },
-        user: { select: { fullName: true, avatarUrl: true } },
+        user: { select: { fullName: true, avatarUrl: true, suspendedAt: true } },
       },
     })
+    // Admin-suspended experts (User.suspendedAt) are fully removed from the
+    // public site: return null so the page 404s exactly like a missing id.
+    // (findUnique can't filter on a relation field, so we check after fetch.)
+    if (t?.user?.suspendedAt) return null
+    return t
   } catch {
     return 'error' as const
   }
@@ -57,6 +63,12 @@ const getTutorSeo = cache(async (id: string) => {
 // Those (live slots, reviews, experience/education/certificates) hydrate from
 // the client's existing fetch. Returns null on any DB error so the client
 // cleanly falls back to its pure client-fetch path (skeleton + retry).
+//
+// CONTRACT: this seed is PARTIAL by design. ./client.tsx tracks it with its own
+// `detailsState` flag and keeps every availability-/review-derived region in a
+// neutral loading state until the fetch lands — so nothing here may be read as
+// „the expert has no free time" or „the histogram is all zeros". If you add a
+// field to the seed, keep that flag's meaning intact.
 const getTutorInitial = cache(async (id: string) => {
   try {
     const [tutor, consultations] = await Promise.all([
@@ -67,7 +79,7 @@ const getTutorInitial = cache(async (id: string) => {
           rating: true, reviewsCount: true, sessionsCount: true, price: true,
           verified: true, available: true, responseHours: true, languages: true,
           videoUrl: true, consultationDurationMin: true,
-          user: { select: { id: true, fullName: true, avatarUrl: true, bio: true } },
+          user: { select: { id: true, fullName: true, avatarUrl: true, bio: true, suspendedAt: true } },
           category: { select: { id: true, slug: true, name: true, icon: true } },
         },
       }),
@@ -77,6 +89,10 @@ const getTutorInitial = cache(async (id: string) => {
       }),
     ])
     if (!tutor) return null
+    // Admin-suspended experts are hidden site-wide — drop the first-paint seed
+    // (the route also 404s via getTutorSeo, and stripAvatar drops suspendedAt
+    // from what ships to the client).
+    if (tutor.user?.suspendedAt) return null
     // Shape matches /api/tutors/[id] for the seeded fields; the arrays the seed
     // omits are read as `?? []` in the client, so their absence is safe.
     // Apply the SAME blob guards the /api/tutors/[id] route uses — otherwise a
@@ -218,13 +234,13 @@ export default async function TutorProfileRoute(
       {jsonLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }}
         />
       )}
       {breadcrumbLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbLd) }}
         />
       )}
       <ExpertProfilePage initialTutor={initialTutor} initialUser={initialUser} />

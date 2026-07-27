@@ -70,7 +70,7 @@ export const OrderSummary = ({
         </div>
         <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
           <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">თემა</dt>
-          <dd className="font-display font-medium text-ink-800 leading-snug">{topic || '— ჯერ არ არჩეული'}</dd>
+          <dd className="font-display font-medium text-ink-800 leading-snug">{topic || '—'}</dd>
         </div>
         <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
           <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">ფორმატი</dt>
@@ -94,17 +94,12 @@ export const OrderSummary = ({
           {PAYMENTS_LIVE ? (
             <>
               <p className="font-display text-[12px] font-bold text-brand-800 leading-snug">დაცული გადახდა</p>
-              <p className="text-[11.5px] text-ink-600 leading-[1.5]">
-                თანხა ინახება უსაფრთხოდ და ექსპერტს გადაერიცხება მხოლოდ სესიის შემდეგ.
-                თუ ექსპერტი არ გამოცხადდა — 100% ავტომატური დაბრუნება. გაუქმება უფასოა სესიამდე 24 საათით ადრე.
-              </p>
+              <p className="text-[11.5px] text-ink-600 leading-[1.5]">თანხა ექსპერტს მხოლოდ სესიის შემდეგ გადაერიცხება.</p>
             </>
           ) : (
             <>
               <p className="font-display text-[12px] font-bold text-brand-800 leading-snug">დაჯავშნა უფასოა</p>
-              <p className="text-[11.5px] text-ink-600 leading-[1.5]">
-                გადახდის სისტემა მალე ჩაირთვება — ამჟამად ჯავშანი უფასოა. ექსპერტი დაგიდასტურებს მოთხოვნას; გაუქმება ნებისმიერ დროს შესაძლებელია.
-              </p>
+              <p className="text-[11.5px] text-ink-600 leading-[1.5]">გადახდა მალე ჩაირთვება.</p>
             </>
           )}
         </div>

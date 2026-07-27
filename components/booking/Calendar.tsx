@@ -5,20 +5,23 @@ import React from 'react'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { KA_MONTHS_LONG as KA_MONTHS_FULL } from '@/lib/kaDate'
-import { WEEK_HEADERS, isoWeekday, startOfDay, sameDay, dayKey, type ApiSlot } from './slots'
+import { WEEK_HEADERS, isoWeekday, startOfDay, sameDay, dayKey, type StartsByDay } from './slots'
 import { CalendarTzLabel } from './TzLabels'
 
 export const Calendar = ({
   viewMonth,
   selected,
-  slotsByDay,
+  startsByDay,
   onSelect,
   onPrev,
   onNext,
 }: {
   viewMonth: Date
   selected: Date | null
-  slotsByDay: Map<string, ApiSlot[]>
+  /** Already-derived bookable starts per day (openStartsByDay) — the calendar
+      never re-reads raw rows, so its availability marks agree with the time
+      picker by construction, for the CHOSEN service length. */
+  startsByDay: StartsByDay
   onSelect: (d: Date) => void
   onPrev: () => void
   onNext: () => void
@@ -36,14 +39,12 @@ export const Calendar = ({
 
   // Bound month nav so users can't scroll to arbitrary past months.
   const canPrev = new Date(year, month, 1).getTime() > new Date(today.getFullYear(), today.getMonth(), 1).getTime()
-  // …and symmetric forward: no paging past the last month that still contains
-  // a published slot (nothing to see there — every further page is empty).
+  // …and symmetric forward: no paging past the last month that still holds a
+  // BOOKABLE start (nothing to see there — every further page is empty).
   let lastSlotMs = 0
-  for (const arr of slotsByDay.values()) {
-    for (const s of arr) {
-      const t = new Date(s.startAt).getTime()
-      if (t > lastSlotMs) lastSlotMs = t
-    }
+  for (const arr of startsByDay.values()) {
+    const last = arr[arr.length - 1]
+    if (last && last.getTime() > lastSlotMs) lastSlotMs = last.getTime()
   }
   const canNext = lastSlotMs > 0 && new Date(year, month + 1, 1).getTime() <= lastSlotMs
 
@@ -83,9 +84,15 @@ export const Calendar = ({
           const isToday = sameDay(d, today)
           const isSelected = selected != null && sameDay(d, selected)
           const isPast = d.getTime() < today.getTime()
-          const slots = slotsByDay.get(dayKey(d))?.filter(s => !s.booked).length ?? 0
+          // Derived starts only — already past-, busy- and length-filtered by
+          // lib/availability, so a marked day can never lead to a dead-end tap.
+          const slots = startsByDay.get(dayKey(d))?.length ?? 0
           const disabled = isPast || slots === 0
-          const dots = Math.min(Math.max(Math.ceil(slots / 2), slots > 0 ? 1 : 0), 4)
+          // Status dots are banned by canon, but "this day is bookable" is real
+          // information — so an open day gets a brand tint plus an underline
+          // accent whose WIDTH carries the density the dot-count used to
+          // (more free time → longer rule). Reads at a glance, no dots.
+          const barW = slots >= 6 ? 'w-5' : slots >= 4 ? 'w-4' : slots >= 2 ? 'w-3' : 'w-2'
 
           return (
             <button
@@ -100,16 +107,17 @@ export const Calendar = ({
                     ? 'bg-white text-brand-800 ring-1 ring-brand-300'
                     : disabled
                       ? 'text-ink-300'
-                      : 'text-ink-800 hover:bg-ink-100'
+                      : 'bg-brand-50 text-brand-900 hover:bg-brand-100'
               }`}
             >
               <span className="text-[13.5px] tabular-nums leading-none">{d.getDate()}</span>
               {!disabled && (
-                <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-0.5">
-                  {Array.from({ length: dots }).map((_, j) => (
-                    <span key={j} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/75' : 'bg-brand-400'}`} />
-                  ))}
-                </span>
+                <span
+                  aria-hidden
+                  className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 h-[2px] rounded-full ${barW} ${
+                    isSelected ? 'bg-white/80' : 'bg-brand-500'
+                  }`}
+                />
               )}
             </button>
           )
@@ -119,10 +127,8 @@ export const Calendar = ({
       <div className="mt-6 pt-4 border-t border-ink-100 space-y-2 text-[11px] text-ink-500">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
-            <span className="flex gap-0.5">
-              <span className="w-1 h-1 rounded-full bg-brand-400" />
-              <span className="w-1 h-1 rounded-full bg-brand-400" />
-              <span className="w-1 h-1 rounded-full bg-brand-400" />
+            <span className="relative w-5 h-5 rounded-btn bg-brand-50 inline-flex items-center justify-center">
+              <span aria-hidden className="absolute bottom-[3px] left-1/2 -translate-x-1/2 w-3 h-[2px] rounded-full bg-brand-500" />
             </span>
             <span>თავისუფალი დროები</span>
           </div>

@@ -16,6 +16,9 @@ import { sendMessageReminders } from '@/lib/messageReminders'
 //   - Booking PREPARING → CANCELED  (tutor never responded within 24h, OR the
 //     scheduled start time passed unanswered — whichever comes first).
 //     Frees the held AvailabilitySlot for someone else.
+//   - Booking PREPARING → CONFIRMED  (a reschedule proposal on a booking that
+//     was CONFIRMED expired unanswered and its original time is still ahead —
+//     the proposal dies, the session survives at its original time).
 //   - Booking CONFIRMED / LIVE → COMPLETED  (session ended ≥ 48h ago and
 //     nobody flagged NO_SHOW — benefit of the doubt).
 //
@@ -40,6 +43,14 @@ import { sendMessageReminders } from '@/lib/messageReminders'
 
 const PREPARING_TTL_HOURS = 24
 const AUTO_COMPLETE_GRACE_HOURS = 48
+// A pending reschedule proposal force-holds a booking in PREPARING and locks its
+// slot. It stays exempt from the PREPARING auto-cancel only while it is still
+// negotiable — proposed within this window AND for a still-future time. Once it
+// goes stale (nobody answered) it must expire, or the booking + slot are bricked
+// forever (cleanup would otherwise skip it indefinitely). Expiring it RESTORES a
+// previously-CONFIRMED booking to its original time; only a never-confirmed one
+// is auto-canceled.
+const RESCHEDULE_PROPOSAL_TTL_HOURS = 48
 
 export async function POST(req: Request) {
   const auth = req.headers.get('authorization') || ''
@@ -101,48 +112,124 @@ export async function POST(req: Request) {
 
   // A pending reschedule proposal force-sets status back to PREPARING on a
   // booking whose createdAt may be days old — keying the TTL on createdAt
-  // would silently auto-cancel it mid-negotiation. Exclude every booking with
-  // a pending rescheduleRequest (raw JSONB column — not in the Prisma model).
-  let pendingRescheduleIds = new Set<string>()
+  // would silently auto-cancel it mid-negotiation. Exempt such bookings, BUT
+  // only while the proposal is still negotiable: proposed within the TTL AND
+  // for a still-future time. A stale/dead proposal (nobody ever answered, or
+  // even the proposed time has now passed) must NOT stay exempt — otherwise the
+  // booking sits in PREPARING forever with its slot locked. Those fall through
+  // to the restore / auto-cancel handling below, depending on `prevStatus`.
+  // (Raw JSONB column — not in the Prisma model.)
+  const proposalTtlMs = RESCHEDULE_PROPOSAL_TTL_HOURS * 3600_000
+  const exemptRescheduleIds = new Set<string>()
+  // A DEAD proposal on a booking that was CONFIRMED before the proposal forced
+  // PREPARING must NOT be canceled either — the expired thing is the proposal,
+  // not the session, whose ORIGINAL startAt may still be weeks away. Those get
+  // restored to CONFIRMED below instead (`prevStatus` is written by the propose
+  // route and bumped to CONFIRMED by the booking-accept PATCH).
+  const restoreRescheduleIds = new Set<string>()
   if (stalePrepAll.length > 0) {
     const placeholders = stalePrepAll.map((_, i) => `$${i + 1}`).join(', ')
-    const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
-      `SELECT id FROM "Booking" WHERE "rescheduleRequest" IS NOT NULL AND id IN (${placeholders})`,
+    const rows = await prisma.$queryRawUnsafe<
+      { id: string; rescheduleRequest: { newStartAt?: string; proposedAt?: string; prevStatus?: string } | null }[]
+    >(
+      `SELECT id, "rescheduleRequest" FROM "Booking" WHERE "rescheduleRequest" IS NOT NULL AND id IN (${placeholders})`,
       ...stalePrepAll.map(b => b.id),
     )
-    pendingRescheduleIds = new Set(rows.map(r => r.id))
+    // Only a booking whose ORIGINAL time is still ahead can be restored — one
+    // whose startAt already passed falls through to the normal auto-cancel
+    // below (never resurrect a past session as CONFIRMED).
+    const futureStartIds = new Set(
+      stalePrepAll.filter(b => b.startAt.getTime() > now.getTime()).map(b => b.id),
+    )
+    for (const r of rows) {
+      const rr = r.rescheduleRequest
+      if (!rr) continue
+      const proposedAt = rr.proposedAt ? new Date(rr.proposedAt).getTime() : 0
+      const newStart = rr.newStartAt ? new Date(rr.newStartAt).getTime() : 0
+      const fresh = proposedAt > 0 && now.getTime() - proposedAt < proposalTtlMs
+      const actionable = newStart > now.getTime()
+      if (fresh && actionable) {
+        exemptRescheduleIds.add(r.id)
+        continue
+      }
+      if (rr.prevStatus === 'CONFIRMED' && futureStartIds.has(r.id)) restoreRescheduleIds.add(r.id)
+    }
   }
-  const stalePrep = stalePrepAll.filter(b => !pendingRescheduleIds.has(b.id))
+  const stalePrep = stalePrepAll.filter(
+    b => !exemptRescheduleIds.has(b.id) && !restoreRescheduleIds.has(b.id),
+  )
+
+  // Expired proposal on a previously-CONFIRMED booking → restore the booking
+  // (original startAt + heldSlotId stay exactly as they are; only the forced
+  // PREPARING and the dead proposal blob are undone). Runs BEFORE the
+  // auto-cancel loop so a confirmed session is never destroyed by a proposal
+  // nobody answered.
+  let rescheduleRestored = 0
+  for (const b of stalePrepAll.filter(x => restoreRescheduleIds.has(x.id))) {
+    const restoredOk = await prisma.$transaction(async tx => {
+      // Status-guarded claim, re-read inside the tx: a concurrent accept (→
+      // CONFIRMED at the NEW time) or reject (clears the blob) must win. Matching
+      // BOTH `status = 'PREPARING'` AND a still-present blob proves the proposal
+      // was untouched when we expired it — so this can never run twice on one
+      // row, and never clobbers the counter-party's answer.
+      const n = await tx.$executeRawUnsafe(
+        `UPDATE "Booking"
+            SET "status" = 'CONFIRMED', "rescheduleRequest" = NULL, "updatedAt" = NOW()
+          WHERE id = $1 AND "status" = 'PREPARING' AND "rescheduleRequest" IS NOT NULL`,
+        b.id,
+      )
+      return n === 1
+    })
+    if (!restoredOk) continue
+    rescheduleRestored++
+
+    // Both parties were waiting on that proposal — tell them the old time stands.
+    const sessionRef = `${b.topic} · ${fmtKaDateTime(b.startAt, { year: true })}`
+    await notify(b.studentId, {
+      type: 'BOOKING_CREATED',
+      title: 'ჯავშანი ძველ დროზე დარჩა',
+      body: `${sessionRef} — გადადების მოთხოვნას ვადა გაუვიდა, ჯავშანი ძველ დროზე ძალაშია`,
+      href: `/student/bookings/${b.id}`,
+    })
+    await notify(b.tutor.userId, {
+      type: 'BOOKING_CREATED',
+      title: 'ჯავშანი ძველ დროზე დარჩა',
+      body: `${sessionRef} — გადადების მოთხოვნას ვადა გაუვიდა, ჯავშანი ძველ დროზე ძალაშია`,
+      href: `/tutor/bookings/${b.id}`,
+    })
+  }
 
   let preparingCanceled = 0
   for (const b of stalePrep) {
-    // Free the EXACT slot this booking claimed (heldSlotId) — same as the
-    // cancel/decline flows. The time-containment scan is a legacy fallback
-    // ONLY for rows created before heldSlotId existed (schema.prisma warns the
-    // scan can free an unrelated slot, so it must never be the primary path).
-    let slotId: string | null = b.heldSlotId
-    if (!slotId) {
-      const end = new Date(b.startAt.getTime() + b.durationMin * 60_000)
-      const legacySlot = await prisma.availabilitySlot.findFirst({
-        where: {
-          tutorId: b.tutorId,
-          startAt: { lte: b.startAt },
-          endAt:   { gte: end },
-          booked: true,
-        },
-        select: { id: true },
-      })
-      slotId = legacySlot?.id ?? null
-    }
-    await prisma.$transaction(async tx => {
-      await tx.booking.update({
-        where: { id: b.id },
+    // Release the EXACT slot this booking claimed (heldSlotId) — same as the
+    // cancel/decline flows. Null is a harmless no-op: under the windows model a
+    // booking claims nothing (a row is a WINDOW and bookable starts are derived
+    // from windows − active bookings), so cancelling one automatically returns
+    // its time to the derivation. Only legacy rows still carry a heldSlotId
+    // worth clearing. The old time-containment fallback that matched a row by
+    // `startAt <= b.startAt AND endAt >= end AND booked = true` is gone: every
+    // new booking has a null heldSlotId, so it fired against whatever unrelated
+    // legacy row happened to contain the time — to clear a flag that no longer
+    // means anything.
+    const slotId: string | null = b.heldSlotId
+    const claimed = await prisma.$transaction(async tx => {
+      // Status-guarded claim: the tutor could have accepted (PREPARING →
+      // CONFIRMED) between our findMany snapshot and this write. count === 1
+      // proves the row was STILL PREPARING when we flipped it — otherwise we'd
+      // clobber a just-confirmed booking back to CANCELED and free its slot.
+      const c = await tx.booking.updateMany({
+        where: { id: b.id, status: 'PREPARING' },
         data: { status: 'CANCELED', payoutStatus: 'REFUNDED', heldSlotId: null },
       })
+      if (c.count !== 1) return false
       if (slotId) {
         await tx.availabilitySlot.updateMany({ where: { id: slotId }, data: { booked: false } })
       }
+      return true
     })
+    // Lost the race (a concurrent accept won) — don't free the slot and don't
+    // send a bogus cancellation to a booking that's now CONFIRMED.
+    if (!claimed) continue
     preparingCanceled++
 
     // Tell both parties — the student's request expired unanswered, and the
@@ -178,9 +265,21 @@ export async function POST(req: Request) {
     where: {
       status: { in: ['CONFIRMED', 'LIVE'] },
       startAt: { lt: candidateCutoff },
+      // NEVER auto-complete a booking an admin already decided on. Without these
+      // two exclusions this block silently REVERSED a dispute refund 48h later:
+      // it flipped payoutStatus back to RELEASED and bumped the expert's public
+      // sessionsCount, while the audit row still said REFUND_FULL.
+      //   · payoutStatus REFUNDED — money already returned (dispute refund, or
+      //     an auto-canceled request), so there is nothing left to release.
+      //   · any Dispute row — a resolved one already wrote its own terminal
+      //     state (see app/api/admin/disputes/[id]), and an OPEN one must not
+      //     be pre-empted by the cron releasing the payout under the admin.
+      payoutStatus: { not: 'REFUNDED' },
+      dispute: { is: null },
     },
     select: {
       id: true,
+      tutorId: true,
       startAt: true,
       durationMin: true,
       topic: true,
@@ -193,23 +292,44 @@ export async function POST(req: Request) {
     return sessionEnd + AUTO_COMPLETE_GRACE_HOURS * 3600_000 < now.getTime()
   })
   let autoCompleted = 0
+  // Only rows that ACTUALLY transitioned here get notified + counted.
+  const completed: typeof overdue = []
   if (overdue.length > 0) {
     // Also set `autoCompleted: true` so downstream flows (specifically the
     // reviews API) can distinguish sessions the tutor manually closed from
     // ones the cron closed on the "benefit of the doubt" fallback. Reviews on
     // auto-completed bookings are refused — a session that may not have
     // actually happened must not seed a rating.
-    const res = await prisma.booking.updateMany({
-      where: { id: { in: overdue.map(b => b.id) } },
-      data: { status: 'COMPLETED', payoutStatus: 'RELEASED', autoCompleted: true },
-    })
-    autoCompleted = res.count
-
+    for (const b of overdue) {
+      const flipped = await prisma.$transaction(async tx => {
+        // Status-guarded claim: a concurrent manual complete could have flipped
+        // this row between our findMany and now. count === 1 proves THIS tick
+        // performed the transition, so the sessionsCount bump below happens
+        // exactly once per genuinely auto-completed booking (no double-count).
+        const claim = await tx.booking.updateMany({
+          where: { id: b.id, status: { in: ['CONFIRMED', 'LIVE'] } },
+          data: { status: 'COMPLETED', payoutStatus: 'RELEASED', autoCompleted: true },
+        })
+        if (claim.count !== 1) return false
+        // Bump the expert's public "N სესია ჩატარებული" stat for this session.
+        await tx.tutorProfile.update({
+          where: { id: b.tutorId },
+          data: { sessionsCount: { increment: 1 } },
+        })
+        return true
+      })
+      if (flipped) {
+        autoCompleted++
+        completed.push(b)
+      }
+    }
+  }
+  if (completed.length > 0) {
     // Both parties learn the session was closed automatically — otherwise the
     // status flips silently and neither side knows why. State is already
     // committed above, so these are pure side-effects — fan them out in one
     // batch instead of one serial round-trip per party.
-    await Promise.all(overdue.flatMap(b => {
+    await Promise.all(completed.flatMap(b => {
       const sessionRef = `${b.topic} · ${fmtKaDateTime(b.startAt, { year: true })}`
       return [
         notify(b.studentId, {
@@ -301,6 +421,7 @@ export async function POST(req: Request) {
     },
     bookings: {
       preparingCanceled,
+      rescheduleRestored,
       autoCompleted,
       remindersSent,
     },
@@ -340,7 +461,8 @@ export async function GET(req: Request) {
       'Delete consumed/expired OtpCode rows',
       'Delete consumed/expired PasswordResetToken rows',
       `Cancel PREPARING bookings unanswered for ${PREPARING_TTL_HOURS}h OR past their startAt + free their held slot`,
-      `Auto-complete CONFIRMED/LIVE bookings past (startAt + duration + ${AUTO_COMPLETE_GRACE_HOURS}h)`,
+      `Restore a previously-CONFIRMED booking whose reschedule proposal went stale (>${RESCHEDULE_PROPOSAL_TTL_HOURS}h or past) and whose original startAt is still ahead`,
+      `Auto-complete CONFIRMED/LIVE bookings past (startAt + duration + ${AUTO_COMPLETE_GRACE_HOURS}h) — refunded + disputed bookings excluded`,
       'Send BOOKING_REMINDER (24h + 1h before start) to both parties of CONFIRMED bookings — run every 15–30 min for reliable 1h reminders',
     ],
     hint: configured

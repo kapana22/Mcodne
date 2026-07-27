@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect } from 'react'
 import { reportClientError } from '@/lib/reportError'
+import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 
 // Per-segment error boundary. Renders whenever any client-side page throws.
 // Reset re-mounts the segment, preserving parent layout state.
@@ -21,7 +22,11 @@ export default function Error({
 
   return (
     <main className="relative min-h-screen flex items-center justify-center px-6 bg-ink-50 overflow-hidden">
-      <span aria-hidden className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full bg-danger-100/30 blur-3xl pointer-events-none" />
+      {/* Soft halo behind content. Same recipe as globals.css `.glow-brand` — a
+          radial gradient, never `blur-3xl` (Safari renders large blur() filters
+          as a hard-edged square stain) — but on the danger hue, which has no
+          named utility; the color still comes from the palette, not a raw hex. */}
+      <span aria-hidden className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[560px] h-[560px] bg-[radial-gradient(closest-side,theme(colors.danger.500/10%),transparent)] pointer-events-none" />
 
       <div className="relative max-w-[520px] w-full text-center">
         <div className="font-display font-bold tabular-nums leading-none tracking-[-0.03em] text-[120px] sm:text-[160px] bg-danger-500 bg-clip-text text-transparent motion-safe:animate-scale-in">
@@ -58,7 +63,7 @@ export default function Error({
 
         <div className="mt-8 text-[12.5px] text-ink-500 motion-safe:animate-fade-in" style={{ animationDelay: '340ms' }}>
           თუ პრობლემა გრძელდება — {' '}
-          <a href="mailto:hi@mcodne.ge" className="font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2">
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2">
             მოგვწერე
           </a>
         </div>

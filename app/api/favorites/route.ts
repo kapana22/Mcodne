@@ -14,6 +14,9 @@ export async function GET() {
     // Never send passwordHash back; narrow both User and Category.
     include: {
       tutor: {
+        // Drop the heavy blobs at the DB level (favorites cards never render the
+        // intro video or professionData); stripTutorBlobs still guards avatars.
+        omit: { professionData: true, videoUrl: true },
         include: {
           user: { select: { id: true, fullName: true, avatarUrl: true } },
           category: { select: { id: true, slug: true, name: true, icon: true } },

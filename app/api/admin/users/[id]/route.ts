@@ -94,7 +94,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 /* ── Admin safety actions: suspend / unsuspend ──
    Guarded identically to every other /api/admin route (requireRole('ADMIN'))
    and audit-logged, following app/api/admin/tutors/[id]/featured as the
-   pattern. Suspend requires a non-empty reason (kept in the audit meta). */
+   pattern. The reason is optional and, when supplied, kept in the audit meta. */
 const PatchBody = z.object({
   action: z.enum(['suspend', 'unsuspend', 'makeAdmin', 'revokeAdmin']),
   reason: z.string().max(300).optional(),
@@ -106,14 +106,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const parsed = PatchBody.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   const { action } = parsed.data
+  // The suspend reason is OPTIONAL — an admin can pause an account without
+  // typing a note (product decision 2026-07-26). When given it's still kept in
+  // the audit meta below; when omitted it's simply null.
   const reason = parsed.data.reason?.trim() || null
-
-  if (action === 'suspend' && !reason) {
-    return NextResponse.json(
-      { ok: false, error: 'REASON_REQUIRED', message: 'შეჩერების მიზეზი სავალდებულოა' },
-      { status: 400 },
-    )
-  }
 
   const target = await prisma.user.findUnique({
     where: { id },

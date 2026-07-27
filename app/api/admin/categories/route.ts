@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { audit } from '@/lib/audit'
 import { slugify } from '@/lib/slug'
 
 // GET /api/admin/categories
@@ -39,7 +40,7 @@ const CreateBody = z.object({
 })
 
 export async function POST(req: Request) {
-  await requireRole('ADMIN')
+  const admin = await requireRole('ADMIN')
   const parsed = CreateBody.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
@@ -55,6 +56,11 @@ export async function POST(req: Request) {
   const created = await prisma.category.create({
     data: { name, slug, defaultServiceType, order: (last?.order ?? 0) + 1, isLive: true },
     select: { id: true, slug: true, name: true, defaultServiceType: true, isLive: true, _count: { select: { tutors: true } } },
+  })
+  await audit(admin.id, 'category.create', {
+    targetType: 'Category',
+    targetId: created.id,
+    meta: { name: created.name, slug: created.slug, defaultServiceType: created.defaultServiceType },
   })
   return NextResponse.json({
     ok: true,

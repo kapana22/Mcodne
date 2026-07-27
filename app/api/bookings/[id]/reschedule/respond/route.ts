@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { notify } from '@/lib/notify'
 import { fmtKaDateTime } from '@/lib/kaDate'
 import { markRelatedRead } from '@/lib/notifClear'
+import { isStartOpen } from '@/lib/availability'
 
 // Counter-party accepts or rejects a pending reschedule proposal.
 //
@@ -18,6 +19,10 @@ import { markRelatedRead } from '@/lib/notifClear'
 const Body = z.object({
   accept: z.boolean(),
 })
+
+// Availability rows are pulled from a wide neighbourhood so a chain of LEGACY
+// pre-sliced rows merges whole (see app/api/bookings/route.ts).
+const WINDOW_LOOKAROUND_MS = 7 * 24 * 60 * 60 * 1000
 
 type ReschedulePayload = {
   proposedBy: 'STUDENT' | 'TUTOR'
@@ -41,7 +46,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       id,
       OR: [{ studentId: user.id }, { tutor: { userId: user.id } }],
     },
-    include: { tutor: { select: { userId: true } } },
+    include: { tutor: { select: { userId: true, bufferMin: true } } },
   })
   if (!booking) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
   // Guard against acting on a terminal booking. If it was canceled/completed
@@ -80,33 +85,42 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     }
     const newEnd = new Date(newStart.getTime() + booking.durationMin * 60_000)
     const oldHeldSlotId = booking.heldSlotId
+    const bufferMin = booking.tutor.bufferMin ?? 0
 
-    // Move atomically: re-verify the new window is free, release the old slot,
-    // claim the new one, then move startAt. Serializable so a concurrent
-    // booking for the same new time can't slip in between the check and claim.
+    // Move atomically: re-verify the new time is genuinely open, then move
+    // startAt. Serializable so a concurrent booking for the same new time can't
+    // slip in between the check and the write. Nothing is claimed — availability
+    // rows are WINDOWS and this booking's own [startAt, end) is the busy
+    // interval, so the move needs no slot bookkeeping at all.
     class SlotConflict extends Error {}
     try {
       await prisma.$transaction(async tx => {
-        // Overlap re-check against OTHER live bookings for this tutor.
+        // Overlap re-check against OTHER live bookings for this tutor. Same
+        // single-query trick as create: the upper bound is end+buffer (so a
+        // later session can block through its buffer) while the guard itself
+        // re-applies the strict `startAt < newEnd` bound in JS.
         const others = await tx.booking.findMany({
           where: {
             tutorId: booking.tutorId,
             status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] },
             id: { not: booking.id },
-            startAt: { lt: newEnd },
+            startAt: { lt: new Date(newEnd.getTime() + bufferMin * 60_000) },
           },
           select: { startAt: true, durationMin: true },
         })
-        const overlaps = others.some(o => o.startAt.getTime() + o.durationMin * 60_000 > newStart.getTime())
+        const overlaps = others.some(o =>
+          o.startAt < newEnd && o.startAt.getTime() + o.durationMin * 60_000 > newStart.getTime())
         if (overlaps) throw new SlotConflict()
 
         // Also re-check the STUDENT's own calendar — create-time rejects a
         // student double-booking themselves (route.ts selfCandidates), but a
         // reschedule moving one booking onto another of the student's sessions
         // would otherwise slip past. Same overlap math, excluding this booking.
+        // Union both hats: a dual-role student's expert-side teaching sessions
+        // live under tutor.userId, not studentId (mirrors the create-time fix).
         const selfCandidates = await tx.booking.findMany({
           where: {
-            studentId: booking.studentId,
+            OR: [{ studentId: booking.studentId }, { tutor: { userId: booking.studentId } }],
             status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] },
             id: { not: booking.id },
             startAt: { lt: newEnd },
@@ -116,39 +130,48 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         const selfOverlap = selfCandidates.some(c => c.startAt.getTime() + c.durationMin * 60_000 > newStart.getTime())
         if (selfOverlap) throw new SlotConflict()
 
-        // Find + claim a covering slot for the new window (may differ from
-        // the one validated at propose time if it got booked meanwhile).
-        // EVERY booking claims a slot at creation regardless of serviceType,
-        // so every reschedule must claim one too — otherwise the move would
-        // free the old slot and claim nothing, desyncing the grid.
-        const slot = await tx.availabilitySlot.findFirst({
+        // Re-derive openness for the new time (the propose-time verdict can be
+        // stale — someone may have booked into that window meanwhile, or the
+        // expert may have withdrawn it). Same predicate the booking flow and the
+        // picker use, so the three can never disagree.
+        const windowRows = await tx.availabilitySlot.findMany({
           where: {
             tutorId: booking.tutorId,
-            startAt: { lte: newStart },
-            endAt: { gte: newEnd },
-            booked: false,
+            endAt: { gt: new Date(newStart.getTime() - WINDOW_LOOKAROUND_MS) },
+            startAt: { lt: new Date(newEnd.getTime() + WINDOW_LOOKAROUND_MS) },
           },
-          select: { id: true },
+          select: { startAt: true, endAt: true },
+          orderBy: { startAt: 'asc' },
+          take: 2000,
         })
-        if (!slot) throw new SlotConflict()
-        const claim = await tx.availabilitySlot.updateMany({
-          where: { id: slot.id, booked: false },
-          data: { booked: true },
+        const open = isStartOpen(newStart, {
+          windows: windowRows.map(w => ({ start: w.startAt, end: w.endAt })),
+          busy: others.map(o => ({
+            start: o.startAt,
+            end: new Date(o.startAt.getTime() + o.durationMin * 60_000),
+          })),
+          serviceMin: booking.durationMin,
+          bufferMin,
         })
-        if (claim.count !== 1) throw new SlotConflict()
-        const newSlotId = slot.id
+        if (!open) throw new SlotConflict()
 
-        // Release the slot the booking used to hold.
+        // Legacy release: rows created before the windows model flipped a slot's
+        // `booked`. Freeing it here keeps that inventory visible; a null
+        // heldSlotId (every booking made since) is a no-op.
         if (oldHeldSlotId) {
           await tx.availabilitySlot.updateMany({ where: { id: oldHeldSlotId }, data: { booked: false } })
         }
 
         await tx.booking.update({
           where: { id: booking.id },
-          data: { startAt: newStart, status: 'CONFIRMED', heldSlotId: newSlotId },
+          data: { startAt: newStart, status: 'CONFIRMED', heldSlotId: null },
         })
+        // Null the reminder dedupe stamp too — the session moved to a new time,
+        // so it must earn a fresh ~1h reminder for the NEW startAt (otherwise a
+        // booking already reminded for its old time would silently never remind
+        // again). Raw SQL: sessionReminderSentAt is a dbBoot-added column.
         await tx.$executeRawUnsafe(
-          `UPDATE "Booking" SET "rescheduleRequest" = NULL, "updatedAt" = NOW() WHERE id = $1`,
+          `UPDATE "Booking" SET "rescheduleRequest" = NULL, "sessionReminderSentAt" = NULL, "updatedAt" = NOW() WHERE id = $1`,
           booking.id,
         )
       }, { isolationLevel: 'Serializable' })
@@ -186,16 +209,32 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     pending.prevStatus === 'PREPARING' || pending.prevStatus === 'CONFIRMED'
       ? pending.prevStatus
       : 'CONFIRMED'
+  // The booking may already have been accepted (PREPARING → CONFIRMED via the
+  // booking PATCH) while this proposal still sat pending. In that case the reject
+  // must STILL clear the blob (otherwise a stale "pending reschedule" banner
+  // survives forever), but must NOT downgrade the now-CONFIRMED booking. So:
+  // clear the blob for both PREPARING and CONFIRMED, and only restore prevStatus
+  // when the booking is still PREPARING.
   await prisma.$executeRawUnsafe(
-    `UPDATE "Booking" SET "status" = $1::"BookingStatus", "rescheduleRequest" = NULL, "updatedAt" = NOW() WHERE id = $2 AND "status" = 'PREPARING'`,
+    `UPDATE "Booking"
+       SET "status" = CASE WHEN "status" = 'PREPARING' THEN $1::"BookingStatus" ELSE "status" END,
+           "rescheduleRequest" = NULL,
+           "updatedAt" = NOW()
+     WHERE id = $2 AND "status" IN ('PREPARING', 'CONFIRMED')`,
     restoredStatus,
     booking.id,
   )
+  // Reflect the real resulting status: an already-CONFIRMED booking stays
+  // CONFIRMED; a still-PREPARING one takes the restored (prev) status.
+  const resultingStatus = booking.status === 'CONFIRMED' ? 'CONFIRMED' : restoredStatus
   const otherPartyUserId = pending.proposedBy === 'STUDENT'
     ? booking.studentId
     : booking.tutor.userId
+  // RESCHEDULE_REQUEST, not BOOKING_CANCELED — the booking is alive at its
+  // original time, and the canceled type renders as a red „გაუქმება" chip,
+  // which read as „the session was killed". Same pref group either way.
   await notify(otherPartyUserId, {
-    type: 'BOOKING_CANCELED',
+    type: 'RESCHEDULE_REQUEST',
     title: 'გადადება უარყოფილია',
     body: 'თარიღი უცვლელი დარჩა',
     href: pending.proposedBy === 'STUDENT'
@@ -207,8 +246,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     ? `/student/bookings/${booking.id}`
     : `/tutor/bookings/${booking.id}`
   await markRelatedRead(user.id, responderHrefR, 'RESCHEDULE_REQUEST')
-  // Return the RESTORED status (PREPARING or CONFIRMED) so the client doesn't
+  // Return the RESULTING status (PREPARING or CONFIRMED) so the client doesn't
   // wrongly assume CONFIRMED — a rejected reschedule on a not-yet-accepted
   // (PREPARING) booking must stay PREPARING and keep its accept/decline actions.
-  return NextResponse.json({ ok: true, accepted: false, status: restoredStatus })
+  return NextResponse.json({ ok: true, accepted: false, status: resultingStatus })
 }

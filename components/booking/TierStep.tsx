@@ -24,7 +24,7 @@ export const TierStep = ({
   <div className="p-4 sm:p-7 lg:p-10">
     <Eyebrow className="mb-2">სესიის ტიპი</Eyebrow>
     <h3 className="font-display text-[20px] font-bold text-ink-900 tracking-tight leading-tight">აირჩიე სერვისი</h3>
-    <p className="mt-1 text-[13px] text-ink-600 leading-[1.55]">ფასი ფიქსირებულია — რასაც აქ ხედავ, ზუსტად იმას იხდი.</p>
+    <p className="mt-1 text-[13px] text-ink-600 leading-[1.55]">ფასი ფიქსირებულია — რასაც ხედავ, იმას იხდი.</p>
 
     <div className="mt-6 grid sm:grid-cols-2 gap-3" role="radiogroup" aria-label="სესიის ტიპი">
       {consultations.map(c => {

@@ -9,7 +9,7 @@ import { StudentAppBar } from '@/components/StudentAppBar'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 import { KA_MONTHS_SHORT } from '@/lib/kaDate'
-import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
+import { LANG_LABELS, langLabel, toLangCode } from '@/lib/languages'
 import { SignInPromptBanner } from '@/components/SignInPromptBanner'
 import { Sheet } from '@/components/Sheet'
 import { Container } from '@/components/Container'
@@ -18,6 +18,7 @@ import { PAYMENTS_LIVE } from '@/lib/flags'
 import { frameQuestion } from '@/lib/askFraming'
 import { fmtRating } from '@/lib/fmt'
 import { useMe, type Me } from '@/lib/me'
+import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 // ONE shared booking flow (DESIGN_FIX_PROMPT 1.1): the same component the
 // expert profile renders. It self-fetches /api/tutors/{id} on open, supports
 // consultation tiers (step 1) and the mandatory intake — QuickBookPopup's
@@ -45,67 +46,28 @@ const VerifiedMark = ({ size = 18 }: { size?: number }) => (
 )
 
 /* ───── Search hero ───── */
-// Category identity is unified: the hero chips and the sidebar checkboxes both
-// filter client-side by category NAME (label). `slug` is retained only to map
-// legacy /tutors?category=<slug> deep links back to their label on load.
-const QUICK_CATS: { slug: string; label: string }[] = [
-  { slug: 'business',    label: 'ბიზნესი' },
-  { slug: 'tax',         label: 'გადასახადები' },
-  { slug: 'finance',     label: 'ფინანსები' },
-  { slug: 'law',         label: 'სამართალი' },
-  { slug: 'marketing',   label: 'მარკეტინგი' },
-  { slug: 'sales',       label: 'გაყიდვები' },
-  { slug: 'it',          label: 'IT' },
-  { slug: 'product',     label: 'პროდაქტი' },
-  { slug: 'design',      label: 'დიზაინი' },
-  { slug: 'career',      label: 'კარიერა' },
-  { slug: 'hr',          label: 'HR' },
-  { slug: 'real-estate', label: 'უძრავი ქონება' },
-  { slug: 'relocation',  label: 'რელოკაცია' },
-  { slug: 'crypto',      label: 'კრიპტო' },
-]
+// Category identity is DB-driven (GET /api/categories → live categories only).
+// The hero chips and the sidebar checkboxes toggle the SAME `filters.cats`, and
+// that array now holds category SLUGS — so filtering is robust to renames and a
+// hidden (isLive:false) category simply stops appearing (no dead chip). The
+// filter matches an expert's `catSlug` (category.slug), never a display string.
+type LiveCat = { id: string; slug: string; name: string }
+// Resolve a slug → its display name from the live list; falls back to the slug
+// itself so a not-yet-loaded / unknown category never renders as blank.
+const catNameOf = (cats: LiveCat[], slug: string) => cats.find(c => c.slug === slug)?.name ?? slug
 
 
-// Category identity is unified with the sidebar: both the hero chips and the
-// sidebar checkboxes toggle the SAME `filters.cats` (category NAMES) and are
-// applied by one client-side filter. Previously the chips sent a server `slug`
-// while the sidebar filtered by label, so the two could silently contradict.
-// Preply-style filter dropdown: a labeled box that opens a popover of options.
-const FilterBox = ({ label, value, active, children }: { label: string; value: string; active: boolean; children: React.ReactNode }) => {
-  const [open, setOpen] = useState(false)
-  const ref = React.useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!open) return
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [open])
-  return (
-    <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen(o => !o)} className={`h-12 min-w-[140px] w-full sm:w-auto px-3.5 rounded-card border text-left flex items-center justify-between gap-2 transition-all ${active ? 'border-brand-500 bg-brand-50/40 ring-1 ring-brand-200' : 'border-ink-200 hover:border-ink-300 bg-white'}`}>
-        <span className="min-w-0">
-          <span className="block text-[10px] font-display font-semibold uppercase tracking-[0.1em] text-ink-500">{label}</span>
-          <span className={`block font-display text-[13px] font-bold truncate ${active ? 'text-brand-800' : 'text-ink-900'}`}>{value}</span>
-        </span>
-        <Icon.chevD className={`w-4 h-4 text-ink-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        // Mobile: the trigger is full-width, so the panel spans it (inset-x-0)
-        // and can never poke past the viewport; sm+ gets the fixed 248px card.
-        <div className="absolute z-40 top-full inset-x-0 sm:inset-x-auto sm:left-0 mt-2 sm:w-[248px] rounded-card border border-ink-200 bg-white shadow-float p-2 max-h-[340px] overflow-y-auto">
-          {children}
-        </div>
-      )}
-    </div>
-  )
-}
-
-const CheckOpt = ({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) => (
-  <button type="button" onClick={onToggle} className="w-full flex items-center gap-2.5 px-2 py-2 rounded-btn hover:bg-ink-50 text-left transition-colors">
-    <span className={`w-4 h-4 rounded border-[1.5px] inline-flex items-center justify-center shrink-0 ${on ? 'bg-brand-500 border-brand-500 text-white' : 'border-ink-300'}`}>{on && <Icon.check className="w-3 h-3" />}</span>
-    <span className="text-[13px] text-ink-800">{label}</span>
-  </button>
-)
+// Filtering is ONE state, TWO breakpoint-exclusive surfaces (2026-07-27):
+//   • lg and up  → the hero's inline row of labeled dropdowns (სფერო / ფასი /
+//     ენა / ხელმისაწვდომობა / შეფასება + the Super toggle). Every refinement is
+//     one click away, so the „ფილტრები" drawer trigger is `lg:hidden`.
+//   • below lg   → the search field + the one-tap category rail, with the full
+//     set in the „ფილტრები" drawer (FiltersPanel) — five stacked h-12 boxes
+//     would push the first result off a phone screen.
+// They are never both on screen, and both write the SAME `filters` object, so
+// the page can no longer show two contradicting „active" states. The earlier
+// inline row was dropped partly because it lacked the rating filter; the box is
+// there now, so desktop reaches all six.
 
 // Price filter is now a BUDGET BAND (min + max), so budget-sensitive buyers
 // (law / therapy / finance) can cap spend, not just set a floor. NO_CAP is the
@@ -181,27 +143,79 @@ function PriceRange({ value, onChange }: { value: [number, number]; onChange: (v
 
 const toggleIn = (arr: string[], v: string) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]
 
-const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, loading }: { filters: Filters; setFilters: (f: Filters) => void; search: string; setSearch: (v: string) => void; onSearch: () => void; total: number; loading: boolean }) => {
-  const catVal = filters.cats.length === 0 ? 'ყველა სფერო' : filters.cats.length === 1 ? filters.cats[0] : `${filters.cats.length} სფერო`
+// Labeled filter dropdown: a box that shows „label / current value" and opens a
+// popover of options. Restored 2026-07-27 — this inline row IS the desktop
+// filter UI (the user asked for the redundant „ფილტრები" drawer trigger to go,
+// not this). Closes on outside mousedown.
+const FilterBox = ({ label, value, active, children }: { label: string; value: string; active: boolean; children: React.ReactNode }) => {
+  const [open, setOpen] = useState(false)
+  const ref = React.useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', h)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', h); document.removeEventListener('keydown', onKey) }
+  }, [open])
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} className={`h-12 min-w-[132px] w-full lg:w-auto px-3.5 rounded-card border text-left flex items-center justify-between gap-2 transition-all ${active ? 'border-brand-500 bg-brand-50/40 ring-1 ring-brand-200' : 'border-ink-200 hover:border-ink-300 bg-white'}`}>
+        <span className="min-w-0">
+          <span className="block text-[10px] font-display font-semibold uppercase tracking-[0.1em] text-ink-500">{label}</span>
+          <span className={`block font-display text-[13px] font-bold truncate ${active ? 'text-brand-800' : 'text-ink-900'}`}>{value}</span>
+        </span>
+        <Icon.chevD className={`w-4 h-4 text-ink-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        // Narrow screens never render this row (it's lg-only), but keep the
+        // inset-x-0 fallback so the panel can't poke past a 1024px viewport.
+        <div className="absolute z-40 top-full inset-x-0 lg:inset-x-auto lg:left-0 mt-2 lg:w-[248px] rounded-card border border-ink-200 bg-white shadow-float p-2 max-h-[340px] overflow-y-auto">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const CheckOpt = ({ label, on, onToggle }: { label: React.ReactNode; on: boolean; onToggle: () => void }) => (
+  <button type="button" onClick={onToggle} className="w-full flex items-center gap-2.5 px-2 py-2 rounded-btn hover:bg-ink-50 text-left transition-colors">
+    <span className={`w-4 h-4 rounded border-[1.5px] inline-flex items-center justify-center shrink-0 ${on ? 'bg-brand-500 border-brand-500 text-white' : 'border-ink-300'}`}>{on && <Icon.check className="w-3 h-3" />}</span>
+    <span className="text-[13px] text-ink-800">{label}</span>
+  </button>
+)
+
+// The rating thresholds the drawer offers, shared so the inline „შეფასება" box
+// and FiltersPanel can never diverge.
+const FILTER_RATINGS = [4.0, 4.5, 4.8, 4.9]
+
+const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, loading, liveCats }: { filters: Filters; setFilters: (f: Filters) => void; search: string; setSearch: (v: string) => void; onSearch: () => void; total: number; loading: boolean; liveCats: LiveCat[] }) => {
   // Live result count as the page heading (DESIGN_FIX_PROMPT 1.9). The label
   // reflects the active refinement: one category → its name; several → the
   // count; a text query → the query itself. While loading show a neutral
   // heading — never a stale or invented number.
   const headingLabel =
-    filters.cats.length === 1 ? filters.cats[0]
+    filters.cats.length === 1 ? catNameOf(liveCats, filters.cats[0])
     : filters.cats.length > 1 ? `${filters.cats.length} სფერო`
     : search.trim() ? `„${search.trim()}“`
     : null
+  // Current value shown on each inline dropdown. Categories are stored as
+  // SLUGS, so the label always goes through catNameOf — printing the raw slug
+  // („real-estate") was exactly the bug the chip row had with availability ids.
+  const catVal = filters.cats.length === 0 ? 'ყველა სფერო'
+    : filters.cats.length === 1 ? catNameOf(liveCats, filters.cats[0])
+    : `${filters.cats.length} სფერო`
   const priceVal = priceBandLabel(filters.price[0], filters.price[1])
   const langVal = filters.langs.length === 0 ? 'ნებისმიერი ენა' : filters.langs.length === 1 ? filters.langs[0] : `${filters.langs.length} ენა`
   const availVal = filters.available.length === 0 ? 'ნებისმიერ დროს' : filters.available.map(id => FILTER_AVAIL.find(a => a.id === id)?.l ?? id).join(', ')
+  const ratingVal = filters.minRating > 0 ? `${filters.minRating.toFixed(1)}+` : 'ნებისმიერი'
   return (
     <section className="bg-white border-b border-ink-200">
       <Container className="pt-8 pb-6">
         <nav aria-label="ნავიგაცია" className="flex items-center gap-1.5 text-[12px] text-ink-500 mb-4">
           <Link href="/" className="hover:text-ink-800 transition-colors">მთავარი</Link>
           <Icon.chevR className="w-3 h-3 text-ink-300" />
-          <span className="font-display font-semibold text-ink-800">ექსპერტების ძიება</span>
+          <span className="font-display font-semibold text-ink-800">ექსპერტები</span>
         </nav>
 
         {/* aria-live: filter/search changes re-announce the fresh count. */}
@@ -213,32 +227,52 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, l
               : <><span className="tabular-nums">{total}</span> ექსპერტი შენთვის</>}
         </h1>
         {/* Honest by flag: only claim escrow once the payment gateway is live. */}
-        <p className="text-[13.5px] text-ink-500 mt-2">ხელით გადამოწმებული პროფესიონალები · გამჭვირვალე ფასი · {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'დაჯავშნა უფასოა'}</p>
+        <p className="text-[13.5px] text-ink-500 mt-2">ხელით შერჩეული · გამჭვირვალე ფასი · {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'დაჯავშნა უფასოა'}</p>
 
-        {/* Preply-style filter bar — labeled dropdown boxes on desktop.
-            Below lg the four dropdowns would stack into ~1.5 screens of
-            controls BEFORE the first result — so on mobile we show only the
-            search input plus a category chip rail; the full filter set lives
-            in the drawer (ფილტრები button in the results bar). */}
+        {/* Filter bar — labeled dropdown boxes, visible from lg up. This IS the
+            desktop filter UI: every refinement is one click away, no drawer to
+            open (the „ფილტრები" trigger in the results bar is lg:hidden for
+            exactly this reason). Below lg the five boxes would stack into ~1.5
+            screens of controls BEFORE the first result, so small screens keep
+            the search field + category rail and the drawer holds the rest.
+            Both surfaces write the SAME `filters` object, so they can never show
+            contradicting state. */}
         <div className="mt-5 flex flex-col lg:flex-row lg:flex-wrap items-stretch gap-2.5">
           <div className="hidden lg:contents">
-          <FilterBox label="სფერო" value={catVal} active={filters.cats.length > 0}>
-            {FILTER_CATS.map(c => <CheckOpt key={c.l} label={c.l} on={filters.cats.includes(c.l)} onToggle={() => setFilters({ ...filters, cats: toggleIn(filters.cats, c.l) })} />)}
-          </FilterBox>
-          <FilterBox label="ფასი / სესია" value={priceVal} active={priceBandActive(filters.price[0], filters.price[1])}>
-            <div className="w-[240px] max-w-[calc(100vw-3rem)]">
-              <PriceRange value={filters.price} onChange={p => setFilters({ ...filters, price: p })} />
-            </div>
-          </FilterBox>
-          <FilterBox label="ენა" value={langVal} active={filters.langs.length > 0}>
-            {FILTER_LANGS.map(l => <CheckOpt key={l.l} label={l.l} on={filters.langs.includes(l.l)} onToggle={() => setFilters({ ...filters, langs: toggleIn(filters.langs, l.l) })} />)}
-          </FilterBox>
-          <FilterBox label="ხელმისაწვდომობა" value={availVal} active={filters.available.length > 0}>
-            {FILTER_AVAIL.map(a => <CheckOpt key={a.id} label={a.l} on={filters.available.includes(a.id)} onToggle={() => setFilters({ ...filters, available: toggleIn(filters.available, a.id) })} />)}
-          </FilterBox>
-          <button type="button" onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })} className={`h-12 px-4 rounded-card border font-display text-[13px] font-bold inline-flex items-center gap-2 transition-all ${filters.superOnly ? 'border-brand-500 bg-brand-50/40 text-brand-800 ring-1 ring-brand-200' : 'border-ink-200 hover:border-ink-300 bg-white text-ink-800'}`}>
-            <Icon.spark className="w-4 h-4 text-ink-400" /> Super
-          </button>
+            <FilterBox label="სფერო" value={catVal} active={filters.cats.length > 0}>
+              {/* Categories are DB-driven and load after paint; show an honest
+                  pending line rather than an empty popover or a dead chip. */}
+              {liveCats.length === 0
+                ? <div className="px-2 py-2 text-[12.5px] text-ink-500">კატეგორიები იტვირთება…</div>
+                : liveCats.map(c => <CheckOpt key={c.slug} label={c.name} on={filters.cats.includes(c.slug)} onToggle={() => setFilters({ ...filters, cats: toggleIn(filters.cats, c.slug) })} />)}
+            </FilterBox>
+            <FilterBox label="ფასი / სესია" value={priceVal} active={priceBandActive(filters.price[0], filters.price[1])}>
+              <div className="w-[240px] max-w-[calc(100vw-3rem)]">
+                <PriceRange value={filters.price} onChange={p => setFilters({ ...filters, price: p })} />
+              </div>
+            </FilterBox>
+            <FilterBox label="ენა" value={langVal} active={filters.langs.length > 0}>
+              {FILTER_LANGS.map(l => <CheckOpt key={l.l} label={l.l} on={filters.langs.includes(l.l)} onToggle={() => setFilters({ ...filters, langs: toggleIn(filters.langs, l.l) })} />)}
+            </FilterBox>
+            <FilterBox label="ხელმისაწვდომობა" value={availVal} active={filters.available.length > 0}>
+              {FILTER_AVAIL.map(a => <CheckOpt key={a.id} label={a.l} on={filters.available.includes(a.id)} onToggle={() => setFilters({ ...filters, available: toggleIn(filters.available, a.id) })} />)}
+            </FilterBox>
+            {/* Min-rating had no inline box before and was drawer-only, so a
+                desktop visitor who never opened the drawer couldn't reach it.
+                Single-select: tapping the active threshold clears it. */}
+            <FilterBox label="შეფასება" value={ratingVal} active={filters.minRating > 0}>
+              {FILTER_RATINGS.map(r => (
+                <CheckOpt
+                  key={r}
+                  label={<span className="inline-flex items-center gap-1"><Icon.star className="w-3 h-3 text-warning-500" /><span className="tabular-nums">{r.toFixed(1)}+</span></span>}
+                  on={filters.minRating === r}
+                  onToggle={() => setFilters({ ...filters, minRating: filters.minRating === r ? 0 : r })}
+                />
+              ))}
+            </FilterBox>
+            <button type="button" onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })} className={`h-12 px-4 rounded-card border font-display text-[13px] font-bold inline-flex items-center gap-2 transition-all ${filters.superOnly ? 'border-brand-500 bg-brand-50/40 text-brand-800 ring-1 ring-brand-200' : 'border-ink-200 hover:border-ink-300 bg-white text-ink-800'}`}>
+              <Icon.spark className="w-4 h-4 text-ink-400" /> Super
+            </button>
           </div>
           <div className="flex-1 min-w-[220px] bg-white rounded-card border border-ink-200 flex items-stretch focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100 transition-all">
             <div className="relative flex-1 min-w-0">
@@ -248,8 +282,10 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, l
           </div>
         </div>
 
-        {/* Mobile category rail — one-tap refinement without opening the
-            drawer. Horizontal scroll, active chips in brand. */}
+        {/* Category rail — one-tap refinement below lg, where the dropdown row
+            is hidden. Not a competing filter UI: these chips write the SAME
+            `filters.cats` the boxes and the drawer do, so all three always read
+            the same state. Horizontal scroll, active chips in brand. */}
         <div className="lg:hidden mt-3 -mx-6 px-6 flex gap-2 overflow-x-auto scrollbar-hide rail-fade-end" role="group" aria-label="სფეროს ფილტრი">
           <button
             type="button"
@@ -258,16 +294,16 @@ const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, l
           >
             <Icon.spark className="w-3.5 h-3.5 text-ink-400" /> Super
           </button>
-          {FILTER_CATS.map(c => {
-            const on = filters.cats.includes(c.l)
+          {liveCats.map(c => {
+            const on = filters.cats.includes(c.slug)
             return (
               <button
-                key={c.l}
+                key={c.slug}
                 type="button"
-                onClick={() => setFilters({ ...filters, cats: toggleIn(filters.cats, c.l) })}
+                onClick={() => setFilters({ ...filters, cats: toggleIn(filters.cats, c.slug) })}
                 className={`shrink-0 h-10 px-3.5 rounded-pill border font-display text-[12.5px] font-semibold transition-colors ${on ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-ink-200 bg-white text-ink-700'}`}
               >
-                {c.l}
+                {c.name}
               </button>
             )
           })}
@@ -288,40 +324,24 @@ type Filters = {
   price: [number, number]
 }
 
-// Category labels must exactly match `category.name` returned by /api/tutors,
-// otherwise the client-side filter won't match anything.
-const FILTER_CATS = [
-  { l: 'ბიზნესი', c: 0 },
-  { l: 'გადასახადები', c: 0 },
-  { l: 'ფინანსები', c: 0 },
-  { l: 'სამართალი', c: 0 },
-  { l: 'მარკეტინგი', c: 0 },
-  { l: 'გაყიდვები', c: 0 },
-  { l: 'IT', c: 0 },
-  { l: 'პროდაქტი', c: 0 },
-  { l: 'დიზაინი', c: 0 },
-  { l: 'კარიერა', c: 0 },
-  { l: 'HR', c: 0 },
-  { l: 'უძრავი ქონება', c: 0 },
-  { l: 'რელოკაცია', c: 0 },
-  { l: 'კრიპტო', c: 0 },
-]
+// Category options are no longer hardcoded — they come from the live,
+// admin-managed categories (GET /api/categories), passed down as `liveCats` and
+// keyed by slug. See LiveCat / catNameOf near the top of the file.
 
 // No counts here on purpose — the old hardcoded numbers (142/98/…) were
 // fabricated and rendered as if real. If per-language counts ever return,
 // they must be computed from the loaded result set.
-const FILTER_LANGS = [
-  { l: 'ქართული' },
-  { l: 'English' },
-  { l: 'Русский' },
-  { l: 'Türkçe' },
-]
+// Labels come from lib/languages so the chips ALWAYS match what a card renders
+// (they are compared as strings — a divergent spelling silently yields 0 hits).
+// Curated subset on purpose: the full 13-language list would bloat the filter.
+const FILTER_LANGS = (['ka', 'en', 'ru', 'tr'] as const).map(c => ({ l: LANG_LABELS[c] }))
 
-// The DB stores language CODES (ka/en/ru/tr); cards + the language filter work
-// in human labels. Map codes → labels so a stored ["ka","en"] matches the
-// "ქართული"/"English" filter chips (previously they never did → 0 results).
-const LANG_LABEL: Record<string, string> = { ka: 'ქართული', en: 'English', ru: 'Русский', tr: 'Türkçe' }
-const toLangLabel = (code: string): string => LANG_LABEL[code] ?? code
+// The DB stores language CODES (ka/en/…); cards + the language filter work in
+// human labels. Map codes → labels so a stored ["ka","en"] matches the filter
+// chips (previously they never did → 0 results). `toLangCode` first, so legacy
+// rows still holding NAMES („ქართული") land on the same label as a code row —
+// otherwise the same expert reads differently depending on when they signed up.
+const toLangLabel = (v: string): string => langLabel(toLangCode(v) ?? v)
 
 // Only expose availability windows we can actually evaluate from the list
 // data (each tutor's soonest free slot, `nextSlotAt`). "Weekend/evening"
@@ -356,138 +376,115 @@ const CheckRow = ({ label, count, on, onToggle }: { label: string; count: number
   </label>
 )
 
-const FiltersPanel = ({ filters, setFilters, total, onReset, variant = 'sidebar', onClose }: { filters: Filters; setFilters: (f: Filters) => void; total: number; onReset: () => void; variant?: 'sidebar' | 'drawer'; onClose?: () => void }) => {
+// The BELOW-lg filter UI (from lg up the hero's inline dropdown row covers the
+// same six refinements). Renders bare sections; the Sheet wrapper at the usage
+// site supplies the pinned header (title + active count) and footer (reset /
+// „ნახე N ექსპერტი"), plus scroll-lock, focus trap and Escape.
+const FiltersPanel = ({ filters, setFilters, liveCats }: { filters: Filters; setFilters: (f: Filters) => void; liveCats: LiveCat[] }) => {
   const toggleArr = (arr: string[], v: string) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]
-  const active =
-    filters.cats.length + filters.langs.length + filters.available.length +
-    (filters.minRating > 0 ? 1 : 0) +
-    (filters.superOnly ? 1 : 0) +
-    (priceBandActive(filters.price[0], filters.price[1]) ? 1 : 0)
-
-  const isDrawer = variant === 'drawer'
 
   return (
-    // Drawer mode renders bare filter sections — the Sheet wrapper at the
-    // usage site supplies the pinned header (title + count) and footer
-    // (reset/apply), plus scroll/trap/Escape.
-    <aside className={isDrawer ? '' : 'hidden lg:block lg:sticky lg:top-[80px]'}>
-      <div className={isDrawer ? '' : 'bg-white rounded-card border border-ink-200'}>
-        {!isDrawer && (
-          <div className="px-5 py-4 border-b border-ink-100 flex items-center justify-between shrink-0">
-            <div className="inline-flex items-center gap-2">
-              <Icon.sliders className="w-4 h-4 text-ink-700" />
-              <span className="font-display text-[13px] font-bold text-ink-900 tracking-tight">ფილტრები</span>
-              {active > 0 && (
-                <span className="ml-1 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill bg-brand-500 text-white text-[10.5px] font-display font-bold tabular-nums">
-                  {active}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              {active > 0 && (
-                <button type="button" onClick={onReset} className="font-display text-[11.5px] font-semibold text-ink-500 hover:text-ink-900 transition-colors">გასუფთავება</button>
-              )}
-            </div>
+    <aside>
+      {/* Prominent Super-expert switch */}
+      <label className="flex items-start gap-3 cursor-pointer select-none py-4 border-b border-ink-100">
+        <button
+          type="button"
+          onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })}
+          className={`mt-0.5 w-9 h-5 rounded-pill relative transition-colors duration-fast shrink-0 ${filters.superOnly ? 'bg-brand-500' : 'bg-ink-200'}`}
+        >
+          <span
+            className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-card transition-transform duration-fast ease-out-quart"
+            style={{ transform: filters.superOnly ? 'translateX(16px)' : 'translateX(0)' }}
+          />
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-[12.5px] font-bold text-ink-900 inline-flex items-center gap-1.5">
+            <Icon.spark className="w-3 h-3 text-ink-400" />
+            მხოლოდ Super-ექსპერტი
           </div>
-        )}
-
-        <div className={isDrawer ? '' : 'px-5'}>
-          {/* Prominent Super-expert switch */}
-          <label className="flex items-start gap-3 cursor-pointer select-none py-4 border-b border-ink-100">
-            <button
-              type="button"
-              onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })}
-              className={`mt-0.5 w-9 h-5 rounded-pill relative transition-colors duration-fast shrink-0 ${filters.superOnly ? 'bg-brand-500' : 'bg-ink-200'}`}
-            >
-              <span
-                className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-card transition-transform duration-fast ease-out-quart"
-                style={{ transform: filters.superOnly ? 'translateX(16px)' : 'translateX(0)' }}
-              />
-            </button>
-            <div className="min-w-0 flex-1">
-              <div className="font-display text-[12.5px] font-bold text-ink-900 inline-flex items-center gap-1.5">
-                <Icon.spark className="w-3 h-3 text-ink-400" />
-                მხოლოდ Super-ექსპერტი
-              </div>
-              <p className="text-[11.5px] text-ink-500 mt-0.5 leading-snug">100+ სესია · 4.9+ · გადამოწმებული</p>
-            </div>
-          </label>
-
-          <FilterSection title="კატეგორია">
-            <div className="space-y-0">
-              {FILTER_CATS.map(c => (
-                <CheckRow
-                  key={c.l}
-                  label={c.l}
-                  count={c.c}
-                  on={filters.cats.includes(c.l)}
-                  onToggle={() => setFilters({ ...filters, cats: toggleArr(filters.cats, c.l) })}
-                />
-              ))}
-            </div>
-          </FilterSection>
-
-          {/* Budget bands (min + max) — mirrors the desktop dropdown so mobile
-              buyers can cap spend, not just set a floor. */}
-          <FilterSection title="ფასი" defaultOpen={false}>
-            <PriceRange value={filters.price} onChange={p => setFilters({ ...filters, price: p })} />
-          </FilterSection>
-
-          <FilterSection title="ენა" defaultOpen={false}>
-            <div className="space-y-0">
-              {FILTER_LANGS.map(l => (
-                <CheckRow
-                  key={l.l}
-                  label={l.l}
-                  count={0}
-                  on={filters.langs.includes(l.l)}
-                  onToggle={() => setFilters({ ...filters, langs: toggleArr(filters.langs, l.l) })}
-                />
-              ))}
-            </div>
-          </FilterSection>
-
-          <FilterSection title="ხელმისაწვდომობა" defaultOpen={false}>
-            <div className="flex flex-wrap gap-1.5">
-              {FILTER_AVAIL.map(a => {
-                const on = filters.available.includes(a.id)
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => setFilters({ ...filters, available: toggleArr(filters.available, a.id) })}
-                    className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-pill text-[12px] font-display font-medium tracking-wide transition-colors ${on ? 'bg-brand-500 text-white' : 'bg-white text-ink-700 border border-ink-200 hover:bg-ink-50'}`}
-                  >
-                    {on && <Icon.check className="w-3 h-3" />}
-                    {a.l}
-                  </button>
-                )
-              })}
-            </div>
-          </FilterSection>
-
-          <FilterSection title="მინ. რეიტინგი">
-            <div className="grid grid-cols-2 gap-1.5">
-              {[4.0, 4.5, 4.8, 4.9].map(r => {
-                const on = filters.minRating === r
-                return (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setFilters({ ...filters, minRating: on ? 0 : r })}
-                    className={`inline-flex items-center justify-center gap-1.5 px-3 h-9 rounded-btn text-[13px] font-display font-medium tracking-wide transition-colors ${on ? 'bg-warning-500 text-white' : 'bg-white text-ink-800 border border-ink-200 hover:bg-ink-50'}`}
-                  >
-                    <Icon.star className={`w-3 h-3 ${on ? 'text-white' : 'text-warning-500'}`} />
-                    <span className="tabular-nums font-bold">{r.toFixed(1)}+</span>
-                  </button>
-                )
-              })}
-            </div>
-          </FilterSection>
-
+          {/* Must describe the REAL predicate (see `superExpert` in the row
+              mapper): verified AND rating ≥ 4.8 AND admin-featured. Omitting
+              the rating made a featured, verified but unrated expert look
+              like a match. */}
+          <p className="text-[11.5px] text-ink-500 mt-0.5 leading-snug">გადამოწმებული · 4.8+ შეფასება · რედაქციის რჩეული</p>
         </div>
+      </label>
 
-      </div>
+      {/* Hide the category section entirely when the live list is empty
+          (fetch pending/failed) — never render dead, unmatched checkboxes. */}
+      {liveCats.length > 0 && (
+      <FilterSection title="კატეგორია">
+        <div className="space-y-0">
+          {liveCats.map(c => (
+            <CheckRow
+              key={c.slug}
+              label={c.name}
+              count={0}
+              on={filters.cats.includes(c.slug)}
+              onToggle={() => setFilters({ ...filters, cats: toggleArr(filters.cats, c.slug) })}
+            />
+          ))}
+        </div>
+      </FilterSection>
+      )}
+
+      {/* Budget band (min + max) — buyers can cap spend, not just set a floor. */}
+      <FilterSection title="ფასი" defaultOpen={false}>
+        <PriceRange value={filters.price} onChange={p => setFilters({ ...filters, price: p })} />
+      </FilterSection>
+
+      <FilterSection title="ენა" defaultOpen={false}>
+        <div className="space-y-0">
+          {FILTER_LANGS.map(l => (
+            <CheckRow
+              key={l.l}
+              label={l.l}
+              count={0}
+              on={filters.langs.includes(l.l)}
+              onToggle={() => setFilters({ ...filters, langs: toggleArr(filters.langs, l.l) })}
+            />
+          ))}
+        </div>
+      </FilterSection>
+
+      <FilterSection title="ხელმისაწვდომობა" defaultOpen={false}>
+        <div className="flex flex-wrap gap-1.5">
+          {FILTER_AVAIL.map(a => {
+            const on = filters.available.includes(a.id)
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => setFilters({ ...filters, available: toggleArr(filters.available, a.id) })}
+                className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-pill text-[12px] font-display font-medium tracking-wide transition-colors ${on ? 'bg-brand-500 text-white' : 'bg-white text-ink-700 border border-ink-200 hover:bg-ink-50'}`}
+              >
+                {on && <Icon.check className="w-3 h-3" />}
+                {a.l}
+              </button>
+            )
+          })}
+        </div>
+      </FilterSection>
+
+      <FilterSection title="მინ. რეიტინგი">
+        <div className="grid grid-cols-2 gap-1.5">
+          {[4.0, 4.5, 4.8, 4.9].map(r => {
+            const on = filters.minRating === r
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setFilters({ ...filters, minRating: on ? 0 : r })}
+                className={`inline-flex items-center justify-center gap-1.5 px-3 h-9 rounded-btn text-[13px] font-display font-medium tracking-wide transition-colors ${on ? 'bg-warning-500 text-white' : 'bg-white text-ink-800 border border-ink-200 hover:bg-ink-50'}`}
+              >
+                <Icon.star className={`w-3 h-3 ${on ? 'text-white' : 'text-warning-500'}`} />
+                <span className="tabular-nums font-bold">{r.toFixed(1)}+</span>
+              </button>
+            )
+          })}
+        </div>
+      </FilterSection>
+
     </aside>
   )
 }
@@ -505,6 +502,10 @@ type Tutor = {
   // 11-char ID at open time to render the nocookie iframe.
   videoUrl?: string | null
   cat: string
+  // Category SLUG (category.slug) — the stable filter key. `cat` above stays the
+  // display NAME the card shows; filtering matches on this slug so renames and
+  // hidden categories never break the sidebar/hero filter.
+  catSlug?: string | null
   headline: string
   bio: string
   langs: string[]
@@ -523,11 +524,18 @@ type Tutor = {
   // upcoming availability (→ effectively unbookable; the card shows a muted
   // "availability soon" state instead of a next-slot chip).
   nextSlotAt?: string | null
+  // ISO creation time of the expert profile (tutorProfile.createdAt). Powers the
+  // „ახლის მიხედვით" sort — without it that sort had no key and was a no-op.
+  createdAt?: string | null
   consultationDurationMin?: number
   // Response-time promise, populated from tutorProfile.responseHours. Rendered
   // as a small badge on cards ("პასუხობს 12 საათში") so students can gauge
   // urgency before clicking through to the profile.
   responseHours?: number
+  // Years of professional experience (tutorProfile.yearsExp). A credibility
+  // signal a brand-new expert (0 rating/sessions/reviews) still has — surfaced
+  // on the card only when >0 so it never reads as "0 წელი".
+  yearsExp?: number
 }
 
 // Extract the 11-char YouTube ID from any of the accepted URL forms. Returns
@@ -597,6 +605,7 @@ function mapTutorRow(t: any, i: number): Tutor {
     avatarUrl: t.user?.avatarUrl ?? null,
     videoUrl: t.videoUrl ?? null,
     cat: t.category?.name ?? t.specialty ?? 'სფერო',
+    catSlug: t.category?.slug ?? null,
     headline: t.headline ?? '',
     bio: t.bio ?? '',
     langs: Array.isArray(t.languages) && t.languages.length ? t.languages.map(toLangLabel) : ['ქართული'],
@@ -609,7 +618,7 @@ function mapTutorRow(t: any, i: number): Tutor {
     trial: 0,
     // Real next free slot — the compare modal shows this verbatim, so a
     // fabricated "დღეს/ხვალ" here lied to the user.
-    next: t.nextSlotAt ? fmtNextSlot(t.nextSlotAt) : 'გამოცხადდება მალე',
+    next: t.nextSlotAt ? fmtNextSlot(t.nextSlotAt) : 'დრო ჯერ არ არის',
     // Only show the play button when we have a real video URL.
     video: Boolean(t.videoUrl),
     verified: t.verified ?? false,
@@ -619,8 +628,11 @@ function mapTutorRow(t: any, i: number): Tutor {
     // high rating.
     superExpert: (t.verified ?? false) && (t.rating ?? 0) >= 4.8 && Boolean(t.featured),
     nextSlotAt: t.nextSlotAt ?? null,
+    // Normalize to ISO — the API sends a string, the SSR seed a Date object.
+    createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : null,
     consultationDurationMin: typeof t.consultationDurationMin === 'number' ? t.consultationDurationMin : TUTOR_DEFAULTS.durationMin,
     responseHours: typeof t.responseHours === 'number' ? t.responseHours : undefined,
+    yearsExp: typeof t.yearsExp === 'number' ? t.yearsExp : undefined,
   }
 }
 
@@ -643,12 +655,33 @@ function isTutorBookable(nextSlotAt?: string | null): boolean {
 
 /*/* ───── "Available now" pill — instant-booking indicator ───── */
 /* ───── Tutor card — mirrors landing.tsx ExpertCard ───── */
-// Language code → Georgian display name for the card's „ენები" line.
-const LANG_NAMES: Record<string, string> = {
-  ka: 'ქართული', en: 'English', ru: 'რუსული', de: 'გერმანული', fr: 'ფრანგული',
-  es: 'ესპანური', it: 'იტალიური', tr: 'თურქული', hy: 'სომხური', az: 'აზერბ.',
+// The card's „ენები" line. `t.langs` already holds labels (see toLangLabel), but
+// run it through again so a stray code can never render raw — a third private
+// map here is exactly how the label vocabularies drifted apart before.
+const fmtLangs = (langs: string[]) => (langs ?? []).map(toLangLabel).join(', ')
+
+// Trust signals for a brand-new expert (0 rating / 0 sessions / 0 reviews).
+// Their card would otherwise be a lonely „ახალი" over empty space, so surface
+// the credibility they DO have — ID-verification, years of experience, an intro
+// video, a response promise. Real fields only; each chip renders solely when its
+// value truly exists. Calm muted meta row (canon: hairline icons, no loud fills).
+// No „ახალი ექსპერტი" lead tag here: the photo pill already says „ახალი", and
+// on the unified card the two sat inches apart and read twice.
+const NewExpertSignals = ({ t, className = '' }: { t: Tutor; className?: string }) => {
+  const signals: { key: string; icon: React.ReactNode; label: React.ReactNode }[] = []
+  if (t.verified) signals.push({ key: 'verified', icon: <Icon.shieldCheck className="w-3 h-3 text-brand-600" />, label: 'გადამოწმებული' })
+  if (typeof t.yearsExp === 'number' && t.yearsExp > 0) signals.push({ key: 'years', icon: <Icon.thumb className="w-3 h-3 text-ink-400" />, label: <><span className="font-display font-bold text-ink-900 tabular-nums">{t.yearsExp}</span> წელი გამოცდილება</> })
+  if (t.video) signals.push({ key: 'video', icon: <Icon.video className="w-3 h-3 text-ink-400" />, label: 'ვიდეოგაცნობა' })
+  if (typeof t.responseHours === 'number') signals.push({ key: 'resp', icon: <Icon.clock className="w-3 h-3 text-ink-400" />, label: <>პასუხი ~<span className="font-display font-bold text-ink-900 tabular-nums">{t.responseHours} სთ</span></> })
+  if (signals.length === 0) return null
+  return (
+    <div className={`flex items-center gap-x-3.5 gap-y-1.5 text-[11.5px] text-ink-600 flex-wrap ${className}`}>
+      {signals.map(s => (
+        <span key={s.key} className="inline-flex items-center gap-1">{s.icon}{s.label}</span>
+      ))}
+    </div>
+  )
 }
-const fmtLangs = (langs: string[]) => (langs ?? []).map(l => LANG_NAMES[l] ?? l).join(', ')
 
 const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSignIn, viewerCantBook = false, viewerCantFav = false }: { t: Tutor; idx: number; onPreviewEnter: (t: Tutor, anchor: HTMLElement) => void; onBook: (t: Tutor) => void; saved: boolean; onToggleFav: (tutorId: string) => void; needsSignIn?: boolean; viewerCantBook?: boolean; viewerCantFav?: boolean }) => {
   // Prefer the tutor's real avatar; fall back to an initials placeholder so we
@@ -668,256 +701,193 @@ const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSi
   // panel cluttering the list. Play button opens the full VideoPreview modal.
   const ytId = tutorYouTubeId(t)
   return (
-    <article className="group relative rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift overflow-hidden flex flex-col">
-      {/* Mobile: the whole card taps through to the profile (overlay-link
-          pattern from app/student/bookings). Explicit buttons opt out by
-          sitting above the overlay with relative z-10. */}
+    // COMPACT HORIZONTAL card (2026-07-27): square thumb left, content right,
+    // price + actions on the bottom strip. ONE layout at every breakpoint —
+    // 1-up on mobile, 2-up from sm. Replaces the photo-banner card, which was
+    // both very tall (little fit on screen) and structurally unable to render a
+    // sharp portrait — see the photo comment below.
+    <article className="group relative rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift overflow-hidden flex flex-col h-full">
+      {/* The WHOLE card opens the profile, at every breakpoint (overlay-link
+          pattern from app/student/bookings). It is a SIBLING of the controls,
+          never a parent — wrapping the card in an <a> would nest the buttons
+          inside a link. Anything interactive opts out by sitting above it with
+          `relative z-10`; miss that and the overlay silently eats the click. */}
       <Link
         href={`/tutors/${t.id}`}
         aria-label={`${t.name} — პროფილი`}
-        className="sm:hidden absolute inset-0 z-[1]"
+        className="absolute inset-0 z-[1]"
       />
-      {/* Mobile photo banner */}
-      <div className="sm:hidden relative aspect-[16/10] w-full bg-gradient-to-br from-brand-50 to-ink-100 overflow-hidden">
-        <img src={photoSrc} alt={t.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover motion-safe:animate-fade-in-fast" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink-950/40 via-transparent to-transparent" />
-        <div className="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/95 backdrop-blur rounded-pill h-7 px-2.5 shadow-xs">
-          {t.rating > 0 ? (
-            <>
-              <Icon.star className="w-3 h-3 text-warning-500" />
-              <span className="font-display text-[12px] font-bold text-ink-900 tabular-nums leading-none">{fmtRating(t.rating)}</span>
-              <span className="text-[10px] text-ink-500 tabular-nums">({t.reviews})</span>
-            </>
-          ) : (
-            <span className="font-display text-[11px] font-semibold text-ink-600">ახალი</span>
-          )}
-        </div>
-        {t.video && (
-          <button
-            type="button"
-            aria-label="ვიდეო"
-            onClick={e => { e.stopPropagation(); onPreviewEnter(t, e.currentTarget) }}
-            className="absolute bottom-3 right-3 z-10 w-10 h-10 rounded-full bg-white/95 backdrop-blur shadow-pop text-ink-900 flex items-center justify-center"
-          >
-            <Icon.play className="w-4 h-4 ml-0.5" />
-          </button>
-        )}
-        {/* Save/favorite is a client-only feature (server 403s non-students). */}
-        {!viewerCantFav && (
-          <button
-            type="button"
-            onClick={() => onToggleFav(t.id)}
-            aria-label={saved ? 'შენახული' : 'შენახვა'}
-            className={`absolute bottom-3 left-3 z-10 w-10 h-10 inline-flex items-center justify-center rounded-full backdrop-blur transition-colors ${saved ? 'text-danger-600 bg-white/95' : 'text-ink-700 bg-white/80 hover:bg-white'}`}
-          >
-            {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
-          </button>
-        )}
-      </div>
 
-      {/* Desktop — Preply-style horizontal card: photo │ content+stats │ price+CTA rail */}
-      <div className="hidden sm:grid sm:grid-cols-[132px_1fr_216px] gap-5 p-5 sm:p-6">
-        {/* Photo + video. The photo itself links to the profile — the
-            highest-frequency action on a listing card. The video preview is a
-            separate small stopPropagation target (the play circle only), so it
-            no longer swallows every click on the face. */}
-        <div className="shrink-0">
+      {/* Save/favorite is a client-only feature (server 403s non-students).
+          Pinned to the card corner rather than sitting in the photo/identity
+          row: as a flex item it stole ~40px from the content column, which at
+          390px is the difference between a readable bio and three words. It is
+          NOT on the photo either — a 112px square has no spare corner. The name
+          row reserves `pr-9` so the two can never collide. */}
+      {!viewerCantFav && (
+        <button
+          type="button"
+          onClick={() => onToggleFav(t.id)}
+          aria-label={saved ? 'შენახული' : 'შენახვა'}
+          className={`absolute top-2.5 right-2.5 z-10 w-10 h-10 inline-flex items-center justify-center rounded-full transition-colors ${saved ? 'text-danger-600' : 'text-ink-400 hover:text-ink-700 hover:bg-ink-50'}`}
+        >
+          {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
+        </button>
+      )}
+
+      {/* Top row — photo + identity. flex-1 so every card in a row ends its
+          footer on the same line even when one bio is shorter. */}
+      <div className="flex-1 min-w-0 flex flex-col p-4">
+        <div className="flex items-start gap-3.5 min-w-0">
+          {/* Portrait — a fixed SQUARE, never a banner. Avatars are stored
+              server-side as a 256×256 image (app/api/uploads/route.ts resizes on
+              upload, deliberately: one 9.4MB base64 avatar once made chat threads
+              7.5MB / 40s). 112–128px is therefore the ceiling that still looks
+              crisp on a 2× screen — the old 16/10 banner blew the same 256px
+              source up ~3.7× (visibly blurry) AND had to crop a square portrait
+              into a wide frame, which cut faces at eye level whatever the
+              object-position. Do NOT turn this back into an aspect-ratio banner.
+              `object-center`: a centred square crop of a portrait keeps the face.
+              Identical size for every expert, so the grid reads as one system.
+              z-10 keeps the block ABOVE the card-wide overlay link — without it
+              the overlay swallows mouseenter and the hover-video never plays. */}
           <div
-            className="relative w-[132px] h-[132px] rounded-card overflow-hidden bg-ink-100 group/photo ring-1 ring-inset ring-ink-900/[0.06] shadow-xs"
+            className="relative z-10 shrink-0 w-28 h-28 sm:w-32 sm:h-32 rounded-card bg-ink-100 overflow-hidden group/photo"
             onMouseEnter={() => { if (t.video && ytId) setVhover(true) }}
             onMouseLeave={() => setVhover(false)}
           >
-            <Link href={`/tutors/${t.id}`} aria-label={`${t.name} — პროფილი`} className="absolute inset-0 block">
-              <img src={photoSrc} alt={t.name} decoding="async" className="absolute inset-0 w-full h-full object-cover" />
+            {/* tabIndex -1: same destination as the card overlay and the name
+                link — three identical tab stops per card is keyboard noise. */}
+            <Link href={`/tutors/${t.id}`} tabIndex={-1} aria-label={`${t.name} — პროფილი`} className="absolute inset-0 block">
+              <img src={photoSrc} alt={t.name} loading="lazy" decoding="async" width={128} height={128} className="absolute inset-0 w-full h-full object-cover object-center motion-safe:animate-fade-in-fast" />
             </Link>
+            {/* Hover → the intro video plays right inside the photo. Only the
+                hovered card mounts an iframe, so we never autoplay the whole list. */}
+            {t.video && vhover && ytId && (
+              <iframe
+                className="absolute inset-0 w-full h-full z-10 pointer-events-none"
+                src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&playsinline=1&rel=0`}
+                allow="autoplay; encrypted-media"
+                title={`${t.name} — ვიდეო`}
+              />
+            )}
+            {/* Play badge — opens the full VideoPreview modal (stopPropagation
+                so the card-wide overlay link doesn't navigate instead). The
+                BUTTON is 40×40 (canon tap-target floor) but its visible circle
+                is 28px, so on a 112px thumb it sits in the shoulder corner
+                instead of covering the face. */}
             {t.video && (
-              <>
-                {/* Hover → the intro video plays right inside the photo. */}
-                {vhover && ytId && (
-                  <iframe
-                    className="absolute inset-0 w-full h-full z-10 pointer-events-none"
-                    src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&playsinline=1&rel=0`}
-                    allow="autoplay; encrypted-media"
-                    title={`${t.name} — ვიდეო`}
-                  />
-                )}
-                {/* Play badge: hints a video exists; click opens the full modal. */}
-                <button
-                  type="button"
-                  aria-label="ვიდეოგაცნობა"
-                  onClick={e => { e.stopPropagation(); onPreviewEnter(t, e.currentTarget) }}
-                  className="absolute bottom-1.5 right-1.5 z-20 w-8 h-8 rounded-full bg-brand-500 text-white shadow-brand-glow inline-flex items-center justify-center group-hover/photo:scale-105 transition-transform"
-                >
-                  <Icon.play className="w-3.5 h-3.5 ml-0.5" />
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="min-w-0 flex flex-col">
-          <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-            <h3 className="font-display text-[19px] font-bold text-ink-900 tracking-tight leading-[1.15]">
-              <Link href={`/tutors/${t.id}`} className="hover:text-brand-700 transition-colors">{t.name}</Link>
-            </h3>
-            {t.verified && <VerifiedMark size={14} />}
-            {t.superExpert && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-[9.5px] font-bold uppercase tracking-[0.12em]">
-                <Icon.spark className="w-3 h-3" /> Super
-              </span>
-            )}
-          </div>
-          {/* Accomplishment headline reads FIRST (consultation scan pattern);
-              the category label is secondary, muted. */}
-          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-            {t.headline && (
-              <>
-                <span className="inline-flex items-center h-[22px] px-2 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 font-display text-[11px] font-semibold tracking-tight max-w-full truncate">{t.headline}</span>
-                <span className="text-ink-300">·</span>
-              </>
-            )}
-            <span className="font-display text-[12px] font-medium text-ink-500">{t.cat}</span>
-          </div>
-          {t.langs && t.langs.length > 0 && (
-            <div className="mt-1.5 inline-flex items-center gap-1.5 text-[11.5px] text-ink-500 max-w-full">
-              <Icon.globe className="w-3.5 h-3.5 text-ink-400 shrink-0" />
-              <span className="truncate">{fmtLangs(t.langs)}</span>
-            </div>
-          )}
-          {/* Real-data demand proof: ჩატარებული სესია + response promise.
-              Each fragment renders only when the real value exists; rating
-              moved to the price rail (the scan anchor). */}
-          {(t.rating === 0 || t.sessions > 0 || typeof t.responseHours === 'number') && (
-            <div className="mt-2.5 flex items-center gap-x-4 gap-y-1 text-[11.5px] text-ink-600 flex-wrap">
-              {t.rating === 0 && <span className="font-display font-semibold text-ink-500">ახალი ექსპერტი</span>}
-              {t.sessions > 0 && <span className="tabular-nums"><span className="font-display font-bold text-ink-900">{t.sessions}</span> ჩატარებული სესია</span>}
-              {typeof t.responseHours === 'number' && <span className="tabular-nums">პასუხი ~<span className="font-display font-bold text-ink-900">{t.responseHours} სთ</span></span>}
-            </div>
-          )}
-          <p className="mt-2.5 text-[13px] text-ink-700 leading-[1.5] line-clamp-2">{t.bio}</p>
-          {t.sessions >= 50 && (
-            <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-brand-700 font-display font-semibold">
-              <Icon.spark className="w-3 h-3" /> პოპულარული · {t.sessions} სესია ჩატარდა
-            </div>
-          )}
-        </div>
-
-        {/* Right rail — the scan anchor: price LARGE, session length small,
-            rating + review count under it (hidden until real reviews exist),
-            then the next-slot line and the booking CTA. */}
-        <div className="flex flex-col justify-between border-l border-ink-100 pl-5">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="font-display text-[24px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">₾{priceForDuration(t.price, dur)}</div>
-              <div className="mt-1 text-[11px] text-ink-500">სესია · {dur} წთ</div>
-              {t.rating > 0 && t.reviews > 0 && (
-                <div className="mt-2 inline-flex items-center gap-1 text-[12px]">
-                  <span className="font-display font-bold text-ink-900 tabular-nums">{fmtRating(t.rating)}</span>
-                  <Icon.star className="w-3.5 h-3.5 text-warning-500" />
-                  <span className="text-ink-500 tabular-nums">· {t.reviews} შეფასება</span>
-                </div>
-              )}
-            </div>
-            {!viewerCantFav && (
-              <button type="button" onClick={() => onToggleFav(t.id)} aria-label={saved ? 'შენახული' : 'შენახვა'} className={`h-8 w-8 rounded-btn inline-flex items-center justify-center transition-colors shrink-0 ${saved ? 'text-danger-600 bg-danger-50' : 'text-ink-400 hover:text-ink-700 hover:bg-ink-50'}`}>
-                {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
+              <button
+                type="button"
+                aria-label="ვიდეო"
+                onClick={e => { e.stopPropagation(); onPreviewEnter(t, e.currentTarget) }}
+                className="absolute bottom-0 right-0 z-20 w-10 h-10 inline-flex items-end justify-end p-1.5"
+              >
+                <span className="w-7 h-7 rounded-full bg-white/95 backdrop-blur shadow-pop text-ink-900 inline-flex items-center justify-center group-hover/photo:scale-105 transition-transform">
+                  <Icon.play className="w-3 h-3 ml-0.5" />
+                </span>
               </button>
             )}
           </div>
-          {/* Two-button CTA: booking is the primary niche, messaging the
-              secondary. A non-student (tutor/admin) can't book OR message, so
-              they get a single neutral note instead of dead-end buttons. */}
-          <div className="mt-3 space-y-2">
-            {viewerCantBook ? (
-              <div className="w-full h-11 rounded-btn bg-ink-75 border border-ink-200 text-ink-400 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center">
-                ჯავშანი მხოლოდ კლიენტს
+
+          {/* Identity column */}
+          <div className="min-w-0 flex-1 flex flex-col">
+            <div className={`flex items-center gap-x-1.5 gap-y-1 min-w-0 flex-wrap ${viewerCantFav ? '' : 'pr-9'}`}>
+              <h3 className="font-display text-[16px] sm:text-[17px] font-bold text-ink-900 tracking-tight leading-[1.2] min-w-0 break-words">
+                <Link href={`/tutors/${t.id}`} className="relative z-10 hover:text-brand-700 transition-colors">{t.name}</Link>
+              </h3>
+              {t.verified && <VerifiedMark size={14} />}
+              {t.superExpert && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-[9.5px] font-bold uppercase tracking-[0.12em]">
+                  <Icon.spark className="w-3 h-3" /> Super
+                </span>
+              )}
+              {/* Rating / „ახალი" moved OFF the photo: a 112px square has no room
+                  for an overlay pill and it hid part of the face. Inline, hairline
+                  chip, no pastel fill (canon). An unrated expert reads „ახალი",
+                  never „0.0 ★". */}
+              {t.rating > 0 ? (
+                <span className="inline-flex items-center gap-1 shrink-0">
+                  <Icon.star className="w-3 h-3 text-warning-500" />
+                  <span className="font-display text-[12px] font-bold text-ink-900 tabular-nums leading-none">{fmtRating(t.rating)}</span>
+                  <span className="text-[10.5px] text-ink-500 tabular-nums">({t.reviews})</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center h-5 px-1.5 rounded-pill border border-ink-200 text-ink-600 font-display text-[10.5px] font-semibold shrink-0">ახალი</span>
+              )}
+            </div>
+            {/* Accomplishment headline reads FIRST (consultation scan pattern);
+                the category label is secondary, muted. */}
+            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap min-w-0">
+              {t.headline && (
+                <>
+                  <span className="inline-flex items-center h-[22px] px-2 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 font-display text-[11px] font-semibold tracking-tight max-w-full truncate">{t.headline}</span>
+                  <span className="text-ink-300">·</span>
+                </>
+              )}
+              <span className="font-display text-[12px] font-medium text-ink-500">{t.cat}</span>
+            </div>
+            {t.langs && t.langs.length > 0 && (
+              <div className="mt-1.5 inline-flex items-center gap-1.5 text-[11.5px] text-ink-500 max-w-full">
+                <Icon.globe className="w-3.5 h-3.5 text-ink-400 shrink-0" />
+                <span className="truncate">{fmtLangs(t.langs)}</span>
               </div>
-            ) : (
-              <>
-                {bookable ? (
-                  <button type="button" onClick={() => onBook(t)} className="w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors shadow-xs">
-                    {needsSignIn ? 'შესვლა და ჯავშანი' : 'დაჯავშნე'}
-                  </button>
-                ) : (
-                  <button type="button" disabled title="ამ ექსპერტს ჯერ არ აქვს გამოქვეყნებული თავისუფალი დრო — მიწერე პირდაპირ" className="w-full h-11 rounded-btn bg-ink-75 text-ink-400 border border-ink-200 cursor-not-allowed font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-1.5">
-                    დაჯავშნე
-                  </button>
-                )}
-                <Link href={`/tutors/${t.id}?intent=message`} className="w-full h-11 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors">
-                  <Icon.chat className="w-4 h-4" /> მიწერე ექსპერტს
-                </Link>
-              </>
             )}
+            {t.bio && <p className="mt-2 text-[12.5px] text-ink-600 leading-[1.45] line-clamp-2 break-words">{t.bio}</p>}
           </div>
         </div>
+
+        {/* Demand proof for established experts; for a brand-new expert
+            (0 rating) surface the credibility signals they DO have — verified,
+            experience, intro video, response — instead of a lonely „ახალი"
+            over empty space. Real values only. */}
+        {t.rating === 0 ? (
+          <NewExpertSignals t={t} className="mt-3" />
+        ) : (t.sessions > 0 || typeof t.responseHours === 'number') ? (
+          <div className="mt-3 flex items-center gap-x-4 gap-y-1 text-[11.5px] text-ink-600 flex-wrap">
+            {t.sessions > 0 && <span className="tabular-nums"><span className="font-display font-bold text-ink-900">{t.sessions}</span> სესია</span>}
+            {typeof t.responseHours === 'number' && <span className="tabular-nums">პასუხი ~<span className="font-display font-bold text-ink-900">{t.responseHours} სთ</span></span>}
+          </div>
+        ) : null}
       </div>
 
-      {/* Mobile content block */}
-      <div className="sm:hidden px-4 pt-4 pb-3 flex flex-col min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-          <h3 className="font-display text-[18px] font-bold text-ink-900 tracking-tight leading-[1.15] truncate">{t.name}</h3>
-          {t.verified && <VerifiedMark size={14} />}
-          {t.superExpert && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-[9.5px] font-bold uppercase tracking-[0.12em]">
-              <Icon.spark className="w-3 h-3" />
-              Super
-            </span>
-          )}
+      {/* Footer strip — the hairline divider, then price on its own line and two
+          equal buttons. Keeping the price above the buttons (instead of beside
+          them) is what stopped „· N წთ სესია" from wrapping on a narrow card. */}
+      <div className="px-4 py-3 border-t border-ink-100 bg-ink-50/40">
+        <div className="flex items-baseline gap-1.5 mb-2.5">
+          <span className="font-display text-[19px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">₾{priceForDuration(t.price, dur)}</span>
+          <span className="text-[11.5px] font-medium text-ink-500">· {dur} წთ სესია</span>
         </div>
-        <div className="mt-1.5 flex items-center gap-1.5 flex-wrap min-w-0">
-          <span className="font-display text-[12px] font-semibold text-ink-700">{t.cat}</span>
-          {t.headline && (
-            <>
-              <span className="text-ink-300">·</span>
-              <span className="inline-flex items-center h-[22px] px-2 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 font-display text-[11px] font-semibold tracking-tight max-w-full truncate">
-                {t.headline}
-              </span>
-            </>
-          )}
-        </div>
-        <p className="mt-3 text-[13px] text-ink-700 leading-[1.55] line-clamp-2">{t.bio}</p>
-        <div className="mt-3 pt-3 border-t border-ink-100 flex items-center gap-x-3 gap-y-1.5 text-[11px] text-ink-500 flex-wrap">
-          <span className="tabular-nums"><span className="font-display font-semibold text-ink-800">{t.sessions}</span> სესია</span>
-        </div>
-      </div>
-
-      {/* Bottom price strip — mobile only (desktop has the right-rail CTA) */}
-      <div className="sm:hidden flex items-center justify-between gap-3 px-4 py-3.5 border-t border-ink-100 bg-ink-50/40">
-        <div className="min-w-0 flex items-baseline gap-2 flex-wrap">
-          {/* Flat expert-set price for the whole session — "/ N წთ" read like a
-              per-minute rate; mirror the desktop rail's session phrasing. */}
-          <span className="font-display text-[20px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">
-            ₾{priceForDuration(t.price, dur)}<span className="text-[11.5px] font-medium text-ink-500 ml-1">· {dur}-წუთიანი სესია</span>
-          </span>
-        </div>
-        {/* relative z-10: explicit actions stay above the mobile overlay link.
-            Two buttons — message (secondary) always present, book (primary)
-            disabled when the expert has no published slots. */}
-        <div className="relative z-10 flex items-center gap-2 shrink-0">
+        {/* Two-button CTA: booking is the primary niche, messaging the
+            secondary. A non-student (tutor/admin) can't book OR message, so
+            they get a single neutral note instead of dead-end buttons.
+            z-10: these sit above the card-wide overlay link, so „დაჯავშნე" and
+            „მიწერე" keep their own actions instead of navigating. */}
+        <div className="relative z-10">
           {viewerCantBook ? (
-            <span className="h-11 px-3.5 rounded-btn bg-ink-75 border border-ink-200 text-ink-400 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center">
-              მხოლოდ კლიენტს
-            </span>
+            <div className="w-full h-11 rounded-btn bg-ink-75 border border-ink-200 text-ink-400 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center justify-center">
+              ჯავშანი მხოლოდ სტუდენტს
+            </div>
           ) : (
-            <>
+            <div className="grid grid-cols-2 gap-2">
               <Link
                 href={`/tutors/${t.id}?intent=message`}
                 aria-label="მიწერე ექსპერტს"
-                className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+                className="h-11 px-2 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors"
               >
-                <Icon.chat className="w-3.5 h-3.5" /> მიწერე
+                <Icon.chat className="w-3.5 h-3.5 shrink-0" /> მიწერე
               </Link>
               {bookable ? (
-                <button type="button" onClick={() => onBook(t)} className="h-11 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast shadow-xs hover:shadow-sm">
+                <button type="button" onClick={() => onBook(t)} className="h-11 px-2 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors shadow-xs">
                   {needsSignIn ? 'შესვლა და ჯავშანი' : 'დაჯავშნე'}
                 </button>
               ) : (
-                <button type="button" disabled aria-label="დაჯავშნა მიუწვდომელია — თავისუფალი დრო არ არის" className="h-11 px-3.5 rounded-btn bg-ink-75 text-ink-400 border border-ink-200 cursor-not-allowed font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5">
+                <button type="button" disabled title="თავისუფალი დრო ჯერ არ არის — მიწერე პირდაპირ" aria-label="თავისუფალი დრო ჯერ არ არის" className="h-11 px-2 rounded-btn bg-ink-75 text-ink-400 border border-ink-200 cursor-not-allowed font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center justify-center gap-1.5">
                   დაჯავშნე
                 </button>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -1011,10 +981,16 @@ const VideoPreview = ({ tutor, onClose, onBook }: { tutor: Tutor; onClose: () =>
         {/* Compact action strip */}
         <div className="flex items-center gap-3 px-3.5 py-2.5 bg-accent-900 border-t border-white/8">
           <div className="flex items-center gap-2.5 text-[11px] text-white/65 min-w-0 flex-1">
-            <span className="inline-flex items-center gap-1">
-              <Icon.star className="w-3 h-3 text-warning-400" />
-              <span className="font-display font-bold text-white tabular-nums">{fmtRating(tutor.rating)}</span>
-            </span>
+            {/* Same zero-state treatment as the card: an unrated expert reads
+                „ახალი“, never „0.0“. */}
+            {tutor.rating > 0 && tutor.reviews > 0 ? (
+              <span className="inline-flex items-center gap-1">
+                <Icon.star className="w-3 h-3 text-warning-400" />
+                <span className="font-display font-bold text-white tabular-nums">{fmtRating(tutor.rating)}</span>
+              </span>
+            ) : (
+              <span className="font-display font-semibold text-white/70">ახალი</span>
+            )}
             <span className="text-white/25">·</span>
             <span className="font-display text-[12.5px] font-bold text-white tabular-nums">
               ₾{tutor.price}<span className="text-[10px] font-medium text-white/55 ml-0.5">/ სესია</span>
@@ -1041,25 +1017,23 @@ const VideoPreview = ({ tutor, onClose, onBook }: { tutor: Tutor; onClose: () =>
 
 /* ───── Sort + view ───── */
 // Worded sort labels — no ASCII arrows (they read as noise to screen readers
-// and mean nothing in Georgian). The default ('rating', highest first) is the
-// platform's recommendation, so it's named as such.
+// and mean nothing in Georgian). The DEFAULT is 'new' (2026-07-27): a marketplace
+// that is still filling up must put a freshly approved expert on screen, not bury
+// them under whoever happened to gather reviews first. It leads the list so the
+// select's first option and the default agree.
 const SORT_OPTS = [
+  { id: 'new',      l: 'ახლის მიხედვით' },
   { id: 'rating',   l: 'ჩვენი რჩევით' },
   { id: 'sessions', l: 'სესიებით, კლებადი' },
   { id: 'price-a',  l: 'ფასით, ზრდადი' },
   { id: 'price-d',  l: 'ფასით, კლებადი' },
-  { id: 'new',      l: 'ახალი ექსპერტები' },
 ] as const
 
-const SORT_LABEL: Record<string, string> = {
-  rating: 'ჩვენი რჩევით',
-  sessions: 'სესიებით, კლებადი',
-  'price-a': 'ფასით, ზრდადი',
-  'price-d': 'ფასით, კლებადი',
-  new: 'ახლის მიხედვით',
-}
+// Derived from SORT_OPTS so the select option and the „დახარისხებული X“ line can
+// never drift apart again (they read „ახალი ექსპერტები“ vs „ახლის მიხედვით“).
+const SORT_LABEL: Record<string, string> = Object.fromEntries(SORT_OPTS.map(o => [o.id, o.l]))
 
-const ResultsBar = ({ total, loading, sort, setSort, activeFilters, removeFilter, onReset, onOpenFilters, activeCount }: { total: number; loading?: boolean; sort: string; setSort: (v: string) => void; activeFilters: { k: string; v: string }[]; removeFilter: (k: string, v: string) => void; onReset: () => void; onOpenFilters: () => void; activeCount: number }) => (
+const ResultsBar = ({ total, loading, sort, setSort, activeFilters, removeFilter, onReset, onOpenFilters, activeCount }: { total: number; loading?: boolean; sort: string; setSort: (v: string) => void; activeFilters: { k: string; v: string; raw?: string }[]; removeFilter: (k: string, v: string) => void; onReset: () => void; onOpenFilters: () => void; activeCount: number }) => (
   <div className="mb-5">
     <div className="flex items-baseline justify-between gap-4 flex-wrap mb-3">
       <div>
@@ -1069,11 +1043,13 @@ const ResultsBar = ({ total, loading, sort, setSort, activeFilters, removeFilter
         <p className="text-[12px] text-ink-500 mt-0.5">დახარისხებული <span className="text-ink-700 font-display font-semibold">{SORT_LABEL[sort]}</span></p>
       </div>
       <div className="flex items-center gap-2 flex-wrap max-w-full">
-        {/* Filter button — Preply-style top filter access (all breakpoints) */}
+        {/* Filter button — BELOW lg only. From lg up the hero renders the inline
+            dropdown row, so a drawer trigger next to it was a second door to the
+            same state (and the one people kept missing). */}
         <button
           type="button"
           onClick={onOpenFilters}
-          className="h-10 pl-3 pr-3.5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 font-display text-[12.5px] font-semibold text-ink-800 inline-flex items-center gap-1.5 transition-colors shrink-0"
+          className="lg:hidden h-10 pl-3 pr-3.5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 font-display text-[12.5px] font-semibold text-ink-800 inline-flex items-center gap-1.5 transition-colors shrink-0"
         >
           <Icon.sliders className="w-3.5 h-3.5" />
           ფილტრები
@@ -1105,7 +1081,7 @@ const ResultsBar = ({ total, loading, sort, setSort, activeFilters, removeFilter
             {f.v}
             <button
               type="button"
-              onClick={() => removeFilter(f.k, f.v)}
+              onClick={() => removeFilter(f.k, f.raw ?? f.v)}
               aria-label={`წაშალე ფილტრი: ${f.v}`}
               className="w-6 h-6 inline-flex items-center justify-center rounded-full hover:bg-ink-100 hover:text-ink-800 text-ink-500 transition-colors ml-0.5"
             >
@@ -1203,7 +1179,7 @@ const CompareModal = ({ open, tutors, onClose, onBook }: { open: boolean; tutors
       size="lg"
       ariaLabel="ექსპერტების შედარება"
       eyebrow="სწრაფი შედარება"
-      title={`ექსპერტი გვერდიგვერდ — ${tutors.length} ვარიანტი`}
+      title={`${tutors.length} ექსპერტი გვერდიგვერდ`}
     >
         {/* Full-bleed, sideways-scrollable compare table inside the sheet body */}
         <div className="overflow-x-auto -mx-5 sm:-mx-6 -my-4">
@@ -1218,7 +1194,7 @@ const CompareModal = ({ open, tutors, onClose, onBook }: { open: boolean; tutors
                   {t.superExpert && <span className="inline-flex items-center gap-1 mt-2 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.spark className="w-3 h-3" /> Super</span>}
                 </div>
                 <Row label="რეიტინგი" isBest={t.rating === best.rating} value={<span className="inline-flex items-center gap-1"><Icon.star className="w-3.5 h-3.5 text-warning-500" />{fmtRating(t.rating)} · {t.reviews}</span>} />
-                <Row label="ჩატარდა სესია" isBest={t.sessions === best.sessions} value={<>{t.sessions.toLocaleString()}</>} />
+                <Row label="სესია" isBest={t.sessions === best.sessions} value={<>{t.sessions.toLocaleString()}</>} />
                 <Row label="ფასი"          isBest={t.price === best.price}      value={<>₾{t.price}</>} />
                 <Row label="ენები"          value={<span className="text-[12px] text-ink-700 font-normal">{t.langs.join(' · ')}</span>} />
                 <div className="p-3 border-t border-ink-100">
@@ -1249,7 +1225,8 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   const router = useRouter()
   // Hydrate from URL so /tutors?q=foo&category=business is shareable/refreshable.
   const [search, setSearch] = useState(() => params?.get('q') ?? '')
-  const [sort, setSort] = useState<string>(() => params?.get('sort') ?? 'rating')
+  // Newest experts first by default — an explicit ?sort= still wins.
+  const [sort, setSort] = useState<string>(() => params?.get('sort') ?? 'new')
   const [page, setPage] = useState(1)
   // Seed the list from the server-rendered rows so the FIRST paint shows real
   // expert cards (in the initial HTML) instead of a skeleton. Category / price
@@ -1428,14 +1405,13 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
       const v = Number(raw)
       return Number.isFinite(v) ? v : def
     }
-    // Backward-compat: external links (breadcrumbs, SimilarExperts) still point
-    // at /tutors?category=<slug>. Map that slug to its category NAME and seed it
-    // into `cats` so the unified client-side category filter honours the link.
+    // Backward-compat: external links (breadcrumbs, SimilarExperts, the home
+    // grid) still point at /tutors?category=<slug>. `cats` now holds SLUGS too,
+    // so the deep-link slug seeds straight in — no name lookup needed.
     const seedCats = csv('cats')
     const catParam = p?.get('category')
-    if (catParam && catParam !== 'all') {
-      const label = QUICK_CATS.find(c => c.slug === catParam)?.label
-      if (label && !seedCats.includes(label)) seedCats.push(label)
+    if (catParam && catParam !== 'all' && !seedCats.includes(catParam)) {
+      seedCats.push(catParam)
     }
     return {
       cats: seedCats,
@@ -1452,16 +1428,29 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
     cats: [], minRate: 0, langs: [], available: [], minRating: 0, superOnly: false, price: [0, NO_CAP],
   })
 
-  // Category chip handlers — shared by the hero chips and (implicitly) the
-  // sidebar checkboxes, both writing to filters.cats (category NAMES).
-  const toggleCat = (label: string) => setFilters(f => ({ ...f, cats: f.cats.includes(label) ? f.cats.filter(x => x !== label) : [...f.cats, label] }))
-  const clearCats = () => setFilters(f => ({ ...f, cats: [] }))
+  // Live, admin-managed categories (GET /api/categories → isLive only). Drives
+  // every category chip/checkbox; `filters.cats` stores the SLUGS these carry.
+  // Starts empty → the sphere filter is hidden until this resolves (and stays
+  // hidden if the fetch fails), so we never show a dead/unmatched chip.
+  const [liveCats, setLiveCats] = useState<LiveCat[]>([])
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/categories')
+      .then(r => (r.ok ? r.json() : []))
+      .then((rows: any[]) => {
+        if (cancelled || !Array.isArray(rows)) return
+        setLiveCats(rows.filter(r => r && r.slug && r.name).map(r => ({ id: r.id, slug: r.slug, name: r.name })))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   // Keep URL in sync with all filter state so refresh + share work.
   useEffect(() => {
     const url = new URLSearchParams()
     if (search.trim()) url.set('q', search.trim())
-    if (sort !== 'rating') url.set('sort', sort)
+    // Only non-default sorts land in the URL — 'new' IS the default now.
+    if (sort !== 'new') url.set('sort', sort)
     // Categories live entirely in `cats` now (the hero chips write here too),
     // so there is no separate `category` param to keep in sync.
     if (filters.cats.length > 0) url.set('cats', filters.cats.join(','))
@@ -1484,10 +1473,15 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
     if (k === 'price') setFilters({ ...filters, price: [0, NO_CAP] })
   }
 
-  const activeFilters: { k: string; v: string }[] = [
-    ...filters.cats.map(c    => ({ k: 'cat',   v: c })),
+  // `raw` carries the value removeFilter needs (the SLUG for categories), while
+  // `v` is the human label shown on the chip (the category NAME). For every other
+  // filter the two coincide.
+  const activeFilters: { k: string; v: string; raw?: string }[] = [
+    ...filters.cats.map(slug  => ({ k: 'cat',   v: catNameOf(liveCats, slug), raw: slug })),
     ...filters.langs.map(l   => ({ k: 'lang',  v: l })),
-    ...filters.available.map(a => ({ k: 'avail', v: a })),
+    // `v` is what the chip PRINTS, so it must be the Georgian label — the raw
+    // id („today“) leaked onto the chip while the hero dropdown showed „დღეს“.
+    ...filters.available.map(a => ({ k: 'avail', v: FILTER_AVAIL.find(x => x.id === a)?.l ?? a, raw: a })),
     ...(filters.minRating > 0 ? [{ k: 'rate', v: `${filters.minRating}+ ★` }] : []),
     ...(filters.superOnly ? [{ k: 'super', v: 'Super-ექსპერტი' }] : []),
     ...(priceBandActive(filters.price[0], filters.price[1]) ? [{ k: 'price', v: priceBandLabel(filters.price[0], filters.price[1]) }] : []),
@@ -1502,7 +1496,9 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
       if (filters.minRating > 0 && (t.rating ?? 0) < filters.minRating) return false
       // Budget band — honor both the floor and the cap (NO_CAP = no ceiling).
       if (t.price < filters.price[0] || t.price > filters.price[1]) return false
-      if (filters.cats.length > 0 && !filters.cats.includes(t.cat)) return false
+      // Match by category SLUG (stable), not the display name — a rename or a
+      // hidden category can never silently drop matching experts.
+      if (filters.cats.length > 0 && (!t.catSlug || !filters.cats.includes(t.catSlug))) return false
       if (filters.langs.length > 0) {
         const hasLang = t.langs.some(l => filters.langs.includes(l))
         if (!hasLang) return false
@@ -1521,11 +1517,19 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
       return true
     })
     switch (sort) {
-      case 'rating':   out = [...out].sort((a, b) => b.rating - a.rating); break
+      // „ახლის მიხედვით" (DEFAULT): newest first. The server order is
+      // verified→rating, which buries brand-new experts — so sort explicitly by
+      // createdAt desc. Rows without a createdAt fall to the end (epoch 0).
+      case 'new':      out = [...out].sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()); break
+      // „ჩვენი რჩევით": KEEP the server's curated order (verified→rating with
+      // bookable experts bubbled up, from queryTutors). Re-sorting purely by
+      // rating here discarded that curation — a verified, bookable but brand-new
+      // expert (rating 0) sank below a mediocre unverified one. Leaving the
+      // seeded order intact IS „our recommendation".
+      case 'rating':   /* keep the server's curated order */ break
       case 'sessions': out = [...out].sort((a, b) => (b.sessions ?? 0) - (a.sessions ?? 0)); break
       case 'price-a':  out = [...out].sort((a, b) => a.price - b.price); break
       case 'price-d':  out = [...out].sort((a, b) => b.price - a.price); break
-      case 'new':      /* keep API order (verified→rating) */ break
     }
     return out
   }, [liveTutors, filters, sort])
@@ -1555,7 +1559,7 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
         ? <StudentAppBar user={viewer ? { name: viewer.fullName, avatar: viewer.avatarUrl } : undefined} />
         : <PublicTopBar activeHref="/tutors" initialUser={initialUser} />}
 
-      <SearchHero filters={filters} setFilters={setFilters} search={search} setSearch={setSearch} onSearch={runSearch} total={total} loading={loading} />
+      <SearchHero filters={filters} setFilters={setFilters} search={search} setSearch={setSearch} onSearch={runSearch} total={total} loading={loading} liveCats={liveCats} />
 
       <Container as="main" id="main" className="py-8 sm:py-10 lg:py-14">
         {needsAuth && !authDismissed && !signedIn && (
@@ -1564,8 +1568,11 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
             className="mb-6"
           />
         )}
-        <RecentTutorsStrip className="mb-6" />
-        {/* Preply-style: full-width list, filters open in a top-triggered drawer. */}
+        {/* „ბოლოს ნანახი" strip removed 2026-07-27 — it pushed the actual
+            results below the fold and repeated cards the visitor had just
+            scrolled past. The component still serves the home page. */}
+        {/* Full-width grid. Refinements live in the hero's inline dropdown row
+            from lg up, and in the drawer below lg. */}
         <div>
           <div className="min-w-0">
             <ResultsBar
@@ -1592,7 +1599,7 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
               </div>
             )}
 
-            <div className={`relative space-y-3 motion-safe:transition-opacity ${loading && liveTutors.length > 0 ? 'opacity-60' : ''}`}>
+            <div className={`relative motion-safe:transition-opacity ${loading && liveTutors.length > 0 ? 'opacity-60' : ''}`}>
               {/* Refetch indicator — the first-paint skeleton below only covers
                   an empty list, so on re-search/refilter (when results already
                   exist) we dim the stale list and show an inline spinner. */}
@@ -1608,14 +1615,23 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
                 // First-paint skeleton: three placeholder cards while /api/tutors
                 // resolves. Prevents the "no experts found" empty-state from
                 // flashing before real data arrives.
-                <div className="space-y-3" aria-busy="true" aria-live="polite">
-                  {[0, 1, 2].map(i => (
-                    <div key={i} className="rounded-card border border-ink-200 bg-white p-5 flex items-start gap-4 animate-pulse">
-                      <div className="w-16 h-16 rounded-full bg-ink-100 shrink-0" />
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="h-4 w-2/5 bg-ink-100 rounded" />
-                        <div className="h-3 w-3/5 bg-ink-100 rounded" />
-                        <div className="h-3 w-4/5 bg-ink-100 rounded" />
+                // Same 1-up/2-up grid and the same horizontal shape as a real
+                // card (square thumb + content + footer strip), so the list
+                // doesn't reflow when the data lands.
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" aria-busy="true" aria-live="polite">
+                  {[0, 1, 2, 3].map(i => (
+                    <div key={i} className="rounded-card border border-ink-200 bg-white overflow-hidden animate-pulse">
+                      <div className="p-4 flex items-start gap-3.5">
+                        <div className="shrink-0 w-28 h-28 sm:w-32 sm:h-32 rounded-card bg-ink-100" />
+                        <div className="flex-1 min-w-0 space-y-2 pt-0.5">
+                          <div className="h-4 w-2/5 bg-ink-100 rounded" />
+                          <div className="h-3 w-3/5 bg-ink-100 rounded" />
+                          <div className="h-3 w-4/5 bg-ink-100 rounded" />
+                        </div>
+                      </div>
+                      <div className="px-4 py-3 border-t border-ink-100 bg-ink-50/40 space-y-2.5">
+                        <div className="h-4 w-24 bg-ink-100 rounded" />
+                        <div className="h-11 bg-ink-100 rounded-btn" />
                       </div>
                     </div>
                   ))}
@@ -1634,7 +1650,7 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
                       ექსპერტები მალე დაემატება
                     </div>
                     <p className="text-[12.5px] text-ink-500 mt-1.5 max-w-[360px] mx-auto leading-snug">
-                      ბაზა იზრდება — დაგვიტოვე კითხვა და მოგწერთ, როგორც კი შესაფერისი ექსპერტი გამოჩნდება.
+                      დაგვიტოვე კითხვა და მოგწერთ, როცა შესაფერისი ექსპერტი გამოჩნდება.
                     </p>
                     <a href="/ask" className="mt-4 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 shadow-xs transition-colors duration-fast">
                       დასვი კითხვა
@@ -1646,7 +1662,7 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
                       <Icon.search className="w-5 h-5" />
                     </div>
                     <div className="font-display text-[15.5px] font-bold text-ink-900 tracking-tight">
-                      ვერ ვიპოვეთ შესაფერისი ექსპერტი — სცადე სხვა ფილტრი ან ტერმინი
+                      ვერ ვიპოვეთ — სცადე სხვა ფილტრი
                     </div>
                     <button type="button" onClick={resetFilters} className="mt-4 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 shadow-xs transition-colors duration-fast">
                       ფილტრების გასუფთავება
@@ -1654,19 +1670,27 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
                   </div>
                 )
               ) : (
-                pagedTutors.map((t, i) => <TutorCard key={t.id} idx={i} t={t} onPreviewEnter={openPreview} onBook={openBook} saved={favIds.has(t.id)} onToggleFav={toggleFav} needsSignIn={authKnown && !signedIn} viewerCantBook={viewerCantBook} viewerCantFav={viewerCantFav} />)
+                // 1-up on mobile, 2-up from sm — the horizontal card is built
+                // for both. Grid items stretch and the card is `h-full flex
+                // flex-col` with the footer after a `flex-1` body, so a row's
+                // cards share one height AND their button rows share a baseline.
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {pagedTutors.map((t, i) => <TutorCard key={t.id} idx={i} t={t} onPreviewEnter={openPreview} onBook={openBook} saved={favIds.has(t.id)} onToggleFav={toggleFav} needsSignIn={authKnown && !signedIn} viewerCantBook={viewerCantBook} viewerCantFav={viewerCantFav} />)}
+                </div>
               )}
             </div>
 
             {/* Helper strip — placed BEFORE pagination so it's actually seen */}
             <div className="mt-8 grid sm:grid-cols-2 gap-3">
-              <a href="mailto:hi@mcodne.ge?subject=%E1%83%A8%E1%83%94%E1%83%9B%E1%83%98%20%E1%83%9B%E1%83%9D%E1%83%97%E1%83%AE%E1%83%9D%E1%83%95%E1%83%9C%E1%83%90" className="group text-left rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift p-5 flex items-start gap-4">
+              {/* Subject was a percent-encoded „შემი მოთხოვნა" — a typo for
+                  „ჩემი". Named for what the card actually offers instead. */}
+              <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('ექსპერტის მოთხოვნა')}`} className="group text-left rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift p-5 flex items-start gap-4">
                 <span className="w-10 h-10 shrink-0 rounded-btn bg-brand-50 text-brand-700 inline-flex items-center justify-center">
                   <Icon.spark className="w-4 h-4" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="font-display text-[13.5px] font-bold text-ink-900 tracking-tight">ვერ იპოვე შესაფერისი?</div>
-                  <p className="text-[12px] text-ink-600 mt-0.5 leading-snug">მოგვწერე — 24 საათში შემოგთავაზებთ 3 ვარიანტს შენი კონტექსტიდან.</p>
+                  <p className="text-[12px] text-ink-600 mt-0.5 leading-snug">მოგვწერე — 24 საათში შემოგთავაზებთ 3 ვარიანტს.</p>
                 </div>
               </a>
               {liveTutors.length >= 2 && (
@@ -1675,8 +1699,8 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
                     <Icon.sliders className="w-4 h-4" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="font-display text-[13.5px] font-bold text-ink-900 tracking-tight">შეადარე ტოპ 3-ი გვერდიგვერდ</div>
-                    <p className="text-[12px] text-ink-600 mt-0.5 leading-snug">რეიტინგი, ფასი, თავისუფალი დრო, ენები — ერთი ცხრილით.</p>
+                    <div className="font-display text-[13.5px] font-bold text-ink-900 tracking-tight">შეადარე ტოპ 3</div>
+                    <p className="text-[12px] text-ink-600 mt-0.5 leading-snug">რეიტინგი, ფასი, ენები — ერთ ცხრილში.</p>
                   </div>
                 </button>
               )}
@@ -1699,7 +1723,8 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
       {/* Quick-Compare modal — top 3 side-by-side */}
       <CompareModal open={compareOpen} tutors={visibleTutors.slice(0, 3)} onClose={() => setCompareOpen(false)} onBook={openBook} />
 
-      {/* Filters drawer — right-side sheet (bottom sheet on mobile) */}
+      {/* Filters drawer — below lg only (its trigger is `lg:hidden`); right-side
+          sheet, bottom sheet on mobile. */}
       <Sheet
         open={filtersOpen}
         onClose={() => setFiltersOpen(false)}
@@ -1728,14 +1753,7 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
           </>
         }
       >
-        <FiltersPanel
-          filters={filters}
-          setFilters={setFilters}
-          total={total}
-          onReset={resetFilters}
-          variant="drawer"
-          onClose={() => setFiltersOpen(false)}
-        />
+        <FiltersPanel filters={filters} setFilters={setFilters} liveCats={liveCats} />
       </Sheet>
     </div>
   )

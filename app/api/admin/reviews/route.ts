@@ -26,7 +26,9 @@ export async function GET(req: Request) {
 
   const rows = await prisma.review.findMany({
     where,
-    orderBy: { createdAt: 'desc' },
+    // `createdAt` is NOT unique — an id tiebreaker keeps the cursor deterministic,
+    // otherwise reviews sharing a timestamp get dropped/repeated at page borders.
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     include: {

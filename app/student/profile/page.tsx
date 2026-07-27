@@ -13,7 +13,7 @@ export default async function StudentProfilePage() {
           className="mb-8"
           eyebrow="პროფილი"
           title="ჩემი პროფილი"
-          sub="შეცვალე შენი ინფორმაცია, ავატარი და პაროლი."
+          sub="ინფორმაცია, ავატარი და პაროლი"
         />
 
         <ProfileClient

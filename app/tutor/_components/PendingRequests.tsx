@@ -73,7 +73,7 @@ export function PendingRequests({
           <SkeletonRow />
         </div>
       ) : pending.length === 0 ? (
-        <div className="p-6 text-center text-[13px] text-ink-500">ახალი მოთხოვნები ჯერ არ არის.</div>
+        <div className="p-6 text-center text-[13px] text-ink-500">ახალი მოთხოვნა არ არის.</div>
       ) : (
         <ul className="divide-y divide-ink-100">
           {pending.slice(0, 6).map(b => (
@@ -104,14 +104,14 @@ export function PendingRequests({
       )}
       {pending.length > 6 && (
         <div className="px-5 py-3 border-t border-ink-100 text-center">
-          <Link href="/tutor/bookings?tab=attention" className="text-[12.5px] text-brand-700 hover:text-brand-800 font-semibold">დანარჩენი {pending.length - 6} მოთხოვნის ნახვა</Link>
+          <Link href="/tutor/bookings?tab=attention" className="text-[12.5px] text-brand-700 hover:text-brand-800 font-semibold">კიდევ {pending.length - 6} მოთხოვნა</Link>
         </div>
       )}
 
       <ConfirmModal
         open={!!confirmDecline}
         title="უარი ჯავშნის მოთხოვნაზე?"
-        body={confirmDecline ? `${confirmDecline.student?.fullName ?? 'კლიენტის'} მოთხოვნა გაუქმდება. კლიენტი მიიღებს შეტყობინებას.` : undefined}
+        body={confirmDecline ? `${confirmDecline.student?.fullName ?? 'სტუდენტის'} მოთხოვნა გაუქმდება.` : undefined}
         tone="warning"
         confirmLabel="უარყოფა"
         busy={busy === (confirmDecline?.id ?? '') + 'decline'}

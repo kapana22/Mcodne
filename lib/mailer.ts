@@ -9,14 +9,27 @@
 //
 // Every trigger calls sendMail fire-and-forget (inside `after()`), so a mail
 // failure NEVER blocks or fails the user's request.
+//
+// ⚠️ SENDING ≠ RECEIVING. Sending is live and verified (Resend, domain
+// mcodne.ge, MAIL_FROM=noreply@mcodne.ge). RECEIVING is a separate setup: the
+// domain needs MX records / Cloudflare Email Routing. As of 2026-07 mcodne.ge
+// had NO MX (the apex is a CNAME to Railway, and a CNAME apex blocks MX), so
+// every message sent TO any @mcodne.ge address — a customer's reply, a contact
+// form forwarded to hi@ — was accepted nowhere and dropped without a bounce.
+// That asymmetry is exactly what hid the problem: outgoing mail looked healthy
+// while nothing came back. Before advertising an address (lib/supportEmails.ts)
+// or pointing CONTACT_INBOX at one, confirm the domain can actually receive.
 
 import nodemailer, { type Transporter } from 'nodemailer'
+import { SUPPORT_EMAIL } from './supportEmails'
 
 type MailPayload = {
   to: string
   subject: string
   html: string
   text?: string
+  /** Where a human reply should land. Defaults to the support inbox. */
+  replyTo?: string
 }
 
 // One reused SMTP transport per server process (creating one per send is slow
@@ -37,11 +50,15 @@ function getGmailTransport(user: string, pass: string): Transporter {
   return gmailTransport
 }
 
-export async function sendMail({ to, subject, html, text }: MailPayload): Promise<{ ok: boolean; mode: string; status?: number }> {
+export async function sendMail({ to, subject, html, text, replyTo }: MailPayload): Promise<{ ok: boolean; mode: string; status?: number }> {
   const gmailUser = process.env.GMAIL_USER
   const gmailPass = process.env.GMAIL_APP_PASSWORD
   const explicitMode = process.env.MAILER_MODE // 'send' opts into Resend
   const fromName = process.env.MAIL_FROM_NAME || 'mcodne'
+  // Mail goes out from noreply@ — without Reply-To a customer who hits Reply
+  // writes into a void. CR/LF stripped as a last line of defence: callers must
+  // validate before passing an address, but a header must never carry a newline.
+  const replyToAddr = (replyTo || process.env.SUPPORT_EMAIL || SUPPORT_EMAIL).replace(/[\r\n]/g, '').trim()
 
   // ── 1. Gmail SMTP ────────────────────────────────────────────────────────
   if (gmailUser && gmailPass) {
@@ -49,13 +66,18 @@ export async function sendMail({ to, subject, html, text }: MailPayload): Promis
       const info = await getGmailTransport(gmailUser, gmailPass).sendMail({
         from: `"${fromName}" <${gmailUser}>`,
         to,
+        replyTo: replyToAddr,
         subject,
         html,
         text: text ?? html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500),
       })
-      return { ok: !!info.accepted?.length, mode: 'gmail' }
+      if (!info.accepted?.length) {
+        console.error('[server-error]', JSON.stringify({ scope: 'mailer', mode: 'gmail', to, subject, rejected: info.rejected }))
+        return { ok: false, mode: 'gmail-rejected' }
+      }
+      return { ok: true, mode: 'gmail' }
     } catch (err) {
-      console.error('📧 [MAIL] gmail send failed', err)
+      console.error('[server-error]', JSON.stringify({ scope: 'mailer', mode: 'gmail', to, subject, err: String(err) }))
       return { ok: false, mode: 'gmail-error' }
     }
   }
@@ -66,24 +88,33 @@ export async function sendMail({ to, subject, html, text }: MailPayload): Promis
     const from = process.env.MAIL_FROM || 'noreply@mcodne.ge'
     if (!apiKey) {
       console.warn('📧 [MAIL] MAILER_MODE=send but no RESEND_API_KEY — falling back to log')
-      console.log('📧 [MAIL]', { to, subject })
+      console.log('📧 [MAIL]', { to, replyTo: replyToAddr, subject })
       return { ok: true, mode: 'log-fallback' }
     }
     try {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from, to, subject, html, text }),
+        body: JSON.stringify({ from, to, reply_to: replyToAddr, subject, html, text }),
         signal: AbortSignal.timeout(15_000),
       })
-      return { ok: res.ok, status: res.status, mode: 'resend' }
+      if (!res.ok) {
+        // A non-2xx here (revoked key, unverified domain, rate limit) silently
+        // drops a real transactional email. Prod monitoring is `grep
+        // [server-error]` in the Railway logs (instrumentation.ts convention),
+        // so the failure MUST carry that prefix or it leaves no trace at all.
+        const detail = await res.text().catch(() => '')
+        console.error('[server-error]', JSON.stringify({ scope: 'mailer', mode: 'resend', status: res.status, to, subject, detail: detail.slice(0, 300) }))
+        return { ok: false, status: res.status, mode: 'resend-http-error' }
+      }
+      return { ok: true, status: res.status, mode: 'resend' }
     } catch (err) {
-      console.error('📧 [MAIL] resend send failed', err)
+      console.error('[server-error]', JSON.stringify({ scope: 'mailer', mode: 'resend', to, subject, err: String(err) }))
       return { ok: false, mode: 'resend-error' }
     }
   }
 
   // ── 3. log (default — no email provider configured) ──────────────────────
-  console.log('📧 [MAIL]', { to, subject, preview: (text ?? html.slice(0, 200)) })
+  console.log('📧 [MAIL]', { to, replyTo: replyToAddr, subject, preview: (text ?? html.slice(0, 200)) })
   return { ok: true, mode: 'log' }
 }

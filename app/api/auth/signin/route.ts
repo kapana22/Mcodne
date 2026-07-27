@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { createSession, postAuthHome, verifyPassword } from '@/lib/auth'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
+import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 
 const Body = z.object({
   email: z.string().email(),
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
   // verifies so suspension state isn't leaked to guessers.
   if (user.suspendedAt) {
     return NextResponse.json(
-      { ok: false, error: 'SUSPENDED', message: 'ანგარიში შეჩერებულია. დაგვიკავშირდი: hi@mcodne.ge' },
+      { ok: false, error: 'SUSPENDED', message: `ანგარიში შეჩერებულია. დაგვიკავშირდი: ${SUPPORT_EMAIL}` },
       { status: 403 },
     )
   }

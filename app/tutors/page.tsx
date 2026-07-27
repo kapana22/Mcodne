@@ -18,10 +18,10 @@ import { getCurrentUser } from '@/lib/auth'
 import { TutorsClient } from './client'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
-const TUTORS_DESC = 'დაათვალიერე ხელით შერჩეული ქართველი ექსპერტები — ბიზნესი, კარიერა, იურიდიული, ფინანსური და ფსიქოლოგიური კონსულტაცია. გაფილტრე კატეგორიით, ფასითა და ენით, დაჯავშნე ვიდეოსესია.'
+const TUTORS_DESC = 'იპოვე ქართველი ექსპერტი და დაჯავშნე ონლაინ კონსულტაცია — ბიზნესი, კარიერა, ფინანსური და იურიდიული საკითხები. ხელით შერჩეული ბაზა, ვიდეოსესია.'
 
 export const metadata: Metadata = {
-  title: 'ექსპერტები — იპოვე და დაჯავშნე კონსულტაცია | მცოდნე',
+  title: 'ონლაინ კონსულტაცია ექსპერტთან — იპოვე და დაჯავშნე | მცოდნე',
   description: TUTORS_DESC,
   alternates: { canonical: '/tutors' },
   openGraph: {
@@ -39,7 +39,9 @@ export default async function TutorsPage() {
   // Resolve the session server-side too so the shared header renders the
   // correct auth state on first paint (no client-side flip).
   const [initialTutors, user] = await Promise.all([
-    queryTutors({ limit: 40 }),
+    // Fetch the full live set (client filters by category/price/lang in-memory),
+    // so category deep-links don't dead-end once there are >40 live experts.
+    queryTutors({ limit: 200 }),
     getCurrentUser(),
   ])
   const initialUser = user

@@ -6,6 +6,7 @@ import { PAYMENTS_LIVE } from '@/lib/flags'
 import { prisma } from '@/lib/prisma'
 import { Icon } from '@/components/Icon'
 import { fmtKaDateTime } from '@/lib/kaDate'
+import { isBookingLive } from '@/lib/bookingLive'
 import { StatusPill } from '@/components/StatusPill'
 import { EmptyState } from '@/components/EmptyState'
 import { Container } from '@/components/Container'
@@ -53,11 +54,11 @@ export default async function StudentBookingsPage({
           className="mb-8"
           eyebrow="ჯავშნები"
           title="ჩემი სესიები"
-          sub={PAYMENTS_LIVE ? 'ყველა შენი ჯავშანი ერთ ადგილას · დაცული გადახდით' : 'ყველა შენი ჯავშანი ერთ ადგილას'}
+          sub={PAYMENTS_LIVE ? 'ყველა ჯავშანი · დაცული გადახდით' : 'ყველა ჯავშანი ერთ ადგილას'}
           actions={<Btn href="/tutors" iconLeft={<Icon.plus className="w-3.5 h-3.5" />}>ახალი ჯავშანი</Btn>}
         />
 
-        <div className="flex items-center gap-1 mb-6 border-b border-ink-200">
+        <div className="flex items-center gap-1 mb-6 border-b border-ink-200 overflow-x-auto scrollbar-hide">
           {[
             { id: 'upcoming', l: 'მომავალი', c: upcoming.length },
             { id: 'past', l: 'დასრულებული', c: past.length },
@@ -79,7 +80,7 @@ export default async function StudentBookingsPage({
           <EmptyState
             icon={<Icon.calendar className="w-6 h-6" />}
             title="ცარიელია"
-            description={tab === 'past' ? 'ჯერ არ გქონია დასრულებული სესია.' : tab === 'canceled' ? 'გაუქმებული ჯავშანი არ არის.' : 'დაიწყე შენი პირველი კონსულტაცია.'}
+            description={tab === 'past' ? 'ჯერ არ გქონია დასრულებული სესია.' : tab === 'canceled' ? 'გაუქმებული ჯავშანი არ არის.' : 'დაიწყე პირველი კონსულტაცია.'}
             cta={{ label: 'იპოვე ექსპერტი', href: '/tutors' }}
           />
         ) : (
@@ -126,7 +127,7 @@ export default async function StudentBookingsPage({
                     <div className="text-right shrink-0">
                       <div className="font-display text-[16px] font-bold tabular-nums text-ink-900">₾{b.price}</div>
                       <div className="text-[11px] font-mono text-ink-400 tabular-nums">{b.durationMin} წუთი</div>
-                      {b.status === 'LIVE' && (
+                      {isBookingLive(b) && (
                         <Link href={`/session/${b.id}`}
                               className="pointer-events-auto relative z-10 mt-2 h-9 px-3 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors">
                           <Icon.video className="w-3.5 h-3.5" /> ოთახში შესვლა

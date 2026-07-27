@@ -24,11 +24,21 @@ const Body = z.object({
   hourlyRate: z.number().int().min(1).max(10000).optional(),
   languages: z.array(z.string().min(2).max(10)).max(20).optional(),
   // Product pivot fields.
+  // The expert's browse category. Required (indirectly) for visibility — a
+  // null-category profile is hidden from /tutors (lib/tutorsQuery.ts). Validated
+  // against the live Category set in the handler so an arbitrary id can't be set.
+  categoryId: z.string().min(1).max(40).nullable().optional(),
   serviceType: z.enum(['CONSULTATION', 'RECURRING']).optional(),
+  // DEFAULT session length only — it does not slice the calendar. Availability
+  // rows are windows and bookable starts are derived per service (lib/availability).
   consultationDurationMin: z.number().int().refine(
     n => (CONSULTATION_DURATIONS as readonly number[]).includes(n),
     { message: 'must be 15, 30, or 60' },
   ).optional(),
+  // Gap reserved around every booked session (minutes). 0 = back-to-back allowed.
+  // Bounded 0–60: the UI offers 0/5/10/15/30, and anything past an hour would
+  // silently swallow a neighbouring session's worth of inventory.
+  bufferMin: z.number().int().min(0).max(60).optional(),
   // Intro video — YouTube URL only (any of the accepted forms: watch, youtu.be,
   // shorts, embed, or a bare 11-char ID). The server normalizes to the canonical
   // "youtu.be/{id}" shape. Explicit `null` clears the video. Uploads of raw
@@ -72,10 +82,21 @@ export async function PATCH(req: Request) {
   const data: any = {}
   const {
     headline, bio, specialty, yearsExp, hourlyRate, languages,
-    serviceType, consultationDurationMin,
+    serviceType, consultationDurationMin, bufferMin, categoryId,
     videoUrl, available, linkedinUrl, websiteUrl, responseHours,
   } = parsed.data
   if (available !== undefined) data.available = available
+  if (categoryId !== undefined) {
+    if (categoryId === null) {
+      data.categoryId = null
+    } else {
+      // Only allow a real, live category — otherwise the profile would set an
+      // invalid FK (or point at a hidden category and vanish from browse).
+      const cat = await prisma.category.findFirst({ where: { id: categoryId, isLive: true }, select: { id: true } })
+      if (!cat) return NextResponse.json({ ok: false, error: 'BAD_CATEGORY' }, { status: 400 })
+      data.categoryId = cat.id
+    }
+  }
   if (responseHours !== undefined) data.responseHours = responseHours
   if (linkedinUrl !== undefined) {
     const trimmed = (linkedinUrl ?? '').trim()
@@ -104,6 +125,7 @@ export async function PATCH(req: Request) {
   if (languages !== undefined) data.languages = languages
   if (serviceType !== undefined) data.serviceType = serviceType
   if (consultationDurationMin !== undefined) data.consultationDurationMin = consultationDurationMin
+  if (bufferMin !== undefined) data.bufferMin = bufferMin
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ ok: false, error: 'NOTHING_TO_UPDATE' }, { status: 400 })

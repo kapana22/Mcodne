@@ -47,10 +47,17 @@ export function ImpersonationBanner() {
   if (!active) return null
 
   return (
-    <div className="sticky top-0 z-[60] bg-warning-100 border-b border-warning-300 text-warning-900 px-4 sm:px-6 py-2 flex items-center justify-between gap-3 text-[12.5px] font-display font-semibold">
+    // `relative`, NOT `sticky top-0`: every page header is also `sticky top-0`,
+    // so two elements claimed the same pinned strip and the banner (z-[60])
+    // painted straight over the header (z-40) — nav, search and avatar became
+    // unreachable while impersonating. In normal flow the banner sits above the
+    // header in the document, scrolls away with the page, and the header then
+    // pins to the viewport top exactly as it does for everyone else. `z-[60]`
+    // is kept so the banner still stacks above page content while visible.
+    <div className="relative z-[60] bg-warning-100 border-b border-warning-300 text-warning-900 px-4 sm:px-6 py-2 flex items-center justify-between gap-3 text-[12.5px] font-display font-semibold">
       <span className="inline-flex items-center gap-2 min-w-0">
         <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 shrink-0"><path d="M12 3 2 21h20L12 3Z" /><path d="M12 10v5M12 18h0" /></svg>
-        <span className="truncate">ადმინის მიერ სხვის სახელით ხარ ავტორიზებული.</span>
+        <span className="truncate">სხვის სახელით ხარ ავტორიზებული.</span>
       </span>
       <button
         type="button"

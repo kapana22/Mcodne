@@ -36,6 +36,10 @@ type Booking = {
   ref: string
   topic: string
   status: ApiStatus
+  // Set by the 48h cleanup cron when nobody manually completed the session.
+  // The reviews API rejects (AUTO_COMPLETED) these, so the UI must not offer
+  // a review form for them.
+  autoCompleted?: boolean
   startAt: string
   durationMin: number
   price: number
@@ -71,8 +75,8 @@ const fmtTime = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(
 // conveyed by colored TEXT at the point of meaning (canon: no pastel status
 // fills, no status dots). The label copy itself already carries the state.
 const STATUS_MAP: Record<ApiStatus, { l: string; cls: string }> = {
-  PREPARING: { l: 'ჯავშანი ელოდება ექსპერტის დადასტურებას', cls: 'bg-ink-50/60 text-warning-800 border-ink-200' },
-  CONFIRMED: { l: 'ექსპერტმა დაადასტურა — ვიდეო-ოთახი გამზადებულია', cls: 'bg-ink-50/60 text-brand-700 border-ink-200' },
+  PREPARING: { l: 'ელოდები დადასტურებას', cls: 'bg-ink-50/60 text-warning-800 border-ink-200' },
+  CONFIRMED: { l: 'დადასტურდა — ვიდეო-ოთახი მზადაა', cls: 'bg-ink-50/60 text-brand-700 border-ink-200' },
   LIVE:      { l: 'სესია მიმდინარეობს', cls: 'bg-ink-50/60 text-danger-700 border-ink-200' },
   COMPLETED: { l: 'სესია დასრულდა', cls: 'bg-ink-50/60 text-brand-700 border-ink-200' },
   CANCELED:  { l: 'ჯავშანი გაუქმდა', cls: 'bg-ink-50/60 text-ink-600 border-ink-200' },
@@ -199,12 +203,14 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
             <span className="font-display text-[13px] font-bold tracking-tight">{m.l}</span>
           </div>
           <span className="font-mono text-[11px] tabular-nums opacity-65 inline-flex items-center gap-1.5">
+            {/* 36px tap target (canon floor); negative block margins keep the
+                banner row at its original visual height. */}
             <button
               type="button"
               onClick={onCopyRef}
               aria-label="ჯავშნის ID-ის კოპირება"
               title="დააკოპირე ჯავშნის ID"
-              className="inline-flex items-center gap-1 px-1.5 h-5 rounded-btn hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-300 transition-colors"
+              className="inline-flex items-center gap-1 px-2 h-9 -my-2 rounded-btn hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-300 transition-colors"
             >
               #{booking.ref.slice(0, 12)}
               <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 opacity-70">
@@ -259,7 +265,7 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
               <div className="p-3 rounded-card border border-ink-200 bg-ink-50/50">
                 <Eyebrow tone="muted" className="inline-flex items-center gap-1.5"><Icon.wallet className="w-3 h-3" /> ფასი</Eyebrow>
                 <div className="mt-1 font-display text-[14.5px] font-bold text-ink-900 tabular-nums">₾{booking.price}</div>
-                <div className="text-[11.5px] text-ink-500 tabular-nums">{PAYMENTS_LIVE ? 'დაცულ გადახდაშია' : 'გადახდები მალე'}</div>
+                <div className="text-[11.5px] text-ink-500 tabular-nums">{PAYMENTS_LIVE ? 'დაცულ გადახდაშია' : 'უფასოა'}</div>
               </div>
             </div>
 
@@ -284,7 +290,7 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
               <div className="p-4 rounded-card bg-white border border-ink-200">
                 <Eyebrow tone="muted" className="mb-2">ელოდება დადასტურებას</Eyebrow>
                 <p className="text-[12.5px] text-ink-700 leading-[1.5]">
-                  ექსპერტი ჩვეულებრივ რამდენიმე საათში ადასტურებს — შეტყობინებას მიიღებ. სანამ ელოდები, შეგიძლია მისწერო.
+                  ექსპერტი მალე დაგიდასტურებს. სანამ ელოდები, თამამად მიწერე.
                 </p>
                 <a href="#chat" className="mt-3 w-full h-11 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] inline-flex items-center justify-center gap-2 transition-colors">
                   <Icon.chat className="w-4 h-4" /> მიწერე ექსპერტს
@@ -301,7 +307,7 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
               <div className="p-4 rounded-card bg-white border border-ink-200">
                 <Eyebrow tone="muted" className="mb-2">სესიის დრო გავიდა</Eyebrow>
                 <p className="text-[12.5px] text-ink-700 leading-[1.5]">
-                  ექსპერტი მალე დახურავს სესიას — შემდეგ შეფასების დატოვებას შეძლებ. თუ სესია არ შედგა, მიწერე ექსპერტს ან დაიწყე დავა.
+                  ექსპერტი მალე დახურავს სესიას. თუ არ შედგა — მიწერე ან შემოგვჩივლე.
                 </p>
                 <a href="#chat" className="mt-3 w-full h-11 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[13px] inline-flex items-center justify-center gap-2 transition-colors">
                   <Icon.chat className="w-4 h-4" /> მიწერე ექსპერტს
@@ -343,7 +349,7 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
               <div className="p-4 rounded-card bg-brand-50 border border-brand-200">
                 <Eyebrow className="mb-2">სესია დასრულდა</Eyebrow>
                 <p className="text-[12.5px] text-ink-700 leading-[1.5]">
-                  {booking.review ? 'შენ უკვე შეაფასე ეს სესია.' : 'დაჯავშნე იგივე ექსპერტთან ან დატოვე შეფასება.'}
+                  {booking.review ? 'შენ უკვე შეაფასე ეს სესია.' : booking.autoCompleted ? 'ეს სესია ავტომატურად დაიხურა. შეგიძლია იგივე ექსპერტთან ხელახლა დაჯავშნო.' : 'დაჯავშნე იგივე ექსპერტთან ან დატოვე შეფასება.'}
                 </p>
                 <Link
                   href={rebookHref(booking)}
@@ -351,15 +357,15 @@ const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; onEnterRo
                 >
                   <Icon.refresh className="w-4 h-4" /> დაჯავშნე ისევ
                 </Link>
-                {!booking.review ? (
-                  <a href="#leave-review" className="mt-2 w-full h-11 rounded-btn bg-white border border-brand-200 hover:bg-brand-50 text-brand-800 font-display font-semibold text-[12.5px] inline-flex items-center justify-center gap-2 transition-colors">
-                    <Icon.star aria-hidden className="w-4 h-4" /> შეფასების დატოვება
-                  </a>
-                ) : (
+                {booking.review ? (
                   <div className="mt-2 inline-flex items-center justify-center gap-1.5 w-full h-11 rounded-btn bg-warning-50 border border-warning-200 text-warning-800 font-display font-semibold text-[12.5px]">
                     <Icon.star aria-hidden className="w-3.5 h-3.5 text-warning-500" />
                     შეფასდა · {booking.review.rating}<span className="sr-only"> 5-დან</span>
                   </div>
+                ) : booking.autoCompleted ? null : (
+                  <a href="#leave-review" className="mt-2 w-full h-11 rounded-btn bg-white border border-brand-200 hover:bg-brand-50 text-brand-800 font-display font-semibold text-[12.5px] inline-flex items-center justify-center gap-2 transition-colors">
+                    <Icon.star aria-hidden className="w-4 h-4" /> შეფასების დატოვება
+                  </a>
                 )}
               </div>
             )}
@@ -455,7 +461,7 @@ const RescheduleModal = ({ open, onClose, onSent, booking }: { open: boolean; on
           <RescheduleTimePicker tutorId={booking.tutor.id} durationMin={booking.durationMin} dateStr={dateStr} timeStr={timeStr} onDate={setDateStr} onTime={setTimeStr} />
           <div>
             <Eyebrow as="label" tone="muted" className="block mb-2">დამატებით <span className="text-ink-400 font-normal normal-case tracking-normal">— სურვილისამებრ</span></Eyebrow>
-            <textarea value={note} onChange={e => setNote(e.target.value.slice(0, 600))} rows={3} placeholder="მიზეზი, დამატებითი კონტექსტი..."
+            <textarea value={note} onChange={e => setNote(e.target.value.slice(0, 600))} rows={3} placeholder="მიზეზი, დამატებითი კონტექსტი…"
                       className="w-full p-3 rounded-field border border-ink-200 text-[13px] focus:border-brand-500 focus:outline-none resize-none leading-relaxed" />
           </div>
           <p className="text-[11.5px] text-ink-500 leading-snug">მოთხოვნა გაიგზავნება მიმოწერაში. ექსპერტის დადასტურების შემდეგ დრო შეიცვლება.</p>
@@ -480,7 +486,7 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
   }, [open])
 
   const REASONS: { id: DisputeReason; l: string; sub: string }[] = [
-    { id: 'no-show',        l: 'ექსპერტი არ მოვიდა',        sub: PAYMENTS_LIVE ? '100% დაბრუნება' : 'პრიორიტეტული განხილვა' },
+    { id: 'no-show',        l: 'ექსპერტი არ მოვიდა',        sub: PAYMENTS_LIVE ? '100% დაბრუნება' : 'სწრაფად განვიხილავთ' },
     { id: 'quality',        l: 'დაბალი ხარისხი',           sub: 'ცოდნა/მომზადება' },
     { id: 'wrong-topic',    l: 'არასწორი თემა',            sub: 'სხვა რაზე ვისაუბრეთ' },
     { id: 'unprofessional', l: 'არაპროფესიული ქცევა',      sub: 'უპატივცემულობა · დაგვიანება' },
@@ -561,7 +567,7 @@ const DisputeModal = ({ open, onClose, bookingId, onSent }: { open: boolean; onC
           {reason && (
             <div>
               <Eyebrow tone="muted" className="mb-2">დეტალურად <span className="text-ink-400 font-normal normal-case tracking-normal">— სურვილისამებრ</span></Eyebrow>
-              <textarea value={story} onChange={e => setStory(e.target.value.slice(0, 1000))} rows={4} placeholder="რა მოხდა, რა იყო მოლოდინი, რა მიიღე..." className="w-full p-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:outline-none text-[13px] resize-none leading-relaxed" />
+              <textarea value={story} onChange={e => setStory(e.target.value.slice(0, 1000))} rows={4} placeholder="რა მოხდა, რა იყო მოლოდინი, რა მიიღე…" className="w-full p-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:outline-none text-[13px] resize-none leading-relaxed" />
               <p className="mt-1 text-[11px] text-ink-500 text-right tabular-nums">{story.length} / 1000</p>
             </div>
           )}
@@ -612,7 +618,7 @@ const NoShowReport = ({ bookingId }: { bookingId: string }) => {
     return (
       <div className="flex items-center gap-2.5 h-9 px-3 rounded-btn bg-ink-50 border border-ink-200 text-ink-600 font-display font-semibold text-[11.5px]">
         <Icon.check className="w-3.5 h-3.5 text-brand-600 shrink-0" />
-        <span>მოხსენებულია — ვამუშავებთ</span>
+        <span>მიღებულია — უკვე განვიხილავთ</span>
       </div>
     )
   }
@@ -719,14 +725,27 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
   return (
     <Container as="section" id="leave-review" className="mt-4 scroll-mt-24">
       <div className="rounded-card border border-brand-200 bg-brand-50/50 p-5 lg:p-6">
-        {existing && !editing ? (
+        {/* Auto-closed sessions (48h cron, tutor never confirmed completion)
+            can't be reviewed — the API rejects with AUTO_COMPLETED. Show an
+            honest note instead of a form that would always fail. A pre-existing
+            review still renders read-only below (defensive). */}
+        {booking.autoCompleted && !existing ? (
+          <div>
+            <Eyebrow tone="muted" className="mb-1.5">შეფასება</Eyebrow>
+            <p className="text-[13px] text-ink-600 leading-[1.6]">
+              ეს სესია ავტომატურად დაიხურა — შეფასება ხელმისაწვდომი არ არის. თუ სესია არ ჩატარდა ან რამე ხარვეზი იყო, გამოიყენე „საჩივარი“.
+            </p>
+          </div>
+        ) : existing && !editing ? (
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="min-w-0 flex-1">
               <div className="inline-flex items-center gap-2 h-6 px-2.5 rounded-pill bg-warning-50 border border-warning-200 text-warning-800 font-display text-[11px] font-bold">
                 შეფასდა · {existing.rating}<span className="sr-only"> 5-დან</span>
-                <svg aria-hidden viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-warning-500"><path d="m12 2 2.95 6.5L22 9.3l-5.2 4.9 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.3l7.05-.8L12 2Z" /></svg>
+                <Icon.star aria-hidden className="w-3 h-3 text-warning-500" />
               </div>
-              <p className="mt-2 text-[13.5px] text-ink-800 leading-[1.6] whitespace-pre-wrap">{existing.body}</p>
+              {/* break-words: globals.css sets overflow-wrap only on h1–h4, so an
+                  unbroken string here would overflow into the clipped area. */}
+              <p className="mt-2 text-[13.5px] text-ink-800 leading-[1.6] whitespace-pre-wrap break-words">{existing.body}</p>
               <div className="mt-2 font-mono text-[10.5px] tabular-nums text-ink-500">
                 {fmtKaDate(new Date(existing.createdAt), { year: true })}
               </div>
@@ -757,7 +776,7 @@ const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Booking; ex
                   aria-label={`${n} ვარსკვლავი`}
                   className={`w-10 h-10 rounded-btn inline-flex items-center justify-center transition-all ${rating >= n ? 'text-warning-500 hover:scale-110' : 'text-ink-300 hover:text-ink-400'}`}
                 >
-                  <svg aria-hidden viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7"><path d="m12 2 2.95 6.5L22 9.3l-5.2 4.9 1.4 7L12 17.8 5.8 21.2l1.4-7L2 9.3l7.05-.8L12 2Z" /></svg>
+                  <Icon.star aria-hidden className="w-7 h-7" />
                 </button>
               ))}
               {rating > 0 && <span className="ml-2 font-display text-[13px] font-bold text-ink-900 tabular-nums">{rating}.0 / 5</span>}
@@ -856,7 +875,7 @@ const RescheduleBanner = ({
           <div className="font-display text-[14.5px] font-bold text-ink-900">
             ახალი დრო: {fmtKaDateTime(proposedTime, { month: 'long', weekday: true })}
           </div>
-          {req.reason && <p className="mt-1 text-[13px] text-ink-700 leading-[1.5] whitespace-pre-wrap">„{req.reason}“</p>}
+          {req.reason && <p className="mt-1 text-[13px] text-ink-700 leading-[1.5] whitespace-pre-wrap break-words">„{req.reason}“</p>}
           {iProposed && (
             <p className="mt-1 text-[12px] text-ink-500">ველოდებით მეორე მხარის დადასტურებას.</p>
           )}
@@ -919,9 +938,9 @@ const BookingBody = ({
         {/* Topic + notes */}
         <div className="rounded-card bg-white border border-ink-200 p-6">
           <Eyebrow tone="muted" className="mb-2">თემა და მიზანი</Eyebrow>
-          <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight mb-3">{booking.topic}</h2>
+          <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight mb-3 break-words">{booking.topic}</h2>
           {booking.studentNotes ? (
-            <p className="text-[13.5px] text-ink-700 leading-[1.6] whitespace-pre-wrap">{booking.studentNotes}</p>
+            <p className="text-[13.5px] text-ink-700 leading-[1.6] whitespace-pre-wrap break-words">{booking.studentNotes}</p>
           ) : (
             <p className="text-[13px] text-ink-400 italic">— დამატებითი ჩანაწერი არ არის.</p>
           )}
@@ -932,7 +951,7 @@ const BookingBody = ({
         {status === 'COMPLETED' && booking.tutorNotes && (
           <div className="rounded-card bg-brand-50/40 border border-brand-200 p-6">
             <Eyebrow className="mb-2">ექსპერტისგან</Eyebrow>
-            <blockquote className="border-l-2 border-brand-300 pl-3 text-[13.5px] text-ink-800 leading-[1.6] whitespace-pre-wrap italic">
+            <blockquote className="border-l-2 border-brand-300 pl-3 text-[13.5px] text-ink-800 leading-[1.6] whitespace-pre-wrap break-words italic">
               {booking.tutorNotes}
             </blockquote>
           </div>
@@ -1009,7 +1028,7 @@ const BookingBody = ({
                   <Icon.refresh className="w-4 h-4" />
                   <span className="flex-1 text-left">დაჯავშნე ისევ</span>
                 </Link>
-                {!booking.review && (
+                {!booking.review && !booking.autoCompleted && (
                   <a href="#leave-review" className="w-full flex items-center gap-2.5 h-11 px-3 rounded-btn bg-warning-50 border border-warning-200 hover:bg-warning-100 text-warning-800 font-display font-semibold text-[12.5px] transition-colors">
                     <Icon.star aria-hidden className="w-4 h-4" />
                     <span className="flex-1 text-left">დატოვე შეფასება</span>
@@ -1063,7 +1082,10 @@ const BookingBody = ({
           <div className="mt-3 text-[11.5px] text-ink-600 flex items-center gap-1.5">
             <Icon.shield className="w-3 h-3 text-brand-700" />
             {PAYMENTS_LIVE
-              ? (status === 'CANCELED' || status === 'NO_SHOW' ? 'თანხა დაბრუნებულია' :
+              ? (status === 'CANCELED' ? 'თანხა დაბრუნებულია' :
+                 // NO_SHOW = ექსპერტი გამოცხადდა, სტუდენტი არა → თანხა ექსპერტს რჩება
+                 // (payoutStatus RELEASED, იხ. app/api/bookings/[id] no_show).
+                 status === 'NO_SHOW' ? 'თანხა ექსპერტს გადაეცა' :
                  status === 'COMPLETED' ? 'გათავისუფლდა ექსპერტზე' :
                  'დაცული გადახდით')
               : 'დაჯავშნა უფასოა — გადახდები მალე'}
@@ -1077,7 +1099,7 @@ const BookingBody = ({
             <div>
               {PAYMENTS_LIVE ? (
                 <>
-                  <div className="font-display text-[12.5px] font-bold text-ink-900 tracking-tight mb-1">100% ფულის უკან-დაბრუნების გარანტია</div>
+                  <div className="font-display text-[12.5px] font-bold text-ink-900 tracking-tight mb-1">100% თანხის დაბრუნების გარანტია</div>
                   <p className="text-[11.5px] text-ink-700 leading-[1.5]">თუ ექსპერტი არ მოვა ან სესია ვერ შესრულდება — დაცული თანხა მთლიანად დაგიბრუნდება.</p>
                 </>
               ) : (
@@ -1125,7 +1147,7 @@ const StatusTimeline = ({ booking }: { booking: Booking }) => {
       list.push({ at: null, l: `${booking.cancelledBy === 'TUTOR' ? 'ექსპერტმა' : booking.cancelledBy === 'ADMIN' ? 'ადმინმა' : 'შენ'} გააუქმა`, done: true, sub: PAYMENTS_LIVE ? 'დაცული თანხა დაბრუნდა' : undefined })
     }
     if (s === 'NO_SHOW') {
-      list.push({ at: end, l: 'სესია არ შედგა', done: true, sub: PAYMENTS_LIVE ? 'დაცული თანხა დაბრუნდა' : undefined })
+      list.push({ at: end, l: 'სესია არ შედგა', done: true, sub: PAYMENTS_LIVE ? 'დაცული თანხა ექსპერტს გადაეცა' : undefined })
     }
     if (s === 'COMPLETED') {
       list.push({ at: end, l: PAYMENTS_LIVE ? 'დასრულდა · დაცული თანხა ექსპერტს გადაეცა' : 'დასრულდა', done: true })
@@ -1158,8 +1180,10 @@ const StatusTimeline = ({ booking }: { booking: Booking }) => {
    Phones had no persistent CTA — the primary action lived far up in the Hero
    rail. Fixed to the viewport bottom (lg:hidden) and flags the body with
    data-mobile-cta so the cookie banner lifts above it (globals.css), same
-   convention as the tutor-profile booking bar. Terminal statuses render
-   nothing — the inline review card / rebook actions cover those. */
+   convention as the tutor-profile booking bar. Terminal statuses (COMPLETED /
+   CANCELED / NO_SHOW) get a "back to bookings" bar instead of nothing:
+   BottomNav hides all five tabs on this route, so without it a finished
+   booking has NO persistent way out at 390px. */
 const MobileActionBar = ({ booking, onReschedule, onCancel }: { booking: Booking; onReschedule: () => void; onCancel: () => void }) => {
   const status = booking.status
   const start = new Date(booking.startAt)
@@ -1167,15 +1191,29 @@ const MobileActionBar = ({ booking, onReschedule, onCancel }: { booking: Booking
   const cd = useCountdown(status === 'PREPARING' || status === 'CONFIRMED' ? start : null)
   const live = isBookingLive(booking)
   const joinable = live || (status === 'CONFIRMED' && cd !== null && cd.diff <= 5 * 60_000)
-  const show = status === 'PREPARING' || status === 'CONFIRMED'
+  const terminal = status === 'COMPLETED' || status === 'CANCELED' || status === 'NO_SHOW'
+  const backHref = `/student/bookings?tab=${status === 'CANCELED' ? 'canceled' : 'past'}`
 
   useEffect(() => {
-    if (!show) return
     document.body.setAttribute('data-mobile-cta', '1')
-    return () => document.body.removeAttribute('data-mobile-cta')
-  }, [show])
-
-  if (!show) return null
+    // globals.css only lifts the COOKIE BANNER for [data-mobile-cta]; nothing
+    // reserves page space, so this fixed bar used to sit on top of
+    // WorkspaceFooter. Reserve it here (mobile only) and clean up on unmount.
+    const mq = window.matchMedia('(max-width: 1023.98px)')
+    const apply = () => {
+      if (!mq.matches) { document.body.style.paddingBottom = ''; return }
+      document.body.style.paddingBottom = 'calc(76px + env(safe-area-inset-bottom, 0px))'
+      // Older engines may reject env() from the CSSOM — fall back to a flat value.
+      if (!document.body.style.paddingBottom) document.body.style.paddingBottom = '88px'
+    }
+    apply()
+    mq.addEventListener('change', apply)
+    return () => {
+      document.body.removeAttribute('data-mobile-cta')
+      document.body.style.paddingBottom = ''
+      mq.removeEventListener('change', apply)
+    }
+  }, [])
 
   const hint = cd
     ? cd.d > 0 ? `${cd.d} დღე ${cd.h} სთ` : cd.h > 0 ? `${cd.h} სთ ${cd.m} წთ` : `${Math.max(1, cd.m)} წთ`
@@ -1210,6 +1248,18 @@ const MobileActionBar = ({ booking, onReschedule, onCancel }: { booking: Booking
               <Icon.video className="w-4 h-4" /> ვიდეო-ოთახში
             </Link>
           </>
+        ) : terminal ? (
+          <>
+            <div className="min-w-0 flex-1">
+              <div className="font-display text-[13px] font-bold text-ink-900 leading-tight truncate">
+                {status === 'COMPLETED' ? 'სესია დასრულდა' : status === 'CANCELED' ? 'ჯავშანი გაუქმდა' : 'სესია არ შედგა'}
+              </div>
+              <div className="mt-0.5 text-[11px] text-ink-500 truncate">{booking.topic}</div>
+            </div>
+            <Link href={backHref} className="shrink-0 h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5 transition-colors">
+              <Icon.chevL className="w-3.5 h-3.5" /> ჯავშნებში დაბრუნება
+            </Link>
+          </>
         ) : (
           <>
             <div className="min-w-0 flex-1">
@@ -1241,6 +1291,11 @@ export default function BookingDetail() {
   // Header identity for the shared StudentAppBar (avatar + user menu).
   const [me, setMe] = useState<{ name: string; avatar?: string | null } | null>(null)
   const [notFound, setNotFound] = useState(false)
+  // A failed load is a first-class state: a 5xx, a non-JSON body or a hung
+  // request must land on a visible retry card — never an eternal spinner (this
+  // page is opened straight from email links, so an API blip used to leave the
+  // student staring at a spinning circle forever).
+  const [loadError, setLoadError] = useState(false)
   const [rescheduleOpen, setRescheduleOpen] = useState(false)
   const [rescheduledOk, setRescheduledOk] = useState(false)
   const [disputeOpen, setDisputeOpen] = useState(false)
@@ -1256,23 +1311,38 @@ export default function BookingDetail() {
     if (!params?.id) return
     const seq = ++loadSeqRef.current
     const idAtCall = params.id
+    setLoadError(false)
+    // Guarantees even a request that never returns settles into the retry
+    // state instead of wedging the page on a spinner.
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 12_000)
     try {
       const [meRes, bRes] = await Promise.all([
         fetch('/api/me').then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`/api/bookings/${idAtCall}`),
+        fetch(`/api/bookings/${idAtCall}`, { signal: ctrl.signal }),
       ])
       // Drop stale responses.
       if (seq !== loadSeqRef.current) return
       setMeId(meRes?.user?.id ?? null)
       setMe(meRes?.user ? { name: meRes.user.fullName, avatar: meRes.user.avatarUrl } : null)
-      if (bRes.status === 404) { setNotFound(true); return }
-      if (bRes.status === 401) { router.push('/signin'); return }
-      if (!bRes.ok) return
+      // 404/403 are permanent answers („არ არსებობს / არ ხარ მონაწილე"), not a
+      // blip — they get the dead-end-free notFound card, not a retry.
+      if (bRes.status === 404 || bRes.status === 403) { setNotFound(true); return }
+      if (bRes.status === 401) {
+        const ret = encodeURIComponent(window.location.pathname + window.location.search)
+        router.push(`/signin?redirect=${ret}`)
+        return
+      }
+      if (!bRes.ok) { setLoadError(true); return }
       const b = await bRes.json()
       if (seq !== loadSeqRef.current) return
       bookingCache.set(idAtCall, b)
       setBooking(b)
-    } catch {}
+    } catch {
+      if (seq === loadSeqRef.current) setLoadError(true)
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   // Called after any mutation on this booking. In addition to refreshing the
@@ -1286,7 +1356,7 @@ export default function BookingDetail() {
   useEffect(() => {
     // On id change, swap to the new booking's cached copy instantly (or clear
     // to the loading state) so B never flashes A's content, then revalidate.
-    if (params?.id) { setBooking(bookingCache.get(params.id) ?? null); setNotFound(false) }
+    if (params?.id) { setBooking(bookingCache.get(params.id) ?? null); setNotFound(false); setLoadError(false) }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params?.id])
@@ -1358,6 +1428,34 @@ export default function BookingDetail() {
               ჩემი ჯავშნები
             </Link>
           </div>
+      </div>
+    )
+  }
+
+  // Failed load with nothing cached to fall back on — compact retry card
+  // (icon + one line + one action), plus a quiet way out because BottomNav is
+  // hidden on this route.
+  if (!booking && loadError) {
+    return (
+      <div className="flex-1 flex items-center justify-center px-6 py-16">
+        <div className="max-w-[360px] w-full text-center">
+          <div className="mx-auto w-12 h-12 rounded-full bg-ink-100 text-ink-500 inline-flex items-center justify-center mb-3">
+            <Icon.warn className="w-6 h-6" />
+          </div>
+          <div className="font-display text-[16px] font-bold text-ink-900 tracking-tight">ვერ ჩაიტვირთა</div>
+          <p className="text-[12.5px] text-ink-500 mt-1.5 leading-relaxed">შეამოწმე ინტერნეტი და სცადე თავიდან.</p>
+          <button
+            type="button"
+            onClick={() => { setLoadError(false); load() }}
+            className="mt-4 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+          >
+            <Icon.refresh className="w-3.5 h-3.5" />
+            სცადე თავიდან
+          </button>
+          <div className="mt-3">
+            <Link href="/student/bookings" className="font-display text-[12px] font-semibold text-ink-500 hover:text-ink-900 transition-colors">ჩემი ჯავშნები</Link>
+          </div>
+        </div>
       </div>
     )
   }

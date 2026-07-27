@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <rect width="64" height="64" rx="15" fill="#2F9C86"/>
-  <text x="32" y="34" font-family="'Helvetica Neue',Arial,'Noto Sans Georgian','BPG Nino Mtavruli',sans-serif" font-size="40" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="central">მ</text>
+  <svg x="23.63" y="11" width="16.74" height="42" viewBox="0 0.44 81.01 203.31" preserveAspectRatio="xMidYMid meet">
+    <path d="M53.02.71c-8.73-.46-16.44-.2-24.85-.05C12.82,2.42,1.79,13.3.7,28.21l-.03,34.61,37.56.09.12-29.73c1.69-.46,3.14-.43,4.45.19v34.23l-9.11-.88C14.35,66.23-.07,80.2,0,99.31l.24,74.47c.05,16.34,14.19,29.38,30.52,30.05h19.55c15.81-.62,30.3-13.66,30.3-29.87l.03-145.93c0-15.08-12.91-26.56-27.62-27.32h0ZM42.77,171.81h-4.8l.09-70.18h4.8l-.09,70.18Z" fill="#ffffff"/>
+  </svg>
 </svg>

@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     category: searchParams.get('category'),
     serviceType,
     onlyFeatured: searchParams.get('featured') === '1',
-    limit: Number(searchParams.get('limit') ?? 40),
+    limit: Number(searchParams.get('limit') ?? 200),
   })
 
   return NextResponse.json(shaped)

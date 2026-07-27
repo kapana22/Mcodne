@@ -49,11 +49,6 @@ export function WorkspaceSidebar({ badges }: { badges: NavBadges }) {
     <aside className="hidden lg:flex flex-col w-[240px] shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-ink-100 bg-white px-4 py-5">
       <div className="px-3">
         <Logo size="sm" />
-        <div className="mt-2 flex items-center gap-1.5">
-          <Eyebrow as="span" tone="muted">ექსპერტი</Eyebrow>
-          <span className="text-ink-300">/</span>
-          <span className="font-display text-[10px] font-bold text-ink-700 uppercase tracking-[0.1em]">სამუშაო სივრცე</span>
-        </div>
       </div>
 
       <nav aria-label="სამუშაო სივრცის ნავიგაცია" className="mt-6 flex flex-col gap-0.5">

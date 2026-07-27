@@ -2,9 +2,14 @@ import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { notify } from '@/lib/notify'
+import { notify, normalizePrefs } from '@/lib/notify'
 import { rateLimit } from '@/lib/rateLimit'
 import { stripTutorBlobs } from '@/lib/stripTutorBlobs'
+import { isStartOpen } from '@/lib/availability'
+import { ensureDbReady } from '@/lib/dbBoot'
+import { sendMail } from '@/lib/mailer'
+import { bookingRequestEmail } from '@/lib/emailTemplates'
+import { fmtKaDateTime } from '@/lib/kaDate'
 
 const Body = z.object({
   tutorId: z.string(),
@@ -29,7 +34,12 @@ export async function GET() {
     take: 100,
     include: {
       // Narrow the tutor.user select — never send passwordHash to the browser.
-      tutor: { include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } },
+      // omit heavy blobs at the DB level so professionData/base64 videoUrl don't
+      // cross the wire per row; stripTutorBlobs still guards oversized avatars.
+      tutor: {
+        omit: { professionData: true, videoUrl: true },
+        include: { user: { select: { id: true, fullName: true, avatarUrl: true } } },
+      },
       consultation: true,
     },
   })
@@ -38,9 +48,25 @@ export async function GET() {
   )
 }
 
+// How far around the requested time we pull availability rows. Wide enough that
+// a long chain of LEGACY pre-sliced rows merges whole (the start grid is
+// anchored to the MERGED window's start, so a truncated chain could shift it),
+// narrow enough that the read stays bounded.
+const WINDOW_LOOKAROUND_MS = 7 * 24 * 60 * 60 * 1000
+// The PAST_DATE guard below tolerates 5 minutes of client clock skew; the
+// openness check must use the same floor or it would reject starts the guard
+// just accepted.
+const CLOCK_SKEW_MS = 5 * 60 * 1000
+
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
+
+  // This route reads TutorProfile.bufferMin, a dbBoot-added column — make sure
+  // the boot DDL has run on this process before the first booking touches it.
+  // Idempotent and already-resolved after the first call, so it costs nothing
+  // on a warm process.
+  await ensureDbReady()
 
   // Dual-role model (2026-07-23): a TUTOR may also act as a CLIENT and book
   // another expert. The /student/* surfaces + space switcher are now wired for
@@ -71,8 +97,8 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   const { tutorId, consultationId, topic, studentNotes } = parsed.data
 
-  // Validate the date BEFORE any DB work — it's free and lets the slot query
-  // below run in the same parallel batch as the tutor fetch.
+  // Validate the date BEFORE any DB work — it's free, and a bad date must never
+  // cost a remote round-trip.
   // Every booking is scheduled against the expert's published availability —
   // the client must send a concrete startAt (+ duration). There is no more
   // "instant / live-now" path.
@@ -87,29 +113,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'PAST_DATE' }, { status: 400 })
   }
   const reqDurationMin = parsed.data.durationMin
-  const reqEnd = new Date(start.getTime() + reqDurationMin * 60 * 1000)
 
   // Independent pre-checks fan out CONCURRENTLY. Sequential awaits cost one
   // remote round-trip each (~300ms on the Railway proxy) and made the whole
   // POST feel hung; the checks don't depend on each other, only the verdicts do.
-  // NB: the covering-slot probe uses the CLIENT duration; when a consultation
-  // overrides the duration below we re-derive `end` and re-verify coverage.
-  const [tutor, consultationRow, probedSlot] = await Promise.all([
-    prisma.tutorProfile.findUnique({ where: { id: tutorId } }),
+  // (There is no availability pre-probe any more: openness depends on the
+  // AUTHORITATIVE duration, which the consultation row can override, and the
+  // only check that counts runs inside the Serializable transaction below.)
+  const [tutor, consultationRow] = await Promise.all([
+    prisma.tutorProfile.findUnique({
+      where: { id: tutorId },
+      include: { user: { select: { suspendedAt: true } } },
+    }),
     consultationId
       ? prisma.consultation.findFirst({
           where: { id: consultationId, tutorId },
           select: { id: true, price: true, minutes: true },
         })
       : Promise.resolve(null),
-    prisma.availabilitySlot.findFirst({
-      where: {
-        tutorId,
-        startAt: { lte: start },
-        endAt: { gte: reqEnd },
-        booked: false,
-      },
-    }),
   ])
 
   if (!tutor) return NextResponse.json({ ok: false, error: 'TUTOR_NOT_FOUND' }, { status: 404 })
@@ -130,6 +151,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'TUTOR_UNAVAILABLE' }, { status: 409 })
   }
 
+  // A suspended expert must not accept new bookings even via a stale deep link.
+  // Mirrors the available guard — the profile is hidden from browse, but the API
+  // has to refuse independently since anyone can craft a direct POST.
+  if (tutor.user.suspendedAt) {
+    return NextResponse.json({ ok: false, error: 'TUTOR_UNAVAILABLE' }, { status: 409 })
+  }
+
   // If a consultation is referenced, it MUST belong to this tutor. Never trust
   // a client-supplied consultationId that could point at another tutor's row —
   // and use its authoritative price/minutes below instead of client values.
@@ -146,32 +174,25 @@ export async function POST(req: Request) {
 
   const end = new Date(start.getTime() + durationMin * 60 * 1000)
 
-  // Every booking must land on a free, published availability slot. The
-  // parallel probe covered the client-sent duration; if the consultation
-  // stretched the session past the probed window, re-verify with the real end.
-  let coveringSlot = probedSlot
-  if (coveringSlot && end.getTime() > coveringSlot.endAt.getTime()) {
-    coveringSlot = await prisma.availabilitySlot.findFirst({
-      where: {
-        tutorId,
-        startAt: { lte: start },
-        endAt: { gte: end },
-        booked: false,
-      },
-    })
-  }
-  if (!coveringSlot) {
-    return NextResponse.json({ ok: false, error: 'NO_AVAILABILITY' }, { status: 409 })
-  }
-  const coveringSlotId: string = coveringSlot.id
+  // Buffer around every session (0 = back-to-back allowed, the historical
+  // behavior). lib/availability implements it by fattening each busy interval.
+  const bufferMin = tutor.bufferMin ?? 0
+  const bufferMs = bufferMin * 60 * 1000
 
   // Race-safe creation. Everything that must be consistent — the overlap
-  // re-check, the conditional slot claim, and the insert — runs inside ONE
-  // Serializable transaction. Two concurrent bookings for the same time can no
-  // longer both pass: the loser hits a conditional-claim miss or a Postgres
-  // serialization failure and is rejected with SLOT_TAKEN.
+  // re-check, the openness check, and the insert — runs inside ONE Serializable
+  // transaction. Two concurrent bookings for the same time can no longer both
+  // pass: the loser sees the winner's row in the overlap re-check, or hits a
+  // Postgres serialization failure, and is rejected with SLOT_TAKEN.
+  //
+  // Nothing is CLAIMED any more (no `booked = true`, no heldSlotId): an
+  // availability row is a WINDOW, and this booking's own [startAt, end) is the
+  // busy interval every later openness check subtracts. That is what lets a
+  // 60-min service span two touching 30-min legacy rows, and stops a 15-min
+  // service from destroying a whole 60-min row's remaining inventory.
   class SlotTaken extends Error {}
   class StudentOverlap extends Error {}
+  class NoAvailability extends Error {}
   let booking: {
     id: string
     ref: string
@@ -182,27 +203,35 @@ export async function POST(req: Request) {
   }
   try {
     booking = await prisma.$transaction(async tx => {
-      // Re-check overlap INSIDE the tx (covers instant with no slot).
+      // Re-check overlap INSIDE the tx. ONE query serves two jobs: this guard
+      // (the real concurrency protection) and the `busy` set the openness check
+      // below subtracts. The upper bound is end+buffer rather than end so a
+      // session starting AFTER ours can still block us through its buffer; the
+      // guard re-applies the strict `startAt < end` bound in JS so its behavior
+      // is byte-for-byte what it was.
       const candidates = await tx.booking.findMany({
         where: {
           tutorId,
           status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] },
-          startAt: { lt: end },
+          startAt: { lt: new Date(end.getTime() + bufferMs) },
         },
         select: { startAt: true, durationMin: true },
       })
       const overlaps = candidates.some(c => {
         const cEnd = new Date(c.startAt.getTime() + c.durationMin * 60 * 1000)
-        return cEnd > start
+        return c.startAt < end && cEnd > start
       })
       if (overlaps) throw new SlotTaken()
 
-      // Reject the student double-booking THEMSELVES for an overlapping time —
+      // Reject the user double-booking THEMSELVES for an overlapping time —
       // two simultaneous sessions waste an expert's slot and guarantee a
       // no-show on one side. (The check above only covers the same tutor.)
+      // A dual-role user's own EXPERT-side sessions live under tutor.userId, not
+      // studentId, so both hats must be unioned — otherwise an expert who is due
+      // to teach at 14:00 could book another expert as a client at 14:00.
       const selfCandidates = await tx.booking.findMany({
         where: {
-          studentId: user.id,
+          OR: [{ studentId: user.id }, { tutor: { userId: user.id } }],
           status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] },
           startAt: { lt: end },
         },
@@ -214,13 +243,39 @@ export async function POST(req: Request) {
       })
       if (selfOverlap) throw new StudentOverlap()
 
-      // Conditionally claim the covering slot — only succeeds if it's still free.
-      if (coveringSlotId) {
-        const claim = await tx.availabilitySlot.updateMany({
-          where: { id: coveringSlotId, booked: false },
-          data: { booked: true },
-        })
-        if (claim.count !== 1) throw new SlotTaken()
+      // The requested start must be genuinely bookable: inside one of the
+      // expert's published WINDOWS, on that window's start grid, long enough for
+      // THIS service, and clear of every active booking (+buffer). Legacy
+      // pre-sliced rows fuse back into one window on the way in — that's how
+      // this works with no data migration.
+      const windowRows = await tx.availabilitySlot.findMany({
+        where: {
+          tutorId,
+          endAt: { gt: new Date(start.getTime() - WINDOW_LOOKAROUND_MS) },
+          startAt: { lt: new Date(end.getTime() + WINDOW_LOOKAROUND_MS) },
+        },
+        select: { startAt: true, endAt: true },
+        orderBy: { startAt: 'asc' },
+        take: 2000,
+      })
+      const openOpts = {
+        windows: windowRows.map(w => ({ start: w.startAt, end: w.endAt })),
+        busy: candidates.map(c => ({
+          start: c.startAt,
+          end: new Date(c.startAt.getTime() + c.durationMin * 60 * 1000),
+        })),
+        serviceMin: durationMin,
+        bufferMin,
+        now: new Date(Date.now() - CLOCK_SKEW_MS),
+      }
+      if (!isStartOpen(start, openOpts)) {
+        // Split the verdict so the client keeps its two distinct messages:
+        // re-running the same predicate with no bookings isolates "the expert
+        // never published this time / it isn't a valid start" (NO_AVAILABILITY)
+        // from "something is already booked there" (SLOT_TAKEN — including a
+        // neighbouring session whose buffer reaches into this one).
+        if (!isStartOpen(start, { ...openOpts, busy: [] })) throw new NoAvailability()
+        throw new SlotTaken()
       }
 
       return tx.booking.create({
@@ -236,8 +291,9 @@ export async function POST(req: Request) {
           status: 'PREPARING',
           // Snapshot the tutor's current type so past bookings never rewrite.
           serviceType: tutor.serviceType,
-          // Exact slot claimed, so cancel/reschedule free the right one.
-          heldSlotId: coveringSlotId,
+          // heldSlotId deliberately left null — nothing is claimed. The release
+          // paths (cancel/decline/cleanup) treat null as a no-op and stay in
+          // place only to free LEGACY rows that really were flipped booked.
         },
         select: { id: true, ref: true, startAt: true, durationMin: true, price: true, status: true },
       })
@@ -248,6 +304,9 @@ export async function POST(req: Request) {
     }
     if (e instanceof StudentOverlap) {
       return NextResponse.json({ ok: false, error: 'STUDENT_OVERLAP' }, { status: 409 })
+    }
+    if (e instanceof NoAvailability) {
+      return NextResponse.json({ ok: false, error: 'NO_AVAILABILITY' }, { status: 409 })
     }
     // P2034 = serialization failure — a concurrent booking won the race.
     if (e?.code === 'P2034') {
@@ -266,6 +325,23 @@ export async function POST(req: Request) {
       body: topic,
       href: `/tutor/bookings/${booking.id}`,
     })
+    // ALSO email the expert — a request they don't act on within 24h gets
+    // auto-canceled by the cleanup cron, so the in-app bell alone isn't enough.
+    // Gate on the tutor's BOOKING_CREATED pref (same as the in-app notify).
+    try {
+      const tutorUser = await prisma.user.findUnique({
+        where: { id: tutor.userId },
+        select: { email: true, notificationPrefs: true },
+      })
+      if (tutorUser?.email && normalizePrefs(tutorUser.notificationPrefs).BOOKING_CREATED) {
+        const { subject, html } = bookingRequestEmail({
+          studentName: user.fullName,
+          topic,
+          whenText: fmtKaDateTime(booking.startAt, { year: true }),
+        })
+        await sendMail({ to: tutorUser.email, subject, html })
+      }
+    } catch { /* email is best-effort */ }
   })
 
   // Echo the AUTHORITATIVE facts (server may have overridden client-sent

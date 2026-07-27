@@ -8,18 +8,19 @@ import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
+import { SiteText } from '@/components/SiteTextProvider'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
 export const metadata: Metadata = {
   title: 'სფეროები — მცოდნე',
   description:
-    'აირჩიე შენი პროფესიული სფერო — ბიზნესი, ფინანსები, კარიერა, სამართალი და სხვ. — და იპოვე გადამოწმებული ექსპერტი.',
+    'აირჩიე შენი პროფესიული სფერო — ბიზნესი, ფინანსები, კარიერა, სამართალი და სხვ. — და იპოვე ხელით შერჩეული ექსპერტი.',
   alternates: { canonical: `${SITE_URL}/categories` },
   openGraph: {
     title: 'სფეროები — მცოდნე',
     description:
-      'აირჩიე შენი პროფესიული სფერო და იპოვე გადამოწმებული ექსპერტი.',
+      'აირჩიე შენი პროფესიული სფერო და იპოვე ხელით შერჩეული ექსპერტი.',
     url: `${SITE_URL}/categories`,
   },
 }
@@ -92,7 +93,10 @@ export default async function CategoriesPage() {
       name: true,
       icon: true,
       defaultServiceType: true,
-      _count: { select: { tutors: true } },
+      // Count only PUBLICLY VISIBLE experts (available + not suspended) so the
+      // „X ექსპერტი" trust number matches what clicking through to /tutors shows
+      // — a bare count inflates it with paused/suspended profiles.
+      _count: { select: { tutors: { where: { available: true, user: { is: { suspendedAt: null } } } } } },
     },
   })
 
@@ -107,11 +111,10 @@ export default async function CategoriesPage() {
             სფეროები
           </Eyebrow>
           <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05]">
-            აირჩიე შენი სფერო
+            <SiteText k="categories.hero.title" />
           </h1>
           <p className="mt-4 text-[15px] lg:text-[16px] text-ink-600 leading-relaxed">
-            თითოეული სფერო ხელით შერჩეული, გამოცდილი ექსპერტებითაა დაკომპლექტებული. აირჩიე მიმართულება
-            — და დაუყოვნებლივ ნახე, ვინც ხელმისაწვდომია.
+            <SiteText k="categories.hero.subtitle" />
           </p>
         </section>
 
@@ -119,7 +122,7 @@ export default async function CategoriesPage() {
           <EmptyState
             icon={<Icon.category className="w-6 h-6" />}
             title="სფეროები ჯერ არ არის"
-            description="მალე დავამატებთ ახალ სფეროებს. სცადე მოგვიანებით."
+            description="მალე დავამატებთ. სცადე მოგვიანებით."
             cta={{ label: 'ექსპერტების ძებნა', href: '/tutors' }}
           />
         ) : (
@@ -155,17 +158,29 @@ export default async function CategoriesPage() {
                     {c.name}
                   </div>
 
-                  {/* Expert count — a trust signal, so the number carries the weight. */}
-                  <div className="mt-3 flex items-baseline gap-1.5">
-                    <span className="font-display text-[26px] lg:text-[28px] font-bold text-ink-900 tabular-nums leading-none">
-                      {tutorCount}
-                    </span>
-                    <span className="text-[13px] text-ink-500">ექსპერტი</span>
-                  </div>
+                  {/* Expert count — a trust signal, so the number carries the
+                      weight. A bold „0 ექსპერტი" reads as broken on a cold-start
+                      sphere, so a zero-count category shows a soft, honest
+                      „მალე დაემატება" chip instead (muted ink, hairline, no
+                      pastel fill per canon) — the card stays clickable. */}
+                  {tutorCount > 0 ? (
+                    <div className="mt-3 flex items-baseline gap-1.5">
+                      <span className="font-display text-[26px] lg:text-[28px] font-bold text-ink-900 tabular-nums leading-none">
+                        {tutorCount}
+                      </span>
+                      <span className="text-[13px] text-ink-500">ექსპერტი</span>
+                    </div>
+                  ) : (
+                    <div className="mt-3">
+                      <span className="inline-flex items-center h-6 px-2.5 rounded-pill bg-ink-75 text-ink-500 border border-ink-200 font-display text-[11px] font-semibold tracking-tight">
+                        მალე დაემატება
+                      </span>
+                    </div>
+                  )}
 
                   <div className="mt-5 pt-4 border-t border-ink-100">
                     <span className="inline-flex items-center gap-1.5 text-[12.5px] font-display font-semibold text-brand-700 transition-all duration-200 group-hover:gap-2.5">
-                      ნახე ექსპერტები
+                      {tutorCount > 0 ? 'ნახე ექსპერტები' : 'გაიგე მეტი'}
                     </span>
                   </div>
                 </Link>

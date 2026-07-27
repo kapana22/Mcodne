@@ -12,7 +12,7 @@ export function WorkspaceFooter() {
       <Container className="py-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Logo size="sm" />
-          <span className="text-[12px] text-ink-500 tabular-nums">© {new Date().getFullYear()} · ყველა უფლება დაცულია.</span>
+          <span className="text-[12px] text-ink-500 tabular-nums">© {new Date().getFullYear()} მცოდნე</span>
         </div>
         <div className="flex items-center gap-5 text-[12px] text-ink-500">
           <Link href="/help" className="hover:text-ink-900 transition-colors">დახმარება</Link>

@@ -32,7 +32,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       ],
     },
     include: {
-      tutor: { include: { user: { select: { fullName: true, email: true } } } },
+      // NOTE: the expert's email is deliberately NOT selected — a student who
+      // booked a free slot could otherwise harvest it from the ORGANIZER line.
+      // This mirrors the guard on GET /api/bookings/[id]. ORGANIZER uses a
+      // no-reply mailto below (calendars only need a valid address, not the
+      // real one).
+      tutor: { include: { user: { select: { fullName: true } } } },
       student: { select: { fullName: true, email: true } },
     },
   })
@@ -47,7 +52,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const summary = escapeICS(`მცოდნე — ${booking.topic}`)
   const description = escapeICS(
     `ექსპერტი: ${booking.tutor.user.fullName}\n` +
-    `კლიენტი: ${booking.student.fullName}\n` +
+    `სტუდენტი: ${booking.student.fullName}\n` +
     `ხანგრძლივობა: ${booking.durationMin} წუთი\n` +
     (booking.meetingUrl ? `ვიდეოოთახი: ${booking.meetingUrl}\n` : '') +
     `\nდეტალები: ${siteUrl(req)}/student/bookings/${booking.id}`,
@@ -70,7 +75,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     `LOCATION:${escapeICS(location)}`,
     `URL:${escapeICS(location)}`,
     `STATUS:${booking.status === 'CANCELED' ? 'CANCELLED' : 'CONFIRMED'}`,
-    `ORGANIZER;CN=${escapeICS(booking.tutor.user.fullName)}:mailto:${booking.tutor.user.email}`,
+    `ORGANIZER;CN=${escapeICS(booking.tutor.user.fullName)}:mailto:noreply@mcodne.ge`,
     `ATTENDEE;CN=${escapeICS(booking.student.fullName)};RSVP=TRUE:mailto:${booking.student.email}`,
     'BEGIN:VALARM',
     'ACTION:DISPLAY',

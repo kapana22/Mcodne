@@ -125,7 +125,7 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
               {value.save && <Icon.check className="w-3 h-3 text-white" />}
             </span>
             <input type="checkbox" checked={value.save} onChange={e => onChange({ ...value, save: e.target.checked })} className="sr-only" />
-            <span className="text-[12.5px] text-ink-700">შემახსოვრე — შემდეგ ჯერზე ერთი დაჭერით გადავიხდი</span>
+            <span className="text-[12.5px] text-ink-700">შემახსოვრე — შემდეგ ერთ დაჭერით</span>
           </label>
         </div>
       )}
@@ -134,9 +134,9 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
         <div className="rounded-card border border-ink-200 bg-ink-50/40 p-5 grid grid-cols-[auto_1fr] gap-3 items-start">
           <Icon.shieldCheck className="w-4 h-4 mt-0.5 text-brand-700 shrink-0" />
           <div>
-            <div className="font-display text-[13px] font-bold text-ink-900">გადახდის გაგრძელება ბანკში</div>
+            <div className="font-display text-[13px] font-bold text-ink-900">გადახდა ბანკის გვერდზე</div>
             <p className="text-[12.5px] text-ink-600 mt-1 leading-[1.5]">
-              „გადახდა“-ს დაჭერით გადახვალ {METHODS.find(m => m.id === value.method)?.l}-ის უსაფრთხო გვერდზე გადახდის დასადასტურებლად. შემდეგ ავტომატურად დაბრუნდები აქ.
+              „გადახდა“-ზე გადახვალ {METHODS.find(m => m.id === value.method)?.l}-ის უსაფრთხო გვერდზე და დაბრუნდები აქ.
             </p>
           </div>
         </div>

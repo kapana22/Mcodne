@@ -7,9 +7,13 @@ export type NavBadges = {
   messages: number
   reschedules: number
   profilePercent: number | null
+  // true = no AvailabilitySlot window ends in the future (the expert is
+  // unbookable). NULL until the first response lands — consumers must treat
+  // „unknown" differently from „has time", or they'd act on the initial zero.
+  noAvailability: boolean | null
 }
 
-const ZERO: NavBadges = { requests: 0, messages: 0, reschedules: 0, profilePercent: null }
+const ZERO: NavBadges = { requests: 0, messages: 0, reschedules: 0, profilePercent: null, noAvailability: null }
 
 /* Sidebar badge counts. Refreshes: on mount, every 60s while the tab is
    visible, on route change (so acting on a request clears its pill without
@@ -42,6 +46,7 @@ export function useNavBadges(): NavBadges {
             messages: d.messages ?? 0,
             reschedules: d.reschedules ?? 0,
             profilePercent: typeof d.profilePercent === 'number' ? d.profilePercent : null,
+            noAvailability: typeof d.noAvailability === 'boolean' ? d.noAvailability : null,
           })
         })
         .catch(() => {})

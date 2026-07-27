@@ -3,10 +3,17 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
 
-// Recurring weekly-template slot generation. Tutor picks weekday+time blocks
-// once, we materialize them as concrete AvailabilitySlot rows for the next N
-// weeks. Conflicts (overlaps with existing slots) are skipped silently — the
-// tutor sees a count of created vs skipped in the response.
+// Recurring weekly-template availability. Tutor picks weekday+time blocks once,
+// we materialize each block as ONE concrete AvailabilitySlot WINDOW per week for
+// the next N weeks. Conflicts (overlaps with existing rows) are skipped silently
+// — the tutor sees a count of created vs skipped in the response.
+//
+// Nothing is pre-split into session-length pieces here, and the earlier
+// "trusts the client to pre-split" hardening gap is GONE by construction: the
+// server derives bookable starts from windows at request time
+// (lib/availability), so how the client chose to chop the week no longer
+// changes what is sellable. A client that still posts many small adjacent
+// blocks is harmless — exactly-touching rows merge back into one window.
 //
 // day: 0=Mon..6=Sun (matches the schedule grid's isoWeekday convention).
 const BlockSchema = z.object({
@@ -18,7 +25,12 @@ const BlockSchema = z.object({
 })
 
 const Body = z.object({
-  blocks: z.array(BlockSchema).min(1).max(50),
+  // One row per posted block, so a week now needs only a handful of blocks.
+  // The 700 cap is kept for backward compatibility: clients built against the
+  // pre-slicing server still post up to 7 days × 96 fifteen-minute blocks, and
+  // rejecting them as INVALID would break a schedule page mid-rollout. `weeks`
+  // multiplies rows server-side, not this array.
+  blocks: z.array(BlockSchema).min(1).max(700),
   weeks: z.number().int().min(1).max(12),
 })
 
@@ -64,7 +76,8 @@ export async function POST(req: Request) {
     return new Date(wall - TB_OFFSET_MS)
   }
 
-  // Materialize every (block, week) pair into a concrete start/end pair.
+  // Materialize every (block, week) pair into ONE window (start/end) — never
+  // into session-length pieces.
   type Candidate = { startAt: Date; endAt: Date }
   const candidates: Candidate[] = []
   for (let w = 0; w < parsed.data.weeks; w++) {
@@ -120,4 +133,74 @@ export async function POST(req: Request) {
   })
 
   return NextResponse.json({ ok: true, created: result.count, skipped })
+}
+
+/* ───── DELETE — withdraw ALL future availability in one call ─────
+ * Powers „სრულად წაშლა“ on /tutor/schedule. It lives here rather than in a new
+ * route because this file already owns the many-windows-at-once half of the
+ * availability API: POST materializes them, DELETE withdraws them. (The
+ * vacation flow still loops over /availability/[id]; it can move here unchanged
+ * via the optional ?from/?to bounds below.)
+ *
+ * Scope — rows with any FUTURE part (`endAt > now`). A window that already
+ * ended is history and is never touched, and neither is a single Booking:
+ * under the windows model a booking is an independent row (see [id]/route.ts),
+ * so un-publishing a window strands nothing — the session still happens, that
+ * time merely stops being offered. We only COUNT the overlapping sessions so
+ * the UI can say so out loud.
+ *
+ * Ownership guard: the sweep is scoped to the CALLER's own profile id and takes
+ * no row ids at all, so it can never name someone else's availability.
+ * Idempotent: a second call deletes 0 rows and still answers 200 { ok: true }.
+ */
+export async function DELETE(req: Request) {
+  const user = await requireRole(['TUTOR', 'ADMIN'])
+  const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
+  if (!profile) return NextResponse.json({ ok: false, error: 'NO_PROFILE' }, { status: 400 })
+
+  const now = new Date()
+  const url = new URL(req.url)
+  const bound = (v: string | null) => {
+    const d = v ? new Date(v) : null
+    return d && !isNaN(d.getTime()) ? d : null
+  }
+  const from = bound(url.searchParams.get('from'))
+  const to = bound(url.searchParams.get('to'))
+  // `now` is a FLOOR, never a ceiling: a caller-supplied `from` can only narrow
+  // the sweep forward, so no query string can ever reach into the past.
+  const floor = from && from > now ? from : now
+
+  const where = {
+    tutorId: profile.id,
+    endAt: { gt: floor },
+    ...(to ? { startAt: { lt: to } } : {}),
+  }
+
+  const doomed = await prisma.availabilitySlot.findMany({
+    where,
+    select: { startAt: true, endAt: true },
+  })
+  if (doomed.length === 0) return NextResponse.json({ ok: true, deleted: 0, keptBookings: 0 })
+
+  // Sessions that stay in force inside the windows we are about to un-publish.
+  // Prisma can't compute `startAt + durationMin` in `where`, so pull the
+  // candidate set once (anything starting before the last window ends) and test
+  // the overlap per-row in JS — same shape as the single-window DELETE.
+  const spanEnd = doomed.reduce((m, s) => (s.endAt > m ? s.endAt : m), doomed[0].endAt)
+  const candidates = await prisma.booking.findMany({
+    where: {
+      tutorId: profile.id,
+      status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] },
+      startAt: { lt: spanEnd },
+    },
+    select: { startAt: true, durationMin: true },
+  })
+  const keptBookings = candidates.filter(b => {
+    const bs = b.startAt.getTime()
+    const be = bs + b.durationMin * 60_000
+    return doomed.some(s => bs < s.endAt.getTime() && be > s.startAt.getTime())
+  }).length
+
+  const res = await prisma.availabilitySlot.deleteMany({ where })
+  return NextResponse.json({ ok: true, deleted: res.count, keptBookings })
 }

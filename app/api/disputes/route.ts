@@ -48,16 +48,28 @@ export async function POST(req: Request) {
   const existing = await prisma.dispute.findUnique({ where: { bookingId: booking.id } })
   if (existing) return NextResponse.json({ ok: false, error: 'ALREADY_EXISTS', id: existing.id }, { status: 409 })
 
-  const dispute = await prisma.dispute.create({
-    data: {
-      bookingId: booking.id,
-      studentId: booking.studentId,
-      tutorId: booking.tutorId,
-      reason: parsed.data.reason,
-      details: parsed.data.details ?? null,
-      requested: parsed.data.requested ?? 'PENDING',
-    },
-  })
+  let dispute
+  try {
+    dispute = await prisma.dispute.create({
+      data: {
+        bookingId: booking.id,
+        studentId: booking.studentId,
+        tutorId: booking.tutorId,
+        reason: parsed.data.reason,
+        details: parsed.data.details ?? null,
+        requested: parsed.data.requested ?? 'PENDING',
+      },
+    })
+  } catch (e: any) {
+    // Concurrent submit won the race on the @unique bookingId — the pre-check
+    // above passed for both requests, so the loser lands here. Return the same
+    // 409 the pre-check does instead of an unhandled P2002 → 500.
+    if (e?.code === 'P2002') {
+      const existing = await prisma.dispute.findUnique({ where: { bookingId: booking.id } })
+      return NextResponse.json({ ok: false, error: 'ALREADY_EXISTS', id: existing?.id }, { status: 409 })
+    }
+    throw e
+  }
 
   // Notify tutor (so they can respond in chat) + all admins (queue signal).
   // The tutor-notify and the admin lookup are independent, so fan them out
@@ -66,7 +78,7 @@ export async function POST(req: Request) {
     notify(booking.tutor.userId, {
       type: 'GENERIC',
       title: 'ჯავშანთან დაკავშირებული საჩივარი',
-      body: `კლიენტმა დააფიქსირა: ${parsed.data.reason}`,
+      body: `სტუდენტმა დააფიქსირა: ${parsed.data.reason}`,
       href: `/tutor/bookings/${booking.id}#chat`,
     }),
     prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } }),

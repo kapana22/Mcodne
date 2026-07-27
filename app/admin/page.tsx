@@ -314,9 +314,26 @@ type AppRow = {
   createdAt?: string
 }
 
+/* Mirrors the category resolver inside PATCH /api/applications/:id — the admin
+   UI must pre-select exactly what approval would pick on its own, otherwise the
+   dropdown quietly lies about the outcome. */
+const matchCategory = (specialty: string, cats: AdminCategory[]): AdminCategory | undefined => {
+  const nrm = (s: string) => s.toLowerCase().trim()
+  const sp = nrm(specialty || '')
+  if (!sp) return undefined
+  return cats.find(c => nrm(c.name) === sp)
+    ?? cats.find(c => { const n = nrm(c.name); const stem = n.slice(0, 4); return sp.includes(n) || n.includes(sp) || (stem.length >= 3 && sp.includes(stem)) })
+}
+
 const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
   const [APPS, setAPPS] = useState<AppRow[]>([])
   const [sel, setSel] = useState<string | null>(null)
+  // Live categories for the approve-time selector. A free-text niche („cat" is
+  // the applicant's specialty) matches no preset → the profile is born
+  // category-less and /tutors never shows it, so the moderator needs a way to
+  // assign one at the moment of approval.
+  const [liveCats, setLiveCats] = useState<AdminCategory[]>([])
+  const [catId, setCatId] = useState('')
   // Verification-doc blobs (idDoc/selfie/certs) are excluded from the list
   // payload and lazy-loaded for the selected application only (see effect below).
   const [activeDocs, setActiveDocs] = useState<{ idDocUrl?: string | null; selfieUrl?: string | null; certificates?: { title: string; url: string }[] | null } | null>(null)
@@ -332,14 +349,24 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
   // Reject flows go through the shared confirm dialog with a REQUIRED reason
   // ('single' → the open application, 'bulk' → every checked application).
   const [pendReject, setPendReject] = useState<'single' | 'bulk' | null>(null)
+  // Revise („შესწორება") also goes through the shared confirm dialog with a
+  // REQUIRED note — softer than reject, sends the application back for the
+  // applicant to fix. Single-application only (no bulk revise).
+  const [pendRevise, setPendRevise] = useState<boolean>(false)
+  // Bulk APPROVE is the most consequential button here (N users promoted to
+  // TUTOR, no undo) — it now goes through the same dialog as bulk reject.
+  const [pendBulkApprove, setPendBulkApprove] = useState<{ ids: string[]; skipped: number } | null>(null)
 
   const load = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/applications')
+      // Server-filtered: the queue used to pull the newest 300 applications of
+      // ANY status and keep the SUBMITTED ones in the browser — past 300 decided
+      // rows it read empty while the KPI still counted a real backlog.
+      const res = await fetch('/api/admin/applications?status=SUBMITTED')
       if (!res.ok) throw new Error('fetch failed')
       const data: any[] = await res.json()
-      const submitted = Array.isArray(data) ? data.filter(a => a.status === 'SUBMITTED') : []
+      const submitted = Array.isArray(data) ? data : []
       const mapped: AppRow[] = submitted.map((a: any) => ({
         id: a.id, name: a.fullName, cat: a.specialty, yrs: a.yearsExp, rate: a.hourlyRate,
         city: a.city ?? '—',
@@ -365,6 +392,17 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
   }
   useEffect(() => { load() }, [])
 
+  // Same endpoint the „კატეგორიები" tab uses — hidden ones are filtered out
+  // because assigning a non-live category would keep the expert invisible.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/admin/categories')
+      .then(r => (r.ok ? r.json() : []))
+      .then((d: AdminCategory[]) => { if (!cancelled) setLiveCats(Array.isArray(d) ? d.filter(c => c.isLive) : []) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   const toggleCheck = (id: string) => {
     setChecked(prev => {
       const next = new Set(prev)
@@ -377,9 +415,16 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
     setChecked(prev => prev.size === APPS.length ? new Set() : new Set(APPS.map(a => a.id)))
   }
 
-  const bulkDecide = async (action: 'approve' | 'reject', reason?: string) => {
-    if (busy || checked.size === 0) return
-    const ids = Array.from(checked)
+  // The category an application would resolve to on approval. Bulk approve sends
+  // it EXPLICITLY per row (the single-application path already does) — without it
+  // an applicant with a free-text niche is approved with categoryId null and
+  // becomes an approved-but-INVISIBLE expert, since /tutors hard-requires a live
+  // category. Rows that match nothing are excluded from the bulk action instead.
+  const catIdFor = (appId: string) => matchCategory(APPS.find(a => a.id === appId)?.cat ?? '', liveCats)?.id
+
+  const bulkDecide = async (action: 'approve' | 'reject', reason?: string, only?: string[]) => {
+    const ids = only ?? Array.from(checked)
+    if (busy || ids.length === 0) return
     setBusy(true)
     setFlash(null)
     setBulkProgress({ done: 0, total: ids.length })
@@ -391,7 +436,11 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
         const res = await fetch(`/api/applications/${ids[i]}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, note: reason?.trim() || undefined }),
+          body: JSON.stringify({
+            action,
+            note: reason?.trim() || undefined,
+            categoryId: action === 'approve' ? catIdFor(ids[i]) : undefined,
+          }),
         })
         const data = await res.json().catch(() => ({} as any))
         if (res.ok && data?.ok !== false) ok++; else fail++
@@ -412,25 +461,40 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
     onDecision?.()
   }
 
-  const decide = async (action: 'approve' | 'reject', reasonArg?: string) => {
+  // Split the checked set into „can be approved right now" and „no live category
+  // matches its სფერო" before opening the confirm dialog, so the moderator sees
+  // exactly how many go through and how many need the single-application path.
+  const askBulkApprove = () => {
+    const ids = Array.from(checked)
+    const approvable = ids.filter(id => !!catIdFor(id))
+    if (approvable.length === 0) {
+      setFlash({ kind: 'error', msg: 'ვერცერთ მონიშნულ განაცხადს სფერო ვერ დაემთხვა — დაამტკიცე ცალ-ცალკე და ხელით მიუთითე კატეგორია.' })
+      return
+    }
+    setPendBulkApprove({ ids: approvable, skipped: ids.length - approvable.length })
+  }
+
+  const decide = async (action: 'approve' | 'reject' | 'revise', reasonArg?: string) => {
     if (busy || !sel) return
     setBusy(true)
     setFlash(null)
     try {
-      // Reject carries the dialog's required reason as the moderator note;
-      // approve keeps using the optional inline textarea.
-      const noteToSend = action === 'reject' ? reasonArg?.trim() : note.trim()
+      // Reject and revise carry the dialog's required reason as the moderator
+      // note; approve keeps using the optional inline textarea.
+      const noteToSend = action === 'approve' ? note.trim() : reasonArg?.trim()
       const res = await fetch(`/api/applications/${sel}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, note: noteToSend || undefined }),
+        // categoryId rides along on approve only — the server falls back to its
+        // own name match when the key is absent, so we omit it when unset.
+        body: JSON.stringify({ action, note: noteToSend || undefined, categoryId: action === 'approve' ? (catId || undefined) : undefined }),
       })
       const data = await res.json().catch(() => ({} as any))
       if (!res.ok || data?.ok === false) {
         setFlash({ kind: 'error', msg: 'ოპერაცია ვერ შესრულდა.' })
         return
       }
-      setFlash({ kind: 'success', msg: action === 'approve' ? 'განაცხადი დამტკიცდა.' : 'განაცხადი უარყოფილია.' })
+      setFlash({ kind: 'success', msg: action === 'approve' ? 'განაცხადი დამტკიცდა.' : action === 'revise' ? 'განაცხადი შესასწორებლად დაბრუნდა.' : 'განაცხადი უარყოფილია.' })
       setNote('')
       await load()
       onDecision?.() // let parent re-fetch KPI stats
@@ -454,6 +518,11 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
       .catch(() => {})
     return () => { cancelled = true }
   }, [sel])
+  // Pre-select the category the applicant's specialty resolves to; a niche that
+  // matches nothing leaves the select empty (and shows the warning below it).
+  useEffect(() => {
+    setCatId(active ? (matchCategory(active.cat, liveCats)?.id ?? '') : '')
+  }, [active, liveCats])
   return (
     <>
       <TabHeader
@@ -495,7 +564,7 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <button
                     type="button"
-                    onClick={() => bulkDecide('approve')}
+                    onClick={askBulkApprove}
                     disabled={busy}
                     className="h-8 px-2.5 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 text-white font-display font-semibold text-[11.5px] inline-flex items-center gap-1"
                   >
@@ -693,8 +762,28 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
                 className="w-full px-3 py-2 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-400 focus:outline-none resize-none"
               />
             </div>
+            {/* Category assignment — sent with „დაამტკიცე". Without a live
+                category the approved expert never appears on /tutors, so an
+                unmatched niche gets a loud (not decorative) warning. */}
+            <div className="mb-3">
+              <Eyebrow as="label" tone="muted" className="block mb-1.5">კატეგორია</Eyebrow>
+              <select
+                value={catId}
+                onChange={(e) => setCatId(e.target.value)}
+                className="w-full sm:max-w-[280px] h-11 px-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-400 focus:outline-none"
+              >
+                <option value="">— არ არის მითითებული —</option>
+                {liveCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              {!catId && liveCats.length > 0 && (
+                <p className="mt-1.5 text-[12px] text-danger-700">
+                  „{active.cat}“ ვერცერთ სფეროს ვერ დაემთხვა. თუ კატეგორიას არ მიუთითებ, ექსპერტი /tutors-ზე არ გამოჩნდება — აირჩიე სფერო ან ჯერ დაამატე „კატეგორიები“ ტაბში.
+                </p>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => decide('approve')} disabled={busy} className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 text-white font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"><Icon.check className="w-3.5 h-3.5" /> {busy ? 'იგზავნება…' : 'დაამტკიცე'}</button>
+              <button type="button" onClick={() => setPendRevise(true)} disabled={busy} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-50 text-ink-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5">შესწორება</button>
               <button type="button" onClick={() => setPendReject('single')} disabled={busy} className="h-11 px-4 rounded-btn bg-white border border-danger-200 hover:bg-danger-50 disabled:opacity-50 text-danger-700 font-display font-semibold text-[12.5px] inline-flex items-center gap-1.5"><Icon.x className="w-3.5 h-3.5" /> უარყავი</button>
             </div>
           </div>
@@ -717,6 +806,43 @@ const ModerationSection = ({ onDecision }: { onDecision?: () => void }) => {
           setPendReject(null)
           if (mode === 'bulk') await bulkDecide('reject', reason)
           else await decide('reject', reason)
+        }}
+      />
+      <AdminConfirmDialog
+        open={pendBulkApprove !== null}
+        title={`${pendBulkApprove?.ids.length ?? 0} განაცხადის დამტკიცება`}
+        body={<>
+          ეს {pendBulkApprove?.ids.length ?? 0} განმცხადებელი გახდება ექსპერტი — შეიქმნება პროფილი და გამოჩნდება საიტზე. უკან დაბრუნება არ არსებობს.
+          {(pendBulkApprove?.skipped ?? 0) > 0 && (
+            <span className="mt-2 block text-danger-700">
+              {pendBulkApprove?.skipped} განაცხადს სფერო ვერ დაემთხვა — გამოტოვდება. დაამტკიცე ცალ-ცალკე და ხელით მიუთითე კატეგორია, თორემ ექსპერტი /tutors-ზე არ გამოჩნდება.
+            </span>
+          )}
+        </>}
+        tone="brand"
+        confirmLabel="დაამტკიცე"
+        busy={busy}
+        onCancel={() => setPendBulkApprove(null)}
+        onConfirm={async () => {
+          const ids = pendBulkApprove?.ids ?? []
+          setPendBulkApprove(null)
+          await bulkDecide('approve', undefined, ids)
+        }}
+      />
+      <AdminConfirmDialog
+        open={pendRevise}
+        title="განაცხადის შესწორება"
+        body={<>მიუთითე რა უნდა შეასწოროს — გაეგზავნება განმცხადებელს: <span className="font-display font-semibold">{active?.name ?? ''}</span></>}
+        tone="warning"
+        reason="required"
+        reasonLabel="რა უნდა შესწორდეს"
+        reasonPlaceholder="მაგ. სახელი ქართულად ჩაწერე"
+        confirmLabel="გააგზავნე"
+        busy={busy}
+        onCancel={() => setPendRevise(false)}
+        onConfirm={async (reason) => {
+          setPendRevise(false)
+          await decide('revise', reason)
         }}
       />
     </>
@@ -891,7 +1017,7 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
                     u.role === 'ADMIN' ? 'bg-iris-50 border-iris-200 text-iris-700'
                     : u.role === 'TUTOR' ? 'bg-brand-50 border-brand-200 text-brand-700'
                     : 'bg-ink-50 border-ink-200 text-ink-600'
-                  }`}>{u.role === 'STUDENT' ? 'კლიენტი' : u.role === 'TUTOR' ? 'ექსპერტი' : 'ადმინი'}</span>
+                  }`}>{u.role === 'STUDENT' ? 'სტუდენტი' : u.role === 'TUTOR' ? 'ექსპერტი' : 'ადმინი'}</span>
                   {u.emailVerified && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-success-50 border border-success-200 text-success-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.check className="w-3 h-3" /> ვერიფ.</span>}
                   {u.suspendedAt && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-danger-50 border border-danger-200 text-danger-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]"><Icon.pause className="w-3 h-3" /> შეჩერებული</span>}
                 </div>
@@ -938,7 +1064,7 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
                     <Stat label="რეგისტრაცია" value={fmtShort(u.createdAt)} />
                     <Stat label="ტელეფონი" value={u.phone ?? '—'} />
                     <Stat label="მიმოწერები" value={String(u._count.sentMessages)} />
-                    <Stat label="ჯავშნები (კლიენტი)" value={String(u._count.bookingsAsStudent)} />
+                    <Stat label="ჯავშნები (სტუდენტი)" value={String(u._count.bookingsAsStudent)} />
                     <Stat label="დაწერილი შეფასებები" value={String(u._count.reviewsGiven)} />
                     <Stat label="ფავორიტები" value={String(u._count.favorites)} />
                   </div>
@@ -975,7 +1101,7 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
                 <div className="px-6 py-5 space-y-6">
                   {data.bookingsAsStudent.length > 0 && (
                     <div>
-                      <Eyebrow tone="muted" className="mb-3">როგორც კლიენტი ({data.bookingsAsStudent.length})</Eyebrow>
+                      <Eyebrow tone="muted" className="mb-3">როგორც სტუდენტი ({data.bookingsAsStudent.length})</Eyebrow>
                       <BookingList items={data.bookingsAsStudent} otherKey="tutor" />
                     </div>
                   )}
@@ -1094,8 +1220,8 @@ const UserDetailModal = ({ userId, onClose, onImpersonate }: { userId: string | 
             ? <>{u.fullName} კვლავ შეძლებს შესვლას.</>
             : <>{u.fullName} ვეღარ შევა ანგარიშზე, სანამ შეჩერება არ მოიხსნება.</>}
           tone={u.suspendedAt ? 'brand' : 'danger'}
-          reason={u.suspendedAt ? 'optional' : 'required'}
-          reasonLabel={u.suspendedAt ? 'მიზეზი (სურვ.)' : 'მიზეზი (სავალდებულო · ინახება აუდიტში)'}
+          reason="optional"
+          reasonLabel={u.suspendedAt ? 'მიზეზი (სურვ.)' : 'მიზეზი (სურვ. · ინახება აუდიტში)'}
           confirmLabel={u.suspendedAt ? 'მოხსენი' : 'შეაჩერე'}
           busy={suspBusy}
           onCancel={() => setPendSuspend(false)}
@@ -1304,7 +1430,7 @@ const UsersSection = () => {
     } catch { /* keep current page */ } finally { setLoadingMore(false) }
   }
 
-  const roleLabel = (r: string) => r === 'STUDENT' ? 'კლიენტი' : r === 'TUTOR' ? 'ექსპერტი' : 'ადმინი'
+  const roleLabel = (r: string) => r === 'STUDENT' ? 'სტუდენტი' : r === 'TUTOR' ? 'ექსპერტი' : 'ადმინი'
 
   // Impersonation goes through the shared confirm dialog (no native confirm()).
   const [pendImp, setPendImp] = useState<{ userId: string; fullName: string } | null>(null)
@@ -1335,18 +1461,21 @@ const UsersSection = () => {
     <>
       <TabHeader
         eyebrow="მოდერაცია · მომხმარებლები"
-        title={<>{users ? `${users.length} ` : '—'} ანგარიში</>}
+        // Honest count: the list is cursor-paginated, so this is what's LOADED,
+        // not the total match — say so while more pages remain.
+        title={<>{users ? (nextCursor ? `ჩატვირთულია ${users.length} ` : `${users.length} `) : '— '}ანგარიში</>}
         sub="ძებნა და როლის ფილტრი — რეალურ დროში მუშავდება ბაზაზე. დააჭირე რიგს — სრული პროფილი."
         actions={users && users.length > 0 ? (
           <button
             type="button"
+            title="ექსპორტდება მხოლოდ ჩატვირთული ჩანაწერები"
             onClick={() => downloadCsv(`users-${new Date().toISOString().slice(0, 10)}.csv`, [
               ['id', 'email', 'fullName', 'role', 'emailVerified', 'bookingsAsStudent', 'createdAt'],
               ...users.map(u => [u.id, u.email, u.fullName, u.role, u.emailVerified ? 'yes' : 'no', u._count.bookingsAsStudent, u.createdAt]),
             ])}
             className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors"
           >
-            <Icon.download className="w-3.5 h-3.5" /> CSV ექსპორტი
+            <Icon.download className="w-3.5 h-3.5" /> CSV · {users.length}
           </button>
         ) : undefined}
       />
@@ -1582,18 +1711,21 @@ const BookingsSection = () => {
     <>
       <TabHeader
         eyebrow="მოდერაცია · ჯავშნები"
-        title={<>{items ? `${items.length} ` : '—'} ჯავშანი</>}
-        sub="ყველა ჯავშნის ნახვა · გაუქმება კლიენტის/ექსპერტის სახელით · მიზეზი გამოჩნდება ორივე მხარისთვის."
+        // Cursor-paginated list — while a next page remains this is the LOADED
+        // count, not the total match, and the CSV carries exactly these rows.
+        title={<>{items ? (nextCursor ? `ჩატვირთულია ${items.length} ` : `${items.length} `) : '— '}ჯავშანი</>}
+        sub="ყველა ჯავშნის ნახვა · გაუქმება სტუდენტის/ექსპერტის სახელით · მიზეზი გამოჩნდება ორივე მხარისთვის."
         actions={items && items.length > 0 ? (
           <button
             type="button"
+            title="ექსპორტდება მხოლოდ ჩატვირთული ჩანაწერები"
             onClick={() => downloadCsv(`bookings-${new Date().toISOString().slice(0, 10)}.csv`, [
               ['id', 'ref', 'topic', 'status', 'startAt', 'durationMin', 'price', 'studentEmail', 'tutorEmail'],
               ...items.map(b => [b.id, b.ref, b.topic, b.status, b.startAt, b.durationMin, b.price, b.student?.email ?? '', b.tutor?.user.email ?? '']),
             ])}
             className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors"
           >
-            <Icon.download className="w-3.5 h-3.5" /> CSV ექსპორტი
+            <Icon.download className="w-3.5 h-3.5" /> CSV · {items.length}
           </button>
         ) : undefined}
       />
@@ -1623,7 +1755,7 @@ const BookingsSection = () => {
               <thead className="bg-ink-50/40 border-b border-ink-100">
                 <tr className="text-left">
                   <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">ჯავშანი</th>
-                  <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">კლიენტი</th>
+                  <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">სტუდენტი</th>
                   <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">ექსპერტი</th>
                   <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">დრო</th>
                   <th className="px-3 py-2.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 whitespace-nowrap">სტატუსი</th>
@@ -1832,7 +1964,7 @@ const DisputesSection = () => {
       <TabHeader
         eyebrow="მოდერაცია · დავები"
         title={<>{items ? `${items.length} ` : '—'} დავა</>}
-        sub="კლიენტის ფორმალური საჩივრები — გახსენი, გადახედე, გადაწყვიტე (refund / redo / dismiss). გადაწყვეტა უცნობდება ორივე მხარეს."
+        sub="სტუდენტის ფორმალური საჩივრები — გახსენი, გადახედე, გადაწყვიტე (refund / redo / dismiss). გადაწყვეტა უცნობდება ორივე მხარეს."
       />
       <section className="px-6 lg:px-8 py-4 bg-ink-50/40 border-b border-ink-100 sticky top-16 z-20">
         <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200 overflow-x-auto">
@@ -1987,18 +2119,21 @@ const ReviewsSection = () => {
     <>
       <TabHeader
         eyebrow="მოდერაცია · შეფასებები"
-        title={<>{items ? `${items.length} ` : '—'} შეფასება</>}
+        // Cursor-paginated list — while a next page remains this is the LOADED
+        // count, not the total match, and the CSV carries exactly these rows.
+        title={<>{items ? (nextCursor ? `ჩატვირთულია ${items.length} ` : `${items.length} `) : '— '}შეფასება</>}
         sub="ცუდი/სპამი/შეურაცხმყოფელი შეფასების წაშლა · წაშლისას ექსპერტის რეიტინგი გადაითვლება ავტომატურად."
         actions={items && items.length > 0 ? (
           <button
             type="button"
+            title="ექსპორტდება მხოლოდ ჩატვირთული ჩანაწერები"
             onClick={() => downloadCsv(`reviews-${new Date().toISOString().slice(0, 10)}.csv`, [
               ['id', 'rating', 'student', 'tutor', 'topic', 'body', 'createdAt'],
               ...items.map(r => [r.id, r.rating, r.student.fullName, r.tutor.user.fullName, r.booking?.topic ?? '', r.body, r.createdAt]),
             ])}
             className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors"
           >
-            <Icon.download className="w-3.5 h-3.5" /> CSV ექსპორტი
+            <Icon.download className="w-3.5 h-3.5" /> CSV · {items.length}
           </button>
         ) : undefined}
       />
@@ -2165,7 +2300,7 @@ const AnalyticsSection = () => {
       <TabHeader
         eyebrow="ანალიტიკა · პროდუქტი"
         title={data
-          ? <>{data.tutors.total} ექსპერტი · {data.users.students} კლიენტი · {data.bookings.total} ჯავშანი</>
+          ? <>{data.tutors.total} ექსპერტი · {data.users.students} სტუდენტი · {data.bookings.total} ჯავშანი</>
           : <>ლოდინი…</>}
         sub="ბაზაზე გამოთვლილი ცოცხალი მაჩვენებლები."
         actions={undefined}
@@ -2176,7 +2311,7 @@ const AnalyticsSection = () => {
           <div className="p-4 rounded-card border border-ink-200 bg-white">
             <Eyebrow tone="muted">აქტივაცია</Eyebrow>
             <div className="mt-1 font-display text-[28px] font-bold text-ink-900 tabular-nums leading-none">{data ? `${data.activationPct}%` : '—'}</div>
-            <div className="mt-2 font-mono text-[10.5px] tabular-nums text-ink-500">{data ? `${data.activatedStudents} კლიენტმა დაჯავშნა` : ''}</div>
+            <div className="mt-2 font-mono text-[10.5px] tabular-nums text-ink-500">{data ? `${data.activatedStudents} სტუდენტმა დაჯავშნა` : ''}</div>
           </div>
           <div className="p-4 rounded-card border border-ink-200 bg-white">
             <Eyebrow tone="muted">ახალი (7 დღე)</Eyebrow>
@@ -2212,7 +2347,7 @@ const AnalyticsSection = () => {
             <Eyebrow tone="muted" className="mb-3">მომხმარებლების ბაზა</Eyebrow>
             <ul className="space-y-2 text-[13px]">
               <li className="flex items-center justify-between"><span className="text-ink-700">სულ</span><span className="font-display font-bold text-ink-900 tabular-nums">{data?.users.total ?? '—'}</span></li>
-              <li className="flex items-center justify-between"><span className="text-ink-700">კლიენტი</span><span className="font-display font-bold text-ink-900 tabular-nums">{data?.users.students ?? '—'}</span></li>
+              <li className="flex items-center justify-between"><span className="text-ink-700">სტუდენტი</span><span className="font-display font-bold text-ink-900 tabular-nums">{data?.users.students ?? '—'}</span></li>
               <li className="flex items-center justify-between"><span className="text-ink-700">ექსპერტი</span><span className="font-display font-bold text-ink-900 tabular-nums">{data?.tutors.total ?? '—'}</span></li>
               <li className="flex items-center justify-between"><span className="text-ink-700">30 დღეში ახალი</span><span className="font-display font-bold text-brand-700 tabular-nums">{data?.users.new30d ?? '—'}</span></li>
             </ul>
@@ -2222,7 +2357,7 @@ const AnalyticsSection = () => {
             <ul className="space-y-2 text-[13px]">
               <li className="flex items-center justify-between"><span className="text-ink-700">სულ ჯავშნები</span><span className="font-display font-bold text-ink-900 tabular-nums">{data?.bookings.total ?? '—'}</span></li>
               <li className="flex items-center justify-between"><span className="text-ink-700">სულ შეფასებები</span><span className="font-display font-bold text-ink-900 tabular-nums">{data?.reviews.total ?? '—'}</span></li>
-              <li className="flex items-center justify-between"><span className="text-ink-700">აქტიური კლიენტი</span><span className="font-display font-bold text-success-700 tabular-nums">{data?.activatedStudents ?? '—'}</span></li>
+              <li className="flex items-center justify-between"><span className="text-ink-700">აქტიური სტუდენტი</span><span className="font-display font-bold text-success-700 tabular-nums">{data?.activatedStudents ?? '—'}</span></li>
             </ul>
           </div>
         </div>
@@ -2236,7 +2371,7 @@ type Segment = 'all' | 'students' | 'tutors' | 'recent'
 
 const SEGMENT_LABEL: Record<Segment, string> = {
   all: 'ყველა მომხმარებელი',
-  students: 'ყველა კლიენტი',
+  students: 'ყველა სტუდენტი',
   tutors: 'ყველა ექსპერტი',
   recent: 'ბოლო 7 დღის რეგისტრაცია',
 }
@@ -2414,6 +2549,11 @@ const CategoriesSection = () => {
   // Category delete was the only destructive admin action firing instantly on
   // click — route it through the shared confirm dialog like every other delete.
   const [pendDelete, setPendDelete] = useState<AdminCategory | null>(null)
+  // Turning isLive OFF is far more destructive than DELETE (which is blocked
+  // while the category still has experts): it delists every expert in it from
+  // /tutors, the category page, the sitemap and the homepage. Confirm it.
+  // Turning it back ON is harmless and stays one click.
+  const [pendHide, setPendHide] = useState<AdminCategory | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -2587,7 +2727,7 @@ const CategoriesSection = () => {
                     role="switch"
                     aria-checked={r.isLive}
                     aria-label={`კატეგორია ${r.name} — ${r.isLive ? 'ცოცხალი' : 'დამალული'}`}
-                    onClick={() => patch(r.id, { isLive: !r.isLive })}
+                    onClick={() => r.isLive ? setPendHide(r) : patch(r.id, { isLive: true })}
                     className={`relative inline-flex items-center h-6 w-11 rounded-pill transition-colors shrink-0 ${r.isLive ? 'bg-success-500' : 'bg-ink-200'}`}
                   >
                     <span className={`inline-block w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${r.isLive ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
@@ -2600,6 +2740,22 @@ const CategoriesSection = () => {
           </div>
         )}
       </section>
+      <AdminConfirmDialog
+        open={pendHide !== null}
+        title="კატეგორიის დამალვა"
+        body={<>
+          „{pendHide?.name ?? ''}“ საჯარო საიტიდან გაქრება — მისი <span className="font-display font-semibold tabular-nums">{pendHide?.tutorCount ?? 0}</span> ექსპერტი აღარ გამოჩნდება ძებნაში, კატეგორიის გვერდზე, sitemap-სა და მთავარ გვერდზე.
+          {(pendHide?.tutorCount ?? 0) > 0 && <span className="mt-2 block text-danger-700">ჯავშნები და პროფილები რჩება — უბრალოდ ვეღარავინ იპოვის. ჩართვით ყველაფერი დაბრუნდება.</span>}
+        </>}
+        tone="danger"
+        confirmLabel="დამალე"
+        onCancel={() => setPendHide(null)}
+        onConfirm={async () => {
+          const id = pendHide?.id
+          setPendHide(null)
+          if (id) await patch(id, { isLive: false })
+        }}
+      />
       <AdminConfirmDialog
         open={pendDelete !== null}
         title="კატეგორიის წაშლა"
@@ -2631,9 +2787,12 @@ type AuditItem = {
   actor: { id: string; fullName: string; email: string } | null
 }
 
+// Every action string written by an audit() call site must have a label here —
+// an unmapped one falls back to the raw `noun.verb` and reads like a bug.
 const ACTION_LABEL: Record<string, string> = {
   'application.approve': 'განაცხადი დამტკიცდა',
   'application.reject': 'განაცხადი უარყოფილია',
+  'application.revise': 'განაცხადი შესასწორებლად დაბრუნდა',
   'booking.cancel': 'ჯავშანი გაუქმდა',
   'review.delete': 'შეფასება წაიშალა',
   'dispute.resolve': 'დავა გადაწყდა',
@@ -2641,8 +2800,27 @@ const ACTION_LABEL: Record<string, string> = {
   'user.impersonate.end': 'იმპერსონაცია დასრულდა',
   'user.suspend': 'ანგარიში შეჩერდა',
   'user.unsuspend': 'შეჩერება მოიხსნა',
+  'user.makeAdmin': 'მიენიჭა ადმინის უფლება',
+  'user.revokeAdmin': 'მოეხსნა ადმინის უფლება',
   'tutor.feature': 'ექსპერტი გახდა რჩეული',
   'tutor.unfeature': 'ექსპერტს მოეხსნა რჩეული',
+  'tutor.verify': 'ექსპერტი ვერიფიცირდა',
+  'tutor.unverify': 'ვერიფიკაცია მოეხსნა',
+  'integration.set': 'ინტეგრაციის კოდი ჩაიწერა',
+  'integration.clear': 'ინტეგრაციის კოდი ამოიშალა',
+  'siteText.set': 'საიტის ტექსტი შეიცვალა',
+  'siteText.reset': 'საიტის ტექსტი დაუბრუნდა ნაგულისხმევს',
+  'post.create': 'სტატია შეიქმნა',
+  'post.update': 'სტატია დარედაქტირდა',
+  'post.publish': 'სტატია გამოქვეყნდა',
+  'post.unpublish': 'სტატია დაიმალა',
+  'post.delete': 'სტატია წაიშალა',
+  'category.create': 'კატეგორია დაემატა',
+  'category.update': 'კატეგორია შეიცვალა',
+  'category.hide': 'კატეგორია დაიმალა',
+  'category.show': 'კატეგორია გამოჩნდა',
+  'category.delete': 'კატეგორია წაიშალა',
+  'broadcast.send': 'მასობრივი შეტყობინება გაიგზავნა',
 }
 
 const AuditSection = () => {
@@ -2790,10 +2968,10 @@ export default function AdminOverview() {
 
   const loadPending = async () => {
     try {
-      const r = await fetch('/api/admin/applications')
+      const r = await fetch('/api/admin/applications?status=SUBMITTED')
       if (!r.ok) return
       const rows = await r.json()
-      if (Array.isArray(rows)) setPendingCount(rows.filter((a: any) => a.status === 'SUBMITTED').length)
+      if (Array.isArray(rows)) setPendingCount(rows.length)
     } catch {}
   }
   useEffect(() => { loadPending() }, [statsTick])

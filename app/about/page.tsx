@@ -7,6 +7,7 @@ import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { ApplyCtaGate } from '@/components/ApplyCtaGate'
+import { SiteText } from '@/components/SiteTextProvider'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -24,33 +25,34 @@ export const metadata: Metadata = {
 const VALUES = [
   {
     icon: <Icon.shield className="w-5 h-5" />,
+    titleKey: 'about.value1.title',
+    bodyKey: 'about.value1.body',
     title: 'გადამოწმებული ცოდნა',
-    body: 'ყოველი ექსპერტი ხელით მოწმდება — გამოცდილება, პორტფოლიო და რეპუტაცია. ცოდნა უნდა იყოს ნამდვილი.',
+    body: 'ხელით ვამოწმებთ გამოცდილებას, პორტფოლიოსა და რეპუტაციას.',
   },
   {
     icon: <Icon.wallet className="w-5 h-5" />,
+    titleKey: 'about.value2.title',
+    bodyKey: 'about.value2.body',
     title: 'გამჭვირვალე ფასი',
     // Honest posture — payments are not live yet, so escrow is framed as the
     // coming model (same „მალე" note as the home page), not a live fact.
-    body: 'ერთი ფასი, ერთი გვერდი — გადაიხდი მხოლოდ დაჯავშნისას. დაცული გადახდები მალე ამოქმედდება.',
+    body: 'ერთი ფასი, გადახდა დაჯავშნისას. დაცული გადახდები — მალე.',
   },
   {
     icon: <Icon.clock className="w-5 h-5" />,
+    titleKey: 'about.value3.title',
+    bodyKey: 'about.value3.body',
     title: 'ღირებული დრო',
-    body: 'ფასი წინასწარ ცნობილია — გადაიხდი მხოლოდ დაჯავშნისას. სესია 40 წუთია, სტრუქტურული და შედეგზე ორიენტირებული.',
+    body: 'ფასი წინასწარ ცნობილია. სესია სტრუქტურული და შედეგზე ორიენტირებული.',
   },
   {
     icon: <Icon.users className="w-5 h-5" />,
+    titleKey: 'about.value4.title',
+    bodyKey: 'about.value4.body',
     title: 'ქართული საზოგადოება',
-    body: 'ჩვენი მისიაა, ცოდნა ქართულად ხელმისაწვდომი გავხადოთ — ბიზნესი, სამართალი, კარიერა, ფსიქოლოგია.',
+    body: 'ცოდნა ქართულად — ბიზნესი, სამართალი, კარიერა, ფსიქოლოგია.',
   },
-]
-
-const STATS = [
-  { n: '142+', l: 'გადამოწმებული ექსპერტი' },
-  { n: '6', l: 'პროფესიული სფერო' },
-  { n: '4.9', l: 'საშუალო რეიტინგი' },
-  { n: '2024', l: 'დაფუძნების წელი' },
 ]
 
 export default function AboutPage() {
@@ -64,32 +66,19 @@ export default function AboutPage() {
             ჩვენს შესახებ
           </Eyebrow>
           <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05] motion-safe:animate-rise-in">
-            ცოდნა, რომელსაც შენ ენდობი
+            <SiteText k="about.hero.title" />
           </h1>
           <p className="mt-6 text-[17px] text-ink-600 leading-relaxed">
-            მცოდნე დაარსდა 2024 წელს — მარტივი მიზნით. საქართველოში ბევრი ადამიანი ეძებს პასუხს რთულ პროფესიულ
-            კითხვებზე, მაგრამ ვერ პოულობს გამოცდილ ექსპერტს, ვისაც ენდობა. ჩვენ ვქმნით ცოდნის არქივს, სადაც
-            შენ ხვდები საუკეთესო სპეციალისტებს — მოკლედ, პირდაპირ და უსაფრთხოდ.
+            <SiteText k="about.hero.body" />
           </p>
         </div>
 
-        <Reveal stagger className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-10 pt-10 border-t border-ink-200">
-          {STATS.map(s => (
-            <div key={s.l}>
-              <div className="font-display text-3xl lg:text-4xl font-bold text-ink-900 tabular-nums tracking-tight">
-                {s.n}
-              </div>
-              <div className="mt-2 text-[13px] text-ink-500 leading-snug">{s.l}</div>
-            </div>
-          ))}
-        </Reveal>
-
-        <section className="mt-20">
+        <section className="mt-20 pt-10 border-t border-ink-200">
           <Reveal>
             <Eyebrow className="mb-3">
               რას გვჯერა
             </Eyebrow>
-            <h2 className="font-display text-3xl font-bold text-ink-900 tracking-tight">ჩვენი პრინციპები</h2>
+            <h2 className="font-display text-3xl font-bold text-ink-900 tracking-tight"><SiteText k="about.principles.title" /></h2>
           </Reveal>
           {/* Reveal-stagger (scroll-triggered) instead of load-time .stagger,
               which finished animating long before the user scrolled here. */}
@@ -99,8 +88,8 @@ export default function AboutPage() {
                 <div className="w-10 h-10 rounded-btn bg-brand-50 text-brand-700 flex items-center justify-center">
                   {v.icon}
                 </div>
-                <div className="font-display text-[17px] font-bold text-ink-900 mt-4">{v.title}</div>
-                <p className="mt-2 text-[14px] text-ink-600 leading-relaxed">{v.body}</p>
+                <div className="font-display text-[17px] font-bold text-ink-900 mt-4"><SiteText k={v.titleKey} /></div>
+                <p className="mt-2 text-[14px] text-ink-600 leading-relaxed"><SiteText k={v.bodyKey} /></p>
               </div>
             ))}
           </Reveal>
@@ -110,25 +99,18 @@ export default function AboutPage() {
         <section className="mt-20 grid lg:grid-cols-[1fr_1.4fr] gap-10 lg:gap-16">
           <div>
             <Eyebrow className="mb-3">
-              ისტორია
+              რას ვქმნით
             </Eyebrow>
             <h2 className="font-display text-3xl font-bold text-ink-900 tracking-tight leading-tight">
-              როგორ დაიწყო მცოდნე
+              <SiteText k="about.create.title" />
             </h2>
           </div>
           <div className="space-y-5 text-[15px] text-ink-700 leading-relaxed">
             <p>
-              იდეა დაიბადა უბრალო კითხვიდან — რატომ არის ასე ძნელი საქართველოში კარგი კონსულტაციის მიღება?
-              დამფუძნებელი გუნდი წლების განმავლობაში მუშაობდა ტექნოლოგიურ და საკონსულტაციო კომპანიებში და ხედავდა,
-              რომ ცოდნა არსებობს — მაგრამ სისტემურად ხელმისაწვდომი არ არის.
+              <SiteText k="about.create.p1" />
             </p>
             <p>
-              პირველი ვერსია გავუშვით 2024 წელს, ხელით შერჩეული 20 ექსპერტით ბიზნესის, ფინანსების და კარიერის
-              მიმართულებებში. ერთ წელიწადში პლატფორმა 142 ექსპერტამდე გაიზარდა და მოიცავს ექვს პროფესიულ სფეროს.
-            </p>
-            <p>
-              დღეს მცოდნე არის ცოდნის არქივი ქართული საზოგადოებისთვის — სადაც ერთი 40-წუთიანი საუბარი შეიძლება
-              შენს პროექტს, კარიერას ან ცხოვრებას შეცვალოს.
+              <SiteText k="about.create.p2" />
             </p>
           </div>
         </section>
@@ -142,11 +124,10 @@ export default function AboutPage() {
               შემოგვიერთდი
             </div>
             <h2 className="font-display text-3xl lg:text-4xl font-bold tracking-tight leading-tight">
-              ხარ ექსპერტი? გვინდა შენი ცოდნა
+              <SiteText k="about.cta.title" />
             </h2>
             <p className="mt-4 text-[15px] text-white/75 leading-relaxed">
-              თუ გაქვს 5+ წლის გამოცდილება და გინდა შენი ცოდნა გაუზიარო სხვას — შემოგვიერთდი. განაცხადს
-              განვიხილავთ 3 დღეში.
+              <SiteText k="about.cta.body" />
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link

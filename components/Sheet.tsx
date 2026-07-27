@@ -34,6 +34,59 @@ type Props = {
   ariaLabel?: string
 }
 
+// ── Shared page-scroll lock ────────────────────────────────────────────────
+// ROOT ELEMENT, VERTICAL AXIS ONLY. Two traps here, both verified in-browser:
+//
+//  1. The old `body.style.overflow = 'hidden'` shorthand also wrote
+//     `overflow-x: hidden`, which the canon bans: `hidden` turns the body into
+//     a scroll container and kills every `position: sticky` descendant
+//     site-wide (globals.css deliberately uses `overflow-x: clip`).
+//  2. Writing even `overflow-y: hidden` on the BODY is just as bad, because CSS
+//     computes `clip` to `hidden` as soon as the other axis is hidden — so the
+//     body's `overflow-x: clip` silently became `overflow-x: hidden` for as long
+//     as the dialog was open (confirmed: computed body overflow-x read `hidden`).
+//     It also doesn't lock anything: globals.css puts `overflow-x: clip` on
+//     <html>, so the ROOT (not the body) is what the viewport takes its
+//     scrolling from, and the page kept scrolling behind the dialog on iOS.
+//
+// So: touch `overflow-y` on <html> alone. The root's overflow is propagated to
+// the viewport (the root element itself resolves to `visible`), which stops the
+// page scroll without turning the body into a scroll container — sticky rails
+// and app bars keep working, and the body's `overflow-x: clip` stays `clip`.
+//
+// Reference-counted so a ConfirmModal opened on top of a Sheet doesn't unlock
+// the page when it closes while the Sheet is still open. Previous inline values
+// are captured on the first lock and restored verbatim on the last unlock.
+let lockCount = 0
+let prevHtmlOverflowY = ''
+let prevBodyPaddingRight = ''
+
+export function lockPageScroll(): () => void {
+  if (typeof document === 'undefined') return () => {}
+  const html = document.documentElement
+  const body = document.body
+  if (lockCount === 0) {
+    prevHtmlOverflowY = html.style.overflowY
+    prevBodyPaddingRight = body.style.paddingRight
+    // Compensate for the classic-scrollbar gutter so the page doesn't jump
+    // sideways when the scrollbar disappears (no-op with overlay scrollbars).
+    const gutter = window.innerWidth - html.clientWidth
+    html.style.overflowY = 'hidden'
+    if (gutter > 0) body.style.paddingRight = `${gutter}px`
+  }
+  lockCount++
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    lockCount = Math.max(0, lockCount - 1)
+    if (lockCount === 0) {
+      html.style.overflowY = prevHtmlOverflowY
+      body.style.paddingRight = prevBodyPaddingRight
+    }
+  }
+}
+
 const MAX_W: Record<NonNullable<Props['size']>, string> = {
   sm: 'sm:max-w-[440px]',
   md: 'sm:max-w-[560px]',
@@ -56,13 +109,23 @@ export function Sheet({
 }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   const restoreRef = useRef<HTMLElement | null>(null)
+  // Consumers pass inline arrow functions for `onClose`, so its identity changes
+  // on EVERY parent render (a keystroke in an open sheet is enough). Depending
+  // on it re-ran the whole effect — tearing down the lock and yanking focus back
+  // to the trigger mid-typing. Read both through refs instead and keep the
+  // effect keyed on `open` alone; consumers need no memoization.
+  const onCloseRef = useRef(onClose)
+  const busyRef = useRef(busy)
+  useEffect(() => {
+    onCloseRef.current = onClose
+    busyRef.current = busy
+  })
 
-  // Escape + focus trap + focus restore + body scroll-lock.
+  // Escape + focus trap + focus restore + page scroll-lock.
   useEffect(() => {
     if (!open) return
     restoreRef.current = document.activeElement as HTMLElement | null
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockPageScroll()
     // Move focus into the panel so the trap has a starting point.
     const t = setTimeout(() => {
       const panel = panelRef.current
@@ -70,10 +133,14 @@ export function Sheet({
       const first = panel.querySelector<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       )
-      ;(first ?? panel).focus()
+      // preventScroll: the panel is a fixed overlay pinned to the top of the
+      // viewport, so a plain focus() scrolled the PAGE BEHIND the sheet up to
+      // meet it (measured: 500 → 56). Closing then dumped you at the top of the
+      // list instead of where you were.
+      ;(first ?? panel).focus({ preventScroll: true })
     }, 0)
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) { onClose(); return }
+      if (e.key === 'Escape' && !busyRef.current) { onCloseRef.current(); return }
       if (e.key !== 'Tab') return
       const panel = panelRef.current
       if (!panel) return
@@ -90,10 +157,10 @@ export function Sheet({
     return () => {
       clearTimeout(t)
       document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prevOverflow
+      unlock()
       restoreRef.current?.focus?.()
     }
-  }, [open, busy, onClose])
+  }, [open])
 
   if (!open) return null
 

@@ -27,7 +27,9 @@ export async function GET(req: Request) {
     where,
     take: limit + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    orderBy: { createdAt: 'desc' },
+    // `createdAt` is NOT unique — an id tiebreaker keeps the cursor deterministic,
+    // otherwise accounts sharing a timestamp get dropped/repeated at page borders.
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     select: {
       id: true, email: true, fullName: true, role: true, emailVerified: true,
       createdAt: true, avatarUrl: true,

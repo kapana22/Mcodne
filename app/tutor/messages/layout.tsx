@@ -17,7 +17,7 @@ export default function TutorMessagesLayout({ children }: { children: React.Reac
       <PageHeader
         className={`mb-4 lg:mb-5 ${threadOpen ? 'hidden lg:flex' : ''}`}
         eyebrow="შეტყობინებები"
-        title="მიმოწერა კლიენტებთან"
+        title="მიმოწერა"
       />
 
       {/* Mobile heights: list view reserves header + BottomNav (215px total
@@ -36,8 +36,8 @@ export default function TutorMessagesLayout({ children }: { children: React.Reac
         <div className={`${threadOpen ? 'hidden lg:flex' : 'flex'} flex-col min-h-0 h-full lg:border-r lg:border-ink-100`}>
           <ConversationList
             empty={{
-              title: 'ჯერ არ გაქვს მიმოწერა',
-              description: 'როცა კლიენტი დაგიწერს, საუბარი აქ გამოჩნდება.',
+              title: 'მიმოწერა ჯერ არ გაქვს',
+              description: 'როცა სტუდენტი დაგიწერს, საუბარი აქ გამოჩნდება.',
               cta: { label: 'ჩემი ჯავშნები', href: '/tutor/bookings' },
             }}
           />

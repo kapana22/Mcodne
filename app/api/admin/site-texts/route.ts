@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { audit } from '@/lib/audit'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { SITE_TEXTS, isKnownSiteTextKey } from '@/lib/siteTextDefs'
 
@@ -34,15 +35,24 @@ const Body = z.object({
 })
 
 export async function PATCH(req: Request) {
-  await requireRole('ADMIN')
+  const admin = await requireRole('ADMIN')
   await ensureDbReady()
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   const { key, value, reset } = parsed.data
   if (!isKnownSiteTextKey(key)) return NextResponse.json({ ok: false, error: 'UNKNOWN_KEY' }, { status: 400 })
 
+  // Public-facing copy — audited so a changed headline/footer line is traceable
+  // to an actor. Previous value comes along so the trail can reconstruct the diff.
+  const before = await prisma.siteText.findUnique({ where: { key }, select: { value: true } })
+
   if (reset) {
     await prisma.siteText.deleteMany({ where: { key } })
+    await audit(admin.id, 'siteText.reset', {
+      targetType: 'SiteText',
+      targetId: key,
+      meta: { key, prevValue: before?.value?.slice(0, 300) ?? null },
+    })
     return NextResponse.json({ ok: true, reset: true })
   }
   if (value === undefined) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
@@ -50,6 +60,11 @@ export async function PATCH(req: Request) {
     where: { key },
     update: { value },
     create: { key, value },
+  })
+  await audit(admin.id, 'siteText.set', {
+    targetType: 'SiteText',
+    targetId: key,
+    meta: { key, value: value.slice(0, 300), prevValue: before?.value?.slice(0, 300) ?? null },
   })
   return NextResponse.json({ ok: true })
 }

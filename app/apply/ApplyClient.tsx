@@ -4,54 +4,39 @@ import Link from 'next/link'
 import { extractYouTubeId } from '@/lib/youtube'
 import { Container } from '@/components/Container'
 import { Icon } from '@/components/Icon'
-import { Logo } from '@/components/Logo'
 import { VerifiedMark } from '@/components/Avatar'
 import { Eyebrow } from '@/components/Eyebrow'
+import { PriceField } from '@/components/PriceField'
+import { PublicTopBar } from '@/components/PublicTopBar'
+import { Footer } from '@/components/Footer'
 
-/* ───── Top bar ───── */
-const TopBar = () => (
-  <header className="sticky top-0 z-40 h-16 px-6 lg:px-8 flex items-center justify-between gap-4 border-b border-ink-200 bg-white lg:bg-white/95 lg:backdrop-blur">
-    <div className="flex items-center gap-3 min-w-0">
-      <Logo />
-      <span className="hidden md:inline-block h-5 w-px bg-ink-200" />
-      <span className="hidden md:inline-flex items-center gap-2">
-        <Eyebrow as="span" tone="muted">ექსპერტი / განცხადება</Eyebrow>
-        <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-ink-50 border border-ink-200 text-ink-700 font-display text-[10px] font-bold uppercase tracking-[0.14em]">
-          <Icon.briefcase className="w-3 h-3" /> რეგისტრაცია
-        </span>
-      </span>
-    </div>
-    <div className="flex items-center gap-2">
-      {/* "პროგრესის შენახვა" removed — server-side draft persistence isn't
-          implemented yet. Advertising a button that does nothing is worse than
-          not offering it. The form state lives in memory only for now. */}
-      <a href="/" aria-label="დახურვა" className="h-9 w-9 rounded-btn text-ink-500 hover:text-ink-900 hover:bg-ink-100 inline-flex items-center justify-center transition-colors">
-        <Icon.x className="w-4 h-4" />
-      </a>
-    </div>
-  </header>
-)
+/* Chrome: the bespoke local TopBar (logo + „დახურვა" ✕) is gone — /apply now
+ * mounts the SHARED <PublicTopBar activeHref="/apply" /> + <Footer />, so the
+ * header doesn't swap out and the footer doesn't vanish when a visitor taps
+ * „გახდი ექსპერტი". The ✕ escape hatch isn't missed: the shared header carries
+ * the full site nav (and the logo → home). PublicTopBar is h-16 sm:h-20 — the
+ * sticky rails below use `top-20`, since both only render at lg+/xl+. */
 
 /* ───── Steps ───── */
 type StepId = 1 | 2 | 3 | 4 | 5
 const STEPS: { id: StepId; l: string; sub: string; icon: any }[] = [
-  { id: 1, l: 'კონტაქტი',    sub: 'სახელი და კონტაქტი',     icon: Icon.user },
-  { id: 2, l: 'ექსპერტიზა',   sub: 'რა იცი და რა გამოცდილებაა', icon: Icon.bolt },
-  { id: 3, l: 'პორტფოლიო',    sub: 'სერტიფიკატები + ვიდეო',  icon: Icon.award },
-  { id: 4, l: 'სერვისები',    sub: 'ფასი + ვინაობა',          icon: Icon.wallet },
-  { id: 5, l: 'მოდერაცია',    sub: 'წარდგენა · 48 სთ',       icon: Icon.shield },
+  { id: 1, l: 'კონტაქტი',    sub: 'სახელი, ელფოსტა',     icon: Icon.user },
+  { id: 2, l: 'ექსპერტიზა',   sub: 'რაში ხარ ძლიერი', icon: Icon.bolt },
+  { id: 3, l: 'პორტფოლიო',    sub: 'ვიდეო, სერტიფიკატი',  icon: Icon.award },
+  { id: 4, l: 'სერვისები',    sub: 'ფასი და სერვისი',          icon: Icon.wallet },
+  { id: 5, l: 'მოდერაცია',    sub: 'წარდგენა · 24–48 სთ',       icon: Icon.shield },
 ]
 
 /* ───── Progress sidebar ───── */
 const ProgressNav = ({ step, setStep, completed }: { step: StepId; setStep: (s: StepId) => void; completed: Set<StepId> }) => {
   return (
-    <aside className="hidden lg:flex flex-col w-[260px] shrink-0 border-r border-ink-200 bg-white p-6 sticky top-16 self-start lg:h-[836px]">
+    <aside className="hidden lg:flex flex-col w-[260px] shrink-0 border-r border-ink-200 bg-white p-6 sticky top-20 self-start lg:h-[836px]">
       <div className="inline-flex items-center gap-1.5 h-6 px-2.5 mb-3 self-start rounded-pill bg-brand-50 border border-brand-200 text-brand-700 font-display text-[9.5px] font-bold uppercase tracking-[0.16em]">
         <Icon.shield className="w-3 h-3" /> ხელით შემოწმებული ქსელი
       </div>
       <Eyebrow tone="muted" className="mb-2">ნაბიჯი {step} / 5</Eyebrow>
       <h2 className="font-display text-[20px] font-bold text-ink-900 tracking-tight leading-tight mb-1">გახდი ექსპერტი მცოდნეზე</h2>
-      <p className="text-[12.5px] text-ink-600 leading-[1.5] mb-5">ვიღებთ განაცხადების მცირე ნაწილს — ვამოწმებთ თითოეულს <span className="font-display font-bold text-ink-900">ხელით</span>.</p>
+      <p className="text-[12.5px] text-ink-600 leading-[1.5] mb-5">თითოეულ განაცხადს <span className="font-display font-bold text-ink-900">ხელით</span> განვიხილავთ.</p>
 
       {/* Vertical progress */}
       <ol className="relative space-y-1">
@@ -89,7 +74,7 @@ const ProgressNav = ({ step, setStep, completed }: { step: StepId; setStep: (s: 
       {/* Help block */}
       <div className="mt-6 pt-5 border-t border-ink-100">
         <Eyebrow tone="muted" className="mb-2">დაგვიკავშირდი</Eyebrow>
-        <p className="text-[11.5px] text-ink-600 leading-[1.5]">თუ შეგექმნა კითხვა — მოგვწერე, გიპასუხებთ სამუშაო დღეს.</p>
+        <p className="text-[11.5px] text-ink-600 leading-[1.5]">კითხვა თუ გაქვს — მოგვწერე.</p>
         <a href="/contact" className="mt-3 h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors">
           მოგვწერე
         </a>
@@ -132,7 +117,7 @@ const MediaWarning = () => (
   <div className="flex items-start gap-2 p-3 rounded-card bg-warning-50/70 border border-warning-200">
     <Icon.warn className="w-3.5 h-3.5 text-warning-700 mt-0.5 shrink-0" />
     <p className="text-[11.5px] text-warning-800 leading-[1.5]">
-      ატვირთული ფაილები (ვიდეო, დოკუმენტები, სერტიფიკატები, ფოტო) <span className="font-display font-semibold">არ ინახება</span> გვერდის განახლებისას — ტექსტური ველები ინახება, ფაილები კი ხელახლა უნდა ატვირთო. დაასრულე ატვირთვები ერთ სესიაში, წარდგენამდე.
+      ატვირთული ფაილები გვერდის განახლებისას <span className="font-display font-semibold">არ ინახება</span> — დაასრულე ატვირთვა ერთ ჯერზე.
     </p>
   </div>
 )
@@ -251,8 +236,12 @@ const PhotoUploader = ({ value, onChange }: { value?: string; onChange: (url?: s
         </div>
         {err
           ? <p className="mt-2 text-[11.5px] text-danger-700">{err}</p>
-          : <p className="mt-2 text-[11.5px] text-ink-500 leading-[1.5]">სასურველი — სახეზე ცოცხალი გამოხედვა. JPG / PNG · მინ. 400×400.</p>}
+          : <p className="mt-2 text-[11.5px] text-ink-500 leading-[1.5]">JPG / PNG · მინ. 400×400 (კვადრატი).</p>}
+        <p className="mt-1 text-[11.5px] text-ink-500 leading-[1.5]">სუფთა ფონი, კარგი განათება, სახე ცენტრში და ნათლად ჩანდეს — პროფესიული სურათი ნდობას ზრდის.</p>
       </div>
+      {/* The hidden file input the „ატვირთვა" button triggers via ref. Without
+          it ref.current is null and clicking the button does nothing. */}
+      <input ref={ref} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={onFile} />
     </div>
   )
 }
@@ -337,25 +326,23 @@ const LanguageEditor = ({ value, onChange }: { value: string[]; onChange: (list:
 
 /* ───── Form State ───── */
 type FormState = {
-  firstName: string; lastName: string; personalId: string; dob: string; email: string; phone: string
+  firstName: string; lastName: string; email: string; phone: string
   cats: string[]; customCat: string; headline: string; motivation: string; city: string; yearsExp: string; linkedin: string; website: string
   introVideoUrl: string
   languages: string[]
   services: { name: string; dur: number; price: number; free: boolean; desc: string }[]
-  bank: string; iban: string
   professionData: Record<string, any>
 }
 const INITIAL_FORM: FormState = {
-  firstName: '', lastName: '', personalId: '', dob: '', email: '', phone: '',
+  firstName: '', lastName: '', email: '', phone: '',
   cats: [], customCat: '', headline: '', motivation: '', city: '', yearsExp: '', linkedin: '', website: '',
   introVideoUrl: '',
   languages: ['ქართული · მშობლიური'],
   services: [
-    { name: 'სრული სტრატეგიული სესია', dur: 60, price: 80, free: false, desc: 'ღრმა მუშაობა ერთ კონკრეტულ თემაზე — pitch, GTM, org design.' },
-    { name: 'სწრაფი კონსულტაცია', dur: 30, price: 45, free: false, desc: 'მცირე გადაწყვეტილებები ან ერთი დოკუმენტის რევიუ.' },
-    { name: 'გაცნობითი სესია', dur: 15, price: 25, free: false, desc: 'fit-ის შემოწმება — ვისთვის ვუმუშავებ კარგად.' },
+    { name: 'სრული სტრატეგიული სესია', dur: 60, price: 80, free: false, desc: 'ღრმა მუშაობა ერთ კონკრეტულ თემაზე.' },
+    { name: 'სწრაფი კონსულტაცია', dur: 30, price: 45, free: false, desc: 'მოკლე, ფოკუსირებული კონსულტაცია.' },
+    { name: 'გაცნობითი სესია', dur: 15, price: 25, free: false, desc: 'მოკლე გაცნობითი საუბარი.' },
   ],
-  bank: 'TBC', iban: '',
   professionData: {},
 }
 
@@ -381,14 +368,14 @@ const partsOf = (s: StepId) => STEP_PARTS[s] ?? 1
  * first thing an applicant sees isn't a wall of identity documents. */
 const Step1 = ({ form, set }: StepProps) => (
   <>
-    <StepHeader n={1} total={5} eyebrow="კონტაქტი" title="დავიწყოთ — ვინ ხარ და როგორ დაგიკავშირდეთ." sub="მხოლოდ საბაზისო კონტაქტი — 1 წუთი. ვინაობის დოკუმენტურ დადასტურებას ბოლოს, წარდგენამდე ვთხოვთ — მას შემდეგ, რაც პროფილს შეავსებ." />
+    <StepHeader n={1} total={5} eyebrow="კონტაქტი" title="ვინ ხარ და როგორ დაგიკავშირდეთ?" sub="მხოლოდ საბაზისო კონტაქტი." />
 
-    <FormSection title="სახელი და კონტაქტი" sub="სახელი და გვარი გამოჩნდება პროფილზე. ელფოსტა და ტელეფონი — კავშირისა და გადახდისთვის.">
+    <FormSection title="სახელი და კონტაქტი" sub="სახელი-გვარი ჩანს პროფილზე; ელფოსტა და ტელეფონი — კავშირისთვის.">
       <div className="grid sm:grid-cols-2 gap-3">
         <Field l="სახელი" required><Input value={form.firstName} onChange={(e: any) => set({ firstName: e.target.value })} placeholder="სახელი" /></Field>
         <Field l="გვარი" required><Input value={form.lastName} onChange={(e: any) => set({ lastName: e.target.value })} placeholder="გვარი" /></Field>
         <Field l="ელფოსტა" required><Input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} value={form.email} onChange={(e: any) => set({ email: e.target.value })} placeholder="you@example.com" /></Field>
-        <Field l="ტელეფონი" required><Input type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e: any) => set({ phone: e.target.value })} placeholder="+995 5XX XX XX XX" /></Field>
+        <Field l="ტელეფონი" required sub="ქართული ნომერი ან უცხოური — ქვეყნის კოდით (+44…)."><Input type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e: any) => set({ phone: e.target.value })} placeholder="+995 5XX XX XX XX" /></Field>
       </div>
     </FormSection>
   </>
@@ -679,20 +666,20 @@ const Step2 = ({ form, set, part = 1 }: StepProps) => {
 
   if (part === 2) return (
     <>
-      <StepHeader n={2} total={5} eyebrow="ექსპერტიზა · 2/2" title="დეტალები — ენები, ლოკაცია, გამოცდილება." sub="ეს ველები პროფილს ავსებს და მოდერაციას აჩქარებს. LinkedIn და ვებსაიტი არასავალდებულოა — მაგრამ ნდობას მკვეთრად ზრდის." />
+      <StepHeader n={2} total={5} eyebrow="ექსპერტიზა · 2/2" title="დეტალები — ენები, ლოკაცია, გამოცდილება." sub="LinkedIn და ვებსაიტი არასავალდებულოა, მაგრამ ნდობას ზრდის." />
 
-      <FormSection title="ენები + ლოკაცია">
+      <FormSection title="ენები და ლოკაცია">
         <div className="grid sm:grid-cols-2 gap-3">
-          <Field l="ენები" sub="დაამატე ენა და დონე (A1–C2 ან მშობლიური)">
+          <Field l="ენები" sub="ენა და დონე (A1–C2 ან მშობლიური)">
             <LanguageEditor value={form.languages} onChange={list => set({ languages: list })} />
           </Field>
-          <Field l="ქალაქი (საჯარო)" sub="მისამართი არ ჩანს — მხოლოდ ქალაქი">
+          <Field l="ქალაქი (საჯარო)" sub="მხოლოდ ქალაქი, არა მისამართი">
             <Input value={form.city} onChange={(e: any) => set({ city: e.target.value })} placeholder="თბილისი" />
           </Field>
         </div>
       </FormSection>
 
-      <FormSection title="გამოცდილების წლები + ფორმალური საფუძველი">
+      <FormSection title="გამოცდილება და ბმულები">
         <div className="grid sm:grid-cols-3 gap-3">
           <Field l="გამოცდილების წლები">
             <Input type="number" min={0} max={80} value={form.yearsExp} onChange={(e: any) => set({ yearsExp: e.target.value })} placeholder="მაგ. 12" />
@@ -712,9 +699,9 @@ const Step2 = ({ form, set, part = 1 }: StepProps) => {
 
   return (
     <>
-      <StepHeader n={2} total={5} eyebrow="ექსპერტიზა · 1/2" title="რაში ხარ ექსპერტი და ვის დაეხმარები?" sub="ეს არის ის, რასაც კლიენტები ნახავენ შენს პროფილზე. იყავი კონკრეტული — ერთი მკაფიო ფოკუსი სჯობს ხუთ ბუნდოვან მიმართულებას." />
+      <StepHeader n={2} total={5} eyebrow="ექსპერტიზა · 1/2" title="რაში ხარ ექსპერტი და ვის დაეხმარები?" sub="ეს ჩანს შენს პროფილზე. ერთი მკაფიო ფოკუსი სჯობს ხუთ ბუნდოვანს." />
 
-      <FormSection title="კატეგორიები" sub="აირჩიე 1–3 ძირითადი მიმართულება. ერთი მთავარი + ერთი მეორადი ჯობია სამ ბუნდოვანზე.">
+      <FormSection title="კატეგორიები" sub="აირჩიე 1–3 მიმართულება.">
         <div className="flex flex-wrap gap-1.5">
           {ALL_CATS.map(c => {
             const on = cats.includes(c)
@@ -740,12 +727,12 @@ const Step2 = ({ form, set, part = 1 }: StepProps) => {
             flagged for the admin to add as a real category. No forced fit. */}
         <div className="mt-4 pt-4 border-t border-ink-100">
           <label className="font-display text-[12px] font-semibold text-ink-800">სფერო სიაში არ არის?</label>
-          <p className="text-[11.5px] text-ink-500 mt-0.5 mb-2">ჩაწერე შენი მიმართულება — ზუსტად როგორც გინდა, რომ ჩანდეს. ნიშური სფეროც მისაღებია.</p>
+          <p className="text-[11.5px] text-ink-500 mt-0.5 mb-2">ჩაწერე შენი მიმართულება — ნიშურიც მისაღებია.</p>
           <Input value={form.customCat} onChange={(e: any) => set({ customCat: e.target.value })} placeholder="მაგ. ეთიკური ჰაკინგი · მევენახეობა · უძრავი ქონების სამართალი" maxLength={60} />
         </div>
       </FormSection>
 
-      <FormSection title="პროფესია (headline)" sub="ერთი წინადადება. გამოჩნდება ბარათში — სიტყვა-სიტყვით. რა-ვ-როგორ-სად ხარ.">
+      <FormSection title="პროფესია (headline)" sub="ერთი წინადადება — ბარათში სიტყვა-სიტყვით ჩანს.">
         <Input value={form.headline} onChange={(e: any) => set({ headline: e.target.value })} placeholder="მაგ. ბიზნეს-სტრატეგი · ყოფ. McKinsey · 12 წელი" maxLength={80} />
         <div className="mt-1.5 flex items-center justify-between text-[11px] text-ink-500 tabular-nums">
           <span>{form.headline.length} / 80 სიმბოლო</span>
@@ -755,11 +742,11 @@ const Step2 = ({ form, set, part = 1 }: StepProps) => {
         </div>
       </FormSection>
 
-      <FormSection title="შესახებ" sub="მინ. 150 სიმბოლო · იდეალურად 300–600 (2–4 აბზაცი). დაიწყე იმით, რა გამოცდილებაა შენ უკან. დაასრულე იმით, ვინ უნდა გადმოგწეროს.">
+      <FormSection title="შესახებ" sub="მინ. 150 სიმბოლო, იდეალურად 300–600. რა გამოცდილება გაქვს და ვის ეხმარები.">
         <textarea
           value={form.motivation}
           onChange={e => set({ motivation: e.target.value })}
-          placeholder="მოკლედ აღწერე — რა გამოცდილება გაქვს, რა კონკრეტულ პრობლემებში ეხმარები კლიენტს, რა შედეგებზე შეიძლება იქცეს."
+          placeholder="რა გამოცდილება გაქვს, რა პრობლემებში ეხმარები, რა შედეგამდე მიჰყავხარ."
           rows={9}
           className="w-full p-3 rounded-field border border-ink-200 bg-white text-[13.5px] text-ink-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none resize-none leading-[1.55]"
         />
@@ -771,7 +758,7 @@ const Step2 = ({ form, set, part = 1 }: StepProps) => {
         </div>
       </FormSection>
 
-      <p className="mb-4 text-[12px] text-ink-500">ენები, ლოკაცია და გამოცდილების დეტალები — შემდეგ ეკრანზე.</p>
+      <p className="mb-4 text-[12px] text-ink-500">ენები და გამოცდილება — შემდეგ ეკრანზე.</p>
     </>
   )
 }
@@ -795,10 +782,10 @@ const YouTubeIntroInput = ({ value, onChange }: { value: string; onChange: (v: s
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-display text-[14.5px] sm:text-[15px] font-bold text-ink-900 mb-1">
-                ატვირთე ვიდეო YouTube-ზე და ბმული ჩააგდე
+                ატვირთე ვიდეო YouTube-ზე, ჩააგდე ბმული
               </div>
               <div className="text-[12px] text-ink-500 mb-3">
-                Unlisted (არასაჯარო) ვიდეო — ჩვენ ვნახავთ, საჯარო არ იქნება. 30–60 წამი.
+                Unlisted (არასაჯარო) — მხოლოდ ჩვენ ვნახავთ. 30–60 წამი.
               </div>
               <input
                 type="url"
@@ -814,7 +801,7 @@ const YouTubeIntroInput = ({ value, onChange }: { value: string; onChange: (v: s
               {invalid && (
                 <p className="mt-2 text-[11.5px] text-danger-700 font-display font-semibold inline-flex items-center gap-1">
                   <Icon.warn className="w-3 h-3" />
-                  ეს YouTube-ის ბმულს არ ჰგავს — შეამოწმე.
+                  YouTube-ის ბმულს არ ჰგავს.
                 </p>
               )}
               {id && (
@@ -859,7 +846,7 @@ const YouTubeIntroInput = ({ value, onChange }: { value: string; onChange: (v: s
         <ol className="mt-2 pl-5 list-decimal space-y-1.5 text-[12.5px] text-ink-700 leading-[1.55] no-caps">
           <li>გახსენი <a href="https://studio.youtube.com" target="_blank" rel="noopener noreferrer" className="font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2">studio.youtube.com</a> და დააჭირე Upload.</li>
           <li>აირჩიე ვიდეოფაილი. სახელი: „მცოდნე — [შენი სახელი] — ინტრო“.</li>
-          <li>Visibility სექციაში აირჩიე <span className="font-display font-semibold text-ink-900">Unlisted</span> (არასაჯარო) — მხოლოდ ის, ვისაც ბმული აქვს, ნახავს.</li>
+          <li>Visibility-ში აირჩიე <span className="font-display font-semibold text-ink-900">Unlisted</span> (არასაჯარო).</li>
           <li>Publish-ის შემდეგ დააკოპირე ბმული და ჩააგდე აქ.</li>
         </ol>
       </details>
@@ -870,22 +857,22 @@ const YouTubeIntroInput = ({ value, onChange }: { value: string; onChange: (v: s
 /* ───── STEP 3 — Portfolio ───── */
 const Step3 = ({ form, set, media, setMedia }: StepProps) => (
   <>
-    <StepHeader n={3} total={5} eyebrow="პორტფოლიო" title="დაარწმუნე — ვიდეო და ფოტოთი." sub="ვიდეო კლიენტს გიცნობს ჯავშნამდე — ეს მას გადაწყვეტილებას უმარტივებს. ინტრო-ვიდეო და სერტიფიკატები არასავალდებულოა, მაგრამ ნდობას მკვეთრად ზრდის." />
+    <StepHeader n={3} total={5} eyebrow="პორტფოლიო" title="დაარწმუნე — ვიდეო და ფოტოთი." sub="ვიდეო სტუდენტს ჯავშნამდე გაცნობს. არასავალდებულო, მაგრამ ნდობას ზრდის." />
 
     <div className="mb-4"><MediaWarning /></div>
 
-    <FormSection title="ინტრო ვიდეო · 30–60 წმ" sub="2-3 ფრაზაში: ვინ ხარ, რა გამოცდილებაა, ვისთვის სასარგებლო. გადაიღე ფანჯრიდან — სუფთა ფონი, კარგი შუქი.">
+    <FormSection title="ინტრო ვიდეო · 30–60 წმ" sub="2–3 ფრაზა: ვინ ხარ და ვის ეხმარები. სუფთა ფონი, კარგი შუქი.">
       <YouTubeIntroInput value={form.introVideoUrl} onChange={(v) => set({ introVideoUrl: v })} />
     </FormSection>
 
-    <FormSection title="სერტიფიკატები + ფორმალური განათლება" sub="არასავალდებულო. სასურველი მათთვის, ვინც ფინანსურ, სამართლებრივ ან საგადასახადო კონსულტაციას სთავაზობს.">
+    <FormSection title="სერტიფიკატები და განათლება" sub="არასავალდებულო — მაგრამ ფინანსების, სამართლისა და გადასახადების ექსპერტს ეხმარება.">
       <CertificateUploader
         items={media?.certificates ?? []}
         onChange={list => setMedia?.({ certificates: list })}
       />
     </FormSection>
 
-    <FormSection title="პროფილის ფოტო" sub="ნებისმიერი ფოტო, სადაც კარგად ჩანხარ — JPG ან PNG. სახე რომ ჩანდეს, ისე ჯობია.">
+    <FormSection title="პროფილის ფოტო" sub="ფოტო, სადაც სახე კარგად ჩანს. JPG ან PNG.">
       <PhotoUploader value={media?.photoUrl} onChange={url => setMedia?.({ photoUrl: url })} />
     </FormSection>
   </>
@@ -905,13 +892,19 @@ const Step4 = ({ form, set, media, setMedia, part = 1 }: StepProps) => {
 
   return (
   <>
-    <StepHeader n={4} total={5} eyebrow="სერვისები" title="რას სთავაზობ — და რა ფასად?" sub="დაიწყე 1-2 ტიპით. ფასს შენ ადგენ — რაც დადებ, ის ერიცხება კლიენტს. ერთსაათიანი კონსულტაცია ჩვეულებრივ ₾60–₾150. ნუ შეუმცირებ — კლიენტი „საუკეთესოს“ ეძებს, არა „იაფს“." />
+    {/* The pricing guidance used to live in this subtitle (with a „ჩვეულებრივ
+        ₾60–₾150“ line that read like market data we don't have). It now lives
+        inside <PriceField>, framed as our recommendation. */}
+    <StepHeader n={4} total={5} eyebrow="სერვისები" title="რას სთავაზობ — და რა ფასად?" sub="ფასს შენ ადგენ — ყოველ სერვისზე ცალკე." />
 
-    <FormSection title="კონსულტაცია-ტიპები" sub="თითო ტიპს უნდა ჰქონდეს მკაფიო სახელი, ფასი და ხანგრძლივობა.">
+    <FormSection title="კონსულტაციის ტიპები" sub="თითოეულს — სახელი, ფასი, ხანგრძლივობა.">
       <div className="space-y-3">
         {form.services.map((s, i) => (
           <div key={i} className={`p-4 rounded-card border ${s.free ? 'bg-brand-50/30 border-brand-200' : 'bg-white border-ink-200'}`}>
-            <div className="grid sm:grid-cols-[1fr_120px_120px_auto] gap-3 items-start">
+            {/* Row 1 — what the service IS. Price used to sit here in a 120px
+                column, visually equal to duration though far more consequential;
+                it now gets its own block below. */}
+            <div className="grid sm:grid-cols-[1fr_120px_auto] gap-3 items-start">
               <div className="min-w-0">
                 <Input value={s.name} onChange={(e: any) => updateService(i, { name: e.target.value })} placeholder="სერვისის სახელი" className="!h-9 !text-[13px] font-display font-bold" />
                 <textarea value={s.desc} onChange={e => updateService(i, { desc: e.target.value })} placeholder="მოკლე აღწერა" rows={2} className="mt-2 w-full p-2 rounded-field border border-ink-200 bg-white text-[12px] text-ink-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none resize-none leading-[1.45]" />
@@ -920,32 +913,32 @@ const Step4 = ({ form, set, media, setMedia, part = 1 }: StepProps) => {
                 <span className="font-display text-[9.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 block mb-1">ხანგრძ. (წთ)</span>
                 <Input type="number" min={15} max={240} value={s.dur} onChange={(e: any) => updateService(i, { dur: Number(e.target.value) || 0 })} className="!h-9 !text-[13px] tabular-nums font-display font-bold" />
               </div>
-              <div>
-                <span className="font-display text-[9.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 block mb-1">ფასი (₾)</span>
-                <Input type="number" min={0} value={s.price} onChange={(e: any) => updateService(i, { price: Number(e.target.value) || 0 })} className="!h-9 !text-[13px] tabular-nums font-display font-bold" disabled={s.free} />
-              </div>
               <button type="button" onClick={() => removeService(i)} aria-label="სერვისის წაშლა" className="h-9 w-9 self-end rounded-btn text-ink-500 hover:text-danger-700 hover:bg-danger-50 inline-flex items-center justify-center transition-colors">
                 <Icon.x className="w-4 h-4" />
               </button>
             </div>
-            {!s.free && (
-              <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between gap-3 text-[11.5px]">
-                <span className="text-ink-600">ექსპერტი მიიღებს (15% კომისიის შემდეგ)</span>
-                <span className="font-display font-bold text-brand-700 tabular-nums">₾{(s.price * 0.85).toFixed(2)}</span>
-              </div>
-            )}
+
+            {/* Row 2 — the decision. Shared with the workspace profile editor so
+                the guidance can't drift between onboarding and later edits. */}
+            <PriceField
+              className="mt-3 pt-3 border-t border-ink-100"
+              value={s.price}
+              onChange={(price) => updateService(i, { price })}
+              minutes={s.dur}
+              disabled={s.free}
+            />
           </div>
         ))}
 
         <button type="button" onClick={addService} className="w-full h-12 rounded-card border border-dashed border-ink-300 hover:border-brand-400 hover:bg-brand-50/30 text-ink-600 hover:text-brand-700 font-display font-semibold text-[12.5px] inline-flex items-center justify-center gap-2 transition-colors">
-          <Icon.plus className="w-4 h-4" /> ახალი ტიპის დამატება
+          <Icon.plus className="w-4 h-4" /> ტიპის დამატება
         </button>
       </div>
     </FormSection>
 
     <div className="flex items-start gap-2.5 p-4 rounded-card bg-ink-50/60 border border-ink-200">
       <Icon.info className="w-4 h-4 text-ink-500 mt-0.5 shrink-0" />
-      <p className="text-[12px] text-ink-600 leading-[1.55]">თავისუფალ დროს — რომელ დღეებში და საათებში ხარ ხელმისაწვდომი — დამტკიცების შემდეგ დაამატებ შენს სივრცეში, კალენდარით. ახლა საკმარისია სერვისი და ფასი.</p>
+      <p className="text-[12px] text-ink-600 leading-[1.55]">ახლა საკმარისია სერვისი და ფასი — დამტკიცების შემდეგ პირველი ნაბიჯი თავისუფალი დროის გამოქვეყნებაა, მის გარეშე ვერავინ დაგიჯავშნის.</p>
     </div>
   </>
   )
@@ -954,16 +947,16 @@ const Step4 = ({ form, set, media, setMedia, part = 1 }: StepProps) => {
 /* ───── STEP 5 — Review status ───── */
 const Step5 = ({ email }: { email: string }) => (
   <>
-    <StepHeader n={5} total={5} eyebrow="წარდგენა" title="მზად ხარ განაცხადის გასაგზავნად." sub="ქვემოთ ღილაკზე დაჭერით გამოგვიგზავნი განაცხადს. ჩვენი მოდერატორი თითოეულ პროფილს ხელით გადახედავს — 24–48 საათში. გვინდა, რომ პლატფორმაზე მხოლოდ რეალური ექსპერტები მოვიდნენ." />
+    <StepHeader n={5} total={5} eyebrow="წარდგენა" title="მზად ხარ განაცხადის გასაგზავნად." sub="თითოეულ პროფილს ხელით გადავხედავთ — 24–48 საათში." />
 
     {/* Honest pre-submit summary of what the manual review will check — described
         in future tense, NOT as a live tracker (nothing is submitted or "done" yet). */}
-    <FormSection title="რას შევამოწმებთ" sub="ყოველ ნაბიჯს მოდერატორი ხელით უყურებს.">
+    <FormSection title="რას შევამოწმებთ" sub="ყოველ ნაბიჯს ხელით ვამოწმებთ.">
       <ol className="space-y-2.5">
         {[
-          { l: 'ექსპერტიზა', sub: 'bio, headline და კატეგორიების შესაბამისობა' },
-          { l: 'ვიდეო და სერტიფიკატები', sub: 'ინტრო-ვიდეო და (თუ დაურთე) დოკუმენტები' },
-          { l: 'საბოლოო გადაწყვეტილება', sub: 'პროფილი გასაჯაროვდება, ან მოვა უკუკავშირი გადასაკეთებლად' },
+          { l: 'ექსპერტიზა', sub: 'bio, headline, კატეგორიები' },
+          { l: 'ვიდეო და სერტიფიკატები', sub: 'ინტრო-ვიდეო და დოკუმენტები' },
+          { l: 'საბოლოო გადაწყვეტილება', sub: 'გასაჯაროება ან უკუკავშირი' },
         ].map((s, i) => (
           <li key={i} className="flex items-start gap-3">
             <span className="mt-0.5 w-7 h-7 shrink-0 rounded-full inline-flex items-center justify-center font-display text-[11px] font-bold tabular-nums bg-ink-100 text-ink-500">{i + 1}</span>
@@ -979,8 +972,8 @@ const Step5 = ({ email }: { email: string }) => (
     <FormSection title="რა მოხდება შემდეგ">
       <div className="grid sm:grid-cols-3 gap-3">
         {[
-          { i: 1, l: 'ელფოსტით გაცნობებთ', sub: `მისამართზე ${email.trim() || 'შენს ელფოსტაზე'} მოვა ან დასტური, ან კონკრეტული უკუკავშირი.` },
-          { i: 2, l: 'პროფილი გასაჯაროვდება', sub: 'დამტკიცების შემდეგ პროფილი ცოცხლდება ძებნაში და კლიენტები დაგიჯავშნიან.' },
+          { i: 1, l: 'ელფოსტით გაცნობებთ', sub: `მოვა ${email.trim() || 'შენს ელფოსტაზე'} — დასტური ან უკუკავშირი.` },
+          { i: 2, l: 'პროფილი გასაჯაროვდება', sub: 'დამტკიცების შემდეგ ჩნდები ძებნაში — ჯავშნები თავისუფალი დროის გამოქვეყნებიდან იწყება.' },
           { i: 3, l: 'შემოსავალი', sub: 'გადახდები მალე ამოქმედდება — ამჟამად ჯავშნები უფასოა.' },
         ].map((s, i) => (
           <div key={i} className="p-4 rounded-card bg-ink-50/50 border border-ink-200">
@@ -996,7 +989,7 @@ const Step5 = ({ email }: { email: string }) => (
       <Icon.bolt className="w-5 h-5 text-brand-700 mt-0.5 shrink-0" />
       <div>
         <div className="font-display text-[13.5px] font-bold text-ink-900 tracking-tight">დამტკიცების შემდეგ — ონბორდინგი</div>
-        <p className="mt-1 text-[12px] text-ink-700 leading-[1.55]">დამტკიცების შემდეგ დაგეხმარებით პროფილის გაფორმებასა და პირველი თავისუფალი დროის გამოქვეყნებაში, რომ კლიენტებმა დაგიჯავშნონ.</p>
+        <p className="mt-1 text-[12px] text-ink-700 leading-[1.55]">დაგეხმარებით პროფილის გაფორმებასა და პირველი დროის გამოქვეყნებაში.</p>
       </div>
     </div>
   </>
@@ -1009,11 +1002,11 @@ const LivePreview = ({ step, form }: { step: StepId; form: FormState }) => {
   const displayYears = form.yearsExp ? `${form.yearsExp} წ. გამოცდილება` : 'გამოცდილება'
   const displayHeadline = form.headline.trim() || 'შენი პროფესია გამოჩნდება აქ'
   const primaryCat = form.cats[0] || 'კატეგორია'
-  const bio = form.motivation.trim() || form.headline.trim() || 'შესახებ — ეს ტექსტი გამოჩნდება ბარათში.'
+  const bio = form.motivation.trim() || form.headline.trim() || 'შესახებ — ტექსტი ბარათში.'
   const paidService = form.services.find(s => !s.free && s.price > 0)
   const price = paidService?.price ?? 0
   return (
-  <aside className="hidden xl:block w-[320px] shrink-0 p-6 border-l border-ink-200 bg-white sticky top-16 self-start xl:h-[836px] overflow-y-auto">
+  <aside className="hidden xl:block w-[320px] shrink-0 p-6 border-l border-ink-200 bg-white sticky top-20 self-start xl:h-[836px] overflow-y-auto">
     <Eyebrow tone="muted" className="mb-2">ცოცხალი გადახედვა</Eyebrow>
     <h3 className="font-display text-[15px] font-bold text-ink-900 tracking-tight mb-4">ასე ხედავენ მომხმარებლები</h3>
 
@@ -1047,18 +1040,18 @@ const LivePreview = ({ step, form }: { step: StepId; form: FormState }) => {
           <span className="inline-flex items-center gap-1"><Icon.star aria-hidden className="w-3 h-3 text-warning-500" /><span className="font-display font-bold tabular-nums text-ink-900">—</span><span className="text-ink-400 tabular-nums">(ახალი)</span></span>
           <span className="font-display text-[15px] font-bold text-ink-900 tabular-nums">₾{price}<span className="text-[11px] font-medium text-ink-500"> / სესია</span></span>
         </div>
-        <div aria-hidden className="mt-3 w-full h-9 rounded-btn bg-brand-500 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center justify-center gap-1.5 select-none cursor-default shadow-xs" title="ეს არის პრევიუ — ამ ეტაპზე ასე ჩანს ჯავშნის ღილაკი კლიენტებისთვის"><Icon.cal className="w-3.5 h-3.5" /> დაჯავშნე (პრევიუ)</div>
+        <div aria-hidden className="mt-3 w-full h-9 rounded-btn bg-brand-500 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center justify-center gap-1.5 select-none cursor-default shadow-xs" title="პრევიუ — ასე ჩანს ჯავშნის ღილაკი"><Icon.cal className="w-3.5 h-3.5" /> დაჯავშნე (პრევიუ)</div>
       </div>
     </article>
 
     <div className="mt-5 p-4 rounded-card bg-ink-50/50 border border-ink-200">
       <Eyebrow tone="muted" className="mb-2">ნაბიჯი {step} / 5 — რჩევა</Eyebrow>
       <p className="text-[12px] text-ink-700 leading-[1.55]">
-        {step === 1 && 'დაიწყე კონტაქტით — ვინაობის დოკუმენტს ბოლოს, წარდგენამდე ვთხოვთ.'}
-        {step === 2 && 'ერთი ფოკუსი > ხუთი "სხვადასხვა". კლიენტი ირჩევს იმას, ვინც ერთ რამეში მკაფიოდ ჩანს ექსპერტი.'}
-        {step === 3 && 'ვიდეო — 4×-ჯერ მეტი ჯავშანი. სუფთა ფონი, კარგი შუქი, 30-45 წამი.'}
-        {step === 4 && 'არ შეუმცირო ფასი. კლიენტი „საუკეთესოს“ ეძებს, არა „იაფს“.'}
-        {step === 5 && 'საშუალოდ 24-48 სთ. პირველი ჯავშანი — 5 დღეში.'}
+        {step === 1 && 'დაიწყე კონტაქტით — მარტივია.'}
+        {step === 2 && 'ერთი მკაფიო ფოკუსი სჯობს ხუთ ბუნდოვანს.'}
+        {step === 3 && 'ვიდეო ნდობას ზრდის — სუფთა ფონი, კარგი შუქი, 30–60 წამი.'}
+        {step === 4 && 'არ შეუმცირო ფასი. სტუდენტი „საუკეთესოს“ ეძებს, არა „იაფს“.'}
+        {step === 5 && 'განხილვა — საშუალოდ 24–48 სთ.'}
       </p>
     </div>
   </aside>
@@ -1067,12 +1060,20 @@ const LivePreview = ({ step, form }: { step: StepId; form: FormState }) => {
 
 /* ───── Per-step validation helpers ───── */
 const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
-// Georgian mobile: 9 digits starting with 5 (5XXXXXXXX), or with +995 prefix (9955XXXXXXXX).
-const isValidGeorgianPhone = (raw: string) => {
-  const d = raw.replace(/\D/g, '')
-  if (d.length === 9) return /^5\d{8}$/.test(d)
-  if (d.length === 12) return /^9955\d{8}$/.test(d)
-  return false
+// Phone. Georgian mobile is the EXPECTED shape — 9 digits starting with 5
+// (5XXXXXXXX), or the same with a +995 prefix (9955XXXXXXXX) — but relocation /
+// international experts apply with a +1 or +44 number, so any plausible
+// international number passes too (E.164: 8–15 digits, spaces/dashes/parens
+// tolerated). Junk (too short, letters) still fails; the server only asks for
+// min-6, so this stays the friendlier of the two gates.
+const isValidPhone = (raw: string) => {
+  const v = raw.trim()
+  // Digits + phone punctuation only (leading + allowed) — letters are junk.
+  if (!/^\+?[\d\s\-().]+$/.test(v)) return false
+  const d = v.replace(/\D/g, '')
+  if (/^5\d{8}$/.test(d) || /^9955\d{8}$/.test(d)) return true
+  // Anything else must look international: an explicit + and an E.164 length.
+  return v.startsWith('+') && d.length >= 8 && d.length <= 15
 }
 
 /* ───── Footer with next/back (part-aware: multi-part steps advance within
@@ -1109,14 +1110,14 @@ const FormFooter = ({ step, setStep, part, setPart, completed, setCompleted, onS
         </button>
 
         <div className="text-[12px] text-ink-500 tabular-nums hidden sm:block">
-          {step} / 5 · საშუალო დრო — <span className="font-display font-bold text-ink-700">12 წთ</span>
+          {step} / 5
         </div>
 
         <div className="flex items-center gap-2">
           {/* "შენახვა + გასვლა" removed — server-side draft persistence isn't
               implemented yet. Users can safely leave; the form is one flow. */}
           <button type="button" onClick={next} disabled={submitting} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 active:bg-brand-700 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[13px] shadow-xs hover:shadow-sm inline-flex items-center gap-2 transition-[background-color,box-shadow,transform] duration-fast motion-safe:active:scale-[0.97]">
-            {submitting ? 'იგზავნება…' : step === 5 ? 'წარდგენა მოდერაციისთვის' : step === 4 && isFinalPart ? 'შემდეგი — წარდგენა' : 'შემდეგი'}
+            {submitting ? 'იგზავნება…' : step === 5 ? 'გაგზავნა' : 'შემდეგი'}
           </button>
         </div>
       </div>
@@ -1191,7 +1192,7 @@ export default function TutorApply() {
   const [accountEmail, setAccountEmail] = useState('')
   // Existing application status, so a returning applicant sees "under review" /
   // "rejected (reason)" instead of a blank form they might re-fill blindly.
-  const [appStatus, setAppStatus] = useState<'SUBMITTED' | 'REJECTED' | 'APPROVED' | null>(null)
+  const [appStatus, setAppStatus] = useState<'SUBMITTED' | 'REJECTED' | 'APPROVED' | 'NEEDS_REVISION' | null>(null)
   const [appNote, setAppNote] = useState<string | null>(null)
   const [appLoaded, setAppLoaded] = useState(false)
   // A SUBMITTED applicant can choose to edit + re-submit; this reveals the form.
@@ -1242,6 +1243,7 @@ export default function TutorApply() {
   }, [])
   // Fetch the caller's own application so a returning applicant gets a real
   // status screen (under review / rejected) instead of a blank wizard.
+  const [appPrefill, setAppPrefill] = useState<any>(null)
   useEffect(() => {
     let cancelled = false
     fetch('/api/applications')
@@ -1250,11 +1252,68 @@ export default function TutorApply() {
         if (cancelled) return
         const a = d?.application
         if (a?.status) { setAppStatus(a.status); setAppNote(a.moderatorNote ?? null) }
+        if (a) setAppPrefill(a)
         setAppLoaded(true)
       })
       .catch(() => { if (!cancelled) setAppLoaded(true) })
     return () => { cancelled = true }
   }, [])
+  // Seed the wizard from the applicant's OWN previously-submitted values so the
+  // „needs revision" (or edit-and-resubmit) re-edit isn't a blank form off-device
+  // / after the 7-day draft expired. A local draft always wins (it's the freshest
+  // in-progress state), so we only seed when NO draft was restored. Runs once.
+  const appSeeded = useRef(false)
+  useEffect(() => {
+    if (appSeeded.current) return
+    if (!appLoaded || !draftLoaded) return   // wait for both status + draft to settle
+    if (draftRestored) { appSeeded.current = true; return } // draft is fresher → don't overwrite
+    const a = appPrefill
+    if (!a) { appSeeded.current = true; return }
+    appSeeded.current = true
+    const pd = (a.professionData && typeof a.professionData === 'object') ? a.professionData : {}
+    const full = (a.fullName ?? '').trim()
+    const sp = full.indexOf(' ')
+    const first = sp === -1 ? full : full.slice(0, sp)
+    const last = sp === -1 ? '' : full.slice(sp + 1).trim()
+    // Invert submitApplication()'s specialty packing: a niche the applicant typed
+    // lands in professionData.requestedCategory (cats was empty); otherwise
+    // specialty is the picked category name.
+    const requestedCategory: string = typeof pd.requestedCategory === 'string' ? pd.requestedCategory : ''
+    const specialty: string = typeof a.specialty === 'string' ? a.specialty : ''
+    const services = Array.isArray(pd.services) && pd.services.length
+      ? pd.services.map((s: any) => ({
+          name: String(s?.name ?? ''),
+          dur: Number(s?.dur) || 60,
+          price: Number(s?.price) || 0,
+          free: !!s?.free,
+          desc: String(s?.desc ?? ''),
+        }))
+      : null
+    const languages = Array.isArray(pd.languages) && pd.languages.length
+      ? pd.languages.map((l: any) => String(l))
+      : null
+    // Strip the keys we unpacked back into first-class form fields so the leftover
+    // professionData (dynamic profession-specific answers) is preserved cleanly.
+    const { requestedCategory: _rc, headline: _hl, languages: _lg, services: _sv, ...restPd } = pd
+    setForm(f => ({
+      ...f,
+      firstName: f.firstName.trim() ? f.firstName : first,
+      lastName: f.lastName.trim() ? f.lastName : last,
+      phone: f.phone.trim() ? f.phone : (a.phone ?? ''),
+      city: f.city.trim() ? f.city : (a.city ?? ''),
+      yearsExp: f.yearsExp.trim() ? f.yearsExp : (a.yearsExp != null ? String(a.yearsExp) : ''),
+      motivation: f.motivation.trim() ? f.motivation : (a.motivation ?? ''),
+      linkedin: f.linkedin.trim() ? f.linkedin : (a.linkedinUrl ?? ''),
+      website: f.website.trim() ? f.website : (a.websiteUrl ?? ''),
+      introVideoUrl: f.introVideoUrl.trim() ? f.introVideoUrl : (a.introVideoUrl ?? ''),
+      headline: f.headline.trim() ? f.headline : (typeof pd.headline === 'string' ? pd.headline : ''),
+      customCat: f.customCat.trim() ? f.customCat : requestedCategory,
+      cats: f.cats.length ? f.cats : (requestedCategory || !specialty ? [] : [specialty]),
+      languages: languages ?? f.languages,
+      services: services ?? f.services,
+      professionData: { ...restPd, ...f.professionData },
+    }))
+  }, [appLoaded, draftLoaded, draftRestored, appPrefill])
   // Recovery action for the unverified banner — (re)send the code and hand the
   // user to the verify view, which returns here (?next=/apply) once verified.
   const requestEmailVerify = () => {
@@ -1310,7 +1369,7 @@ export default function TutorApply() {
     if (s === 1) {
       if (`${form.firstName.trim()} ${form.lastName.trim()}`.trim().length < 2) return 'შეავსე სახელი და გვარი.'
       if (!isValidEmail(form.email)) return 'შეიყვანე სწორი ელფოსტა.'
-      if (!isValidGeorgianPhone(form.phone)) return 'ტელეფონი ქართული ნომერი უნდა იყოს — მაგ. 5XX XX XX XX ან +995 5XX XX XX XX.'
+      if (!isValidPhone(form.phone)) return 'ტელეფონის ნომერი არასწორია — მაგ. 5XX XX XX XX, ან უცხოური ნომერი კოდით: +44 20 7123 4567.'
       return null
     }
     if (s === 2) {
@@ -1369,6 +1428,11 @@ export default function TutorApply() {
         professionData: (() => {
           const pd: Record<string, any> = { ...form.professionData }
           if (form.languages.length) pd.languages = form.languages
+          // The one-line pitch the applicant wrote (and saw in the live preview)
+          // used to be discarded at submit — the approved profile then showed the
+          // category name as its headline. Stash it here so approval can seed the
+          // real headline, not re-ask for it.
+          if (form.headline.trim()) pd.headline = form.headline.trim()
           // Niche field the expert typed (not in the preset list) — kept so the
           // admin can review and promote it to a real category.
           if (!form.cats.length && form.customCat.trim()) pd.requestedCategory = form.customCat.trim()
@@ -1436,7 +1500,7 @@ export default function TutorApply() {
     ]
     return (
       <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen flex flex-col">
-        <TopBar />
+        <PublicTopBar activeHref="/apply" />
         <Container as="main" size="content" className="flex-1 py-16 lg:py-24">
           <div className="max-w-[560px] mx-auto text-center">
             <div className="w-16 h-16 rounded-full bg-success-100 text-success-700 inline-flex items-center justify-center mb-6 motion-safe:animate-scale-in">
@@ -1444,7 +1508,7 @@ export default function TutorApply() {
             </div>
             <h1 className="font-display text-[26px] font-bold tracking-tight">განაცხადი მიღებულია</h1>
             <p className="mt-3 text-[14px] text-ink-600 leading-[1.6]">
-              მადლობა! შენს განაცხადს ხელით განვიხილავთ და შედეგს ელფოსტაზე შეგატყობინებთ.
+              მადლობა! ხელით განვიხილავთ და შედეგს ელფოსტაზე შეგატყობინებთ.
             </p>
 
             <div className="mt-8 text-left rounded-card border border-ink-200 bg-white p-5">
@@ -1465,6 +1529,7 @@ export default function TutorApply() {
             </div>
           </div>
         </Container>
+        <Footer />
       </div>
     )
   }
@@ -1475,7 +1540,7 @@ export default function TutorApply() {
   if (appLoaded && appStatus === 'SUBMITTED' && !forceEdit) {
     return (
       <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen flex flex-col">
-        <TopBar />
+        <PublicTopBar activeHref="/apply" />
         <Container as="main" size="content" className="flex-1 py-16 lg:py-24">
           <div className="max-w-[560px] mx-auto text-center">
             <div className="w-16 h-16 rounded-full bg-brand-50 text-brand-700 inline-flex items-center justify-center mb-6 motion-safe:animate-scale-in">
@@ -1483,7 +1548,7 @@ export default function TutorApply() {
             </div>
             <h1 className="font-display text-[26px] font-bold tracking-tight">განაცხადი განიხილება</h1>
             <p className="mt-3 text-[14px] text-ink-600 leading-[1.6]">
-              შენი განაცხადი უკვე გაგზავნილია და ხელით განიხილება. შედეგს ელფოსტაზე შეგატყობინებთ — ხელახლა შევსება საჭირო არ არის.
+              უკვე გაგზავნილია და განიხილება. შედეგს ელფოსტაზე მიიღებ — თავიდან შევსება არ სჭირდება.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-2.5 justify-center">
               <Link href="/" className="h-11 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center transition-colors">მთავარზე დაბრუნება</Link>
@@ -1491,13 +1556,76 @@ export default function TutorApply() {
             </div>
           </div>
         </Container>
+        <Footer />
+      </div>
+    )
+  }
+
+  // Sent back for correction → NEEDS_REVISION. Softer than a reject: the applicant
+  // keeps their draft and just fixes what the moderator flagged (e.g. „სახელი
+  // ქართულად ჩაწერე"), then re-submits (the /apply POST resets them to SUBMITTED).
+  // Mirrors the SUBMITTED/APPROVED short-circuit; „შეასწორე…" reveals the wizard.
+  if (appLoaded && appStatus === 'NEEDS_REVISION' && !forceEdit) {
+    return (
+      <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen flex flex-col">
+        <PublicTopBar activeHref="/apply" />
+        <Container as="main" size="content" className="flex-1 py-16 lg:py-24">
+          <div className="max-w-[560px] mx-auto text-center">
+            <div className="w-16 h-16 rounded-full bg-warning-50 text-warning-700 inline-flex items-center justify-center mb-6 motion-safe:animate-scale-in">
+              <Icon.edit className="w-8 h-8" />
+            </div>
+            <h1 className="font-display text-[26px] font-bold tracking-tight">საჭიროა შესწორება</h1>
+            <p className="mt-3 text-[14px] text-ink-600 leading-[1.6]">
+              განაცხადი კარგადაა — მხოლოდ პატარა რამ უნდა შეასწორო და თავიდან გამოგზავნო.
+            </p>
+            {appNote?.trim() && (
+              <div className="mt-6 text-left rounded-card border border-warning-200 bg-warning-50 px-4 py-3">
+                <div className="font-display text-[11px] font-bold uppercase tracking-[0.16em] text-warning-700">რა უნდა შესწორდეს</div>
+                <p className="mt-1.5 text-[13.5px] text-ink-800 leading-[1.55] whitespace-pre-wrap">{appNote}</p>
+              </div>
+            )}
+            <div className="mt-8 flex flex-col sm:flex-row gap-2.5 justify-center">
+              <button type="button" onClick={() => setForceEdit(true)} className="h-11 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center transition-colors">შეასწორე და ხელახლა გამოგზავნე</button>
+              <Link href="/" className="h-11 px-5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center transition-colors">მთავარზე დაბრუნება</Link>
+            </div>
+          </div>
+        </Container>
+        <Footer />
+      </div>
+    )
+  }
+
+  // Already an approved expert (or promoted to TUTOR) → the wizard is a dead end
+  // for them (the API rejects non-students with ONLY_STUDENTS_CAN_APPLY). Show a
+  // friendly "you're already an expert" screen instead of a blank form + generic
+  // submit error.
+  if (appLoaded && appStatus === 'APPROVED') {
+    return (
+      <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen flex flex-col">
+        <PublicTopBar activeHref="/apply" />
+        <Container as="main" size="content" className="flex-1 py-16 lg:py-24">
+          <div className="max-w-[560px] mx-auto text-center">
+            <div className="w-16 h-16 rounded-full bg-success-100 text-success-700 inline-flex items-center justify-center mb-6 motion-safe:animate-scale-in">
+              <Icon.check className="w-8 h-8" />
+            </div>
+            <h1 className="font-display text-[26px] font-bold tracking-tight">შენ უკვე ექსპერტი ხარ</h1>
+            <p className="mt-3 text-[14px] text-ink-600 leading-[1.6]">
+              დამტკიცებულია. გახსენი პროფილი და დაამატე დრო, რომ დაგიჯავშნონ.
+            </p>
+            <div className="mt-8 flex flex-col sm:flex-row gap-2.5 justify-center">
+              <Link href="/tutor/profile" className="h-11 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center transition-colors">გახსენი პროფილი</Link>
+              <Link href="/tutor" className="h-11 px-5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center transition-colors">ჩემი სივრცე</Link>
+            </div>
+          </div>
+        </Container>
+        <Footer />
       </div>
     )
   }
 
   return (
     <div className="font-sans bg-ink-50/50 text-ink-900 antialiased min-h-[1000px] flex flex-col">
-      <TopBar />
+      <PublicTopBar activeHref="/apply" />
 
       {/* Top horizontal progress (mobile + desktop) */}
       <div className="border-b border-ink-200 bg-white">
@@ -1545,7 +1673,7 @@ export default function TutorApply() {
                 className="mb-4 rounded-card border border-brand-200 bg-brand-50 text-brand-900 px-4 py-2.5 flex items-center gap-3 motion-safe:transition-opacity"
               >
                 <span className="font-display text-[12.5px] font-semibold tracking-tight">
-                  ნახევრადი შეტანა აღდგა
+                  შენახული ვერსია აღდგა
                 </span>
                 <button
                   type="button"
@@ -1574,7 +1702,17 @@ export default function TutorApply() {
                 <p className="text-[12px] text-danger-800 mt-1 leading-[1.5]">
                   {appNote?.trim()
                     ? <>მიზეზი: <span className="font-semibold">{appNote}</span>. გაითვალისწინე და თავიდან შეავსე.</>
-                    : <>შეგიძლია გაასწორო და თავიდან გააგზავნო განაცხადი.</>}
+                    : <>გაასწორე და თავიდან გააგზავნე.</>}
+                </p>
+              </div>
+            )}
+            {appStatus === 'NEEDS_REVISION' && (
+              <div role="alert" className="mb-4 rounded-card border border-warning-200 bg-warning-50 px-4 py-3">
+                <div className="font-display text-[12.5px] font-bold text-warning-800">საჭიროა შესწორება</div>
+                <p className="text-[12px] text-ink-800 mt-1 leading-[1.5]">
+                  {appNote?.trim()
+                    ? <>შეასწორე: <span className="font-semibold">{appNote}</span>, შემდეგ თავიდან გააგზავნე.</>
+                    : <>შეასწორე და თავიდან გააგზავნე.</>}
                 </p>
               </div>
             )}
@@ -1596,6 +1734,11 @@ export default function TutorApply() {
 
         <LivePreview step={step} form={form} />
       </div>
+
+      {/* The wizard's own next/back bar is `max-lg:sticky bottom-0` INSIDE the
+          form column, so it unpins the moment the form ends — it never covers
+          the site footer, and the footer never hides the last field. */}
+      <Footer />
     </div>
   )
 }

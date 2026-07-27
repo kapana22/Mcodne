@@ -2,6 +2,8 @@
 // { subject, html }. Inline styles only — email clients strip <style>/external
 // CSS. Brand green #2F9C86 (the logo teal), neutral ink, no external assets.
 
+import { SUPPORT_EMAIL } from './supportEmails'
+
 const BASE = 'https://mcodne.ge'
 const BRAND = '#2F9C86'
 const INK = '#1c1a17'
@@ -37,8 +39,8 @@ function shell(opts: { heading: string; bodyHtml: string; cta?: { label: string;
           </table>
         </td></tr>
         <tr><td style="padding:16px 4px;font-size:12px;line-height:1.6;color:${MUTED};">
-          mcodne — ბიზნეს-კონსულტაციები ექსპერტებთან.<br>
-          ეს ავტომატური შეტყობინებაა. კითხვებზე: <a href="mailto:hi@mcodne.ge" style="color:${MUTED};">hi@mcodne.ge</a>
+          mcodne — კონსულტაციები ექსპერტებთან.<br>
+          ავტომატური შეტყობინება · <a href="mailto:${SUPPORT_EMAIL}" style="color:${MUTED};">${SUPPORT_EMAIL}</a>
         </td></tr>
       </table>
     </td></tr>
@@ -63,13 +65,33 @@ function detail(rows: { label: string; value: string }[]): string {
 export function welcomeEmail(name: string) {
   const first = (name || '').trim().split(/\s+/)[0] || 'მეგობარო'
   return {
-    subject: 'მოგესალმებით mcodne-ზე 👋',
+    subject: 'კეთილი იყოს მობრძანება 👋',
     html: shell({
       heading: `${esc(first)}, კეთილი იყოს შენი მობრძანება!`,
       bodyHtml:
-        p('შენ წარმატებით დარეგისტრირდი <b>mcodne</b>-ზე — პლატფორმაზე, სადაც ბიზნეს-საკითხებზე პირდაპირ ექსპერტებს ელაპარაკები.') +
-        p('დაიწყე ექსპერტის მოძებნით — აირჩიე საკითხი, დაჯავშნე დრო და ისაუბრე ვიდეოზარით.'),
+        p('დარეგისტრირდი <b>mcodne</b>-ზე — აქ შენს საკითხზე პირდაპირ ექსპერტს ელაპარაკები.') +
+        p('აირჩიე ექსპერტი, დაჯავშნე დრო და ისაუბრე ვიდეოზე.'),
       cta: { label: 'იპოვე ექსპერტი', href: `${BASE}/tutors` },
+    }),
+  }
+}
+
+// Sent the moment an application is APPROVED. The one thing that turns a fresh
+// expert into a bookable one is published free time (booking is slot-gated), so
+// this email is about the calendar — not about „finishing the profile". Subject
+// is a static string, so no CR/LF stripping is needed; the moderator's optional
+// note is body-only and escaped like every other interpolated value.
+export function applicationApprovedEmail(o: { name: string; note?: string }) {
+  const first = (o.name || '').trim().split(/\s+/)[0] || 'მეგობარო'
+  return {
+    subject: 'განაცხადი დამტკიცდა — გახსენი შენი თავისუფალი დრო',
+    html: shell({
+      heading: `${esc(first)}, დამტკიცდი — ახლა ხარ ექსპერტი`,
+      bodyHtml:
+        p('პროფილი ცოცხალია და ძებნაში ჩანს.') +
+        p('ერთი ნაბიჯიღა დარჩა: <b>გახსენი შენი თავისუფალი დრო</b>. სანამ განრიგში დროს არ გამოაქვეყნებ, დაჯავშნა არავის შეუძლია.') +
+        (o.note ? p(`<span style="color:${MUTED};">მოდერატორის კომენტარი:</span> ${esc(o.note)}`) : ''),
+      cta: { label: 'დროის გამოქვეყნება', href: `${BASE}/tutor/schedule` },
     }),
   }
 }
@@ -80,30 +102,49 @@ export function bookingConfirmedEmail(o: { studentName: string; expertName: stri
     html: shell({
       heading: 'შენი ჯავშანი დადასტურდა',
       bodyHtml:
-        p(`${esc(o.expertName)}-მა დაადასტურა შენი კონსულტაცია. დეტალები:`) +
+        p(`${esc(o.expertName)}-მა დაადასტურა ჯავშანი.`) +
         detail([
           { label: 'ექსპერტი', value: o.expertName },
           { label: 'თემა', value: o.topic },
           { label: 'დრო', value: o.whenText },
         ]) +
-        p('დანიშნულ დროზე ერთი კლიკით შეხვალ ვიდეო-ოთახში.'),
+        p('დანიშნულ დროზე ერთ კლიკში შეხვალ ვიდეო-ოთახში.'),
       cta: { label: 'ჯავშნის ნახვა', href: `${BASE}/student/bookings/${o.bookingId}` },
+    }),
+  }
+}
+
+// Sent to the EXPERT the moment a client files a new booking request. The
+// expert must accept/decline within 24h or the cleanup cron auto-cancels it —
+// so this email is time-sensitive, not just a courtesy ping.
+export function bookingRequestEmail(o: { studentName: string; topic: string; whenText: string }) {
+  return {
+    subject: 'ახალი მოთხოვნა 🔔',
+    html: shell({
+      heading: 'ახალი ჯავშნის მოთხოვნა',
+      bodyHtml:
+        p(`${esc(o.studentName)}-მა მოგთხოვა კონსულტაცია. უპასუხე 24 სთ-ში, თორემ ავტომატურად გაუქმდება.`) +
+        detail([
+          { label: 'სტუდენტი', value: o.studentName },
+          { label: 'თემა', value: o.topic },
+          { label: 'დრო', value: o.whenText },
+        ]),
+      cta: { label: 'ჯავშნის ნახვა', href: `${BASE}/tutor/bookings` },
     }),
   }
 }
 
 export function sessionReminderEmail(o: { name: string; counterpartName: string; topic: string; whenText: string; href: string }) {
   return {
-    subject: 'შეხსენება: სესია მალე იწყება ⏰',
+    subject: 'სესია მალე იწყება ⏰',
     html: shell({
       heading: 'შენი სესია მალე იწყება',
       bodyHtml:
-        p(`შეხსენება — მალე გაქვს დაგეგმილი კონსულტაცია ${esc(o.counterpartName)}-თან.`) +
+        p(`მალე გაქვს კონსულტაცია ${esc(o.counterpartName)}-თან.`) +
         detail([
           { label: 'თემა', value: o.topic },
           { label: 'დრო', value: o.whenText },
-        ]) +
-        p('დარწმუნდი, რომ მზად ხარ — შედი ვიდეო-ოთახში დანიშნულ დროზე.'),
+        ]),
       cta: { label: 'სესიის გახსნა', href: `${BASE}${o.href}` },
     }),
   }
@@ -111,12 +152,11 @@ export function sessionReminderEmail(o: { name: string; counterpartName: string;
 
 export function newMessageEmail(o: { name: string; fromName: string; preview: string; href: string }) {
   return {
-    subject: `ახალი შეტყობინება — ${o.fromName}`,
+    subject: `ახალი შეტყობინება — ${o.fromName.replace(/[\r\n]+/g, ' ').trim()}`,
     html: shell({
       heading: `${esc(o.fromName)}-მა მოგწერა`,
       bodyHtml:
-        p(`<span style="color:${MUTED};">„</span>${esc(o.preview)}<span style="color:${MUTED};">“</span>`) +
-        p('უპასუხე პლატფორმაზე — სწრაფი პასუხი დაგეხმარება.'),
+        p(`<span style="color:${MUTED};">„</span>${esc(o.preview)}<span style="color:${MUTED};">“</span>`),
       cta: { label: 'პასუხის გაცემა', href: `${BASE}${o.href}` },
     }),
   }

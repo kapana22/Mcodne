@@ -1,5 +1,6 @@
 'use client'
 import { useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { Icon } from './Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import {
@@ -9,13 +10,14 @@ import {
 } from '@/lib/profileScore'
 
 /* ProfileCompleteness — small, warm-tinted card that scores the tutor profile
-   on nine fields + one "availability-toggled" signal, totalling 100%.
-   Scoring lives in lib/profileScore.ts so /api/tutor/nav-badges (sidebar
-   hint) computes the identical percent server-side.
+   on ten fields, totalling 100%. Scoring lives in lib/profileScore.ts so
+   /api/tutor/nav-badges (sidebar hint) computes the identical percent
+   server-side.
 
-   The check anchors below are IDs that the /tutor/profile page attaches to
-   its sections (see mounting site). Missing anchors fall back to hash "#"
-   which is a no-op — never a broken link. */
+   Most check anchors are #IDs that the /tutor/profile page attaches to its
+   sections — clicking scrolls in-page. The „availability" check anchors to a
+   full ROUTE (/tutor/schedule), so a non-"#" anchor navigates there instead.
+   Missing #anchors fall back to hash "#" which is a no-op — never a broken link. */
 
 export type { ProfileForCompleteness }
 
@@ -25,6 +27,9 @@ export type ProfileCompletenessProps = {
   education: number
   experience: number
   avatarUrl?: string | null
+  /** Count of upcoming (future) availability slots — drives the „თავისუფალი
+      დრო" check. Booking is slot-gated, so 0 slots = unbookable. */
+  slotCount?: number
   /** Optional visual variant. `card` = full section (used on profile page),
       `compact` = right-rail widget (used on dashboard). */
   variant?: 'card' | 'compact'
@@ -54,13 +59,15 @@ export function ProfileCompleteness({
   education,
   experience,
   avatarUrl,
+  slotCount = 0,
   variant = 'card',
   alwaysShow = false,
   className = '',
 }: ProfileCompletenessProps) {
+  const router = useRouter()
   const checks = useMemo(
-    () => buildProfileChecks(profile, certificates, education, experience, avatarUrl),
-    [profile, certificates, education, experience, avatarUrl],
+    () => buildProfileChecks(profile, certificates, education, experience, avatarUrl, slotCount),
+    [profile, certificates, education, experience, avatarUrl, slotCount],
   )
 
   const { percent, undone } = useMemo(
@@ -118,10 +125,16 @@ export function ProfileCompleteness({
             <a
               href={item.anchor}
               onClick={e => {
-                if (typeof window !== 'undefined' && item.anchor.startsWith('#')) {
+                if (typeof window === 'undefined') return
+                if (item.anchor.startsWith('#')) {
+                  // In-page section: scroll instead of jumping the hash.
                   e.preventDefault()
                   scrollToAnchor(item.anchor)
                   history.replaceState(null, '', item.anchor)
+                } else {
+                  // Full route (e.g. /tutor/schedule): SPA-navigate there.
+                  e.preventDefault()
+                  router.push(item.anchor)
                 }
               }}
               aria-label={item.done ? `დასრულებულია: ${item.label}` : `დაუსრულებელი: ${item.label} — გადადი შესაბამის სექციაზე`}
@@ -152,7 +165,7 @@ export function ProfileCompleteness({
 
       {percent < 100 && variant === 'card' && (
         <p className="mt-4 text-[11.5px] text-ink-500 leading-snug">
-          სრული პროფილი უფრო მეტ კლიენტს იზიდავს — დაასრულე დარჩენილი ნაბიჯები.
+          სრული პროფილი მეტ სტუდენტს იზიდავს.
         </p>
       )}
     </section>

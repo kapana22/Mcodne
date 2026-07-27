@@ -24,7 +24,7 @@ import {
 type TabId = 'attention' | 'upcoming' | 'history'
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'attention', label: 'საჭიროებს ყურადღებას' },
+  { id: 'attention', label: 'ყურადღება' },
   { id: 'upcoming', label: 'მოახლოებული' },
   { id: 'history', label: 'ისტორია' },
 ]
@@ -178,7 +178,6 @@ function BookingsPageInner() {
       <PageHeader
         className="mb-5"
         title="ჯავშნები"
-        sub="ერთ ადგილას: გადასაწყვეტი, მოახლოებული და წარსული სესიები"
       />
 
       {/* Bucket tabs — underline pattern from the student side */}
@@ -231,21 +230,21 @@ function BookingsPageInner() {
         tab === 'attention' ? (
           <EmptyState
             icon={<Icon.check className="w-6 h-6" />}
-            title="ყველაფერი დამუშავებულია"
-            description="ახალი მოთხოვნა ან გადასაწყვეტი საკითხი არ არის."
+            title="ყველაფერი მოგვარებულია"
+            description="ახალი მოთხოვნა არ არის."
           />
         ) : tab === 'upcoming' ? (
           <EmptyState
             icon={<Icon.calendar className="w-6 h-6" />}
             title="მოახლოებული სესია არ გაქვს"
-            description="გამოაქვეყნე თავისუფალი დროები, რომ კლიენტებმა დაგიჯავშნონ."
-            cta={{ label: 'დროების გამოქვეყნება', href: '/tutor/schedule' }}
+            description="გამოაქვეყნე დრო, რომ დაგიჯავშნონ."
+            cta={{ label: 'დროის გამოქვეყნება', href: '/tutor/schedule' }}
           />
         ) : (
           <EmptyState
             icon={<Icon.clock className="w-6 h-6" />}
             title="ისტორია ცარიელია"
-            description="დასრულებული და გაუქმებული სესიები აქ გამოჩნდება."
+            description="დასრულებული სესიები აქ გამოჩნდება."
           />
         )
       ) : grouped ? (
@@ -278,14 +277,14 @@ function BookingsPageInner() {
         title={
           confirming?.kind === 'cancel' ? 'ჯავშნის გაუქმება?'
           : confirming?.kind === 'decline' ? 'უარი მოთხოვნაზე?'
-          : 'კლიენტი არ გამოცხადდა?'
+          : 'სტუდენტი არ გამოცხადდა?'
         }
         body={
           confirming?.kind === 'cancel'
-            ? 'ჯავშნის გაუქმებისას კლიენტს დაცული თანხა სრულად უბრუნდება და მიიღებს შეტყობინებას.'
+            ? 'სტუდენტს თანხა სრულად უბრუნდება.'
             : confirming?.kind === 'decline'
-            ? `${confirming.b.student?.fullName ?? 'კლიენტის'} მოთხოვნა გაუქმდება. კლიენტი მიიღებს შეტყობინებას.`
-            : 'ჯავშანი აღინიშნება როგორც გამოუცხადებლობა და თანხა კლიენტს დაუბრუნდება.'
+            ? `${confirming.b.student?.fullName ?? 'სტუდენტის'} მოთხოვნა გაუქმდება.`
+            : 'აღინიშნება გამოუცხადებლობა, თანხა დაუბრუნდება.'
         }
         tone={confirming?.kind === 'decline' ? 'warning' : 'danger'}
         confirmLabel={
@@ -345,7 +344,7 @@ function BookingRow({
       )}
       {live && (
         <Btn variant="primary" size="sm" href={`/session/${b.id}`}>
-          <Icon.video className="w-4 h-4" /> ვიდეო-ოთახში შესვლა
+          <Icon.video className="w-4 h-4" /> ვიდეო-ოთახი
         </Btn>
       )}
       {needsClosure && !reschedPending && (
@@ -354,7 +353,7 @@ function BookingRow({
             არ გამოცხადდა
           </Btn>
           <Btn variant="primary" size="sm" onClick={() => onAct(b, 'complete')} disabled={busy === b.id + 'complete'}>
-            {busy === b.id + 'complete' ? '…' : 'დასრულებულად მონიშვნა'}
+            {busy === b.id + 'complete' ? '…' : 'დასრულება'}
           </Btn>
         </>
       )}
@@ -379,7 +378,7 @@ function BookingRow({
           <span className="min-w-0 flex-1 block">
             <span className="flex items-center gap-2 flex-wrap">
               <span className="font-display text-[14px] font-bold text-ink-900 truncate group-hover:text-brand-800 transition-colors">
-                {b.student?.fullName ?? 'უცნობი კლიენტი'}
+                {b.student?.fullName ?? 'უცნობი სტუდენტი'}
               </span>
               <StatusPill tone={live ? 'live' : toneOf(b.status)} />
               {reschedPending && (

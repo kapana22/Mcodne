@@ -60,6 +60,12 @@ export function CookieConsent() {
     <div
       role="region"
       aria-label="Cookie consent"
+      // z-[60] — ABOVE page chrome (headers z-40, BottomNav z-40, mobile CTA
+      // bars z-[65]… which the CSS lift rule moves the banner clear of anyway)
+      // but BELOW every full-screen overlay: the mobile nav drawer (z-[70]),
+      // Sheet (80), ConfirmModal (90), toasts (95). It used to be z-[70] AND
+      // rendered after {children} in AppShell, so it tied with the nav drawer
+      // and won on DOM order — covering the drawer's „დაწყება" button.
       className="fixed bottom-3 left-3 right-3 sm:left-4 sm:right-auto sm:bottom-4 sm:max-w-md z-[60] motion-safe:animate-[fadeIn_220ms_ease-out]"
     >
       <div className="rounded-card border border-ink-200 bg-white shadow-pop p-4 sm:p-4">

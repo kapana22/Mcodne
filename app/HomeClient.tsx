@@ -6,7 +6,6 @@ import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { useRouter } from 'next/navigation'
 import { PAYMENTS_LIVE, COMMISSION_PCT, TUTOR_PAYOUT_PCT } from '@/lib/flags'
 import { fmtRating } from '@/lib/fmt'
-import { RecentTutorsStrip } from '@/components/RecentTutorsStrip'
 import { Reveal } from '@/components/Reveal'
 import { CountUp } from '@/components/CountUp'
 import { Footer } from '@/components/Footer'
@@ -28,16 +27,41 @@ const VerifiedMark = ({ size = 16 }: { size?: number }) => (
 
 // One brand treatment for every tile — the canon is the 3-color system, so no
 // per-category rainbow hues (and no safelist-dependent dynamic classes).
-// Top-6 by demand (beachhead research): tax/accounting, business, marketing,
-// law/setup, IT, career/mentorship — the spheres a 1-hour paid consultation
-// most concretely solves. The full 14 live in the /tutors filter.
-const categories = [
-  { l: 'ბიზნესი',     d: 'სტრატეგია, სტარტაპი',     i: CatIcon.business,   c: 32, slug: 'business' },
-  { l: 'გადასახადები', d: 'ინდ. მეწარმე, დღგ, 1%',   i: CatIcon.tax,        c: 26, slug: 'tax' },
-  { l: 'მარკეტინგი',  d: 'ბრენდი, რეკლამა, SMM',    i: CatIcon.marketing,  c: 21, slug: 'marketing' },
-  { l: 'სამართალი',   d: 'კონტრაქტი, რეგისტრაცია',  i: CatIcon.law,        c: 12, slug: 'law' },
-  { l: 'IT',          d: 'დეველოპმენტი, კარიერა',   i: CatIcon.it,         c: 24, slug: 'it' },
-  { l: 'კარიერა',     d: 'CV, ინტერვიუ, მენტორობა', i: CatIcon.career,     c: 19, slug: 'career' },
+// The grid is driven by the LIVE, admin-managed categories (GET /api/categories)
+// so a hidden category drops out, a rename propagates, and a new one can surface
+// — no code edit needed. This per-slug meta only supplies the icon + a short
+// description (which aren't stored on the Category row); NAMES come from the DB.
+// A default covers any slug without bespoke meta.
+type CatMeta = { i: React.ReactElement<{ className?: string }>; d: string }
+const CAT_META: Record<string, CatMeta> = {
+  business:      { i: CatIcon.business,  d: 'სტრატეგია, სტარტაპი' },
+  tax:           { i: CatIcon.tax,       d: 'ინდ. მეწარმე, დღგ, 1%' },
+  finance:       { i: CatIcon.finance,   d: 'ბიუჯეტი, ინვესტიცია' },
+  law:           { i: CatIcon.law,       d: 'კონტრაქტი, რეგისტრაცია' },
+  marketing:     { i: CatIcon.marketing, d: 'ბრენდი, რეკლამა, SMM' },
+  sales:         { i: CatIcon.business,  d: 'გაყიდვები, მოლაპარაკება' },
+  it:            { i: CatIcon.it,        d: 'დეველოპმენტი, კარიერა' },
+  product:       { i: CatIcon.it,        d: 'პროდაქტი, UX' },
+  design:        { i: CatIcon.marketing, d: 'ბრენდი, UI, გრაფიკა' },
+  career:        { i: CatIcon.career,    d: 'CV, ინტერვიუ, მენტორობა' },
+  hr:            { i: CatIcon.career,    d: 'რეკრუტინგი, გუნდი' },
+  'real-estate': { i: CatIcon.finance,   d: 'ყიდვა, გაქირავება' },
+  relocation:    { i: CatIcon.career,    d: 'ვიზა, გადასვლა' },
+  crypto:        { i: CatIcon.finance,   d: 'ბლოკჩეინი, ტოკენი' },
+}
+const DEFAULT_CAT_META: CatMeta = { i: CatIcon.business, d: 'ექსპერტული კონსულტაცია' }
+
+// Fallback used ONLY for the SSR/first paint and if the categories fetch fails —
+// so the home never renders an empty category section (SEO). Top-6 by demand;
+// once the live fetch resolves, hidden/renamed categories self-correct.
+type HomeCat = { slug: string; name: string }
+const FALLBACK_CATS: HomeCat[] = [
+  { slug: 'business',  name: 'ბიზნესი' },
+  { slug: 'tax',       name: 'გადასახადები' },
+  { slug: 'marketing', name: 'მარკეტინგი' },
+  { slug: 'law',       name: 'სამართალი' },
+  { slug: 'it',        name: 'IT' },
+  { slug: 'career',    name: 'კარიერა' },
 ]
 
 /* ───── Top nav ─────
@@ -173,7 +197,7 @@ const HomeHero = () => {
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-6 sm:mb-10 lg:mb-12">
           <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-500">
             <Icon.shieldCheck className="w-3.5 h-3.5 text-ink-400" />
-            <span>ხელით შერჩეული ბაზა · ინდივიდუალურად შემოწმებული</span>
+            <span>ხელით შერჩეული ბაზა</span>
           </span>
         </div>
 
@@ -201,12 +225,12 @@ const HomeHero = () => {
                     type="text"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
-                    placeholder="რა გჭირდება? მაგ. გადასახადი, კარიერული ნაბიჯი, იურიდიული რჩევა"
+                    placeholder="რა გჭირდება? მაგ. გადასახადი, კარიერა, იურიდიული რჩევა"
                     className="w-full h-12 pl-11 pr-3 bg-transparent text-[15px] text-ink-900 placeholder:text-ink-400 focus:outline-none"
                   />
                 </div>
                 <button type="submit" className="btn-sheen h-12 px-6 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.4)] transition-all duration-fast">
-                  ექსპერტის ძიება
+                  ძებნა
                 </button>
               </form>
               <div className="mt-4 flex items-center gap-1.5 flex-wrap">
@@ -222,7 +246,7 @@ const HomeHero = () => {
                 <Link href={query ? `/ask?q=${encodeURIComponent(query)}` : '/ask'} className="font-display font-semibold text-brand-700 hover:underline">
                   დასვი კითხვა
                 </Link>
-                {' '}— და ექსპერტები გიპასუხებენ
+                {' '}— ექსპერტი გიპასუხებს
               </div>
             </div>
 
@@ -231,9 +255,12 @@ const HomeHero = () => {
                 stacked rows — saves most of a screen of hero scroll. */}
             <div className="mt-8 sm:mt-12 lg:mt-14 pt-6 sm:pt-8 border-t border-ink-200 grid grid-cols-3 gap-3 sm:gap-8 max-w-[540px] motion-safe:stagger">
               {[
-                { l: 'ხელით შერჩეული', d: 'ყოველი ექსპერტი ინდივიდუალურად შემოწმებული' },
-                { l: 'გამჭვირვალე ფასი', d: 'ერთი ნათელი განაკვეთი — გადაიხდი მხოლოდ დაჯავშნისას' },
-                { l: 'ვიდეოსესია', d: 'HD ვიდეო-ოთახი, ჩატი, ფაილები' },
+                { l: 'ხელით შერჩეული', d: 'თითოეულ ექსპერტს ვამოწმებთ' },
+                // Payment tense follows PAYMENTS_LIVE — until the gateway ships
+                // a booking costs nothing, so „გადახდა დაჯავშნისას“ would be a
+                // promise we don't keep.
+                { l: 'გამჭვირვალე ფასი', d: PAYMENTS_LIVE ? 'ერთი ფასი, გადახდა დაჯავშნისას' : 'ერთი ფასი — დაჯავშნა ახლა უფასოა' },
+                { l: 'ვიდეოსესია', d: 'ვიდეო-ოთახი, ჩატი, ფაილები' },
               ].map(s => (
                 <div key={s.l}>
                   <div className="font-display text-[12px] sm:text-[13px] font-bold text-ink-900 tracking-tight leading-snug">{s.l}</div>
@@ -256,7 +283,7 @@ const HomeHero = () => {
               <span className="inline-flex items-center gap-2 h-8 pl-3 pr-3.5 rounded-pill bg-white border border-ink-200 shadow-pop">
                 <Icon.shieldCheck className="w-3.5 h-3.5 text-brand-600" />
                 <span className="font-display text-[12px] font-semibold text-ink-800 tracking-tight tabular-nums">
-                  {stats ? `${stats.total} გადამოწმებული ექსპერტი` : 'ხელით შერჩეული ბაზა'}
+                  {stats ? `${stats.total} ექსპერტი` : 'ხელით შერჩეული ბაზა'}
                 </span>
               </span>
             </div>
@@ -284,11 +311,18 @@ const HomeHero = () => {
 
                 {/* Trust stats row */}
                 <div className="px-5 sm:px-6 pb-4 flex items-center gap-3 text-[12px] flex-wrap">
-                  <span className="inline-flex items-center gap-1 text-ink-800">
-                    <Icon.star className="w-3.5 h-3.5 text-warning-500" />
-                    <span className="font-display font-bold tabular-nums">{fmtRating(featured.rate)}</span>
-                    <span className="text-ink-400 tabular-nums">({featured.reviews})</span>
-                  </span>
+                  {/* A rating only exists once someone has reviewed — an unrated
+                      expert reads „ახალი“, exactly like the /tutors card and the
+                      profile, never „0.0 ★ (0)“. */}
+                  {featured.rate > 0 && featured.reviews > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-ink-800">
+                      <Icon.star className="w-3.5 h-3.5 text-warning-500" />
+                      <span className="font-display font-bold tabular-nums">{fmtRating(featured.rate)}</span>
+                      <span className="text-ink-400 tabular-nums">({featured.reviews})</span>
+                    </span>
+                  ) : (
+                    <span className="font-display font-semibold text-ink-600">ახალი ექსპერტი</span>
+                  )}
                   <span className="w-px h-3.5 bg-ink-200" />
                   <span className="inline-flex items-center gap-1 text-ink-600">
                     <span className="font-display font-semibold text-ink-800 tabular-nums">{featured.sessions}</span> სესია
@@ -357,7 +391,13 @@ const HomeHero = () => {
               )}
               <div className="min-w-0 flex-1">
                 <div className="font-display text-[13px] font-semibold text-ink-900 tracking-tight">
-                  {stats ? `${fmtRating(stats.avg)}★ საშუალო · ${stats.total} ექსპერტი` : 'გადახედე მთელ ბაზას'}
+                  {/* On a cold catalog the average is 0 — printing „0.0★ საშუალო“
+                      would read as a terrible score rather than „no reviews yet“. */}
+                  {stats
+                    ? (stats.avg > 0
+                        ? `${fmtRating(stats.avg)}★ საშუალო · ${stats.total} ექსპერტი`
+                        : `${stats.total} ექსპერტი`)
+                    : 'გადახედე მთელ ბაზას'}
                 </div>
                 <Link href="/tutors" className="mt-0.5 inline-flex items-center gap-1 font-display text-[11.5px] font-semibold text-brand-700 hover:text-brand-800 transition-colors">
                   ყველა ექსპერტი
@@ -371,8 +411,12 @@ const HomeHero = () => {
                 <Icon.shieldCheck className="w-5 h-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="font-display text-[14px] font-bold tracking-tight">გადახდა მხოლოდ დაჯავშნისას</div>
-                <div className="text-[12px] text-white/70 mt-1 leading-snug">ერთი ნათელი ფასი · ვიდეობმული დადასტურებისთანავე.</div>
+                <div className="font-display text-[14px] font-bold tracking-tight">
+                  {PAYMENTS_LIVE ? 'გადახდა მხოლოდ დაჯავშნისას' : 'დაჯავშნა ახლა უფასოა'}
+                </div>
+                <div className="text-[12px] text-white/70 mt-1 leading-snug">
+                  {PAYMENTS_LIVE ? 'ერთი ფასი · ვიდეო დადასტურებისთანავე.' : 'ერთი ფასი · გადახდები მალე.'}
+                </div>
               </div>
             </Link>
           </div>
@@ -383,43 +427,64 @@ const HomeHero = () => {
 }
 
 
-const Categories = () => (
-  <section className="bg-white border-b border-ink-200">
-    <Container className="py-10 sm:py-16 lg:py-20">
-      <Reveal className="flex flex-wrap items-end justify-between gap-4 mb-8 sm:mb-10">
-        <div className="max-w-[640px]">
-          <Eyebrow className="mb-3">კატეგორიები</Eyebrow>
-          <h2 className="font-display text-[30px] sm:text-[40px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">აირჩიე სფერო, რომელშიც გჭირდება ცოდნა</h2>
-          <p className="hidden sm:block mt-4 text-[14.5px] text-ink-600 leading-[1.55]">ხელით შერჩეული ექსპერტები 6 სფეროში — გადახედე, შეადარე და დაჯავშნე ვიდეოსესია.</p>
-        </div>
-      </Reveal>
-      <Reveal stagger className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
-        {categories.map(c => (
-          <Link key={c.l} href={`/tutors?category=${c.slug}`} className="group relative overflow-hidden rounded-card border border-ink-200 bg-white p-4 sm:p-6 shadow-xs hover:border-brand-200 hover-lift motion-safe:active:scale-[0.99] flex flex-col text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
-            {/* Brand accent hairline — reveals on hover (matches /categories). */}
-            <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-brand-500 transition-transform duration-300 ease-out group-hover:scale-x-100" />
-            <div className="flex items-start justify-between gap-3">
-              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-btn flex items-center justify-center shrink-0 bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-all duration-300 ease-out group-hover:text-brand-700 motion-safe:group-hover:scale-110 motion-safe:group-hover:-rotate-3 motion-safe:group-active:scale-105 motion-safe:group-active:-rotate-2">
-                {React.cloneElement(c.i, { className: 'w-5 h-5 sm:w-7 sm:h-7' })}
-              </div>
-              <span className="font-display text-[10px] sm:text-[10.5px] font-semibold uppercase tracking-[0.14em] sm:tracking-[0.16em] text-ink-400 whitespace-nowrap pt-1">
-                <span className="hidden sm:inline">ხელით შერჩეული</span>
-              </span>
-            </div>
-            <h3 className="mt-4 sm:mt-6 font-display text-[18px] sm:text-[26px] font-bold text-ink-900 leading-[1.1] tracking-tight transition-colors group-hover:text-brand-700">{c.l}</h3>
-            <p className="mt-1 sm:mt-1.5 text-[12px] sm:text-[13px] text-ink-600 leading-[1.45] line-clamp-2">{c.d}</p>
-            <div className="mt-auto pt-4 sm:pt-5 border-t border-ink-100 flex items-center justify-between">
-              <span className="font-display text-[10px] sm:text-[11.5px] font-semibold uppercase tracking-[0.14em] sm:tracking-[0.16em] text-ink-500 group-hover:text-brand-700 transition-colors">
-                <span className="sm:hidden">ნახე</span>
-                <span className="hidden sm:inline">ექსპერტების ნახვა</span>
-              </span>
-            </div>
-          </Link>
-        ))}
-      </Reveal>
-    </Container>
-  </section>
-)
+const Categories = () => {
+  // Drive the grid from the live, admin-managed categories. Seed with the
+  // fallback so SSR/first paint (and a failed fetch) still render the canonical
+  // top-6 — the effect then replaces them with the DB set (hidden categories
+  // drop out, renames propagate). Kept to 6 tiles so the 2×3 design is intact.
+  const [cats, setCats] = useState<HomeCat[]>(FALLBACK_CATS)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/categories')
+      .then(r => (r.ok ? r.json() : []))
+      .then((rows: any[]) => {
+        if (cancelled || !Array.isArray(rows) || rows.length === 0) return
+        setCats(rows.map(r => ({ slug: r.slug, name: r.name })))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+  return (
+    <section className="bg-white border-b border-ink-200">
+      <Container className="py-10 sm:py-16 lg:py-20">
+        <Reveal className="flex flex-wrap items-end justify-between gap-4 mb-8 sm:mb-10">
+          <div className="max-w-[640px]">
+            <Eyebrow className="mb-3">კატეგორიები</Eyebrow>
+            <h2 className="font-display text-[30px] sm:text-[40px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]"><SiteText k="home.categories.title" /></h2>
+            <p className="hidden sm:block mt-4 text-[14.5px] text-ink-600 leading-[1.55]"><SiteText k="home.categories.subtitle" /></p>
+          </div>
+        </Reveal>
+        <Reveal stagger className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
+          {cats.slice(0, 6).map(c => {
+            const meta = CAT_META[c.slug] ?? DEFAULT_CAT_META
+            return (
+              <Link key={c.slug} href={`/tutors?category=${c.slug}`} className="group relative overflow-hidden rounded-card border border-ink-200 bg-white p-4 sm:p-6 shadow-xs hover:border-brand-200 hover-lift motion-safe:active:scale-[0.99] flex flex-col text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
+                {/* Brand accent hairline — reveals on hover (matches /categories). */}
+                <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-brand-500 transition-transform duration-300 ease-out group-hover:scale-x-100" />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-btn flex items-center justify-center shrink-0 bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-all duration-300 ease-out group-hover:text-brand-700 motion-safe:group-hover:scale-110 motion-safe:group-hover:-rotate-3 motion-safe:group-active:scale-105 motion-safe:group-active:-rotate-2">
+                    {React.cloneElement(meta.i, { className: 'w-5 h-5 sm:w-7 sm:h-7' })}
+                  </div>
+                  <span className="font-display text-[10px] sm:text-[10.5px] font-semibold uppercase tracking-[0.14em] sm:tracking-[0.16em] text-ink-400 whitespace-nowrap pt-1">
+                    <span className="hidden sm:inline">ხელით შერჩეული</span>
+                  </span>
+                </div>
+                <h3 className="mt-4 sm:mt-6 font-display text-[18px] sm:text-[26px] font-bold text-ink-900 leading-[1.1] tracking-tight transition-colors group-hover:text-brand-700">{c.name}</h3>
+                <p className="mt-1 sm:mt-1.5 text-[12px] sm:text-[13px] text-ink-600 leading-[1.45] line-clamp-2">{meta.d}</p>
+                <div className="mt-auto pt-4 sm:pt-5 border-t border-ink-100 flex items-center justify-between">
+                  <span className="font-display text-[10px] sm:text-[11.5px] font-semibold uppercase tracking-[0.14em] sm:tracking-[0.16em] text-ink-500 group-hover:text-brand-700 transition-colors">
+                    <span className="sm:hidden">ნახე</span>
+                    <span className="hidden sm:inline">ექსპერტების ნახვა</span>
+                  </span>
+                </div>
+              </Link>
+            )
+          })}
+        </Reveal>
+      </Container>
+    </section>
+  )
+}
 
 const ExpertCard = ({ e }: { e: Expert }) => (
   <article className="group relative rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift overflow-hidden flex flex-col">
@@ -427,10 +492,18 @@ const ExpertCard = ({ e }: { e: Expert }) => (
     <div className="sm:hidden relative aspect-[16/10] w-full bg-gradient-to-br from-brand-50 to-ink-100 overflow-hidden">
       <img src={e.photo} alt={e.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover motion-safe:animate-fade-in-fast" />
       <div className="absolute inset-0 bg-gradient-to-t from-accent-950/40 via-transparent to-transparent" />
+      {/* fmtRating is THE rating precision for the whole product — printing the
+          raw Prisma average here rendered „4.333333333333333“. */}
       <div className="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/95 backdrop-blur rounded-pill h-7 px-2.5 shadow-xs">
-        <Icon.star className="w-3 h-3 text-warning-500" />
-        <span className="font-display text-[12px] font-bold text-ink-900 tabular-nums leading-none">{e.rate}</span>
-        <span className="text-[10px] text-ink-500 tabular-nums">({e.reviews})</span>
+        {e.rate > 0 && e.reviews > 0 ? (
+          <>
+            <Icon.star className="w-3 h-3 text-warning-500" />
+            <span className="font-display text-[12px] font-bold text-ink-900 tabular-nums leading-none">{fmtRating(e.rate)}</span>
+            <span className="text-[10px] text-ink-500 tabular-nums">({e.reviews})</span>
+          </>
+        ) : (
+          <span className="font-display text-[11px] font-semibold text-ink-600">ახალი</span>
+        )}
       </div>
     </div>
 
@@ -461,11 +534,17 @@ const ExpertCard = ({ e }: { e: Expert }) => (
             </div>
           </div>
           <div className="shrink-0 text-right -mt-0.5">
-            <div className="inline-flex items-baseline gap-1 font-display">
-              <Icon.star className="w-3.5 h-3.5 text-warning-500 self-center" />
-              <span className="text-[17px] font-bold text-ink-900 tabular-nums leading-none">{e.rate}</span>
-            </div>
-            <div className="mt-1 text-[9.5px] uppercase tracking-[0.18em] text-ink-500 tabular-nums">{e.reviews} მიმოხ.</div>
+            {e.rate > 0 && e.reviews > 0 ? (
+              <>
+                <div className="inline-flex items-baseline gap-1 font-display">
+                  <Icon.star className="w-3.5 h-3.5 text-warning-500 self-center" />
+                  <span className="text-[17px] font-bold text-ink-900 tabular-nums leading-none">{fmtRating(e.rate)}</span>
+                </div>
+                <div className="mt-1 text-[9.5px] uppercase tracking-[0.18em] text-ink-500 tabular-nums">{e.reviews} მიმოხ.</div>
+              </>
+            ) : (
+              <span className="font-display text-[12px] font-semibold text-ink-500">ახალი</span>
+            )}
           </div>
         </div>
         <p className="mt-3 text-[13px] text-ink-700 leading-[1.55] line-clamp-2">{e.quote}</p>
@@ -562,11 +641,11 @@ const FeaturedExperts = () => {
           <div className="flex items-center gap-3 mb-3">
             <Eyebrow as="span">ექსპერტები</Eyebrow>
             <span className="inline-flex items-center gap-1.5 text-[11px] text-ink-500">
-              ხელით შერჩეული · ინდივიდუალურად შემოწმებული
+              ხელით შერჩეული
             </span>
           </div>
           <h2 className="font-display text-[28px] sm:text-[40px] lg:text-[48px] font-bold text-ink-900 tracking-[-0.025em] leading-[1.05]">
-            ხელით შერჩეული ექსპერტები.
+            <SiteText k="home.experts.title" />
           </h2>
         </Reveal>
 
@@ -592,8 +671,8 @@ const FeaturedExperts = () => {
             ))
           ) : experts.length === 0 ? (
             <div className="lg:col-span-2 py-14 px-6 text-center rounded-card border border-dashed border-ink-200 bg-white">
-              <div className="font-display text-[15px] font-bold text-ink-900">რჩეული ექსპერტები მალე დაემატება</div>
-              <p className="text-[12.5px] text-ink-500 mt-1.5 max-w-[420px] mx-auto leading-relaxed">გადახედე ყველა ექსპერტს — მოდერაცია რჩეულ პროფესიონალებს მალე მოირჩევს.</p>
+              <div className="font-display text-[15px] font-bold text-ink-900">რჩეულები მალე დაემატება</div>
+              <p className="text-[12.5px] text-ink-500 mt-1.5 max-w-[420px] mx-auto leading-relaxed">ჯერ გადახედე ყველა ექსპერტს.</p>
               <Link href="/tutors" className="mt-4 inline-flex items-center gap-1.5 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide transition-colors">
                 ყველა ექსპერტი
               </Link>
@@ -621,9 +700,9 @@ const HowItWorks = () => (
           <Eyebrow className="mb-3">როგორ მუშაობს</Eyebrow>
           <h2 className="font-display text-[32px] sm:text-[44px] font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
             სამი ნაბიჯი —<br />
-            ვიდრე უკვე გელაპარაკები.
+            ვიდრე უკვე ელაპარაკები.
           </h2>
-          <p className="text-[15px] text-ink-600 mt-5 max-w-[400px] leading-relaxed">რეგისტრაცია — გაცნობა — სესია. 15 წუთიდან სრულ კონსულტაციამდე.</p>
+          <p className="text-[15px] text-ink-600 mt-5 max-w-[400px] leading-relaxed"><SiteText k="home.how.subtitle" /></p>
           <AnonOnly>
             <Link href="/signup" className="mt-7 h-12 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
               დაწყება
@@ -631,18 +710,18 @@ const HowItWorks = () => (
           </AnonOnly>
         </Reveal>
         <Reveal stagger className="space-y-3">
-          {[
-            { n: '01', t: 'აირჩიე ექსპერტი', d: 'გადახედე პროფილებს, რეიტინგებს და მოკლე ვიდეოშესავალს. ფილტრები სფერო-ფასი-ხელმისაწვდომობაზე.' },
-            { n: '02', t: 'აირჩიე სერვისი და დრო', d: 'აირჩიე ექსპერტის სერვისი და თავისუფალი დრო კალენდრიდან — ის ადასტურებს მოთხოვნას. ფასი ფიქსირებულია.' },
+          {([
+            { n: '01', t: 'აირჩიე ექსპერტი', d: 'გადახედე პროფილებს, შეფასებებს და ვიდეოშესავალს.', tk: 'home.how.step1.title', dk: 'home.how.step1.desc' },
+            { n: '02', t: 'აირჩიე სერვისი და დრო', d: 'აირჩიე სერვისი და დრო კალენდრიდან — ექსპერტი ადასტურებს.', tk: 'home.how.step2.title', dk: 'home.how.step2.desc' },
             PAYMENTS_LIVE
-              ? { n: '03', t: 'დაცული გადახდა', d: 'ბარათით — თანხა დაცულ ანგარიშზე ჩერდება, ექსპერტს მხოლოდ სესიის შემდეგ გადაერიცხება.' }
-              : { n: '03', t: 'უსაფრთხო გადახდები · მალე', d: 'დაცული გადახდები — მალე. ამჟამად სესია იჯავშნება უფასოდ, გადახდის სისტემა მოდის.' },
-          ].map((s, i) => (
+              ? { n: '03', t: 'დაცული გადახდა', d: 'თანხა დაცულია — ექსპერტს სესიის შემდეგ გადაერიცხება.' }
+              : { n: '03', t: 'უსაფრთხო გადახდები · მალე', d: 'ახლა დაჯავშნა უფასოა — გადახდა მალე.' },
+          ] as { n: string; t: string; d: string; tk?: string; dk?: string }[]).map((s, i) => (
             <div key={i} className="rounded-card border border-ink-200 bg-white p-6 grid grid-cols-[60px_1fr] gap-5 items-start">
               <div className="font-display text-[44px] font-bold text-brand-500 tabular-nums tracking-tight leading-none">{s.n}</div>
               <div>
-                <h3 className="font-display text-xl font-bold text-ink-900 mb-2 tracking-tight">{s.t}</h3>
-                <p className="text-[14px] text-ink-600 leading-relaxed">{s.d}</p>
+                <h3 className="font-display text-xl font-bold text-ink-900 mb-2 tracking-tight">{s.tk ? <SiteText k={s.tk} /> : s.t}</h3>
+                <p className="text-[14px] text-ink-600 leading-relaxed">{s.dk ? <SiteText k={s.dk} /> : s.d}</p>
               </div>
             </div>
           ))}
@@ -661,22 +740,25 @@ const WhyUs = () => (
           ცოდნა, რომელსაც ენდობი —<br className="hidden sm:inline" />
           <span className="text-ink-500">ფასი, რომელიც ღირს.</span>
         </h2>
+        <p className="mt-4 text-[14.5px] text-ink-600 leading-[1.55]">
+          ონლაინ ბიზნეს კონსულტაცია ექსპერტთან — ბიზნესი, ფინანსები, კარიერა თუ სამართალი, გამჭვირვალე ფასად, ვიდეოზე.
+        </p>
       </Reveal>
       {/* Single-block reveal on purpose: the gap-px/overflow-hidden lattice
           would clip per-cell staggered motion. */}
       <Reveal delay={120} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-ink-200 border border-ink-200 rounded-card overflow-hidden">
-        {[
+        {([
           PAYMENTS_LIVE
-            ? { t: 'დაცული გადახდა', d: 'თანხა დაცულ ანგარიშზე ჩერდება სანამ სესია არ ჩატარდება. გაუქმდე უფასოდ 24 სთ-ით ადრე.' }
-            : { t: 'უსაფრთხო გადახდები · მალე', d: 'დაცული გადახდები მუშავდება — ამჟამად სესია იჯავშნება უფასოდ, ბარათი არ ვთხოვთ.' },
-          { t: 'ხელით მოდერაცია',    d: 'ადმინისტრაცია განიხილავს ყოველ განაცხადს. ვამოწმებთ პროფილს, გამოცდილებას, საჯარო კვალს.' },
-          { t: 'HD ვიდეოსესია',     d: 'ჩაშენებული ვიდეო-ოთახი, ფაილების გაცვლა, ჩატი. სესიის ჩაწერა — მალე.' },
-          { t: 'გამჭვირვალე ფასი',   d: 'ერთი ნათელი განაკვეთი ექსპერტზე — გადაიხდი მხოლოდ დაჯავშნისას, ფარული საკომისიოს გარეშე.' },
-        ].map((c, i) => (
+            ? { t: 'დაცული გადახდა', d: 'თანხა დაცულია სესიამდე. გაუქმება უფასო 24 სთ-ით ადრე.' }
+            : { t: 'უსაფრთხო გადახდები · მალე', d: 'ახლა დაჯავშნა უფასოა, ბარათს არ ვთხოვთ.' },
+          { t: 'ხელით მოდერაცია',    d: 'ვამოწმებთ ყოველ განაცხადს — გამოცდილებას და რეპუტაციას.', tk: 'home.why.card1.title', dk: 'home.why.card1.body' },
+          { t: 'HD ვიდეოსესია',     d: 'ვიდეო-ოთახი, ჩატი, ფაილები. ჩაწერა — მალე.', tk: 'home.why.card2.title', dk: 'home.why.card2.body' },
+          { t: 'გამჭვირვალე ფასი',   d: 'ერთი ფასი, ფარული საკომისიოს გარეშე.', tk: 'home.why.card3.title', dk: 'home.why.card3.body' },
+        ] as { t: string; d: string; tk?: string; dk?: string }[]).map((c, i) => (
           <div key={i} className="bg-white p-7">
             <Eyebrow tone="muted" className="tabular-nums mb-4">№ {String(i + 1).padStart(2, '0')}</Eyebrow>
-            <h3 className="font-display text-[17px] font-bold text-ink-900 tracking-tight leading-tight mb-2">{c.t}</h3>
-            <p className="text-[12.5px] text-ink-600 leading-[1.55]">{c.d}</p>
+            <h3 className="font-display text-[17px] font-bold text-ink-900 tracking-tight leading-tight mb-2">{c.tk ? <SiteText k={c.tk} /> : c.t}</h3>
+            <p className="text-[12.5px] text-ink-600 leading-[1.55]">{c.dk ? <SiteText k={c.dk} /> : c.d}</p>
           </div>
         ))}
       </Reveal>
@@ -696,21 +778,26 @@ const ExpertCta = () => (
         <Reveal>
           <div className="inline-flex items-center gap-2 rounded-pill bg-white border border-ink-200 pl-1 pr-3 py-1 mb-6 shadow-xs">
             <span className="inline-flex items-center gap-1.5 rounded-pill bg-brand-500 text-white px-2.5 py-1 text-[11px] font-display font-semibold tracking-wide">ექსპერტებისთვის</span>
-            <span className="text-[12px] text-ink-700 font-medium">ღია განაცხადი · ხელით მოდერაცია</span>
+            <span className="text-[12px] text-ink-700 font-medium">ხელით მოდერაცია</span>
           </div>
           <h2 className="font-display text-[36px] sm:text-[48px] lg:text-[56px] font-bold leading-[1.02] tracking-[-0.02em] text-ink-900">
             გააზიარე შენი ცოდნა.<br />
             <span className="text-brand-600">{PAYMENTS_LIVE ? 'გასამრჯელო — სესიის შემდეგ.' : 'შემოსავალი · მალე.'}</span>
           </h2>
           <p className="text-[15px] text-ink-700 mt-6 max-w-[520px] leading-relaxed">
-            შენ წერ შენს კონსულტაციას — ფასს, დროს, თემას. ჩვენ ვუვლით მოდერაციას, ანგარიშფაქტურებს და მომხმარებლების მოძიებას. საკომისიო {COMMISSION_PCT}% — გამჭვირვალე, ერთი ციფრი.
+            {/* Until PAYMENTS_LIVE flips, nothing is charged and nothing is
+                withheld — stating the commission in the present tense would
+                describe a deduction that doesn't happen. */}
+            {PAYMENTS_LIVE
+              ? `შენ ადგენ ფასს, დროსა და თემას. დანარჩენს ჩვენ ვუვლით. საკომისიო ${COMMISSION_PCT}%.`
+              : `შენ ადგენ ფასს, დროსა და თემას. დანარჩენს ჩვენ ვუვლით. ახლა დაჯავშნა უფასოა და საკომისიოს არ ვიკავებთ — ${COMMISSION_PCT}% ფასიანი ჯავშნების ამოქმედებისთანავე დაიწყება.`}
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link href="/apply" className="h-12 px-6 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
               გახდი ექსპერტი
             </Link>
             <Link href="/apply" className="h-12 px-5 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 hover:border-ink-300 text-ink-800 font-display font-medium text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
-              <Icon.play className="w-3.5 h-3.5 text-brand-600" /> 90 წამიანი ვიდეო
+              როგორ მუშაობს
             </Link>
           </div>
         </Reveal>
@@ -719,11 +806,20 @@ const ExpertCta = () => (
             /* One brand treatment for all stat tiles — no per-row hues. The
                numeric tiles count up on scroll-enter (CountUp snaps under
                reduced motion). */
-            [
-              { n: COMMISSION_PCT as number | null, txt: '', l: 'საკომისიო', s: 'გამჭვირვალე · ერთი ციფრი' },
-              { n: TUTOR_PAYOUT_PCT as number | null, txt: '', l: 'შენი ნაწილი', s: 'დანარჩენი — შენს ჯიბეშია' },
-              { n: null, txt: 'მალე', l: 'შემოსავალი', s: 'დაცული გადახდის დანერგვის შემდეგ' },
-            ].map((s, i) => (
+            (PAYMENTS_LIVE
+              ? [
+                  { n: COMMISSION_PCT as number | null, txt: '', l: 'საკომისიო', s: 'ერთი ციფრი' },
+                  { n: TUTOR_PAYOUT_PCT as number | null, txt: '', l: 'შენი ნაწილი', s: 'დანარჩენი — შენია' },
+                  { n: null, txt: 'მალე', l: 'შემოსავალი', s: 'დაცული გადახდის შემდეგ' },
+                ]
+              // Flag off = no charge and no deduction today. The percentages
+              // describe what WILL apply, never what is being taken now.
+              : [
+                  { n: null as number | null, txt: '0%', l: 'საკომისიო დღეს', s: `${COMMISSION_PCT}% — ფასიანი ჯავშნების ამოქმედებისას` },
+                  { n: null as number | null, txt: '100%', l: 'შენი ნაწილი', s: 'ახლა არაფერს ვიკავებთ' },
+                  { n: null as number | null, txt: 'მალე', l: 'შემოსავალი', s: 'დაცული გადახდის შემდეგ' },
+                ]
+            ).map((s, i) => (
               <div key={i} className="rounded-card border border-ink-200 bg-white p-5 grid grid-cols-[auto_1fr] gap-5 items-baseline shadow-xs">
                 <div className="font-display text-[40px] font-bold text-brand-600 tabular-nums tracking-tight leading-none">
                   {/* Static number until scroll-enter (SSR/crawlers always see
@@ -745,46 +841,9 @@ const ExpertCta = () => (
   </section>
 )
 
-const AuthedRecentTutorsStrip = () => {
-  // Shared /api/me (lib/me) — deduped with the top bar + AppShell.
-  const { me } = useMe()
-  const signedIn = !!me
-  const [hasItems, setHasItems] = useState(false)
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const check = () => {
-      try {
-        const raw = window.localStorage.getItem('mcodne:recent-tutors')
-        if (!raw) { setHasItems(false); return }
-        const parsed = JSON.parse(raw)
-        setHasItems(Array.isArray(parsed) && parsed.length > 0)
-      } catch {
-        setHasItems(false)
-      }
-    }
-    check()
-    const onChange = () => check()
-    window.addEventListener('storage', onChange)
-    window.addEventListener('mcodne:recent-tutors:change', onChange as EventListener)
-    return () => {
-      window.removeEventListener('storage', onChange)
-      window.removeEventListener('mcodne:recent-tutors:change', onChange as EventListener)
-    }
-  }, [])
-  if (!signedIn || !hasItems) return null
-  return (
-    <section className="bg-white border-b border-ink-200">
-      <Container className="pt-6 pb-4">
-        <RecentTutorsStrip />
-      </Container>
-    </section>
-  )
-}
-
 const HomeView = () => (
   <>
     <HomeHero />
-    <AuthedRecentTutorsStrip />
     <Categories />
     <FeaturedExperts />
     <HowItWorks />

@@ -17,7 +17,12 @@ export async function GET() {
     take: 500,
     include: {
       // Narrow user select so we never ship passwordHash / phone / email.
+      // omit the heavy blobs at the DB level (not just post-query) so the
+      // unbounded professionData JSON + legacy base64 videoUrl never cross the
+      // DB→Node wire once per row (take:500). stripTutorBlobs still runs below
+      // for the oversized-avatar guard.
       tutor: {
+        omit: { professionData: true, videoUrl: true },
         include: {
           user: { select: { id: true, fullName: true, avatarUrl: true } },
           category: { select: { id: true, slug: true, name: true } },

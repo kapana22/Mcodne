@@ -5,9 +5,16 @@ import { TabHeader } from './_parts'
 
 type State = { gaId: string; headerHtml: string; footerHtml: string }
 type Field = keyof State
+// components/Analytics.tsx falls back to NEXT_PUBLIC_GA_ID when the DB value is
+// empty, so „ამოშლა" does NOT necessarily turn GA off. The API reports whether
+// such an env id exists; the badge and copy must say so rather than claim
+// „გამორთული" while GA keeps loading. (Analytics.tsx itself is untouched here —
+// removing the env fallback is a separate call.)
+type Loaded = State & { envGaId?: string }
 
 export const IntegrationsSection = () => {
   const [saved, setSaved] = useState<State | null>(null)
+  const [envGaId, setEnvGaId] = useState('')
   const [draft, setDraft] = useState<State>({ gaId: '', headerHtml: '', footerHtml: '' })
   const [err, setErr] = useState<string | null>(null)
   const [flash, setFlash] = useState<{ kind: 'success' | 'error'; msg: string } | null>(null)
@@ -19,8 +26,13 @@ export const IntegrationsSection = () => {
       try {
         const res = await fetch('/api/admin/integrations')
         if (!res.ok) throw new Error()
-        const data: State = await res.json()
-        if (!cancelled) { setSaved(data); setDraft(data) }
+        const data: Loaded = await res.json()
+        if (!cancelled) {
+          const { gaId, headerHtml, footerHtml } = data
+          setSaved({ gaId, headerHtml, footerHtml })
+          setDraft({ gaId, headerHtml, footerHtml })
+          setEnvGaId((data.envGaId ?? '').trim())
+        }
       } catch { if (!cancelled) setErr('ჩატვირთვა ვერ მოხერხდა.') }
     })()
     return () => { cancelled = true }
@@ -39,12 +51,23 @@ export const IntegrationsSection = () => {
       const newVal = opts.reset ? '' : value
       setSaved(s => ({ ...(s ?? draft), [field]: newVal }))
       setDraft(d => ({ ...d, [field]: newVal }))
-      setFlash({ kind: 'success', msg: opts.reset ? 'ამოიშალა — გამორთულია.' : 'შენახულია — ცოცხალია საიტზე.' })
+      setFlash({
+        kind: 'success',
+        msg: opts.reset
+          // Don't claim „გამორთულია" when the env fallback keeps GA running.
+          ? (field === 'gaId' && envGaId
+            ? 'ამოიშალა — მაგრამ GA მაინც მუშაობს NEXT_PUBLIC_GA_ID-ით.'
+            : 'ამოიშალა — გამორთულია.')
+          : 'შენახულია — ცოცხალია საიტზე.',
+      })
     } catch { setFlash({ kind: 'error', msg: 'ვერ შეინახა — სცადე თავიდან.' }) }
     finally { setBusy(null) }
   }
 
-  const gaActive = !!saved?.gaId
+  // GA runs when EITHER the DB id or the env fallback is set — the badge must
+  // reflect what visitors actually get, not just what this panel stores.
+  const envOnly = !saved?.gaId && !!envGaId
+  const gaActive = !!saved?.gaId || envOnly
   const dirty = (f: Field) => saved !== null && draft[f] !== saved[f]
 
   return (
@@ -66,10 +89,20 @@ export const IntegrationsSection = () => {
           <div className="flex items-center justify-between gap-3 mb-1">
             <h2 className="font-display text-[15px] font-bold text-ink-900">Google Analytics</h2>
             <span className={`inline-flex items-center gap-1.5 h-6 px-2 rounded-pill text-[10px] font-bold uppercase tracking-wide ${gaActive ? 'bg-success-100 text-success-800' : 'bg-ink-100 text-ink-500'}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${gaActive ? 'bg-success-500' : 'bg-ink-400'}`} /> {gaActive ? 'აქტიური' : 'გამორთული'}
+              <span className={`w-1.5 h-1.5 rounded-full ${gaActive ? 'bg-success-500' : 'bg-ink-400'}`} /> {gaActive ? (envOnly ? 'აქტიური · env' : 'აქტიური') : 'გამორთული'}
             </span>
           </div>
           <p className="text-[12.5px] text-ink-500 leading-relaxed mb-3">Measurement ID (მაგ. <code className="text-ink-600">G-XXXXXXXX</code>). იტვირთება მხოლოდ ქუქი-თანხმობის შემდეგ.</p>
+          {/* Honest note: with NEXT_PUBLIC_GA_ID set, clearing this field does NOT
+              stop GA — the code falls back to the env id until it's removed on Railway. */}
+          {envGaId && (
+            <p className="text-[12px] text-warning-700 leading-relaxed mb-3">
+              გარემოს ცვლადში (<code>NEXT_PUBLIC_GA_ID</code>) მითითებულია <code className="font-mono">{envGaId}</code>
+              {saved?.gaId
+                ? ' — აქ შენახული ID-ს ენიჭება უპირატესობა.'
+                : ' — ეს ID მუშაობს ახლაც. აქედან „ამოშლა“ მას ვერ გამორთავს: წაშალე ცვლადი Railway-ზე.'}
+            </p>
+          )}
           <div className="flex gap-2">
             <input value={draft.gaId} onChange={e => setDraft(d => ({ ...d, gaId: e.target.value }))} placeholder="G-XXXXXXXX" className="flex-1 h-10 px-3 rounded-btn border border-ink-200 text-[13px] font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-shadow" />
             <button type="button" onClick={() => patch('gaId')} disabled={!dirty('gaId') || busy === 'gaId'} className="h-10 px-4 rounded-btn bg-ink-900 hover:bg-ink-800 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[12.5px] transition-colors shrink-0">{busy === 'gaId' ? '…' : 'შენახვა'}</button>

@@ -33,9 +33,12 @@ export function AlertsStack({
       key: 'no-slots',
       tone: 'warning',
       icon: 'calendar',
-      text: 'ჯერ ხელმისაწვდომი დრო არ გამოგიქვეყნებია',
-      sub: 'კლიენტი მხოლოდ გამოცხადებულ დროზე დაგიჯავშნის — სანამ თავისუფალ დროს არ დაამატებ, ჯავშანს ვერ მიიღებ.',
-      cta: { label: 'დროების გამოქვეყნება', href: '/tutor/schedule' },
+      // `upcomingSlots` is now free MINUTES (windows − active bookings), not a
+      // row count — so this also fires when every published window is full.
+      // The headline therefore says „აღარ გაქვს", not „არ გამოგიქვეყნებია".
+      text: 'თავისუფალი დრო აღარ გაქვს',
+      sub: 'დროის გარეშე ვერავინ დაგიჯავშნის.',
+      cta: { label: 'დროის გამოქვეყნება', href: '/tutor/schedule' },
     })
   }
 
@@ -45,7 +48,7 @@ export function AlertsStack({
         key: `resched-${b.id}`,
         tone: 'info',
         icon: 'clock',
-        text: `${b.student?.fullName ?? 'კლიენტი'} ითხოვს გადადებას`,
+        text: `${b.student?.fullName ?? 'სტუდენტი'} ითხოვს გადადებას`,
         sub: b.rescheduleRequest?.newStartAt
           ? `შემოთავაზებული დრო: ${fmtKaDateTime(new Date(b.rescheduleRequest.newStartAt))}`
           : undefined,
@@ -60,7 +63,7 @@ export function AlertsStack({
         key: `closure-${b.id}`,
         tone: 'info',
         icon: 'check',
-        text: `სესია დასრულდა — ${b.student?.fullName ?? 'კლიენტი'}`,
+        text: `სესია დასრულდა — ${b.student?.fullName ?? 'სტუდენტი'}`,
         sub: 'მონიშნე დასრულებულად ან გამოუცხადებლობად.',
         cta: { label: 'დახურვა', href: `/tutor/bookings/${b.id}` },
       })
@@ -101,7 +104,7 @@ export function AlertsStack({
       {rest > 0 && (
         <div className="text-right">
           <Link href="/tutor/bookings?tab=attention" className="text-[12.5px] text-brand-700 hover:text-brand-800 font-display font-semibold">
-            კიდევ {rest} ყურადღების საკითხი
+            კიდევ {rest} საკითხი
           </Link>
         </div>
       )}

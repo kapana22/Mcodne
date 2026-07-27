@@ -2,7 +2,7 @@ import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { notify } from '@/lib/notify'
+import { notify, normalizePrefs } from '@/lib/notify'
 import { markRelatedRead } from '@/lib/notifClear'
 import { newMeetingUrl, isStaleMeetingUrl } from '@/lib/meeting'
 import { sendMail } from '@/lib/mailer'
@@ -30,6 +30,10 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       // Narrow selects — bookings are visible to both parties + admin, but
       // passwordHash / phone / email should never leave the server.
       tutor: {
+        // Drop the heavy blobs at the DB level (this page renders neither the
+        // intro video nor professionData) — same omit the sibling booking routes
+        // already carry.
+        omit: { professionData: true, videoUrl: true },
         include: {
           // Expert email is NOT selected: no UI renders it and returning it to
           // the (any-authenticated) requester who booked a free slot is an
@@ -42,11 +46,26 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       student: { select: { id: true, fullName: true, avatarUrl: true, email: true } },
       consultation: true,
       messages: {
-        orderBy: { createdAt: 'asc' },
-        // Avatars are NOT embedded per message — BookingChat renders each
-        // sender's avatar from the 2 thread participants. Embedding a (base64)
-        // avatar per message once made this payload multi-MB.
-        include: { from: { select: { id: true, fullName: true } } },
+        // Newest-first + take, then flipped back to ascending below — same
+        // recent-200 cap /api/messages uses, so a long thread's whole history
+        // no longer rides on every booking GET. (`take` with 'asc' would keep
+        // the OLDEST 200 — the wrong end of the thread.)
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+        // Explicit `select`, and the base64 `fileUrl` attachment is NOT in it:
+        // each stored data: URL is up to 3 MB, so a handful of image attachments
+        // alone made this single GET multi-MB. These rows are only BookingChat's
+        // initial seed — it full-loads the thread (attachments included) from
+        // /api/messages the moment it mounts — so the rendered bubbles are
+        // unchanged. `fileName` stays: it carries the attachment affordance and
+        // the `__call__` invite sentinel.
+        // Avatars are likewise NOT embedded per message — BookingChat renders
+        // each sender's avatar from the 2 thread participants. Embedding a
+        // (base64) avatar per message once made this payload multi-MB.
+        select: {
+          id: true, body: true, fromId: true, createdAt: true, fileName: true,
+          from: { select: { id: true, fullName: true } },
+        },
       },
       // Include the student's post-session review (if any) so both parties can
       // render "already reviewed" state without a second round-trip.
@@ -91,7 +110,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const rescheduleRows = await reschedulePromise
   const rescheduleRequest = rescheduleRows?.[0]?.rescheduleRequest ?? null
 
-  return NextResponse.json({ ...booking, rescheduleRequest })
+  // The capped thread came back newest-first; hand it to the client in the
+  // ascending order the chat renders in.
+  const messages = [...booking.messages].reverse()
+
+  return NextResponse.json({ ...booking, messages, rescheduleRequest })
 }
 
 // Student-only "prep note" update — separate schema (no `action`) so it never
@@ -207,10 +230,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     after(async () => {
       try {
         const [student, profile] = await Promise.all([
-          prisma.user.findUnique({ where: { id: booking.studentId }, select: { email: true, fullName: true } }),
+          prisma.user.findUnique({ where: { id: booking.studentId }, select: { email: true, fullName: true, notificationPrefs: true } }),
           prisma.tutorProfile.findUnique({ where: { id: booking.tutorId }, select: { user: { select: { fullName: true } } } }),
         ])
-        if (student?.email) {
+        // Honor the student's notification prefs — the in-app notify() above
+        // already checks them; the email must too (BOOKING_CREATED covers the
+        // whole booking lifecycle, confirmations included).
+        if (student?.email && normalizePrefs(student.notificationPrefs).BOOKING_CREATED) {
           const { subject, html } = bookingConfirmedEmail({
             studentName: student.fullName,
             expertName: profile?.user.fullName || 'ექსპერტი',
@@ -286,11 +312,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (Date.now() < booking.startAt.getTime() + NO_SHOW_GRACE_MS) {
       return NextResponse.json({ ok: false, error: 'TOO_EARLY' }, { status: 400 })
     }
+    // Payout policy: the STUDENT didn't turn up, so this is NOT a refund case —
+    // the expert held the slot and showed up, so the money is RELEASED to them.
+    // (REFUNDED is reserved for tutor-cancel / decline / unanswered auto-cancel,
+    // where the student got nothing.)
     const claim = await prisma.booking.updateMany({
       where: { id, status: { in: ['CONFIRMED', 'LIVE'] } },
       data: {
         status: 'NO_SHOW',
-        payoutStatus: 'REFUNDED',
+        payoutStatus: 'RELEASED',
         tutorNotes: tutorNotes ?? booking.tutorNotes,
       },
     })
@@ -329,8 +359,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // Clear any leftover reschedule proposal so a completed booking never renders
   // a stuck pending-reschedule banner.
   await prisma.$executeRawUnsafe(`UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`, id)
+  // Bump the expert's public "N სესია ჩატარებული" stat. The status-guarded
+  // claim above (where status ∈ CONFIRMED/LIVE, count === 1) proves THIS request
+  // performed the transition — so a booking that was already COMPLETED (by the
+  // cron or a duplicate click) can't reach here and double-count.
+  await prisma.tutorProfile.update({
+    where: { id: booking.tutorId },
+    data: { sessionsCount: { increment: 1 } },
+  })
   await notify(booking.studentId, {
-    type: 'GENERIC',
+    type: 'BOOKING_COMPLETED',
     title: 'სესია დასრულდა',
     body: `${booking.topic} — დატოვე შეფასება`,
     href: `/student/bookings/${booking.id}`,

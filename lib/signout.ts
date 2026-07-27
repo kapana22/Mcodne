@@ -29,7 +29,7 @@ export async function signOut(dest: string = '/'): Promise<void> {
     // consent) and user-scoped keys (`…:${userId}`) deliberately survive.
     try {
       for (const k of [
-        'mcodne:recent-tutors',   // recently-viewed experts strip
+        'mcodne:recent-tutors',   // removed feature — kept so old devices get cleaned
         'mcodne:apply-draft',     // expert-application form draft
         'mcodne:signup-draft',    // signup form draft (name + email)
         'mtsodne:onboarding',     // onboarding wizard answers

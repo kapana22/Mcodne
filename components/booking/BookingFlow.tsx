@@ -25,8 +25,8 @@ import { RISK_REVERSAL_LINE } from '@/lib/copy'
 import { KA_MONTHS_LONG as KA_MONTHS_FULL } from '@/lib/kaDate'
 import {
   TUTOR_DEFAULTS, priceForDuration, DAY_SHORT, isoWeekday, startOfDay, fmtHM,
-  groupSlotsByDay, enumerateTimes,
-  type ApiSlot, type BusySlot, type ConsultationItem,
+  openStartsByDay, startsOnDay, firstOpenDay, toTimeChoices, isOpenStart,
+  type ApiSlot, type BusySlot, type ConsultationItem, type SlotRules,
 } from './slots'
 import { Calendar } from './Calendar'
 import { DayTimeline } from './DayTimeline'
@@ -119,15 +119,26 @@ export const BookingFlow = ({
   /* ── state ── */
   const [step, setStep] = useState<number>(1)
   const [selectedService, setSelectedService] = useState<ConsultationItem | null>(initialService)
-  const slotsByDay = React.useMemo(() => groupSlotsByDay(availability), [availability])
-  const firstFreeDate = React.useMemo(() => {
-    for (const s of availability) {
-      if (s.booked) continue
-      const d = new Date(s.startAt)
-      if (d.getTime() > Date.now()) return d
-    }
-    return null
-  }, [availability])
+
+  // A tapped consultation tier overrides the flat defaults: its minutes drive
+  // the slot DERIVATION and its price is what the summary restates (the server
+  // re-reads both from the Consultation row via consultationId anyway). This
+  // sits above the slot memos on purpose — the tier is chosen FIRST, so every
+  // start below is computed for the length actually being booked.
+  const duration = selectedService?.minutes ?? info?.sessionMin ?? TUTOR_DEFAULTS.durationMin
+  const priceNum = priceForDuration(selectedService?.price ?? info?.price ?? TUTOR_DEFAULTS.price, duration)
+  const price = `₾${priceNum}`
+  const total = `₾${priceNum}`
+  const rules = React.useMemo<SlotRules>(() => ({ bufferMin: info?.bufferMin ?? 0 }), [info?.bufferMin])
+
+  // Windows − bookings − THIS service's length: recomputed whenever the tier
+  // changes, so the calendar dots and the time grid always describe what can
+  // genuinely be booked.
+  const startsByDay = React.useMemo(
+    () => openStartsByDay(availability, busySlots, duration, rules),
+    [availability, busySlots, duration, rules],
+  )
+  const firstFreeDate = React.useMemo(() => firstOpenDay(startsByDay), [startsByDay])
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [viewMonth, setViewMonth] = useState<Date>(() => {
     const anchor = initialStart ?? new Date()
@@ -206,23 +217,23 @@ export const BookingFlow = ({
     setViewMonth(new Date(anchor.getFullYear(), anchor.getMonth(), 1))
   }, [open, selectedDate, firstFreeDate, initialStart])
 
-  // A tapped consultation tier overrides the flat defaults: its minutes drive
-  // the slot enumeration and its price is what the summary restates (the
-  // server re-reads both from the Consultation row via consultationId anyway).
-  const duration = selectedService?.minutes ?? info?.sessionMin ?? TUTOR_DEFAULTS.durationMin
-  const priceNum = priceForDuration(selectedService?.price ?? info?.price ?? TUTOR_DEFAULTS.price, duration)
-  const price = `₾${priceNum}`
-  const total = `₾${priceNum}`
-
   // Tier switches change the duration — a start picked for 30 წთ may not fit
-  // (or exist) in the 90-წთ enumeration. Re-validate and clear silently; the
-  // picker re-opens on the same day.
+  // (or exist) in the 90-წთ derivation. Re-validate against the SAME predicate
+  // the server uses (isStartOpen) and clear silently rather than carrying a
+  // now-illegal start into submit; the picker re-opens on the same day.
   useEffect(() => {
     if (!selectedStart || !info) return
-    const choices = enumerateTimes(startOfDay(selectedStart), info.availability, info.busySlots, duration)
-    const stillValid = choices.some(c => !c.taken && c.start.getTime() === selectedStart.getTime())
-    if (!stillValid) setSelectedStart(null)
-  }, [duration, info, selectedStart])
+    if (!isOpenStart(selectedStart, info.availability, info.busySlots, duration, rules)) setSelectedStart(null)
+  }, [duration, info, selectedStart, rules])
+
+  // …and the whole DAY can lose its free times when the service grows. Move to
+  // the first day that still has one instead of leaving the user parked on a
+  // day the calendar has just disabled.
+  useEffect(() => {
+    if (!open || !selectedDate || startsOnDay(startsByDay, selectedDate).length > 0) return
+    const next = firstOpenDay(startsByDay)
+    if (next) { setSelectedDate(next); setViewMonth(new Date(next.getFullYear(), next.getMonth(), 1)) }
+  }, [open, selectedDate, startsByDay])
 
   const resendVerify = async () => {
     if (resendingVerify) return
@@ -255,8 +266,11 @@ export const BookingFlow = ({
 
   const bookTutorId = info?.id || tutorId
   const timeChoices = selectedDate && info
-    ? enumerateTimes(selectedDate, availability, busySlots, duration)
+    ? toTimeChoices(startsOnDay(startsByDay, selectedDate), duration)
     : []
+  // „No free time" for THIS service — distinct from „the expert published
+  // nothing at all", which is a different sentence to the client.
+  const noOpenStarts = startsByDay.size === 0
 
   const dayLabelFull = selectedStart
     ? `${DAY_SHORT[isoWeekday(selectedStart)]} ${selectedStart.getDate()} ${KA_MONTHS_FULL[selectedStart.getMonth()]}`
@@ -267,11 +281,11 @@ export const BookingFlow = ({
   const submitBooking = async () => {
     if (!bookTutorId || submitting) return
     if (!selectedStart) {
-      setSubmitError('აირჩიე კონკრეტული დრო.')
+      setSubmitError('აირჩიე დრო.')
       return
     }
     if (!goalValid) {
-      setSubmitError(`მოკლედ აღწერე, რისი განხილვა გინდა (მინ. ${MIN_INTAKE_CHARS} სიმბოლო).`)
+      setSubmitError(`აღწერე, რისი განხილვა გინდა (მინ. ${MIN_INTAKE_CHARS} სიმბოლო).`)
       return
     }
     setSubmitting(true)
@@ -280,9 +294,19 @@ export const BookingFlow = ({
     setResendMsg(null)
     try {
       if (selectedStart.getTime() < Date.now()) {
-        setSubmitError('არჩეული დრო წარსულშია. აირჩიე მომავალი დრო.')
+        setSubmitError('ეს დრო წარსულშია — აირჩიე სხვა.')
         return
       }
+      // The „მასალის გაგზავნა სესიამდე“ checkbox has no dedicated API field
+      // (no schema change). When set, fold the intent into studentNotes so the
+      // expert actually sees it — but only if it still fits the 1000-char cap.
+      const STUDENT_NOTES_MAX = 1000
+      const baseNotes = details.goal.trim()
+      const preCallLine = '(სტუდენტს სურს მასალის წინასწარ გაზიარება)'
+      const studentNotes =
+        details.preCall && baseNotes.length + preCallLine.length + 2 <= STUDENT_NOTES_MAX
+          ? `${baseNotes}\n\n${preCallLine}`
+          : baseNotes
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -294,8 +318,9 @@ export const BookingFlow = ({
           consultationId: selectedService?.id,
           topic: details.topic || 'კონსულტაცია',
           // Mandatory intake (1.3) — the expert reads this on the request card
-          // and the booking detail page before the session.
-          studentNotes: details.goal.trim(),
+          // and the booking detail page before the session. Carries the
+          // pre-call material intent as an appended line when checked.
+          studentNotes,
           startAt: selectedStart.toISOString(),
           durationMin: duration,
           price: priceNum,
@@ -315,27 +340,27 @@ export const BookingFlow = ({
         // ever diverged. Removed: any such code now falls through to the generic
         // error below, never a hard verification wall.
         const msg =
-          code === 'SLOT_TAKEN' ? 'ეს დრო უკვე დაჯავშნილია. აირჩიე სხვა დრო.' :
-          code === 'NO_AVAILABILITY' ? 'ექსპერტი ამ დროზე არ არის ხელმისაწვდომი. აირჩიე მისი გამოცხადებული დროებიდან.' :
-          code === 'PAST_DATE' ? 'არჩეული დრო წარსულშია.' :
+          code === 'SLOT_TAKEN' ? 'ეს დრო დაიკავეს — აირჩიე სხვა.' :
+          code === 'NO_AVAILABILITY' ? 'ამ დროზე ექსპერტი დაკავებულია — აირჩიე სხვა დრო.' :
+          code === 'PAST_DATE' ? 'ეს დრო წარსულშია.' :
           code === 'SELF_BOOKING' ? 'ვერ დაიჯავშნი საკუთარ თავს.' :
           code === 'TUTOR_NOT_FOUND' ? 'ექსპერტი ვერ მოიძებნა.' :
-          code === 'CONSULTATION_NOT_FOUND' ? 'ეს სერვისი ვეღარ მოიძებნა — აირჩიე თავიდან.' :
-          code === 'TUTOR_UNAVAILABLE' ? 'ექსპერტი ამჟამად პაუზაზეა — ახალი ჯავშანი ვერ შეიქმნება.' :
-          code === 'RATE_LIMIT' ? 'ხშირად ცდი ჯავშანს — ცოტა ხანში სცადე თავიდან.' :
-          code === 'STUDENT_OVERLAP' ? 'ამ დროს უკვე გაქვს სხვა ჯავშანი. აირჩიე თავისუფალი დრო.' :
-          code === 'INVALID' ? 'შეავსე ყველა აუცილებელი ველი.' :
-          code === 'FORBIDDEN' ? 'ჯავშანი მხოლოდ კლიენტის ანგარიშს შეუძლია — ექსპერტის/ადმინის ანგარიშით ვერ დაჯავშნი.' :
+          code === 'CONSULTATION_NOT_FOUND' ? 'ეს სერვისი აღარ არსებობს — აირჩიე სხვა.' :
+          code === 'TUTOR_UNAVAILABLE' ? 'ექსპერტი პაუზაზეა — ვერ დაჯავშნი.' :
+          code === 'RATE_LIMIT' ? 'ხშირად ცდი — ცოტა ხანში სცადე.' :
+          code === 'STUDENT_OVERLAP' ? 'ამ დროს სხვა ჯავშანი გაქვს — აირჩიე სხვა.' :
+          code === 'INVALID' ? 'შეავსე ყველა ველი.' :
+          code === 'FORBIDDEN' ? 'ჯავშანი მხოლოდ სტუდენტს შეუძლია.' :
           // Surface the raw code when unmapped so a failure is never a silent
           // "try again" with no clue what went wrong.
-          `დაჯავშნა ვერ შესრულდა${code ? ` (${code})` : ''}. სცადე თავიდან.`
+          `ვერ დაიჯავშნა${code ? ` (${code})` : ''} — სცადე თავიდან.`
         setSubmitError(msg)
         return
       }
       setCreatedId(typeof data?.id === 'string' ? data.id : null)
       setSubmitted(true)
     } catch {
-      setSubmitError('ქსელის შეცდომა. შეამოწმე კავშირი და სცადე თავიდან.')
+      setSubmitError('ქსელის შეცდომა — სცადე თავიდან.')
     } finally {
       setSubmitting(false)
     }
@@ -410,16 +435,16 @@ export const BookingFlow = ({
             <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12.5px] font-medium">
               {submitUnverified ? (
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span>დაჯავშნამდე დაადასტურე ელფოსტა</span>
+                  <span>დაადასტურე ელფოსტა</span>
                   <span>·</span>
-                  <a href="/settings" className="underline font-semibold hover:text-danger-900">ბმული ვერიფიკაციაზე</a>
+                  <a href="/settings" className="underline font-semibold hover:text-danger-900">ვერიფიკაცია</a>
                   <button
                     type="button"
                     onClick={resendVerify}
                     disabled={resendingVerify}
                     className="ml-auto h-7 px-2 rounded-btn bg-white border border-danger-200 hover:border-danger-300 disabled:opacity-50 text-danger-700 font-display font-semibold text-[11.5px] transition-colors"
                   >
-                    {resendingVerify ? 'იგზავნება…' : 'კოდის ხელახლა გაგზავნა'}
+                    {resendingVerify ? 'იგზავნება…' : 'ხელახლა გაგზავნა'}
                   </button>
                   {resendMsg && <div className="w-full text-[11.5px] text-danger-700 mt-0.5">{resendMsg}</div>}
                 </div>
@@ -484,7 +509,7 @@ export const BookingFlow = ({
                   <Icon.warn className="w-5 h-5" />
                 </div>
                 <div className="font-display text-[15px] font-bold text-ink-900">მონაცემები ვერ ჩაიტვირთა</div>
-                <p className="text-[13px] text-ink-500 mt-2 max-w-[300px]">დროებითი ქსელური ხარვეზია. სცადე თავიდან.</p>
+                <p className="text-[13px] text-ink-500 mt-2 max-w-[300px]">ქსელის დროებითი ხარვეზი.</p>
                 <button
                   type="button"
                   onClick={() => setFetchAttempt(a => a + 1)}
@@ -516,7 +541,7 @@ export const BookingFlow = ({
                 მოთხოვნა გაგზავნილია
               </h3>
               <p className="text-[14px] text-ink-600 mt-3 max-w-[440px] leading-[1.55] motion-safe:animate-rise-in" style={{ animationDelay: '200ms' }}>
-                {dayLabelFull}{selectedStart ? ` · ${fmtHM(selectedStart)}` : ''} · {total} · {info.name}. ექსპერტი მალე დაადასტურებს — შეტყობინებას მიიღებ. ჯავშანი გამოჩნდება „ჩემი ჯავშნების“ გვერდზე.
+                {dayLabelFull}{selectedStart ? ` · ${fmtHM(selectedStart)}` : ''} · {total} · {info.name}. ექსპერტი მალე დაადასტურებს.
               </p>
               <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-2 motion-safe:animate-rise-in" style={{ animationDelay: '280ms' }}>
                 <Link
@@ -546,14 +571,48 @@ export const BookingFlow = ({
                 <Calendar
                   viewMonth={viewMonth}
                   selected={selectedDate}
-                  slotsByDay={slotsByDay}
+                  startsByDay={startsByDay}
                   onSelect={(d) => { setSelectedDate(d); setSelectedStart(null); scrollToTimesRef.current = true }}
                   onPrev={() => setViewMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
                   onNext={() => setViewMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
                 />
               </div>
               <div ref={timePaneRef} className="p-4 sm:p-6 lg:overflow-y-auto scroll-mt-4">
-                {selectedDate ? (
+                {/* Nothing bookable for THIS service length short-circuits the
+                    picker — a calendar of disabled days is a dead end. */}
+                {noOpenStarts ? (
+                  <div className="lg:h-full min-h-[260px] flex flex-col items-center justify-center text-center px-6 py-12">
+                    <div className="w-12 h-12 rounded-full bg-ink-100 inline-flex items-center justify-center text-ink-500 mb-4">
+                      <Icon.cal className="w-5 h-5" />
+                    </div>
+                    <div className="font-display text-[15px] font-bold text-ink-900">
+                      {availability.length === 0
+                        ? 'ჯერ არ აქვს თავისუფალი დროები'
+                        : `${duration} წუთი ვერსად ეტევა`}
+                    </div>
+                    <p className="text-[13px] text-ink-500 mt-2 max-w-[320px]">
+                      {availability.length === 0
+                        ? 'მიწერე — ხშირად ცალკე დროსაც ხსნიან.'
+                        : 'აირჩიე უფრო მოკლე სერვისი ან მიწერე ექსპერტს.'}
+                    </p>
+                    <div className="mt-5 flex flex-col sm:flex-row gap-2 items-center">
+                      <Link
+                        href={`/tutors/${bookTutorId}?intent=message`}
+                        onClick={(e) => { e.preventDefault(); onClose(); if (bookTutorId) window.location.href = `/tutors/${bookTutorId}?intent=message` }}
+                        className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+                      >
+                        მიწერე ექსპერტს
+                      </Link>
+                      <Link
+                        href="/tutors"
+                        onClick={() => onClose()}
+                        className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center transition-colors"
+                      >
+                        მსგავსი ექსპერტები
+                      </Link>
+                    </div>
+                  </div>
+                ) : selectedDate ? (
                   <>
                     <DayTimeline
                       date={selectedDate}
@@ -573,46 +632,18 @@ export const BookingFlow = ({
                           onClick={() => onClose()}
                           className="text-[12.5px] text-ink-500 hover:text-brand-700 font-display font-medium transition-colors"
                         >
-                          არცერთი დრო არ მაწყობს? მიწერე ექსპერტს
+                          დრო არ გაწყობს? მიწერე ექსპერტს
                         </Link>
                       </div>
                     )}
                   </>
-                ) : availability.length === 0 ? (
-                  <div className="lg:h-full min-h-[260px] flex flex-col items-center justify-center text-center px-6 py-12">
-                    <div className="w-12 h-12 rounded-full bg-ink-100 inline-flex items-center justify-center text-ink-500 mb-4">
-                      <Icon.cal className="w-5 h-5" />
-                    </div>
-                    <div className="font-display text-[15px] font-bold text-ink-900">
-                      ექსპერტს ჯერ არ აქვს გამოცხადებული დროები
-                    </div>
-                    <p className="text-[13px] text-ink-500 mt-2 max-w-[320px]">
-                      მიწერე პირდაპირ — ექსპერტი ხშირად ხსნის ინდივიდუალურ დროს კონკრეტული მოთხოვნით.
-                    </p>
-                    <div className="mt-5 flex flex-col sm:flex-row gap-2 items-center">
-                      <Link
-                        href={`/tutors/${bookTutorId}?intent=message`}
-                        onClick={(e) => { e.preventDefault(); onClose(); if (bookTutorId) window.location.href = `/tutors/${bookTutorId}?intent=message` }}
-                        className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
-                      >
-                        დაუკავშირდი ექსპერტს
-                      </Link>
-                      <Link
-                        href="/tutors"
-                        onClick={() => onClose()}
-                        className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center transition-colors"
-                      >
-                        მსგავსი ექსპერტები
-                      </Link>
-                    </div>
-                  </div>
                 ) : (
                   <div className="lg:h-full min-h-[260px] flex flex-col items-center justify-center text-center px-6 py-12">
                     <div className="w-12 h-12 rounded-full bg-ink-100 inline-flex items-center justify-center text-ink-500 mb-4">
                       <Icon.cal className="w-5 h-5" />
                     </div>
                     <div className="font-display text-[15px] font-bold text-ink-900">აირჩიე დღე კალენდარში</div>
-                    <p className="text-[13px] text-ink-500 mt-2 max-w-[280px]">შემდეგ გამოჩნდება ხელმისაწვდომი დროები.</p>
+                    <p className="text-[13px] text-ink-500 mt-2 max-w-[280px]">გამოჩნდება თავისუფალი დროები.</p>
                   </div>
                 )}
               </div>

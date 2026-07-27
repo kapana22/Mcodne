@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation'
 import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
 import { BookingChat } from '@/components/chat/BookingChat'
-import { ThreadHeader } from '@/components/chat/ThreadHeader'
+import { ThreadHeader, PreThreadLink } from '@/components/chat/ThreadHeader'
 import type { ChatUser } from '@/components/chat/useBookingThread'
 import { useMe } from '@/lib/me'
 
@@ -22,10 +22,13 @@ export default function StudentMessageThreadPage() {
 
   // Cheap membership probe so a foreign/deleted booking shows a clear state
   // instead of an eternally-loading chat (BookingChat polls silently on 403).
+  // `&probe=1` runs the SAME guards but returns just `{ ok }` — without it this
+  // re-fetched the entire thread (up to 200 messages, attachments included) that
+  // BookingChat is already fetching, purely to read a status code.
   useEffect(() => {
     if (!bookingId) return
     let cancelled = false
-    fetch(`/api/messages?bookingId=${bookingId}`)
+    fetch(`/api/messages?bookingId=${bookingId}&probe=1`)
       .then(r => { if (!cancelled && (r.status === 403 || r.status === 404)) setDenied(true) })
       .catch(() => {})
     return () => { cancelled = true }
@@ -40,8 +43,8 @@ export default function StudentMessageThreadPage() {
           <Icon.warn className="w-6 h-6" />
         </span>
         <div className="font-display text-[15px] font-semibold text-ink-800">მიმოწერა ვერ მოიძებნა</div>
-        <p className="text-[12.5px] text-ink-500 mt-1">შესაძლოა წაიშალა, ან არ არის შენი.</p>
-        <div className="mt-4"><Btn variant="secondary" size="sm" href="/student/messages">მიმოწერების სია</Btn></div>
+        <p className="text-[12.5px] text-ink-500 mt-1">წაიშალა, ან არ არის შენი.</p>
+        <div className="mt-4"><Btn variant="secondary" size="sm" href="/student/messages">სიაში დაბრუნება</Btn></div>
       </div>
     )
   }
@@ -53,14 +56,19 @@ export default function StudentMessageThreadPage() {
       me={me}
       variant="fill"
       autoFocus
-      emptyState={{ title: 'დაიწყე საუბარი', body: 'მიწერე ექსპერტს კითხვა ან დააზუსტე დეტალები კონსულტაციამდე — სწრაფი, კონკრეტული შეტყობინება უკეთეს პასუხს იძლევა.' }}
-      header={booking => (
-        <ThreadHeader
-          booking={booking}
-          peer={booking?.tutorUser}
-          backHref="/student/messages"
-          bookingHref={booking ? `/student/bookings/${booking.id}` : undefined}
-        />
+      emptyState={{ title: 'დაიწყე საუბარი', body: 'დასვი კითხვა ან დააზუსტე დეტალები კონსულტაციამდე.' }}
+      header={(booking, _pair, preThread) => (
+        <>
+          <ThreadHeader
+            booking={booking}
+            peer={booking?.tutorUser}
+            backHref="/student/messages"
+            bookingHref={booking ? `/student/bookings/${booking.id}` : undefined}
+          />
+          {/* The pre-booking Q&A with this expert, if there was one — the inbox
+              folds it into this thread, so this is its only entry point. */}
+          {preThread && <PreThreadLink href={preThread.href} />}
+        </>
       )}
       onActivity={() => window.dispatchEvent(new Event('mcodne:threads-refresh'))}
     />

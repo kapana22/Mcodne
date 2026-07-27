@@ -7,6 +7,7 @@ import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { useMe } from '@/lib/me'
+import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 import { showApplyCta } from '@/lib/roleHome'
 
 type Topic = 'general' | 'expert' | 'billing' | 'press' | 'other'
@@ -33,8 +34,8 @@ const CHANNELS = [
   {
     icon: <Icon.mail className="w-5 h-5" />,
     label: 'ელფოსტა',
-    value: 'hi@mcodne.ge',
-    href: 'mailto:hi@mcodne.ge',
+    value: SUPPORT_EMAIL,
+    href: `mailto:${SUPPORT_EMAIL}`,
     hint: 'პასუხი 24 საათში',
   },
   // Display values describe the actual destination (internal pages) — no
@@ -175,7 +176,7 @@ export default function ContactPage() {
                 value={message}
                 onChange={e => setMessage(e.target.value)}
                 className="w-full px-3.5 py-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none resize-y transition-colors leading-relaxed"
-                placeholder="მითხარი, რაშიც შეგვიძლია დაგეხმაროთ..."
+                placeholder="მითხარი, რაშიც შეგვიძლია დაგეხმაროთ…"
               />
               <div className={`mt-1 text-[11px] tabular-nums text-right ${message.length > 3800 ? 'text-warning-700 font-semibold' : 'text-ink-400'}`}>
                 {message.length} / 4000
@@ -212,7 +213,7 @@ export default function ContactPage() {
                 disabled={status === 'sending'}
                 className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-300 disabled:cursor-not-allowed text-white font-display font-semibold text-[13.5px] inline-flex items-center gap-2 transition-colors"
               >
-                {status === 'sending' ? 'იგზავნება...' : 'გაგზავნა'}
+                {status === 'sending' ? 'იგზავნება…' : 'გაგზავნა'}
               </button>
             </div>
           </form>

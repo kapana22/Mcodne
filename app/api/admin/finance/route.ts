@@ -9,10 +9,15 @@ export async function GET() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
 
+  // Month windows are scoped by `startAt` — when the session happened, i.e. when
+  // the money was earned. `updatedAt` (the old scope) is bumped by ANY later
+  // write, so resolving a May booking's dispute in July moved its whole price
+  // into July's GMV and out of the baseline, corrupting growthPct both ways.
+  // The Booking model has no completion timestamp, so startAt is the stable one.
   const [completed, monthCompleted, prevMonthCompleted, pending] = await Promise.all([
     prisma.booking.aggregate({ where: { status: 'COMPLETED' }, _sum: { price: true }, _count: { _all: true } }),
-    prisma.booking.aggregate({ where: { status: 'COMPLETED', updatedAt: { gte: monthStart } }, _sum: { price: true }, _count: { _all: true } }),
-    prisma.booking.aggregate({ where: { status: 'COMPLETED', updatedAt: { gte: prevMonthStart, lt: monthStart } }, _sum: { price: true } }),
+    prisma.booking.aggregate({ where: { status: 'COMPLETED', startAt: { gte: monthStart } }, _sum: { price: true }, _count: { _all: true } }),
+    prisma.booking.aggregate({ where: { status: 'COMPLETED', startAt: { gte: prevMonthStart, lt: monthStart } }, _sum: { price: true } }),
     prisma.booking.aggregate({ where: { status: 'COMPLETED', payoutStatus: 'PENDING' }, _sum: { price: true }, _count: { _all: true } }),
   ])
 

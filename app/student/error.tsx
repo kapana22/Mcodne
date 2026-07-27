@@ -27,7 +27,7 @@ export default function StudentError({
           </svg>
         </div>
         <div className="font-display text-[15.5px] font-bold text-ink-900 tracking-tight">რაღაც აირია</div>
-        <p className="text-[12.5px] text-ink-500 mt-1.5">გვერდის ჩატვირთვა ვერ მოხერხდა — სცადე თავიდან.</p>
+        <p className="text-[12.5px] text-ink-500 mt-1.5">გვერდი ვერ ჩაიტვირთა.</p>
         <button
           type="button"
           onClick={() => reset()}

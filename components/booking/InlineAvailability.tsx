@@ -10,8 +10,9 @@
 // uses; pre-booking chat does not exist yet).
 import React, { useState, useMemo } from 'react'
 import { Icon } from '@/components/Icon'
+import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 import {
-  groupSlotsByDay, enumerateTimes, computeNextFreeStart, startOfDay,
+  openStartsByDay, startsOnDay, firstOpenDay, toTimeChoices,
   type ApiSlot, type BusySlot,
 } from './slots'
 import { Calendar } from './Calendar'
@@ -21,29 +22,35 @@ export const InlineAvailability = ({
   availability,
   busySlots,
   sessionMin,
+  bufferMin = 0,
   priceLabel,
   tutorName,
   onPickSlot,
 }: {
   availability: ApiSlot[]
   busySlots: BusySlot[]
+  /** Service length this preview derives starts for — the expert's SHORTEST
+      real service (previewServiceMin), since no tier is chosen yet here. */
   sessionMin: number
+  bufferMin?: number
   /** Price string for the slot cards — the flat price, or the honest
       „₾N-დან“ from-price when tiers differ. */
   priceLabel: string
   tutorName: string
   onPickSlot: (start: Date) => void
 }) => {
-  const slotsByDay = useMemo(() => groupSlotsByDay(availability), [availability])
-  const nextFree = useMemo(
-    () => computeNextFreeStart(availability, busySlots, sessionMin),
-    [availability, busySlots, sessionMin],
+  // ONE derivation feeds both panes: windows − bookings − sessionMin.
+  const rules = useMemo(() => ({ bufferMin }), [bufferMin])
+  const startsByDay = useMemo(
+    () => openStartsByDay(availability, busySlots, sessionMin, rules),
+    [availability, busySlots, sessionMin, rules],
   )
+  const nextFree = useMemo(() => firstOpenDay(startsByDay), [startsByDay])
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [viewMonth, setViewMonth] = useState<Date | null>(null)
 
   // Seed with the first actually-bookable day once (data arrives async).
-  const effectiveDate = selectedDate ?? (nextFree ? startOfDay(nextFree) : null)
+  const effectiveDate = selectedDate ?? nextFree
   const effectiveMonth = viewMonth ?? (effectiveDate
     ? new Date(effectiveDate.getFullYear(), effectiveDate.getMonth(), 1)
     : new Date(new Date().getFullYear(), new Date().getMonth(), 1))
@@ -57,10 +64,10 @@ export const InlineAvailability = ({
         </div>
         <div className="font-display text-[15px] font-bold text-ink-900">თავისუფალი დროები ჯერ არ არის</div>
         <p className="text-[12.5px] text-ink-500 mt-1.5 max-w-[360px] mx-auto leading-snug">
-          მოგვწერე შენი შეკითხვა — გუნდი ექსპერტს დაუკავშირდება და დრო ხშირად ინდივიდუალურად იხსნება.
+          მოგვწერე — ხშირად ცალკე დროსაც ვაწყობთ.
         </p>
         <a
-          href={`mailto:hi@mcodne.ge?subject=${encodeURIComponent(`დროის მოთხოვნა — ${tutorName}`)}`}
+          href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`დროის მოთხოვნა — ${tutorName}`)}`}
           className="mt-4 inline-flex h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide items-center gap-1.5 transition-colors"
         >
           მოგვწერე <Icon.arrow className="w-3.5 h-3.5" />
@@ -69,9 +76,7 @@ export const InlineAvailability = ({
     )
   }
 
-  const timeChoices = effectiveDate
-    ? enumerateTimes(effectiveDate, availability, busySlots, sessionMin)
-    : []
+  const timeChoices = toTimeChoices(startsOnDay(startsByDay, effectiveDate), sessionMin)
 
   return (
     <div className="rounded-card border border-ink-200 bg-white overflow-hidden">
@@ -80,7 +85,7 @@ export const InlineAvailability = ({
           <Calendar
             viewMonth={effectiveMonth}
             selected={effectiveDate}
-            slotsByDay={slotsByDay}
+            startsByDay={startsByDay}
             onSelect={(d) => setSelectedDate(d)}
             onPrev={() => setViewMonth(new Date(effectiveMonth.getFullYear(), effectiveMonth.getMonth() - 1, 1))}
             onNext={() => setViewMonth(new Date(effectiveMonth.getFullYear(), effectiveMonth.getMonth() + 1, 1))}
@@ -102,7 +107,7 @@ export const InlineAvailability = ({
                 <Icon.cal className="w-5 h-5" />
               </div>
               <div className="font-display text-[15px] font-bold text-ink-900">აირჩიე დღე კალენდარში</div>
-              <p className="text-[13px] text-ink-500 mt-2 max-w-[280px]">შემდეგ გამოჩნდება ხელმისაწვდომი დროები.</p>
+              <p className="text-[13px] text-ink-500 mt-2 max-w-[280px]">გამოჩნდება თავისუფალი დროები.</p>
             </div>
           )}
         </div>

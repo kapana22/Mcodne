@@ -6,8 +6,9 @@ export async function GET() {
   // Compute the four hero numbers in a single aggregate query instead of pulling
   // every live tutor row into JS. The INNER JOIN to Category reproduces the old
   // `category: { is: { isLive: true } }` relation filter (which also excluded
-  // null-category tutors), and `available = true` skips paused tutors — so the
-  // numbers are identical to the previous findMany+reduce, at O(1) rows returned.
+  // null-category tutors), `available = true` skips paused tutors, and the User
+  // join drops admin-suspended accounts — the same three filters lib/tutorsQuery
+  // applies, so the hero totals can't exceed the list they head.
   // weightedSum = Σ(rating·reviewsCount) can't be expressed via Prisma aggregate,
   // hence $queryRaw; the whole thing is one round-trip.
   const [row] = await prisma.$queryRaw<
@@ -20,7 +21,8 @@ export async function GET() {
       COALESCE(SUM(tp."rating" * tp."reviewsCount"), 0)::float AS "weightedSum"
     FROM "TutorProfile" tp
     JOIN "Category" c ON c."id" = tp."categoryId"
-    WHERE tp."available" = true AND c."isLive" = true
+    JOIN "User" u ON u."id" = tp."userId"
+    WHERE tp."available" = true AND c."isLive" = true AND u."suspendedAt" IS NULL
   `
 
   const total = row?.total ?? 0

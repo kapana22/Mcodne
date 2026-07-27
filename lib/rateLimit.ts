@@ -28,11 +28,29 @@ export function rateLimit(key: string, max: number, windowSec: number): RateResu
   return { ok: true }
 }
 
+// Resolve the real client IP for rate-limit keying.
+//
+// The LEFTMOST x-forwarded-for entry is attacker-controlled — a client can send
+// `X-Forwarded-For: <random>` and the proxy just PREPENDS its observed address,
+// so trusting parts[0] lets anyone mint a fresh limiter bucket per request and
+// defeat every IP-keyed limit (signup, contact, signin, otp, reset). Instead key
+// on the hop the trusted proxy actually appended: index from the RIGHT by the
+// number of trusted proxies in front of the app (Railway's edge = 1). An attacker
+// can prepend spoofed hops on the left but cannot remove or forge the real one on
+// the right. TRUSTED_PROXY_HOPS overrides the default if the platform adds more
+// internal hops.
+const TRUSTED_PROXY_HOPS = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS) || 1)
+
 export function clientIp(req: Request): string {
-  const h = req.headers
-  return (
-    h.get('x-forwarded-for')?.split(',')[0].trim() ||
-    h.get('x-real-ip') ||
-    'unknown'
-  )
+  const xff = req.headers.get('x-forwarded-for')
+  if (xff) {
+    const parts = xff.split(',').map(s => s.trim()).filter(Boolean)
+    if (parts.length > 0) {
+      const idx = Math.max(0, parts.length - TRUSTED_PROXY_HOPS)
+      return parts[idx]
+    }
+  }
+  // x-real-ip is only trustworthy if the edge sets it; used purely as a fallback
+  // when no XFF is present (e.g. local/dev). Never preferred over the proxy hop.
+  return req.headers.get('x-real-ip')?.trim() || 'unknown'
 }

@@ -13,6 +13,7 @@ export const SiteTextsSection = () => {
   const [flash, setFlash] = useState<{ kind: 'success' | 'error'; msg: string } | null>(null)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
+  const [q, setQ] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -31,10 +32,19 @@ export const SiteTextsSection = () => {
   }, [])
 
   const groups = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    const match = (it: Item) =>
+      !needle ||
+      it.label.toLowerCase().includes(needle) ||
+      it.key.toLowerCase().includes(needle) ||
+      it.value.toLowerCase().includes(needle)
     const m = new Map<string, Item[]>()
-    for (const it of items ?? []) { const a = m.get(it.group) ?? []; a.push(it); m.set(it.group, a) }
+    for (const it of items ?? []) {
+      if (!match(it)) continue
+      const a = m.get(it.group) ?? []; a.push(it); m.set(it.group, a)
+    }
     return [...m.entries()]
-  }, [items])
+  }, [items, q])
 
   const save = async (key: string) => {
     const value = drafts[key] ?? ''
@@ -68,7 +78,7 @@ export const SiteTextsSection = () => {
       <TabHeader
         eyebrow="ტექსტები"
         title="საიტის ტექსტები"
-        sub="შეცვალე მთავარი გვერდისა და footer-ის ტექსტები — ცვლილება მაშინვე ცოცხლდება საიტზე."
+        sub="მთავარი, სფეროები, ჩვენ შესახებ და დახმარების ტექსტები — ცვლილება მაშინვე ცოცხლდება საიტზე."
       />
 
       <section className="px-6 lg:px-8 py-6 max-w-[760px]">
@@ -78,6 +88,25 @@ export const SiteTextsSection = () => {
         )}
 
         {items === null && <div className="text-[13px] text-ink-400 py-10">იტვირთება…</div>}
+
+        {items !== null && (
+          <div className="relative mb-6">
+            <input
+              type="search"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="მოძებნე ტექსტი, სახელი ან key…"
+              className="w-full h-10 pl-3 pr-9 rounded-btn border border-ink-200 text-[13.5px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-shadow"
+            />
+            {q && (
+              <button type="button" onClick={() => setQ('')} aria-label="გასუფთავება" className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded-btn text-ink-400 hover:text-ink-800 hover:bg-ink-100 transition-colors text-[15px] leading-none">×</button>
+            )}
+          </div>
+        )}
+
+        {items !== null && groups.length === 0 && (
+          <div className="text-[13px] text-ink-400 py-10">ვერაფერი მოიძებნა „{q}“-ზე.</div>
+        )}
 
         <div className="flex flex-col gap-9">
           {groups.map(([group, list]) => (

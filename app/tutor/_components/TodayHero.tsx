@@ -38,8 +38,8 @@ export function TodayHero({
           variant="inline"
           icon={<Icon.calendar className="w-5 h-5" />}
           title="დადასტურებული სესია არ გაქვს"
-          description="გამოაქვეყნე თავისუფალი დროები — კლიენტები მხოლოდ გამოცხადებულ დროზე ჯავშნიან."
-          cta={{ label: 'გრაფიკის რედაქტირება', href: '/tutor/schedule' }}
+          description="გამოაქვეყნე დრო, რომ დაგიჯავშნონ."
+          cta={{ label: 'გრაფიკი', href: '/tutor/schedule' }}
         />
       </Card>
     )
@@ -78,8 +78,8 @@ export function TodayHero({
             <div className="inline-flex items-center gap-2.5">
               <Avatar src={next.student?.avatarUrl ?? undefined} name={next.student?.fullName} size={36} />
               <div className="min-w-0">
-                <div className="font-display font-semibold text-[13.5px] text-white">{next.student?.fullName ?? 'უცნობი კლიენტი'}</div>
-                <div className="text-[11.5px] text-white/55 mt-0.5">კლიენტი</div>
+                <div className="font-display font-semibold text-[13.5px] text-white">{next.student?.fullName ?? 'უცნობი სტუდენტი'}</div>
+                <div className="text-[11.5px] text-white/55 mt-0.5">სტუდენტი</div>
               </div>
             </div>
 

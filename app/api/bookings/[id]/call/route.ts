@@ -23,6 +23,13 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   })
   if (!booking) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
+  // Only the EXPERT may start a video call — the student joins, never initiates.
+  // (Product decision: the expert runs the session; a student can't ring the
+  // expert unprompted.)
+  if (booking.tutor.userId !== user.id) {
+    return NextResponse.json({ ok: false, error: 'ONLY_EXPERT' }, { status: 403 })
+  }
+
   // No calls on a finished/dead booking.
   if (booking.status === 'COMPLETED' || booking.status === 'CANCELED' || booking.status === 'NO_SHOW') {
     return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 400 })

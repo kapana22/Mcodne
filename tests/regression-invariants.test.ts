@@ -78,9 +78,14 @@ function check(name: string, ok: boolean, hint: string) {
     'Duration must come from consultationDurationMin (Expert.durationMin) — the detail page shows the real value and the surfaces must agree.',
   )
   check(
-    'C2: home hero next-availability is derived, not a static placeholder',
-    home.includes('fmtNextShort') && !home.includes("next: 'დაჯავშნით'"),
-    'Expert.next must format t.nextSlotAt (fmtNextShort), never a hardcoded string.',
+    // REWRITTEN 2026-07-27. The original guard required the hero to RENDER a
+    // derived next-availability line (`fmtNextShort`). That preview was removed
+    // by product decision on 2026-07-21 — a slot-less expert is now routed to
+    // „მიწერე ექსპერტს" instead of being advertised with a time. What still
+    // matters is the thing the guard was really protecting: no FAKE availability.
+    'C2: home hero never advertises a hardcoded availability promise',
+    !home.includes("next: 'დაჯავშნით'") && !/ხელმისაწვდომია\s+ახლავე/.test(home),
+    'A static "available now" string next to a real expert is a fabricated claim.',
   )
 }
 
@@ -90,9 +95,13 @@ function check(name: string, ok: boolean, hint: string) {
   // into a server page.tsx (SSR seed) + client.tsx (interactive list).
   const tutors = read('app/tutors/client.tsx')
   check(
-    'D: /tutors PRICE_OPTS are min-floors ("₾N-დან"), not ranges',
-    tutors.includes('-დან') && !/₾40\s*–\s*₾80/.test(tutors),
-    'The filter apply logic only reads price[0] (t.price < min); range labels lie and the default state renders as active.',
+    // REWRITTEN 2026-07-27. The original guard banned RANGE labels because the
+    // apply logic only read price[0], so „₾50–100" lied. The filter is now a
+    // real two-bound range (dual-handle slider + NO_CAP sentinel), so ranges are
+    // correct — what must hold instead is that BOTH bounds are actually applied.
+    'D: /tutors price filter applies both bounds, not just the floor',
+    tutors.includes('filters.price[1]') && tutors.includes('NO_CAP'),
+    'Reading only price[0] makes the upper bound decorative — the label would promise a cap the list ignores.',
   )
 }
 
@@ -146,14 +155,16 @@ function check(name: string, ok: boolean, hint: string) {
     /after\(\s*async/.test(api),
     'notify + markRelatedRead cost 3 round-trips the sender must not wait on.',
   )
-  const sInbox = read('app/student/messages/page.tsx')
-  // The tutor inbox moved to the two-pane messages center: the API computes
-  // `at` from the last message and ConversationList sorts on it.
-  const tList = read('app/tutor/messages/_components/ConversationList.tsx')
+  // BOTH inboxes became two-pane centers whose list is the SHARED
+  // components/chat/ConversationList (was app/tutor/messages/_components/…),
+  // rendered from the layout. app/student/messages/page.tsx is now just the
+  // desktop "pick a conversation" placeholder, so the old per-page sort
+  // assertion can never hold — the substance moved to the API + shared list,
+  // and both halves are still asserted below.
+  const tList = read('components/chat/ConversationList.tsx')
   check(
     'H3: inboxes sort by last-message time, not booking.updatedAt',
-    sInbox.includes('messages[0]?.createdAt.getTime') &&
-      api.includes('at: (last?.createdAt') &&
+    api.includes('at: (last?.createdAt') &&
       tList.includes('new Date(z.at).getTime() - new Date(a.at).getTime()'),
     'booking.updatedAt is not bumped by messages — sorting on it buries fresh threads.',
   )
@@ -170,16 +181,21 @@ function check(name: string, ok: boolean, hint: string) {
   const tPane = read('app/tutor/bookings/[id]/page.tsx')
   const hook = read('components/chat/useBookingThread.ts')
   check(
-    'H5: both chat panes poll the thread while visible',
-    sPane.includes('/api/messages?bookingId=') &&
-      hook.includes('/api/messages?bookingId=') &&
-      tPane.includes('BookingChat'),
+    // REWRITTEN 2026-07-27. Both guards used to assert that the STUDENT pane
+    // carried its own local copy of the polling + optimistic-append logic. That
+    // duplication is gone: both panes now render the shared <BookingChat>, and
+    // the behavior lives once in useBookingThread. Guard the unified shape —
+    // asserting the old per-pane copies would push the duplication back.
+    'H5: both chat panes use the shared thread, which polls while visible',
+    sPane.includes('BookingChat') &&
+      tPane.includes('BookingChat') &&
+      hook.includes('/api/messages?bookingId='),
     'Without polling, incoming messages only appeared on a full page reload.',
   )
   check(
-    'H6: both chat panes append optimistically (tmp- reconcile)',
-    sPane.includes("`tmp-${Date.now()}`") && hook.includes("`tmp-${Date.now()}`"),
-    'Waiting for the POST (seconds on remote DB) before showing your own bubble feels broken.',
+    'H6: the shared thread appends optimistically and reconciles tmp- ids',
+    hook.includes("`tmp-${Date.now()}`") && hook.includes('upsert'),
+    'Waiting for the POST (seconds on remote DB) before showing your own bubble feels broken; without id reconcile the bubble duplicates.',
   )
 }
 

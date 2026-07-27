@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { audit } from '@/lib/audit'
 import { normalizePrefs } from '@/lib/notify'
 
 const Segment = z.enum(['all', 'students', 'tutors', 'recent'])
@@ -28,7 +29,7 @@ function whereForSegment(segment: z.infer<typeof Segment>) {
 // dispatched — this uses the existing in-app Notification model only. We chunk
 // via createMany to keep the write to one query per segment.
 export async function POST(req: Request) {
-  await requireRole('ADMIN')
+  const admin = await requireRole('ADMIN')
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   const { segment, subject, body } = parsed.data
@@ -55,5 +56,17 @@ export async function POST(req: Request) {
   // broadcast fan-out. skipDuplicates has no effect here (no unique on user/
   // title) but is left off to keep behavior explicit.
   const res = await prisma.notification.createMany({ data: rows })
+  // A message that lands in every user's bell is worth a trail: who sent what,
+  // to which segment, and how many rows it actually wrote.
+  await audit(admin.id, 'broadcast.send', {
+    meta: {
+      segment,
+      subject: subject.trim(),
+      body: body.trim().slice(0, 300),
+      sent: res.count,
+      segmentSize: users.length,
+      optedOut: users.length - targets.length,
+    },
+  })
   return NextResponse.json({ ok: true, sent: res.count })
 }

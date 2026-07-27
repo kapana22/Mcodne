@@ -7,7 +7,7 @@ import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
 import { PageHeader } from '@/components/tutor/PageHeader'
 import { fmtKaDate, KA_MONTHS_LONG } from '@/lib/kaDate'
-import { TUTOR_PAYOUT_PCT } from '@/lib/flags'
+import { COMMISSION_PCT, PAYMENTS_LIVE, TUTOR_PAYOUT_PCT } from '@/lib/flags'
 
 type Tx = {
   id: string
@@ -36,10 +36,18 @@ const fmtDate = (iso: string) => {
   } catch { return iso }
 }
 
+// Badges: hairline border + colored text, NO pastel fill (design canon) — the
+// PENDING case was already correct; RELEASED/REFUNDED carried `bg-success-50` /
+// `bg-ink-100`. Wording is gated on PAYMENTS_LIVE because „გადარიცხულია“ /
+// „დაბრუნდა“ assert that money moved, which is false while bookings are free.
 const payoutLabel = (s: Tx['payoutStatus']) =>
   s === 'PENDING' ? { l: 'მოლოდინში', cls: 'bg-transparent text-ink-500 border-ink-200' }
-  : s === 'RELEASED' ? { l: 'გადარიცხულია', cls: 'bg-success-50 text-success-700 border-success-200' }
-  : { l: 'დაბრუნდა', cls: 'bg-ink-100 text-ink-700 border-ink-200' }
+  : s === 'RELEASED' ? { l: PAYMENTS_LIVE ? 'გადარიცხულია' : 'დასრულდა', cls: 'bg-transparent text-success-700 border-success-200' }
+  : { l: PAYMENTS_LIVE ? 'დაბრუნდა' : 'ანულირდა', cls: 'bg-transparent text-ink-600 border-ink-200' }
+
+// The gross/net split only means something once a commission is actually
+// withheld. Until then the two columns would print identical numbers.
+const SHOW_GROSS = PAYMENTS_LIVE
 
 export default function TutorEarningsPage() {
   const [data, setData] = useState<Earnings | null>(null)
@@ -91,9 +99,17 @@ export default function TutorEarningsPage() {
       <PageHeader
         className="mb-6"
         title="შემოსავალი"
-        sub={`დამუშავებული ჯავშნები და ტრანზაქციები · შენი წილი ${TUTOR_PAYOUT_PCT}%`}
+        sub={PAYMENTS_LIVE ? `შენი წილი ${TUTOR_PAYOUT_PCT}%` : 'სრული თანხა შენია'}
         actions={
-          <Btn variant="secondary" size="sm" href="/api/tutor/earnings?format=csv">
+          // A real action, not a <Link>: as an href this rendered a next/link,
+          // so Next's prefetch fired the CSV-generating GET (a 5000-row query)
+          // merely by opening the page. Content-Disposition: attachment means
+          // the browser downloads without navigating away.
+          <Btn
+            variant="secondary"
+            size="sm"
+            onClick={() => { window.location.href = '/api/tutor/earnings?format=csv' }}
+          >
             CSV ექსპორტი
           </Btn>
         }
@@ -133,7 +149,9 @@ export default function TutorEarningsPage() {
                   <CountUp value={data.totalEarned} prefix="₾" />
                 </div>
                 <p className="mt-3 text-[12px] text-white/60 leading-snug max-w-[420px]">
-                  გადარიცხვები მალე ამოქმედდება — ამჟამად ჯავშნები ტარდება უფასოდ.
+                  {PAYMENTS_LIVE
+                    ? `გადარიცხვა სესიის დასრულების შემდეგ — საკომისიო ${COMMISSION_PCT}%.`
+                    : `ახლა ჯავშნა უფასოა — სრული თანხა შენია. ${COMMISSION_PCT}% საკომისიო ონლაინ გადახდების ამოქმედებისას დაიწყება.`}
                 </p>
               </div>
               <div className="flex sm:flex-col gap-4 sm:gap-2 sm:text-right">
@@ -141,9 +159,18 @@ export default function TutorEarningsPage() {
                   <div className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">ამ თვეში</div>
                   <div className="font-display text-[18px] font-bold tabular-nums">{fmtGel(data.thisMonth?.earned ?? 0)}</div>
                 </div>
+                {/* „გადარიცხვის მოლოდინში“ was structurally always ₾0 — every
+                    completion path sets payoutStatus RELEASED, so no COMPLETED
+                    booking is ever PENDING. Until a real payout queue exists it
+                    would be a permanently-zero metric dressed as meaningful; the
+                    honest number today is the cut we take: none. */}
                 <div>
-                  <div className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">გადარიცხვის მოლოდინში</div>
-                  <div className="font-display text-[18px] font-bold tabular-nums">{fmtGel(data.pendingPayout)}</div>
+                  <div className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                    {PAYMENTS_LIVE ? 'გადარიცხვის მოლოდინში' : 'საკომისიო'}
+                  </div>
+                  <div className="font-display text-[18px] font-bold tabular-nums">
+                    {PAYMENTS_LIVE ? fmtGel(data.pendingPayout) : '0%'}
+                  </div>
                 </div>
               </div>
             </div>
@@ -179,7 +206,7 @@ export default function TutorEarningsPage() {
                 <Eyebrow as="span" tone="muted">საშუალო სესიაზე</Eyebrow>
               </div>
               <div className="font-display text-[24px] font-bold text-ink-900 tabular-nums">{fmtGel(avgPerSession)}</div>
-              <div className="text-[11.5px] text-ink-500 mt-1">ნეტო, {TUTOR_PAYOUT_PCT}% წილით</div>
+              <div className="text-[11.5px] text-ink-500 mt-1">{PAYMENTS_LIVE ? `ნეტო, ${TUTOR_PAYOUT_PCT}% წილით` : 'სრული თანხა'}</div>
             </div>
           </div>
 
@@ -195,7 +222,7 @@ export default function TutorEarningsPage() {
                 <EmptyState
                   icon={<Icon.wallet className="w-6 h-6" />}
                   title="ჯერ არაფერია"
-                  description="დაასრულე პირველი სესია, რომ აქ ტრანზაქცია გამოჩნდეს."
+                  description="პირველი სესიის შემდეგ აქ გამოჩნდება."
                   cta={{ label: 'გრაფიკის შევსება', href: '/tutor/schedule' }}
                 />
               </div>
@@ -203,7 +230,9 @@ export default function TutorEarningsPage() {
               <>
                 {hasRefunded && (
                   <div className="px-5 py-2 border-b border-ink-100 text-[11.5px] text-ink-500 bg-ink-50/40">
-                    „დაბრუნდა“ — გაუქმებული ან გამოუცხადებლობის სესია, თანხა კლიენტს დაუბრუნდა.
+                    {PAYMENTS_LIVE
+                      ? '„დაბრუნდა“ — თანხა სტუდენტს დაუბრუნდა.'
+                      : '„ანულირდა“ — დავა სტუდენტის სასარგებლოდ გადაწყდა.'}
                   </div>
                 )}
                 {/* Mobile: card rows under month headers */}
@@ -227,7 +256,7 @@ export default function TutorEarningsPage() {
                                 <span className="truncate">{tx.topic}</span>
                                 <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border font-display text-[10px] font-bold uppercase tracking-[0.12em] shrink-0 ${s.cls}`}>{s.l}</span>
                               </div>
-                              <div className="mt-1 text-[11.5px] text-ink-400 tabular-nums">{fmtDate(tx.startAt)} · {tx.durationMin} წთ · ბრუტო {fmtGel(tx.gross)}</div>
+                              <div className="mt-1 text-[11.5px] text-ink-400 tabular-nums">{fmtDate(tx.startAt)} · {tx.durationMin} წთ{SHOW_GROSS ? ` · ბრუტო ${fmtGel(tx.gross)}` : ''}</div>
                             </div>
                           )
                         })}
@@ -241,11 +270,11 @@ export default function TutorEarningsPage() {
                     <thead className="bg-ink-50 text-ink-500 font-display font-semibold uppercase text-[10.5px] tracking-[0.14em]">
                       <tr>
                         <th className="text-left px-5 py-3 whitespace-nowrap">თარიღი</th>
-                        <th className="text-left px-5 py-3 whitespace-nowrap">კლიენტი</th>
+                        <th className="text-left px-5 py-3 whitespace-nowrap">სტუდენტი</th>
                         <th className="text-left px-5 py-3">თემა</th>
                         <th className="text-right px-5 py-3 whitespace-nowrap">ხანგრძლივობა</th>
-                        <th className="text-right px-5 py-3 whitespace-nowrap">ბრუტო</th>
-                        <th className="text-right px-5 py-3 whitespace-nowrap">ნეტო</th>
+                        {SHOW_GROSS && <th className="text-right px-5 py-3 whitespace-nowrap">ბრუტო</th>}
+                        <th className="text-right px-5 py-3 whitespace-nowrap">{SHOW_GROSS ? 'ნეტო' : 'თანხა'}</th>
                         <th className="text-right px-5 py-3 whitespace-nowrap">სტატუსი</th>
                       </tr>
                     </thead>
@@ -272,7 +301,7 @@ function FragmentRows({ group }: { group: { label: string; net: number; items: T
   return (
     <>
       <tr className="bg-ink-50/70 border-t border-ink-200">
-        <td colSpan={5} className="px-5 py-2 font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+        <td colSpan={SHOW_GROSS ? 5 : 4} className="px-5 py-2 font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
           {group.label}
         </td>
         <td className="px-5 py-2 text-right font-display text-[12px] font-bold text-ink-700 tabular-nums">₾{group.net.toLocaleString('en-US')}</td>
@@ -286,7 +315,7 @@ function FragmentRows({ group }: { group: { label: string; net: number; items: T
             <td className="px-5 py-3 text-ink-800 font-medium truncate max-w-[180px]">{tx.student?.fullName ?? '—'}</td>
             <td className="px-5 py-3 text-ink-600 truncate max-w-[240px]">{tx.topic}</td>
             <td className="px-5 py-3 text-right text-ink-600 tabular-nums">{tx.durationMin} წთ</td>
-            <td className="px-5 py-3 text-right text-ink-600 tabular-nums">₾{tx.gross.toLocaleString('en-US')}</td>
+            {SHOW_GROSS && <td className="px-5 py-3 text-right text-ink-600 tabular-nums">₾{tx.gross.toLocaleString('en-US')}</td>}
             <td className="px-5 py-3 text-right font-display font-bold text-ink-900 tabular-nums">₾{tx.net.toLocaleString('en-US')}</td>
             <td className="px-5 py-3 text-right">
               <span className={`inline-flex items-center h-6 px-2 rounded-pill border font-display text-[10.5px] font-bold uppercase tracking-[0.14em] ${s.cls}`}>{s.l}</span>

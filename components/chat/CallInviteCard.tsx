@@ -29,7 +29,7 @@ export function CallInviteCard({
         <div className="font-display text-[13.5px] font-bold text-ink-900 leading-tight">ვიდეოზარზე მოწვევა</div>
       </div>
       <div className="text-[12px] text-ink-600 mb-3 leading-snug">
-        {mine ? 'მოწვევა გაიგზავნა — თავად შედი ან დაელოდე მეორე მხარეს.' : `${fromName} გიწვევს ვიდეოზარზე ახლავე.`}
+        {mine ? 'მოწვევა გაიგზავნა — შედი ან დაელოდე.' : `${fromName} გიწვევს ვიდეოზარზე.`}
       </div>
       {room && (
         <a

@@ -2,6 +2,8 @@
 import { WorkspaceSidebar } from './WorkspaceSidebar'
 import { WorkspaceTopBar } from './WorkspaceTopBar'
 import { WorkspaceFooter } from '@/components/WorkspaceFooter'
+import { Container } from '@/components/Container'
+import { OpenTimeNudge } from './OpenTimeNudge'
 import { useNavBadges } from './useNavBadges'
 
 /* Visual shell for every /tutor/* page: desktop = sticky sidebar + top bar,
@@ -22,14 +24,20 @@ export function WorkspaceShell({
       <WorkspaceSidebar badges={badges} />
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         <WorkspaceTopBar user={user} />
-        {/* Column matches the canon Container ("wide" = 1280, gutter px-6 sm:px-8)
-            so the tutor and student workspaces line up edge-for-edge — they were
-            1120/px-4 vs the student's 1280/px-6 before. */}
-        <main className="flex-1 w-full max-w-[1280px] mx-auto px-6 sm:px-8 py-6 lg:py-8">
+        {/* The canon page grid itself ("wide" = 1280, gutter px-6 sm:px-8) so the
+            tutor and student workspaces line up edge-for-edge. Pages that nest
+            their own <Container> inside this one (booking detail's not-found /
+            loading states) would otherwise pay the gutter TWICE — 48px on mobile
+            — so a nested container drops its own horizontal padding here; the
+            shell's gutter already covers it. */}
+        <Container as="main" className="flex-1 py-6 lg:py-8 [&_.mx-auto.px-6]:px-0">
           {children}
-        </main>
+        </Container>
         <WorkspaceFooter />
       </div>
+      {/* Mounted at shell level (not per page) so the „open your time" nudge can
+          reach a freshly approved expert wherever they land in the workspace. */}
+      <OpenTimeNudge noAvailability={badges.noAvailability} />
     </div>
   )
 }

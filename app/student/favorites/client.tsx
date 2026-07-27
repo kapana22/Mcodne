@@ -47,10 +47,10 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
       } else {
         // The list is only mutated on success (no optimistic removal), so a
         // failure just needs to be surfaced — previously it was silent.
-        toast('ვერ მოიხერხდა წაშლა — სცადე თავიდან', 'error')
+        toast('წაშლა ვერ მოხერხდა', 'error')
       }
     } catch {
-      toast('ვერ მოიხერხდა წაშლა — სცადე თავიდან', 'error')
+      toast('წაშლა ვერ მოხერხდა', 'error')
     } finally { setRemoving(null) }
   }
 
@@ -65,7 +65,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
             className={`h-9 px-3.5 rounded-btn inline-flex items-center gap-1.5 font-display text-[12px] font-semibold tracking-wide transition-colors ${compare ? 'bg-ink-900 text-white' : 'bg-white border border-ink-200 hover:border-ink-300 text-ink-800'}`}
           >
             <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M8 3v18M16 3v18M3 8h5M16 16h5M3 16h5M16 8h5" /></svg>
-            გვერდიგვერდ შედარება
+            შედარება
           </button>
         </div>
       )}
@@ -73,7 +73,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
       {compare && cheapest && topRated && (
         <div className="mb-5 rounded-card overflow-hidden border border-ink-200 bg-ink-900 text-white">
           <div className="px-5 py-4 flex items-baseline justify-between">
-            <div className="font-display text-[13px] font-bold tracking-tight">გვერდიგვერდ — {items.length} ექსპერტი</div>
+            <div className="font-display text-[13px] font-bold tracking-tight">შედარება · {items.length} ექსპერტი</div>
             <button type="button" onClick={() => setCompare(false)} className="text-[11px] text-white/60 hover:text-white inline-flex items-center gap-1">
               დახურვა <Icon.x className="w-3 h-3" />
             </button>
@@ -95,12 +95,12 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
               </thead>
               <tbody className="font-display tabular-nums">
                 <tr className="border-t border-white/10">
-                  <td className="py-2.5 pr-3 text-white/60">ფასი / სესია</td>
+                  <td className="py-2.5 pr-3 text-white/60">ფასი</td>
                   {items.map(t => <td key={t.id} className={`py-2.5 px-2 font-bold ${t.price === cheapest.price ? 'text-brand-300' : 'text-white'}`}>₾{t.price}</td>)}
                 </tr>
                 <tr className="border-t border-white/10">
                   <td className="py-2.5 pr-3 text-white/60">რეიტინგი</td>
-                  {items.map(t => <td key={t.id} className={`py-2.5 px-2 font-bold ${t.rating === topRated.rating ? 'text-brand-300' : 'text-white'}`}>{t.rating.toFixed(2)} ★</td>)}
+                  {items.map(t => <td key={t.id} className={`py-2.5 px-2 font-bold ${t.rating === topRated.rating ? 'text-brand-300' : 'text-white'}`}>{t.rating > 0 ? `${t.rating.toFixed(2)} ★` : 'ახალი'}</td>)}
                 </tr>
                 <tr className="border-t border-white/10">
                   <td className="py-2.5 pr-3 text-white/60">შეფასებები</td>
@@ -131,9 +131,15 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
             {/* Rating chip — moved onto the photo (premium marketplace pattern),
                 freeing the body for name · specialty · price. */}
             <span className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 h-6 pl-1.5 pr-2 rounded-pill bg-white/95 backdrop-blur shadow-xs">
-              <Icon.star aria-hidden className="w-3 h-3 text-warning-500" />
-              <span className="font-display text-[11.5px] font-bold text-ink-900 tabular-nums" role="img" aria-label={`${t.rating.toFixed(1)} 5-დან`}>{t.rating.toFixed(1)}</span>
-              <span className="text-[10px] text-ink-400 tabular-nums">({t.reviews})</span>
+              {t.rating > 0 ? (
+                <>
+                  <Icon.star aria-hidden className="w-3 h-3 text-warning-500" />
+                  <span className="font-display text-[11.5px] font-bold text-ink-900 tabular-nums" role="img" aria-label={`${t.rating.toFixed(1)} 5-დან`}>{t.rating.toFixed(1)}</span>
+                  <span className="text-[10px] text-ink-400 tabular-nums">({t.reviews})</span>
+                </>
+              ) : (
+                <span className="font-display text-[11px] font-semibold text-ink-600">ახალი</span>
+              )}
             </span>
             {/* Saved heart — filled/brand (it IS saved); warms to danger on
                 hover to signal the click removes it. */}
@@ -141,7 +147,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
               type="button"
               onClick={(e) => { e.preventDefault(); remove(t.tutorId) }}
               disabled={removing === t.tutorId}
-              aria-label="წაშლა შენახულიდან"
+              aria-label="წაშლა"
               className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full inline-flex items-center justify-center bg-white/95 backdrop-blur text-brand-600 hover:text-danger-600 hover:bg-white disabled:opacity-50 shadow-xs transition-colors"
             >
               <Icon.heartFilled className="w-4 h-4" />

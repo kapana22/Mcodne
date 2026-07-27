@@ -163,7 +163,7 @@ export function ConversationList({ empty }: { empty: EmptyCopy }) {
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="ძებნა სახელით ან თემით…"
+              placeholder="ძებნა…"
               className="w-full h-9 pl-9 pr-3 rounded-field border border-ink-200 text-[13px] focus:outline-none"
               aria-label="მიმოწერების ძებნა"
             />
