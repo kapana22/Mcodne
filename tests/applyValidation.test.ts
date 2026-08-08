@@ -18,7 +18,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import {
   APPLY,
   applyValidationFailure,
@@ -115,7 +115,14 @@ test('refine() forwards the rule verbatim into zod', () => {
 
 /* ── the contract, read off the two files that have to honour it ── */
 const api = readFileSync(new URL('../app/api/applications/route.ts', import.meta.url), 'utf8')
-const form = readFileSync(new URL('../app/apply/ApplyClient.tsx', import.meta.url), 'utf8')
+/* /apply is split across `app/apply/_*.tsx` — ApplyClient.tsx is only the
+   container now. These assertions are about the FORM as a whole, so read the
+   directory rather than a filename the next split would invalidate. */
+const form = readdirSync(new URL('../app/apply/', import.meta.url))
+  .filter(f => f.endsWith('.tsx'))
+  .sort()
+  .map(f => readFileSync(new URL(`../app/apply/${f}`, import.meta.url), 'utf8'))
+  .join('\n')
 
 test('the API states no bound of its own for a shared field', () => {
   // A `.min(20)` / `.max(500)` back in the schema is how the two sides drift

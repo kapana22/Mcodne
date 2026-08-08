@@ -6,7 +6,7 @@
  * the form and no idea which field is wrong, which is exactly the state this
  * work set out to fix. A renamed field would reintroduce it invisibly.
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 
 let passed = 0, failed = 0
 const check = (name: string, ok: boolean, why = '') => {
@@ -14,7 +14,14 @@ const check = (name: string, ok: boolean, why = '') => {
   else { failed++; console.log(`✗ ${name}${why ? ` — ${why}` : ''}`) }
 }
 
-const src = readFileSync(new URL('../app/apply/ApplyClient.tsx', import.meta.url), 'utf8')
+/* /apply is split across `app/apply/_*.tsx` — ApplyClient.tsx is only the
+   container now. These assertions are about the FORM as a whole, so read the
+   directory rather than a filename the next split would invalidate. */
+const src = readdirSync(new URL('../app/apply/', import.meta.url))
+  .filter(f => f.endsWith('.tsx'))
+  .sort()
+  .map(f => readFileSync(new URL(`../app/apply/${f}`, import.meta.url), 'utf8'))
+  .join('\n')
 const uniq = (re: RegExp) => [...new Set([...src.matchAll(re)].map(m => m[1]))].sort()
 
 const named = uniq(/fail\('([A-Za-z]+)'/g)

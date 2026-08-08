@@ -23,7 +23,7 @@
 // requirements and turned applicants away. That cut stays. What came back is the
 // optional attachment only — the one thing a moderator can actually verify.
 
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
 /* ───── tiny assert harness (✓/✗, exit 1 on failure — matches tests/ vibe) ───── */
@@ -148,7 +148,14 @@ check('a non-array (corrupt restored state) → omitted, not thrown',
 /* ═════ 2. Source-level invariants — app/apply/ApplyClient.tsx ═════ */
 
 const root = join(__dirname, '..')
-const src = readFileSync(join(root, 'app/apply/ApplyClient.tsx'), 'utf8')
+/* /apply is split across `app/apply/_*.tsx` — ApplyClient.tsx is only the
+   container now. These assertions are about the FORM as a whole, so read the
+   directory rather than a filename the next split would invalidate. */
+const src = readdirSync(join(root, 'app/apply'))
+  .filter(f => f.endsWith('.tsx'))
+  .sort()
+  .map(f => readFileSync(join(root, 'app/apply', f), 'utf8'))
+  .join('\n')
 
 // ── the mirror above must match the real source ──
 check('S1: MAX_CERTS in the component matches this file',

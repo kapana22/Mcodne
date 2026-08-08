@@ -19,10 +19,17 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { materializeWeekly } from '../lib/availabilityRules'
 
-const src = readFileSync(new URL('../app/apply/ApplyClient.tsx', import.meta.url), 'utf8')
+/* /apply is split across `app/apply/_*.tsx` — ApplyClient.tsx is only the
+   container now. These assertions are about the FORM as a whole, so read the
+   directory rather than a filename the next split would invalidate. */
+const src = readdirSync(new URL('../app/apply/', import.meta.url))
+  .filter(f => f.endsWith('.tsx'))
+  .sort()
+  .map(f => readFileSync(new URL(`../app/apply/${f}`, import.meta.url), 'utf8'))
+  .join('\n')
 const approve = readFileSync(new URL('../app/api/applications/[id]/route.ts', import.meta.url), 'utf8')
 
 test('two screens, and the last one submits', () => {
