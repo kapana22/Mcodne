@@ -3,6 +3,26 @@
 Georgian expert-consultation marketplace (Next.js 15 + Tailwind + Prisma). UI is Georgian.
 **Every new/edited surface must follow this canon — public, auth, student, tutor, admin alike.**
 
+## Where things live (map added 2026-08-08)
+**Every big screen is a container plus `_*.tsx` siblings in its own folder. Open the part, not the page** — the container holds only state, fetch and layout.
+
+| screen | container | its parts |
+| --- | --- | --- |
+| `/` home | `app/HomeClient.tsx` (50L) | `app/_home/` — `data` `hero` `categories` `experts` `how` `cta` |
+| `/tutors` browse | `app/tutors/client.tsx` | `_data` `_filters` `_hero` `_card` `_results` |
+| `/tutors/[id]` profile | `app/tutors/[id]/client.tsx` | `_bits` `_data` `_hero` `_reviews` `_booking` `_similar` `_sections` |
+| `/apply` | `app/apply/ApplyClient.tsx` | `_form` `_fields` `_chrome` `_upload` `_steps` `_draft` |
+| `/signin` + `/signup` | `app/signin/auth-client.tsx` (79L) | `_model` `_fields` `_signin` `_signup` `_verify` `_reset` `_onboarding` |
+| `/student` | `app/student/page.tsx` | `_model` `_welcome` `_next` `_saved` `_discover` `_sessions` |
+| `/student/bookings/[id]` | `.../page.tsx` | `_model` `_hero` `_modals` `_review` `_body` `_mobile` |
+| `/tutor/bookings/[id]` | `.../page.tsx` | `_model` `_review` `_timeline` |
+| `/admin` | `app/admin/page.tsx` (115L) | one `_<tab>.tsx` per tab + shared `_parts.tsx` |
+
+Three rules this shape depends on:
+- **The model is a leaf.** Each folder's `_model` / `_data` / `_form` imports no sibling; everything else imports it. A cycle always means a piece of the model was left in a UI file — move it to the leaf, don't add an import.
+- **Never split a component to shrink a file.** These were pure MOVES, verified line-for-line. `tutor/profile` (1695L), `tutor/schedule` (1505L), `BookingFlow` (1136L) and `settings` (916L) are still big because each is ONE component — shrinking them is a rewrite and needs its own decision.
+- **Tests read these screens as SOURCE TEXT.** ~10 of them. They must read the whole route DIRECTORY, never one filename. Watch for the reverse failure too: a negative assertion („X no longer appears here") pointed at a container passes vacuously — `category-marks` C6 was defanged exactly this way and is now directory-wide.
+
 ## Design levers (2026-08-01)
 **The full map of "change it once, it changes everywhere" lives in `lib/design/README.md` (Georgian, with file:line pointers) — read it before touching any visual value.** Short version: colors = `BRAND_SCALE`/`INK_SCALE` consts at the top of `tailwind.config.js` (brand/success/flame share ONE object, accent aliases ink); type = the `fontSize` ramp; motion = `DUR_*`/`EASE_*` consts mirrored as `--dur-*`/`--ease-*` in globals.css (utility name `ease-out-quart` ↔ CSS var `--ease-out` — `var(--ease-out-quart)` does not exist); shadows/radii/gradients = named tokens only (CTA hover glow = `shadow-brand-glow-lg`, never the rgba literal); glass = `.glass`/`.glass-bar`; uppercase tracking = the ONE globals.css rule (see Type below); section rhythm + primitive components (`Btn`/`Card`/`Eyebrow`/`PageHeader`/`Container`/`EmptyState`/`Sheet`) = README §5–6. New surface checklist = README §7; the backlog of call-site duplication still to sweep = README §8.
 
