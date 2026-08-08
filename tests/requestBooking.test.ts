@@ -14,7 +14,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { FEATURE_REQUEST_BOOKING } from '../lib/flags'
 
@@ -55,7 +55,14 @@ test('every surface that offers a proposal is category-scoped', () => {
     assert.match(readFileSync(join(ROOT, f), 'utf8'), re, `${f} offers a proposal without the category scope`)
   }
   // The profile's two CTAs share one derived predicate rather than four copies.
-  const profile = readFileSync(join(ROOT, 'app/tutors/[id]/client.tsx'), 'utf8')
+  // Read the whole page directory: the profile is split across `_*.tsx` files
+  // (the two CTAs live in _booking.tsx, the predicate is derived in client.tsx),
+  // and this assertion is about the page as a whole, not about one file.
+  const profile = readdirSync(join(ROOT, 'app/tutors/[id]'))
+    .filter(f => f.endsWith('.tsx'))
+    .sort()
+    .map(f => readFileSync(join(ROOT, 'app/tutors/[id]', f), 'utf8'))
+    .join('\n')
   assert.match(profile, /const isAbroadProfile = isAbroadCategory\(/)
   assert.equal((profile.match(/FEATURE_REQUEST_BOOKING && canProposeCategory/g) ?? []).length, 2)
 })
