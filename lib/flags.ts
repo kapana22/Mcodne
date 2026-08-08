@@ -30,3 +30,103 @@ export const COMMISSION_PCT = 15
 
 // Tutor's share of a paid booking (used in earnings displays).
 export const TUTOR_PAYOUT_PCT = 100 - COMMISSION_PCT
+
+// Request-based booking: the client proposes a time instead of picking one out
+// of the expert's published windows, and the expert accepts or declines it.
+//
+// WHY IT EXISTS. 46% of booking attempts (31 of 68, measured 2026-08-03) died on
+// „no free time" — every one of them because the expert had published nothing
+// upcoming. Publishing windows depends on expert discipline, and the data says
+// that dependency does not hold: 6 of 18 listed experts were unbookable, costing
+// 60 profile views in 30 days. Inverting the direction removes the dependency
+// instead of nagging it: the expert answers a request the way they answer a
+// message, and never has to fill a calendar in advance.
+//
+// The accept/decline half already existed — a booking is created PREPARING and
+// the expert confirms it. The only thing this changes is WHERE the start may
+// come from. Every other guard (overlap, self-overlap, past date, suspended or
+// paused expert, server-side price) applies exactly as before.
+//
+// OFF until the client UI ships. With it off, POST /api/bookings ignores a
+// `proposed` body flag entirely and behaves exactly as it did.
+//
+// SCOPE (2026-08-04): even with this ON, a request is only accepted for experts
+// in the diaspora category — see lib/abroad.ts → ABROAD_CATEGORY_SLUG. The flag
+// is the kill switch; the category is the audience. Both must agree, so turning
+// this on cannot leak the proposal UI onto the ordinary catalog.
+export const FEATURE_REQUEST_BOOKING = false
+
+// ── The diaspora vertical (2026-08-04) ───────────────────────────────────────
+// /abroad and everything that hangs off it: the landing page, the EUR price
+// display, and the request-booking surfaces for diaspora experts. OFF ships the
+// whole vertical dark — /abroad 404s, and no existing page, component or flow
+// changes by so much as a pixel.
+//
+// This ONE line is the entire switch. Nothing else gates the vertical: no env
+// var, no second boolean, no per-surface check. Same contract as
+// FEATURE_PAYMENTS_V2 above.
+export const FEATURE_ABROAD = false
+
+// ── Teaching packages (2026-08-05) ───────────────────────────────────────────
+// A „1-month package": a teacher sells N prepaid lessons; the client spends
+// them one booking at a time. Same one-line contract as FEATURE_ABROAD above —
+// OFF ships the whole vertical dark: no route, no API, no admin control, and
+// not one existing page changes by a pixel.
+//
+// WHY A PACKAGE AND NOT A SUBSCRIPTION. Preply's model auto-charges a stored
+// card every 28 days. We have no stored card and no gateway (PAYMENTS_LIVE is
+// false below), so an auto-renewing subscription is not a design choice we
+// declined — it is physically unavailable. italki's prepaid pack is the only
+// shape that works, and it also matches what the Georgian market already sells:
+// blocks of 8 lessons (2/week × 4 weeks), 100–250₾, priced as a whole.
+//
+// ⚠️ THE PER-EXPERT GATE IS `TutorProfile.packagesEnabled`, NOT `serviceType`.
+// `ServiceType.RECURRING` looks like the natural switch and is NOT usable as
+// one: measured on production 2026-08-05, 11 of 21 profiles already carry
+// RECURRING as a legacy default nobody reads, so gating browse on
+// `serviceType = CONSULTATION` would have deleted half the public catalog in
+// one deploy. `packagesEnabled` is admin-set and starts false for everyone,
+// which makes it an allowlist — an empty list yields an empty page, never a
+// disappearance. Cleaning up serviceType is a separate, deliberate task.
+//
+// ROLLOUT STAGE — deliberately ONE three-state constant, not a pair of
+// booleans. Two flags ("enabled" + "adminOnly") can contradict each other, and
+// the contradiction is always resolved in whichever surface someone forgot to
+// update. There is exactly one question here — who can see this? — so there is
+// exactly one answer.
+//
+//   'off'    nothing exists: no route, no admin control, no API. The state
+//            every other vertical ships in until its owner says otherwise.
+//   'admin'  signed-in ADMINs only. Surfaces 404 for everyone else — 404 and
+//            not 403, because a 403 confirms the thing is there.
+//   'signed-in'  any signed-in account. The testing stage: the owner can hand
+//            the URL to a real client and watch them go through the whole flow.
+//            Still unlinked from every nav, still noindex, still anonymous-404,
+//            so it cannot be stumbled into — but it needs no allowlist to
+//            maintain. Deliberately NOT a list of tester emails: the gate is
+//            one function (canSeePackages), and a list there is a second thing
+//            to keep in sync for a stage that lasts weeks.
+//   'public' live for everyone. Only ever set together with the linking,
+//            sitemap and SEO work — see the plan's „გამოქვეყნება" phase.
+//
+// Read it through `canSeePackages()` in lib/packages.ts; do not compare this
+// constant directly at call sites.
+export type PackagesVisibility = 'off' | 'admin' | 'signed-in' | 'public'
+export const PACKAGES_VISIBILITY: PackagesVisibility = 'signed-in'
+
+// GEL → EUR, for DISPLAY ONLY in the /abroad context.
+//
+// Consultation.price and TutorProfile.price stay Int lari everywhere — in the
+// DB, in the booking payload, in the expert's earnings. Nothing is stored,
+// charged or compared in euro; this rate only decides what the landing page and
+// the diaspora expert cards SAY, so an emigrant on a euro salary can judge the
+// price without opening a converter.
+//
+// Deliberately a hardcoded constant and not a live FX feed: a marketing price
+// that moves hourly is worse than one that is honestly approximate, and a feed
+// is a dependency plus a failure mode for a number that moves a percent a month.
+// Displayed prices are rounded and prefixed with „≈" (lib/abroad → eurLabel) —
+// never presented as an exact quote.
+//
+// ⚠️ Review this by hand every few months. 2026-08-04: 1 GEL ≈ 0.33 EUR.
+export const ABROAD_EUR_PER_GEL = 0.33

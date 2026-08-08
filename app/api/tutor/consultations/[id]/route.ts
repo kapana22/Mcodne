@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 
 const UpdateBody = z.object({
   title: z.string().min(2).max(80).optional(),
@@ -23,7 +23,9 @@ async function loadOwned(id: string, userId: string, role: string) {
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await requireRole(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  if (auth.response) return auth.response
+  const user = auth.user
   const { id } = await ctx.params
   const { c, forbidden } = await loadOwned(id, user.id, user.role)
   if (!c) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
@@ -37,7 +39,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await requireRole(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  if (auth.response) return auth.response
+  const user = auth.user
   const { id } = await ctx.params
   const { c, forbidden } = await loadOwned(id, user.id, user.role)
   if (!c) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })

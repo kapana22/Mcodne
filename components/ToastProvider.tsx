@@ -18,7 +18,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Toast, type ToastKind } from './Toast'
 
-type ToastItem = { id: number; kind: ToastKind; msg: string }
+type ToastItem = { id: number; kind: ToastKind; msg: string; leaving?: boolean }
 
 type ToastCtx = {
   toast: (msg: string, kind?: ToastKind) => void
@@ -41,9 +41,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
 
   const dismiss = useCallback((id: number) => {
-    setItems(prev => prev.filter(t => t.id !== id))
+    // Two-phase: mark leaving (the slide-out plays), THEN drop it. 220ms
+    // matches the slide-out token; a second dismiss on the same id is a no-op
+    // thanks to the `leaving` check.
     const t = timers.current.get(id)
     if (t) { clearTimeout(t); timers.current.delete(id) }
+    setItems(prev => prev.map(x => (x.id === id ? { ...x, leaving: true } : x)))
+    setTimeout(() => setItems(prev => prev.filter(x => x.id !== id)), 220)
   }, [])
 
   const toast = useCallback((msg: string, kind: ToastKind = 'info') => {
@@ -76,15 +80,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={value}>
       {children}
       <div
-        // z-[95]: above page modals (z-[80]) and ConfirmModal (z-[90]) — a
+        // z-toast: above page modals (z-sheet) and ConfirmModal (z-confirm) — a
         // toast fired while a dialog is open must stay visible, not paint
-        // behind the scrim. Below only the skip-link (z-[100]).
-        className="toast-host fixed bottom-4 right-4 z-[95] flex flex-col gap-2 pointer-events-none safe-area-bottom"
+        // behind the scrim. Below only the skip-link (z-skip).
+        className="toast-host fixed bottom-4 right-4 z-toast flex flex-col gap-2 pointer-events-none safe-area-bottom"
         aria-live="polite"
       >
         {items.map(t => (
           <div key={t.id} className="pointer-events-auto">
-            <Toast kind={t.kind} onDismiss={() => dismiss(t.id)}>{t.msg}</Toast>
+            <Toast kind={t.kind} leaving={t.leaving} onDismiss={() => { if (!t.leaving) dismiss(t.id) }}>{t.msg}</Toast>
           </div>
         ))}
       </div>

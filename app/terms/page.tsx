@@ -26,7 +26,7 @@ const SECTIONS = [
     title: '1. ზოგადი დებულებები',
     body: [
       'მცოდნე (შემდგომ — „პლატფორმა“) არის ონლაინ საკონსულტაციო სივრცე, რომელიც აკავშირებს მომხმარებლებს ხელით შერჩეულ ექსპერტებთან. პლატფორმაზე რეგისტრაციით ან მისი გამოყენებით შენ თანხმდები წინამდებარე პირობებზე.',
-      'თუ არ ეთანხმები რომელიმე პუნქტს, გთხოვ, არ გამოიყენო პლატფორმა. ცვლილებების შემთხვევაში წინასწარ გაცნობებთ ელფოსტით ან საიტზე გამოქვეყნებით.',
+      'თუ არ ეთანხმები რომელიმე პუნქტს, გთხოვ, არ გამოიყენო პლატფორმა. ცვლილებების შემთხვევაში წინასწარ შეგატყობინებთ ელფოსტით ან საიტზე გამოქვეყნებით.',
     ],
   },
   {
@@ -102,7 +102,7 @@ const SECTIONS = [
     id: 'changes',
     title: '9. ცვლილებები',
     body: [
-      'ვიტოვებთ უფლებას შევცვალოთ ეს პირობები. მნიშვნელოვანი ცვლილებების შემთხვევაში წინასწარ გაცნობებთ 14 დღით ადრე ელფოსტით.',
+      'ვიტოვებთ უფლებას შევცვალოთ ეს პირობები. მნიშვნელოვანი ცვლილებების შესახებ 14 დღით ადრე შეგატყობინებთ ელფოსტით.',
     ],
   },
   {
@@ -124,12 +124,12 @@ export default function TermsPage() {
         <Eyebrow className="mb-3">
           სამართალი
         </Eyebrow>
-        <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05]">
+        <h1 className="font-display text-display lg:text-display-xl font-bold text-ink-900 tracking-tight leading-[1.05]">
           გამოყენების წესები
         </h1>
-        <p className="mt-2 text-[12.5px] text-ink-500 tabular-nums">ბოლო განახლება: 2026 წლის 1 ივლისი</p>
+        <p className="mt-2 text-small text-ink-500 tabular-nums">ბოლო განახლება: 2026 წლის 1 ივლისი</p>
 
-        <p className="mt-6 text-[16px] text-ink-700 leading-relaxed">
+        <p className="mt-6 text-body-lg text-ink-700 leading-relaxed">
           წინამდებარე პირობები არეგულირებს მცოდნე პლატფორმის გამოყენებას. გთხოვ, ყურადღებით წაიკითხე — ეს
           დოკუმენტი ეხება როგორც სტუდენტებს, ისე ექსპერტებს.
         </p>
@@ -138,7 +138,7 @@ export default function TermsPage() {
           <Eyebrow tone="muted" className="mb-3">
             შინაარსი
           </Eyebrow>
-          <ol className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-[13px] text-ink-700">
+          <ol className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-small text-ink-700">
             {SECTIONS.map(s => (
               <li key={s.id}>
                 <a href={`#${s.id}`} className="hover:text-brand-700">
@@ -152,10 +152,10 @@ export default function TermsPage() {
         <div className="mt-12 space-y-10">
           {SECTIONS.map(s => (
             <section key={s.id} id={s.id} className="scroll-mt-24">
-              <h2 className="font-display text-xl lg:text-2xl font-bold text-ink-900 tracking-tight">{s.title}</h2>
+              <h2 className="font-display text-h2 lg:text-h1 font-bold text-ink-900 tracking-tight">{s.title}</h2>
               <div className="mt-3 space-y-3">
                 {s.body.map((p, i) => (
-                  <p key={i} className="text-[14.5px] text-ink-700 leading-relaxed max-w-prose">
+                  <p key={i} className="text-body-lg text-ink-700 leading-relaxed max-w-prose">
                     {p}
                   </p>
                 ))}
@@ -165,16 +165,16 @@ export default function TermsPage() {
         </div>
 
         <div className="mt-12 pt-8 border-t border-ink-200 flex items-center justify-between gap-4 flex-wrap">
-          <Link href="/" className="text-[13px] text-brand-700 hover:text-brand-800 font-semibold">
+          <Link href="/" className="inline-flex items-center min-h-[40px] sm:min-h-0 text-small text-brand-700 hover:text-brand-800 font-semibold">
             ← მთავარზე დაბრუნება
           </Link>
-          <div className="text-[12.5px] text-ink-500">
+          <div className="text-small text-ink-500">
             იხილე ასევე{' '}
-            <Link href="/privacy" className="text-brand-700 hover:text-brand-800 font-semibold">
+            <Link href="/privacy" className="tap-area text-brand-700 hover:text-brand-800 font-semibold">
               კონფიდენციალურობა
             </Link>{' '}
             და{' '}
-            <Link href="/cookies" className="text-brand-700 hover:text-brand-800 font-semibold">
+            <Link href="/cookies" className="tap-area text-brand-700 hover:text-brand-800 font-semibold">
               ქუქიების პოლიტიკა
             </Link>
           </div>

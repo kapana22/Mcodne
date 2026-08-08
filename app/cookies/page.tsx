@@ -41,7 +41,7 @@ const CATEGORIES = [
   {
     name: 'მარკეტინგი',
     tag: 'შენ აკონტროლებ',
-    body: 'გამოიყენება რეკლამის რელევანტურობის გასაუმჯობესებლად და კამპანიების ეფექტიანობის გასაზომად. თუ გამორთავ, რეკლამა მაინც გამოჩნდება, უბრალოდ ნაკლებად პერსონალიზებული.',
+    body: 'გამოიყენება რეკლამის რელევანტურობის გასაუმჯობესებლად და კამპანიების ეფექტიანობის გასაზომად. თუ გამორთავ, რეკლამა მაინც გამოჩნდება — მხოლოდ ნაკლებად პერსონალიზებული.',
     examples: ['fbp', 'ads_click_id', 'mcodne_campaign'],
   },
 ]
@@ -55,28 +55,28 @@ export default function CookiesPage() {
         <Eyebrow className="mb-3">
           სამართალი
         </Eyebrow>
-        <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05]">
+        <h1 className="font-display text-display lg:text-display-xl font-bold text-ink-900 tracking-tight leading-[1.05]">
           ქუქი-ფაილების პოლიტიკა
         </h1>
-        <p className="mt-2 text-[12.5px] text-ink-500 tabular-nums">ბოლო განახლება: 2026 წლის 1 ივლისი</p>
-        <p className="mt-6 text-[16px] text-ink-700 leading-relaxed">
+        <p className="mt-2 text-small text-ink-500 tabular-nums">ბოლო განახლება: 2026 წლის 1 ივლისი</p>
+        <p className="mt-6 text-body-lg text-ink-700 leading-relaxed">
           ქუქი-ფაილი (cookie) მცირე ტექსტური ფაილია, რომელსაც ვებგვერდი ინახავს შენს მოწყობილობაზე. მცოდნე იყენებს
           ქუქიებს პლატფორმის მუშაობის უზრუნველყოფისთვის, შენი პარამეტრების დამახსოვრებისთვის და მომსახურების
           გასაუმჯობესებლად.
         </p>
 
         <section className="mt-12">
-          <h2 className="font-display text-2xl font-bold text-ink-900 tracking-tight">კატეგორიები</h2>
+          <h2 className="font-display text-h1 font-bold text-ink-900 tracking-tight">კატეგორიები</h2>
           <div className="mt-6 space-y-4">
             {CATEGORIES.map(c => (
               <div key={c.name} className="rounded-card border border-ink-200 bg-white p-5 lg:p-6">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="min-w-0">
-                    <div className="font-display text-[17px] font-bold text-ink-900">{c.name}</div>
-                    <p className="mt-2 text-[14px] text-ink-600 leading-relaxed">{c.body}</p>
+                    <div className="font-display text-h3 font-bold text-ink-900">{c.name}</div>
+                    <p className="mt-2 text-body text-ink-600 leading-relaxed">{c.body}</p>
                   </div>
                   <span
-                    className="inline-flex items-center h-6 px-2.5 rounded-pill bg-brand-50 text-brand-700 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] shrink-0"
+                    className="inline-flex items-center h-6 px-2.5 rounded-pill bg-brand-50 text-brand-700 font-display text-micro font-semibold uppercase shrink-0"
                   >
                     {c.tag}
                   </span>
@@ -89,7 +89,7 @@ export default function CookiesPage() {
                     {c.examples.map(x => (
                       <code
                         key={x}
-                        className="text-[11.5px] font-mono bg-ink-50 text-ink-700 px-2 py-1 rounded-btn"
+                        className="text-meta font-mono bg-ink-50 text-ink-700 px-2 py-1 rounded-btn"
                       >
                         {x}
                       </code>
@@ -102,12 +102,12 @@ export default function CookiesPage() {
         </section>
 
         <section className="mt-12">
-          <h2 className="font-display text-2xl font-bold text-ink-900 tracking-tight">როგორ ვაკონტროლო</h2>
-          <p className="mt-4 text-[14.5px] text-ink-700 leading-relaxed">
+          <h2 className="font-display text-h1 font-bold text-ink-900 tracking-tight">როგორ ვაკონტროლო</h2>
+          <p className="mt-4 text-body-lg text-ink-700 leading-relaxed">
             შენ შეგიძლია ნებისმიერ დროს გამორთო ან წაშალო ქუქიები შენი ბრაუზერის პარამეტრებში. გახსოვდეს, რომ
             აუცილებელი ქუქიების გამორთვა შესაძლოა შეზღუდოს პლატფორმის ფუნქციონალი — მაგალითად, ვერ შეხვალ ანგარიშში.
           </p>
-          <ul className="mt-4 space-y-2 text-[14px] text-ink-700 leading-relaxed">
+          <ul className="mt-4 space-y-2 text-body text-ink-700 leading-relaxed">
             <li>
               <b>Chrome:</b> Settings → Privacy → Cookies and other site data
             </li>
@@ -121,15 +121,15 @@ export default function CookiesPage() {
         </section>
 
         <section className="mt-12 pt-8 border-t border-ink-200">
-          <h2 className="font-display text-xl font-bold text-ink-900 tracking-tight">კითხვები?</h2>
-          <p className="mt-3 text-[14px] text-ink-600 leading-relaxed">
+          <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight">კითხვები?</h2>
+          <p className="mt-3 text-body text-ink-600 leading-relaxed">
             თუ გაქვს კითხვა ქუქიების ან პირადი მონაცემების შესახებ, დაწერე{' '}
             <a href={`mailto:${PRIVACY_EMAIL}`} className="text-brand-700 hover:text-brand-800 font-semibold">
               {PRIVACY_EMAIL}
             </a>
             . დამატებით ინფორმაცია იხილე{' '}
             <Link href="/privacy" className="text-brand-700 hover:text-brand-800 font-semibold">
-              პრივატულობის პოლიტიკაში
+              კონფიდენციალურობის პოლიტიკაში
             </Link>
             .
           </p>

@@ -43,6 +43,28 @@ export async function GET(req: Request) {
     jar.delete('g_oauth_next')
   }
 
+  // The signin form's „დამიმახსოვრე 30 დღით" checkbox, carried the same way as
+  // the deep-link above. It used to stop at the Google button: the password
+  // path passes `rememberMe` to createSession, while the callback called
+  // createSession(user.id) with no options — so unticking the box and then
+  // signing in with Google still handed out a 30-day session.
+  //
+  // Only `remember=0` is carried, and ONLY as a session shortener. The default
+  // (no cookie) stays "remember" exactly as before, so a stale or forged cookie
+  // can never LENGTHEN a session — the worst it can do is sign someone out
+  // after 12 hours.
+  if (new URL(req.url).searchParams.get('remember') === '0') {
+    jar.set('g_oauth_short', '1', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 600,
+    })
+  } else {
+    jar.delete('g_oauth_short')
+  }
+
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: `${origin}/api/auth/google/callback`,

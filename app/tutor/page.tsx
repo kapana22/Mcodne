@@ -11,8 +11,10 @@ import { fmtKaDate, KA_WEEKDAYS_LONG } from '@/lib/kaDate'
 import { PageHeader } from '@/components/tutor/PageHeader'
 import { AlertsStack } from './_components/AlertsStack'
 import { PendingRequests } from './_components/PendingRequests'
+import { ProfileSignal } from './_components/ProfileSignal'
 import { SnapshotRow } from './_components/SnapshotRow'
 import { TodayHero } from './_components/TodayHero'
+import { MonthSchedule, type ScheduleLesson } from './_components/MonthSchedule'
 import type { DashBooking } from './_components/types'
 
 // Auth redirect helper — preserves the return URL so the user lands back
@@ -54,6 +56,20 @@ export default function TutorHome() {
   // effect so first paint matches the browser's time.
   const [clientNow, setClientNow] = useState<Date | null>(null)
   useEffect(() => { setClientNow(new Date()) }, [])
+  // The month grid's data. Fetched separately from `bookings` on purpose: that
+  // one is „what needs attention" (paginated, urgency-sorted), this is a whole
+  // date range with only the four fields a calendar cell draws.
+  const [schedule, setSchedule] = useState<ScheduleLesson[]>([])
+  useEffect(() => {
+    let alive = true
+    fetch('/api/tutor/schedule')
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => { if (alive && j?.items) setSchedule(j.items) })
+      // A failed calendar must not take the dashboard down with it — the grid
+      // simply does not render.
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
 
   const load = async () => {
     try {
@@ -191,10 +207,23 @@ export default function TutorHome() {
       <div className="grid lg:grid-cols-[1fr_320px] gap-6 items-start">
         {/* Left */}
         <div className="min-w-0 space-y-6">
-          <TodayHero next={loading ? null : nextSession} todayRest={todayRest} />
+          <TodayHero next={loading ? null : nextSession} todayRest={todayRest} noFreeTime={bookable === 0} />
           {(loading || pending.length > 0) && (
             <PendingRequests pending={pending} loading={loading} onChanged={load} />
           )}
+          {/* „is my profile working?" — views vs bookings, with the reading
+              that tells visibility apart from persuasion.
+              WITH ZERO BOOKABLE TIME IT DOES NOT RENDER AT ALL: its only
+              possible verdict then is „გამოაქვეყნე დრო", which the alert row
+              above and the OpenTimeNudge modal already say. One screen was
+              telling the expert the same thing four times; now it says it once,
+              and this card comes back the moment there is time to analyse. */}
+          {/* The month. Sits directly under „today" because a teacher's whole
+              question is the SHAPE of the month, not the next single session.
+              Renders for everyone — a consultant's month is just sparser — but
+              only draws when there is something in the window. */}
+          {schedule.length > 0 && <MonthSchedule lessons={schedule} loading={loading} />}
+          {bookable !== 0 && <ProfileSignal freeMinutes={bookable} />}
           <SnapshotRow
             loading={loading}
             today={todaySessions.length}
@@ -212,13 +241,13 @@ export default function TutorHome() {
           <Card padding="none" className="p-5">
             <Eyebrow tone="muted" className="mb-3">მოქმედებები</Eyebrow>
             <div className="space-y-2">
-              <Link href="/tutor/schedule" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
+              <Link href="/tutor/schedule" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-small transition-colors duration-fast">
                 <Icon.calendar className="w-4 h-4 text-ink-500" /> გრაფიკი
               </Link>
-              <Link href="/tutor/profile" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
+              <Link href="/tutor/profile" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-small transition-colors duration-fast">
                 <Icon.user className="w-4 h-4 text-ink-500" /> პროფილი
               </Link>
-              <Link href="/tutors" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
+              <Link href="/tutors" className="flex items-center gap-2.5 h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-small transition-colors duration-fast">
                 <Icon.search className="w-4 h-4 text-ink-500" /> ექსპერტები
               </Link>
             </div>

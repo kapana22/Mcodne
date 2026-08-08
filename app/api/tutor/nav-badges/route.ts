@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 import { buildProfileChecks, profilePercent } from '@/lib/profileScore'
 import { preThreadInitiators } from '@/lib/preThreadInitiators'
 
@@ -10,7 +10,9 @@ import { preThreadInitiators } from '@/lib/preThreadInitiators'
 // nav-badge polling path).
 
 export async function GET() {
-  const user = await requireRole(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  if (auth.response) return auth.response
+  const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({
     where: { userId: user.id },
     select: {
@@ -20,7 +22,19 @@ export async function GET() {
       specialty: true,
       price: true,
       languages: true,
-      _count: { select: { certificates: true, education: true, experience: true } },
+      // Certificates are counted ONLY when they carry a document. A row with
+      // `fileUrl = NULL` does not render on the public profile at all (an empty
+      // frame under „გადამოწმებული აღინიშნება" reads as a credential that failed
+      // to verify), so awarding its 8 completeness points told the expert their
+      // profile was more finished than a visitor can see. All five certificates
+      // on the live roster are in exactly that state.
+      _count: {
+        select: {
+          certificates: { where: { fileUrl: { not: null } } },
+          education: true,
+          experience: true,
+        },
+      },
     },
   })
   if (!profile) {

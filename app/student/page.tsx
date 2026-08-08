@@ -9,11 +9,16 @@ import { EmptyState } from '@/components/EmptyState'
 import { PAYMENTS_LIVE, CANCEL_CUTOFF_HOURS } from '@/lib/flags'
 import { bucketBookings, deriveSummary } from '@/lib/bookings'
 import { isBookingLive } from '@/lib/bookingLive'
-import { fmtKaDate, fmtKaTime, fmtKaDateTime, KA_WEEKDAYS_SHORT } from '@/lib/kaDate'
+import { KA_MONTHS_SHORT_DOT } from '@/lib/kaDate'
+import { TzNote } from '@/components/workspace/TzNote'
+import { sessionDate, sessionDateTime, sessionTime, sessionWeekdayShort } from '@/components/workspace/sessionTime'
 import { StatusPill } from '@/components/StatusPill'
 import { Skeleton } from '@/components/Skeleton'
 import { VerifiedMark } from '@/components/Avatar'
 import { Container } from '@/components/Container'
+import { displayHeadline } from '@/lib/headline'
+import { primaryPriceLabel, TUTOR_DEFAULTS } from '@/components/booking/slots'
+import { StudentPackages } from './_packages'
 
 
 type MeData = { id: string; fullName: string; email: string; avatarUrl?: string | null }
@@ -28,7 +33,7 @@ const DashboardSearch = () => {
   return (
     <form
       onSubmit={e => { e.preventDefault(); go() }}
-      className="mt-5 max-w-[520px] flex items-center gap-2 rounded-card bg-white border border-ink-300 focus-within:border-ink-400 focus-within:ring-4 focus-within:ring-brand-100 transition-all p-1.5"
+      className="mt-5 max-w-[520px] flex items-center gap-2 rounded-card bg-white border border-ink-300 focus-within:border-ink-400 focus-within:ring-4 focus-within:ring-brand-100 transition-all duration-fast p-1.5"
     >
       <div className="relative flex-1 min-w-0">
         <Icon.search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none" />
@@ -38,12 +43,12 @@ const DashboardSearch = () => {
           onChange={e => setQ(e.target.value)}
           placeholder="ეძებე ექსპერტი, სფერო, თემა…"
           aria-label="ექსპერტის ძებნა"
-          className="w-full h-11 pl-10 pr-3 bg-transparent text-[14px] text-ink-900 placeholder:text-ink-400 focus:outline-none"
+          className="w-full h-11 pl-10 pr-3 bg-transparent text-body text-ink-900 placeholder:text-ink-400 focus:outline-none"
         />
       </div>
       <button
         type="submit"
-        className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-1.5 transition-colors focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+        className="h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
       >
         ძებნა
       </button>
@@ -78,7 +83,7 @@ const OnboardingTour = ({ userId, hasBookings, joinedAt }: { userId?: string; ha
   const steps = [
     { n: 1, l: 'იპოვე ექსპერტი', d: 'აირჩიე საკითხი — საგადასახადო, სამართალი, ან სხვა.', href: '/tutors' },
     { n: 2, l: 'აირჩიე დრო და დაჯავშნე', d: 'აირჩიე დრო კალენდარში — ექსპერტი ადასტურებს.', href: '/tutors' },
-    { n: 3, l: 'შედი ვიდეო-ოთახში', d: 'დანიშნულ დროზე ერთი დაწკაპუნებით — აპლიკაცია არ გჭირდება.', href: null as string | null },
+    { n: 3, l: 'შედი ვიდეოოთახში', d: 'დანიშნულ დროზე ერთი დაწკაპუნებით — აპლიკაცია არ გჭირდება.', href: null as string | null },
   ]
   return (
     <Container as="section" className="mt-6 motion-safe:animate-scale-in">
@@ -87,22 +92,27 @@ const OnboardingTour = ({ userId, hasBookings, joinedAt }: { userId?: string; ha
           type="button"
           onClick={close}
           aria-label="დახურვა"
-          className="absolute top-3 right-3 w-8 h-8 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors z-10"
+          className="absolute top-3 right-3 w-9 h-9 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast z-10"
         >
           <Icon.x className="w-4 h-4" />
         </button>
         <div className="relative">
           <Eyebrow className="mb-2 motion-safe:animate-rise-in">დასაწყისი</Eyebrow>
-          <h2 className="font-display text-[20px] sm:text-[22px] font-bold text-ink-900 tracking-tight motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>3 ნაბიჯი — და მზად ხარ</h2>
+          <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>3 ნაბიჯი — და მზად ხარ</h2>
           <div className="mt-5 grid sm:grid-cols-3 gap-3 motion-safe:stagger">
             {steps.map(s => {
+              // Solid, not translucent: an in-flow card is a surface you READ,
+              // and the canon reserves glass for surfaces you look PAST
+              // (.glass / .glass-bar). The old `bg-white/80 backdrop-blur-sm`
+              // also paid for a compositor layer per card to tint the page
+              // background by 20%.
               const inner = (
-                <div className="p-4 rounded-card border border-ink-200 bg-white/80 backdrop-blur-sm h-full flex flex-col hover:border-brand-300 hover-lift transition-colors">
+                <div className="p-4 rounded-card border border-ink-200 bg-white h-full flex flex-col hover:border-brand-300 hover-lift transition-colors duration-fast">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-500 text-white font-display font-bold text-[13px] shadow-xs">{s.n}</span>
-                    <span className="font-display text-[14px] font-bold text-ink-900">{s.l}</span>
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-600 text-white font-display font-bold text-small shadow-xs">{s.n}</span>
+                    <span className="font-display text-body font-bold text-ink-900">{s.l}</span>
                   </div>
-                  <p className="text-[12.5px] text-ink-600 leading-[1.5]">{s.d}</p>
+                  <p className="text-small text-ink-600">{s.d}</p>
                 </div>
               )
               return s.href
@@ -117,7 +127,7 @@ const OnboardingTour = ({ userId, hasBookings, joinedAt }: { userId?: string; ha
 }
 
 /* ───── Welcome strip ───── */
-const KA_MONTHS_SHORT = ['იან.','თებ.','მარ.','აპრ.','მაი.','ივნ.','ივლ.','აგვ.','სექტ.','ოქტ.','ნოე.','დეკ.']
+const KA_MONTHS_SHORT = KA_MONTHS_SHORT_DOT
 const KA_WEEKDAY_SHORT = ['კვ.','ორშ.','სამშ.','ოთხ.','ხუთ.','პარ.','შაბ.']
 
 /* ───── Booking derivation — single source of truth ─────
@@ -161,10 +171,10 @@ const Welcome = ({ me, bookings }: { me: MeData | null; bookings: any[] }) => {
                 თბილისი
               </span>
             </Eyebrow>
-            <h1 className="font-display text-[26px] sm:text-[42px] lg:text-[50px] font-bold tracking-[-0.028em] leading-[1.02] text-ink-900 motion-safe:animate-rise-in">
+            <h1 className="font-display text-h1 sm:text-display-lg lg:text-display-xl font-bold tracking-[-0.028em] leading-[1.02] text-ink-900 motion-safe:animate-rise-in">
               {firstName ? `გამარჯობა, ${firstName}.` : 'გამარჯობა.'}
             </h1>
-            <p className="mt-3 text-[14.5px] text-ink-600 max-w-[560px] leading-[1.55] motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>
+            <p className="mt-3 text-body-lg text-ink-600 max-w-[560px] leading-[1.55] motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>
               {s.upcomingCount > 0
                 ? <>დაჯავშნილი გაქვს <span className="font-display font-semibold text-ink-900">{s.upcomingCount} სესია</span>.</>
                 : <>ჯერ არ გაქვს ჯავშანი — მოძებნე პირველი ექსპერტი.</>}
@@ -178,10 +188,10 @@ const Welcome = ({ me, bookings }: { me: MeData | null; bookings: any[] }) => {
             {/* Secondary shortcuts — the search box above is the single primary
                 "find expert" CTA, so these stay neutral and non-duplicative. */}
             <div className="mt-3 flex flex-wrap gap-2 motion-safe:stagger">
-              <Link href="/student/bookings" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-btn bg-ink-50 hover:bg-ink-100 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
+              <Link href="/student/bookings" className="inline-flex items-center gap-1.5 h-10 sm:h-9 px-3 rounded-btn bg-ink-50 hover:bg-ink-100 text-ink-800 font-display font-semibold text-small transition-colors duration-fast">
                 <Icon.cal className="w-3.5 h-3.5" /> ჩემი ჯავშნები
               </Link>
-              <Link href="/tutors" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-btn bg-ink-50 hover:bg-ink-100 text-ink-800 font-display font-semibold text-[12.5px] transition-colors">
+              <Link href="/tutors" className="inline-flex items-center gap-1.5 h-10 sm:h-9 px-3 rounded-btn bg-ink-50 hover:bg-ink-100 text-ink-800 font-display font-semibold text-small transition-colors duration-fast">
                 <Icon.search className="w-3.5 h-3.5" /> ყველა ექსპერტი
               </Link>
             </div>
@@ -229,7 +239,7 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
   if (loading) {
     return (
       <div className="rounded-card border border-ink-200 bg-white p-6 sm:p-8">
-        <div className="animate-pulse space-y-3">
+        <div className="motion-safe:animate-pulse space-y-3">
           <div className="h-3 w-32 bg-ink-100 rounded" />
           <div className="h-6 w-3/4 bg-ink-100 rounded" />
           <div className="h-4 w-1/2 bg-ink-100 rounded" />
@@ -241,15 +251,14 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
   if (!next) {
     return (
       <EmptyState
-        icon={<Icon.cal className="w-6 h-6" />}
+        illustration="bookings"
         title="უახლოესი ჯავშანი არ არის"
-        description="აირჩიე ექსპერტი და დაჯავშნე."
+        description="აირჩიე ექსპერტი და დაჯავშნე შენთვის მოსახერხებელი დრო."
         cta={{ label: 'ექსპერტები', href: '/tutors' }}
       />
     )
   }
 
-  const startDate = new Date(next.startAt)
   const tutorName = next.tutor?.user?.fullName ?? 'ექსპერტი'
   const tutorAvatar = next.tutor?.user?.avatarUrl
   const specialty = next.tutor?.specialty ?? next.tutor?.category?.name ?? ''
@@ -267,11 +276,12 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
     <article className="relative overflow-hidden rounded-card bg-gradient-dark text-white">
       <div className="relative grid lg:grid-cols-[1fr_280px]">
         <div className="p-6 sm:p-8 lg:p-10">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-6 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-6 font-display text-micro font-semibold uppercase">
             <span className="inline-flex items-center gap-1.5 text-white/75">
               <Icon.clock className="w-3 h-3" />
-              {fmtKaDateTime(startDate, { weekday: true })} · {next.durationMin} წთ
+              {sessionDateTime(next.startAt)} · {next.durationMin} წთ
             </span>
+            <TzNote className="text-white/50" />
             <span className="text-white/25">·</span>
             {/* escrow is only claimed once payments are actually live — until
                 then the honest line is the flat price alone. */}
@@ -290,34 +300,34 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
           </div>
 
           <div className="mb-5 max-w-[560px]">
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-white/45 mb-2">თემა</div>
-            <h2 className="font-display text-[24px] sm:text-[28px] font-bold tracking-[-0.022em] leading-[1.1] text-white">
+            <div className="font-display text-micro font-semibold uppercase text-white/45 mb-2">თემა</div>
+            <h2 className="font-display text-h2 sm:text-h1 font-bold tracking-[-0.022em] leading-[1.1] text-white">
               {next.topic}
             </h2>
           </div>
 
           <div className="inline-flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white/15 bg-white/10 shrink-0">
+            <div className="w-9 h-10 sm:h-9 rounded-full overflow-hidden ring-2 ring-white/15 bg-white/10 shrink-0">
               {tutorAvatar ? (
                 <img src={tutorAvatar} alt={tutorName} className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full inline-flex items-center justify-center text-white font-display font-bold text-[14px]">{tutorName.charAt(0)}</div>
+                <div className="w-full h-full inline-flex items-center justify-center text-white font-display font-bold text-body">{tutorName.charAt(0)}</div>
               )}
             </div>
             <div className="min-w-0">
-              <div className="font-display font-semibold text-[13.5px] text-white">{tutorName}</div>
-              {specialty && <div className="text-[11.5px] text-white/55 mt-0.5">{specialty}</div>}
+              <div className="font-display font-semibold text-body text-white">{tutorName}</div>
+              {specialty && <div className="text-meta text-white/55 mt-0.5">{specialty}</div>}
             </div>
           </div>
 
           <div className="mt-7 flex flex-wrap items-center gap-2.5">
             {joinable && (
-              <Link href={`/session/${next.id}`} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-400 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center gap-2 transition-colors">
+              <Link href={`/session/${next.id}`} className="h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-2 transition-colors duration-fast">
                 <Icon.video className="w-4 h-4" />
-                ვიდეო-ოთახში
+                ვიდეოოთახში
               </Link>
             )}
-            <button type="button" onClick={() => onOpenDetail(next.id)} className="h-11 px-4 rounded-btn bg-white/10 hover:bg-white/15 backdrop-blur text-white font-display font-medium text-[13px] inline-flex items-center gap-1.5 transition-colors">
+            <button type="button" onClick={() => onOpenDetail(next.id)} className="h-11 px-4 rounded-btn bg-white/10 hover:bg-white/15 backdrop-blur text-white font-display font-medium text-small inline-flex items-center gap-1.5 transition-colors duration-fast">
               დეტალები
             </button>
           </div>
@@ -325,25 +335,29 @@ const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any[]; loa
 
         {live ? (
           <div className="relative bg-white/[0.06] border-t lg:border-t-0 lg:border-l border-white/10 p-6 sm:p-8 flex flex-col justify-center">
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/50 mb-3">ახლა</div>
+            <div className="font-display text-micro font-semibold uppercase text-white/50 mb-3">ახლა</div>
             <div className="inline-flex items-center gap-2.5">
-              <span className="font-display text-[26px] font-bold leading-none tracking-[-0.02em] text-white">მიმდინარეობს</span>
+              <span className="font-display text-h1 font-bold leading-none tracking-[-0.02em] text-white">მიმდინარეობს</span>
             </div>
           </div>
         ) : countdown && (
           <div className="relative bg-white/[0.06] border-t lg:border-t-0 lg:border-l border-white/10 p-6 sm:p-8 flex flex-col justify-center">
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/50 mb-3">დაიწყება</div>
+            <div className="font-display text-micro font-semibold uppercase text-white/50 mb-3">დაიწყება</div>
+            {/* OFF-RAMP (56px, not a ramp step): the dd/hh/mm row is
+                geometry-locked — at 390px the card leaves ~294px and the row
+                already measures ~283px; the ramp's next step up (text-hero,
+                64px) pushes it to ~303px and the minutes fall off the card. */}
             <div className="flex items-baseline gap-2">
               {countdown.d > 0 && (
                 <>
                   <span className="font-display text-[56px] font-bold leading-none tabular-nums tracking-[-0.04em]">{String(countdown.d).padStart(2, '0')}</span>
-                  <span className="font-display text-[16px] font-semibold text-white/60">დღე</span>
+                  <span className="font-display text-body-lg font-semibold text-white/60">დღე</span>
                 </>
               )}
               <span className="font-display text-[56px] font-bold leading-none tabular-nums tracking-[-0.04em] ml-1">{String(countdown.h).padStart(2, '0')}</span>
-              <span className="font-display text-[16px] font-semibold text-white/60">სთ</span>
-              <span className="font-display text-[36px] font-bold leading-none tabular-nums tracking-[-0.04em] ml-1">{String(countdown.m).padStart(2, '0')}</span>
-              <span className="font-display text-[16px] font-semibold text-white/60">წთ</span>
+              <span className="font-display text-body-lg font-semibold text-white/60">სთ</span>
+              <span className="font-display text-display font-bold leading-none tabular-nums tracking-[-0.04em] ml-1">{String(countdown.m).padStart(2, '0')}</span>
+              <span className="font-display text-body-lg font-semibold text-white/60">წთ</span>
             </div>
           </div>
         )}
@@ -364,42 +378,13 @@ type SavedExpert = {
   rating: number
 }
 
-const SavedStrip = () => {
-  const [items, setItems] = useState<SavedExpert[]>([])
-  // 'error' is distinct from an empty list: a failed request must NOT render
-  // as "your shortlist is empty" (which would lie), it gets its own retry card.
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [attempt, setAttempt] = useState(0)
+type FavState = 'loading' | 'ready' | 'error'
 
-  useEffect(() => {
-    let cancelled = false
-    setLoadState('loading')
-    ;(async () => {
-      try {
-        const res = await fetch('/api/favorites')
-        if (!res.ok) throw new Error('favorites failed')
-        const data = await res.json()
-        if (!Array.isArray(data)) throw new Error('bad shape')
-        if (cancelled) return
-        // Real API fields only — the old strip decorated favorites with stock
-        // pravatar photos and a hardcoded "90% match" badge, which lied.
-        const mapped: SavedExpert[] = data.map((f, i) => ({
-          id: f.tutor?.id ?? String(i),
-          name: f.tutor?.user?.fullName ?? 'ექსპერტი',
-          avatar: f.tutor?.user?.avatarUrl ?? null,
-          cat: f.tutor?.category?.name ?? f.tutor?.specialty ?? '',
-          price: f.tutor?.price ?? 0,
-          rating: f.tutor?.rating ?? 0,
-        }))
-        setItems(mapped)
-        setLoadState('ready')
-      } catch {
-        if (!cancelled) setLoadState('error')
-      }
-    })()
-    return () => { cancelled = true }
-  }, [attempt])
-
+/* Presentational only. The fetch lives in <Dashboard> because the BLANK-SLATE
+   rule („no bookings and no favorites ⇒ show only Welcome + Discover") needs
+   the favorites count one level above this strip — a component that hides
+   itself cannot tell its siblings to hide too. */
+const SavedStrip = ({ items, loadState, onRetry }: { items: SavedExpert[]; loadState: FavState; onRetry: () => void }) => {
   if (loadState === 'loading') return null
   // Failure/empty here is secondary content — render a compact single-row
   // notice, never a hero-sized card competing with the user's sessions.
@@ -407,13 +392,13 @@ const SavedStrip = () => {
     return (
       <div role="alert" className="rounded-card border border-ink-200 bg-white px-4 sm:px-5 py-3 flex items-center gap-3 flex-wrap motion-safe:animate-fade-in">
         <Icon.warn className="w-4 h-4 text-ink-400 shrink-0" />
-        <p className="flex-1 min-w-[220px] text-[12.5px] text-ink-600">
+        <p className="flex-1 min-w-[220px] text-small text-ink-600">
           <span className="font-display font-semibold text-ink-800">რჩეულების სია ვერ ჩაიტვირთა</span> — სცადე ცოტა ხანში.
         </p>
         <button
           type="button"
-          onClick={() => setAttempt(a => a + 1)}
-          className="shrink-0 h-8 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+          onClick={onRetry}
+          className="shrink-0 h-10 sm:h-8 px-3.5 sm:px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-meta tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast"
         >
           <Icon.refresh className="w-3.5 h-3.5" />
           სცადე თავიდან
@@ -425,12 +410,12 @@ const SavedStrip = () => {
     return (
       <div className="rounded-card border border-dashed border-ink-200 bg-white px-4 sm:px-5 py-3 flex items-center gap-3 flex-wrap motion-safe:animate-fade-in">
         <Icon.heart className="w-4 h-4 text-ink-400 shrink-0" />
-        <p className="flex-1 min-w-[220px] text-[12.5px] text-ink-600">
+        <p className="flex-1 min-w-[220px] text-small text-ink-600">
           <span className="font-display font-semibold text-ink-800">რჩეულების სია ცარიელია</span> — შეინახე ექსპერტები შესადარებლად.
         </p>
         <Link
           href="/tutors"
-          className="shrink-0 h-8 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+          className="shrink-0 h-10 sm:h-8 px-3.5 sm:px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-meta tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast"
         >
           ექსპერტების ნახვა
         </Link>
@@ -444,25 +429,25 @@ const SavedStrip = () => {
         <div>
           <div className="inline-flex items-center gap-2 mb-1">
             <Eyebrow as="span">შენახული</Eyebrow>
-            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill bg-ink-900 text-white text-[10.5px] font-display font-bold tabular-nums">{items.length}</span>
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill bg-ink-900 text-white text-meta font-display font-bold tabular-nums">{items.length}</span>
           </div>
-          <h2 className="font-display text-[18px] sm:text-[20px] font-bold text-ink-900 tracking-tight leading-tight">შენახული ექსპერტები</h2>
+          <h2 className="font-display text-h3 sm:text-h2 font-bold text-ink-900 tracking-tight leading-tight">შენახული ექსპერტები</h2>
         </div>
-        <Link href="/student/favorites" className="font-display text-[12px] font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
+        <Link href="/student/favorites" className="font-display text-meta font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
           ყველა · შედარება
         </Link>
       </div>
       <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {items.slice(0, 4).map(w => (
-          <Link key={w.id} href={`/tutors/${w.id}`} className="group rounded-card border border-ink-200 hover:border-ink-300 hover:shadow-card transition-all p-4 min-w-0 bg-white">
+          <Link key={w.id} href={`/tutors/${w.id}`} className="group rounded-card border border-ink-200 hover:border-ink-300 hover:shadow-card transition-all duration-fast p-4 min-w-0 bg-white">
             <div className="flex items-center gap-3">
               <img src={w.avatar || DEFAULT_AVATAR} alt={w.name} className="w-11 h-11 rounded-full object-cover ring-1 ring-ink-200 shrink-0" />
               <div className="min-w-0">
-                <div className="font-display text-[13px] font-bold text-ink-900 truncate group-hover:text-brand-800 transition-colors">{w.name}</div>
-                <div className="text-[11px] text-ink-500 truncate">{w.cat}</div>
+                <div className="font-display text-small font-bold text-ink-900 truncate group-hover:text-brand-800 transition-colors duration-fast">{w.name}</div>
+                <div className="text-meta text-ink-500 truncate">{w.cat}</div>
               </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between text-[12px]">
+            <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between text-meta">
               <span className="inline-flex items-center gap-1 text-ink-600">
                 {w.rating > 0 && (
                   <>
@@ -490,7 +475,9 @@ type DiscoverTutor = {
   category: string
   rating: number
   reviews: number
-  price: number
+  /** Already-resolved FLAGSHIP price label („₾80" / „უფასო"), not a raw number —
+   *  a free flagship has to be able to say „უფასო", which a number cannot. */
+  priceLabel: string
   verified: boolean
 }
 
@@ -524,7 +511,14 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
           category: t.category?.name ?? '',
           rating: t.rating ?? 0,
           reviews: t.reviewsCount ?? 0,
-          price: t.price ?? 0,
+          // FLAGSHIP price, via the shared helper — the raw profile `price` is
+          // not a service anyone can buy, and printing it here made one expert
+          // read ₾60 on this dashboard and ₾30 on /tutors (measured 2026-07-31).
+          priceLabel: primaryPriceLabel(
+            Array.isArray(t.consultations) ? t.consultations : [],
+            t.price ?? TUTOR_DEFAULTS.price,
+            t.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin,
+          ).label,
           verified: t.verified ?? false,
         })))
       } catch {
@@ -549,14 +543,14 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
       <div className="px-5 sm:px-6 py-5 border-b border-ink-100 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <Eyebrow tone="muted" className="mb-1.5">გამოცადე</Eyebrow>
-          <h2 className="font-display text-[16px] sm:text-[17px] font-bold text-ink-900 tracking-tight leading-tight">
+          <h2 className="font-display text-body-lg sm:text-h3 font-bold text-ink-900 tracking-tight leading-tight">
             რეკომენდებული ექსპერტები
           </h2>
-          <p className="text-[12.5px] text-ink-500 mt-1.5 max-w-[480px] leading-relaxed">
+          <p className="text-small text-ink-500 mt-1.5 max-w-[480px] leading-relaxed">
             გადახედე და დაჯავშნე.
           </p>
         </div>
-        <Link href="/tutors" className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors">
+        <Link href="/tutors" className="h-10 sm:h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-meta inline-flex items-center gap-1.5 transition-colors duration-fast">
           ყველა ექსპერტი
         </Link>
       </div>
@@ -570,8 +564,8 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
               key={c.slug}
               type="button"
               onClick={() => setCat(c.slug)}
-              className={`shrink-0 h-8 px-3 rounded-pill font-display text-[12px] font-semibold transition-colors ${
-                on ? 'bg-brand-500 text-white' : 'bg-ink-50 text-ink-700 hover:bg-ink-100'
+              className={`shrink-0 h-10 sm:h-8 px-3.5 sm:px-3 rounded-pill font-display text-meta font-semibold transition-colors duration-fast ${
+                on ? 'bg-brand-600 text-white' : 'bg-ink-50 text-ink-700 hover:bg-ink-100'
               }`}
             >
               {c.label}
@@ -585,7 +579,7 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
         // Skeleton cards — same grid/cell shape as the loaded state below.
         <div aria-busy="true" className="p-5 sm:p-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[0, 1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="rounded-card border border-ink-200 bg-white p-4 animate-pulse">
+            <div key={i} className="rounded-card border border-ink-200 bg-white p-4 motion-safe:animate-pulse">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-12 h-12 rounded-full bg-ink-100 shrink-0" />
                 <div className="flex-1 space-y-2 min-w-0">
@@ -602,13 +596,13 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
         // Compact single-row failure notice — retryable, never hero-sized.
         <div role="alert" className="px-5 sm:px-6 py-3.5 flex items-center gap-3 flex-wrap">
           <Icon.warn className="w-4 h-4 text-ink-400 shrink-0" />
-          <p className="flex-1 min-w-[220px] text-[12.5px] text-ink-600">
+          <p className="flex-1 min-w-[220px] text-small text-ink-600">
             <span className="font-display font-semibold text-ink-800">ვერ ჩაიტვირთა</span> — სცადე ცოტა ხანში.
           </p>
           <button
             type="button"
             onClick={() => setAttempt(a => a + 1)}
-            className="shrink-0 h-8 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+            className="shrink-0 h-10 sm:h-8 px-3.5 sm:px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-meta tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast"
           >
             <Icon.refresh className="w-3.5 h-3.5" />
             სცადე თავიდან
@@ -617,6 +611,7 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
       ) : tutors.length === 0 ? (
         <EmptyState
           variant="inline"
+          illustration="categoryComingSoon"
           icon={<Icon.search className="w-6 h-6" />}
           title="ამ კატეგორიაში ჯერ არ არის ექსპერტი"
           description="სცადე სხვა კატეგორია."
@@ -630,30 +625,32 @@ const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
               key={t.id}
               type="button"
               onClick={() => onOpen(t)}
-              className="text-left rounded-card border border-ink-200 hover:border-ink-300 hover:shadow-card transition-all bg-white p-4 min-w-0"
+              className="text-left rounded-card border border-ink-200 hover:border-ink-300 hover:shadow-card transition-all duration-fast bg-white p-4 min-w-0"
             >
               <div className="flex items-center gap-3 mb-3">
                 <img src={t.avatar || DEFAULT_AVATAR} alt={t.name} className="w-12 h-12 rounded-full object-cover ring-1 ring-ink-200 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1">
-                    <div className="font-display text-[13.5px] font-bold text-ink-900 truncate">{t.name}</div>
+                    <div className="font-display text-body font-bold text-ink-900 truncate">{t.name}</div>
                     {t.verified && <VerifiedMark size={12} />}
                   </div>
-                  <div className="text-[11.5px] text-brand-700 font-display font-semibold truncate">{t.specialty}</div>
+                  <div className="text-meta text-brand-700 font-display font-semibold truncate">{t.specialty}</div>
                 </div>
               </div>
-              <p className="text-[12px] text-ink-600 leading-snug line-clamp-2 min-h-[32px]">{t.headline}</p>
+              {/* Normalised like every other headline render — the trailing
+                  „- 7 წელი" and hand-typed „|" separators never reach the UI. */}
+              <p className="text-meta text-ink-600 leading-snug line-clamp-2 min-h-[32px]">{displayHeadline(t.headline)}</p>
               <div className="mt-3 pt-3 border-t border-ink-100 flex items-baseline justify-between">
                 <div className="inline-flex items-baseline gap-1.5">
                   {t.rating > 0 && (
                     <>
                       <Icon.star aria-hidden className="w-3 h-3 text-warning-500 self-center" />
-                      <span role="img" aria-label={`${t.rating.toFixed(2)} 5-დან`} className="font-display text-[12px] font-bold text-ink-900 tabular-nums">{t.rating.toFixed(2)}</span>
-                      <span className="font-mono text-[10.5px] text-ink-400 tabular-nums">({t.reviews})</span>
+                      <span role="img" aria-label={`${t.rating.toFixed(2)} 5-დან`} className="font-display text-meta font-bold text-ink-900 tabular-nums">{t.rating.toFixed(2)}</span>
+                      <span className="font-mono text-meta text-ink-400 tabular-nums">({t.reviews})</span>
                     </>
                   )}
                 </div>
-                <span className="font-display text-[13px] font-bold text-ink-900 tabular-nums">₾{t.price}</span>
+                <span className="font-display text-small font-bold text-ink-900 tabular-nums">{t.priceLabel}</span>
               </div>
             </button>
           ))}
@@ -708,14 +705,14 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
   <>
   {/* Mobile: 2-col grid (avatar + text), actions wrap to their own full-width
       row below — buttons squeezing the text column made 390px unreadable. */}
-  <article onClick={() => onOpen(s)} className="cursor-pointer grid grid-cols-[auto_1fr] sm:grid-cols-[64px_auto_minmax(0,1fr)_auto_auto] gap-x-4 gap-y-4 sm:gap-x-8 items-center py-4 sm:py-5 px-5 sm:px-6 hover:bg-ink-50/40 transition-colors">
+  <article onClick={() => onOpen(s)} className="cursor-pointer grid grid-cols-[auto_1fr] sm:grid-cols-[64px_auto_minmax(0,1fr)_auto_auto] gap-x-4 gap-y-4 sm:gap-x-8 items-center py-4 sm:py-5 px-5 sm:px-6 hover:bg-ink-50/40 transition-colors duration-fast">
     {/* Date pill (desktop) — soft, borderless tile: a hairline-boxed white card
         read as heavy/„ugly“; a quiet ink-50 fill with a brand-tinted weekday
         and a well-proportioned day number scans cleaner. */}
     <div className="hidden sm:flex flex-col items-center justify-center w-16 h-[72px] rounded-2xl bg-ink-50">
-      <span className="font-display text-[9px] font-bold uppercase tracking-[0.16em] text-brand-600/90">{s.day}</span>
-      <span className="font-display text-[21px] font-extrabold leading-none text-ink-900 tabular-nums mt-1.5">{s.date.split(' ')[0]}</span>
-      <span className="font-display text-[9px] uppercase tracking-[0.12em] text-ink-400 mt-1.5">{s.date.split(' ')[1]?.slice(0, 3)}</span>
+      <span className="font-display text-micro font-bold uppercase text-brand-600/90">{s.day}</span>
+      <span className="font-display text-h2 font-extrabold leading-none text-ink-900 tabular-nums mt-1.5">{s.date.split(' ')[0]}</span>
+      <span className="font-display text-micro uppercase text-ink-400 mt-1.5">{s.date.split(' ')[1]?.slice(0, 3)}</span>
     </div>
 
     {/* Expert avatar */}
@@ -727,21 +724,21 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
     {/* Topic + meta */}
     <div className="min-w-0">
       <div className="flex items-center gap-2 flex-wrap">
-        <h3 className="font-display text-[15.5px] font-bold text-ink-900 tracking-tight truncate">{s.expert.name}</h3>
-        <span className="font-display text-[11.5px] font-semibold text-brand-700">{s.expert.cat}</span>
+        <h3 className="font-display text-body-lg font-bold text-ink-900 tracking-tight truncate">{s.expert.name}</h3>
+        <span className="font-display text-meta font-semibold text-brand-700">{s.expert.cat}</span>
         <StatusBadge s={s.status} />
         {s.status === 'completed' && !s.reviewed && (
-          <span className="inline-flex items-center gap-1 px-2 h-5 rounded-pill bg-transparent border border-ink-200 text-[10.5px] font-display font-bold uppercase tracking-[0.12em] text-ink-500">
+          <span className="inline-flex items-center gap-1 px-2 h-5 rounded-pill bg-transparent border border-ink-200 text-micro font-display font-bold uppercase text-ink-500">
             <Icon.star aria-hidden className="w-3 h-3" />
             შეფასების მოლოდინში
           </span>
         )}
       </div>
-      <p className="mt-1 text-[13px] text-ink-700 leading-snug line-clamp-1">{s.topic}</p>
+      <p className="mt-1 text-small text-ink-700 leading-snug line-clamp-1">{s.topic}</p>
       {/* Mobile-only inline meta — on desktop time+price move to their own
           right-aligned column so the row's actions no longer float against a
           large empty gap. */}
-      <div className="mt-1.5 inline-flex items-center gap-3 text-[11.5px] text-ink-500 sm:hidden">
+      <div className="mt-1.5 inline-flex items-center gap-3 text-meta text-ink-500 sm:hidden">
         <span className="inline-flex items-center gap-1">
           <Icon.cal className="w-3 h-3" />
           {s.date}
@@ -757,11 +754,11 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
     {/* Meta (desktop) — time + price, right-aligned, sitting next to the
         actions so the row reads as info-left / summary+actions-right. */}
     <div className="hidden sm:flex flex-col items-end gap-1 shrink-0 text-right">
-      <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-600 tabular-nums">
+      <span className="inline-flex items-center gap-1.5 text-meta text-ink-600 tabular-nums">
         <Icon.clock className="w-3.5 h-3.5 text-ink-400" />
         {s.time} · {s.duration} წთ
       </span>
-      <span className="font-display text-[13.5px] font-semibold text-ink-800 tabular-nums inline-flex items-center gap-1">
+      <span className="font-display text-body font-semibold text-ink-800 tabular-nums inline-flex items-center gap-1">
         {PAYMENTS_LIVE && <Icon.shieldCheck className="w-3.5 h-3.5 text-success-600" />}
         ₾{s.price}
       </span>
@@ -771,15 +768,15 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
     <div className="col-span-2 sm:col-span-1 flex items-center justify-end gap-1.5 shrink-0 flex-wrap" onClick={e => e.stopPropagation()}>
       {s.status === 'confirmed' && (
         <>
-          <Link href={`/student/messages/${s.id}`} aria-label="მიმოწერა" className="hidden md:inline-flex h-9 w-9 rounded-btn border border-ink-200 hover:border-ink-300 text-ink-600 items-center justify-center transition-colors">
+          <Link href={`/student/messages/${s.id}`} aria-label="მიმოწერა" className="hidden md:inline-flex h-10 sm:h-9 w-9 rounded-btn border border-ink-200 hover:border-ink-300 text-ink-600 items-center justify-center transition-colors duration-fast">
             <Icon.chat className="w-4 h-4" />
           </Link>
-          <Link href={`/session/${s.id}`} className="h-9 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors">
+          <Link href={`/session/${s.id}`} className="h-10 sm:h-9 px-3.5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-small tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast">
             <Icon.video className="w-3.5 h-3.5" />
             <span>ოთახი</span>
           </Link>
           {onCancel && (
-            <button type="button" disabled={cancelling} onClick={() => setAskCancel(true)} className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-[12px] tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <button type="button" disabled={cancelling} onClick={() => setAskCancel(true)} className="h-10 sm:h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-meta tracking-wide transition-colors duration-fast disabled:opacity-50 disabled:cursor-not-allowed">
               {cancelling ? 'უუქმდება…' : 'გაუქმება'}
             </button>
           )}
@@ -787,11 +784,11 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
       )}
       {s.status === 'pending' && (
         <>
-          <button type="button" onClick={() => onOpen(s)} className="h-9 px-3.5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-[12px] tracking-wide transition-colors">
+          <button type="button" onClick={() => onOpen(s)} className="h-10 sm:h-9 px-3.5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-meta tracking-wide transition-colors duration-fast">
             დეტალები
           </button>
           {onCancel && (
-            <button type="button" disabled={cancelling} onClick={() => setAskCancel(true)} className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-[12px] tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <button type="button" disabled={cancelling} onClick={() => setAskCancel(true)} className="h-10 sm:h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-meta tracking-wide transition-colors duration-fast disabled:opacity-50 disabled:cursor-not-allowed">
               {cancelling ? 'უუქმდება…' : 'გაუქმება'}
             </button>
           )}
@@ -800,7 +797,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
       {s.status === 'completed' && (
         <>
           {!s.reviewed && (
-            <Link href={`/student/bookings/${s.id}?review=1`} className="h-9 px-3.5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1.5 transition-colors">
+            <Link href={`/student/bookings/${s.id}?review=1`} className="h-10 sm:h-9 px-3.5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-small tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast">
               <Icon.star aria-hidden className="w-3.5 h-3.5" />
               <span>შეაფასე</span>
             </Link>
@@ -813,7 +810,7 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
                 ? `/tutors/${s.tutorId}?topic=${encodeURIComponent(s.topic)}&duration=${s.duration}&price=${s.price}&rebook=1`
                 : '/tutors'
             }
-            className="h-9 px-3.5 rounded-btn bg-brand-50 border border-brand-200 hover:bg-brand-500 hover:text-white hover:border-brand-500 text-brand-800 font-display font-semibold text-[12px] tracking-wide transition-colors inline-flex items-center gap-1.5"
+            className="h-10 sm:h-9 px-3.5 rounded-btn bg-brand-50 border border-brand-200 hover:bg-brand-600 hover:text-white hover:border-brand-600 text-brand-800 font-display font-semibold text-meta tracking-wide transition-colors duration-fast inline-flex items-center gap-1.5"
           >
             <Icon.refresh className="w-3.5 h-3.5" />
             <span>დაჯავშნე ისევ</span>
@@ -821,11 +818,11 @@ const SessionRow = ({ s, onOpen, onCancel, cancelling }: { s: Session; onOpen: (
         </>
       )}
       {s.status === 'cancelled' && (
-        <Link href="/tutors" className="h-9 px-3.5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-700 font-display font-medium text-[12px] tracking-wide transition-colors inline-flex items-center">
+        <Link href="/tutors" className="h-10 sm:h-9 px-3.5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-700 font-display font-medium text-meta tracking-wide transition-colors duration-fast inline-flex items-center">
           ხელახლა
         </Link>
       )}
-      <button type="button" onClick={() => onOpen(s)} aria-label="მეტი" className="h-10 w-10 rounded-btn hover:bg-ink-100 text-ink-500 inline-flex items-center justify-center transition-colors">
+      <button type="button" onClick={() => onOpen(s)} aria-label="მეტი" className="h-10 w-10 rounded-btn hover:bg-ink-100 text-ink-500 inline-flex items-center justify-center transition-colors duration-fast">
         <Icon.more className="w-4 h-4" />
       </button>
     </div>
@@ -886,7 +883,6 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
   const [flash, setFlash] = useState<string | null>(null)
 
   const mapSession = (b: any): Session => {
-    const dt = new Date(b.startAt)
     const statusMap: Record<string, SessionStatus> = { CONFIRMED: 'confirmed', PREPARING: 'pending', LIVE: 'confirmed', COMPLETED: 'completed', CANCELED: 'cancelled', NO_SHOW: 'cancelled' }
     return {
       id: b.id,
@@ -897,9 +893,12 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
       expert: { name: b.tutor?.user?.fullName ?? 'ექსპერტი', avatarUrl: b.tutor?.user?.avatarUrl ?? null, cat: b.tutor?.specialty ?? '', headline: b.tutor?.headline ?? '' },
       topic: b.topic,
       startAt: b.startAt,
-      date: fmtKaDate(dt, { month: 'long' }),
-      day: KA_WEEKDAYS_SHORT[dt.getDay()],
-      time: fmtKaTime(dt),
+      // Tbilisi wall-clock, always — these strings feed the date pill, the row
+      // meta AND the cancel dialog, so a viewer abroad used to be shown their
+      // own local hour while every reminder e-mail said „თბილისის დროით".
+      date: sessionDate(b.startAt, { month: 'long' }),
+      day: sessionWeekdayShort(b.startAt),
+      time: sessionTime(b.startAt),
       duration: b.durationMin,
       price: b.price,
       status: statusMap[b.status] ?? 'pending',
@@ -956,10 +955,15 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
         <div className="flex items-baseline justify-between flex-wrap gap-3">
           <div>
             <Eyebrow className="mb-1">აქტივობა</Eyebrow>
-            <h2 className="font-display text-[20px] sm:text-[22px] font-bold text-ink-900 tracking-tight">ჩემი სესიები</h2>
-            <p className="text-[12px] text-ink-500 mt-0.5">{PAYMENTS_LIVE ? 'ყველა ჯავშანი · დაცული გადახდით' : 'ყველა ჯავშანი · დაჯავშნა უფასოა'}</p>
+            <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight">ჩემი სესიები</h2>
+            <p className="text-meta text-ink-500 mt-0.5">
+              {PAYMENTS_LIVE ? 'ყველა ჯავშანი · დაცული გადახდით' : 'ყველა ჯავშანი · დაჯავშნა უფასოა'}
+              {/* The separator rides the note itself, so nothing dangles for
+                  Tbilisi viewers (TzNote renders nothing for them). */}
+              <TzNote className="text-meta text-ink-500 before:content-['·'] before:mx-1" />
+            </p>
           </div>
-          <Link href="/student/bookings" className="font-display text-[12px] font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
+          <Link href="/student/bookings" className="font-display text-meta font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1 min-h-[40px] sm:min-h-0">
             მთლიანი ისტორია
           </Link>
         </div>
@@ -972,10 +976,13 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
-                className={`relative inline-flex items-center gap-2 pb-3 px-1 mr-4 font-display text-[13px] font-semibold tracking-wide transition-colors ${on ? 'text-ink-900' : 'text-ink-500 hover:text-ink-800'}`}
+                // min-h-[40px] + pt-2 — the underline tab pattern measured 32px, under
+                // the 40px floor. Padding grows the hit area UPWARD so the indicator
+                // stays on the border line (same fix as /tutor/bookings).
+                className={`relative inline-flex items-center gap-2 min-h-[40px] pt-2 pb-3 px-1 mr-4 font-display text-small font-semibold tracking-wide transition-colors duration-fast ${on ? 'text-ink-900' : 'text-ink-500 hover:text-ink-800'}`}
               >
                 {t.l}
-                <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill text-[10.5px] font-bold tabular-nums ${on ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600'}`}>{t.c}</span>
+                <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill text-meta font-bold tabular-nums ${on ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600'}`}>{t.c}</span>
                 {on && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-ink-900 rounded-full" />}
               </button>
             )
@@ -984,12 +991,12 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
       </div>
 
       {(flash || loadError) && (
-        <div role="alert" className={`px-5 sm:px-6 py-2.5 text-[12.5px] font-medium ${loadError ? 'bg-danger-50 text-danger-800 border-b border-danger-200' : 'bg-success-50 text-success-800 border-b border-success-200'}`}>
+        <div role="alert" className={`px-5 sm:px-6 py-2.5 text-small font-medium ${loadError ? 'bg-danger-50 text-danger-800 border-b border-danger-200' : 'bg-success-50 text-success-800 border-b border-success-200'}`}>
           {loadError ? (
             <span className="inline-flex items-center gap-3 flex-wrap">
               <span>{loadError}</span>
               {/* A failed load must never dead-end — retry re-runs the parent fetch. */}
-              <button type="button" onClick={() => reload()} className="font-display font-semibold underline underline-offset-2 hover:text-danger-900 transition-colors">
+              <button type="button" onClick={() => reload()} className="font-display font-semibold underline underline-offset-2 hover:text-danger-900 transition-colors duration-fast">
                 სცადე თავიდან
               </button>
             </span>
@@ -1004,14 +1011,14 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
           // known, so no spinner and no jump when data lands.
           <div aria-busy="true" className="divide-y divide-ink-100">
             {[0, 1, 2].map(i => (
-              <div key={i} className="grid grid-cols-[auto_1fr_auto] sm:grid-cols-[64px_auto_1fr_auto] gap-4 sm:gap-5 items-center py-4 px-5 animate-pulse">
+              <div key={i} className="grid grid-cols-[auto_1fr_auto] sm:grid-cols-[64px_auto_1fr_auto] gap-4 sm:gap-5 items-center py-4 px-5 motion-safe:animate-pulse">
                 <div className="hidden sm:block w-16 h-16 rounded-card bg-ink-100" />
                 <div className="w-11 h-11 rounded-full bg-ink-100" />
                 <div className="min-w-0 space-y-2">
                   <div className="h-3.5 w-2/5 bg-ink-100 rounded" />
                   <div className="h-3 w-3/5 bg-ink-100 rounded" />
                 </div>
-                <div className="h-9 w-24 bg-ink-100 rounded-btn" />
+                <div className="h-10 sm:h-9 w-24 bg-ink-100 rounded-btn" />
               </div>
             ))}
           </div>
@@ -1020,7 +1027,7 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
           // exists — where to go next. Never a dead end.
           <EmptyState
             variant="inline"
-            icon={<Icon.cal className="w-6 h-6" />}
+            illustration="bookings"
             title={tab === 'past' ? 'დასრულებული სესია ჯერ არ გაქვს' : tab === 'cancelled' ? 'გაუქმებული ჯავშანი არ არის' : 'მომავალი სესია არ გაქვს'}
             description={
               tab === 'past'
@@ -1039,7 +1046,7 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
             <div key={g.key}>
               <div className="px-5 sm:px-6 py-2 bg-ink-50/50 flex items-center gap-2">
                 <Eyebrow as="span" tone="muted">{g.label}</Eyebrow>
-                <span className="text-[10.5px] text-ink-400 tabular-nums">· {g.items.length}</span>
+                <span className="text-meta text-ink-400 tabular-nums">· {g.items.length}</span>
               </div>
               <div className="divide-y divide-ink-100">
                 {g.items.map(s => <SessionRow key={s.id} s={s} onOpen={onOpenSession} onCancel={handleCancel} cancelling={cancellingId === s.id} />)}
@@ -1053,8 +1060,8 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
 
       {rows.length > 0 && (
         <div className="px-5 sm:px-6 py-3.5 bg-ink-50/40 border-t border-ink-100 flex items-center justify-between">
-          <span className="text-[12px] text-ink-500"><span className="font-display font-semibold text-ink-700 tabular-nums">{rows.length}</span> სესია</span>
-          <Link href="/student/bookings" className="font-display text-[12px] font-semibold text-ink-700 hover:text-ink-900 inline-flex items-center gap-1">
+          <span className="text-meta text-ink-500"><span className="font-display font-semibold text-ink-700 tabular-nums">{rows.length}</span> სესია</span>
+          <Link href="/student/bookings" className="font-display text-meta font-semibold text-ink-700 hover:text-ink-900 inline-flex items-center gap-1">
             სრული სიის ნახვა
             <Icon.chevR className="w-3 h-3" />
           </Link>
@@ -1066,29 +1073,56 @@ const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSession }: 
 
 /* ───── Page ───── */
 /* ───── Dashboard "home" section — wraps the original main content ───── */
-const HomeSection = ({ me, bookings, bookingsLoading, bookingsError, reload, onOpenDetail }: { me: MeData | null; bookings: any[]; bookingsLoading: boolean; bookingsError: string | null; reload: () => Promise<void> | void; onOpenDetail: (id?: string) => void }) => (
-  <>
-    <Welcome me={me} bookings={bookings} />
-    <OnboardingTour userId={me?.id} hasBookings={bookings.length > 0} joinedAt={(me as any)?.createdAt} />
-    <Container as="main" className="py-8 lg:py-10">
-      {/* Primary: the user's own sessions come FIRST, full-width — the old
-          quick-book sidebar duplicated the hero search and is gone.
-          Discovery (recommendations, saved strip) follows below. */}
-      <div className="mb-6">
-        <NextSession bookings={bookings} loading={bookingsLoading} onOpenDetail={onOpenDetail} onOpenExpert={() => {}} />
-      </div>
-      <div className="mb-8">
-        <SessionsPanel bookings={bookings} loading={bookingsLoading} loadError={bookingsError} reload={reload} onOpenSession={s => onOpenDetail(s.id)} />
-      </div>
-      <div className="mb-8">
-        <Discover onOpen={(t) => { window.location.href = `/tutors/${t.id}` }} />
-      </div>
-      <div>
-        <SavedStrip />
-      </div>
-    </Container>
-  </>
-)
+const HomeSection = ({ me, bookings, bookingsLoading, bookingsError, reload, onOpenDetail, favs, favState, reloadFavs }: { me: MeData | null; bookings: any[]; bookingsLoading: boolean; bookingsError: string | null; reload: () => Promise<void> | void; onOpenDetail: (id?: string) => void; favs: SavedExpert[]; favState: FavState; reloadFavs: () => void }) => {
+  /* BLANK SLATE. A brand-new account has nothing in every one of these panels,
+     and each empty panel used to render its own „find an expert" card — four
+     identical CTAs in four shells, pushing the only real content (Discover)
+     ~1300px down. With zero bookings AND zero saved experts there is exactly
+     one thing to do, so we show exactly one place to do it: the Welcome search
+     + the expert grid. A load ERROR is never treated as „empty" — SessionsPanel
+     has to stay mounted to show its retry banner. */
+  const blankSlate =
+    !bookingsLoading && !bookingsError && bookings.length === 0 &&
+    favState === 'ready' && favs.length === 0
+
+  return (
+    <>
+      <Welcome me={me} bookings={bookings} />
+      <OnboardingTour userId={me?.id} hasBookings={bookings.length > 0} joinedAt={(me as any)?.createdAt} />
+      <Container as="main" className="py-8 lg:py-10">
+        {/* Primary: the user's own sessions come FIRST, full-width — the old
+            quick-book sidebar duplicated the hero search and is gone.
+            Discovery (recommendations, saved strip) follows below. */}
+        {/* Packages ABOVE the session list, and above the blankSlate branch:
+            a client with credits but no bookings yet is exactly the person this
+            card exists for, and they would otherwise land on an empty
+            dashboard holding lessons they paid for. Renders nothing when there
+            are no packages. */}
+        <div className="mb-6 empty:mb-0">
+          <StudentPackages />
+        </div>
+        {!blankSlate && (
+          <>
+            <div className="mb-6">
+              <NextSession bookings={bookings} loading={bookingsLoading} onOpenDetail={onOpenDetail} onOpenExpert={() => {}} />
+            </div>
+            <div className="mb-8">
+              <SessionsPanel bookings={bookings} loading={bookingsLoading} loadError={bookingsError} reload={reload} onOpenSession={s => onOpenDetail(s.id)} />
+            </div>
+          </>
+        )}
+        <div className={blankSlate ? '' : 'mb-8'}>
+          <Discover onOpen={(t) => { window.location.href = `/tutors/${t.id}` }} />
+        </div>
+        {!blankSlate && (
+          <div>
+            <SavedStrip items={favs} loadState={favState} onRetry={reloadFavs} />
+          </div>
+        )}
+      </Container>
+    </>
+  )
+}
 
 export default function Dashboard() {
   const [me, setMe] = useState<MeData | null>(null)
@@ -1103,6 +1137,10 @@ export default function Dashboard() {
   const [bookings, setBookings] = useState<any[]>([])
   const [bookingsLoading, setBookingsLoading] = useState(true)
   const [bookingsError, setBookingsError] = useState<string | null>(null)
+  // Favorites live here (not inside SavedStrip) because the blank-slate rule in
+  // <HomeSection> needs the count. 'error' stays distinct from an empty list.
+  const [favs, setFavs] = useState<SavedExpert[]>([])
+  const [favState, setFavState] = useState<FavState>('loading')
 
   // Canonical signed-out destination — same param requireUser() uses, so
   // sign-in returns the user straight back here.
@@ -1128,6 +1166,29 @@ export default function Dashboard() {
       setBookingsLoading(false)
     }
   }, [goSignin])
+
+  const loadFavs = useCallback(async () => {
+    setFavState('loading')
+    try {
+      const res = await fetch('/api/favorites')
+      if (!res.ok) throw new Error('favorites failed')
+      const data = await res.json()
+      if (!Array.isArray(data)) throw new Error('bad shape')
+      // Real API fields only — the old strip decorated favorites with stock
+      // pravatar photos and a hardcoded "90% match" badge, which lied.
+      setFavs(data.map((f: any, i: number) => ({
+        id: f.tutor?.id ?? String(i),
+        name: f.tutor?.user?.fullName ?? 'ექსპერტი',
+        avatar: f.tutor?.user?.avatarUrl ?? null,
+        cat: f.tutor?.category?.name ?? f.tutor?.specialty ?? '',
+        price: f.tutor?.price ?? 0,
+        rating: f.tutor?.rating ?? 0,
+      })))
+      setFavState('ready')
+    } catch {
+      setFavState('error')
+    }
+  }, [])
 
   // Retryable session check. Every path settles authState: signed-out
   // redirects, success renders, and anything else (network drop, 5xx,
@@ -1160,7 +1221,8 @@ export default function Dashboard() {
     // /api/me. If the session is actually gone this call 401s and redirects
     // exactly like checkAuth would.
     loadBookings()
-  }, [checkAuth, loadBookings])
+    loadFavs()
+  }, [checkAuth, loadBookings, loadFavs])
 
   // Neutral gate while we confirm the session — no authed chrome, no redirect
   // flash. On failure this becomes a visible dead-end-free error card with a
@@ -1173,7 +1235,9 @@ export default function Dashboard() {
       // The workspace shell already provides the sidebar + top bar, so this
       // loading state renders ONLY the content skeleton (no internal header).
       return (
-          <Container className="py-8 sm:py-10" aria-busy="true">
+          // Same rhythm as the loaded page — a skeleton that pads differently
+          // makes the content jump when it arrives.
+          <Container className="py-8 lg:py-10" aria-busy="true">
             <Skeleton className="h-7 w-56 max-w-full mb-3" />
             <Skeleton className="h-4 w-80 max-w-full mb-8" />
             <div className="grid gap-4 sm:gap-5 sm:grid-cols-2 mb-6">
@@ -1200,12 +1264,12 @@ export default function Dashboard() {
         <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain opacity-90 select-none" draggable={false} />
         {(
           <div className="text-center max-w-[360px]">
-            <div className="font-display text-[16px] font-bold text-ink-900 tracking-tight">ვერ ჩაიტვირთა</div>
-            <p className="text-[12.5px] text-ink-500 mt-1.5 leading-relaxed">შეამოწმე ინტერნეტი და სცადე თავიდან.</p>
+            <div className="font-display text-body-lg font-bold text-ink-900 tracking-tight">ვერ ჩაიტვირთა</div>
+            <p className="text-small text-ink-500 mt-1.5 leading-relaxed">შეამოწმე ინტერნეტი და სცადე თავიდან.</p>
             <button
               type="button"
               onClick={() => { checkAuth(); if (bookingsError) loadBookings() }}
-              className="mt-4 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+              className="mt-4 h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast"
             >
               <Icon.refresh className="w-3.5 h-3.5" />
               სცადე თავიდან
@@ -1224,6 +1288,9 @@ export default function Dashboard() {
       bookingsError={bookingsError}
       reload={loadBookings}
       onOpenDetail={(id) => { if (id) window.location.href = `/student/bookings/${id}` }}
+      favs={favs}
+      favState={favState}
+      reloadFavs={loadFavs}
     />
   )
 }

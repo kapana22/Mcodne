@@ -1,5 +1,6 @@
 'use client'
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useScrollIntoResults } from '@/lib/useScrollIntoResults'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Avatar } from '@/components/Avatar'
@@ -11,7 +12,9 @@ import { Icon } from '@/components/Icon'
 import { StatusPill } from '@/components/StatusPill'
 import { useToast } from '@/components/ToastProvider'
 import { PageHeader } from '@/components/tutor/PageHeader'
-import { fmtKaDate, fmtKaTime } from '@/lib/kaDate'
+import { TzNote } from '@/components/workspace/TzNote'
+import { sessionDate, sessionTime } from '@/components/workspace/sessionTime'
+import { dayKeyInTz } from '@/lib/bookings'
 import { isBookingLive } from '@/lib/bookingLive'
 import { refreshNavBadges } from '@/components/tutor/useNavBadges'
 import {
@@ -40,12 +43,16 @@ const LEGACY_TAB: Record<string, TabId> = {
   ALL: 'attention',
 }
 
-const dayLabel = (d: Date, now: Date) => {
-  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
-  const diff = Math.round((startOf(d) - startOf(now)) / 86_400_000)
+// Grouped by the TBILISI day, because the row times below are Tbilisi
+// wall-clock — grouping on the viewer's midnight would file a 00:30 Tbilisi
+// session under „ხვალ" and then print „00:30" next to it.
+const dayLabel = (iso: string, now: Date) => {
+  const key = (x: Date) => dayKeyInTz(x)               // "2026-08-02" in Tbilisi
+  const days = (k: string) => Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10)) / 86_400_000
+  const diff = days(key(new Date(iso))) - days(key(now))
   if (diff === 0) return 'დღეს'
   if (diff === 1) return 'ხვალ'
-  return fmtKaDate(d, { weekday: true })
+  return sessionDate(iso, { weekday: true })
 }
 
 function BookingsPageInner() {
@@ -107,6 +114,11 @@ function BookingsPageInner() {
   // Next syncs useSearchParams from native history.replaceState.
   const setTab = (t: TabId) => window.history.replaceState(null, '', `/tutor/bookings?tab=${t}`)
 
+  // Switching bucket replaces the whole list; `replaceState` means no navigation
+  // happens, so nothing would otherwise move the viewport.
+  const tabsRef = useRef<HTMLDivElement | null>(null)
+  useScrollIntoResults(tabsRef, [tab])
+
   const act = async (b: Booking, action: 'accept' | 'decline' | 'complete' | 'no_show') => {
     setBusy(b.id + action)
     try {
@@ -164,7 +176,7 @@ function BookingsPageInner() {
     if (tab !== 'upcoming') return null
     const groups: { label: string; items: Booking[] }[] = []
     for (const b of list) {
-      const label = dayLabel(new Date(b.startAt), nowDate)
+      const label = dayLabel(b.startAt, nowDate)
       const last = groups[groups.length - 1]
       if (last && last.label === label) last.items.push(b)
       else groups.push({ label, items: [b] })
@@ -175,40 +187,52 @@ function BookingsPageInner() {
 
   return (
     <div>
+      {/* The h1 stays in the document outline (skip-link + screen-reader
+          landmark) but hides on lg+, where it was the literal text of the
+          highlighted sidebar pill ~40px to its left. Below lg there is no
+          sidebar, so it shows. */}
       <PageHeader
-        className="mb-5"
+        className="mb-5 lg:sr-only"
         title="ჯავშნები"
       />
 
       {/* Bucket tabs — underline pattern from the student side */}
-      <div className="flex border-b border-ink-200 mb-5 overflow-x-auto scrollbar-hide rail-fade-end">
-        {TABS.map(t => {
-          const on = t.id === tab
-          const c = loading ? 0 : buckets[t.id].length
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              aria-pressed={on}
-              className={`relative inline-flex items-center gap-2 pb-3 px-1 mr-5 font-display text-[13px] font-semibold whitespace-nowrap transition-colors ${
-                on ? 'text-ink-900' : 'text-ink-500 hover:text-ink-800'
-              }`}
-            >
-              {t.label}
-              {c > 0 && (
-                <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill text-[10.5px] font-bold tabular-nums ${
-                  t.id === 'attention' && !on ? 'bg-brand-500 text-white' : on ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600'
-                }`}>{c}</span>
-              )}
-              {on && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-brand-500 rounded-full" />}
-            </button>
-          )
-        })}
+      <div className="flex items-end justify-between gap-4 border-b border-ink-200 mb-5">
+        <div ref={tabsRef} className="flex min-w-0 overflow-x-auto scrollbar-hide rail-fade-end">
+          {TABS.map(t => {
+            const on = t.id === tab
+            const c = loading ? 0 : buckets[t.id].length
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                aria-pressed={on}
+                // min-h-[40px] + pt-2: measured at 32px, below this project's own
+                // 40px tap floor. The padding grows the hit area UPWARD so the
+                // underline indicator keeps sitting on the border line.
+                className={`relative inline-flex items-center gap-2 min-h-[40px] pt-2 pb-3 px-1 mr-5 font-display text-small font-semibold whitespace-nowrap transition-colors duration-fast ${
+                  on ? 'text-ink-900' : 'text-ink-500 hover:text-ink-800'
+                }`}
+              >
+                {t.label}
+                {c > 0 && (
+                  <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-pill text-meta font-bold tabular-nums ${
+                    t.id === 'attention' && !on ? 'bg-brand-600 text-white' : on ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600'
+                  }`}>{c}</span>
+                )}
+                {on && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-brand-500 rounded-full" />}
+              </button>
+            )
+          })}
+        </div>
+        {/* Every time in the rows below is Tbilisi wall-clock — say so, once,
+            and only to viewers whose browser is somewhere else. */}
+        <TzNote className="hidden sm:block text-meta text-ink-500 pb-3 shrink-0" />
       </div>
 
       {err && (
-        <div className="mb-4 p-4 rounded-card bg-danger-50 border border-danger-200 text-danger-700 text-[13px] flex items-center justify-between gap-3">
+        <div className="mb-4 p-4 rounded-card bg-danger-50 border border-danger-200 text-danger-700 text-small flex items-center justify-between gap-3">
           <span className="min-w-0">{err}</span>
           <Btn variant="secondary" size="sm" onClick={() => { setErr(null); setBookings(null); load() }}>თავიდან</Btn>
         </div>
@@ -218,10 +242,10 @@ function BookingsPageInner() {
         <ul className="space-y-3" aria-busy="true">
           {[0, 1, 2].map(i => (
             <li key={i} className="p-5 rounded-card border border-ink-200 bg-white flex items-center gap-4">
-              <span className="w-11 h-11 rounded-full bg-ink-100 animate-pulse shrink-0" />
+              <span className="w-11 h-11 rounded-full bg-ink-100 motion-safe:animate-pulse shrink-0" />
               <span className="flex-1 space-y-2">
-                <span className="block h-3.5 w-1/3 rounded-pill bg-ink-100 animate-pulse" />
-                <span className="block h-3 w-2/3 rounded-pill bg-ink-100 animate-pulse" />
+                <span className="block h-3.5 w-1/3 rounded-pill bg-ink-100 motion-safe:animate-pulse" />
+                <span className="block h-3 w-2/3 rounded-pill bg-ink-100 motion-safe:animate-pulse" />
               </span>
             </li>
           ))}
@@ -235,14 +259,14 @@ function BookingsPageInner() {
           />
         ) : tab === 'upcoming' ? (
           <EmptyState
-            icon={<Icon.calendar className="w-6 h-6" />}
+            illustration="bookings"
             title="მოახლოებული სესია არ გაქვს"
             description="გამოაქვეყნე დრო, რომ დაგიჯავშნონ."
             cta={{ label: 'დროის გამოქვეყნება', href: '/tutor/schedule' }}
           />
         ) : (
           <EmptyState
-            icon={<Icon.clock className="w-6 h-6" />}
+            illustration="bookings"
             title="ისტორია ცარიელია"
             description="დასრულებული სესიები აქ გამოჩნდება."
           />
@@ -269,7 +293,7 @@ function BookingsPageInner() {
       )}
 
       {!loading && tab === 'history' && list.length >= 30 && (
-        <p className="mt-4 text-center text-[11.5px] text-ink-400">ნაჩვენებია ბოლო ჯავშნები.</p>
+        <p className="mt-4 text-center text-meta text-ink-400">ნაჩვენებია ბოლო ჯავშნები.</p>
       )}
 
       <ConfirmModal
@@ -325,7 +349,6 @@ function BookingRow({
   const reschedPending = awaitsRescheduleAnswer(b)
   const future = new Date(b.startAt).getTime() > now
   const terminal = b.status === 'COMPLETED' || b.status === 'CANCELED' || b.status === 'NO_SHOW'
-  const d = new Date(b.startAt)
 
   const actions = terminal ? null : (
     <div className="flex items-center gap-2 flex-wrap shrink-0">
@@ -344,7 +367,7 @@ function BookingRow({
       )}
       {live && (
         <Btn variant="primary" size="sm" href={`/session/${b.id}`}>
-          <Icon.video className="w-4 h-4" /> ვიდეო-ოთახი
+          <Icon.video className="w-4 h-4" /> ვიდეოოთახი
         </Btn>
       )}
       {needsClosure && !reschedPending && (
@@ -371,25 +394,25 @@ function BookingRow({
   )
 
   return (
-    <li className="rounded-card border border-ink-200 bg-white shadow-xs hover:border-ink-300 transition-colors">
+    <li className="rounded-card border border-ink-200 bg-white shadow-xs hover:border-ink-300 transition-colors duration-fast">
       <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
         <Link href={`/tutor/bookings/${b.id}`} className="flex items-center gap-3 min-w-0 flex-1 group">
           <Avatar src={b.student?.avatarUrl ?? undefined} name={b.student?.fullName} size={44} />
           <span className="min-w-0 flex-1 block">
             <span className="flex items-center gap-2 flex-wrap">
-              <span className="font-display text-[14px] font-bold text-ink-900 truncate group-hover:text-brand-800 transition-colors">
+              <span className="font-display text-body font-bold text-ink-900 truncate group-hover:text-brand-800 transition-colors duration-fast">
                 {b.student?.fullName ?? 'უცნობი სტუდენტი'}
               </span>
               <StatusPill tone={live ? 'live' : toneOf(b.status)} />
               {reschedPending && (
-                <span className="inline-flex items-center h-6 px-2 rounded-pill bg-transparent border border-ink-200 text-ink-500 font-display text-[10.5px] font-bold uppercase tracking-[0.1em]">
+                <span className="inline-flex items-center h-6 px-2 rounded-pill bg-transparent border border-ink-200 text-ink-500 font-display text-micro font-bold uppercase">
                   გადადება ელოდება
                 </span>
               )}
             </span>
-            <span className="block text-[13px] text-ink-600 truncate mt-0.5" title={b.topic}>{b.topic}</span>
-            <span className="text-[12px] text-ink-500 mt-1 flex items-center gap-3 flex-wrap">
-              <span className="inline-flex items-center gap-1"><Icon.calendar className="w-3.5 h-3.5" />{fmtKaDate(d)} · {fmtKaTime(d)}</span>
+            <span className="block text-small text-ink-600 truncate mt-0.5" title={b.topic}>{b.topic}</span>
+            <span className="text-meta text-ink-500 mt-1 flex items-center gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-1"><Icon.calendar className="w-3.5 h-3.5" />{sessionDate(b.startAt)} · {sessionTime(b.startAt)}</span>
               <span className="inline-flex items-center gap-1"><Icon.clock className="w-3.5 h-3.5" />{b.durationMin} წთ</span>
               <span className="font-display font-bold text-ink-800 tabular-nums">₾{b.price}</span>
             </span>

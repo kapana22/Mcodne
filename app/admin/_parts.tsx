@@ -1,53 +1,15 @@
 'use client'
 // AdminConfirmDialog — shared admin confirmation dialog, modeled on
 // components/ConfirmModal.tsx (a11y copied: role="alertdialog", focus trap,
-// Escape, focus restore, ink-950/55 scrim, z-[90], mobile bottom-sheet).
+// Escape, focus restore, ink-950/55 scrim, z-confirm, mobile bottom-sheet).
 // Extends it with an OPTIONAL reason textarea:
 //   reason="required" → confirm disabled until non-empty
 //   reason="optional" → textarea shown, may be left empty
 //   reason="none"     → plain confirm (default)
 // onConfirm receives the trimmed reason text (empty string when none).
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-
-// Shared section header for every admin tab — consistent eyebrow + title + sub,
-// with an optional right-aligned actions slot. Single source so all sections
-// (including blog/texts) read identically.
-export const TabHeader = ({ eyebrow, title, sub, actions }: { eyebrow: string; title: ReactNode; sub: string; actions?: ReactNode }) => (
-  <section className="px-6 lg:px-8 pt-7 pb-5 border-b border-ink-100 bg-white">
-    <div className="flex items-end justify-between gap-4 flex-wrap">
-      <div className="min-w-0 max-w-[680px]">
-        <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-900 mb-1.5">{eyebrow}</div>
-        <h1 className="font-display text-[24px] lg:text-[28px] font-bold text-ink-900 tracking-tight leading-[1.1]">{title}</h1>
-        <p className="mt-2 text-[13px] text-ink-600 leading-[1.55]">{sub}</p>
-      </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
-    </div>
-  </section>
-)
-
-type Tone = 'danger' | 'brand' | 'warning'
-
-const TONE_CLS: Record<Tone, string> = {
-  danger:  'bg-danger-500 hover:bg-danger-600 active:bg-danger-700 text-white focus-visible:ring-danger-300',
-  brand:   'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white focus-visible:ring-brand-300',
-  warning: 'bg-warning-500 hover:bg-warning-600 active:bg-warning-700 text-white focus-visible:ring-warning-300',
-}
-
-type Props = {
-  open: boolean
-  title: string
-  body?: React.ReactNode
-  confirmLabel?: string
-  cancelLabel?: string
-  tone?: Tone
-  reason?: 'required' | 'optional' | 'none'
-  reasonLabel?: string
-  reasonPlaceholder?: string
-  onConfirm: (reason: string) => void | Promise<void>
-  onCancel: () => void
-  busy?: boolean
-}
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { Icon } from '@/components/Icon'
 
 const FOCUSABLE = [
   'a[href]',
@@ -58,48 +20,33 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
-export function AdminConfirmDialog({
-  open,
-  title,
-  body,
-  confirmLabel,
-  cancelLabel,
-  tone = 'brand',
-  reason = 'none',
-  reasonLabel,
-  reasonPlaceholder,
-  onConfirm,
-  onCancel,
-  busy,
-}: Props) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const cancelBtnRef = useRef<HTMLButtonElement | null>(null)
-  // Restore focus to the opener on close — expected pattern for accessible modals.
+// Shared modal chrome for the admin dialogs below: focus the first control on
+// open, restore focus to the opener on close, Escape closes, Tab is trapped.
+// Extracted so AdminMessageDialog inherits AdminConfirmDialog's a11y behaviour
+// verbatim instead of re-implementing (and drifting from) it.
+function useModalChrome(opts: {
+  open: boolean
+  onClose: () => void
+  containerRef: RefObject<HTMLDivElement | null>
+  initialFocusRef: RefObject<HTMLElement | null>
+}) {
+  const { open, onClose, containerRef, initialFocusRef } = opts
   const restoreRef = useRef<HTMLElement | null>(null)
-  const [text, setText] = useState('')
-
-  const cancel = useCallback(() => {
-    if (busy) return
-    onCancel()
-  }, [busy, onCancel])
-
-  // Reset the reason text every time the dialog opens for a new action.
-  useEffect(() => { if (open) setText('') }, [open])
 
   useEffect(() => {
     if (!open) return
     restoreRef.current = (document.activeElement as HTMLElement | null) ?? null
-    const t = window.setTimeout(() => cancelBtnRef.current?.focus(), 20)
+    const t = window.setTimeout(() => initialFocusRef.current?.focus(), 20)
     return () => {
       window.clearTimeout(t)
       restoreRef.current?.focus?.()
     }
-  }, [open])
+  }, [open, initialFocusRef])
 
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); cancel(); return }
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); return }
       if (e.key !== 'Tab') return
       const root = containerRef.current
       if (!root) return
@@ -117,7 +64,180 @@ export function AdminConfirmDialog({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, cancel])
+  }, [open, onClose, containerRef])
+}
+
+/* adminOk — truthful success check for admin mutations. When the admin session
+   expires mid-visit, the mutation endpoint answers with a redirect to sign-in;
+   fetch follows it and hands back the sign-in page as an HTML 200, so a bare
+   `res.ok` reports success for a write that never happened. A mutation counts
+   as OK only when it wasn't redirected, came back as JSON, and that JSON says
+   ok:true. Consumes the body — use it where the call site doesn't need the
+   payload (toggles, renames, hide/show). */
+export async function adminOk(res: Response): Promise<boolean> {
+  if (!res.ok || res.redirected) return false
+  if (!(res.headers.get('content-type') ?? '').includes('application/json')) return false
+  const j = (await res.json().catch(() => null)) as { ok?: unknown } | null
+  return j?.ok === true
+}
+
+// Shared section header for every admin tab — consistent eyebrow + title + sub,
+// with an optional right-aligned actions slot. Single source so all sections
+// (including blog/texts) read identically.
+export const TabHeader = ({ eyebrow, title, sub, actions }: { eyebrow: string; title: ReactNode; sub: string; actions?: ReactNode }) => (
+  <section className="px-6 lg:px-8 pt-7 pb-5 border-b border-ink-100 bg-white">
+    <div className="flex items-end justify-between gap-4 flex-wrap">
+      <div className="min-w-0 max-w-[680px]">
+        <div className="font-display text-micro font-semibold uppercase text-ink-900 mb-1.5">{eyebrow}</div>
+        <h1 className="font-display text-h1 font-bold text-ink-900 tracking-tight leading-[1.1]">{title}</h1>
+        <p className="mt-2 text-small text-ink-600 leading-[1.55]">{sub}</p>
+      </div>
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+    </div>
+  </section>
+)
+
+type Tone = 'danger' | 'brand' | 'warning'
+
+const TONE_CLS: Record<Tone, string> = {
+  danger:  'bg-danger-500 hover:bg-danger-600 active:bg-danger-700 text-white focus-visible:ring-danger-300',
+  brand:   'bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white focus-visible:ring-brand-300',
+  // 600, not 500 — white on warning-500 is 3.67:1 (fails AA); 600 is 5.51.
+  warning: 'bg-warning-600 hover:bg-warning-700 active:bg-warning-800 text-white focus-visible:ring-warning-300',
+}
+
+type Props = {
+  open: boolean
+  title: string
+  body?: React.ReactNode
+  confirmLabel?: string
+  cancelLabel?: string
+  tone?: Tone
+  reason?: 'required' | 'optional' | 'none'
+  reasonLabel?: string
+  reasonPlaceholder?: string
+  onConfirm: (reason: string) => void | Promise<void>
+  onCancel: () => void
+  busy?: boolean
+}
+
+/* ═══════════ the three states every section has, written ONCE ════════════
+ *
+ * Counted before this existed: 93 hand-written `<button>` against 3 uses of the
+ * shared `<Btn>`, „იტვირთება" spelled out 29 times in four different type
+ * sizes, and 48 hand-rolled danger banners in three tiers of seriousness for
+ * the same event. That is why the panel feels like eleven different products —
+ * not because any one screen is wrong, but because the same idea is re-drawn
+ * in every file.
+ *
+ * `AdminConfirmDialog` below already proves the pattern lands here: it is used
+ * 13 times across 3 files and there is not one native `confirm()` left in the
+ * admin. These three follow it.
+ */
+
+/**
+ * „Loading" — and it says so in WORDS, not only in movement.
+ *
+ * A spinner frozen by `prefers-reduced-motion` is a lie about working (the
+ * project's motion canon). There is no spinner here at all: a muted line is
+ * honest at any motion setting, and `aria-busy` carries it to a screen reader.
+ */
+export function AdminLoading({ label = 'იტვირთება…', inset = false, className = '' }: {
+  label?: string; inset?: boolean; className?: string
+}) {
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      className={`${inset ? 'px-4 py-10 text-center' : 'py-6'} text-small text-ink-500 ${className}`}
+    >
+      {label}
+    </div>
+  )
+}
+
+/**
+ * „It failed" — and it must never be mistaken for „there is nothing here".
+ *
+ * An empty list and a broken request look identical on screen, and only one of
+ * them needs somebody to act. So this always says the request failed, and it
+ * offers the retry when the caller can retry: a dead end with no way forward is
+ * how an operator concludes the panel is broken and stops trusting the rest.
+ */
+export function AdminError({ message = 'ჩატვირთვა ვერ მოხერხდა.', hint, onRetry, className = '' }: {
+  message?: string; hint?: string; onRetry?: () => void; className?: string
+}) {
+  return (
+    <div role="alert" className={`rounded-card border border-danger-200 bg-danger-50/50 p-4 ${className}`}>
+      <p className="text-small font-display font-semibold text-ink-900">{message}</p>
+      {hint && <p className="mt-1 text-meta text-ink-700 leading-[1.5]">{hint}</p>}
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-2.5 h-9 px-3.5 rounded-btn bg-ink-900 hover:bg-ink-800 text-white font-display font-semibold text-small transition-colors duration-fast"
+        >
+          თავიდან ცდა
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The 7/30/90-day segmented control, built twice before this with different
+ * ranges and the same markup. `aria-pressed` rather than a radio group because
+ * it is a filter on what is already shown, not a choice being submitted.
+ */
+export function PeriodSwitch({ value, onChange, options = [7, 30, 90] }: {
+  value: number; onChange: (n: number) => void; options?: number[]
+}) {
+  return (
+    <div role="group" aria-label="პერიოდი" className="inline-flex rounded-btn border border-ink-200 overflow-hidden">
+      {options.map(n => (
+        <button
+          key={n}
+          type="button"
+          aria-pressed={value === n}
+          onClick={() => onChange(n)}
+          className={`h-11 px-4 font-display text-small font-semibold transition-colors duration-fast ${
+            value === n ? 'bg-ink-900 text-white' : 'bg-white text-ink-700 hover:bg-ink-50'
+          }`}
+        >
+          {n} დღე
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export function AdminConfirmDialog({
+  open,
+  title,
+  body,
+  confirmLabel,
+  cancelLabel,
+  tone = 'brand',
+  reason = 'none',
+  reasonLabel,
+  reasonPlaceholder,
+  onConfirm,
+  onCancel,
+  busy,
+}: Props) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const cancelBtnRef = useRef<HTMLButtonElement | null>(null)
+  const [text, setText] = useState('')
+
+  const cancel = useCallback(() => {
+    if (busy) return
+    onCancel()
+  }, [busy, onCancel])
+
+  // Reset the reason text every time the dialog opens for a new action.
+  useEffect(() => { if (open) setText('') }, [open])
+
+  useModalChrome({ open, onClose: cancel, containerRef, initialFocusRef: cancelBtnRef })
 
   if (!open) return null
 
@@ -131,7 +251,7 @@ export function AdminConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-0 sm:p-4 motion-safe:animate-[fadeIn_180ms_ease-out]"
+      className="fixed inset-0 z-confirm flex items-end sm:items-center justify-center p-0 sm:p-4 motion-safe:animate-fade-in-fast"
       ref={containerRef}
     >
       <button
@@ -151,14 +271,14 @@ export function AdminConfirmDialog({
         <div className="px-6 pt-6 pb-4">
           <h2
             id={titleId}
-            className="font-display text-[18px] font-bold text-ink-900 tracking-tight leading-snug"
+            className="font-display text-h3 font-bold text-ink-900 tracking-tight leading-snug"
           >
             {title}
           </h2>
           {body && (
             <div
               id={descId}
-              className="mt-2 text-[13.5px] text-ink-600 leading-relaxed"
+              className="mt-2 text-body text-ink-600 leading-relaxed"
             >
               {body}
             </div>
@@ -167,7 +287,7 @@ export function AdminConfirmDialog({
             <div className="mt-4">
               <label
                 htmlFor="admin-confirm-reason"
-                className="block font-display text-[10.5px] font-semibold uppercase tracking-[0.18em] text-ink-500 mb-1.5"
+                className="block font-display text-micro font-semibold uppercase text-ink-500 mb-1.5"
               >
                 {reasonLabel ?? (needReason ? 'მიზეზი (სავალდებულო)' : 'მიზეზი (სურვ.)')}
               </label>
@@ -179,7 +299,7 @@ export function AdminConfirmDialog({
                 maxLength={300}
                 disabled={busy}
                 placeholder={reasonPlaceholder ?? 'დაწერე მიზეზი…'}
-                className="w-full px-3 py-3 rounded-field border border-ink-200 bg-white text-[13px] focus:border-brand-400 focus:outline-none resize-none disabled:opacity-60"
+                className="w-full px-3 py-3 rounded-field border border-ink-200 bg-white text-small focus:border-brand-400 focus:outline-none resize-none disabled:opacity-60"
               />
             </div>
           )}
@@ -190,7 +310,7 @@ export function AdminConfirmDialog({
             type="button"
             onClick={cancel}
             disabled={busy}
-            className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink-300 disabled:opacity-50 disabled:pointer-events-none"
+            className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-small transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink-300 disabled:opacity-50 disabled:pointer-events-none"
           >
             {xLabel}
           </button>
@@ -198,7 +318,7 @@ export function AdminConfirmDialog({
             type="button"
             onClick={() => onConfirm(text.trim())}
             disabled={busy || confirmDisabled}
-            className={`h-11 px-4 rounded-btn font-display font-semibold text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:pointer-events-none inline-flex items-center justify-center gap-2 ${TONE_CLS[tone]}`}
+            className={`h-11 px-4 rounded-btn font-display font-semibold text-small transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:pointer-events-none inline-flex items-center justify-center gap-2 ${TONE_CLS[tone]}`}
           >
             {busy ? (
               <>
@@ -207,6 +327,556 @@ export function AdminConfirmDialog({
               </>
             ) : (
               cLabel
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AdminMessageDialog — write to ONE person (in-app notification + email).
+
+   The admin panel could suspend, impersonate or broadcast; it could not simply
+   WRITE to someone. This is that composer. It deliberately does NOT open a chat
+   thread: app/api/messages refuses any thread involving an ADMIN (client PII
+   boundary), so the channel is a bell notification plus an email whose Reply-To
+   is the support inbox.
+
+   The prefilled starters exist because the motivating case is one specific
+   sentence — „you registered as a student but seem to want to be an expert" —
+   and it should be one click, not a blank page. Everything stays editable.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export type AdminMessageStarterId = 'expert' | 'info' | 'blank'
+
+export const ADMIN_MESSAGE_STARTERS: {
+  id: AdminMessageStarterId
+  label: string
+  subject: string
+  body: string
+}[] = [
+  {
+    id: 'expert',
+    label: 'ექსპერტის გზა',
+    subject: 'გინდა ექსპერტად დარეგისტრირდე?',
+    body:
+      'გამარჯობა! ანგარიში სტუდენტად შეიქმნა — თუ მცოდნეზე კონსულტაციების გაწევა გინდოდა, ეს ორ წუთში სწორდება.\n\n' +
+      'დააჭირე ღილაკს „ექსპერტად რეგისტრაცია“ და შეავსე მოკლე განაცხადი — სახელი და ელფოსტა უკვე შევსებული დაგხვდება. განაცხადს 48 საათში გადავხედავთ.\n\n' +
+      'თუ რამე გაუგებარია, უპასუხე ამ წერილს.',
+  },
+  {
+    id: 'info',
+    label: 'მეტი ინფორმაცია',
+    subject: 'ერთი დაზუსტება გვჭირდება',
+    body:
+      'გამარჯობა! შენს ანგარიშთან დაკავშირებით ერთი დეტალის დაზუსტება გვინდა.\n\n' +
+      '[დაწერე, ზუსტად რა გვჭირდება]\n\n' +
+      'უპასუხე ამ წერილს — პირდაპირ ჩვენთან მოვა.',
+  },
+  { id: 'blank', label: 'ცარიელი', subject: '', body: '' },
+]
+
+const SUBJECT_MAX = 120
+const BODY_MAX = 4000
+
+type MessageTarget = { id: string; fullName: string; email: string }
+
+export function AdminMessageDialog({
+  open,
+  user,
+  onClose,
+  onSent,
+}: {
+  open: boolean
+  user: MessageTarget | null
+  onClose: () => void
+  /** Fired only on a fully-delivered send (notification + email). */
+  onSent?: (msg: string) => void
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const subjectRef = useRef<HTMLInputElement | null>(null)
+  const [starter, setStarter] = useState<AdminMessageStarterId>('blank')
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<{ kind: 'error' | 'warn'; msg: string } | null>(null)
+
+  const close = useCallback(() => { if (!busy) onClose() }, [busy, onClose])
+
+  // Every open is a fresh message — never inherit the previous recipient's text.
+  useEffect(() => {
+    if (!open) return
+    setStarter('blank'); setSubject(''); setBody(''); setStatus(null); setBusy(false)
+  }, [open, user?.id])
+
+  useModalChrome({ open, onClose: close, containerRef, initialFocusRef: subjectRef })
+
+  if (!open || !user) return null
+
+  const applyStarter = (id: AdminMessageStarterId) => {
+    const t = ADMIN_MESSAGE_STARTERS.find(s => s.id === id)
+    if (!t) return
+    setStarter(id); setSubject(t.subject); setBody(t.body); setStatus(null)
+  }
+
+  const valid = subject.trim().length > 0 && body.trim().length > 0
+
+  const send = async () => {
+    if (busy || !valid) return
+    setBusy(true); setStatus(null)
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: subject.trim(), body: body.trim(), template: starter }),
+      })
+      const j = await res.json().catch(() => ({} as any))
+      if (!res.ok || !j?.ok) {
+        setStatus({ kind: 'error', msg: j?.message ?? 'გაგზავნა ვერ მოხერხდა' })
+        return
+      }
+      // sendMail resolves { ok:false } on a provider failure — say so instead of
+      // claiming a delivery that didn't happen. The text stays in the form.
+      if (!j.emailOk) {
+        setStatus({
+          kind: 'warn',
+          msg: j.emailTo
+            ? 'შეტყობინება აპლიკაციაში მივიდა, ელფოსტა კი ვერ გაიგზავნა. ხელახლა გაგზავნა მეორე შეტყობინებას შექმნის.'
+            : 'ამ ანგარიშს ელფოსტა არ აქვს — შეტყობინება მხოლოდ აპლიკაციაში მივიდა.',
+        })
+        return
+      }
+      onSent?.(`${user.fullName} — შეტყობინება და ელფოსტა გაიგზავნა.`)
+      onClose()
+    } catch {
+      setStatus({ kind: 'error', msg: 'ქსელის შეცდომა' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const titleId = 'admin-message-title'
+
+  return (
+    <div
+      className="fixed inset-0 z-confirm flex items-end sm:items-center justify-center p-0 sm:p-4 motion-safe:animate-fade-in-fast"
+      ref={containerRef}
+    >
+      <button
+        type="button"
+        aria-label="დახურვა"
+        onClick={close}
+        tabIndex={-1}
+        className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative w-full sm:max-w-[560px] max-h-[92vh] bg-white sm:rounded-card rounded-t-card shadow-float overflow-hidden flex flex-col font-sans motion-safe:animate-scale-in"
+      >
+        <div className="px-6 pt-6 pb-4 border-b border-ink-100 shrink-0">
+          <h2 id={titleId} className="font-display text-h3 font-bold text-ink-900 tracking-tight leading-snug">
+            მიწერე — {user.fullName}
+          </h2>
+          <p className="mt-1 text-meta text-ink-500">
+            <span className="font-mono">{user.email || '—'}</span> · მიუვა შეტყობინებაში და ელფოსტაზე. პასუხი ჩვენს ფოსტაზე მოვა.
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <div>
+            <label className="block font-display text-micro font-semibold uppercase text-ink-500 mb-1.5">
+              მზა ტექსტი
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              {ADMIN_MESSAGE_STARTERS.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => applyStarter(s.id)}
+                  disabled={busy}
+                  aria-pressed={starter === s.id}
+                  className={`h-11 px-3.5 rounded-pill border font-display text-small font-semibold transition-colors duration-fast disabled:opacity-50 ${
+                    starter === s.id
+                      ? 'bg-ink-900 border-ink-900 text-white'
+                      : 'bg-white border-ink-200 text-ink-700 hover:border-ink-300 hover:bg-ink-50'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-meta text-ink-500">შაბლონი ჩაანაცვლებს ტექსტს — შემდეგ თავისუფლად დაარედაქტირე.</p>
+          </div>
+
+          <div>
+            <label htmlFor="admin-message-subject" className="block font-display text-micro font-semibold uppercase text-ink-500 mb-1.5">
+              სათაური
+            </label>
+            <input
+              id="admin-message-subject"
+              ref={subjectRef}
+              type="text"
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              maxLength={SUBJECT_MAX}
+              disabled={busy}
+              placeholder="მაგ. გინდა ექსპერტად დარეგისტრირდე?"
+              className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-small focus:border-brand-400 focus:outline-none disabled:opacity-60"
+            />
+            <div className="mt-1 font-mono text-meta tabular-nums text-ink-400">{subject.length}/{SUBJECT_MAX}</div>
+          </div>
+
+          <div>
+            <label htmlFor="admin-message-body" className="block font-display text-micro font-semibold uppercase text-ink-500 mb-1.5">
+              ტექსტი
+            </label>
+            <textarea
+              id="admin-message-body"
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              rows={8}
+              maxLength={BODY_MAX}
+              disabled={busy}
+              placeholder="დაწერე შეტყობინება…"
+              className="w-full px-3 py-3 rounded-field border border-ink-200 bg-white text-small focus:border-brand-400 focus:outline-none resize-y disabled:opacity-60"
+            />
+            <div className="mt-1 font-mono text-meta tabular-nums text-ink-400">{body.length}/{BODY_MAX}</div>
+          </div>
+
+          {status && (
+            <div
+              role="alert"
+              className={`rounded-btn border px-3 py-2 text-small ${
+                status.kind === 'error'
+                  ? 'border-danger-200 bg-danger-50 text-danger-800'
+                  : 'border-warning-200 bg-warning-50 text-warning-800'
+              }`}
+            >
+              {status.msg}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 pb-6 pt-3 border-t border-ink-100 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={close}
+            disabled={busy}
+            className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-small transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink-300 disabled:opacity-50 disabled:pointer-events-none"
+          >
+            გაუქმება
+          </button>
+          <button
+            type="button"
+            onClick={send}
+            disabled={busy || !valid}
+            className="h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-display font-semibold text-body transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-300 disabled:opacity-60 disabled:pointer-events-none inline-flex items-center justify-center gap-2"
+          >
+            {busy ? (
+              <>
+                <span className="inline-block w-3.5 h-3.5 border-2 border-white/70 border-t-transparent rounded-full motion-safe:animate-spin" />
+                იგზავნება…
+              </>
+            ) : (
+              <>
+                <Icon.send className="w-3.5 h-3.5" /> გაგზავნა
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AdminDeleteUserDialog — remove an account.
+
+   Not an AdminConfirmDialog with a red button, for two reasons. First, the
+   choice is not yes/no: an account with history has two defensible endings
+   (erase it, or erase the person and keep the rows) and the admin has to pick
+   one knowingly. Second, „წაშალო?" is not a question anyone can answer without
+   knowing what hangs off the account — so the numbers are on screen before the
+   button is, and they come from real counts, not from the capped arrays the
+   modal already had.
+
+   The reason field is mandatory. The account is about to stop existing, so the
+   audit row is the only place the story survives.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export type DeleteImpact = {
+  bookings: number
+  activeBookings: number
+  messages: number
+  reviews: number
+  enrollments: number
+}
+
+export type DeleteMode = 'purge' | 'anonymize'
+
+type DeleteTarget = { id: string; fullName: string; email: string; isExpert: boolean }
+
+const IMPACT_ROWS: { key: keyof DeleteImpact; label: string }[] = [
+  { key: 'bookings', label: 'ჯავშანი' },
+  { key: 'messages', label: 'შეტყობინება' },
+  { key: 'reviews', label: 'შეფასება' },
+  { key: 'enrollments', label: 'პაკეტი' },
+]
+
+export function AdminDeleteUserDialog({
+  open,
+  user,
+  impact,
+  onClose,
+  onDeleted,
+}: {
+  open: boolean
+  user: DeleteTarget | null
+  impact: DeleteImpact | null
+  onClose: () => void
+  /** Fired only after the server confirmed the deletion. */
+  onDeleted: (mode: DeleteMode, name: string) => void
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const cancelBtnRef = useRef<HTMLButtonElement | null>(null)
+  const [mode, setMode] = useState<DeleteMode>('anonymize')
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const close = useCallback(() => { if (!busy) onClose() }, [busy, onClose])
+
+  /* THREE states, not two. `impact === null` means the counts never arrived
+     (an older cached response, a failed load) — and it must NOT collapse into
+     „this account is empty". That is the same class as the 2026-08-01 rule that
+     a failed fetch may never render as „no results", and here it would talk an
+     admin into an irreversible purge of an account with two years of history.
+     Unknown behaves like „has history": both modes offered, nothing claimed. */
+  const known = !!impact
+  const hasHistory = !known ||
+    impact.bookings + impact.messages + impact.reviews + impact.enrollments > 0
+
+  // A fresh decision every time. The default follows the account: whenever
+  // anything might be lost the reversible option is preselected; only a
+  // provably empty account preselects (and offers) the purge alone.
+  useEffect(() => {
+    if (!open) return
+    setReason(''); setError(null); setBusy(false)
+    setMode(hasHistory ? 'anonymize' : 'purge')
+  }, [open, user?.id, hasHistory])
+
+  useModalChrome({ open, onClose: close, containerRef, initialFocusRef: cancelBtnRef })
+
+  if (!open || !user) return null
+
+  const blocked = (impact?.activeBookings ?? 0) > 0
+  const canSubmit = !busy && !blocked && reason.trim().length >= 3
+
+  const submit = async () => {
+    if (!canSubmit) return
+    setBusy(true); setError(null)
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, reason: reason.trim() }),
+      })
+      // Same truthfulness check as `adminOk`: an expired admin session answers
+      // with a redirect to sign-in, and fetch hands that page back as an HTML
+      // 200 — a bare `res.ok` would report a deletion that never happened.
+      if (res.redirected || !(res.headers.get('content-type') ?? '').includes('application/json')) {
+        setError('სესია ამოიწურა — გადატვირთე გვერდი და თავიდან შედი')
+        return
+      }
+      const j = await res.json().catch(() => null) as { ok?: boolean; message?: string } | null
+      if (!res.ok || j?.ok !== true) {
+        setError(j?.message ?? 'წაშლა ვერ მოხერხდა')
+        return
+      }
+      onDeleted(mode, user.fullName)
+    } catch {
+      setError('ქსელის შეცდომა')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const titleId = 'admin-delete-title'
+  const rows = impact ? IMPACT_ROWS.filter(r => impact[r.key] > 0) : []
+
+  return (
+    <div
+      className="fixed inset-0 z-confirm flex items-end sm:items-center justify-center p-0 sm:p-4 motion-safe:animate-fade-in-fast"
+      ref={containerRef}
+    >
+      <button
+        type="button"
+        aria-label="გაუქმება"
+        onClick={close}
+        tabIndex={-1}
+        className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm"
+      />
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative w-full sm:max-w-[540px] max-h-[92dvh] bg-white sm:rounded-card rounded-t-card shadow-float overflow-hidden flex flex-col font-sans motion-safe:animate-scale-in"
+      >
+        <div className="px-6 pt-6 pb-4 border-b border-ink-100 shrink-0">
+          <h2 id={titleId} className="font-display text-h3 font-bold text-ink-900 tracking-tight leading-snug">
+            ანგარიშის წაშლა — {user.fullName}
+          </h2>
+          <p className="mt-1 text-meta text-ink-500 font-mono truncate">{user.email}</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {/* What is actually attached to this account. */}
+          <div>
+            <label className="block font-display text-micro font-semibold uppercase text-ink-500 mb-1.5">
+              რა ჰკიდია ანგარიშზე
+            </label>
+            {!known ? (
+              <p className="text-small text-warning-800">
+                რიცხვები ვერ ჩაიტვირთა — ვერ გეტყვი, რა წაიშლება. დახურე, გადატვირთე გვერდი და თავიდან გახსენი.
+              </p>
+            ) : rows.length === 0 ? (
+              <p className="text-small text-ink-600">
+                ჯავშანი, მიმოწერა და შეფასება არ აქვს — ანგარიში ცარიელია.
+              </p>
+            ) : (
+              <ul className="flex flex-wrap gap-1.5">
+                {rows.map(r => (
+                  <li
+                    key={r.key}
+                    className="inline-flex items-center h-7 px-2.5 rounded-pill border border-ink-200 bg-white text-meta text-ink-700"
+                  >
+                    <span className="font-mono font-semibold tabular-nums text-ink-900">{impact![r.key]}</span>
+                    <span className="ml-1">{r.label}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* The one thing that stops both modes. Said before the choice, not
+              after a failed submit. */}
+          {blocked && (
+            <div role="alert" className="rounded-btn border border-warning-200 bg-warning-50 px-3 py-2.5 text-small text-warning-800">
+              <span className="font-display font-semibold">{impact!.activeBookings} აქტიური ჯავშანი აქვს.</span>{' '}
+              წაშლამდე ეს სესიები უნდა გაუქმდეს — თორემ მეორე მხარეს დარჩება ჯავშანი, რომელზეც აღარავინ მოვა.
+            </div>
+          )}
+
+          {hasHistory ? (
+            <fieldset disabled={busy || blocked} className="disabled:opacity-60">
+              <legend className="font-display text-micro font-semibold uppercase text-ink-500 mb-1.5">
+                რეჟიმი
+              </legend>
+              <div className="space-y-2">
+                {([
+                  {
+                    id: 'anonymize' as const,
+                    title: 'ანონიმიზაცია',
+                    desc: 'ჩანაწერები რჩება, ადამიანი ქრება: სახელი, ელფოსტა, ტელეფონი, ფოტო და ბიო იშლება, ანგარიში იბლოკება.'
+                      + (user.isExpert
+                        ? ' საჯარო პროფილი, სერტიფიკატები, განათლება და გამოცდილება იშლება — პროფილი საიტიდან ქრება.'
+                        : '')
+                      + ' მეორე მხარეს ისტორია რჩება. მიმოწერის ტექსტი რჩება.',
+                  },
+                  {
+                    id: 'purge' as const,
+                    title: 'სრული წაშლა',
+                    desc: 'ანგარიშიც და ყველა ჩანაწერიც იშლება — მათ შორის მეორე მხარის ასლი იმ სესიისა, რომელიც მართლა შედგა. შეუქცევადია.',
+                  },
+                ]).map(o => (
+                  <label
+                    key={o.id}
+                    className={`flex gap-3 p-3 rounded-card border cursor-pointer transition-colors duration-fast ${
+                      mode === o.id
+                        ? o.id === 'purge'
+                          ? 'border-danger-300 bg-danger-50/60'
+                          : 'border-ink-400 bg-ink-50'
+                        : 'border-ink-200 bg-white hover:border-ink-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="admin-delete-mode"
+                      value={o.id}
+                      checked={mode === o.id}
+                      onChange={() => setMode(o.id)}
+                      className="mt-1 shrink-0 accent-ink-900"
+                    />
+                    <span className="min-w-0">
+                      <span className="block font-display text-small font-bold text-ink-900">{o.title}</span>
+                      <span className="block mt-0.5 text-meta text-ink-600 leading-[1.5]">{o.desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : (
+            <p className="text-small text-ink-600">
+              ანგარიში და მისი პროფილი სრულად წაიშლება. შეუქცევადია.
+            </p>
+          )}
+
+          <div>
+            <label htmlFor="admin-delete-reason" className="block font-display text-micro font-semibold uppercase text-ink-500 mb-1.5">
+              მიზეზი (სავალდებულო · ინახება აუდიტში)
+            </label>
+            <textarea
+              id="admin-delete-reason"
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              rows={3}
+              maxLength={300}
+              disabled={busy || blocked}
+              placeholder="მაგ. სპამი · ტესტური ანგარიში · მომხმარებლის მოთხოვნა"
+              className="w-full px-3 py-3 rounded-field border border-ink-200 bg-white text-small focus:border-brand-400 focus:outline-none resize-none disabled:opacity-60"
+            />
+            <p className="mt-1 text-meta text-ink-500">
+              ანგარიში ქრება — ეს ჩანაწერი დარჩება ერთადერთი კვალი იმისა, რა და რატომ წაიშალა.
+            </p>
+          </div>
+
+          {error && (
+            <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 px-3 py-2 text-small text-danger-800">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 pb-6 pt-3 border-t border-ink-100 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 shrink-0">
+          <button
+            ref={cancelBtnRef}
+            type="button"
+            onClick={close}
+            disabled={busy}
+            className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-body transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink-300 disabled:opacity-50 disabled:pointer-events-none"
+          >
+            გაუქმება
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!canSubmit}
+            className={`h-11 px-4 rounded-btn font-display font-semibold text-body transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:pointer-events-none inline-flex items-center justify-center gap-2 ${TONE_CLS.danger}`}
+          >
+            {busy ? (
+              <>
+                <span className="inline-block w-3.5 h-3.5 border-2 border-white/70 border-t-transparent rounded-full motion-safe:animate-spin" />
+                იშლება…
+              </>
+            ) : (
+              <>
+                <Icon.warn className="w-3.5 h-3.5" />
+                {mode === 'purge' ? 'სამუდამოდ წაშალე' : 'ანონიმიზაცია'}
+              </>
             )}
           </button>
         </div>

@@ -23,13 +23,25 @@ const DEFAULT_PREFS: PrefsMap = {
   APPLICATION_STATUS: true,
   ADMIN_BROADCAST: true,
 }
-const PREF_ROWS: Array<{ key: PrefKey; label: string; hint: string }> = [
-  { key: 'BOOKING_CREATED',    label: 'ჯავშნის ცვლილება',      hint: 'ახალი, გაუქმებული, დადასტურებული' },
-  { key: 'MESSAGE_NEW',        label: 'ახალი შეტყობინება',     hint: 'ახალი ტექსტი მიმოწერაში' },
-  { key: 'REVIEW_NEW',         label: 'ახალი შეფასება',        hint: 'სტუდენტმა შეგაფასა' },
-  { key: 'APPLICATION_STATUS', label: 'განაცხადის სტატუსი',   hint: 'ექსპერტად რეგისტრაცია' },
-  { key: 'ADMIN_BROADCAST',    label: 'პლატფორმის სიახლეები', hint: 'მნიშვნელოვანი განცხადებები' },
-]
+/* The same pref KEY means different things to the two sides, so the copy is
+   derived from the viewer's role — it used to be hardcoded tutor-side and a
+   student was told „სტუდენტმა შეგაფასა" about a notification they get when an
+   EXPERT replies to their review (see app/api/reviews/[bookingId] vs
+   app/api/reviews). Keys never change; only the wording does. */
+const prefRows = (role: Me['role'] | null | undefined): Array<{ key: PrefKey; label: string; hint: string }> => {
+  const expert = role === 'TUTOR' || role === 'ADMIN'
+  return [
+    { key: 'BOOKING_CREATED',    label: 'ჯავშნის ცვლილება',      hint: 'ახალი, გაუქმებული, დადასტურებული' },
+    { key: 'MESSAGE_NEW',        label: 'ახალი შეტყობინება',     hint: 'ახალი ტექსტი მიმოწერაში' },
+    expert
+      ? { key: 'REVIEW_NEW' as const, label: 'ახალი შეფასება',      hint: 'სტუდენტმა შეგაფასა' }
+      : { key: 'REVIEW_NEW' as const, label: 'პასუხი შეფასებაზე',  hint: 'ექსპერტმა უპასუხა შენს შეფასებას' },
+    expert
+      ? { key: 'APPLICATION_STATUS' as const, label: 'განაცხადი და პროფილი', hint: 'განაცხადის პასუხი და პროფილის შეხსენებები' }
+      : { key: 'APPLICATION_STATUS' as const, label: 'განაცხადის სტატუსი',   hint: 'პასუხი, თუ ექსპერტად განაცხადს გააკეთებ' },
+    { key: 'ADMIN_BROADCAST',    label: 'პლატფორმის სიახლეები', hint: 'მნიშვნელოვანი განცხადებები' },
+  ]
+}
 
 type Me = {
   id: string
@@ -178,7 +190,7 @@ export default function SettingsPage() {
       if (!res.ok || data?.ok === false) {
         setVerifyMsg({
           kind: 'error',
-          text: data?.error === 'RATE_LIMITED' ? 'ხშირად ცდი — მოგვიანებით.' : 'გაგზავნა ვერ მოხერხდა.',
+          text: data?.error === 'RATE_LIMITED' ? 'ბევრი მცდელობა — სცადე მოგვიანებით.' : 'გაგზავნა ვერ მოხერხდა.',
         })
         return
       }
@@ -238,7 +250,10 @@ export default function SettingsPage() {
       })
       const data = await res.json().catch(() => ({} as any))
       if (!res.ok || data?.ok === false) {
-        setProfileMsg({ kind: 'error', text: 'შენახვა ვერ მოხერხდა' })
+        // `message` carries our own validation copy (e.g. the Georgian-language
+        // gate). Falling back to the generic line would hide the one thing the
+        // user needs in order to fix the field.
+        setProfileMsg({ kind: 'error', text: data?.message || 'შენახვა ვერ მოხერხდა' })
         return
       }
       setProfileMsg({ kind: 'success', text: 'პროფილი განახლდა' })
@@ -253,8 +268,8 @@ export default function SettingsPage() {
 
   const uploadAvatar = async (file: File) => {
     if (uploading) return
-    if (file.size > 500 * 1024) {
-      setProfileMsg({ kind: 'error', text: 'ავატარი მაქსიმუმ 500KB' })
+    if (file.size > 8 * 1024 * 1024) {
+      setProfileMsg({ kind: 'error', text: 'ავატარი მაქსიმუმ 8MB' })
       return
     }
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
@@ -396,7 +411,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-ink-50">
-        <div className="inline-flex items-center gap-2 text-ink-500 text-[13px]">
+        <div className="inline-flex items-center gap-2 text-ink-500 text-small">
           <span aria-hidden className="inline-block w-4 h-4 rounded-full border-2 border-ink-300 border-t-transparent motion-safe:animate-spin" />
           იტვირთება…
         </div>
@@ -411,14 +426,14 @@ export default function SettingsPage() {
       <div className="min-h-screen bg-ink-50/50 flex flex-col items-center justify-center gap-4 px-6">
         <Logo size="sm" />
         <div className="text-center max-w-[360px]">
-          <div className="font-display text-[16px] font-bold text-ink-900 tracking-tight">ვერ ჩაიტვირთა</div>
-          <p className="text-[12.5px] text-ink-500 mt-1.5 leading-relaxed">
+          <div className="font-display text-body-lg font-bold text-ink-900 tracking-tight">ვერ ჩაიტვირთა</div>
+          <p className="text-small text-ink-500 mt-1.5 leading-relaxed">
             {loadErr ? 'შეამოწმე ინტერნეტი და სცადე თავიდან.' : 'პროფილის ჩატვირთვა ვერ მოხერხდა.'}
           </p>
           <button
             type="button"
             onClick={loadMe}
-            className="mt-4 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors"
+            className="mt-4 h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast"
           >
             <Icon.refresh className="w-3.5 h-3.5" />
             სცადე თავიდან
@@ -432,16 +447,22 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-ink-50/50">
-      <header className="sticky top-0 z-40 bg-ink-50 lg:bg-ink-50/90 lg:backdrop-blur-md border-b border-ink-100">
+      <header className="sticky top-0 z-chrome bg-ink-50 lg:bg-ink-50/90 lg:backdrop-blur-md border-b border-ink-100">
         <Container size="content" className="h-16 flex items-center justify-between gap-6">
           <div className="inline-flex items-center gap-2">
-            <Link href={backHref} aria-label="უკან" className="inline-flex items-center text-ink-700 hover:text-ink-900 transition-colors">
+            {/* 40×40, the canon icon-button tier. It was a bare 16×16 glyph — the
+                smallest target in the product, on a primary nav control. The
+                negative margin keeps the chevron optically where it was. */}
+            <Link href={backHref} aria-label="უკან" className="w-10 h-10 -ml-2.5 rounded-btn inline-flex items-center justify-center text-ink-700 hover:text-ink-900 hover:bg-ink-100 transition-colors duration-fast">
               <Icon.chevR className="w-4 h-4 rotate-180" />
             </Link>
             {/* Logo always goes to the main page „/" — the chevron handles „back". */}
             <Logo size="sm" />
           </div>
-          <span className="font-display text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500">პარამეტრები</span>
+          {/* The sticky bar no longer repeats the page title. „პარამეტრები"
+              appeared here AND as the h1 directly beneath it — the same word
+              twice within 200px, which reads as a rendering mistake rather than
+              as navigation. The back chevron and logo carry the chrome. */}
         </Container>
       </header>
 
@@ -450,17 +471,17 @@ export default function SettingsPage() {
             heading; this h1 is the page's actual title. */}
         <div>
           <Eyebrow className="mb-2">ანგარიში</Eyebrow>
-          <h1 className="font-display text-3xl font-bold text-ink-900 tracking-tight">პარამეტრები</h1>
+          <h1 className="font-display text-display font-bold text-ink-900 tracking-tight">პარამეტრები</h1>
         </div>
 
         {/* Profile section */}
         <section className="bg-white rounded-card border border-ink-200 p-6 lg:p-8">
           <div className="flex items-baseline justify-between gap-3 mb-6">
             <div className="min-w-0">
-              <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight">პროფილი</h2>
-              <p className="text-[12.5px] text-ink-500 mt-0.5">როგორ გხედავენ სხვები</p>
+              <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">პროფილი</h2>
+              <p className="text-small text-ink-500 mt-0.5">როგორ გხედავენ სხვები</p>
             </div>
-            <span className="hidden sm:block font-mono text-[10.5px] tabular-nums text-ink-400 truncate max-w-[220px] shrink" title={me.email}>{me.email}</span>
+            <span className="hidden sm:block font-mono text-meta tabular-nums text-ink-400 truncate max-w-[220px] shrink" title={me.email}>{me.email}</span>
           </div>
 
           <form onSubmit={saveProfile} className="space-y-5">
@@ -481,10 +502,13 @@ export default function SettingsPage() {
                 {!uploading && (
                   <span
                     aria-hidden="true"
-                    className="absolute inset-0 inline-flex flex-col items-center justify-center gap-0.5 bg-black/45 text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-visible:opacity-100 motion-safe:transition-opacity motion-safe:duration-150"
+                    // bg-black/65, not /45: over an average photo the white label measured
+                    // 3.35:1 — under the 4.5:1 body-text floor. The scrim is the only
+                    // thing we control here (the photo underneath is the user's).
+                    className="absolute inset-0 inline-flex flex-col items-center justify-center gap-0.5 bg-black/65 text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-visible:opacity-100 motion-safe:transition-opacity motion-safe:duration-fast"
                   >
                     <Icon.camera className="w-4 h-4" />
-                    <span className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em]">შეცვლა</span>
+                    <span className="font-display text-micro font-semibold uppercase">შეცვლა</span>
                   </span>
                 )}
                 {uploading && (
@@ -496,12 +520,12 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-1.5">
                 <div className="flex gap-2">
                   {avatarUrl && (
-                    <button type="button" onClick={removeAvatar} disabled={uploading} className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 disabled:opacity-50 text-ink-700 font-display font-semibold text-[12.5px] transition-colors">
+                    <button type="button" onClick={removeAvatar} disabled={uploading} className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 disabled:opacity-50 text-ink-700 font-display font-semibold text-small transition-colors duration-fast">
                       წაშლა
                     </button>
                   )}
                 </div>
-                <div className="text-[11px] text-ink-500">მაქს. 500KB · JPG/PNG/WEBP/GIF</div>
+                <div className="text-meta text-ink-500">მაქს. 8MB · JPG/PNG/WEBP/GIF</div>
                 <input
                   ref={fileInput}
                   type="file"
@@ -518,50 +542,50 @@ export default function SettingsPage() {
 
             {/* Name */}
             <label className="block">
-              <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">სახელი და გვარი</span>
+              <span className="font-display text-micro font-semibold uppercase text-ink-700">სახელი და გვარი</span>
               <input
                 type="text"
                 value={fullName}
                 onChange={e => setFullName(e.target.value)}
                 maxLength={80}
-                className="w-full mt-2 h-11 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14px] text-ink-900 transition-colors"
+                className="w-full mt-2 h-11 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body text-ink-900 transition-colors duration-fast"
               />
             </label>
 
             {/* Phone */}
             <label className="block">
-              <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">ტელეფონი <span className="text-ink-400 normal-case tracking-normal">— არასავალდებულო</span></span>
+              <span className="font-display text-micro font-semibold uppercase text-ink-700">ტელეფონი <span className="text-ink-400 normal-case tracking-normal">— არასავალდებულო</span></span>
               <input
                 type="tel"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
                 maxLength={40}
                 placeholder="+995 5XX XXX XXX"
-                className="w-full mt-2 h-11 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14px] text-ink-900 placeholder:text-ink-400 transition-colors"
+                className="w-full mt-2 h-11 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body text-ink-900 placeholder:text-ink-400 transition-colors duration-fast"
               />
             </label>
 
             {/* Bio */}
             <label className="block">
-              <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">შესახებ</span>
+              <span className="font-display text-micro font-semibold uppercase text-ink-700">შესახებ</span>
               <textarea
                 value={bio}
                 onChange={e => setBio(e.target.value.slice(0, 500))}
                 rows={4}
                 placeholder="მოკლედ შენ შესახებ"
-                className="w-full mt-2 px-3.5 py-2.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14px] text-ink-900 placeholder:text-ink-400 resize-none transition-colors"
+                className="w-full mt-2 px-3.5 py-2.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body text-ink-900 placeholder:text-ink-400 resize-none transition-colors duration-fast"
               />
-              <div className="text-right mt-1 font-mono text-[10.5px] tabular-nums text-ink-400">{bio.length} / 500</div>
+              <div className="text-right mt-1 font-mono text-meta tabular-nums text-ink-400">{bio.length} / 500</div>
             </label>
 
             {profileMsg && (
-              <div role="alert" className={`rounded-btn border px-3 py-2 text-[12.5px] font-medium ${profileMsg.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
+              <div role="alert" className={`rounded-btn border px-3 py-2 text-small font-medium ${profileMsg.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
                 {profileMsg.text}
               </div>
             )}
 
             <div className="flex justify-end">
-              <button type="submit" disabled={savingProfile} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
+              <button type="submit" disabled={savingProfile} className="h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 disabled:bg-ink-100 disabled:text-ink-500 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-2 transition-colors duration-fast">
                 {savingProfile && <span aria-hidden className="inline-block w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent motion-safe:animate-spin" />}
                 {savingProfile ? 'ინახება…' : 'შენახვა'}
               </button>
@@ -572,35 +596,35 @@ export default function SettingsPage() {
         {/* Password section */}
         <section className="bg-white rounded-card border border-ink-200 p-6 lg:p-8">
           <div className="mb-6">
-            <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight">პაროლის შეცვლა</h2>
+            <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">პაროლის შეცვლა</h2>
             {/* PATCH /api/me/password calls revokeOtherSessions — the old copy
                 („სხვა სესიები აქტიური დარჩება") promised the exact opposite. */}
-            <p className="text-[12.5px] text-ink-500 mt-0.5">შეცვლის შემდეგ სხვა მოწყობილობებზე ხელახლა უნდა შეხვიდე</p>
+            <p className="text-small text-ink-500 mt-0.5">შეცვლის შემდეგ სხვა მოწყობილობებზე ხელახლა უნდა შეხვიდე</p>
           </div>
 
           <form onSubmit={savePassword} className="space-y-4">
             <label className="block">
-              <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">მიმდინარე პაროლი</span>
+              <span className="font-display text-micro font-semibold uppercase text-ink-700">მიმდინარე პაროლი</span>
               <div className="relative mt-2">
                 <input
                   type={showCurrentPw ? 'text' : 'password'}
                   value={currentPw}
                   onChange={e => setCurrentPw(e.target.value)}
                   autoComplete="current-password"
-                  className="w-full h-11 pl-3.5 pr-12 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14px] text-ink-900 transition-colors"
+                  className="w-full h-11 pl-3.5 pr-12 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body text-ink-900 transition-colors duration-fast"
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPw(s => !s)}
                   aria-label={showCurrentPw ? 'დამალე' : 'აჩვენე'}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   {showCurrentPw ? <Icon.eyeOff className="w-4 h-4" /> : <Icon.eye className="w-4 h-4" />}
                 </button>
               </div>
             </label>
             <label className="block">
-              <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">ახალი პაროლი</span>
+              <span className="font-display text-micro font-semibold uppercase text-ink-700">ახალი პაროლი</span>
               <div className="relative mt-2">
                 <input
                   type={showNewPw ? 'text' : 'password'}
@@ -608,51 +632,51 @@ export default function SettingsPage() {
                   onChange={e => setNewPw(e.target.value)}
                   autoComplete="new-password"
                   minLength={8}
-                  className="w-full h-11 pl-3.5 pr-12 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14px] text-ink-900 transition-colors"
+                  className="w-full h-11 pl-3.5 pr-12 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body text-ink-900 transition-colors duration-fast"
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPw(s => !s)}
                   aria-label={showNewPw ? 'დამალე' : 'აჩვენე'}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   {showNewPw ? <Icon.eyeOff className="w-4 h-4" /> : <Icon.eye className="w-4 h-4" />}
                 </button>
               </div>
-              <div className="mt-1 text-[11px] text-ink-500">მინიმუმ 8 სიმბოლო</div>
+              <div className="mt-1 text-meta text-ink-500">მინიმუმ 8 სიმბოლო</div>
             </label>
             <label className="block">
-              <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">გაიმეორე ახალი პაროლი</span>
+              <span className="font-display text-micro font-semibold uppercase text-ink-700">გაიმეორე ახალი პაროლი</span>
               <div className="relative mt-2">
                 <input
                   type={showConfirmPw ? 'text' : 'password'}
                   value={confirmPw}
                   onChange={e => setConfirmPw(e.target.value)}
                   autoComplete="new-password"
-                  className={`w-full h-11 pl-3.5 pr-12 rounded-field bg-white border focus:ring-2 focus:outline-none text-[14px] text-ink-900 transition-colors ${confirmPw.length > 0 && confirmPw !== newPw ? 'border-danger-300 focus:border-danger-500 focus:ring-danger-100' : 'border-ink-200 focus:border-brand-500 focus:ring-brand-100'}`}
+                  className={`w-full h-11 pl-3.5 pr-12 rounded-field bg-white border focus:ring-2 focus:outline-none text-body text-ink-900 transition-colors duration-fast ${confirmPw.length > 0 && confirmPw !== newPw ? 'border-danger-300 focus:border-danger-500 focus:ring-danger-100' : 'border-ink-200 focus:border-brand-500 focus:ring-brand-100'}`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPw(s => !s)}
                   aria-label={showConfirmPw ? 'დამალე' : 'აჩვენე'}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   {showConfirmPw ? <Icon.eyeOff className="w-4 h-4" /> : <Icon.eye className="w-4 h-4" />}
                 </button>
               </div>
               {confirmPw.length > 0 && confirmPw !== newPw && (
-                <div className="mt-1 text-[11px] text-danger-700">პაროლი არ ემთხვევა</div>
+                <div className="mt-1 text-meta text-danger-700">პაროლი არ ემთხვევა</div>
               )}
             </label>
 
             {pwMsg && (
-              <div role="alert" className={`rounded-btn border px-3 py-2 text-[12.5px] font-medium ${pwMsg.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
+              <div role="alert" className={`rounded-btn border px-3 py-2 text-small font-medium ${pwMsg.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
                 {pwMsg.text}
               </div>
             )}
 
             <div className="flex justify-end">
-              <button type="submit" disabled={savingPw || !currentPw || !newPw || newPw !== confirmPw} className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors">
+              <button type="submit" disabled={savingPw || !currentPw || !newPw || newPw !== confirmPw} className="h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 disabled:bg-ink-100 disabled:text-ink-500 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-2 transition-colors duration-fast">
                 {savingPw && <span aria-hidden className="inline-block w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent motion-safe:animate-spin" />}
                 {savingPw ? 'ინახება…' : 'პაროლის შენახვა'}
               </button>
@@ -663,9 +687,9 @@ export default function SettingsPage() {
         {/* Account section */}
         <section className="bg-white rounded-card border border-ink-200 p-6 lg:p-8">
           <div className="mb-4">
-            <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight">ანგარიში</h2>
+            <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">ანგარიში</h2>
           </div>
-          <dl className="text-[13px] space-y-2">
+          <dl className="text-small space-y-2">
             <div className="flex justify-between gap-3">
               <dt className="text-ink-500 shrink-0">ელფოსტა</dt>
               <dd className="font-display font-semibold text-ink-900 truncate max-w-[280px]" title={me.email}>{me.email}</dd>
@@ -689,7 +713,9 @@ export default function SettingsPage() {
                           type="button"
                           onClick={startVerify}
                           disabled={verifyingBusy}
-                          className="h-8 px-3 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[11.5px] transition-colors"
+                          // h-10 sm:h-9 = the canon compact tier (40px on touch,
+                          // 36 on desktop). h-8 put a real action at 32px.
+                          className="h-10 sm:h-9 px-3.5 rounded-btn bg-brand-600 hover:bg-brand-700 disabled:bg-ink-100 disabled:text-ink-500 text-white font-display font-semibold text-small transition-colors duration-fast"
                         >
                           {verifyingBusy ? 'იგზავნება…' : 'ახლა დადასტურება'}
                         </button>
@@ -702,7 +728,7 @@ export default function SettingsPage() {
 
           {!me.emailVerified && verifyStage === 'sent' && (
             <div className="mt-4 rounded-btn border border-ink-200 bg-ink-50/60 p-4">
-              <div className="text-[12.5px] text-ink-700 mb-2">
+              <div className="text-small text-ink-700 mb-2">
                 შეიყვანე ელფოსტაზე მიღებული კოდი
               </div>
               <div className="flex gap-2">
@@ -714,13 +740,13 @@ export default function SettingsPage() {
                   onChange={e => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   maxLength={6}
                   placeholder="123456"
-                  className="flex-1 h-11 px-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14px] tabular-nums text-ink-900 transition-colors"
+                  className="flex-1 h-11 px-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body tabular-nums text-ink-900 transition-colors duration-fast"
                 />
                 <button
                   type="button"
                   onClick={submitVerify}
                   disabled={verifyingBusy || verifyCode.length !== 6}
-                  className="h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white font-display font-semibold text-[12.5px] transition-colors"
+                  className="h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 disabled:bg-ink-100 disabled:text-ink-500 text-white font-display font-semibold text-body transition-colors duration-fast"
                 >
                   დადასტურება
                 </button>
@@ -728,7 +754,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={startVerify}
                   disabled={verifyingBusy}
-                  className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 disabled:opacity-50 text-ink-700 font-display font-semibold text-[12.5px] transition-colors"
+                  className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 disabled:opacity-50 text-ink-700 font-display font-semibold text-small transition-colors duration-fast"
                 >
                   ხელახლა
                 </button>
@@ -737,16 +763,16 @@ export default function SettingsPage() {
           )}
 
           {verifyMsg && (
-            <div role="alert" className={`mt-3 rounded-btn border px-3 py-2 text-[12.5px] font-medium ${verifyMsg.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
+            <div role="alert" className={`mt-3 rounded-btn border px-3 py-2 text-small font-medium ${verifyMsg.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
               {verifyMsg.text}
             </div>
           )}
 
           <div className="mt-6 pt-5 border-t border-ink-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
-            <button type="button" onClick={openDelete} className="font-display text-[12px] font-semibold text-danger-700 hover:text-danger-800 self-start transition-colors">
+            <button type="button" onClick={openDelete} className="tap-area font-display text-meta font-semibold text-danger-700 hover:text-danger-800 self-start transition-colors duration-fast">
               ანგარიშის წაშლა
             </button>
-            <button type="button" onClick={() => setSignOutOpen(true)} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-[12.5px] transition-colors self-end sm:self-auto">
+            <button type="button" onClick={() => setSignOutOpen(true)} className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:text-danger-700 text-ink-700 font-display font-semibold text-small transition-colors duration-fast self-end sm:self-auto">
               გამოსვლა
             </button>
           </div>
@@ -755,15 +781,15 @@ export default function SettingsPage() {
         {/* Notification preferences */}
         <section className="bg-white rounded-card border border-ink-200 p-6 lg:p-8">
           <div className="mb-5">
-            <h2 className="font-display text-[18px] font-bold text-ink-900 tracking-tight">შეტყობინებები</h2>
-            <p className="text-[12.5px] text-ink-500 mt-0.5">აირჩიე, რა მიიღო</p>
+            <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">შეტყობინებები</h2>
+            <p className="text-small text-ink-500 mt-0.5">აირჩიე, რა მიიღო</p>
           </div>
 
           {!prefs ? (
-            <div className="text-[12.5px] text-ink-500">იტვირთება…</div>
+            <div className="text-small text-ink-500">იტვირთება…</div>
           ) : (
             <ul className="divide-y divide-ink-100">
-              {PREF_ROWS.map(row => {
+              {prefRows(me.role).map(row => {
                 const value = prefs[row.key]
                 const busy = savingKey === row.key
                 return (
@@ -771,20 +797,24 @@ export default function SettingsPage() {
                      track keeps its 44×24 proportions inside it. */
                   <li key={row.key} className="py-3.5 flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <div className="font-display text-[13.5px] font-semibold text-ink-900">{row.label}</div>
-                      <div className="text-[11.5px] text-ink-500 mt-0.5">{row.hint}</div>
+                      <div className="font-display text-body font-semibold text-ink-900">{row.label}</div>
+                      <div className="text-meta text-ink-500 mt-0.5">{row.hint}</div>
                     </div>
                     <button
                       type="button"
                       role="switch"
                       aria-checked={value}
+                      // The visible label lives in a SIBLING div, so a screen
+                      // reader announced five identical „switch, on" controls
+                      // with no way to tell which setting it was reading.
+                      aria-label={row.label}
                       disabled={busy}
                       onClick={() => togglePref(row.key)}
                       className="shrink-0 h-11 rounded-btn inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                     >
-                      <span className={`relative block w-11 h-6 rounded-full transition-colors ${value ? 'bg-brand-500' : 'bg-ink-200'} ${busy ? 'opacity-60' : ''}`}>
+                      <span className={`relative block w-11 h-6 rounded-full transition-colors duration-fast ${value ? 'bg-brand-500' : 'bg-ink-200'} ${busy ? 'opacity-60' : ''}`}>
                         <span
-                          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${value ? 'translate-x-5' : 'translate-x-0'}`}
+                          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-fast ${value ? 'translate-x-5' : 'translate-x-0'}`}
                         />
                       </span>
                     </button>
@@ -795,7 +825,7 @@ export default function SettingsPage() {
           )}
 
           {prefsMsg && (
-            <div role="alert" className={`mt-4 rounded-btn border px-3 py-2 text-[12.5px] font-medium ${prefsMsg.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
+            <div role="alert" className={`mt-4 rounded-btn border px-3 py-2 text-small font-medium ${prefsMsg.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
               {prefsMsg.text}
             </div>
           )}
@@ -832,7 +862,7 @@ export default function SettingsPage() {
                 onChange={e => setDeleteAcknowledged(e.target.value)}
                 autoComplete="off"
                 spellCheck={false}
-                className="w-full mt-2 h-11 px-3 rounded-field border border-ink-200 focus:border-danger-500 focus:ring-2 focus:ring-danger-100 focus:outline-none text-[13.5px] text-ink-900 transition-colors"
+                className="w-full mt-2 h-11 px-3 rounded-field border border-ink-200 focus:border-danger-500 focus:ring-2 focus:ring-danger-100 focus:outline-none text-body text-ink-900 transition-colors duration-fast"
                 placeholder="წაშლა"
                 disabled={deleteBusy}
               />
@@ -846,14 +876,14 @@ export default function SettingsPage() {
                     value={deletePw}
                     onChange={e => setDeletePw(e.target.value)}
                     autoComplete="current-password"
-                    className="w-full h-11 pl-3 pr-12 rounded-field border border-ink-200 focus:border-danger-500 focus:ring-2 focus:ring-danger-100 focus:outline-none text-[13.5px] text-ink-900 transition-colors"
+                    className="w-full h-11 pl-3 pr-12 rounded-field border border-ink-200 focus:border-danger-500 focus:ring-2 focus:ring-danger-100 focus:outline-none text-body text-ink-900 transition-colors duration-fast"
                     disabled={deleteBusy}
                   />
                   <button
                     type="button"
                     onClick={() => setShowDeletePw(s => !s)}
                     aria-label={showDeletePw ? 'დამალე' : 'აჩვენე'}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                   >
                     {showDeletePw ? <Icon.eyeOff className="w-4 h-4" /> : <Icon.eye className="w-4 h-4" />}
                   </button>
@@ -861,12 +891,12 @@ export default function SettingsPage() {
               </label>
             )}
             {deleteErr && (
-              <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12px] font-medium">
+              <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-meta font-medium">
                 {deleteErr}
               </div>
             )}
             {!canDelete && (
-              <p className="text-[11.5px] text-ink-500">
+              <p className="text-meta text-ink-500">
                 აკრიფე <span className="font-display font-bold">წაშლა</span> გასაგრძელებლად.
               </p>
             )}

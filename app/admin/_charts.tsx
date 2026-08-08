@@ -9,6 +9,26 @@ const W = 320
 const H = 88
 const PAD = 6
 
+/**
+ * THE chart palette — the one place a chart colour is written down.
+ *
+ * SVG `fill`/`stroke` cannot take a Tailwind class, so a chart is the rare
+ * place a literal hex is unavoidable. „Unavoidable" is not „unowned": the same
+ * brand green was typed at three separate call sites, which is how a palette
+ * drifts. Import the name, never the value.
+ *
+ * ⚠️ These MIRROR tailwind.config.js → BRAND_SCALE / INK_SCALE. If a token
+ * moves there, move it here — nothing enforces the pairing.
+ *   brand: BRAND_SCALE[500], the wordmark green.
+ *   ink:   INK_SCALE[800]. The neutral series used to be #1c1a17, which is on
+ *          no scale at all — a hair off ink-800 and invisible to the eye, but
+ *          it was a fourth colour system with one member.
+ */
+export const CHART = {
+  brand: '#2F9C86',
+  ink: '#1D1B15',
+} as const
+
 type Props = {
   title: string
   data: number[]
@@ -18,7 +38,7 @@ type Props = {
   format?: (n: number) => string
 }
 
-export function MiniChart({ title, data, labels, kind = 'area', color = '#2F9C86', format = (n) => String(n) }: Props) {
+export function MiniChart({ title, data, labels, kind = 'area', color = CHART.brand, format = (n) => String(n) }: Props) {
   const max = Math.max(1, ...data)
   const n = data.length
   const total = data.reduce((a, b) => a + b, 0)
@@ -33,8 +53,8 @@ export function MiniChart({ title, data, labels, kind = 'area', color = '#2F9C86
   return (
     <div className="p-4 rounded-card border border-ink-200 bg-white">
       <div className="flex items-baseline justify-between mb-2.5">
-        <span className="text-[11px] font-semibold text-ink-500 uppercase tracking-[0.08em]">{title}</span>
-        <span className="font-display text-[19px] font-bold text-ink-900 tabular-nums leading-none">{format(total)}</span>
+        <span className="text-micro font-semibold text-ink-500 uppercase">{title}</span>
+        <span className="font-display text-h2 font-bold text-ink-900 tabular-nums leading-none">{format(total)}</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" role="img" aria-label={title} className="block overflow-visible">
         {kind === 'area' ? (
@@ -57,7 +77,7 @@ export function MiniChart({ title, data, labels, kind = 'area', color = '#2F9C86
           })
         )}
       </svg>
-      <div className="flex justify-between mt-1.5 text-[10px] text-ink-400 tabular-nums font-mono">
+      <div className="flex justify-between mt-1.5 text-meta text-ink-400 tabular-nums font-mono">
         <span>{labels[0]}</span>
         <span>{labels[labels.length - 1]}</span>
       </div>

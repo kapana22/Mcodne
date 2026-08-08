@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole, replaceSession, homeForRole } from '@/lib/auth'
+import { requireRoleApi, replaceSession, homeForRole } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 
 const Params = z.object({ userId: z.string().min(1).max(64) })
@@ -15,7 +15,9 @@ export async function POST(
   _req: Request,
   ctx: { params: Promise<{ userId: string }> },
 ) {
-  const admin = await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  const admin = auth.user
   const { userId } = Params.parse(await ctx.params)
 
   if (userId === admin.id) {

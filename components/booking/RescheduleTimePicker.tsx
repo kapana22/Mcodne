@@ -84,16 +84,16 @@ export function RescheduleTimePicker({
   }, [times])
 
   if (avail === null) {
-    return <div className="py-8 text-center text-[13px] text-ink-400">იტვირთება…</div>
+    return <div className="py-8 text-center text-small text-ink-400">იტვირთება…</div>
   }
   if (failed) {
-    return <div className="py-6 text-center text-[13px] text-danger-700">დროები ვერ ჩაიტვირთა.</div>
+    return <div className="py-6 text-center text-small text-danger-700">დროები ვერ ჩაიტვირთა.</div>
   }
   if (!days.length) {
     return (
       <div className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 p-6 text-center">
         <Icon.cal className="w-5 h-5 text-ink-400 mx-auto mb-2" />
-        <p className="text-[13px] text-ink-600">ექსპერტს ახლა თავისუფალი დრო არ აქვს.</p>
+        <p className="text-small text-ink-600">ექსპერტს ახლა თავისუფალი დრო არ აქვს.</p>
       </div>
     )
   }
@@ -104,7 +104,7 @@ export function RescheduleTimePicker({
       <div>
         <div className="flex items-center justify-between mb-2">
           <Eyebrow as="span" tone="muted">თარიღი</Eyebrow>
-          {selDay && <span className="text-[11.5px] text-ink-400">{KA_MONTHS_LONG[selDay.getMonth()]} {selDay.getFullYear()}</span>}
+          {selDay && <span className="text-meta text-ink-400">{KA_MONTHS_LONG[selDay.getMonth()]} {selDay.getFullYear()}</span>}
         </div>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide rail-fade-end -mx-1 px-1 pb-1">
           {days.map(d => {
@@ -116,13 +116,18 @@ export function RescheduleTimePicker({
                 type="button"
                 onClick={() => onDate(iso)}
                 aria-pressed={sel}
-                className={`flex-none w-[58px] h-[64px] rounded-card border flex flex-col items-center justify-center gap-0.5 transition-colors motion-safe:active:scale-[0.97] ${
-                  sel ? 'bg-brand-500 border-brand-500' : 'border-ink-200 bg-white hover:border-ink-300'
+                className={`flex-none w-[58px] h-[64px] rounded-card border flex flex-col items-center justify-center gap-0.5 transition-colors duration-fast motion-safe:active:scale-[0.97] ${
+                  sel ? 'bg-brand-600 border-brand-600' : 'border-ink-200 bg-white hover:border-ink-300'
                 }`}
               >
-                <span className={`text-[11px] font-medium ${sel ? 'text-white/90' : 'text-ink-500'}`}>{KA_WEEKDAYS_SHORT[d.getDay()]}</span>
-                <span className={`text-[18px] font-display font-bold tabular-nums leading-none ${sel ? 'text-white' : 'text-ink-900'}`}>{d.getDate()}</span>
-                <span className={`text-[9px] uppercase tracking-wide ${sel ? 'text-white/80' : 'text-ink-400'}`}>{KA_MONTHS_SHORT[d.getMonth()]}</span>
+                {/* Solid white on the selected fill, never translucent. On
+                    brand-600 even white/90 measures 4.19:1 — every opacity step
+                    fails AA, so the fill simply cannot carry a second white
+                    tier. Hierarchy here comes from size and weight instead,
+                    which is what the type scale is for. */}
+                <span className={`text-meta font-medium ${sel ? 'text-white' : 'text-ink-500'}`}>{KA_WEEKDAYS_SHORT[d.getDay()]}</span>
+                <span className={`text-h3 font-display font-bold tabular-nums leading-none ${sel ? 'text-white' : 'text-ink-900'}`}>{d.getDate()}</span>
+                <span className={`text-micro uppercase ${sel ? 'text-white' : 'text-ink-400'}`}>{KA_MONTHS_SHORT[d.getMonth()]}</span>
               </button>
             )
           })}
@@ -133,10 +138,10 @@ export function RescheduleTimePicker({
       <div>
         <div className="flex items-center justify-between mb-2">
           <Eyebrow as="span" tone="muted">დრო</Eyebrow>
-          {durationLabel && <span className="text-[11.5px] text-ink-400">{durationLabel}</span>}
+          {durationLabel && <span className="text-meta text-ink-400">{durationLabel}</span>}
         </div>
         {times.length === 0 ? (
-          <p className="text-[12px] text-ink-400 py-3">ამ დღეს დრო აღარ დარჩა — აირჩიე სხვა.</p>
+          <p className="text-meta text-ink-400 py-3">ამ დღეს დრო აღარ დარჩა — აირჩიე სხვა.</p>
         ) : (
           <div className="grid grid-cols-4 gap-2 max-h-[148px] overflow-y-auto pr-0.5">
             {times.map(t => {
@@ -148,8 +153,8 @@ export function RescheduleTimePicker({
                   type="button"
                   onClick={() => onTime(hm)}
                   aria-pressed={sel}
-                  className={`h-9 rounded-field border text-[13px] font-display font-semibold tabular-nums transition-colors motion-safe:active:scale-[0.97] ${
-                    sel ? 'bg-brand-500 border-brand-500 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300'
+                  className={`h-9 rounded-field border text-small font-display font-semibold tabular-nums transition-colors duration-fast motion-safe:active:scale-[0.97] ${
+                    sel ? 'bg-brand-600 border-brand-600 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300'
                   }`}
                 >
                   {hm}
@@ -162,7 +167,7 @@ export function RescheduleTimePicker({
 
       {/* Selected summary */}
       {selDay && times.some(t => fmtHM(t.start) === timeStr) && (
-        <div className="flex items-center gap-2 px-3 py-2.5 rounded-field bg-ink-75 border border-ink-100 text-[12.5px] text-ink-700">
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-field bg-ink-75 border border-ink-100 text-small text-ink-700">
           <Icon.cal className="w-3.5 h-3.5 text-brand-600 shrink-0" />
           <span>
             შენ ირჩევ:{' '}

@@ -41,6 +41,18 @@ export type ConsultationItem = {
   price: number
 }
 
+/**
+ * The only two columns tier RESOLUTION actually reads.
+ *
+ * Pre-tier surfaces (browse card, /ask, saved experts, the student dashboard)
+ * deliberately select just `minutes/price/tier` — shipping a tier's title and
+ * description to a list of 200 experts is payload nobody renders. Typing the
+ * resolvers against the full `ConsultationItem` forced those call sites to
+ * either widen to `any` or invent the missing fields; both hide real mistakes.
+ * Resolvers take this instead, and `ConsultationItem` still satisfies it.
+ */
+export type TierShape = { minutes: number; price: number }
+
 /* ───── Shared fallback defaults ─────
  * Single source for the card/profile/booking fallbacks. Duration is aligned to
  * the Prisma schema (`consultationDurationMin @default(30)`); price has no
@@ -203,30 +215,117 @@ export const isOpenStart = (
 
 /* ───── Tier resolution ───── */
 
-// Service length for the surfaces that render BEFORE a tier is chosen (the
-// sticky rail, the mobile bar, the in-page „განრიგი"): the SHORTEST real
-// service, because that is the one that fits the most windows — if nothing is
-// open for it, nothing is open at all. Falls back to the expert's profile-level
-// duration when they publish no tiers. Never a synthetic number: pairing the
-// preview with a length no service actually has is how the picker used to
-// advertise unbookable times.
-export function previewServiceMin(consultations: ConsultationItem[], fallbackMin: number): number {
-  const mins = (consultations ?? []).map(c => c.minutes).filter(m => typeof m === 'number' && m > 0)
-  return mins.length ? Math.min(...mins) : fallbackMin
+/** A tier the expert offers at no charge — the „გაცნობითი" intro session. */
+export const isFreeTier = (c: TierShape): boolean => !(c.price > 0)
+
+/**
+ * The expert's FLAGSHIP service — what a visitor should see priced and
+ * scheduled before touching anything: the LONGEST PAID tier.
+ *
+ * WHY LONGEST-PAID, and why this replaced the old shortest-service rule:
+ * deriving the pre-tier preview from the shortest service looked safe ("it fits
+ * the most windows") but produced the single worst bug in the booking flow. An
+ * expert offering a free 15-min intro alongside a 60-min consultation had their
+ * „განრიგი" drawn on a 15-minute grid — most of those starts cannot hold 60
+ * minutes. A visitor picked 15:45, chose the 60-min service, and the flow
+ * silently dropped their time because it no longer fit. The time they picked
+ * was never bookable for the service they wanted; only the preview claimed it
+ * was.
+ *
+ * Longest-paid also matches how experts think about their own offer: the free
+ * intro is a door, not the product, so it must never be the default.
+ *
+ * Falls back to the profile-level duration when no tiers are published, and to
+ * the longest FREE tier if — unusually — every tier is free. Never a synthetic
+ * number: previewing a length no service actually has is what advertised
+ * unbookable times in the first place.
+ */
+export function primaryService<T extends TierShape>(consultations: T[]): T | null {
+  const valid = (consultations ?? []).filter(c => typeof c.minutes === 'number' && c.minutes > 0)
+  if (!valid.length) return null
+  const paid = valid.filter(c => !isFreeTier(c))
+  const pool = paid.length ? paid : valid
+  return pool.reduce((best, c) => (c.minutes > best.minutes ? c : best), pool[0])
 }
 
+/** Minutes of `primaryService`, or the profile-level duration when there are no tiers. */
+export function primaryServiceMin(consultations: TierShape[], fallbackMin: number): number {
+  return primaryService(consultations)?.minutes ?? fallbackMin
+}
+
+/**
+ * Tier order for every picker: paid tiers longest-first (the flagship leads),
+ * then free intro tiers last. Stable and shared, so the „განრიგი" chips, the
+ * tier step and the rail can never disagree about which service comes first.
+ */
+export function orderedTiers(consultations: ConsultationItem[]): ConsultationItem[] {
+  const valid = (consultations ?? []).filter(c => typeof c.minutes === 'number' && c.minutes > 0)
+  return valid.slice().sort((a, b) => {
+    const af = isFreeTier(a) ? 1 : 0
+    const bf = isFreeTier(b) ? 1 : 0
+    if (af !== bf) return af - bf
+    return b.minutes - a.minutes
+  })
+}
+
+/** „უფასო" for a zero-price tier, „₾N" otherwise. One definition, everywhere. */
+export const tierPriceLabel = (c: TierShape): string =>
+  isFreeTier(c) ? 'უფასო' : `₾${Math.max(0, Math.round(c.price))}`
+
 /* ───── Tier pricing labels ───── */
+
+/**
+ * THE price a pre-tier surface advertises: the FLAGSHIP tier's price and its
+ * real length. One helper, so the browse card, the profile rail and the mobile
+ * bar cannot quote three different numbers for one expert.
+ *
+ * WHY THIS REPLACED THE TWO RULES THAT PRECEDED IT (2026-07-31). Measured on
+ * production, ONE expert advertised three prices at once:
+ *   • the /tutors card said „₾80 · 30 წთ" — it priced `consultationDurationMin`,
+ *     the profile-level DEFAULT, which is not a service anybody can buy;
+ *   • the profile rail said „₾25-დან" — `fromPriceLabel` anchors on the CHEAPEST
+ *     paid tier, so a 15-minute add-on priced the whole profile;
+ *   • the service list said 60წთ ₾80 · 30წთ ₾45 · 15წთ ₾25 — the truth.
+ * A visitor who clicked ₾25 met ₾80. Anchoring on the flagship is the only rule
+ * that agrees with `primaryService` — which is ALREADY what the „განრიგი" grid,
+ * the tier step and every duration preview resolve from — so the price and the
+ * times on screen now describe the same service.
+ *
+ * `label` is the tier's own `tierPriceLabel` (so a free flagship reads „უფასო",
+ * never „₾0"), and `minutes` is that tier's real length — never a synthetic
+ * number, which is the bug primaryService's own docblock exists to prevent.
+ * Falls back to the flat profile price + `fallbackMin` only when the expert has
+ * published no tiers at all.
+ */
+export function primaryPriceLabel(
+  consultations: TierShape[],
+  flatPrice: number,
+  fallbackMin: number,
+): { label: string; minutes: number } {
+  const flagship = primaryService(consultations ?? [])
+  if (flagship) return { label: tierPriceLabel(flagship), minutes: flagship.minutes }
+  return { label: `₾${priceForDuration(flatPrice, 0)}`, minutes: fallbackMin }
+}
 
 // From-price label for rails/bars (DESIGN_FIX_PROMPT 1.2): with 2+ tiers whose
 // prices differ, the honest headline price is „₾{min}-დან"; otherwise the flat
 // (or single-tier) price. Real tier rows only — never a synthetic figure.
-export function fromPriceLabel(consultations: ConsultationItem[], flatPrice: number): { label: string; isFrom: boolean } {
-  if (consultations.length >= 2) {
-    const prices = consultations.map(c => c.price)
+// SUPERSEDED for the rail/card headline by `primaryPriceLabel` above — see its
+// docblock. Kept because `isFrom` still drives copy elsewhere; do not reach for
+// it as a new surface's headline price.
+export function fromPriceLabel(consultations: TierShape[], flatPrice: number): { label: string; isFrom: boolean } {
+  // PAID tiers only. A free intro session made `min` 0, so an expert charging
+  // ₾80 advertised „₾0-დან" on their card, rail and mobile bar — the free door
+  // priced the whole profile. Fall back to every tier only if all are free.
+  const paid = consultations.filter(c => !isFreeTier(c))
+  const pool = paid.length ? paid : consultations
+  if (pool.length >= 2) {
+    const prices = pool.map(c => c.price)
     const min = Math.min(...prices)
     const max = Math.max(...prices)
     if (min !== max) return { label: `₾${Math.max(0, Math.round(min))}-დან`, isFrom: true }
     return { label: `₾${Math.max(0, Math.round(min))}`, isFrom: false }
   }
+  if (pool.length === 1) return { label: tierPriceLabel(pool[0]), isFrom: false }
   return { label: `₾${priceForDuration(flatPrice, 0)}`, isFrom: false }
 }

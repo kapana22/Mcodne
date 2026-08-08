@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { notify } from '@/lib/notify'
-import { fmtKaDateTime } from '@/lib/kaDate'
+import { notify, normalizePrefs } from '@/lib/notify'
+import { sendMail } from '@/lib/mailer'
+import { bookingChangedEmail, fmtWhenTz } from '@/lib/emailTemplates'
 import { markRelatedRead } from '@/lib/notifClear'
 import { isStartOpen } from '@/lib/availability'
 
@@ -144,8 +145,24 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           orderBy: { startAt: 'asc' },
           take: 2000,
         })
+        // The published-window gate, with the SAME single exception the propose
+        // half carries: a booking created as a client proposal
+        // (`proposedByStudent`) is negotiated outside the published schedule by
+        // definition, because these experts publish nothing. Both routes must
+        // agree — an accept that re-imposed the window rule would let a
+        // counter-offer be proposed and then bounce at the moment of agreement,
+        // which is the worst possible place to discover it.
+        //
+        // The relaxation is expressed as a synthetic window over the proposed
+        // slot rather than as a skipped call, so clause (b) — clear of every
+        // other live session, plus buffer — still runs against `others` here,
+        // exactly as it does for an ordinary booking. The two overlap re-checks
+        // above (this expert's calendar, and the client's own) are unconditional
+        // and ran before this line.
         const open = isStartOpen(newStart, {
-          windows: windowRows.map(w => ({ start: w.startAt, end: w.endAt })),
+          windows: booking.proposedByStudent
+            ? [{ start: newStart, end: newEnd }]
+            : windowRows.map(w => ({ start: w.startAt, end: w.endAt })),
           busy: others.map(o => ({
             start: o.startAt,
             end: new Date(o.startAt.getTime() + o.durationMin * 60_000),
@@ -184,13 +201,36 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const otherPartyUserId = pending.proposedBy === 'STUDENT'
       ? booking.studentId
       : booking.tutor.userId
+    const proposerHref = pending.proposedBy === 'STUDENT'
+      ? `/student/bookings/${booking.id}`
+      : `/tutor/bookings/${booking.id}`
     await notify(otherPartyUserId, {
       type: 'BOOKING_CREATED',
       title: 'გადადება დადასტურდა',
-      body: `ახალი დრო: ${fmtKaDateTime(newStart, { year: true })}`,
-      href: pending.proposedBy === 'STUDENT'
-        ? `/student/bookings/${booking.id}`
-        : `/tutor/bookings/${booking.id}`,
+      body: `ახალი დრო: ${fmtWhenTz(newStart, { year: true })}`,
+      href: proposerHref,
+    })
+    // Email the proposer: the session just MOVED. Nothing else will tell them —
+    // the ~1h reminder is re-armed for the new time, but until then the only
+    // record of the change is a bell entry, and „when is my session" is exactly
+    // the fact you cannot afford to have wrong.
+    after(async () => {
+      try {
+        const [proposer, responder] = await Promise.all([
+          prisma.user.findUnique({ where: { id: otherPartyUserId }, select: { email: true, notificationPrefs: true } }),
+          prisma.user.findUnique({ where: { id: user.id }, select: { fullName: true } }),
+        ])
+        if (proposer?.email && normalizePrefs(proposer.notificationPrefs).BOOKING_CREATED) {
+          const { subject, html } = bookingChangedEmail('reschedule_accepted', {
+            counterpartName: responder?.fullName || (pending.proposedBy === 'STUDENT' ? 'ექსპერტი' : 'სტუდენტი'),
+            topic: booking.topic,
+            whenText: fmtWhenTz(booking.startAt, { year: true }),
+            newWhenText: fmtWhenTz(newStart, { year: true }),
+            href: proposerHref,
+          })
+          await sendMail({ to: proposer.email, subject, html })
+        }
+      } catch { /* email is best-effort */ }
     })
     // The responder has now acted on the pending reschedule — clear their
     // RESCHEDULE_REQUEST notif so it doesn't sit unread.
@@ -233,13 +273,36 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // RESCHEDULE_REQUEST, not BOOKING_CANCELED — the booking is alive at its
   // original time, and the canceled type renders as a red „გაუქმება" chip,
   // which read as „the session was killed". Same pref group either way.
+  const proposerHrefRej = pending.proposedBy === 'STUDENT'
+    ? `/student/bookings/${booking.id}`
+    : `/tutor/bookings/${booking.id}`
   await notify(otherPartyUserId, {
     type: 'RESCHEDULE_REQUEST',
     title: 'გადადება უარყოფილია',
-    body: 'თარიღი უცვლელი დარჩა',
-    href: pending.proposedBy === 'STUDENT'
-      ? `/student/bookings/${booking.id}`
-      : `/tutor/bookings/${booking.id}`,
+    body: `თარიღი უცვლელი დარჩა — ${fmtWhenTz(booking.startAt, { year: true })}`,
+    href: proposerHrefRej,
+  })
+  // Email the proposer. A rejection is the one outcome that leaves them believing
+  // the WRONG thing if they miss it: they asked to move the session, so their
+  // working assumption is that it moved. The original time stands and they have
+  // to be told in the channel they actually read.
+  after(async () => {
+    try {
+      const [proposer, responder] = await Promise.all([
+        prisma.user.findUnique({ where: { id: otherPartyUserId }, select: { email: true, notificationPrefs: true } }),
+        prisma.user.findUnique({ where: { id: user.id }, select: { fullName: true } }),
+      ])
+      if (proposer?.email && normalizePrefs(proposer.notificationPrefs).BOOKING_CREATED) {
+        const { subject, html } = bookingChangedEmail('reschedule_rejected', {
+          counterpartName: responder?.fullName || (pending.proposedBy === 'STUDENT' ? 'ექსპერტი' : 'სტუდენტი'),
+          topic: booking.topic,
+          whenText: fmtWhenTz(booking.startAt, { year: true }),
+          note: 'სესია ძველ დროზე რჩება ძალაში.',
+          href: proposerHrefRej,
+        })
+        await sendMail({ to: proposer.email, subject, html })
+      }
+    } catch { /* email is best-effort */ }
   })
   // Responder acted — clear their own RESCHEDULE_REQUEST notif for this booking.
   const responderHrefR = isStudent

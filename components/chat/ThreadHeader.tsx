@@ -18,11 +18,11 @@ export function PreThreadLink({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      className="flex items-center gap-2 px-3 sm:px-5 py-2 border-b border-ink-100 bg-ink-50/60 hover:bg-ink-100/70 transition-colors group"
+      className="flex items-center gap-2 px-3 sm:px-5 py-2 border-b border-ink-100 bg-ink-50/60 hover:bg-ink-100/70 transition-colors duration-fast group"
     >
       <Icon.chat className="w-3.5 h-3.5 text-ink-400 shrink-0" />
-      <span className="text-[12px] text-ink-600 truncate">ჯავშნამდე უკვე მიწერეთ ერთმანეთს</span>
-      <span className="ml-auto shrink-0 font-display text-[12px] font-semibold text-brand-700 group-hover:text-brand-800">
+      <span className="text-meta text-ink-600 truncate">ჯავშნამდე უკვე მიწერეთ ერთმანეთს</span>
+      <span className="ml-auto shrink-0 font-display text-meta font-semibold text-brand-700 group-hover:text-brand-800">
         ნახე
       </span>
     </Link>
@@ -82,25 +82,30 @@ export function ThreadHeader({
       <Link
         href={backHref}
         aria-label="უკან, მიმოწერების სია"
-        className={`${alwaysBack ? '' : 'lg:hidden'} shrink-0 w-9 h-9 -ml-1 rounded-btn inline-flex items-center justify-center text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors`}
+        className={`${alwaysBack ? '' : 'lg:hidden'} shrink-0 w-9 h-10 sm:h-9 -ml-1 rounded-btn inline-flex items-center justify-center text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors duration-fast`}
       >
         <Icon.chevR className="w-4.5 h-4.5 rotate-180" />
       </Link>
       <Avatar src={other?.avatarUrl ?? undefined} name={other?.fullName} size={40} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-display text-[14px] font-bold text-ink-900 truncate">
+          {/* h2, not a bare span and not an h1: a thread had NO heading at all
+              (mobile outline landed on an untitled document), but on desktop the
+              two-pane layout already owns the page h1 „მიმოწერა" — making this
+              an h1 too produced two. The layout owns the title; the person you
+              are talking to is the section beneath it. */}
+          <h2 className="font-display text-body font-bold text-ink-900 truncate">
             {other?.fullName ?? '—'}
-          </span>
+          </h2>
           {booking && <StatusPill tone={toneOf(booking.status)} />}
           {isPre && (
-            <span className="inline-flex items-center h-5 px-2 rounded-pill bg-ink-100 text-ink-600 font-display text-[10.5px] font-semibold">
+            <span className="inline-flex items-center h-5 px-2 rounded-pill bg-ink-100 text-ink-600 font-display text-meta font-semibold">
               შეკითხვა ჯავშნამდე
             </span>
           )}
         </div>
         {booking && (
-          <div className="text-[12px] text-ink-500 truncate mt-0.5">
+          <div className="text-meta text-ink-500 truncate mt-0.5">
             {booking.topic} · {fmtKaDateTime(new Date(booking.startAt))}
           </div>
         )}
@@ -114,7 +119,7 @@ export function ThreadHeader({
       {bookHref && (
         <div className="shrink-0 flex items-center gap-2.5">
           {bookPrice != null && (
-            <span className="font-display text-[12.5px] font-semibold text-ink-500 tabular-nums whitespace-nowrap">
+            <span className="font-display text-small font-semibold text-ink-500 tabular-nums whitespace-nowrap">
               ₾{bookPrice}<span className="hidden sm:inline"> · სესია</span>
             </span>
           )}

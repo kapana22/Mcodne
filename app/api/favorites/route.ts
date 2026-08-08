@@ -20,6 +20,13 @@ export async function GET() {
         include: {
           user: { select: { id: true, fullName: true, avatarUrl: true } },
           category: { select: { id: true, slug: true, name: true, icon: true } },
+          // Tier SHAPE only (minutes/price/tier) — the saved-experts cards are a
+          // PRE-TIER surface, so they must advertise the FLAGSHIP service like
+          // /tutors does. Without this they printed the raw profile-level
+          // `price`, which is not a service anyone can buy: measured 2026-07-31,
+          // one expert read ₾60 on the surfaces that lacked these rows and ₾30
+          // on /tutors. Three small numbers per tier; never the title or body.
+          consultations: { select: { minutes: true, price: true, tier: true } },
         },
       },
     },

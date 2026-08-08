@@ -82,7 +82,7 @@ export function OpenTimeNudge({ noAvailability }: { noAvailability: boolean | nu
         <span className="w-9 h-9 rounded-btn bg-ink-100 text-ink-700 inline-flex items-center justify-center shrink-0">
           <Icon.calendar className="w-5 h-5" />
         </span>
-        <div className="min-w-0 text-[13.5px] text-ink-700 leading-relaxed">
+        <div className="min-w-0 text-body text-ink-700 leading-relaxed">
           <p>პროფილი დამტკიცებულია და ძებნაში ჩანს — მაგრამ სანამ განრიგში დროს არ გამოაქვეყნებ, დაჯავშნა არავის შეუძლია.</p>
           <p className="mt-2">განრიგი უკვე შევსებულია: ორშაბათიდან პარასკევამდე, 10:00–18:00. გახსენი, გამორთე დღეები ან შეცვალე საათები და გამოაქვეყნე — ნებისმიერ დროს შეცვლი.</p>
         </div>

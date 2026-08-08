@@ -4,6 +4,8 @@ type IconProps = SVGProps<SVGSVGElement>
 const base = 'currentColor'
 
 const S = (props: IconProps) => ({
+  'aria-hidden': true,
+  focusable: false,
   viewBox: '0 0 24 24',
   fill: 'none',
   stroke: base,
@@ -91,6 +93,8 @@ export const Icon = {
 // Category glyphs (home page category grid). Native 28-grid drawings — kept as
 // ready-to-render elements to match call sites; stroke normalized to 1.7.
 const catS = {
+  'aria-hidden': true,
+  focusable: false,
   viewBox: '0 0 28 28',
   fill: 'none',
   stroke: base,
@@ -101,6 +105,28 @@ const catS = {
 }
 
 export const CatIcon = {
+  /* ── SEVEN NEW MARKS, 2026-07-31 ──────────────────────────────────────────
+   * Fourteen categories were sharing SEVEN drawings: „ბიზნესი"/„გაყიდვები" were
+   * the same briefcase, „ფინანსები"/„უძრავი ქონება"/„კრიპტო" the same bank, and
+   * „ფსიქოლოგია" wasn't mapped at all so it fell back to the briefcase too. On a
+   * grid they read as one repeated stamp — which is exactly how it looked.
+   * Same language as the originals (28-box, 1.7 stroke, round joins); each mark
+   * names ONE thing, so no two can be confused at 28px. */
+  // Bullseye + arrow — sales (a deal landed), not the briefcase of „business".
+  sales: (<svg {...catS}><circle cx="12.5" cy="15.5" r="8.5" /><circle cx="12.5" cy="15.5" r="4" /><path d="m12.5 15.5 9-9" /><path d="M17.5 6h4.5v4.5" /></svg>),
+  // Stacked layers — product (versions, releases), distinct from IT's brackets.
+  product: (<svg {...catS}><path d="M14 4.5 23.5 9.5 14 14.5 4.5 9.5 14 4.5Z" /><path d="m4.5 14.5 9.5 5 9.5-5" /><path d="m4.5 19 9.5 5 9.5-5" /></svg>),
+  // Pen nib — design, distinct from marketing's megaphone.
+  design: (<svg {...catS}><path d="M5.5 22.5 8 13.5 18.5 4.5l5 5L14.5 20l-9 2.5Z" /><path d="m8 13.5 6.5 6.5" /><circle cx="11.2" cy="17.2" r="1.5" /></svg>),
+  // Two people — HR, distinct from career's compass.
+  hr: (<svg {...catS}><circle cx="10.5" cy="10" r="3.6" /><path d="M4 22.5c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5" /><circle cx="19.6" cy="11.6" r="2.7" /><path d="M18.6 15.7c3 .4 5.4 3 5.4 6.8" /></svg>),
+  // Pitched house with a door — property, distinct from finance's columned bank.
+  'real-estate': (<svg {...catS}><path d="M4 12.5 14 5l10 7.5" /><path d="M6.5 11v11.5h15V11" /><path d="M11.5 22.5V16h5v6.5" /></svg>),
+  // Globe with an outbound arrow — relocation (leaving, arriving).
+  relocation: (<svg {...catS}><circle cx="12.5" cy="15" r="8" /><path d="M4.5 15h16" /><path d="M12.5 7c2.2 2.3 3.3 5 3.3 8s-1.1 5.7-3.3 8c-2.2-2.3-3.3-5-3.3-8s1.1-5.7 3.3-8Z" /><path d="M18.5 4.5h5v5" /><path d="m23.5 4.5-5.5 5.5" /></svg>),
+  // Hexagonal token with a ₿ stem — crypto, distinct from the bank and the coin.
+  crypto: (<svg {...catS}><path d="M14 3.5 23.5 9v10L14 24.5 4.5 19V9L14 3.5Z" /><path d="M11.5 9.5h4a2.4 2.4 0 0 1 0 4.8h-4Zm0 4.8h4.5a2.4 2.4 0 0 1 0 4.8h-4.5Z" /><path d="M13.5 7.5v2M13.5 19.1v2" /></svg>),
+
   business: (<svg {...catS}><rect x="3.5" y="9" width="21" height="14" rx="2" /><path d="M10 9V6.5A1.5 1.5 0 0 1 11.5 5h5A1.5 1.5 0 0 1 18 6.5V9" /><path d="M3.5 15.5h21" /><path d="M13 14.5v2.5" /></svg>),
   finance: (<svg {...catS}><path d="M3.5 11 14 5l10.5 6" /><path d="M5 11v10h18V11" /><path d="M9 14v5M14 14v5M19 14v5" /><path d="M3.5 22h21" /></svg>),
   career: (<svg {...catS}><path d="M14 4c4 3 6 7 6 11 0 2.5-1 4.5-2 6l-4 3-4-3c-1-1.5-2-3.5-2-6 0-4 2-8 6-11Z" /><circle cx="14" cy="13" r="2.5" /><path d="m9 21-2.5 3.5 4.5-1M19 21l2.5 3.5-4.5-1" /></svg>),

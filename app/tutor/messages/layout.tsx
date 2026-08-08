@@ -15,7 +15,14 @@ export default function TutorMessagesLayout({ children }: { children: React.Reac
   return (
     <div>
       <PageHeader
-        className={`mb-4 lg:mb-5 ${threadOpen ? 'hidden lg:flex' : ''}`}
+        // `sr-only`, never `hidden`: the h1 must stay in the accessibility tree
+        // so „skip to content" and every screen-reader outline have a title to
+        // land on — it is only ever hidden VISUALLY.
+        //   lg+ : always, because „მიმოწერა" is the exact text of the
+        //         highlighted sidebar pill ~40px to its left.
+        //   <lg : only with a thread open, where the list pane collapses and
+        //         the phone gives the conversation the whole screen.
+        className={`mb-4 lg:mb-5 ${threadOpen ? 'sr-only' : 'lg:sr-only'}`}
         eyebrow="შეტყობინებები"
         title="მიმოწერა"
       />

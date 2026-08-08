@@ -13,6 +13,7 @@ export const OrderSummary = ({
   duration,
   topic,
   total,
+  totalNote = null,
   tutorName,
   tutorSpecialty,
   tutorAvatar,
@@ -22,6 +23,9 @@ export const OrderSummary = ({
   duration: number
   topic: string
   total: string
+  /** Secondary line under the total — the approximate euro figure for a
+      diaspora expert („≈ €33"). Null everywhere else. */
+  totalNote?: string | null
   tutorName: string
   tutorSpecialty: string
   tutorAvatar?: string | null
@@ -41,39 +45,39 @@ export const OrderSummary = ({
 
       <div className="flex items-center gap-3 pb-4 border-b border-ink-200">
         {tutorAvatar ? (
-          <img src={tutorAvatar} alt="" width={40} height={40} className="w-10 h-10 rounded-card object-cover" />
+          <img src={tutorAvatar} alt="" width={40} height={40} className="w-10 h-10 rounded-full object-cover" />
         ) : (
-          <span className="w-10 h-10 rounded-card bg-brand-100 text-brand-700 inline-flex items-center justify-center font-display font-bold text-[13px]">
+          <span className="w-10 h-10 rounded-full bg-brand-100 text-brand-700 inline-flex items-center justify-center font-display font-bold text-small">
             {tutorName.slice(0, 1)}
           </span>
         )}
         <div className="min-w-0">
-          <div className="font-display text-[13.5px] font-bold text-ink-900 truncate">{tutorName}</div>
-          <div className="text-[11.5px] text-ink-500 truncate">{tutorSpecialty}</div>
+          <div className="font-display text-body font-bold text-ink-900 truncate">{tutorName}</div>
+          <div className="text-meta text-ink-500 truncate">{tutorSpecialty}</div>
         </div>
       </div>
 
-      <dl className="mt-4 space-y-3 text-[12.5px]">
+      <dl className="mt-4 space-y-3 text-small">
         {serviceTitle && (
           <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
-            <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">სერვისი</dt>
+            <dt className="font-display text-micro font-semibold uppercase text-ink-500">სერვისი</dt>
             <dd className="font-display font-bold text-ink-900 leading-snug">{serviceTitle}</dd>
           </div>
         )}
         <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
-          <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">დღე</dt>
+          <dt className="font-display text-micro font-semibold uppercase text-ink-500">დღე</dt>
           <dd className="font-display font-bold text-ink-900 tabular-nums">{dayLabel}</dd>
         </div>
         <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
-          <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">დრო</dt>
+          <dt className="font-display text-micro font-semibold uppercase text-ink-500">დრო</dt>
           <dd className="font-display font-bold text-ink-900 tabular-nums">{timeLabel}</dd>
         </div>
         <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
-          <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">თემა</dt>
+          <dt className="font-display text-micro font-semibold uppercase text-ink-500">თემა</dt>
           <dd className="font-display font-medium text-ink-800 leading-snug">{topic || '—'}</dd>
         </div>
         <div className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
-          <dt className="font-display text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-500">ფორმატი</dt>
+          <dt className="font-display text-micro font-semibold uppercase text-ink-500">ფორმატი</dt>
           <dd className="font-display font-bold text-ink-900 inline-flex items-center gap-1.5">
             <Icon.video className="w-3.5 h-3.5" />
             ვიდეო · ინდივიდუალური
@@ -83,9 +87,16 @@ export const OrderSummary = ({
 
       <div className="mt-5 pt-4 border-t border-ink-200">
         <div className="flex items-baseline justify-between">
-          <span className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">ჯამი</span>
-          <span className="font-display text-[22px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">{total}</span>
+          <span className="font-display text-micro font-semibold uppercase text-ink-700">ჯამი</span>
+          <span className="font-display text-h2 font-bold text-ink-900 tabular-nums tracking-tight leading-none">{total}</span>
         </div>
+        {/* Diaspora only (lib/abroad → eurLabel), and always UNDER the lari
+            figure, never instead of it: the charge is in lari and the „≈" says
+            the euro number is a conversion, not a quote. Null for everyone
+            else, so this surface is unchanged for the ordinary flow. */}
+        {totalNote && (
+          <div className="mt-1 text-right text-small text-ink-500 tabular-nums">{totalNote}</div>
+        )}
       </div>
 
       <div className="mt-4 rounded-card bg-brand-50 border border-brand-100 p-3.5 grid grid-cols-[auto_1fr] gap-2.5 items-start">
@@ -93,13 +104,13 @@ export const OrderSummary = ({
         <div className="space-y-1">
           {PAYMENTS_LIVE ? (
             <>
-              <p className="font-display text-[12px] font-bold text-brand-800 leading-snug">დაცული გადახდა</p>
-              <p className="text-[11.5px] text-ink-600 leading-[1.5]">თანხა ექსპერტს მხოლოდ სესიის შემდეგ გადაერიცხება.</p>
+              <p className="font-display text-meta font-bold text-brand-800 leading-snug">დაცული გადახდა</p>
+              <p className="text-meta text-ink-600 leading-[1.5]">თანხა ექსპერტს მხოლოდ სესიის შემდეგ გადაერიცხება.</p>
             </>
           ) : (
             <>
-              <p className="font-display text-[12px] font-bold text-brand-800 leading-snug">დაჯავშნა უფასოა</p>
-              <p className="text-[11.5px] text-ink-600 leading-[1.5]">გადახდა მალე ჩაირთვება.</p>
+              <p className="font-display text-meta font-bold text-brand-800 leading-snug">დაჯავშნა უფასოა</p>
+              <p className="text-meta text-ink-600 leading-[1.5]">გადახდა მალე ჩაირთვება.</p>
             </>
           )}
         </div>

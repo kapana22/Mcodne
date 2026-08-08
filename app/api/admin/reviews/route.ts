@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { stripTutorBlobs, stripAvatar } from '@/lib/stripTutorBlobs'
+import { parseLimit, parseIntParam } from '@/lib/apiParams'
 
 // List reviews with filters — flagged (rating < 2 by default), search body/authors.
 export async function GET(req: Request) {
-  await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
   const { searchParams } = new URL(req.url)
-  const maxRating = Number(searchParams.get('maxRating') ?? '5')
+  const maxRating = parseIntParam(searchParams.get('maxRating'), { fallback: 5, min: 1, max: 5 })
   const q = searchParams.get('q')?.trim()
-  const limit = Math.min(Number(searchParams.get('limit') ?? 100), 300)
+  const limit = parseLimit(searchParams.get('limit'), { fallback: 100, max: 300 })
   const cursor = searchParams.get('cursor')?.trim() || undefined
 
   const where: any = {}
@@ -49,7 +51,9 @@ const DelBody = z.object({ reason: z.string().max(300).optional() })
 
 // Delete a review. Also decrement TutorProfile.reviewsCount and recompute rating.
 export async function DELETE(req: Request) {
-  const admin = await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  const admin = auth.user
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ ok: false, error: 'MISSING_ID' }, { status: 400 })

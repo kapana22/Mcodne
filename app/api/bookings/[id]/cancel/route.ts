@@ -1,11 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { notify } from '@/lib/notify'
+import { notify, normalizePrefs } from '@/lib/notify'
 import { audit } from '@/lib/audit'
 import { CANCEL_CUTOFF_HOURS } from '@/lib/flags'
-import { fmtKaDateTime } from '@/lib/kaDate'
+import { sendMail } from '@/lib/mailer'
+import { bookingChangedEmail, fmtWhenTz } from '@/lib/emailTemplates'
 
 // Cancel body is optional — legacy clients POST empty. When present we accept a
 // short reason chip label + optional freeform text (the "სხვა" case).
@@ -74,7 +75,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       // can move status. Using the pre-read snapshot would free a stale slot and
       // leave the newly-claimed one booked forever, or overwrite a terminal
       // status. Bail if it's no longer ours to cancel.
-      const fresh = await tx.booking.findUnique({ where: { id }, select: { status: true, heldSlotId: true } })
+      const fresh = await tx.booking.findUnique({ where: { id }, select: { status: true, heldSlotId: true, enrollmentId: true } })
       if (!fresh || fresh.status === 'COMPLETED' || fresh.status === 'CANCELED' || fresh.status === 'NO_SHOW') {
         throw new Error('BAD_STATE')
       }
@@ -98,6 +99,32 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       // Clear any pending reschedule proposal so an accept can't resurrect this
       // now-canceled booking (raw column — not in the Prisma model).
       await tx.$executeRawUnsafe(`UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`, id)
+
+      // ── Package credit: give it back ────────────────────────────────────
+      // `Enrollment.lessonsUsed` counts lessons BOOKED, so a cancelled lesson
+      // must return its credit — otherwise cancelling once quietly costs the
+      // client a lesson they paid for, and the count stops meaning anything.
+      // Inside the same transaction as the cancel, so the two can never
+      // disagree. Guarded at 0: a double-cancel is refused above by BAD_STATE,
+      // but a negative balance is the kind of thing worth making impossible.
+      if (fresh.enrollmentId) {
+        await tx.enrollment.updateMany({
+          where: { id: fresh.enrollmentId, lessonsUsed: { gt: 0 } },
+          data: { lessonsUsed: { decrement: 1 } },
+        })
+        // When the EXPERT is at fault the client also loses a day of their
+        // month through no doing of their own, so the window is extended —
+        // see lib/packages → extendedExpiry for why a whole day, not a lesson.
+        if (cancelledBy === 'TUTOR') {
+          const e = await tx.enrollment.findUnique({ where: { id: fresh.enrollmentId }, select: { expiresAt: true } })
+          if (e?.expiresAt) {
+            await tx.enrollment.update({
+              where: { id: fresh.enrollmentId },
+              data: { expiresAt: new Date(e.expiresAt.getTime() + 24 * 60 * 60 * 1000) },
+            })
+          }
+        }
+      }
     })
   } catch (e) {
     if (e instanceof Error && e.message === 'BAD_STATE') {
@@ -119,7 +146,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // Admin cancel → notify BOTH parties so neither is left in the dark.
   // Body always names WHICH session (topic + date/time) so the notified party
   // doesn't have to open the app to figure out what was canceled.
-  const sessionRef = `${booking.topic} · ${fmtKaDateTime(booking.startAt, { year: true })}`
+  const sessionRef = `${booking.topic} · ${fmtWhenTz(booking.startAt, { year: true })}`
   const cancelBody = reason ? `${sessionRef} — ${reason}` : sessionRef
   if (cancelledBy === 'ADMIN') {
     await notify(booking.studentId, {
@@ -145,6 +172,54 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         : `/student/bookings/${booking.id}`,
     })
   }
+
+  // Email the same recipients the in-app notify() above just got. This is THE
+  // gap that hurts: a cancellation removes the booking from the reminder sweep
+  // (it selects status='CONFIRMED'), so after this point the app will never
+  // speak about this session again — the other party's last signal stays the old
+  // confirmation email and they turn up to an empty room. Runs in after(), each
+  // send wrapped so a mail failure can never touch the cancellation itself.
+  after(async () => {
+    try {
+      const [student, tutorUser] = await Promise.all([
+        prisma.user.findUnique({ where: { id: booking.studentId }, select: { email: true, fullName: true, notificationPrefs: true } }),
+        prisma.user.findUnique({ where: { id: booking.tutor.userId }, select: { email: true, fullName: true, notificationPrefs: true } }),
+      ])
+      const whenText = fmtWhenTz(booking.startAt, { year: true })
+      const actorLabel =
+        cancelledBy === 'ADMIN' ? 'ადმინისტრატორმა'
+        : cancelledBy === 'STUDENT' ? 'სტუდენტმა'
+        : 'ექსპერტმა'
+      // Same pref gate as the in-app notify(): BOOKING_CANCELED lives in the
+      // BOOKING_CREATED group (lib/notify prefKeyForType).
+      const mailStudent = cancelledBy !== 'STUDENT'
+      const mailTutor = cancelledBy !== 'TUTOR'
+      if (mailStudent && student?.email && normalizePrefs(student.notificationPrefs).BOOKING_CREATED) {
+        const { subject, html } = bookingChangedEmail('canceled', {
+          counterpartName: tutorUser?.fullName || 'ექსპერტი',
+          topic: booking.topic,
+          whenText,
+          actorLabel,
+          reason,
+          note: 'სხვა დროს დაჯავშნა ნებისმიერ დროს შეგიძლია.',
+          href: `/student/bookings/${booking.id}`,
+        })
+        await sendMail({ to: student.email, subject, html })
+      }
+      if (mailTutor && tutorUser?.email && normalizePrefs(tutorUser.notificationPrefs).BOOKING_CREATED) {
+        const { subject, html } = bookingChangedEmail('canceled', {
+          counterpartName: student?.fullName || 'სტუდენტი',
+          topic: booking.topic,
+          whenText,
+          actorLabel,
+          reason,
+          note: 'ეს დრო შენს განრიგში ისევ თავისუფალია.',
+          href: `/tutor/bookings/${booking.id}`,
+        })
+        await sendMail({ to: tutorUser.email, subject, html })
+      }
+    } catch { /* email is best-effort */ }
+  })
 
   return NextResponse.json({ ok: true, fullRefund: refundClient })
 }

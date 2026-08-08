@@ -26,12 +26,12 @@ export default function StudentError({
             <path d="M12 10v5M12 18h0" />
           </svg>
         </div>
-        <div className="font-display text-[15.5px] font-bold text-ink-900 tracking-tight">რაღაც აირია</div>
-        <p className="text-[12.5px] text-ink-500 mt-1.5">გვერდი ვერ ჩაიტვირთა.</p>
+        <div className="font-display text-body-lg font-bold text-ink-900 tracking-tight">რაღაც აირია</div>
+        <p className="text-small text-ink-500 mt-1.5">გვერდი ვერ ჩაიტვირთა.</p>
         <button
           type="button"
           onClick={() => reset()}
-          className="mt-5 h-11 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] tracking-wide inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+          className="mt-5 h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
         >
           სცადე თავიდან
         </button>

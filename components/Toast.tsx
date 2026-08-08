@@ -42,16 +42,24 @@ const Icons: Record<ToastKind, ReactNode> = {
 export function Toast({
   kind,
   onDismiss,
+  leaving = false,
   children,
 }: {
   kind: ToastKind
   onDismiss: () => void
+  /** Exit phase — the host keeps the toast mounted for one slide-out. */
+  leaving?: boolean
   children: ReactNode
 }) {
   return (
     <div
       role="status"
-      className={`select-none min-w-[260px] max-w-[380px] bg-white border border-ink-200 border-l-4 ${ACCENT[kind]} rounded-card shadow-pop pl-4 pr-3 py-3 flex items-start gap-3 text-[13.5px] text-ink-900 motion-safe:animate-slide-in-b`}
+      /* SOLID, deliberately (reverted 2026-08-02). A toast lands over
+         whatever the page is showing and carries a one-line message the user
+         gets one chance to read — translucency made it ambiguous against busy
+         content. Glass stays for surfaces you look PAST, not surfaces you
+         must read. */
+      className={`select-none min-w-[260px] max-w-[380px] bg-white border border-ink-200 shadow-pop border-l-4 ${ACCENT[kind]} rounded-card pl-4 pr-3 py-3 flex items-start gap-3 text-body text-ink-900 ${leaving ? 'motion-safe:animate-slide-out-b' : 'motion-safe:animate-slide-in-b'}`}
     >
       <span className={`shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full ${ICON_BG[kind]}`}>
         {Icons[kind]}
@@ -61,7 +69,7 @@ export function Toast({
         type="button"
         onClick={onDismiss}
         aria-label="დახურვა"
-        className="shrink-0 w-9 h-9 -m-1 rounded-btn text-ink-400 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors"
+        className="shrink-0 w-9 h-9 -m-1 rounded-btn text-ink-400 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast"
       >
         <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
           <path d="m6 6 12 12M18 6 6 18" />

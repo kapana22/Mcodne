@@ -82,14 +82,14 @@ function MessageBubble({
       {!mine && (groupedWithPrev
         ? <span className="w-7 shrink-0" aria-hidden />
         : <Avatar src={senderAvatar ?? undefined} name={m.from.fullName} size={28} />)}
-      <div className={`max-w-[85%] sm:max-w-[75%] rounded-card px-3 py-2 text-[13.5px] ${mine ? 'bg-brand-500 text-white shadow-xs' : 'bg-white border border-ink-200 text-ink-800 shadow-xs'}`}>
+      <div className={`max-w-[85%] sm:max-w-[75%] rounded-card px-3 py-2 text-body ${mine ? 'bg-brand-600 text-white shadow-xs' : 'bg-white border border-ink-200 text-ink-800 shadow-xs'}`}>
         <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{sanitizeMsgBody(m.body)}</div>
         {safeFile && (
           <div className={`mt-2 pt-2 border-t ${mine ? 'border-white/25' : 'border-ink-200'}`}>
             {safeFile.startsWith('data:image/') ? (
               <a href={safeFile} target="_blank" rel="noopener noreferrer" className="block">
                 <img src={safeFile} alt={m.fileName ?? 'attachment'} className="max-h-[200px] rounded-md object-cover" />
-                {m.fileName && <div className={`mt-1 text-[11px] ${mine ? 'text-white/85' : 'text-ink-500'} font-mono truncate`}>{m.fileName}</div>}
+                {m.fileName && <div className={`mt-1 text-meta ${mine ? 'text-white' : 'text-ink-500'} font-mono truncate`}>{m.fileName}</div>}
               </a>
             ) : (
               <a
@@ -97,7 +97,7 @@ function MessageBubble({
                 target="_blank"
                 rel="noopener noreferrer"
                 download={m.fileName ?? undefined}
-                className={`inline-flex items-center gap-2 text-[12.5px] ${mine ? 'text-white hover:text-white' : 'text-brand-700 hover:text-brand-800'} font-display font-semibold underline underline-offset-2 decoration-dotted`}
+                className={`inline-flex items-center gap-2 text-small ${mine ? 'text-white hover:text-white' : 'text-brand-700 hover:text-brand-800'} font-display font-semibold underline underline-offset-2 decoration-dotted`}
               >
                 <Icon.paperclip className="w-3.5 h-3.5" />
                 {m.fileName ?? 'ფაილი'}
@@ -106,7 +106,7 @@ function MessageBubble({
           </div>
         )}
         {!groupedWithNext && (
-          <div className={`text-[10.5px] mt-1 font-mono tabular-nums ${mine ? 'text-white/70' : 'text-ink-400'}`}>{fmtTime(m.createdAt, tz)}</div>
+          <div className={`text-meta mt-1 font-mono tabular-nums ${mine ? 'text-white/70' : 'text-ink-400'}`}>{fmtTime(m.createdAt, tz)}</div>
         )}
       </div>
     </div>
@@ -183,9 +183,9 @@ export function BookingChat({
 
   const defaultHeader = (
     <div className="px-5 sm:px-6 py-4 border-b border-ink-100 flex items-center justify-between">
-      <div className="font-display text-[15px] font-bold tracking-tight text-ink-900">მიმოწერა სტუდენტთან</div>
+      <div className="font-display text-body-lg font-bold tracking-tight text-ink-900">მიმოწერა სტუდენტთან</div>
       {msgs.length > 0 && (
-        <div className="text-[11.5px] text-ink-400 tabular-nums">{msgs.length} შეტყობინება</div>
+        <div className="text-meta text-ink-400 tabular-nums">{msgs.length} შეტყობინება</div>
       )}
     </div>
   )
@@ -206,7 +206,7 @@ export function BookingChat({
         {!loaded && msgs.length === 0 ? (
           <div className="space-y-3 py-2" aria-busy="true">
             {[62, 44, 74].map((w, i) => (
-              <div key={i} className={`h-9 rounded-card bg-ink-100/80 animate-pulse ${i % 2 ? 'ml-auto' : ''}`} style={{ width: `${w}%` }} />
+              <div key={i} className={`h-9 rounded-card bg-ink-100/80 motion-safe:animate-pulse ${i % 2 ? 'ml-auto' : ''}`} style={{ width: `${w}%` }} />
             ))}
           </div>
         ) : msgs.length === 0 ? (
@@ -214,8 +214,8 @@ export function BookingChat({
             <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-50 text-brand-700 mb-3">
               <Icon.chat className="w-5 h-5" />
             </span>
-            <div className="font-display text-[13.5px] font-semibold text-ink-800">{emptyState?.title ?? 'მიმოწერა ჯერ არ არის'}</div>
-            <p className="text-[12.5px] text-ink-500 mt-1 max-w-[340px] mx-auto">
+            <div className="font-display text-body font-semibold text-ink-800">{emptyState?.title ?? 'მიმოწერა ჯერ არ არის'}</div>
+            <p className="text-small text-ink-500 mt-1 max-w-[340px] mx-auto">
               {emptyState?.body ?? 'მიესალმე ან დააზუსტე დეტალები.'}
             </p>
           </div>
@@ -253,7 +253,7 @@ export function BookingChat({
       </div>
 
       {error && (
-        <div className="px-4 py-2 bg-danger-50 border-t border-danger-200 text-danger-700 text-[12.5px]" role="alert">
+        <div className="px-4 py-2 bg-danger-50 border-t border-danger-200 text-danger-700 text-small" role="alert">
           {error}
         </div>
       )}
@@ -262,6 +262,11 @@ export function BookingChat({
         <input
           ref={fileInputRef}
           type="file"
+          // sr-only does NOT mean „invisible to assistive tech" — the input is
+          // still reachable and was announced as an unnamed file field. The
+          // visible trigger is a separate button, so the name has to be stated
+          // here explicitly.
+          aria-label="ფაილის მიმაგრება"
           accept="application/pdf,image/jpeg,image/png,image/webp"
           onChange={e => {
             const f = e.target.files?.[0]
@@ -271,11 +276,13 @@ export function BookingChat({
           className="sr-only"
         />
         {attachment && (
-          <div className="flex items-center gap-2 rounded-btn border border-ink-200 bg-ink-50/40 px-3 py-2 text-[12.5px]">
+          <div className="flex items-center gap-2 rounded-btn border border-ink-200 bg-ink-50/40 px-3 py-2 text-small">
             <Icon.paperclip className="w-3.5 h-3.5 text-ink-500 shrink-0" />
             <span className="flex-1 truncate font-display font-semibold text-ink-800">{attachment.name}</span>
-            <span className="font-mono text-[10.5px] text-ink-500 tabular-nums shrink-0">{(attachment.size / 1024).toFixed(0)} KB</span>
-            <button type="button" onClick={() => setAttachment(null)} aria-label="ფაილის მოხსნა" className="w-8 h-8 shrink-0 rounded-btn hover:bg-ink-100 text-ink-500 hover:text-danger-600 inline-flex items-center justify-center">
+            <span className="font-mono text-meta text-ink-500 tabular-nums shrink-0">{(attachment.size / 1024).toFixed(0)} KB</span>
+            {/* `.tap-area` keeps the 32px box (it sits in a one-line file row
+                next to the name and size) while giving the finger ≥40px. */}
+            <button type="button" onClick={() => setAttachment(null)} aria-label="ფაილის მოხსნა" className="tap-area w-8 h-8 shrink-0 rounded-btn hover:bg-ink-100 text-ink-500 hover:text-danger-600 inline-flex items-center justify-center">
               <Icon.x className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -284,19 +291,20 @@ export function BookingChat({
             button live INSIDE the input pill so nothing overflows the row and
             the whole bar reads as a single control (focus ring on the wrapper,
             not per-field). */}
-        <div className="flex items-end gap-1 rounded-2xl border border-ink-200 bg-white pl-1.5 pr-1.5 py-1.5 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/25 transition-colors">
+        <div className="flex items-end gap-1 rounded-2xl border border-ink-200 bg-white pl-1.5 pr-1.5 py-1.5 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/25 transition-colors duration-fast">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
+            aria-busy={uploading}
             aria-label="ფაილის მიბმა"
             // Two numbers because they genuinely differ: a photo is downscaled
             // server-side, a PDF is stored byte-for-byte and hits the API's
             // stored-URL ceiling far sooner (see MAX_STORED_URL_CHARS).
             title="ფაილის მიბმა (PDF/JPG/PNG · სურათი მაქს. 8 MB, PDF მაქს. 2 MB)"
-            className="h-10 w-10 rounded-full text-ink-500 hover:text-ink-900 hover:bg-ink-100 disabled:opacity-50 inline-flex items-center justify-center transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+            className="h-10 w-10 rounded-full text-ink-500 hover:text-ink-900 hover:bg-ink-100 disabled:opacity-50 inline-flex items-center justify-center transition-colors duration-fast shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           >
-            {uploading ? <span className="inline-block w-4 h-4 border-2 border-ink-500 border-t-transparent rounded-full animate-spin" /> : <Icon.paperclip className="w-4 h-4" />}
+            {uploading ? <span aria-hidden className="inline-block w-4 h-4 border-2 border-ink-500 border-t-transparent rounded-full motion-safe:animate-spin" /> : <Icon.paperclip className="w-4 h-4" />}
           </button>
           {/* Instant „let's meet now“ call — booking threads only, and ONLY the
               expert can start it (the student joins, never initiates). */}
@@ -305,11 +313,12 @@ export function BookingChat({
               type="button"
               onClick={requestCall}
               disabled={calling || !me}
+              aria-busy={calling}
               aria-label="ვიდეოზარის დაწყება"
               title="დაიწყე ვიდეოზარი — სტუდენტი შემოუერთდება"
-              className="h-10 w-10 rounded-full text-brand-600 hover:text-brand-700 hover:bg-brand-50 disabled:opacity-50 inline-flex items-center justify-center transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+              className="h-10 w-10 rounded-full text-brand-600 hover:text-brand-700 hover:bg-brand-50 disabled:opacity-50 inline-flex items-center justify-center transition-colors duration-fast shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
             >
-              {calling ? <span className="inline-block w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /> : <Icon.video className="w-4 h-4" />}
+              {calling ? <span aria-hidden className="inline-block w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full motion-safe:animate-spin" /> : <Icon.video className="w-4 h-4" />}
             </button>
           )}
           <textarea
@@ -326,7 +335,7 @@ export function BookingChat({
             placeholder="შეტყობინება…"
             rows={1}
             maxLength={MSG_MAX_LEN}
-            className="flex-1 min-w-0 min-h-[36px] max-h-[132px] resize-none bg-transparent border-0 px-2 py-1.5 text-[13.5px] leading-relaxed text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-0"
+            className="flex-1 min-w-0 min-h-[36px] max-h-[132px] resize-none bg-transparent border-0 px-2 py-1.5 text-body leading-relaxed text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-0"
           />
           {/* Icon-only send — matches the ghost actions' footprint, never
               overflows, and Enter also sends. Disabled until /api/me resolves
@@ -334,15 +343,16 @@ export function BookingChat({
           <button
             type="submit"
             disabled={!me || sending || uploading || (!draft.trim() && !attachment)}
+            aria-busy={sending}
             aria-label="გაგზავნა"
             title="გაგზავნა"
-            className="h-10 w-10 shrink-0 rounded-full bg-brand-500 hover:bg-brand-600 disabled:bg-ink-200 disabled:text-ink-400 text-white inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1"
+            className="h-10 w-10 shrink-0 rounded-full bg-brand-600 hover:bg-brand-700 disabled:bg-ink-100 disabled:text-ink-500 text-white inline-flex items-center justify-center transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1"
           >
-            {sending ? <span className="inline-block w-4 h-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin" /> : <Icon.send className="w-4 h-4" />}
+            {sending ? <span aria-hidden className="inline-block w-4 h-4 border-2 border-white/70 border-t-transparent rounded-full motion-safe:animate-spin" /> : <Icon.send className="w-4 h-4" />}
           </button>
         </div>
         {draft.length > MSG_MAX_LEN - 200 && (
-          <div className={`text-right font-mono text-[10.5px] tabular-nums ${draft.length >= MSG_MAX_LEN ? 'text-danger-600' : 'text-ink-400'}`}>
+          <div className={`text-right font-mono text-meta tabular-nums ${draft.length >= MSG_MAX_LEN ? 'text-danger-600' : 'text-ink-400'}`}>
             {draft.length} / {MSG_MAX_LEN}
           </div>
         )}

@@ -3,8 +3,8 @@
 // (or right-side rail) on desktop. Every consumer gets, for free, the a11y
 // and mobile behaviors the hand-rolled modals kept missing: focus trap +
 // restore, Escape, body scroll-lock, max-height with internal scroll,
-// safe-area-padded footer, and the standard ink-950/55 scrim at z-[80]
-// (ConfirmModal stays above at z-[90], toasts above both at z-[95]).
+// safe-area-padded footer, and the standard ink-950/55 scrim at z-sheet
+// (ConfirmModal stays above at z-confirm, toasts above both at z-toast).
 //
 // Usage:
 //   <Sheet open={open} onClose={close} title="გადადება" size="md"
@@ -15,7 +15,7 @@
 // `variant="side"` renders a full-height right rail on desktop (filters,
 // quick-book) while staying a bottom sheet on mobile.
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode, useState } from 'react'
 import { Eyebrow } from '@/components/Eyebrow'
 
 type Props = {
@@ -32,6 +32,8 @@ type Props = {
   closeOnBackdrop?: boolean
   role?: 'dialog' | 'alertdialog'
   ariaLabel?: string
+  /** Change this (e.g. the current step) to return the body scroll to the top. */
+  scrollResetKey?: string | number
 }
 
 // ── Shared page-scroll lock ────────────────────────────────────────────────
@@ -106,9 +108,20 @@ export function Sheet({
   closeOnBackdrop = true,
   role = 'dialog',
   ariaLabel,
+  scrollResetKey,
 }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
+  // Multi-step sheets reuse ONE scroll container for every step. Measured on the
+  // booking flow: scroll down on „choose a service", press „შემდეგი", and the
+  // calendar opened already 120px down — the top of the new step, including its
+  // heading, was simply not on screen. The step owns its own top; the sheet has
+  // to hand it back. Consumers pass their step/tab value here.
+  const bodyRef = useRef<HTMLDivElement>(null)
   const restoreRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (scrollResetKey === undefined) return
+    bodyRef.current?.scrollTo({ top: 0 })
+  }, [scrollResetKey])
   // Consumers pass inline arrow functions for `onClose`, so its identity changes
   // on EVERY parent render (a keystroke in an open sheet is enough). Depending
   // on it re-ran the whole effect — tearing down the lock and yanking focus back
@@ -162,13 +175,53 @@ export function Sheet({
     }
   }, [open])
 
-  if (!open) return null
+  // ── EXIT PHASE (2026-08-01) ──────────────────────────────────────────────
+  // `open` used to gate the render directly, so closing a sheet DELETED it
+  // mid-frame — the one surface with a deliberate entrance vanished with no
+  // exit. Now open→false keeps the sheet mounted for one exit animation
+  // (220ms, the slide/scale mirrors) and THEN unmounts. `leaving` drives the
+  // exit classes; reduced-motion users skip the wait entirely — for them the
+  // exit classes are motion-safe: and the timer is cut to 0.
+  const [mounted, setMounted] = useState(open)
+  const [leaving, setLeaving] = useState(false)
+  useEffect(() => {
+    if (open) { setMounted(true); setLeaving(false); return }
+    if (!mounted) return
+    setLeaving(true)
+    const quick = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const t = setTimeout(() => { setMounted(false); setLeaving(false) }, quick ? 0 : 220)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  if (!mounted) return null
 
   const side = variant === 'side'
 
+  // NB the panel is capped in `dvh`, not `vh` (2026-08-04). `vh` resolves
+  // against the LARGE viewport, which on a phone is the height the page has
+  // with the browser chrome collapsed and the keyboard down — neither of which
+  // is true while someone is filling a sheet. Measured on the booking flow: the
+  // footer (which carries the primary CTA) sat under Safari's bottom bar with
+  // the URL bar up, and under the keyboard as soon as a field took focus.
+  // `dvh` tracks the actually-visible height, so the footer stays reachable.
+  // The messages layouts already used `dvh`; this was the last `vh` holdout.
+  //
+  // CAVEAT, so nobody over-trusts this: `dvh` answers the BROWSER CHROME, not
+  // the keyboard. On iOS Safari the keyboard does not resize the layout
+  // viewport at all (only `window.visualViewport` reflects it), so a sheet that
+  // fills the height can still have its footer behind the keyboard there. The
+  // durable defence is a footer that stays cheap: consumers collapse their
+  // optional footer/header rows under `@media (max-height: 600px)` — see
+  // BookingFlow — so what remains fits whatever height is left.
+  //
+  // `side` sheets sit at 92dvh rather than 85: they carry multi-step flows, and
+  // the 15% of unused scrim was costing more than the peek of the page behind
+  // it was worth. The peek survives at 8%.
+
   return (
     <div
-      className={`fixed inset-0 z-[80] flex ${
+      className={`fixed inset-0 z-sheet flex ${
         side
           ? 'items-end sm:items-stretch sm:justify-end'
           : 'items-end sm:items-center sm:justify-center sm:p-4'
@@ -179,7 +232,7 @@ export function Sheet({
         aria-label="დახურვა"
         tabIndex={-1}
         onClick={() => { if (closeOnBackdrop && !busy) onClose() }}
-        className="absolute inset-0 bg-ink-950/55 backdrop-blur-sm motion-safe:animate-fade-in-fast"
+        className={`absolute inset-0 bg-ink-950/55 backdrop-blur-sm ${leaving ? 'motion-safe:animate-fade-out-fast' : 'motion-safe:animate-fade-in-fast'}`}
       />
       <div
         ref={panelRef}
@@ -189,12 +242,12 @@ export function Sheet({
         tabIndex={-1}
         className={`relative w-full bg-white shadow-float flex flex-col outline-none ${
           side
-            ? `rounded-t-card sm:rounded-none max-h-[85vh] sm:max-h-none sm:h-full ${MAX_W[size]} motion-safe:animate-slide-in-b sm:motion-safe:animate-slide-in-r`
-            : `rounded-t-card sm:rounded-card max-h-[85vh] sm:max-h-[calc(100vh-32px)] ${MAX_W[size]} motion-safe:animate-slide-in-b sm:motion-safe:animate-scale-in`
+            ? `rounded-t-card sm:rounded-none max-h-[92dvh] sm:max-h-none sm:h-full ${MAX_W[size]} ${leaving ? 'motion-safe:animate-slide-out-b sm:motion-safe:animate-slide-out-r' : 'motion-safe:animate-slide-in-b sm:motion-safe:animate-slide-in-r'}`
+            : `rounded-t-card sm:rounded-card max-h-[85dvh] sm:max-h-[calc(100vh-32px)] ${MAX_W[size]} ${leaving ? 'motion-safe:animate-slide-out-b sm:motion-safe:animate-scale-out' : 'motion-safe:animate-slide-in-b sm:motion-safe:animate-scale-in'}`
         }`}
       >
         {(title || eyebrow) && (
-          <div className="px-5 sm:px-6 pt-5 pb-3 border-b border-ink-100 shrink-0 flex items-start justify-between gap-4">
+          <div className="px-5 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-ink-100 shrink-0 flex items-start justify-between gap-3 sm:gap-4">
             <div className="min-w-0">
               {eyebrow && (
                 <Eyebrow className="mb-1">
@@ -202,7 +255,7 @@ export function Sheet({
                 </Eyebrow>
               )}
               {title && (
-                <div className="font-display text-[16px] font-bold text-ink-900 tracking-tight">
+                <div className="font-display text-body-lg font-bold text-ink-900 tracking-tight">
                   {title}
                 </div>
               )}
@@ -211,13 +264,13 @@ export function Sheet({
               type="button"
               onClick={() => { if (!busy) onClose() }}
               aria-label="დახურვა"
-              className="w-9 h-9 -mr-1.5 -mt-1 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center shrink-0 transition-colors"
+              className="w-10 h-10 -mr-1.5 -mt-1 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center shrink-0 transition-colors duration-fast"
             >
               <svg aria-hidden viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-5 sm:px-6 py-4">
+        <div ref={bodyRef} className="flex-1 overflow-y-auto overscroll-contain px-5 sm:px-6 py-4">
           {children}
         </div>
         {footer && (

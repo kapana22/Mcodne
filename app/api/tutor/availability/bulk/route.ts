@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
+import { materializeWeekly } from '@/lib/availabilityRules'
 
 // Recurring weekly-template availability. Tutor picks weekday+time blocks once,
 // we materialize each block as ONE concrete AvailabilitySlot WINDOW per week for
@@ -34,13 +35,10 @@ const Body = z.object({
   weeks: z.number().int().min(1).max(12),
 })
 
-// Asia/Tbilisi is a fixed UTC+4 with no DST — the platform's canonical zone.
-// Slot times must be materialized in Tbilisi wall-clock, NOT the server's local
-// tz (a UTC container would otherwise shift every "10:00" slot to 14:00 Tbilisi).
-const TB_OFFSET_MS = 4 * 60 * 60 * 1000
-
 export async function POST(req: Request) {
-  const user = await requireRole(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  if (auth.response) return auth.response
+  const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
   if (!profile) return NextResponse.json({ ok: false, error: 'NO_PROFILE' }, { status: 400 })
 
@@ -59,38 +57,12 @@ export async function POST(req: Request) {
 
   const now = new Date()
 
-  // "Now" in Tbilisi wall-clock, read via UTC getters (shift the instant by the
-  // fixed +4 offset, then interpret UTC fields as local fields).
-  const nowTb = new Date(now.getTime() + TB_OFFSET_MS)
-  // Midnight of the Tbilisi-Monday of the current week, held as UTC components.
-  const mondayTb = new Date(Date.UTC(nowTb.getUTCFullYear(), nowTb.getUTCMonth(), nowTb.getUTCDate()))
-  const dow = (mondayTb.getUTCDay() + 6) % 7 // Mon=0
-  mondayTb.setUTCDate(mondayTb.getUTCDate() - dow)
-
-  // Given a day-offset from Monday and a Tbilisi wall-clock h:m, return the real
-  // UTC instant (subtract the +4 offset). endHour=24 rolls to next-day 00:00.
-  const slotUtc = (dayOffset: number, h: number, m: number): Date => {
-    const d = new Date(mondayTb)
-    d.setUTCDate(d.getUTCDate() + dayOffset)
-    const wall = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), h, m)
-    return new Date(wall - TB_OFFSET_MS)
-  }
-
   // Materialize every (block, week) pair into ONE window (start/end) — never
-  // into session-length pieces.
+  // into session-length pieces. The Tbilisi arithmetic lives in
+  // lib/availabilityRules because approval opens a new expert's calendar from
+  // the very same pattern and must not re-derive it.
   type Candidate = { startAt: Date; endAt: Date }
-  const candidates: Candidate[] = []
-  for (let w = 0; w < parsed.data.weeks; w++) {
-    for (const b of parsed.data.blocks) {
-      const dayOffset = w * 7 + b.day
-      const startAt = slotUtc(dayOffset, b.startHour, b.startMin)
-      const endAt = slotUtc(dayOffset, b.endHour, b.endMin)
-      // Skip past slots — a "Monday 10:00" template applied on Wednesday
-      // shouldn't create Monday-morning rows in week 0.
-      if (endAt <= now) continue
-      candidates.push({ startAt, endAt })
-    }
-  }
+  const candidates: Candidate[] = materializeWeekly(parsed.data.blocks, parsed.data.weeks, now)
 
   if (candidates.length === 0) {
     return NextResponse.json({ ok: true, created: 0, skipped: 0 })
@@ -154,7 +126,9 @@ export async function POST(req: Request) {
  * Idempotent: a second call deletes 0 rows and still answers 200 { ok: true }.
  */
 export async function DELETE(req: Request) {
-  const user = await requireRole(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  if (auth.response) return auth.response
+  const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
   if (!profile) return NextResponse.json({ ok: false, error: 'NO_PROFILE' }, { status: 400 })
 

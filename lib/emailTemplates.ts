@@ -3,6 +3,7 @@
 // CSS. Brand green #2F9C86 (the logo teal), neutral ink, no external assets.
 
 import { SUPPORT_EMAIL } from './supportEmails'
+import { fmtKaDateTime, type KaDateOpts } from './kaDate'
 
 const BASE = 'https://mcodne.ge'
 const BRAND = '#2F9C86'
@@ -16,8 +17,17 @@ function esc(s: string): string {
 }
 
 // Shared shell: header wordmark, white card, optional CTA button, muted footer.
-function shell(opts: { heading: string; bodyHtml: string; cta?: { label: string; href: string } }): string {
+function shell(opts: {
+  heading: string
+  bodyHtml: string
+  cta?: { label: string; href: string }
+  /** Footer kicker. Defaults to „ავტომატური შეტყობინება", which is true of every
+   *  template here EXCEPT the hand-written admin message — telling someone to
+   *  reply and then labelling the mail automated is a small lie. */
+  footerNote?: string
+}): string {
   const { heading, bodyHtml, cta } = opts
+  const footerNote = opts.footerNote ?? 'ავტომატური შეტყობინება'
   const button = cta
     ? `<tr><td style="padding:8px 0 4px;">
          <a href="${esc(cta.href)}" style="display:inline-block;background:${BRAND};color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 24px;border-radius:10px;">${esc(cta.label)}</a>
@@ -40,7 +50,7 @@ function shell(opts: { heading: string; bodyHtml: string; cta?: { label: string;
         </td></tr>
         <tr><td style="padding:16px 4px;font-size:12px;line-height:1.6;color:${MUTED};">
           mcodne — კონსულტაციები ექსპერტებთან.<br>
-          ავტომატური შეტყობინება · <a href="mailto:${SUPPORT_EMAIL}" style="color:${MUTED};">${SUPPORT_EMAIL}</a>
+          ${esc(footerNote)} · <a href="mailto:${SUPPORT_EMAIL}" style="color:${MUTED};">${SUPPORT_EMAIL}</a>
         </td></tr>
       </table>
     </td></tr>
@@ -50,6 +60,19 @@ function shell(opts: { heading: string; bodyHtml: string; cta?: { label: string;
 
 function p(text: string): string {
   return `<p style="margin:0 0 12px;">${text}</p>`
+}
+
+// ── The one way to print a session time OUTSIDE the app ──────────────────────
+// The server runs TZ=Asia/Tbilisi, so `fmtKaDateTime` already yields Tbilisi
+// wall-clock — but a bare „28 ივლ · 11:00" is read in an inbox, next to an app
+// that renders the SAME instant in the reader's own browser zone. For anyone
+// outside Georgia those two disagree by hours with nothing on screen saying so,
+// which is a silent missed-session bug rather than a cosmetic one. So every
+// time string that leaves the server — email bodies AND the notify() bodies the
+// booking routes write — goes through this, never through fmtKaDateTime alone.
+export const TZ_LABEL = 'თბილისის დროით'
+export function fmtWhenTz(d: Date, opts?: KaDateOpts): string {
+  return `${fmtKaDateTime(d, opts)} (${TZ_LABEL})`
 }
 
 // A labelled detail row (used in booking/reminder emails).
@@ -63,15 +86,70 @@ function detail(rows: { label: string; value: string }[]): string {
 }
 
 export function welcomeEmail(name: string) {
-  const first = (name || '').trim().split(/\s+/)[0] || 'მეგობარო'
+  const first = (name || '').trim().split(/\s+/)[0] || ''
   return {
     subject: 'კეთილი იყოს მობრძანება 👋',
     html: shell({
-      heading: `${esc(first)}, კეთილი იყოს შენი მობრძანება!`,
+      heading: first ? `${esc(first)}, კეთილი იყოს შენი მობრძანება!` : 'კეთილი იყოს შენი მობრძანება!',
       bodyHtml:
-        p('დარეგისტრირდი <b>mcodne</b>-ზე — აქ შენს საკითხზე პირდაპირ ექსპერტს ელაპარაკები.') +
+        p('დარეგისტრირდი <b>მცოდნეზე</b> — აქ შენს საკითხზე პირდაპირ ექსპერტს ესაუბრები.') +
         p('აირჩიე ექსპერტი, დაჯავშნე დრო და ისაუბრე ვიდეოზე.'),
       cta: { label: 'იპოვე ექსპერტი', href: `${BASE}/tutors` },
+    }),
+  }
+}
+
+// Sent when Google sign-in links to an account whose email had NEVER been
+// verified, which costs that account its stored password — see lib/googleLink.ts
+// for why that is the only safe reading of two credentials claiming one address.
+//
+// This mail is not a courtesy. The user is losing a credential they may have
+// been using, so silence would read as „my password randomly stopped working";
+// and in the case the revocation exists for — someone else had registered this
+// address — this is the ONLY signal the real owner ever gets that it happened.
+// The CTA therefore goes to password recovery, not to the home page.
+export function googleLinkedEmail(name: string) {
+  const first = (name || '').trim().split(/\s+/)[0] || ''
+  return {
+    subject: 'უსაფრთხოება — ანგარიშში Google-ით შეხვედი',
+    html: shell({
+      heading: first ? `${esc(first)}, ანგარიშში Google-ით შეხვედი` : 'ანგარიშში Google-ით შეხვედი',
+      bodyHtml:
+        p('შენი ელფოსტა აქამდე დადასტურებული არ იყო, ამიტომ უსაფრთხოებისთვის <b>ძველი პაროლი გავაუქმეთ</b> და ყველა გახსნილი სესია დავხურეთ.') +
+        p('ამიერიდან ანგარიშში Google-ით შედი. თუ პაროლითაც გინდა შესვლა, დააყენე ახალი — ეს ერთი წუთის საქმეა.') +
+        p(`თუ ეს შენ არ ყოფილხარ, მაშინვე მოგვწერე: <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>`),
+      cta: { label: 'ახალი პაროლის დაყენება', href: `${BASE}/signin?view=reset` },
+    }),
+  }
+}
+
+// Sent to every ADMIN the moment an application arrives. Until 2026-08-03 a
+// submission only rang the in-app bell, which nobody sees unless they are
+// already inside /admin — so an applicant could wait days for a decision that
+// was simply never noticed. The body carries enough to triage from the inbox
+// (who, what field, how long they have worked, what they charge) and the CTA
+// lands directly on the moderation queue.
+export function newApplicationAdminEmail(o: {
+  name: string; specialty: string; city?: string | null
+  yearsExp?: number | null; rate?: number | null; email?: string | null; phone?: string | null
+}) {
+  const rows: { label: string; value: string }[] = [
+    { label: 'სფერო', value: o.specialty || '—' },
+    { label: 'გამოცდილება', value: o.yearsExp != null ? `${o.yearsExp} წელი` : '—' },
+    { label: 'ფასი', value: o.rate != null ? `₾${o.rate}` : '—' },
+    { label: 'ქალაქი', value: o.city || '—' },
+    { label: 'ელფოსტა', value: o.email || '—' },
+    { label: 'ტელეფონი', value: o.phone || '—' },
+  ]
+  return {
+    // The applicant's name rides in the subject, so strip CR/LF — a header
+    // injection here would be user-controlled.
+    subject: `ახალი განაცხადი — ${String(o.name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 60)}`,
+    html: shell({
+      heading: 'ახალი განაცხადი მოდერაციაში',
+      bodyHtml: p(`<b>${esc(o.name)}</b> გამოგზავნა განაცხადი ექსპერტად.`) + detail(rows),
+      cta: { label: 'გახსენი მოდერაცია', href: `${BASE}/admin#moderation` },
+      footerNote: 'ადმინის შეტყობინება',
     }),
   }
 }
@@ -82,11 +160,11 @@ export function welcomeEmail(name: string) {
 // is a static string, so no CR/LF stripping is needed; the moderator's optional
 // note is body-only and escaped like every other interpolated value.
 export function applicationApprovedEmail(o: { name: string; note?: string }) {
-  const first = (o.name || '').trim().split(/\s+/)[0] || 'მეგობარო'
+  const first = (o.name || '').trim().split(/\s+/)[0] || ''
   return {
     subject: 'განაცხადი დამტკიცდა — გახსენი შენი თავისუფალი დრო',
     html: shell({
-      heading: `${esc(first)}, დამტკიცდი — ახლა ხარ ექსპერტი`,
+      heading: first ? `${esc(first)}, დამტკიცდი — ახლა ხარ ექსპერტი` : 'დამტკიცდი — ახლა ხარ ექსპერტი',
       bodyHtml:
         p('პროფილი ცოცხალია და ძებნაში ჩანს.') +
         p('ერთი ნაბიჯიღა დარჩა: <b>გახსენი შენი თავისუფალი დრო</b>. სანამ განრიგში დროს არ გამოაქვეყნებ, დაჯავშნა არავის შეუძლია.') +
@@ -108,7 +186,7 @@ export function bookingConfirmedEmail(o: { studentName: string; expertName: stri
           { label: 'თემა', value: o.topic },
           { label: 'დრო', value: o.whenText },
         ]) +
-        p('დანიშნულ დროზე ერთ კლიკში შეხვალ ვიდეო-ოთახში.'),
+        p('დანიშნულ დროზე ერთი დაწკაპუნებით შეხვალ ვიდეოოთახში.'),
       cta: { label: 'ჯავშნის ნახვა', href: `${BASE}/student/bookings/${o.bookingId}` },
     }),
   }
@@ -117,24 +195,45 @@ export function bookingConfirmedEmail(o: { studentName: string; expertName: stri
 // Sent to the EXPERT the moment a client files a new booking request. The
 // expert must accept/decline within 24h or the cleanup cron auto-cancels it —
 // so this email is time-sensitive, not just a courtesy ping.
-export function bookingRequestEmail(o: { studentName: string; topic: string; whenText: string }) {
+export function bookingRequestEmail(o: {
+  studentName: string
+  topic: string
+  whenText: string
+  /** Request-based booking: the client NAMED this time; it is not in the
+   *  expert's published schedule. Without saying so, the expert reads an
+   *  unfamiliar time as a calendar bug. */
+  proposedByStudent?: boolean
+  /** Their 2nd/3rd choice, already formatted. Listing them here is the whole
+   *  point of collecting more than one: the expert decides in the email
+   *  instead of opening a thread to negotiate. */
+  alternateWhenTexts?: string[]
+}) {
+  const alts = o.alternateWhenTexts?.filter(Boolean) ?? []
   return {
     subject: 'ახალი მოთხოვნა 🔔',
     html: shell({
       heading: 'ახალი ჯავშნის მოთხოვნა',
       bodyHtml:
-        p(`${esc(o.studentName)}-მა მოგთხოვა კონსულტაცია. უპასუხე 24 სთ-ში, თორემ ავტომატურად გაუქმდება.`) +
+        p(`${esc(o.studentName)}-მა მოგთხოვა კონსულტაცია. უპასუხე 24 საათში — წინააღმდეგ შემთხვევაში ჯავშანი ავტომატურად გაუქმდება.`) +
+        (o.proposedByStudent
+          ? p('დროები კლიენტმა შემოგვთავაზა — ისინი შენს გამოქვეყნებულ განრიგში არაა.')
+          : '') +
         detail([
           { label: 'სტუდენტი', value: o.studentName },
           { label: 'თემა', value: o.topic },
-          { label: 'დრო', value: o.whenText },
+          { label: alts.length ? 'სასურველი დრო' : 'დრო', value: o.whenText },
+          ...alts.map((w, i) => ({ label: `ალტერნატივა ${i + 1}`, value: w })),
         ]),
       cta: { label: 'ჯავშნის ნახვა', href: `${BASE}/tutor/bookings` },
     }),
   }
 }
 
-export function sessionReminderEmail(o: { name: string; counterpartName: string; topic: string; whenText: string; href: string }) {
+// The ~1h reminder — the ACTIONABLE one (still time to prepare, reschedule or
+// warn the other side). The detail table now names the counterpart and the
+// length: „who am I meeting and how long does this take" is exactly what someone
+// re-reads a reminder for, and it was the one thing the table didn't say.
+export function sessionReminderEmail(o: { name: string; counterpartName: string; topic: string; whenText: string; durationText?: string; href: string }) {
   return {
     subject: 'სესია მალე იწყება ⏰',
     html: shell({
@@ -142,10 +241,332 @@ export function sessionReminderEmail(o: { name: string; counterpartName: string;
       bodyHtml:
         p(`მალე გაქვს კონსულტაცია ${esc(o.counterpartName)}-თან.`) +
         detail([
+          { label: 'ვისთან', value: o.counterpartName },
+          { label: 'თემა', value: o.topic },
+          { label: 'დრო', value: o.whenText },
+          ...(o.durationText ? [{ label: 'ხანგრძლივობა', value: o.durationText }] : []),
+        ]),
+      cta: { label: 'სესიის გახსნა', href: `${BASE}${o.href}` },
+    }),
+  }
+}
+
+// Sent to the CLIENT a few hours after a completed session that has no review
+// yet (see lib/postSession). One message carries both jobs: the review CTA is
+// the button, and — only when the client has nothing else booked with that
+// expert — a single soft line invites them back. No urgency, no claims about
+// what the rating will do for anyone; the subject is a static string, so no
+// CR/LF stripping is needed.
+export function reviewNudgeEmail(o: {
+  name: string
+  expertName: string
+  topic: string
+  whenText: string
+  href: string
+  rebookHref?: string
+}) {
+  const first = (o.name || '').trim().split(/\s+/)[0]
+  return {
+    subject: 'როგორ ჩაიარა სესიამ?',
+    html: shell({
+      heading: first ? `${esc(first)}, როგორ ჩაიარა?` : 'როგორ ჩაიარა სესიამ?',
+      bodyHtml:
+        p(`${esc(o.expertName)}-თან სესია დასრულდა. თუ ორი წუთი გაქვს, დატოვე შეფასება — სხვებს არჩევანში დაეხმარება.`) +
+        detail([
+          { label: 'ექსპერტი', value: o.expertName },
+          { label: 'თემა', value: o.topic },
+          { label: 'დრო', value: o.whenText },
+        ]) +
+        (o.rebookHref
+          ? p(`<span style="color:${MUTED};">თუ სასარგებლო იყო — <a href="${esc(BASE + o.rebookHref)}" style="color:${BRAND};">ხელახლა დაჯავშნე ${esc(o.expertName)}-თან</a>.</span>`)
+          : ''),
+      cta: { label: 'შეფასების დატოვება', href: `${BASE}${o.href}` },
+    }),
+  }
+}
+
+// Sent to the EXPERT while a booking request is STILL ALIVE and unanswered (see
+// lib/expertEscalation). The creation ping („ახალი მოთხოვნა") used to be the only
+// one — a single missed email meant the client got no reply and the request was
+// auto-cancelled in silence. This is the escalation: it names how long is left
+// and says plainly that it disappears on its own.
+//
+// `leftText` is computed from the real remaining time, never a stage constant —
+// the deadline is min(created + 24h, startAt), so a short-notice request has far
+// less than the nominal window. Both SUBJECTs are static per-urgency strings —
+// nothing interpolated — so there is no CR/LF injection surface to strip; every
+// caller-supplied value is escaped (directly or via detail()).
+export function expertRequestEscalationEmail(o: {
+  expertName: string
+  studentName: string
+  topic: string
+  whenText: string
+  /** „დაახლოებით 12 საათი" — how long until it auto-cancels. */
+  leftText: string
+  /** The last stage: the wording stops nudging and starts warning. */
+  final?: boolean
+  href: string
+}) {
+  const first = (o.expertName || '').trim().split(/\s+/)[0]
+  const lead = o.final
+    ? `${esc(o.studentName)}-ის მოთხოვნას ჯერ არ გიპასუხია. დარჩა <b>${esc(o.leftText)}</b> — შემდეგ ჯავშანი ავტომატურად გაუქმდება და სტუდენტი სხვას მიმართავს.`
+    : `${esc(o.studentName)}-ის მოთხოვნა კვლავ შენს პასუხს ელოდება. დარჩა <b>${esc(o.leftText)}</b> — პასუხის გარეშე ჯავშანი ავტომატურად გაუქმდება.`
+  return {
+    subject: o.final ? 'ბოლო შეხსენება — მოთხოვნა მალე გაუქმდება' : 'მოთხოვნა შენს პასუხს ელოდება',
+    html: shell({
+      heading: first
+        ? `${esc(first)}, ${o.final ? 'ბოლო შანსია პასუხის გასაცემად' : 'მოთხოვნა უპასუხოდ დარჩა'}`
+        : (o.final ? 'ბოლო შანსია პასუხის გასაცემად' : 'მოთხოვნა უპასუხოდ დარჩა'),
+      bodyHtml:
+        p(lead) +
+        detail([
+          { label: 'სტუდენტი', value: o.studentName },
+          { label: 'თემა', value: o.topic },
+          { label: 'დრო', value: o.whenText },
+          { label: 'დარჩა', value: o.leftText },
+        ]) +
+        p(`<span style="color:${MUTED};">უარის თქმაც პასუხია — თუ ეს დრო არ გამოგდგება, უარყავი და სტუდენტი მაშინვე სხვა დროს აირჩევს.</span>`),
+      cta: { label: 'მოთხოვნაზე პასუხი', href: `${BASE}${o.href}` },
+    }),
+  }
+}
+
+// ── Activation: approved, live, but not bookable ─────────────────────────────
+// The counterpart to applicationApprovedEmail. „You are approved" is only half
+// the truth when the profile still has no service or no free times — the expert
+// believes they are open for business while every visitor hits a dead button.
+// Deliberately plain and specific: one blocker, one fix, one link. See
+// lib/expertActivation for the schedule and the why.
+export function expertActivationEmail(o: {
+  name: string
+  blocker: 'slots' | 'service'
+  /** Last of the three nudges — say so, and stop. */
+  final?: boolean
+  href: string
+}) {
+  const first = (o.name || '').trim().split(/\s+/)[0]
+  const what = o.blocker === 'service'
+    ? {
+        lead: 'შენი პროფილი გამოქვეყნებულია, მაგრამ <b>სერვისი არ გაქვს დამატებული</b> — ჯავშნის ღილაკს გასაყიდი არაფერი აქვს, ამიტომ დაჯავშნა ვერავინ შეძლებს.',
+        step: 'დაამატე ერთი კონსულტაცია — სახელი, ხანგრძლივობა და ფასი. ერთი წუთის საქმეა.',
+        cta: 'სერვისის დამატება',
+      }
+    : {
+        // „აღარ გაქვს", not „არ მიგითითებია" — the same wording the in-app alert
+        // uses (app/tutor/_components/AlertsStack), and for the same reason:
+        // since 2026-08-03 this also reaches experts whose published windows
+        // simply RAN OUT. Telling someone who added 42 times that they never
+        // added any is both wrong and slightly insulting.
+        lead: 'შენი პროფილი გამოქვეყნებულია, მაგრამ <b>თავისუფალი დრო აღარ გაქვს</b> — სტუდენტი პროფილს ხედავს, დაჯავშნა კი არ შეუძლია.',
+        step: 'მონიშნე მომავალი კვირის რამდენიმე დრო, როცა თავისუფალი ხარ. დროები ნებისმიერ მომენტში იცვლება.',
+        cta: 'დროების მითითება',
+      }
+  return {
+    subject: o.final ? 'ბოლო შეხსენება — შენი პროფილი ჯავშანს ვერ იღებს' : 'შენი პროფილი ჯავშანს ვერ იღებს',
+    html: shell({
+      heading: first ? `${esc(first)}, ერთი ნაბიჯიღა დარჩა` : 'ერთი ნაბიჯიღა დარჩა',
+      bodyHtml:
+        p(what.lead) +
+        p(what.step) +
+        (o.final
+          ? p(`<span style="color:${MUTED};">ეს ბოლო შეხსენებაა — მეტს აღარ მოგწერთ. თუ ახლა დრო არ გაქვს, პროფილი ადგილზე დაგრჩება და ნებისმიერ დროს დაასრულებ.</span>`)
+          : ''),
+      cta: { label: what.cta, href: `${BASE}${o.href}` },
+    }),
+  }
+}
+
+// ── Mid-lifecycle booking changes ────────────────────────────────────────────
+// ONE builder for every booking event that used to be in-app-only: the expert
+// declining a request, either side cancelling, a no-show flagged in either
+// direction, and all three reschedule events (proposed / accepted / rejected).
+//
+// Why one template and not seven: they are the same message shape — „something
+// moved on a booking you already know about, here is what and when" — and the
+// events that matter most are exactly the ones that STOP the reminder pipeline.
+// An expert cancelling a CONFIRMED 17:00 session at 14:00 makes the booking
+// leave the reminder query (it filters status='CONFIRMED'), so without this mail
+// the client's last signal is the old confirmation and they show up to an empty
+// room.
+//
+// Every SUBJECT is a static per-kind string — nothing interpolated — so unlike
+// newMessageEmail below there is no CR/LF injection surface to strip. All
+// caller-supplied values are escaped (via esc() inside detail()/the leads).
+// `whenText` is expected to come from fmtWhenTz above, so it carries its zone.
+export type BookingChangeKind =
+  | 'request_sent'
+  | 'declined'
+  | 'canceled'
+  | 'no_show'
+  | 'reschedule_proposed'
+  | 'reschedule_accepted'
+  | 'reschedule_rejected'
+
+export type BookingChangeOpts = {
+  /** The other human on the booking, from the RECIPIENT's point of view. */
+  counterpartName: string
+  topic: string
+  /** Current/original session time — always via fmtWhenTz. */
+  whenText: string
+  /** Proposed or newly-agreed time (reschedule kinds only). */
+  newWhenText?: string
+  /** Who acted. Ergative for `canceled` / `reschedule_proposed` („ექსპერტმა",
+   *  „სტუდენტმა", „ადმინისტრატორმა"); GENITIVE for `no_show`, which reads
+   *  „<...>ის თქმით" so it also works for the person who filed it („შენი"). */
+  actorLabel?: string
+  /** Free-text cancel/reschedule reason, shown as its own row. */
+  reason?: string | null
+  /** One extra sentence under the lead — what this recipient should do next. */
+  note?: string
+  /** Site-relative path; the CTA is always rendered absolute (BASE + href). */
+  href: string
+  ctaLabel?: string
+}
+
+const CHANGE_COPY: Record<BookingChangeKind, { subject: string; heading: string; cta: string }> = {
+  request_sent:          { subject: 'მოთხოვნა გაიგზავნა',      heading: 'მოთხოვნა გაიგზავნა',        cta: 'ჯავშნის ნახვა' },
+  declined:              { subject: 'ჯავშანი ვერ დადასტურდა',  heading: 'ჯავშანი ვერ დადასტურდა',    cta: 'სხვა დროის არჩევა' },
+  canceled:              { subject: 'ჯავშანი გაუქმდა',          heading: 'ჯავშანი გაუქმდა',            cta: 'ჯავშნის ნახვა' },
+  no_show:               { subject: 'სესია არ შედგა',           heading: 'სესია არ შედგა',             cta: 'ჯავშნის ნახვა' },
+  reschedule_proposed:   { subject: 'გადადების მოთხოვნა',       heading: 'დროის გადატანა ითხოვეს',     cta: 'პასუხის გაცემა' },
+  reschedule_accepted:   { subject: 'ახალი დრო დადასტურდა',     heading: 'ახალი დრო დადასტურდა',       cta: 'ჯავშნის ნახვა' },
+  reschedule_rejected:   { subject: 'გადადება უარყოფილია',      heading: 'გადადება უარყოფილია',        cta: 'ჯავშნის ნახვა' },
+}
+
+export function bookingChangedEmail(kind: BookingChangeKind, o: BookingChangeOpts) {
+  const who = esc(o.counterpartName)
+  const actor = esc(o.actorLabel || 'მეორე მხარემ')
+  const lead: Record<BookingChangeKind, string> = {
+    request_sent: `${who}-ს გაეგზავნა შენი მოთხოვნა. პასუხს 24 საათში მიიღებ — თუ ამ დროში არ დაადასტურებს, ჯავშანი ავტომატურად უქმდება.`,
+    declined: `${who}-მა ვერ დაადასტურა ეს მოთხოვნა — სესია არ შედგება.`,
+    canceled: `${actor} გააუქმა ეს კონსულტაცია. დანიშნულ დროზე შეხვედრა აღარ შედგება.`,
+    no_show: `${esc(o.actorLabel || 'მეორე მხარის')} თქმით, სესია არ შედგა.`,
+    reschedule_proposed: `${actor} ითხოვს ამ კონსულტაციის სხვა დროზე გადატანას. სანამ არ უპასუხებ, ძველი დრო დადასტურებულად აღარ ითვლება.`,
+    reschedule_accepted: `${who}-მა დაეთანხმა გადადებას — სესია ახალ დროზეა.`,
+    reschedule_rejected: `${who}-მა უარყო გადადება. დრო უცვლელი დარჩა.`,
+  }
+  // Reschedule kinds show BOTH times, so the recipient can see what moved where;
+  // everything else shows the one time the message is about.
+  const rows: { label: string; value: string }[] = [
+    { label: 'ვისთან', value: o.counterpartName },
+    { label: 'თემა', value: o.topic },
+  ]
+  if (kind === 'reschedule_proposed') {
+    rows.push({ label: 'ახლანდელი დრო', value: o.whenText })
+    if (o.newWhenText) rows.push({ label: 'შემოთავაზებული დრო', value: o.newWhenText })
+  } else if (kind === 'reschedule_accepted') {
+    rows.push({ label: 'ახალი დრო', value: o.newWhenText || o.whenText })
+  } else {
+    rows.push({ label: 'დრო', value: o.whenText })
+  }
+  if (o.reason) rows.push({ label: 'მიზეზი', value: o.reason })
+
+  const copy = CHANGE_COPY[kind]
+  return {
+    subject: copy.subject,
+    html: shell({
+      heading: copy.heading,
+      bodyHtml: p(lead[kind]) + detail(rows) + (o.note ? p(`<span style="color:${MUTED};">${esc(o.note)}</span>`) : ''),
+      cta: { label: o.ctaLabel || copy.cta, href: `${BASE}${o.href}` },
+    }),
+  }
+}
+
+// The IMMINENT reminder — sent when the session is minutes away, on top of the
+// ~1h one above. Deliberately NOT the same builder: the subject has to read as a
+// different message at a glance, or two near-identical mails ~45 min apart look
+// like a duplicate send. It also never names a number of minutes — the sweep
+// delivers it anywhere in a 5–20 min band, so „5 წუთში" would be wrong most of
+// the time. This one is a doorbell (join now); the 1h one stays the actionable
+// „you have something today" mail.
+export function sessionImminentEmail(o: { counterpartName: string; topic: string; whenText: string; href: string }) {
+  return {
+    subject: 'შეხვედრის ოთახი გელოდება',
+    html: shell({
+      // Heading differs from the ~1h mail's („შენი სესია მალე იწყება") as hard as
+      // the subject does — the two arrive ~45 min apart and must not read as the
+      // same message sent twice.
+      heading: 'სესია იწყება — შედი ოთახში',
+      bodyHtml:
+        p(`კონსულტაცია ${esc(o.counterpartName)}-თან სულ მალე იწყება. ოთახში შესვლა ერთი დაწკაპუნებაა.`) +
+        detail([
+          { label: 'ვისთან', value: o.counterpartName },
           { label: 'თემა', value: o.topic },
           { label: 'დრო', value: o.whenText },
         ]),
-      cta: { label: 'სესიის გახსნა', href: `${BASE}${o.href}` },
+      cta: { label: 'ოთახში შესვლა', href: `${BASE}${o.href}` },
+    }),
+  }
+}
+
+// ── Admin → ONE user, written by hand (admin panel „მიწერე") ────────────────
+// Every other builder in this file is a template with a static subject and a
+// couple of interpolated system values. This one is different in kind: BOTH the
+// subject and the body are free text an operator typed into a form, so it is
+// the one place where the escaping rules are load-bearing rather than habit.
+//   · subject → sanitizeSubject() (CR/LF stripped: a newline in a mail header
+//     splices in an extra header — the classic injection) and it is ALSO the
+//     in-app notification title, so the route reuses the same helper.
+//   · body    → esc()-ed first, then split into paragraphs. The only markup a
+//     typed body can ever produce is <p> and <br>, both emitted by us.
+// The caller sets replyTo to SUPPORT_EMAIL — the point of this message is that
+// the recipient can hit Reply and reach a human, not a noreply void.
+export type AdminMessageTemplate = 'expert' | 'info' | 'blank'
+
+export const ADMIN_MESSAGE_SUBJECT_MAX = 120
+export const ADMIN_MESSAGE_BODY_MAX = 4000
+
+// Where the message TAKES the person: the email CTA and the in-app notification
+// href are the same destination. Kept server-side (never accepted from the
+// request body) so a typed message can't be turned into an arbitrary link.
+const ADMIN_MESSAGE_DEST: Record<AdminMessageTemplate, { href: string; ctaLabel: string }> = {
+  expert: { href: '/apply',         ctaLabel: 'ექსპერტად რეგისტრაცია' },
+  info:   { href: '/settings',      ctaLabel: 'ანგარიშის გახსნა' },
+  blank:  { href: '/notifications', ctaLabel: 'შეტყობინების ნახვა' },
+}
+
+export function adminMessageDestination(t?: string | null): { href: string; ctaLabel: string } {
+  // Explicit allowlist rather than `MAP[t] ?? MAP.blank`: an indexed lookup with
+  // '__proto__' (or 'constructor') resolves through the prototype chain and
+  // returns a truthy object, which would sail past the ?? and yield href
+  // `undefined`. Comparing against the three literals cannot do that.
+  const key: AdminMessageTemplate = t === 'expert' || t === 'info' ? t : 'blank'
+  return ADMIN_MESSAGE_DEST[key]
+}
+
+/** One line, no header-splitting characters. Used for the mail subject AND the
+ *  notification title, so both stay identical to what the admin typed. */
+export function sanitizeSubject(s: string): string {
+  return String(s ?? '').replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim()
+}
+
+export function adminDirectMessageEmail(o: {
+  name: string
+  subject: string
+  body: string
+  template?: AdminMessageTemplate | string | null
+}) {
+  const first = (o.name || '').trim().split(/\s+/)[0]
+  const subject = sanitizeSubject(o.subject)
+  const dest = adminMessageDestination(o.template)
+  // Blank-line separated blocks become paragraphs; single newlines become <br>.
+  // esc() runs BEFORE the <br> substitution, so the only tags here are ours.
+  const bodyBlocks = o.body
+    .split(/\r?\n\s*\r?\n/)
+    .map(b => b.trim())
+    .filter(Boolean)
+    .map(b => p(esc(b).replace(/\r?\n/g, '<br>')))
+    .join('')
+  return {
+    subject: subject || 'შეტყობინება მცოდნესგან',
+    html: shell({
+      heading: first ? `${esc(first)}, გამარჯობა` : 'გამარჯობა',
+      bodyHtml:
+        (subject ? p(`<b>${esc(subject)}</b>`) : '') +
+        bodyBlocks +
+        p(`<span style="color:${MUTED};">უპასუხე პირდაპირ ამ წერილს — ჩვენს ფოსტაზე მოვა და ცოცხალი ადამიანი წაიკითხავს.</span>`),
+      cta: { label: dest.ctaLabel, href: `${BASE}${dest.href}` },
+      footerNote: 'მცოდნეს გუნდი',
     }),
   }
 }

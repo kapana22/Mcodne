@@ -1,12 +1,15 @@
 import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 import { notify, normalizePrefs } from '@/lib/notify'
 import { audit } from '@/lib/audit'
+import { ensureExpertSlug } from '@/lib/expertSlug'
 import { normalizeLangs } from '@/lib/languages'
 import { sendMail } from '@/lib/mailer'
 import { applicationApprovedEmail } from '@/lib/emailTemplates'
+import { resolveVerifiedGrant } from '@/app/admin/_application'
+import { materializeWeekly } from '@/lib/availabilityRules'
 
 const Body = z.object({
   action: z.enum(['approve', 'reject', 'revise']),
@@ -16,6 +19,14 @@ const Body = z.object({
   // Category name — be assigned one at approval time instead of being born
   // category-less and invisible on /tutors.
   categoryId: z.string().min(1).max(64).optional(),
+  // The moderator's deliberate „გადამოწმებული" decision (approve only).
+  // STRICTLY a boolean and STRICTLY optional-defaulting-to-false: the badge is
+  // a public trust signal on every card, so it may only ever be granted by a
+  // human ticking it while the applicant's documents are on screen. Absent
+  // (bulk approve, an older client) ⇒ no badge, exactly as before this field
+  // existed. `resolveVerifiedGrant` re-asserts the same rule so the default
+  // cannot drift if this schema is ever loosened.
+  verified: z.boolean().optional(),
 })
 
 // Map an /apply service duration onto the Consultation tier enum.
@@ -26,11 +37,13 @@ function tierForMinutes(m: number): 'QUICK' | 'STANDARD' | 'DEEP' {
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const admin = await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  const admin = auth.user
   const { id } = await ctx.params
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false }, { status: 400 })
-  const { action, note, categoryId } = parsed.data
+  const { action, note, categoryId, verified } = parsed.data
 
   // Reject AND revise must carry a reason — it is sent to the applicant and kept
   // in the audit trail. Revise IS the correction note ("write your name in
@@ -97,6 +110,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // raw Georgian name here left the expert with zero chips selected and a
     // duplicated „ქართული · English · ქართული · English" card after they re-picked.
     const resolvedLanguages = normalizeLangs((app.professionData as any)?.languages)
+    // „გადამოწმებული" — granted ONLY when the moderator explicitly ticked it on
+    // this approval. `hadDocument` records whether anything was actually
+    // attached at that moment, so the audit trail can answer „why is this
+    // person verified?" long after the fact. A grant with nothing attached is
+    // permitted (a moderator may have verified out-of-band) but never silent.
+    const badge = resolveVerifiedGrant(verified, app)
     await prisma.$transaction([
       prisma.tutorApplication.update({
         where: { id },
@@ -125,7 +144,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           languages: resolvedLanguages.length ? resolvedLanguages : undefined,
           yearsExp: app.yearsExp,
           price: app.hourlyRate,
-          verified: false,
+          verified: badge.grant,
           linkedinUrl: app.linkedinUrl,
           websiteUrl: app.websiteUrl,
           professionData: app.professionData ?? undefined,
@@ -138,12 +157,31 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           linkedinUrl: app.linkedinUrl,
           websiteUrl: app.websiteUrl,
           professionData: app.professionData ?? undefined,
+          // Grant-only, never revoke: re-approving an existing profile with the
+          // box unticked must not strip a badge that was awarded earlier (that
+          // would make a routine re-approval silently downgrade a live expert).
+          // Removing the badge stays the explicit job of the „ექსპერტები" tab's
+          // verify toggle (`tutor.unverify`).
+          ...(badge.grant ? { verified: true } : {}),
           // videoUrl is deliberately NOT touched on re-approval — a tutor who
           // already exists may have edited their intro to a newer/better clip
           // since their original application. Only the `create` path seeds it.
         },
       }),
     ])
+
+    // Public URL slug — „/tutors/ana-gagoshidze" instead of the raw cuid.
+    // Deliberately OUTSIDE the promotion transaction and fully guarded: a slug
+    // is cosmetic, and it must never be able to fail an approval. A profile
+    // without one stays reachable by id (app/tutors/[id] resolves both).
+    try {
+      const profile = await prisma.tutorProfile.findUnique({
+        where: { userId: app.userId },
+        select: { id: true },
+      })
+      if (profile) await ensureExpertSlug(profile.id)
+    } catch { /* non-fatal — see above */ }
+
     // Turn the services the applicant defined during /apply into real
     // Consultation tiers. Runs OUTSIDE the promotion tx and is fully guarded, so
     // a malformed service row can NEVER block the approval itself. Skips if the
@@ -180,9 +218,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // the fresh expert's certificates tab is empty and they must re-upload
     // everything they already sent us. The SCAN itself stays admin-only on the
     // application (schema comment: verification media is never copied to the
-    // public profile), so only an http(s) link is carried over — a base64 data:
-    // URL becomes a title-only row. issuer/year aren't captured by /apply, so
-    // they're honest placeholders the expert edits in the profile editor.
+    // The scan is carried over as-is (base64 included); `year` falls back to
+    // the application year, and an unknown issuer stays EMPTY rather than
+    // becoming a placeholder string the profile would display as fact.
     try {
       const certs = (app.certificates as any)
       if (Array.isArray(certs) && certs.length) {
@@ -199,9 +237,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
                 return {
                   tutorId: profile.id,
                   title: String(c.title).trim().slice(0, 200),
-                  issuer: 'მითითებული არ არის',
+                  // Empty, not „მითითებული არ არის". That placeholder was stored
+                  // as DATA and then rendered on the public profile as if the
+                  // expert had typed it. The UI now omits an empty issuer.
+                  issuer: String((c as any).issuer ?? '').trim().slice(0, 200),
                   year,
-                  fileUrl: /^https?:\/\//i.test(url) && url.length <= 500 ? url : null,
+                  // Carry the scan over whatever its form — a base64 data: URI
+                  // is exactly what /api/uploads returns, and rejecting it here
+                  // (the old `^https?://` + 500-char test) is why every approved
+                  // expert lost the diploma they had just uploaded.
+                  fileUrl: url || null,
                 }
               })
             if (rows.length) await prisma.certificate.createMany({ data: rows })
@@ -209,13 +254,59 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         }
       }
     } catch { /* certificates are a convenience — never fail the approval on them */ }
-    // Point the approval at the SCHEDULE, not the profile: booking is slot-gated,
-    // so an approved expert with no published time is unbookable no matter how
-    // complete their profile is. A moderator note still overrides the body.
+
+    /* OPEN THE CALENDAR (2026-08-07). The applicant picked a weekly pattern on
+     * /apply — pre-filled with a full working week — and this is where it
+     * becomes real bookable availability.
+     *
+     * WHY IT MATTERS: publishing time used to be a separate job AFTER approval,
+     * and 46% of booking attempts died on „this expert has no free time". An
+     * approved expert with an empty calendar is an expert nobody can book, so
+     * the empty calendar is what had to go.
+     *
+     * Guarded and idempotent like every other post-approval step: it never fails
+     * an approval that has already committed, and it does nothing at all when
+     * the expert already has future windows (a re-approval must not double-book
+     * the week, and must never overwrite a schedule they have since edited).
+     */
+    let openedWindows = 0
+    try {
+      const av = (app.professionData as any)?.availability
+      const days: number[] = Array.isArray(av?.days) ? av.days.filter((d: any) => Number.isInteger(d) && d >= 0 && d <= 6) : []
+      const startHour = Number(av?.startHour)
+      const endHour = Number(av?.endHour)
+      const weeks = Math.min(12, Math.max(1, Number(av?.weeks) || 8))
+      if (days.length && Number.isInteger(startHour) && Number.isInteger(endHour) && endHour > startHour) {
+        const profile = await prisma.tutorProfile.findUnique({ where: { userId: app.userId }, select: { id: true } })
+        if (profile) {
+          const already = await prisma.availabilitySlot.count({
+            where: { tutorId: profile.id, endAt: { gt: new Date() } },
+          })
+          if (already === 0) {
+            const windows = materializeWeekly(days.map(day => ({ day, startHour, endHour })), weeks)
+            if (windows.length) {
+              const res = await prisma.availabilitySlot.createMany({
+                data: windows.map(w => ({ tutorId: profile.id, startAt: w.startAt, endAt: w.endAt })),
+                skipDuplicates: true,
+              })
+              openedWindows = res.count
+            }
+          }
+        }
+      }
+    } catch { /* availability is a convenience — never fail the approval on it */ }
+
+    // Point the approval at the SCHEDULE: booking is slot-gated, and the expert
+    // must be able to SEE (and change) what we just published in their name.
+    // A moderator note still overrides the body.
     await notify(app.userId, {
       type: 'APPLICATION_STATUS',
-      title: 'დამტკიცდი — გახსენი შენი დრო',
-      body: note?.trim() || 'ახლა ხარ ექსპერტი. სანამ თავისუფალ დროს არ გამოაქვეყნებ, ვერავინ დაგიჯავშნის.',
+      title: openedWindows > 0 ? 'დამტკიცდი — შენი განრიგი გამოქვეყნდა' : 'დამტკიცდი — გახსენი შენი დრო',
+      body: note?.trim() || (openedWindows > 0
+        // Says what we did on their behalf. A calendar that opened without a
+        // word would be a client booking an hour the expert never agreed to.
+        ? 'ახლა ხარ ექსპერტი. განაცხადში მითითებული განრიგი გამოქვეყნდა და დაჯავშნა შესაძლებელია — შეამოწმე და შეცვალე, თუ საჭიროა.'
+        : 'ახლა ხარ ექსპერტი. სანამ თავისუფალ დროს არ გამოაქვეყნებ, ვერავინ დაგიჯავშნის.'),
       href: '/tutor/schedule',
     })
     // Same message by email — the in-app bell only lands if they come back on
@@ -236,7 +327,29 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         }
       } catch { /* email is best-effort */ }
     })
-    await audit(admin.id, 'application.approve', { targetType: 'TutorApplication', targetId: id, meta: { note, applicantUserId: app.userId } })
+    await audit(admin.id, 'application.approve', {
+      targetType: 'TutorApplication',
+      targetId: id,
+      meta: { note, applicantUserId: app.userId, verified: badge.grant, hadDocument: badge.hadDocument },
+    })
+    // A SECOND, separately-filterable row when the badge was actually granted —
+    // „გადამოწმებული" is the one decision here with a public consequence, and
+    // the audit tab filters by action string. `hadDocument: false` is the
+    // record of a badge awarded with nothing attached.
+    if (badge.grant) {
+      await audit(admin.id, 'application.approve.verified', {
+        targetType: 'TutorApplication',
+        targetId: id,
+        meta: {
+          applicantUserId: app.userId,
+          hadDocument: badge.hadDocument,
+          grantedWithoutDocument: badge.grantedWithoutDocument,
+          certificateCount: Array.isArray(app.certificates) ? app.certificates.length : 0,
+          idDoc: !!app.idDocUrl,
+          selfie: !!app.selfieUrl,
+        },
+      })
+    }
   } else if (action === 'revise') {
     // „გაასწორე" — softer than a reject. The application lands in NEEDS_REVISION
     // (not REJECTED), the applicant's role/profile is untouched, and the note is

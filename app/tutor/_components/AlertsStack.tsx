@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
-import { fmtKaDateTime } from '@/lib/kaDate'
+import { sessionDateTime } from '@/components/workspace/sessionTime'
 import { type DashBooking, awaitsClosure, awaitsRescheduleAnswer } from './types'
 
 type Alert = {
@@ -50,7 +50,7 @@ export function AlertsStack({
         icon: 'clock',
         text: `${b.student?.fullName ?? 'სტუდენტი'} ითხოვს გადადებას`,
         sub: b.rescheduleRequest?.newStartAt
-          ? `შემოთავაზებული დრო: ${fmtKaDateTime(new Date(b.rescheduleRequest.newStartAt))}`
+          ? `შემოთავაზებული დრო: ${sessionDateTime(b.rescheduleRequest.newStartAt)}`
           : undefined,
         cta: { label: 'პასუხი', href: `/tutor/bookings/${b.id}` },
       })
@@ -92,8 +92,8 @@ export function AlertsStack({
               <IconComp className="w-4 h-4" />
             </span>
             <div className="flex-1 min-w-[200px]">
-              <div className="font-display text-[13.5px] font-bold text-ink-900">{a.text}</div>
-              {a.sub && <div className="text-[12px] text-ink-600 mt-0.5 leading-snug">{a.sub}</div>}
+              <div className="font-display text-body font-bold text-ink-900">{a.text}</div>
+              {a.sub && <div className="text-meta text-ink-600 mt-0.5 leading-snug">{a.sub}</div>}
             </div>
             <Btn href={a.cta.href} variant={warning ? 'primary' : 'secondary'} size="sm" className="shrink-0">
               {a.cta.label}
@@ -103,7 +103,7 @@ export function AlertsStack({
       })}
       {rest > 0 && (
         <div className="text-right">
-          <Link href="/tutor/bookings?tab=attention" className="text-[12.5px] text-brand-700 hover:text-brand-800 font-display font-semibold">
+          <Link href="/tutor/bookings?tab=attention" className="text-small text-brand-700 hover:text-brand-800 font-display font-semibold">
             კიდევ {rest} საკითხი
           </Link>
         </div>

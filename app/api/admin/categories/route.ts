@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { slugify } from '@/lib/slug'
 
@@ -9,7 +9,8 @@ import { slugify } from '@/lib/slug'
 // Returns every category (live + hidden) with attached tutor counts so admin
 // can toggle visibility + service-type default without a second round-trip.
 export async function GET() {
-  await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
   const rows = await prisma.category.findMany({
     orderBy: [{ order: 'asc' }, { name: 'asc' }],
     select: {
@@ -40,7 +41,9 @@ const CreateBody = z.object({
 })
 
 export async function POST(req: Request) {
-  const admin = await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  const admin = auth.user
   const parsed = CreateBody.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })

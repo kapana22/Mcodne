@@ -1,5 +1,7 @@
 import Link from 'next/link'
-import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/pageSeo'
+import { socialMeta } from '@/lib/seo'
+import { jsonLdString } from '@/lib/jsonLd'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
 import { Container } from '@/components/Container'
 import { Reveal } from '@/components/Reveal'
@@ -11,16 +13,14 @@ import { SiteText } from '@/components/SiteTextProvider'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
-export const metadata: Metadata = {
-  title: 'ჩვენს შესახებ — მცოდნე',
-  description: 'მცოდნე ქართული ცოდნის არქივია — ვაკავშირებთ ადამიანებს გამოცდილ ექსპერტებთან.',
-  alternates: { canonical: `${SITE_URL}/about` },
-  openGraph: {
-    title: 'ჩვენს შესახებ — მცოდნე',
-    description: 'მცოდნე ქართული ცოდნის არქივია — ვაკავშირებთ ადამიანებს გამოცდილ ექსპერტებთან.',
-    url: `${SITE_URL}/about`,
-  },
-}
+// Editable in ადმინი → ტექსტები (group „SEO — …"). See lib/pageSeo.
+// Metadata now reads the editable SEO text from the database, so this page
+// must render per request. Built statically it would bake whatever the
+// defaults were at BUILD time — and Railway's builder cannot reach the DB,
+// so that means the code defaults forever, whatever the admin types.
+export const dynamic = 'force-dynamic'
+
+export const generateMetadata = () => pageMetadata('about', '/about')
 
 const VALUES = [
   {
@@ -56,8 +56,39 @@ const VALUES = [
 ]
 
 export default function AboutPage() {
+  // AboutPage + the Organization it describes. This page is where a search
+  // engine expects to find the entity behind the site — it was the only public
+  // marketing page emitting no structured data at all.
+  const aboutLd = {
+    '@context': 'https://schema.org',
+    '@type': 'AboutPage',
+    name: 'ჩვენს შესახებ — მცოდნე',
+    url: `${SITE_URL}/about`,
+    inLanguage: 'ka',
+    mainEntity: {
+      '@type': 'Organization',
+      name: 'მცოდნე',
+      url: SITE_URL,
+      logo: `${SITE_URL}/logo.png`,
+      areaServed: { '@type': 'Country', name: 'Georgia' },
+      description: 'ქართული ექსპერტ-კონსულტაციის პლატფორმა — ონლაინ ვიდეოსესიები ხელით შერჩეულ სპეციალისტებთან.',
+      // `sameAs` is intentionally absent until real social profiles exist —
+      // a guessed or empty array is a worse signal than none.
+    },
+  }
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'მთავარი', item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: 'ჩვენს შესახებ' },
+    ],
+  }
+
   return (
     <div className="min-h-screen bg-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(aboutLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbLd) }} />
       <MarketingTopBar />
 
       <Container as="main" size="wide" className="py-16 lg:py-24">
@@ -65,10 +96,10 @@ export default function AboutPage() {
           <Eyebrow className="mb-3">
             ჩვენს შესახებ
           </Eyebrow>
-          <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05] motion-safe:animate-rise-in">
+          <h1 className="font-display text-display lg:text-display-xl font-bold text-ink-900 tracking-tight leading-[1.05] motion-safe:animate-rise-in">
             <SiteText k="about.hero.title" />
           </h1>
-          <p className="mt-6 text-[17px] text-ink-600 leading-relaxed">
+          <p className="mt-6 text-h3 text-ink-600 leading-relaxed">
             <SiteText k="about.hero.body" />
           </p>
         </div>
@@ -78,7 +109,7 @@ export default function AboutPage() {
             <Eyebrow className="mb-3">
               რას გვჯერა
             </Eyebrow>
-            <h2 className="font-display text-3xl font-bold text-ink-900 tracking-tight"><SiteText k="about.principles.title" /></h2>
+            <h2 className="font-display text-h1 font-bold text-ink-900 tracking-tight"><SiteText k="about.principles.title" /></h2>
           </Reveal>
           {/* Reveal-stagger (scroll-triggered) instead of load-time .stagger,
               which finished animating long before the user scrolled here. */}
@@ -88,8 +119,8 @@ export default function AboutPage() {
                 <div className="w-10 h-10 rounded-btn bg-brand-50 text-brand-700 flex items-center justify-center">
                   {v.icon}
                 </div>
-                <div className="font-display text-[17px] font-bold text-ink-900 mt-4"><SiteText k={v.titleKey} /></div>
-                <p className="mt-2 text-[14px] text-ink-600 leading-relaxed"><SiteText k={v.bodyKey} /></p>
+                <div className="font-display text-h3 font-bold text-ink-900 mt-4"><SiteText k={v.titleKey} /></div>
+                <p className="mt-2 text-body text-ink-600 leading-relaxed"><SiteText k={v.bodyKey} /></p>
               </div>
             ))}
           </Reveal>
@@ -101,11 +132,11 @@ export default function AboutPage() {
             <Eyebrow className="mb-3">
               რას ვქმნით
             </Eyebrow>
-            <h2 className="font-display text-3xl font-bold text-ink-900 tracking-tight leading-tight">
+            <h2 className="font-display text-h1 font-bold text-ink-900 tracking-tight leading-tight">
               <SiteText k="about.create.title" />
             </h2>
           </div>
-          <div className="space-y-5 text-[15px] text-ink-700 leading-relaxed">
+          <div className="space-y-5 text-body-lg text-ink-700 leading-relaxed">
             <p>
               <SiteText k="about.create.p1" />
             </p>
@@ -120,25 +151,25 @@ export default function AboutPage() {
         <Reveal>
         <section className="mt-20 rounded-card bg-gradient-dark text-white p-10 lg:p-14 relative overflow-hidden">
           <div className="max-w-[560px] relative z-10">
-            <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-300 mb-3">
+            <div className="font-display text-micro font-semibold uppercase text-brand-300 mb-3">
               შემოგვიერთდი
             </div>
-            <h2 className="font-display text-3xl lg:text-4xl font-bold tracking-tight leading-tight">
+            <h2 className="font-display text-h1 lg:text-display font-bold tracking-tight leading-tight">
               <SiteText k="about.cta.title" />
             </h2>
-            <p className="mt-4 text-[15px] text-white/75 leading-relaxed">
+            <p className="mt-4 text-body-lg text-white/75 leading-relaxed">
               <SiteText k="about.cta.body" />
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 href="/apply"
-                className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] inline-flex items-center gap-2 transition-colors"
+                className="h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body inline-flex items-center gap-2 transition-colors duration-fast"
               >
                 გახდი ექსპერტი
               </Link>
               <Link
                 href="/contact"
-                className="h-11 px-5 rounded-btn bg-white/10 hover:bg-white/15 text-white font-display font-semibold text-[13.5px] inline-flex items-center transition-colors"
+                className="h-11 px-5 rounded-btn bg-white/10 hover:bg-white/15 text-white font-display font-semibold text-body inline-flex items-center transition-colors duration-fast"
               >
                 დაგვიკავშირდი
               </Link>

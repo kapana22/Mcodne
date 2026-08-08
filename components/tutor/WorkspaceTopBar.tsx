@@ -21,7 +21,7 @@ export function WorkspaceTopBar({ user }: { user?: { name: string; avatar?: stri
 
   return (
     <header
-      className={`sticky top-0 z-40 bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
+      className={`sticky top-0 z-chrome bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
         scrolled ? 'shadow-sm' : ''
       }`}
     >

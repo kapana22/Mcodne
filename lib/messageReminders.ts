@@ -144,7 +144,10 @@ export async function sendMessageReminders(): Promise<{ threads: number; emails:
       preview,
       href,
     })
-    await sendMail({ to: recipient.email, subject, html }).then(() => { emails++ }).catch(() => {})
+    // Count only what actually went out — sendMail RESOLVES with { ok: false }
+    // on a provider error, so the bare .then() this replaces reported every
+    // failed send as delivered. (Same fix the two sibling sweeps already carry.)
+    await sendMail({ to: recipient.email, subject, html }).then(res => { if (res.ok) emails++ }).catch(() => {})
   }
 
   return { threads: claimedGroups.length, emails }

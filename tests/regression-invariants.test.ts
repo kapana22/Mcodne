@@ -245,6 +245,90 @@ function check(name: string, ok: boolean, hint: string) {
   )
 }
 
+// ── K. „გახდი ექსპერტი" is present in BOTH chromes, gated on the REAL role ───
+// Reported 2026-08-07: a signed-in student sees the apply CTA as a top-level
+// nav item on every public page, then walks into /student and it is gone — it
+// survived only one click deep, inside the avatar dropdown. Two halves, and
+// each half is a separate way to break it:
+//   · presence — the workspace sidebar must carry the same door as the public
+//     nav, or the CTA "disappears" exactly where a student spends their time;
+//   · gating   — the student shell hardcodes role="STUDENT" on its chrome, but
+//     /student also admits a TUTOR using their client side. An ungated item
+//     there invites an approved expert to become one: the 2026-07-22 bug.
+{
+  const publicNav = read('components/PublicTopBar.tsx')
+  check(
+    'K: the public nav still carries /apply, gated by showApplyCta',
+    publicNav.includes("href: '/apply'") && publicNav.includes('showApplyCta'),
+    'The public nav is the reference surface — if the item leaves it, the two chromes have diverged again.',
+  )
+  const navConfig = read('components/student/navConfig.ts')
+  const sidebar = read('components/student/StudentSidebar.tsx')
+  check(
+    'K2: the student workspace sidebar carries the same /apply door',
+    navConfig.includes("href: '/apply'") && sidebar.includes('APPLY_LINK'),
+    'Without it the CTA vanishes the moment a student enters their own workspace — the reported bug.',
+  )
+  check(
+    'K3: the sidebar item is wrapped in <ApplyCtaGate> (real role, not the shell prop)',
+    /<ApplyCtaGate>[\s\S]{0,200}APPLY_LINK/.test(sidebar) && sidebar.includes('ApplyCtaGate'),
+    'The shell passes a hardcoded role="STUDENT"; only useMe knows the viewer is really a TUTOR.',
+  )
+  const gate = read('components/ApplyCtaGate.tsx')
+  check(
+    'K4: ApplyCtaGate reads the role from useMe, never from a prop',
+    gate.includes('useMe()') && gate.includes('showApplyCta'),
+    'A gate that trusts a caller-supplied role is not a gate — the caller is what was wrong.',
+  )
+  // Still reachable from the account menu too (traced from a real 2026-07-29
+  // signup who never found /apply); the sidebar adds a visible path, it does
+  // not replace this one.
+  const menu = read('components/UserMenu.tsx')
+  check(
+    'K5: the account menu keeps its own gated /apply item',
+    menu.includes("href: '/apply'") && menu.includes('showApplyCta(role)'),
+    'On mobile the avatar menu is the ONLY path — the sidebar is desktop-only (hidden lg:flex).',
+  )
+}
+
+// ── L. the public header must look the same on every public page ────────────
+// Reported 2026-08-07: „the whole menu changes on the expert page." Two causes,
+// both of them the header being told about the page instead of reading it:
+//   L1 — the ACTIVE item was a hand-threaded `activeHref` prop that exactly two
+//        surfaces ever passed (/tutors, /apply). So „ექსპერტები" was lit on the
+//        browse list and went dark the instant you opened an expert, and every
+//        marketing page lit nothing while you stood on it.
+//   L2 — home rendered <PublicTopBar/> with no `initialUser`, so it fell back
+//        to the client probe: a signed-in TUTOR saw „გახდი ექსპერტი" paint and
+//        then vanish once /api/me landed, on the busiest page on the site.
+{
+  const bar = read('components/PublicTopBar.tsx')
+  check(
+    'L1: the active nav item is DERIVED from usePathname, not passed in',
+    bar.includes('usePathname()') && /const isActive = \(href: string\)/.test(bar) &&
+      !/const active = activeHref === item\.href/.test(bar),
+    'A per-page prop means every new page can forget it — and 12 of 14 already had.',
+  )
+  check(
+    'L1b: a detail route stays lit under its section (/tutors/[id] → ექსპერტები)',
+    bar.includes("activePath.startsWith(href + '/')"),
+    'Exact-match only is what made the highlight disappear when you opened an expert.',
+  )
+  const home = read('app/page.tsx')
+  const homeClient = read('app/HomeClient.tsx')
+  check(
+    'L2: home resolves the viewer server-side and hands it to the header',
+    home.includes('getCurrentUser()') && home.includes('initialUser={initialUser}') &&
+      homeClient.includes('<PublicTopBar initialUser={initialUser} />'),
+    'Without it the header rearranges after hydration for any signed-in expert.',
+  )
+  check(
+    'L2b: home stays force-dynamic (what makes the server-side session free)',
+    /export const dynamic = 'force-dynamic'/.test(home),
+    'If home ever goes static, getCurrentUser() there becomes a build-time error, not a header fix.',
+  )
+}
+
 if (failures > 0) {
   console.error(`\n${failures} regression guard(s) FAILED`)
   process.exit(1)

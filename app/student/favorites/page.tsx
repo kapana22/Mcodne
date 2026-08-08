@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { FavoritesClient } from './client'
 import { Container } from '@/components/Container'
 import { PageHeader } from '@/components/PageHeader'
+import { primaryPriceLabel, primaryService, TUTOR_DEFAULTS } from '@/components/booking/slots'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,10 @@ export default async function StudentFavoritesPage() {
         include: {
           user: { select: { id: true, fullName: true, avatarUrl: true } },
           category: { select: { id: true, slug: true, name: true } },
+          // Tier shape only — needed to resolve the FLAGSHIP price, exactly as
+          // /tutors does. Must stay in step with the API sibling
+          // (app/api/favorites/route.ts), which selects the same three columns.
+          consultations: { select: { minutes: true, price: true, tier: true } },
         },
       },
     },
@@ -32,17 +37,32 @@ export default async function StudentFavoritesPage() {
   // A deleted tutor leaves `tutor: null` on the favorite — skip those rows
   // (a card without a bookable expert is a dead end). Empty photo falls back
   // to the client's initials tile — never external stock-avatar URLs.
-  const items = favs.filter(f => f.tutor?.user).map(f => ({
-    id: f.id,
-    tutorId: f.tutor.id,
-    name: f.tutor.user.fullName,
-    photo: f.tutor.user.avatarUrl ?? '',
-    headline: f.tutor.headline,
-    specialty: f.tutor.specialty,
-    rating: f.tutor.rating,
-    reviews: f.tutor.reviewsCount,
-    price: f.tutor.price,
-  }))
+  const items = favs.filter(f => f.tutor?.user).map(f => {
+    // FLAGSHIP price + its real length, from the shared helper. This used to be
+    // the raw profile-level `f.tutor.price`, which is not a service anyone can
+    // buy — one live expert therefore read ₾60 on this page and ₾30 on /tutors
+    // (measured 2026-07-31). `price` stays numeric so the compare table can
+    // still find the cheapest; `priceLabel` is what gets rendered, because a
+    // free flagship must read „უფასო" and a number cannot say that.
+    const flagship = primaryPriceLabel(
+      f.tutor.consultations ?? [],
+      f.tutor.price,
+      f.tutor.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin,
+    )
+    return {
+      id: f.id,
+      tutorId: f.tutor.id,
+      name: f.tutor.user.fullName,
+      photo: f.tutor.user.avatarUrl ?? '',
+      headline: f.tutor.headline,
+      specialty: f.tutor.specialty,
+      rating: f.tutor.rating,
+      reviews: f.tutor.reviewsCount,
+      price: primaryService(f.tutor.consultations ?? [])?.price ?? f.tutor.price,
+      priceLabel: flagship.label,
+      durationMin: flagship.minutes,
+    }
+  })
 
   return (
     <Container as="main" className="w-full py-8 lg:py-10 flex-1">
@@ -54,9 +74,9 @@ export default async function StudentFavoritesPage() {
 
         {items.length === 0 ? (
           <EmptyState
-            icon={<Icon.heart className="w-6 h-6" />}
-            title="შენახული ცარიელია"
-            description="დააჭირე გულს ბარათზე — აქ დაემატება."
+            illustration="favourites"
+            title="შენახული ექსპერტები ჯერ არ გაქვს"
+            description="შეინახე საინტერესო ექსპერტი, რომ მოგვიანებით მარტივად დაუბრუნდე."
             cta={{ label: 'ექსპერტების ნახვა', href: '/tutors' }}
           />
         ) : (

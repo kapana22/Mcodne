@@ -25,10 +25,10 @@ export function PageHeader({
             {eyebrow}
           </Eyebrow>
         )}
-        <h1 className="font-display text-[22px] sm:text-[26px] font-bold text-ink-900 tracking-tight mt-1">
+        <h1 className="font-display text-h2 sm:text-h1 font-bold text-ink-900 tracking-tight mt-1">
           {title}
         </h1>
-        {sub && <p className="text-[13px] text-ink-500 mt-1.5 leading-snug">{sub}</p>}
+        {sub && <p className="text-small text-ink-500 mt-1.5 leading-snug">{sub}</p>}
       </div>
       {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
     </div>

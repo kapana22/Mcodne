@@ -18,6 +18,12 @@ export type BookingTutorInfo = {
   availability: ApiSlot[]
   busySlots: BusySlot[]
   consultations: ConsultationItem[]
+  /** Category slug. The flow needs it for ONE decision: whether the „propose a
+      time" affordance may be offered (diaspora experts only — the server
+      applies the same rule and is the authority, so this is purely about not
+      showing a control that would be refused). Null when the expert has no
+      category, which is itself a „no". */
+  categorySlug: string | null
 }
 
 // Map the /api/tutors/[id] JSON to the flow's payload.
@@ -33,5 +39,6 @@ export function mapTutorPayload(d: any): BookingTutorInfo {
     availability: Array.isArray(d?.availability) ? d.availability : [],
     busySlots: Array.isArray(d?.busySlots) ? d.busySlots : [],
     consultations: Array.isArray(d?.consultations) ? d.consultations : [],
+    categorySlug: typeof d?.category?.slug === 'string' ? d.category.slug : null,
   }
 }

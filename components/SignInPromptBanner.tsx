@@ -28,22 +28,22 @@ export function SignInPromptBanner({
     <div
       role="status"
       aria-live="polite"
-      className={`bg-brand-50 border border-brand-200 rounded-card p-4 text-brand-900 flex flex-wrap items-center gap-x-3 gap-y-2 motion-safe:transition-opacity ${className}`}
+      className={`bg-brand-50 border border-brand-200 rounded-card p-4 text-brand-900 flex flex-wrap items-center gap-x-3 gap-y-2 motion-safe:transition-opacity motion-safe:duration-fast ${className}`}
     >
-      <span className="font-display text-[13.5px] font-semibold tracking-tight">
+      <span className="font-display text-body font-semibold tracking-tight">
         შედი რომ დაიჯავშნო
       </span>
       <span className="text-brand-400" aria-hidden="true">·</span>
       <Link
         href={`/signin?redirect=${enc}`}
-        className="font-display text-[13px] font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 decoration-brand-300"
+        className="font-display text-small font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 decoration-brand-300"
       >
         შესვლა
       </Link>
       <span className="text-brand-400" aria-hidden="true">·</span>
       <Link
         href={`/signup?redirect=${enc}`}
-        className="font-display text-[13px] font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 decoration-brand-300"
+        className="font-display text-small font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 decoration-brand-300"
       >
         რეგისტრაცია
       </Link>
@@ -52,7 +52,7 @@ export function SignInPromptBanner({
           type="button"
           onClick={onDismiss}
           aria-label="დახურვა"
-          className="ml-auto w-9 h-9 -m-1 inline-flex items-center justify-center rounded-full text-brand-700 hover:bg-brand-100 motion-safe:transition-colors"
+          className="ml-auto w-9 h-9 -m-1 inline-flex items-center justify-center rounded-full text-brand-700 hover:bg-brand-100 motion-safe:transition-colors motion-safe:duration-fast"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14" aria-hidden="true">
             <path d="m6 6 12 12M18 6 6 18" />

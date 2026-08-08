@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 import { isBookingLive } from '@/lib/bookingLive'
 import { stripTutorBlobs, stripAvatar } from '@/lib/stripTutorBlobs'
+import { parseLimit } from '@/lib/apiParams'
 
 // „ცოცხალი" is DERIVED, never stored: no code path ever writes status='LIVE'
 // (see lib/bookingLive.ts), so filtering the list on it returned an empty tab
@@ -15,14 +16,15 @@ const MAX_SESSION_MIN = 240
 // Admin-wide booking list with filters: status, date-range, tutor, student, q(topic).
 // Cursor pagination via `?cursor=<lastId>&limit=<n>`.
 export async function GET(req: Request) {
-  await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
   const q = searchParams.get('q')?.trim()
   const from = searchParams.get('from') // YYYY-MM-DD
   const to = searchParams.get('to')
-  const limit = Math.min(Number(searchParams.get('limit') ?? 50), 200)
+  const limit = parseLimit(searchParams.get('limit'), { fallback: 50, max: 200 })
   const cursor = searchParams.get('cursor')
 
   const where: any = {}

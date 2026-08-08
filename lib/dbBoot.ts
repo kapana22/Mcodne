@@ -49,6 +49,31 @@ async function runMigrations() {
       ADD COLUMN IF NOT EXISTS "bufferMin" INTEGER NOT NULL DEFAULT 0;
   `)
 
+  // TutorProfile — MEASURED response time (median minutes + sample size).
+  // Replaces the self-declared `responseHours` as the public signal: that one is
+  // typed in by the expert and can't be verified, this one is computed from real
+  // Message rows (lib/responseTime defines it, lib/responseTimeStore writes it).
+  // Nullable with NO default — null means "not enough data yet", which the UI
+  // renders as nothing at all. Existing rows therefore need no backfill to be
+  // correct, only to be populated (`npx tsx -r dotenv/config lib/responseTimeStore.ts`).
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "TutorProfile"
+      ADD COLUMN IF NOT EXISTS "responseMedianMin" INTEGER,
+      ADD COLUMN IF NOT EXISTS "responseSampleN" INTEGER;
+  `)
+
+  // Public profile slug — „/tutors/ana-gagoshidze" instead of a raw cuid.
+  // Nullable + UNIQUE: uniqueness is what the generator relies on to resolve
+  // collisions, and Postgres allows many NULLs under a unique index, so
+  // un-backfilled rows coexist fine. The route accepts id OR slug, so this can
+  // never orphan a profile.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "TutorProfile" ADD COLUMN IF NOT EXISTS "slug" TEXT;
+  `)
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "TutorProfile_slug_key" ON "TutorProfile"("slug");
+  `)
+
   // Booking — snapshot column + reschedule proposal blob.
   // `rescheduleRequest` holds the pending "party X proposes new time" state
   // until the other side accepts or rejects it. Shape:
@@ -60,7 +85,31 @@ async function runMigrations() {
       ADD COLUMN IF NOT EXISTS "autoCompleted" BOOLEAN NOT NULL DEFAULT false,
       -- Set once the ~1h-before session reminder email has been sent, so the
       -- reminder cron never emails the same booking twice.
-      ADD COLUMN IF NOT EXISTS "sessionReminderSentAt" TIMESTAMP;
+      ADD COLUMN IF NOT EXISTS "sessionReminderSentAt" TIMESTAMP,
+      -- True when the CLIENT proposed this time rather than picking it out of
+      -- the expert's published windows (request-based booking, 2026-08-04).
+      -- The expert's answer flow is unchanged — PREPARING already meant
+      -- „awaiting the expert" — but their UI has to be able to say „this time
+      -- is outside your published schedule", or an out-of-schedule request
+      -- looks like a bug in the calendar.
+      ADD COLUMN IF NOT EXISTS "proposedByStudent" BOOLEAN NOT NULL DEFAULT false,
+      -- The client's SECOND and THIRD choice of time, when they named more than
+      -- one. Shape: [{ "startAt": ISO string }, …], at most two entries; the
+      -- FIRST choice is the booking's own startAt, never duplicated in here.
+      -- Written only alongside proposedByStudent, inside the same transaction.
+      --
+      -- WHY A COLUMN AND NOT A ROW-PER-TIME: an alternate is not a booking. It
+      -- claims nothing, blocks nothing, and expires with its parent — exactly
+      -- the properties that made "rescheduleRequest" a JSONB blob rather than
+      -- the RescheduleRequest table sitting unused next to it. Same call, same
+      -- reasons.
+      ADD COLUMN IF NOT EXISTS "proposedAlternates" JSONB,
+      -- BOG/TBC payment link, pasted by the expert or an admin, shown to the
+      -- client as a „გადახდა“ button. Storage and display ONLY: no checkout, no
+      -- webhook, no charge, no reconciliation, and PAYMENTS_LIVE is untouched.
+      -- It exists so a diaspora client can pay at all before the real
+      -- integration lands, and it must stay this dumb until it does.
+      ADD COLUMN IF NOT EXISTS "paymentLinkUrl" TEXT;
   `)
 
   // Category — default type + public visibility toggle.
@@ -129,6 +178,93 @@ async function runMigrations() {
     );
   `)
 
+  // Job-run ledger. ONE row per recurring job, holding when it last ran. It is
+  // the atomic claim for the traffic-triggered maintenance sweep (lib/sweepRunner):
+  // a guarded UPDATE … WHERE "ranAt" < now() - interval … RETURNING lets exactly
+  // one request per interval do the work, across every instance.
+  //
+  // WHY this exists: the Railway `cleanup-cron` reported „Completed" every 15
+  // min for days while never actually running the sweep — it requested the
+  // endpoint without a valid secret, got the harmless self-doc page, and curl
+  // exited 0. Reminders, review nudges and stale-booking cleanup were all dark
+  // and nothing surfaced it. The sweep must not depend on that cron alone.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "JobRun" (
+      "key"   TEXT PRIMARY KEY,
+      "ranAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `)
+  // Outcome of the last run, so the admin „სისტემა" panel can show WHAT it did
+  // — not merely that it ticked. „It ran" was exactly the false comfort the
+  // Railway cron gave for days.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "JobRun"
+      ADD COLUMN IF NOT EXISTS "ok"     BOOLEAN,
+      ADD COLUMN IF NOT EXISTS "result" JSONB;
+  `)
+
+  // Event — product instrumentation. Append-only; ONE row per tracked action
+  // (lib/events is the only writer). Deliberately NOT in schema.prisma: it has
+  // no relations, is written by raw SQL, and adding a model would make a
+  // `prisma db push` mandatory before the first deploy — the exact coupling
+  // this file exists to avoid.
+  //
+  // `props` is free-form JSONB so a new event type needs no migration; the
+  // event NAME is the contract (lib/events → EVENTS). `userId` is a bare TEXT
+  // column with NO foreign key on purpose: analytics must never block or
+  // cascade with a user delete, and an anonymous visitor writes NULL. It is
+  // also the ONLY identifier this table ever holds — no IP, no user-agent.
+  //
+  // RETENTION: append-only + one row per search means unbounded growth. The
+  // maintenance sweep prunes rows older than lib/events → EVENT_RETENTION_DAYS
+  // (see EVENT_PRUNE_SQL / pruneEvents there).
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Event" (
+      "id"     TEXT PRIMARY KEY,
+      "name"   TEXT NOT NULL,
+      "at"     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "userId" TEXT,
+      "props"  JSONB
+    );
+  `)
+  // Every read is "the recent N of ONE event name" (admin panel) or the prune's
+  // age range — both are served by (name, at DESC).
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "Event_name_at_idx" ON "Event" ("name", "at" DESC);`,
+  )
+
+  // HelpMessage — a person wrote to us FROM the help chat because the bot had no
+  // answer. Same boot-time-DDL reasoning as "Event" above (no relations, raw
+  // SQL, no migration coupling), but it is NOT analytics and must not live in
+  // "Event":
+  //   · it is a MESSAGE, with a person waiting for a reply, so it needs a
+  //     status the admin can move and an address to answer at. Analytics rows
+  //     are append-only and anonymous by design;
+  //   · "Event" is PRUNED at 90 days. Deleting somebody's unanswered support
+  //     request on a timer is the kind of quiet data loss that reads as „we
+  //     ignored you". These are kept until an admin closes them.
+  // `email` is stored because it is the reply channel the person chose to give;
+  // `question` is what they had asked the bot right before, so the admin sees
+  // the failure and the request together.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "HelpMessage" (
+      "id"        TEXT PRIMARY KEY,
+      "at"        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "route"     TEXT,
+      "question"  TEXT,
+      "message"   TEXT NOT NULL,
+      "email"     TEXT,
+      "name"      TEXT,
+      "userId"    TEXT,
+      "status"    TEXT NOT NULL DEFAULT 'new',
+      "handledAt" TIMESTAMPTZ
+    );
+  `)
+  // The admin reads „open ones, newest first" and nothing else.
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "HelpMessage_status_at_idx" ON "HelpMessage" ("status", "at" DESC);`,
+  )
+
   // TutorApplication — YouTube intro-video reference + admin-only verification
   // documents (ID front, selfie-with-doc, certificate scans). All nullable so
   // old rows don't need a backfill.
@@ -140,6 +276,127 @@ async function runMigrations() {
       ADD COLUMN IF NOT EXISTS "selfieUrl" TEXT,
       ADD COLUMN IF NOT EXISTS "certificates" JSONB;
   `)
+
+  // ── Teaching packages (2026-08-05) ─────────────────────────────────────────
+  // Ships DARK: lib/flags → FEATURE_PACKAGES is false, so nothing reads any of
+  // this yet. Created here anyway (rather than at switch-on) so the schema and
+  // the code land in the same deploy and the flag flip is a pure UI event.
+  //
+  // ⚠️ Every column below is ALSO declared in prisma/schema.prisma, deliberately.
+  // A column that lives only here is one `prisma db push` away from being
+  // silently dropped — that exact mistake shipped once already with
+  // Booking.proposedByStudent. If you add to one, add to the other.
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      CREATE TYPE "EnrollmentStatus" AS ENUM ('REQUESTED', 'ACTIVE', 'COMPLETED', 'EXPIRED', 'CANCELLED');
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+  `)
+  // What a profile IS (expert vs teacher) — not a Role; see schema.prisma.
+  // Defaulting to EXPERT means every existing profile keeps its behaviour and
+  // nobody moves when the column appears.
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      CREATE TYPE "ProfileType" AS ENUM ('EXPERT', 'TEACHER');
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+  `)
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "TutorProfile"
+      ADD COLUMN IF NOT EXISTS "profileType" "ProfileType" NOT NULL DEFAULT 'EXPERT';
+  `)
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "TutorProfile_profileType_idx" ON "TutorProfile"("profileType");`,
+  )
+  // The ONE gate for the vertical, and an allowlist on purpose: it starts false
+  // for every existing profile, so switching the feature on cannot remove
+  // anybody from anywhere. (Gating on `serviceType` instead would have: 11 of
+  // 21 live profiles carry a legacy RECURRING value nobody reads.)
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "TutorProfile"
+      ADD COLUMN IF NOT EXISTS "packagesEnabled" BOOLEAN NOT NULL DEFAULT false;
+  `)
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Package" (
+      "id"               TEXT PRIMARY KEY,
+      "tutorId"          TEXT NOT NULL,
+      "title"            TEXT NOT NULL,
+      "description"      TEXT NOT NULL,
+      "lessonsCount"     INTEGER NOT NULL,
+      "minutesPerLesson" INTEGER NOT NULL,
+      "price"            INTEGER NOT NULL,
+      "validDays"        INTEGER NOT NULL DEFAULT 30,
+      "active"           BOOLEAN NOT NULL DEFAULT true
+    );
+  `)
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "Package_tutorId_idx" ON "Package"("tutorId");`,
+  )
+  // Money and lesson counts are SNAPSHOTTED here: editing or deleting the
+  // Package must never rewrite a deal that is already running.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Enrollment" (
+      "id"             TEXT PRIMARY KEY,
+      "packageId"      TEXT,
+      "studentId"      TEXT NOT NULL,
+      "tutorId"        TEXT NOT NULL,
+      "status"         "EnrollmentStatus" NOT NULL DEFAULT 'REQUESTED',
+      "lessonsTotal"   INTEGER NOT NULL,
+      "lessonsUsed"    INTEGER NOT NULL DEFAULT 0,
+      "priceTotal"     INTEGER NOT NULL,
+      "perLessonPrice" INTEGER NOT NULL,
+      "minutesPerLesson" INTEGER,
+      "paidAt"         TIMESTAMP,
+      "startsAt"       TIMESTAMP,
+      "expiresAt"      TIMESTAMP,
+      "createdAt"      TIMESTAMP NOT NULL DEFAULT now(),
+      "updatedAt"      TIMESTAMP NOT NULL DEFAULT now()
+    );
+  `)
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "Enrollment_studentId_createdAt_idx" ON "Enrollment"("studentId", "createdAt");`,
+  )
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "Enrollment_tutorId_status_idx" ON "Enrollment"("tutorId", "status");`,
+  )
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "Enrollment_status_expiresAt_idx" ON "Enrollment"("status", "expiresAt");`,
+  )
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "Enrollment_packageId_idx" ON "Enrollment"("packageId");`,
+  )
+  // Lesson LENGTH is a snapshot too — it was the one agreed scalar that was not.
+  // Both spend routes used to read it live off the Package, so a teacher editing
+  // „90 წუთი" down to „50" silently shortened every not-yet-booked lesson of
+  // every running enrollment (DELETE is refused while a package is in use;
+  // PATCH was not). Nullable rather than DEFAULT 50: a default is
+  // indistinguishable from a package that genuinely sells 50-minute lessons, and
+  // „we do not know" must not look like an answer.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Enrollment"
+      ADD COLUMN IF NOT EXISTS "minutesPerLesson" INTEGER;
+  `)
+  // Backfill the rows that predate the column, from the package they were sold
+  // from. Touches only NULLs, so it is idempotent and re-running it can never
+  // overwrite a snapshot that has since been taken.
+  await prisma.$executeRawUnsafe(`
+    UPDATE "Enrollment" e
+       SET "minutesPerLesson" = p."minutesPerLesson"
+      FROM "Package" p
+     WHERE e."packageId" = p."id" AND e."minutesPerLesson" IS NULL;
+  `)
+  // The whole packages design in one nullable column: a package lesson is an
+  // ORDINARY Booking, so reschedule/cancel/video/messages/reminders/disputes
+  // keep working untouched. NULL = every booking that exists today.
+  // ⚠️ Financial aggregates must filter `enrollmentId IS NULL` — the Enrollment
+  // already counted that money.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Booking"
+      ADD COLUMN IF NOT EXISTS "enrollmentId" TEXT;
+  `)
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "Booking_enrollmentId_idx" ON "Booking"("enrollmentId");`,
+  )
 
   // Indexes — cheap even if already present thanks to IF NOT EXISTS.
   await prisma.$executeRawUnsafe(
@@ -226,6 +483,46 @@ async function runMigrations() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Message_toId_createdAt_idx" ON "Message"("toId", "createdAt");`)
   // Every expert profile view loads that expert's consultation offerings.
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Consultation_tutorId_idx" ON "Consultation"("tutorId");`)
+
+  // ── pg_trgm: Georgian-aware expert search ──────────────────────────────
+  // Georgian declines heavily („მარკეტინგი" → „მარკეტინგის"/„მარკეტინგში"),
+  // so substring matching silently returns nothing for a perfectly normal
+  // query. lib/tutorsQuery ranks by trigram similarity instead; these GIN
+  // indexes back both that predicate and the ILIKE '%…%' arm it keeps (a
+  // gin_trgm_ops index serves LIKE/ILIKE contains too).
+  //
+  // WRAPPED IN try/catch ON PURPOSE: `CREATE EXTENSION` needs rights the app
+  // role may not have on some managed Postgres. pg_trgm is a TRUSTED extension
+  // on PG 13+ so a plain DB owner can create it (Railway's managed Postgres
+  // does), but if it is ever refused this must NOT take the boot — and it
+  // must not: lib/tutorsQuery catches the resulting „function
+  // word_similarity does not exist" and degrades to the old substring search.
+  // The whole block shares one catch because every index below depends on the
+  // gin_trgm_ops opclass the extension installs.
+  //
+  // Also declared in prisma/schema.prisma (@@index(..., type: Gin)), so no
+  // `prisma db push` is required either way — whichever runs first wins and
+  // the other is a no-op.
+  try {
+    await prisma.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`)
+    await prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "TutorProfile_specialty_trgm_idx" ON "TutorProfile" USING GIN ("specialty" gin_trgm_ops);`,
+    )
+    await prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "TutorProfile_headline_trgm_idx" ON "TutorProfile" USING GIN ("headline" gin_trgm_ops);`,
+    )
+    await prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "TutorProfile_bio_trgm_idx" ON "TutorProfile" USING GIN ("bio" gin_trgm_ops);`,
+    )
+    await prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "User_fullName_trgm_idx" ON "User" USING GIN ("fullName" gin_trgm_ops);`,
+    )
+    await prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "Category_name_trgm_idx" ON "Category" USING GIN ("name" gin_trgm_ops);`,
+    )
+  } catch (err) {
+    console.error('[dbBoot] pg_trgm setup skipped (search degrades to substring match):', err)
+  }
 }
 
 export function ensureDbReady(): Promise<void> {

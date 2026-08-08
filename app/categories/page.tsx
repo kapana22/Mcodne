@@ -1,29 +1,24 @@
 import Link from 'next/link'
-import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/pageSeo'
+import { socialMeta } from '@/lib/seo'
+import { jsonLdString } from '@/lib/jsonLd'
 import { prisma } from '@/lib/prisma'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
 import { Reveal } from '@/components/Reveal'
 import { Footer } from '@/components/Footer'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
+import { categoryIcon } from '@/lib/categoryMarks'
 import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
+import { getSiteTextMap } from '@/lib/siteText'
+import { SITE_TEXT_DEFAULTS } from '@/lib/siteTextDefs'
 import { SiteText } from '@/components/SiteTextProvider'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
-export const metadata: Metadata = {
-  title: 'სფეროები — მცოდნე',
-  description:
-    'აირჩიე შენი პროფესიული სფერო — ბიზნესი, ფინანსები, კარიერა, სამართალი და სხვ. — და იპოვე ხელით შერჩეული ექსპერტი.',
-  alternates: { canonical: `${SITE_URL}/categories` },
-  openGraph: {
-    title: 'სფეროები — მცოდნე',
-    description:
-      'აირჩიე შენი პროფესიული სფერო და იპოვე ხელით შერჩეული ექსპერტი.',
-    url: `${SITE_URL}/categories`,
-  },
-}
+// Editable in ადმინი → ტექსტები (group „SEO — …"). See lib/pageSeo.
+export const generateMetadata = () => pageMetadata('categories', '/categories')
 
 // Server component — Prisma-fed, no client JS needed for the browse view.
 // MUST stay force-dynamic. This page queries the DB (category counts), and on
@@ -34,56 +29,34 @@ export const metadata: Metadata = {
 // (Same constraint applies to every DB-querying page — never statically render one.)
 export const dynamic = 'force-dynamic'
 
-// Map arbitrary icon slug -> Icon.* key. Category.icon is a free-form string in
-// the schema (may reference a Lucide-ish name), so we take a best-effort match
-// and fall back to Icon.category for anything unknown.
-const ICON_MAP: Record<string, keyof typeof Icon> = {
-  business: 'graph',
-  finance: 'wallet',
-  money: 'money',
-  career: 'trend',
-  marketing: 'spark',
-  law: 'shield',
-  psychology: 'heart',
-  chat: 'chat',
-  doc: 'doc',
-  users: 'users',
-  bolt: 'bolt',
-  globe: 'globe',
-  graph: 'graph',
-  trend: 'trend',
-  wallet: 'wallet',
-  shield: 'shield',
-  heart: 'heart',
-  spark: 'spark',
-  category: 'category',
-}
+// The icon map that used to live here is GONE (2026-07-31). It pointed at the
+// generic UI set (graph/wallet/heart/…), covered seven of fifteen slugs and
+// dropped the rest onto one fallback glyph — measured: fifteen cards, six
+// distinct drawings. The hand-drawn category marks in lib/categoryMarks are now
+// the single source, shared with the home grid, so a category can no longer
+// wear two different faces depending on which page you are looking at.
 
-// Resolve an icon from the free-form `icon` field first, then fall back to the
-// category `slug` (which ICON_MAP also covers) so each sphere gets a distinct
-// glyph even when `icon` is null/unmapped — otherwise every card collapses to
-// the generic grid icon.
-function iconFor(icon: string | null | undefined, slug?: string | null) {
-  const tryKey = (v: string | null | undefined) => (v ? ICON_MAP[v.toLowerCase()] : undefined)
-  const key = tryKey(icon) ?? tryKey(slug)
-  return key ? Icon[key] : Icon.category
-}
-
-type ServiceType = 'CONSULTATION' | 'RECURRING'
-
-const SERVICE_PILL: Record<ServiceType, { label: string; cls: string }> = {
-  CONSULTATION: {
-    label: 'კონსულტაცია',
-    cls: 'bg-brand-50 text-brand-700 border-brand-100',
-  },
-  RECURRING: {
-    label: 'მენტორინგი',
-    // Informational chip → neutral ink per canon.
-    cls: 'bg-ink-75 text-ink-700 border-ink-200',
-  },
-}
+// THE „კონსულტაცია / მენტორინგი" PILL IS GONE (2026-07-31), and must not come
+// back while the product sells one thing.
+//
+// It rendered `Category.defaultServiceType`, which eight of fifteen spheres
+// carried as RECURRING → „მენტორინგი". Measured before removing it: every
+// booking in the database is CONSULTATION, no service carries a recurring
+// price or duration, and /categories/marketing — a sphere the index badged
+// „მენტორინგი" — contains the word „კონსულტაცია" 33 times and „მენტორინგი"
+// zero. The badge promised an offering the very next page contradicts, which
+// is the same failure as the subscription page that was removed for it.
+//
+// `defaultServiceType` still exists in the schema and in the admin toggle; it
+// simply is not a public claim. If recurring engagements ever ship, the label
+// comes back attached to something a visitor can actually buy.
 
 export default async function CategoriesPage() {
+  // Resolved here rather than through <SiteText> because these three strings
+  // are PROPS on <EmptyState>, not children — a component can't render a client
+  // context leaf into a plain `string` prop.
+  const map = await getSiteTextMap()
+  const t = (k: string) => map[k] ?? SITE_TEXT_DEFAULTS[k] ?? ''
   const cats = await prisma.category.findMany({
     where: { isLive: true },
     orderBy: [{ order: 'asc' }, { name: 'asc' }],
@@ -93,15 +66,70 @@ export default async function CategoriesPage() {
       name: true,
       icon: true,
       defaultServiceType: true,
-      // Count only PUBLICLY VISIBLE experts (available + not suspended) so the
-      // „X ექსპერტი" trust number matches what clicking through to /tutors shows
-      // — a bare count inflates it with paused/suspended profiles.
-      _count: { select: { tutors: { where: { available: true, user: { is: { suspendedAt: null } } } } } },
+      // Count only PUBLICLY VISIBLE experts so the „X ექსპერტი" trust number
+      // matches what clicking through actually shows. The three gates MUST stay
+      // in step with lib/tutorsQuery: available (not self-paused), not
+      // admin-suspended, and — added 2026-07-31 — at least one service, because
+      // a serviceless expert is hidden from browse and counting them here would
+      // promise a person the destination then withholds. Same drift that made
+      // the home page say „10 ექსპერტი" over a 9-expert list.
+      _count: {
+        select: {
+          tutors: {
+            where: {
+              available: true,
+              user: { is: { suspendedAt: null } },
+              consultations: { some: {} },
+            },
+          },
+        },
+      },
     },
   })
 
+  // Split the roster by whether the sphere can actually be entered today.
+  // 11 of the 15 live categories have nobody in them, and every one of those
+  // rendered a full-weight card — same size, same icon plate, same hairline —
+  // whose entire payload was the words „მალე დაემატება". Four screens of
+  // identical cards where the eye can find no signal, and the page as a whole
+  // read as an apology rather than as a directory. Populated spheres stay cards;
+  // the rest keep their links (they are real, indexable landing pages) but as
+  // one quiet line, which is the weight a „not yet" deserves.
+  const populated = cats.filter(c => c._count.tutors > 0)
+  const upcoming = cats.filter(c => c._count.tutors === 0)
+
+  // CollectionPage + ItemList: tells a crawler this URL IS the index of the
+  // sphere pages, and names each one. Without it the page was structurally
+  // anonymous — /konsultacia (the sibling index) had this from day one.
+  const collectionLd = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'სფეროები — მცოდნე',
+    url: `${SITE_URL}/categories`,
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: cats.length,
+      itemListElement: cats.map((c, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: `${SITE_URL}/categories/${c.slug}`,
+        name: c.name,
+      })),
+    },
+  }
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'მთავარი', item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: 'სფეროები' },
+    ],
+  }
+
   return (
     <div className="min-h-screen bg-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(collectionLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbLd) }} />
       <MarketingTopBar />
 
       <Container as="main" className="py-12 lg:py-16">
@@ -110,26 +138,41 @@ export default async function CategoriesPage() {
           <Eyebrow className="mb-3">
             სფეროები
           </Eyebrow>
-          <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05]">
+          <h1 className="font-display text-display lg:text-display-xl font-bold text-ink-900 tracking-tight leading-[1.05]">
             <SiteText k="categories.hero.title" />
           </h1>
-          <p className="mt-4 text-[15px] lg:text-[16px] text-ink-600 leading-relaxed">
+          <p className="mt-4 text-body-lg text-ink-600 leading-relaxed">
             <SiteText k="categories.hero.subtitle" />
           </p>
         </section>
 
-        {cats.length === 0 ? (
+        {/* The whole-catalogue-cold case. The „upcoming spheres" strip further
+            down deliberately stays a one-line footnote — putting a 200px
+            drawing on the EMPTY spheres would give them more visual weight than
+            the populated ones, the opposite of what that section is for. */}
+        {populated.length === 0 ? (
           <EmptyState
+            illustration="categoryComingSoon"
             icon={<Icon.category className="w-6 h-6" />}
-            title="სფეროები ჯერ არ არის"
-            description="მალე დავამატებთ. სცადე მოგვიანებით."
-            cta={{ label: 'ექსპერტების ძებნა', href: '/tutors' }}
+            title={t('categories.empty.title')}
+            description={t('categories.empty.body')}
+            cta={{ label: t('categories.empty.cta'), href: '/tutors' }}
           />
         ) : (
-          <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
-            {cats.map(c => {
-              const IconCmp = iconFor(c.icon, c.slug)
-              const pill = SERVICE_PILL[c.defaultServiceType as ServiceType]
+          /* Column count follows the CARD COUNT. A fixed 3-up left four cards
+             as „three and a lonely one", with two thirds of the second row
+             empty — the site has nine experts across four live spheres, so
+             that is the normal case, not an edge one. Two columns fill; a
+             single card doesn't stretch to full width either. */
+          <Reveal
+            stagger
+            className={`grid gap-4 lg:gap-5 ${
+              populated.length === 1 ? 'grid-cols-1 max-w-[420px]'
+              : populated.length <= 4 ? 'grid-cols-1 sm:grid-cols-2'
+              : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+            }`}
+          >
+            {populated.map(c => {
               const tutorCount = c._count.tutors
               return (
                 <Link
@@ -140,52 +183,75 @@ export default async function CategoriesPage() {
                   {/* Brand accent hairline — reveals on hover for a subtle premium cue. */}
                   <span
                     aria-hidden
-                    className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-brand-500 transition-transform duration-300 ease-out group-hover:scale-x-100"
+                    className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-brand-500 transition-transform duration-mid ease-out-quart group-hover:scale-x-100"
                   />
 
-                  <div className="flex items-start justify-between gap-3 mb-5">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-btn bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-all duration-300 ease-out group-hover:text-brand-700 motion-safe:group-hover:scale-110 motion-safe:group-hover:-rotate-3 motion-safe:group-active:scale-105 motion-safe:group-active:-rotate-2">
-                      <IconCmp className="w-6 h-6" />
+                  <div className="mb-5">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-btn bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-all duration-mid ease-out-quart group-hover:text-brand-700 motion-safe:group-hover:scale-110 motion-safe:group-active:scale-105">
+                      {categoryIcon(c.slug, 'w-6 h-6')}
                     </div>
-                    <span
-                      className={`inline-flex items-center h-6 px-2.5 rounded-pill border font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] ${pill.cls}`}
-                    >
-                      {pill.label}
-                    </span>
                   </div>
 
-                  <div className="font-display text-[18px] lg:text-[19px] font-bold text-ink-900 tracking-tight leading-tight transition-colors duration-200 group-hover:text-brand-700">
+                  <div className="font-display text-h3 lg:text-h2 font-bold text-ink-900 tracking-tight leading-tight transition-colors duration-mid group-hover:text-brand-700">
                     {c.name}
                   </div>
 
                   {/* Expert count — a trust signal, so the number carries the
-                      weight. A bold „0 ექსპერტი" reads as broken on a cold-start
-                      sphere, so a zero-count category shows a soft, honest
-                      „მალე დაემატება" chip instead (muted ink, hairline, no
-                      pastel fill per canon) — the card stays clickable. */}
-                  {tutorCount > 0 ? (
-                    <div className="mt-3 flex items-baseline gap-1.5">
-                      <span className="font-display text-[26px] lg:text-[28px] font-bold text-ink-900 tabular-nums leading-none">
-                        {tutorCount}
-                      </span>
-                      <span className="text-[13px] text-ink-500">ექსპერტი</span>
-                    </div>
-                  ) : (
-                    <div className="mt-3">
-                      <span className="inline-flex items-center h-6 px-2.5 rounded-pill bg-ink-75 text-ink-500 border border-ink-200 font-display text-[11px] font-semibold tracking-tight">
-                        მალე დაემატება
-                      </span>
-                    </div>
-                  )}
+                      weight. The old „მალე დაემატება" branch that lived here is
+                      gone: an empty sphere no longer reaches this grid at all
+                      (see the populated/upcoming split above), so every card in
+                      it has a real number to show. */}
+                  <div className="mt-3 flex items-baseline gap-1.5">
+                    <span className="font-display text-h1 font-bold text-ink-900 tabular-nums leading-none">
+                      {tutorCount}
+                    </span>
+                    <span className="text-small text-ink-500">ექსპერტი</span>
+                  </div>
 
                   <div className="mt-5 pt-4 border-t border-ink-100">
-                    <span className="inline-flex items-center gap-1.5 text-[12.5px] font-display font-semibold text-brand-700 transition-all duration-200 group-hover:gap-2.5">
-                      {tutorCount > 0 ? 'ნახე ექსპერტები' : 'გაიგე მეტი'}
+                    {/* `transition-all group-hover:gap-2.5` removed 2026-07-29 —
+                        a gap on a single-child flex container animates nothing;
+                        it was `transition-all` paying for a no-op every hover. */}
+                    <span className="inline-flex items-center gap-1.5 text-small font-display font-semibold text-brand-700">
+                      ნახე ექსპერტები
                     </span>
                   </div>
                 </Link>
               )
             })}
+          </Reveal>
+        )}
+
+        {/* Spheres with nobody in them yet. Still linked — each is a real,
+            indexable landing page, and someone who wants „ფინანსები" should be
+            able to reach it and see the honest state — but at the weight of a
+            footnote instead of eleven cards. Rendered only when at least one
+            sphere IS populated; on a completely cold catalogue the EmptyState
+            above is the whole answer and this would contradict it. */}
+        {populated.length > 0 && upcoming.length > 0 && (
+          <Reveal delay={120} className="mt-10 lg:mt-12 border-t border-ink-100 pt-6">
+            <Eyebrow tone="muted" className="mb-3"><SiteText k="categories.emptySpheres.eyebrow" /></Eyebrow>
+            <p className="text-small text-ink-500 leading-[1.7]">
+              {upcoming.map((c, i) => (
+                <span key={c.id}>
+                  {i > 0 && <span aria-hidden className="text-ink-300"> · </span>}
+                  <Link
+                    href={`/categories/${encodeURIComponent(c.slug)}`}
+                    className="text-ink-600 hover:text-brand-700 transition-colors duration-fast"
+                  >
+                    {c.name}
+                  </Link>
+                </span>
+              ))}
+            </p>
+            {/* No „გახდი ექსპერტი" CTA here on purpose: this is a server
+                component, so it cannot run <ApplyCtaGate>, and an ungated apply
+                link is exactly what showed „გახდი ექსპერტი" to people who
+                already are one (see the 2026-07-22 role-correctness fix). The
+                footer carries the gated one. */}
+            <p className="mt-3 text-meta text-ink-500">
+              ამ სფეროებში ექსპერტებს ჯერ ვარჩევთ.
+            </p>
           </Reveal>
         )}
       </Container>

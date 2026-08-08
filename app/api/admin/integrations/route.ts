@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { INTEGRATION_KEYS } from '@/lib/integrations'
@@ -15,7 +15,8 @@ type Field = keyof typeof FIELD_KEY
 
 // GET — current integration values for the admin editor.
 export async function GET() {
-  await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
   await ensureDbReady()
   const rows = await prisma.siteText.findMany({
     where: { key: { in: Object.values(FIELD_KEY) } },
@@ -43,7 +44,9 @@ const Body = z.object({
 })
 
 export async function PATCH(req: Request) {
-  const admin = await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  const admin = auth.user
   await ensureDbReady()
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })

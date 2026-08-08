@@ -136,7 +136,22 @@ select {
   letter-spacing: 0;
 }
 
-/* Uppercase eyebrows get MORE tracking (loose caps read better small). */
+/* ── THE eyebrow/label tracking — SINGLE SOURCE (canon 0.14em) ─────────────
+ * Every uppercase label (eyebrows, badge captions, micro labels) gets its
+ * letter-spacing from THIS rule and nowhere else. Loose caps read better
+ * small — and Georgian mtavruli needs the air even more than Latin.
+ *
+ * CASCADE FACT, verified 2026-08-01: this rule WINS over every `tracking-*`
+ * utility on an uppercase element. `[class*="uppercase"]` has the same
+ * specificity as a class (0,1,0), Tailwind's utilities are emitted at the
+ * `@tailwind utilities` line at the top of this file, and this rule comes
+ * later — so source order decides. Any `tracking-[0.18em]` etc. written next
+ * to `uppercase` at a call site is DEAD CODE (174 such sites across 10
+ * different values existed when this was measured; the site has rendered
+ * 0.14em everywhere all along). Change the value HERE to retune every
+ * uppercase label at once; never try to per-site it with a utility.
+ * (To genuinely opt one element out, drop `uppercase` or use an inline
+ * style — but that should basically never happen.) */
 [class*="uppercase"] {
   letter-spacing: 0.14em;
 }
@@ -174,11 +189,43 @@ label:has(> input.sr-only:focus-visible) {
   border-radius: 8px;
 }
 
+/* ─────────── THE MOTION SCALE (2026-07-29) ────────────────────────────
+ * The same three durations and two curves that tailwind.config.js exports as
+ * `duration-fast|mid|slow` / `ease-out-quart|out-expo`, restated here as
+ * custom properties so the CSS layer and the utility layer cannot drift apart.
+ * Every `transition`/`animation` below MUST reference these vars — a literal
+ * `220ms` or `cubic-bezier(…)` in this file is a bug.
+ *
+ *   --dur-fast  140ms  instant feedback (hover, focus, press, opacity toggle)
+ *   --dur-mid   220ms  visible state change (transform, elevation, progress)
+ *   --dur-slow  360ms  deliberate entrance (scroll reveal, drawer, surface)
+ *   --ease-out       the ONE default curve — anything settling to rest
+ *   --ease-entrance  the ONE alternative — entrances only (see note)
+ *
+ * Why two curves and not one: an entrance starts from a state the user has
+ * never seen, so `--ease-entrance` (expo) front-loads the travel and the
+ * element is legible in the first third — the tail is a settle, not a wait.
+ * A transition starts from a state the user is already looking at, where the
+ * same front-load reads as a snap. That is the whole rule; there is no third.
+ *
+ * Off-scale by nature and deliberately exempt: ambient infinite loops
+ * (`shimmer` 1.6s, `pulseSoft` 2.4s, the aurora drift) — they have no start
+ * and no end, so a "how long until it's done" duration is meaningless.
+ */
+:root {
+  --dur-fast: 140ms;
+  --dur-mid:  220ms;
+  --dur-slow: 360ms;
+  --ease-out:      cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* ─────────── Motion library ───────────────────────────────────────────
  * All keyframes live here (also exported to Tailwind so `animate-fade-in`
- * etc. work). Call sites should use `motion-safe:` variants — the
- * reduced-motion block at the bottom of this file cancels everything for
- * users who opt out.
+ * etc. work). Call sites MUST use `motion-safe:` variants — the
+ * reduced-motion block at the bottom of this file is a net, not the fix: it
+ * can only crush a duration to 0.001ms, which leaves a spinner frozen
+ * mid-arc rather than removed.
  */
 /* OPACITY-ONLY by contract (mirrors tailwind.config.js). fadeIn runs on the
    AppShell page wrapper: a transform here would make that wrapper a containing
@@ -226,10 +273,6 @@ label:has(> input.sr-only:focus-visible) {
   0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
   50%      { transform: translate3d(-44px, 32px, 0) scale(1.12); }
 }
-@keyframes auroraB {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50%      { transform: translate3d(48px, -26px, 0) scale(1.08); }
-}
 
 /* ─────────── Motion & depth utilities (motion-safe) ───────────
  * Short, calm transitions. Never bouncy — playful motion reads as loud on
@@ -241,8 +284,8 @@ label:has(> input.sr-only:focus-visible) {
   /* Card / tile hover lift — subtle raise + shadow ramp. Applied to any
      element with `.hover-lift`; used on cards, category tiles, KPI blocks. */
   .hover-lift {
-    transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
-                box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform var(--dur-mid) var(--ease-out),
+                box-shadow var(--dur-mid) var(--ease-out);
   }
   .hover-lift:hover {
     transform: translateY(-2px);
@@ -250,18 +293,26 @@ label:has(> input.sr-only:focus-visible) {
   }
   .hover-lift:active {
     transform: translateY(-1px);
-    transition-duration: 90ms;
+    transition-duration: var(--dur-fast);
   }
 
-  /* Interactive card — smooth border + shadow ramp on hover, no lift. Use
-     when the card must stay in the flow (list rows, comparison tiles). */
-  .card-interactive {
-    transition: box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
-                border-color 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  /* Tap-area expansion for controls that must STAY small (2026-08-05).
+     The canon minimum for anything tappable is 40px, but a breadcrumb crumb or
+     a „forgot?" link beside a field label cannot grow to 40px without becoming
+     a different design element — a 17px-tall text link is the correct visual,
+     and it was also a 17px-tall TARGET, which on a phone is a miss waiting to
+     happen. `.tap-area` leaves the box exactly where it is and hangs an
+     invisible ::before over it, so the finger gets ≥40px while the layout gets
+     nothing. Use it instead of padding whenever padding would move neighbours. */
+  .tap-area {
+    position: relative;
   }
-  .card-interactive:hover {
-    box-shadow: 0 10px 24px rgba(46, 42, 33, 0.07), 0 3px 6px rgba(46, 42, 33, 0.04);
-    border-color: rgba(198, 188, 169, 0.95);
+  .tap-area::before {
+    content: '';
+    position: absolute;
+    /* -12px vertical takes a 16–22px line to 40–46px; horizontal stays small so
+       adjacent crumbs cannot swallow each other's targets. */
+    inset: -12px -6px;
   }
 
   /* Button tap-shrink — brief scale on press. Applied globally to `button`
@@ -271,49 +322,21 @@ label:has(> input.sr-only:focus-visible) {
   [role="button"]:not(.no-tap-shrink),
   a.tap-shrink {
     transition-property: transform, background-color, color, border-color, box-shadow, opacity;
-    transition-duration: 140ms;
-    transition-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+    transition-duration: var(--dur-fast);
+    transition-timing-function: var(--ease-out);
   }
   button:not(.no-tap-shrink):not(:disabled):active,
   [role="button"]:not(.no-tap-shrink):active,
   a.tap-shrink:active {
     transform: scale(0.97);
-    transition-duration: 90ms;
-  }
-
-  /* Underline slide — anchor link hover state. Add `.link-slide` to any
-     nav/inline link that should get a Kobik-Airbnb underline reveal. */
-  .link-slide {
-    position: relative;
-  }
-  .link-slide::after {
-    content: '';
-    position: absolute;
-    left: 0; right: 0; bottom: -3px;
-    height: 2px;
-    background: currentColor;
-    transform: scaleX(0);
-    transform-origin: right;
-    transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .link-slide:hover::after,
-  .link-slide:focus-visible::after {
-    transform: scaleX(1);
-    transform-origin: left;
-  }
-
-  /* Page transition — every top-level route wrapper opts in via
-     `.page-in`. The fade is 240ms, imperceptibly quick but softens
-     hard cuts between routes. */
-  .page-in {
-    animation: fadeIn 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    transition-duration: var(--dur-fast);
   }
 
   /* Stagger children — nested lists / grids use `.stagger > *:nth-child(n)`
      with `animation-delay` set per child (Tailwind arbitrary values). This
      is a helper: pin every direct child to a `riseIn` starter, then the
      variant delays cascade the entrance. */
-  .stagger > * { animation: riseIn 380ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .stagger > * { animation: riseIn var(--dur-slow) var(--ease-entrance) both; }
   .stagger > *:nth-child(1) { animation-delay: 0ms; }
   .stagger > *:nth-child(2) { animation-delay: 40ms; }
   .stagger > *:nth-child(3) { animation-delay: 80ms; }
@@ -344,7 +367,7 @@ label:has(> input.sr-only:focus-visible) {
   textarea:focus-visible,
   select:focus-visible,
   summary:focus-visible {
-    transition: outline-offset 140ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: outline-offset var(--dur-fast) var(--ease-out);
   }
 
   /* Universal input focus glow — soft brand ring reveals smoothly on focus
@@ -367,8 +390,8 @@ label:has(> input.sr-only:focus-visible) {
   input[type="time"],
   textarea,
   select {
-    transition: box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
-                border-color 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: box-shadow var(--dur-mid) var(--ease-out),
+                border-color var(--dur-mid) var(--ease-out);
   }
   input:not([type]):focus,
   input[type="text"]:focus,
@@ -392,7 +415,7 @@ label:has(> input.sr-only:focus-visible) {
   input[type="checkbox"],
   input[type="radio"] {
     accent-color: #2F9C86;
-    transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform var(--dur-fast) var(--ease-out);
   }
   input[type="checkbox"]:active,
   input[type="radio"]:active {
@@ -400,7 +423,10 @@ label:has(> input.sr-only:focus-visible) {
   }
   input[type="checkbox"]:checked,
   input[type="radio"]:checked {
-    animation: scaleIn 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    /* Was cubic-bezier(0.34, 1.56, 0.64, 1) — a 3rd, overshooting curve.
+       Canon is "never bouncy"; a tick that springs past its size is the
+       loudest motion in a long form. On the scale's entrance curve now. */
+    animation: scaleIn var(--dur-mid) var(--ease-entrance) both;
   }
 
   /* ── Scroll-reveal (components/Reveal.tsx flips .is-visible) ──────────
@@ -411,8 +437,8 @@ label:has(> input.sr-only:focus-visible) {
   .reveal {
     opacity: 0;
     transform: translateY(14px);
-    transition: opacity 480ms cubic-bezier(0.16, 1, 0.3, 1),
-                transform 480ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: opacity var(--dur-slow) var(--ease-entrance),
+                transform var(--dur-slow) var(--ease-entrance);
   }
   .reveal.is-visible {
     opacity: 1;
@@ -421,8 +447,8 @@ label:has(> input.sr-only:focus-visible) {
   .reveal-stagger > * {
     opacity: 0;
     transform: translateY(12px);
-    transition: opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
-                transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: opacity var(--dur-slow) var(--ease-entrance),
+                transform var(--dur-slow) var(--ease-entrance);
   }
   .reveal-stagger.is-visible > * {
     opacity: 1;
@@ -436,31 +462,13 @@ label:has(> input.sr-only:focus-visible) {
   .reveal-stagger.is-visible > *:nth-child(n+7) { transition-delay: 360ms; }
 
   /* ── Aurora blobs — hero backdrop breathes (26s / 34s cycles). ── */
+  /* Ambient, aria-hidden, behind the hero — an infinite loop with no start
+     and no end, so neither the duration scale NOR the curve rule applies
+     (documented exception): `ease-in-out` is the correct shape for a
+     symmetric breathing cycle, where an exit-to-rest curve has nothing to
+     rest at. `.aurora-b` deleted 2026-07-29: zero usages. */
   .aurora-a { animation: auroraA 26s ease-in-out infinite; }
-  .aurora-b { animation: auroraB 34s ease-in-out infinite; }
 
-  /* ── Button sheen — a soft light sweep across primary CTAs on hover.
-   * White-alpha highlight only (not a palette hue, so no gradient-token
-   * violation). Host must tolerate overflow:hidden. */
-  .btn-sheen {
-    position: relative;
-    overflow: hidden;
-  }
-  .btn-sheen::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: -60%;
-    width: 40%;
-    background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.35), transparent);
-    transform: skewX(-18deg);
-    transition: left 640ms cubic-bezier(0.16, 1, 0.3, 1);
-    pointer-events: none;
-  }
-  .btn-sheen:hover::after {
-    left: 120%;
-  }
 }
 
 /* ── Hero glow washes — named decorative utilities (palette hues only).
@@ -473,7 +481,176 @@ label:has(> input.sr-only:focus-visible) {
   background: radial-gradient(closest-side, rgba(47, 156, 134, 0.13), rgba(47, 156, 134, 0));
 }
 
-/* Reduced-motion fallback: no transitions at all. */
+
+/* ── `.grain` — the thing that makes flat colour read as material ──────────
+ * A page built from flat #fff and flat #0F0E0A looks unfinished, and the usual
+ * cure — gradients on white — is what made 2015 SaaS look like 2015 SaaS. Grain
+ * is the opposite trade: it costs one inline SVG (no request, ~200 bytes), it
+ * adds no colour, and it is what separates „a white div" from „paper".
+ * Kept at 3.5% and screen-blended so it never dirties text; `pointer-events:
+ * none` because it is an overlay on top of its section. */
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* On the dark band the same grain has to be lighter to be visible at all. */
+.grain-dark::after { opacity: 0.06; }
+
+/* ── `.deep` — a black that isn't flat ─────────────────────────────────────
+ * ink-900 alone is a rectangle of paint. A very slight vertical lift plus one
+ * off-centre brand glow gives the band depth without ever reading as a
+ * „gradient background" — the colour shift is under 4% and the glow sits behind
+ * the numerals, which is the one place on the page green can be luminous. */
+.deep {
+  background-image:
+    radial-gradient(120% 90% at 78% 8%, rgba(47, 156, 134, 0.16), rgba(47, 156, 134, 0) 62%),
+    linear-gradient(180deg, #16150F 0%, #0F0E0A 55%, #0B0A07 100%);
+}
+
+/* ── `.glass` — THE translucent surface of the design system ───────────────
+ * ONE canonical glass: translucent white + a real backdrop blur, a hairline
+ * border and a lit top edge, so the surface reads as a pane of glass instead
+ * of a flat white rectangle.
+ *
+ * TWO EDGES, ONE MATERIAL:
+ *   `.glass`     → FLOATING surfaces that sit inside the page — pills, popovers,
+ *                  floating toolbars (the profile section-nav pill). Border all
+ *                  round + radius from the host.
+ *   `.glass-bar` → FULL-WIDTH bars pinned to a viewport edge (the public
+ *                  header). No radius, no box: a bottom hairline only, because
+ *                  a bar's left/right/top edges are the screen itself.
+ * Both are the same pane of glass — same promotion, same `@supports` fallback.
+ *
+ * USE THEM FOR chrome that page content passes *underneath*. Do NOT use them
+ * for cards in the normal flow — those sit ON the page, not over it, and keep
+ * `bg-white` + `border-ink-200`. Never re-invent a translucent
+ * `bg-white/xx backdrop-blur-*` string in page code; reach for these.
+ *
+ * The class owns background + border + shadow + radius-agnostic depth, so the
+ * host only adds `rounded-*`. Don't stack `shadow-*`/`bg-*`/`border-*` on top
+ * (this rule is unlayered CSS and therefore beats Tailwind utilities).
+ *
+ * DELIBERATELY TRANSPARENT (55%): the page background is white, so anything
+ * above ~0.8 alpha reads as a solid capsule and the blur becomes invisible.
+ * The whole point is that text and photos scrolling under it show through as a
+ * soft, saturated smudge.
+ *
+ * MOBILE-FLICKER HISTORY (2026-07-22 → superseded 2026-07-27): `backdrop-blur`
+ * on sticky/fixed MOBILE bars used to strobe on scroll, so blur was banned
+ * there and restricted to `lg:`. The cause is per-frame re-rasterisation of an
+ * un-promoted layer — so the fix is promotion, not avoidance: `translateZ(0)`
+ * + `will-change` + `backface-visibility` hand the surface to the compositor
+ * once, and the radius stays moderate (16px, never `blur-3xl`). The ban still
+ * stands for anything that is NOT layer-promoted.
+ * ONE-LINE REVERT if a real device ever strobes again: delete the two
+ * `backdrop-filter` declarations below — the `@supports` fallback background
+ * takes over and every glass surface degrades to a near-solid, legible white.
+ *
+ * `.glass-quiet` / `.glass-bar-quiet` = the same pane, flattened: no drop
+ * shadow (and, on the bar, a fainter hairline + more transparency). The header
+ * wears its `-quiet` variant at scroll-top so it sits flush with the page until
+ * you actually scroll.
+ */
+.glass {
+  /* 0.55 → 0.86 (2026-08-02). Glass is for surfaces you look PAST;
+     these carry labels you must READ. At 0.55 the section-nav pill's text
+     collided with the body copy behind it — and on any engine where the
+     blur silently fails to paint (GPU blocklist, low-power, macOS „Reduce
+     transparency") it was simply illegible. Still translucent, still
+     saturating what is behind it — just readable first. */
+  background-color: rgba(255, 255, 255, 0.86);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(223, 216, 203, 0.85); /* ink-200 hairline */
+  box-shadow: 0 6px 16px rgba(46, 42, 33, 0.10),
+              0 2px 4px rgba(46, 42, 33, 0.05),
+              inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  /* Compositor promotion — see the flicker note above. `will-change` carries
+     it on its own because an entrance animation (`animate-slide-in-b`) can
+     overwrite `transform` on the settled state. */
+  transform: translateZ(0);
+  will-change: backdrop-filter, transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transition: box-shadow var(--dur-mid) var(--ease-out),
+              background-color var(--dur-mid) var(--ease-out);
+}
+/* Must stay AFTER `.glass` — same specificity, later declaration wins. */
+.glass-quiet {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+/* ── `.glass-over-copy` — for a glass surface that floats over BODY TEXT ──────
+ * 55% white plus a blur is a beautiful material over a photo or a card, and a
+ * smear over a paragraph: measured on the expert profile at 390px, the floating
+ * section pill sat directly on top of the bio and left one line neither legible
+ * nor cleanly hidden — the worst of both. Blur cannot fix that; only opacity
+ * can. Phones are also where a translucent fixed layer costs the most to
+ * composite, so this is a mobile-only override and desktop keeps the material
+ * intact (there the pill sits in the page margin, over nothing).
+ * Must stay AFTER `.glass`. */
+@media (max-width: 1023.98px) {
+  .glass-over-copy {
+    background-color: rgba(255, 255, 255, 0.97);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    will-change: transform;
+  }
+}
+/* ── `.glass-bar` — the full-bleed variant ─────────────────────────────────
+ * Same material, bar geometry: edge-to-edge, so it has NO radius and NO box
+ * border — only a bottom hairline (drawn as an inset box-shadow so it can
+ * animate together with the elevation, and so a host `border-*` utility can't
+ * silently fight it).
+ *
+ * Blur/saturation run a touch hotter than `.glass` (20px / 190% vs 16 / 180):
+ * a bar spans the whole viewport, so it covers far more content than a pill
+ * does, and the softer pill setting lets busy photography read through as
+ * recognisable shapes — a smear instead of a pane. More blur, more saturation
+ * = the colour underneath still glows through, but as light, not as detail.
+ *
+ * The two states are the whole personality of the bar:
+ *   `.glass-bar-quiet` (scroll-top) — 55% white, faint hairline, no lift: the
+ *      bar is part of the page, the hero runs straight into it.
+ *   `.glass-bar` (scrolled)         — 72% white, crisp hairline + a low, wide
+ *      shadow: the page has visibly slid *under* the bar.
+ */
+.glass-bar {
+  background-color: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  backdrop-filter: blur(20px) saturate(190%);
+  border: 0;
+  box-shadow: inset 0 -1px 0 rgba(223, 216, 203, 0.95), /* ink-200 hairline */
+              0 1px 2px rgba(46, 42, 33, 0.04),
+              0 10px 28px -14px rgba(46, 42, 33, 0.22);
+  /* Compositor promotion — see the flicker note above. */
+  transform: translateZ(0);
+  will-change: backdrop-filter, transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transition: box-shadow var(--dur-mid) var(--ease-out),
+              background-color var(--dur-mid) var(--ease-out);
+}
+/* Must stay AFTER `.glass-bar` — same specificity, later declaration wins. */
+.glass-bar-quiet {
+  background-color: rgba(255, 255, 255, 0.8);
+  box-shadow: inset 0 -1px 0 rgba(223, 216, 203, 0.45);
+}
+/* No backdrop-filter support (old Firefox, locked-down engines): fall back to
+   a near-solid pane so the surface is still readable over any content. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-bar,
+  .glass-bar-quiet { background-color: rgba(255, 255, 255, 0.95); }
+}
+
+/* Reduced-motion NET — not the fix. `motion-safe:` at the call site is what
+   actually removes an animation; this blanket rule only crushes whatever got
+   through to 0.001ms, which stops a spinner mid-arc instead of replacing it.
+   Kept because a missed call site must still never move. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
@@ -565,6 +742,50 @@ html {
   }
 }
 
+/* ─────────── Back-to-top vs the bottom chrome ───────────
+ * `.back-to-top` (components/BackToTop) is fixed bottom-right and has to clear
+ * whatever else is pinned to that edge. It reads the SAME two body hooks the
+ * cookie banner and the toast host already use — one mechanism for „something
+ * occupies the bottom edge", not a third private offset.
+ *   data-bottom-nav="1" → the 64px mobile tab bar
+ *   data-mobile-cta     → a booking bar / sticky composer (up to ~122px).
+ *                         Matches ANY value, exactly like the banner lift: the
+ *                         in-flow composers set a different value on purpose.
+ * The CTA rule is declared SECOND so it wins on a page carrying both.
+ */
+@media (max-width: 1023px) {
+  body[data-bottom-nav="1"] .back-to-top {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+  body[data-mobile-cta] .back-to-top {
+    bottom: calc(134px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ─────────── Help widget vs the bottom chrome ───────────
+ * The help circle (components/HelpWidget) has to clear BACK-TO-TOP, which is
+ * itself lifted by the two rules above — so its offset cannot be a constant.
+ * It was one: `bottom-[4.5rem]` hardcoded in the component, which put it at
+ * 72px while a lifted BackToTop sat at 76px, on the same right rail, both
+ * 44px tall. They overlapped on every mobile page carrying the tab bar.
+ *
+ * `--help-bottom` is therefore derived from the SAME body hooks, one step
+ * above BackToTop: its bottom + its 44px height + a 12px gap. The panel reads
+ * the same variable (+56px) so the two move together. Custom properties
+ * inherit, and `body[…]` out-specifies `:root`, so the overrides win inside
+ * the document without either element knowing why.
+ */
+:root { --help-bottom: 72px; }            /* 16 (BackToTop) + 44 + 12 */
+@media (min-width: 640px) {
+  :root { --help-bottom: 80px; }          /* 24 + 44 + 12 */
+}
+@media (max-width: 1023px) {
+  body[data-bottom-nav="1"] { --help-bottom: calc(132px + env(safe-area-inset-bottom, 0px)); }
+  /* Below lg the widget hides itself while a CTA bar is up (see HelpWidget);
+     this keeps the ladder complete for the frame in which both are true. */
+  body[data-mobile-cta]     { --help-bottom: calc(190px + env(safe-area-inset-bottom, 0px)); }
+}
+
 /* ─────────── Scrollbar-less horizontal rails ───────────
  * Chip rails / card carousels scroll horizontally on mobile; the scrollbar
  * itself is visual noise there. (Class was already referenced in page code
@@ -620,10 +841,13 @@ td, th, label, span {
 
 /* ─────────── iOS input-zoom guard ───────────
  * Mobile Safari auto-zooms the page when a focused input's font-size is
- * under 16px. Page code sizes inputs at 13-14.5px via utility classes, so
- * below the desktop breakpoint we force every text-entry control to 16px.
- * `!important` is required: utility classes like `text-[14.5px]` would
- * otherwise out-rank the bare `textarea`/`select` element selectors.
+ * under 16px. Page code sizes inputs from the type scale (text-small 13px /
+ * text-body 14px), so below the desktop breakpoint we force every text-entry
+ * control to 16px. `!important` is required: type-scale utility classes like
+ * `text-body` would otherwise out-rank the bare `textarea`/`select` element
+ * selectors. Note this is the one place a font-size legitimately leaves the
+ * ramp — 16px is an iOS platform constant, and it happens to equal
+ * `text-body-lg` anyway.
  */
 @media (max-width: 1023px) {
   /* `input:not([type])` — a type-less <input> is a text field and would
@@ -665,7 +889,7 @@ td, th, label, span {
  *
  * 132px = the 124px reserve above + a hairline gap. The old 88px was measured
  * against a "~72px bar" that no longer exists — the profile booking bar is
- * ~122px tall, so the bar (z-[65]) clipped the banner's own buttons.
+ * ~122px tall, so the bar (z-overlay) clipped the banner's own buttons.
  *
  * Matches ANY value of the attribute (not just "1"): in-flow sticky composers
  * (/ask follow-up bar, full-screen chat) need the same lift but must NOT get
@@ -737,3 +961,42 @@ td, th, label, span {
 }
 .prose-post hr { margin: 2em 0; border: none; border-top: 1px solid #e6e4e0; }
 .prose-post code { font-size: 0.92em; }
+
+/* ── View Transitions (2026-08-01) ─────────────────────────────────────────
+   Page navigations run inside document.startViewTransition (wired by
+   next-view-transitions in app/layout.tsx). Two things happen:
+   1. every navigation cross-fades instead of blinking;
+   2. elements sharing a view-transition-name across the two pages MORPH —
+      today that is the expert photo (vt-photo-<id>): browse/home card square
+      → profile circle, position and radius animated by the browser.
+   Durations sit on the motion scale: the page fade is `fast` (a navigation is
+   feedback, not a performance), the photo morph is `mid` (something moves and
+   the eye follows it arriving). ease-out-quart to match every transition. */
+/* NOTE the var name: the custom property is `--ease-out` (matching the
+   `:root` block above), NOT `--ease-out-quart` (the Tailwind utility name).
+   A `var(--ease-out-quart)` here would be undefined → the declaration goes
+   invalid at computed-value time and the browser falls back to stock `ease`
+   — exactly the bug fixed 2026-08-01. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-fast);
+  animation-timing-function: var(--ease-out);
+}
+::view-transition-group(*) {
+  animation-duration: var(--dur-mid);
+  animation-timing-function: var(--ease-out);
+}
+/* The photo pair swaps a square for a circle; letting both snapshots show
+   during the flight doubles the face. Keep only the incoming one. */
+::view-transition-old(*):only-child { animation-name: none; opacity: 0; }
+
+/* MANDATORY quiet-mode: the API has no motion-safe variant, so the guard
+   lives here. Zero duration = instant swap, exactly the pre-transition UX. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-image-pair(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

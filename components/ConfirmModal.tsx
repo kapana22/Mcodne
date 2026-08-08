@@ -19,7 +19,7 @@
 //   • Tab / Shift+Tab cycles inside the modal (focus trap)
 //   • Escape or backdrop click → cancel (disabled while `busy`)
 //   • Page scroll locked while open (vertical axis only — see Sheet)
-//   • `motion-safe:animate-[fadeIn_180ms_ease-out]` — respects prefers-reduced-motion
+//   • `motion-safe:animate-fade-in-fast` — motion-safe is mandatory (canon)
 //   • Tone drives confirm-button color: danger/brand/warning
 //   • busy → both buttons disabled + confirm shows "ინახება…"
 
@@ -32,8 +32,10 @@ type Tone = 'danger' | 'brand' | 'warning'
 
 const TONE_CLS: Record<Tone, string> = {
   danger:  'bg-danger-500 hover:bg-danger-600 active:bg-danger-700 text-white focus-visible:ring-danger-300',
-  brand:   'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white focus-visible:ring-brand-300',
-  warning: 'bg-warning-500 hover:bg-warning-600 active:bg-warning-700 text-white focus-visible:ring-warning-300',
+  brand:   'bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white focus-visible:ring-brand-300',
+  // Fills start at 600, like brand: white on warning-500 is 3.67:1 and fails AA
+  // for text (600 = 5.51). Same rule as CLAUDE.md's brand-600 note.
+  warning: 'bg-warning-600 hover:bg-warning-700 active:bg-warning-800 text-white focus-visible:ring-warning-300',
 }
 
 type Props = {
@@ -133,7 +135,7 @@ export function ConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-0 sm:p-4 motion-safe:animate-[fadeIn_180ms_ease-out]"
+      className="fixed inset-0 z-confirm flex items-end sm:items-center justify-center p-0 sm:p-4 motion-safe:animate-fade-in-fast"
       ref={containerRef}
     >
       <button
@@ -153,14 +155,14 @@ export function ConfirmModal({
         <div className="px-6 pt-6 pb-4">
           <h2
             id={titleId}
-            className="font-display text-[18px] font-bold text-ink-900 tracking-tight leading-snug"
+            className="font-display text-h3 font-bold text-ink-900 tracking-tight leading-snug"
           >
             {title}
           </h2>
           {body && (
             <div
               id={descId}
-              className="mt-2 text-[13.5px] text-ink-600 leading-relaxed"
+              className="mt-2 text-body text-ink-600 leading-relaxed"
             >
               {body}
             </div>
@@ -172,7 +174,7 @@ export function ConfirmModal({
             type="button"
             onClick={cancel}
             disabled={busy}
-            className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink-300 disabled:opacity-50 disabled:pointer-events-none"
+            className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-small transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink-300 disabled:opacity-50 disabled:pointer-events-none"
           >
             {xLabel}
           </button>
@@ -180,7 +182,7 @@ export function ConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={busy || confirmDisabled}
-            className={`h-11 px-4 rounded-btn font-display font-semibold text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:pointer-events-none inline-flex items-center justify-center gap-2 ${TONE_CLS[tone]}`}
+            className={`h-11 px-4 rounded-btn font-display font-semibold text-small transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:pointer-events-none inline-flex items-center justify-center gap-2 ${TONE_CLS[tone]}`}
           >
             {busy ? (
               <>

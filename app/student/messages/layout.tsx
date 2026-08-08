@@ -18,7 +18,11 @@ export default function StudentMessagesLayout({ children }: { children: React.Re
   return (
     <Container as="main" className={`w-full py-6 lg:py-8 flex-1 flex flex-col ${threadOpen ? 'max-lg:!px-0 max-lg:!py-0' : ''}`}>
       <PageHeader
-        className={`mb-4 lg:mb-5 ${threadOpen ? 'hidden lg:block' : ''}`}
+        // `sr-only`, never `hidden` — the h1 stays in the accessibility tree so
+        // „skip to content" and screen-reader outlines have a title. Hidden
+        // VISUALLY on lg+ (where it duplicates the highlighted sidebar pill) and
+        // on a phone with a thread open (focused screen). Mirrors the tutor side.
+        className={`mb-4 lg:mb-5 ${threadOpen ? 'sr-only' : 'lg:sr-only'}`}
         eyebrow="შეტყობინებები"
         title="მიმოწერა"
       />
@@ -39,8 +43,8 @@ export default function StudentMessagesLayout({ children }: { children: React.Re
         <div className={`${threadOpen ? 'hidden lg:flex' : 'flex'} flex-col min-h-0 h-full lg:border-r lg:border-ink-100`}>
           <ConversationList
             empty={{
-              title: 'მიმოწერა ჯერ არ გაქვს',
-              description: 'მიწერე ექსპერტს — საუბარი აქ გამოჩნდება.',
+              title: 'შეტყობინებები ჯერ არ არის',
+              description: 'ექსპერტთან მიმოწერა აქ გამოჩნდება.',
               cta: { label: 'იპოვე ექსპერტი', href: '/tutors' },
             }}
           />

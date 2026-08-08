@@ -9,7 +9,8 @@ import { ConfirmModal } from '@/components/ConfirmModal'
 import { Icon } from '@/components/Icon'
 import { SkeletonRow } from '@/components/Skeleton'
 import { useToast } from '@/components/ToastProvider'
-import { fmtKaDate, fmtKaTime } from '@/lib/kaDate'
+import { TzNote } from '@/components/workspace/TzNote'
+import { sessionDate, sessionTime } from '@/components/workspace/sessionTime'
 import { refreshNavBadges } from '@/components/tutor/useNavBadges'
 import type { DashBooking } from './types'
 
@@ -61,11 +62,14 @@ export function PendingRequests({
       <div className="px-5 sm:px-6 py-4 border-b border-ink-100 flex items-center justify-between">
         <div>
           <Eyebrow tone="muted">ჯავშნის მოთხოვნები</Eyebrow>
-          <div className="font-display text-[15px] font-bold text-ink-900 mt-0.5">{loading ? '—' : `${pending.length} მოთხოვნა`}</div>
+          <div className="font-display text-body-lg font-bold text-ink-900 mt-0.5">{loading ? '—' : `${pending.length} მოთხოვნა`}</div>
         </div>
-        <Link href="/tutor/bookings?tab=attention" className="text-[12px] text-brand-700 hover:text-brand-800 font-semibold inline-flex items-center gap-1">
-          ყველა
-        </Link>
+        <div className="flex items-center gap-3 shrink-0">
+          <TzNote />
+          <Link href="/tutor/bookings?tab=attention" className="text-meta text-brand-700 hover:text-brand-800 font-semibold inline-flex items-center gap-1">
+            ყველა
+          </Link>
+        </div>
       </div>
       {loading ? (
         <div className="divide-y divide-ink-100">
@@ -73,7 +77,7 @@ export function PendingRequests({
           <SkeletonRow />
         </div>
       ) : pending.length === 0 ? (
-        <div className="p-6 text-center text-[13px] text-ink-500">ახალი მოთხოვნა არ არის.</div>
+        <div className="p-6 text-center text-small text-ink-500">ახალი მოთხოვნა არ არის.</div>
       ) : (
         <ul className="divide-y divide-ink-100">
           {pending.slice(0, 6).map(b => (
@@ -81,11 +85,18 @@ export function PendingRequests({
               <div className="flex items-center gap-3 flex-wrap">
                 <Avatar src={b.student?.avatarUrl ?? undefined} name={b.student?.fullName} size={40} />
                 <div className="flex-1 min-w-0">
-                  <div className="font-display text-[14px] font-bold text-ink-900 truncate">{b.student?.fullName ?? 'უცნობი'}</div>
-                  <div className="text-[12.5px] text-ink-600 truncate">{b.topic}</div>
-                  <div className="text-[11.5px] text-ink-500 mt-1 flex items-center gap-3 flex-wrap">
-                    <span className="inline-flex items-center gap-1"><Icon.calendar className="w-3 h-3" />{fmtKaDate(new Date(b.startAt))}</span>
-                    <span className="inline-flex items-center gap-1"><Icon.clock className="w-3 h-3" />{fmtKaTime(new Date(b.startAt))} · {b.durationMin} წთ</span>
+                  <div className="font-display text-body font-bold text-ink-900 truncate">{b.student?.fullName ?? 'უცნობი'}</div>
+                  <div className="text-small text-ink-600 truncate">{b.topic}</div>
+                  {b.proposedByStudent && (
+                    // Says WHY this time is not in their calendar, before they
+                    // go looking for the bug that isn't there.
+                    <div className="mt-1 inline-flex items-center gap-1.5 h-5 px-2 rounded-pill border border-ink-200 text-ink-700 font-display text-micro font-bold uppercase">
+                      კლიენტის შემოთავაზებული დრო
+                    </div>
+                  )}
+                  <div className="text-meta text-ink-500 mt-1 flex items-center gap-3 flex-wrap">
+                    <span className="inline-flex items-center gap-1"><Icon.calendar className="w-3 h-3" />{sessionDate(b.startAt)}</span>
+                    <span className="inline-flex items-center gap-1"><Icon.clock className="w-3 h-3" />{sessionTime(b.startAt)} · {b.durationMin} წთ</span>
                     <span className="font-display font-bold text-ink-800">₾{b.price}</span>
                   </div>
                 </div>
@@ -104,7 +115,7 @@ export function PendingRequests({
       )}
       {pending.length > 6 && (
         <div className="px-5 py-3 border-t border-ink-100 text-center">
-          <Link href="/tutor/bookings?tab=attention" className="text-[12.5px] text-brand-700 hover:text-brand-800 font-semibold">კიდევ {pending.length - 6} მოთხოვნა</Link>
+          <Link href="/tutor/bookings?tab=attention" className="text-small text-brand-700 hover:text-brand-800 font-semibold">კიდევ {pending.length - 6} მოთხოვნა</Link>
         </div>
       )}
 

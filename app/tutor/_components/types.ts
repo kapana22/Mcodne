@@ -17,6 +17,10 @@ export type DashBooking = {
   price: number
   student: { id: string; fullName: string; avatarUrl?: string | null } | null
   rescheduleRequest?: ReschedulePayload | null
+  /** The CLIENT named this time rather than picking a published one
+   *  (request-based booking). The expert's card must say so — otherwise a
+   *  booking at a time they never published reads as a calendar bug. */
+  proposedByStudent?: boolean
 }
 
 export const toneOf = (s: BookingStatus) =>

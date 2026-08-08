@@ -31,7 +31,10 @@ export function Logo({ size = 'md', href }: { size?: Size; href?: string | null 
   if (href === null) return inner
   const dest = href ?? '/'
   return (
-    <Link href={dest} aria-label="მცოდნე — მთავარზე" className="inline-flex rounded-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
+    // items-center + a 40px floor below sm: the wordmark itself renders 28px
+    // tall, so the home link was the one control on the page you could miss with
+    // a thumb. The mark does not grow — only its hit area does.
+    <Link href={dest} aria-label="მცოდნე — მთავარზე" className="inline-flex items-center min-h-[40px] sm:min-h-0 rounded-btn hover:opacity-80 transition-opacity duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
       {inner}
     </Link>
   )

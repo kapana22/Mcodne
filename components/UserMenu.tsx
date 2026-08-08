@@ -5,6 +5,7 @@
 // drop this in without duplicating the menu logic.
 
 import Link from 'next/link'
+import { showApplyCta } from '@/lib/roleHome'
 import { usePathname } from 'next/navigation'
 import { Fragment, useEffect, useRef, useState, type ReactElement } from 'react'
 import { Avatar } from './Avatar'
@@ -13,6 +14,7 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { signOut as doSignOut } from '@/lib/signout'
 import { useNotifications } from '@/lib/notifications'
 import { useMe } from '@/lib/me'
+import { useMenuKeys } from '@/lib/useMenuKeys'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 
@@ -32,6 +34,14 @@ type MenuItem = {
 
 const STUDENT_ITEMS = (onSignout: () => void): MenuItem[] => [
   { href: '/student/profile',   label: 'პროფილი',       icon: Icon.user },
+  // „გახდი ექსპერტი" belongs HERE, not only at the bottom of /student/profile.
+  // Traced from a real signup (2026-07-29): the person registered as a STUDENT,
+  // spent ten minutes looking for how to offer consultations, edited her profile,
+  // viewed two expert pages and left — she never reached /apply. The path existed
+  // in exactly ONE place: below the sign-out button on a page she had to seek out.
+  // The account menu is where someone hunting for „how do I…" actually looks.
+  // Only for a plain STUDENT — an expert/admin has no use for it.
+  { href: '/apply',             label: 'გახდი ექსპერტი', icon: Icon.briefcase },
   { href: '/settings',          label: 'პარამეტრები',   icon: Icon.settings },
   { href: '/notifications',     label: 'შეტყობინებები', icon: Icon.bell },
   { href: '/help',              label: 'დახმარება',     icon: Icon.info },
@@ -72,6 +82,9 @@ export function UserMenu({
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
+  // ↑/↓/Home/End/Escape/Tab for the dropdown. The role="menu" below was already
+  // promising this behaviour and not delivering it.
+  const { triggerRef, menuProps } = useMenuKeys(open, () => setOpen(false))
 
   // Unread indicator on the avatar (count chip — canon bans status dots) — reads the shared
   // lib/notifications store so bell / user menu / bottom nav stay in sync
@@ -94,7 +107,9 @@ export function UserMenu({
       if (!ref.current?.contains(e.target as Node)) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      // Focus goes back to the avatar button — the menu's own handler does the
+      // same, and two Escape paths must not behave differently.
+      if (e.key === 'Escape') { setOpen(false); triggerRef.current?.focus() }
     }
     document.addEventListener('mousedown', onClick)
     document.addEventListener('keydown', onKey)
@@ -129,43 +144,52 @@ export function UserMenu({
       ? { href: '/tutor', label: 'ექსპერტის სივრცე', icon: Icon.briefcase }
       : { href: '/student', label: 'სტუდენტის სივრცე', icon: Icon.home }
     : null
-  const items = switchItem ? [switchItem, ...baseItems] : baseItems
+  // ADMIN manages all three worlds — give the menu direct doors into both
+  // spaces (user request 2026-08-01: „ადმინადაც და სტუდენტადაც… იკარგება").
+  const adminSpaceItems: MenuItem[] = role === 'ADMIN'
+    ? [
+        { href: '/student', label: 'სტუდენტის სივრცე', icon: Icon.home },
+        { href: '/tutor', label: 'ექსპერტის სივრცე', icon: Icon.briefcase },
+      ]
+    : []
+  // „გახდი ექსპერტი" only for someone who can actually apply — an approved
+  // expert browsing their client space was still being invited to become one.
+  const gated = baseItems.filter(i => i.href !== '/apply' || showApplyCta(role))
+  const items = [...(switchItem ? [switchItem] : []), ...adminSpaceItems, ...gated]
 
   const initialName = user?.name ?? ''
 
   return (
     <div ref={ref} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-label={unread > 0 ? `მომხმარებლის მენიუ — ${unread} წაუკითხავი` : 'მომხმარებლის მენიუ'}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="relative inline-flex items-center gap-2 h-10 pl-1 pr-2 rounded-btn hover:bg-ink-100 transition-colors"
+        className="relative inline-flex items-center gap-2 h-11 pl-1 pr-2 rounded-btn hover:bg-ink-100 transition-colors duration-fast"
       >
         <Avatar src={user?.avatar ?? undefined} name={initialName} size={32} />
         <Icon.chevD className="w-3.5 h-3.5 text-ink-500" />
-        {/* Count chip, not a status dot (canon) — the same badge the bell uses,
-            so the two unread surfaces read identically. A number also says how
-            much is waiting, which the dot never did. */}
-        {unread > 0 && (
-          <span
-            aria-hidden
-            className="absolute top-0.5 left-[18px] min-w-[16px] h-[16px] px-1 rounded-full bg-danger-500 text-white font-display text-[9.5px] font-bold tabular-nums inline-flex items-center justify-center ring-2 ring-white motion-safe:animate-scale-in"
-          >
-            {unread > 9 ? '9+' : unread}
-          </span>
-        )}
+        {/* NO unread badge here (removed 2026-07-30). Every top bar that
+            renders this menu renders a NotifBell immediately to its left with
+            the identical count — the avatar badge painted the same number twice,
+            40px apart. Measured: one unread message produced FOUR red badges on
+            a single mobile screen (bell, avatar, messages tab, profile tab). The
+            bell owns the count; this is the account menu. The aria-label above
+            still carries it, so a screen-reader user loses nothing. */}
       </button>
 
       {open && (
         <div
+          {...menuProps}
           role="menu"
-          className="absolute right-0 top-full mt-2 w-[240px] bg-white border border-ink-200 rounded-card shadow-float z-50 overflow-hidden motion-safe:animate-[fadeIn_140ms_ease-out]"
+          className="absolute right-0 top-full mt-2 w-[240px] bg-white border border-ink-200 rounded-card shadow-float z-50 overflow-hidden motion-safe:animate-fade-in-fast"
         >
           {initialName && (
             <div className="px-4 pt-3 pb-2 border-b border-ink-100">
-              <div className="font-display text-[13px] font-bold text-ink-900 truncate">{initialName}</div>
+              <div className="font-display text-small font-bold text-ink-900 truncate">{initialName}</div>
               <Eyebrow tone="muted" className="mt-0.5">
                 {role === 'TUTOR' ? 'ექსპერტი' : role === 'ADMIN' ? 'ადმინი' : 'სტუდენტი'}
               </Eyebrow>
@@ -181,7 +205,7 @@ export function UserMenu({
               // desktop and the divider would otherwise dangle at the top.
               const needsDivider = !item.mobileOnly && idx > 0 && !!items[idx - 1]?.mobileOnly
               const liCls = item.mobileOnly ? 'lg:hidden' : ''
-              const cls = `w-full text-left px-4 h-10 inline-flex items-center gap-3 text-[13.5px] font-display font-medium transition-colors ${
+              const cls = `w-full text-left px-4 h-11 inline-flex items-center gap-3 text-body font-display font-medium transition-colors duration-fast ${
                 item.danger
                   ? 'text-danger-700 hover:bg-danger-50'
                   : 'text-ink-800 hover:bg-ink-50'
@@ -198,7 +222,7 @@ export function UserMenu({
                       notifications treatment. No status dots (canon). */}
                   <span className={`flex-1 ${itemUnread > 0 ? 'font-bold text-ink-900' : ''}`}>{item.label}</span>
                   {itemUnread > 0 && (
-                    <span className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-brand-500 text-white font-display text-[11px] font-bold tabular-nums">
+                    <span className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-brand-600 text-white font-display text-meta font-bold tabular-nums">
                       {itemUnread > 9 ? '9+' : itemUnread}
                     </span>
                   )}

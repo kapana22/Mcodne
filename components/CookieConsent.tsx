@@ -59,34 +59,56 @@ export function CookieConsent() {
   return (
     <div
       role="region"
+      // KEEP THIS LABEL VERBATIM: globals.css targets the banner by
+      // `[aria-label="Cookie consent"]` to lift it clear of the mobile tab bar
+      // and of any sticky booking bar. Rename it and both offsets go dark.
       aria-label="Cookie consent"
-      // z-[60] — ABOVE page chrome (headers z-40, BottomNav z-40, mobile CTA
-      // bars z-[65]… which the CSS lift rule moves the banner clear of anyway)
-      // but BELOW every full-screen overlay: the mobile nav drawer (z-[70]),
-      // Sheet (80), ConfirmModal (90), toasts (95). It used to be z-[70] AND
+      // z-consent — still ABOVE page chrome (headers z-40, BottomNav z-40) and
+      // still BELOW every full-screen overlay: the mobile nav drawer (z-drawer),
+      // Sheet (80), ConfirmModal (90), toasts (95). It used to be z-drawer AND
       // rendered after {children} in AppShell, so it tied with the nav drawer
       // and won on DOM order — covering the drawer's „დაწყება" button.
-      className="fixed bottom-3 left-3 right-3 sm:left-4 sm:right-auto sm:bottom-4 sm:max-w-md z-[60] motion-safe:animate-[fadeIn_220ms_ease-out]"
+      //
+      // Dropped 60 → 50 on 2026-08-02: at 1440px the banner sits bottom-left and
+      // at z-60 it painted OVER the expert profile's section-nav pill (z-pill)
+      // and the top of the availability calendar — i.e. over the two controls a
+      // visitor uses to decide, while asking them about cookies. Everything
+      // between 50 and 55 is a decision surface; consent is not one, so it
+      // yields. On mobile the CTA bar is z-overlay and the CSS lift already moves
+      // the banner off it entirely, so nothing there depends on this number.
+      className="fixed inset-x-0 bottom-0 sm:inset-x-auto sm:left-4 sm:right-auto sm:bottom-4 sm:max-w-md z-consent motion-safe:animate-fade-in-fast"
     >
-      <div className="rounded-card border border-ink-200 bg-white shadow-pop p-4 sm:p-4">
-        <p className="text-[12.5px] leading-[1.55] text-ink-800">
-          ვიყენებთ ქუქიებს პლატფორმის მუშაობისთვის.{' '}
+      {/* ONE ROW ON MOBILE, a card from sm up (2026-08-02). As a card at 390px
+          this was ~117px of an 844px viewport, and stacked with the profile's
+          booking bar it took 249px — 29% of the screen, covering the decision
+          it was interrupting. A bar flush to the bottom edge with the copy
+          trimmed to what it has to say is ~56px. Same buttons, same consent
+          logic (components/Analytics.tsx gates GA on it) — only the geometry
+          and the wording length change. */}
+      <div className="bg-white shadow-pop border-t border-ink-200 sm:border sm:rounded-card flex items-center gap-2 sm:block px-4 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] sm:p-4 sm:pb-4">
+        <p className="flex-1 min-w-0 text-meta sm:text-small leading-snug sm:leading-[1.55] text-ink-700 sm:text-ink-800">
+          <span className="sm:hidden">ვიყენებთ ქუქიებს.</span>
+          <span className="hidden sm:inline">ვიყენებთ ქუქიებს პლატფორმის მუშაობისთვის.</span>{' '}
           <Link href="/cookies" className="font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 decoration-brand-300">
-            ქუქიების პოლიტიკა
+            <span className="sm:hidden">პოლიტიკა</span>
+            <span className="hidden sm:inline">ქუქიების პოლიტიკა</span>
           </Link>
         </p>
-        <div className="mt-3 flex items-center gap-2 justify-end flex-wrap">
+        <div className="shrink-0 flex items-center gap-2 justify-end sm:mt-3 sm:flex-wrap">
           <button
             type="button"
             onClick={() => decide('necessary')}
-            className="h-9 px-3 rounded-btn text-ink-600 hover:text-ink-900 font-display font-semibold text-[12.5px] transition-colors"
+            className="h-10 sm:h-9 px-2.5 sm:px-3 rounded-btn text-ink-600 hover:text-ink-900 font-display font-semibold text-small whitespace-nowrap transition-colors duration-fast"
           >
-            მხოლოდ საჭირო
+            {/* „მხოლოდ საჭირო" doesn't fit the one-row bar at 390px; „საჭირო"
+                carries the same meaning next to „თანხმობა". */}
+            <span className="sm:hidden">საჭირო</span>
+            <span className="hidden sm:inline">მხოლოდ საჭირო</span>
           </button>
           <button
             type="button"
             onClick={() => decide('accepted')}
-            className="h-9 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[12.5px] transition-colors"
+            className="h-10 sm:h-9 px-3 sm:px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-small whitespace-nowrap transition-colors duration-fast"
           >
             თანხმობა
           </button>

@@ -11,6 +11,31 @@ import { KA_MONTHS_SHORT, KA_MONTHS_LONG, KA_WEEKDAYS_SHORT, KA_WEEKDAYS_LONG } 
 export const TBILISI = 'Asia/Tbilisi'
 export const TZ_LABEL = 'თბილისის დროით'
 
+/** Georgia is a fixed UTC+4 and observes no DST, so a constant shift is exact. */
+export const TB_OFFSET_MS = 4 * 3_600_000
+
+/**
+ * Tbilisi wall-clock parts for an instant: ISO weekday (1 = Monday … 7 =
+ * Sunday), hour, minute.
+ *
+ * ⚠️ USE THIS INSTEAD OF `getDay()` / `getHours()` IN SERVER CODE. Those read
+ * whichever zone the PROCESS is in. Production sets `TZ=Asia/Tbilisi`, so they
+ * currently agree with Tbilisi — by accident of an environment variable, not
+ * because anything says so. That accident is unset in local dev today, and a
+ * comparison that silently means a different hour on two machines is the kind
+ * of bug that reads as „no free time" rather than as a bug.
+ *
+ * `lib/postSession → tbilisiHour` was the first place to need this and used the
+ * same +4 trick privately; it now delegates here so the offset has one home.
+ * For FORMATTING, don't reach for this — use `fmtDateTime(..., TBILISI)` below
+ * or `components/workspace/sessionTime`.
+ */
+export function tbilisiParts(d: Date): { isoDow: number; hour: number; minute: number } {
+  const t = new Date(d.getTime() + TB_OFFSET_MS)
+  const dow = t.getUTCDay()
+  return { isoDow: dow === 0 ? 7 : dow, hour: t.getUTCHours(), minute: t.getUTCMinutes() }
+}
+
 // Best-effort browser tz detection. Server has no window so we fall back to
 // Tbilisi — callers should re-format in an effect after mount if they want
 // the local-machine value.
@@ -20,6 +45,40 @@ export function userTimezone(): string {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || TBILISI
   } catch {
     return TBILISI
+  }
+}
+
+/**
+ * How many hours AHEAD of the viewer Tbilisi is, at `at`. Berlin → 2, London →
+ * 3, New York → 8, Tbilisi → 0. Negative would mean Tbilisi is behind (nowhere
+ * a Georgian diaspora is large, but the sign is honest either way).
+ *
+ * WHY A DELTA AND NOT A ZONE NAME. „დროის ზონა: შენი (Europe/Berlin)" is
+ * accurate and tells a reader nothing: they do not need to be told which zone
+ * they live in, they need to know what a Tbilisi expert's day looks like from
+ * where they are. „თბილისში 2 საათით მეტია" answers that in one glance, and it
+ * is the whole question for someone booking across a border.
+ *
+ * Computed from wall-clock parts rather than getTimezoneOffset() so it is
+ * correct on both sides of either zone's DST switch (Georgia has none; most of
+ * the diaspora's zones do, which is exactly when a hardcoded „+2" starts
+ * lying). Half-hour zones (India, Iran) round to the nearest hour — the label
+ * is a rounded hint, and the actual times shown are always exact.
+ */
+export function tbilisiDeltaHours(at: Date = new Date()): number {
+  try {
+    const asUtc = (tz: string) => {
+      const p = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      }).formatToParts(at)
+      const g = (t: Intl.DateTimeFormatPartTypes) => Number(p.find(x => x.type === t)?.value)
+      return Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'))
+    }
+    return Math.round((asUtc(TBILISI) - asUtc(userTimezone())) / 3_600_000)
+  } catch {
+    return 0
   }
 }
 

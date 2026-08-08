@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { slugify } from '@/lib/slug'
 import { ensureDbReady } from '@/lib/dbBoot'
@@ -12,6 +12,19 @@ const SELECT = {
   publishedAt: true, updatedAt: true,
 } as const
 
+// GET /api/admin/posts/[id] — one full post, body included. The list endpoint
+// omits `body` (60K-character articles × N posts), so the editor fetches the
+// selected post here before seeding the form.
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  await ensureDbReady()
+  const { id } = await params
+  const post = await prisma.post.findUnique({ where: { id }, select: SELECT })
+  if (!post) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
+  return NextResponse.json({ ok: true, post })
+}
+
 // PATCH /api/admin/posts/[id] — partial update. Publishing (status → PUBLISHED)
 // stamps publishedAt the first time. Empty bodies are rejected so no-op saves
 // fail loud. `slug` is re-slugified + de-duplicated (excluding this post).
@@ -21,7 +34,15 @@ const Body = z
     slug: z.string().trim().min(1).max(80).optional(),
     excerpt: z.string().trim().max(400).optional(),
     body: z.string().max(60000).optional(),
-    coverUrl: z.string().trim().max(2000).optional(),
+    // 2000 was a URL ceiling, and it silently rejected every UPLOADED cover:
+    // an uploaded image arrives as a base64 data URI, and a 1200×675 webp is
+    // ~80–150 THOUSAND characters. Exactly the failure that left every diploma
+    // unsaved for weeks (zod max(500) vs a base64 PDF — see
+    // tests/certificateStorage.test.ts). The bound stays real: 1.2M characters
+    // ≈ 900KB of binary, far above anything /api/uploads can emit for `cover`
+    // (it hard-crops to 1200×675 webp) and far below anything that could bloat
+    // the row unnoticed.
+    coverUrl: z.string().trim().max(1_200_000).optional(),
     tag: z.string().trim().max(40).optional(),
     authorName: z.string().trim().max(80).optional(),
     status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
@@ -29,7 +50,9 @@ const Body = z
   .refine(v => Object.keys(v).length > 0, { message: 'EMPTY_BODY' })
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  const admin = auth.user
   await ensureDbReady()
   const { id } = await params
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
@@ -77,7 +100,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 // DELETE /api/admin/posts/[id]
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  const admin = auth.user
   await ensureDbReady()
   const { id } = await params
   try {

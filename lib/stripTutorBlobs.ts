@@ -1,3 +1,5 @@
+import { avatarSrc } from '@/lib/avatarSrc'
+
 // Files (avatars, videos, the apply-flow profession JSON) live INLINE in Postgres
 // text/JSON columns — there is no object storage yet — so a single TutorProfile
 // row can weigh several MB. List endpoints `include` the whole profile per row,
@@ -10,18 +12,26 @@
 // field the UI reads (headline, price, rating, category, name, short videoUrl)
 // is preserved, so this is zero-risk to callers.
 
-// A 256px webp avatar is ~5–10 KB; anything materially larger is a legacy,
-// un-resized upload. The UI always has an initials fallback, so nulling it is safe.
-const AVATAR_MAX = 16_384
+// AVATARS ARE NO LONGER SHIPPED INLINE — they became a URL (2026-08-01).
+//
+// This function used to NULL any stored avatar above 128KB, which had two
+// costs: an expert with a detailed photo silently rendered as initials, and
+// every avatar UNDER the ceiling still travelled as base64 inside the payload,
+// repeated once per card. Measured: /tutors was 556KB of HTML against 59KB for
+// the home page, and a ~259ms network floor applies to every request, so bytes
+// were the only thing left worth cutting.
+//
+// Now the data URI is replaced with `/api/avatars/<id>?v=<fingerprint>`, which
+// the browser fetches once and reuses everywhere. Nothing is dropped, so the
+// initials-instead-of-photo regression is gone with it; see lib/avatarSrc.ts
+// and app/api/avatars/[id]/route.ts.
 
-export function stripAvatar<T extends { avatarUrl?: string | null }>(
+export function stripAvatar<T extends { id?: string; avatarUrl?: string | null }>(
   u: T | null | undefined,
 ): T | null | undefined {
   if (!u || !u.avatarUrl) return u
-  if (u.avatarUrl.startsWith('data:') && u.avatarUrl.length > AVATAR_MAX) {
-    return { ...u, avatarUrl: null }
-  }
-  return u
+  const src = avatarSrc(u.id, u.avatarUrl)
+  return src === u.avatarUrl ? u : ({ ...u, avatarUrl: src } as T)
 }
 
 // A joined TutorProfile (as returned by `include`, with a nested `user`).

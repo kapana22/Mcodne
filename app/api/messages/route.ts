@@ -7,6 +7,8 @@ import { notify } from '@/lib/notify'
 import { markRelatedRead } from '@/lib/notifClear'
 import { safeStoredFileUrl } from '@/lib/safeUrl'
 import { preThreadInitiators } from '@/lib/preThreadInitiators'
+import { recomputeResponseTime } from '@/lib/responseTimeStore'
+import { avatarSrc } from '@/lib/avatarSrc'
 
 // New-message email is NOT sent inline here anymore. Emailing the instant a
 // message arrives pings people who are actively reading in-app. Instead, the
@@ -149,7 +151,9 @@ export async function GET(req: Request) {
         ],
       },
       orderBy: { createdAt: initialLoad ? 'desc' : 'asc' },
-      ...(initialLoad ? { take: 200 } : {}),
+      // take applies UNCONDITIONALLY: `?since=1970-…` used to disable the cap,
+      // turning one GET into the entire thread with its base64 attachments.
+      take: 200,
       // Avatars are NOT embedded per message — the client renders each sender's
       // avatar from the 2 thread participants (returned once). This stopped a
       // repeated avatar from multiplying the payload per message.
@@ -178,7 +182,7 @@ export async function GET(req: Request) {
       ...(sinceValid ? {} : {
         pair: {
           otherUser: {
-            id: other.id, fullName: other.fullName, avatarUrl: other.avatarUrl, role: other.role,
+            id: other.id, fullName: other.fullName, avatarUrl: avatarSrc(other.id, other.avatarUrl), role: other.role,
             tutorProfileId: other.tutor?.id ?? null,
             price: other.tutor?.price ?? null,
           },
@@ -382,7 +386,9 @@ export async function GET(req: Request) {
         pre: false,
         otherId: other.id,
         name: other.fullName,
-        avatarUrl: other.avatarUrl,
+        // `/api/avatars/<id>?v=` rather than the stored base64 — one cacheable
+        // URL per counterparty instead of ~32 KB inlined per thread row.
+        avatarUrl: avatarSrc(other.id, other.avatarUrl),
         topic: b.topic,
         status: b.status,
         preview: last?.body ?? '',
@@ -423,15 +429,21 @@ export async function GET(req: Request) {
       // `select` (not `include`) so the base64 `fileUrl` attachment is NOT pulled
       // for 200 rows — the inbox only needs a preview + a "has attachment" flag,
       // which the tiny `fileName` provides.
+      //
+      // `avatarUrl` is left out for the SAME reason, and it is worth naming: it
+      // is a base64 `data:` webp too, and selecting it on BOTH `from` and `to`
+      // pulled up to 400 blobs (~12 MB) out of Postgres to build a list that
+      // shows one avatar per PARTNER — a couple of dozen at most. The surviving
+      // partners' photos are fetched in one small query after the dedup below.
       select: {
         id: true, body: true, fromId: true, toId: true, readAt: true, createdAt: true, fileName: true,
-        from: { select: { id: true, fullName: true, avatarUrl: true } },
-        to: { select: { id: true, fullName: true, avatarUrl: true } },
+        from: { select: { id: true, fullName: true } },
+        to: { select: { id: true, fullName: true } },
       },
     }),
     preThreadInitiators(user.id),
   ])
-  const preByPartner = new Map<string, { last: (typeof preMsgs)[number]; unread: number; other: { id: string; fullName: string; avatarUrl: string | null } }>()
+  const preByPartner = new Map<string, { last: (typeof preMsgs)[number]; unread: number; other: { id: string; fullName: string } }>()
   for (const m of preMsgs) {
     const iAmSender = m.fromId === user.id
     const other = iAmSender ? m.to : m.from
@@ -444,7 +456,7 @@ export async function GET(req: Request) {
     }
     if (m.toId === user.id && m.readAt === null) g.unread++
   }
-  const preThreads = [...preByPartner.values()]
+  const preSurviving = [...preByPartner.values()]
     // I'm the client in threads I opened, the expert in threads opened with me.
     // The initiator comes from the authoritative map (same source+filter as
     // preMsgs, so the partner is always present); if it were ever absent, an
@@ -462,6 +474,20 @@ export async function GET(req: Request) {
       // so the conversation shows there — folded, not dropped (below).
       return !bookingPartnerIds.has(g.other.id)
     })
+
+  // Partner photos, resolved AFTER the filter — only the threads that actually
+  // render cost anything, and it is one bounded query instead of 400 blobs
+  // riding along on the message scan above.
+  const preAvatarById = new Map<string, string | null>()
+  if (preSurviving.length) {
+    const rows = await prisma.user.findMany({
+      where: { id: { in: preSurviving.map(g => g.other.id) } },
+      select: { id: true, avatarUrl: true },
+    })
+    for (const r of rows) preAvatarById.set(r.id, r.avatarUrl)
+  }
+
+  const preThreads = preSurviving
     .map(g => {
       // Deep-link into the space that matches my hat in THIS thread, not my
       // global role (a dual-role expert's client inquiries must open in /student).
@@ -471,7 +497,7 @@ export async function GET(req: Request) {
         bookingId: undefined as string | undefined,
         pre: true,
         name: g.other.fullName,
-        avatarUrl: g.other.avatarUrl,
+        avatarUrl: avatarSrc(g.other.id, preAvatarById.get(g.other.id) ?? null),
         // No booking → no topic; the inbox shows a subtle pre-inquiry label.
         topic: 'წინასწარი შეკითხვა',
         status: 'PRE',
@@ -617,6 +643,11 @@ export async function POST(req: Request) {
         href: `/${recipientArea}/messages/u/${user.id}`,
       })
       await markRelatedRead(user.id, `messages/u/${toUserId}`, 'MESSAGE_NEW')
+      // An expert just replied → their MEASURED median may have moved. Never
+      // throws, no-ops without a TutorProfile, self-throttled to once per
+      // 10 min per process (lib/responseTimeStore). Only for a TUTOR sender —
+      // the role is already loaded on `user`, so the guard is free.
+      if ((user as any).role === 'TUTOR') await recomputeResponseTime(user.id)
     })
 
     return NextResponse.json({ ok: true, message: msg })
@@ -670,6 +701,10 @@ export async function POST(req: Request) {
     // so legacy (/…/bookings/{id}#chat) and new (/tutor/messages/{id}) hrefs
     // both clear.
     await markRelatedRead(user.id, b.id, 'MESSAGE_NEW')
+    // Same as the pre-booking branch: recompute the sender's measured response
+    // time when the sender is the EXPERT on this booking. `isFromStudent`
+    // already answers that with no extra query.
+    if (!isFromStudent) await recomputeResponseTime(user.id)
   })
 
   return NextResponse.json({ ok: true, message: msg })

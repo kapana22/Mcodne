@@ -128,7 +128,7 @@ export function ConversationList({ empty }: { empty: EmptyCopy }) {
 
   if (err && threads === null) {
     return (
-      <div className="p-5 text-center text-[13px] text-ink-500">
+      <div className="p-5 text-center text-small text-ink-500">
         ჩატვირთვა ვერ მოხერხდა.
         <button
           type="button"
@@ -144,8 +144,11 @@ export function ConversationList({ empty }: { empty: EmptyCopy }) {
   if ((threads?.length ?? 0) === 0) {
     return (
       <div className="p-6 flex-1 flex items-center justify-center">
+        {/* `illustration` is hardcoded, not a prop: this list is ALWAYS the
+            message inbox, so which drawing belongs here is not the caller's
+            decision. Only the WORDS differ between the client and expert sides. */}
         <EmptyState
-          icon={<Icon.chat className="w-6 h-6" />}
+          illustration="messages"
           title={empty.title}
           description={empty.description}
           cta={empty.cta}
@@ -164,7 +167,7 @@ export function ConversationList({ empty }: { empty: EmptyCopy }) {
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="ძებნა…"
-              className="w-full h-9 pl-9 pr-3 rounded-field border border-ink-200 text-[13px] focus:outline-none"
+              className="w-full h-9 pl-9 pr-3 rounded-field border border-ink-200 text-small focus:outline-none"
               aria-label="მიმოწერების ძებნა"
             />
           </div>
@@ -188,7 +191,7 @@ export function ConversationList({ empty }: { empty: EmptyCopy }) {
           </div>
         ))}
         {sorted.length === 0 && (
-          <div className="p-6 text-center text-[13px] text-ink-500">ვერაფერი მოიძებნა.</div>
+          <div className="p-6 text-center text-small text-ink-500">ვერაფერი მოიძებნა.</div>
         )}
       </div>
     </>

@@ -1,0 +1,424 @@
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { requireRoleApi } from '@/lib/auth'
+import { futureWindowWhere } from '@/lib/bookability'
+import { ensureDbReady } from '@/lib/dbBoot'
+import { EVENTS, EVENT_RETENTION_DAYS } from '@/lib/events'
+import { BOOKING_FUNNEL_EVENTS } from '@/components/booking/funnelEvents'
+import { APPLY_FUNNEL_EVENTS } from '@/app/apply/applyFunnelEvents'
+import { buildProfileChecks, profilePercent } from '@/lib/profileScore'
+
+// Behavioural insights for the admin „ინსაითები" tab — the two questions GA
+// cannot answer:
+//
+//   1. WHAT ARE PEOPLE LOOKING FOR AND NOT FINDING? Every zero-result search is
+//      a client who arrived with money and intent and left with nothing. The
+//      grouped list of those queries IS the expert-recruitment to-do list — it
+//      is the single most actionable thing in this product.
+//   2. WHERE DOES THE BOOKING FLOW LOSE PEOPLE, and is the loss our fault? An
+//      attempt that hit a server error is a bug to fix; one that was simply
+//      abandoned is a design problem. Averaging them together hides both.
+//
+// Event names are IMPORTED, never typed: lib/events (search) and
+// components/booking/funnelEvents (the funnel contract shared with the client)
+// are the single source, so a rename can't silently zero this dashboard.
+//
+// COST. Every query is bounded by `at > now() - N days` with N restricted to
+// 7/30, which rides the (name, at DESC) index dbBoot creates, and the table is
+// pruned at EVENT_RETENTION_DAYS. Grouped lists are LIMITed. This is a
+// dashboard: it must stay cheap enough that an admin can hit refresh.
+//
+// DEGRADES, NEVER 500s. The Event table is created at boot by lib/dbBoot and may
+// legitimately be empty (or, on a cold DB, momentarily absent) — every read
+// falls back to an empty result rather than breaking the panel.
+export const dynamic = 'force-dynamic'
+
+const ALLOWED_DAYS = [7, 30] as const
+export type InsightsDays = (typeof ALLOWED_DAYS)[number]
+
+/** Steps every attempt must pass, in order. `booking_service_chosen` is
+ *  deliberately NOT part of the chain: the tier step doesn't exist for an expert
+ *  with 0–1 services, so counting it as a stage would print a drop that is
+ *  really just most experts having one offering. */
+/**
+ * Flows driven by an ADMIN account — the operator testing their own product.
+ *
+ * WHY THIS EXISTS (measured 2026-08-05). Of 132 booking flows on record, 55
+ * came from the two admin accounts and 13 more from the owner's other logins:
+ * at least half the funnel was the operator clicking through. Read without this
+ * filter the panel said „132 attempts → 2 bookings", which is not a conversion
+ * problem — it is a reflection. The give-away was that 44 of the 51 flows that
+ * picked a time and stopped had lived under ten seconds, most of them exactly
+ * four: nobody reads a service list and a calendar that fast.
+ *
+ * A whole FLOW is excluded when ANY of its events carries an admin userId —
+ * attribution is opportunistic (the beacon fires before the session lookup
+ * resolves), so a flow is usually part-attributed and part-anonymous. Filtering
+ * event-by-event would keep exactly the half that failed to attribute.
+ *
+ * Anonymous flows are KEPT. They cannot be told apart from real visitors, and
+ * silently dropping them would trade one distortion for another.
+ */
+const STAFF_FLOWS = `
+  SELECT DISTINCT e2."props"->>'flowId'
+    FROM "Event" e2
+    JOIN "User" u2 ON u2."id" = e2."userId"
+   WHERE u2."role" = 'ADMIN' AND e2."props" ? 'flowId'`
+
+const FUNNEL_SPINE = [
+  { key: 'opened', event: BOOKING_FUNNEL_EVENTS.opened },
+  { key: 'time', event: BOOKING_FUNNEL_EVENTS.timeChosen },
+  { key: 'details', event: BOOKING_FUNNEL_EVENTS.detailsSubmitted },
+  { key: 'created', event: BOOKING_FUNNEL_EVENTS.created },
+] as const
+
+export async function GET(req: Request) {
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+
+  const url = new URL(req.url)
+  const asked = Number(url.searchParams.get('days'))
+  const days: InsightsDays = (ALLOWED_DAYS as readonly number[]).includes(asked)
+    ? (asked as InsightsDays)
+    : 7
+
+  // The Event table is boot-time DDL (not in schema.prisma), so make sure it
+  // exists before reading it. Memoised — costs nothing after the first call.
+  await ensureDbReady().catch(() => {})
+
+  const [zeroQueries, searchTotals, funnel, failureCodes, applyFunnel, applyDropoffs, expertRows] = await Promise.all([
+    // ── 1. Zero-result searches, grouped. The list that names the experts the
+    // platform is missing. Ordered by frequency, then recency.
+    prisma
+      .$queryRawUnsafe<{ q: string; n: number; lastAt: Date }[]>(
+        `SELECT "props"->>'q' AS "q",
+                COUNT(*)::int  AS "n",
+                MAX("at")      AS "lastAt"
+           FROM "Event"
+          WHERE "name" = $1
+            AND "at" > now() - ($2 * interval '1 day')
+            AND "props"->>'q' IS NOT NULL
+            AND "props"->>'q' <> ''
+          GROUP BY 1
+          ORDER BY "n" DESC, "lastAt" DESC
+          LIMIT 40`,
+        EVENTS.SEARCH_ZERO,
+        days,
+      )
+      .catch(() => []),
+
+    // ── 2. Search health. api/tutors writes EXACTLY ONE row per search — SEARCH
+    // when it returned experts, SEARCH_ZERO when it didn't — so the two sum to
+    // every search performed and the ratio is a true rate, not an estimate.
+    prisma
+      .$queryRawUnsafe<{ searches: number; zero: number }[]>(
+        `SELECT COUNT(*) FILTER (WHERE "name" = $1)::int AS "searches",
+                COUNT(*) FILTER (WHERE "name" = $2)::int AS "zero"
+           FROM "Event"
+          WHERE "name" IN ($1, $2)
+            AND "at" > now() - ($3 * interval '1 day')`,
+        EVENTS.SEARCH,
+        EVENTS.SEARCH_ZERO,
+        days,
+      )
+      .catch(() => []),
+
+    // ── 3. The booking funnel, stitched per ATTEMPT by the anonymous flowId.
+    //
+    // Reach is CUMULATIVE (GREATEST over this step and every later one): an
+    // attempt that reached „დეტალები" obviously passed „დრო", even if a step
+    // event was lost in flight (the browser fires these with keepalive, over a
+    // network we don't control). Without that, a dropped beacon would print as
+    // a drop-off that never happened.
+    //
+    // The three outcomes of a non-completed attempt are counted separately and
+    // are mutually exclusive: a server FAILURE (our bug), a dead end where the
+    // expert had nothing bookable (NO SLOTS — the user didn't choose to leave),
+    // and everything else (ABANDONED — a design problem, not an error).
+    prisma
+      .$queryRawUnsafe<{
+        attempts: number; opened: number; time: number; details: number; created: number
+        failed: number; noSlots: number; abandoned: number
+      }[]>(
+        `WITH f AS (
+           SELECT "props"->>'flowId' AS flow,
+                  MAX(CASE WHEN "name" = $1 THEN 1 ELSE 0 END) AS s_open,
+                  MAX(CASE WHEN "name" = $2 THEN 1 ELSE 0 END) AS s_time,
+                  MAX(CASE WHEN "name" = $3 THEN 1 ELSE 0 END) AS s_details,
+                  MAX(CASE WHEN "name" = $4 THEN 1 ELSE 0 END) AS s_created,
+                  MAX(CASE WHEN "name" = $5 THEN 1 ELSE 0 END) AS s_failed,
+                  MAX(CASE WHEN "name" = $6 THEN 1 ELSE 0 END) AS s_noslots
+             FROM "Event"
+            WHERE "name" IN ($1, $2, $3, $4, $5, $6)
+              AND "at" > now() - ($7 * interval '1 day')
+              AND "props"->>'flowId' IS NOT NULL
+              AND "props"->>'flowId' NOT IN (${STAFF_FLOWS})
+            GROUP BY 1
+         )
+         SELECT COUNT(*)::int AS "attempts",
+                COALESCE(SUM(GREATEST(s_open, s_time, s_details, s_created)), 0)::int AS "opened",
+                COALESCE(SUM(GREATEST(s_time, s_details, s_created)), 0)::int         AS "time",
+                COALESCE(SUM(GREATEST(s_details, s_created)), 0)::int                 AS "details",
+                COALESCE(SUM(s_created), 0)::int                                      AS "created",
+                COALESCE(SUM(CASE WHEN s_created = 0 AND s_failed = 1 THEN 1 ELSE 0 END), 0)::int AS "failed",
+                COALESCE(SUM(CASE WHEN s_created = 0 AND s_failed = 0 AND s_noslots = 1 THEN 1 ELSE 0 END), 0)::int AS "noSlots",
+                COALESCE(SUM(CASE WHEN s_created = 0 AND s_failed = 0 AND s_noslots = 0 THEN 1 ELSE 0 END), 0)::int AS "abandoned"
+           FROM f`,
+        FUNNEL_SPINE[0].event,
+        FUNNEL_SPINE[1].event,
+        FUNNEL_SPINE[2].event,
+        FUNNEL_SPINE[3].event,
+        BOOKING_FUNNEL_EVENTS.failed,
+        BOOKING_FUNNEL_EVENTS.noSlots,
+        days,
+      )
+      .catch(() => []),
+
+    // ── 4. WHY the failures failed. The server's own error code, per attempt —
+    // this is what turns „12 დაიკარგა" into a fixable ticket.
+    prisma
+      .$queryRawUnsafe<{ code: string; n: number }[]>(
+        `SELECT "props"->>'code'                     AS "code",
+                COUNT(DISTINCT "props"->>'flowId')::int AS "n"
+           FROM "Event"
+          WHERE "name" = $1
+            AND "at" > now() - ($2 * interval '1 day')
+            AND "props"->>'code' IS NOT NULL
+            AND "props"->>'flowId' NOT IN (${STAFF_FLOWS})
+          GROUP BY 1
+          ORDER BY "n" DESC
+          LIMIT 12`,
+        BOOKING_FUNNEL_EVENTS.failed,
+        days,
+      )
+      .catch(() => []),
+
+    // ── 5. The EXPERT-APPLICATION funnel. Same stitching as the booking one.
+    prisma
+      .$queryRawUnsafe<{
+        attempts: number; opened: number; profile: number; pricing: number
+        submitted: number; failed: number; abandoned: number
+      }[]>(
+        `WITH f AS (
+           SELECT "props"->>'flowId' AS flow,
+                  MAX(CASE WHEN "name" = $1 THEN 1 ELSE 0 END) AS s_open,
+                  MAX(CASE WHEN "name" = $2 THEN 1 ELSE 0 END) AS s_profile,
+                  MAX(CASE WHEN "name" = $3 THEN 1 ELSE 0 END) AS s_pricing,
+                  MAX(CASE WHEN "name" = $4 THEN 1 ELSE 0 END) AS s_sent,
+                  MAX(CASE WHEN "name" = $5 THEN 1 ELSE 0 END) AS s_failed
+             FROM "Event"
+            WHERE "name" IN ($1, $2, $3, $4, $5)
+              AND "at" > now() - ($6 * interval '1 day')
+              AND "props"->>'flowId' IS NOT NULL
+              -- Same operator-traffic exclusion as the booking funnel above.
+              AND "props"->>'flowId' NOT IN (${STAFF_FLOWS})
+            GROUP BY 1
+         )
+         SELECT COUNT(*)::int AS "attempts",
+                COALESCE(SUM(GREATEST(s_open, s_profile, s_pricing, s_sent)), 0)::int AS "opened",
+                COALESCE(SUM(GREATEST(s_profile, s_pricing, s_sent)), 0)::int         AS "profile",
+                COALESCE(SUM(GREATEST(s_pricing, s_sent)), 0)::int                    AS "pricing",
+                COALESCE(SUM(s_sent), 0)::int                                         AS "submitted",
+                COALESCE(SUM(CASE WHEN s_sent = 0 AND s_failed = 1 THEN 1 ELSE 0 END), 0)::int AS "failed",
+                COALESCE(SUM(CASE WHEN s_sent = 0 AND s_failed = 0 THEN 1 ELSE 0 END), 0)::int AS "abandoned"
+           FROM f`,
+        APPLY_FUNNEL_EVENTS.opened,
+        APPLY_FUNNEL_EVENTS.profileDone,
+        APPLY_FUNNEL_EVENTS.pricingDone,
+        APPLY_FUNNEL_EVENTS.submitted,
+        APPLY_FUNNEL_EVENTS.failed,
+        days,
+      )
+      .catch(() => []),
+
+    // ── 6. WHO abandoned an application — the actionable half.
+    //
+    // This is the whole reason the apply funnel is worth building: a count tells
+    // you there is a leak, a NAME lets you close it with one message. /apply
+    // requires a session, so every row already carries the real userId and the
+    // contact details come from the User row — this query never touches anything
+    // the applicant typed.
+    //
+    // „Abandoned" = they emitted a funnel event, never submitted, and STILL have
+    // no application on file (so someone who came back later and finished, or
+    // was already approved, correctly drops out).
+    prisma
+      .$queryRawUnsafe<{
+        userId: string; fullName: string | null; email: string; phone: string | null
+        lastStep: number; lastAt: Date; catCount: number | null; blockCode: string | null
+      }[]>(
+        `WITH f AS (
+           SELECT e."userId",
+                  MAX(COALESCE((e."props"->>'step')::int, 1)) AS last_step,
+                  MAX(e."at")                                 AS last_at,
+                  MAX((e."props"->>'catCount')::int)          AS cat_count,
+                  MAX(CASE WHEN e."name" = $4 THEN 1 ELSE 0 END) AS sent
+             FROM "Event" e
+            WHERE e."name" IN ($1, $2, $3, $4, $6)
+              AND e."at" > now() - ($5 * interval '1 day')
+              AND e."userId" IS NOT NULL
+            GROUP BY 1
+         ),
+         -- The LAST wall they hit, if any. Kept out of the f CTE on purpose:
+         -- it must be the most RECENT block, and MAX() over a text column
+         -- would return the alphabetically largest code instead —
+         -- PRICE_REQUIRED beating a later PHOTO_REQUIRED, reporting the wrong field.
+         b AS (
+           SELECT DISTINCT ON (e."userId")
+                  e."userId",
+                  e."props"->>'code' AS code
+             FROM "Event" e
+            WHERE e."name" = $6
+              AND e."at" > now() - ($5 * interval '1 day')
+              AND e."userId" IS NOT NULL
+            ORDER BY e."userId", e."at" DESC
+         )
+         SELECT f."userId"        AS "userId",
+                u."fullName"     AS "fullName",
+                u."email"        AS "email",
+                u."phone"        AS "phone",
+                f.last_step      AS "lastStep",
+                f.last_at        AS "lastAt",
+                f.cat_count      AS "catCount",
+                b.code           AS "blockCode"
+           FROM f
+           JOIN "User" u ON u."id" = f."userId"
+      LEFT JOIN b ON b."userId" = f."userId"
+      LEFT JOIN "TutorApplication" a ON a."userId" = f."userId"
+          WHERE f.sent = 0
+            AND a."id" IS NULL
+            AND u."role" = 'STUDENT'
+          ORDER BY f.last_at DESC
+          LIMIT 40`,
+        APPLY_FUNNEL_EVENTS.opened,
+        APPLY_FUNNEL_EVENTS.profileDone,
+        APPLY_FUNNEL_EVENTS.pricingDone,
+        APPLY_FUNNEL_EVENTS.submitted,
+        days,
+        APPLY_FUNNEL_EVENTS.blocked,
+      )
+      .catch(() => []),
+
+    // ── 7. Which EXPERTS have an incomplete profile.
+    //
+    // Reuses lib/profileScore — the exact same 10 weighted checks the expert
+    // sees on their own dashboard and the sidebar badge counts. Deliberately
+    // NOT a second admin-only definition of „complete": two scores that disagree
+    // would make the nudge unactionable („it says 70% here and 85% there").
+    //
+    // `availability` carries the highest weight there for a reason, and it is
+    // the one the admin must act on first: booking is slot-gated, so an expert
+    // with no published time is UNBOOKABLE however polished the rest is.
+    prisma.tutorProfile
+      .findMany({
+        // Same public-visibility rule as every other public read.
+        where: { available: true, user: { is: { suspendedAt: null } } },
+        select: {
+          id: true, slug: true, headline: true, bio: true, specialty: true,
+          price: true, languages: true, videoUrl: true,
+          user: { select: { fullName: true, email: true, avatarUrl: true } },
+          _count: {
+            // Document-less certificates don't render on the public profile, so
+            // they must not score as a completed check either — otherwise this
+            // panel reports an expert as more complete than a visitor can see.
+            // Same filter as /api/tutor/nav-badges; the two MUST agree, since the
+            // expert reads one number and the admin reads the other.
+            select: {
+              certificates: { where: { fileUrl: { not: null } } },
+              education: true,
+              experience: true,
+            },
+          },
+          // Only FUTURE slots count — a profile whose only windows are in the
+          // past is exactly as unbookable as one with none.
+          availability: { where: futureWindowWhere(), select: { id: true }, take: 1 },
+        },
+        take: 200,
+      })
+      .catch(() => []),
+  ])
+
+  const totals = searchTotals[0] ?? { searches: 0, zero: 0 }
+  const searchAll = totals.searches + totals.zero
+  const f = funnel[0] ?? {
+    attempts: 0, opened: 0, time: 0, details: 0, created: 0, failed: 0, noSlots: 0, abandoned: 0,
+  }
+  const af = applyFunnel[0] ?? {
+    attempts: 0, opened: 0, profile: 0, pricing: 0, submitted: 0, failed: 0, abandoned: 0,
+  }
+
+  // Score every visible expert with the SHARED checks, keep only the imperfect
+  // ones, and sort by what matters: unbookable first, then least complete.
+  const experts = expertRows
+    .map(t => {
+      const checks = buildProfileChecks(
+        { headline: t.headline, bio: t.bio, specialty: t.specialty, price: t.price, languages: t.languages },
+        t._count.certificates,
+        t._count.education,
+        t._count.experience,
+        t.user?.avatarUrl,
+        t.availability.length,
+      )
+      const undone = checks.filter(c => !c.done)
+      return {
+        slug: t.slug,
+        fullName: t.user?.fullName ?? null,
+        email: t.user?.email ?? '',
+        percent: profilePercent(checks),
+        // The one gap that makes a profile unbookable rather than merely thin.
+        unbookable: t.availability.length === 0,
+        hasVideo: !!t.videoUrl,
+        bioLen: (t.bio ?? '').trim().length,
+        missing: undone.map(c => c.id),
+      }
+    })
+    .filter(e => e.percent < 100)
+    .sort((a, b) => Number(b.unbookable) - Number(a.unbookable) || a.percent - b.percent)
+
+  return NextResponse.json({
+    days,
+    retentionDays: EVENT_RETENTION_DAYS,
+    search: {
+      total: searchAll,
+      zero: totals.zero,
+      // Share of searches that found nothing. Null (not 0) when there were no
+      // searches at all — „0%" would read as „everything is fine".
+      zeroShare: searchAll > 0 ? totals.zero / searchAll : null,
+    },
+    zeroQueries: zeroQueries.map(r => ({
+      q: r.q,
+      n: r.n,
+      lastAt: new Date(r.lastAt).toISOString(),
+    })),
+    funnel: {
+      attempts: f.attempts,
+      steps: FUNNEL_SPINE.map(s => ({ key: s.key, n: f[s.key] })),
+      outcomes: { failed: f.failed, noSlots: f.noSlots, abandoned: f.abandoned },
+    },
+    failureCodes,
+    apply: {
+      attempts: af.attempts,
+      steps: [
+        { key: 'opened', n: af.opened },
+        { key: 'profile', n: af.profile },
+        { key: 'pricing', n: af.pricing },
+        { key: 'submitted', n: af.submitted },
+      ],
+      outcomes: { failed: af.failed, abandoned: af.abandoned },
+      // Contact details come from the User row, never from the half-filled form.
+      dropoffs: applyDropoffs.map(r => ({
+        userId: r.userId,
+        fullName: r.fullName,
+        email: r.email,
+        phone: r.phone,
+        lastStep: r.lastStep,
+        catCount: r.catCount,
+        lastAt: new Date(r.lastAt).toISOString(),
+        // The field that refused them, or null when they simply left. „Stopped"
+        // and „was refused" are opposite problems and used to look identical.
+        blockCode: r.blockCode ?? null,
+      })),
+    },
+    experts,
+  })
+}

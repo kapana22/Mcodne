@@ -9,6 +9,15 @@
 // and may keep using toLocale* directly.
 
 export const KA_MONTHS_SHORT = ['იან', 'თებ', 'მარ', 'აპრ', 'მაი', 'ივნ', 'ივლ', 'აგვ', 'სექ', 'ოქტ', 'ნოე', 'დეკ']
+/**
+ * The abbreviated months WITH the trailing period, for compact date chips.
+ *
+ * Five files had hand-written copies of this array and three of them disagreed
+ * — „მარტ." vs „მარ.", „სექტ." vs „სექ." — so the same date rendered
+ * differently depending on which screen you were on. One array, imported.
+ */
+export const KA_MONTHS_SHORT_DOT = KA_MONTHS_SHORT.map(m => `${m}.`)
+
 export const KA_MONTHS_LONG = ['იანვარი', 'თებერვალი', 'მარტი', 'აპრილი', 'მაისი', 'ივნისი', 'ივლისი', 'აგვისტო', 'სექტემბერი', 'ოქტომბერი', 'ნოემბერი', 'დეკემბერი']
 // Indexed by Date#getDay() — Sunday = 0.
 export const KA_WEEKDAYS_SHORT = ['კვი', 'ორშ', 'სამ', 'ოთხ', 'ხუთ', 'პარ', 'შაბ']

@@ -12,12 +12,15 @@ export function WorkspaceFooter() {
       <Container className="py-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Logo size="sm" />
-          <span className="text-[12px] text-ink-500 tabular-nums">© {new Date().getFullYear()} მცოდნე</span>
+          <span className="text-meta text-ink-500 tabular-nums">© {new Date().getFullYear()} მცოდნე</span>
         </div>
-        <div className="flex items-center gap-5 text-[12px] text-ink-500">
-          <Link href="/help" className="hover:text-ink-900 transition-colors">დახმარება</Link>
-          <Link href="/terms" className="hover:text-ink-900 transition-colors">წესები</Link>
-          <Link href="/privacy" className="hover:text-ink-900 transition-colors">კონფიდენციალურობა</Link>
+        {/* min-h-[40px] below sm — these three sat at 17px on eight workspace
+            pages. Same treatment the public Footer got; the row keeps its
+            desktop rhythm. */}
+        <div className="flex items-center gap-4 sm:gap-5 text-meta text-ink-500">
+          <Link href="/help" className="inline-flex items-center min-h-[40px] sm:min-h-0 hover:text-ink-900 transition-colors duration-fast">დახმარება</Link>
+          <Link href="/terms" className="inline-flex items-center min-h-[40px] sm:min-h-0 hover:text-ink-900 transition-colors duration-fast">წესები</Link>
+          <Link href="/privacy" className="inline-flex items-center min-h-[40px] sm:min-h-0 hover:text-ink-900 transition-colors duration-fast">კონფიდენციალურობა</Link>
         </div>
       </Container>
     </footer>

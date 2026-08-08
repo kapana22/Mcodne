@@ -32,7 +32,7 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
   <div className="grid lg:grid-cols-[1fr_280px] gap-6 sm:gap-7 lg:gap-10 p-4 sm:p-7 lg:p-10">
     <div className="space-y-7">
       <div>
-        <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-3">გადახდის მეთოდი</label>
+        <label className="block font-display text-micro font-semibold uppercase text-ink-700 mb-3">გადახდის მეთოდი</label>
         <div className="grid grid-cols-2 gap-2">
           {METHODS.map(m => {
             const on = value.method === m.id
@@ -42,15 +42,15 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
                 key={m.id}
                 type="button"
                 onClick={() => onChange({ ...value, method: m.id })}
-                className={`relative text-left p-3.5 rounded-card border transition-all ${on ? 'border-brand-500 bg-brand-50/40 ring-2 ring-brand-200' : 'border-ink-200 bg-white hover:border-ink-400'}`}
+                className={`relative text-left p-3.5 rounded-card border transition-all duration-fast ${on ? 'border-brand-500 bg-brand-50/40 ring-2 ring-brand-200' : 'border-ink-200 bg-white hover:border-ink-400'}`}
               >
                 <div className="flex items-center gap-2.5">
-                  <span className={`w-9 h-9 rounded-card font-display font-bold text-[12px] tracking-wider inline-flex items-center justify-center ${toneCls}`}>
+                  <span className={`w-9 h-9 rounded-card font-display font-bold text-meta tracking-wider inline-flex items-center justify-center ${toneCls}`}>
                     {m.id === 'card' ? <Icon.money className="w-4 h-4" /> : m.l.split(' ')[0].slice(0, 3).toUpperCase()}
                   </span>
                   <div className="min-w-0">
-                    <div className="font-display text-[13px] font-bold text-ink-900 truncate">{m.l}</div>
-                    <div className="text-[11px] text-ink-500 truncate">{m.sub}</div>
+                    <div className="font-display text-small font-bold text-ink-900 truncate">{m.l}</div>
+                    <div className="text-meta text-ink-500 truncate">{m.sub}</div>
                   </div>
                 </div>
                 {on && (
@@ -68,17 +68,17 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
         <div className="rounded-card border border-ink-200 bg-white p-5 space-y-4">
           <Eyebrow tone="muted">ბარათის მონაცემები</Eyebrow>
           <div>
-            <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-2">მფლობელის სახელი</label>
+            <label className="block font-display text-micro font-semibold uppercase text-ink-700 mb-2">მფლობელის სახელი</label>
             <input
               type="text"
               value={value.cardName}
               onChange={e => onChange({ ...value, cardName: e.target.value })}
               placeholder="GIORGI MELADZE"
-              className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors uppercase tracking-wide"
+              className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body-lg text-ink-900 placeholder:text-ink-400 transition-colors duration-fast uppercase"
             />
           </div>
           <div>
-            <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-2">ბარათის ნომერი</label>
+            <label className="block font-display text-micro font-semibold uppercase text-ink-700 mb-2">ბარათის ნომერი</label>
             <input
               type="text"
               value={value.cardNum}
@@ -89,12 +89,12 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
               }}
               placeholder="0000 0000 0000 0000"
               inputMode="numeric"
-              className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors tabular-nums tracking-wider"
+              className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body-lg text-ink-900 placeholder:text-ink-400 transition-colors duration-fast tabular-nums tracking-wider"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-2">ვადა · MM/YY</label>
+              <label className="block font-display text-micro font-semibold uppercase text-ink-700 mb-2">ვადა · MM/YY</label>
               <input
                 type="text"
                 value={value.cardExp}
@@ -105,27 +105,27 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
                 }}
                 placeholder="12/28"
                 inputMode="numeric"
-                className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors tabular-nums"
+                className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body-lg text-ink-900 placeholder:text-ink-400 transition-colors duration-fast tabular-nums"
               />
             </div>
             <div>
-              <label className="block font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700 mb-2">CVV</label>
+              <label className="block font-display text-micro font-semibold uppercase text-ink-700 mb-2">CVV</label>
               <input
                 type="text"
                 value={value.cardCvv}
                 onChange={e => onChange({ ...value, cardCvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
                 placeholder="•••"
                 inputMode="numeric"
-                className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-colors tabular-nums"
+                className="w-full h-12 px-3.5 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body-lg text-ink-900 placeholder:text-ink-400 transition-colors duration-fast tabular-nums"
               />
             </div>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
-            <span className={`w-4 h-4 rounded border-[1.5px] inline-flex items-center justify-center transition-colors ${value.save ? 'bg-brand-500 border-brand-500' : 'border-ink-300 bg-white'}`}>
+            <span className={`w-4 h-4 rounded border-[1.5px] inline-flex items-center justify-center transition-colors duration-fast ${value.save ? 'bg-brand-500 border-brand-500' : 'border-ink-300 bg-white'}`}>
               {value.save && <Icon.check className="w-3 h-3 text-white" />}
             </span>
             <input type="checkbox" checked={value.save} onChange={e => onChange({ ...value, save: e.target.checked })} className="sr-only" />
-            <span className="text-[12.5px] text-ink-700">შემახსოვრე — შემდეგ ერთ დაჭერით</span>
+            <span className="text-small text-ink-700">დაიმახსოვრე ბარათი — შემდეგ ერთი დაწკაპუნებაა</span>
           </label>
         </div>
       )}
@@ -134,8 +134,8 @@ export const PaymentStep = ({ value, onChange, summary }: { value: PaymentState;
         <div className="rounded-card border border-ink-200 bg-ink-50/40 p-5 grid grid-cols-[auto_1fr] gap-3 items-start">
           <Icon.shieldCheck className="w-4 h-4 mt-0.5 text-brand-700 shrink-0" />
           <div>
-            <div className="font-display text-[13px] font-bold text-ink-900">გადახდა ბანკის გვერდზე</div>
-            <p className="text-[12.5px] text-ink-600 mt-1 leading-[1.5]">
+            <div className="font-display text-small font-bold text-ink-900">გადახდა ბანკის გვერდზე</div>
+            <p className="text-small text-ink-600 mt-1">
               „გადახდა“-ზე გადახვალ {METHODS.find(m => m.id === value.method)?.l}-ის უსაფრთხო გვერდზე და დაბრუნდები აქ.
             </p>
           </div>

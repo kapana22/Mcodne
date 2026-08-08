@@ -2,7 +2,10 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
+// next-view-transitions' Link is a drop-in for next/link that runs the
+// navigation inside document.startViewTransition — this is what animates
+// the card→profile morph. Unsupported browsers get plain navigation.
+import { Link } from 'next-view-transitions'
 import { PublicTopBar } from '@/components/PublicTopBar'
 import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { Footer as SharedFooter } from '@/components/Footer'
@@ -11,10 +14,11 @@ import { copyToClipboard } from '@/lib/clipboard'
 import { safeHttpUrl } from '@/lib/safeUrl'
 import { langLabel, toLangCode } from '@/lib/languages'
 import { useMe, fetchMe, type Me as PublicMe } from '@/lib/me'
-import { PAYMENTS_LIVE } from '@/lib/flags'
-import { RISK_REVERSAL_LINE } from '@/lib/copy'
+import { PAYMENTS_LIVE, FEATURE_REQUEST_BOOKING } from '@/lib/flags'
+import { isAbroadCategory } from '@/lib/abroad'
 import { fmtRating } from '@/lib/fmt'
-import { fmtKaDate, KA_MONTHS_LONG as KA_MONTHS_FULL } from '@/lib/kaDate'
+import { displayHeadline } from '@/lib/headline'
+import { fmtKaDate, KA_MONTHS_LONG as KA_MONTHS_FULL, KA_MONTHS_SHORT_DOT, KA_WEEKDAYS_SHORT } from '@/lib/kaDate'
 import { CountUp } from '@/components/CountUp'
 import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/components/Icon'
@@ -34,7 +38,8 @@ const BookingFlow = dynamic(
 )
 import { InlineAvailability } from '@/components/booking/InlineAvailability'
 import {
-  TUTOR_DEFAULTS, priceForDuration, fromPriceLabel, computeNextFreeStart, previewServiceMin,
+  TUTOR_DEFAULTS, priceForDuration, primaryPriceLabel, computeNextFreeStart, primaryServiceMin,
+  orderedTiers, tierPriceLabel,
   isoWeekday, DAY_NAMES_FULL,
   type ApiSlot, type BusySlot, type ConsultationItem,
 } from '@/components/booking/slots'
@@ -52,7 +57,7 @@ const Logo = () => (
 const VerifiedMark = ({ size = 20, title = 'გადამოწმებული ექსპერტი' }: { size?: number; title?: string }) => {
   const glyph = Math.max(12, Math.round(size * 0.6))
   return (
-    <span title={title} className="inline-flex items-center justify-center rounded-full bg-brand-500 text-white shrink-0" style={{ width: size, height: size }}>
+    <span title={title} className="inline-flex items-center justify-center rounded-full bg-brand-600 text-white shrink-0" style={{ width: size, height: size }}>
       <Icon.check style={{ width: glyph, height: glyph }} />
     </span>
   )
@@ -73,6 +78,11 @@ type TutorDetail = {
   price?: number | null
   verified?: boolean
   responseHours?: number | null
+  // MEASURED response time (lib/responseTime) — null when we don't have enough
+  // answered conversations to say anything true. NEVER fall back to
+  // `responseHours`: the expert types that into their own editor and we cannot
+  // verify it, so rendering it would be a fabricated trust signal.
+  responseTime?: { medianMin: number | null; sampleN: number | null; label: string } | null
   languages?: string[] | null
   videoUrl?: string | null
   linkedinUrl?: string | null
@@ -82,12 +92,15 @@ type TutorDetail = {
 }
 
 const Breadcrumb = ({ tutor }: { tutor: TutorDetail | null }) => (
-  <nav aria-label="ნავიგაცია" className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] flex items-center gap-2 text-ink-500">
-    <Link href="/tutors" className="hover:text-ink-900 transition-colors">ექსპერტები</Link>
+  <nav aria-label="ნავიგაცია" className="font-display text-micro font-semibold uppercase flex items-center gap-2 text-ink-500">
+    <Link href="/tutors" className="hover:text-ink-900 transition-colors duration-fast">ექსპერტები</Link>
     {tutor?.category && (
       <>
         <Icon.chevR className="w-3 h-3 text-ink-300" />
-        <Link href={`/tutors?category=${tutor.category.slug}`} className="hover:text-ink-900 transition-colors">{tutor.category.name}</Link>
+        {/* The indexable category landing page, not the /tutors filter (which
+            canonicalises away). Expert profiles are the site's deepest crawled
+            pages, so this is the link that feeds the category pages upward. */}
+        <Link href={`/categories/${tutor.category.slug}`} className="hover:text-ink-900 transition-colors duration-fast">{tutor.category.name}</Link>
       </>
     )}
     <Icon.chevR className="w-3 h-3 text-ink-300" />
@@ -204,9 +217,12 @@ const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false }: { tut
           return
         }
         setSaved(wasSaved) // revert
+        // The heart just snapped back — say why, or the revert reads as a bug.
+        toast('შენახვა ვერ მოხერხდა', 'error')
       }
     } catch {
       setSaved(wasSaved)
+      toast('შენახვა ვერ მოხერხდა', 'error')
     } finally {
       setSavedBusy(false)
     }
@@ -313,12 +329,20 @@ const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false }: { tut
         <div className="flex items-start gap-4">
           {/* Avatar */}
           <div className="relative shrink-0">
-            <div className="w-[88px] h-[88px] sm:w-[112px] sm:h-[112px] rounded-full overflow-hidden bg-brand-100 ring-1 ring-ink-100 inline-flex items-center justify-center">
-              <img
-                src={tutor?.user.avatarUrl || DEFAULT_AVATAR}
-                alt={tutor?.user.fullName ?? ''}
-                className="w-full h-full object-cover"
-              />
+            {/* The receiving half of the card→profile morph (vt-photo-<id> is
+                set on the browse and home cards). Uses the DATA id, never the
+                URL param — the route also answers to name slugs, and a name
+                mismatch silently degrades the morph to a plain cross-fade. */}
+            <div style={tutor?.id ? { viewTransitionName: `vt-photo-${tutor.id}` } : undefined} className="w-[88px] h-[88px] sm:w-[112px] sm:h-[112px] rounded-full overflow-hidden bg-brand-100 ring-1 ring-ink-100 inline-flex items-center justify-center [&>button]:w-full [&>button]:h-full">
+              {/* State, not a DOM write. `||` only covers an ABSENT avatarUrl,
+                  and two live profiles carry a Google-SSO URL that no longer
+                  resolves — 112px of broken-image glyph, captioned with the
+                  expert's own name, as the first thing on their profile. The
+                  first version of this fix assigned `e.currentTarget.src` inside
+                  `onError`; React owns that attribute and restored the dead URL
+                  on the next render, so the fallback never stuck. Mirrors
+                  <ExpertPhoto> on the browse card. */}
+              <ProfilePhoto src={tutor?.user.avatarUrl} name={tutor?.user.fullName ?? ''} />
             </div>
           </div>
 
@@ -331,7 +355,7 @@ const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false }: { tut
               onClick={toggleSave}
               disabled={savedBusy}
               aria-label={saved ? 'შენახული' : 'შენახვა'}
-              className={`w-11 h-11 rounded-full border inline-flex items-center justify-center transition-colors disabled:opacity-60 ${saved ? 'border-danger-300 bg-danger-50 text-danger-600' : 'border-ink-200 bg-white hover:border-ink-300 text-ink-600'}`}
+              className={`w-11 h-11 rounded-full border inline-flex items-center justify-center transition-colors duration-fast disabled:opacity-60 ${saved ? 'border-danger-300 bg-danger-50 text-danger-600' : 'border-ink-200 bg-white hover:border-ink-300 text-ink-600'}`}
             >
               {saved ? <Icon.heartFilled className="w-4 h-4" /> : <Icon.heart className="w-4 h-4" />}
             </button>
@@ -341,7 +365,7 @@ const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false }: { tut
               onClick={shareTutorLink}
               aria-label="ბმულის კოპირება"
               title="დააკოპირე ბმული"
-              className="h-11 px-3.5 rounded-pill border border-ink-200 bg-white hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 text-ink-700 inline-flex items-center gap-1.5 font-display text-[12px] sm:text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+              className="h-11 px-3.5 rounded-pill border border-ink-200 bg-white hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 text-ink-700 inline-flex items-center gap-1.5 font-display text-meta sm:text-small font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
             >
               {/* Chain-link glyph: components/Icon has no link icon (`Icon.share`
                   is the screen-share monitor from the video-call cluster), so
@@ -359,21 +383,29 @@ const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false }: { tut
         {/* Identity content */}
         <div className="mt-3 sm:mt-4">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="font-display text-[26px] sm:text-[32px] lg:text-[38px] font-bold text-ink-900 tracking-tight leading-[1.05]">
+            <h1 className="font-display text-h1 sm:text-display lg:text-display-lg font-bold text-ink-900 tracking-tight leading-[1.05]">
               {tutor?.user.fullName ?? TUTOR_DEFAULTS.name}
             </h1>
             {tutor?.verified && <VerifiedMark size={22} />}
           </div>
 
+          {/* The CATEGORY leads, `specialty` follows — same hierarchy as the
+              browse card (see the long note there). It used to be the other way
+              round: `specialty` wore the brand chip even though it is free text
+              carried over from /apply, while the category — our own, filterable
+              taxonomy — was the demoted second chip. On all nine live rows the
+              two strings are IDENTICAL, so this swap is invisible today; it
+              matters the moment they diverge, which is exactly when the reader
+              needs to know which one the platform stands behind. */}
           <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
-            {tutor?.specialty && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 h-7 rounded-pill bg-brand-50 border border-brand-200 text-[12px] font-display font-semibold text-brand-800">
-                {tutor.specialty}
+            {tutor?.category?.name && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 h-7 rounded-pill bg-brand-50 border border-brand-200 text-meta font-display font-semibold text-brand-800">
+                {tutor.category.name}
               </span>
             )}
-            {tutor?.category?.name && tutor.category.name !== tutor.specialty && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-7 rounded-pill bg-ink-50 border border-ink-200 text-[12px] font-display font-medium text-ink-700">
-                {tutor.category.name}
+            {tutor?.specialty && tutor.specialty !== tutor?.category?.name && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-7 rounded-pill bg-ink-50 border border-ink-200 text-meta font-display font-medium text-ink-700">
+                {tutor.specialty}
               </span>
             )}
           </div>
@@ -382,11 +414,11 @@ const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false }: { tut
               banned by canon (no status dots) and orphaned: each one rendered
               after its own fact, so an expert with no sessions/languages after
               it ended the row on a dangling dot. */}
-          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-small">
             {typeof tutor?.rating === 'number' && tutor.rating > 0 && (
               <div className="inline-flex items-baseline gap-1.5">
                 <Icon.star className="w-3.5 h-3.5 text-warning-500 self-center" />
-                <span className="font-display font-bold text-ink-900 tabular-nums text-[15px]">{fmtRating(tutor.rating)}</span>
+                <span className="font-display font-bold text-ink-900 tabular-nums text-body-lg">{fmtRating(tutor.rating)}</span>
                 {typeof tutor.reviewsCount === 'number' && tutor.reviewsCount > 0 && (
                   <span className="text-ink-500 tabular-nums">· {tutor.reviewsCount}</span>
                 )}
@@ -394,32 +426,46 @@ const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false }: { tut
             )}
             {typeof tutor?.sessionsCount === 'number' && tutor.sessionsCount > 0 && (
               <div className="inline-flex items-baseline gap-1.5">
-                <span className="font-display font-bold text-ink-900 tabular-nums text-[15px]">{tutor.sessionsCount}</span>
+                <span className="font-display font-bold text-ink-900 tabular-nums text-body-lg">{tutor.sessionsCount}</span>
                 <span className="text-ink-500">სესია</span>
               </div>
             )}
-            {tutor?.languages && tutor.languages.length > 0 && (
-              <div className="inline-flex items-center gap-1.5 text-ink-700">
-                <Icon.globe className="w-3.5 h-3.5 text-ink-500" />
-                <span>{tutor.languages.map(toLangLabel).join(' · ')}</span>
-              </div>
-            )}
+            {/* Dedupe AFTER labelling, not before. `languages` is stored as ISO
+                codes, but /apply once wrote Georgian NAMES and older rows hold
+                both spellings for one language — so „ka" and „ქართული" survive a
+                raw dedupe as two entries and only collapse once each has been
+                mapped to its label. That is exactly what printed „ქართული ·
+                ქართული · ინგლისური" on a live profile. lib/languages'
+                normalizeLangs fixes new writes; this keeps existing rows honest
+                without a migration. */}
+            {tutor?.languages && tutor.languages.length > 0 && (() => {
+              const labels = Array.from(new Set(tutor.languages.map(toLangLabel)))
+              return (
+                <div className="inline-flex items-center gap-1.5 text-ink-700">
+                  <Icon.globe className="w-3.5 h-3.5 text-ink-500" />
+                  <span>{labels.join(' · ')}</span>
+                </div>
+              )
+            })()}
             {typeof tutor?.yearsExp === 'number' && tutor.yearsExp > 0 && (
               <div className="inline-flex items-center gap-1.5 text-ink-700">
                 <span>{tutor.yearsExp} წელი</span>
               </div>
             )}
-            {typeof tutor?.responseHours === 'number' && tutor.responseHours > 0 && (
-              <div className="inline-flex items-center gap-1.5 text-ink-700">
-                <Icon.clock className="w-3.5 h-3.5 text-ink-500" />
-                <span>პასუხი &lt; {tutor.responseHours}სთ</span>
-              </div>
-            )}
+            {/* Response time deliberately NOT here (2026-07-29). It is not an
+                identity fact — it only matters at the moment someone decides
+                whether to message and wait, so it lives beside the message
+                button in the booking rail. Preply, the only comparable site
+                that measures it, uses it as a SEARCH RANKING input and never
+                prints it as a headline stat. */}
           </div>
 
-          {(tutor?.headline || tutor?.bio) && (
-            <p className="mt-4 text-[14px] text-ink-600 leading-[1.6] max-w-[560px]">
-              {tutor?.headline ?? tutor?.bio}
+          {/* Same normaliser the browse card uses, so the two surfaces can never
+              print one expert's headline differently — and so the trailing
+              „- 7 წელი" is gone here too (the years have their own row). */}
+          {(displayHeadline(tutor?.headline) || tutor?.bio) && (
+            <p className="mt-4 text-body text-ink-600 leading-[1.6] max-w-[560px]">
+              {displayHeadline(tutor?.headline) || tutor?.bio}
             </p>
           )}
 
@@ -432,12 +478,12 @@ const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false }: { tut
             return (
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 {li && (
-                  <a href={li} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 h-8 px-3 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 hover:border-ink-300 hover:text-ink-900 font-display text-[12px] font-semibold transition-colors">
+                  <a href={li} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 h-10 sm:h-8 px-3.5 sm:px-3 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 hover:border-ink-300 hover:text-ink-900 font-display text-meta font-semibold transition-colors duration-fast">
                     <Icon.external className="w-3.5 h-3.5" /> LinkedIn
                   </a>
                 )}
                 {web && (
-                  <a href={web} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 h-8 px-3 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 hover:border-ink-300 hover:text-ink-900 font-display text-[12px] font-semibold transition-colors">
+                  <a href={web} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 h-10 sm:h-8 px-3.5 sm:px-3 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 hover:border-ink-300 hover:text-ink-900 font-display text-meta font-semibold transition-colors duration-fast">
                     <Icon.globe className="w-3.5 h-3.5" /> ვებგვერდი
                   </a>
                 )}
@@ -448,14 +494,17 @@ const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false }: { tut
           {/* Trust row — reassurance before booking. On a high-ticket, first-time
               purchase these three signals remove the biggest objections. */}
           <div className="mt-5 pt-4 border-t border-ink-100 flex flex-wrap items-center gap-x-5 gap-y-2.5">
-            <span className="inline-flex items-center gap-1.5 text-[12px] font-display font-medium text-ink-700">
+            <span className="inline-flex items-center gap-1.5 text-meta font-display font-medium text-ink-700">
               <Icon.check className="w-4 h-4 text-brand-600" /> ხელით შერჩეული
             </span>
-            <span className="inline-flex items-center gap-1.5 text-[12px] font-display font-medium text-ink-700">
-              <Icon.shieldCheck className="w-4 h-4 text-brand-600" /> {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'უფასო დაჯავშნა · გადახდები მალე'}
+            <span className="inline-flex items-center gap-1.5 text-meta font-display font-medium text-ink-700">
+              {/* „· გადახდები მალე" dropped: a visitor can act on „booking is
+                  free", not on our roadmap. Keep the half that is a fact about
+                  their next click. */}
+              <Icon.shieldCheck className="w-4 h-4 text-brand-600" /> {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'უფასო დაჯავშნა'}
             </span>
             {tutor?.verified && (
-              <span className="inline-flex items-center gap-1.5 text-[12px] font-display font-medium text-ink-700">
+              <span className="inline-flex items-center gap-1.5 text-meta font-display font-medium text-ink-700">
                 <Icon.shieldCheck className="w-4 h-4 text-brand-600" /> ID გადამოწმებული
               </span>
             )}
@@ -499,7 +548,7 @@ const Stars = ({ n }: { n: number }) => (
   </div>
 )
 
-const REV_MONTHS = ['იან.','თებ.','მარ.','აპრ.','მაი.','ივნ.','ივლ.','აგვ.','სექ.','ოქტ.','ნოე.','დეკ.']
+const REV_MONTHS = KA_MONTHS_SHORT_DOT
 const timeAgoGe = (iso: string) => {
   const d = new Date(iso); if (isNaN(d.getTime())) return ''
   const days = Math.floor((Date.now() - d.getTime()) / 86_400_000)
@@ -526,23 +575,23 @@ const ReviewArticle = ({ r }: { r: ReviewItem }) => {
           <img src={DEFAULT_AVATAR} alt="" width={40} height={40} loading="lazy" decoding="async" className="w-10 h-10 rounded-full object-cover shrink-0" />
         )}
         <div className="min-w-0 flex-1">
-          <div className="font-display text-[14px] font-bold text-ink-900 leading-tight truncate">{anon ? 'ანონიმური სტუდენტი' : r.student?.fullName ?? 'ანონიმური სტუდენტი'}</div>
-          <div className="mt-0.5 inline-flex items-center gap-2 text-[11.5px] text-ink-500">
+          <div className="font-display text-body font-bold text-ink-900 leading-tight truncate">{anon ? 'ანონიმური სტუდენტი' : r.student?.fullName ?? 'ანონიმური სტუდენტი'}</div>
+          <div className="mt-0.5 inline-flex items-center gap-2 text-meta text-ink-500">
             <Stars n={Math.round(r.rating)} />
             <span>·</span>
             <span>{timeAgoGe(r.createdAt)}</span>
           </div>
         </div>
       </div>
-      <p className="text-[14px] text-ink-700 leading-[1.6] max-w-[680px] whitespace-pre-wrap">{r.body}</p>
+      <p className="text-body text-ink-700 leading-[1.6] max-w-[680px] whitespace-pre-wrap">{r.body}</p>
       {/* Expert's public reply — quoted sub-block, visually nested. */}
       {r.tutorResponse && (
         <div className="mt-4 border-l-2 border-ink-200 pl-3 max-w-[680px]">
-          <div className="text-[11px] text-ink-500">
+          <div className="text-meta text-ink-500">
             <span className="font-display font-semibold text-ink-700">ექსპერტის პასუხი</span>
             {respondedDate && !isNaN(respondedDate.getTime()) && <span> · {fmtKaDate(respondedDate, { year: true })}</span>}
           </div>
-          <p className="mt-1 text-[13px] text-ink-600 leading-[1.6] whitespace-pre-wrap">{r.tutorResponse}</p>
+          <p className="mt-1 text-small text-ink-600 leading-[1.6] whitespace-pre-wrap">{r.tutorResponse}</p>
         </div>
       )}
     </article>
@@ -574,12 +623,12 @@ const Reviews = ({ reviews, rating, total, verified, expertFeatured, loading = f
   return (
     <section id="reviews" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-24">
       <Eyebrow className="mb-3">შეფასებები</Eyebrow>
-      <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">
-        {total > 0 ? 'რას ამბობს მომხმარებელი' : 'ჯერ არ არის შეფასება'}
+      <h2 className="font-display text-h2 lg:text-h1 font-bold tracking-[-0.022em] text-ink-900 leading-tight">
+        {total > 0 ? 'რას ამბობენ სტუდენტები' : 'ჯერ არ არის შეფასება'}
       </h2>
 
       {total === 0 ? (
-        <p className="mt-3 text-[13.5px] text-ink-500 max-w-[520px]">ჯერ არავის შეუფასებია — იყავი პირველი.</p>
+        <p className="mt-3 text-body text-ink-500 max-w-[520px]">ჯერ არავის შეუფასებია — იყავი პირველი.</p>
       ) : (
         <>
           {/* Featured outcome stories — above the star math, because on a
@@ -597,13 +646,13 @@ const Reviews = ({ reviews, rating, total, verified, expertFeatured, loading = f
 
           <div className="mt-7 rounded-card border border-ink-200 bg-ink-50/50 p-5 sm:p-6 grid sm:grid-cols-[auto_1fr] gap-6 sm:gap-10 items-center">
             <div className="flex items-baseline gap-4 pb-5 sm:pb-0 sm:pr-8 sm:border-r border-b sm:border-b-0 border-ink-200">
-              <span className="font-display text-[56px] sm:text-[64px] font-bold text-ink-900 tabular-nums leading-none tracking-tight motion-safe:animate-scale-in">
+              <span className="font-display text-hero font-bold text-ink-900 tabular-nums leading-none tracking-tight motion-safe:animate-scale-in">
                 {/* decimals=1 — same precision as fmtRating everywhere else. */}
                 <CountUp value={rating} decimals={1} />
               </span>
               <div>
                 <Stars n={Math.round(rating)} />
-                <div className="mt-1.5 text-[12px] text-ink-500 tabular-nums">
+                <div className="mt-1.5 text-meta text-ink-500 tabular-nums">
                   <CountUp value={total} /> შეფასებიდან
                 </div>
                 {verified && rating >= 4.8 && expertFeatured && (
@@ -616,7 +665,7 @@ const Reviews = ({ reviews, rating, total, verified, expertFeatured, loading = f
                 loading ? (
                   // Neutral placeholder bars — same rows/heights as the real
                   // histogram, so nothing jumps when the rows land.
-                  <div className="space-y-2 animate-pulse" aria-busy="true">
+                  <div className="space-y-2 motion-safe:animate-pulse" aria-busy="true">
                     {[5, 4, 3, 2, 1].map(s => (
                       <div key={s} className="grid grid-cols-[24px_1fr_40px] items-center gap-3">
                         <span className="h-3 rounded bg-ink-100" />
@@ -627,12 +676,12 @@ const Reviews = ({ reviews, rating, total, verified, expertFeatured, loading = f
                     <span className="sr-only">შეფასებები იტვირთება…</span>
                   </div>
                 ) : (
-                  <p className="text-[12px] text-ink-500 leading-snug">შეფასებების განაწილება ვერ ჩაიტვირთა.</p>
+                  <p className="text-meta text-ink-500 leading-snug">შეფასებების განაწილება ვერ ჩაიტვირთა.</p>
                 )
               ) : dist.map(d => {
                 const pct = reviews.length > 0 ? (d.n / reviews.length) * 100 : 0
                 return (
-                  <div key={d.s} className="grid grid-cols-[24px_1fr_40px] items-center gap-3 text-[12px]">
+                  <div key={d.s} className="grid grid-cols-[24px_1fr_40px] items-center gap-3 text-meta">
                     <span className="font-display font-semibold tabular-nums text-ink-700 inline-flex items-center gap-1">
                       {d.s}
                       <Icon.star className="w-3 h-3 text-warning-500" />
@@ -651,7 +700,7 @@ const Reviews = ({ reviews, rating, total, verified, expertFeatured, loading = f
                   without this caption the two visibly disagree and read as a
                   fake rating. */}
               {reviews.length > 0 && reviews.length < total && (
-                <div className="pt-1 text-[11px] text-ink-400">ბოლო {reviews.length} შეფასების მიხედვით</div>
+                <div className="pt-1 text-meta text-ink-400">ბოლო {reviews.length} შეფასების მიხედვით</div>
               )}
             </div>
           </div>
@@ -659,7 +708,7 @@ const Reviews = ({ reviews, rating, total, verified, expertFeatured, loading = f
           <div className="mt-10 divide-y divide-ink-100">
             {distUnknown && loading
               ? [0, 1, 2].map(i => (
-                  <div key={i} className="py-6 first:pt-0 last:pb-0 animate-pulse" aria-hidden>
+                  <div key={i} className="py-6 first:pt-0 last:pb-0 motion-safe:animate-pulse" aria-hidden>
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-full bg-ink-100 shrink-0" />
                       <div className="min-w-0 flex-1 space-y-2">
@@ -679,7 +728,7 @@ const Reviews = ({ reviews, rating, total, verified, expertFeatured, loading = f
               <button
                 type="button"
                 onClick={() => setShowAll(true)}
-                className="h-11 px-5 rounded-btn border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors"
+                className="h-11 px-5 rounded-btn border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-small tracking-wide inline-flex items-center gap-2 transition-colors duration-fast"
               >
                 ნახე ყველა {rest.length} შეფასება
                 <Icon.chevD className="w-3.5 h-3.5" />
@@ -704,7 +753,7 @@ const Reviews = ({ reviews, rating, total, verified, expertFeatured, loading = f
 type SlotsState = 'pending' | 'ready' | 'failed'
 
 /* ───── Mobile sticky booking bar ───── */
-const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, bufferMin = 0, signedIn, paused, availability = [], busySlots = [], slotsState = 'ready', onRetrySlots, canMessage = false, onMessage, isOwnProfile = false, viewerCantBook = false }: { onBook: () => void; priceLabel: string; priceIsFrom: boolean; sessionMin: number; bufferMin?: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[]; busySlots?: BusySlot[]; slotsState?: SlotsState; onRetrySlots?: () => void; canMessage?: boolean; onMessage?: () => void; isOwnProfile?: boolean; viewerCantBook?: boolean }) => {
+const MobileBookingBar = ({ onBook, priceLabel, sessionMin, bufferMin = 0, signedIn, paused, availability = [], busySlots = [], slotsState = 'ready', onRetrySlots, canMessage = false, onMessage, isOwnProfile = false, viewerCantBook = false, canProposeCategory = false }: { onBook: () => void; priceLabel: string; sessionMin: number; bufferMin?: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[]; busySlots?: BusySlot[]; slotsState?: SlotsState; onRetrySlots?: () => void; canMessage?: boolean; onMessage?: () => void; isOwnProfile?: boolean; viewerCantBook?: boolean; canProposeCategory?: boolean }) => {
   // Flag the body while this mobile CTA bar is mounted so the cookie banner
   // lifts above it (see globals.css) instead of covering the primary CTA.
   useEffect(() => {
@@ -731,48 +780,78 @@ const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, bufferM
   const pending = !paused && slotsState === 'pending'
   const failed = !paused && slotsState === 'failed'
   const noSlots = !paused && slotsState === 'ready' && nextFree === null
-  const disabled = paused || noSlots
+  // With request-based booking on, „no published time" STOPS being a dead end:
+  // the visitor proposes one and the expert answers. Booking therefore stays
+  // enabled — which matters more than it looks, because the booking sheet's
+  // „შემომთავაზე დრო" screen is reachable ONLY through this button. Disabling
+  // it here made the whole feature unreachable for exactly the experts it was
+  // built for (verified on a slot-less profile before shipping).
+  // `paused` still disables: an expert who stepped out has not asked to be
+  // sent proposals.
+  const canPropose = FEATURE_REQUEST_BOOKING && canProposeCategory && noSlots
+  const disabled = paused || (noSlots && !canPropose)
+  // Mirrors the desktop rail: with nothing bookable, the primary slot goes to
+  // the action that still works instead of a greyed „დროები არ არის". `paused`
+  // deliberately does NOT promote — an expert who stepped out is a different
+  // statement from one who has published no time, and the bar says so.
+  // `canMessage` already excludes the owner and ADMIN, so this can't outrank
+  // their own branches below.
+  const messagePromoted = noSlots && !canPropose && canMessage && !!onMessage
   return (
   <div
-    className="lg:hidden fixed bottom-0 left-0 right-0 z-[65] bg-white border-t border-ink-200 shadow-[0_-4px_20px_rgba(46,42,33,0.06)] motion-safe:animate-slide-in-b"
+    className="lg:hidden fixed bottom-0 left-0 right-0 z-overlay bg-white border-t border-ink-200 shadow-[0_-4px_20px_rgba(46,42,33,0.06)] motion-safe:animate-slide-in-b"
     style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
   >
     <div className="px-4 py-3 flex items-center gap-3">
-      {/* shrink-0 so the price keeps its width and the CTA never starves it
-          into breaking „₾NN-დან“ at the hyphen (was a real 360px bug). */}
-      <div className="min-w-0 shrink-0">
+      {/* Shrinkable (2026-07-27 type-scale pass): this block used to be
+          `shrink-0`, which dumped ALL flex shrinkage on the CTA — once the
+          „უახლოესი: …" line moved 11.5px → text-meta the CTA truncated to
+          „დაჯავშ…". Both children are already overflow-safe (the price has
+          `whitespace-nowrap` so „₾NN-დან" can't break at the hyphen — the
+          original reason for shrink-0 — and the date line has `truncate`),
+          so shrinkage now lands on the secondary hint, never on the CTA. */}
+      <div className="min-w-0 shrink">
         <div className="flex items-baseline gap-1.5">
-          {/* From-price when tiers differ (1.2) — the exact price is chosen at
-              the flow's service step; flat experts keep the "/ N წთ" label. */}
-          <span className="font-display text-[22px] font-bold text-ink-900 tabular-nums leading-none tracking-tight whitespace-nowrap">{priceLabel}</span>
-          <span className="text-[11.5px] text-ink-500 whitespace-nowrap">{priceIsFrom ? '/ სესია' : `/ ${sessionMin} წთ`}</span>
+          {/* The FLAGSHIP tier's price and its real length — always a concrete
+              service, so there is no „/ სესია" from-price branch left to take. */}
+          <span className="font-display text-h2 font-bold text-ink-900 tabular-nums leading-none tracking-tight whitespace-nowrap">{priceLabel}</span>
+          <span className="text-meta text-ink-500 whitespace-nowrap">{`/ ${sessionMin} წთ`}</span>
         </div>
         {!disabled && nextFree && (
-          <div className="mt-1 text-[11px] text-ink-500 leading-none truncate">
-            უახლოესი: <span className="font-display font-semibold text-ink-800">{DAY_NAMES_FULL[isoWeekday(nextFree)]}, {nextFree.getDate()} {KA_MONTHS_FULL[nextFree.getMonth()]}</span>
+          /* SHORT date (2026-08-02). „ორშაბათი, 3 აგვისტო" does not fit beside
+             a price, an icon button and the CTA on a 390px bar — it truncated to
+             „ორშაბათი, 3 აგვ…", i.e. the one fact this line exists to deliver
+             was the part that got cut. „ორშ, 3 აგვ." is the same information in
+             half the width, from the shared kaDate arrays. */
+          <div className="mt-1 text-meta text-ink-500 leading-none truncate">
+            უახლოესი: <span className="font-display font-semibold text-ink-800">{KA_WEEKDAYS_SHORT[nextFree.getDay()]}, {nextFree.getDate()} {KA_MONTHS_SHORT_DOT[nextFree.getMonth()]}</span>
           </div>
         )}
       </div>
-      <div className="ml-auto flex items-center gap-2 min-w-0">
+      <div className="ml-auto flex items-center gap-2 min-w-0 shrink-0">
         {/* Pre-booking message — secondary, icon-only to protect „დაჯავშნა“'s
-            width on 360px. Allowed even when booking is paused. */}
-        {canMessage && onMessage && (
+            width on 360px. Allowed even when booking is paused. Hidden once
+            messaging has BECOME the primary (noSlots), so the bar never shows
+            the same action twice, once as an icon and once as a button. */}
+        {canMessage && onMessage && !messagePromoted && (
           <button
             type="button"
             onClick={onMessage}
             aria-label="მიწერე ექსპერტს"
             title="მიწერე ექსპერტს"
-            className="h-12 w-12 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-700 hover:border-brand-300 hover:text-brand-700 inline-flex items-center justify-center transition-colors"
+            className="h-12 w-12 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-700 hover:border-brand-300 hover:text-brand-700 inline-flex items-center justify-center transition-colors duration-fast"
           >
             <Icon.chat className="w-5 h-5" />
           </button>
         )}
         {isOwnProfile ? (
-          <Link href="/tutor/profile" className="shrink min-w-0 h-12 px-4 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
+          <Link href="/tutor/profile" className="tap-shrink shrink min-w-0 h-12 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center justify-center gap-2 transition-colors duration-fast">
             <span className="truncate">პროფილის რედაქტირება</span>
           </Link>
         ) : viewerCantBook ? (
-          <span className="shrink min-w-0 h-12 px-4 rounded-btn bg-ink-75 border border-ink-200 text-ink-400 font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center">
+          // ink-500 on the tinted ink-75 plate (5.19); ink-400 measures 4.40
+          // there and fails AA — its documented 4.75 is against WHITE.
+          <span className="shrink min-w-0 h-12 px-4 rounded-btn bg-ink-75 border border-ink-200 text-ink-500 font-display font-semibold text-body tracking-wide inline-flex items-center justify-center">
             <span className="truncate">ჯავშანი მხოლოდ სტუდენტს</span>
           </span>
         ) : pending ? (
@@ -786,37 +865,61 @@ const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, bufferM
           <button
             type="button"
             onClick={onRetrySlots}
-            className="shrink min-w-0 h-12 px-4 rounded-btn border border-ink-200 bg-white text-ink-800 font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors hover:border-ink-300"
+            className="shrink min-w-0 h-12 px-4 rounded-btn border border-ink-200 bg-white text-ink-800 font-display font-semibold text-body tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors duration-fast hover:border-ink-300"
           >
             <Icon.refresh className="w-4 h-4" />
             <span className="truncate">სცადე თავიდან</span>
+          </button>
+        ) : messagePromoted ? (
+          // No bookable time: the live action takes the primary slot. The old
+          // branch rendered the CTA disabled with the label „დროები არ არის" —
+          // a beige, dead primary that stated a problem and offered no way out,
+          // while the only working control was a 48px icon beside it.
+          <button
+            type="button"
+            onClick={onMessage}
+            className="shrink-0 min-w-0 h-12 px-4 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] transition-all duration-fast"
+          >
+            <Icon.chat className="w-4 h-4 shrink-0" />
+            <span className="truncate">მიწერე</span>
           </button>
         ) : (
           <button
             type="button"
             onClick={onBook}
             disabled={disabled}
-            className="shrink min-w-0 h-12 px-4 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[13.5px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] transition-all duration-fast disabled:bg-none disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed"
+            className="shrink-0 min-w-0 h-12 px-4 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] transition-all duration-fast disabled:bg-none disabled:bg-ink-100 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed"
           >
             {/* Guest label kept short — tapping opens the auth sheet, which
-                explains the sign-in step. „შესვლა და დაჯავშნა“ overflowed 360px. */}
-            <span className="truncate">{paused ? 'პაუზაზეა' : noSlots ? 'დროები არ არის' : 'დაჯავშნა'}</span>
+                explains the sign-in step. „შესვლა და დაჯავშნა“ overflowed 360px.
+                shrink-0 (2026-07-27): every label here is short (max
+                „დროები არ არის" ≈ 137px incl. padding), so the PRIMARY action
+                never truncates — the sibling price block absorbs the squeeze
+                on its secondary „უახლოესი: …" line instead. */}
+            <span className="truncate">{paused ? 'პაუზაზეა' : canPropose ? 'შემომთავაზე დრო' : noSlots ? 'დროები არ არის' : 'დაჯავშნა'}</span>
           </button>
         )}
       </div>
     </div>
-    <div className="border-t border-ink-100 px-4 py-2 flex items-center justify-center gap-4 text-[11.5px] text-ink-500">
-      {paused ? (
-        <span>ჯავშნები დროებით შეჩერებულია</span>
-      ) : failed ? (
-        <span>თავისუფალი დროები ვერ ჩაიტვირთა</span>
-      ) : noSlots ? (
-        <span>დრო ჯერ არ არის — მიწერე ან შეინახე ❤</span>
-      ) : (
-        // Canonical risk-reversal line under the CTA (shared constant).
-        <span className="text-center leading-snug">{RISK_REVERSAL_LINE}</span>
-      )}
-    </div>
+    {/* Status strip — renders ONLY when there is a state to explain. The
+        default („bookable") case used to carry the free-cancellation line;
+        removed 2026-08-05 at the owner's request, and with it the strip
+        itself, rather than leaving an empty bordered band on the bar. */}
+    {(paused || failed || canPropose || noSlots) && (
+      <div className="border-t border-ink-100 px-4 py-2 flex items-center justify-center gap-4 text-meta text-ink-500">
+        {paused ? (
+          <span>ჯავშნები დროებით შეჩერებულია</span>
+        ) : failed ? (
+          <span>თავისუფალი დროები ვერ ჩაიტვირთა</span>
+        ) : canPropose ? (
+          <span>გამოქვეყნებული დრო ჯერ არ არის — შესთავაზე შენთვის მოსახერხებელი</span>
+        ) : (
+          // Don't re-issue the instruction the button beside it already is. This
+          // line's job is the REASON („no published time"), not a second „მიწერე".
+          <span>გამოქვეყნებული დრო ჯერ არ არის — შეთანხმდით მიმოწერაში</span>
+        )}
+      </div>
+    )}
   </div>
   )
 }
@@ -828,9 +931,14 @@ const MobileBookingBar = ({ onBook, priceLabel, priceIsFrom, sessionMin, bufferM
  * to this profile; a booking intent adds ?rebook=1 so the modal reopens by
  * itself and the flow continues where it left off.
  */
-const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; intent: 'book' | 'message' | null; onDismiss: () => void }) => {
+const AuthPromptSheet = ({ tutorId, intent, start, serviceId, onDismiss }: { tutorId: string; intent: 'book' | 'message' | null; start?: Date | null; serviceId?: string | null; onDismiss: () => void }) => {
   // Escape / scroll-lock / focus trap come from the Sheet container.
-  const target = `/tutors/${tutorId}${intent === 'book' ? '?rebook=1' : intent === 'message' ? '?intent=message' : ''}`
+  // The picked time and tier ride along, so „ჯავშანი გაგრძელდება" is true:
+  // the profile re-seeds them on arrival instead of asking again.
+  const bookQs = new URLSearchParams({ rebook: '1' })
+  if (start) bookQs.set('start', start.toISOString())
+  if (serviceId) bookQs.set('service', serviceId)
+  const target = `/tutors/${tutorId}${intent === 'book' ? `?${bookQs}` : intent === 'message' ? '?intent=message' : ''}`
   const q = `redirect=${encodeURIComponent(target)}`
   return (
     <Sheet
@@ -840,18 +948,18 @@ const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; inte
       ariaLabel="ავტორიზაცია საჭიროა"
       title={intent === 'book' ? 'შედი, რომ დაიჯავშნო' : intent === 'message' ? 'შედი, რომ მისწერო ექსპერტს' : 'შედი, რომ გააგრძელო'}
     >
-        <p className="text-[13px] text-ink-600 leading-[1.55]">
+        <p className="text-small text-ink-600 leading-[1.55]">
           წუთში მორჩები — აქვე დაბრუნდები{intent === 'book' ? ' და ჯავშანი გაგრძელდება' : ''}.
         </p>
         <div className="mt-5 space-y-2.5">
-          <Link href={`/signin?${q}`} className="w-full h-12 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow transition-all">
+          <Link href={`/signin?${q}`} className="tap-shrink w-full h-12 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow transition-all duration-fast">
             შესვლა
           </Link>
-          <Link href={`/signup?${q}`} className="w-full h-12 rounded-btn border border-ink-200 hover:border-ink-300 hover:bg-ink-75 text-ink-800 font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center transition-colors">
+          <Link href={`/signup?${q}`} className="w-full h-12 rounded-btn border border-ink-200 hover:border-ink-300 hover:bg-ink-75 text-ink-800 font-display font-semibold text-body tracking-wide inline-flex items-center justify-center transition-colors duration-fast">
             რეგისტრაცია
           </Link>
         </div>
-        <p className="mt-4 mb-2 text-[11px] text-ink-500 text-center inline-flex items-center gap-1.5 w-full justify-center">
+        <p className="mt-4 mb-2 text-meta text-ink-500 text-center inline-flex items-center gap-1.5 w-full justify-center">
           <Icon.shieldCheck className="w-3 h-3 text-success-600" />
           {PAYMENTS_LIVE ? 'გადახდა დაცულია' : 'დაჯავშნა უფასოა — გადახდები მალე'}
         </p>
@@ -862,6 +970,7 @@ const AuthPromptSheet = ({ tutorId, intent, onDismiss }: { tutorId: string; inte
 /* ───── Similar experts — fetches real tutors in the same category ───── */
 type SimilarTutor = {
   id: string
+  slug: string | null
   name: string
   avatar: string | null
   specialty: string
@@ -887,6 +996,10 @@ const SimilarExperts = ({ excludeId, categorySlug, categoryName }: { excludeId?:
           .slice(0, 4)
           .map(t => ({
             id: t.id,
+            // Slug, not the cuid: a cuid href 308s to the slug and the redirect
+            // downgrades the navigation to a full load, which kills the photo
+            // view-transition (CLAUDE.md, animation pass 2026-08-01).
+            slug: t.slug ?? null,
             name: t.user?.fullName ?? 'ექსპერტი',
             avatar: t.user?.avatarUrl ?? null,
             specialty: t.specialty ?? '',
@@ -909,9 +1022,9 @@ const SimilarExperts = ({ excludeId, categorySlug, categoryName }: { excludeId?:
       <div className="flex items-baseline justify-between gap-4 flex-wrap mb-6">
         <div>
           <Eyebrow className="mb-3">ასევე ნახე</Eyebrow>
-          <h2 className="font-display text-[22px] lg:text-[26px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">მსგავსი ექსპერტები</h2>
+          <h2 className="font-display text-h2 lg:text-h1 font-bold tracking-[-0.022em] text-ink-900 leading-tight">მსგავსი ექსპერტები</h2>
         </div>
-        <Link href={`/tutors${categorySlug ? `?category=${categorySlug}` : ''}`} className="text-[12px] text-ink-600 hover:text-ink-900 font-display font-semibold inline-flex items-center gap-1 transition-colors">
+        <Link href={`/tutors${categorySlug ? `?category=${categorySlug}` : ''}`} className="text-meta text-ink-600 hover:text-ink-900 font-display font-semibold inline-flex items-center gap-1 transition-colors duration-fast">
           {categoryName ? `ყველა · ${categoryName}` : 'ყველა ექსპერტი'}
           <Icon.chevR className="w-3 h-3" />
         </Link>
@@ -921,21 +1034,33 @@ const SimilarExperts = ({ excludeId, categorySlug, categoryName }: { excludeId?:
         {tutors.map(t => (
           <Link
             key={t.id}
-            href={`/tutors/${t.id}`}
-            className="shrink-0 sm:shrink w-[260px] sm:w-auto text-left rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift p-4 snap-start"
+            href={`/tutors/${t.slug || t.id}`}
+            /* min-w-0: a grid item defaults to min-width:auto, so a long word
+               inside would grow this track past its 1fr share instead of
+               being clamped by it. */
+            className="shrink-0 sm:shrink w-[260px] sm:w-auto min-w-0 text-left rounded-card border border-ink-200 bg-white hover:border-ink-300 hover-lift p-4 snap-start"
           >
             <div className="flex items-start gap-3">
-              <img src={t.avatar || DEFAULT_AVATAR} alt="" width={52} height={52} loading="lazy" decoding="async" className="w-[52px] h-[52px] rounded-full object-cover shrink-0 ring-2 ring-ink-100" />
+              <img src={t.avatar || DEFAULT_AVATAR} alt="" width={60} height={60} loading="lazy" decoding="async" className="w-[60px] h-[60px] rounded-full object-cover shrink-0 ring-2 ring-ink-100" />
               <div className="min-w-0 flex-1">
-                <div className="font-display text-[14px] font-bold text-ink-900 tracking-tight truncate">{t.name}</div>
-                <div className="text-[11.5px] text-ink-500 truncate mt-0.5">{t.specialty}</div>
+                <div className="font-display text-body font-bold text-ink-900 tracking-tight truncate">{t.name}</div>
+                <div className="text-meta text-ink-500 truncate mt-0.5">{t.specialty}</div>
                 {t.categoryName && (
-                  <div className="mt-1.5 inline-flex items-center gap-1 px-2 h-5 rounded-pill bg-brand-50 text-brand-800 font-display text-[10px] font-semibold uppercase tracking-[0.12em]">{t.categoryName}</div>
+                  /* max-w-full + a truncating span: the chip's text is a flex
+                     item with min-width:auto, i.e. it refuses to go below the
+                     longest word („გადასახადები" = 114px at this size) and
+                     pushed the pill outside the card. `truncate` sets
+                     overflow:hidden, which is what makes that automatic
+                     minimum resolve to 0 — the pill now clamps to its column
+                     and ellipsises instead of spilling. */
+                  <div className="mt-1.5 inline-flex max-w-full items-center gap-1 px-2 h-5 rounded-pill bg-brand-50 text-brand-800 font-display text-micro font-semibold uppercase">
+                    <span className="truncate">{t.categoryName}</span>
+                  </div>
                 )}
               </div>
             </div>
             <div className="mt-3.5 pt-3 border-t border-ink-100 flex items-center justify-between">
-              <div className="inline-flex items-baseline gap-1 text-[12px]">
+              <div className="inline-flex items-baseline gap-1 text-meta">
                 {t.rating > 0 ? (
                   <>
                     <Icon.star className="w-3 h-3 text-warning-500 self-center" />
@@ -943,10 +1068,10 @@ const SimilarExperts = ({ excludeId, categorySlug, categoryName }: { excludeId?:
                     {t.sessions > 0 && <span className="text-ink-500 tabular-nums">· {t.sessions}</span>}
                   </>
                 ) : (
-                  <span className="text-ink-400 text-[11px]">ახალი</span>
+                  <span className="text-ink-400 text-meta">ახალი</span>
                 )}
               </div>
-              <div className="font-display text-[14px] font-bold text-ink-900 tabular-nums tracking-tight">₾{t.price}<span className="text-[11px] font-medium text-ink-500 tracking-normal">/ სესია</span></div>
+              <div className="font-display text-body font-bold text-ink-900 tabular-nums tracking-tight">₾{t.price}<span className="text-meta font-medium text-ink-500 tracking-normal">/ სესია</span></div>
             </div>
           </Link>
         ))}
@@ -956,46 +1081,22 @@ const SimilarExperts = ({ excludeId, categorySlug, categoryName }: { excludeId?:
 }
 
 /* ───── Specs strip — compact stats row ───── */
-const SpecsGrid = ({ tutor }: { tutor: TutorDetail | null }) => {
-  if (!tutor) return null
-  // `> 0`, not just `typeof === 'number'`: a brand-new expert stores 0, and the
-  // old check headlined their profile with „0 ჩატარებული სესია" / „0 წ.
-  // გამოცდილება". The browse card and the sticky rail both suppress zeros —
-  // here the honest value is „—".
-  const num = (v: number | null | undefined) => (typeof v === 'number' && v > 0 ? v : null)
-  const items = [
-    { n: num(tutor.sessionsCount) !== null ? String(tutor.sessionsCount) : '—', l: 'ჩატარებული სესია', icon: <Icon.video className="w-3.5 h-3.5" /> },
-    { n: num(tutor.responseHours) !== null ? `~ ${tutor.responseHours} სთ` : '—', l: 'რეაგირება', icon: <Icon.clock className="w-3.5 h-3.5" /> },
-    { n: num(tutor.yearsExp) !== null ? `${tutor.yearsExp} წ.` : '—', l: 'გამოცდილება', icon: <Icon.thumb className="w-3.5 h-3.5" /> },
-    // Bank names must not render before the gateway is live — until then the
-    // honest spec is that booking costs nothing.
-    PAYMENTS_LIVE
-      ? { n: 'დაცული გადახდა', l: 'TBC · BOG · SOLO', icon: <Icon.shieldCheck className="w-3.5 h-3.5" /> }
-      : { n: 'უფასო', l: 'გადახდები მალე', icon: <Icon.shieldCheck className="w-3.5 h-3.5" /> },
-  ]
-  return (
-    // Compact fact strip — these repeat identity-row facts, so on desktop they
-    // act as quiet confirmation, not a second hero. Half the old height keeps
-    // the About content (the real evaluation material) above the fold.
-    <section className="mt-8 rounded-card border border-ink-200 bg-white overflow-hidden">
-      <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-ink-100">
-        {/* `divide-x` puts a left hairline on every child but the first — in the
-            2-col mobile grid that lands on cell 3, i.e. a stray line hanging off
-            the strip's left edge. Cell 3 only gets its divider back at lg,
-            where the row is a single 4-col line. */}
-        {items.map((it, i) => (
-          <div key={i} className={`px-4 py-3 sm:px-5 ${i === 0 ? 'border-l-0' : ''} ${i === 2 ? 'border-l-0 lg:border-l' : ''}`}>
-            <div className="inline-flex items-center gap-1.5 text-ink-500">
-              {it.icon}
-              <span className="font-display text-[9.5px] font-semibold uppercase tracking-[0.16em]">{it.l}</span>
-            </div>
-            <div className="mt-1 font-display text-[17px] sm:text-[19px] font-bold text-ink-900 tabular-nums tracking-tight leading-none">{it.n}</div>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
+/* SpecsGrid (sessions · response time · years) was DELETED 2026-07-29.
+ *
+ * It restated three facts the identity header already carried, in a heavier
+ * type size — the same number appeared up to three times on one desktop screen
+ * (header, this strip, the booking rail's stat-trio), so none of them read as
+ * authoritative. It also could not survive our own data: of the ten live
+ * experts, ZERO have a measured response time, nine have zero sessions, and
+ * four have none of the three — for them a bordered section rendered one lone
+ * number or nothing at all.
+ *
+ * No comparable marketplace runs such a strip: MentorCruise and ADPList lead
+ * with photo + role-at-company, Preply leads with the intro video. Identity and
+ * the video are what a first-time buyer evaluates; counters are what a mature
+ * marketplace adds later. Don't reintroduce it — if a number is worth showing,
+ * it belongs in exactly one place, at the weight it deserves.
+ */
 
 /* ───── About ───── */
 const AboutSection = ({ tutor }: { tutor: TutorDetail | null }) => {
@@ -1005,32 +1106,30 @@ const AboutSection = ({ tutor }: { tutor: TutorDetail | null }) => {
   const [bioExpanded, setBioExpanded] = useState(false)
   if (!tutor) return null
   const bio = tutor.bio ?? tutor.user.bio
-  if (!bio && !tutor.headline) return null
+  // The headline is printed in the identity header, ~300px above. Repeating it
+  // here as a large pull-quote made the same sentence the two most prominent
+  // pieces of text on the page. About = the bio; no bio, no section.
+  if (!bio) return null
   // Split bio into paragraphs by double newline or period-space+capital.
   const paragraphs = bio ? bio.split(/\n\n+/).filter(p => p.trim()) : []
   const isLong = (bio?.length ?? 0) > 420
   return (
     <section id="overview" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-24">
       <Eyebrow className="mb-4">ჩემ შესახებ</Eyebrow>
-      {tutor.headline && (
-        <blockquote className="font-display text-[22px] lg:text-[26px] leading-[1.35] font-medium tracking-tight text-ink-800 mb-7 max-w-[640px]">
-          „{tutor.headline}“
-        </blockquote>
-      )}
       {paragraphs.length > 0 && (
         <>
-          <div className={`space-y-4 text-[14.5px] text-ink-700 leading-[1.65] max-w-[640px] whitespace-pre-wrap ${isLong && !bioExpanded ? 'max-lg:line-clamp-[8]' : ''}`}>
+          <div className={`space-y-4 text-body-lg text-ink-700 leading-[1.65] max-w-[640px] whitespace-pre-wrap ${isLong && !bioExpanded ? 'max-lg:line-clamp-[8]' : ''}`}>
             {paragraphs.map((p, i) => <p key={i}>{p}</p>)}
           </div>
           {isLong && (
             <button
               type="button"
               onClick={() => setBioExpanded(v => !v)}
-              className="lg:hidden mt-3 h-11 -ml-1 px-1 inline-flex items-center gap-1.5 font-display text-[13px] font-semibold text-brand-700 no-caps"
+              className="lg:hidden mt-3 h-11 -ml-1 px-1 inline-flex items-center gap-1.5 font-display text-small font-semibold text-brand-700 no-caps"
               aria-expanded={bioExpanded}
             >
               {bioExpanded ? 'ჩაკეცვა' : 'სრულად წაკითხვა'}
-              <Icon.chevD className={`w-4 h-4 transition-transform ${bioExpanded ? 'rotate-180' : ''}`} />
+              <Icon.chevD className={`w-4 h-4 transition-transform duration-fast ${bioExpanded ? 'rotate-180' : ''}`} />
             </button>
           )}
         </>
@@ -1045,28 +1144,33 @@ const AboutSection = ({ tutor }: { tutor: TutorDetail | null }) => {
    that tier preselected (DESIGN_FIX_PROMPT 1.2). */
 const ServicesSection = ({ consultations, onBook }: { consultations: ConsultationItem[]; onBook: (s: ConsultationItem) => void }) => {
   if (!consultations || consultations.length === 0) return null
+  // Shared ordering: flagship (longest PAID) first, free intro last. Raw payload
+  // order could lead with a free 15-min tier, which reads as the main offer.
+  const tiers = orderedTiers(consultations)
   return (
     <section id="services" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-24">
       <div className="flex items-baseline justify-between gap-4 flex-wrap">
         <div>
           <Eyebrow className="mb-3">სერვისები</Eyebrow>
-          <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">როგორ დაგეხმარები</h2>
+          <h2 className="font-display text-h2 lg:text-h1 font-bold tracking-[-0.022em] text-ink-900 leading-tight">როგორ დაგეხმარები</h2>
         </div>
-        <span className="text-[11.5px] text-ink-500 font-display tabular-nums">{consultations.length} სერვისი · ფიქსირებული ფასი</span>
+        <span className="text-meta text-ink-500 font-display tabular-nums">{consultations.length} სერვისი · ფიქსირებული ფასი</span>
       </div>
 
       <div className="mt-7 grid sm:grid-cols-2 gap-3">
-        {consultations.map((s, i) => (
+        {tiers.map((s, i) => (
           <article key={s.id} className="rounded-card border border-ink-200 bg-white p-5 hover:border-ink-300 hover-lift flex flex-col">
-            <div className="font-display text-[11px] font-bold text-brand-700 tabular-nums mb-2">{String(i+1).padStart(2, '0')}</div>
-            <h3 className="font-display text-[15px] lg:text-[16px] font-bold text-ink-900 tracking-tight leading-tight">{s.title}</h3>
-            {s.description && <p className="text-[13px] text-ink-600 mt-2 leading-[1.55] flex-1">{s.description}</p>}
+            <div className="font-display text-meta font-bold text-brand-700 tabular-nums mb-2">{String(i+1).padStart(2, '0')}</div>
+            <h3 className="font-display text-body-lg font-bold text-ink-900 tracking-tight leading-tight">{s.title}</h3>
+            {s.description && <p className="text-small text-ink-600 mt-2 leading-[1.55] flex-1">{s.description}</p>}
             <div className="mt-4 pt-4 border-t border-ink-100 flex items-center justify-between">
               <div>
                 <Eyebrow tone="muted">{s.minutes} წუთი</Eyebrow>
-                <div className="font-display text-[18px] font-bold text-ink-900 tabular-nums leading-none mt-1">₾{s.price}</div>
+                {/* tierPriceLabel, not „₾{price}“ — a free intro tier used to
+                    render as „₾0", which reads like a broken price, not a gift. */}
+                <div className="font-display text-h3 font-bold text-ink-900 tabular-nums leading-none mt-1">{tierPriceLabel(s)}</div>
               </div>
-              <button type="button" onClick={() => onBook(s)} className="h-11 px-4 rounded-btn bg-brand-50 hover:bg-brand-500 hover:text-white border border-brand-200 hover:border-brand-500 text-brand-700 font-display font-semibold text-[12px] tracking-wide inline-flex items-center gap-1 transition-colors">
+              <button type="button" onClick={() => onBook(s)} className="h-11 px-4 rounded-btn bg-brand-50 hover:bg-brand-600 hover:text-white border border-brand-200 hover:border-brand-600 text-brand-700 font-display font-semibold text-meta tracking-wide inline-flex items-center gap-1 transition-colors duration-fast">
                 აირჩიე
               </button>
             </div>
@@ -1078,44 +1182,194 @@ const ServicesSection = ({ consultations, onBook }: { consultations: Consultatio
 }
 
 /* ───── Certificates ───── */
-type CertItem = { id: string; title: string; issuer: string; year: number; fileUrl: string | null; verified: boolean }
+// `fileUrl` no longer travels in the payload (a base64 diploma would add
+// megabytes to every profile response) — `hasFile` says a scan exists and the
+// bytes come from /api/certificates/<id>/file. `fileUrl` stays optional for
+// legacy externally-hosted links.
+type CertItem = { id: string; title: string; issuer?: string | null; year: number; fileUrl?: string | null; hasFile?: boolean; verified: boolean }
 type EduItem = { id: string; school: string; degree: string; field: string | null; startYear: number; endYear: number | null }
 type ExpItem = { id: string; company: string; role: string; startYear: number; endYear: number | null; description: string | null }
 
+/**
+ * A certificate thumbnail that degrades instead of breaking. `hasFile` says a
+ * row HAS bytes, not that they are still fetchable, so a stored-then-lost scan
+ * rendered the browser's broken-image glyph inside a trust section. On failure
+ * we fall back to the neutral document mark — the card stays, the frame stays,
+ * only the promise of a preview is withdrawn.
+ */
+/**
+ * Profile portrait with a state-backed fallback — the identity-header twin of
+ * <ExpertPhoto> on the browse card. See the note at its call site for why the
+ * fallback cannot be a DOM write inside `onError`.
+ */
+const ProfilePhoto = ({ src, name }: { src?: string | null; name: string }) => {
+  const [failed, setFailed] = useState(false)
+  const [zoom, setZoom] = useState(false)
+  useEffect(() => { setFailed(false) }, [src])
+  const shown = !src || failed ? DEFAULT_AVATAR : src
+  const real = !!src && !failed
+
+  // Esc closes, and the page behind must not scroll under the overlay.
+  useEffect(() => {
+    if (!zoom) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setZoom(false) }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [zoom])
+
+  const img = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={shown}
+      alt={name}
+      onError={() => setFailed(true)}
+      className="w-full h-full object-cover"
+    />
+  )
+
+  // Only a REAL photo is worth opening. The placeholder silhouette enlarges to
+  // nothing, and a control that does nothing is worse than no control.
+  if (!real) return img
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setZoom(true)}
+        aria-label={`${name} — ფოტოს გადიდება`}
+        className="block rounded-full overflow-hidden cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      >
+        {img}
+      </button>
+      {zoom && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={name}
+          onClick={() => setZoom(false)}
+          // z-sheet, not a hand-written number: this is a page-level modal and
+          // must sit under a destructive confirm and a toast (see the stacking
+          // order in CLAUDE.md).
+          className="fixed inset-0 z-sheet bg-ink-900/85 p-6 flex items-center justify-center motion-safe:animate-fade-in-fast cursor-zoom-out"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={shown}
+            alt={name}
+            onClick={e => e.stopPropagation()}
+            className="max-w-[min(680px,92vw)] max-h-[86dvh] w-auto h-auto object-contain rounded-card shadow-float cursor-default"
+          />
+          <button
+            type="button"
+            onClick={() => setZoom(false)}
+            aria-label="დახურვა"
+            className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/95 text-ink-800 hover:bg-white inline-flex items-center justify-center shadow-sm transition-colors duration-fast"
+          >
+            <Icon.close className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
+const CertThumb = ({ src, alt }: { src: string; alt: string }) => {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <Icon.doc className="w-7 h-7 text-ink-300" />
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+      className="w-full h-full object-cover"
+    />
+  )
+}
+
 const CertificatesSection = ({ items }: { items: CertItem[] }) => {
-  if (!items || items.length === 0) return null
+  // ── Rows with NO document do not render (2026-07-31) ──────────────────────
+  // A certificate whose entire content is „IMG_2763 · 2026" is not a credential,
+  // it is the residue of a failed upload: a zod `max(500)` on `fileUrl` silently
+  // rejected every base64 diploma before 2026-07-29, so those rows kept the
+  // camera's filename as their title and nothing else. Framed under a heading
+  // that promises „დიპლომები და სერტიფიკატები" and „გადამოწმებული აღინიშნება",
+  // an empty frame does not read as neutral — it reads as a credential that
+  // failed to verify, which is worse than showing nothing.
+  //
+  // NOTHING IS DELETED. This filters the RENDER only; the row stays in the DB
+  // and reappears the moment the expert uploads the scan (which is what
+  // lib/expertActivation nudges them to do). No expert-authored text is touched.
+  //
+  // `href` is resolved once here rather than per-branch below, so the list and
+  // the anchors can never disagree about whether a document exists.
+  const withFile = (items ?? [])
+    .map(c => ({ c, href: c.hasFile ? `/api/certificates/${c.id}/file` : safeHttpUrl(c.fileUrl) }))
+    .filter((x): x is { c: CertItem; href: string } => !!x.href)
+  // Every row lacked a file → the section as a whole has nothing to prove, so it
+  // is absent rather than an empty heading over blank space.
+  if (withFile.length === 0) return null
   return (
     <section className="mt-14 lg:mt-16 pt-10 border-t border-ink-100">
       <div className="flex items-baseline justify-between gap-4 flex-wrap">
         <div>
           <Eyebrow className="mb-3">სერტიფიკატები</Eyebrow>
-          <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">დიპლომები და სერტიფიკატები</h2>
+          <h2 className="font-display text-h2 lg:text-h1 font-bold tracking-[-0.022em] text-ink-900 leading-tight">დიპლომები და სერტიფიკატები</h2>
         </div>
-        <span className="text-[11.5px] text-ink-500 font-display inline-flex items-center gap-1.5">
+        <span className="text-meta text-ink-500 font-display inline-flex items-center gap-1.5">
           <Icon.shieldCheck className="w-3.5 h-3.5 text-brand-600" />
           გადამოწმებული აღინიშნება
         </span>
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        {items.map(c => (
-          <div key={c.id} className="inline-flex items-center gap-2 h-9 pl-3 pr-3.5 rounded-pill border border-ink-200 bg-white">
-            <span className="font-display text-[12.5px] font-bold text-ink-900 truncate max-w-[280px]">{c.title}</span>
-            <span className="text-[11px] text-ink-500 tabular-nums">· {c.issuer} · {c.year}</span>
-            {c.verified && (
-              // Shared VerifiedMark (Icon.check inside) — was a third page-local
-              // check svg, drawn at 8px, under the canon's 12px icon floor.
-              <span className="ml-0.5 inline-flex">
-                <VerifiedMark size={16} title="გადამოწმებული სერტიფიკატი" />
-              </span>
-            )}
-            {safeHttpUrl(c.fileUrl) && (
-              <a href={safeHttpUrl(c.fileUrl)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center w-9 h-9 -my-2 -mr-1.5 rounded-btn text-ink-500 hover:text-ink-900 hover:bg-ink-100 transition-colors" aria-label="ჩამოტვირთვა">
-                <Icon.download className="w-4 h-4" />
-              </a>
-            )}
-          </div>
-        ))}
+      {/* Cards with a real preview, not text pills. A diploma is a VISUAL trust
+          signal — rendering it as „IMG_2763.jpeg · მითითებული არ არის · 2026"
+          threw that away and looked broken. The scan loads per-certificate from
+          its own cacheable URL, so nothing heavy enters the profile payload. */}
+      <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {withFile.map(({ c, href }) => {
+          // `href` is guaranteed by the filter above — legacy rows carry an
+          // external https link, new ones are served by id, and rows with
+          // neither never reach this map.
+          const inner = (
+            <>
+              <div className="aspect-[4/3] w-full bg-ink-50 border-b border-ink-100 overflow-hidden flex items-center justify-center">
+                <CertThumb src={href} alt={c.title} />
+              </div>
+              <div className="p-3">
+                <div className="font-display text-small font-bold text-ink-900 leading-snug line-clamp-2">{c.title}</div>
+                <div className="mt-1 flex items-center gap-1.5 text-meta text-ink-500">
+                  {/* An empty issuer renders as NOTHING. It used to be the
+                      literal string „მითითებული არ არის", stored in the column
+                      and shown as if the expert had written it. */}
+                  {c.issuer?.trim() && <span className="truncate">{c.issuer.trim()}</span>}
+                  {c.issuer?.trim() && <span className="text-ink-300">·</span>}
+                  <span className="tabular-nums shrink-0">{c.year}</span>
+                  {c.verified && <VerifiedMark size={14} title="გადამოწმებული სერტიფიკატი" />}
+                </div>
+              </div>
+            </>
+          )
+          // Always an anchor now: the file-less branch that used to render a
+          // dead <div> here is unreachable, because those rows are filtered out
+          // above rather than shown as an empty frame.
+          return (
+            <a
+              key={c.id}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-card border border-ink-200 bg-white overflow-hidden block hover-lift transition-all duration-fast"
+              aria-label={`${c.title} — გახსნა`}
+            >
+              {inner}
+            </a>
+          )
+        })}
       </div>
     </section>
   )
@@ -1126,16 +1380,16 @@ const EducationSection = ({ items }: { items: EduItem[] }) => {
   return (
     <section className="mt-14 lg:mt-16 pt-10 border-t border-ink-100">
       <Eyebrow className="mb-3">განათლება</Eyebrow>
-      <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">ფორმალური საფუძველი</h2>
+      <h2 className="font-display text-h2 lg:text-h1 font-bold tracking-[-0.022em] text-ink-900 leading-tight">ფორმალური საფუძველი</h2>
 
       <ol className="mt-6 relative space-y-5 pl-6">
         <span className="absolute left-[7px] top-2 bottom-2 w-px bg-ink-200" aria-hidden />
         {items.map(e => (
           <li key={e.id} className="relative">
             <span className="absolute left-[-24px] top-1.5 w-3.5 h-3.5 rounded-full bg-brand-500 ring-4 ring-white" />
-            <div className="font-display text-[14.5px] font-bold text-ink-900 tracking-tight">{e.school}</div>
-            <div className="text-[13px] text-ink-700 mt-0.5">{e.degree}{e.field ? ` · ${e.field}` : ''}</div>
-            <div className="text-[11.5px] text-ink-500 tabular-nums mt-0.5">{e.startYear} – {e.endYear ?? 'დღემდე'}</div>
+            <div className="font-display text-body-lg font-bold text-ink-900 tracking-tight">{e.school}</div>
+            <div className="text-small text-ink-700 mt-0.5">{e.degree}{e.field ? ` · ${e.field}` : ''}</div>
+            <div className="text-meta text-ink-500 tabular-nums mt-0.5">{e.startYear} – {e.endYear ?? 'დღემდე'}</div>
           </li>
         ))}
       </ol>
@@ -1148,15 +1402,15 @@ const ExperienceSection = ({ items }: { items: ExpItem[] }) => {
   return (
     <section id="experience" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-24">
       <Eyebrow className="mb-3">გამოცდილება</Eyebrow>
-      <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">სამუშაო ისტორია</h2>
+      <h2 className="font-display text-h2 lg:text-h1 font-bold tracking-[-0.022em] text-ink-900 leading-tight">სამუშაო ისტორია</h2>
 
       <div className="mt-6 grid sm:grid-cols-2 gap-3">
         {items.map(x => (
           <article key={x.id} className="rounded-card border border-ink-200 bg-white p-4">
-            <div className="font-display text-[14px] font-bold text-ink-900 leading-snug">{x.role}</div>
-            <div className="text-[12.5px] text-ink-700 mt-0.5">{x.company}</div>
-            <div className="text-[11.5px] text-ink-500 tabular-nums mt-1">{x.startYear} – {x.endYear ?? 'ახლა'}</div>
-            {x.description && <p className="mt-2 text-[12.5px] text-ink-600 leading-[1.55]">{x.description}</p>}
+            <div className="font-display text-body font-bold text-ink-900 leading-snug">{x.role}</div>
+            <div className="text-small text-ink-700 mt-0.5">{x.company}</div>
+            <div className="text-meta text-ink-500 tabular-nums mt-1">{x.startYear} – {x.endYear ?? 'ახლა'}</div>
+            {x.description && <p className="mt-2 text-small text-ink-600 leading-[1.55]">{x.description}</p>}
           </article>
         ))}
       </div>
@@ -1177,9 +1431,7 @@ const StickyBookingCard = ({
   tutorPrice = TUTOR_DEFAULTS.price,
   sessionMin = TUTOR_DEFAULTS.durationMin,
   bufferMin = 0,
-  responseHours = TUTOR_DEFAULTS.responseHours,
   sessionsCount = 0,
-  yearsExp = 0,
   rating = 0,
   reviewsCount = 0,
   signedIn,
@@ -1188,7 +1440,11 @@ const StickyBookingCard = ({
   onMessage,
   isOwnProfile = false,
   viewerCantBook = false,
+  canProposeCategory = false,
 }: {
+  /** Request-based booking is scoped to one category server-side; the CTA
+   *  must be scoped identically or it promises what the POST refuses. */
+  canProposeCategory?: boolean
   onOpen: () => void
   availability?: ApiSlot[]
   busySlots?: BusySlot[]
@@ -1197,9 +1453,7 @@ const StickyBookingCard = ({
   tutorPrice?: number
   sessionMin?: number
   bufferMin?: number
-  responseHours?: number
   sessionsCount?: number
-  yearsExp?: number
   rating?: number
   reviewsCount?: number
   signedIn?: boolean | null
@@ -1209,14 +1463,14 @@ const StickyBookingCard = ({
   isOwnProfile?: boolean
   viewerCantBook?: boolean
 }) => {
-  const duration = sessionMin
-  // From-price when the expert's tiers differ (DESIGN_FIX_PROMPT 1.2) — the
-  // exact price is chosen at the flow's service step. Flat experts keep the
-  // familiar "₾N / N წუთი" pair.
-  const fromPrice = fromPriceLabel(consultations, tutorPrice)
+  // The FLAGSHIP tier — one price, one length, the same service the „განრიგი"
+  // grid and the tier step already lead with. `sessionMin` is that tier's length
+  // (resolved by the caller via primaryServiceMin), so it is also the fallback
+  // when the expert has published no tiers at all.
+  const flagship = primaryPriceLabel(consultations, tutorPrice, sessionMin)
   const hasTiers = consultations.length >= 2
-  const priceLabel = fromPrice.label
-  const subLabel = fromPrice.isFrom ? '/ სესია' : `/ ${duration} წუთი`
+  const priceLabel = flagship.label
+  const subLabel = `/ ${flagship.minutes} წუთი`
 
   // Soonest actually-bookable start — powers the "next available" hint. Same
   // derivation the booking sheet runs, so the rail never advertises a day whose
@@ -1230,6 +1484,18 @@ const StickyBookingCard = ({
   // the SlotsState note. Until then the hint + CTA stay neutral.
   const pending = slotsState === 'pending'
   const failed = slotsState === 'failed'
+  // The expert genuinely has no upcoming free time AND we know it (slots
+  // resolved, not still in flight and not a failed fetch). In that state the
+  // booking CTA has nothing to open, so messaging is promoted from secondary to
+  // primary and the disabled button is not rendered at all — see the CTA below.
+  // `isOwnProfile`/`viewerCantBook` are handled by earlier branches, so they are
+  // not re-tested here; `canMessage` is true for guests too (onMessage runs
+  // requireAuth first), so a signed-out visitor still gets a live primary.
+  // See the mobile bar: „no published time" stops being a dead end once the
+  // visitor can propose one, and the propose screen is reachable ONLY through
+  // this button.
+  const canPropose = FEATURE_REQUEST_BOOKING && canProposeCategory && !pending && !failed && nextFree === null
+  const messagePromoted = !pending && !failed && nextFree === null && !canPropose && canMessage && !!onMessage
 
   return (
     <aside className="lg:sticky lg:top-[80px]">
@@ -1240,42 +1506,29 @@ const StickyBookingCard = ({
           {/* Honest popularity signal — derived from real completed sessions,
               not a fabricated "N bookings in 48h" figure. */}
           {sessionsCount >= 100 && (
-            <div className="mb-3 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-pill bg-brand-50 text-brand-700 font-display text-[11px] font-semibold">
+            <div className="mb-3 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-pill bg-brand-50 text-brand-700 font-display text-meta font-semibold">
               <Icon.spark className="w-3 h-3" />
               პოპულარული · {sessionsCount} სესია
             </div>
           )}
           <div className="flex items-baseline gap-2">
-            <span className="font-display text-[34px] font-bold text-ink-900 tabular-nums leading-none tracking-tight">{priceLabel}</span>
-            <span className="text-[13px] text-ink-500">{subLabel}</span>
+            <span className="font-display text-display font-bold text-ink-900 tabular-nums leading-none tracking-tight">{priceLabel}</span>
+            <span className="text-small text-ink-500">{subLabel}</span>
           </div>
 
-          {/* Stat-trio — Preply-signature. Stays visible on scroll (the card is
-              sticky), so the trust numbers travel with the CTA. Real data only;
-              cells with no value are dropped, then capped to three. For a
-              brand-new expert (0 rating / 0 sessions) this otherwise collapsed to
-              a lone „პასუხი" cell — so years-of-experience joins the candidates
-              and fills the strip with a real credential instead of empty space.
-              Priority order keeps established experts on rating·სესია·პასუხი. */}
-          {(() => {
-            const cells: { key: string; value: React.ReactNode; label: string }[] = []
-            if (rating > 0) cells.push({ key: 'rating', value: <span className="inline-flex items-center gap-1"><Icon.star className="w-3 h-3 text-warning-500" />{fmtRating(rating)}</span>, label: reviewsCount > 0 ? `${reviewsCount} შეფასება` : 'რეიტინგი' })
-            if (sessionsCount > 0) cells.push({ key: 'sessions', value: sessionsCount, label: 'სესია' })
-            if (yearsExp > 0) cells.push({ key: 'years', value: yearsExp, label: 'წელი გამოცდ.' })
-            if (responseHours > 0) cells.push({ key: 'resp', value: <>&lt;{responseHours}სთ</>, label: 'პასუხი' })
-            const shown = cells.slice(0, 3)
-            if (shown.length === 0) return null
-            return (
-              <div className="mt-4 flex items-stretch rounded-card border border-ink-100 bg-ink-50/50 divide-x divide-ink-100 overflow-hidden">
-                {shown.map(c => (
-                  <div key={c.key} className="flex-1 px-2 py-2.5 text-center">
-                    <div className="font-display text-[15px] font-bold text-ink-900 tabular-nums leading-none">{c.value}</div>
-                    <div className="mt-1 text-[10px] text-ink-500 tabular-nums">{c.label}</div>
-                  </div>
-                ))}
-              </div>
-            )
-          })()}
+          {/* Stat-trio DELETED 2026-07-29 — it was the third printing of
+              sessions/years/response on one screen, and with real data it
+              collapsed to a single cell that stretched full width and rendered
+              one digit at price size. What survives is the rating: the one
+              number MentorCruise, ADPList and Preply all still show at the
+              point of decision. Rendered as a quiet line, not a grid. */}
+          {rating > 0 && (
+            <div className="mt-3 inline-flex items-baseline gap-1.5 text-small">
+              <Icon.star className="w-3.5 h-3.5 text-warning-500 self-center" />
+              <span className="font-display font-bold text-ink-900 tabular-nums">{fmtRating(rating)}</span>
+              {reviewsCount > 0 && <span className="text-ink-500 tabular-nums">· {reviewsCount} შეფასება</span>}
+            </div>
+          )}
         </div>
 
         {/* Availability hint + open-in-popup CTA. The full day/time picker lives
@@ -1289,11 +1542,25 @@ const StickyBookingCard = ({
               <span className="sr-only">თავისუფალი დროები იტვირთება…</span>
             </div>
           ) : nextFree === null ? (
-            <div className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 px-3 py-4 text-center text-[12px] text-ink-500 mb-4">
-              {failed ? 'თავისუფალი დროები ვერ ჩაიტვირთა.' : 'ჯერ არ არის თავისუფალი დრო.'}
+            <div className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 px-3 py-4 text-center text-meta text-ink-500 mb-4">
+              {failed
+                ? 'თავისუფალი დროები ვერ ჩაიტვირთა.'
+                : canPropose
+                  ? 'ჯერ არ არის გამოქვეყნებული დრო — შესთავაზე შენთვის მოსახერხებელი.'
+                  : 'ჯერ არ არის თავისუფალი დრო.'}
             </div>
           ) : (
-            <div className="flex items-center gap-2.5 text-[12.5px] text-ink-700 mb-4">
+            /* One fact, one place (2026-08-04, owner's call). This box used to
+               carry three pressable „უახლოესი დროები" chips — actual clock
+               times — while the „განრიგი" section below listed every bookable
+               time for the same expert. Two lists of the same times on one
+               page, and the rail is desktop-only, so the duplication existed
+               only where the page had the most room to show it once properly.
+               The rail now states WHEN the expert is next free (a day, not a
+               time) and hands the choosing to „განრიგი", which is built for it.
+               NB this also removes the card's only route into the sheet with a
+               pre-picked start; the section's chips still carry one. */
+            <div className="flex items-center gap-2.5 text-small text-ink-700 mb-4">
               <span className="w-7 h-7 rounded-full bg-brand-50 inline-flex items-center justify-center shrink-0">
                 <Icon.cal className="w-3.5 h-3.5 text-brand-600" />
               </span>
@@ -1301,11 +1568,11 @@ const StickyBookingCard = ({
             </div>
           )}
           {isOwnProfile ? (
-            <Link href="/tutor/profile" className="w-full h-12 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-colors">
+            <Link href="/tutor/profile" className="tap-shrink w-full h-12 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center justify-center gap-2 transition-colors duration-fast">
               პროფილის რედაქტირება
             </Link>
           ) : viewerCantBook ? (
-            <div className="w-full h-12 rounded-btn bg-ink-75 border border-ink-200 text-ink-500 font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center">
+            <div className="w-full h-12 rounded-btn bg-ink-75 border border-ink-200 text-ink-500 font-display font-semibold text-small tracking-wide inline-flex items-center justify-center">
               ჯავშანი მხოლოდ სტუდენტს
             </div>
           ) : pending ? (
@@ -1319,37 +1586,56 @@ const StickyBookingCard = ({
             <Btn variant="secondary" size="lg" onClick={onRetrySlots} className="w-full">
               <Icon.refresh className="w-4 h-4" /> სცადე თავიდან
             </Btn>
+          ) : messagePromoted ? (
+            // NO free time, and the slots really did load. The old code rendered
+            // „დაჯავშნე" DISABLED here — a dead primary at the top of the one
+            // surface that exists to convert, wearing `bg-ink-200`, the warm
+            // hairline beige, which is the only filled-beige control in the whole
+            // system and reads as broken rather than as unavailable. There IS a
+            // live next step for this visitor, so it takes the primary slot and
+            // the dead button is gone entirely: messaging is how a slot-less
+            // expert gets booked (they agree a time, then publish it).
+            <button
+              type="button"
+              onClick={onMessage}
+              className="w-full h-12 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center justify-center gap-2 transition-all duration-fast shadow-brand-glow"
+            >
+              <Icon.chat className="w-4 h-4" /> მიწერე ექსპერტს
+            </button>
           ) : (
             <button
               type="button"
-              disabled={nextFree === null}
+              disabled={nextFree === null && !canPropose}
               onClick={onOpen}
-              className="w-full h-12 rounded-btn bg-gradient-cta hover:brightness-105 disabled:bg-none disabled:bg-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed text-white font-display font-semibold text-[14px] tracking-wide inline-flex items-center justify-center gap-2 transition-all shadow-brand-glow disabled:shadow-none"
+              className="w-full h-12 rounded-btn bg-gradient-cta hover:brightness-105 disabled:bg-none disabled:bg-ink-100 disabled:text-ink-500 disabled:cursor-not-allowed text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center justify-center gap-2 transition-all duration-fast shadow-brand-glow disabled:shadow-none"
             >
-              {signedIn === false ? 'შესვლა და დაჯავშნა' : 'დაჯავშნე'}
+              {canPropose
+                ? (signedIn === false ? 'შესვლა და დროის შეთავაზება' : 'შემომთავაზე დრო')
+                : signedIn === false ? 'შესვლა და დაჯავშნა' : 'დაჯავშნე'}
             </button>
           )}
           {/* Pre-booking messaging — secondary to the primary booking CTA. The
-              objection-handler: ask before committing to a ₾100+ session. */}
-          {canMessage && onMessage && (
+              objection-handler: ask before committing to a ₾100+ session. Skipped
+              when it has already been promoted TO the primary above, so the rail
+              never stacks the same action on itself. */}
+          {canMessage && onMessage && !messagePromoted && (
             <Btn variant="secondary" size="lg" onClick={onMessage} className="w-full mt-2.5">
               <Icon.chat className="w-4 h-4" /> მიწერე ექსპერტს
             </Btn>
           )}
-          {/* Decision-point reassurance: what happens next + the canonical
-              risk-reversal line (shared constant — one wording everywhere). */}
-          <p className="mt-2.5 text-[11.5px] text-ink-500 text-center leading-snug">
-            {hasTiers ? 'შემდეგ აირჩევ სერვისსა და დროს' : 'შემდეგ აირჩევ ზუსტ დროს'}
+          {/* Decision-point reassurance: what happens NEXT, one line. With no
+              slots to pick there is no „next you choose a time", so an honest
+              line replaces it. (The free-cancellation line that used to sit
+              under this one was removed 2026-08-05 at the owner's request.) */}
+          <p className="mt-2.5 text-meta text-ink-500 text-center leading-snug">
+            {messagePromoted
+              ? 'დროზე მიმოწერაში შეთანხმდებით'
+              : hasTiers ? 'შემდეგ აირჩევ სერვისსა და დროს' : 'შემდეგ აირჩევ ზუსტ დროს'}
           </p>
-          <p className="mt-1 text-[11.5px] text-ink-500 text-center leading-snug">{RISK_REVERSAL_LINE}</p>
         </div>
 
         {/* Bottom strip */}
-        <div className="border-t border-ink-100 px-6 py-3 flex items-center justify-between gap-3 text-[11px]">
-          <span className="inline-flex items-center gap-1.5 text-ink-600">
-            <Icon.clock className="w-3 h-3 text-ink-400" />
-            რეაგ. ~ {responseHours} სთ
-          </span>
+        <div className="border-t border-ink-100 px-6 py-3 flex items-center justify-center gap-3 text-meta">
           <span className="inline-flex items-center gap-1.5 text-ink-600">
             <Icon.shieldCheck className="w-3 h-3 text-ink-400" />
             {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'უფასო დაჯავშნა'}
@@ -1378,7 +1664,6 @@ const StickyBookingCard = ({
    (h-16/h-20) now that nothing else sticks under it. */
 const SectionNav = ({ items, hidden = false }: { items: { id: string; l: string }[]; hidden?: boolean }) => {
   const [active, setActive] = useState<string | null>(null)
-  const [shown, setShown] = useState(false)
   const ids = items.map(i => i.id).join(',')
 
   useEffect(() => {
@@ -1387,13 +1672,11 @@ const SectionNav = ({ items, hidden = false }: { items: { id: string; l: string 
     let frame = 0
     const measure = () => {
       frame = 0
-      // Reveal only after the hero (identity card + specs) has scrolled by —
-      // the pill floating over the very first paint would just be chrome. The
-      // scrollY floor matters on a wide desktop, where the first section can
-      // already be in view before the reader has scrolled at all.
-      const first = document.getElementById(list[0])
-      const past = first ? first.getBoundingClientRect().top < window.innerHeight * 0.85 : window.scrollY > 420
-      setShown(window.scrollY > 200 && past)
+      // NOTE: there is deliberately no reveal threshold here any more. The pill
+      // used to appear only after you scrolled ~400px; it is now permanent
+      // chrome, present from the moment the profile opens. The effect below is
+      // purely the scroll-spy that highlights the current section.
+      //
       // Scroll-spy: the last section whose heading has passed the top bar. At
       // the very bottom the final section can never reach that line (the page
       // runs out of scroll), so the end of the document claims the last tab.
@@ -1418,7 +1701,9 @@ const SectionNav = ({ items, hidden = false }: { items: { id: string; l: string 
     }
   }, [ids])
 
-  if (items.length < 2 || hidden || !shown) return null
+  // `hidden` still applies — it's a genuine conflict (the booking sheet / auth
+  // gate is open on top), not a scroll state.
+  if (items.length < 2 || hidden) return null
   return (
     // The wrapper owns the centering transform; the pill owns the entry
     // animation — `animate-slide-in-b` animates `transform`, so sharing one
@@ -1429,15 +1714,39 @@ const SectionNav = ({ items, hidden = false }: { items: { id: string; l: string 
       // 150px = the mobile booking bar's real height (~122px at 390px, where
       // the risk-reversal line wraps) plus a clear gap; the safe-area inset is
       // added on top because the bar itself grows by it.
-      className="fixed left-1/2 -translate-x-1/2 z-[55] pointer-events-none bottom-[calc(150px+env(safe-area-inset-bottom))] lg:bottom-6"
+      // DESKTOP ONLY (2026-08-01). This jump-nav is a SHORTCUT, not a path:
+      // every section it links to is reachable by scrolling, so removing it on
+      // phones takes nothing away. (That is what separates it from the
+      // saved-experts heart, which was hidden on mobile with NO other route —
+      // the reason this was repositioned twice before being cut.)
+      //
+      // Measured on a phone before cutting it: a profile runs 6–8.3 screens, and
+      // header + this nav + the booking bar occupied 241px = 29% of a 390×844
+      // viewport, permanently. Anchored at the bottom it landed on a bio
+      // paragraph (`.glass-over-copy` could only make that coverage opaque, not
+      // stop it); moved under the header at 72px it left an 8px slit that body
+      // text showed through as a band of cut type; flush at 64px it read as a
+      // second bar stacked on the first. Every position was a different way of
+      // spending a third of a small screen on a convenience.
+      //
+      // No major marketplace ships a floating section nav on a mobile profile.
+      // If the function is ever wanted back on phones, the right shape is an
+      // IN-FLOW index under the identity card — visible while the reader is
+      // orienting, then scrolled away — not another fixed layer.
+      className="hidden lg:block fixed left-1/2 -translate-x-1/2 z-pill pointer-events-none bottom-6"
     >
       <nav
         aria-label="პროფილის სექციები"
-        // Glass, but NOT on mobile: backdrop-blur on a fixed mobile bar flickers
-        // on scroll (fixed 2026-07-22 for the headers + BottomNav), and this
-        // page is mostly read on a phone. Phones get a near-solid white pill
-        // with a hairline + shadow; the real translucent blur starts at lg.
-        className="pointer-events-auto max-w-[calc(100vw-2rem)] rounded-pill border border-ink-200 bg-white/95 lg:bg-white/70 lg:backdrop-blur-xl shadow-pop motion-safe:animate-slide-in-b"
+        // `.glass` (globals.css) owns the whole surface — translucency, blur,
+        // hairline, edge-highlight, shadow AND the compositor promotion that
+        // keeps a blurred fixed element from strobing on mobile scroll. It is
+        // glass at every breakpoint now (the old `lg:`-only blur was the
+        // avoidance workaround; promotion is the real fix). Add nothing but the
+        // radius here — no bg-/border-/shadow- utilities on a glass surface.
+        // `glass-over-copy`: below lg this pill floats directly over the bio
+        // paragraph, where 55% translucency smeared a line into unreadability.
+        // See the utility's note in globals.css — opacity is the only fix.
+        className="pointer-events-auto max-w-[calc(100vw-2rem)] rounded-pill glass glass-over-copy motion-safe:animate-slide-in-b"
       >
         {/* The rail scrolls INSIDE the pill (four Georgian labels overflow
             390px), and only the labels are edge-masked — masking the <nav>
@@ -1459,8 +1768,11 @@ const SectionNav = ({ items, hidden = false }: { items: { id: string; l: string 
                 el.scrollIntoView({ behavior: 'smooth', block: 'start' })
                 history.replaceState(null, '', `#${it.id}`)
               }}
-              className={`shrink-0 h-10 px-3.5 rounded-pill inline-flex items-center font-display text-[12.5px] font-semibold whitespace-nowrap no-caps transition-colors ${
-                active === it.id ? 'bg-ink-900 text-white' : 'text-ink-600 hover:text-ink-900 hover:bg-ink-50'
+              // Active chip is BRAND green, not `bg-ink-900`. Black was the only
+              // non-palette surface left on this control and it read as a
+              // foreign element sitting on the site's own glass.
+              className={`shrink-0 h-11 px-3.5 rounded-pill inline-flex items-center font-display text-small font-semibold whitespace-nowrap no-caps transition-colors duration-fast ${
+                active === it.id ? 'bg-brand-600 text-white shadow-xs' : 'text-ink-600 hover:text-ink-900 hover:bg-ink-50'
               }`}
             >
               {it.l}
@@ -1486,7 +1798,16 @@ export default function ExpertProfilePage({ initialTutor, initialUser }: { initi
 function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initialUser?: PublicMe | null }) {
   const params = useParams<{ id: string }>()
   const searchParams = useSearchParams()
-  const tutorId = params?.id
+  // The REAL profile id — never the URL segment.
+  //
+  // The URL is now the human slug („/tutors/ana-gagoshidze"), and every request
+  // this component makes (/api/tutors/…, /api/favorites?tutorId=…, booking
+  // submits) is keyed by the profile's actual id. Reading `params.id` here sent
+  // the slug to those endpoints, which 404'd — it broke booking on every
+  // profile the moment slugs shipped. `initialTutor` is the server's own row,
+  // so its id is authoritative; the param is only a fallback for the id-form
+  // URL (and for the brief window before the seed exists).
+  const tutorId = initialTutor?.id ?? params?.id
   // Seed from the server's already-loaded profile (page.tsx passes the same
   // core fields it reads for SEO — name/avatar/headline/specialty/verified/
   // rating/price/consultations). The hero, identity, specs, about and price
@@ -1521,6 +1842,12 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
   void searchParams?.get('duration')
   void searchParams?.get('price')
   const rebookAutoOpen = searchParams?.get('rebook') === '1'
+  // The slot + tier the visitor picked BEFORE the auth gate (written by
+  // AuthPromptSheet). Reading them here is what makes the gate's promise —
+  // „ჯავშანი გაგრძელდება" — literally true; before this the flow reopened
+  // empty and the person re-hunted the same time.
+  const resumeStartIso = searchParams?.get('start') ?? null
+  const resumeServiceId = searchParams?.get('service') ?? null
   // Deep-link from a slot-less expert's card CTA ("მიწერე ექსპერტს"): open the
   // message flow on arrival — auth-gated for guests, straight to the thread for
   // signed-in students. Same one-shot pattern as ?rebook=1 for booking.
@@ -1574,9 +1901,18 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
   // Which flow the visitor was in when the auth gate fired. 'book' makes the
   // post-auth redirect carry ?rebook=1 so the booking modal reopens by itself.
   const [authIntent, setAuthIntent] = useState<'book' | 'message' | null>(null)
-  const requireAuth = React.useCallback((intent?: 'book' | 'message') => {
+  // THE SLOT THE VISITOR ALREADY PICKED. The gate used to promise „ჯავშანი
+  // გაგრძელდება" and then return ?rebook=1 with nothing in it — the chosen
+  // time and tier were dropped and the person had to re-find the exact slot
+  // they had just tapped. These travel through the redirect and are re-seeded
+  // on arrival (see the ?start/?service reader below).
+  const [authStart, setAuthStart] = useState<Date | null>(null)
+  const [authServiceId, setAuthServiceId] = useState<string | null>(null)
+  const requireAuth = React.useCallback((intent?: 'book' | 'message', ctx?: { start?: Date | null; service?: ConsultationItem | null }) => {
     if (signedIn === false) {
       setAuthIntent(intent ?? null)
+      setAuthStart(ctx?.start ?? null)
+      setAuthServiceId(ctx?.service?.id ?? null)
       setNeedsAuth(true)
       setAuthDismissed(false)
       // Deliberately NO scroll — the AuthPromptSheet opens at the point of
@@ -1593,6 +1929,10 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
   // boundary. All hooks must run on every render.
 
   const [bookingOpen, setBookingOpen] = useState(false)
+  // Request-based booking is scoped to one category on the SERVER (lib/abroad).
+  // Every CTA that offers it must read the same predicate, or the button
+  // promises something POST /api/bookings refuses.
+  const isAbroadProfile = isAbroadCategory(tutorData?.category?.slug ?? null)
   // Pre-selected slot start — set by the inline „განრიგი" picker so the flow
   // opens with that time already chosen. Null for generic CTAs.
   const [bookingStart, setBookingStart] = useState<Date | null>(null)
@@ -1627,17 +1967,21 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
   // tier into the flow (tier step pre-answered).
   const openServiceBooking = (s: ConsultationItem) => {
     if (isPaused) return
-    if (requireAuth('book')) return
+    if (requireAuth('book', { service: s })) return
     setSelectedService(s)
     setBookingStart(null)
     setBookingOpen(true)
   }
   // Inline-schedule entry point (1.6): opens the flow with the tapped time
   // preselected; multi-tier experts still answer the tier step first.
-  const openSlotBooking = (start: Date) => {
+  // `service` comes from the #schedule tier switcher: the times shown there are
+  // derived for THAT service, so it must travel with the tap. Passing null (as
+  // this did unconditionally) meant the sheet re-asked for the tier and then
+  // silently discarded the start whenever the chosen tier was longer.
+  const openSlotBooking = (start: Date, service: ConsultationItem | null = null) => {
     if (isPaused) return
-    if (requireAuth('book')) return
-    setSelectedService(null)
+    if (requireAuth('book', { start, service })) return
+    setSelectedService(service)
     setBookingStart(start)
     setBookingOpen(true)
   }
@@ -1683,11 +2027,24 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
     if (isPaused) { setRebookConsumed(true); return }
     if (signedIn === null) return // wait for the /api/me probe to resolve
     if (requireAuth('book')) { setRebookConsumed(true); return }
-    setSelectedService(null)
-    setBookingStart(null)
+    // Re-seed what the gate carried. A stale/past `start` is dropped rather
+    // than passed on — the flow would reject it anyway, and an expired time
+    // silently preselected is worse than none.
+    const resumed = resumeStartIso ? new Date(resumeStartIso) : null
+    const usableStart = resumed && !isNaN(resumed.getTime()) && resumed.getTime() > Date.now() ? resumed : null
+    const tiers: ConsultationItem[] = tutorData?.consultations ?? []
+    // No explicit tier in the URL? The carried start came from a chip derived
+    // for the FLAGSHIP tier, so resume on that one — otherwise the sheet
+    // re-validates the start against a different duration and drops it.
+    const flagMin = primaryServiceMin(tiers, tutorData?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin)
+    const resumedService = resumeServiceId
+      ? (tiers.find(t => t.id === resumeServiceId) ?? null)
+      : (usableStart ? (tiers.find(t => t.minutes === flagMin) ?? null) : null)
+    setSelectedService(resumedService)
+    setBookingStart(usableStart)
     setBookingOpen(true)
     setRebookConsumed(true)
-  }, [rebookAutoOpen, rebookConsumed, loadState, isPaused, signedIn, requireAuth])
+  }, [rebookAutoOpen, rebookConsumed, loadState, isPaused, signedIn, requireAuth, resumeStartIso, resumeServiceId, tutorData])
 
   // Same one-shot resolution for the ?intent=message deep-link (slot-less card
   // CTA): guests hit the auth sheet with a 'message' intent, signed-in students
@@ -1714,9 +2071,9 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
         <PublicTopBar initialUser={initialUser} />
         <div className="flex-1 flex items-center justify-center px-6 py-16">
           <div className="max-w-[480px] w-full text-center">
-            <h1 className="font-display text-[22px] font-bold text-ink-900">ექსპერტი ვერ მოიძებნა</h1>
-            <p className="text-[13.5px] text-ink-500 mt-2">პროფილი წაიშალა ან ბმული არასწორია.</p>
-            <Link href="/tutors" className="mt-6 inline-flex h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] items-center gap-2">
+            <h1 className="font-display text-h2 font-bold text-ink-900">ექსპერტი ვერ მოიძებნა</h1>
+            <p className="text-body text-ink-500 mt-2">პროფილი წაიშალა ან ბმული არასწორია.</p>
+            <Link href="/tutors" className="tap-shrink mt-6 inline-flex h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body items-center gap-2">
               ყველა ექსპერტი
             </Link>
           </div>
@@ -1737,17 +2094,17 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
             <div className="w-14 h-14 mx-auto rounded-full bg-warning-50 border border-warning-200 inline-flex items-center justify-center text-warning-700 mb-5">
               <Icon.warn className="w-6 h-6" />
             </div>
-            <h1 className="font-display text-[22px] font-bold text-ink-900">პროფილი ვერ ჩაიტვირთა</h1>
-            <p className="text-[13.5px] text-ink-500 mt-2 leading-relaxed">ქსელის დროებითი ხარვეზი — სცადე თავიდან.</p>
+            <h1 className="font-display text-h2 font-bold text-ink-900">პროფილი ვერ ჩაიტვირთა</h1>
+            <p className="text-body text-ink-500 mt-2 leading-relaxed">ქსელის დროებითი ხარვეზი — სცადე თავიდან.</p>
             <div className="mt-6 flex items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={() => setLoadAttempt(a => a + 1)}
-                className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center gap-2 transition-colors"
+                className="h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-2 transition-colors duration-fast"
               >
                 სცადე თავიდან
               </button>
-              <Link href="/tutors" className="h-11 px-5 rounded-btn border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-[13px] tracking-wide inline-flex items-center transition-colors">
+              <Link href="/tutors" className="h-11 px-5 rounded-btn border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-800 font-display font-semibold text-small tracking-wide inline-flex items-center transition-colors duration-fast">
                 ყველა ექსპერტი
               </Link>
             </div>
@@ -1758,7 +2115,7 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
   }
 
   // Loading gate (B1): until the fetch resolves, `tutorData` is null. Rendering
-  // the full profile here used to flash "—" names, an empty SpecsGrid, a
+  // the full profile here used to flash "—" names, an empty facts strip, a
   // ₾80/30-წთ fallback price and a DISABLED "no published slots" booking card —
   // all of which self-healed a moment later once the data arrived, so users saw
   // a jarring broken-then-fixed profile. Show a skeleton instead; only render
@@ -1774,7 +2131,7 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
           aria-busy="true"
           aria-live="polite"
         >
-          <div className="sm:mt-6 grid lg:grid-cols-[1fr_360px] gap-8 xl:gap-12 animate-pulse">
+          <div className="sm:mt-6 grid lg:grid-cols-[1fr_360px] gap-8 xl:gap-12 motion-safe:animate-pulse">
             {/* Left: identity + specs placeholders. Deliberately NO media
                 block: most experts have no intro video, so a video-shaped
                 skeleton promised one to everyone and then vanished. */}
@@ -1811,17 +2168,28 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
     ...((tutorData?.bio || tutorData?.headline || tutorData?.user?.bio) ? [{ id: 'overview', l: 'მიმოხილვა' }] : []),
     ...((tutorData?.consultations?.length ?? 0) > 0 ? [{ id: 'services', l: 'სერვისები' }] : []),
     ...(!isPaused ? [{ id: 'schedule', l: 'განრიგი' }] : []),
-    { id: 'reviews', l: 'შეფასებები' },
     ...((tutorData?.experience?.length ?? 0) > 0 ? [{ id: 'experience', l: 'გამოცდილება' }] : []),
+    { id: 'reviews', l: 'შეფასებები' },
   ]
 
-  // From-price shared by the rail + mobile bar (1.2): „₾N-დან" when tiers differ.
-  const headlinePrice = fromPriceLabel(tutorData?.consultations ?? [], tutorData?.price ?? TUTOR_DEFAULTS.price)
   // ONE service length for every pre-tier surface (rail, mobile bar, #schedule)
-  // so they can't disagree about what „free" means: the SHORTEST real service,
-  // falling back to the profile duration. Starts are DERIVED from it (windows −
-  // bookings − length), never read off a pre-sliced row's `booked` flag.
-  const previewMin = previewServiceMin(tutorData?.consultations ?? [], tutorData?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin)
+  // so they can't disagree: the expert's FLAGSHIP service — longest PAID tier —
+  // falling back to the profile duration. It used to be the SHORTEST service,
+  // which drew the schedule on a grid most of whose starts could not hold the
+  // service the visitor actually wanted (see primaryService in slots.ts).
+  // Starts are DERIVED from it (windows − bookings − length), never read off a
+  // pre-sliced row's `booked` flag.
+  const previewMin = primaryServiceMin(tutorData?.consultations ?? [], tutorData?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin)
+  // The headline price shared by the rail + mobile bar. It reads off the SAME
+  // flagship tier `previewMin` above is derived from, so the price and the times
+  // beside it now describe one service. It used to be `fromPriceLabel`, i.e. the
+  // CHEAPEST tier — the rail said „₾25-დან" while the browse card said „₾80" and
+  // the service list said both. See primaryPriceLabel in slots.ts.
+  const headlinePrice = primaryPriceLabel(
+    tutorData?.consultations ?? [],
+    tutorData?.price ?? TUTOR_DEFAULTS.price,
+    previewMin,
+  )
   // Absent from the payload until the profile carries it — 0 changes nothing.
   const bufferMin = typeof tutorData?.bufferMin === 'number' && tutorData.bufferMin > 0 ? tutorData.bufferMin : 0
 
@@ -1829,16 +2197,20 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
     <div className="font-sans bg-white text-ink-900 antialiased">
       <PublicTopBar initialUser={initialUser} />
 
-      <Container as="main" id="main" className="pt-4 sm:pt-7 lg:pt-9 pb-8 lg:pb-16">
+      {/* pb: on mobile the page carries a fixed stack — the section pill at 150px
+          and the booking bar below it — so the final section needs room to be
+          scrolled ABOVE them. Without it the last paragraph could never be read
+          in full, no matter how far you scrolled. */}
+      <Container as="main" id="main" className="pt-4 sm:pt-7 lg:pt-9 pb-[168px] lg:pb-16">
         {/* Owner preview note — the expert opened their own profile from the
             editor's „ნახე შენი პროფილი“ button (?preview=1). Shown only when the
             signed-in viewer owns this profile, so a student never sees it.
             The page already resolves for the owner even while paused (nothing
             gates on available === false — only admin-suspension hides). */}
         {searchParams?.get('preview') === '1' && initialUser?.id && tutorData?.user?.id === initialUser.id && (
-          <div className="mb-4 rounded-card border border-ink-200 bg-ink-50 p-3 flex items-center gap-2 text-[12.5px] text-ink-600">
+          <div className="mb-4 rounded-card border border-ink-200 bg-ink-50 p-3 flex items-center gap-2 text-small text-ink-600">
             <Icon.eye className="w-4 h-4 shrink-0 text-ink-400" />
-            პრევიუ — ასე გხედავს სტუდენტი.
+            ასე გხედავს სტუდენტი.
           </div>
         )}
         {/* Paused-profile banner. Shown when the tutor has toggled visibility
@@ -1850,8 +2222,8 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
           <div className="mb-4 sm:mb-6 rounded-card border border-warning-200 bg-warning-50 p-4 sm:p-5 flex items-start gap-3">
             <Icon.warn className="w-5 h-5 shrink-0 text-warning-700 mt-0.5" />
             <div className="min-w-0 flex-1">
-              <div className="font-display text-[14px] font-bold text-warning-800">ექსპერტი დროებით პაუზაზეა</div>
-              <p className="text-[12.5px] text-warning-800/85 mt-1 leading-snug">ახალი ჯავშანი შეჩერებულია. არსებული სესია აქტიურია და მიწერა შეგიძლია.</p>
+              <div className="font-display text-body font-bold text-warning-800">ექსპერტი დროებით პაუზაზეა</div>
+              <p className="text-small text-warning-800/85 mt-1 leading-snug">ახალი ჯავშანი შეჩერებულია. არსებული სესია აქტიურია და მიწერა შეგიძლია.</p>
             </div>
           </div>
         )}
@@ -1864,8 +2236,6 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
           {/* Left: scrollable content */}
           <div className="min-w-0">
             <VideoHero tutorId={tutorId} tutor={tutorData} requireAuth={requireAuth} viewerCantFav={viewerCantFav} />
-
-            <SpecsGrid tutor={tutorData} />
 
             <AboutSection tutor={tutorData} />
             {/* Consultation tiers: a tapped card opens the shared BookingFlow
@@ -1880,8 +2250,8 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
             {!isPaused && (
               <section id="schedule" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-24">
                 <Eyebrow className="mb-3">განრიგი</Eyebrow>
-                <h2 className="font-display text-[24px] lg:text-[28px] font-bold tracking-[-0.022em] text-ink-900 leading-tight">თავისუფალი დროები</h2>
-                <p className="mt-2 text-[13.5px] text-ink-500 max-w-[520px]">აირჩიე დრო — ჯავშანი არჩეული დროით გაიხსნება.</p>
+                <h2 className="font-display text-h2 lg:text-h1 font-bold tracking-[-0.022em] text-ink-900 leading-tight">თავისუფალი დროები</h2>
+                <p className="mt-2 text-body text-ink-500 max-w-[520px]">აირჩიე დრო — ჯავშანი არჩეული დროით გაიხსნება.</p>
                 <div className="mt-6">
                   {detailsState === 'pending' ? (
                     // The picker reads an empty `availability` as „no free
@@ -1898,8 +2268,8 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
                     </div>
                   ) : detailsState === 'failed' ? (
                     <div className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 px-6 py-8 text-center">
-                      <div className="font-display text-[15px] font-bold text-ink-900">დროები ვერ ჩაიტვირთა</div>
-                      <p className="text-[12.5px] text-ink-500 mt-1.5">ქსელის დროებითი ხარვეზი — სცადე თავიდან.</p>
+                      <div className="font-display text-body-lg font-bold text-ink-900">დროები ვერ ჩაიტვირთა</div>
+                      <p className="text-small text-ink-500 mt-1.5">ქსელის დროებითი ხარვეზი — სცადე თავიდან.</p>
                       <Btn variant="secondary" onClick={() => setLoadAttempt(a => a + 1)} className="mt-4">
                         <Icon.refresh className="w-4 h-4" /> სცადე თავიდან
                       </Btn>
@@ -1912,7 +2282,11 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
                       bufferMin={bufferMin}
                       priceLabel={headlinePrice.label}
                       tutorName={tutorData?.user?.fullName ?? TUTOR_DEFAULTS.name}
+                      tutorId={tutorData?.id}
+                      consultations={tutorData?.consultations ?? []}
                       onPickSlot={openSlotBooking}
+                      categorySlug={tutorData?.category?.slug ?? null}
+                      onPropose={() => setBookingOpen(true)}
                     />
                   )}
                 </div>
@@ -1931,16 +2305,12 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
               // the histogram drew all-zero bars next to a real total.
               loading={detailsState === 'pending'}
             />
-            <SimilarExperts
-              excludeId={tutorId}
-              categorySlug={tutorData?.category?.slug ?? null}
-              categoryName={tutorData?.category?.name ?? null}
-            />
           </div>
 
           {/* Right: sticky booking — desktop only */}
           <div className="hidden lg:block">
             <StickyBookingCard
+                canProposeCategory={isAbroadProfile}
               onOpen={openPaid}
               availability={tutorData?.availability ?? []}
               busySlots={tutorData?.busySlots ?? []}
@@ -1949,9 +2319,7 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
               tutorPrice={tutorData?.price ?? TUTOR_DEFAULTS.price}
               sessionMin={previewMin}
               bufferMin={bufferMin}
-              responseHours={tutorData?.responseHours ?? TUTOR_DEFAULTS.responseHours}
               sessionsCount={tutorData?.sessionsCount ?? 0}
-              yearsExp={tutorData?.yearsExp ?? 0}
               rating={tutorData?.rating ?? 0}
               reviewsCount={tutorData?.reviewsCount ?? 0}
               signedIn={signedIn}
@@ -1963,10 +2331,28 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
             />
           </div>
         </div>
+
+        {/* Similar experts — FULL WIDTH, deliberately outside the two-column
+            grid (moved 2026-08-05). Inside the 1fr column it shared the row
+            with the 360px booking rail, so the section measured 808px and its
+            4-up grid gave each card 193px: after p-4 and the 60px photo the
+            text column was 89px, which truncated every name and let the
+            category chip (min-content 114px — Georgian category words don't
+            break) hang 26px outside the card. At full width the same cards
+            are 295px and everything fits. Nothing here belongs to the rail's
+            row, so it costs nothing to lift out. */}
+        <SimilarExperts
+          excludeId={tutorId}
+          categorySlug={tutorData?.category?.slug ?? null}
+          categoryName={tutorData?.category?.name ?? null}
+        />
       </Container>
 
-      {/* The fixed mobile booking bar overlays the page bottom at ~121px +
-          safe-area (the risk-reversal line wraps to two lines at 390px). The
+      {/* The fixed mobile booking bar overlays the page bottom. The clearance
+          covers its TALLEST state — the one that still renders a status strip
+          („paused" / „no published time" / load failure), which wraps to two
+          lines at 390px. In the ordinary bookable state the bar is now ~72px,
+          since the strip no longer carries a line there at all. The
           footer lives OUTSIDE the main Container, so it carries the clearance
           itself — with only the Container's old pb-24 the last footer row was
           permanently unreachable on a phone. */}
@@ -1980,9 +2366,9 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
 
       {/* Mobile sticky bottom booking */}
       <MobileBookingBar
+              canProposeCategory={isAbroadProfile}
         onBook={openPaid}
         priceLabel={headlinePrice.label}
-        priceIsFrom={headlinePrice.isFrom}
         sessionMin={previewMin}
         bufferMin={bufferMin}
         signedIn={signedIn}
@@ -2002,6 +2388,8 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
         <AuthPromptSheet
           tutorId={tutorId}
           intent={authIntent}
+          start={authStart}
+          serviceId={authServiceId}
           onDismiss={() => setAuthDismissed(true)}
         />
       )}

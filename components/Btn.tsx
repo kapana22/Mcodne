@@ -15,16 +15,29 @@ const BASE =
   'disabled:opacity-50 disabled:pointer-events-none'
 
 const SIZES: Record<Size, string> = {
-  sm: 'h-9 px-3.5 text-[12.5px]',
-  md: 'h-11 px-5 text-[13.5px]',
-  lg: 'h-12 px-6 text-[14.5px]',
+  // THE LABEL SIZES ARE THE HIERARCHY. Measured on production 2026-07-30: the
+  // site's primary action („დაჯავშნე", „ძებნა", „შესვლა") rendered at 14px while
+  // 50+ secondary chips sat at 13px — the most important control on the page was
+  // one pixel bigger than a filter. The fix was NOT a global bump (that raises
+  // everything and changes no relationship); it was giving the strongest visual
+  // treatment, `bg-gradient-cta`, the largest label at 16px (`text-body-lg`).
+  // If you add a gradient CTA, give it `text-body-lg` — the gradient and the
+  // size travel together.
+  // h-10 below sm, h-9 from sm up. `sm` is 36px — four pixels under this
+  // project's own 40px tap floor — and it is the size used for „ყველა
+  // წაკითხულად", „CSV ექსპორტი", „ავატარის შეცვლა", filter toggles and every
+  // other compact action, so ONE token change lifts a dozen controls that were
+  // each individually missable by a thumb. Desktop keeps the compact 36px.
+  sm: 'h-10 sm:h-9 px-3.5 text-small',
+  md: 'h-11 px-5 text-body',
+  lg: 'h-12 px-6 text-body-lg',
 }
 
 // Each variant carries hover AND active tints so the press reads as a real,
 // physical state change rather than a flat color the whole time.
 const VARIANTS: Record<Variant, string> = {
-  primary:   'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-xs hover:shadow-sm',
-  hero:      'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)]',
+  primary:   'bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white shadow-xs hover:shadow-sm',
+  hero:      'bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)]',
   // The gradient-cta token as a component variant — pages should reach for
   // this instead of hand-rolling `bg-gradient-cta …` button classes.
   cta:       'bg-gradient-cta text-white shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] hover:brightness-[1.04] active:brightness-95',

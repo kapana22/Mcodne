@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
+import { BOOKING_REVENUE_ONLY } from '@/lib/packages'
 
 export async function GET() {
-  await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -15,10 +17,10 @@ export async function GET() {
   // into July's GMV and out of the baseline, corrupting growthPct both ways.
   // The Booking model has no completion timestamp, so startAt is the stable one.
   const [completed, monthCompleted, prevMonthCompleted, pending] = await Promise.all([
-    prisma.booking.aggregate({ where: { status: 'COMPLETED' }, _sum: { price: true }, _count: { _all: true } }),
-    prisma.booking.aggregate({ where: { status: 'COMPLETED', startAt: { gte: monthStart } }, _sum: { price: true }, _count: { _all: true } }),
-    prisma.booking.aggregate({ where: { status: 'COMPLETED', startAt: { gte: prevMonthStart, lt: monthStart } }, _sum: { price: true } }),
-    prisma.booking.aggregate({ where: { status: 'COMPLETED', payoutStatus: 'PENDING' }, _sum: { price: true }, _count: { _all: true } }),
+    prisma.booking.aggregate({ where: { status: 'COMPLETED', ...BOOKING_REVENUE_ONLY }, _sum: { price: true }, _count: { _all: true } }),
+    prisma.booking.aggregate({ where: { status: 'COMPLETED', ...BOOKING_REVENUE_ONLY, startAt: { gte: monthStart } }, _sum: { price: true }, _count: { _all: true } }),
+    prisma.booking.aggregate({ where: { status: 'COMPLETED', ...BOOKING_REVENUE_ONLY, startAt: { gte: prevMonthStart, lt: monthStart } }, _sum: { price: true } }),
+    prisma.booking.aggregate({ where: { status: 'COMPLETED', ...BOOKING_REVENUE_ONLY, payoutStatus: 'PENDING' }, _sum: { price: true }, _count: { _all: true } }),
   ])
 
   const gmvTotal = completed._sum.price ?? 0

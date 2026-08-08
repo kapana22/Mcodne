@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { PublicTopBar } from '@/components/PublicTopBar'
 import { Container } from '@/components/Container'
@@ -9,6 +9,10 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { useMe } from '@/lib/me'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 import { showApplyCta } from '@/lib/roleHome'
+// Resolve the help widget's topic IDS back into their questions — one source,
+// so a reworded question reads correctly here too.
+import { ALL_TOPICS } from '@/lib/helpTopics'
+import { Illustration } from '@/components/Illustration'
 
 type Topic = 'general' | 'expert' | 'billing' | 'press' | 'other'
 type Status = 'idle' | 'sending' | 'ok' | 'error'
@@ -52,7 +56,7 @@ const CHANNELS = [
     label: 'ექსპერტთა გაწევრიანება',
     value: 'განაცხადის ფორმა',
     href: '/apply',
-    hint: 'გახდი ექსპერტი 3 დღეში',
+    hint: 'პასუხი 24–48 საათში',
   },
 ]
 
@@ -64,6 +68,36 @@ export default function ContactPage() {
   const [message, setMessage] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [errorText, setErrorText] = useState<string | null>(null)
+
+  /* Context from the help widget's „ვერ ვიპოვე პასუხი“ (`?from=` / `?asked=`).
+   *
+   * The link carried these before and nothing read them, so every unresolved
+   * help session arrived as a blank form — „someone wrote in“, when the widget
+   * already knew which page failed them and which answers they had just read.
+   *
+   * It is prefilled as an EDITABLE first line rather than a hidden field: the
+   * person sees exactly what is being sent and can delete it. Read from
+   * window.location instead of useSearchParams so this statically-rendered page
+   * needs no Suspense boundary. Prefills only while the textarea is untouched.
+   */
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search)
+    const from = sp.get('from')
+    if (!from || !from.startsWith('/')) return
+    const asked = (sp.get('asked') || '')
+      .split(',')
+      .map(id => ALL_TOPICS.find(t => t.id === id)?.q)
+      .filter(Boolean)
+    // `ask` is the question the help widget could not answer. Prefilled as the
+    // FIRST line and unquoted, because it is the actual message — the person
+    // already typed it once and should not have to type it again.
+    const ask = (sp.get('ask') || '').slice(0, 120).trim()
+    const lines: string[] = []
+    if (ask) lines.push(ask, '')
+    lines.push(`(გვერდი: ${from.slice(0, 120)})`)
+    if (asked.length) lines.push(`(დახმარებაში წავიკითხე: ${asked.join(' · ')})`)
+    setMessage(prev => (prev ? prev : lines.join('\n') + '\n\n'))
+  }, [])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,11 +136,11 @@ export default function ContactPage() {
           <Eyebrow className="mb-3">
             დაგვიკავშირდი
           </Eyebrow>
-          <h1 className="font-display text-4xl lg:text-5xl font-bold text-ink-900 tracking-tight leading-[1.05]">
+          <h1 className="font-display text-display lg:text-display-xl font-bold text-ink-900 tracking-tight leading-[1.05]">
             გაქვს კითხვა? მოგვწერე
           </h1>
-          <p className="mt-6 text-[17px] text-ink-600 leading-relaxed">
-            ვცდილობთ ყოველ შეტყობინებას ვუპასუხოთ 24 საათში. თუ საკითხი გადაუდებელია, დაწერე პირდაპირ ელფოსტაზე —
+          <p className="mt-6 text-h3 text-ink-600 leading-relaxed">
+            პასუხს ჩვეულებრივ 24 საათში იღებ. თუ საკითხი გადაუდებელია, დაწერე პირდაპირ ელფოსტაზე —
             ჩვენი გუნდი უფრო სწრაფად ხედავს.
           </p>
         </div>
@@ -117,36 +151,36 @@ export default function ContactPage() {
             <Eyebrow tone="muted" className="mb-1">
               შეტყობინება
             </Eyebrow>
-            <h2 className="font-display text-xl font-bold text-ink-900 tracking-tight">გამოგვიგზავნე დეტალები</h2>
+            <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight">გამოგვიგზავნე დეტალები</h2>
 
             <div className="mt-6 grid sm:grid-cols-2 gap-4">
               <label className="block">
-                <span className="block text-[12.5px] font-display font-semibold text-ink-800 mb-1.5">სახელი</span>
+                <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">სახელი</span>
                 <input
                   type="text"
                   required
                   minLength={2}
                   value={name}
                   onChange={e => { setName(e.target.value); if (status === 'error') { setStatus('idle'); setErrorText(null) } }}
-                  className="w-full h-11 px-3.5 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-colors"
+                  className="w-full h-11 px-3.5 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-colors duration-fast"
                   placeholder="შენი სახელი"
                 />
               </label>
               <label className="block">
-                <span className="block text-[12.5px] font-display font-semibold text-ink-800 mb-1.5">ელფოსტა</span>
+                <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">ელფოსტა</span>
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={e => { setEmail(e.target.value); if (status === 'error') { setStatus('idle'); setErrorText(null) } }}
-                  className="w-full h-11 px-3.5 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-colors"
+                  className="w-full h-11 px-3.5 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-colors duration-fast"
                   placeholder="you@example.com"
                 />
               </label>
             </div>
 
             <label className="block mt-4">
-              <span className="block text-[12.5px] font-display font-semibold text-ink-800 mb-1.5">თემა</span>
+              <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">თემა</span>
               <div className="flex flex-wrap gap-1.5">
                 {TOPICS.map(t => (
                   <button
@@ -154,9 +188,9 @@ export default function ContactPage() {
                     type="button"
                     aria-pressed={topic === t.v}
                     onClick={() => setTopic(t.v)}
-                    className={`h-9 px-3 rounded-pill text-[12.5px] font-display font-semibold transition-colors border ${
+                    className={`h-10 sm:h-9 px-3.5 sm:px-3 rounded-pill text-small font-display font-semibold transition-colors duration-fast border ${
                       topic === t.v
-                        ? 'bg-brand-500 text-white border-brand-500'
+                        ? 'bg-brand-600 text-white border-brand-500'
                         : 'bg-white text-ink-700 border-ink-200 hover:border-ink-300 hover:bg-ink-50'
                     }`}
                   >
@@ -167,7 +201,7 @@ export default function ContactPage() {
             </label>
 
             <label className="block mt-4">
-              <span className="block text-[12.5px] font-display font-semibold text-ink-800 mb-1.5">შეტყობინება</span>
+              <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">შეტყობინება</span>
               <textarea
                 required
                 minLength={10}
@@ -175,35 +209,44 @@ export default function ContactPage() {
                 rows={6}
                 value={message}
                 onChange={e => setMessage(e.target.value)}
-                className="w-full px-3.5 py-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none resize-y transition-colors leading-relaxed"
-                placeholder="მითხარი, რაშიც შეგვიძლია დაგეხმაროთ…"
+                className="w-full px-3.5 py-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none resize-y transition-colors duration-fast leading-relaxed"
+                placeholder="მოგვწერე, რაშიც შეგვიძლია დაგეხმაროთ…"
               />
-              <div className={`mt-1 text-[11px] tabular-nums text-right ${message.length > 3800 ? 'text-warning-700 font-semibold' : 'text-ink-400'}`}>
+              <div className={`mt-1 text-meta tabular-nums text-right ${message.length > 3800 ? 'text-warning-700 font-semibold' : 'text-ink-400'}`}>
                 {message.length} / 4000
               </div>
             </label>
 
+            {/* SUCCESS gets the illustration; the error branch below keeps its
+                compact tinted strip. An error is something to act on and wants
+                to be read fast — art there would slow down the one message the
+                reader actually needs. No plate behind the drawing: the tinted
+                success box stays a sibling of the text, not a frame for the
+                image. */}
             {status === 'ok' && (
-              <div className="mt-5 rounded-btn bg-success-50 border border-success-200 p-3.5 flex items-start gap-2.5">
-                <Icon.check className="w-4 h-4 text-success-700 mt-0.5 shrink-0" />
-                <div className="text-[13px] text-success-800 leading-relaxed">
-                  მადლობა — შეტყობინება მივიღეთ. გიპასუხებთ 24 საათში.
+              <div className="mt-5 flex flex-col items-center text-center gap-1">
+                <Illustration name="contactSent" alt="გაგზავნილი წერილი" />
+                <div className="mt-2 font-display text-body-lg font-bold text-ink-900 tracking-tight">
+                  წერილი გავიგეთ
                 </div>
+                <p className="text-small text-ink-500 max-w-[420px] leading-relaxed">
+                  გიპასუხებთ ჩვეულებრივ 24 საათში.
+                </p>
               </div>
             )}
             {status === 'error' && (
               <div role="alert" className="mt-5 rounded-btn bg-danger-50 border border-danger-200 p-3.5 flex items-start gap-2.5">
                 <Icon.warn className="w-4 h-4 text-danger-700 mt-0.5 shrink-0" />
-                <div className="text-[13px] text-danger-800 leading-relaxed break-words min-w-0">
+                <div className="text-small text-danger-800 leading-relaxed break-words min-w-0">
                   {errorText || 'შეცდომა. სცადე ხელახლა ან მოგვწერე ელფოსტაზე.'}
                 </div>
               </div>
             )}
 
             <div className="mt-6 flex items-center justify-between gap-4">
-              <div className="text-[11.5px] text-ink-500 leading-relaxed">
+              <div className="text-meta text-ink-500 leading-relaxed">
                 გაგზავნით ეთანხმები{' '}
-                <Link href="/privacy" className="text-brand-700 hover:text-brand-800 font-semibold">
+                <Link href="/privacy" className="tap-area text-brand-700 hover:text-brand-800 font-semibold">
                   კონფიდენციალურობის პოლიტიკას
                 </Link>
                 .
@@ -211,7 +254,7 @@ export default function ContactPage() {
               <button
                 type="submit"
                 disabled={status === 'sending'}
-                className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 disabled:bg-ink-300 disabled:cursor-not-allowed text-white font-display font-semibold text-[13.5px] inline-flex items-center gap-2 transition-colors"
+                className="h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 disabled:bg-ink-300 disabled:cursor-not-allowed text-white font-display font-semibold text-body inline-flex items-center gap-2 transition-colors duration-fast"
               >
                 {status === 'sending' ? 'იგზავნება…' : 'გაგზავნა'}
               </button>
@@ -228,25 +271,25 @@ export default function ContactPage() {
                 <a
                   key={c.label}
                   href={c.href}
-                  className="group flex items-start gap-4 p-4 rounded-card border border-ink-200 bg-white hover:border-ink-300 hover:shadow-card transition-all"
+                  className="group flex items-start gap-4 p-4 rounded-card border border-ink-200 bg-white hover:border-ink-300 hover:shadow-card transition-all duration-fast"
                 >
-                  <div className="w-10 h-10 rounded-btn bg-brand-50 text-brand-700 flex items-center justify-center shrink-0 group-hover:bg-brand-500 group-hover:text-white transition-colors">
+                  <div className="w-10 h-10 rounded-btn bg-brand-50 text-brand-700 flex items-center justify-center shrink-0 group-hover:bg-brand-600 group-hover:text-white transition-colors duration-fast">
                     {c.icon}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-display text-[13.5px] font-bold text-ink-900">{c.label}</div>
-                    <div className="text-[13px] text-brand-700 mt-0.5 truncate">{c.value}</div>
-                    <div className="text-[11.5px] text-ink-500 mt-1">{c.hint}</div>
+                    <div className="font-display text-body font-bold text-ink-900">{c.label}</div>
+                    <div className="text-small text-brand-700 mt-0.5 truncate">{c.value}</div>
+                    <div className="text-meta text-ink-500 mt-1">{c.hint}</div>
                   </div>
                 </a>
               ))}
             </div>
 
             <div className="mt-8 p-5 rounded-card bg-ink-50 border border-ink-200">
-              <div className="font-display text-[12px] font-semibold uppercase tracking-[0.14em] text-ink-600 mb-2">
+              <div className="font-display text-meta font-semibold uppercase text-ink-600 mb-2">
                 სამუშაო საათები
               </div>
-              <div className="text-[13px] text-ink-800 leading-relaxed">
+              <div className="text-small text-ink-800 leading-relaxed">
                 ორშ – პარ · 10:00 – 19:00
                 <br />
                 შაბ – კვ · მხოლოდ ელფოსტა

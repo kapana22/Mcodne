@@ -40,7 +40,7 @@ export function StudentAppBar({ user }: { user?: { name: string; avatar?: string
 
   return (
     <header
-      className={`sticky top-0 z-40 bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
+      className={`sticky top-0 z-chrome bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
         scrolled ? 'shadow-sm' : ''
       }`}
     >
@@ -55,7 +55,7 @@ export function StudentAppBar({ user }: { user?: { name: string; avatar?: string
                   key={item.href}
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
-                  className={`h-11 px-3.5 rounded-btn font-display text-[12px] font-semibold uppercase tracking-[0.06em] inline-flex items-center transition-colors duration-fast ${
+                  className={`h-11 px-3.5 rounded-btn font-display text-meta font-semibold uppercase inline-flex items-center transition-colors duration-fast ${
                     active ? 'bg-brand-50 text-brand-800' : 'text-ink-700 hover:bg-ink-100/70 hover:text-ink-900'
                   }`}
                 >
@@ -68,17 +68,17 @@ export function StudentAppBar({ user }: { user?: { name: string; avatar?: string
         <div className="flex items-center gap-1.5">
           <Link
             href="/tutors"
-            className="hidden md:inline-flex items-center gap-2 h-9 px-3 rounded-pill bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 transition-colors group"
+            className="hidden md:inline-flex items-center gap-2 h-9 px-3 rounded-pill bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 transition-colors duration-fast group"
           >
-            <Icon.search className="w-3.5 h-3.5 text-ink-500 group-hover:text-brand-600 transition-colors" />
-            <span className="font-display text-[12px] text-ink-500">ექსპერტი, თემა…</span>
+            <Icon.search className="w-3.5 h-3.5 text-ink-500 group-hover:text-brand-600 transition-colors duration-fast" />
+            <span className="font-display text-meta text-ink-500">ექსპერტი, თემა…</span>
           </Link>
           {/* Saved — heart icon left of the bell (replaces the „შენახული“ text nav). */}
           <Link
             href="/student/favorites"
             aria-label="შენახული"
             aria-current={savedActive ? 'page' : undefined}
-            className={`w-10 h-10 rounded-btn inline-flex items-center justify-center transition-colors ${
+            className={`w-10 h-10 rounded-btn inline-flex items-center justify-center transition-colors duration-fast ${
               savedActive ? 'text-brand-600 bg-brand-50' : 'text-ink-600 hover:text-ink-900 hover:bg-ink-100'
             }`}
           >
@@ -104,7 +104,7 @@ export function StudentAppBar({ user }: { user?: { name: string; avatar?: string
               key={item.href}
               href={item.href}
               aria-current={active ? 'page' : undefined}
-              className={`shrink-0 h-9 px-3 rounded-pill font-display text-[12px] font-semibold inline-flex items-center whitespace-nowrap transition-colors duration-fast ${
+              className={`shrink-0 h-9 px-3 rounded-pill font-display text-meta font-semibold inline-flex items-center whitespace-nowrap transition-colors duration-fast ${
                 active ? 'bg-brand-50 text-brand-800 border border-brand-200' : 'text-ink-600 hover:text-ink-900 border border-transparent'
               }`}
             >

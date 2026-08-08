@@ -6,10 +6,49 @@ import { notify, normalizePrefs } from '@/lib/notify'
 import { rateLimit } from '@/lib/rateLimit'
 import { stripTutorBlobs } from '@/lib/stripTutorBlobs'
 import { isStartOpen } from '@/lib/availability'
+import { FEATURE_REQUEST_BOOKING } from '@/lib/flags'
+import { isAbroadCategory } from '@/lib/abroad'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { sendMail } from '@/lib/mailer'
-import { bookingRequestEmail } from '@/lib/emailTemplates'
-import { fmtKaDateTime } from '@/lib/kaDate'
+import { bookingRequestEmail, bookingChangedEmail, fmtWhenTz } from '@/lib/emailTemplates'
+
+/**
+ * Run a Serializable transaction, retrying the ONE failure that means „try
+ * again", not „you lost".
+ *
+ * WHY THIS EXISTS (found 2026-08-05 in production data). P2034 is Postgres
+ * refusing to serialize a transaction. It was mapped straight to SLOT_TAKEN —
+ * „ეს დრო დაიკავეს" — and that is a different claim entirely: a serialization
+ * conflict is raised by ANY concurrent work touching the same tables, including
+ * the cleanup cron that runs every 15 minutes. It does not mean somebody booked
+ * the slot.
+ *
+ * The evidence: an expert with 24 published windows and, in the whole lifetime
+ * of the database, ZERO bookings in any status still produced six „that time is
+ * taken" refusals inside ten minutes. With no bookings, `busy` is empty, the
+ * openness check is identical with and without it, and the genuine SlotTaken
+ * branch is unreachable — P2034 was the only path left. The person picked
+ * another time, was refused again, and gave up. Across the funnel, 9 of the 11
+ * people who reached the final button failed.
+ *
+ * Retrying is the standard remedy for a serialization failure and the reason
+ * the isolation level is safe to use. Only P2034 is retried: SlotTaken,
+ * StudentOverlap and NoAvailability are real verdicts about this booking and
+ * must reach the user unchanged and on the first attempt.
+ */
+const MAX_TX_ATTEMPTS = 3
+async function runSerializable<T>(attempt: () => Promise<T>): Promise<T> {
+  for (let n = 1; ; n++) {
+    try {
+      return await attempt()
+    } catch (e: any) {
+      if (e?.code !== 'P2034' || n >= MAX_TX_ATTEMPTS) throw e
+      // Short, jittered backoff — long enough for the conflicting statement to
+      // finish, short enough that the person never notices the retry.
+      await new Promise(r => setTimeout(r, 40 * n + Math.floor(Math.random() * 40)))
+    }
+  }
+}
 
 const Body = z.object({
   tutorId: z.string(),
@@ -23,6 +62,16 @@ const Body = z.object({
   // for backward-compatible client payloads.
   price: z.number().int().min(0).optional(),
   studentNotes: z.string().max(1000).optional(),
+  // Request-based booking: the client is PROPOSING this time rather than
+  // picking it from the published calendar. Ignored entirely unless
+  // FEATURE_REQUEST_BOOKING is on AND the expert is in the diaspora category —
+  // an older or hostile client cannot use it to bypass the availability gate.
+  proposed: z.boolean().optional(),
+  // Their 2nd and 3rd choice of time, so the expert can answer once instead of
+  // trading messages. `startAt` above is always the FIRST choice; these are
+  // never anything but extra options, and at most two of them. Ignored on the
+  // same terms as `proposed`.
+  proposedAlternates: z.array(z.string().datetime()).max(2).optional(),
 })
 
 export async function GET() {
@@ -123,7 +172,14 @@ export async function POST(req: Request) {
   const [tutor, consultationRow] = await Promise.all([
     prisma.tutorProfile.findUnique({
       where: { id: tutorId },
-      include: { user: { select: { suspendedAt: true } } },
+      include: {
+        user: { select: { suspendedAt: true } },
+        // Only for the request-booking scope check below. The category is the
+        // audience gate: a proposal is a diaspora affordance, and reading it off
+        // the expert's own row means a client cannot claim to be in that
+        // audience — there is no „context" field to forge.
+        category: { select: { slug: true } },
+      },
     }),
     consultationId
       ? prisma.consultation.findFirst({
@@ -172,6 +228,39 @@ export async function POST(req: Request) {
   const durationMin = consultation ? consultation.minutes : reqDurationMin
   const price = consultation ? consultation.price : tutor.price
 
+  // A request only exists when the FEATURE is on, the client asked for one, AND
+  // the expert belongs to the diaspora category. Resolved once, here, so the
+  // gate below and the row written afterwards can never disagree about which
+  // kind of booking this is.
+  //
+  // THE CATEGORY TERM IS A SECOND LOCK, not a nicety. The published-window gate
+  // is the platform's only guarantee that an expert is never booked at a time
+  // they did not offer, and a request deliberately steps around it. Scoping that
+  // exception to one hidden category means flipping the flag on cannot loosen
+  // the guarantee for the ~18 experts in the ordinary catalog, who never agreed
+  // to answer out-of-schedule proposals. Both terms, always.
+  const isRequest =
+    FEATURE_REQUEST_BOOKING && parsed.data.proposed === true && isAbroadCategory(tutor.category?.slug)
+
+  // Their 2nd/3rd choice, normalised: real dates, in the future (same 5-minute
+  // clock-skew floor the PAST_DATE guard uses), never a repeat of a time already
+  // on the list or of the primary choice, capped at two. Anything else is
+  // dropped rather than rejected — a malformed alternate must not cost the
+  // client the booking their FIRST choice would have produced.
+  const alternates: string[] = []
+  if (isRequest) {
+    const seen = new Set([start.getTime()])
+    for (const raw of parsed.data.proposedAlternates ?? []) {
+      const d = new Date(raw)
+      if (isNaN(d.getTime())) continue
+      if (d.getTime() < Date.now() - CLOCK_SKEW_MS) continue
+      if (seen.has(d.getTime())) continue
+      seen.add(d.getTime())
+      alternates.push(d.toISOString())
+      if (alternates.length === 2) break
+    }
+  }
+
   const end = new Date(start.getTime() + durationMin * 60 * 1000)
 
   // Buffer around every session (0 = back-to-back allowed, the historical
@@ -201,8 +290,9 @@ export async function POST(req: Request) {
     price: number
     status: string
   }
-  try {
-    booking = await prisma.$transaction(async tx => {
+  // The transaction body is unchanged; it is only wrapped so a serialization
+  // failure can be retried instead of reported as a lost slot.
+  const attemptBooking = () => prisma.$transaction(async tx => {
       // Re-check overlap INSIDE the tx. ONE query serves two jobs: this guard
       // (the real concurrency protection) and the `busy` set the openness check
       // below subtracts. The upper bound is end+buffer rather than end so a
@@ -268,7 +358,14 @@ export async function POST(req: Request) {
         bufferMin,
         now: new Date(Date.now() - CLOCK_SKEW_MS),
       }
-      if (!isStartOpen(start, openOpts)) {
+      // ── The published-window gate ────────────────────────────────────────
+      // A REQUEST (`proposed`) is exactly the booking whose start is NOT in a
+      // published window — so this one check, and only this one, is skipped.
+      // Everything above still ran: the overlap re-check and the student's own
+      // overlap are INSIDE this transaction and rejected the request already if
+      // it collided. A proposal may sit outside the expert's calendar; it may
+      // never sit on top of a real session.
+      if (!isRequest && !isStartOpen(start, openOpts)) {
         // Split the verdict so the client keeps its two distinct messages:
         // re-running the same predicate with no bookings isolates "the expert
         // never published this time / it isn't a valid start" (NO_AVAILABILITY)
@@ -278,7 +375,7 @@ export async function POST(req: Request) {
         throw new SlotTaken()
       }
 
-      return tx.booking.create({
+      const created = await tx.booking.create({
         data: {
           studentId: user.id,
           tutorId,
@@ -288,6 +385,9 @@ export async function POST(req: Request) {
           durationMin,
           price,
           studentNotes,
+          // PREPARING already means „waiting for the expert to answer", which is
+          // exactly what a request is — so a proposal needs no new status and
+          // no new answer flow. Only its ORIGIN differs, recorded below.
           status: 'PREPARING',
           // Snapshot the tutor's current type so past bookings never rewrite.
           serviceType: tutor.serviceType,
@@ -297,7 +397,25 @@ export async function POST(req: Request) {
         },
         select: { id: true, ref: true, startAt: true, durationMin: true, price: true, status: true },
       })
+      // The ORIGIN of the booking, written INSIDE the transaction so a request
+      // can never commit as an ordinary booking: the expert would then see a
+      // time outside their calendar with nothing explaining it, and the
+      // alternates they were offered would be gone.
+      //
+      // Raw SQL, matching `rescheduleRequest`: these are dbBoot columns and the
+      // create() above stays a plain typed insert.
+      if (isRequest) {
+        await tx.$executeRawUnsafe(
+          `UPDATE "Booking" SET "proposedByStudent" = true, "proposedAlternates" = $2::jsonb WHERE id = $1`,
+          created.id,
+          alternates.length ? JSON.stringify(alternates.map(startAt => ({ startAt }))) : null,
+        )
+      }
+      return created
     }, { isolationLevel: 'Serializable' })
+
+  try {
+    booking = await runSerializable(attemptBooking)
   } catch (e: any) {
     if (e instanceof SlotTaken) {
       return NextResponse.json({ ok: false, error: 'SLOT_TAKEN' }, { status: 409 })
@@ -308,8 +426,18 @@ export async function POST(req: Request) {
     if (e instanceof NoAvailability) {
       return NextResponse.json({ ok: false, error: 'NO_AVAILABILITY' }, { status: 409 })
     }
-    // P2034 = serialization failure — a concurrent booking won the race.
+    // P2034 after MAX_TX_ATTEMPTS retries (see runSerializable). Reaching here
+    // means the transaction could not be serialized three times running, which
+    // — unlike a single P2034 — really is best explained by contention on this
+    // slot, so the user still gets „that time was taken".
+    //
+    // Logged, and logged distinctly: this used to be indistinguishable from a
+    // genuine SlotTaken in both the response and the funnel, which is how six
+    // refusals against an expert with no bookings at all went unexplained for a
+    // day. If this line starts appearing, the conflict is real and the retry
+    // budget is the thing to look at — not the availability data.
     if (e?.code === 'P2034') {
+      console.error('[booking] serialization retries exhausted', { tutorId, startAt: start.toISOString(), durationMin })
       return NextResponse.json({ ok: false, error: 'SLOT_TAKEN' }, { status: 409 })
     }
     throw e
@@ -322,24 +450,56 @@ export async function POST(req: Request) {
     await notify(tutor.userId, {
       type: 'BOOKING_CREATED',
       title: 'ახალი ჯავშნის მოთხოვნა',
-      body: topic,
+      // Say up front when the client named the time — the bell is often the
+      // only thing an expert reads, and „why is this not in my schedule?" is
+      // the first question an unannounced proposal raises.
+      body: isRequest ? `${topic} — დრო კლიენტმა შემოგვთავაზა` : topic,
       href: `/tutor/bookings/${booking.id}`,
     })
     // ALSO email the expert — a request they don't act on within 24h gets
     // auto-canceled by the cleanup cron, so the in-app bell alone isn't enough.
     // Gate on the tutor's BOOKING_CREATED pref (same as the in-app notify).
+    const whenText = fmtWhenTz(booking.startAt, { year: true })
+    let expertName = 'ექსპერტი'
     try {
       const tutorUser = await prisma.user.findUnique({
         where: { id: tutor.userId },
-        select: { email: true, notificationPrefs: true },
+        select: { email: true, fullName: true, notificationPrefs: true },
       })
+      if (tutorUser?.fullName) expertName = tutorUser.fullName
       if (tutorUser?.email && normalizePrefs(tutorUser.notificationPrefs).BOOKING_CREATED) {
         const { subject, html } = bookingRequestEmail({
           studentName: user.fullName,
           topic,
-          whenText: fmtKaDateTime(booking.startAt, { year: true }),
+          whenText,
+          // A proposal must ANNOUNCE itself, in the email as well as in the
+          // dashboard: the expert is being shown a time that is not on their
+          // calendar, plus up to two more they were never asked about.
+          proposedByStudent: isRequest,
+          alternateWhenTexts: alternates.map(iso => fmtWhenTz(new Date(iso), { year: true })),
         })
         await sendMail({ to: tutorUser.email, subject, html })
+      }
+    } catch { /* email is best-effort */ }
+    // …and a receipt to the CLIENT. Until now the requesting side got nothing at
+    // all: the request sits in PREPARING, and if the expert never answers, the
+    // cleanup cron cancels it — so a booking could be created and die without a
+    // single line reaching the person who made it. The receipt states the 24h
+    // rule, so the silence is at least expected. Its OWN try/catch: a failure
+    // emailing the expert must not swallow the client's copy.
+    try {
+      const student = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { email: true, notificationPrefs: true },
+      })
+      if (student?.email && normalizePrefs(student.notificationPrefs).BOOKING_CREATED) {
+        const { subject, html } = bookingChangedEmail('request_sent', {
+          counterpartName: expertName,
+          topic,
+          whenText,
+          href: `/student/bookings/${booking.id}`,
+        })
+        await sendMail({ to: student.email, subject, html })
       }
     } catch { /* email is best-effort */ }
   })

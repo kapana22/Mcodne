@@ -8,7 +8,8 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { StatusPill } from '@/components/StatusPill'
-import { fmtKaDateTime, fmtKaTime } from '@/lib/kaDate'
+import { TzNote } from '@/components/workspace/TzNote'
+import { sessionDateTime, sessionTime } from '@/components/workspace/sessionTime'
 import { isBookingLive } from '@/lib/bookingLive'
 import { type DashBooking, toneOf } from './types'
 
@@ -19,9 +20,16 @@ import { type DashBooking, toneOf } from './types'
 export function TodayHero({
   next,
   todayRest,
+  noFreeTime = false,
 }: {
   next: DashBooking | null
   todayRest: DashBooking[]
+  /** True when the expert has no bookable time left. The dashboard already
+      states that ONCE, in the alert row above (plus the OpenTimeNudge modal) —
+      so this card must not repeat the same „გამოაქვეყნე დრო" CTA a third time.
+      It keeps stating its own fact (no confirmed session) and stays silent
+      about the fix. */
+  noFreeTime?: boolean
 }) {
   // 30s tick for the countdown column.
   const [now, setNow] = useState(() => Date.now())
@@ -38,8 +46,8 @@ export function TodayHero({
           variant="inline"
           icon={<Icon.calendar className="w-5 h-5" />}
           title="დადასტურებული სესია არ გაქვს"
-          description="გამოაქვეყნე დრო, რომ დაგიჯავშნონ."
-          cta={{ label: 'გრაფიკი', href: '/tutor/schedule' }}
+          description={noFreeTime ? undefined : 'გამოაქვეყნე დრო, რომ დაგიჯავშნონ.'}
+          cta={noFreeTime ? undefined : { label: 'გრაფიკი', href: '/tutor/schedule' }}
         />
       </Card>
     )
@@ -59,18 +67,19 @@ export function TodayHero({
       <article className="relative overflow-hidden rounded-card bg-gradient-dark text-white">
         <div className="relative grid lg:grid-cols-[1fr_240px]">
           <div className="p-6 sm:p-7">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-4 font-display text-[10.5px] font-semibold uppercase tracking-[0.18em]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-4 font-display text-micro font-semibold uppercase">
               <span className="inline-flex items-center gap-1.5 text-white/75">
                 <Icon.clock className="w-3 h-3" />
-                {fmtKaDateTime(start, { weekday: true })} · {next.durationMin} წთ
+                {sessionDateTime(next.startAt)} · {next.durationMin} წთ
               </span>
+              <TzNote className="text-white/50" />
               <span className="text-white/25">·</span>
               <span className="text-brand-300">₾{next.price}</span>
             </div>
 
             <div className="mb-4 max-w-[520px]">
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-white/45 mb-1.5">თემა</div>
-              <h2 className="font-display text-[21px] sm:text-[24px] font-bold tracking-[-0.02em] leading-[1.15] text-white">
+              <div className="font-display text-micro font-semibold uppercase text-white/45 mb-1.5">თემა</div>
+              <h2 className="font-display text-h2 sm:text-h1 font-bold tracking-[-0.02em] leading-[1.15] text-white">
                 {next.topic}
               </h2>
             </div>
@@ -78,8 +87,8 @@ export function TodayHero({
             <div className="inline-flex items-center gap-2.5">
               <Avatar src={next.student?.avatarUrl ?? undefined} name={next.student?.fullName} size={36} />
               <div className="min-w-0">
-                <div className="font-display font-semibold text-[13.5px] text-white">{next.student?.fullName ?? 'უცნობი სტუდენტი'}</div>
-                <div className="text-[11.5px] text-white/55 mt-0.5">სტუდენტი</div>
+                <div className="font-display font-semibold text-body text-white">{next.student?.fullName ?? 'უცნობი სტუდენტი'}</div>
+                <div className="text-meta text-white/55 mt-0.5">სტუდენტი</div>
               </div>
             </div>
 
@@ -87,17 +96,17 @@ export function TodayHero({
               {live ? (
                 <>
                   <Btn href={`/session/${next.id}`} variant="primary" size="md">
-                    <Icon.video className="w-4 h-4" /> ვიდეო-ოთახში შესვლა
+                    <Icon.video className="w-4 h-4" /> ვიდეოოთახში შესვლა
                   </Btn>
-                  <Link href={`/tutor/bookings/${next.id}`} className="h-11 px-4 rounded-btn bg-white/10 hover:bg-white/15 backdrop-blur text-white font-display font-medium text-[13px] inline-flex items-center transition-colors">
+                  <Link href={`/tutor/bookings/${next.id}`} className="h-11 px-4 rounded-btn bg-white/10 hover:bg-white/15 backdrop-blur text-white font-display font-medium text-small inline-flex items-center transition-colors duration-fast">
                     დეტალები
                   </Link>
                 </>
               ) : (
                 <>
                   <Btn href={`/tutor/bookings/${next.id}`} variant="primary" size="md">დეტალები</Btn>
-                  <Link href={`/session/${next.id}`} className="h-11 px-4 rounded-btn bg-white/10 hover:bg-white/15 backdrop-blur text-white font-display font-medium text-[13px] inline-flex items-center gap-1.5 transition-colors">
-                    <Icon.video className="w-4 h-4" /> ვიდეო-ოთახი
+                  <Link href={`/session/${next.id}`} className="h-11 px-4 rounded-btn bg-white/10 hover:bg-white/15 backdrop-blur text-white font-display font-medium text-small inline-flex items-center gap-1.5 transition-colors duration-fast">
+                    <Icon.video className="w-4 h-4" /> ვიდეოოთახი
                   </Link>
                 </>
               )}
@@ -106,25 +115,25 @@ export function TodayHero({
 
           {live ? (
             <div className="relative bg-white/[0.06] border-t lg:border-t-0 lg:border-l border-white/10 p-6 flex flex-col justify-center">
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/50 mb-2.5">ახლა</div>
+              <div className="font-display text-micro font-semibold uppercase text-white/50 mb-2.5">ახლა</div>
               <div className="inline-flex items-center gap-2.5">
-                <span className="font-display text-[22px] font-bold leading-none tracking-[-0.02em] text-brand-300">მიმდინარეობს</span>
+                <span className="font-display text-h2 font-bold leading-none tracking-[-0.02em] text-brand-300">მიმდინარეობს</span>
               </div>
             </div>
           ) : (
             <div className="relative bg-white/[0.06] border-t lg:border-t-0 lg:border-l border-white/10 p-6 flex flex-col justify-center">
-              <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/50 mb-2.5">დაიწყება</div>
+              <div className="font-display text-micro font-semibold uppercase text-white/50 mb-2.5">დაიწყება</div>
               <div className="flex items-baseline gap-1.5">
                 {cd.d > 0 && (
                   <>
-                    <span className="font-display text-[40px] font-bold leading-none tabular-nums tracking-[-0.04em]">{cd.d}</span>
-                    <span className="font-display text-[14px] font-semibold text-white/60 mr-1.5">დღე</span>
+                    <span className="font-display text-display-lg font-bold leading-none tabular-nums tracking-[-0.04em]">{cd.d}</span>
+                    <span className="font-display text-body font-semibold text-white/60 mr-1.5">დღე</span>
                   </>
                 )}
-                <span className="font-display text-[40px] font-bold leading-none tabular-nums tracking-[-0.04em]">{String(cd.h).padStart(2, '0')}</span>
-                <span className="font-display text-[14px] font-semibold text-white/60">სთ</span>
-                <span className="font-display text-[28px] font-bold leading-none tabular-nums tracking-[-0.04em] ml-1">{String(cd.m).padStart(2, '0')}</span>
-                <span className="font-display text-[14px] font-semibold text-white/60">წთ</span>
+                <span className="font-display text-display-lg font-bold leading-none tabular-nums tracking-[-0.04em]">{String(cd.h).padStart(2, '0')}</span>
+                <span className="font-display text-body font-semibold text-white/60">სთ</span>
+                <span className="font-display text-h1 font-bold leading-none tabular-nums tracking-[-0.04em] ml-1">{String(cd.m).padStart(2, '0')}</span>
+                <span className="font-display text-body font-semibold text-white/60">წთ</span>
               </div>
             </div>
           )}
@@ -133,17 +142,18 @@ export function TodayHero({
 
       {todayRest.length > 0 && (
         <Card padding="none" className="mt-3 overflow-hidden">
-          <div className="px-5 py-3 border-b border-ink-100">
+          <div className="px-5 py-3 border-b border-ink-100 flex items-center justify-between gap-3">
             <Eyebrow tone="muted">კიდევ დღეს</Eyebrow>
+            <TzNote />
           </div>
           <ul className="divide-y divide-ink-100">
             {todayRest.map(b => (
               <li key={b.id}>
-                <Link href={`/tutor/bookings/${b.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-ink-50/60 transition-colors">
-                  <span className="font-mono text-[12.5px] tabular-nums text-ink-700 shrink-0 w-12">{fmtKaTime(new Date(b.startAt))}</span>
+                <Link href={`/tutor/bookings/${b.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-ink-50/60 transition-colors duration-fast">
+                  <span className="font-mono text-small tabular-nums text-ink-700 shrink-0 w-12">{sessionTime(b.startAt)}</span>
                   <Avatar src={b.student?.avatarUrl ?? undefined} name={b.student?.fullName} size={28} />
-                  <span className="font-display text-[13px] font-semibold text-ink-900 truncate shrink-0 max-w-[160px]">{b.student?.fullName ?? '—'}</span>
-                  <span className="text-[12.5px] text-ink-500 truncate flex-1">{b.topic}</span>
+                  <span className="font-display text-small font-semibold text-ink-900 truncate shrink-0 max-w-[160px]">{b.student?.fullName ?? '—'}</span>
+                  <span className="text-small text-ink-500 truncate flex-1">{b.topic}</span>
                   <StatusPill tone={isBookingLive(b) ? 'live' : toneOf(b.status)} />
                 </Link>
               </li>

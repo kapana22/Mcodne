@@ -36,8 +36,21 @@ const TABLE: (LanguageOption & { aliases: string[] })[] = [
   { code: 'zh', label: 'ჩინური',         aliases: ['ჩინური', 'chinese', 'mandarin', '中文', 'zho', 'chi'] },
 ]
 
-/** Editor chip list / any picker. Order is the display order. */
-export const LANGUAGES: LanguageOption[] = TABLE.map(({ code, label }) => ({ code, label }))
+/**
+ * The three that are always OFFERED as chips.
+ *
+ * MEASURED 2026-07-31, across all 12 profiles: ka×11, en×5, ru×1, de×1 — four
+ * languages in use, thirteen chips on screen to express them. A picker whose
+ * options outnumber its real answers 3:1 is a wall to read past, not a choice.
+ *
+ * The other ten did not disappear: `TABLE` still holds the canonical set,
+ * a typed entry is normalized against it (so „French", „ფრანგული" and „fr" all
+ * land on `fr`), and any code ALREADY on a profile renders as its own chip —
+ * the one expert with German keeps German without touching anything.
+ */
+export const PRIMARY_LANG_CODES = ['ka', 'en', 'ru'] as const
+export const PRIMARY_LANGUAGES: LanguageOption[] =
+  PRIMARY_LANG_CODES.map(c => ({ code: c, label: TABLE.find(t => t.code === c)!.label }))
 
 /** code → Georgian label, for rendering a stored array. */
 export const LANG_LABELS: Record<string, string> = Object.fromEntries(TABLE.map(l => [l.code, l.label]))

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { slugify } from '@/lib/slug'
 import { ensureDbReady } from '@/lib/dbBoot'
@@ -9,13 +9,17 @@ import { ensureDbReady } from '@/lib/dbBoot'
 // GET /api/admin/posts — every post (draft + published), newest first, for the
 // admin blog editor. The Post table is created by dbBoot, so ensure it exists
 // before the first query after a cold deploy.
+// `body` is deliberately NOT selected: articles run to 60K characters, so the
+// list payload dragged every full text along on every open. The editor
+// lazy-loads the selected post (GET /api/admin/posts/[id]) when it needs it.
 export async function GET() {
-  await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
   await ensureDbReady()
   const rows = await prisma.post.findMany({
     orderBy: { createdAt: 'desc' },
     select: {
-      id: true, slug: true, title: true, excerpt: true, body: true,
+      id: true, slug: true, title: true, excerpt: true,
       coverUrl: true, tag: true, status: true, authorName: true,
       publishedAt: true, updatedAt: true,
     },
@@ -28,7 +32,9 @@ export async function GET() {
 const CreateBody = z.object({ title: z.string().trim().min(2).max(160) })
 
 export async function POST(req: Request) {
-  const admin = await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  const admin = auth.user
   await ensureDbReady()
   const parsed = CreateBody.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 
 // 30-day daily time series for the admin dashboard charts: new signups,
 // new bookings, and realized revenue (completed bookings) per day. Grouped in
@@ -9,7 +9,8 @@ import { requireRole } from '@/lib/auth'
 type Row = { day: Date; c: number }
 
 export async function GET() {
-  await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
 
   const [signupRows, bookingRows, revenueRows] = await Promise.all([
     prisma.$queryRawUnsafe<Row[]>(`

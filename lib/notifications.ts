@@ -38,7 +38,7 @@ function publish(next: Partial<NotifSnapshot>) {
 }
 
 // Single-flight fetch. Visibility-gated: a backgrounded tab shouldn't poll.
-export function refreshNotifications(): Promise<void> {
+function refreshNotifications(): Promise<void> {
   if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
     return Promise.resolve()
   }
@@ -85,9 +85,32 @@ function subscribe(onChange: () => void): () => void {
   }
 }
 
-export function useNotifications(): NotifSnapshot {
-  return useSyncExternalStore(subscribe, () => snapshot, () => SERVER_SNAPSHOT)
+/**
+ * @param enabled pass `false` when there is no signed-in user.
+ *
+ * WHY THE FLAG: `BottomNav` calls this before it decides whether to render
+ * (it returns null for anonymous visitors), and a hook cannot be called
+ * conditionally. The subscription therefore started for EVERY guest on EVERY
+ * page — one `/api/notifications` request that 401s immediately, then another
+ * every 90 seconds for as long as the tab stayed open. Nothing broke (the
+ * fetch swallows non-ok responses) but it was pure waste and it filled the
+ * console with auth errors that mask real ones.
+ *
+ * Disabled just returns the empty server snapshot and never subscribes, so no
+ * poll, no listeners, no request. Re-enabling (after sign-in) resubscribes
+ * normally and fires an immediate refresh — the refcounted `subscribe` already
+ * handles that.
+ */
+export function useNotifications(enabled = true): NotifSnapshot {
+  return useSyncExternalStore(
+    enabled ? subscribe : noopSubscribe,
+    () => (enabled ? snapshot : SERVER_SNAPSHOT),
+    () => SERVER_SNAPSHOT,
+  )
 }
+
+/** No-op subscribe for the disabled case — never registers a listener. */
+const noopSubscribe = () => () => {}
 
 // Bump the cross-tab key so other tabs' stores revalidate after a read here.
 function pingCrossTab() {

@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useScrollIntoResults } from '@/lib/useScrollIntoResults'
 import { Container } from '@/components/Container'
 import Link from 'next/link'
 import { Icon } from '@/components/Icon'
@@ -11,6 +12,7 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { Logo } from '@/components/Logo'
 import { NotifBell } from '@/components/NotifBell'
 import { UserMenu } from '@/components/UserMenu'
+import { homeForRole } from '@/lib/roleHome'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 
@@ -68,6 +70,10 @@ export default function NotificationsPage() {
   // told the user they had no notifications. Distinct state, distinct copy.
   const [loadFailed, setLoadFailed] = useState(false)
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  // „წაუკითხავი" can drop a long list to two rows — the reader must land on
+  // them, not on the empty space where the old list used to be.
+  const listRef = useRef<HTMLDivElement | null>(null)
+  useScrollIntoResults(listRef, [filter])
   // This page is shared across roles — the authed top bar (bell + user menu)
   // needs the viewer's identity, so we hold name/avatar/role, not just role.
   const [me, setMe] = useState<{ name: string; avatar: string | null; role: Role } | null>(null)
@@ -116,14 +122,24 @@ export default function NotificationsPage() {
   const markOne = async (id: string) => {
     // On the „წაუკითხავი" filter a just-read item no longer belongs in the
     // list — drop it immediately instead of leaving it until the next load.
+    // Optimistic: keep the pre-mutation list so a failed POST can put the item
+    // back instead of lying that it was read (it would resurrect on reload).
+    const prevItems = items
     setItems(prev => filter === 'unread'
       ? prev.filter(n => n.id !== id)
       : prev.map(n => n.id === id ? { ...n, readAt: n.readAt ?? new Date().toISOString() } : n))
-    await fetch('/api/notifications/read', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: [id] }),
-    }).catch(() => {})
-    pingCrossTab()
+    try {
+      const res = await fetch('/api/notifications/read', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] }),
+      })
+      if (!res.ok) throw new Error('http ' + res.status)
+      // Only a CONFIRMED write should bump other tabs to re-poll.
+      pingCrossTab()
+    } catch {
+      setItems(prevItems)
+      toast('ვერ მოხერხდა — სცადე თავიდან', 'error')
+    }
   }
 
   const markAll = async () => {
@@ -160,17 +176,35 @@ export default function NotificationsPage() {
       {/* Same authed workspace chrome the rest of the signed-in app uses:
           logo → „/“, saved (heart), notification bell, user menu. No sidebar on
           this standalone page, so the logo stays visible at every breakpoint. */}
-      <header className="sticky top-0 z-40 bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100">
+      <header className="sticky top-0 z-chrome bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100">
         <Container size="content" className="h-14 lg:h-16 flex items-center justify-between gap-4">
-          <Logo size="sm" href="/" />
+          <div className="inline-flex items-center gap-1">
+            {/* Way back INTO the workspace. Without it this page was a desktop
+                dead end: above lg the BottomNav is hidden and the logo goes to
+                the marketing home, so nothing led back to „ჩემი სივრცე".
+                Same chevron pattern as /settings; it waits for /api/me so the
+                role — and therefore the destination — is the real one. */}
+            {me && (
+              <Link
+                href={homeForRole(me.role)}
+                aria-label="უკან, ჩემს სივრცეში"
+                className="w-10 h-10 -ml-2 rounded-btn inline-flex items-center justify-center text-ink-600 hover:text-ink-900 hover:bg-ink-100 transition-colors duration-fast"
+              >
+                <Icon.chevR className="w-4 h-4 rotate-180" />
+              </Link>
+            )}
+            <Logo size="sm" href="/" />
+          </div>
           <div className="flex items-center gap-2 shrink-0">
+            {me?.role === 'STUDENT' && (
             <Link
               href="/student/favorites"
               aria-label="შენახული ექსპერტები"
-              className="w-10 h-10 rounded-btn inline-flex items-center justify-center text-ink-500 hover:text-ink-900 hover:bg-ink-100 transition-colors"
+              className="w-10 h-10 rounded-btn inline-flex items-center justify-center text-ink-500 hover:text-ink-900 hover:bg-ink-100 transition-colors duration-fast"
             >
               <Icon.heart className="w-[18px] h-[18px]" />
             </Link>
+            )}
             <NotifBell />
             {me && <UserMenu user={{ name: me.name, avatar: me.avatar }} role={me.role} />}
           </div>
@@ -181,16 +215,16 @@ export default function NotificationsPage() {
         <div className="flex items-end justify-between gap-4 mb-6 flex-wrap">
           <div>
             <Eyebrow tone="muted" className="mb-1">შეტყობინებები</Eyebrow>
-            <h1 className="font-display text-[26px] sm:text-[32px] font-bold text-ink-900 tracking-tight leading-[1.05]">
+            <h1 className="font-display text-h1 sm:text-display font-bold text-ink-900 tracking-tight leading-[1.05]">
               შეტყობინებები {unread > 0 && <span className="text-brand-600">({unread})</span>}
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div ref={listRef} className="flex items-center gap-2">
             <div className="inline-flex rounded-btn border border-ink-200 bg-white overflow-hidden">
-              <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')} className={`h-9 px-3 font-display text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400 ${filter === 'all' ? 'bg-brand-500 text-white' : 'text-ink-700 hover:bg-ink-50'}`}>ყველა</button>
-              <button type="button" aria-pressed={filter === 'unread'} onClick={() => setFilter('unread')} className={`h-9 px-3 font-display text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400 ${filter === 'unread' ? 'bg-brand-500 text-white' : 'text-ink-700 hover:bg-ink-50'}`}>წაუკითხავი</button>
+              <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')} className={`h-10 sm:h-9 px-3 font-display text-meta font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400 ${filter === 'all' ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-ink-50'}`}>ყველა</button>
+              <button type="button" aria-pressed={filter === 'unread'} onClick={() => setFilter('unread')} className={`h-10 sm:h-9 px-3 font-display text-meta font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400 ${filter === 'unread' ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-ink-50'}`}>წაუკითხავი</button>
             </div>
-            <button type="button" onClick={markAll} disabled={busy || unread === 0} className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-50 disabled:cursor-not-allowed text-ink-700 font-display font-semibold text-[12px] inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
+            <button type="button" onClick={markAll} disabled={busy || unread === 0} className="h-10 sm:h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-50 disabled:cursor-not-allowed text-ink-700 font-display font-semibold text-meta inline-flex items-center gap-1.5 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
               ყველა წაკითხულად
             </button>
           </div>
@@ -218,13 +252,13 @@ export default function NotificationsPage() {
             <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-ink-100 text-ink-500 mb-3">
               <Icon.warn className="w-6 h-6" />
             </span>
-            <div className="font-display text-[15px] font-semibold text-ink-800">შეტყობინებები ვერ ჩაიტვირთა</div>
-            <p className="text-[12.5px] text-ink-500 mt-1">დროებითი შეფერხებაა — სცადე თავიდან.</p>
+            <div className="font-display text-body-lg font-semibold text-ink-800">შეტყობინებები ვერ ჩაიტვირთა</div>
+            <p className="text-small text-ink-500 mt-1">დროებითი შეფერხებაა — სცადე თავიდან.</p>
             <div className="mt-4">
               <button
                 type="button"
                 onClick={() => { setLoadFailed(false); void load() }}
-                className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12px] inline-flex items-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+                className="h-10 sm:h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-meta inline-flex items-center transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
               >
                 თავიდან ცდა
               </button>
@@ -253,21 +287,21 @@ export default function NotificationsPage() {
                         <div className="p-4 flex items-start gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-baseline gap-2 flex-wrap">
-                              <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border bg-transparent font-display text-[10px] font-bold uppercase tracking-[0.14em] shrink-0 ${meta.cls}`}>{meta.l}</span>
-                              <span className={`font-display text-[13.5px] tracking-tight line-clamp-1 min-w-0 flex-1 ${isUnread ? 'font-bold text-ink-900' : 'font-medium text-ink-800'}`}>{n.title}</span>
-                              <span className="ml-auto text-[10.5px] text-ink-400 font-mono tabular-nums shrink-0">{timeShort(n.createdAt)}</span>
+                              <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border bg-transparent font-display text-micro font-bold uppercase shrink-0 ${meta.cls}`}>{meta.l}</span>
+                              <span className={`font-display text-body tracking-tight line-clamp-1 min-w-0 flex-1 ${isUnread ? 'font-bold text-ink-900' : 'font-medium text-ink-800'}`}>{n.title}</span>
+                              <span className="ml-auto text-meta text-ink-400 font-mono tabular-nums shrink-0">{timeShort(n.createdAt)}</span>
                             </div>
                             {n.body && (
-                              <div className="text-[12.5px] text-ink-600 mt-1 leading-[1.5] line-clamp-2">{n.body}</div>
+                              <div className="text-small text-ink-600 mt-1 line-clamp-2">{n.body}</div>
                             )}
                             <div className="mt-2 flex items-center gap-3">
                               {n.href && (
-                                <Link href={n.href} onClick={() => markOne(n.id)} className="font-display text-[12px] font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
+                                <Link href={n.href} onClick={() => markOne(n.id)} className="font-display text-meta font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
                                   ნახვა
                                 </Link>
                               )}
                               {isUnread && (
-                                <button type="button" onClick={() => markOne(n.id)} className="font-display text-[12px] font-semibold text-ink-500 hover:text-ink-900">
+                                <button type="button" onClick={() => markOne(n.id)} className="font-display text-meta font-semibold text-ink-500 hover:text-ink-900">
                                   წაკითხულად მონიშვნა
                                 </button>
                               )}

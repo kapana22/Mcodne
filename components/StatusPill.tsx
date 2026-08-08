@@ -15,7 +15,7 @@ const TONES: Record<Tone, { cls: string; label: string }> = {
 export function StatusPill({ tone, label }: { tone: Tone; label?: string }) {
   const t = TONES[tone]
   return (
-    <span className={`inline-flex items-center h-6 px-2.5 rounded-pill border bg-transparent font-display text-[10.5px] font-bold uppercase tracking-[0.16em] ${t.cls}`}>
+    <span className={`inline-flex items-center h-6 px-2.5 rounded-pill border bg-transparent font-display text-micro font-bold uppercase ${t.cls}`}>
       {label ?? t.label}
     </span>
   )

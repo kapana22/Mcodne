@@ -22,7 +22,7 @@ function NavRow({ item, badges }: { item: NavItem; badges: NavBadges }) {
     <Link
       href={item.href}
       aria-current={active ? 'page' : undefined}
-      className={`h-11 px-3 rounded-btn inline-flex items-center gap-3 font-display text-[13px] font-semibold transition-colors duration-fast ${
+      className={`h-11 px-3 rounded-btn inline-flex items-center gap-3 font-display text-small font-semibold transition-colors duration-fast ${
         active ? 'bg-brand-50 text-brand-800' : 'text-ink-700 hover:bg-ink-100/70 hover:text-ink-900'
       }`}
     >
@@ -30,7 +30,7 @@ function NavRow({ item, badges }: { item: NavItem; badges: NavBadges }) {
       <span className="flex-1 truncate">{item.label}</span>
       {count > 0 && (
         <span
-          className={`min-w-[20px] h-5 px-1.5 rounded-pill inline-flex items-center justify-center text-[10.5px] font-bold tabular-nums text-white ${
+          className={`min-w-[20px] h-5 px-1.5 rounded-pill inline-flex items-center justify-center text-meta font-bold tabular-nums text-white ${
             item.badgeKey === 'messages' ? 'bg-danger-500' : 'bg-brand-500'
           }`}
         >
@@ -72,7 +72,7 @@ export function WorkspaceSidebar({ badges }: { badges: NavBadges }) {
             <Eyebrow as="span">
               პროფილის სისრულე
             </Eyebrow>
-            <span className="font-display text-[13px] font-bold text-brand-700 tabular-nums">{percent}%</span>
+            <span className="font-display text-small font-bold text-brand-700 tabular-nums">{percent}%</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-pill bg-white border border-brand-100 overflow-hidden">
             <div

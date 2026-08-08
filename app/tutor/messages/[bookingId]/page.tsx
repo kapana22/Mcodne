@@ -48,8 +48,8 @@ export default function TutorMessageThreadPage() {
         <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-ink-100 text-ink-500 mb-3">
           <Icon.warn className="w-6 h-6" />
         </span>
-        <div className="font-display text-[15px] font-semibold text-ink-800">მიმოწერა ვერ მოიძებნა</div>
-        <p className="text-[12.5px] text-ink-500 mt-1">წაიშალა, ან არ არის შენი.</p>
+        <div className="font-display text-body-lg font-semibold text-ink-800">მიმოწერა ვერ მოიძებნა</div>
+        <p className="text-small text-ink-500 mt-1">წაიშალა, ან არ არის შენი.</p>
         <div className="mt-4"><Btn variant="secondary" size="sm" href="/tutor/messages">სიაში დაბრუნება</Btn></div>
       </div>
     )

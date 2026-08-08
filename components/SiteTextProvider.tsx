@@ -13,6 +13,14 @@ export function SiteTextProvider({ value, children }: { value: Record<string, st
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
+/** The whole resolved map. For a consumer that needs MANY keys chosen at
+ *  runtime (the help widget resolves one key per FAQ item) — calling
+ *  useSiteText in a loop would break the rules of hooks the moment the list
+ *  length changes. */
+export function useSiteTextMap(): Record<string, string> {
+  return useContext(Ctx) ?? SITE_TEXT_DEFAULTS
+}
+
 export function useSiteText(key: string): string {
   const map = useContext(Ctx)
   return map?.[key] ?? SITE_TEXT_DEFAULTS[key] ?? ''

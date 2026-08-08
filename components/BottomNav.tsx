@@ -36,9 +36,21 @@ const STUDENT_TABS: Tab[] = [
   // Bookings — the core object of the product — earns a tab.
   { href: '/student/bookings',  label: 'ჯავშნები',     icon: Icon.calendar, match: startsWith('/student/bookings') },
   // Messages — a marketplace conversation surface earns its own tab (mirrors
-  // the tutor nav). „შენახული" stays in the StudentAppBar rail + profile.
+  // the tutor nav).
   { href: '/student/messages',  label: 'მიმოწერა',      icon: Icon.chat,     match: startsWith('/student/messages') },
-  { href: '/student/profile',   label: 'პროფილი',      icon: Icon.user,     match: startsWith('/student/profile') },
+  // „შენახული" TOOK THE PROFILE SLOT (2026-07-31). The old comment above claimed
+  // saved-experts lived „in the StudentAppBar rail + profile" — but that rail is
+  // `hidden lg:flex` and the public header's heart was `hidden sm:`, so on a
+  // phone a student had NO route to their shortlist anywhere. It was reported to
+  // us as „the save function was deleted", which is exactly how an unreachable
+  // feature reads.
+  // Why PROFILE gave up the slot rather than „ექსპერტები": /tutors is the
+  // catalog — the core action of a marketplace — and must stay one tap away.
+  // The profile is a rare destination that ALREADY has a permanent entry point
+  // in the always-visible avatar menu (UserMenu → „პროფილი"), so it loses
+  // nothing by leaving the bar. A shortlist, by contrast, is used exactly while
+  // the visitor is deciding, which is the whole job of this nav.
+  { href: '/student/favorites', label: 'შენახული',     icon: Icon.heart,    match: startsWith('/student/favorites') },
 ]
 
 const TUTOR_TABS: Tab[] = [
@@ -58,9 +70,19 @@ export function BottomNav({ role }: { role: Role | null }) {
   const path = usePathname() ?? ''
   // Shared store (one poll app-wide, visibility-gated + cross-tab). Reads the
   // unread count for the profile/messages dot.
-  const { unreadCount: unread } = useNotifications()
+  //
+  // Gated on `role`: this component renders nothing for anonymous visitors, but
+  // the hook still ran for them and started a 90-second /api/notifications poll
+  // that 401s every time. Guests now subscribe to nothing.
+  const { unreadCount: unread } = useNotifications(role !== null)
 
-  const tabs = role ? TABS_BY_ROLE[role] : []
+  // SPACE-aware, not just role-aware. A dual-role expert (or an admin) who
+  // switches into the client space at /student got TUTOR tabs whose every
+  // destination bounced them straight back out — on mobile the switch was a
+  // trap. The path names the space the user is IN; the role only decides the
+  // default elsewhere.
+  const space = path.startsWith('/student') ? 'STUDENT' : path.startsWith('/tutor') ? 'TUTOR' : role
+  const tabs = role ? TABS_BY_ROLE[space === 'STUDENT' || space === 'TUTOR' ? space : role] ?? [] : []
   // Focused screens own the full viewport including the bottom edge, so the
   // tab bar steps aside there:
   //  • conversation threads (student AND tutor) — the composer owns the
@@ -102,7 +124,7 @@ export function BottomNav({ role }: { role: Role | null }) {
   return (
     <nav
       aria-label="მთავარი ნავიგაცია"
-      className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-ink-200"
+      className="lg:hidden fixed inset-x-0 bottom-0 z-chrome bg-white border-t border-ink-200"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <ul className={`grid h-16 ${tabs.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
@@ -111,13 +133,20 @@ export function BottomNav({ role }: { role: Role | null }) {
           const IconComp = tab.icon
           const isProfile = tab.href.endsWith('/profile')
           const isBell = tab.href === '/notifications' || tab.href.endsWith('/messages')
-          const showDot = (isProfile || isBell) && unread > 0
+          // The profile tab used to carry the SAME count as the messages tab —
+          // one unread message painted two identical red badges side by side in
+          // a four-tab bar, and neither told you which one to press. The count
+          // belongs to the destination that answers it. Measured 2026-07-30:
+          // one unread produced FOUR badges on a single screen (bell, avatar,
+          // messages tab, profile tab). This removes one of the two duplicates
+          // here; UserMenu drops the avatar badge.
+          const showDot = isBell && unread > 0
           return (
             <li key={tab.href}>
               <Link
                 href={tab.href}
                 aria-current={active ? 'page' : undefined}
-                className={`h-full flex flex-col items-center justify-center gap-1 text-[10.5px] font-display font-semibold tracking-tight transition-colors ${
+                className={`h-full flex flex-col items-center justify-center gap-1 text-meta font-display font-semibold tracking-tight transition-colors duration-fast ${
                   active ? 'text-brand-700' : 'text-ink-500 hover:text-ink-800'
                 }`}
               >
@@ -128,7 +157,7 @@ export function BottomNav({ role }: { role: Role | null }) {
                     // bare status dot). Caps at 9+ so it never overflows the tab.
                     <span
                       aria-label={`${unread} წაუკითხავი`}
-                      className="absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-danger-500 text-white ring-2 ring-white text-[9px] font-display font-bold leading-none inline-flex items-center justify-center tabular-nums"
+                      className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-danger-500 text-white ring-2 ring-white text-meta font-display font-bold leading-none inline-flex items-center justify-center tabular-nums"
                     >
                       {unread > 9 ? '9+' : unread}
                     </span>

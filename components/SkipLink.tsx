@@ -32,7 +32,7 @@ export function SkipLink() {
     <a
       href="#main"
       onClick={jumpToContent}
-      className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:h-11 focus:px-4 focus:rounded-btn focus:bg-brand-500 focus:text-white focus:font-display focus:font-semibold focus:text-[13px] focus:inline-flex focus:items-center focus:shadow-float"
+      className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-skip focus:h-11 focus:px-4 focus:rounded-btn focus:bg-brand-600 focus:text-white focus:font-display focus:font-semibold focus:text-small focus:inline-flex focus:items-center focus:shadow-float"
     >
       გადადი მთავარ შიგთავსზე
     </a>

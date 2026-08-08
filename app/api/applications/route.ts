@@ -4,21 +4,45 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { extractYouTubeId, canonicalYouTubeUrl } from '@/lib/youtube'
 import { notifyMany } from '@/lib/notify'
+import { after } from 'next/server'
+import { sendMail } from '@/lib/mailer'
+import { newApplicationAdminEmail } from '@/lib/emailTemplates'
+import {
+  APPLY,
+  applyValidationFailure,
+  bioError,
+  nameError,
+  phoneError,
+  priceError,
+  refine,
+  specialtyError,
+  urlError,
+  videoError,
+  yearsError,
+} from '@/lib/applyValidation'
 
+// EVERY rule below is a function from lib/applyValidation, which the /apply
+// form calls too. That is the whole point: a rule stated in two places is a
+// rule that will be stated differently, and the applicant is the one who finds
+// out — see the file header for the production failure that proves it.
 const Body = z.object({
-  fullName: z.string().min(2),
-  phone: z.string().min(6),
-  city: z.string().optional(),
-  specialty: z.string().min(2),
-  yearsExp: z.number().int().min(0).max(80),
-  hourlyRate: z.number().int().min(10).max(5000),
-  motivation: z.string().min(20).max(2000),
-  linkedinUrl: z.string().max(500).optional().nullable(),
-  websiteUrl: z.string().max(500).optional().nullable(),
+  fullName: z.string().superRefine(refine(nameError)),
+  // Optional since the 2026-07-28 onboarding simplification — the apply form no
+  // longer requires a phone number (the admin reaches applicants by email).
+  // `''` is accepted and normalised to undefined below so an empty input from
+  // an older cached client doesn't 400 with the useless generic INVALID.
+  phone: z.string().optional().nullable().superRefine(refine(phoneError)),
+  city: z.string().max(120).optional(),
+  specialty: z.string().superRefine(refine(specialtyError)),
+  yearsExp: z.number().superRefine(refine(yearsError)),
+  hourlyRate: z.number().superRefine(refine(priceError)),
+  motivation: z.string().superRefine(refine(v => bioError(v, APPLY.BIO_MIN_API))),
+  linkedinUrl: z.string().optional().nullable().superRefine(refine(v => urlError(v, 'LinkedIn-ის ბმული'))),
+  websiteUrl: z.string().optional().nullable().superRefine(refine(v => urlError(v, 'ვებგვერდის ბმული'))),
   // Intro video — YouTube URL (unlisted per our onboarding guidance). We
   // validate + extract the ID server-side and reject any URL we can't parse,
   // so what lands in the DB is always a real YouTube reference.
-  introVideoUrl: z.string().max(500).optional().nullable(),
+  introVideoUrl: z.string().optional().nullable().superRefine(refine(videoError)),
   professionData: z.record(z.string(), z.any()).optional().nullable(),
   // Verification docs — data: URLs (or https) produced by /api/uploads. Stored
   // admin-only on the application, never on the public profile.
@@ -26,6 +50,9 @@ const Body = z.object({
   selfieUrl: z.string().max(15_000_000).optional().nullable(),
   certificates: z.array(z.object({
     title: z.string().max(200),
+    // Captured on /apply since 2026-07-29 so the approved profile shows a real
+    // issuer instead of a placeholder. Optional — an expert may not know it.
+    issuer: z.string().max(200).optional(),
     url: z.string().max(35_000_000),
   })).max(20).optional().nullable(),
 })
@@ -76,16 +103,31 @@ export async function POST(req: Request) {
   // of the admin role and lock everyone out of /admin — the exact bug this
   // guards). Admins who want to inspect the flow can impersonate a student.
   if (user.role !== 'STUDENT') {
-    return NextResponse.json({ ok: false, error: 'ONLY_STUDENTS_CAN_APPLY' }, { status: 403 })
+    return NextResponse.json({
+      ok: false,
+      error: 'ONLY_STUDENTS_CAN_APPLY',
+      message: user.role === 'TUTOR'
+        ? 'შენ უკვე ექსპერტი ხარ — განაცხადი აღარ გჭირდება. პროფილს „ჩემი სივრციდან“ მართავ.'
+        : 'ამ ანგარიშიდან განაცხადს ვერ გააგზავნი. შედი როგორც სტუდენტი და სცადე თავიდან.',
+    }, { status: 403 })
   }
 
   // Email verification is intentionally NOT required to apply (removed
   // 2026-07-20) — the application is moderated by an admin regardless.
 
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
-  if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+  if (!parsed.success) {
+    // A 400 must always answer WHICH field and WHAT TO DO — the form uses
+    // `field` to jump the applicant there (even across steps) and renders
+    // `message` beside the input. `error` stays a stable code for the funnel.
+    const fail = applyValidationFailure(parsed.error)
+    return NextResponse.json(
+      { ok: false, error: fail.code, field: fail.field, message: fail.message },
+      { status: 400 },
+    )
+  }
 
-  const { linkedinUrl, websiteUrl, introVideoUrl, professionData, idDocUrl, selfieUrl, certificates, ...rest } = parsed.data
+  const { linkedinUrl, websiteUrl, introVideoUrl, professionData, idDocUrl, selfieUrl, certificates, phone, ...rest } = parsed.data
 
   // Normalize the intro video: extract the canonical 11-char ID; reject any
   // non-empty string that isn't a valid YouTube URL. Missing is fine (video
@@ -96,13 +138,23 @@ export async function POST(req: Request) {
   if (rawVideo) {
     introVideoId = extractYouTubeId(rawVideo)
     if (!introVideoId) {
-      return NextResponse.json({ ok: false, error: 'INVALID_VIDEO_URL' }, { status: 400 })
+      // Unreachable: the schema already ran videoError() (the same predicate) on
+      // this field. Kept as the belt to that pair of braces — and it answers
+      // with the same field + sentence, so it can never be a silent 400.
+      return NextResponse.json(
+        { ok: false, error: 'INVALID_VIDEO_URL', field: 'introVideoUrl', message: videoError(rawVideo) },
+        { status: 400 },
+      )
     }
     introVideoUrlNormalized = canonicalYouTubeUrl(introVideoId)
   }
 
   const data = {
     ...rest,
+    // TutorApplication.phone is NOT NULL in the schema, and phone became
+    // optional in onboarding — coerce a missing one to '' rather than adding a
+    // migration. The admin panel renders empty, which is the truth.
+    phone: phone?.trim() || '',
     linkedinUrl: linkedinUrl?.trim() || null,
     websiteUrl: websiteUrl?.trim() || null,
     introVideoUrl: introVideoUrlNormalized,
@@ -124,12 +176,33 @@ export async function POST(req: Request) {
   // admin happened to open the dashboard. APPLICATION_NEW is deliberately not
   // pref-gated (admin ops signal, like the GENERIC dispute pings).
   try {
-    const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } })
+    const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true, email: true } })
     await notifyMany(admins.map(a => a.id), {
       type: 'APPLICATION_NEW',
       title: 'ახალი განაცხადი',
       body: `${parsed.data.fullName} · ${parsed.data.specialty}`,
       href: '/admin#moderation',
+    })
+    // …and by EMAIL (2026-08-03). The bell alone only lands if an admin happens
+    // to open /admin — a submission could sit unreviewed for days because
+    // nobody was told. Off the response path (`after`) and fully guarded, since
+    // a mail failure must never fail a submit that already committed. NOT
+    // pref-gated: this is an ops signal to staff, like APPLICATION_NEW itself.
+    after(async () => {
+      try {
+        const { subject, html } = newApplicationAdminEmail({
+          name: parsed.data.fullName,
+          specialty: parsed.data.specialty,
+          city: parsed.data.city,
+          yearsExp: parsed.data.yearsExp,
+          rate: parsed.data.hourlyRate,
+          email: user.email,
+          phone: parsed.data.phone || null,
+        })
+        for (const a of admins) {
+          if (a.email) await sendMail({ to: a.email, subject, html })
+        }
+      } catch { /* email is best-effort */ }
     })
   } catch { /* notification is a side-effect — never fail the submit */ }
 

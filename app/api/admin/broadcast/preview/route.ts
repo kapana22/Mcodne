@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 
 const Segment = z.enum(['all', 'students', 'tutors', 'recent'])
 const Body = z.object({ segment: Segment })
@@ -22,7 +22,8 @@ function whereForSegment(segment: z.infer<typeof Segment>) {
 // Returns how many users would receive the broadcast for the chosen segment.
 // Zero write side-effects — just a Prisma count.
 export async function POST(req: Request) {
-  await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 

@@ -4,6 +4,14 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { CONSULTATION_DURATIONS } from '@/lib/consultation'
 import { extractYouTubeId, canonicalYouTubeUrl } from '@/lib/youtube'
+import { georgianRefine } from '@/lib/georgianText'
+
+/** First human-readable custom message from a zod error, if any. */
+function firstCustomMessage(err: { issues: { code: string; message: string }[] }): string | null {
+  const hit = err.issues.find(i => i.code === 'custom' && /[Ⴀ-ჿᲐ-Ჿ]/.test(i.message))
+  return hit?.message ?? null
+}
+
 
 // Very loose URL validator — we don't want to reject unusual TLDs or protocols
 // the tutor legitimately wants. Empty string is treated as "clear".
@@ -13,8 +21,8 @@ const optionalUrl = z.string().max(500).refine(
 ).nullable().optional()
 
 const Body = z.object({
-  headline: z.string().min(2).max(200).optional(),
-  bio: z.string().max(2000).nullable().optional(),
+  headline: z.string().min(2).max(200).superRefine(georgianRefine('ერთი წინადადება შენზე')).optional(),
+  bio: z.string().max(2000).superRefine(georgianRefine('აღწერა')).nullable().optional(),
   specialty: z.string().min(2).max(200).optional(),
   yearsExp: z.number().int().min(0).max(80).optional(),
   // Rate limits opened up — the old 10-5000 range was arbitrary and blocked
@@ -77,7 +85,12 @@ export async function PATCH(req: Request) {
   }
 
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
-  if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+  if (!parsed.success) {
+    // Surface OUR validation copy (e.g. the Georgian-language gate); zod's
+    // own English messages stay behind the generic code.
+    const msg = firstCustomMessage(parsed.error)
+    return NextResponse.json({ ok: false, error: msg ? 'INVALID_TEXT' : 'INVALID', message: msg ?? undefined }, { status: 400 })
+  }
 
   const data: any = {}
   const {

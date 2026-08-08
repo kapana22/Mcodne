@@ -7,6 +7,8 @@ import { Icon } from '@/components/Icon'
 import { Skeleton } from '@/components/Skeleton'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { Sheet } from '@/components/Sheet'
+// One source for what a publishable window is, shared with POST/PATCH.
+import { MAX_WINDOW_MS, windowErrorMessage, windowRangeError } from '@/lib/availabilityRules'
 import { useToast } from '@/components/ToastProvider'
 import { PageHeader } from '@/components/tutor/PageHeader'
 import { KA_MONTHS_SHORT, KA_WEEKDAYS_SHORT } from '@/lib/kaDate'
@@ -119,6 +121,8 @@ function tbInputValue(d: Date) {
 // is UTC, which between 00:00 and 04:00 Tbilisi still reads YESTERDAY and let
 // the expert block off a past date.
 function tbDateValue(d: Date) { return tbInputValue(d).slice(0, 10) }
+/** „HH:MM" in Tbilisi wall-clock — the other half of what the picker holds. */
+function tbTimeValue(d: Date) { return tbInputValue(d).slice(11, 16) }
 
 // Interpret a datetime-local "YYYY-MM-DDTHH:MM" value as Tbilisi wall-clock and
 // return the real UTC instant — MIRRORS the bulk route's `slotUtc`, so „10:00"
@@ -186,7 +190,18 @@ export default function TutorSchedulePage() {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [modalErr, setModalErr] = useState<string | null>(null)
-  const [form, setForm] = useState({ startAt: '', endAt: '' })
+  /* THE PICKER IS A DAY + A START + A LENGTH (2026-08-07).
+   *
+   * It was two `datetime-local` inputs. On a phone that is the native spinner
+   * twice — and the second one asks again for the DATE the expert had just
+   * tapped, then refuses the save if the end is not after the start (which is
+   * what happens by default, because the end does not follow the start). The
+   * owner's word for it was „არაკომფორტული"; the honest description is that
+   * publishing one hour took two date pickers and usually two attempts.
+   *
+   * `editId` is what makes this sheet do double duty: null = publish a new
+   * window, an id = PATCH that one. Before today there was no edit at all. */
+  const [form, setForm] = useState({ date: '', start: '', durMin: 60, editId: null as string | null })
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [blockOpen, setBlockOpen] = useState(false)
   const [blockForm, setBlockForm] = useState({ from: '', to: '' })
@@ -305,12 +320,9 @@ export default function TutorSchedulePage() {
       })
       const j = await res.json().catch(() => ({} as any))
       if (!res.ok || !j.ok) {
-        const map: Record<string, string> = {
-          BAD_RANGE: 'დროის დიაპაზონი არასწორია',
-          INVALID: 'შეავსე ყველა ველი',
-          NO_PROFILE: 'ექსპერტის პროფილი არ არსებობს',
-        }
-        setTplErr(map[j.error] ?? 'შექმნა ვერ მოხერხდა')
+        // Same vocabulary as the single-window sheet — the two used to describe
+        // an identical refusal in different words.
+        setTplErr(windowErrorMessage(j?.error))
         return
       }
       // Refresh slots list from server so the new rows appear in the grid.
@@ -534,56 +546,76 @@ export default function TutorSchedulePage() {
     // (`setHours` here was the bug: it wrote a BROWSER-local hour that the
     // submit path then re-read as Tbilisi.)
     const start = new Date(addDays(weekStart, dayIdx).getTime() + hour * 3_600_000)
-    // Default the manual add to a ONE-HOUR window. A row is a range the client
-    // picks a start inside, so defaulting to the expert's session length would
-    // publish a 15-წთ sliver that only the shortest service could ever use. The
-    // expert can widen (or shorten) the end time in the form.
-    const end = new Date(start.getTime() + 60 * 60_000)
-    setForm({ startAt: tbInputValue(start), endAt: tbInputValue(end) })
+    // ONE HOUR by default. A row is a range the client picks a start inside, so
+    // defaulting to the expert's session length would publish a 15-წთ sliver
+    // that only the shortest service could ever use.
+    setForm({ date: tbDateValue(start), start: tbTimeValue(start), durMin: 60, editId: null })
+    setModalErr(null)
     setModalOpen(true)
+  }
+
+  /** Same sheet, editing an existing window. */
+  const openEditFor = (slot: Slot) => {
+    const start = new Date(slot.startAt)
+    const mins = Math.round((new Date(slot.endAt).getTime() - start.getTime()) / 60_000)
+    setForm({ date: tbDateValue(start), start: tbTimeValue(start), durMin: mins, editId: slot.id })
+    setModalErr(null)
+    setModalOpen(true)
+  }
+
+  /** The instant pair the picker currently describes — null if incomplete. */
+  const formRange = (): { start: Date; end: Date } | null => {
+    if (!form.date || !form.start) return null
+    const start = tbilisiInstant(`${form.date}T${form.start}`)
+    if (!start || isNaN(start.getTime()) || !form.durMin) return null
+    return { start, end: new Date(start.getTime() + form.durMin * 60_000) }
   }
 
   const submitSlot = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true); setModalErr(null)
     try {
-      const start = tbilisiInstant(form.startAt)
-      const end = tbilisiInstant(form.endAt)
-      if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) {
-        setModalErr('არასწორი თარიღი'); return
-      }
-      if (end <= start) {
-        setModalErr('დასრულების დრო დაწყებაზე გვიან უნდა იყოს'); return
-      }
-      if (start < new Date()) {
-        setModalErr('დრო წარსულში ვერ იქნება'); return
-      }
-      const res = await fetch('/api/tutor/availability', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          startAt: start.toISOString(),
-          endAt: end.toISOString(),
-        }),
+      const range = formRange()
+      if (!range) { setModalErr(windowErrorMessage('INVALID')); return }
+      // The SAME predicate the API runs (lib/availabilityRules) — so the sheet
+      // can never let through something the server will refuse, and the two can
+      // never word the same refusal differently.
+      const editingSlot = form.editId ? (slots ?? []).find(s => s.id === form.editId) : undefined
+      const local = windowRangeError(range.start, range.end, new Date(), {
+        keepStart: editingSlot ? new Date(editingSlot.startAt) : undefined,
       })
-      const j = await res.json()
+      if (local) { setModalErr(windowErrorMessage(local)); return }
+
+      const editing = form.editId
+      const res = await fetch(editing ? `/api/tutor/availability/${editing}` : '/api/tutor/availability', {
+        method: editing ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startAt: range.start.toISOString(), endAt: range.end.toISOString() }),
+      })
+      const j = await res.json().catch(() => ({} as any))
       if (!res.ok || !j.ok) {
-        const map: Record<string, string> = {
-          BAD_RANGE: 'დასრულების დრო დაწყებაზე გვიან უნდა იყოს',
-          PAST_DATE: 'დრო წარსულში ვერ იქნება',
-          OVERLAP: 'ეს დრო უკვე დაკავებულია',
-          NO_PROFILE: 'ექსპერტის პროფილი არ არსებობს',
-          TOO_LONG: 'შუალედი მეტისმეტად გრძელია — დაყავი მოკლე შუალედებად',
-        }
-        setModalErr(map[j.error] ?? 'დროის დამატება ვერ მოხერხდა')
+        setModalErr(windowErrorMessage(j?.error))
         return
       }
-      // The range is stored as ONE window; `slots` stays tolerated for legacy
-      // responses that returned several rows.
-      const added = Array.isArray(j.slots) ? j.slots : j.slot ? [j.slot] : []
-      setSlots(prev => [...(prev ?? []), ...added])
-      setModalOpen(false)
-      toast('თავისუფალი შუალედი დაემატა', 'success')
+      if (editing) {
+        setSlots(prev => (prev ?? []).map(s => (s.id === editing ? { ...s, ...j.slot } : s)))
+        setModalOpen(false)
+        // Honesty: a resize can push an agreed session outside what is published.
+        // The session still stands — say so rather than letting it look cancelled.
+        toast(
+          j.outsideBookings > 0
+            ? `შუალედი შეიცვალა — ${j.outsideBookings} დაჯავშნილი სესია ძალაში რჩება`
+            : 'შუალედი შეიცვალა',
+          'success',
+        )
+      } else {
+        // The range is stored as ONE window; `slots` stays tolerated for legacy
+        // responses that returned several rows.
+        const added = Array.isArray(j.slots) ? j.slots : j.slot ? [j.slot] : []
+        setSlots(prev => [...(prev ?? []), ...added])
+        setModalOpen(false)
+        toast('თავისუფალი შუალედი დაემატა', 'success')
+      }
     } catch {
       setModalErr('ქსელის შეცდომა — სცადე თავიდან')
     } finally {
@@ -645,6 +677,10 @@ export default function TutorSchedulePage() {
   // Nothing published → nothing to clear; the button simply isn't there.
   const canClear = clearTarget.windows > 0
 
+  // The „პირველი ნაბიჯი" activation card owns the publish actions while it is
+  // on screen (see the toolbar above — it hides its duplicates then).
+  const firstStep = !loading && noFreeTime
+
   // Booked sessions inside the visible week (summary chip).
   const weekBooked = useMemo(() => {
     const weekEnd = addDays(weekStart, 7)
@@ -681,19 +717,22 @@ export default function TutorSchedulePage() {
             slot, wrapping below on mobile), then the chips/actions row. */}
         <div className="mb-5 lg:mb-6 space-y-3">
           <PageHeader
-            title="გრაფიკი"
+            // The h1 carries STATE (the week you are looking at) instead of
+            // repeating the highlighted sidebar label „გრაფიკი" 40px away —
+            // and the week range now exists in exactly one place, so the
+            // arrows are pure controls.
+            title={<>გრაფიკი <span className="font-normal text-ink-400 tabular-nums whitespace-nowrap">· {fmtRangeLabel(weekStart)}</span></>}
             // Every time on this screen is Tbilisi wall-clock — say so, so an
             // expert abroad never reads the grid as their own local time.
             sub="დრო და ჯავშნები · თბილისის დროით (UTC+4)"
             actions={
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="წინა კვირა"
-                        className="h-11 w-11 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center">
+                        className="h-11 w-11 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center transition-colors duration-fast">
                   <Icon.chevR className="w-4 h-4 rotate-180" />
                 </button>
-                <div className="flex-1 lg:flex-none text-center font-display text-[13px] font-semibold text-ink-800 tabular-nums px-2 whitespace-nowrap">{fmtRangeLabel(weekStart)}</div>
                 <button type="button" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="შემდეგი კვირა"
-                        className="h-11 w-11 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center">
+                        className="h-11 w-11 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 inline-flex items-center justify-center transition-colors duration-fast">
                   <Icon.chevR className="w-4 h-4" />
                 </button>
               </div>
@@ -703,7 +742,7 @@ export default function TutorSchedulePage() {
               actually gets published at scale; one-off slots and vacation
               are the quieter secondaries. */}
           <div className="flex flex-wrap items-center gap-2 lg:justify-between">
-            <div className="flex items-center gap-2 flex-wrap text-[12px]">
+            <div className="flex items-center gap-2 flex-wrap text-meta">
               {/* Free time as a DURATION: rows are windows, so „3 თავისუფალი
                   დრო" would be a lie about three ranges of unknown length. */}
               <span className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border font-display font-semibold ${
@@ -717,14 +756,22 @@ export default function TutorSchedulePage() {
                 {loading ? '…' : `${weekBooked} ჯავშანი ამ კვირაში`}
               </span>
             </div>
+            {/* When the „პირველი ნაბიჯი" card below is up it carries these very
+                two buttons (same handlers, ~120px lower), so the toolbar drops
+                its copies — one action, one place. „შვებულება" has no twin and
+                stays either way. */}
             <div className="grid grid-cols-2 lg:flex lg:items-center gap-2 w-full lg:w-auto">
-              <Btn variant="primary" size="md" className="col-span-2 lg:col-span-1 lg:h-9 lg:px-3.5 lg:text-[12.5px]" onClick={() => setTplOpen(true)}>
-                <Icon.calendar className="w-4 h-4" /> ყოველკვირეული განრიგი
-              </Btn>
-              <Btn variant="secondary" size="md" className="lg:h-9 lg:px-3.5 lg:text-[12.5px]" onClick={() => openModalFor(selectedDay, 9)}>
-                <Icon.plus className="w-4 h-4" /> შუალედი
-              </Btn>
-              <Btn variant="ghost" size="md" className="lg:h-9 lg:px-3.5 lg:text-[12.5px]" onClick={() => setBlockOpen(true)}>
+              {!firstStep && (
+                <>
+                  <Btn variant="primary" size="md" className="col-span-2 lg:col-span-1 lg:h-9 lg:px-3.5 lg:text-small" onClick={() => setTplOpen(true)}>
+                    <Icon.calendar className="w-4 h-4" /> ყოველკვირეული განრიგი
+                  </Btn>
+                  <Btn variant="secondary" size="md" className="lg:h-9 lg:px-3.5 lg:text-small" onClick={() => openModalFor(selectedDay, 9)}>
+                    <Icon.plus className="w-4 h-4" /> შუალედი
+                  </Btn>
+                </>
+              )}
+              <Btn variant="ghost" size="md" className={`lg:h-9 lg:px-3.5 lg:text-small ${firstStep ? 'col-span-2' : ''}`} onClick={() => setBlockOpen(true)}>
                 შვებულება
               </Btn>
             </div>
@@ -732,7 +779,7 @@ export default function TutorSchedulePage() {
         </div>
 
         {err && (
-          <div className="mb-4 p-4 rounded-card bg-danger-50 border border-danger-200 text-danger-700 text-[13px] flex items-start justify-between gap-3">
+          <div className="mb-4 p-4 rounded-card bg-danger-50 border border-danger-200 text-danger-700 text-small flex items-start justify-between gap-3">
             <span className="min-w-0">{err}</span>
             <button
               type="button"
@@ -750,11 +797,11 @@ export default function TutorSchedulePage() {
             an invitation (hairline card, no alarm fill) and the pre-filled
             ორშ–პარ 10:00–18:00 template is the obvious first action. Opening it
             only FILLS the form; „შექმნა" inside the sheet publishes. */}
-        {!loading && noFreeTime && (
+        {firstStep && (
           <div className="mb-4 rounded-card border border-ink-200 bg-white p-5 sm:p-6">
             <Eyebrow>პირველი ნაბიჯი</Eyebrow>
-            <h2 className="mt-1.5 font-display text-[16px] sm:text-[17px] font-bold text-ink-900">გამოაქვეყნე შენი თავისუფალი დრო</h2>
-            <p className="mt-1.5 text-[13px] text-ink-600 leading-snug max-w-[62ch]">
+            <h2 className="mt-1.5 font-display text-body-lg sm:text-h3 font-bold text-ink-900">გამოაქვეყნე შენი თავისუფალი დრო</h2>
+            <p className="mt-1.5 text-small text-ink-600 leading-snug max-w-[62ch]">
               სანამ დროს არ გამოაქვეყნებ, პროფილიდან ვერავინ დაგიჯავშნის. განრიგი უკვე შევსებულია — ორშაბათიდან პარასკევამდე, 10:00–18:00 თბილისის დროით. გახსენი, გამორთე დღეები ან შეცვალე საათები და გამოაქვეყნე.
             </p>
             <div className="mt-4 flex flex-col sm:flex-row gap-2">
@@ -832,17 +879,17 @@ export default function TutorSchedulePage() {
                     onClick={() => setSelectedDay(i)}
                     aria-pressed={sel}
                     aria-label={`${d} ${tbDayNum(day)} — ${c.bookings} ჯავშანი, ${fmtDur(c.freeMin)} თავისუფალი დრო`}
-                    className={`h-[56px] rounded-btn border flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                    className={`h-[56px] rounded-btn border flex flex-col items-center justify-center gap-0.5 transition-colors duration-fast ${
                       sel ? 'bg-ink-900 border-ink-900 text-white' : 'bg-white border-ink-200 text-ink-800 hover:border-ink-300'
                     }`}
                   >
-                    <span className={`font-display text-[10px] font-semibold uppercase tracking-[0.1em] ${sel ? 'text-white/70' : 'text-ink-500'}`}>{d}</span>
-                    <span className={`text-[14px] font-bold tabular-nums leading-none ${!sel && isToday ? 'text-brand-700' : ''}`}>{tbDayNum(day)}</span>
+                    <span className={`font-display text-micro font-semibold uppercase ${sel ? 'text-white/70' : 'text-ink-500'}`}>{d}</span>
+                    <span className={`text-body font-bold tabular-nums leading-none ${!sel && isToday ? 'text-brand-700' : ''}`}>{tbDayNum(day)}</span>
                     {/* Counts, not status dots (canon bans dots) — and a number
                         actually says HOW busy the day is. Colored text only, no
                         fill: bookings count first, then free time as a duration
                         (a single 8-hour window is „8სთ", never „1"). */}
-                    <span aria-hidden className="flex items-center gap-1 h-3 text-[9.5px] font-display font-bold tabular-nums leading-none">
+                    <span aria-hidden className="flex items-center gap-1 h-3 text-meta font-display font-bold tabular-nums leading-none">
                       {c.bookings > 0 && <span className={sel ? 'text-white' : 'text-brand-700'}>{c.bookings}</span>}
                       {c.freeMin > 0 && (
                         <span className={sel ? 'text-white/55' : 'text-ink-400'}>
@@ -857,7 +904,7 @@ export default function TutorSchedulePage() {
 
             {dayEntries.length === 0 ? (
               <div className="rounded-card border border-ink-200 bg-white p-6 text-center">
-                <p className="text-[13.5px] text-ink-600">ამ დღეს არაფერი გაქვს</p>
+                <p className="text-body text-ink-600">ამ დღეს არაფერი გაქვს</p>
                 <Btn variant="secondary" size="md" className="mt-4 w-full" onClick={() => openModalFor(selectedDay, 9)}>
                   <Icon.plus className="w-4 h-4" /> დროის დამატება
                 </Btn>
@@ -869,29 +916,29 @@ export default function TutorSchedulePage() {
                     <Link
                       key={`b-${e.booking.id}`}
                       href={`/tutor/bookings/${e.booking.id}`}
-                      className="flex items-center gap-3 p-4 min-h-[64px] active:bg-ink-50 transition-colors"
+                      className="flex items-center gap-3 p-4 min-h-[64px] active:bg-ink-50 transition-colors duration-fast"
                     >
                       <div className="w-[72px] shrink-0">
-                        <div className="text-[13.5px] font-display font-bold text-ink-900 tabular-nums">{fmtTime(e.booking.startAt)}</div>
-                        <div className="text-[11px] text-ink-400 tabular-nums">{e.booking.durationMin} წთ</div>
+                        <div className="text-body font-display font-bold text-ink-900 tabular-nums">{fmtTime(e.booking.startAt)}</div>
+                        <div className="text-meta text-ink-400 tabular-nums">{e.booking.durationMin} წთ</div>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-[13.5px] font-display font-bold text-ink-900 truncate">{e.booking.student?.fullName ?? 'ჯავშანი'}</div>
-                        <div className="text-[12.5px] text-ink-500 truncate">{e.booking.topic}</div>
+                        <div className="text-body font-display font-bold text-ink-900 truncate">{e.booking.student?.fullName ?? 'ჯავშანი'}</div>
+                        <div className="text-small text-ink-500 truncate">{e.booking.topic}</div>
                       </div>
-                      <span className="shrink-0 h-6 px-2 rounded-pill bg-brand-50 text-brand-700 text-[10.5px] font-display font-bold inline-flex items-center">ჯავშანი</span>
+                      <span className="shrink-0 h-6 px-2 rounded-pill bg-brand-50 text-brand-700 text-meta font-display font-bold inline-flex items-center">ჯავშანი</span>
                       <Icon.chevR className="w-4 h-4 text-ink-300 shrink-0" />
                     </Link>
                   ) : (
                     <div key={`s-${e.slot.id}`} className="flex items-center gap-3 p-4 min-h-[64px]">
                       <div className="w-[72px] shrink-0">
-                        <div className="text-[13.5px] font-display font-bold text-ink-900 tabular-nums">{fmtTime(e.slot.startAt)}</div>
-                        <div className="text-[11px] text-ink-400 tabular-nums">— {fmtTime(e.slot.endAt)}</div>
+                        <div className="text-body font-display font-bold text-ink-900 tabular-nums">{fmtTime(e.slot.startAt)}</div>
+                        <div className="text-meta text-ink-400 tabular-nums">— {fmtTime(e.slot.endAt)}</div>
                       </div>
                       {/* A row is a WINDOW — say how much of it is still free, not
                           just that it exists („ხელმისაწვდომია" read as one
                           bookable session, and ignored bookings sitting inside). */}
-                      <div className="min-w-0 flex-1 text-[13px]">
+                      <div className="min-w-0 flex-1 text-small">
                         {(() => {
                           const from = new Date(e.slot.startAt).getTime()
                           const to = new Date(e.slot.endAt).getTime()
@@ -902,6 +949,17 @@ export default function TutorSchedulePage() {
                             : <span className="text-success-700 font-display font-semibold">თავისუფალი · {fmtDur(free)}</span>
                         })()}
                       </div>
+                      {/* Edit first, delete second — a schedule is corrected far
+                          more often than it is withdrawn, and until 2026-08-07
+                          only the second of these existed. */}
+                      <button
+                        type="button"
+                        onClick={() => openEditFor(e.slot)}
+                        aria-label={`შუალედის შეცვლა — ${fmtTime(e.slot.startAt)}–${fmtTime(e.slot.endAt)}`}
+                        className="shrink-0 w-11 h-11 rounded-btn border border-ink-200 text-ink-500 hover:text-brand-700 hover:border-brand-300 hover:bg-brand-50 inline-flex items-center justify-center transition-colors duration-fast"
+                      >
+                        <Icon.edit className="w-4 h-4" />
+                      </button>
                       {/* Every window is deletable — the DELETE route never
                           touches the sessions inside one, and the confirm
                           dialog says how many stay in force. Gating this on the
@@ -911,7 +969,7 @@ export default function TutorSchedulePage() {
                         onClick={() => setConfirmDeleteId(e.slot.id)}
                         disabled={deletingId === e.slot.id}
                         aria-label="შუალედის წაშლა"
-                        className="shrink-0 w-11 h-11 rounded-btn border border-ink-200 text-ink-500 hover:text-danger-600 hover:border-danger-300 hover:bg-danger-50 inline-flex items-center justify-center transition-colors disabled:opacity-50"
+                        className="shrink-0 w-11 h-11 rounded-btn border border-ink-200 text-ink-500 hover:text-danger-600 hover:border-danger-300 hover:bg-danger-50 inline-flex items-center justify-center transition-colors duration-fast disabled:opacity-50"
                       >
                         <Icon.close className="w-4 h-4" />
                       </button>
@@ -921,7 +979,7 @@ export default function TutorSchedulePage() {
                 <button
                   type="button"
                   onClick={() => openModalFor(selectedDay, 9)}
-                  className="w-full p-4 min-h-[56px] text-[13px] font-display font-semibold text-brand-700 hover:bg-brand-50/50 active:bg-brand-50 inline-flex items-center justify-center gap-2 transition-colors"
+                  className="w-full p-4 min-h-[56px] text-small font-display font-semibold text-brand-700 hover:bg-brand-50/50 active:bg-brand-50 inline-flex items-center justify-center gap-2 transition-colors duration-fast"
                 >
                   <Icon.plus className="w-4 h-4" /> დროის დამატება ამ დღეს
                 </button>
@@ -941,7 +999,7 @@ export default function TutorSchedulePage() {
                 return (
                   <div key={d} className="px-2 py-3 text-center border-l border-ink-200">
                     <Eyebrow tone="muted">{d}</Eyebrow>
-                    <div className={`text-[13px] font-bold tabular-nums ${isToday ? 'text-brand-700' : 'text-ink-800'}`}>{tbDayNum(day)}</div>
+                    <div className={`text-small font-bold tabular-nums ${isToday ? 'text-brand-700' : 'text-ink-800'}`}>{tbDayNum(day)}</div>
                   </div>
                 )
               })}
@@ -949,7 +1007,7 @@ export default function TutorSchedulePage() {
             <div className="max-h-[600px] overflow-y-auto">
               {hours.map(h => (
                 <div key={h} className="grid grid-cols-[64px_repeat(7,1fr)] border-b border-ink-100 min-h-[64px]">
-                  <div className="px-2 py-2 text-[11px] font-mono text-ink-400 border-r border-ink-100 tabular-nums">
+                  <div className="px-2 py-2 text-meta font-mono text-ink-400 border-r border-ink-100 tabular-nums">
                     {String(h).padStart(2, '0')}:00
                   </div>
                   {Array.from({ length: 7 }, (_, dayIdx) => {
@@ -976,7 +1034,7 @@ export default function TutorSchedulePage() {
                           type="button"
                           onClick={() => openModalFor(dayIdx, h)}
                           aria-label={`დროის დამატება — ${DAY_LABELS[dayIdx]} ${tbDayNum(addDays(weekStart, dayIdx))}, ${String(h).padStart(2, '0')}:00`}
-                          className="absolute inset-0 group-hover:bg-brand-50/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400"
+                          className="absolute inset-0 group-hover:bg-brand-50/40 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400"
                         />
                         {cellBookings.map(b => (
                           // Click booking pill → open booking detail. Sibling of
@@ -985,10 +1043,10 @@ export default function TutorSchedulePage() {
                           <Link
                             key={b.id}
                             href={`/tutor/bookings/${b.id}`}
-                            className="relative z-10 block rounded-field bg-white border border-ink-200 border-l-[3px] border-l-brand-500 text-ink-800 px-1.5 py-1 mb-1 hover:border-ink-300 hover:shadow-xs transition-all"
+                            className="relative z-10 block rounded-field bg-white border border-ink-200 border-l-[3px] border-l-brand-500 text-ink-800 px-1.5 py-1 mb-1 hover:border-ink-300 hover:shadow-xs transition-all duration-fast"
                           >
-                            <div className="text-[10.5px] font-display font-bold truncate">{b.student?.fullName ?? 'ჯავშანი'}</div>
-                            <div className="text-[10px] truncate text-ink-500">{b.topic}</div>
+                            <div className="text-meta font-display font-bold truncate">{b.student?.fullName ?? 'ჯავშანი'}</div>
+                            <div className="text-meta truncate text-ink-500">{b.topic}</div>
                           </Link>
                         ))}
                         {cellSlots.map(s => {
@@ -1003,37 +1061,47 @@ export default function TutorSchedulePage() {
                           const past = to <= Date.now()
                           const spent = free === 0                    // fully booked, or already gone
                           const state = past ? 'გასული' : spent ? 'სრულად დაჯავშნილი' : `თავისუფალი ${fmtDur(free)}`
-                          const chipInner = (
-                            <div className="text-[10.5px] font-display font-bold flex items-center justify-between gap-1">
-                              <span className="tabular-nums truncate">{fmtTime(s.startAt)}–{fmtTime(s.endAt)}</span>
-                              <span className="sr-only">{state}</span>
-                              <span aria-hidden className="text-[9px] opacity-0 group-hover/slot:opacity-100 transition-opacity">{deletingId === s.id ? '…' : '×'}</span>
-                            </div>
-                          )
-                          // EVERY window deletes via a real button (keyboard +
-                          // screen-reader operable): the DELETE route leaves the
-                          // sessions inside untouched, so „ვერ წაიშლება" was never
-                          // true — it was the legacy flag freezing old rows. Spent
-                          // windows only lose the green.
+                          // TAPPING A WINDOW EDITS IT; DELETE IS ITS OWN BUTTON
+                          // (2026-08-07). The whole chip used to be the delete
+                          // control — the only thing you could do to a published
+                          // window was destroy it, and the „×" was a decorative
+                          // span, so the real hit area was the range itself. Two
+                          // SIBLING buttons now (never nested — the cell's
+                          // add-slot button is already an ancestor layer).
                           return (
-                            <button
+                            <div
                               key={s.id}
-                              type="button"
-                              onClick={() => setConfirmDeleteId(s.id)}
-                              aria-label={`შუალედის წაშლა — ${fmtTime(s.startAt)}–${fmtTime(s.endAt)} · ${state}`}
-                              title={`${state} — დააკლიკე წასაშლელად`}
-                              className={`group/slot relative z-10 block w-full text-left rounded-field px-1.5 py-1 mb-1 transition-colors cursor-pointer hover:bg-danger-50 hover:border-danger-200 hover:text-danger-700 ${
+                              className={`group/slot relative z-10 flex items-stretch rounded-field mb-1 overflow-hidden border ${
                                 spent
-                                  ? 'bg-ink-50 border border-ink-200 text-ink-500'
-                                  : 'bg-brand-50 border border-brand-100 text-brand-800'
+                                  ? 'bg-ink-50 border-ink-200 text-ink-500'
+                                  : 'bg-brand-50 border-brand-100 text-brand-800'
                               }`}
                             >
-                              {chipInner}
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => openEditFor(s)}
+                                aria-label={`შუალედის შეცვლა — ${fmtTime(s.startAt)}–${fmtTime(s.endAt)} · ${state}`}
+                                title={`${state} — დააკლიკე შესაცვლელად`}
+                                className="min-w-0 flex-1 text-left px-1.5 py-1 hover:bg-white/60 transition-colors duration-fast"
+                              >
+                                <div className="text-meta font-display font-bold tabular-nums truncate">{fmtTime(s.startAt)}–{fmtTime(s.endAt)}</div>
+                                <span className="sr-only">{state}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(s.id)}
+                                disabled={deletingId === s.id}
+                                aria-label={`შუალედის წაშლა — ${fmtTime(s.startAt)}–${fmtTime(s.endAt)}`}
+                                title="წაშლა"
+                                className="shrink-0 w-6 inline-flex items-center justify-center text-meta opacity-0 group-hover/slot:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-danger-100 hover:text-danger-700 transition-opacity duration-fast"
+                              >
+                                {deletingId === s.id ? '…' : '×'}
+                              </button>
+                            </div>
                           )
                         })}
                         {cellBookings.length === 0 && cellSlots.length === 0 && (
-                          <div className="pointer-events-none opacity-0 group-hover:opacity-100 text-ink-400 text-[10px] p-1 transition">+ დამატება</div>
+                          <div className="pointer-events-none opacity-0 group-hover:opacity-100 text-ink-400 text-meta p-1 transition duration-fast">+ დამატება</div>
                         )}
                       </div>
                     )
@@ -1045,7 +1113,7 @@ export default function TutorSchedulePage() {
               <button
                 type="button"
                 onClick={() => setAllHours(v => !v)}
-                className="text-[11.5px] font-display font-semibold text-ink-500 hover:text-ink-800 inline-flex items-center gap-1.5 transition-colors"
+                className="text-meta font-display font-semibold text-ink-500 hover:text-ink-800 inline-flex items-center gap-1.5 transition-colors duration-fast"
               >
                 <Icon.clock className="w-3.5 h-3.5" />
                 {allHours ? 'ძირითადი საათები (08–22)' : 'ყველა საათი (24სთ)'}
@@ -1061,7 +1129,7 @@ export default function TutorSchedulePage() {
               published to withdraw. */}
           {canClear && (
             <div className="mt-4 rounded-card border border-ink-200 bg-white px-4 py-3.5 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <p className="text-[12.5px] text-ink-500 leading-snug min-w-0">
+              <p className="text-small text-ink-500 leading-snug min-w-0">
                 გინდა თავიდან დაიწყო? „სრულად წაშლა“ მოხსნის ყველა მომავალ შუალედს — დაჯავშნილი სესიები ძალაში რჩება.
               </p>
               <Btn variant="danger" size="md" className="w-full sm:w-auto shrink-0" onClick={() => setConfirmClear(true)}>
@@ -1077,34 +1145,93 @@ export default function TutorSchedulePage() {
         onClose={() => { setModalOpen(false); setModalErr(null) }}
         size="sm"
         busy={saving}
-        title="თავისუფალი დროის დამატება"
+        title={form.editId ? 'შუალედის შეცვლა' : 'თავისუფალი დროის დამატება'}
         footer={
           <>
             <Btn variant="ghost" size="md" type="button" onClick={() => { setModalOpen(false); setModalErr(null) }}>გაუქმება</Btn>
             <Btn variant="primary" size="md" type="submit" form="add-slot-form" disabled={saving}>
-              {saving ? 'ინახება…' : 'დამატება'}
+              {saving ? 'ინახება…' : form.editId ? 'შენახვა' : 'დამატება'}
             </Btn>
           </>
         }
       >
             <form id="add-slot-form" onSubmit={submitSlot} className="space-y-4">
-              <p className="text-[12.5px] text-ink-500 leading-snug">
-                მიუთითე შუალედი, რომელშიც თავისუფალი ხარ — კლიენტი დაწყებას მის შიგნით აირჩევს, სერვისის ხანგრძლივობის მიხედვით. დრო თბილისის დროითაა (UTC+4) — სწორედ ასე დაინახავს კლიენტი.
+              <p className="text-small text-ink-500 leading-snug">
+                მიუთითე შუალედი, რომელშიც თავისუფალი ხარ — სტუდენტი დაწყებას მის შიგნით აირჩევს, სერვისის ხანგრძლივობის მიხედვით. დრო თბილისის დროითაა (UTC+4) — სწორედ ასე დაინახავს სტუდენტი.
               </p>
-              <div>
-                <Eyebrow as="label" htmlFor="slot-start" tone="muted" className="block mb-1.5">დაწყება</Eyebrow>
-                <input id="slot-start" type="datetime-local" required value={form.startAt}
-                       onChange={e => setForm({ ...form, startAt: e.target.value })}
-                       className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Eyebrow as="label" htmlFor="slot-date" tone="muted" className="block mb-1.5">დღე</Eyebrow>
+                  <input id="slot-date" type="date" required value={form.date}
+                         onChange={e => setForm({ ...form, date: e.target.value })}
+                         className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-400 focus:outline-none" />
+                </div>
+                <div>
+                  <Eyebrow as="label" htmlFor="slot-start" tone="muted" className="block mb-1.5">დაწყება</Eyebrow>
+                  {/* 15-minute steps: the granularity real availability is
+                      published at, and it keeps the native picker short. */}
+                  <input id="slot-start" type="time" required step={900} value={form.start}
+                         onChange={e => setForm({ ...form, start: e.target.value })}
+                         className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 tabular-nums focus:border-brand-400 focus:outline-none" />
+                </div>
               </div>
+
+              {/* LENGTH, not an end time. The end is arithmetic — asking for it
+                  was asking the expert to do the sum, and to re-enter the date
+                  to do it. Chips cover what people actually publish; ±30წთ
+                  covers everything else without a second picker. */}
               <div>
-                <Eyebrow as="label" htmlFor="slot-end" tone="muted" className="block mb-1.5">დასრულება</Eyebrow>
-                <input id="slot-end" type="datetime-local" required value={form.endAt}
-                       onChange={e => setForm({ ...form, endAt: e.target.value })}
-                       className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                <Eyebrow as="span" id="slot-dur-label" tone="muted" className="block mb-1.5">ხანგრძლივობა</Eyebrow>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="slot-dur-label">
+                  {[60, 120, 180, 240, 480].map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      aria-pressed={form.durMin === m}
+                      onClick={() => setForm({ ...form, durMin: m })}
+                      className={`h-11 px-3.5 rounded-pill border font-display text-small font-semibold tabular-nums inline-flex items-center transition-colors duration-fast ${
+                        form.durMin === m
+                          ? 'bg-brand-600 text-white border-brand-600'
+                          : 'bg-white text-ink-700 border-ink-200 hover:border-ink-400'
+                      }`}
+                    >
+                      {fmtDur(m)}
+                    </button>
+                  ))}
+                  <span className="inline-flex items-center gap-1">
+                    <button
+                      type="button"
+                      aria-label="ხანგრძლივობის შემცირება ნახევარი საათით"
+                      disabled={form.durMin <= 30}
+                      onClick={() => setForm({ ...form, durMin: Math.max(30, form.durMin - 30) })}
+                      className="w-11 h-11 rounded-btn border border-ink-200 bg-white text-ink-600 hover:border-ink-400 disabled:opacity-40 inline-flex items-center justify-center transition-colors duration-fast"
+                    >−30</button>
+                    <button
+                      type="button"
+                      aria-label="ხანგრძლივობის გაზრდა ნახევარი საათით"
+                      disabled={form.durMin >= MAX_WINDOW_MS / 60_000}
+                      onClick={() => setForm({ ...form, durMin: Math.min(MAX_WINDOW_MS / 60_000, form.durMin + 30) })}
+                      className="w-11 h-11 rounded-btn border border-ink-200 bg-white text-ink-600 hover:border-ink-400 disabled:opacity-40 inline-flex items-center justify-center transition-colors duration-fast"
+                    >+30</button>
+                  </span>
+                </div>
               </div>
+
+              {/* Exactly what will be published, in the expert's own words,
+                  before they commit to it. */}
+              {(() => {
+                const r = formRange()
+                if (!r) return null
+                return (
+                  <p className="rounded-btn bg-ink-50 border border-ink-200 px-3 py-2.5 text-small text-ink-800">
+                    <span className="font-display font-bold tabular-nums">{fmtTime(r.start.toISOString())}–{fmtTime(r.end.toISOString())}</span>
+                    <span className="text-ink-500"> · {fmtDur(form.durMin)} · გამოქვეყნდება როგორც ერთი შუალედი</span>
+                  </p>
+                )
+              })()}
+
               {modalErr && (
-                <div className="p-2.5 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[12.5px]">
+                <div role="alert" className="p-2.5 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-small">
                   {modalErr}
                 </div>
               )}
@@ -1126,8 +1253,8 @@ export default function TutorSchedulePage() {
           </>
         }
       >
-            <p className="text-[12.5px] text-ink-500 mb-4 leading-snug">
-              ორშ–პარ 10:00–18:00 უკვე მონიშნულია — გამორთე დღეები ან შეცვალე საათები, თუ სხვანაირად გირჩევნია. თითოეული დღე ერთ თავისუფალ შუალედად დაემატება და გამეორდება არჩეულ კვირებზე; კლიენტი დაწყებას შუალედის შიგნით აირჩევს, სერვისის ხანგრძლივობის მიხედვით. საათები თბილისის დროითაა (UTC+4); გადამფარავი შუალედები გამოტოვდება.
+            <p className="text-small text-ink-500 mb-4 leading-snug">
+              ორშ–პარ 10:00–18:00 უკვე მონიშნულია — გამორთე დღეები ან შეცვალე საათები, თუ სხვანაირად გირჩევნია. თითოეული დღე ერთ თავისუფალ შუალედად დაემატება და გამეორდება არჩეულ კვირებზე; სტუდენტი დაწყებას შუალედის შიგნით აირჩევს, სერვისის ხანგრძლივობის მიხედვით. საათები თბილისის დროითაა (UTC+4); გადამფარავი შუალედები გამოტოვდება.
             </p>
             <form id="weekly-template-form" onSubmit={submitTemplate} className="space-y-5">
               <div>
@@ -1142,7 +1269,7 @@ export default function TutorSchedulePage() {
                       key={p.label}
                       type="button"
                       onClick={() => applyTplPreset(p.days, p.start, p.end)}
-                      className="h-8 px-3 rounded-pill border border-ink-200 bg-white text-ink-700 text-[12px] font-display font-semibold inline-flex items-center hover:border-ink-300 hover:bg-ink-50 transition-colors"
+                      className="h-8 px-3 rounded-pill border border-ink-200 bg-white text-ink-700 text-meta font-display font-semibold inline-flex items-center hover:border-ink-300 hover:bg-ink-50 transition-colors duration-fast"
                     >
                       {p.label}
                     </button>
@@ -1159,21 +1286,21 @@ export default function TutorSchedulePage() {
                     <button
                       type="button"
                       onClick={() => setTplDays([true, true, true, true, true, false, false])}
-                      className="h-7 px-2 rounded-btn text-[11.5px] font-display font-semibold text-ink-500 hover:text-ink-800 hover:bg-ink-50 transition-colors"
+                      className="h-7 px-2 rounded-btn text-meta font-display font-semibold text-ink-500 hover:text-ink-800 hover:bg-ink-50 transition-colors duration-fast"
                     >
                       სამუშაო დღეები
                     </button>
                     <button
                       type="button"
                       onClick={() => setTplDays([true, true, true, true, true, true, true])}
-                      className="h-7 px-2 rounded-btn text-[11.5px] font-display font-semibold text-ink-500 hover:text-ink-800 hover:bg-ink-50 transition-colors"
+                      className="h-7 px-2 rounded-btn text-meta font-display font-semibold text-ink-500 hover:text-ink-800 hover:bg-ink-50 transition-colors duration-fast"
                     >
                       ყველა
                     </button>
                     <button
                       type="button"
                       onClick={() => setTplDays([false, false, false, false, false, false, false])}
-                      className="h-7 px-2 rounded-btn text-[11.5px] font-display font-semibold text-ink-500 hover:text-ink-800 hover:bg-ink-50 transition-colors"
+                      className="h-7 px-2 rounded-btn text-meta font-display font-semibold text-ink-500 hover:text-ink-800 hover:bg-ink-50 transition-colors duration-fast"
                     >
                       გასუფთავება
                     </button>
@@ -1186,9 +1313,9 @@ export default function TutorSchedulePage() {
                       type="button"
                       aria-pressed={tplDays[i]}
                       onClick={() => setTplDays(prev => prev.map((v, j) => j === i ? !v : v))}
-                      className={`h-11 rounded-btn font-display font-bold text-[12px] tracking-wide border transition-colors ${
+                      className={`h-11 rounded-btn font-display font-bold text-meta tracking-wide border transition-colors duration-fast ${
                         tplDays[i]
-                          ? 'bg-brand-500 border-brand-500 text-white'
+                          ? 'bg-brand-600 border-brand-600 text-white'
                           : 'bg-white border-ink-200 text-ink-700 hover:border-ink-300'
                       }`}
                     >
@@ -1201,7 +1328,7 @@ export default function TutorSchedulePage() {
                 <div>
                   <Eyebrow as="label" htmlFor="tpl-start" tone="muted" className="block mb-1.5">დაწყება</Eyebrow>
                   <select id="tpl-start" value={tplStartHour} onChange={e => setTplStartHour(Number(e.target.value))}
-                          className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none">
+                          className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-400 focus:outline-none">
                     {Array.from({ length: 24 }, (_, h) => (
                       <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
                     ))}
@@ -1210,7 +1337,7 @@ export default function TutorSchedulePage() {
                 <div>
                   <Eyebrow as="label" htmlFor="tpl-end" tone="muted" className="block mb-1.5">დასრულება</Eyebrow>
                   <select id="tpl-end" value={tplEndHour} onChange={e => setTplEndHour(Number(e.target.value))}
-                          className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none">
+                          className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-400 focus:outline-none">
                     {Array.from({ length: 24 }, (_, h) => h + 1).map(h => (
                       <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
                     ))}
@@ -1227,9 +1354,9 @@ export default function TutorSchedulePage() {
                       type="button"
                       aria-pressed={tplWeeks === w}
                       onClick={() => setTplWeeks(w)}
-                      className={`h-11 flex-1 rounded-btn font-display font-bold text-[13px] tabular-nums border transition-colors ${
+                      className={`h-11 flex-1 rounded-btn font-display font-bold text-small tabular-nums border transition-colors duration-fast ${
                         tplWeeks === w
-                          ? 'bg-brand-500 border-brand-500 text-white'
+                          ? 'bg-brand-600 border-brand-600 text-white'
                           : 'bg-white border-ink-200 text-ink-700 hover:border-ink-300'
                       }`}
                     >
@@ -1241,7 +1368,7 @@ export default function TutorSchedulePage() {
               {/* Estimate in the SAME unit as the rest of the screen: how many
                   windows and how much free time they add up to. Session counts
                   can't be promised here — the client's service decides them. */}
-              <div className="rounded-btn bg-ink-50 border border-ink-200 px-3 py-2.5 text-[12.5px] text-ink-700">
+              <div className="rounded-btn bg-ink-50 border border-ink-200 px-3 py-2.5 text-small text-ink-700">
                 {(() => {
                   const days = tplDays.filter(Boolean).length
                   const windowMin = Math.max(0, (tplEndHour - tplStartHour) * 60)
@@ -1252,19 +1379,19 @@ export default function TutorSchedulePage() {
                       <>
                         დაახლ. <span className="font-display font-bold tabular-nums">{count}</span> შუალედი · სულ{' '}
                         <span className="font-display font-bold tabular-nums">{fmtDur(total)}</span> თავისუფალი დრო
-                        <span className="block text-[11.5px] text-ink-500 mt-0.5">შენი ნაგულისხმევი სესია — {durationMin} წთ.</span>
+                        <span className="block text-meta text-ink-500 mt-0.5">შენი ნაგულისხმევი სესია — {durationMin} წთ.</span>
                       </>
                     )
                     : <>აირჩიე დღეები და დროის დიაპაზონი</>
                 })()}
               </div>
               {tplErr && (
-                <div className="p-2.5 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[12.5px]">
+                <div className="p-2.5 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-small">
                   {tplErr}
                 </div>
               )}
               {tplMsg && (
-                <div className="p-2.5 rounded-btn bg-success-50 border border-success-200 text-success-800 text-[12.5px]">
+                <div className="p-2.5 rounded-btn bg-success-50 border border-success-200 text-success-800 text-small">
                   {tplMsg}
                 </div>
               )}
@@ -1286,7 +1413,7 @@ export default function TutorSchedulePage() {
           </>
         }
       >
-            <p className="text-[12.5px] text-ink-500 mb-4 leading-snug">ამ პერიოდის ყველა <span className="font-display font-semibold text-ink-700">თავისუფალი</span> შუალედი წაიშლება. ჯავშნები არ დაზარალდება.</p>
+            <p className="text-small text-ink-500 mb-4 leading-snug">ამ პერიოდის ყველა <span className="font-display font-semibold text-ink-700">თავისუფალი</span> შუალედი წაიშლება. ჯავშნები არ დაზარალდება.</p>
             <form id="block-off-form" onSubmit={submitBlockOff} className="space-y-4">
               <div>
                 <Eyebrow as="label" htmlFor="block-from" tone="muted" className="block mb-1.5">დაწყება</Eyebrow>
@@ -1294,16 +1421,16 @@ export default function TutorSchedulePage() {
                     between 00:00–04:00 Tbilisi still says yesterday. */}
                 <input id="block-from" type="date" required value={blockForm.from} min={tbDateValue(new Date())}
                        onChange={e => setBlockForm({ ...blockForm, from: e.target.value })}
-                       className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                       className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-400 focus:outline-none" />
               </div>
               <div>
                 <Eyebrow as="label" htmlFor="block-to" tone="muted" className="block mb-1.5">დასრულება</Eyebrow>
                 <input id="block-to" type="date" required value={blockForm.to} min={blockForm.from || tbDateValue(new Date())}
                        onChange={e => setBlockForm({ ...blockForm, to: e.target.value })}
-                       className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-[14px] text-ink-900 focus:border-brand-400 focus:outline-none" />
+                       className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-400 focus:outline-none" />
               </div>
               {blockErr && (
-                <div className="p-2.5 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[12.5px]">
+                <div className="p-2.5 rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-small">
                   {blockErr}
                 </div>
               )}

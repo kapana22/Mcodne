@@ -3,10 +3,20 @@
 // the formal cognate ("სამართალი"). Keys are lowercased Georgian/English
 // terms; values include the original term + related terms.
 //
-// Coverage is intentionally biased toward the 6 seeded categories
-// (business, finance, career, law, marketing, psychology) and their
-// specialties from prisma/seed.ts. Adding a new key is cheap — dedupe is
-// handled by expandQuery below.
+// Coverage originally tracked only the 6 seeded categories; the catalogue is
+// now 15 spheres, so the map was extended 2026-07-28 to cover the rest
+// (sales, product, HR, real-estate, relocation, crypto) plus the CONCRETE
+// terms people actually type. That second group matters more than the sphere
+// names: nobody searches „გადასახადები", they search „დღგ", „შპს",
+// „ინდმეწარმე", „დეკლარაცია". A zero-result search is a lost booking, not
+// just a lost ranking.
+//
+// Adding a new key is cheap — dedupe is handled by expandQuery below. Two
+// rules when you do:
+//   1. Every bucket must contain its own key (expandQuery returns the bucket
+//      verbatim on a direct hit, so omitting it drops the user's own word).
+//   2. Keys are matched by substring in BOTH directions, so keep them short
+//      and distinctive — a key like „ბიზნესი" also catches „ბიზნეს".
 
 export const SEARCH_SYNONYMS: Record<string, string[]> = {
   // Law / ადვოკატი
@@ -61,6 +71,74 @@ export const SEARCH_SYNONYMS: Record<string, string[]> = {
   // Design / product
   'დიზაინი':     ['დიზაინი', 'design', 'ux'],
   'design':      ['design', 'დიზაინი', 'ux'],
+
+  /* ═══ Added 2026-07-28 ═══════════════════════════════════════════════════
+   * Concrete terms first — these are what people type. Each one routes to the
+   * sphere that can actually answer it, so „დღგ" reaches the tax experts even
+   * though no profile literally contains that string.
+   */
+
+  // Tax & accounting — the highest-intent zero-result terms on the site.
+  'დღგ':          ['დღგ', 'გადასახადი', 'საგადასახადო', 'ბუღალტერი', 'vat'],
+  'vat':          ['vat', 'დღგ', 'საგადასახადო', 'ბუღალტერი'],
+  'დეკლარაცია':   ['დეკლარაცია', 'საგადასახადო', 'ბუღალტერი', 'გადასახადი'],
+  'აღრიცხვა':     ['აღრიცხვა', 'ბუღალტერი', 'ბუღალტრული', 'ფინანსები'],
+  'ბუღალტრული':   ['ბუღალტრული', 'ბუღალტერი', 'აღრიცხვა', 'საგადასახადო'],
+  'ხელფასი':      ['ხელფასი', 'ბუღალტერი', 'hr', 'გადასახადი'],
+
+  // Company forms — searched as the form itself, never as „სამართალი".
+  'შპს':          ['შპს', 'კომპანია', 'რეგისტრაცია', 'იურისტი', 'ბიზნესი'],
+  'ინდმეწარმე':   ['ინდმეწარმე', 'მეწარმე', 'რეგისტრაცია', 'საგადასახადო', 'ბუღალტერი'],
+  'მეწარმე':      ['მეწარმე', 'ინდმეწარმე', 'ბიზნესი', 'რეგისტრაცია'],
+  'რეგისტრაცია':  ['რეგისტრაცია', 'შპს', 'ინდმეწარმე', 'იურისტი'],
+  'ხელშეკრულება': ['ხელშეკრულება', 'იურისტი', 'სამართალი', 'contract'],
+  'contract':     ['contract', 'ხელშეკრულება', 'იურისტი'],
+
+  // Business planning
+  'ბიზნეს გეგმა': ['ბიზნეს გეგმა', 'ბიზნესი', 'სტრატეგია', 'ფინანსები'],
+  'გეგმა':        ['გეგმა', 'ბიზნეს გეგმა', 'სტრატეგია', 'ბიზნესი'],
+  'სტარტაპი':     ['სტარტაპი', 'ბიზნესი', 'სტრატეგია', 'startup', 'ინვესტიცია'],
+  'startup':      ['startup', 'სტარტაპი', 'ბიზნესი'],
+
+  // Sales — a live sphere with a live expert and no entry until now.
+  'გაყიდვები':    ['გაყიდვები', 'გაყიდვა', 'sales', 'ბიზნესი'],
+  'გაყიდვა':      ['გაყიდვა', 'გაყიდვები', 'sales'],
+  'sales':        ['sales', 'გაყიდვები', 'გაყიდვა'],
+  'მოლაპარაკება': ['მოლაპარაკება', 'გაყიდვები', 'ბიზნესი', 'negotiation'],
+
+  // Product
+  'პროდაქტი':     ['პროდაქტი', 'product', 'პროდუქტი', 'სტრატეგია'],
+  'პროდუქტი':     ['პროდუქტი', 'პროდაქტი', 'product'],
+  'product':      ['product', 'პროდაქტი', 'პროდუქტი'],
+
+  // HR / recruiting — 'hr' already existed but pointed only at career.
+  'რეკრუტინგი':   ['რეკრუტინგი', 'hr', 'კადრები', 'recruiting'],
+  'კადრები':      ['კადრები', 'hr', 'რეკრუტინგი'],
+  'გასაუბრება':   ['გასაუბრება', 'კარიერა', 'ქოუჩი', 'hr', 'interview'],
+  'რეზიუმე':      ['რეზიუმე', 'cv', 'კარიერა', 'ქოუჩი'],
+  'cv':           ['cv', 'რეზიუმე', 'კარიერა'],
+
+  // Real estate
+  'უძრავი':       ['უძრავი', 'ქონება', 'უძრავი ქონება', 'real estate'],
+  'ქონება':       ['ქონება', 'უძრავი', 'უძრავი ქონება', 'real estate'],
+  'იპოთეკა':      ['იპოთეკა', 'უძრავი', 'ქონება', 'ფინანსები'],
+
+  // Relocation / residency
+  'რელოკაცია':    ['რელოკაცია', 'relocation', 'ბინადრობა', 'ვიზა'],
+  'ბინადრობა':    ['ბინადრობა', 'რელოკაცია', 'ვიზა', 'იურისტი'],
+  'ვიზა':         ['ვიზა', 'რელოკაცია', 'ბინადრობა', 'იურისტი'],
+  'relocation':   ['relocation', 'რელოკაცია', 'ბინადრობა'],
+
+  // Crypto
+  'კრიპტო':       ['კრიპტო', 'crypto', 'ბლოკჩეინი', 'ინვესტიცია'],
+  'crypto':       ['crypto', 'კრიპტო', 'ბლოკჩეინი'],
+  'ბლოკჩეინი':    ['ბლოკჩეინი', 'კრიპტო', 'blockchain'],
+
+  // IT — 'it' is too short to be a safe substring key (it matches inside many
+  // Latin words), so route the spelled-out terms instead.
+  'ტექნოლოგი':    ['ტექნოლოგი', 'პროგრამისტი', 'დეველოპერი', 'it'],
+  'ვებგვერდი':    ['ვებგვერდი', 'საიტი', 'დეველოპერი', 'დიზაინი'],
+  'საიტი':        ['საიტი', 'ვებგვერდი', 'დეველოპერი'],
 }
 
 // Expand a raw user query into a list of terms to search against. Includes the

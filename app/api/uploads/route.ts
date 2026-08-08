@@ -11,6 +11,7 @@ export const runtime = 'nodejs'
 // photos; certificates cover diplomas (PDF or image scan); videos cover the
 // apply-flow intro clip.
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024        // 8 MB — avatars, ID, selfie
+const MAX_COVER_BYTES = 20 * 1024 * 1024       // 20 MB — blog cover, see below
 const MAX_CERT_BYTES = 25 * 1024 * 1024        // 25 MB — diploma PDF / image
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024      // 100 MB — intro video
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024   // 8 MB — generic message file
@@ -20,7 +21,7 @@ const ALLOWED_CERT = new Set(['application/pdf', 'image/jpeg', 'image/png', 'ima
 const ALLOWED_VIDEO = new Set(['video/mp4', 'video/quicktime', 'video/webm'])
 const ALLOWED_ATTACH = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
 
-type Kind = 'avatar' | 'certificate' | 'video' | 'idDoc' | 'selfie' | 'attachment'
+type Kind = 'avatar' | 'cover' | 'certificate' | 'video' | 'idDoc' | 'selfie' | 'attachment'
 
 // Returns the real MIME sniffed from the leading bytes, or null if unrecognized.
 function sniffMime(buf: Buffer): string | null {
@@ -41,6 +42,13 @@ function magicBytesMatch(buf: Buffer, allowed: Set<string>): boolean {
 
 function limitsFor(kind: Kind): { max: number; allowed: Set<string> } {
   switch (kind) {
+    // Covers get a bigger INPUT allowance than other photos even though they
+    // produce the smallest output: the server hard-crops every one to 1200×675,
+    // so the source size costs nothing but transient memory — while a 48MP
+    // phone photo straight off a modern camera lands at 10–15 MB and would
+    // otherwise be rejected for being too good.
+    case 'cover':
+      return { max: MAX_COVER_BYTES, allowed: ALLOWED_IMG }
     case 'avatar':
     case 'idDoc':
     case 'selfie':
@@ -103,14 +111,41 @@ export async function POST(req: Request) {
   // un-resized upload becomes a multi-MB row that is then EMBEDDED in every API
   // payload the user/file appears in. A single 9.4 MB base64 avatar made chat
   // threads 7.5 MB (the sender's avatar is repeated per message) and 30-40s to
-  // load. Cap every stored image: avatars to a 256px square (they render ≤64px),
-  // other photos to 1600px. PDFs and GIFs pass through untouched.
+  // load. Cap every stored image: avatars to a 512px square, other photos to
+  // 1600px. PDFs and GIFs pass through untouched.
+  //
+  // AVATAR SIZE, measured — do not lower this again without re-measuring. The
+  // browse card renders a 128px square (112px on mobile), so a 3x DPR phone asks
+  // for 384px; the old 256px cap (whose comment claimed avatars "render <=64px")
+  // is what let a blurry-banner regression ship. 512px @ q78/effort6 costs ~24 KB
+  // (~32 KB base64) for a typical portrait and ~39 KB (~52 KB base64) worst case
+  // for a very high-detail photo, versus ~11 KB (~15 KB base64) at 256 q82.
+  // Quality drops 82 -> 78 because the extra pixels already carry the sharpness;
+  // effort 6 + smartSubsample buy another ~8% for a few ms at upload time.
+  // Clients crop to a square first (components/AvatarCropper.tsx); `fit: cover`
+  // stays as the guard for anything that doesn't.
   const realMime = sniffMime(buf)
   let outBuf: Buffer = buf
   let outType = file.type
   if (kind === 'avatar' && realMime?.startsWith('image/')) {
     try {
-      outBuf = await sharp(buf).rotate().resize(256, 256, { fit: 'cover' }).webp({ quality: 82 }).toBuffer()
+      outBuf = await sharp(buf).rotate()
+        .resize(512, 512, { fit: 'cover' })
+        .webp({ quality: 78, effort: 6, smartSubsample: true })
+        .toBuffer()
+      outType = 'image/webp'
+    } catch { /* fall back to the original bytes if sharp can't decode it */ }
+  } else if (kind === 'cover' && realMime?.startsWith('image/')) {
+    // BLOG COVERS. Wide crop, and hard-bounded on purpose: these live as base64
+    // in the Post row and the /blog index renders every one of them at once, so
+    // a careless 4MB phone photo would be paid for eight times on the page that
+    // is supposed to sell the writing. 1200×675 webp lands around 60–110KB and
+    // is still sharp on a 2× display at card size.
+    try {
+      outBuf = await sharp(buf).rotate()
+        .resize(1200, 675, { fit: 'cover' })
+        .webp({ quality: 76, effort: 6, smartSubsample: true })
+        .toBuffer()
       outType = 'image/webp'
     } catch { /* fall back to the original bytes if sharp can't decode it */ }
   } else if (realMime?.startsWith('image/') && realMime !== 'image/gif') {

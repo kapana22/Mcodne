@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { NextResponse } from 'next/server'
 import { randomBytes, createHash } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
@@ -90,7 +91,7 @@ export async function replaceSession(
   await createSession(userId, opts)
 }
 
-export async function currentSessionTokenHash(): Promise<string | null> {
+async function currentSessionTokenHash(): Promise<string | null> {
   const jar = await cookies()
   const raw = jar.get(COOKIE)?.value
   return raw ? tokenHash(raw) : null
@@ -195,4 +196,44 @@ export async function requireRole(role: Role | Role[]) {
   // so a tutor accidentally hitting /student lands on /tutor (not `/`).
   if (!roles.includes(user.role)) redirect(homeForRole(user.role))
   return user
+}
+
+// API-route auth guard — added 2026-08-01. requireUser/requireRole answer a
+// missing or expired session with next/navigation redirect(), which an API
+// route serves as **307 → /signin → 200 text/html**. Every client-side
+// `res.ok` / `status === 401` check downstream of such a route was therefore
+// dead code: the fetch "succeeded" with an HTML page, so e.g. app/tutor/page.tsx
+// rendered "no bookings" for an expired session instead of re-authenticating.
+// API handlers must use THIS helper (explicit 401/403 JSON, same shape as
+// app/api/bookings/route.ts); requireUser/requireRole remain for PAGES, where
+// redirecting is the right behavior.
+//
+// Role semantics mirror requireRole EXACTLY: strict membership in the given
+// list — ADMIN does NOT implicitly pass a TUTOR check; call sites that want
+// that spell it out (e.g. ['TUTOR', 'ADMIN']). Suspension is inherited from
+// getCurrentUser (a suspended account reads as logged-out → 401).
+//
+// Usage:
+//   const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+//   if (auth.response) return auth.response
+//   const user = auth.user
+export async function requireRoleApi(role: Role | Role[]): Promise<
+  | { user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>; response: null }
+  | { user: null; response: NextResponse }
+> {
+  const user = await getCurrentUser()
+  if (!user) {
+    return {
+      user: null,
+      response: NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 }),
+    }
+  }
+  const roles = Array.isArray(role) ? role : [role]
+  if (!roles.includes(user.role)) {
+    return {
+      user: null,
+      response: NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 }),
+    }
+  }
+  return { user, response: null }
 }

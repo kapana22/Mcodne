@@ -4,7 +4,13 @@ import { notify } from '@/lib/notify'
 import { fmtKaDateTime, fmtKaTime } from '@/lib/kaDate'
 import { sendSessionReminders } from '@/lib/sessionReminders'
 import { sendMessageReminders } from '@/lib/messageReminders'
+import { sendPostSessionNudges } from '@/lib/postSession'
+import { sendExpertRequestEscalations, PREPARING_TTL_HOURS, ESCALATION_STAGES } from '@/lib/expertEscalation'
+import { sendExpertActivationNudges } from '@/lib/expertActivation'
+import { pruneEvents, EVENT_RETENTION_DAYS } from '@/lib/events'
 import { cronAuth } from '@/lib/cronAuth'
+import { lastSweepRunAt } from '@/lib/sweepRunner'
+import { topUpAvailability } from '@/lib/availabilityTopUp'
 
 // Cleanup job for expired auth artifacts + stale bookings.
 //
@@ -28,6 +34,11 @@ import { cronAuth } from '@/lib/cronAuth'
 //     both parties (deduped via deterministic href markers — see below).
 //     NB: the 1h reminder only fires if a cron tick lands inside that hour, so
 //     schedule this endpoint at least every 15–30 min for it to be reliable.
+//   - COMPLETED bookings with no review → a review nudge (+ folded-in rebook
+//     invite) to the client ~3h after the session ended. See lib/postSession.
+//   - PREPARING bookings the expert hasn't answered → escalating reminders to
+//     the EXPERT at 12h and 3h before the auto-cancel deadline, in-app AND by
+//     email, exactly once per stage. See lib/expertEscalation.
 //
 // Auth: see lib/cronAuth. Prefer `Authorization: Bearer <CLEANUP_SECRET>`; the
 // `?secret=` query form still works on GET only, for the live cron, and is
@@ -43,7 +54,10 @@ import { cronAuth } from '@/lib/cronAuth'
 //        Command:  curl -fsS -X POST -H "Authorization: Bearer $CLEANUP_SECRET" \
 //                    https://mcodne.ge/api/internal/cleanup
 
-const PREPARING_TTL_HOURS = 24
+// PREPARING_TTL_HOURS now lives in lib/expertEscalation and is imported above:
+// the escalation reminders are timed against the very deadline this constant
+// defines, and two copies of it would eventually disagree — nudging an expert
+// about a window that no longer matches when the request actually dies.
 const AUTO_COMPLETE_GRACE_HOURS = 48
 // A pending reschedule proposal force-holds a booking in PREPARING and locks its
 // slot. It stays exempt from the PREPARING auto-cancel only while it is still
@@ -402,6 +416,89 @@ export async function POST(req: Request) {
   let messageReminders = { threads: 0, emails: 0 }
   try { messageReminders = await sendMessageReminders() } catch { /* best-effort */ }
 
+  // Post-session follow-up: ~3h after a completed, unreviewed session, ask the
+  // client for a review (with a folded-in „book again" line). Deduped by a
+  // deterministic Notification id — no stamp column. See lib/postSession.
+  let postSession = { bookings: 0, emails: 0 }
+  try { postSession = await sendPostSessionNudges() } catch { /* best-effort */ }
+
+  // Escalating reminders to the EXPERT while a request is still answerable. The
+  // creation ping was the ONLY one they ever got, so a single missed email cost
+  // the booking outright. Deduped by a deterministic Notification id per stage —
+  // no stamp column. Guarded like every other side effect here: a mail or DB
+  // failure inside it must never break the sweep. Runs AFTER the auto-cancel
+  // block on purpose — a request cancelled this same tick is no longer
+  // PREPARING, so it can't be chased and cancelled in the same breath.
+  let expertEscalations = { bookings: 0, emails: 0 }
+  try { expertEscalations = await sendExpertRequestEscalations() } catch { /* best-effort */ }
+
+  // Approved experts who never finished setup — no service, or no free times —
+  // get up to three nudges and then silence. This is the sweep's only OUTBOUND
+  // supply-side job: every other block here reacts to a booking, but a profile
+  // that CANNOT take bookings produces no events to react to, so nothing in the
+  // product would ever have noticed it. Deduped by a deterministic Notification
+  // id per (blocker, stage); guarded like every other side effect here. See
+  // lib/expertActivation for the production audit that prompted it.
+  let expertActivation = { experts: 0, emails: 0 }
+  try { expertActivation = await sendExpertActivationNudges() } catch { /* best-effort */ }
+
+  // Event retention. "Event" is append-only and every browse search writes a
+  // row, so it grows without bound unless something trims it — and lib/events
+  // names THIS sweep as the owner (it is the one place recurring deletes live).
+  // Index-backed, idempotent, and guarded like everything else here: the admin
+  // „ინსაითები" queries stay cheap only while the table stays bounded.
+  let eventsPruned = 0
+  try { eventsPruned = await pruneEvents() } catch { /* best-effort */ }
+
+  // ── The rolling availability horizon ──────────────────────────────────────
+  // Approval opens 8 weeks from the pattern the expert picked on /apply. Eight
+  // weeks later those windows are simply GONE, and an expert who never opened
+  // /tutor/schedule is back to „თავისუფალი დრო არ აქვს" — the state that killed
+  // 46% of booking attempts — with nothing anywhere saying so. A one-shot seed
+  // postpones that failure; it does not fix it. This keeps the horizon rolling
+  // for experts who are actively publishing, and deliberately does NOT touch an
+  // expert whose calendar is empty (that is a decision, not a gap). See
+  // lib/availabilityTopUp for the full set of guards.
+  const availabilityTopUp = await topUpAvailability()
+
+  // ── Enrollments reach a terminal state ────────────────────────────────────
+  // Nothing else moves them, so without this a package stays ACTIVE forever:
+  // the client keeps seeing credits the book route will refuse (it checks the
+  // expiry), the teacher's roster never clears, and „ვადაგასული" is a status no
+  // row can ever hold. Two transitions, both derivable, neither guessed:
+  //
+  //   ACTIVE + past expiry            → EXPIRED   (the month ran out)
+  //   ACTIVE + every lesson COMPLETED → COMPLETED (the package was delivered)
+  //
+  // A package whose lessons are all BOOKED but not yet taught stays ACTIVE —
+  // that is still work in progress, and calling it complete would tell the
+  // teacher they are done when they have eight lessons left to teach.
+  let enrollmentsExpired = 0
+  let enrollmentsCompleted = 0
+  try {
+    const expired = await prisma.enrollment.updateMany({
+      where: { status: 'ACTIVE', expiresAt: { lt: new Date() } },
+      data: { status: 'EXPIRED' },
+    })
+    enrollmentsExpired = expired.count
+
+    // Fully-delivered ones: all credits spent AND no lesson still outstanding.
+    const candidates = await prisma.enrollment.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true, lessonsTotal: true, lessonsUsed: true },
+      take: 500,
+    })
+    for (const e of candidates) {
+      if (e.lessonsUsed < e.lessonsTotal) continue
+      const outstanding = await prisma.booking.count({
+        where: { enrollmentId: e.id, status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] } },
+      })
+      if (outstanding > 0) continue
+      await prisma.enrollment.update({ where: { id: e.id }, data: { status: 'COMPLETED' } })
+      enrollmentsCompleted++
+    }
+  } catch { /* best-effort, like every other step here */ }
+
   return NextResponse.json({
     ok: true,
     deleted: {
@@ -418,6 +515,12 @@ export async function POST(req: Request) {
     },
     emailReminders,
     messageReminders,
+    availabilityTopUp,
+    postSession,
+    expertEscalations,
+    expertActivation,
+    eventsPruned,
+    enrollments: { expired: enrollmentsExpired, completed: enrollmentsCompleted },
     at: now.toISOString(),
   })
 }
@@ -450,13 +553,21 @@ export async function GET(req: Request) {
       'Delete expired Session rows',
       'Delete consumed/expired OtpCode rows',
       'Delete consumed/expired PasswordResetToken rows',
+      `Prune "Event" analytics rows older than ${EVENT_RETENTION_DAYS} days`,
       `Cancel PREPARING bookings unanswered for ${PREPARING_TTL_HOURS}h OR past their startAt + free their held slot`,
       `Restore a previously-CONFIRMED booking whose reschedule proposal went stale (>${RESCHEDULE_PROPOSAL_TTL_HOURS}h or past) and whose original startAt is still ahead`,
       `Auto-complete CONFIRMED/LIVE bookings past (startAt + duration + ${AUTO_COMPLETE_GRACE_HOURS}h) — refunded + disputed bookings excluded`,
       'Send BOOKING_REMINDER (24h + 1h before start) to both parties of CONFIRMED bookings — run every 15–30 min for reliable 1h reminders',
+      'Nudge the client to review a completed, unreviewed session ~3h after it ended (auto-completed / disputed excluded) — one in-app notification + one email, plus a rebook invite when they have nothing booked with that expert',
+      `Escalate an unanswered PREPARING request to the EXPERT at ${ESCALATION_STAGES.map(s => `${s.hoursLeft}h`).join(' and ')} before it auto-cancels — in-app + email, exactly once per stage, never for an answered/reschedule-pending/past-start request`,
     ],
+    // HEARTBEAT. The whole sweep was silently dark for days because a „Completed"
+    // cron proved nothing — it never carried a valid secret and this very page is
+    // what it kept receiving. `lastRunAt` makes that impossible to miss: if it is
+    // null or hours old, nothing is running, whatever the cron dashboard claims.
+    lastRunAt: await lastSweepRunAt(),
     hint: configured
-      ? 'Ping this endpoint every 15 min — POST with an Authorization: Bearer header'
+      ? 'Ping this endpoint every 15 min — POST with an Authorization: Bearer header. Traffic also self-triggers it (lib/sweepRunner); check lastRunAt above before trusting any cron status.'
       : 'CLEANUP_SECRET is NOT set — endpoint is disabled. Set it in Railway env to enable.',
   })
 }

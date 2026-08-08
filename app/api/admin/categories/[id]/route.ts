@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 
 // PATCH /api/admin/categories/[id]
@@ -22,7 +22,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const admin = await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  const admin = auth.user
   const { id } = await params
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) {
@@ -70,7 +72,9 @@ export async function PATCH(
 // DELETE /api/admin/categories/[id] — only when no experts are attached (a
 // category with tutors can be hidden via isLive instead, never orphaned).
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  const admin = auth.user
   const { id } = await params
   const cat = await prisma.category.findUnique({ where: { id }, select: { name: true, slug: true, _count: { select: { tutors: true } } } })
   if (!cat) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })

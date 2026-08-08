@@ -37,10 +37,21 @@ export function Avatar({
             alt={name ?? ''}
             width={size}
             height={size}
-            // Base64 data-URI avatars can't be optimized by Next's loader —
-            // skip it to avoid needless work/warnings; remote hosts still optimize.
-            unoptimized={src!.startsWith('data:')}
-            className="w-full h-full object-cover motion-safe:animate-fade-in-fast"
+            // Skip Next's optimizer for anything ALREADY optimized:
+            //  • base64 data URIs — it can't process them at all;
+            //  • /api/avatars/* — that route resizes to ≤384px webp and serves
+            //    it `immutable`, so routing it through /_next/image adds a
+            //    second server hop and a re-encode for zero benefit. Measured
+            //    on a throttled phone: the optimizer hop was pure added
+            //    latency before the face appeared.
+            unoptimized={src!.startsWith('data:') || src!.startsWith('/api/avatars/')}
+            // NO entrance animation. `fade-in-fast` carries
+            // `animation-fill-mode: both`, which holds the FROM state
+            // (opacity 0) from mount until the animation's first frame — on a
+            // slow phone that is a visible „the photo is missing, then it pops
+            // in" beat, and the canon already forbids fill-mode on fade-in for
+            // exactly this class of bug. An image appearing is not an event.
+            className="w-full h-full object-cover"
           />
         ) : (
           // Friendly on-brand default: a soft person glyph on the brand-green
@@ -68,7 +79,7 @@ export function VerifiedMark({ size = 18 }: { size?: number }) {
       role="img"
       aria-label="გადამოწმებული"
       title="გადამოწმებული"
-      className="inline-flex items-center justify-center rounded-full bg-brand-500 text-white motion-safe:animate-scale-in"
+      className="inline-flex items-center justify-center rounded-full bg-brand-600 text-white motion-safe:animate-scale-in"
       style={{ width: size, height: size }}
     >
       <svg

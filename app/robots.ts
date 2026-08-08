@@ -14,6 +14,12 @@ export default function robots(): MetadataRoute.Robots {
           '/',
           '/tutors',
           '/tutors/*',
+          // The two SEO landing-page families: spheres and professions. Allowed
+          // by the bare '/' anyway — listed for the same explicitness as the rest.
+          '/categories',
+          '/categories/*',
+          '/konsultacia',
+          '/konsultacia/*',
           '/about',
           '/blog',
           '/contact',

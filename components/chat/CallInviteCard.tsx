@@ -23,12 +23,12 @@ export function CallInviteCard({
   return (
     <div className="max-w-[85%] sm:max-w-[78%] rounded-card border border-brand-200 bg-brand-50 p-3.5">
       <div className="flex items-center gap-2 mb-1">
-        <span className="w-8 h-8 rounded-full bg-brand-500 text-white inline-flex items-center justify-center shrink-0">
+        <span className="w-8 h-8 rounded-full bg-brand-600 text-white inline-flex items-center justify-center shrink-0">
           <Icon.video className="w-4 h-4" />
         </span>
-        <div className="font-display text-[13.5px] font-bold text-ink-900 leading-tight">ვიდეოზარზე მოწვევა</div>
+        <div className="font-display text-body font-bold text-ink-900 leading-tight">ვიდეოზარზე მოწვევა</div>
       </div>
-      <div className="text-[12px] text-ink-600 mb-3 leading-snug">
+      <div className="text-meta text-ink-600 mb-3 leading-snug">
         {mine ? 'მოწვევა გაიგზავნა — შედი ან დაელოდე.' : `${fromName} გიწვევს ვიდეოზარზე.`}
       </div>
       {room && (
@@ -36,12 +36,12 @@ export function CallInviteCard({
           href={room}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full h-10 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+          className="w-full h-11 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center justify-center gap-1.5 transition-colors duration-fast shadow-xs"
         >
           <Icon.video className="w-4 h-4" /> შემოსვლა
         </a>
       )}
-      <div className="text-[10.5px] mt-2 font-mono tabular-nums text-ink-400">{time}</div>
+      <div className="text-meta mt-2 font-mono tabular-nums text-ink-400">{time}</div>
     </div>
   )
 }

@@ -54,9 +54,9 @@ export function NavProgress() {
   useEffect(() => () => { clearTrickle(); if (hideT.current) clearTimeout(hideT.current) }, [])
 
   return (
-    <div aria-hidden className={`fixed top-0 inset-x-0 z-[100] h-[3px] pointer-events-none transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}>
+    <div aria-hidden className={`fixed top-0 inset-x-0 z-skip h-[3px] pointer-events-none transition-opacity duration-mid ${visible ? 'opacity-100' : 'opacity-0'}`}>
       <div
-        className="h-full bg-brand-500 shadow-[0_0_10px_rgba(47,156,134,0.55)] transition-[width] duration-300 ease-out"
+        className="h-full bg-brand-500 shadow-[0_0_10px_rgba(47,156,134,0.55)] transition-[width] duration-mid ease-out-quart"
         style={{ width: `${width}%` }}
       />
     </div>

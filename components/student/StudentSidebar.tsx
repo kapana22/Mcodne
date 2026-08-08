@@ -4,7 +4,8 @@ import { usePathname } from 'next/navigation'
 import { Icon } from '@/components/Icon'
 import { Logo } from '@/components/Logo'
 import { Eyebrow } from '@/components/Eyebrow'
-import { WORKSPACE_NAV, CATALOG_LINK, type NavItem } from './navConfig'
+import { ApplyCtaGate } from '@/components/ApplyCtaGate'
+import { WORKSPACE_NAV, CATALOG_LINK, APPLY_LINK, type NavItem } from './navConfig'
 import type { StudentBadges } from './useStudentBadges'
 
 function badgeCount(item: NavItem, badges: StudentBadges): number {
@@ -21,14 +22,14 @@ function NavRow({ item, badges }: { item: NavItem; badges: StudentBadges }) {
     <Link
       href={item.href}
       aria-current={active ? 'page' : undefined}
-      className={`h-11 px-3 rounded-btn inline-flex items-center gap-3 font-display text-[13px] font-semibold transition-colors duration-fast ${
+      className={`h-11 px-3 rounded-btn inline-flex items-center gap-3 font-display text-small font-semibold transition-colors duration-fast ${
         active ? 'bg-brand-50 text-brand-800' : 'text-ink-700 hover:bg-ink-100/70 hover:text-ink-900'
       }`}
     >
       <IconComp className={`w-[18px] h-[18px] shrink-0 ${active ? 'text-brand-700' : 'text-ink-500'}`} />
       <span className="flex-1 truncate">{item.label}</span>
       {count > 0 && (
-        <span className="min-w-[20px] h-5 px-1.5 rounded-pill inline-flex items-center justify-center text-[10.5px] font-bold tabular-nums text-white bg-danger-500">
+        <span className="min-w-[20px] h-5 px-1.5 rounded-pill inline-flex items-center justify-center text-meta font-bold tabular-nums text-white bg-danger-500">
           {count > 99 ? '99+' : count}
         </span>
       )}
@@ -52,8 +53,16 @@ export function StudentSidebar({ badges }: { badges: StudentBadges }) {
         ))}
       </nav>
 
-      <div className="mt-4 pt-4 border-t border-ink-100">
+      {/* Outside the workspace proper. „გახდი ექსპერტი" sits here rather than
+          in the group above because it leaves the client space — same reason
+          „ექსპერტები" does — but it is now ALWAYS on screen, not one click deep
+          in the avatar menu. Gated on the real role, never on the shell's
+          hardcoded "STUDENT" (see APPLY_LINK). */}
+      <div className="mt-4 pt-4 border-t border-ink-100 flex flex-col gap-0.5">
         <NavRow item={CATALOG_LINK} badges={badges} />
+        <ApplyCtaGate>
+          <NavRow item={APPLY_LINK} badges={badges} />
+        </ApplyCtaGate>
       </div>
 
       <div className="flex-1" />
@@ -67,7 +76,7 @@ export function StudentSidebar({ badges }: { badges: StudentBadges }) {
         <Eyebrow tone="muted">
           ახალი კონსულტაცია
         </Eyebrow>
-        <div className="mt-1 font-display text-[12.5px] font-semibold text-ink-800">
+        <div className="mt-1 font-display text-small font-semibold text-ink-800">
           იპოვე ექსპერტი
         </div>
       </Link>

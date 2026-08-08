@@ -156,8 +156,8 @@ export default function SessionRoom() {
           <div className="mx-auto w-14 h-14 rounded-full bg-ink-100 text-ink-500 inline-flex items-center justify-center mb-4">
             <Icon.warn className="w-7 h-7" />
           </div>
-          <h1 className="font-display text-[22px] font-bold text-ink-900">სესია ვერ მოიძებნა</h1>
-          <p className="text-[13.5px] text-ink-500 mt-2">ჯავშანი წაიშალა ან შენ არ ხარ მონაწილე.</p>
+          <h1 className="font-display text-h2 font-bold text-ink-900">სესია ვერ მოიძებნა</h1>
+          <p className="text-body text-ink-500 mt-2">ჯავშანი წაიშალა ან შენ არ ხარ მონაწილე.</p>
           <div className="mt-6 flex justify-center gap-2">
             <Btn variant="secondary" href="/student/bookings">ჩემი ჯავშნები</Btn>
             <Btn variant="primary" href="/tutors">ექსპერტები</Btn>
@@ -176,15 +176,15 @@ export default function SessionRoom() {
           <div className="mx-auto w-12 h-12 rounded-full bg-ink-100 text-ink-500 inline-flex items-center justify-center mb-3">
             <Icon.warn className="w-6 h-6" />
           </div>
-          <div className="font-display text-[16px] font-bold text-ink-900 tracking-tight">ვერ ჩაიტვირთა</div>
-          <p className="text-[12.5px] text-ink-500 mt-1.5 leading-relaxed">შეამოწმე ინტერნეტი და სცადე თავიდან.</p>
+          <div className="font-display text-body-lg font-bold text-ink-900 tracking-tight">ვერ ჩაიტვირთა</div>
+          <p className="text-small text-ink-500 mt-1.5 leading-relaxed">შეამოწმე ინტერნეტი და სცადე თავიდან.</p>
           <div className="mt-4">
             <Btn variant="primary" size="md" onClick={() => { setLoadErr(false); setRetryKey(k => k + 1) }}>
               <Icon.refresh className="w-3.5 h-3.5" /> სცადე თავიდან
             </Btn>
           </div>
           <div className="mt-3">
-            <Link href="/student/bookings" className="font-display text-[12px] font-semibold text-ink-500 hover:text-ink-900 transition-colors">ჩემი ჯავშნები</Link>
+            <Link href="/student/bookings" className="font-display text-meta font-semibold text-ink-500 hover:text-ink-900 transition-colors duration-fast">ჩემი ჯავშნები</Link>
           </div>
         </div>
       </div>
@@ -194,7 +194,13 @@ export default function SessionRoom() {
   if (!booking) {
     return (
       <div className="min-h-screen bg-ink-50 flex items-center justify-center">
-        <span className="inline-block w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+        {/* The ring carries the motion; the LABEL is what still says "working"
+            once `motion-safe:` removes the spin for reduced-motion users — a
+            frozen arc alone is indistinguishable from a decorative circle. */}
+        <div role="status" className="inline-flex items-center gap-3 text-ink-500">
+          <span aria-hidden className="inline-block w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full motion-safe:animate-spin" />
+          <span className="text-small">იტვირთება…</span>
+        </div>
       </div>
     )
   }
@@ -233,7 +239,7 @@ export default function SessionRoom() {
           <Link href="/" className="inline-flex items-center" aria-label="მცოდნე">
             <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain select-none" draggable={false} />
           </Link>
-          <Link href={backHref} className="text-[13px] text-ink-500 hover:text-ink-900 inline-flex items-center gap-1">
+          <Link href={backHref} className="text-small text-ink-500 hover:text-ink-900 inline-flex items-center gap-1">
             <Icon.arrow className="w-3.5 h-3.5 rotate-180" /> ჯავშნის დეტალები
           </Link>
         </Container>
@@ -246,13 +252,13 @@ export default function SessionRoom() {
               <div>
                 <div className="mb-2 flex items-center gap-2 flex-wrap">
                   <StatusPill tone={toneOf(booking.status)} />
-                  <span className="text-[11.5px] text-ink-500 font-mono">{booking.ref.slice(0, 12)}</span>
+                  <span className="text-meta text-ink-500 font-mono">{booking.ref.slice(0, 12)}</span>
                 </div>
-                <h1 className="font-display text-[22px] sm:text-[26px] font-bold tracking-tight text-ink-900 motion-safe:animate-rise-in">{booking.topic}</h1>
-                <div className="text-[13px] text-ink-500 mt-2">
+                <h1 className="font-display text-h2 sm:text-h1 font-bold tracking-tight text-ink-900 motion-safe:animate-rise-in">{booking.topic}</h1>
+                <div className="text-small text-ink-500 mt-2">
                   {fmtDateTime(booking.startAt, tz)} · {booking.durationMin} წუთი
                   {tz !== TBILISI && (
-                    <span className="ml-1.5 text-[11px] text-ink-400">(თბილისის დროით: {fmtDateTime(booking.startAt, TBILISI)})</span>
+                    <span className="ml-1.5 text-meta text-ink-400">(თბილისის დროით: {fmtDateTime(booking.startAt, TBILISI)})</span>
                   )}
                 </div>
               </div>
@@ -262,16 +268,16 @@ export default function SessionRoom() {
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar src={booking.tutor.user.avatarUrl ?? undefined} name={booking.tutor.user.fullName} size={44} />
                 <div className="min-w-0">
-                  <div className="text-[11.5px] text-ink-500 font-semibold uppercase tracking-wide">ექსპერტი</div>
-                  <div className="font-display text-[14px] font-bold text-ink-900 truncate">{booking.tutor.user.fullName}</div>
+                  <div className="text-meta text-ink-500 font-semibold uppercase">ექსპერტი</div>
+                  <div className="font-display text-body font-bold text-ink-900 truncate">{booking.tutor.user.fullName}</div>
                 </div>
               </div>
               <div className="h-8 w-px bg-ink-200 hidden sm:block" />
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar src={booking.student.avatarUrl ?? undefined} name={booking.student.fullName} size={44} />
                 <div className="min-w-0">
-                  <div className="text-[11.5px] text-ink-500 font-semibold uppercase tracking-wide">სტუდენტი</div>
-                  <div className="font-display text-[14px] font-bold text-ink-900 truncate">{booking.student.fullName}</div>
+                  <div className="text-meta text-ink-500 font-semibold uppercase">სტუდენტი</div>
+                  <div className="font-display text-body font-bold text-ink-900 truncate">{booking.student.fullName}</div>
                 </div>
               </div>
             </div>
@@ -279,25 +285,25 @@ export default function SessionRoom() {
 
           <div className="p-6 sm:p-8">
             {booking.status === 'CANCELED' && (
-              <div className="p-4 rounded-btn bg-ink-50 border border-ink-200 text-[13px] text-ink-700 text-center">
+              <div className="p-4 rounded-btn bg-ink-50 border border-ink-200 text-small text-ink-700 text-center">
                 სესია გაუქმდა.
               </div>
             )}
 
             {booking.status === 'NO_SHOW' && (
-              <div className="p-4 rounded-btn bg-ink-50 border border-ink-200 text-[13px] text-ink-700 text-center">
+              <div className="p-4 rounded-btn bg-ink-50 border border-ink-200 text-small text-ink-700 text-center">
                 მხარე არ გამოცხადდა.
               </div>
             )}
 
             {booking.status === 'COMPLETED' && (
-              <div className="p-4 rounded-btn bg-success-50 border border-success-200 text-[13px] text-success-800 text-center">
+              <div className="p-4 rounded-btn bg-success-50 border border-success-200 text-small text-success-800 text-center">
                 სესია დასრულდა.
                 {!isTutor && (
                   <div className="mt-3">
                     <Link
                       href={`/student/bookings/${booking.id}?review=1`}
-                      className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13px] transition-colors"
+                      className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body transition-colors duration-fast"
                     >
                       შეაფასე
                     </Link>
@@ -307,7 +313,7 @@ export default function SessionRoom() {
             )}
 
             {booking.status === 'PREPARING' && (
-              <div className="p-4 rounded-btn bg-warning-50 border border-warning-200 text-[13px] text-warning-800 text-center">
+              <div className="p-4 rounded-btn bg-warning-50 border border-warning-200 text-small text-warning-800 text-center">
                 ექსპერტს ჯერ არ დაუდასტურებია — დადასტურების შემდეგ ბმული გაიხსნება.
               </div>
             )}
@@ -317,8 +323,8 @@ export default function SessionRoom() {
                 <div className="mx-auto w-12 h-12 rounded-full bg-ink-100 text-ink-500 inline-flex items-center justify-center mb-3">
                   <Icon.clock className="w-6 h-6" />
                 </div>
-                <div className="font-display text-[17px] font-bold text-ink-900">სესია დასრულდა</div>
-                <p className="text-[13px] text-ink-500 mt-1">ვიდეო-ოთახი დაიხურა.</p>
+                <div className="font-display text-h3 font-bold text-ink-900">სესია დასრულდა</div>
+                <p className="text-small text-ink-500 mt-1">ვიდეოოთახი დაიხურა.</p>
                 <div className="mt-5">
                   <Btn variant="secondary" size="md" href={backHref}>ჯავშნის დეტალები</Btn>
                 </div>
@@ -329,27 +335,27 @@ export default function SessionRoom() {
               <>
                 {isBefore || !booking.meetingUrl ? (
                   <div className="text-center py-8 motion-safe:animate-fade-in">
-                    <div className={`text-[11.5px] font-semibold uppercase tracking-wide mb-3 ${msUntil < 5 * 60_000 ? 'text-brand-700' : 'text-ink-500'}`}>
+                    <div className={`text-meta font-semibold uppercase mb-3 ${msUntil < 5 * 60_000 ? 'text-brand-700' : 'text-ink-500'}`}>
                       {msUntil < 5 * 60_000 ? 'იწყება ახლა' : 'დაიწყება'}
                     </div>
-                    <div className={`font-display text-[42px] font-bold tabular-nums leading-none motion-safe:animate-scale-in ${msUntil < 5 * 60_000 ? 'text-brand-700 motion-safe:animate-pulse-soft' : 'text-ink-900'}`}>
+                    <div className={`font-display text-display-lg font-bold tabular-nums leading-none motion-safe:animate-scale-in ${msUntil < 5 * 60_000 ? 'text-brand-700 motion-safe:animate-pulse-soft' : 'text-ink-900'}`}>
                       {humanCountdown(msUntil)}
                     </div>
-                    <p className="text-[13px] text-ink-500 mt-4 max-w-[420px] mx-auto leading-relaxed motion-safe:animate-rise-in" style={{ animationDelay: '120ms' }}>
-                      ვიდეო-ოთახი გაიხსნება დაწყებამდე 5 წუთით ადრე, პირდაპირ ბრაუზერში.
+                    <p className="text-small text-ink-500 mt-4 max-w-[420px] mx-auto leading-relaxed motion-safe:animate-rise-in" style={{ animationDelay: '120ms' }}>
+                      ვიდეოოთახი გაიხსნება დაწყებამდე 5 წუთით ადრე, პირდაპირ ბრაუზერში.
                     </p>
                   </div>
                 ) : (
                   <div className="text-center py-6">
-                    <div className="text-[11.5px] text-success-700 font-semibold uppercase tracking-wide mb-3 motion-safe:animate-pulse-soft">მზადაა შესვლა</div>
+                    <div className="text-meta text-success-700 font-semibold uppercase mb-3 motion-safe:animate-pulse-soft">მზადაა შესვლა</div>
                     <div className="flex flex-wrap items-center justify-center gap-2 max-w-full">
                       <a
                         href={booking.meetingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 h-14 px-8 max-w-full rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-bold text-[16px] tracking-wide shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.4)] transition-all duration-fast"
+                        className="inline-flex items-center justify-center gap-2 h-12 px-8 max-w-full rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-bold text-body-lg tracking-wide shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.4)] transition-all duration-fast"
                       >
-                        <Icon.video className="w-5 h-5" /> ვიდეო-ოთახში შესვლა
+                        <Icon.video className="w-5 h-5" /> ვიდეოოთახში შესვლა
                       </a>
                       <button
                         type="button"
@@ -360,7 +366,7 @@ export default function SessionRoom() {
                         }}
                         aria-label="ბმულის კოპირება"
                         title="დააკოპირე ბმული"
-                        className="h-14 w-14 inline-flex items-center justify-center rounded-btn bg-white border border-ink-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 text-ink-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+                        className="h-12 w-12 inline-flex items-center justify-center rounded-btn bg-white border border-ink-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 text-ink-600 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5" aria-hidden="true">
                           <path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1" />
@@ -368,14 +374,14 @@ export default function SessionRoom() {
                         </svg>
                       </button>
                     </div>
-                    <p className="text-[12.5px] text-ink-500 mt-4">
+                    <p className="text-small text-ink-500 mt-4">
                       გაიხსნება ახალ ტაბში.
                     </p>
                     {isTutor && (
                       <div className="mt-6 pt-6 border-t border-ink-100">
-                        <div className="text-[12px] text-ink-500 mb-3">სესიის ბოლოს მონიშნე დასრულებულად — სტუდენტი შეგაფასებს.</div>
+                        <div className="text-meta text-ink-500 mb-3">სესიის ბოლოს მონიშნე დასრულებულად — სტუდენტი შეგაფასებს.</div>
                         {completeErr && (
-                          <div role="alert" className="mb-3 mx-auto max-w-[380px] rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-[12.5px] px-3 py-2">
+                          <div role="alert" className="mb-3 mx-auto max-w-[380px] rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-small px-3 py-2">
                             {completeErr}
                           </div>
                         )}
@@ -391,7 +397,7 @@ export default function SessionRoom() {
           </div>
         </div>
 
-        <div className="mt-4 text-center text-[12px] text-ink-400">
+        <div className="mt-4 text-center text-meta text-ink-400">
           ვიდეოზარის შემდეგ — <Link href={backHref} className="text-brand-700 hover:text-brand-800 font-semibold">ჯავშნის დეტალები და მიმოწერა</Link>
         </div>
       </Container>

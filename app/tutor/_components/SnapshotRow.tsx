@@ -35,7 +35,10 @@ export function SnapshotRow({
     { label: 'დასრულებული', value: completed, sub: 'სესია ჯამში' },
     {
       label: 'სულ ნაშოვნი', value: totalEarned, prefix: '₾',
-      sub: FEATURE_PAYMENTS_V2 ? (pendingPayout ? `₾${pendingPayout} მოლოდინში` : 'ყველა გადახდილი') : 'გადახდები მალე',
+      // With payments off this used to read „გადახდები მალე" forever — a static
+      // string in a slot meant for a live figure. „სრულად შენია" at least tells
+      // the expert something true about the number above it.
+      sub: FEATURE_PAYMENTS_V2 ? (pendingPayout ? `₾${pendingPayout} მოლოდინში` : 'ყველა გადახდილი') : 'სრულად შენია',
     },
   ]
   return (
@@ -43,10 +46,10 @@ export function SnapshotRow({
       {cells.map((c, i) => (
         <div key={c.label} className={`p-4 sm:p-5 ${i >= 2 ? 'border-t sm:border-t-0 border-ink-100' : ''} ${i === 1 ? 'border-l sm:border-l-0 border-ink-100' : ''} ${i === 3 ? 'border-l sm:border-l-0 border-ink-100' : ''}`}>
           <Eyebrow tone="muted">{c.label}</Eyebrow>
-          <div className="font-display text-[22px] font-bold text-ink-900 tabular-nums mt-1 leading-none">
+          <div className="font-display text-h2 font-bold text-ink-900 tabular-nums mt-1 leading-none">
             <CountUp value={c.value} prefix={c.prefix ?? ''} />
           </div>
-          {c.sub && <div className="text-[11px] text-ink-500 mt-1.5">{c.sub}</div>}
+          {c.sub && <div className="text-meta text-ink-500 mt-1.5">{c.sub}</div>}
         </div>
       ))}
     </Card>

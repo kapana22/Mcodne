@@ -6,6 +6,25 @@ import { NextRequest, NextResponse } from 'next/server'
 // Also mirrors the request pathname into `x-current-path` so server components
 // (e.g. requireUser) can build a "return-here-after-signin" URL.
 export function middleware(req: NextRequest) {
+  // ── www → apex, permanently ────────────────────────────────────────────────
+  // DNS already points www.mcodne.ge at the apex, but Railway held no
+  // certificate for that host, so www failed at the TLS handshake — anyone who
+  // typed it got a browser security error, not the site. Once www is registered
+  // as a custom domain (and a cert is issued) it would serve the SAME content on
+  // a second hostname, i.e. textbook duplicate content. This 308 collapses it
+  // onto one canonical host before that can happen.
+  //
+  // 308 (not 302): permanent AND method-preserving, so a POST to a www URL
+  // isn't silently downgraded to GET.
+  const host = req.headers.get('host') ?? ''
+  if (host.startsWith('www.')) {
+    const url = req.nextUrl.clone()
+    url.host = host.slice(4)
+    url.protocol = 'https:'
+    url.port = ''
+    return NextResponse.redirect(url, 308)
+  }
+
   const path = req.nextUrl.pathname + req.nextUrl.search
   const res = NextResponse.next({
     request: { headers: new Headers([...req.headers.entries(), ['x-current-path', path]]) },

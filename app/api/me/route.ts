@@ -1,10 +1,19 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { cookies } from 'next/headers'
+import { kickSweep } from '@/lib/sweepRunner'
 import { z } from 'zod'
 import { getCurrentUser, hashPassword, verifyPassword, revokeOtherSessions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeAvatar } from '@/lib/normalizeAvatar'
 import { rateLimit } from '@/lib/rateLimit'
+import { georgianRefine } from '@/lib/georgianText'
+
+/** First human-readable custom message from a zod error, if any. */
+function firstCustomMessage(err: { issues: { code: string; message: string }[] }): string | null {
+  const hit = err.issues.find(i => i.code === 'custom' && /[Ⴀ-ჿᲐ-Ჿ]/.test(i.message))
+  return hit?.message ?? null
+}
+
 
 // The header/nav reads role from here to decide what to render. If the browser
 // serves a cached response, the top bar keeps showing the PREVIOUS role after
@@ -15,6 +24,14 @@ export const dynamic = 'force-dynamic'
 const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' }
 
 export async function GET() {
+  // Maintenance sweep, kicked off ordinary traffic. This route is hit on nearly
+  // every page load (AppShell reads the role from it), which makes it the
+  // cheapest reliable heartbeat in the app. `after()` keeps it strictly OFF the
+  // response path, and lib/sweepRunner claims atomically so only one request
+  // per 15 min actually does anything — see the WHY block in that file: the
+  // Railway cron reported success for days while never running the sweep.
+  after(() => kickSweep())
+
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ user: null }, { headers: NO_STORE })
   return NextResponse.json({
@@ -40,9 +57,12 @@ export async function GET() {
 }
 
 const Patch = z.object({
-  fullName: z.string().min(2).max(80).optional(),
+  // The site is Georgian-only at this stage (2026-08-02) — public text must
+  // be written in Georgian. Latin brands/acronyms inside it stay fine; see
+  // lib/georgianText.ts for the exact rule.
+  fullName: z.string().min(2).max(80).superRefine(georgianRefine('სახელი')).optional(),
   phone: z.string().max(40).optional(),
-  bio: z.string().max(500).optional(),
+  bio: z.string().max(500).superRefine(georgianRefine('აღწერა')).optional(),
   // Only a same-origin uploaded image (data:image/…) or an https URL — never a
   // `javascript:`/`data:text/html` string that could be reflected elsewhere.
   avatarUrl: z.string().max(500_000)
@@ -56,7 +76,12 @@ export async function PATCH(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
   const parsed = Patch.safeParse(await req.json().catch(() => ({})))
-  if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+  if (!parsed.success) {
+    // Surface OUR validation copy (e.g. the Georgian-language gate); zod's
+    // own English messages stay behind the generic code.
+    const msg = firstCustomMessage(parsed.error)
+    return NextResponse.json({ ok: false, error: msg ? 'INVALID_TEXT' : 'INVALID', message: msg ?? undefined }, { status: 400 })
+  }
 
   const { fullName, phone, bio, avatarUrl, currentPassword, newPassword } = parsed.data
 

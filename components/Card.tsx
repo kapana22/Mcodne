@@ -31,7 +31,7 @@ export function Card({
 }) {
   return (
     <Tag
-      className={`rounded-card border border-ink-200 bg-white ${PAD[padding]} ${interactive ? 'hover-lift transition-shadow' : ''} ${className}`}
+      className={`rounded-card border border-ink-200 bg-white ${PAD[padding]} ${interactive ? 'hover-lift transition-shadow duration-fast' : ''} ${className}`}
       {...rest}
     >
       {children}

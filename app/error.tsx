@@ -29,18 +29,21 @@ export default function Error({
       <span aria-hidden className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[560px] h-[560px] bg-[radial-gradient(closest-side,theme(colors.danger.500/10%),transparent)] pointer-events-none" />
 
       <div className="relative max-w-[520px] w-full text-center">
+        {/* OFF-RAMP (120/160px): a decorative gradient-clipped numeral, not
+            type — it's sized to the 520px plate, well past the ramp's top step
+            (text-hero, 64px). Deliberately outside the scale; do not "fix". */}
         <div className="font-display font-bold tabular-nums leading-none tracking-[-0.03em] text-[120px] sm:text-[160px] bg-danger-500 bg-clip-text text-transparent motion-safe:animate-scale-in">
           500
         </div>
 
-        <h1 className="mt-2 font-display text-[24px] sm:text-[28px] font-bold text-ink-900 tracking-tight motion-safe:animate-rise-in" style={{ animationDelay: '80ms' }}>
+        <h1 className="mt-2 font-display text-h1 font-bold text-ink-900 tracking-tight motion-safe:animate-rise-in" style={{ animationDelay: '80ms' }}>
           დროებითი ხარვეზი
         </h1>
-        <p className="mt-3 text-[14px] text-ink-600 leading-relaxed max-w-[420px] mx-auto motion-safe:animate-rise-in" style={{ animationDelay: '140ms' }}>
-          ჩვენს მხარეს რაღაც ხარვეზი მოხდა. ცოტა ხანში სცადე თავიდან, ან დაუბრუნდი მთავარს.
+        <p className="mt-3 text-body text-ink-600 leading-relaxed max-w-[420px] mx-auto motion-safe:animate-rise-in" style={{ animationDelay: '140ms' }}>
+          ხარვეზი ჩვენს მხარესაა. სცადე ხელახლა ან დაუბრუნდი მთავარს.
         </p>
         {error.digest && (
-          <p className="mt-4 inline-block font-mono text-[11px] text-ink-500 bg-ink-100 px-2.5 py-1 rounded-btn motion-safe:animate-fade-in" style={{ animationDelay: '200ms' }}>
+          <p className="mt-4 inline-block font-mono text-meta text-ink-500 bg-ink-100 px-2.5 py-1 rounded-btn motion-safe:animate-fade-in" style={{ animationDelay: '200ms' }}>
             ID: {error.digest}
           </p>
         )}
@@ -49,19 +52,19 @@ export default function Error({
           <button
             type="button"
             onClick={reset}
-            className="h-11 px-5 rounded-btn bg-brand-500 hover:bg-brand-600 text-white font-display font-semibold text-[13.5px] tracking-tight inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] transition-all duration-fast"
+            className="h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-tight inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] transition-all duration-fast"
           >
             თავიდან ცდა
           </button>
           <Link
             href="/"
-            className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-100 text-ink-800 font-display font-semibold text-[13.5px] tracking-tight inline-flex items-center transition-colors duration-fast"
+            className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-100 text-ink-800 font-display font-semibold text-body tracking-tight inline-flex items-center transition-colors duration-fast"
           >
             მთავარი
           </Link>
         </div>
 
-        <div className="mt-8 text-[12.5px] text-ink-500 motion-safe:animate-fade-in" style={{ animationDelay: '340ms' }}>
+        <div className="mt-8 text-small text-ink-500 motion-safe:animate-fade-in" style={{ animationDelay: '340ms' }}>
           თუ პრობლემა გრძელდება — {' '}
           <a href={`mailto:${SUPPORT_EMAIL}`} className="font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2">
             მოგვწერე

@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
+import { parseLimit } from '@/lib/apiParams'
 
 // Recent audit log entries. Includes actor's name/email so the UI doesn't need
 // a second lookup per row.
 export async function GET(req: Request) {
-  await requireRole('ADMIN')
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
 
   const { searchParams } = new URL(req.url)
   const action = searchParams.get('action')?.trim()
   const actorId = searchParams.get('actorId')?.trim()
-  const limit = Math.min(Number(searchParams.get('limit') ?? 100), 500)
+  const limit = parseLimit(searchParams.get('limit'), { fallback: 100, max: 500 })
 
   const where: any = {}
   if (action) where.action = { contains: action }

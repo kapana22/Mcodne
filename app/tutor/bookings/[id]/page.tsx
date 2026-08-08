@@ -12,6 +12,7 @@ import { ConfirmModal } from '@/components/ConfirmModal'
 import { Sheet } from '@/components/Sheet'
 import { RescheduleTimePicker } from '@/components/booking/RescheduleTimePicker'
 import { useToast } from '@/components/ToastProvider'
+import { FEATURE_ABROAD } from '@/lib/flags'
 import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
 import { fmtKaDate } from '@/lib/kaDate'
 import { BookingChat } from '@/components/chat/BookingChat'
@@ -47,6 +48,14 @@ type Booking = {
   durationMin: number
   price: number
   meetingUrl?: string | null
+  // A BOG/TBC payment page the expert (or an admin) pasted. Display only — no
+  // checkout, no webhook, PAYMENTS_LIVE untouched. See app/api/bookings/[id].
+  paymentLinkUrl?: string | null
+  // Request-based booking: the CLIENT named this time, so it is deliberately
+  // not in the expert's published schedule…
+  proposedByStudent?: boolean
+  // …and these are the other times they said would also work.
+  proposedAlternates?: { startAt: string }[] | null
   studentNotes?: string | null
   tutorNotes?: string | null
   student: { id: string; fullName: string; avatarUrl?: string | null; email: string }
@@ -129,6 +138,10 @@ export default function TutorBookingDetailPage() {
   const [rescheduleTime, setRescheduleTime] = useState('14:00')
   const [rescheduleReason, setRescheduleReason] = useState('')
   const [rescheduleErr, setRescheduleErr] = useState<string | null>(null)
+  // Payment link the expert pastes from their bank. Mirrored from the booking
+  // on load, exactly like tutorNotes above.
+  const [payLink, setPayLink] = useState('')
+  const [payLinkSaving, setPayLinkSaving] = useState(false)
   // Detect user's browser tz on mount; SSR/first paint uses Tbilisi.
   const [tz, setTz] = useState<string>(TBILISI)
   useEffect(() => { setTz(userTimezone()) }, [])
@@ -161,6 +174,7 @@ export default function TutorBookingDetailPage() {
         tutorBookingCache.set(bookingId, data)
         setBooking(data)
         setTutorNotes(data.tutorNotes ?? '')
+        setPayLink(data.paymentLinkUrl ?? '')
       } catch {
         if (!cancelled) toast('მონაცემების ჩატვირთვა ვერ მოხერხდა', 'error')
       }
@@ -241,6 +255,32 @@ export default function TutorBookingDetailPage() {
     finally { setNotesSaving(false) }
   }
 
+  // Save (or clear) the payment link. Same PATCH shape as the summary above.
+  // The server is the authority on what a payment link may be — https only —
+  // so this only relays its verdict rather than duplicating the rule.
+  const savePayLink = async () => {
+    if (!booking) return
+    setPayLinkSaving(true)
+    try {
+      const res = await fetch(`/api/bookings/${booking.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentLinkUrl: payLink.trim().slice(0, 2000) }),
+      })
+      const j = await res.json().catch(() => ({} as any))
+      if (!res.ok || !j.ok) {
+        showFlash('err', j?.error === 'BAD_PAYMENT_URL'
+          ? 'ბმული უნდა იწყებოდეს https://-ით'
+          : 'შენახვა ვერ მოხერხდა')
+        return
+      }
+      setBooking(b => b ? { ...b, paymentLinkUrl: j.paymentLinkUrl ?? null } : b)
+      setPayLink(j.paymentLinkUrl ?? '')
+      showFlash('ok', j.paymentLinkUrl ? 'ბმული შენახულია — კლიენტს ეცნობა' : 'ბმული წაიშალა')
+    } catch { showFlash('err', 'ქსელის შეცდომა') }
+    finally { setPayLinkSaving(false) }
+  }
+
   // Propose a new time. Server validates lead time + tutor availability slot.
   const openReschedule = () => {
     if (!booking) return
@@ -283,6 +323,33 @@ export default function TutorBookingDetailPage() {
       router.refresh()
       showFlash('ok', 'გადადების მოთხოვნა გაიგზავნა')
     } catch { setRescheduleErr('ქსელის შეცდომა') }
+    finally { setRescheduleBusy(null) }
+  }
+
+  // „This one works for me" on one of the times the CLIENT offered. Goes
+  // through the ordinary propose endpoint — see the panel's comment for why it
+  // is a proposal and not an immediate move.
+  const proposeAlternate = async (iso: string) => {
+    if (!booking || rescheduleBusy) return
+    setRescheduleBusy('send')
+    try {
+      const res = await fetch(`/api/bookings/${booking.id}/reschedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newStartAt: new Date(iso).toISOString(), reason: 'შენ მიერ შემოთავაზებული დრო' }),
+      })
+      const j = await res.json().catch(() => ({} as any))
+      if (!res.ok || !j.ok) {
+        showFlash('err',
+          j?.error === 'TOO_SOON' ? 'ეს დრო ძალიან ახლოსაა — მინიმუმ 1 საათი წინ'
+          : j?.error === 'NO_SLOT' ? 'ამ დროს სხვა ჯავშანი ემთხვევა'
+          : 'გაგზავნა ვერ მოხერხდა')
+        return
+      }
+      setBooking(b => b ? { ...b, rescheduleRequest: j.rescheduleRequest, status: 'PREPARING' } : b)
+      router.refresh()
+      showFlash('ok', 'გაეგზავნა კლიენტს დასადასტურებლად')
+    } catch { showFlash('err', 'ქსელის შეცდომა') }
     finally { setRescheduleBusy(null) }
   }
 
@@ -345,8 +412,8 @@ export default function TutorBookingDetailPage() {
             <div className="mx-auto w-12 h-12 rounded-full bg-ink-100 text-ink-500 flex items-center justify-center mb-3">
               <Icon.warn className="w-6 h-6" />
             </div>
-            <div className="font-display text-[17px] font-semibold text-ink-800">ჯავშანი ვერ მოიძებნა</div>
-            <div className="text-[13px] text-ink-500 mt-1">წაიშალა, ან არ არის შენი.</div>
+            <div className="font-display text-h3 font-semibold text-ink-800">ჯავშანი ვერ მოიძებნა</div>
+            <div className="text-small text-ink-500 mt-1">წაიშალა, ან არ არის შენი.</div>
             <div className="mt-5"><Btn href="/tutor/bookings" variant="secondary" size="sm">ჯავშნების სია</Btn></div>
           </div>
       </Container>
@@ -357,8 +424,8 @@ export default function TutorBookingDetailPage() {
     return (
       <Container size="content">
           <div className="p-12 rounded-card border border-ink-200 bg-white flex items-center justify-center text-ink-400">
-            <span className="inline-block w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-            <span className="ml-3 text-[13px]">იტვირთება…</span>
+            <span aria-hidden className="inline-block w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full motion-safe:animate-spin" />
+            <span className="ml-3 text-small">იტვირთება…</span>
           </div>
       </Container>
     )
@@ -406,22 +473,22 @@ export default function TutorBookingDetailPage() {
           <>
             <Link
               href={`/session/${booking.id}`}
-              className={`inline-flex items-center justify-center gap-2 font-display font-medium tracking-wide transition-colors rounded-btn h-11 px-4 text-sm w-full ${
+              className={`inline-flex items-center justify-center gap-2 font-display font-medium tracking-wide transition-colors duration-fast rounded-btn h-11 px-4 text-body w-full ${
                 isLiveNow
-                  ? 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-brand-glow'
+                  ? 'bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white shadow-brand-glow'
                   : canAcceptDecline
                   ? 'border border-ink-200 hover:bg-ink-50 text-ink-800'
-                  : 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-xs'
+                  : 'bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white shadow-xs'
               }`}
             >
-              <Icon.video className="w-4 h-4" /> ვიდეო-ოთახი
+              <Icon.video className="w-4 h-4" /> ვიდეოოთახი
             </Link>
             {booking.meetingUrl && (
               <a
                 href={booking.meetingUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-1.5 text-[11.5px] font-display font-semibold text-ink-500 hover:text-ink-800 transition-colors min-h-[32px]"
+                className="inline-flex items-center justify-center gap-1.5 text-meta font-display font-semibold text-ink-500 hover:text-ink-800 transition-colors duration-fast min-h-[32px]"
               >
                 <Icon.external className="w-3.5 h-3.5" /> გარე ბმული
               </a>
@@ -449,13 +516,13 @@ export default function TutorBookingDetailPage() {
           </Btn>
         )}
         {booking.status === 'COMPLETED' && (
-          <div className="text-[13px] text-ink-500">ჯავშანი დასრულდა.</div>
+          <div className="text-small text-ink-500">ჯავშანი დასრულდა.</div>
         )}
         {booking.status === 'CANCELED' && (
-          <div className="text-[13px] text-ink-500">ჯავშანი გაუქმდა.</div>
+          <div className="text-small text-ink-500">ჯავშანი გაუქმდა.</div>
         )}
         {booking.status === 'NO_SHOW' && (
-          <div className="text-[13px] text-danger-700">სტუდენტი არ გამოცხადდა.</div>
+          <div className="text-small text-danger-700">სტუდენტი არ გამოცხადდა.</div>
         )}
       </div>
     </div>
@@ -463,10 +530,10 @@ export default function TutorBookingDetailPage() {
 
   return (
     <div>
-        <div className="mb-5 flex items-center gap-3 text-[13px] text-ink-500">
-          <Link href="/tutor/bookings" className="hover:text-ink-800 inline-flex items-center gap-1"><Icon.arrow className="w-3.5 h-3.5 rotate-180" /> ჯავშნების სია</Link>
+        <div className="mb-5 flex items-center gap-3 text-small text-ink-500">
+          <Link href="/tutor/bookings" className="hover:text-ink-800 inline-flex items-center gap-1 min-h-[40px] sm:min-h-0"><Icon.arrow className="w-3.5 h-3.5 rotate-180" /> ჯავშნების სია</Link>
           <span className="text-ink-300">·</span>
-          <span className="font-mono text-[11.5px] text-ink-400">{booking.ref.slice(0, 12)}</span>
+          <span className="font-mono text-meta text-ink-400">{booking.ref.slice(0, 12)}</span>
         </div>
 
         {/* Pending reschedule proposal — banner drives the accept/reject
@@ -479,19 +546,19 @@ export default function TutorBookingDetailPage() {
           return (
             <div className="mb-4 rounded-card border border-warning-200 bg-warning-50 p-5 flex items-start gap-4 flex-wrap">
               <div className="min-w-0 flex-1">
-                <div className="font-display text-[10.5px] font-semibold uppercase tracking-[0.22em] text-warning-800 mb-1">
+                <div className="font-display text-micro font-semibold uppercase text-warning-800 mb-1">
                   {iProposed ? 'გადადება გაგზავნილია' : 'სტუდენტმა ითხოვა გადადება'}
                 </div>
-                <div className="font-display text-[14.5px] font-bold text-ink-900">
+                <div className="font-display text-body-lg font-bold text-ink-900">
                   ახალი დრო: {fmtDateTime(req.newStartAt, tz)}
                   {tz !== TBILISI && (
-                    <span className="ml-1 font-normal text-[11.5px] text-ink-500">
+                    <span className="ml-1 font-normal text-meta text-ink-500">
                       (თბილისის დროით: {fmtDateTime(req.newStartAt, TBILISI)})
                     </span>
                   )}
                 </div>
-                {req.reason && <p className="mt-1 text-[13px] text-ink-700 leading-[1.5] whitespace-pre-wrap">„{req.reason}“</p>}
-                {iProposed && <p className="mt-1 text-[12px] text-ink-500">ელოდება სტუდენტის პასუხს.</p>}
+                {req.reason && <p className="mt-1 text-small text-ink-700 whitespace-pre-wrap">„{req.reason}“</p>}
+                {iProposed && <p className="mt-1 text-meta text-ink-500">ელოდება სტუდენტის პასუხს.</p>}
               </div>
               {!iProposed && (
                 <div className="flex items-center gap-2 shrink-0">
@@ -516,22 +583,30 @@ export default function TutorBookingDetailPage() {
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <StatusPill tone={toneOf(booking.status)} />
                 {booking.status === 'PREPARING' && (
-                  <span className="text-[11.5px] text-warning-700 font-semibold">ელოდება პასუხს</span>
+                  <span className="text-meta text-warning-700 font-semibold">ელოდება პასუხს</span>
                 )}
               </div>
-              <h1 className="font-display text-[21px] sm:text-[24px] font-bold tracking-tight text-ink-900">{booking.topic}</h1>
-              <div className="text-[13px] text-ink-500 mt-2 flex items-center gap-3 flex-wrap">
+              <h1 className="font-display text-h2 sm:text-h1 font-bold tracking-tight text-ink-900">{booking.topic}</h1>
+              <div className="text-small text-ink-500 mt-2 flex items-center gap-3 flex-wrap">
                 <span className="inline-flex items-center gap-1"><Icon.calendar className="w-3.5 h-3.5" />{fmtDateTime(booking.startAt, tz)}</span>
                 <span className="inline-flex items-center gap-1"><Icon.clock className="w-3.5 h-3.5" />{booking.durationMin} წუთი</span>
               </div>
               {tz !== TBILISI && (
-                <div className="mt-1 text-[11.5px] text-ink-400">
+                <div className="mt-1 text-meta text-ink-400">
                   (თბილისის დროით: {fmtDateTime(booking.startAt, TBILISI)})
+                </div>
+              )}
+              {/* Same line the dashboard row carries: an out-of-schedule time
+                  with nothing explaining it reads as a calendar bug. Shown
+                  whether or not the client offered alternates. */}
+              {booking.proposedByStudent && (
+                <div className="mt-2 inline-flex items-center h-5 px-2 rounded-pill border border-ink-200 text-ink-700 font-display text-micro font-bold uppercase">
+                  კლიენტის შემოთავაზებული დრო
                 </div>
               )}
               {showRemainingPill && remainingLabel && (
                 <div className="mt-3">
-                  <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-pill bg-brand-50 border border-brand-200 text-[12px] font-display font-semibold text-brand-800">
+                  <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-pill bg-brand-50 border border-brand-200 text-meta font-display font-semibold text-brand-800">
                     <Icon.clock className="w-3 h-3" />
                     {remainingLabel === 'დაწყებულია' || remainingLabel === 'დასრულებულია'
                       ? remainingLabel
@@ -540,6 +615,54 @@ export default function TutorBookingDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* ── The client named these times ───────────────────────────────
+                Request-based booking (FEATURE_REQUEST_BOOKING). The time above
+                is the client's FIRST choice and is deliberately NOT in this
+                expert's published schedule — say so, or it reads as a bug in
+                the calendar. Their other choices sit here so the answer is one
+                decision instead of a thread.
+
+                Tapping one sends an ORDINARY reschedule proposal, which the
+                client then accepts. It does NOT move the booking on the spot,
+                and that is deliberate: the propose→respond machinery already
+                exists, is already tested, and already handles the lead time,
+                the overlap re-check, the notification and the email. Inventing
+                a second, quieter path to move a booking would be a second state
+                machine to keep honest. The client offered the time, so their
+                „yes" is a formality — but it is a formality that leaves the
+                system with exactly one way a session's time can change. */}
+            {booking.proposedByStudent && (booking.proposedAlternates?.length ?? 0) > 0
+              && (booking.status === 'PREPARING') && (
+              <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5 sm:p-6">
+                <Eyebrow tone="muted" className="mb-2">კლიენტის შემოთავაზებული დროები</Eyebrow>
+                <p className="text-meta text-ink-500 leading-snug">
+                  ეს დროები კლიენტმა დაასახელა — შენს გამოქვეყნებულ განრიგში არაა. დაადასტურე ზემოთ მოცემული დრო, ან შესთავაზე ერთ-ერთი ეს.
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {(booking.proposedAlternates ?? []).map((alt, i) => (
+                    <li key={`${alt.startAt}-${i}`} className="flex items-center gap-3 flex-wrap">
+                      <span className="flex-1 min-w-0 text-body text-ink-800">
+                        {fmtDateTime(alt.startAt, tz)}
+                        {tz !== TBILISI && (
+                          <span className="ml-1.5 text-meta text-ink-400">
+                            (თბილისის დროით: {fmtDateTime(alt.startAt, TBILISI)})
+                          </span>
+                        )}
+                      </span>
+                      <Btn
+                        variant="secondary"
+                        size="sm"
+                        disabled={rescheduleBusy !== null}
+                        onClick={() => proposeAlternate(alt.startAt)}
+                      >
+                        ეს დრო მაწყობს
+                      </Btn>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Actions surface above the fold on mobile; rail owns them on lg */}
             <div className="lg:hidden">{actionPanel}</div>
@@ -553,7 +676,7 @@ export default function TutorBookingDetailPage() {
                 {booking.studentNotes && (
                   <div>
                     <Eyebrow tone="muted" className="mb-2">სტუდენტის შენიშვნა</Eyebrow>
-                    <div className="p-3 rounded-btn bg-ink-50 border border-ink-200 text-[13px] text-ink-700 whitespace-pre-wrap">
+                    <div className="p-3 rounded-btn bg-ink-50 border border-ink-200 text-small text-ink-700 whitespace-pre-wrap">
                       {booking.studentNotes}
                     </div>
                   </div>
@@ -561,17 +684,17 @@ export default function TutorBookingDetailPage() {
                 {booking.status === 'COMPLETED' && (
                   <div>
                     <Eyebrow className="mb-1">შემაჯამებელი</Eyebrow>
-                    <h3 className="font-display text-[14px] font-bold text-ink-900 tracking-tight">დაუტოვე გამოხმაურება</h3>
-                    <p className="text-[12px] text-ink-500 mt-0.5">სტუდენტი ნახავს თავის ჯავშანში.</p>
+                    <h3 className="font-display text-body font-bold text-ink-900 tracking-tight">დაუტოვე გამოხმაურება</h3>
+                    <p className="text-meta text-ink-500 mt-0.5">სტუდენტი ნახავს თავის ჯავშანში.</p>
                     <textarea
                       value={tutorNotes}
                       onChange={(e) => setTutorNotes(e.target.value.slice(0, 1500))}
                       rows={5}
                       placeholder="რა გავიარეთ, რაზე იმუშაოს, რეკომენდაციები…"
-                      className="mt-2 w-full p-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[13.5px] resize-none leading-relaxed"
+                      className="mt-2 w-full p-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body resize-none leading-relaxed"
                     />
                     <div className="mt-2 flex items-center justify-between gap-3">
-                      <span className="font-mono text-[10.5px] tabular-nums text-ink-400">{tutorNotes.length} / 1500</span>
+                      <span className="font-mono text-meta tabular-nums text-ink-400">{tutorNotes.length} / 1500</span>
                       <Btn variant="primary" size="sm" onClick={saveTutorNotes} disabled={notesSaving}>
                         {notesSaving ? 'ინახება…' : 'შენახვა'}
                       </Btn>
@@ -614,11 +737,11 @@ export default function TutorBookingDetailPage() {
               <div className="flex items-center gap-3">
                 <Avatar src={booking.student.avatarUrl ?? undefined} name={booking.student.fullName} size={48} />
                 <div className="min-w-0 flex-1">
-                  <div className="font-display text-[14.5px] font-bold text-ink-900 truncate">{booking.student.fullName}</div>
-                  <div className="text-[12px] text-ink-500 truncate">{booking.student.email}</div>
+                  <div className="font-display text-body-lg font-bold text-ink-900 truncate">{booking.student.fullName}</div>
+                  <div className="text-meta text-ink-500 truncate">{booking.student.email}</div>
                 </div>
               </div>
-              <a href="#chat" className="mt-3 flex items-center justify-center gap-2 h-9 rounded-btn border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-[12.5px] transition-colors">
+              <a href="#chat" className="mt-3 flex items-center justify-center gap-2 h-10 sm:h-9 rounded-btn border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-small transition-colors duration-fast">
                 <Icon.chat className="w-4 h-4" /> მიწერა
               </a>
             </div>
@@ -629,14 +752,59 @@ export default function TutorBookingDetailPage() {
             <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5">
               <Eyebrow tone="muted" className="mb-3">ღირებულება</Eyebrow>
               <div className="flex items-baseline justify-between">
-                <span className="font-display text-[24px] font-bold text-ink-900 tabular-nums">₾{booking.price}</span>
-                <span className="text-[12px] text-ink-500">{booking.durationMin} წთ</span>
+                <span className="font-display text-h1 font-bold text-ink-900 tabular-nums">₾{booking.price}</span>
+                <span className="text-meta text-ink-500">{booking.durationMin} წთ</span>
               </div>
-              <p className="mt-2 text-[11.5px] text-ink-500 leading-snug">
+              <p className="mt-2 text-meta text-ink-500 leading-snug">
                 ახლა ჯავშნა უფასოა — გადახდები მალე.
               </p>
-              <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between text-[11px]">
-                <span className="text-ink-400 uppercase tracking-[0.14em] font-display font-semibold">Ref</span>
+
+              {/* ── Payment link ────────────────────────────────────────────
+                  Not a platform checkout and not a step toward one: the expert
+                  pastes the link their own bank generated, and the client gets
+                  a button instead of a link read out in a message. Everything
+                  about the platform's money model is unchanged — the line above
+                  still says payments are not live, because they are not.
+                  Hidden once the booking is terminal: asking a client to pay
+                  for a canceled session is a bug, not a nudge. */}
+              {/* FEATURE_ABROAD-gated. The field was added FOR the diaspora
+                  vertical — a client abroad cannot hand over cash — so it
+                  belongs to that flag like everything else the vertical added.
+                  Without this gate it was the one change an existing expert
+                  could see while the vertical was supposedly dark, which is
+                  exactly the thing the flag exists to prevent. */}
+              {FEATURE_ABROAD && booking.status !== 'CANCELED' && booking.status !== 'NO_SHOW' && (
+                <div className="mt-4 pt-4 border-t border-ink-100">
+                  <Eyebrow as="label" tone="muted" htmlFor="pay-link" className="block mb-2">
+                    გადახდის ბმული
+                  </Eyebrow>
+                  <input
+                    id="pay-link"
+                    type="url"
+                    inputMode="url"
+                    value={payLink}
+                    onChange={e => setPayLink(e.target.value)}
+                    placeholder="https://…"
+                    className="w-full h-11 px-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 text-body text-ink-900 transition-colors duration-fast"
+                  />
+                  <p className="mt-1.5 text-meta text-ink-500 leading-snug">
+                    ჩასვი BOG-ის ან TBC-ის ბმული — კლიენტი მას ღილაკად დაინახავს. ცარიელი ველი ბმულს შლის.
+                  </p>
+                  <Btn
+                    variant="secondary"
+                    size="sm"
+                    className="mt-2 w-full"
+                    loading={payLinkSaving}
+                    disabled={payLink.trim() === (booking.paymentLinkUrl ?? '')}
+                    onClick={savePayLink}
+                  >
+                    შენახვა
+                  </Btn>
+                </div>
+              )}
+
+              <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between text-meta">
+                <span className="text-ink-400 uppercase font-display font-semibold">Ref</span>
                 <span className="font-mono text-ink-500">{booking.ref.slice(0, 12)}</span>
               </div>
             </div>
@@ -659,7 +827,7 @@ export default function TutorBookingDetailPage() {
               type="button"
               onClick={() => setRescheduleOpen(false)}
               disabled={rescheduleBusy !== null}
-              className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800 disabled:opacity-40"
+              className="font-display text-small font-semibold text-ink-500 hover:text-ink-800 disabled:opacity-40"
             >
               გაუქმება
             </button>
@@ -670,7 +838,7 @@ export default function TutorBookingDetailPage() {
         }
       >
             <div className="space-y-4">
-              <div className="text-[12px] text-ink-500">
+              <div className="text-meta text-ink-500">
                 ამჟამინდელი: <span className="font-display font-semibold text-ink-900">
                   {fmtDateTime(booking.startAt, tz)}
                 </span>
@@ -685,11 +853,11 @@ export default function TutorBookingDetailPage() {
                   onChange={(e) => setRescheduleReason(e.target.value.slice(0, 500))}
                   rows={3}
                   placeholder="მოკლედ — რატომ…"
-                  className="w-full p-3 rounded-field border border-ink-200 text-[13px] focus:border-brand-500 focus:outline-none resize-none leading-relaxed"
+                  className="w-full p-3 rounded-field border border-ink-200 text-small focus:border-brand-500 focus:outline-none resize-none leading-relaxed"
                 />
               </div>
               {rescheduleErr && (
-                <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-[12px] font-medium">
+                <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-meta font-medium">
                   {rescheduleErr}
                 </div>
               )}
@@ -778,26 +946,26 @@ function ReviewBlock({
             <Icon.star aria-hidden key={n} className={`w-4 h-4 ${n <= review.rating ? 'text-warning-500' : 'text-ink-200'}`} />
           ))}
         </span>
-        <span className="font-display text-[13px] font-bold text-ink-900 tabular-nums">{review.rating}.0</span>
-        <span className="ml-auto font-mono text-[10.5px] tabular-nums text-ink-400">{fmtKaDate(new Date(review.createdAt), { year: true })}</span>
+        <span className="font-display text-small font-bold text-ink-900 tabular-nums">{review.rating}.0</span>
+        <span className="ml-auto font-mono text-meta tabular-nums text-ink-400">{fmtKaDate(new Date(review.createdAt), { year: true })}</span>
       </div>
-      <p className="mt-2 text-[13.5px] text-ink-800 leading-[1.6] whitespace-pre-wrap">{review.body}</p>
+      <p className="mt-2 text-body text-ink-800 leading-[1.6] whitespace-pre-wrap">{review.body}</p>
 
       <div className="mt-4 pt-4 border-t border-ink-100">
         {review.tutorResponse && !editing ? (
           <>
             <Eyebrow className="mb-1.5">შენი პასუხი</Eyebrow>
-            <blockquote className="border-l-2 border-brand-300 pl-3 text-[13px] text-ink-800 leading-[1.6] whitespace-pre-wrap">
+            <blockquote className="border-l-2 border-brand-300 pl-3 text-small text-ink-800 leading-[1.6] whitespace-pre-wrap">
               {review.tutorResponse}
             </blockquote>
             <div className="mt-2 flex items-center gap-3">
               {review.respondedAt && (
-                <span className="font-mono text-[10.5px] tabular-nums text-ink-400">{fmtKaDate(new Date(review.respondedAt), { year: true })}</span>
+                <span className="font-mono text-meta tabular-nums text-ink-400">{fmtKaDate(new Date(review.respondedAt), { year: true })}</span>
               )}
               <button
                 type="button"
                 onClick={() => { setText(review.tutorResponse ?? ''); setEditing(true) }}
-                className="font-display text-[12px] font-semibold text-brand-700 hover:text-brand-900 underline underline-offset-2 decoration-dotted"
+                className="font-display text-meta font-semibold text-brand-700 hover:text-brand-900 underline underline-offset-2 decoration-dotted"
               >
                 რედაქტირება
               </button>
@@ -813,12 +981,12 @@ function ReviewBlock({
               onChange={e => setText(e.target.value.slice(0, 600))}
               rows={3}
               placeholder="მადლობა შეფასებისთვის…"
-              className="w-full p-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-[13.5px] resize-none leading-relaxed"
+              className="w-full p-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body resize-none leading-relaxed"
             />
             <div className="mt-2 flex items-center justify-between gap-3">
-              <span className="font-mono text-[10.5px] tabular-nums text-ink-400">{text.length} / 600</span>
+              <span className="font-mono text-meta tabular-nums text-ink-400">{text.length} / 600</span>
               <div className="flex items-center gap-3">
-                <button type="button" onClick={() => setEditing(false)} className="font-display text-[12.5px] font-semibold text-ink-500 hover:text-ink-800">
+                <button type="button" onClick={() => setEditing(false)} className="font-display text-small font-semibold text-ink-500 hover:text-ink-800">
                   გაუქმება
                 </button>
                 <Btn variant="primary" size="sm" onClick={submit} disabled={saving || trimmed.length < 2}>
@@ -826,13 +994,13 @@ function ReviewBlock({
                 </Btn>
               </div>
             </div>
-            <p className="mt-1.5 text-[11.5px] text-ink-500">პასუხი საჯაროდ ჩანს პროფილზე.</p>
+            <p className="mt-1.5 text-meta text-ink-500">პასუხი საჯაროდ ჩანს პროფილზე.</p>
           </div>
         ) : (
           <button
             type="button"
             onClick={() => { setText(''); setEditing(true) }}
-            className="font-display text-[12.5px] font-semibold text-brand-700 hover:text-brand-900 inline-flex items-center gap-1.5"
+            className="font-display text-small font-semibold text-brand-700 hover:text-brand-900 inline-flex items-center gap-1.5"
           >
             <Icon.chat className="w-3.5 h-3.5" /> უპასუხე შეფასებას
           </button>
@@ -849,7 +1017,7 @@ function SessionTimeline({ status, startAt, durationMin }: { status: BookingStat
     return (
       <div className="rounded-card border border-ink-200 bg-ink-50/60 px-5 py-3.5 flex items-center gap-2.5">
         <Icon.x className="w-4 h-4 text-ink-400 shrink-0" />
-        <span className="text-[12.5px] text-ink-500">
+        <span className="text-small text-ink-500">
           {status === 'CANCELED' ? 'ჯავშანი გაუქმდა.' : 'სესია არ შედგა.'}
         </span>
       </div>
@@ -873,7 +1041,7 @@ function SessionTimeline({ status, startAt, durationMin }: { status: BookingStat
               {i > 0 && <span className={`flex-1 h-px mx-2 ${done ? 'bg-brand-400' : 'bg-ink-200'}`} aria-hidden />}
               <span className="flex flex-col items-center gap-1.5 shrink-0">
                 <span className={`w-5 h-5 rounded-full inline-flex items-center justify-center border ${
-                  done ? 'bg-brand-500 border-brand-500 text-white'
+                  done ? 'bg-brand-600 border-brand-600 text-white'
                   : current ? 'bg-white border-brand-400 text-brand-600'
                   : 'bg-white border-ink-300 text-transparent'
                 }`}>
@@ -881,7 +1049,7 @@ function SessionTimeline({ status, startAt, durationMin }: { status: BookingStat
                       the ring color + the bolder label underneath. */}
                   {done ? <Icon.check className="w-3 h-3" /> : null}
                 </span>
-                <span className={`font-display text-[10px] font-semibold uppercase tracking-[0.08em] ${done || current ? 'text-ink-800' : 'text-ink-400'}`}>
+                <span className={`font-display text-micro font-semibold uppercase ${done || current ? 'text-ink-800' : 'text-ink-400'}`}>
                   {label}
                 </span>
               </span>

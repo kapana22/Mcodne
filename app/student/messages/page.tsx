@@ -10,8 +10,8 @@ export default function StudentMessagesIndexPage() {
       <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white border border-ink-200 text-ink-400 mb-3">
         <Icon.chat className="w-6 h-6" />
       </span>
-      <div className="font-display text-[14px] font-semibold text-ink-700">აირჩიე მიმოწერა</div>
-      <p className="text-[12.5px] text-ink-500 mt-1 max-w-[280px]">
+      <div className="font-display text-body font-semibold text-ink-700">აირჩიე მიმოწერა</div>
+      <p className="text-small text-ink-500 mt-1 max-w-[280px]">
         ხილულია მხოლოდ შენ და ექსპერტისთვის.
       </p>
     </div>

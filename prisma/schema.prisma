@@ -51,6 +51,39 @@ enum ServiceType {
   RECURRING
 }
 
+// WHAT this profile is, as opposed to what it may DO.
+//
+// Deliberately NOT a Role. A role answers „what are you allowed to do", and an
+// expert and a teacher are allowed exactly the same things: publish time, be
+// booked, message, be paid, be reviewed. What differs is what they SELL and how
+// they are presented — that is a type. Making it a Role would have touched 87
+// call sites, roleHome/postAuthHome, the approve flow, the dual-role switcher
+// and the auth-routing invariants, and bought nothing this field does not.
+//
+// italki ships exactly this shape: „Professional Teacher" and „Community Tutor"
+// are two types of the same account, with different admission requirements and
+// different presentation, not two roles.
+//
+// Mutually exclusive on purpose — a person is one or the other. Existing rows
+// default to EXPERT, so nothing moves when the column lands.
+enum ProfileType {
+  EXPERT
+  TEACHER
+}
+
+// A bought package's life. REQUESTED is the state that exists only because
+// there is no payment gateway yet: the client asks, the two settle offline, and
+// the expert flips it to ACTIVE by hand (audit-logged). Once checkout ships,
+// the gateway callback sets ACTIVE and REQUESTED simply stops being reachable —
+// no migration, no rename.
+enum EnrollmentStatus {
+  REQUESTED
+  ACTIVE
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
 model User {
   id            String   @id @default(cuid())
   email         String   @unique
@@ -76,6 +109,7 @@ model User {
   tutor             TutorProfile?
   application       TutorApplication?
   bookingsAsStudent Booking[]            @relation("StudentBookings")
+  enrollments       Enrollment[]         @relation("StudentEnrollments")
   sentMessages      Message[]            @relation("SentMessages")
   receivedMessages  Message[]            @relation("ReceivedMessages")
   reviewsGiven      Review[]             @relation("ReviewsGiven")
@@ -88,6 +122,9 @@ model User {
   // Admin filters + list order-by
   @@index([role])
   @@index([createdAt])
+  // Expert search matches on the expert's name too — see the TutorProfile
+  // trigram block. Also created in lib/dbBoot under this same name.
+  @@index([fullName(ops: raw("gin_trgm_ops"))], type: Gin, map: "User_fullName_trgm_idx")
 }
 
 model OtpCode {
@@ -147,6 +184,10 @@ model Category {
   // Admin can hide categories from public browse without deleting them.
   isLive             Boolean        @default(true)
   tutors             TutorProfile[]
+
+  // Searching a sphere by its visible label („მარკეტინგში") must find that
+  // sphere's experts — see the TutorProfile trigram block. Also in lib/dbBoot.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Category_name_trgm_idx")
 }
 
 // Blog post — DB-backed so content is edited in the admin panel, not in code.
@@ -182,6 +223,10 @@ model SiteText {
 
 model TutorProfile {
   id                      String      @id @default(cuid())
+  // Human-readable public URL segment, e.g. "ana-gagoshidze" → /tutors/ana-gagoshidze.
+  // Nullable: legacy rows are backfilled by lib/expertSlug.ts, and the route
+  // resolves by id as well, so a null slug is never a broken profile.
+  slug                    String?     @unique
   userId                  String      @unique
   headline                String
   bio                     String?
@@ -194,7 +239,21 @@ model TutorProfile {
   currency                String      @default("GEL")
   verified                Boolean     @default(false)
   available               Boolean     @default(true)
+  // SELF-DECLARED response promise, typed in by the expert in /tutor/profile.
+  // Unverifiable, so it is NO LONGER a public trust signal — the browse list
+  // omits it entirely and the card/profile render `responseMedianMin` instead.
+  // Kept only because the profile editor still writes it; the editor field
+  // should be relabelled or removed.
   responseHours           Int         @default(24)
+  // MEASURED first-response time: the median minutes an expert takes to answer
+  // a conversation the OTHER party started, over the last 90 days, and the
+  // number of answered conversations that median came from. Both nullable —
+  // null (or a sample below RESPONSE_MIN_SAMPLE) means "not enough data", and
+  // the UI must then show NOTHING rather than fall back to responseHours.
+  // Definition + math: lib/responseTime.ts. Written by lib/responseTimeStore.
+  // Also added idempotently in lib/dbBoot, so no `prisma db push` is required.
+  responseMedianMin       Int?
+  responseSampleN         Int?
   languages               String[]    @default(["ka"])
   linkedinUrl             String?
   websiteUrl              String?
@@ -217,6 +276,27 @@ model TutorProfile {
   videoUrl                String?
   // Admin-curated homepage featured slot — appears in landing hero when true.
   featured                Boolean     @default(false)
+  // EXPERT (one-off consultations) or TEACHER (monthly packages). See enum
+  // ProfileType for why this is a type and not a Role.
+  //
+  // Drives four things and nothing else: which route lists them, which product
+  // they may create, which profile FIELDS they are asked for (stored in
+  // `professionData`, the existing per-profession JSON bag), and which words the
+  // UI uses. Permissions are untouched.
+  profileType             ProfileType @default(EXPERT)
+  // Admin-curated: may this expert sell teaching PACKAGES? (2026-08-05)
+  //
+  // This is the ONE gate for the whole packages vertical, and it is deliberately
+  // an allowlist that starts empty. It is NOT `serviceType`: 11 of 21 live
+  // profiles already carry a legacy RECURRING value nobody reads, so filtering
+  // browse on serviceType would have wiped half the catalog (see lib/flags.ts →
+  // FEATURE_PACKAGES). An empty allowlist can only ever produce an empty page.
+  //
+  // Two directions, both safe while nobody is enabled:
+  //   · the teaching route lists ONLY profiles where this is true;
+  //   · the consultation browse (lib/tutorsQuery) EXCLUDES them, so one card
+  //     never mixes „₾100 · 60 წთ" with „₾640 · 8 გაკვეთილი".
+  packagesEnabled         Boolean     @default(false)
   createdAt               DateTime    @default(now())
   updatedAt               DateTime    @updatedAt
 
@@ -231,6 +311,8 @@ model TutorProfile {
   certificates  Certificate[]
   education     Education[]
   experience    Experience[]
+  packages      Package[]
+  enrollments   Enrollment[]
 
   @@index([serviceType])
   // Fast lookup for admin-curated hero on /
@@ -242,6 +324,15 @@ model TutorProfile {
   // Postgres doesn't auto-index FKs: every category-filtered browse and the
   // /categories counts scanned the whole table without this. Also in dbBoot.
   @@index([categoryId])
+  // Trigram (GIN) indexes backing the Georgian-aware search in
+  // lib/tutorsQuery: Georgian declines heavily, so search ranks by
+  // word_similarity() rather than substring. A gin_trgm_ops index also serves
+  // the ILIKE '%…%' arm that predicate keeps. Requires the pg_trgm extension,
+  // which lib/dbBoot creates idempotently at boot (so no `prisma db push` is
+  // needed); dbBoot also creates these same indexes under the same names.
+  @@index([specialty(ops: raw("gin_trgm_ops"))], type: Gin, map: "TutorProfile_specialty_trgm_idx")
+  @@index([headline(ops: raw("gin_trgm_ops"))], type: Gin, map: "TutorProfile_headline_trgm_idx")
+  @@index([bio(ops: raw("gin_trgm_ops"))], type: Gin, map: "TutorProfile_bio_trgm_idx")
 }
 
 model Certificate {
@@ -304,6 +395,99 @@ model Consultation {
   @@index([tutorId])
 }
 
+// A teaching PACKAGE — N prepaid lessons an expert sells as one product.
+// Sibling of Consultation: that model is one session you buy once, this one is
+// a block you draw down over a month. Gated by TutorProfile.packagesEnabled and
+// FEATURE_PACKAGES; invisible until both are on.
+model Package {
+  id               String  @id @default(cuid())
+  tutorId          String
+  title            String
+  description      String
+  // How many lessons the block contains. 8 is the Georgian market's unit
+  // (2/week × 4 weeks) — gurus.ge/servisebi.ge listings price exactly that.
+  lessonsCount     Int
+  minutesPerLesson Int
+  // The TOTAL price of the block in GEL — never a per-lesson rate.
+  //
+  // The per-lesson figure is DERIVED for display (price / lessonsCount) and is
+  // never an input. Reason, learned the hard way on this codebase: an expert
+  // whose card said „₾80 · 30 წთ" while their profile rail said „₾25-დან" had
+  // one real offer and three published prices. One stored number, one truth.
+  price            Int
+  // How long the block stays spendable once it goes ACTIVE. 30 = „1 თვე".
+  validDays        Int     @default(30)
+  // Expert's own on/off, independent of the admin's packagesEnabled gate.
+  active           Boolean @default(true)
+
+  tutor       TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+
+  // „this expert's packages" on every profile view
+  @@index([tutorId])
+}
+
+// One package, bought by one client — the thing that actually holds the money
+// and the remaining lessons. Every scalar the client agreed to is SNAPSHOTTED
+// here, so an expert editing (or deleting) the Package later cannot rewrite a
+// deal that is already running.
+model Enrollment {
+  id        String           @id @default(cuid())
+  packageId String?
+  studentId String
+  // Denormalised from Package.tutorId so „my students" is one indexed read and
+  // survives the package being deleted.
+  tutorId   String
+  status    EnrollmentStatus @default(REQUESTED)
+
+  lessonsTotal   Int
+  lessonsUsed    Int @default(0)
+  // priceTotal is what the client owes; perLessonPrice is priceTotal spread
+  // over lessonsTotal and exists ONLY so a package lesson can display a
+  // non-zero value to the expert.
+  //
+  // ⚠️ REVENUE IS COUNTED HERE, NEVER ON THE BOOKINGS. A booking that carries
+  // an enrollmentId contributes 0 — its Enrollment already counted. Summing
+  // Booking.price across a package would double-count the whole block.
+  priceTotal     Int
+  perLessonPrice Int
+  // Lesson length, snapshotted like the money above. Nullable ONLY for rows
+  // created before this column existed (dbBoot backfills them from the
+  // package); every new enrollment writes it. Read it through
+  // `enrollmentMinutes()` in lib/packages — never off `package` directly, or a
+  // later edit to the Package rewrites a deal someone already agreed to.
+  minutesPerLesson Int?
+
+  // Set by hand by the expert while PAYMENTS_LIVE is false (audit-logged), by
+  // the gateway callback once it isn't. Null → still REQUESTED.
+  paidAt    DateTime?
+  startsAt  DateTime?
+  // paidAt + validDays. EXTENDS when the EXPERT cancels or no-shows: the client
+  // did nothing wrong and must not lose the days. A client-side cancellation
+  // refunds the credit (subject to CANCEL_CUTOFF_HOURS) but never moves this.
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Restrict on student/tutor, matching Booking: an account with package
+  // history must not be cascade-wiped out from under its counterparty.
+  student  User         @relation("StudentEnrollments", fields: [studentId], references: [id])
+  tutor    TutorProfile @relation(fields: [tutorId], references: [id])
+  // A deleted package nulls the FK; this row keeps its own snapshot, so the
+  // running deal loses nothing.
+  package  Package?     @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  bookings Booking[]
+
+  // „my packages", newest first — the student dashboard's only query here.
+  @@index([studentId, createdAt])
+  // „students on a package with me" + the expert's inbox of REQUESTED ones.
+  @@index([tutorId, status])
+  // The expiry sweep: find ACTIVE rows past their date.
+  @@index([status, expiresAt])
+  @@index([packageId])
+}
+
 // A row is a WINDOW of published availability, never a pre-sliced ticket. Start
 // times are derived at request time (windows − active bookings − service length
 // − buffer) by lib/availability; exactly-touching rows merge, so legacy
@@ -357,13 +541,35 @@ model Booking {
   // Track cancellation source so admin can see tutor-cancel rate vs student.
   cancelledBy    Role?
   cancelReason   String?
-  // These two columns are created at boot by lib/dbBoot.ts and accessed via raw
-  // SQL only. They MUST be declared here so a `prisma db push` treats them as
-  // source-of-truth and does NOT drop them (dropping rescheduleRequest wipes all
-  // pending reschedule proposals; dropping sessionReminderSentAt double-sends
-  // reminder emails). See lib/dbBoot.ts.
+  // These columns are created at boot by lib/dbBoot.ts. They MUST be declared
+  // here so a `prisma db push` treats them as source-of-truth and does NOT drop
+  // them (dropping rescheduleRequest wipes all pending reschedule proposals;
+  // dropping sessionReminderSentAt double-sends reminder emails). See lib/dbBoot.ts.
   rescheduleRequest     Json?
   sessionReminderSentAt DateTime?
+  // ⚠️ proposedByStudent shipped 2026-08-04 in dbBoot WITHOUT a declaration
+  // here — i.e. one `prisma db push` away from silently erasing which bookings
+  // the client had proposed. Declared now, together with the two columns the
+  // diaspora vertical adds, so the block above tells the whole truth again.
+  //   proposedByStudent  — the client named this time; it is not in the
+  //                        expert's published schedule and their UI says so.
+  //   proposedAlternates — their 2nd/3rd choice, [{ startAt }], max 2.
+  //   paymentLinkUrl     — a BOG/TBC link an expert or admin pasted. Display
+  //                        only; no checkout, no webhook, PAYMENTS_LIVE untouched.
+  proposedByStudent     Boolean   @default(false)
+  proposedAlternates    Json?
+  paymentLinkUrl        String?
+  // The lesson this booking spends, when it came out of a package (2026-08-05).
+  // NULL = an ordinary one-off booking, i.e. every row that exists today.
+  //
+  // This single nullable column is the whole packages design. A package lesson
+  // is an ORDINARY Booking, so reschedule, cancel, the video room, messages,
+  // reminders, no-show, disputes and the .ics feed all keep working with no new
+  // code — there is deliberately no parallel booking system to maintain.
+  //
+  // ⚠️ Financial aggregates MUST filter `enrollmentId IS NULL`. The Enrollment
+  // already booked the revenue; counting these too double-counts the block.
+  enrollmentId          String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -376,6 +582,7 @@ model Booking {
   // A deleted consultation offering nulls the FK; the booking keeps its own
   // snapshotted price/duration, so no data is lost.
   consultation       Consultation?       @relation(fields: [consultationId], references: [id], onDelete: SetNull)
+  enrollment         Enrollment?         @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
   messages           Message[]
   review             Review?
   rescheduleRequests RescheduleRequest[]
@@ -396,6 +603,8 @@ model Booking {
   @@index([updatedAt])
   // Admin finance / analytics filter by createdAt for date-window aggregates
   @@index([createdAt])
+  // „the lessons of this package", and the revenue rule's IS NULL filter
+  @@index([enrollmentId])
 }
 
 model Message {

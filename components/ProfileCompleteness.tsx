@@ -94,11 +94,11 @@ export function ProfileCompleteness({
           <Eyebrow>
             {label}
           </Eyebrow>
-          <div className={`font-display font-bold text-ink-900 tracking-tight mt-1 ${variant === 'compact' ? 'text-[14px]' : 'text-[16px]'}`}>
+          <div className={`font-display font-bold text-ink-900 tracking-tight mt-1 ${variant === 'compact' ? 'text-body' : 'text-body-lg'}`}>
             {percent >= 100 ? 'პროფილი 100% სრულია' : `დარჩენილია ${undone.length} ნაბიჯი`}
           </div>
         </div>
-        <div className="font-display font-bold text-brand-700 tabular-nums leading-none text-[22px]">
+        <div className="font-display font-bold text-brand-700 tabular-nums leading-none text-h2">
           {percent}%
         </div>
       </div>
@@ -119,7 +119,7 @@ export function ProfileCompleteness({
       </div>
 
       {/* Checklist */}
-      <ul className={`mt-4 space-y-1.5 ${variant === 'compact' ? 'text-[12px]' : 'text-[12.5px]'}`}>
+      <ul className={`mt-4 space-y-1.5 ${variant === 'compact' ? 'text-meta' : 'text-small'}`}>
         {shownItems.map(item => (
           <li key={item.id}>
             <a
@@ -146,7 +146,7 @@ export function ProfileCompleteness({
                 aria-hidden="true"
                 className={`mt-0.5 inline-flex items-center justify-center shrink-0 w-4 h-4 rounded-full border ${
                   item.done
-                    ? 'bg-brand-500 border-brand-500 text-white'
+                    ? 'bg-brand-600 border-brand-600 text-white'
                     : 'bg-white border-ink-300 text-transparent group-hover:border-brand-400'
                 }`}
               >
@@ -156,7 +156,7 @@ export function ProfileCompleteness({
                 {item.label}
               </span>
               {!item.done && (
-                <span className="font-mono text-[10px] tabular-nums text-brand-700 shrink-0 mt-0.5">+{item.weight}%</span>
+                <span className="font-mono text-meta tabular-nums text-brand-700 shrink-0 mt-0.5">+{item.weight}%</span>
               )}
             </a>
           </li>
@@ -164,7 +164,7 @@ export function ProfileCompleteness({
       </ul>
 
       {percent < 100 && variant === 'card' && (
-        <p className="mt-4 text-[11.5px] text-ink-500 leading-snug">
+        <p className="mt-4 text-meta text-ink-500 leading-snug">
           სრული პროფილი მეტ სტუდენტს იზიდავს.
         </p>
       )}

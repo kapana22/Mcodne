@@ -48,6 +48,39 @@ export const Calendar = ({
   }
   const canNext = lastSlotMs > 0 && new Date(year, month + 1, 1).getTime() <= lastSlotMs
 
+  // Roving-tabindex anchor. Preference order — the selected day, then today,
+  // then the first day that can actually be booked, then day 1. Whichever it
+  // lands on is the cell a Tab into the grid reaches, so it should be the one
+  // the user would most likely act on.
+  const dayRefs = React.useRef<(HTMLButtonElement | null)[]>([])
+  const preferredIdx = React.useMemo(() => {
+    const idxOf = (pred: (d: Date) => boolean) => cells.findIndex(c => c !== null && pred(c))
+    if (selected) { const i = idxOf(d => sameDay(d, selected)); if (i >= 0) return i }
+    const t = idxOf(d => sameDay(d, today)); if (t >= 0) return t
+    const open = idxOf(d => d.getTime() >= today.getTime() && (startsByDay.get(dayKey(d))?.length ?? 0) > 0)
+    if (open >= 0) return open
+    return Math.max(0, cells.findIndex(c => c !== null))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, month, selected?.getTime(), startsByDay])
+  const [activeIdx, setActiveIdx] = React.useState(preferredIdx)
+  // A date the arrows asked for that lives in the month we are paging TO. It
+  // cannot be focused until that month has rendered, so it waits here.
+  const pendingFocus = React.useRef<number | null>(null)
+  // Paging the month rebuilds `cells`, so the old index would point at an
+  // unrelated day (or past the end).
+  React.useEffect(() => {
+    const want = pendingFocus.current
+    if (want !== null) {
+      pendingFocus.current = null
+      const i = cells.findIndex(c => c !== null && c.getTime() === want)
+      // Keyboard paging keeps the keyboard: land on the day the user was
+      // steering toward, not back at the month's default cell.
+      if (i >= 0) { setActiveIdx(i); dayRefs.current[i]?.focus(); return }
+    }
+    setActiveIdx(preferredIdx)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferredIdx])
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -56,17 +89,17 @@ export const Calendar = ({
           onClick={onPrev}
           disabled={!canPrev}
           aria-label="წინა თვე"
-          className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <Icon.chevL className="w-4 h-4" />
         </button>
-        <div className="font-display text-[15px] font-bold text-ink-900 tracking-tight">{KA_MONTHS_FULL[month]} {year}</div>
+        <div className="font-display text-body-lg font-bold text-ink-900 tracking-tight">{KA_MONTHS_FULL[month]} {year}</div>
         <button
           type="button"
           onClick={onNext}
           disabled={!canNext}
           aria-label="შემდეგი თვე"
-          className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="w-11 h-11 rounded-btn hover:bg-ink-100 text-ink-600 inline-flex items-center justify-center transition-colors duration-fast disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <Icon.chevR className="w-4 h-4" />
         </button>
@@ -78,7 +111,57 @@ export const Calendar = ({
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      {/* KEYBOARD GRID (2026-07-30). The month used to be mouse-only: day cells
+          carried no arrow handling, and the unavailable ones were `disabled`, so
+          they were not even focusable — the most important step in the whole
+          product could not be done from the keyboard.
+
+          Roving tabindex: exactly ONE cell is in the tab order, arrows move
+          which. That is the standard date-picker pattern and it also keeps the
+          calendar from costing 30 Tab presses to step over.
+
+          Unavailable days are now `aria-disabled` rather than `disabled` so the
+          arrows can pass ACROSS them — a grid you cannot traverse is worse than
+          one with dead cells. Enter on such a day does nothing, deliberately. */}
+      <div
+        role="grid"
+        aria-label="აირჩიე დღე"
+        onKeyDown={e => {
+          // Movement is by DATE, not by cell index. Indices stop at the month
+          // edge; dates don't — pressing ↓ on 31 July has to reach 7 August,
+          // the way every real date picker behaves. Clamping there was the
+          // first version and it felt broken at exactly the moment someone is
+          // looking for the next free slot.
+          const moveDays = (delta: number) => {
+            e.preventDefault()
+            const from = cells[activeIdx]
+            if (!from) return
+            const target = new Date(from.getFullYear(), from.getMonth(), from.getDate() + delta)
+            const i = cells.findIndex(c => c !== null && c.getTime() === target.getTime())
+            if (i >= 0) { setActiveIdx(i); dayRefs.current[i]?.focus(); return }
+            // Off the visible month: page there and land on the target date
+            // once it exists (pendingFocus, applied in the effect below). If
+            // paging is not allowed we simply stay — there is nothing bookable
+            // in that direction anyway.
+            if (delta > 0 && canNext) { pendingFocus.current = target.getTime(); onNext() }
+            else if (delta < 0 && canPrev) { pendingFocus.current = target.getTime(); onPrev() }
+          }
+          switch (e.key) {
+            case 'ArrowLeft':  moveDays(-1); break
+            case 'ArrowRight': moveDays(1); break
+            case 'ArrowUp':    moveDays(-7); break
+            case 'ArrowDown':  moveDays(7); break
+            // Start / end of the displayed WEEK row.
+            case 'Home':       moveDays(-(activeIdx % 7)); break
+            case 'End':        moveDays(6 - (activeIdx % 7)); break
+            case 'PageUp':     if (canPrev) { e.preventDefault(); onPrev() } break
+            case 'PageDown':   if (canNext) { e.preventDefault(); onNext() } break
+          }
+        }}
+        // gap-0.5 below sm: seven cells + six gaps have to fit a 360px phone,
+        // where the old gap-1 left each day 36px against the 40px tap floor.
+        className="grid grid-cols-7 gap-0.5 sm:gap-1"
+      >
         {cells.map((d, i) => {
           if (d === null) return <div key={i} className="aspect-square" />
           const isToday = sameDay(d, today)
@@ -97,12 +180,19 @@ export const Calendar = ({
           return (
             <button
               key={i}
+              ref={el => { dayRefs.current[i] = el }}
               type="button"
-              disabled={disabled}
-              onClick={() => onSelect(d)}
-              className={`relative aspect-square rounded-btn flex flex-col items-center justify-center font-display font-semibold transition-colors disabled:cursor-not-allowed ${
+              // aria-disabled, NOT disabled — see the grid note above. The click
+              // guard is what actually prevents selecting a dead day.
+              aria-disabled={disabled || undefined}
+              aria-current={isToday ? 'date' : undefined}
+              aria-pressed={isSelected}
+              tabIndex={i === activeIdx ? 0 : -1}
+              onFocus={() => setActiveIdx(i)}
+              onClick={() => { if (!disabled) onSelect(d) }}
+              className={`relative aspect-square min-h-[40px] rounded-btn flex flex-col items-center justify-center font-display font-semibold transition-colors duration-fast ${disabled ? 'cursor-not-allowed' : ''} ${
                 isSelected
-                  ? 'bg-brand-500 text-white'
+                  ? 'bg-brand-600 text-white'
                   : isToday
                     ? 'bg-white text-brand-800 ring-1 ring-brand-300'
                     : disabled
@@ -110,7 +200,7 @@ export const Calendar = ({
                       : 'bg-brand-50 text-brand-900 hover:bg-brand-100'
               }`}
             >
-              <span className="text-[13.5px] tabular-nums leading-none">{d.getDate()}</span>
+              <span className="text-body tabular-nums leading-none">{d.getDate()}</span>
               {!disabled && (
                 <span
                   aria-hidden
@@ -124,7 +214,7 @@ export const Calendar = ({
         })}
       </div>
 
-      <div className="mt-6 pt-4 border-t border-ink-100 space-y-2 text-[11px] text-ink-500">
+      <div className="mt-6 pt-4 border-t border-ink-100 space-y-2 text-meta text-ink-500">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
             <span className="relative w-5 h-5 rounded-btn bg-brand-50 inline-flex items-center justify-center">
@@ -133,7 +223,11 @@ export const Calendar = ({
             <span>თავისუფალი დროები</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-white ring-1 ring-brand-300" />
+            {/* Same 20px rounded-btn plate as the „თავისუფალი დროები" swatch and
+                as a real day cell. It used to be a 10px `rounded-sm` outline,
+                which at that size read as an empty checkbox rather than as the
+                today ring it is describing. */}
+            <span className="w-5 h-5 rounded-btn bg-white ring-1 ring-brand-300 inline-block" />
             <span>დღეს</span>
           </div>
         </div>

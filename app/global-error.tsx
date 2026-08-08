@@ -57,6 +57,11 @@ export default function GlobalError({
             >
               თავიდან ცდა
             </button>
+            {/* A real <a>, deliberately — not <Link>. global-error replaces the
+                whole document after a fatal crash, so the React tree that a
+                client-side navigation would reuse is the broken one. A full
+                document load is the recovery. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/"
               style={{

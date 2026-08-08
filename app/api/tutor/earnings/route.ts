@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRoleApi } from '@/lib/auth'
 import { PAYMENTS_LIVE, TUTOR_PAYOUT_PCT } from '@/lib/flags'
 import { fmtKaDateTime } from '@/lib/kaDate'
+import { BOOKING_REVENUE_ONLY } from '@/lib/packages'
 
 // Single source of truth for the tutor's cut — derived from the canonical
 // commission percentage in lib/flags.ts (never a hardcoded 0.85 that could drift).
@@ -45,7 +46,9 @@ const PAYOUT_KA: Record<string, string> = PAYMENTS_LIVE
   : { PENDING: 'მოლოდინში', RELEASED: 'დასრულდა', REFUNDED: 'ანულირდა' }
 
 export async function GET(req: Request) {
-  const user = await requireRole(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  if (auth.response) return auth.response
+  const user = auth.user
   const wantsCsv = new URL(req.url).searchParams.get('format') === 'csv'
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
   if (!profile) {
@@ -63,7 +66,7 @@ export async function GET(req: Request) {
   // capped at the recent 50 for display; an accounting export must not be).
   if (wantsCsv) {
     const all = await prisma.booking.findMany({
-      where: { tutorId: profile.id, status: 'COMPLETED' },
+      where: { tutorId: profile.id, status: 'COMPLETED', ...BOOKING_REVENUE_ONLY },
       orderBy: { startAt: 'desc' },
       take: 5000,
       include: { student: { select: { fullName: true } } },
@@ -95,7 +98,7 @@ export async function GET(req: Request) {
   const [completed, pending, lifetime, month] = await Promise.all([
     // Recent list for the transactions table (display only).
     prisma.booking.findMany({
-      where: { tutorId: profile.id, status: 'COMPLETED' },
+      where: { tutorId: profile.id, status: 'COMPLETED', ...BOOKING_REVENUE_ONLY },
       orderBy: { startAt: 'desc' },
       take: 50,
       include: { student: { select: { id: true, fullName: true, avatarUrl: true } } },
@@ -107,27 +110,46 @@ export async function GET(req: Request) {
     // /tutor reads it); the earnings UI must NOT present it as a live metric.
     prisma.booking.aggregate({
       _sum: { price: true },
-      where: { tutorId: profile.id, status: 'COMPLETED', payoutStatus: 'PENDING' },
+      where: { tutorId: profile.id, status: 'COMPLETED', ...BOOKING_REVENUE_ONLY, payoutStatus: 'PENDING' },
     }),
     // Lifetime totals across ALL completed bookings — not just the recent 50,
     // which previously undercounted any tutor with more than 50 sessions.
     prisma.booking.aggregate({
       _sum: { price: true },
       _count: true,
-      where: { tutorId: profile.id, status: 'COMPLETED' },
+      where: { tutorId: profile.id, status: 'COMPLETED', ...BOOKING_REVENUE_ONLY },
     }),
     prisma.booking.aggregate({
       _sum: { price: true },
       _count: true,
-      where: { tutorId: profile.id, status: 'COMPLETED', startAt: { gte: monthStart, lt: monthEnd } },
+      where: { tutorId: profile.id, status: 'COMPLETED', ...BOOKING_REVENUE_ONLY, startAt: { gte: monthStart, lt: monthEnd } },
     }),
   ])
 
-  const totalEarned = Math.round(((lifetime as any)._sum?.price ?? 0) * TUTOR_SHARE)
+  // ── Package money, counted ONCE, at the Enrollment ────────────────────────
+  // The booking aggregates above deliberately exclude package lessons
+  // (BOOKING_REVENUE_ONLY), so without this the teacher's earnings would simply
+  // LOSE every lari a package brought in. Recognised at `paidAt` — the moment
+  // the money actually changed hands — not per lesson delivered, because that
+  // is when the client paid and it is the figure both sides agreed on.
+  const [pkgLifetime, pkgMonth] = await Promise.all([
+    prisma.enrollment.aggregate({
+      _sum: { priceTotal: true },
+      where: { tutorId: profile.id, paidAt: { not: null } },
+    }),
+    prisma.enrollment.aggregate({
+      _sum: { priceTotal: true },
+      where: { tutorId: profile.id, paidAt: { gte: monthStart, lt: monthEnd } },
+    }),
+  ])
+  const pkgTotal = pkgLifetime._sum.priceTotal ?? 0
+  const pkgThisMonth = pkgMonth._sum.priceTotal ?? 0
+
+  const totalEarned = Math.round((((lifetime as any)._sum?.price ?? 0) + pkgTotal) * TUTOR_SHARE)
   const pendingPayout = Math.round(((pending as any)._sum?.price ?? 0) * TUTOR_SHARE)
   const completedCount = (lifetime as any)._count ?? 0
   const thisMonth = {
-    earned: Math.round(((month as any)._sum?.price ?? 0) * TUTOR_SHARE),
+    earned: Math.round((((month as any)._sum?.price ?? 0) + pkgThisMonth) * TUTOR_SHARE),
     count: (month as any)._count ?? 0,
   }
 

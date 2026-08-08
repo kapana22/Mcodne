@@ -2,12 +2,11 @@ import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { notify, normalizePrefs } from '@/lib/notify'
+import { notify, notifyMany, normalizePrefs } from '@/lib/notify'
 import { markRelatedRead } from '@/lib/notifClear'
 import { newMeetingUrl, isStaleMeetingUrl } from '@/lib/meeting'
 import { sendMail } from '@/lib/mailer'
-import { bookingConfirmedEmail } from '@/lib/emailTemplates'
-import { fmtKaDateTime } from '@/lib/kaDate'
+import { bookingConfirmedEmail, bookingChangedEmail, fmtWhenTz } from '@/lib/emailTemplates'
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
@@ -130,10 +129,27 @@ const TutorNotesBody = z.object({
   tutorNotes: z.string().max(1500),
 })
 
+// Expert/admin-set payment link. 2000 is a ceiling for a URL and this field is
+// genuinely a URL — unlike `Certificate.fileUrl` and `Post.coverUrl`, which
+// silently rejected every upload because their max was sized for a link while
+// the value was base64. Nothing base64 can ever arrive here: the https-only
+// check below rejects `data:` outright.
+const PaymentLinkBody = z.object({
+  paymentLinkUrl: z.string().max(2000),
+})
+
 const PatchBody = z.object({
   action: z.enum(['accept', 'decline', 'complete', 'no_show']),
   tutorNotes: z.string().max(1500).optional(),
 })
+
+// Grace window before EITHER side may report a no-show: the scheduled start
+// plus this much must have passed, so nobody can flag at :01 — before the other
+// party could plausibly have joined. Module scope on purpose: the tutor's
+// `no_show` and the student's `expert_no_show` read the SAME value, so the two
+// directions can never drift apart. (Same 15 min the disputes route uses for a
+// client-reported no-show.)
+const NO_SHOW_GRACE_MS = 15 * 60 * 1000
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
@@ -176,6 +192,175 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       data: { tutorNotes: parsedT.data.tutorNotes.trim() || null },
     })
     return NextResponse.json({ ok: true, tutorNotes: updated.tutorNotes })
+  }
+
+    // Payment-link branch: `{ paymentLinkUrl }` without `action`, written by the
+  // booking's EXPERT or an ADMIN, read by the client as a „გადახდა“ button.
+  //
+  // THIS IS A TEXT FIELD, NOT A PAYMENT INTEGRATION, and the distance between
+  // those two is the whole design. There is no checkout, no webhook, no charge,
+  // no reconciliation, no ledger; `payoutStatus` is untouched and PAYMENTS_LIVE
+  // stays false with its logic unchanged. All that happens is that a link an
+  // expert pasted from their BOG/TBC dashboard becomes clickable for the person
+  // who owes them money — which is the difference between „we'll sort payment
+  // out somehow" and a client abroad actually being able to pay.
+  //
+  // https ONLY, deliberately stricter than lib/safeUrl's render guard: that one
+  // also passes mailto:, tel: and relative paths, and none of those is a bank
+  // payment page. A plain http link to one is either a typo or a downgrade
+  // attack, so it is refused rather than sanitised.
+  if (typeof rawBody?.paymentLinkUrl === 'string' && rawBody?.action === undefined) {
+    const parsedP = PaymentLinkBody.safeParse(rawBody)
+    if (!parsedP.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+    const own = await prisma.booking.findFirst({
+      where: user.role === 'ADMIN' ? { id } : { id, tutor: { userId: user.id } },
+      select: { id: true, studentId: true, paymentLinkUrl: true },
+    })
+    if (!own) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
+
+    const raw = parsedP.data.paymentLinkUrl.trim()
+    // Empty string CLEARS the link — the expert who pasted a wrong one needs a
+    // way to take it down, and a stale payment link is worse than none.
+    let value: string | null = null
+    if (raw) {
+      if (!/^https:\/\//i.test(raw)) {
+        return NextResponse.json({ ok: false, error: 'BAD_PAYMENT_URL' }, { status: 400 })
+      }
+      try { new URL(raw) } catch {
+        return NextResponse.json({ ok: false, error: 'BAD_PAYMENT_URL' }, { status: 400 })
+      }
+      value = raw
+    }
+
+    await prisma.booking.update({ where: { id }, data: { paymentLinkUrl: value } })
+
+    // Tell the client a link appeared. Without this the button is only found by
+    // someone who happens to reopen the booking page — and this client is on a
+    // phone in another timezone, not watching a tab.
+    if (value && value !== own.paymentLinkUrl) {
+      after(async () => {
+        await notify(own.studentId, {
+          type: 'BOOKING_CREATED',
+          title: 'გადახდის ბმული მზადაა',
+          body: 'ჯავშნის გვერდზე გამოჩნდა გადახდის ღილაკი.',
+          href: `/student/bookings/${id}`,
+        })
+      })
+    }
+    return NextResponse.json({ ok: true, paymentLinkUrl: value })
+  }
+
+  // Client-reported EXPERT no-show — the mirror image of the tutor's `no_show`
+  // action below. It lives in its own branch (rather than role-switching inside
+  // `no_show`) for two reasons: the lifecycle lookup below is hard-scoped to
+  // `tutor: { userId: user.id }`, so a student can never reach it at all; and an
+  // explicit action keeps each direction behind its OWN authorization gate —
+  // neither party can name the other as the no-show. No payload beyond the
+  // action, so there is nothing for zod to add here.
+  if (rawBody?.action === 'expert_no_show') {
+    // AUTHORIZATION: only the booking's own student (or an ADMIN acting for
+    // them). A tutor hitting this gets NOT_FOUND from the same query.
+    const own = await prisma.booking.findFirst({
+      where: user.role === 'ADMIN' ? { id } : { id, studentId: user.id },
+      include: { tutor: { select: { userId: true } } },
+    })
+    if (!own) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
+    // STATUS: only a session that actually reached a live state can be reported
+    // as not held. PREPARING (never confirmed), COMPLETED, CANCELED and an
+    // already-NO_SHOW booking are all refused.
+    if (own.status !== 'CONFIRMED' && own.status !== 'LIVE') {
+      return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 400 })
+    }
+    // TIMING: same grace as the tutor's direction, from the one shared constant.
+    if (Date.now() < own.startAt.getTime() + NO_SHOW_GRACE_MS) {
+      return NextResponse.json({ ok: false, error: 'TOO_EARLY' }, { status: 400 })
+    }
+    // Payout policy — the MIRROR IMAGE of the tutor-reported case below: the
+    // EXPERT didn't turn up, so the client must not pay for a session that never
+    // happened → REFUNDED (the expert gets nothing). `sessionsCount` is NOT
+    // touched — only `complete` bumps that stat, and a session that did not
+    // happen must never inflate an expert's public „N სესია ჩატარებული".
+    // Status-guarded claim: a double click or a race with the tutor's own
+    // transition can only ever be processed once (count === 1 proves it was us).
+    const claim = await prisma.booking.updateMany({
+      where: { id, status: { in: ['CONFIRMED', 'LIVE'] } },
+      data: { status: 'NO_SHOW', payoutStatus: 'REFUNDED' },
+    })
+    if (claim.count !== 1) {
+      return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 409 })
+    }
+    // Same terminal cleanup the tutor path does: drop any pending reschedule
+    // proposal so the booking can't render a stuck banner with dead buttons.
+    await prisma.$executeRawUnsafe(`UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`, id)
+    // Both parties are told, with the same BOOKING_CANCELED type the rest of the
+    // lifecycle uses — notify() checks each recipient's prefs for it.
+    await Promise.all([
+      notify(own.studentId, {
+        type: 'BOOKING_CANCELED',
+        title: 'აღინიშნა: სესია არ შედგა',
+        body: `${own.topic} · ${fmtWhenTz(own.startAt, { year: true })} — ექსპერტს ეცნობა. გადასახდელი არაფერია.`,
+        href: `/student/bookings/${own.id}`,
+      }),
+      notify(own.tutor.userId, {
+        type: 'BOOKING_CANCELED',
+        title: 'აღინიშნა: სესია არ შედგა',
+        body: `სტუდენტმა აღნიშნა, რომ სესია არ შედგა — ${own.topic} · ${fmtWhenTz(own.startAt, { year: true })}. თუ ეს შეცდომაა, უპასუხე მიმოწერაში — გუნდიც გადახედავს.`,
+        href: `/tutor/bookings/${own.id}#chat`,
+      }),
+    ])
+    // Email BOTH parties — same two recipients as the in-app pair above. The
+    // expert side is the one that actually matters here: they are being told,
+    // without having done anything themselves, that a session they may believe
+    // happened is now marked NO_SHOW and their payout is REFUNDED away. That
+    // must not depend on them having a tab open.
+    after(async () => {
+      try {
+        const [student, tutorUser, profile] = await Promise.all([
+          prisma.user.findUnique({ where: { id: own.studentId }, select: { email: true, fullName: true, notificationPrefs: true } }),
+          prisma.user.findUnique({ where: { id: own.tutor.userId }, select: { email: true, fullName: true, notificationPrefs: true } }),
+          prisma.tutorProfile.findUnique({ where: { id: own.tutorId }, select: { user: { select: { fullName: true } } } }),
+        ])
+        const whenText = fmtWhenTz(own.startAt, { year: true })
+        if (student?.email && normalizePrefs(student.notificationPrefs).BOOKING_CREATED) {
+          const { subject, html } = bookingChangedEmail('no_show', {
+            counterpartName: profile?.user.fullName || 'ექსპერტი',
+            topic: own.topic,
+            whenText,
+            actorLabel: 'შენი',
+            note: 'გადასახდელი არაფერია — ექსპერტს ეცნობა.',
+            href: `/student/bookings/${own.id}`,
+          })
+          await sendMail({ to: student.email, subject, html })
+        }
+        if (tutorUser?.email && normalizePrefs(tutorUser.notificationPrefs).BOOKING_CREATED) {
+          const { subject, html } = bookingChangedEmail('no_show', {
+            counterpartName: student?.fullName || 'სტუდენტი',
+            topic: own.topic,
+            whenText,
+            actorLabel: 'სტუდენტის',
+            note: 'თუ ეს შეცდომაა, უპასუხე მიმოწერაში — გუნდიც გადახედავს.',
+            href: `/tutor/bookings/${own.id}#chat`,
+          })
+          await sendMail({ to: tutorUser.email, subject, html })
+        }
+      } catch { /* email is best-effort */ }
+    })
+    // Ops ping so „გუნდი გადახედავს" is true: the expert has no dispute form of
+    // their own (POST /api/disputes is student-only), so an admin is the real
+    // contest surface. Off the response path — same fan-out the disputes route
+    // does. GENERIC is not opt-outable, which is what an ops signal needs.
+    after(async () => {
+      try {
+        const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } })
+        await notifyMany(admins.map(a => a.id), {
+          type: 'GENERIC',
+          title: 'სესია არ შედგა — ექსპერტი',
+          body: `#${own.ref.slice(0, 8)} · სტუდენტის განაცხადი`,
+          href: '/admin#bookings',
+        })
+      } catch { /* ops ping is best-effort */ }
+    })
+    return NextResponse.json({ ok: true, status: 'NO_SHOW' })
   }
 
   const parsed = PatchBody.safeParse(rawBody)
@@ -241,7 +426,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
             studentName: student.fullName,
             expertName: profile?.user.fullName || 'ექსპერტი',
             topic: booking.topic,
-            whenText: fmtKaDateTime(booking.startAt, { year: true }),
+            whenText: fmtWhenTz(booking.startAt, { year: true }),
             bookingId: booking.id,
           })
           await sendMail({ to: student.email, subject, html })
@@ -297,15 +482,40 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     })
     // Clear the tutor's "new request" bell entry — they've already answered.
     await markRelatedRead(user.id, `/tutor/bookings/${booking.id}`, 'BOOKING_CREATED')
+    // Email the client. A decline is TERMINAL: this booking will never produce
+    // another signal (no confirmation, no reminder — the reminder sweep only
+    // looks at CONFIRMED rows), so the in-app bell alone means a client who
+    // isn't in an open tab is simply never told their request died. Off the
+    // response path in after(); a mail failure can never affect the mutation.
+    after(async () => {
+      try {
+        const [student, profile] = await Promise.all([
+          prisma.user.findUnique({ where: { id: booking.studentId }, select: { email: true, notificationPrefs: true } }),
+          prisma.tutorProfile.findUnique({ where: { id: booking.tutorId }, select: { user: { select: { fullName: true } } } }),
+        ])
+        // Same gate the in-app notify() applied: BOOKING_CANCELED belongs to the
+        // BOOKING_CREATED pref group (see lib/notify prefKeyForType).
+        if (student?.email && normalizePrefs(student.notificationPrefs).BOOKING_CREATED) {
+          const { subject, html } = bookingChangedEmail('declined', {
+            counterpartName: profile?.user.fullName || 'ექსპერტი',
+            topic: booking.topic,
+            whenText: fmtWhenTz(booking.startAt, { year: true }),
+            note: 'იმავე ექსპერტთან სხვა დროს ან სხვა ექსპერტს მარტივად აირჩევ.',
+            href: `/tutors/${booking.tutorId}`,
+          })
+          await sendMail({ to: student.email, subject, html })
+        }
+      } catch { /* email is best-effort */ }
+    })
     return NextResponse.json({ ok: true, status: 'CANCELED' })
   }
 
   if (action === 'no_show') {
-    // Tutor flags "student didn't turn up". Only allowed once a GRACE window
-    // past the scheduled start has elapsed — otherwise a tutor could flag the
-    // instant the clock hits startAt, before the student could plausibly join.
-    // Mirrors the 15-min grace on the student's own no-show report (disputes).
-    const NO_SHOW_GRACE_MS = 15 * 60 * 1000
+    // Tutor flags "student didn't turn up". Only allowed once the shared GRACE
+    // window past the scheduled start has elapsed — otherwise a tutor could flag
+    // the instant the clock hits startAt, before the student could plausibly
+    // join. The opposite direction (`expert_no_show`, above) uses the same
+    // constant so the two can never diverge.
     if (booking.status !== 'CONFIRMED' && booking.status !== 'LIVE') {
       return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 400 })
     }
@@ -333,8 +543,31 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     await notify(booking.studentId, {
       type: 'BOOKING_CANCELED',
       title: 'აღინიშნა: გამოუცხადებლობა',
-      body: `ექსპერტმა აღნიშნა, რომ არ გამოცხადდი — ${booking.topic}`,
+      body: `ექსპერტმა აღნიშნა, რომ არ გამოცხადდი — ${booking.topic} · ${fmtWhenTz(booking.startAt, { year: true })}`,
       href: `/student/bookings/${booking.id}`,
+    })
+    // Email the client: being marked as a no-show is a consequential, contestable
+    // claim about them, and the in-app notice reaches nobody who isn't already
+    // looking. Mirrors the in-app recipient exactly (client only — the expert
+    // just performed this action).
+    after(async () => {
+      try {
+        const [student, profile] = await Promise.all([
+          prisma.user.findUnique({ where: { id: booking.studentId }, select: { email: true, notificationPrefs: true } }),
+          prisma.tutorProfile.findUnique({ where: { id: booking.tutorId }, select: { user: { select: { fullName: true } } } }),
+        ])
+        if (student?.email && normalizePrefs(student.notificationPrefs).BOOKING_CREATED) {
+          const { subject, html } = bookingChangedEmail('no_show', {
+            counterpartName: profile?.user.fullName || 'ექსპერტი',
+            topic: booking.topic,
+            whenText: fmtWhenTz(booking.startAt, { year: true }),
+            actorLabel: 'ექსპერტის',
+            note: 'თუ ეს შეცდომაა, მიწერე მიმოწერაში — გუნდიც გადახედავს.',
+            href: `/student/bookings/${booking.id}#chat`,
+          })
+          await sendMail({ to: student.email, subject, html })
+        }
+      } catch { /* email is best-effort */ }
     })
     return NextResponse.json({ ok: true, status: 'NO_SHOW' })
   }

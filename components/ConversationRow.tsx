@@ -40,26 +40,32 @@ export function ConversationRow({
   return (
     <Link
       href={href}
-      className="relative flex items-center gap-3.5 pl-4 pr-4 sm:pl-5 sm:pr-5 py-3.5 min-h-[76px] hover:bg-ink-50/60 active:bg-ink-100/50 transition-colors group"
+      className="relative flex items-center gap-3.5 pl-4 pr-4 sm:pl-5 sm:pr-5 py-3.5 min-h-[76px] hover:bg-ink-50/60 active:bg-ink-100/50 transition-colors duration-fast group"
     >
       {isUnread && <span aria-hidden className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-brand-500" />}
 
       <div className="relative w-12 h-12 rounded-full overflow-hidden ring-1 ring-ink-200 shrink-0">
-        <Image src={avatarUrl || DEFAULT_AVATAR} alt="" fill sizes="48px" unoptimized={(avatarUrl || DEFAULT_AVATAR).startsWith('data:')} className="object-cover" />
+        {/* Same rule as components/Avatar.tsx — keep the two in step. `data:`
+            URIs the optimizer cannot process at all, and `/api/avatars/*` is
+            ALREADY a ≤384px webp served `immutable`, so routing it through
+            /_next/image only adds a server hop and a re-encode. The inbox
+            started sending that shape on 2026-08-03; before then this branch
+            only ever saw `data:`. */}
+        <Image src={avatarUrl || DEFAULT_AVATAR} alt="" fill sizes="48px" unoptimized={/^(data:|\/api\/avatars\/)/.test(avatarUrl || DEFAULT_AVATAR)} className="object-cover" />
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          <span className={`font-display text-[14px] text-ink-900 truncate ${isUnread ? 'font-bold' : 'font-semibold'}`}>
+          <span className={`font-display text-body text-ink-900 truncate ${isUnread ? 'font-bold' : 'font-semibold'}`}>
             {name}
           </span>
-          <span className={`text-[11px] tabular-nums shrink-0 ${isUnread ? 'font-display font-bold text-brand-700' : 'text-ink-400'}`}>
+          <span className={`text-meta tabular-nums shrink-0 ${isUnread ? 'font-display font-bold text-brand-700' : 'text-ink-400'}`}>
             {lastAt ? fmtKaThreadTime(lastAt, now) : null}
           </span>
         </div>
 
         <div className="flex items-center justify-between gap-3 mt-0.5">
-          <span className={`flex items-center gap-1.5 min-w-0 text-[13px] ${isUnread ? 'text-ink-900 font-medium' : 'text-ink-500'}`}>
+          <span className={`flex items-center gap-1.5 min-w-0 text-small ${isUnread ? 'text-ink-900 font-medium' : 'text-ink-500'}`}>
             {lastFromMe && <span className="text-ink-400 shrink-0">შენ:</span>}
             {preview.isAttachment && <Icon.paperclip className="w-3.5 h-3.5 text-ink-400 shrink-0" />}
             {/* min-w-0: a flex child defaults to min-width:auto, so without it
@@ -68,13 +74,13 @@ export function ConversationRow({
             <span className="truncate min-w-0">{preview.text || (preview.isAttachment ? 'მიმაგრებული ფაილი' : '')}</span>
           </span>
           {isUnread && (
-            <span className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-brand-500 text-white font-display text-[11px] font-bold tabular-nums">
+            <span className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-brand-600 text-white font-display text-meta font-bold tabular-nums">
               {unread > 9 ? '9+' : unread}
             </span>
           )}
         </div>
 
-        <div className="text-[11.5px] text-ink-400 truncate mt-1">{topic}</div>
+        <div className="text-meta text-ink-400 truncate mt-1">{topic}</div>
       </div>
     </Link>
   )
