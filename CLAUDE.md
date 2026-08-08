@@ -17,6 +17,22 @@ Georgian expert-consultation marketplace (Next.js 15 + Tailwind + Prisma). UI is
 | `/student/bookings/[id]` | `.../page.tsx` | `_model` `_hero` `_modals` `_review` `_body` `_mobile` |
 | `/tutor/bookings/[id]` | `.../page.tsx` | `_model` `_review` `_timeline` |
 | `/admin` | `app/admin/page.tsx` (115L) | one `_<tab>.tsx` per tab + shared `_parts.tsx` |
+| `/settings` | `app/settings/page.tsx` | `_types` `_profile` `_password` `_account` `_prefs` |
+| `/tutor/profile` | `app/tutor/profile/page.tsx` | `_types` `_parts` `_tabProfile` `_tabServices` `_tabCredentials` `_tabAccount` |
+| `/tutor/schedule` | `app/tutor/schedule/page.tsx` | `_shared` `_sheetSlot` `_sheetTemplate` `_sheetBlock` |
+
+⚠️ **The last four differ: state stayed in the page, only JSX moved.** Those
+sections take explicit props (ProfileSection 16, CredentialsTab 24) because the
+coupling was already there — the prop list makes it visible, it did not create
+it. Do not "tidy" that by moving the useState calls into the children: the page
+seeds them from its fetch, so moving them turns seeding into an effect.
+
+**`components/booking/BookingFlow.tsx` (1,136L) is deliberately NOT split.**
+Measured, not assumed: every block worth extracting needs ~40 props (the time
+step 45, the day/time grid 40). At that ratio the interface is as much to hold
+in your head as the code, and this is the booking path — it is also a lazy
+chunk, so it cannot be checked by grep. If it is ever restructured, the move is
+a `useSlotSelection` hook, not a prop-threaded child, and it needs a browser.
 
 Three rules this shape depends on:
 - **The model is a leaf.** Each folder's `_model` / `_data` / `_form` imports no sibling; everything else imports it. A cycle always means a piece of the model was left in a UI file — move it to the leaf, don't add an import.
