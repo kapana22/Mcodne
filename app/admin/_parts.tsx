@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Icon } from '@/components/Icon'
+import { KA_MONTHS_SHORT_DOT } from '@/lib/kaDate'
 
 const FOCUSABLE = [
   'a[href]',
@@ -881,6 +882,61 @@ export function AdminDeleteUserDialog({
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ───── Shared list/format helpers used by every admin tab ───── */
+/* ───── CSV export helper — client-side Blob, no server round-trip ───── */
+const escapeCsv = (v: unknown): string => {
+  if (v == null) return ''
+  const s = String(v)
+  // Escape per RFC 4180: wrap in quotes when the field contains ", newline, or comma.
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  return s
+}
+export const downloadCsv = (filename: string, rows: (string | number | null | undefined)[][]) => {
+  const csv = rows.map(r => r.map(escapeCsv).join(',')).join('\r\n')
+  // BOM lets Excel open Georgian correctly.
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+export const KA_STATUS: Record<string, string> = {
+  PREPARING: 'მოსამზადებელი', CONFIRMED: 'დადასტურდა', LIVE: 'ცოცხალი',
+  COMPLETED: 'დასრულდა', CANCELED: 'გაუქმდა', NO_SHOW: 'გამოუცხადებლობა',
+}
+const KA_MO_SHORT = KA_MONTHS_SHORT_DOT
+export const fmtShort = (iso: string) => {
+  const d = new Date(iso); if (isNaN(d.getTime())) return ''
+  return `${d.getDate()} ${KA_MO_SHORT[d.getMonth()]} ${d.getFullYear()}`
+}
+export const fmtDT = (iso: string) => {
+  const d = new Date(iso); if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getDate()} ${KA_MO_SHORT[d.getMonth()]} · ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/* Shared "load more" footer for the paginated admin lists (users/bookings/
+   reviews). Shows the button while a cursor remains, else a total-count line. */
+export const LoadMoreBar = ({ hasMore, loading, onMore, count }: { hasMore: boolean; loading: boolean; onMore: () => void; count: number }) => {
+  if (count === 0) return null
+  return (
+    <div className="px-6 lg:px-8 py-5 flex justify-center">
+      {hasMore ? (
+        <button type="button" onClick={onMore} disabled={loading} className="h-11 px-5 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 disabled:opacity-60 text-ink-700 font-display font-semibold text-small transition-colors duration-fast">
+          {loading ? 'იტვირთება…' : 'მეტის ჩვენება'}
+        </button>
+      ) : (
+        <span className="text-meta text-ink-400 tabular-nums">სულ {count} ჩანაწერი</span>
+      )}
     </div>
   )
 }

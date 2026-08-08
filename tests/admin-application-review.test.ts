@@ -95,7 +95,9 @@ check('a complete application reports nothing missing', complete.length === 0, J
 
 /* ═════ 4. source invariants on the panel ═══════════════════════════════════ */
 
-const panel = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
+// The review queue moved out of page.tsx into its own tab file; page.tsx is now
+// just the composition root and contains none of what is asserted below.
+const panel = readFileSync(join(process.cwd(), 'app/admin/_moderation.tsx'), 'utf8')
 
 check(
   'the panel no longer stringifies professionData with String(v)',

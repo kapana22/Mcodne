@@ -18,8 +18,9 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+
 import {
   LIVE_STATUSES,
   ANON_NAME,
@@ -36,6 +37,17 @@ const ROUTE = readFileSync(
   join(process.cwd(), 'app/api/admin/users/[id]/route.ts'),
   'utf8',
 )
+
+/* The admin panel is one screen split across `app/admin/*.tsx` — the users list
+   and the audit-label map live in their own tab files now, not in page.tsx. The
+   assertions below are about the panel as a whole, so read the directory rather
+   than name a file that the next split would invalidate. */
+const adminPanelSrc = () =>
+  readdirSync(join(process.cwd(), 'app/admin'))
+    .filter(f => f.endsWith('.tsx'))
+    .sort()
+    .map(f => readFileSync(join(process.cwd(), 'app/admin', f), 'utf8'))
+    .join('\n')
 
 /* ── §A scope ──────────────────────────────────────────────────────────── */
 
@@ -222,7 +234,7 @@ test('an anonymized account can never be un-suspended', () => {
   assert.ok(!isAnonymized('nino@gmail.com'))
   assert.ok(!isAnonymized(null))
   // …and the panel must not offer the control the server refuses.
-  const page = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
+  const page = adminPanelSrc()
   assert.match(page, /u\.role !== 'ADMIN' && !isAnonymized\(u\.email\)/)
 })
 
@@ -319,7 +331,7 @@ test('both modes write an audit row carrying a SNAPSHOT, not just an id', () => 
 })
 
 test('every audit action string has a Georgian label in the admin panel', () => {
-  const page = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
+  const page = adminPanelSrc()
   // An unmapped action falls back to the raw `noun.verb` and reads like a bug.
   assert.match(page, /'user\.delete':\s*'/)
   assert.match(page, /'user\.anonymize':\s*'/)

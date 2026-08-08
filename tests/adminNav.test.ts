@@ -17,11 +17,24 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = join(import.meta.dirname, '..')
-const page = readFileSync(join(ROOT, 'app/admin/page.tsx'), 'utf8')
+/* The panel is one screen split across `app/admin/*.tsx` — page.tsx is only the
+   composition root, the nav lives in _nav.tsx and each tab in its own file. Read
+   the DIRECTORY, not a file list: every assertion below is about the panel as a
+   whole („is this idea written once?"), so a hand-maintained list would silently
+   stop covering the next file someone adds — which is exactly the drift these
+   tests exist to catch. */
+const adminSrc = (skip: string[] = []) =>
+  readdirSync(join(ROOT, 'app/admin'))
+    .filter(f => f.endsWith('.tsx') && !skip.includes(f))
+    .sort()
+    .map(f => readFileSync(join(ROOT, 'app/admin', f), 'utf8'))
+    .join('\n')
+
+const page = adminSrc()
 const iconSrc = readFileSync(join(ROOT, 'components/Icon.tsx'), 'utf8')
 
 const navIcons = [...page.matchAll(/icon: '([a-zA-Z]+)'/g)].map(m => m[1])
@@ -83,9 +96,10 @@ test('every tab in the nav has a section rendered for it', () => {
 
 /* ═══════════ consistency: one idea, written once ════════════════════════ */
 
-const adminFiles = ['page.tsx', '_help.tsx', '_texts.tsx', '_blog.tsx', '_insights.tsx',
-  '_system.tsx', '_integrations.tsx', '_profileViews.tsx', '_expertsAttention.tsx']
-  .map(f => readFileSync(join(ROOT, 'app/admin', f), 'utf8')).join('\n')
+/* `_parts.tsx` is the primitives module itself — it DEFINES <PeriodSwitch> and
+   <AdminError>, so counting it would make „built once" fail on the one copy that
+   is supposed to exist. Everything else in the folder is a consumer. */
+const adminFiles = adminSrc(['_parts.tsx'])
 
 test('error banners come from ONE component', () => {
   // Counted before the sweep: 48 hand-rolled danger blocks across three tiers of
