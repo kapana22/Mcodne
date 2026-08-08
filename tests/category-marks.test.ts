@@ -13,7 +13,7 @@
 // SOURCE-LEVEL on purpose: importing lib/categoryMarks would pull in
 // components/Icon (JSX + the `@/` alias), which this bare-node runner cannot
 // resolve. The invariants here are all about the TEXT of the map anyway.
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 
 let passed = 0, failed = 0
 const check = (name: string, ok: boolean, why = '') => {
@@ -53,7 +53,17 @@ check('C5: every category carries a blurb',
   MARKED_SLUGS.filter(s => blurbOf(s).trim().length <= 3).join(', '))
 
 // The old duplicate maps must stay deleted.
-const home = readFileSync(new URL('../app/HomeClient.tsx', import.meta.url), 'utf8')
+/* Read the WHOLE home surface, not just the container. C6 is a negative check,
+   and the home page was split into app/_home/ — pointed at HomeClient.tsx alone
+   it would pass because the category code is no longer there, which is a test
+   that cannot fail rather than a test that holds. */
+const home = [
+  readFileSync(new URL('../app/HomeClient.tsx', import.meta.url), 'utf8'),
+  ...readdirSync(new URL('../app/_home/', import.meta.url))
+    .filter(f => f.endsWith('.tsx'))
+    .sort()
+    .map(f => readFileSync(new URL(`../app/_home/${f}`, import.meta.url), 'utf8')),
+].join('\n')
 const cats = readFileSync(new URL('../app/categories/page.tsx', import.meta.url), 'utf8')
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 check('C6: the home page no longer keeps its own map', !/CAT_META\s*:/.test(strip(home)))
