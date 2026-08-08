@@ -13,7 +13,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { MAX_WINDOW_MS, windowErrorMessage, windowRangeError } from '../lib/availabilityRules'
 
 const NOW = new Date('2026-08-10T09:00:00.000Z')
@@ -56,7 +56,14 @@ test('every code the API can answer with has a Georgian sentence', () => {
 
 const item = readFileSync(new URL('../app/api/tutor/availability/[id]/route.ts', import.meta.url), 'utf8')
 const coll = readFileSync(new URL('../app/api/tutor/availability/route.ts', import.meta.url), 'utf8')
-const page = readFileSync(new URL('../app/tutor/schedule/page.tsx', import.meta.url), 'utf8')
+/* The schedule screen is split across `app/tutor/schedule/_*.tsx` — the slot
+   and template sheets are their own files now. These assertions are about the
+   SCREEN, so read the directory rather than one filename. */
+const page = readdirSync(new URL('../app/tutor/schedule/', import.meta.url))
+  .filter(f => /\.tsx?$/.test(f))
+  .sort()
+  .map(f => readFileSync(new URL(`../app/tutor/schedule/${f}`, import.meta.url), 'utf8'))
+  .join('\n')
 
 test('editing a window is possible at all', () => {
   assert.match(item, /export async function PATCH/, 'the schedule was write-once without this')
