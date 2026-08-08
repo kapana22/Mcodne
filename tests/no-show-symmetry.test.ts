@@ -22,7 +22,7 @@
 //   6. Rendered by the student UI as a DIFFERENT outcome from a student
 //      no-show — the two are opposites and must not share one sentence.
 
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
 const root = join(__dirname, '..')
@@ -39,9 +39,15 @@ function check(name: string, ok: boolean, hint: string) {
 }
 
 const ROUTE = 'app/api/bookings/[id]/route.ts'
-const PAGE = 'app/student/bookings/[id]/page.tsx'
+const PAGE = 'app/student/bookings/[id]'
 const route = read(ROUTE)
-const page = read(PAGE)
+/* The screen is split across `_*.tsx` files beside page.tsx — these assertions
+   are about the SCREEN, so read the directory rather than one filename. */
+const page = readdirSync(join(root, PAGE))
+  .filter(f => f.endsWith('.tsx'))
+  .sort()
+  .map(f => read(join(PAGE, f)))
+  .join('\n')
 
 /* ───── slice the two no-show branches out of the route ───── */
 
@@ -238,7 +244,10 @@ check(
 
 check(
   '7b: the UI grace is derived from one local constant, not a literal',
-  /const NO_SHOW_GRACE_MIN = 15\s*\nconst NO_SHOW_GRACE_MS = NO_SHOW_GRACE_MIN \* 60_000/.test(page) &&
+  // `export` is tolerated: the pair moved to _model.tsx when this screen was
+  // split, so the gate imports it rather than declaring it. What is pinned is
+  // unchanged — the two sit together and the second derives from the first.
+  /(?:export )?const NO_SHOW_GRACE_MIN = 15\s*\n(?:export )?const NO_SHOW_GRACE_MS = NO_SHOW_GRACE_MIN \* 60_000/.test(page) &&
     !/\+ 15 \* 60_000/.test(page),
   'The copy („დაწყებიდან N წუთი") and the gate must read the same number.',
 )

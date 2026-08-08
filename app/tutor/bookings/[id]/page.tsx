@@ -1,9 +1,12 @@
 'use client'
+// /tutor/bookings/[id] — the expert's booking detail. Owns the fetch, the
+// actions and the chat; the review block and timeline live beside it.
+
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
-import Link from 'next/link'
 import { Avatar } from '@/components/Avatar'
 import { StatusPill } from '@/components/StatusPill'
 import { Icon } from '@/components/Icon'
@@ -13,110 +16,12 @@ import { Sheet } from '@/components/Sheet'
 import { RescheduleTimePicker } from '@/components/booking/RescheduleTimePicker'
 import { useToast } from '@/components/ToastProvider'
 import { FEATURE_ABROAD } from '@/lib/flags'
-import { fmtDateTime as fmtInTz, userTimezone, TBILISI } from '@/lib/tz'
-import { fmtKaDate } from '@/lib/kaDate'
+import { userTimezone, TBILISI } from '@/lib/tz'
 import { BookingChat } from '@/components/chat/BookingChat'
 import { refreshNavBadges } from '@/components/tutor/useNavBadges'
-
-type BookingStatus = 'PREPARING' | 'CONFIRMED' | 'LIVE' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW'
-
-import type { ChatMessage as Message } from '@/components/chat/useBookingThread'
-
-type ReschedulePayload = {
-  proposedBy: 'STUDENT' | 'TUTOR'
-  newStartAt: string
-  reason: string | null
-  proposedAt: string
-}
-
-type BookingReview = {
-  id: string
-  rating: number
-  body: string
-  createdAt: string
-  anonymous?: boolean
-  tutorResponse?: string | null
-  respondedAt?: string | null
-}
-
-type Booking = {
-  id: string
-  ref: string
-  topic: string
-  status: BookingStatus
-  startAt: string
-  durationMin: number
-  price: number
-  meetingUrl?: string | null
-  // A BOG/TBC payment page the expert (or an admin) pasted. Display only — no
-  // checkout, no webhook, PAYMENTS_LIVE untouched. See app/api/bookings/[id].
-  paymentLinkUrl?: string | null
-  // Request-based booking: the CLIENT named this time, so it is deliberately
-  // not in the expert's published schedule…
-  proposedByStudent?: boolean
-  // …and these are the other times they said would also work.
-  proposedAlternates?: { startAt: string }[] | null
-  studentNotes?: string | null
-  tutorNotes?: string | null
-  student: { id: string; fullName: string; avatarUrl?: string | null; email: string }
-  tutor: { id: string; userId: string; user: { id: string; fullName: string; avatarUrl?: string | null } }
-  messages: Message[]
-  review?: BookingReview | null
-  rescheduleRequest?: ReschedulePayload | null
-}
-
-type Me = { id: string; fullName: string; avatarUrl?: string | null; role: string } | null
-
-const toneOf = (s: BookingStatus) =>
-  s === 'PREPARING' ? 'preparing'
-  : s === 'CONFIRMED' ? 'confirmed'
-  : s === 'LIVE' ? 'live'
-  : s === 'COMPLETED' ? 'completed'
-  : s === 'CANCELED' ? 'canceled'
-  : 'noshow' as const
-
-// SSR-safe: default to Tbilisi so first paint matches server. The page
-// re-formats after mount when it learns the user's browser tz.
-const fmtDateTime = (iso: string, tz: string = TBILISI) => {
-  const { local } = fmtInTz(iso, {
-    weekday: 'short', day: '2-digit', month: 'long',
-    hour: '2-digit', minute: '2-digit',
-  }, tz)
-  return local
-}
-
-const fmtTime = (iso: string, tz: string = TBILISI) => {
-  const { local } = fmtInTz(iso, { hour: '2-digit', minute: '2-digit' }, tz)
-  return local
-}
-
-/* Coarse countdown label — ticks every 60s. Same semantics as the student page:
-   "დაწყებულია" while in-flight, "დასრულებულია" after end, else formatted delta. */
-const useRemainingLabel = (startAtIso: string, durationMin: number): string => {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 60_000)
-    return () => clearInterval(id)
-  }, [])
-  const start = new Date(startAtIso).getTime()
-  if (Number.isNaN(start)) return ''
-  const end = start + durationMin * 60_000
-  if (now >= end) return 'დასრულებულია'
-  if (now >= start) return 'დაწყებულია'
-  const diff = start - now
-  const days = Math.floor(diff / 86_400_000)
-  const hours = Math.floor((diff / 3_600_000) % 24)
-  const mins = Math.max(1, Math.floor((diff / 60_000) % 60))
-  if (days > 0) return `${days} დღე · ${hours} სთ`
-  if (hours > 0) return `${hours} სთ · ${mins} წთ`
-  const totalMin = Math.max(1, Math.ceil(diff / 60_000))
-  return `${totalMin} წუთი`
-}
-
-// Stale-while-revalidate cache per booking id (same pattern as lib/me.ts) —
-// `/api/bookings/[id]` is the slowest endpoint, so re-opening a booking renders
-// instantly from cache while a fresh copy loads.
-const tutorBookingCache = new Map<string, Booking>()
+import { Booking, BookingStatus, Me, fmtDateTime, toneOf, tutorBookingCache, useRemainingLabel } from './_model'
+import { ReviewBlock } from './_review'
+import { SessionTimeline } from './_timeline'
 
 export default function TutorBookingDetailPage() {
   const params = useParams<{ id: string }>()
@@ -894,169 +799,6 @@ export default function TutorBookingDetailPage() {
         }}
         onCancel={() => setConfirming(null)}
       />
-    </div>
-  )
-}
-
-/* Client review + expert reply. One reply per review (server allows edits —
-   PATCH overwrites). The reply ships publicly on the expert profile, so the
-   form says so under the textarea. */
-function ReviewBlock({
-  bookingId,
-  review,
-  onUpdated,
-}: {
-  bookingId: string
-  review: BookingReview
-  onUpdated: (tutorResponse: string, respondedAt: string) => void
-}) {
-  const { toast } = useToast()
-  const [editing, setEditing] = useState(false)
-  const [text, setText] = useState(review.tutorResponse ?? '')
-  const [saving, setSaving] = useState(false)
-  const trimmed = text.trim()
-
-  const submit = async () => {
-    if (trimmed.length < 2 || saving) return
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/reviews/${bookingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response: trimmed }),
-      })
-      const j = await res.json().catch(() => ({} as any))
-      if (!res.ok || !j.ok) {
-        toast('პასუხის შენახვა ვერ მოხერხდა', 'error')
-        return
-      }
-      onUpdated(j.tutorResponse, j.respondedAt)
-      setEditing(false)
-      toast(review.tutorResponse ? 'პასუხი განახლდა' : 'პასუხი გამოქვეყნდა', 'success')
-    } catch { toast('ქსელის შეცდომა', 'error') }
-    finally { setSaving(false) }
-  }
-
-  return (
-    <div className="rounded-card border border-ink-200 bg-white shadow-xs p-5 sm:p-6">
-      <Eyebrow tone="muted" className="mb-2">სტუდენტის შეფასება</Eyebrow>
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span role="img" aria-label={`${review.rating} 5-დან`} className="inline-flex items-center gap-0.5">
-          {[1, 2, 3, 4, 5].map(n => (
-            <Icon.star aria-hidden key={n} className={`w-4 h-4 ${n <= review.rating ? 'text-warning-500' : 'text-ink-200'}`} />
-          ))}
-        </span>
-        <span className="font-display text-small font-bold text-ink-900 tabular-nums">{review.rating}.0</span>
-        <span className="ml-auto font-mono text-meta tabular-nums text-ink-400">{fmtKaDate(new Date(review.createdAt), { year: true })}</span>
-      </div>
-      <p className="mt-2 text-body text-ink-800 leading-[1.6] whitespace-pre-wrap">{review.body}</p>
-
-      <div className="mt-4 pt-4 border-t border-ink-100">
-        {review.tutorResponse && !editing ? (
-          <>
-            <Eyebrow className="mb-1.5">შენი პასუხი</Eyebrow>
-            <blockquote className="border-l-2 border-brand-300 pl-3 text-small text-ink-800 leading-[1.6] whitespace-pre-wrap">
-              {review.tutorResponse}
-            </blockquote>
-            <div className="mt-2 flex items-center gap-3">
-              {review.respondedAt && (
-                <span className="font-mono text-meta tabular-nums text-ink-400">{fmtKaDate(new Date(review.respondedAt), { year: true })}</span>
-              )}
-              <button
-                type="button"
-                onClick={() => { setText(review.tutorResponse ?? ''); setEditing(true) }}
-                className="font-display text-meta font-semibold text-brand-700 hover:text-brand-900 underline underline-offset-2 decoration-dotted"
-              >
-                რედაქტირება
-              </button>
-            </div>
-          </>
-        ) : editing ? (
-          <div>
-            <Eyebrow tone="muted" className="mb-2">
-              {review.tutorResponse ? 'პასუხის რედაქტირება' : 'პასუხი შეფასებაზე'}
-            </Eyebrow>
-            <textarea
-              value={text}
-              onChange={e => setText(e.target.value.slice(0, 600))}
-              rows={3}
-              placeholder="მადლობა შეფასებისთვის…"
-              className="w-full p-3 rounded-field border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body resize-none leading-relaxed"
-            />
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <span className="font-mono text-meta tabular-nums text-ink-400">{text.length} / 600</span>
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={() => setEditing(false)} className="font-display text-small font-semibold text-ink-500 hover:text-ink-800">
-                  გაუქმება
-                </button>
-                <Btn variant="primary" size="sm" onClick={submit} disabled={saving || trimmed.length < 2}>
-                  {saving ? 'ინახება…' : 'გამოქვეყნება'}
-                </Btn>
-              </div>
-            </div>
-            <p className="mt-1.5 text-meta text-ink-500">პასუხი საჯაროდ ჩანს პროფილზე.</p>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => { setText(''); setEditing(true) }}
-            className="font-display text-small font-semibold text-brand-700 hover:text-brand-900 inline-flex items-center gap-1.5"
-          >
-            <Icon.chat className="w-3.5 h-3.5" /> უპასუხე შეფასებას
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/* Minimal 4-step lifecycle trail. Canceled/no-show render a terminal state
-   instead of fake progress. Pure presentation from status + clock. */
-function SessionTimeline({ status, startAt, durationMin }: { status: BookingStatus; startAt: string; durationMin: number }) {
-  if (status === 'CANCELED' || status === 'NO_SHOW') {
-    return (
-      <div className="rounded-card border border-ink-200 bg-ink-50/60 px-5 py-3.5 flex items-center gap-2.5">
-        <Icon.x className="w-4 h-4 text-ink-400 shrink-0" />
-        <span className="text-small text-ink-500">
-          {status === 'CANCELED' ? 'ჯავშანი გაუქმდა.' : 'სესია არ შედგა.'}
-        </span>
-      </div>
-    )
-  }
-  const ended = new Date(startAt).getTime() + durationMin * 60_000 < Date.now()
-  const doneCount =
-    status === 'COMPLETED' ? 4
-    : ended ? 3
-    : status !== 'PREPARING' ? 2
-    : 1
-  const STEPS = ['მოთხოვნა', 'დადასტურება', 'სესია', 'დასრულება']
-  return (
-    <div className="rounded-card border border-ink-200 bg-white shadow-xs px-5 py-4">
-      <ol className="flex items-center" aria-label="ჯავშნის ეტაპები">
-        {STEPS.map((label, i) => {
-          const done = i < doneCount
-          const current = i === doneCount
-          return (
-            <li key={label} className={`flex items-center ${i > 0 ? 'flex-1' : ''}`}>
-              {i > 0 && <span className={`flex-1 h-px mx-2 ${done ? 'bg-brand-400' : 'bg-ink-200'}`} aria-hidden />}
-              <span className="flex flex-col items-center gap-1.5 shrink-0">
-                <span className={`w-5 h-5 rounded-full inline-flex items-center justify-center border ${
-                  done ? 'bg-brand-600 border-brand-600 text-white'
-                  : current ? 'bg-white border-brand-400 text-brand-600'
-                  : 'bg-white border-ink-300 text-transparent'
-                }`}>
-                  {/* Canon bans status dots — the current step is carried by
-                      the ring color + the bolder label underneath. */}
-                  {done ? <Icon.check className="w-3 h-3" /> : null}
-                </span>
-                <span className={`font-display text-micro font-semibold uppercase ${done || current ? 'text-ink-800' : 'text-ink-400'}`}>
-                  {label}
-                </span>
-              </span>
-            </li>
-          )
-        })}
-      </ol>
     </div>
   )
 }

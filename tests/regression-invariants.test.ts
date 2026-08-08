@@ -24,7 +24,7 @@
 //   G. POST /api/bookings must keep notify() out of the response path (after)
 //      and its independent pre-checks parallel.
 
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
 const root = join(__dirname, '..')
@@ -177,8 +177,16 @@ function check(name: string, ok: boolean, hint: string) {
   // The tutor pane now renders the shared <BookingChat>, whose polling and
   // optimistic append live in the useBookingThread hook — guard the hook plus
   // the import, and the student pane's still-local implementation.
-  const sPane = read('app/student/bookings/[id]/page.tsx')
-  const tPane = read('app/tutor/bookings/[id]/page.tsx')
+  // Both panes are split across `_*.tsx` files beside their page.tsx (the
+  // student pane's <BookingChat> now sits in _body.tsx), so read the whole
+  // route directory — the invariant is about the pane, not about one file.
+  const readDir = (d: string) => readdirSync(join(root, d))
+    .filter(f => f.endsWith('.tsx'))
+    .sort()
+    .map(f => read(join(d, f)))
+    .join('\n')
+  const sPane = readDir('app/student/bookings/[id]')
+  const tPane = readDir('app/tutor/bookings/[id]')
   const hook = read('components/chat/useBookingThread.ts')
   check(
     // REWRITTEN 2026-07-27. Both guards used to assert that the STUDENT pane
