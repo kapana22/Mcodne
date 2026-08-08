@@ -19,6 +19,19 @@ export type SiteTextDef = {
    * resolve their copy the moment the flag flips.
    */
   vertical?: 'abroad'
+  /**
+   * The surface that rendered this key was DELETED, but the key itself must
+   * never be. A production SiteText row may hold copy the owner typed by hand
+   * under this exact string; dropping the entry would orphan it silently and
+   * for good (tests/siteTexts.test.ts §„NO KEY MAY EVER BE RENAMED OR
+   * REMOVED"). Retiring instead keeps the key known — the row survives, the
+   * string can never be reused for something else, and putting the section back
+   * restores the text with it — while the admin editor hides the field, because
+   * a control that edits a page nobody can see is exactly the dead control the
+   * whole registry exists to prevent. Same mechanism as `vertical`, different
+   * reason: a dark vertical is not built yet, a retired key is no longer built.
+   */
+  retired?: true
 }
 
 import { PAGE_SEO, pageSeoKey } from '@/lib/pageSeoDefs'
@@ -96,19 +109,25 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'home.how.step3.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'შეხვდი ვიდეოზე' },
   { key: 'home.how.step3.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'დანიშნულ დროს ბმულით შეხვალ — დაჯავშნა ახლა უფასოა.' },
 
-  // ── Home · What every booking includes ──
+  // ── Home · What every booking includes — RETIRED 2026-08-08 (owner) ──
+  // The three-cell strip at the foot of „როგორ მუშაობს" was deleted from
+  // app/HomeClient.tsx. These seven entries stay, `retired`, and are hidden from
+  // the admin editor — see the field's doc comment on SiteTextDef for why the
+  // keys themselves can never be dropped. Whatever the owner had typed here
+  // (the live panel showed „რას გთავაზობთ?" / „ინდივიდუალური მიდგომა" /
+  // „მარტივი პროცესი") is still in the DB under these exact strings and comes
+  // back untouched the moment the strip is rendered again.
+  //
   // The `home.why.*` KEY NAMES are historical (the section used to be called
   // „რატომ მცოდნე") and must NOT be renamed — a SiteText DB row is keyed by the
   // key string, so renaming one silently drops whatever the admin had typed.
-  // The GROUP LABEL is what the admin reads, and it now matches the heading
-  // that is actually on the page.
-  { key: 'home.includes.eyebrow', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'პატარა იარლიყი (ზემოთ)', default: 'ყოველი ჯავშანი მოიცავს' },
-  { key: 'home.why.card1.title', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 1 — სათაური', default: 'ხელით მოდერაცია' },
-  { key: 'home.why.card1.body', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 1 — ტექსტი', multiline: true, default: 'ვამოწმებთ ყოველ განაცხადს — გამოცდილებას და რეპუტაციას.' },
-  { key: 'home.why.card2.title', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 2 — სათაური', default: 'HD ვიდეოსესია' },
-  { key: 'home.why.card2.body', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 2 — ტექსტი', multiline: true, default: 'ვიდეოოთახი, მიმოწერა და ფაილები — ბრაუზერიდან.' },
-  { key: 'home.why.card3.title', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 3 — სათაური', default: 'გამჭვირვალე ფასი' },
-  { key: 'home.why.card3.body', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 3 — ტექსტი', multiline: true, default: 'ერთი ფასი, ფარული საკომისიოს გარეშე.' },
+  { key: 'home.includes.eyebrow', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'პატარა იარლიყი (ზემოთ)', default: 'ყოველი ჯავშანი მოიცავს', retired: true },
+  { key: 'home.why.card1.title', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 1 — სათაური', default: 'ხელით მოდერაცია', retired: true },
+  { key: 'home.why.card1.body', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 1 — ტექსტი', multiline: true, default: 'ვამოწმებთ ყოველ განაცხადს — გამოცდილებას და რეპუტაციას.', retired: true },
+  { key: 'home.why.card2.title', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 2 — სათაური', default: 'HD ვიდეოსესია', retired: true },
+  { key: 'home.why.card2.body', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 2 — ტექსტი', multiline: true, default: 'ვიდეოოთახი, მიმოწერა და ფაილები — ბრაუზერიდან.', retired: true },
+  { key: 'home.why.card3.title', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 3 — სათაური', default: 'გამჭვირვალე ფასი', retired: true },
+  { key: 'home.why.card3.body', group: 'მთავარი — ყოველი ჯავშანი მოიცავს', label: 'ბარათი 3 — ტექსტი', multiline: true, default: 'ერთი ფასი, ფარული საკომისიოს გარეშე.', retired: true },
 
   // ── Home · „ხარ ექსპერტი?" CTA ──
   // The paragraph became editable 2026-08-05: it lost its commission clause,

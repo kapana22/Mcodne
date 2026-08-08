@@ -82,7 +82,12 @@ test('every editable text actually renders somewhere', () => {
     SOURCE.includes(`"${key}"`) ||
     SOURCE.includes(`'${key}'`) ||
     TEMPLATE_HEADS.some(h => key.startsWith(h))
-  const dead = SITE_TEXTS.filter(t => !used(t.key))
+  // `retired` = the surface was deleted on purpose. Such a key is deliberately
+  // unused in source AND deliberately hidden from the admin editor, so it is not
+  // a dead control — it is a preserved DB row. It still has to stay in the
+  // registry (see the ledger test below), which is why it is skipped here rather
+  // than deleted there.
+  const dead = SITE_TEXTS.filter(t => !t.retired && !used(t.key))
   assert.deepEqual(
     dead.map(t => `${t.key}  (${t.group} · ${t.label})`),
     [],

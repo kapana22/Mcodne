@@ -8,7 +8,6 @@ import { Link } from 'next-view-transitions'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { PublicTopBar } from '@/components/PublicTopBar'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
-import { StudentAppBar } from '@/components/StudentAppBar'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 import { Sheet } from '@/components/Sheet'
@@ -502,14 +501,6 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   useEffect(() => { if (page > totalPages) setPage(totalPages) }, [totalPages, page])
   const pagedTutors = visibleTutors.slice((page - 1) * PER_PAGE, page * PER_PAGE)
 
-  // A signed-in STUDENT browsing the catalog keeps THEIR workspace shell (with
-  // „ექსპერტები" active + Logo→/student) instead of the public header — so they
-  // never feel they left their account and always have a way back. Guests and
-  // tutors/admins keep the public header. `initialUser` seeds SSR so the header
-  // doesn't flip on hydration; `me` refreshes it after the /api/me probe.
-  const viewer = me ?? initialUser ?? null
-  const studentShell = viewer?.role === 'STUDENT'
-
   // The term the visitor actually searched for, used by the dead-end empty
   // state below. Echoed back (clipped, so a pasted paragraph can't blow up the
   // heading) and carried into /ask so the intent survives the miss.
@@ -518,9 +509,22 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
 
   return (
     <div className="font-sans bg-white text-ink-900 antialiased">
-      {studentShell
-        ? <StudentAppBar user={viewer ? { name: viewer.fullName, avatar: viewer.avatarUrl } : undefined} />
-        : <PublicTopBar activeHref="/tutors" initialUser={initialUser} />}
+      {/* ONE header, every viewer (2026-08-08, owner: „ექსპერტებზე რომ
+          გადავდივარ — იცვლება; მინდა როგორც ორიგინალში").
+          A signed-in STUDENT used to get the workspace shell here instead — the
+          reasoning was that they should never feel they had left their account.
+          What it actually produced was a menu that changed under them: /tutors
+          read მთავარი · ექსპერტები · ჯავშნები · მიმოწერა, and opening any expert
+          from that very list swapped it back to ექსპერტები · კატეგორიები ·
+          გახდი ექსპერტი · დახმარება. Browse and the profile it leads to are the
+          same public section, so they get the same bar.
+          The way back to the account was never in the nav items anyway: the Logo
+          auto-routes to the viewer's role-home (a student lands on /student) and
+          UserMenu carries the rest — both are in this header already.
+          No `activeHref`: the lit item is DERIVED from usePathname inside
+          PublicTopBar (§L). Passing it is what made the highlight go dark on
+          /tutors/[slug] the last time this was reported. */}
+      <PublicTopBar initialUser={initialUser} />
 
       <SearchHero filters={filters} setFilters={setFilters} search={search} setSearch={setSearch} onSearch={runSearch} total={total} loading={loading} liveCats={liveCats} facets={facets} />
 

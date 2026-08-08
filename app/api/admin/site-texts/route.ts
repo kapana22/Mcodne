@@ -21,7 +21,10 @@ export async function GET() {
   // secrecy — an admin can read the source — but because a group of fields that
   // edit a page nobody can open is a dead control, and the admin panel must not
   // change at all until the vertical is switched on.
-  const items = SITE_TEXTS.filter(t => t.vertical !== 'abroad' || FEATURE_ABROAD).map(t => ({
+  // `retired` keys are withheld for the mirror-image reason: their surface was
+  // deleted, so the field would edit a void. The key stays in the registry (the
+  // DB row is preserved) — it just stops being offered here.
+  const items = SITE_TEXTS.filter(t => !t.retired && (t.vertical !== 'abroad' || FEATURE_ABROAD)).map(t => ({
     key: t.key,
     group: t.group,
     label: t.label,

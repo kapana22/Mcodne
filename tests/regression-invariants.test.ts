@@ -335,6 +335,24 @@ function check(name: string, ok: boolean, hint: string) {
     /export const dynamic = 'force-dynamic'/.test(home),
     'If home ever goes static, getCurrentUser() there becomes a build-time error, not a header fix.',
   )
+  // L3 — reported AGAIN 2026-08-08, same sentence, third cause: /tutors swapped
+  // the whole bar for the workspace shell when the viewer was a STUDENT. The
+  // items themselves changed (მთავარი · ჯავშნები · მიმოწერა), and opening an
+  // expert from that list swapped them back. A public page renders the public
+  // header for every viewer — the role belongs in the Logo target and UserMenu,
+  // which this header already carries, not in which sections exist.
+  const browse = read('app/tutors/client.tsx')
+  check(
+    'L3: browse renders the PUBLIC header for every viewer, role included',
+    browse.includes('<PublicTopBar initialUser={initialUser} />') &&
+      !browse.includes('StudentAppBar'),
+    'A per-role header means the menu changes under the reader mid-journey.',
+  )
+  check(
+    'L3b: browse does not re-introduce the activeHref prop',
+    !/activeHref=/.test(browse),
+    'Passing it is what made the highlight go dark the moment you opened an expert (L1).',
+  )
 }
 
 if (failures > 0) {

@@ -996,12 +996,11 @@ const FeaturedExperts = () => {
    already said: hand-picked / transparent price / video session, plus a second
    copy of the payments note verbatim. Read end to end the page said the same
    three things three times and then asked you to become an expert.
-   The four „why" cells are now a compact strip at the FOOT of this section —
-   the detail under the steps rather than a competing heading. All three
-   `home.why.*` SiteText pairs still render here, so admin edits keep working;
-   the fourth cell (the payments one, the only cell with no SiteText key) is
-   gone because step 03 right above it IS the payments step, in both
-   PAYMENTS_LIVE states. */
+   The four „why" cells first became a compact strip at the FOOT of this section
+   — the detail under the steps rather than a competing heading — and were then
+   removed outright 2026-08-08 (owner). The section is now the three steps and
+   nothing else; see the note where the strip used to be for why its SiteText
+   keys stay in the registry. */
 /**
  * Do the three step drawings exist yet — ALL of them?
  *
@@ -1018,30 +1017,6 @@ const stepArt =
   hasIllustration('expertSearchOnDark') &&
   hasIllustration('bookingsOnDark') &&
   hasIllustration('videoSessionOnDark')
-
-/* ───── The band that hands the page over to „როგორ მუშაობს" ─────
-   Full-bleed, no copy, no CTA — the drawing's own left→right story (questions
-   and half-written notes → a booked video consultation) is the picture of what
-   the section immediately below then explains in three steps.
-
-   It also does the colour work the page was missing here: hero → categories →
-   experts are all white, and the next section is near-black. Landing a warm
-   paper band between them turns a hard white/black butt-joint into a proper
-   chapter break, and it is the ONE ground this art can sit on — the light
-   drawings were verified by screenshot to be nearly invisible on `#how` itself
-   (thin dark-teal strokes on #0F0E0A).
-
-   `bg-ink-75` is not a guess: the artwork was colour-shifted at export so its
-   paper measures #F8F6F2 exactly, which is why the empty left half reads as the
-   drawing's own paper continuing rather than as a background behind an image.
-   Change this class and the band grows a vertical seam — see the PAPER note in
-   components/Illustration. No border: the section above already owns its bottom
-   hairline, and below this the ink-900 edge is its own divider. */
-const JourneyBand = () => (
-  <section className="bg-ink-75">
-    <IllustrationBand name="consultationJourney" />
-  </section>
-)
 
 const HowItWorks = () => (
   /* THE PAGE'S ONE DARK BAND (2026-07-31).
@@ -1120,28 +1095,13 @@ const HowItWorks = () => (
         </Reveal>
       </div>
 
-      {/* What every booking includes — the former „რატომ მცოდნე" cells, demoted
-          to a hairline strip. Single-block reveal on purpose: the gap-px /
-          overflow-hidden lattice would clip per-cell staggered motion. */}
-      <Reveal delay={120} className="mt-10 sm:mt-12">
-        {/* `tone="onDark"` (white/55 = 5.67:1). `muted` is ink-500, which is
-            3.45:1 here — the same failure as the eyebrow above. */}
-        <Eyebrow tone="onDark" className="mb-3"><SiteText k="home.includes.eyebrow" /></Eyebrow>
-        {/* On the dark ground the lattice is drawn in white at 12%, not ink-200
-            — a warm-grey hairline vanishes on ink-900. */}
-        <div className="grid sm:grid-cols-3 gap-px bg-white/12 border border-white/12 rounded-card overflow-hidden">
-          {([
-            { t: 'ხელით მოდერაცია', d: 'ვამოწმებთ ყოველ განაცხადს — გამოცდილებას და რეპუტაციას.', tk: 'home.why.card1.title', dk: 'home.why.card1.body' },
-            { t: 'HD ვიდეოსესია',   d: 'ვიდეოოთახი, მიმოწერა და ფაილები — ბრაუზერიდან.',            tk: 'home.why.card2.title', dk: 'home.why.card2.body' },
-            { t: 'გამჭვირვალე ფასი', d: 'ერთი ფასი, ფარული საკომისიოს გარეშე.',                     tk: 'home.why.card3.title', dk: 'home.why.card3.body' },
-          ] as { t: string; d: string; tk: string; dk: string }[]).map((c, i) => (
-            <div key={i} className="bg-ink-900 p-5 sm:p-6">
-              <h3 className="font-display text-body-lg font-bold text-white tracking-tight leading-tight mb-1.5"><SiteText k={c.tk} /></h3>
-              <p className="text-small text-white/65 leading-[1.55]"><SiteText k={c.dk} /></p>
-            </div>
-          ))}
-        </div>
-      </Reveal>
+      {/* The three-cell „რას გთავაზობთ?" strip that used to close this section
+          was REMOVED 2026-08-08 (owner). Its seven SiteText keys —
+          `home.includes.eyebrow` and `home.why.card1–3.title/body` — are marked
+          `retired: true` in lib/siteTextDefs rather than deleted: the keys must
+          survive (production rows hold the owner's hand-written copy under those
+          exact strings) but the admin fields must not, or they would edit a
+          void. Render this strip again and the stored text comes back with it. */}
     </Container>
   </section>
 )
@@ -1245,17 +1205,45 @@ const ExpertCta = () => (
   </section>
 )
 
+/* ───── The page's closing image ─────
+   Full-bleed, no copy, no CTA: the drawing's own left→right story — questions
+   and half-written notes resolving into a booked video consultation — is the
+   whole product in one picture, which is why it closes the page rather than
+   explaining any one section.
+
+   Placement is the owner's call (2026-08-08): it shipped above „როგორ მუშაობს"
+   first and was moved here, under „გააზიარე შენი ცოდნა". Note the one hard
+   constraint if it ever moves again — it CANNOT go inside `#how`; that band is
+   bg-ink-900 and this art is thin dark-teal line work, verified by screenshot
+   to be nearly invisible there.
+
+   `bg-ink-75` is not a guess: the artwork was colour-shifted at export so its
+   paper measures #F8F6F2 exactly, which is why the empty left half reads as the
+   drawing's own paper continuing rather than as a background behind an image.
+   Change this class and the band grows a vertical seam — see the PAPER note in
+   components/Illustration. No border either side: the footer below draws its
+   own full-bleed hairline, and the tone step above IS the divider.
+
+   OUTSIDE `<ApplyCtaGate>` deliberately — an existing expert doesn't see the
+   „გახდი ექსპერტი" section, but the page still needs something between the
+   dark band and the footer. */
+const JourneyBand = () => (
+  <section className="bg-ink-75">
+    <IllustrationBand name="consultationJourney" />
+  </section>
+)
+
 const HomeView = ({ initialCategories = [] }: { initialCategories?: HomeCat[] }) => (
   <>
     <HomeHero />
     <Categories initialCategories={initialCategories} />
     <FeaturedExperts />
-    <JourneyBand />
     {/* „როგორ მუშაობს" now also carries the former „რატომ მცოდნე" cells —
         see the note above HowItWorks for why those two sections merged. */}
     <HowItWorks />
     {/* „გახდი ექსპერტი“ section is meaningless for an existing expert/admin. */}
     <ApplyCtaGate><ExpertCta /></ApplyCtaGate>
+    <JourneyBand />
   </>
 )
 
