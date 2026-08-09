@@ -29,6 +29,7 @@
  * Pinned by tests/applyValidation.test.ts.
  */
 import { checkGeorgian, georgianError } from './georgianText'
+import { phoneFormatError } from './phone'
 import { extractYouTubeId } from './youtube'
 
 /** Every bound the application is judged by. Two numbers, one place. */
@@ -139,12 +140,17 @@ export function videoError(raw: string | null | undefined): string | null {
   return null
 }
 
-/** Optional. Shape is the form's business; the API only bounds the length. */
+/**
+ * Optional HERE (an application may be sent without one), but when a number IS
+ * given it has to be a real one. The shape rule lives in lib/phone.ts because
+ * signup now requires a phone too, and a number accepted on one screen must not
+ * be refused on the next.
+ */
 export function phoneError(raw: string | null | undefined): string | null {
   const v = (raw ?? '').trim()
   if (!v) return null
   if (v.length > APPLY.PHONE_MAX) return `ტელეფონი ძალიან გრძელია — მაქსიმუმ ${APPLY.PHONE_MAX} სიმბოლო.`
-  return null
+  return phoneFormatError(v)
 }
 
 /* ───────────────────── zod ↔ these rules ───────────────────── */

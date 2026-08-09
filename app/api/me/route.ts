@@ -1,4 +1,5 @@
 import { NextResponse, after } from 'next/server'
+import { normalizePhone, phoneFormatError } from '@/lib/phone'
 import { cookies } from 'next/headers'
 import { kickSweep } from '@/lib/sweepRunner'
 import { z } from 'zod'
@@ -85,9 +86,24 @@ export async function PATCH(req: Request) {
 
   const { fullName, phone, bio, avatarUrl, currentPassword, newPassword } = parsed.data
 
+  // A number given here has to satisfy the same rule as the one given at signup
+  // — this is the OTHER way a phone reaches the column (settings, and the
+  // missing-phone prompt), and a rule enforced on one path only is not a rule.
+  // Clearing it (empty string) stays allowed: the column is nullable, and the
+  // prompt — not this route — is what makes a phone mandatory.
+  if (phone !== undefined && phone.trim()) {
+    const msg = phoneFormatError(phone, { required: true })
+    if (msg) {
+      return NextResponse.json(
+        { ok: false, error: 'INVALID_PHONE', field: 'phone', message: msg },
+        { status: 400 },
+      )
+    }
+  }
+
   const data: any = {}
   if (fullName !== undefined) data.fullName = fullName.trim()
-  if (phone !== undefined) data.phone = phone.trim() || null
+  if (phone !== undefined) data.phone = phone.trim() ? normalizePhone(phone) : null
   if (bio !== undefined) data.bio = bio.trim() || null
   // Downscale an inbound base64 avatar to a 256px webp (same as /api/uploads)
   // so this write path can't persist a multi-MB avatar. null clears it.

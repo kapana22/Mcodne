@@ -5,6 +5,7 @@ import { createSession, hashPassword } from '@/lib/auth'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { sendMail } from '@/lib/mailer'
 import { welcomeEmail } from '@/lib/emailTemplates'
+import { normalizePhone, phoneFormatError } from '@/lib/phone'
 
 // NB: `role` is intentionally NOT accepted from the client. Every self-signup
 // creates a STUDENT; promotion to TUTOR happens only through the moderated
@@ -13,6 +14,12 @@ const Body = z.object({
   fullName: z.string().min(2).max(80),
   email: z.string().email(),
   password: z.string().min(8).max(120),
+  // Required since 2026-08-09 (owner). The rule lives in lib/phone so the form,
+  // this route, /apply and the profile editor all judge a number the same way.
+  // Refused here as a NAMED field: a bare 400 INVALID on a required field the
+  // form only just grew is the „wall with no sign on it" that lib/applyValidation
+  // exists to prevent.
+  phone: z.string().min(1).max(40),
 })
 
 export async function POST(req: Request) {
@@ -29,7 +36,14 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   }
-  const { fullName, email, password } = parsed.data
+  const { fullName, email, password, phone } = parsed.data
+  const phoneMsg = phoneFormatError(phone, { required: true })
+  if (phoneMsg) {
+    return NextResponse.json(
+      { ok: false, error: 'INVALID_PHONE', field: 'phone', message: phoneMsg },
+      { status: 400 },
+    )
+  }
   const emailLc = email.toLowerCase().trim()
   const existing = await prisma.user.findUnique({ where: { email: emailLc } })
   if (existing) {
@@ -42,6 +56,7 @@ export async function POST(req: Request) {
         email: emailLc,
         fullName: fullName.trim(),
         passwordHash: await hashPassword(password),
+        phone: normalizePhone(phone),
         role: 'STUDENT',
       },
     })

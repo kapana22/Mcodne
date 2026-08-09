@@ -10,6 +10,8 @@ import { Icon } from '@/components/Icon'
 import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
 import { Field, GoogleMark, PwInput, StrengthBar, inputCls } from './_fields'
+import { PhoneInput } from '@/components/PhoneInput'
+import { phoneFormatError } from '@/lib/phone'
 import { View, clearSignupDraft, readEmailParam, readSignupDraft, redirectAfterSignin, startGoogleSignin, writeSignupDraft } from './_model'
 
 /* ═══════════════════════════════════════════════════════════════════ */
@@ -43,6 +45,7 @@ const RoleSwitch = ({ role, setRole }: { role: 'learn' | 'teach'; setRole: (r: '
 const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
   const [first, setFirst] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [pw, setPw] = useState('')
   const [agree, setAgree] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -70,6 +73,8 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
     // specific message instead of the generic INVALID error.
     if (first.trim().length < 2) { setErrMsg('სახელი — მინიმუმ 2 სიმბოლო'); return }
     if (!email) { setErrMsg('შეიყვანე ელფოსტა'); return }
+    const phoneMsg = phoneFormatError(phone, { required: true })
+    if (phoneMsg) { setErrMsg(phoneMsg); return }
     if (pw.length < 8) { setErrMsg('პაროლი მინიმუმ 8 სიმბოლო'); return }
     if (!agree) { setErrMsg('დაეთანხმე წესებს'); return }
     setSubmitting(true); setErrMsg(null)
@@ -77,12 +82,13 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName: first.trim(), email: email.trim().toLowerCase(), password: pw }),
+        body: JSON.stringify({ fullName: first.trim(), email: email.trim().toLowerCase(), password: pw, phone }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setErrMsg(
           data.error === 'EMAIL_TAKEN' ? 'ეს ელფოსტა უკვე გამოყენებულია' :
+          data.error === 'INVALID_PHONE' ? (data.message ?? 'ტელეფონის ნომერი არასწორია') :
           data.error === 'INVALID' ? 'შეავსე ყველა ველი (პაროლი მინიმუმ 8 სიმბოლო)' :
           data.error === 'RATE_LIMITED' ? `ბევრი მცდელობა — სცადე ${Math.ceil((data.retryInSec ?? 60)/60)} წუთში` :
           'შეცდომა, სცადე თავიდან'
@@ -120,6 +126,10 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
 
         <Field label="ელფოსტა" required>
           <input type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null) }} placeholder="anu@gmail.com" autoComplete="email" className={inputCls} />
+        </Field>
+
+        <Field label="ტელეფონი" required>
+          <PhoneInput value={phone} onChange={v => { setPhone(v); if (errMsg) setErrMsg(null) }} className={inputCls} />
         </Field>
 
         <div>
@@ -175,6 +185,7 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
   const [first, setFirst] = useState('')
   const [last, setLast] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [pw, setPw] = useState('')
   const [agree, setAgree] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -185,6 +196,8 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
     if (!first.trim()) { setErrMsg('შეიყვანე სახელი'); return }
     if (!last.trim()) { setErrMsg('შეიყვანე გვარი'); return }
     if (!email) { setErrMsg('შეიყვანე ელფოსტა'); return }
+    const phoneMsg = phoneFormatError(phone, { required: true })
+    if (phoneMsg) { setErrMsg(phoneMsg); return }
     if (pw.length < 8) { setErrMsg('პაროლი მინიმუმ 8 სიმბოლო'); return }
     if (!agree) { setErrMsg('დაეთანხმე წესებს'); return }
     setSubmitting(true); setErrMsg(null)
@@ -192,12 +205,13 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName: `${first.trim()} ${last.trim()}`.trim(), email: email.trim().toLowerCase(), password: pw }),
+        body: JSON.stringify({ fullName: `${first.trim()} ${last.trim()}`.trim(), email: email.trim().toLowerCase(), password: pw, phone }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setErrMsg(
           data.error === 'EMAIL_TAKEN' ? 'ეს ელფოსტა უკვე გამოყენებულია' :
+          data.error === 'INVALID_PHONE' ? (data.message ?? 'ტელეფონის ნომერი არასწორია') :
           data.error === 'INVALID' ? 'შეავსე ყველა ველი (პაროლი მინიმუმ 8 სიმბოლო)' :
           data.error === 'RATE_LIMITED' ? `ბევრი მცდელობა — სცადე ${Math.ceil((data.retryInSec ?? 60)/60)} წუთში` :
           'შეცდომა, სცადე თავიდან'
@@ -250,6 +264,10 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
 
           <Field label="ელფოსტა" required>
             <input type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null) }} placeholder="anu@gmail.com" autoComplete="email" className={inputCls} />
+          </Field>
+
+          <Field label="ტელეფონი" required>
+            <PhoneInput value={phone} onChange={v => { setPhone(v); if (errMsg) setErrMsg(null) }} className={inputCls} />
           </Field>
 
           <div>
