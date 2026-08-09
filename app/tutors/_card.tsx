@@ -334,7 +334,14 @@ export const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, 
               ჯავშანი მხოლოდ სტუდენტს
             </div>
           ) : bookable ? (
-            <div className="grid grid-cols-2 gap-2">
+            /* `auto 1fr`, not `grid-cols-2`. Two equal halves fit „დაჯავშნე"
+               and break „შესვლა და ჯავშანი" — the label a SIGNED-OUT visitor
+               sees — onto two lines inside a 44px button. Measured on the live
+               site: 150px/2 lines at 390px, 135px/2 lines at 360px. „მიწერე"
+               takes only the width it needs and the primary gets the rest
+               (212px / 182px, one line), so the fix costs the secondary nothing
+               and touches no copy. */
+            <div className="grid grid-cols-[auto_1fr] gap-2">
               <Link
                 href={`/tutors/${t.slug || t.id}?intent=message`}
                 aria-label="მიწერე ექსპერტს"
