@@ -5,6 +5,7 @@ import { Icon } from '@/components/Icon'
 import { fmtKaDateTime } from '@/lib/kaDate'
 import { copyToClipboard } from '@/lib/clipboard'
 import { Eyebrow } from '@/components/Eyebrow'
+import { Card } from '@/components/Card'
 import { TabHeader, PeriodSwitch } from './_parts'
 import { ProfileViewsSection } from './_profileViews'
 
@@ -27,6 +28,7 @@ type Insights = {
   days: number
   retentionDays: number
   search: { total: number; zero: number; zeroShare: number | null }
+  categories: { slug: string; name: string; searches: number; experts: number; bookings: number }[]
   zeroQueries: { q: string; n: number; lastAt: string }[]
   funnel: {
     attempts: number
@@ -352,6 +354,45 @@ export function InsightsSection() {
             sees on their own dashboard, so admin and expert can never disagree
             about what „complete" means. Sorted unbookable-first: booking is
             slot-gated, so no published time beats every other gap. */}
+        {d && d.categories.length > 0 && (
+          <Card as="section">
+            <Eyebrow className="mb-1">სფეროები</Eyebrow>
+            <h3 className="font-display text-h3 font-bold text-ink-900 tracking-tight">სად არის მოთხოვნა და სად — ექსპერტი</h3>
+            <p className="text-small text-ink-600 mt-1 leading-relaxed">
+              ძებნა — რამდენჯერ მოძებნეს ეს სფერო. ექსპერტი — რამდენის დაჯავშნა შეიძლება ახლა.
+            </p>
+
+            <div className="mt-5 overflow-x-auto">
+              <table className="w-full min-w-[380px] text-small">
+                <thead>
+                  <tr className="text-left border-b border-ink-200">
+                    <th className="pb-2 font-display text-micro font-semibold uppercase text-ink-500">სფერო</th>
+                    <th className="pb-2 pl-3 text-right font-display text-micro font-semibold uppercase text-ink-500">ძებნა</th>
+                    <th className="pb-2 pl-3 text-right font-display text-micro font-semibold uppercase text-ink-500">ექსპერტი</th>
+                    <th className="pb-2 pl-3 text-right font-display text-micro font-semibold uppercase text-ink-500">ჯავშანი</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ink-100">
+                  {d.categories.map(c => {
+                    // Searched for, nobody bookable — the row that is a decision.
+                    const gap = c.searches > 0 && c.experts === 0
+                    return (
+                      <tr key={c.slug} className={gap ? 'bg-danger-50/40' : undefined}>
+                        <td className="py-2.5 pr-3">
+                          <a href={`/categories/${c.slug}`} target="_blank" rel="noopener noreferrer" className="font-display font-semibold text-ink-900 hover:text-brand-700 transition-colors duration-fast">{c.name}</a>
+                        </td>
+                        <td className="py-2.5 pl-3 text-right tabular-nums text-ink-700">{c.searches}</td>
+                        <td className={`py-2.5 pl-3 text-right tabular-nums font-semibold ${gap ? 'text-danger-700' : 'text-ink-900'}`}>{c.experts}</td>
+                        <td className="py-2.5 pl-3 text-right tabular-nums text-ink-700">{c.bookings}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
         {d && d.experts.length > 0 && (
           <section className="rounded-card border border-ink-200 bg-white p-5 sm:p-6">
             <Eyebrow className="mb-1">ექსპერტების პროფილები</Eyebrow>

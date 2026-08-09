@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
-import { futureWindowWhere } from '@/lib/bookability'
+import { futureWindowWhere, hasFutureWindow } from '@/lib/bookability'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { EVENTS, EVENT_RETENTION_DAYS } from '@/lib/events'
 import { BOOKING_FUNNEL_EVENTS } from '@/components/booking/funnelEvents'
@@ -86,7 +86,7 @@ export async function GET(req: Request) {
   // exists before reading it. Memoised — costs nothing after the first call.
   await ensureDbReady().catch(() => {})
 
-  const [zeroQueries, searchTotals, funnel, failureCodes, applyFunnel, applyDropoffs, expertRows] = await Promise.all([
+  const [zeroQueries, searchTotals, funnel, failureCodes, applyFunnel, applyDropoffs, expertRows, catSearches, catExperts, catBookings, liveCats] = await Promise.all([
     // ── 1. Zero-result searches, grouped. The list that names the experts the
     // platform is missing. Ordered by frequency, then recency.
     prisma
@@ -336,6 +336,50 @@ export async function GET(req: Request) {
         take: 200,
       })
       .catch(() => []),
+
+    // ── 8. DEMAND per category. Which spheres people actually search for.
+    // /api/tutors records the chosen category on every search row, so this is
+    // the same events the zero-result list above reads, grouped differently.
+    prisma
+      .$queryRawUnsafe<{ slug: string; n: number }[]>(
+        `SELECT "props"->>'category' AS "slug", COUNT(*)::int AS "n"
+           FROM "Event"
+          WHERE "name" IN ($1, $2)
+            AND "at" > now() - ($3 * interval '1 day')
+            AND "props"->>'category' IS NOT NULL
+            AND "props"->>'category' <> ''
+          GROUP BY 1`,
+        EVENTS.SEARCH,
+        EVENTS.SEARCH_ZERO,
+        days,
+      )
+      .catch(() => []),
+
+    // ── 9. SUPPLY per category — experts a visitor could actually book right
+    // now. Same three gates the browse list applies (published, not suspended,
+    // has an open window), and the window test is lib/bookability's, so this
+    // cannot disagree with the სისტემა tab.
+    prisma.tutorProfile
+      .findMany({
+        where: { available: true, user: { is: { suspendedAt: null } }, availability: hasFutureWindow() },
+        select: { category: { select: { slug: true } } },
+      })
+      .catch(() => []),
+
+    // ── 10. OUTCOME per category — bookings actually created in the window.
+    prisma.booking
+      .findMany({
+        where: { createdAt: { gt: new Date(Date.now() - days * 86_400_000) } },
+        select: { tutor: { select: { category: { select: { slug: true } } } } },
+      })
+      .catch(() => []),
+
+    // ── 11. Every LIVE category, so a sphere with zero of everything still gets
+    // a row. Those are the rows worth reading — an empty category is invisible
+    // in any list built from the events alone.
+    prisma.category
+      .findMany({ where: { isLive: true }, select: { slug: true, name: true }, orderBy: { name: 'asc' } })
+      .catch(() => []),
   ])
 
   const totals = searchTotals[0] ?? { searches: 0, zero: 0 }
@@ -375,9 +419,36 @@ export async function GET(req: Request) {
     .filter(e => e.percent < 100)
     .sort((a, b) => Number(b.unbookable) - Number(a.unbookable) || a.percent - b.percent)
 
+  // Demand ↔ supply, one row per live sphere. Sorted so the rows that need a
+  // decision come first: most searched, and among equals the one with fewest
+  // bookable experts. „People look here and there is nobody" is the whole point
+  // of the table — a category with demand and no supply is a recruiting target,
+  // and it is invisible in the zero-result query above (that one only sees
+  // free-text searches, not a category filter that returned an empty page).
+  const tally = <T,>(rows: T[], slug: (r: T) => string | null | undefined) => {
+    const m: Record<string, number> = {}
+    for (const r of rows) { const s = slug(r); if (s) m[s] = (m[s] ?? 0) + 1 }
+    return m
+  }
+  const searchBySlug: Record<string, number> = {}
+  for (const r of catSearches) searchBySlug[r.slug] = r.n
+  const expertBySlug = tally(catExperts, r => r.category?.slug)
+  const bookingBySlug = tally(catBookings, r => r.tutor?.category?.slug)
+
+  const categories = liveCats
+    .map(c => ({
+      slug: c.slug,
+      name: c.name,
+      searches: searchBySlug[c.slug] ?? 0,
+      experts: expertBySlug[c.slug] ?? 0,
+      bookings: bookingBySlug[c.slug] ?? 0,
+    }))
+    .sort((a, b) => b.searches - a.searches || a.experts - b.experts || a.name.localeCompare(b.name, 'ka'))
+
   return NextResponse.json({
     days,
     retentionDays: EVENT_RETENTION_DAYS,
+    categories,
     search: {
       total: searchAll,
       zero: totals.zero,
