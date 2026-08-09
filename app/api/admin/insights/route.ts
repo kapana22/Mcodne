@@ -86,7 +86,7 @@ export async function GET(req: Request) {
   // exists before reading it. Memoised — costs nothing after the first call.
   await ensureDbReady().catch(() => {})
 
-  const [zeroQueries, searchTotals, funnel, failureCodes, applyFunnel, applyDropoffs, expertRows, catSearches, catExperts, catBookings, liveCats] = await Promise.all([
+  const [zeroQueries, searchTotals, funnel, failureCodes, applyFunnel, applyDropoffs, expertRows, catSearches, catExperts, catBookings, liveCats, clientBookings, prevFunnel] = await Promise.all([
     // ── 1. Zero-result searches, grouped. The list that names the experts the
     // platform is missing. Ordered by frequency, then recency.
     prisma
@@ -150,7 +150,8 @@ export async function GET(req: Request) {
                   MAX(CASE WHEN "name" = $6 THEN 1 ELSE 0 END) AS s_noslots
              FROM "Event"
             WHERE "name" IN ($1, $2, $3, $4, $5, $6)
-              AND "at" > now() - ($7 * interval '1 day')
+              AND "at" >  now() - ($7 * interval '1 day')
+              AND "at" <= now() - ($8 * interval '1 day')
               AND "props"->>'flowId' IS NOT NULL
               AND "props"->>'flowId' NOT IN (${STAFF_FLOWS})
             GROUP BY 1
@@ -171,6 +172,7 @@ export async function GET(req: Request) {
         BOOKING_FUNNEL_EVENTS.failed,
         BOOKING_FUNNEL_EVENTS.noSlots,
         days,
+        0,
       )
       .catch(() => []),
 
@@ -315,6 +317,7 @@ export async function GET(req: Request) {
         where: { available: true, user: { is: { suspendedAt: null } } },
         select: {
           id: true, slug: true, headline: true, bio: true, specialty: true,
+          responseMedianMin: true, responseSampleN: true,
           price: true, languages: true, videoUrl: true,
           user: { select: { fullName: true, email: true, avatarUrl: true } },
           _count: {
@@ -380,6 +383,38 @@ export async function GET(req: Request) {
     prisma.category
       .findMany({ where: { isLive: true }, select: { slug: true, name: true }, orderBy: { name: 'asc' } })
       .catch(() => []),
+
+    // ── 12. Do clients come BACK. One booking is curiosity; the second one is
+    // the first evidence the product worked. Counted over all time on purpose —
+    // a repeat inside a 7-day window would mostly measure how busy the week was.
+    prisma.booking
+      .groupBy({ by: ['studentId'], _count: { _all: true } })
+      .catch(() => [] as { studentId: string; _count: { _all: number } }[]),
+
+    // ── 13. The SAME funnel window, one period earlier. Only the two numbers a
+    // rate is made of — a conversion figure on its own says nothing; „12%,
+    // was 9%" is a decision. Staff flows excluded here too, or the comparison
+    // would be against a period the operator was clicking through.
+    prisma
+      .$queryRawUnsafe<{ attempts: number; created: number }[]>(
+        `WITH f AS (
+           SELECT "props"->>'flowId' AS flow,
+                  MAX(CASE WHEN "name" = $1 THEN 1 ELSE 0 END) AS s_created
+             FROM "Event"
+            WHERE "name" IN ($1, $2)
+              AND "at" >  now() - ($3 * interval '1 day')
+              AND "at" <= now() - ($4 * interval '1 day')
+              AND "props"->>'flowId' IS NOT NULL
+              AND "props"->>'flowId' NOT IN (${STAFF_FLOWS})
+            GROUP BY 1
+         )
+         SELECT COUNT(*)::int AS "attempts", COALESCE(SUM(s_created), 0)::int AS "created" FROM f`,
+        FUNNEL_SPINE[3].event,
+        FUNNEL_SPINE[0].event,
+        days * 2,
+        days,
+      )
+      .catch(() => []),
   ])
 
   const totals = searchTotals[0] ?? { searches: 0, zero: 0 }
@@ -435,6 +470,23 @@ export async function GET(req: Request) {
   const expertBySlug = tally(catExperts, r => r.category?.slug)
   const bookingBySlug = tally(catBookings, r => r.tutor?.category?.slug)
 
+  // Clients with two or more bookings, over the clients who have any.
+  const repeatTotal = clientBookings.length
+  const repeatReturning = clientBookings.filter(r => r._count._all > 1).length
+
+  // Slowest to reply, among experts with enough messages for a median to mean
+  // anything. Sorted worst-first — this list is a nudge list, not a leaderboard.
+  const slowResponders = expertRows
+    .filter(t => (t.responseSampleN ?? 0) >= 3 && t.responseMedianMin != null)
+    .map(t => ({
+      slug: t.slug,
+      fullName: t.user?.fullName ?? null,
+      medianMin: t.responseMedianMin as number,
+      sampleN: t.responseSampleN as number,
+    }))
+    .sort((a, b) => b.medianMin - a.medianMin)
+    .slice(0, 8)
+
   const categories = liveCats
     .map(c => ({
       slug: c.slug,
@@ -449,6 +501,9 @@ export async function GET(req: Request) {
     days,
     retentionDays: EVENT_RETENTION_DAYS,
     categories,
+    repeat: { clients: repeatTotal, returning: repeatReturning },
+    prev: { attempts: prevFunnel[0]?.attempts ?? 0, created: prevFunnel[0]?.created ?? 0 },
+    slowResponders,
     search: {
       total: searchAll,
       zero: totals.zero,

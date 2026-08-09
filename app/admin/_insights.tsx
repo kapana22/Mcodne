@@ -29,6 +29,9 @@ type Insights = {
   retentionDays: number
   search: { total: number; zero: number; zeroShare: number | null }
   categories: { slug: string; name: string; searches: number; experts: number; bookings: number }[]
+  repeat: { clients: number; returning: number }
+  prev: { attempts: number; created: number }
+  slowResponders: { slug: string | null; fullName: string | null; medianMin: number; sampleN: number }[]
   zeroQueries: { q: string; n: number; lastAt: string }[]
   funnel: {
     attempts: number
@@ -354,6 +357,51 @@ export function InsightsSection() {
             sees on their own dashboard, so admin and expert can never disagree
             about what „complete" means. Sorted unbookable-first: booking is
             slot-gated, so no published time beats every other gap. */}
+        {d && (
+          <div className="grid sm:grid-cols-2 gap-4">
+            {(() => {
+              const now = pct(d.funnel.steps.find(s => s.key === 'created')?.n ?? 0, d.funnel.attempts)
+              const was = pct(d.prev.created, d.prev.attempts)
+              const diff = now - was
+              return (
+                <Stat
+                  n={`${now}%`}
+                  label="ჯავშნამდე მისული"
+                  sub={d.prev.attempts === 0 ? 'წინა პერიოდში მცდელობა არ ყოფილა' : `წინა ${d.days} დღეში — ${was}%`}
+                  bad={d.prev.attempts > 0 && diff < 0}
+                />
+              )
+            })()}
+            <Stat
+              n={`${pct(d.repeat.returning, d.repeat.clients)}%`}
+              label="დაბრუნებული კლიენტი"
+              sub={`${d.repeat.returning} ${d.repeat.clients}-დან ერთზე მეტჯერ დაჯავშნა`}
+            />
+          </div>
+        )}
+
+        {d && d.slowResponders.length > 0 && (
+          <Card as="section">
+            <Eyebrow className="mb-1">პასუხის დრო</Eyebrow>
+            <h3 className="font-display text-h3 font-bold text-ink-900 tracking-tight">ვინ აყოვნებს პასუხს</h3>
+            <p className="text-small text-ink-600 mt-1 leading-relaxed">
+              მიმოწერაზე პასუხის მედიანა. მინიმუმ 3 შეტყობინება.
+            </p>
+            <div className="mt-5 rounded-card border border-ink-200 divide-y divide-ink-100 overflow-hidden">
+              {d.slowResponders.map(e => (
+                <div key={e.slug ?? e.fullName ?? Math.random()} className="p-3 sm:p-4 flex items-center justify-between gap-4 bg-white">
+                  {e.slug
+                    ? <a href={`/tutors/${e.slug}`} target="_blank" rel="noopener noreferrer" className="font-display text-small font-bold text-ink-900 hover:text-brand-700 transition-colors duration-fast truncate">{e.fullName?.trim() || 'უსახელო'}</a>
+                    : <span className="font-display text-small font-bold text-ink-900 truncate">{e.fullName?.trim() || 'უსახელო'}</span>}
+                  <span className="font-display text-small font-semibold tabular-nums text-ink-700 shrink-0">
+                    {e.medianMin >= 60 ? `${Math.round(e.medianMin / 60)} სთ` : `${e.medianMin} წთ`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {d && d.categories.length > 0 && (
           <Card as="section">
             <Eyebrow className="mb-1">სფეროები</Eyebrow>
