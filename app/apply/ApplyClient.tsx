@@ -741,26 +741,42 @@ export default function TutorApply() {
               <div
                 role="status"
                 aria-live="polite"
-                className="mb-4 rounded-card border border-brand-200 bg-brand-50 text-brand-900 px-4 py-2.5 flex items-center gap-3 motion-safe:transition-opacity motion-safe:duration-fast"
+                /* `flex-wrap`, not one rigid row. At 360px the three children
+                   need ~320px inside a ~280px box, so flex fell back to
+                   SHRINKING them — and the only child that can shrink is the
+                   label, which broke „დაიწყე თავიდან" across two lines inside a
+                   32px-tall button. Wrapping drops the controls to their own
+                   line instead, which is the correct answer at that width.
+                   Reported 2026-08-08 (owner) from a phone. */
+                className="mb-4 rounded-card border border-brand-200 bg-brand-50 text-brand-900 px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 motion-safe:transition-opacity motion-safe:duration-fast"
               >
-                <span className="font-display text-small font-semibold tracking-tight">
+                <span className="font-display text-small font-semibold tracking-tight min-w-0">
                   შენახული მონახაზი აღდგა
                 </span>
-                <button
-                  type="button"
-                  onClick={clearDraftAndReset}
-                  className="ml-auto h-8 px-3 rounded-btn bg-white border border-brand-200 hover:border-brand-300 text-brand-700 hover:text-brand-800 font-display font-semibold text-meta tracking-wide inline-flex items-center motion-safe:transition-colors motion-safe:duration-fast"
-                >
-                  დაიწყე თავიდან
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraftRestored(false)}
-                  aria-label="დახურვა"
-                  className="w-7 h-7 rounded-full text-brand-700 hover:bg-brand-100 inline-flex items-center justify-center motion-safe:transition-colors motion-safe:duration-fast"
-                >
-                  <Icon.x className="w-3.5 h-3.5" />
-                </button>
+                {/* The two controls travel together — wrapped separately, the
+                    „×" would strand itself on a third line. */}
+                <div className="ml-auto flex items-center gap-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={clearDraftAndReset}
+                    /* `whitespace-nowrap` is the actual guard: it makes an
+                       over-tight row impossible to "solve" by breaking the
+                       label, so the wrap above has to happen instead.
+                       `tap-area` gives the 32px control a ≥40px finger target
+                       without moving anything (canon: tappable ≥40px). */
+                    className="tap-area shrink-0 whitespace-nowrap h-8 px-3 rounded-btn bg-white border border-brand-200 hover:border-brand-300 text-brand-700 hover:text-brand-800 font-display font-semibold text-meta tracking-wide inline-flex items-center motion-safe:transition-colors motion-safe:duration-fast"
+                  >
+                    დაიწყე თავიდან
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDraftRestored(false)}
+                    aria-label="დახურვა"
+                    className="tap-area shrink-0 w-7 h-7 rounded-full text-brand-700 hover:bg-brand-100 inline-flex items-center justify-center motion-safe:transition-colors motion-safe:duration-fast"
+                  >
+                    <Icon.x className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             )}
             {/* Email-verification banner removed: signup no longer sends an OTP and

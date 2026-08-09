@@ -34,8 +34,14 @@ export const PwInput = ({ value, onChange, placeholder = 'მინ. 8 სიმ
   const [show, setShow] = useState(false)
   return (
     <div className="relative">
-      <input type={show ? 'text' : 'password'} aria-label="პაროლი" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} autoComplete={autoComplete} className="w-full h-12 pl-3.5 pr-11 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body-lg text-ink-900 placeholder:text-ink-400 transition-colors duration-fast" />
-      <button type="button" onClick={() => setShow(s => !s)} aria-label={show ? 'დამალე' : 'აჩვენე'} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 inline-flex items-center justify-center rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 transition-colors duration-fast">
+      <input type={show ? 'text' : 'password'} aria-label="პაროლი" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} autoComplete={autoComplete} className="w-full h-12 pl-3.5 pr-12 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body-lg text-ink-900 placeholder:text-ink-400 transition-colors duration-fast" />
+      {/* 40×40 (`right-1` + `pr-12`), not 36×36. This was the LAST password
+          toggle on the site still at w-9 — the three in /settings and the
+          delete-account one were already 40 — and a live 390/360px audit
+          flagged it on both /signin and /signup as the only sub-40px tap target
+          on any public page. Canon: a chip may be h-7, but anything TAPPABLE is
+          ≥40px. The icon inside stays w-4. */}
+      <button type="button" onClick={() => setShow(s => !s)} aria-label={show ? 'დამალე' : 'აჩვენე'} className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 inline-flex items-center justify-center rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 transition-colors duration-fast">
         {show ? <Icon.eyeOff className="w-4 h-4" /> : <Icon.eye className="w-4 h-4" />}
       </button>
     </div>
