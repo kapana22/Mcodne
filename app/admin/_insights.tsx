@@ -221,7 +221,7 @@ export function InsightsSection() {
         sub="ქცევის მონაცემები — რა ვერ იპოვეს ძებნაში და ჯავშნის რომელ ნაბიჯზე გვწყდება ხალხი."
         actions={
           <>
-            <PeriodSwitch value={days} onChange={setDays} options={[7, 30]} />
+            <PeriodSwitch value={days} onChange={setDays} options={[1, 7, 30]} />
             <Btn variant="secondary" size="sm" onClick={() => load(days)} disabled={busy}>
               {busy ? 'იტვირთება…' : 'განახლება'}
             </Btn>
@@ -367,7 +367,7 @@ export function InsightsSection() {
                 <Stat
                   n={`${now}%`}
                   label="ჯავშნამდე მისული"
-                  sub={d.prev.attempts === 0 ? 'წინა პერიოდში მცდელობა არ ყოფილა' : `წინა ${d.days} დღეში — ${was}%`}
+                  sub={d.prev.attempts === 0 ? 'წინა პერიოდში მცდელობა არ ყოფილა' : d.days === 1 ? `გუშინ — ${was}%` : `წინა ${d.days} დღეში — ${was}%`}
                   bad={d.prev.attempts > 0 && diff < 0}
                 />
               )

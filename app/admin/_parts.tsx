@@ -205,7 +205,7 @@ export function PeriodSwitch({ value, onChange, options = [7, 30, 90] }: {
             value === n ? 'bg-ink-900 text-white' : 'bg-white text-ink-700 hover:bg-ink-50'
           }`}
         >
-          {n} დღე
+          {n === 1 ? 'დღეს' : `${n} დღე`}
         </button>
       ))}
     </div>

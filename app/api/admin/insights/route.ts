@@ -33,7 +33,7 @@ import { buildProfileChecks, profilePercent } from '@/lib/profileScore'
 // falls back to an empty result rather than breaking the panel.
 export const dynamic = 'force-dynamic'
 
-const ALLOWED_DAYS = [7, 30] as const
+const ALLOWED_DAYS = [1, 7, 30] as const
 export type InsightsDays = (typeof ALLOWED_DAYS)[number]
 
 /** Steps every attempt must pass, in order. `booking_service_chosen` is
