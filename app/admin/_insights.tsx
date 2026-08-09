@@ -32,6 +32,11 @@ type Insights = {
   repeat: { clients: number; returning: number }
   prev: { attempts: number; created: number }
   slowResponders: { slug: string | null; fullName: string | null; medianMin: number; sampleN: number }[]
+  browse: { searches: number; profileViews: number; bookingOpens: number }
+  concentration: { bookings: number; experts: number; topShare: number | null }
+  waiting: { slug: string | null; fullName: string | null; days: number }[]
+  hours: { demand: number[]; supply: number[] }
+  cancelBy: { STUDENT: number; TUTOR: number; ADMIN: number; unknown: number }
   zeroQueries: { q: string; n: number; lastAt: string }[]
   funnel: {
     attempts: number
@@ -128,6 +133,9 @@ const CODE_LABEL: Record<string, string> = {
   SERVER: 'სერვერის შეცდომა',
 }
 
+const PCT = (share: number) => Math.round(share * 100) + '%'
+const SUB = (bookings: number, experts: number) => bookings + ' ჯავშანი, ' + experts + ' ექსპერტზე გადანაწილებული'
+const CANCEL = (tutor: number, student: number) => 'ექსპერტმა ' + tutor + ', კლიენტმა ' + student
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
 
 const Stat = ({ n, label, sub, bad }: { n: string; label: string; sub: string; bad?: boolean }) => (
@@ -398,6 +406,85 @@ export function InsightsSection() {
                   </span>
                 </div>
               ))}
+            </div>
+          </Card>
+        )}
+
+        {d && (
+          <Card as="section">
+            <Eyebrow className="mb-1">ძებნიდან ჯავშნამდე</Eyebrow>
+            <h3 className="font-display text-h3 font-bold text-ink-900 tracking-tight">სად ჩერდებიან</h3>
+            <p className="text-small text-ink-600 mt-1 leading-relaxed">
+              ჯავშნის ძაბრი მხოლოდ მას შემდეგ იწყება, რაც ფანჯარა გაიხსნა. ეს სამი ციფრი მანამდე იყურება.
+            </p>
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              {[['ძებნა', d.browse.searches], ['პროფილი გახსნა', d.browse.profileViews], ['ჯავშანი გახსნა', d.browse.bookingOpens]].map(([l, n]) => (
+                <div key={String(l)} className="rounded-card border border-ink-200 p-4">
+                  <div className="font-display text-h2 font-bold tabular-nums text-ink-900 leading-none">{String(n)}</div>
+                  <div className="text-meta text-ink-600 mt-1.5 leading-snug">{String(l)}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {d && d.concentration.bookings > 0 && (
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Stat
+              n={d.concentration.topShare == null ? '—' : PCT(d.concentration.topShare)}
+              label="სამ ექსპერტზე მოდის"
+              sub={SUB(d.concentration.bookings, d.concentration.experts)}
+              bad={(d.concentration.topShare ?? 0) > 0.7}
+            />
+            <Stat
+              n={String(d.cancelBy.TUTOR + d.cancelBy.STUDENT)}
+              label="გაუქმებული ჯავშანი"
+              sub={CANCEL(d.cancelBy.TUTOR, d.cancelBy.STUDENT)}
+              bad={d.cancelBy.TUTOR > d.cancelBy.STUDENT}
+            />
+          </div>
+        )}
+
+        {d && d.waiting.length > 0 && (
+          <Card as="section">
+            <Eyebrow className="mb-1">ექსპერტები</Eyebrow>
+            <h3 className="font-display text-h3 font-bold text-ink-900 tracking-tight">ვინ ელოდება პირველ ჯავშანს</h3>
+            <p className="text-small text-ink-600 mt-1 leading-relaxed">
+              დამტკიცებიდან დღემდე. ვინც დიდხანს ელოდება, აღარ ბრუნდება.
+            </p>
+            <div className="mt-5 rounded-card border border-ink-200 divide-y divide-ink-100 overflow-hidden">
+              {d.waiting.map(e => (
+                <div key={(e.slug ?? '') + e.days} className="p-3 sm:p-4 flex items-center justify-between gap-4 bg-white">
+                  {e.slug
+                    ? <a href={"/tutors/" + e.slug} target="_blank" rel="noopener noreferrer" className="font-display text-small font-bold text-ink-900 hover:text-brand-700 transition-colors duration-fast truncate">{e.fullName?.trim() || 'უსახელო'}</a>
+                    : <span className="font-display text-small font-bold text-ink-900 truncate">{e.fullName?.trim() || 'უსახელო'}</span>}
+                  <span className={"font-display text-small font-semibold tabular-nums shrink-0 " + (e.days >= 21 ? 'text-danger-700' : 'text-ink-700')}>{e.days} დღე</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {d && (d.hours.demand.some(Boolean) || d.hours.supply.some(Boolean)) && (
+          <Card as="section">
+            <Eyebrow className="mb-1">საათები</Eyebrow>
+            <h3 className="font-display text-h3 font-bold text-ink-900 tracking-tight">როდის ეძებენ და როდის არიან თავისუფლები</h3>
+            <p className="text-small text-ink-600 mt-1 leading-relaxed">
+              მუქი — ძებნა. ღია — გამოქვეყნებული დრო. საათი, სადაც ძებნაა და დრო არა, ერთი წერილით სწორდება.
+            </p>
+            <div className="mt-5 flex items-end gap-[2px] h-24" aria-hidden>
+              {Array.from({ length: 24 }, (_, h) => {
+                const dm = Math.max(...d.hours.demand, 1), sm = Math.max(...d.hours.supply, 1)
+                return (
+                  <div key={h} className="flex-1 flex flex-col justify-end gap-[2px] h-full" title={h + ':00'}>
+                    <div className="bg-ink-900 rounded-t-[2px]" style={{ height: (d.hours.demand[h] / dm) * 55 + '%' }} />
+                    <div className="bg-brand-200 rounded-t-[2px]" style={{ height: (d.hours.supply[h] / sm) * 40 + '%' }} />
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex justify-between text-micro text-ink-400 mt-1.5 tabular-nums">
+              <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>
             </div>
           </Card>
         )}

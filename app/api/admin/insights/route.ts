@@ -86,7 +86,7 @@ export async function GET(req: Request) {
   // exists before reading it. Memoised — costs nothing after the first call.
   await ensureDbReady().catch(() => {})
 
-  const [zeroQueries, searchTotals, funnel, failureCodes, applyFunnel, applyDropoffs, expertRows, catSearches, catExperts, catBookings, liveCats, clientBookings, prevFunnel] = await Promise.all([
+  const [zeroQueries, searchTotals, funnel, failureCodes, applyFunnel, applyDropoffs, expertRows, catSearches, catExperts, catBookings, liveCats, clientBookings, prevFunnel, profileViews, bookingsByTutor, tutorAges, demandHours, supplyHours, cancels] = await Promise.all([
     // ── 1. Zero-result searches, grouped. The list that names the experts the
     // platform is missing. Ordered by frequency, then recency.
     prisma
@@ -415,6 +415,74 @@ export async function GET(req: Request) {
         days,
       )
       .catch(() => []),
+
+    // 14. Profile views, so browse can be read as a funnel. The booking funnel
+    // starts at "the sheet opened" — everything before it was invisible, and in
+    // a marketplace that is where most people leave: they searched, they read
+    // the cards, they opened nobody.
+    prisma
+      .$queryRawUnsafe<{ n: number }[]>(
+        `SELECT COUNT(*)::int AS "n" FROM "Event"
+          WHERE "name" = $1 AND "at" > now() - ($2 * interval '1 day')`,
+        EVENTS.PROFILE_VIEW,
+        days,
+      )
+      .catch(() => []),
+
+    // 15. Who the bookings go to. ALL TIME, not the window: concentration over
+    // seven days with a handful of bookings is noise. If a few experts take
+    // everything, the rest see nothing happen and quietly leave.
+    prisma.booking
+      .groupBy({ by: ['tutorId'], _count: { _all: true } })
+      .catch(() => [] as { tutorId: string; _count: { _all: number } }[]),
+
+    // 16. Approval -> first booking. TutorProfile.createdAt IS the approval
+    // moment (the row is written when an application is approved). An expert
+    // who waits a month does not come back.
+    prisma.tutorProfile
+      .findMany({
+        where: { user: { is: { suspendedAt: null } } },
+        select: { id: true, slug: true, createdAt: true, user: { select: { fullName: true } } },
+      })
+      .catch(() => []),
+
+    // 17. WHEN people look, against WHEN anyone is free. Hours are Tbilisi's,
+    // computed in SQL — lib/tz's rule is that the process timezone must never
+    // decide this. A window counts in every hour it covers, not just the one it
+    // starts in. (A window crossing midnight counts only to 23; the schedule
+    // editor cannot create one.)
+    prisma
+      .$queryRawUnsafe<{ h: number; n: number }[]>(
+        `SELECT EXTRACT(HOUR FROM "at" AT TIME ZONE 'Asia/Tbilisi')::int AS "h",
+                COUNT(*)::int AS "n"
+           FROM "Event"
+          WHERE "name" IN ($1, $2) AND "at" > now() - ($3 * interval '1 day')
+          GROUP BY 1`,
+        EVENTS.SEARCH,
+        EVENTS.SEARCH_ZERO,
+        days,
+      )
+      .catch(() => []),
+
+    prisma
+      .$queryRawUnsafe<{ h: number; n: number }[]>(
+        `SELECT h::int AS "h", COUNT(*)::int AS "n"
+           FROM "AvailabilitySlot" s,
+                LATERAL generate_series(
+                  EXTRACT(HOUR FROM s."startAt" AT TIME ZONE 'Asia/Tbilisi')::int,
+                  GREATEST(EXTRACT(HOUR FROM s."endAt" AT TIME ZONE 'Asia/Tbilisi')::int - 1,
+                           EXTRACT(HOUR FROM s."startAt" AT TIME ZONE 'Asia/Tbilisi')::int)
+                ) AS h
+          WHERE s."endAt" > now()
+          GROUP BY 1`,
+      )
+      .catch(() => []),
+
+    // 18. Who cancels. `cancelledBy` is stamped on the row; a cancel rate that
+    // does not say WHICH side did it cannot be acted on.
+    prisma.booking
+      .groupBy({ by: ['cancelledBy'], where: { status: 'CANCELED' }, _count: { _all: true } })
+      .catch(() => [] as { cancelledBy: string | null; _count: { _all: number } }[]),
   ])
 
   const totals = searchTotals[0] ?? { searches: 0, zero: 0 }
@@ -487,6 +555,64 @@ export async function GET(req: Request) {
     .sort((a, b) => b.medianMin - a.medianMin)
     .slice(0, 8)
 
+  // ── Browse read as a funnel. Not stitched per visitor (profile views carry no
+  // flowId), so these are three MAGNITUDES side by side, not a chain — enough
+  // to say whether the cards or the profile is where people stop.
+  const browse = {
+    searches: searchAll,
+    profileViews: profileViews[0]?.n ?? 0,
+    bookingOpens: f.opened,
+  }
+
+  // ── Concentration. `topShare` is the share of all bookings held by the three
+  // busiest experts; with few bookings it is noisy, which is why the raw counts
+  // travel with it.
+  let bookedTotal = 0
+  for (const r of bookingsByTutor) bookedTotal += r._count._all
+  const topThree = [...bookingsByTutor].sort((a, b) => b._count._all - a._count._all).slice(0, 3)
+  let topThreeTotal = 0
+  for (const r of topThree) topThreeTotal += r._count._all
+  const concentration = {
+    bookings: bookedTotal,
+    experts: bookingsByTutor.length,
+    topShare: bookedTotal > 0 ? topThreeTotal / bookedTotal : null,
+  }
+
+  // ── How long each expert has been waiting for their first booking. The ones
+  // still waiting are the list worth reading; a median over people who already
+  // booked says nothing about them.
+  const firstBookingAt = new Map<string, Date>()
+  const waitingRows = await prisma.booking
+    .groupBy({ by: ['tutorId'], _min: { createdAt: true } })
+    .catch(() => [] as { tutorId: string; _min: { createdAt: Date | null } }[])
+  for (const r of waitingRows) if (r._min.createdAt) firstBookingAt.set(r.tutorId, r._min.createdAt)
+  const DAY = 86_400_000
+  const waiting = tutorAges
+    .filter(tp => !firstBookingAt.has(tp.id))
+    .map(tp => ({
+      slug: tp.slug,
+      fullName: tp.user?.fullName ?? null,
+      days: Math.floor((Date.now() - new Date(tp.createdAt).getTime()) / DAY),
+    }))
+    .sort((a, b) => b.days - a.days)
+    .slice(0, 10)
+
+  // ── Demand vs supply by hour of the Tbilisi day, normalised to their own
+  // peaks so two different units can share one row of bars. What matters is the
+  // SHAPE: an hour people search and nobody is free is a fixable mismatch.
+  const dh: number[] = Array(24).fill(0)
+  for (const r of demandHours) dh[r.h] = r.n
+  const sh: number[] = Array(24).fill(0)
+  for (const r of supplyHours) sh[r.h] = r.n
+  const hours = { demand: dh, supply: sh }
+
+  // ── Who cancels.
+  const cancelBy = { STUDENT: 0, TUTOR: 0, ADMIN: 0, unknown: 0 }
+  for (const r of cancels) {
+    const k = (r.cancelledBy ?? 'unknown') as keyof typeof cancelBy
+    cancelBy[k in cancelBy ? k : 'unknown'] += r._count._all
+  }
+
   const categories = liveCats
     .map(c => ({
       slug: c.slug,
@@ -504,6 +630,11 @@ export async function GET(req: Request) {
     repeat: { clients: repeatTotal, returning: repeatReturning },
     prev: { attempts: prevFunnel[0]?.attempts ?? 0, created: prevFunnel[0]?.created ?? 0 },
     slowResponders,
+    browse,
+    concentration,
+    waiting,
+    hours,
+    cancelBy,
     search: {
       total: searchAll,
       zero: totals.zero,
