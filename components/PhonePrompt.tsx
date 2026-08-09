@@ -77,8 +77,7 @@ export function PhonePrompt() {
     <Sheet
       open={open}
       onClose={snooze}
-      eyebrow="ერთი წუთი"
-      title="დაამატე ტელეფონის ნომერი"
+      title="ტელეფონის ნომერი"
       size="sm"
       busy={saving}
       footer={
@@ -90,9 +89,7 @@ export function PhonePrompt() {
         </div>
       }
     >
-      <p className="text-small text-ink-600 leading-relaxed">
-        ექსპერტს სჭირდება, რომ შეხვედრამდე დაგიკავშირდეს. ნომერი პროფილზე არ ჩანს — მას მხოლოდ ის ექსპერტი ხედავს, ვისთანაც ჯავშანი გაქვს.
-      </p>
+      <p className="text-small text-ink-600">ექსპერტს სჭირდება შეხვედრამდე დასაკავშირებლად.</p>
 
       <div className="mt-5">
         <label htmlFor="phone-prompt-input" className="block font-display text-micro font-semibold uppercase text-ink-700 mb-2">

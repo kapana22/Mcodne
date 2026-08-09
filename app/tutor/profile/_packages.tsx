@@ -195,7 +195,7 @@ function DraftFields({ d, set, capacity }: { d: Draft; set: (d: Draft) => void; 
           </div>
         </Field>
         <Field label="ვადა (დღე)" hint="რამდენ ხანში უნდა გამოიყენოს">
-          <input type="number" required min={7} max={365} value={d.validDays}
+          <input type="number" inputMode="numeric" required min={7} max={365} value={d.validDays}
                  onChange={e => set({ ...d, validDays: Number(e.target.value) })}
                  className={`${inputCls} tabular-nums`} />
         </Field>
@@ -209,7 +209,7 @@ function DraftFields({ d, set, capacity }: { d: Draft; set: (d: Draft) => void; 
       {/* TOTAL price. The per-lesson number below is computed — it is deliberately
           not an input, so the two can never disagree. */}
       <Field label="სრული ფასი (₾)" hint="მთლიან პაკეტში, არა ერთ გაკვეთილში">
-        <input type="number" required min={0} max={100000}
+        <input type="number" inputMode="numeric" required min={0} max={100000}
                value={d.price === 0 ? '' : d.price}
                onChange={e => set({ ...d, price: Number(e.target.value) || 0 })}
                className={`${inputCls} tabular-nums sm:max-w-[220px]`} />

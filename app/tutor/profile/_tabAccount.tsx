@@ -107,19 +107,19 @@ export function AccountTab({ profile, setProfile, form, fullNameInput, setFullNa
           <Eyebrow tone="muted" className="mb-2">პაროლის შეცვლა</Eyebrow>
 
           <Field label="მიმდინარე პაროლი">
-            <input type="password" required
+            <input type="password" required autoComplete="current-password"
                    value={pwd.current} onChange={e => setPwd({ ...pwd, current: e.target.value })}
                    className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body focus:border-brand-400 focus:outline-none" />
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="ახალი პაროლი">
-              <input type="password" required minLength={PWD_MIN}
+              <input type="password" required autoComplete="new-password" minLength={PWD_MIN}
                      value={pwd.next} onChange={e => setPwd({ ...pwd, next: e.target.value })}
                      className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body focus:border-brand-400 focus:outline-none" />
               <p className="mt-1.5 text-meta text-ink-500">მინიმუმ 8 სიმბოლო</p>
             </Field>
             <Field label="დაადასტურე ახალი პაროლი">
-              <input type="password" required minLength={PWD_MIN}
+              <input type="password" required autoComplete="new-password" minLength={PWD_MIN}
                      value={pwd.confirm} onChange={e => setPwd({ ...pwd, confirm: e.target.value })}
                      className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body focus:border-brand-400 focus:outline-none" />
             </Field>

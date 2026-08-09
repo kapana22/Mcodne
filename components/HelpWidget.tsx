@@ -549,7 +549,7 @@ export function HelpWidget() {
                               the label says what it costs to leave it empty. */}
                           {!me && (
                             <input
-                              type="email"
+                              type="email" autoComplete="email"
                               value={msgEmail}
                               onChange={e => setMsgEmail(e.target.value)}
                               placeholder="ელფოსტა — რომ პასუხი მოგწეროთ (სურვილისამებრ)"

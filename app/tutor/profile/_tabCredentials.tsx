@@ -109,7 +109,7 @@ export function CredentialsTab({ profile, form, certificates, certForm, setCertF
                          className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-400 focus:outline-none" />
                 </Field>
                 <Field label="წელი">
-                  <input type="number" required min={1900} max={2100} value={certForm.year}
+                  <input type="number" inputMode="numeric" required min={1900} max={2100} value={certForm.year}
                          onChange={e => setCertForm({ ...certForm, year: Number(e.target.value) })}
                          className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
                 </Field>
@@ -190,12 +190,12 @@ export function CredentialsTab({ profile, form, certificates, certForm, setCertF
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="დაწყების წელი">
-                    <input type="number" required min={1900} max={2100} value={eduForm.startYear}
+                    <input type="number" inputMode="numeric" required min={1900} max={2100} value={eduForm.startYear}
                            onChange={e => setEduForm({ ...eduForm, startYear: Number(e.target.value) })}
                            className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
                   </Field>
                   <Field label="დასრულების წელი">
-                    <input type="number" min={1900} max={2100} value={eduForm.endYear}
+                    <input type="number" inputMode="numeric" min={1900} max={2100} value={eduForm.endYear}
                            onChange={e => setEduForm({ ...eduForm, endYear: e.target.value })}
                            placeholder="ცარიელი — დღემდე"
                            className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
@@ -252,12 +252,12 @@ export function CredentialsTab({ profile, form, certificates, certForm, setCertF
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="დაწყების წელი">
-                    <input type="number" required min={1900} max={2100} value={expForm.startYear}
+                    <input type="number" inputMode="numeric" required min={1900} max={2100} value={expForm.startYear}
                            onChange={e => setExpForm({ ...expForm, startYear: Number(e.target.value) })}
                            className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />
                   </Field>
                   <Field label="დასრულების წელი">
-                    <input type="number" min={1900} max={2100} value={expForm.endYear}
+                    <input type="number" inputMode="numeric" min={1900} max={2100} value={expForm.endYear}
                            onChange={e => setExpForm({ ...expForm, endYear: e.target.value })}
                            placeholder="ცარიელი — ახლა"
                            className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body tabular-nums text-ink-900 focus:border-brand-400 focus:outline-none" />

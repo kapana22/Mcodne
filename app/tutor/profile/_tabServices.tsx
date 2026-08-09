@@ -77,7 +77,7 @@ export function ServicesTab({ profile, setProfile, form, consultations, consForm
                                   className="w-full px-3 py-2 rounded-field border border-ink-200 bg-white text-small focus:border-brand-400 focus:outline-none resize-y" />
                       </Field>
                       <Field label="ხანგრძლივობა (წუთი)">
-                        <input type="number" required min={5} max={240} value={consEdit.minutes}
+                        <input type="number" inputMode="numeric" required min={5} max={240} value={consEdit.minutes}
                                onChange={e => setConsEdit({ ...consEdit, minutes: Number(e.target.value) })}
                                className="w-full sm:max-w-[200px] h-11 px-3 rounded-field border border-ink-200 bg-white text-body tabular-nums focus:border-brand-400 focus:outline-none" />
                       </Field>
@@ -130,7 +130,7 @@ export function ServicesTab({ profile, setProfile, form, consultations, consForm
                           className="w-full px-3 py-2 rounded-field border border-ink-200 bg-white text-small focus:border-brand-400 focus:outline-none resize-y" />
               </Field>
               <Field label="ხანგრძლივობა (წუთი)">
-                <input type="number" required min={5} max={240} value={consForm.minutes}
+                <input type="number" inputMode="numeric" required min={5} max={240} value={consForm.minutes}
                        onChange={e => setConsForm({ ...consForm, minutes: Number(e.target.value) })}
                        className="w-full sm:max-w-[200px] h-11 px-3 rounded-field border border-ink-200 bg-white text-body tabular-nums focus:border-brand-400 focus:outline-none" />
               </Field>

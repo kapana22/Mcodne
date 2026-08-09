@@ -36,19 +36,14 @@ export function phoneFormatError(
   { required = false }: { required?: boolean } = {},
 ): string | null {
   const v = normalizePhone(raw)
-  if (!v) return required ? 'შეიყვანე ტელეფონის ნომერი.' : null
+  if (!v) return required ? 'შეიყვანე ტელეფონის ნომერი' : null
 
   if (isGeorgianMobile(v)) return null
 
   // Anything not Georgian must carry its country code, or we cannot dial it.
-  if (!v.startsWith('+')) {
-    return 'ქართული ნომერი უნდა იწყებოდეს 5-ით და იყოს 9 ციფრი. უცხოური ნომერი მიუთითე ქვეყნის კოდით, მაგ. +49…'
-  }
   // E.164 allows up to 15 digits; below 8 nothing real exists.
-  const digits = v.slice(1)
-  if (digits.length < 8 || digits.length > 15) {
-    return 'ნომერი არასწორია — ქვეყნის კოდთან ერთად 8-დან 15 ციფრამდე უნდა იყოს.'
-  }
+  const digits = v.startsWith('+') ? v.slice(1) : ''
+  if (!digits || digits.length < 8 || digits.length > 15) return 'ნომერი არასწორია'
   return null
 }
 

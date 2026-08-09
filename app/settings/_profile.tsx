@@ -108,7 +108,7 @@ export function ProfileSection({ me, fullName, setFullName, phone, setPhone, bio
         <label className="block">
           <span className="font-display text-micro font-semibold uppercase text-ink-700">ტელეფონი <span className="text-ink-400 normal-case tracking-normal">— არასავალდებულო</span></span>
           <input
-            type="tel"
+            type="tel" inputMode="tel" autoComplete="tel"
             value={phone}
             onChange={e => setPhone(e.target.value)}
             maxLength={40}

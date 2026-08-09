@@ -169,7 +169,7 @@ export default function ContactPage() {
               <label className="block">
                 <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">ელფოსტა</span>
                 <input
-                  type="email"
+                  type="email" autoComplete="email"
                   required
                   value={email}
                   onChange={e => { setEmail(e.target.value); if (status === 'error') { setStatus('idle'); setErrorText(null) } }}

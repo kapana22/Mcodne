@@ -186,12 +186,12 @@ export function ProfileTab({ me, profile, loading, form, setForm, dirty, savingP
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="გამოცდილება (წლები)">
-                <input type="number" min={0} max={80} required
+                <input type="number" inputMode="numeric" min={0} max={80} required
                        value={form.yearsExp} onChange={e => setForm({ ...form, yearsExp: Number(e.target.value) })}
                        className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-400 focus:outline-none tabular-nums" />
               </Field>
               <Field label="სესიის ფასი (₾)">
-                <input type="number" min={1} max={10000} required
+                <input type="number" inputMode="numeric" min={1} max={10000} required
                        value={form.hourlyRate} onChange={e => setForm({ ...form, hourlyRate: Number(e.target.value) })}
                        className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-400 focus:outline-none tabular-nums" />
                 <p className="mt-1.5 text-meta text-ink-500 leading-snug">ნაგულისხმევი ფასი — ტიპების დამატებისას ჩანაცვლდება.</p>
