@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   // Do NOT remove it, or Search Console will lose verification.
   verification: { google: 'd52ikKfhRDBsgsbzX-ZfC9lE-jPW4BGVpPeNLERiVpo' },
   title: {
-    default: 'მცოდნე — ბიზნეს კონსულტაცია ქართველ ექსპერტებთან',
+    default: 'მცოდნე — ონლაინ კონსულტაცია ქართველ ექსპერტებთან',
     template: '%s',
   },
   description: 'ქართული ექსპერტ-კონსულტაციის პლატფორმა — დაჯავშნე ვიდეოსესია ბიზნესის, კარიერის, იურიდიულ და ფინანსურ საკითხებზე ხელით შერჩეულ ექსპერტებთან.',
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     apple: '/favicon.svg',
   },
   openGraph: {
-    title: 'მცოდნე — ბიზნეს კონსულტაცია ექსპერტებთან',
+    title: 'მცოდნე — ონლაინ კონსულტაცია ექსპერტებთან',
     description: 'დაჯავშნე ვიდეოკონსულტაცია ხელით შერჩეულ ქართველ ექსპერტებთან.',
     images: [{ url: '/og.png', width: 1200, height: 630, alt: 'მცოდნე' }],
     locale: 'ka_GE',
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'მცოდნე — ბიზნეს კონსულტაცია ექსპერტებთან',
+    title: 'მცოდნე — ონლაინ კონსულტაცია ექსპერტებთან',
     description: 'დაჯავშნე ვიდეოკონსულტაცია ხელით შერჩეულ ქართველ ექსპერტებთან.',
     images: [{ url: '/og.png', width: 1200, height: 630, alt: 'მცოდნე' }],
   },
