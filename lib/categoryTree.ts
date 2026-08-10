@@ -130,7 +130,13 @@ export function categorySlugFilter(slug: string | readonly string[]) {
   return {
     is: {
       OR: [
-        { ...match, status: 'VISIBLE' as const },
+        // the named category itself, when it is browsable in its own right —
+        // which an absorbed one still is, through its sphere. That is what
+        // makes /categories/<sphere>/<absorbed> able to list its own experts,
+        // and what keeps an old ?category=finance bookmark returning people
+        // instead of an empty page.
+        { AND: [match, BROWSABLE_CATEGORY] },
+        // …plus everything folded into it.
         { status: 'REDIRECTED' as const, parent: { is: { ...match, status: 'VISIBLE' as const } } },
       ],
     },

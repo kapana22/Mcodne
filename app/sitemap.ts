@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next'
 import { prisma } from '@/lib/prisma'
 import { professions } from '@/lib/professionSeo'
 import { BROWSABLE_CATEGORY } from '@/lib/categoryTree'
+import { categoryPath } from '@/lib/categoryRoutes'
 
 // Next auto-serves this at /sitemap.xml. We keep the surface small and static
 // for public routes, then splice in tutor detail pages sourced directly from
@@ -167,6 +168,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       },
       take: 500,
     })
+    // The absorbed categories that kept a page of their own. They carry unique
+    // keyword copy and their old flat URL 301s to them, so leaving them out
+    // would mean the only page holding that copy is the one page we never
+    // declare. lib/categoryRoutes decides which ones those are.
+    const absorbed = await prisma.category.findMany({
+      where: { status: 'REDIRECTED', parent: { is: { status: 'VISIBLE' } } },
+      select: { slug: true, status: true, parent: { select: { slug: true } } },
+      take: 500,
+    })
+    const absorbedEntries: MetadataRoute.Sitemap = absorbed
+      .map(c => categoryPath(c))
+      // A category with no copy resolves to its parent's URL, which is already
+      // in the list — declaring it twice would be a duplicate, not a page.
+      .filter(path => path.split('/').length === 4)
+      .map(path => ({
+        url: `${SITE_URL}${path}`,
+        lastModified: CONTENT_REVISION,
+        changeFrequency: 'weekly' as const,
+        priority: 0.6,
+      }))
     categoryEntries = cats.map((c) => {
       const dates = [c.tutors[0]?.updatedAt, ...c.children.map(k => k.tutors[0]?.updatedAt)]
         .filter((d): d is Date => !!d)
@@ -180,6 +201,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       }
     })
+    categoryEntries = [...categoryEntries, ...absorbedEntries]
   } catch {
     categoryEntries = []
   }
