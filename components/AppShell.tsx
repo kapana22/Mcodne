@@ -10,7 +10,6 @@ import { ToastProvider } from './ToastProvider'
 import { CookieConsent } from './CookieConsent'
 import { BottomNav } from './BottomNav'
 import { BackToTop } from './BackToTop'
-import { PhonePrompt } from '@/components/PhonePrompt'
 import { HelpWidget } from './HelpWidget'
 import { NavProgress } from './NavProgress'
 import { ClientErrorReporter } from './ClientErrorReporter'
@@ -194,9 +193,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           overlap; hides itself entirely while a mobile booking CTA owns the
           bottom edge — see HelpWidget. */}
       <HelpWidget />
-      {/* Asks for a missing phone once per session — see the component for why
-          it is here and not on the signup form alone. */}
-      <PhonePrompt />
       <BottomNav role={role} />
     </ToastProvider>
   )
