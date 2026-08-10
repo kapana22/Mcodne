@@ -1,21 +1,56 @@
 'use client'
-// Admin tab: კატეგორიები — isLive + defaultServiceType toggles.
+// Admin tab: კატეგორიები — status + parent + name.
 
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/Icon'
+import { hierarchyError, canBeParent, TREE_ERROR } from '@/lib/categoryTree'
+import type { CategoryStatus } from '@/lib/categoryTree'
 import { AdminConfirmDialog, TabHeader, adminOk, AdminError } from './_parts'
 
-/* ───── Section: Categories (isLive + defaultServiceType toggles) ─────
-   Small admin surface for controlling the /categories browse page. Every
-   toggle hits PATCH /api/admin/categories/:id — we mutate local state first
-   (optimistic) and revert on network failure so the switch feels instant. */
+/* ───── Section: Categories (status + parent + name) ─────
+   The one screen where the shape of the catalogue is decided. Every control
+   hits PATCH /api/admin/categories/:id — we mutate local state first
+   (optimistic) and revert on failure so the change feels instant.
+
+   The hierarchy rules are NOT restated here: the picker offers only what
+   lib/categoryTree would accept, and the same function runs again before the
+   fetch. The server runs it a third time, because a screen is not a guard. */
 export type AdminCategory = {
   id: string
   slug: string
   name: string
   defaultServiceType: 'CONSULTATION' | 'RECURRING'
   isLive: boolean
+  status: CategoryStatus
+  parentId: string | null
   tutorCount: number
+  childCount: number
+}
+
+const STATUS_LABEL: Record<CategoryStatus, string> = {
+  VISIBLE: 'ჩანს',
+  HIDDEN: 'დამალული',
+  REDIRECTED: 'გადამისამართებული',
+}
+
+/** Children follow their parent, so the structure is readable top to bottom. */
+function ordered(rows: AdminCategory[]): { row: AdminCategory; child: boolean }[] {
+  const byParent = new Map<string, AdminCategory[]>()
+  for (const r of rows) {
+    if (!r.parentId) continue
+    const list = byParent.get(r.parentId)
+    if (list) list.push(r); else byParent.set(r.parentId, [r])
+  }
+  const ids = new Set(rows.map(r => r.id))
+  const out: { row: AdminCategory; child: boolean }[] = []
+  for (const r of rows) {
+    // A row whose parent is missing from the list would otherwise vanish, so it
+    // is listed at the top level rather than dropped.
+    if (r.parentId && ids.has(r.parentId)) continue
+    out.push({ row: r, child: false })
+    for (const kid of byParent.get(r.id) ?? []) out.push({ row: kid, child: true })
+  }
+  return out
 }
 
 export const CategoriesSection = () => {
@@ -30,11 +65,11 @@ export const CategoriesSection = () => {
   // Category delete was the only destructive admin action firing instantly on
   // click — route it through the shared confirm dialog like every other delete.
   const [pendDelete, setPendDelete] = useState<AdminCategory | null>(null)
-  // Turning isLive OFF is far more destructive than DELETE (which is blocked
-  // while the category still has experts): it delists every expert in it from
-  // /tutors, the category page, the sitemap and the homepage. Confirm it.
-  // Turning it back ON is harmless and stays one click.
-  const [pendHide, setPendHide] = useState<AdminCategory | null>(null)
+  // Leaving VISIBLE is far more destructive than DELETE (which is blocked while
+  // the category still has experts): it takes the category out of browse, the
+  // sitemap and the homepage. Confirm it. Coming back is harmless and stays one
+  // click.
+  const [pendStatus, setPendStatus] = useState<{ row: AdminCategory; next: CategoryStatus } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -51,12 +86,15 @@ export const CategoriesSection = () => {
     return () => { cancelled = true }
   }, [])
 
-  const patch = async (id: string, body: Partial<Pick<AdminCategory, 'isLive' | 'defaultServiceType'>>) => {
+  const patch = async (id: string, body: Partial<Pick<AdminCategory, 'status' | 'parentId' | 'defaultServiceType'>>) => {
     if (!rows) return
     const before = rows
     // Optimistic mutation first — the UI feels instant. If the server rejects
-    // (auth expired, 404, network drop) we swap the array back and flash.
-    const next = rows.map(r => r.id === id ? { ...r, ...body } : r)
+    // (auth expired, 404, a rule we did not check) we swap the array back and
+    // flash. `isLive` is mirrored because the public site still reads it.
+    const next = rows.map(r => r.id === id
+      ? { ...r, ...body, ...(body.status ? { isLive: body.status === 'VISIBLE' } : {}) }
+      : r)
     setRows(next)
     setFlash(null)
     try {
@@ -68,11 +106,16 @@ export const CategoriesSection = () => {
       // adminOk, not res.ok — an expired session 307s to sign-in and fetch
       // hands the HTML back as a 200, which used to flash fake success while
       // the category never changed.
-      if (!(await adminOk(res))) throw new Error('patch failed')
+      if (!(await adminOk(res))) {
+        // A 409 carries the sentence that says WHY; anything else is generic.
+        const why = res.status === 409 ? (await res.json().catch(() => ({}))).message : null
+        throw new Error(why || '')
+      }
       setFlash({ kind: 'success', msg: 'ცვლილება შეინახა.' })
-    } catch {
+    } catch (e) {
       setRows(before)
-      setFlash({ kind: 'error', msg: 'ცვლილება ვერ შეინახა — სცადე თავიდან.' })
+      const why = e instanceof Error ? e.message : ''
+      setFlash({ kind: 'error', msg: why || 'ცვლილება ვერ შეინახა — სცადე თავიდან.' })
     }
   }
 
@@ -113,24 +156,54 @@ export const CategoriesSection = () => {
     try {
       const res = await fetch(`/api/admin/categories/${id}`, { method: 'DELETE' })
       const j = await res.json().catch(() => ({}))
-      if (res.status === 409) { setFlash({ kind: 'error', msg: 'ვერ წაიშლება — ამ კატეგორიას ექსპერტები ჰყავს. დამალე ნაცვლად.' }); return }
+      if (res.status === 409) { setFlash({ kind: 'error', msg: j.message || 'ვერ წაიშლება — ამ კატეგორიას ექსპერტები ჰყავს. დამალე ნაცვლად.' }); return }
       if (!res.ok || !j.ok) throw new Error()
       setRows(prev => (prev ?? []).filter(r => r.id !== id))
       setFlash({ kind: 'success', msg: 'კატეგორია წაიშალა.' })
     } catch { setFlash({ kind: 'error', msg: 'წაშლა ვერ მოხერხდა.' }) }
   }
 
+  /* The two rules-aware handlers. Both run lib/categoryTree BEFORE the fetch,
+     so an impossible move is explained here instead of coming back as a 409. */
+  const treeCheck = (row: AdminCategory, change: { status?: CategoryStatus; parentId?: string | null }) => {
+    const nextParentId = change.parentId !== undefined ? change.parentId : row.parentId
+    const parent = nextParentId ? (rows ?? []).find(r => r.id === nextParentId) ?? null : null
+    return hierarchyError(
+      { id: row.id, status: row.status, parentId: row.parentId, childCount: row.childCount },
+      change,
+      parent,
+    )
+  }
+
+  const changeStatus = (row: AdminCategory, next: CategoryStatus) => {
+    if (next === row.status) return
+    const bad = treeCheck(row, { status: next })
+    if (bad) { setFlash({ kind: 'error', msg: TREE_ERROR[bad] }); return }
+    // Coming back into view needs no warning; leaving it does.
+    if (next === 'VISIBLE') { patch(row.id, { status: next }); return }
+    setPendStatus({ row, next })
+  }
+
+  const changeParent = (row: AdminCategory, parentId: string | null) => {
+    if (parentId === row.parentId) return
+    const bad = treeCheck(row, { parentId })
+    if (bad) { setFlash({ kind: 'error', msg: TREE_ERROR[bad] }); return }
+    patch(row.id, { parentId })
+  }
+
   const filtered = (rows ?? []).filter(r => {
     const q = query.trim().toLowerCase()
     return !q || r.name.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q)
   })
+  const listed = ordered(filtered)
+  const nameOf = (id: string | null) => (id ? (rows ?? []).find(r => r.id === id)?.name ?? '' : '')
 
   return (
     <>
       <TabHeader
         eyebrow="კატეგორიები · სფეროების მართვა"
         title={<>სფეროების მართვა</>}
-        sub="დაამატე, გადაარქვი, დამალე ან წაშალე სფერო — /apply და ძებნა DB-დან კითხულობს, ასე რომ კოდის შეცვლა აღარ სჭირდება."
+        sub="დაამატე, გადაარქვი, დამალე ან გადაამისამართე სფერო — /apply და ძებნა DB-დან კითხულობს, ასე რომ კოდის შეცვლა აღარ სჭირდება."
         actions={undefined}
       />
       <section className="px-6 lg:px-8 py-6">
@@ -179,17 +252,18 @@ export const CategoriesSection = () => {
           </div>
         ) : (
           <div className="rounded-card border border-ink-200 bg-white overflow-hidden">
-            <div className="hidden sm:grid grid-cols-[1.5fr_1fr_0.6fr_auto] gap-4 px-4 py-2.5 border-b border-ink-200 bg-ink-50/60 font-display text-micro font-semibold uppercase text-ink-500">
+            <div className="hidden lg:grid grid-cols-[1.4fr_10rem_1fr_3.5rem_auto] gap-4 px-4 py-2.5 border-b border-ink-200 bg-ink-50/60 font-display text-micro font-semibold uppercase text-ink-500">
               <div>სახელი</div>
-              <div>Slug</div>
+              <div>სტატუსი</div>
+              <div>მშობელი</div>
               <div>ექსპერტი</div>
               <div className="text-right">მართვა</div>
             </div>
-            {filtered.length === 0 ? (
+            {listed.length === 0 ? (
               <div className="px-4 py-8 text-center text-small text-ink-500">ვერაფერი მოიძებნა.</div>
-            ) : filtered.map(r => (
-              <div key={r.id} className="grid grid-cols-1 sm:grid-cols-[1.5fr_1fr_0.6fr_auto] gap-2 sm:gap-4 items-center px-4 py-3 border-b border-ink-100 last:border-b-0">
-                <div className="min-w-0">
+            ) : listed.map(({ row: r, child }) => (
+              <div key={r.id} className="grid grid-cols-1 lg:grid-cols-[1.4fr_10rem_1fr_3.5rem_auto] gap-2 lg:gap-4 items-center px-4 py-3 border-b border-ink-100 last:border-b-0">
+                <div className={`min-w-0 ${child ? 'lg:pl-5' : ''}`}>
                   {editingId === r.id ? (
                     <input
                       autoFocus
@@ -201,24 +275,50 @@ export const CategoriesSection = () => {
                       className="w-full h-9 px-2.5 rounded-btn border border-brand-400 text-body font-display font-semibold focus:outline-none"
                     />
                   ) : (
-                    <div className="font-display font-semibold text-body text-ink-900 truncate">{r.name}</div>
+                    <>
+                      <div className="font-display font-semibold text-body text-ink-900 truncate">{r.name}</div>
+                      {/* The slug is the URL and never changes — reference, not a control. */}
+                      <div className="font-mono text-meta text-ink-400 truncate">{r.slug}</div>
+                    </>
                   )}
                 </div>
-                <div className="font-mono text-meta text-ink-500 tabular-nums truncate">{r.slug}</div>
-                <div className="font-display font-semibold text-small text-ink-800 tabular-nums">{r.tutorCount}</div>
-                <div className="flex items-center gap-1 sm:justify-end">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={r.isLive}
-                    aria-label={`კატეგორია ${r.name} — ${r.isLive ? 'ცოცხალი' : 'დამალული'}`}
-                    onClick={() => r.isLive ? setPendHide(r) : patch(r.id, { isLive: true })}
-                    className={`relative inline-flex items-center h-6 w-11 rounded-pill transition-colors duration-fast shrink-0 ${r.isLive ? 'bg-success-500' : 'bg-ink-200'}`}
+                <div>
+                  <label className="lg:hidden block text-micro font-display font-semibold uppercase text-ink-500 mb-1">სტატუსი</label>
+                  <select
+                    value={r.status}
+                    onChange={e => changeStatus(r, e.target.value as CategoryStatus)}
+                    aria-label={`${r.name} — სტატუსი`}
+                    className="w-full h-9 px-2 rounded-btn border border-ink-200 bg-white text-small text-ink-800 focus:border-brand-500 focus:outline-none"
                   >
-                    <span className={`inline-block w-5 h-5 rounded-full bg-white shadow-xs transition-transform duration-fast ${r.isLive ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
-                  </button>
+                    {(['VISIBLE', 'HIDDEN', 'REDIRECTED'] as CategoryStatus[]).map(s => (
+                      <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="min-w-0">
+                  <label className="lg:hidden block text-micro font-display font-semibold uppercase text-ink-500 mb-1">მშობელი</label>
+                  <select
+                    value={r.parentId ?? ''}
+                    onChange={e => changeParent(r, e.target.value || null)}
+                    aria-label={`${r.name} — მშობელი კატეგორია`}
+                    // A row with children cannot become somebody's child, so the
+                    // picker says so instead of offering a move that would 409.
+                    disabled={r.childCount > 0}
+                    title={r.childCount > 0 ? TREE_ERROR.HAS_CHILDREN : undefined}
+                    className="w-full h-9 px-2 rounded-btn border border-ink-200 bg-white text-small text-ink-800 focus:border-brand-500 focus:outline-none disabled:bg-ink-50 disabled:text-ink-400"
+                  >
+                    <option value="">—</option>
+                    {(rows ?? []).filter(c => canBeParent(c, r)).map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="font-display font-semibold text-small text-ink-800 tabular-nums">
+                  <span className="lg:hidden text-ink-500 font-normal">ექსპერტი: </span>{r.tutorCount}
+                </div>
+                <div className="flex items-center gap-1 lg:justify-end">
                   <button type="button" onClick={() => { setEditingId(r.id); setEditName(r.name) }} className="h-8 px-2.5 rounded-btn text-meta font-display font-semibold text-ink-600 hover:bg-ink-100 transition-colors duration-fast">რედაქტ.</button>
-                  <button type="button" onClick={() => setPendDelete(r)} disabled={r.tutorCount > 0} title={r.tutorCount > 0 ? 'ჯერ ექსპერტები ჰყავს — დამალე' : 'წაშლა'} className="h-8 px-2.5 rounded-btn text-meta font-display font-semibold text-danger-600 hover:bg-danger-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-fast">წაშლა</button>
+                  <button type="button" onClick={() => setPendDelete(r)} disabled={r.tutorCount > 0 || r.childCount > 0} title={r.tutorCount > 0 ? 'ჯერ ექსპერტები ჰყავს — დამალე' : r.childCount > 0 ? TREE_ERROR.HAS_CHILDREN : 'წაშლა'} className="h-8 px-2.5 rounded-btn text-meta font-display font-semibold text-danger-600 hover:bg-danger-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-fast">წაშლა</button>
                 </div>
               </div>
             ))}
@@ -226,19 +326,23 @@ export const CategoriesSection = () => {
         )}
       </section>
       <AdminConfirmDialog
-        open={pendHide !== null}
-        title="კატეგორიის დამალვა"
-        body={<>
-          „{pendHide?.name ?? ''}“ საჯარო საიტიდან გაქრება — მისი <span className="font-display font-semibold tabular-nums">{pendHide?.tutorCount ?? 0}</span> ექსპერტი აღარ გამოჩნდება ძებნაში, კატეგორიის გვერდზე, sitemap-სა და მთავარ გვერდზე.
-          {(pendHide?.tutorCount ?? 0) > 0 && <span className="mt-2 block text-danger-700">ჯავშნები და პროფილები რჩება — მაგრამ ვეღარავინ იპოვის. ჩართვით ყველაფერი დაბრუნდება.</span>}
-        </>}
+        open={pendStatus !== null}
+        title={pendStatus?.next === 'REDIRECTED' ? 'კატეგორიის გადამისამართება' : 'კატეგორიის დამალვა'}
+        body={pendStatus?.next === 'REDIRECTED' ? (
+          <>„{pendStatus?.row.name ?? ''}“ გვერდი გადამისამართდება „{nameOf(pendStatus?.row.parentId ?? null)}“-ზე. მისი <span className="font-display font-semibold tabular-nums">{pendStatus?.row.tutorCount ?? 0}</span> ექსპერტი „{nameOf(pendStatus?.row.parentId ?? null)}“-ში ჩაითვლება. ძველი ბმული მუშაობს.</>
+        ) : (
+          <>
+            „{pendStatus?.row.name ?? ''}“ საჯარო საიტიდან გაქრება — მისი <span className="font-display font-semibold tabular-nums">{pendStatus?.row.tutorCount ?? 0}</span> ექსპერტი აღარ გამოჩნდება ძებნაში, კატეგორიის გვერდზე, sitemap-სა და მთავარ გვერდზე.
+            {(pendStatus?.row.tutorCount ?? 0) > 0 && <span className="mt-2 block text-danger-700">ჯავშნები და პროფილები რჩება — მაგრამ ვეღარავინ იპოვის. ჩართვით ყველაფერი დაბრუნდება.</span>}
+          </>
+        )}
         tone="danger"
-        confirmLabel="დამალე"
-        onCancel={() => setPendHide(null)}
+        confirmLabel={pendStatus?.next === 'REDIRECTED' ? 'გადამისამართება' : 'დამალე'}
+        onCancel={() => setPendStatus(null)}
         onConfirm={async () => {
-          const id = pendHide?.id
-          setPendHide(null)
-          if (id) await patch(id, { isLive: false })
+          const p = pendStatus
+          setPendStatus(null)
+          if (p) await patch(p.row.id, { status: p.next })
         }}
       />
       <AdminConfirmDialog
@@ -257,4 +361,3 @@ export const CategoriesSection = () => {
     </>
   )
 }
-

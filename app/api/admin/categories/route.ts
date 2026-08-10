@@ -6,8 +6,10 @@ import { audit } from '@/lib/audit'
 import { slugify } from '@/lib/slug'
 
 // GET /api/admin/categories
-// Returns every category (live + hidden) with attached tutor counts so admin
-// can toggle visibility + service-type default without a second round-trip.
+// Returns EVERY category whatever its status, with the counts the screen needs
+// to judge a change before making it: how many experts sit in it, and how many
+// categories hang off it. Both are the reason a status change is refused, so
+// they travel with the row rather than costing a second round-trip.
 export async function GET() {
   const auth = await requireRoleApi('ADMIN')
   if (auth.response) return auth.response
@@ -19,7 +21,9 @@ export async function GET() {
       name: true,
       defaultServiceType: true,
       isLive: true,
-      _count: { select: { tutors: true } },
+      status: true,
+      parentId: true,
+      _count: { select: { tutors: true, children: true } },
     },
   })
   const out = rows.map(r => ({
@@ -28,7 +32,10 @@ export async function GET() {
     name: r.name,
     defaultServiceType: r.defaultServiceType,
     isLive: r.isLive,
+    status: r.status,
+    parentId: r.parentId,
     tutorCount: r._count.tutors,
+    childCount: r._count.children,
   }))
   return NextResponse.json(out)
 }
@@ -56,9 +63,11 @@ export async function POST(req: Request) {
     slug = `${base}-${i}`
   }
   const last = await prisma.category.findFirst({ orderBy: { order: 'desc' }, select: { order: true } })
+  // A new sphere is visible and stands on its own; a parent is assigned later,
+  // deliberately, from the row itself.
   const created = await prisma.category.create({
-    data: { name, slug, defaultServiceType, order: (last?.order ?? 0) + 1, isLive: true },
-    select: { id: true, slug: true, name: true, defaultServiceType: true, isLive: true, _count: { select: { tutors: true } } },
+    data: { name, slug, defaultServiceType, order: (last?.order ?? 0) + 1, isLive: true, status: 'VISIBLE' },
+    select: { id: true, slug: true, name: true, defaultServiceType: true, isLive: true, status: true, parentId: true, _count: { select: { tutors: true, children: true } } },
   })
   await audit(admin.id, 'category.create', {
     targetType: 'Category',
@@ -67,6 +76,11 @@ export async function POST(req: Request) {
   })
   return NextResponse.json({
     ok: true,
-    category: { id: created.id, slug: created.slug, name: created.name, defaultServiceType: created.defaultServiceType, isLive: created.isLive, tutorCount: created._count.tutors },
+    category: {
+      id: created.id, slug: created.slug, name: created.name,
+      defaultServiceType: created.defaultServiceType,
+      isLive: created.isLive, status: created.status, parentId: created.parentId,
+      tutorCount: created._count.tutors, childCount: created._count.children,
+    },
   }, { status: 201 })
 }
