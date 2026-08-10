@@ -33,6 +33,10 @@ export const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, t
   // bug. One line says why — and it is the true reason, not a shrug.
   const ratingAllZero = FILTER_RATINGS.every(r => (facets.rating[String(r)] ?? 0) === 0)
   const availAllZero = FILTER_AVAIL.every(a => (facets.avail[a.id] ?? 0) === 0)
+  // Hidden, not dimmed, while nobody is Super (owner, 2026-08-10). A greyed-out
+  // control with „0" next to it still asks to be read and still says the
+  // platform has a tier it cannot fill. It comes back on its own the moment an
+  // expert is featured — the switch is driven by the facet count, not a flag.
   const superDead = facets.superOnly === 0 && !filters.superOnly
   return (
     <section className="bg-white border-b border-ink-200">
@@ -112,16 +116,16 @@ export const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, t
               ))}
               {ratingAllZero && <p className="px-2 pt-1 pb-0.5 text-meta text-ink-500 leading-snug">შეფასება ჯერ არავის აქვს — პლატფორმა ახალია.</p>}
             </FilterBox>
+            {!superDead && (
             <button
               type="button"
               onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })}
-              disabled={superDead}
-              title={superDead ? 'Super-ექსპერტი ჯერ არავინაა' : undefined}
-              className={`h-12 px-4 rounded-card border font-display text-small font-bold inline-flex items-center gap-2 transition-all duration-fast ${filters.superOnly ? 'border-brand-500 bg-brand-50/40 text-brand-800 ring-1 ring-brand-200' : superDead ? 'border-ink-200 bg-white text-ink-800 opacity-45 cursor-not-allowed' : 'border-ink-200 hover:border-ink-300 bg-white text-ink-800'}`}
+              className={`h-12 px-4 rounded-card border font-display text-small font-bold inline-flex items-center gap-2 transition-all duration-fast ${filters.superOnly ? 'border-brand-500 bg-brand-50/40 text-brand-800 ring-1 ring-brand-200' : 'border-ink-200 hover:border-ink-300 bg-white text-ink-800'}`}
             >
               <Icon.spark className="w-4 h-4 text-ink-400" /> Super
               <span className="text-meta font-medium text-ink-500 tabular-nums">{facets.superOnly}</span>
             </button>
+            )}
           </div>
           <div className="group flex-1 min-w-[220px] bg-white rounded-card border border-ink-200 flex items-stretch focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100 transition-all duration-fast">
             <div className="relative flex-1 min-w-0">
@@ -165,16 +169,16 @@ export const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, t
             `filters.cats` the boxes and the drawer do, so all three always read
             the same state. Horizontal scroll, active chips in brand. */}
         <div className="lg:hidden mt-3 -mx-6 px-6 flex gap-2 overflow-x-auto scrollbar-hide rail-fade-end" role="group" aria-label="სფეროს ფილტრი">
+          {!superDead && (
           <button
             type="button"
             onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })}
-            disabled={superDead}
-            title={superDead ? 'Super-ექსპერტი ჯერ არავინაა' : undefined}
-            className={`shrink-0 h-11 px-3.5 rounded-pill border font-display text-small font-semibold inline-flex items-center gap-1.5 transition-colors duration-fast ${filters.superOnly ? 'border-brand-500 bg-brand-50 text-brand-800' : superDead ? 'border-ink-200 bg-white text-ink-700 opacity-45 cursor-not-allowed' : 'border-ink-200 bg-white text-ink-700'}`}
+            className={`shrink-0 h-11 px-3.5 rounded-pill border font-display text-small font-semibold inline-flex items-center gap-1.5 transition-colors duration-fast ${filters.superOnly ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-ink-200 bg-white text-ink-700'}`}
           >
             <Icon.spark className="w-3.5 h-3.5 text-ink-400" /> Super
             <span className="text-meta font-medium text-ink-500 tabular-nums">{facets.superOnly}</span>
           </button>
+          )}
           {liveCats.map(c => {
             const on = filters.cats.includes(c.slug)
             return (

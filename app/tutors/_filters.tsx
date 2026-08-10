@@ -266,7 +266,9 @@ const CheckRow = ({ label, count, on, onToggle }: { label: string; count: number
 export const FiltersPanel = ({ filters, setFilters, liveCats, facets }: { filters: Filters; setFilters: (f: Filters) => void; liveCats: LiveCat[]; facets: Facets }) => {
   const toggleArr = (arr: string[], v: string) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]
   // Same rule as the desktop popovers: a zero-count option is disabled, its
-  // count stays on screen, and an ACTIVE one is always switchable off.
+  // count stays on screen, and an ACTIVE one is always switchable off. The
+  // Super switch is the ONE exception — see the note in _hero.tsx: it is
+  // hidden while nobody is Super, and returns by itself once someone is.
   const superDead = facets.superOnly === 0 && !filters.superOnly
   const ratingAllZero = FILTER_RATINGS.every(r => (facets.rating[String(r)] ?? 0) === 0)
   const availAllZero = FILTER_AVAIL.every(a => (facets.avail[a.id] ?? 0) === 0)
@@ -274,32 +276,32 @@ export const FiltersPanel = ({ filters, setFilters, liveCats, facets }: { filter
   return (
     <aside>
       {/* Prominent Super-expert switch */}
-      <label className={`flex items-start gap-3 select-none py-4 border-b border-ink-100 ${superDead ? 'opacity-45 cursor-not-allowed' : 'cursor-pointer'}`}>
-        <button
-          type="button"
-          onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })}
-          disabled={superDead}
-          className={`mt-0.5 w-9 h-5 rounded-pill relative transition-colors duration-fast shrink-0 ${filters.superOnly ? 'bg-brand-500' : 'bg-ink-200'} ${superDead ? 'cursor-not-allowed' : ''}`}
-        >
-          <span
-            className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-card transition-transform duration-fast ease-out-quart"
-            style={{ transform: filters.superOnly ? 'translateX(16px)' : 'translateX(0)' }}
-          />
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="font-display text-small font-bold text-ink-900 inline-flex items-center gap-1.5">
-            <Icon.spark className="w-3 h-3 text-ink-400" />
-            მხოლოდ Super-ექსპერტი
-            <span className="text-meta font-medium text-ink-500 tabular-nums">{facets.superOnly}</span>
+      {!superDead && (
+        <label className="flex items-start gap-3 select-none py-4 border-b border-ink-100 cursor-pointer">
+          <button
+            type="button"
+            onClick={() => setFilters({ ...filters, superOnly: !filters.superOnly })}
+            className={`mt-0.5 w-9 h-5 rounded-pill relative transition-colors duration-fast shrink-0 ${filters.superOnly ? 'bg-brand-500' : 'bg-ink-200'}`}
+          >
+            <span
+              className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-card transition-transform duration-fast ease-out-quart"
+              style={{ transform: filters.superOnly ? 'translateX(16px)' : 'translateX(0)' }}
+            />
+          </button>
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-small font-bold text-ink-900 inline-flex items-center gap-1.5">
+              <Icon.spark className="w-3 h-3 text-ink-400" />
+              მხოლოდ Super-ექსპერტი
+              <span className="text-meta font-medium text-ink-500 tabular-nums">{facets.superOnly}</span>
+            </div>
+            {/* Must describe the REAL predicate (see `superExpert` in the row
+                mapper): verified AND rating ≥ 4.8 AND admin-featured. Omitting
+                the rating made a featured, verified but unrated expert look
+                like a match. */}
+            <p className="text-meta text-ink-500 mt-0.5 leading-snug">გადამოწმებული · 4.8+ შეფასება · რედაქციის რჩეული</p>
           </div>
-          {/* Must describe the REAL predicate (see `superExpert` in the row
-              mapper): verified AND rating ≥ 4.8 AND admin-featured. Omitting
-              the rating made a featured, verified but unrated expert look
-              like a match. */}
-          <p className="text-meta text-ink-500 mt-0.5 leading-snug">გადამოწმებული · 4.8+ შეფასება · რედაქციის რჩეული</p>
-          {superDead && <p className="text-meta text-ink-500 mt-1 leading-snug">ამ პირობებს ჯერ არავინ აკმაყოფილებს.</p>}
-        </div>
-      </label>
+        </label>
+      )}
 
       {/* Hide the category section entirely when the live list is empty
           (fetch pending/failed) — never render dead, unmatched checkboxes. */}
