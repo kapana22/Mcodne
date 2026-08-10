@@ -124,62 +124,68 @@ export function PriceField({
         />
       </div>
 
-      {!disabled && market && market.median > 0 && (
-        /* A FACT, never a verdict — no „low/high", no colour, no comparison to
-           what the expert just typed. Scaled to this service's length so a
-           30-minute row isn't measured against hour prices. */
-        <p className="mt-2 text-meta text-ink-500">
-          სხვა ექსპერტები: <span className="tabular-nums text-ink-700">₾{round5(market.p25 * factor)}–₾{round5(market.p75 * factor)}</span>
-          {' · '}მედიანა <span className="tabular-nums text-ink-700">₾{round5(market.median * factor)}</span>
-        </p>
-      )}
 
       {!disabled && (
         <>
-          {/* Live take-home. Payments aren't live yet and the platform takes no
-              cut today, so we must NOT show a commission or a reduced amount —
-              the expert gets the full price. The commission branch stays here
-              (reading COMMISSION_PCT / TUTOR_PAYOUT_PCT, never a literal) so
-              flipping PAYMENTS_LIVE restores the net line by itself.
-              The pre-launch note says „ჯერ" rather than „სრულად შენია": 0%
-              is today's truth, not a permanent promise. */}
-          <div className="mt-2 flex items-center justify-between gap-3 text-meta">
-            <span className="text-ink-600">
-              {!hasPrice ? 'მიუთითე ფასი'
-                : <>მიიღებ <span className="font-display font-bold text-brand-700 tabular-nums">₾{(PAYMENTS_LIVE ? net : price).toFixed(2)}</span></>}
-            </span>
-            {hasPrice && (
-              PAYMENTS_LIVE
-                ? <span className="text-ink-500 tabular-nums">{COMMISSION_PCT}% საკომისიო</span>
-                : <span className="text-ink-500">საკომისიოს ჯერ არ ვიღებთ</span>
-            )}
+          {/* Shortcuts, not options: each one just fills the input above — which
+              is why they sit against it, before anything that only describes it.
+
+              NO recommended range and no verdict on the price. It used to show
+              „ჩვენი რჩევა ₾60–₾150" with a below/within/above read-out, which
+              told a new expert pricing at ₾20 that they were „რჩევაზე დაბალი".
+              Cheap first prices create bookings, bookings create reviews,
+              reviews create trust — guidance that pushes prices UP suppresses
+              all three. */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-meta text-ink-500 mr-0.5">სწრაფი არჩევანი</span>
+            {chips.map(c => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => onChange(c)}
+                className={`h-11 sm:h-9 px-3.5 rounded-pill border font-display text-meta font-semibold tabular-nums transition-colors duration-fast ${
+                  price === c
+                    ? 'border-brand-500 text-brand-700 bg-brand-50/50'
+                    : 'border-ink-200 text-ink-700 hover:border-brand-400 hover:text-brand-700'
+                }`}
+              >
+                ₾{c}
+              </button>
+            ))}
           </div>
 
-          {/* NO recommended range, and no verdict on the price. It used to show
-              „ჩვენი რჩევა ₾60–₾150" with a below/within/above read-out — which
-              told a new expert pricing at ₾20 that they were „რჩევაზე დაბალი".
-              That is the exact behaviour the marketplace needs right now: cheap
-              first prices create bookings, bookings create reviews, reviews
-              create trust. Guidance that pushes prices UP suppresses all three.
-              What stays is the shortcut row — fills the field, judges nothing. */}
-          <div className="mt-3 pt-3 border-t border-ink-100">
-            {/* Shortcuts, not options: each one just fills the input above. */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-meta text-ink-500 mr-0.5">სწრაფი არჩევანი</span>
-              {chips.map(c => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => onChange(c)}
-                  className={`h-11 sm:h-9 px-3.5 rounded-pill border font-display text-meta font-semibold tabular-nums transition-colors duration-fast ${
-                    price === c
-                      ? 'border-brand-500 text-brand-700 bg-brand-50/50'
-                      : 'border-ink-200 text-ink-700 hover:border-brand-400 hover:text-brand-700'
-                  }`}
-                >
-                  ₾{c}
-                </button>
-              ))}
+          {/* Reference, not controls. Grouped below the shortcut row and behind
+              one divider: four separately-spaced meta lines under a single input
+              read as noise, and none of these two change anything.
+
+              The market line is a FACT, never a verdict — no „low/high", no
+              colour, no comparison to what was just typed. Scaled to this
+              service's length so a 30-minute row isn't measured against hour
+              prices.
+
+              Take-home: payments aren't live and the platform takes no cut
+              today, so no commission and no reduced amount may be shown. The
+              commission branch stays (reading COMMISSION_PCT, never a literal)
+              so flipping PAYMENTS_LIVE restores the net line by itself, and the
+              note says „ჯერ" rather than „სრულად შენია" — 0% is today's truth,
+              not a permanent promise. */}
+          <div className="mt-3 pt-3 border-t border-ink-100 space-y-1 text-meta">
+            {market && market.median > 0 && (
+              <p className="text-ink-500">
+                სხვა ექსპერტები: <span className="tabular-nums text-ink-700">₾{round5(market.p25 * factor)}–₾{round5(market.p75 * factor)}</span>
+                {' · '}მედიანა <span className="tabular-nums text-ink-700">₾{round5(market.median * factor)}</span>
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-ink-600">
+                {!hasPrice ? 'მიუთითე ფასი'
+                  : <>მიიღებ <span className="font-display font-bold text-brand-700 tabular-nums">₾{(PAYMENTS_LIVE ? net : price).toFixed(2)}</span></>}
+              </span>
+              {hasPrice && (
+                PAYMENTS_LIVE
+                  ? <span className="text-ink-500 tabular-nums">{COMMISSION_PCT}% საკომისიო</span>
+                  : <span className="text-ink-500">საკომისიოს ჯერ არ ვიღებთ</span>
+              )}
             </div>
           </div>
         </>

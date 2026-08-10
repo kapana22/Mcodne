@@ -297,8 +297,12 @@ export const Step2 = ({ form, set }: StepProps) => {
           <div key={i} className="p-4 rounded-card border bg-white border-ink-200">
             {/* Row 1 — what the service IS. Price used to sit here in a 120px
                 column, visually equal to duration though far more consequential;
-                it now gets its own block below. */}
-            <div className="grid sm:grid-cols-[1fr_120px_auto] gap-3 items-start">
+                it now gets its own block below.
+                The duration column is 152px, not 120: „ხანგრძლივობა · წთ" is a
+                17-character uppercase label with 0.14em tracking and wrapped to
+                two lines at the narrower width, which left the field floating
+                under a broken heading. */}
+            <div className="grid sm:grid-cols-[1fr_152px_auto] gap-3 items-start">
               <div className="min-w-0">
                 <Input value={s.name} onChange={(e: any) => updateService(i, { name: e.target.value })} placeholder="სერვისის სახელი" className="!h-9 !text-small font-display font-bold" />
                 <textarea value={s.desc} onChange={e => updateService(i, { desc: e.target.value })} placeholder="მოკლე აღწერა" rows={2} className="mt-2 w-full p-2 rounded-field border border-ink-200 bg-white text-meta text-ink-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none resize-none" />
