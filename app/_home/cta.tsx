@@ -80,8 +80,8 @@ export const ExpertCta = () => (
               // sub-line said what WILL be withheld, which is a promise the
               // marketing surfaces no longer make. /terms still states it.
               : [
-                  { n: null as number | null, txt: '0%', l: 'საკომისიო დღეს', s: 'ახლა არაფერს ვიკავებთ' },
-                  { n: null as number | null, txt: '100%', l: 'შენი ნაწილი', s: 'სრული თანხა შენია' },
+                  { n: null as number | null, txt: '0%', l: 'საკომისიო დღეს', s: 'მოგვიანებით 10–15%' },
+                  { n: null as number | null, txt: '100%', l: 'შენი ნაწილი', s: 'სანამ გადახდები არ ამოქმედდება' },
                   // Was „მალე / შემოსავალი" — a stat cell whose figure is the
                   // word „soon". A number slot holding roadmap status is the
                   // emptiest thing on the page; this states what the expert
