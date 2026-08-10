@@ -51,6 +51,23 @@ enum ServiceType {
   RECURRING
 }
 
+// How a sphere behaves in public. Replaces the old `isLive` boolean, which
+// could only say „in the menu" or „gone" — and „gone" meant the page 404'd,
+// taking its indexed URL with it.
+//
+//   VISIBLE     in the menu, on the home grid, in the browse filter
+//   HIDDEN      the page still works and still ranks; it is only out of the
+//               menus. For a sphere with no experts yet, that is the honest
+//               state: keep the landing page, stop advertising an empty room
+//   REDIRECTED  it became a sub-topic of `parent`. The row is KEPT, its experts
+//               keep pointing at it, and the old URL 301s — see
+//               lib/categoryTree for where it 301s TO.
+enum CategoryStatus {
+  VISIBLE
+  HIDDEN
+  REDIRECTED
+}
+
 // WHAT this profile is, as opposed to what it may DO.
 //
 // Deliberately NOT a Role. A role answers „what are you allowed to do", and an
@@ -181,8 +198,21 @@ model Category {
   order              Int            @default(0)
   // Sensible default that new tutors in this category inherit (they can override).
   defaultServiceType ServiceType    @default(CONSULTATION)
-  // Admin can hide categories from public browse without deleting them.
+  // DEPRECATED — superseded by `status`, kept for one release so the migration
+  // is reversible without data loss. Dropped in the follow-up migration once
+  // every reader is on `status`.
   isLive             Boolean        @default(true)
+  status             CategoryStatus @default(VISIBLE)
+
+  // Sub-topic hierarchy. A REDIRECTED sphere points at the one that absorbed
+  // it; experts keep their own categoryId, so nothing is re-pointed and no
+  // booking history moves — the parent simply counts its children's experts
+  // as well. Self-referential, nullable, and never cascading: deleting a
+  // parent must fail loudly rather than orphan a subtree.
+  parentId           String?
+  parent             Category?      @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children           Category[]     @relation("CategoryTree")
+
   tutors             TutorProfile[]
 
   // Searching a sphere by its visible label („მარკეტინგში") must find that
