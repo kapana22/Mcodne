@@ -141,11 +141,18 @@ export function videoError(raw: string | null | undefined): string | null {
 }
 
 /**
- * Optional HERE (an application may be sent without one), but when a number IS
- * given it has to be a real one. The shape rule lives in lib/phone.ts because
- * signup now requires a phone too, and a number accepted on one screen must not
- * be refused on the next.
+ * REQUIRED on the application since 2026-08-10 (owner): the moderator phones the
+ * applicant, and an application with no number is one they cannot act on. The
+ * shape rule lives in lib/phone.ts, the same one signup uses, so a number
+ * accepted on one screen is never refused on the next.
  */
+export function phoneRequiredError(raw: string | null | undefined): string | null {
+  const v = (raw ?? '').trim()
+  if (v.length > APPLY.PHONE_MAX) return `ტელეფონი ძალიან გრძელია — მაქსიმუმ ${APPLY.PHONE_MAX} სიმბოლო.`
+  return phoneFormatError(v, { required: true })
+}
+
+/** The lenient sibling: empty is fine, anything typed must still be real. */
 export function phoneError(raw: string | null | undefined): string | null {
   const v = (raw ?? '').trim()
   if (!v) return null

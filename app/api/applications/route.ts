@@ -12,7 +12,7 @@ import {
   applyValidationFailure,
   bioError,
   nameError,
-  phoneError,
+  phoneRequiredError,
   priceError,
   refine,
   specialtyError,
@@ -31,7 +31,7 @@ const Body = z.object({
   // longer requires a phone number (the admin reaches applicants by email).
   // `''` is accepted and normalised to undefined below so an empty input from
   // an older cached client doesn't 400 with the useless generic INVALID.
-  phone: z.string().optional().nullable().superRefine(refine(phoneError)),
+  phone: z.string().superRefine(refine(phoneRequiredError)),
   city: z.string().max(120).optional(),
   specialty: z.string().superRefine(refine(specialtyError)),
   yearsExp: z.number().superRefine(refine(yearsError)),

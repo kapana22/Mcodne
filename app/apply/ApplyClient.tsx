@@ -18,11 +18,12 @@ import { PublicTopBar } from '@/components/PublicTopBar'
 import { Footer } from '@/components/Footer'
 import { APPLY_FUNNEL_EVENTS, newApplyFlowId, trackApply } from './applyFunnelEvents'
 import { checkGeorgian, georgianError } from '@/lib/georgianText'
-import { bioError, nameError, phoneError, priceError, specialtyError, videoError, yearsError } from '@/lib/applyValidation'
+import { bioError, nameError, priceError, specialtyError, videoError, yearsError } from '@/lib/applyValidation'
+import { phoneFormatError } from '@/lib/phone'
 import { FormFooter, ProgressNav } from './_chrome'
 import { clearApplyDraft, readApplyDraft, writeApplyDraft } from './_draft'
 import { ApplyErrCtx } from './_fields'
-import { AVAIL_WEEKS, ApplyErr, DEFAULT_AVAIL, FormState, INITIAL_FORM, MediaState, SERVER_FIELD, STEPS, StepId, StepPart, isValidEmail, isValidPhone } from './_form'
+import { AVAIL_WEEKS, ApplyErr, DEFAULT_AVAIL, FormState, INITIAL_FORM, MediaState, SERVER_FIELD, STEPS, StepId, StepPart, isValidEmail } from './_form'
 import { LivePreview, Step1, Step2 } from './_steps'
 import { certificatesPayload } from './_upload'
 
@@ -318,10 +319,9 @@ export default function TutorApply() {
       const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`.trim()
       { const e = nameError(fullName); if (e) return fail('firstName', e) }
       if (!isValidEmail(form.email)) return fail('email', 'შეიყვანე სწორი ელფოსტა.')
-      // Phone is optional — but if something WAS typed it still has to be a
-      // real number, otherwise a typo is silently stored and never reachable.
-      if (form.phone.trim() && !isValidPhone(form.phone)) return fail('phone', 'ტელეფონი არასწორია — მაგ. 555 12 34 56, ან საერთაშორისო ნომერი კოდით (+44…). ველი ცარიელიც შეიძლება დატოვო.')
-      { const e = phoneError(form.phone); if (e) return fail('phone', e) }
+      // Required: the moderator phones the applicant. lib/phone is the same
+      // rule signup uses, so a number accepted there is accepted here.
+      { const e = phoneFormatError(form.phone, { required: true }); if (e) return fail('phone', e) }
       if (form.cats.length < 1) return fail('cats', 'აირჩიე სფერო.')
       if (form.headline.trim().length < 2) return fail('headline', 'დაწერე ერთი წინადადება შენზე.')
       { const e = georgianError('ერთი წინადადება შენზე', checkGeorgian(form.headline)); if (e) return fail('headline', e) }

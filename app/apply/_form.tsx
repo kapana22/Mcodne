@@ -175,18 +175,3 @@ export const SERVER_FIELD: Record<string, string> = {
  * essay. Both validators below read this, so there is one number to change. */
 export const MIN_BIO = APPLY.BIO_MIN
 export const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
-// Phone. Georgian mobile is the EXPECTED shape — 9 digits starting with 5
-// (5XXXXXXXX), or the same with a +995 prefix (9955XXXXXXXX) — but relocation /
-// international experts apply with a +1 or +44 number, so any plausible
-// international number passes too (E.164: 8–15 digits, spaces/dashes/parens
-// tolerated). Junk (too short, letters) still fails; the server only asks for
-// min-6, so this stays the friendlier of the two gates.
-export const isValidPhone = (raw: string) => {
-  const v = raw.trim()
-  // Digits + phone punctuation only (leading + allowed) — letters are junk.
-  if (!/^\+?[\d\s\-().]+$/.test(v)) return false
-  const d = v.replace(/\D/g, '')
-  if (/^5\d{8}$/.test(d) || /^9955\d{8}$/.test(d)) return true
-  // Anything else must look international: an explicit + and an E.164 length.
-  return v.startsWith('+') && d.length >= 8 && d.length <= 15
-}

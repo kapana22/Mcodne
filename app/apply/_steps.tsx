@@ -78,9 +78,10 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
               className="bg-ink-50 text-ink-600 cursor-default"
             />
           </Field>
-          {/* Optional now. It was a hard gate with a strict validator; the only
-              consumer is the admin, who already has the applicant's email. */}
-          <Field l="ტელეფონი (არასავალდებულო)"><Input data-field="phone" type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e: any) => set({ phone: e.target.value })} placeholder="+995 5XX XX XX XX" /></Field>
+          {/* Required again since 2026-08-10 (owner). The moderator calls the
+              applicant, and an application with no number is one they cannot
+              act on. `name` is what lets FieldError land under this field. */}
+          <Field l="ტელეფონი" required name="phone"><Input data-field="phone" type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e: any) => set({ phone: e.target.value })} placeholder="+995 5XX XX XX XX" /></Field>
         </div>
       </FormSection>
 
