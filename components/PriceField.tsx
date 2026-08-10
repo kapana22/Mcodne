@@ -178,14 +178,18 @@ export function PriceField({
             )}
             <div className="flex items-center justify-between gap-3">
               <span className="text-ink-600">
+                {/* NET, and the commission beside it — always, whatever
+                    PAYMENTS_LIVE says. This is the one screen where the expert
+                    decides a number, and until 2026-08-10 it answered „მიიღებ
+                    ₾{the full price}" with „საკომისიოს ჯერ არ ვიღებთ" next to
+                    it. Someone pricing a service against that figure was being
+                    told the wrong one. The flag governs whether money MOVES; it
+                    was never a licence to quote a take-home that will not
+                    arrive. */}
                 {!hasPrice ? 'მიუთითე ფასი'
-                  : <>მიიღებ <span className="font-display font-bold text-brand-700 tabular-nums">₾{(PAYMENTS_LIVE ? net : price).toFixed(2)}</span></>}
+                  : <>მიიღებ <span className="font-display font-bold text-brand-700 tabular-nums">₾{net.toFixed(2)}</span></>}
               </span>
-              {hasPrice && (
-                PAYMENTS_LIVE
-                  ? <span className="text-ink-500 tabular-nums">{COMMISSION_PCT}% საკომისიო</span>
-                  : <span className="text-ink-500">საკომისიოს ჯერ არ ვიღებთ</span>
-              )}
+              {hasPrice && <span className="text-ink-500 tabular-nums">{COMMISSION_PCT}% საკომისიო</span>}
             </div>
           </div>
         </>

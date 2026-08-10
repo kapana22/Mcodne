@@ -139,10 +139,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // (which is what actually changes day to day). Whichever is later wins.
   let categoryEntries: MetadataRoute.Sitemap = []
   try {
-    // Only spheres. A HIDDEN category keeps its page but is not advertised, and
-    // a REDIRECTED one answers with a 301 — neither belongs in a sitemap.
+    // Everything that still ANSWERS at /categories/<slug>: the spheres, and the
+    // hidden ones, which keep a real 200 page with unique copy. Dropping the
+    // hidden ones would have made them orphans — out of the sitemap AND out of
+    // the /categories index while still resolving — which is how a URL quietly
+    // loses the history this change exists to keep. Only REDIRECTED is absent,
+    // because it answers with a 301 and its target is listed below.
     const cats = await prisma.category.findMany({
-      where: { status: 'VISIBLE' },
+      where: { status: { in: ['VISIBLE', 'HIDDEN'] } },
       select: {
         slug: true,
         // One row per category: the freshest visible expert in it. Mirrors the

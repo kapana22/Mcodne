@@ -108,7 +108,7 @@ const getTutorInitial = cache(async (id: string) => {
           responseMedianMin: true, responseSampleN: true,
           videoUrl: true, consultationDurationMin: true,
           user: { select: { id: true, fullName: true, avatarUrl: true, bio: true, suspendedAt: true } },
-          category: { select: { id: true, slug: true, name: true, icon: true } },
+          category: { select: { id: true, slug: true, name: true, icon: true, status: true, parent: { select: { slug: true } } } },
         },
       }),
       prisma.consultation.findMany({

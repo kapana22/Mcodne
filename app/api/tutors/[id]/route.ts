@@ -37,7 +37,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       // passwordHash / phone / email never leave the server.
       include: {
         user: { select: { id: true, fullName: true, avatarUrl: true, bio: true, suspendedAt: true } },
-        category: { select: { id: true, slug: true, name: true, icon: true } },
+        category: { select: { id: true, slug: true, name: true, icon: true, status: true, parent: { select: { slug: true } } } },
       },
     }),
     // Consultation tiers only matter for RECURRING tutors; still returned

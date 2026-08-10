@@ -103,11 +103,23 @@ export async function PATCH(req: Request) {
     if (categoryId === null) {
       data.categoryId = null
     } else {
-      // Only a SPHERE can be chosen — otherwise the profile would set an
-      // invalid FK, or point at a hidden category and vanish from browse. An
-      // expert already sitting in an absorbed category keeps it (nothing is
-      // re-pointed); they simply cannot move INTO one.
-      const cat = await prisma.category.findFirst({ where: { id: categoryId, status: 'VISIBLE' }, select: { id: true } })
+      // Only a SPHERE can be CHOSEN — otherwise the profile would set an
+      // invalid FK, or point at a hidden category and vanish from browse.
+      //
+      // …but the one they ALREADY have always passes, and that exception is
+      // load-bearing. The profile form sends `categoryId` on every save, and
+      // after the 2026-08-10 merge an expert filed under „ფინანსები" holds an
+      // id the picker no longer offers. Without this they could not save their
+      // bio, their price, their languages — anything — and the 400 arrives as
+      // „შენახვა ვერ მოხერხდა" with nothing on screen naming the category.
+      // Nobody is re-pointed by this merge, so this case is not an edge one.
+      const current = await prisma.tutorProfile.findUnique({
+        where: { userId: user.id },
+        select: { categoryId: true },
+      })
+      const cat = categoryId === current?.categoryId
+        ? { id: categoryId }
+        : await prisma.category.findFirst({ where: { id: categoryId, status: 'VISIBLE' }, select: { id: true } })
       if (!cat) return NextResponse.json({ ok: false, error: 'BAD_CATEGORY' }, { status: 400 })
       data.categoryId = cat.id
     }

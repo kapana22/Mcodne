@@ -26,7 +26,7 @@ const STATIC_OK = new Set([
 async function main() {
   const [posts, cats] = await Promise.all([
     prisma.post.findMany({ select: { slug: true, title: true, body: true, status: true } }),
-    prisma.category.findMany({ where: { isLive: true }, select: { slug: true } }),
+    prisma.category.findMany({ where: { status: 'VISIBLE' }, select: { slug: true } }),
   ])
   const published = new Set(posts.filter(p => p.status === 'PUBLISHED').map(p => p.slug))
   const allPosts = new Set(posts.map(p => p.slug))

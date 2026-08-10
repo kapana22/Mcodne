@@ -16,7 +16,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { hierarchyError, canBeParent, foldCounts, BROWSABLE_CATEGORY_SQL, TREE_ERROR } from '../lib/categoryTree'
+import { hierarchyError, canBeParent, foldCounts, strandedBy, BROWSABLE_CATEGORY_SQL, TREE_ERROR } from '../lib/categoryTree'
 import type { TreeNode, TreeTarget } from '../lib/categoryTree'
 
 const node = (id: string, over: Partial<TreeNode> = {}): TreeNode =>
@@ -42,6 +42,29 @@ test('a category cannot be its own parent', () => {
 test('the parent has to exist and has to be the one asked for', () => {
   assert.equal(hierarchyError(target('a'), { parentId: 'b' }, null), 'PARENT_NOT_FOUND')
   assert.equal(hierarchyError(target('a'), { parentId: 'b' }, node('c')), 'PARENT_NOT_FOUND')
+})
+
+test('a redirect into a HIDDEN sphere is refused', () => {
+  // The quiet failure, and the reason it is a rule rather than a warning:
+  // nothing 404s and nothing errors — the child's experts are just browsable
+  // from nowhere and counted under nothing. „კადრები" pointed at the hidden
+  // „კარიერა" in the first draft of the migration; this is what caught it.
+  assert.equal(
+    hierarchyError(target('a'), { status: 'REDIRECTED', parentId: 'b' }, node('b', { status: 'HIDDEN' })),
+    'PARENT_IS_HIDDEN',
+  )
+  assert.equal(hierarchyError(target('a'), { parentId: 'b' }, node('b', { status: 'HIDDEN' })), 'PARENT_IS_HIDDEN')
+})
+
+test('hiding a sphere names what it takes down with it', () => {
+  const cats: TreeNode[] = [
+    { id: 'sphere', status: 'VISIBLE', parentId: null },
+    { id: 'absorbed', status: 'REDIRECTED', parentId: 'sphere' },
+    { id: 'elsewhere', status: 'REDIRECTED', parentId: 'other' },
+  ]
+  assert.deepEqual(strandedBy(cats, { id: 'sphere' }, 'HIDDEN'), ['absorbed'])
+  // Coming back into view strands nobody.
+  assert.deepEqual(strandedBy(cats, { id: 'sphere' }, 'VISIBLE'), [])
 })
 
 test('no redirect chains — from either side', () => {
@@ -76,7 +99,8 @@ test('the parent picker offers exactly what the rules would accept', () => {
   const me = { id: 'a' }
   assert.equal(canBeParent(node('a'), me), false)                                   // self
   assert.equal(canBeParent(node('b'), me), true)                                    // a plain sphere
-  assert.equal(canBeParent(node('b', { status: 'HIDDEN' }), me), true)              // hidden is still a real sphere
+  // A HIDDEN sphere is NOT offered: a child under it is browsable from nowhere.
+  assert.equal(canBeParent(node('b', { status: 'HIDDEN' }), me), false)
   assert.equal(canBeParent(node('b', { status: 'REDIRECTED', parentId: 'c' }), me), false)
   assert.equal(canBeParent(node('b', { parentId: 'c' }), me), false)                // already a child
 })

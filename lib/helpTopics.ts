@@ -137,11 +137,12 @@ export const GROUPS: FaqGroup[] = [
       {
         id: 'commission',
         q: 'რა კომისიას იღებს პლატფორმა?',
-        // Present tense only when money actually moves — today no booking is
-        // charged, so nothing is withheld from the expert.
+        // The figure is stated in both branches (owner, 2026-08-10). The
+        // „არ ვიკავებთ" half of the old answer was true and still misleading:
+        // it is the sentence an expert quotes back when the 15% appears.
         a: PAYMENTS_LIVE
           ? `პლატფორმა იტოვებს ${COMMISSION_PCT}%-ს. ეს მოიცავს ინფრასტრუქტურას, გადახდას, მხარდაჭერასა და მარკეტინგს.`
-          : `ახლა დაჯავშნა უფასოა და საკომისიოს არ ვიკავებთ — ექსპერტი სრულ თანხას იღებს. ონლაინ გადახდების ამოქმედების შემდეგ პლატფორმა ${COMMISSION_PCT}%-ს დაიტოვებს; ეს მოიცავს ინფრასტრუქტურას, გადახდას, მხარდაჭერასა და მარკეტინგს.`,
+          : `პლატფორმა ${COMMISSION_PCT}%-ს იტოვებს — ონლაინ გადახდების ამოქმედების შემდეგ. ეს მოიცავს ინფრასტრუქტურას, გადახდას, მხარდაჭერასა და მარკეტინგს.`,
         action: { label: 'განაცხადის შევსება', href: '/apply', gate: 'apply' },
       },
       {

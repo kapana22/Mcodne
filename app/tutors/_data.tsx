@@ -12,7 +12,10 @@ import { TUTOR_DEFAULTS, type ConsultationItem } from '@/components/booking/slot
 // The hero chips and the sidebar checkboxes toggle the SAME `filters.cats`, and
 // that array now holds category SLUGS — so filtering is robust to renames and a
 // category that stops being a sphere simply stops appearing (no dead chip). The
-// filter matches an expert's `catSlug` (category.slug), never a display string.
+// filter matches an expert's `catSlug`, never a display string. Since
+// 2026-08-10 that field is the SPHERE the expert is browsed under — their own
+// category, or the one it was absorbed into — because the chips are spheres and
+// the count beside them is folded. Their own category is still `catOwnSlug`.
 // `expertCount` drives which categories are OFFERED as a filter: an option that
 // can only ever return zero results is a dead end, not a filter.
 export type LiveCat = { id: string; slug: string; name: string; expertCount?: number }
@@ -45,6 +48,8 @@ export type Tutor = {
   // display NAME the card shows; filtering matches on this slug so renames and
   // hidden categories never break the sidebar/hero filter.
   catSlug?: string | null
+  /** The expert's actual category, when it differs from the sphere. */
+  catOwnSlug?: string | null
   headline: string
   bio: string
   langs: string[]
@@ -162,7 +167,8 @@ function mapTutorRow(t: any, i: number): Tutor {
     avatarUrl: t.user?.avatarUrl ?? null,
     videoUrl: t.videoUrl ?? null,
     cat: t.category?.name ?? t.specialty ?? 'სფერო',
-    catSlug: t.category?.slug ?? null,
+    catSlug: (t.category?.status === 'REDIRECTED' ? t.category?.parent?.slug : t.category?.slug) ?? t.category?.slug ?? null,
+    catOwnSlug: t.category?.slug ?? null,
     headline: t.headline ?? '',
     bio: t.bio ?? '',
     langs: Array.isArray(t.languages) && t.languages.length ? t.languages.map(toLangLabel) : ['ქართული'],

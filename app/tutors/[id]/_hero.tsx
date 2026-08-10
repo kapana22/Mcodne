@@ -10,6 +10,7 @@ import { fetchMe } from '@/lib/me'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { fmtRating } from '@/lib/fmt'
 import { displayHeadline } from '@/lib/headline'
+import { categoryPath } from '@/lib/categoryRoutes'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { TUTOR_DEFAULTS } from '@/components/booking/slots'
@@ -24,8 +25,11 @@ export const Breadcrumb = ({ tutor }: { tutor: TutorDetail | null }) => (
         <Icon.chevR className="w-3 h-3 text-ink-300" />
         {/* The indexable category landing page, not the /tutors filter (which
             canonicalises away). Expert profiles are the site's deepest crawled
-            pages, so this is the link that feeds the category pages upward. */}
-        <Link href={`/categories/${tutor.category.slug}`} className="hover:text-ink-900 transition-colors duration-fast">{tutor.category.name}</Link>
+            pages, so this is the link that feeds the category pages upward —
+            and it goes through lib/categoryRoutes so it lands on the page
+            directly instead of on a 301 to it. Link equity survives a redirect;
+            it does not survive it as well as not needing one. */}
+        <Link href={categoryPath({ slug: tutor.category.slug, status: tutor.category.status ?? 'VISIBLE', parent: tutor.category.parent })} className="hover:text-ink-900 transition-colors duration-fast">{tutor.category.name}</Link>
       </>
     )}
     <Icon.chevR className="w-3 h-3 text-ink-300" />

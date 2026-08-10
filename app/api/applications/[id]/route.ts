@@ -83,12 +83,22 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // appear. A custom/niche specialty that matches nothing stays null (that's the
     // genuine "admin must add this category" case; the expert can also self-set it
     // from the profile editor once the category exists).
-    const liveCats = await prisma.category.findMany({ where: { status: 'VISIBLE' }, select: { id: true, name: true, defaultServiceType: true } })
+    const liveCats = await prisma.category.findMany({ where: { status: 'VISIBLE' }, select: { id: true, slug: true, name: true, defaultServiceType: true } })
     const nrm = (s: string) => s.toLowerCase().trim()
     const sp = nrm(app.specialty || '')
+    // The SLUG is matched as well as the name, as a whole word. The name used to
+    // carry the Latin term by accident — „IT და პროგრამირება" contained „it", so
+    // an applicant who wrote „IT" landed in it. The 2026-08-10 rename to
+    // „ტექნოლოგია და პროდუქტი" took that away silently, and the failure mode is
+    // an approved expert filed under no category at all.
+    //
+    // Whole-word, and that is not pedantry: a bare `includes('it')` matches
+    // „digital", which would file a marketer as a programmer.
+    const slugHit = (slug: string) => new RegExp(`(^|[^a-z0-9])${slug}([^a-z0-9]|$)`).test(sp)
     const matchedCat = sp
       ? (liveCats.find(c => nrm(c.name) === sp)
-        ?? liveCats.find(c => { const n = nrm(c.name); const stem = n.slice(0, 4); return sp.includes(n) || n.includes(sp) || (stem.length >= 3 && sp.includes(stem)) }))
+        ?? liveCats.find(c => { const n = nrm(c.name); const stem = n.slice(0, 4); return sp.includes(n) || n.includes(sp) || (stem.length >= 3 && sp.includes(stem)) })
+        ?? liveCats.find(c => slugHit(c.slug)))
       : undefined
     // An explicit `categoryId` from the admin OVERRIDES the name match — that is
     // the whole point of the override (the name matched nothing, or matched the

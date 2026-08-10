@@ -4,7 +4,7 @@
 
 import Link from 'next/link'
 import { SiteText } from '@/components/SiteTextProvider'
-import { PAYMENTS_LIVE } from '@/lib/flags'
+import { PAYMENTS_LIVE, COMMISSION_PCT, TUTOR_PAYOUT_PCT } from '@/lib/flags'
 import { Reveal } from '@/components/Reveal'
 import { CountUp } from '@/components/CountUp'
 import { Container } from '@/components/Container'
@@ -47,7 +47,7 @@ export const ExpertCta = () => (
           <Eyebrow className="mb-3"><SiteText k="home.expertCta.eyebrow" /></Eyebrow>
           <h2 className="font-display text-h2 sm:text-display font-bold leading-[1.08] tracking-[-0.02em] text-ink-900">
             <SiteText k="home.expertCta.title" /><br />
-            <span className="text-brand-600">{PAYMENTS_LIVE ? 'გასამრჯელო — სესიის შემდეგ.' : 'სრული თანხა შენია.'}</span>
+            <span className="text-brand-600">{PAYMENTS_LIVE ? 'გასამრჯელო — სესიის შემდეგ.' : 'საკომისიო 15%.'}</span>
           </h2>
           <p className="text-body-lg text-ink-700 mt-5 max-w-[520px] leading-relaxed">
             {/* The commission clause was removed 2026-08-05 (owner) — with it
@@ -75,13 +75,14 @@ export const ExpertCta = () => (
                   { n: null as number | null, txt: 'შენ', l: 'ადგენ ფასს', s: 'დროსა და თემას' },
                   { n: null as number | null, txt: '60', l: 'წუთი სესია', s: 'ხანგრძლივობასა და ფასს შენ ადგენ' },
                 ]
-              // Flag off = no charge and no deduction today. The commission
-              // figure was removed from this cell 2026-08-05 (owner): the
-              // sub-line said what WILL be withheld, which is a promise the
-              // marketing surfaces no longer make. /terms still states it.
+              // The cells state the DEAL, not today's till. „0% / 100%" was
+              // here until 2026-08-10 and it was the loudest zero-commission
+              // claim on the site — two numbers in stat type, with the real
+              // figure demoted to a caption. Owner: the 15% goes everywhere and
+              // the 0% goes nowhere.
               : [
-                  { n: null as number | null, txt: '0%', l: 'საკომისიო დღეს', s: 'მოგვიანებით 15%' },
-                  { n: null as number | null, txt: '100%', l: 'შენი ნაწილი', s: 'სანამ გადახდები არ ამოქმედდება' },
+                  { n: null as number | null, txt: `${COMMISSION_PCT}%`, l: 'საკომისიო', s: 'ონლაინ გადახდების ამოქმედების შემდეგ' },
+                  { n: null as number | null, txt: `${TUTOR_PAYOUT_PCT}%`, l: 'შენი ნაწილი', s: 'ფასს შენ ადგენ' },
                   // Was „მალე / შემოსავალი" — a stat cell whose figure is the
                   // word „soon". A number slot holding roadmap status is the
                   // emptiest thing on the page; this states what the expert

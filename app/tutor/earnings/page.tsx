@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/tutor/PageHeader'
 import { sessionDate } from '@/components/workspace/sessionTime'
 import { dayKeyInTz } from '@/lib/bookings'
 import { KA_MONTHS_LONG } from '@/lib/kaDate'
-import { PAYMENTS_LIVE, TUTOR_PAYOUT_PCT } from '@/lib/flags'
+import { PAYMENTS_LIVE, TUTOR_PAYOUT_PCT, COMMISSION_PCT } from '@/lib/flags'
 
 type Tx = {
   id: string
@@ -157,12 +157,13 @@ export default function TutorEarningsPage() {
                   <CountUp value={data.totalEarned} prefix="₾" />
                 </div>
                 <p className="mt-3 text-meta text-white/60 leading-snug max-w-[420px]">
-                  {/* No commission figure (owner, 2026-08-05). The rule lives
-                      in /terms and the /help FAQ; this card states what the
-                      expert has, not what will be withheld later. */}
+                  {/* The commission figure is BACK (owner, 2026-08-10). This
+                      is the expert's own money screen — if the rule lives only
+                      in /terms, the one person it applies to is the one who
+                      never reads it. */}
                   {PAYMENTS_LIVE
                     ? 'გადარიცხვა სესიის დასრულების შემდეგ.'
-                    : 'ახლა ჯავშნა უფასოა — სრული თანხა შენია.'}
+                    : 'ონლაინ გადახდები მალე ამოქმედდება.'}
                 </p>
               </div>
               <div className="flex sm:flex-col gap-4 sm:gap-2 sm:text-right">
@@ -173,14 +174,16 @@ export default function TutorEarningsPage() {
                 {/* „გადარიცხვის მოლოდინში“ was structurally always ₾0 — every
                     completion path sets payoutStatus RELEASED, so no COMPLETED
                     booking is ever PENDING. Until a real payout queue exists it
-                    would be a permanently-zero metric dressed as meaningful; the
-                    honest number today is the cut we take: none. */}
+                    would be a permanently-zero metric dressed as meaningful, so
+                    the cell states the commission instead. It read „0%" until
+                    2026-08-10, which was the same emptiness with a worse
+                    consequence: a promise nobody meant to keep. */}
                 <div>
                   <div className="font-display text-micro font-semibold uppercase text-white/45">
                     {PAYMENTS_LIVE ? 'გადარიცხვის მოლოდინში' : 'საკომისიო'}
                   </div>
                   <div className="font-display text-h3 font-bold tabular-nums">
-                    {PAYMENTS_LIVE ? fmtGel(data.pendingPayout) : '0%'}
+                    {PAYMENTS_LIVE ? fmtGel(data.pendingPayout) : `${COMMISSION_PCT}%`}
                   </div>
                 </div>
               </div>
@@ -217,7 +220,7 @@ export default function TutorEarningsPage() {
                 <Eyebrow as="span" tone="muted">საშუალო სესიაზე</Eyebrow>
               </div>
               <div className="font-display text-h1 font-bold text-ink-900 tabular-nums">{fmtGel(avgPerSession)}</div>
-              <div className="text-meta text-ink-500 mt-1">{PAYMENTS_LIVE ? `ნეტო, ${TUTOR_PAYOUT_PCT}% წილით` : 'სრული თანხა'}</div>
+              <div className="text-meta text-ink-500 mt-1">{`ნეტო, ${TUTOR_PAYOUT_PCT}% წილით`}</div>
             </div>
           </div>
 

@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/Icon'
-import { hierarchyError, canBeParent, TREE_ERROR } from '@/lib/categoryTree'
+import { hierarchyError, canBeParent, strandedBy, TREE_ERROR } from '@/lib/categoryTree'
 import type { CategoryStatus } from '@/lib/categoryTree'
 import { AdminConfirmDialog, TabHeader, adminOk, AdminError } from './_parts'
 
@@ -196,6 +196,14 @@ export const CategoriesSection = () => {
     return !q || r.name.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q)
   })
   const listed = ordered(filtered)
+  /* Hiding a sphere takes its absorbed categories with it — their experts are
+     browsable only through it. The dialog counted the row's OWN experts only,
+     which is the number that is wrong in exactly the case that matters. */
+  const hideStranded = pendStatus
+    ? strandedBy(rows ?? [], pendStatus.row, pendStatus.next)
+    : []
+  const hideCount = (pendStatus?.row.tutorCount ?? 0)
+    + hideStranded.reduce((n, id) => n + ((rows ?? []).find(r => r.id === id)?.tutorCount ?? 0), 0)
   const nameOf = (id: string | null) => (id ? (rows ?? []).find(r => r.id === id)?.name ?? '' : '')
 
   return (
@@ -332,8 +340,8 @@ export const CategoriesSection = () => {
           <>„{pendStatus?.row.name ?? ''}“ გვერდი გადამისამართდება „{nameOf(pendStatus?.row.parentId ?? null)}“-ზე. მისი <span className="font-display font-semibold tabular-nums">{pendStatus?.row.tutorCount ?? 0}</span> ექსპერტი „{nameOf(pendStatus?.row.parentId ?? null)}“-ში ჩაითვლება. ძველი ბმული მუშაობს.</>
         ) : (
           <>
-            „{pendStatus?.row.name ?? ''}“ საჯარო საიტიდან გაქრება — მისი <span className="font-display font-semibold tabular-nums">{pendStatus?.row.tutorCount ?? 0}</span> ექსპერტი აღარ გამოჩნდება ძებნაში, კატეგორიის გვერდზე, sitemap-სა და მთავარ გვერდზე.
-            {(pendStatus?.row.tutorCount ?? 0) > 0 && <span className="mt-2 block text-danger-700">ჯავშნები და პროფილები რჩება — მაგრამ ვეღარავინ იპოვის. ჩართვით ყველაფერი დაბრუნდება.</span>}
+            „{pendStatus?.row.name ?? ''}“ საჯარო საიტიდან გაქრება — მისი <span className="font-display font-semibold tabular-nums">{hideCount}</span> ექსპერტი აღარ გამოჩნდება ძებნაში, კატეგორიის გვერდზე, sitemap-სა და მთავარ გვერდზე.
+            {hideCount > 0 && <span className="mt-2 block text-danger-700">ჯავშნები და პროფილები რჩება — მაგრამ ვეღარავინ იპოვის. ჩართვით ყველაფერი დაბრუნდება.</span>}
           </>
         )}
         tone="danger"

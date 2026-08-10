@@ -138,7 +138,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // paid bookings ship.
   { key: 'home.expertCta.eyebrow', group: 'მთავარი — გახდი ექსპერტი', label: 'პატარა იარლიყი (ზემოთ)', default: 'ექსპერტებისთვის' },
   { key: 'home.expertCta.title', group: 'მთავარი — გახდი ექსპერტი', label: 'სათაური (1-ლი ხაზი)', default: 'გააზიარე შენი ცოდნა.' },
-  { key: 'home.expertCta.body', group: 'მთავარი — გახდი ექსპერტი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'შენ ადგენ ფასს, დროსა და თემას. დანარჩენს ჩვენ ვუვლით. ახლა დაჯავშნა უფასოა და საკომისიოს არ ვიკავებთ. მოგვიანებით 15% საკომისიო დაემატება.' },
+  { key: 'home.expertCta.body', group: 'მთავარი — გახდი ექსპერტი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'შენ ადგენ ფასს, დროსა და თემას. დანარჩენს ჩვენ ვუვლით. პლატფორმის საკომისიოა 15%.' },
   { key: 'home.expertCta.cta', group: 'მთავარი — გახდი ექსპერტი', label: 'ღილაკი', default: 'გახდი ექსპერტი' },
 
   // ── Categories page ──
@@ -222,8 +222,8 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // Card 4 was PAYMENTS_LIVE-branched with a COMMISSION_PCT template until
   // 2026-08-05. ⚠ It no longer follows the flag — re-type it here when paid
   // bookings ship.
-  { key: 'apply.get.card4.title', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 4 — სათაური', default: 'სრული თანხა შენია' },
-  { key: 'apply.get.card4.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 4 — ტექსტი', multiline: true, default: 'ამჟამად ჯავშნა უფასოა და საკომისიოს არ ვიკავებთ. მოგვიანებით 15% საკომისიო დაემატება.' },
+  { key: 'apply.get.card4.title', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 4 — სათაური', default: 'საკომისიო 15%' },
+  { key: 'apply.get.card4.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 4 — ტექსტი', multiline: true, default: 'ფასს შენ ადგენ. პლატფორმა 15%-ს იტოვებს — ონლაინ გადახდების ამოქმედების შემდეგ.' },
 
   { key: 'apply.faq.eyebrow', group: 'გახდი ექსპერტი — კითხვები', label: 'პატარა იარლიყი', default: 'ხშირად დასმული კითხვები' },
   { key: 'apply.faq.q1', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 1', default: 'რა მჭირდება დასაწყებად?' },
@@ -231,14 +231,14 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'apply.faq.q2', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 2', default: 'რამდენი დრო სჭირდება განაცხადს?' },
   { key: 'apply.faq.a2', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 2', multiline: true, default: 'რამდენიმე წუთი. დანარჩენს — ვიდეო, სერტიფიკატები, ბმულები — პროფილში ავსებ დამტკიცების შემდეგ.' },
   { key: 'apply.faq.q3', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 3', default: 'ვინ ადგენს ფასს?' },
-  { key: 'apply.faq.a3', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 3', multiline: true, default: 'შენ. ფასს თითოეულ სერვისზე ცალკე ადგენ და სტუდენტი მას წინასწარ ხედავს — ფარული საკომისიო არ ემატება.' },
+  { key: 'apply.faq.a3', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 3', multiline: true, default: 'შენ. ფასს თითოეულ სერვისზე ცალკე ადგენ და სტუდენტი მას წინასწარ ხედავს. პლატფორმის საკომისიოა 15%.' },
   { key: 'apply.faq.q4', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 4', default: 'როგორ ტარდება კონსულტაცია?' },
   { key: 'apply.faq.a4', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 4', multiline: true, default: 'ვიდეოსესიის ფორმატში, ბრაუზერიდან — ცალკე აპლიკაცია არც შენ გჭირდება და არც სტუდენტს.' },
   // Q6 is the money question. It sits FOURTH on the page (see ApplyMarketing's
   // FAQ array) but is numbered 6 because keys may never be renumbered — its
   // predecessor was hardcoded, so there is simply no q6 row anywhere yet.
   { key: 'apply.faq.q6', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა — გადახდები', default: 'რა ხდება გადახდებთან დაკავშირებით?' },
-  { key: 'apply.faq.a6', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი — გადახდები', multiline: true, default: 'ამ ეტაპზე ჯავშნა უფასოა და საკომისიოს არ ვიკავებთ — ექსპერტი სრულ თანხას იღებს. ონლაინ გადახდების ამოქმედებამდე ამის შესახებ წინასწარ შეგატყობინებთ.' },
+  { key: 'apply.faq.a6', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი — გადახდები', multiline: true, default: 'პლატფორმა 15%-ს იტოვებს. ონლაინ გადახდები ჯერ არ ამოქმედებულა — როცა ამოქმედდება, წინასწარ შეგატყობინებთ.' },
   { key: 'apply.faq.q5', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 5', default: 'შემიძლია დრო თავად განვსაზღვრო?' },
   { key: 'apply.faq.a5', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 5', multiline: true, default: 'დიახ. შენ აქვეყნებ თავისუფალ დროებს და მხოლოდ იმ საათებში გიჯავშნიან. ნებისმიერ დროს შეგიძლია პროფილი პაუზაზე დააყენო.' },
 
@@ -400,14 +400,16 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // removed (owner, 2026-08-05) both are plain sentences, so the whole panel
   // became editable at once — no half-editable section, per the rule above.
   //
-  // ⚠ These sentences no longer follow PAYMENTS_LIVE. When online payments go
-  // live, „0% საკომისიო" and „სრული თანხა შენია" must be re-typed HERE, in the
-  // admin panel — nothing in the code will correct them.
+  // ⚠ These sentences no longer follow PAYMENTS_LIVE, and since 2026-08-10
+  // that is the point rather than a caveat. Owner: the commission is 15%, it
+  // must be said everywhere, and „0%" must appear nowhere.
   //
-  // Since 2026-08-10 they say the commission is COMING (owner: „მოტყუებაში რომ
-  // არ შევიდეს"). „სრული თანხა შენია" with no end date is a promise the
-  // platform intends to break, and an expert who priced against it would be
-  // right to feel misled.
+  // The reason is not tidiness. An expert read „0%" in the biggest type on the
+  // panel, priced their service against it, and would later find 15% withheld
+  // („მოტყუებაში რომ არ შევიდეს"). „ახლა 0%, მოგვიანებით 15%" was the
+  // 2026-08-05 attempt at honesty and it failed the same way: the number the
+  // eye lands on is the one it believes, and the correction sat in the caption
+  // underneath it.
   //
   // The figure is written out rather than interpolated — these defaults are
   // deliberately plain sentences so the whole panel stays editable (see above).
@@ -433,10 +435,10 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'signup.teach.title1', group: 'რეგისტრაცია — ვასწავლი', label: 'სათაური, 1-ლი ხაზი', default: 'გახდი მცოდნე.' },
   { key: 'signup.teach.title2', group: 'რეგისტრაცია — ვასწავლი', label: 'სათაური, აქცენტი (მწვანე)', default: 'შენი ცოდნა — შენი შემოსავალი.' },
   { key: 'signup.teach.sub', group: 'რეგისტრაცია — ვასწავლი', label: 'ქვესათაური', multiline: true, default: 'შენ ირჩევ ფასს, დროსა და თემას.' },
-  { key: 'signup.teach.subEmphasis', group: 'რეგისტრაცია — ვასწავლი', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'სრული თანხა შენია.' },
-  { key: 'signup.teach.stat1.n', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1', default: '0%' },
+  { key: 'signup.teach.subEmphasis', group: 'რეგისტრაცია — ვასწავლი', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'საკომისიო 15%.' },
+  { key: 'signup.teach.stat1.n', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1', default: '15%' },
   { key: 'signup.teach.stat1.label', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1 — იარლიყი', default: 'საკომისიო' },
-  { key: 'signup.teach.stat1.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1 — ქვეტექსტი', default: 'ახლა სრული თანხა შენია — მოგვიანებით 15% საკომისიო' },
+  { key: 'signup.teach.stat1.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1 — ქვეტექსტი', default: 'ონლაინ გადახდების ამოქმედების შემდეგ' },
   { key: 'signup.teach.stat2.n', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 2', default: 'შენ' },
   { key: 'signup.teach.stat2.label', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 2 — იარლიყი', default: 'ადგენ ფასს' },
   { key: 'signup.teach.stat2.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 2 — ქვეტექსტი', default: 'დროსა და თემას' },

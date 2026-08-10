@@ -48,6 +48,7 @@ export const TREE_ERROR = {
   SELF_PARENT: 'კატეგორია საკუთარი თავის ქვეშ ვერ იქნება.',
   PARENT_NOT_FOUND: 'მშობელი კატეგორია ვერ მოიძებნა.',
   PARENT_IS_REDIRECTED: 'მშობელი თვითონ გადამისამართებულია — აირჩიე სხვა.',
+  PARENT_IS_HIDDEN: 'მშობელი დამალულია — მისი ექსპერტები ვერსად გამოჩნდება.',
   PARENT_HAS_PARENT: 'ეს კატეგორია სხვის ქვეშაა — მშობლად ვერ გამოდგება.',
   HAS_CHILDREN: 'ამ კატეგორიას ქვეკატეგორიები ჰყავს — ჯერ ისინი მოხსენი.',
   REDIRECT_NEEDS_PARENT: 'გადამისამართებას მშობელი კატეგორია სჭირდება.',
@@ -77,6 +78,11 @@ export function hierarchyError(
     // itself pointed somewhere else cannot be the end of a redirect.
     if (parent.status === 'REDIRECTED') return 'PARENT_IS_REDIRECTED'
     if (parent.parentId) return 'PARENT_HAS_PARENT'
+    // A hidden parent is the quiet version of the same failure. Nothing 404s,
+    // nothing errors — the child's experts are simply browsable from nowhere
+    // and counted under nothing. It is the one move in this panel that can
+    // remove a real person from the site without saying so.
+    if (parent.status !== 'VISIBLE') return 'PARENT_IS_HIDDEN'
     // Gaining a parent while having children would make this row a middle
     // level, which the depth rule does not allow.
     if (target.childCount > 0) return 'HAS_CHILDREN'
@@ -93,7 +99,21 @@ export function hierarchyError(
 
 /** Can this row be offered as a parent in a picker? Same rules, read forwards. */
 export function canBeParent(candidate: TreeNode, target: { id: string }): boolean {
-  return candidate.id !== target.id && candidate.status !== 'REDIRECTED' && !candidate.parentId
+  return candidate.id !== target.id && candidate.status === 'VISIBLE' && !candidate.parentId
+}
+
+/**
+ * Hiding a sphere takes its children's experts with it — they are browsable
+ * only through it. The panel has to say so, with the real number, so this
+ * returns the ids whose experts would go dark alongside the row being hidden.
+ */
+export function strandedBy(
+  cats: readonly TreeNode[],
+  target: { id: string },
+  next: CategoryStatus,
+): string[] {
+  if (next === 'VISIBLE') return []
+  return cats.filter(c => c.parentId === target.id && c.status === 'REDIRECTED').map(c => c.id)
 }
 
 /* ───────────────────── what the public may see ─────────────────────

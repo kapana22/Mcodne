@@ -30,7 +30,7 @@ export type TutorDetail = {
   linkedinUrl?: string | null
   websiteUrl?: string | null
   user: { id: string; fullName: string; avatarUrl?: string | null; bio?: string | null }
-  category?: { id: string; slug: string; name: string; icon?: string | null } | null
+  category?: { id: string; slug: string; name: string; icon?: string | null; status?: 'VISIBLE' | 'HIDDEN' | 'REDIRECTED'; parent?: { slug: string } | null } | null
 }
 
 // Same vocabulary as the browse cards (lib/languages) — this used to be a private

@@ -27,7 +27,7 @@
  * catalog this small that is the most expensive kind of dead end: it happens
  * at the exact moment someone has decided what they want.
  *
- * `isLive: false` is the existing, reversible mechanism — the category keeps
+ * HIDDEN is the existing, reversible mechanism — the category keeps
  * its row, its slug and any future experts; it simply stops being offered.
  * Flip it back in ადმინი → კატეგორიები the day someone is in it.
  *
@@ -77,24 +77,24 @@ async function main() {
   console.log('\n── ცარიელი კატეგორიები ──')
   const cats = await prisma.category.findMany({
     where: { slug: { in: HIDE } },
-    select: { id: true, slug: true, name: true, isLive: true, _count: { select: { tutors: true } } },
+    select: { id: true, slug: true, name: true, status: true, _count: { select: { tutors: true } } },
     orderBy: { order: 'asc' },
   })
   for (const c of cats) {
     if (c._count.tutors > 0) {
       throw new Error(`ABORT — „${c.name}" now has ${c._count.tutors} expert(s). Remove it from HIDE.`)
     }
-    console.log(`   ${c.isLive ? (APPLY ? '🙈' : '·') : '—'}  ${c.slug.padEnd(12)} ${c.name}${c.isLive ? '' : '  (უკვე დამალული)'}`)
+    console.log(`   ${c.status === 'VISIBLE' ? (APPLY ? '🙈' : '·') : '—'}  ${c.slug.padEnd(12)} ${c.name}${c.status === 'VISIBLE' ? '' : '  (უკვე დამალული)'}`)
   }
-  const toHide = cats.filter(c => c.isLive)
+  const toHide = cats.filter(c => c.status === 'VISIBLE')
   if (APPLY && toHide.length) {
-    await prisma.category.updateMany({ where: { id: { in: toHide.map(c => c.id) } }, data: { isLive: false } })
+    await prisma.category.updateMany({ where: { id: { in: toHide.map(c => c.id) } }, data: { isLive: false, status: 'HIDDEN' } })
     console.log(`   ✅ დაიმალა ${toHide.length}`)
   }
 
   /* ── after ── */
   const live = await prisma.category.findMany({
-    where: { isLive: true },
+    where: { status: 'VISIBLE' },
     select: { name: true, _count: { select: { tutors: true } } },
     orderBy: { order: 'asc' },
   })

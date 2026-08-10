@@ -300,7 +300,12 @@ export async function queryTutors(params: TutorsQueryParams = {}) {
     // Public endpoint — never send passwordHash or private User columns.
     include: {
       user: { select: { id: true, fullName: true, avatarUrl: true, bio: true } },
-      category: { select: { id: true, slug: true, name: true, icon: true } },
+      // The parent travels with the category because the browse filter runs on
+      // the CLIENT (the /tutors list is fetched unfiltered), and it has to be
+      // able to answer „is this expert in this sphere?" the same way the count
+      // does. Without it the sphere chip printed 7 and returned 5 — the same
+      // shape as the 2026-07-31 „10 over a list of 9".
+      category: { select: { id: true, slug: true, name: true, icon: true, status: true, parent: { select: { slug: true } } } },
       // Tier SHAPE only — minutes/price/tier, never the title or description.
       // Pre-tier surfaces (the home card, the browse card) must advertise the
       // FLAGSHIP service, i.e. the longest paid one, and until now they had no
