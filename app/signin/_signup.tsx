@@ -381,12 +381,14 @@ const SignUpIntro = ({ role }: { role: 'learn' | 'teach' }) => {
           {t('signup.teach.title1')}<br />
           <span className="text-brand-600">{t('signup.teach.title2')}</span>
         </h1>
-        {/* No commission clause and no PAYMENTS_LIVE branch here any more
-            (owner, 2026-08-05): the platform's cut is not part of the pitch.
-            The rule itself still lives where it is binding — /terms — and the
-            /help FAQ still answers it in full. */}
+        {/* ONE sentence, and ONE mention of the commission (owner, 2026-08-10).
+            The figure is the stat tile directly below — a number belongs in the
+            number slot — and repeating it here said the same thing twice, two
+            lines apart. `signup.teach.subEmphasis` is RETIRED rather than
+            deleted: the key stays in the registry so any row an admin already
+            saved for it survives, exactly as the seven home.why.* keys do. */}
         <p className="text-body-lg sm:text-h3 text-ink-700 mt-6 sm:mt-7 max-w-[440px]">
-          {t('signup.teach.sub')} <span className="font-display font-semibold text-ink-900">{t('signup.teach.subEmphasis')}</span>
+          {t('signup.teach.sub')}
         </p>
 
         <dl className="mt-10 lg:mt-12 grid grid-cols-3 gap-x-6 sm:gap-x-8">

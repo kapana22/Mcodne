@@ -47,7 +47,7 @@ export const ExpertCta = () => (
           <Eyebrow className="mb-3"><SiteText k="home.expertCta.eyebrow" /></Eyebrow>
           <h2 className="font-display text-h2 sm:text-display font-bold leading-[1.08] tracking-[-0.02em] text-ink-900">
             <SiteText k="home.expertCta.title" /><br />
-            <span className="text-brand-600">{PAYMENTS_LIVE ? 'გასამრჯელო — სესიის შემდეგ.' : 'საკომისიო 15%.'}</span>
+            <span className="text-brand-600">გასამრჯელო — სესიის შემდეგ.</span>
           </h2>
           <p className="text-body-lg text-ink-700 mt-5 max-w-[520px] leading-relaxed">
             {/* The commission clause was removed 2026-08-05 (owner) — with it

@@ -138,7 +138,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // paid bookings ship.
   { key: 'home.expertCta.eyebrow', group: 'მთავარი — გახდი ექსპერტი', label: 'პატარა იარლიყი (ზემოთ)', default: 'ექსპერტებისთვის' },
   { key: 'home.expertCta.title', group: 'მთავარი — გახდი ექსპერტი', label: 'სათაური (1-ლი ხაზი)', default: 'გააზიარე შენი ცოდნა.' },
-  { key: 'home.expertCta.body', group: 'მთავარი — გახდი ექსპერტი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'შენ ადგენ ფასს, დროსა და თემას. დანარჩენს ჩვენ ვუვლით. პლატფორმის საკომისიოა 15%.' },
+  { key: 'home.expertCta.body', group: 'მთავარი — გახდი ექსპერტი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'შენ ადგენ ფასს, დროსა და თემას. დანარჩენს ჩვენ ვუვლით.' },
   { key: 'home.expertCta.cta', group: 'მთავარი — გახდი ექსპერტი', label: 'ღილაკი', default: 'გახდი ექსპერტი' },
 
   // ── Categories page ──
@@ -222,7 +222,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // Card 4 was PAYMENTS_LIVE-branched with a COMMISSION_PCT template until
   // 2026-08-05. ⚠ It no longer follows the flag — re-type it here when paid
   // bookings ship.
-  { key: 'apply.get.card4.title', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 4 — სათაური', default: 'საკომისიო 15%' },
+  { key: 'apply.get.card4.title', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 4 — სათაური', default: 'საკომისიო' },
   { key: 'apply.get.card4.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 4 — ტექსტი', multiline: true, default: 'ფასს შენ ადგენ. პლატფორმა 15%-ს იტოვებს — ონლაინ გადახდების ამოქმედების შემდეგ.' },
 
   { key: 'apply.faq.eyebrow', group: 'გახდი ექსპერტი — კითხვები', label: 'პატარა იარლიყი', default: 'ხშირად დასმული კითხვები' },
@@ -231,7 +231,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'apply.faq.q2', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 2', default: 'რამდენი დრო სჭირდება განაცხადს?' },
   { key: 'apply.faq.a2', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 2', multiline: true, default: 'რამდენიმე წუთი. დანარჩენს — ვიდეო, სერტიფიკატები, ბმულები — პროფილში ავსებ დამტკიცების შემდეგ.' },
   { key: 'apply.faq.q3', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 3', default: 'ვინ ადგენს ფასს?' },
-  { key: 'apply.faq.a3', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 3', multiline: true, default: 'შენ. ფასს თითოეულ სერვისზე ცალკე ადგენ და სტუდენტი მას წინასწარ ხედავს. პლატფორმის საკომისიოა 15%.' },
+  { key: 'apply.faq.a3', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 3', multiline: true, default: 'შენ. ფასს თითოეულ სერვისზე ცალკე ადგენ და სტუდენტი მას წინასწარ ხედავს.' },
   { key: 'apply.faq.q4', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 4', default: 'როგორ ტარდება კონსულტაცია?' },
   { key: 'apply.faq.a4', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 4', multiline: true, default: 'ვიდეოსესიის ფორმატში, ბრაუზერიდან — ცალკე აპლიკაცია არც შენ გჭირდება და არც სტუდენტს.' },
   // Q6 is the money question. It sits FOURTH on the page (see ApplyMarketing's
@@ -435,7 +435,9 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'signup.teach.title1', group: 'რეგისტრაცია — ვასწავლი', label: 'სათაური, 1-ლი ხაზი', default: 'გახდი მცოდნე.' },
   { key: 'signup.teach.title2', group: 'რეგისტრაცია — ვასწავლი', label: 'სათაური, აქცენტი (მწვანე)', default: 'შენი ცოდნა — შენი შემოსავალი.' },
   { key: 'signup.teach.sub', group: 'რეგისტრაცია — ვასწავლი', label: 'ქვესათაური', multiline: true, default: 'შენ ირჩევ ფასს, დროსა და თემას.' },
-  { key: 'signup.teach.subEmphasis', group: 'რეგისტრაცია — ვასწავლი', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'საკომისიო 15%.' },
+  // RETIRED 2026-08-10: it repeated the commission two lines above the stat
+  // tile that already carries it. One mention per surface (owner).
+  { key: 'signup.teach.subEmphasis', group: 'რეგისტრაცია — ვასწავლი', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'გასამრჯელო — სესიის შემდეგ.', retired: true },
   { key: 'signup.teach.stat1.n', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1', default: '15%' },
   { key: 'signup.teach.stat1.label', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1 — იარლიყი', default: 'საკომისიო' },
   { key: 'signup.teach.stat1.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1 — ქვეტექსტი', default: 'ონლაინ გადახდების ამოქმედების შემდეგ' },
