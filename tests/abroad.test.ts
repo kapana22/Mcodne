@@ -302,7 +302,7 @@ test('the landing NEVER lists by the hidden category', () => {
   // single expert was assigned to it:
   //
   //   `TutorProfile.categoryId` is single-valued, and lib/tutorsQuery excludes
-  //   any expert whose category is not `isLive` — from the category page, from
+  //   any expert whose category is not browsable — from the category page, from
   //   the general /tutors browse, from search AND from the sitemap. So moving a
   //   lawyer into the hidden `diaspora` category does not add them to /abroad,
   //   it REMOVES them from the public site. The one action that reads as „turn
@@ -317,8 +317,10 @@ test('the landing NEVER lists by the hidden category', () => {
     'the landing filters on the hidden category — assigning experts to it would delete them from the catalog',
   )
   // …and it still applies the catalog's own visibility rule, so it can never
-  // advertise a paused or suspended expert.
-  for (const rule of [/available: true/, /suspendedAt: null/, /isLive: true/]) {
+  // advertise a paused or suspended expert. Since 2026-08-10 the category half
+  // of that rule is lib/categoryTree's — asserted by name, because a hand-typed
+  // copy here is exactly how the landing and the catalogue would drift apart.
+  for (const rule of [/available: true/, /suspendedAt: null/, /categorySlugFilter\(ABROAD_SOURCE_CATEGORY_SLUGS\)/]) {
     assert.match(landing, rule, `the landing dropped a visibility rule: ${rule}`)
   }
   // The source list must name only REAL categories.
@@ -331,11 +333,15 @@ test('the landing NEVER lists by the hidden category', () => {
 
 test('the seed script creates a HIDDEN category, and refuses to re-hide a live one', () => {
   const script = read('scripts/abroad-category.ts')
+  // Both fields: `status` is what the site reads, `isLive` is what the rollback
+  // restores from, and a row where they disagree is a row that behaves
+  // differently before and after the migration is reverted.
+  assert.match(script, /status: 'HIDDEN'/)
   assert.match(script, /isLive: false/)
-  // Hiding is the entire mechanism (browse, sitemap and /categories all filter
-  // on isLive while the profile route does not), so a script that could flip a
-  // live category back to hidden is a script that can cause a silent outage.
-  assert.match(script, /if \(existing\?\.isLive\)/)
+  // Hiding is the entire mechanism (browse, sitemap and /categories all apply
+  // it while the profile route does not), so a script that could flip a live
+  // category back to hidden is a script that can cause a silent outage.
+  assert.match(script, /if \(existing\?\.status === 'VISIBLE'\)/)
   assert.match(script, /Refusing to re-hide/)
   // It must not create experts, bookings or anything else.
   for (const forbidden of ['tutorProfile.create', 'user.create', 'booking.create', 'deleteMany']) {

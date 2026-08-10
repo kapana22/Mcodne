@@ -67,7 +67,7 @@ export default async function Page() {
   try {
     await ensureDbReady()
     liveCats = await prisma.category.findMany({
-      where: { isLive: true },
+      where: { status: 'VISIBLE' },
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
       select: { slug: true, name: true },
       take: 50,

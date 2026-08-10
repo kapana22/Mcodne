@@ -16,6 +16,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
+import { categorySlugFilter } from '@/lib/categoryTree'
 import { ABROAD_SOURCE_CATEGORY_SLUGS, eurLabel, gelFromSiteText } from '@/lib/abroad'
 import { getSiteTextMap } from '@/lib/siteText'
 import { SITE_TEXT_DEFAULTS } from '@/lib/siteTextDefs'
@@ -72,7 +73,7 @@ async function loadExperts(): Promise<AbroadExpert[]> {
       // disappear from here too, or the landing page advertises someone who
       // cannot be booked.
       where: {
-        category: { is: { slug: { in: [...ABROAD_SOURCE_CATEGORY_SLUGS] }, isLive: true } },
+        category: categorySlugFilter(ABROAD_SOURCE_CATEGORY_SLUGS),
         available: true,
         user: { is: { suspendedAt: null } },
       },

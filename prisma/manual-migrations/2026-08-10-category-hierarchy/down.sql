@@ -16,6 +16,8 @@ BEGIN;
 UPDATE "Category" SET "name" = 'ბიზნესი'            WHERE "slug" = 'business';
 UPDATE "Category" SET "name" = 'მარკეტინგი'         WHERE "slug" = 'marketing';
 UPDATE "Category" SET "name" = 'IT და პროგრამირება' WHERE "slug" = 'it';
+UPDATE "Category" SET "name" = 'HR და რეკრუტინგი'   WHERE "slug" = 'hr';
+UPDATE "Category" SET "name" = 'პროდაქტი'           WHERE "slug" = 'product';
 
 -- The hierarchy and the status vocabulary. `isLive` was never modified, so no
 -- category changes visibility as a result of this.

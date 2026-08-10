@@ -95,3 +95,86 @@ export function hierarchyError(
 export function canBeParent(candidate: TreeNode, target: { id: string }): boolean {
   return candidate.id !== target.id && candidate.status !== 'REDIRECTED' && !candidate.parentId
 }
+
+/* ───────────────────── what the public may see ─────────────────────
+ *
+ * THE RULE, once: an expert is browsable when their category is VISIBLE, or
+ * when it REDIRECTS into a VISIBLE sphere. The second half is not a nicety — it
+ * is the whole reason the hierarchy exists. Collapsing „ფინანსები" into
+ * „ბიზნესი და ფინანსები" by status alone would have taken its experts off the
+ * site the moment the migration ran; they surface under the parent instead.
+ *
+ * HIDDEN still hides, in both directions — a hidden sphere and anything
+ * redirecting into one. That is a deliberate admin action, confirmed in the
+ * panel with the expert count it affects.
+ *
+ * Both forms below say the same thing, because the app asks the question in two
+ * languages: Prisma for the browse list, raw SQL for the trigram search and the
+ * stats aggregates. When they disagree, a search surfaces someone the list
+ * hides — which is the bug lib/tutorsQuery already carries a comment about. */
+
+/** Prisma: a category an expert may be browsed through. */
+export const BROWSABLE_CATEGORY = {
+  OR: [
+    { status: 'VISIBLE' as const },
+    { status: 'REDIRECTED' as const, parent: { is: { status: 'VISIBLE' as const } } },
+  ],
+}
+
+/**
+ * Prisma: `?category=<slug>` — the sphere itself plus everything folded into
+ * it. Takes one slug or a set of them (the /abroad landing names four).
+ */
+export function categorySlugFilter(slug: string | readonly string[]) {
+  const match = typeof slug === 'string' ? { slug } : { slug: { in: [...slug] } }
+  return {
+    is: {
+      OR: [
+        { ...match, status: 'VISIBLE' as const },
+        { status: 'REDIRECTED' as const, parent: { is: { ...match, status: 'VISIBLE' as const } } },
+      ],
+    },
+  }
+}
+
+/**
+ * SQL twin of BROWSABLE_CATEGORY, including the „no category at all" case.
+ *
+ * Written for the aliases the two raw queries already use — `tp` for
+ * TutorProfile and `c` for its LEFT JOINed category — and as an EXISTS rather
+ * than a second JOIN so it drops straight into an existing WHERE clause.
+ *
+ * A missing category must never hide an approved, available expert: that
+ * taxonomy gap made real people invisible twice.
+ */
+export const BROWSABLE_CATEGORY_SQL = `(
+           tp."categoryId" IS NULL
+        OR c."status" = 'VISIBLE'
+        OR (c."status" = 'REDIRECTED' AND EXISTS (
+              SELECT 1 FROM "Category" cp WHERE cp."id" = c."parentId" AND cp."status" = 'VISIBLE'))
+      )`
+
+/**
+ * Per-category expert counts, folded up into the sphere each one is browsed
+ * under. A number shown next to a sphere has to match what tapping it returns,
+ * so the folding rule is the visibility rule read from the other end.
+ */
+export function foldCounts(
+  cats: readonly TreeNode[],
+  raw: readonly { categoryId: string | null; count: number }[],
+): Map<string, number> {
+  const byId = new Map(cats.map(c => [c.id, c]))
+  const out = new Map<string, number>()
+  for (const { categoryId, count } of raw) {
+    if (!categoryId) continue
+    const cat = byId.get(categoryId)
+    if (!cat) continue
+    // A redirected category contributes to its parent, never to itself.
+    const sphere = cat.status === 'REDIRECTED'
+      ? (cat.parentId ? byId.get(cat.parentId) : undefined)
+      : cat
+    if (!sphere || sphere.status !== 'VISIBLE') continue
+    out.set(sphere.id, (out.get(sphere.id) ?? 0) + count)
+  }
+  return out
+}

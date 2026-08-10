@@ -371,7 +371,8 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
     cats: [], minRate: 0, langs: [], available: [], minRating: 0, superOnly: false, price: [0, NO_CAP],
   })
 
-  // Live, admin-managed categories (GET /api/categories → isLive only). Drives
+  // The admin-managed SPHERES (GET /api/categories → VISIBLE only; a sphere's
+  // count and results include everything folded into it). Drives
   // every category chip/checkbox; `filters.cats` stores the SLUGS these carry.
   // Starts empty → the sphere filter is hidden until this resolves (and stays
   // hidden if the fetch fails), so we never show a dead/unmatched chip.

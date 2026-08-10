@@ -4,6 +4,7 @@ import { ensureDbReady } from '@/lib/dbBoot'
 import { expandQuery } from '@/lib/searchSynonyms'
 import { stripTutorBlobs } from '@/lib/stripTutorBlobs'
 import { computeOpenStarts } from '@/lib/availability'
+import { BROWSABLE_CATEGORY, BROWSABLE_CATEGORY_SQL, categorySlugFilter } from '@/lib/categoryTree'
 
 // Single source of truth for the public expert-list query. Both the JSON API
 // (app/api/tutors/route.ts) and the server-rendered /tutors page
@@ -162,11 +163,10 @@ function searchCandidateSql(terms: SearchTerm[], cap: number): Prisma.Sql {
          -- Same no-service rule as the Prisma path above. The two MUST agree,
          -- or a search would surface someone the browse list deliberately hides.
          AND EXISTS (SELECT 1 FROM "Consultation" c2 WHERE c2."tutorId" = tp."id")
-         -- A MISSING category must never hide an approved, available expert —
-         -- that taxonomy gap is what made real experts invisible twice. A
-         -- category the admin deliberately HID still hides them (that action
-         -- is confirmed in the panel and says so explicitly).
-         AND (tp."categoryId" IS NULL OR c."isLive" = true)
+         -- The visibility rule, from lib/categoryTree — the SQL twin of what
+         -- the Prisma path above applies, so a search can never surface
+         -- someone the browse list hides, or hide someone it shows.
+         AND ${Prisma.raw(BROWSABLE_CATEGORY_SQL)}
     ) s
     WHERE s."score" >= ${SEARCH_SIMILARITY_THRESHOLD}::float8
     ORDER BY s."score" DESC, s."id" ASC
@@ -227,14 +227,18 @@ export async function queryTutors(params: TutorsQueryParams = {}) {
     consultations: { some: {} },
   }
   // Category is a LABEL, not a gate. Filtering by slug still restricts to that
-  // category, but with no filter an expert whose category is unset stays
+  // sphere, but with no filter an expert whose category is unset stays
   // visible: a taxonomy field must never be able to hide a person (it did,
-  // twice). An admin-hidden category DOES still hide them — that is a
+  // twice). An admin-HIDDEN category DOES still hide them — that is a
   // deliberate action, and the admin panel warns how many experts it affects.
+  //
+  // Filtering by a sphere also returns the experts of everything folded into
+  // it, so „ბიზნესი და ფინანსები" answers for the old „ფინანსები" too. The rule
+  // lives in lib/categoryTree, once, in both Prisma and SQL.
   if (category) {
-    where.category = { slug: category, isLive: true }
+    where.category = categorySlugFilter(category)
   } else {
-    where.OR = [{ categoryId: null }, { category: { is: { isLive: true } } }]
+    where.OR = [{ categoryId: null }, { category: { is: BROWSABLE_CATEGORY } }]
   }
   if (serviceType) where.serviceType = serviceType
   if (onlyFeatured) where.featured = true

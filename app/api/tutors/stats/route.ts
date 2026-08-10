@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { BROWSABLE_CATEGORY_SQL } from '@/lib/categoryTree'
 
 // Public aggregate stats for the /tutors hero.
 export async function GET() {
@@ -20,6 +22,8 @@ export async function GET() {
   //     expert (it did, twice; see the note in tutorsQuery). The inner join here
   //     silently dropped them, so the two errors were also pulling in OPPOSITE
   //     directions and could mask each other at some roster sizes.
+  //   • BROWSABLE_CATEGORY_SQL — the one visibility rule, imported rather than
+  //     retyped. That is precisely how these two files drifted apart before.
   //
   // `available = true` skips self-paused experts and the User join drops
   // admin-suspended accounts, as before.
@@ -38,7 +42,7 @@ export async function GET() {
     JOIN "User" u ON u."id" = tp."userId"
     WHERE tp."available" = true
       AND u."suspendedAt" IS NULL
-      AND (tp."categoryId" IS NULL OR c."isLive" = true)
+      AND ${Prisma.raw(BROWSABLE_CATEGORY_SQL)}
       AND EXISTS (SELECT 1 FROM "Consultation" cs WHERE cs."tutorId" = tp."id")
   `
 
@@ -56,7 +60,7 @@ export async function GET() {
     JOIN "AvailabilitySlot" a ON a."tutorId" = tp."id"
     WHERE tp."available" = true
       AND u."suspendedAt" IS NULL
-      AND (tp."categoryId" IS NULL OR c."isLive" = true)
+      AND ${Prisma.raw(BROWSABLE_CATEGORY_SQL)}
       AND EXISTS (SELECT 1 FROM "Consultation" cs WHERE cs."tutorId" = tp."id")
       AND a."endAt" > NOW()
       AND a."startAt" < NOW() + INTERVAL '7 days'
@@ -86,7 +90,7 @@ export async function GET() {
     WHERE cs."price" >= 10
       AND tp."available" = true
       AND u."suspendedAt" IS NULL
-      AND (tp."categoryId" IS NULL OR c."isLive" = true)
+      AND ${Prisma.raw(BROWSABLE_CATEGORY_SQL)}
   `
 
   return NextResponse.json({

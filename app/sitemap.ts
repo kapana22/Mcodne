@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { prisma } from '@/lib/prisma'
 import { professions } from '@/lib/professionSeo'
+import { BROWSABLE_CATEGORY } from '@/lib/categoryTree'
 
 // Next auto-serves this at /sitemap.xml. We keep the surface small and static
 // for public routes, then splice in tutor detail pages sourced directly from
@@ -85,12 +86,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       // otherwise we submit profiles that no public listing links to:
       //   available: true      — self-paused experts are pulled from browse
       //   suspendedAt: null    — admin-suspended experts 404 on /tutors/[id]
-      //   category.isLive      — hidden-category (and categoryId-null) experts
+      //   BROWSABLE_CATEGORY   — hidden-category (and categoryId-null) experts
       //                          are unreachable from browse and unbookable
       where: {
         available: true,
         user: { is: { suspendedAt: null } },
-        category: { is: { isLive: true } },
+        category: { is: BROWSABLE_CATEGORY },
       },
       select: { id: true, slug: true, updatedAt: true },
       orderBy: { updatedAt: 'desc' },
@@ -137,24 +138,39 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // (which is what actually changes day to day). Whichever is later wins.
   let categoryEntries: MetadataRoute.Sitemap = []
   try {
+    // Only spheres. A HIDDEN category keeps its page but is not advertised, and
+    // a REDIRECTED one answers with a 301 — neither belongs in a sitemap.
     const cats = await prisma.category.findMany({
-      where: { isLive: true },
+      where: { status: 'VISIBLE' },
       select: {
         slug: true,
         // One row per category: the freshest visible expert in it. Mirrors the
         // visibility rule used for tutorEntries above — an invisible expert's
-        // edit must not claim the page changed.
+        // edit must not claim the page changed. Children count too: the page
+        // lists their experts, so their edits change it.
         tutors: {
           where: { available: true, user: { is: { suspendedAt: null } } },
           select: { updatedAt: true },
           orderBy: { updatedAt: 'desc' },
           take: 1,
         },
+        children: {
+          select: {
+            tutors: {
+              where: { available: true, user: { is: { suspendedAt: null } } },
+              select: { updatedAt: true },
+              orderBy: { updatedAt: 'desc' },
+              take: 1,
+            },
+          },
+        },
       },
       take: 500,
     })
     categoryEntries = cats.map((c) => {
-      const newestExpert = c.tutors[0]?.updatedAt
+      const dates = [c.tutors[0]?.updatedAt, ...c.children.map(k => k.tutors[0]?.updatedAt)]
+        .filter((d): d is Date => !!d)
+      const newestExpert = dates.length ? new Date(Math.max(...dates.map(d => d.getTime()))) : undefined
       const lastModified =
         newestExpert && newestExpert > CONTENT_REVISION ? newestExpert : CONTENT_REVISION
       return {

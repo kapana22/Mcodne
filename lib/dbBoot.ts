@@ -119,6 +119,42 @@ async function runMigrations() {
       ADD COLUMN IF NOT EXISTS "isLive" BOOLEAN NOT NULL DEFAULT true;
   `)
 
+  // Category — status + one-level hierarchy (2026-08-10).
+  //
+  // The STRUCTURE (which sphere absorbs which) is applied by the reviewed
+  // migration in prisma/manual-migrations/2026-08-10-category-hierarchy. This
+  // block only guarantees the COLUMNS EXIST, because every public query now
+  // reads `status`: on a database that never ran the migration, the site would
+  // 500 on its own home page. The backfill mirrors the old boolean, so a
+  // deployment that arrives before the migration behaves exactly as it did
+  // before it — nothing is hidden or revealed by accident.
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      CREATE TYPE "CategoryStatus" AS ENUM ('VISIBLE', 'HIDDEN', 'REDIRECTED');
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+  `)
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Category"
+      ADD COLUMN IF NOT EXISTS "status" "CategoryStatus" NOT NULL DEFAULT 'VISIBLE',
+      ADD COLUMN IF NOT EXISTS "parentId" TEXT;
+  `)
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      ALTER TABLE "Category"
+        ADD CONSTRAINT "Category_parentId_fkey"
+        FOREIGN KEY ("parentId") REFERENCES "Category"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+  `)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Category_parentId_idx" ON "Category" ("parentId");`)
+  // Carries the old boolean across on the boot that first adds the column. In
+  // steady state it matches nothing: `status` is what writes `isLive`, so a
+  // hidden row is never left at the VISIBLE default.
+  await prisma.$executeRawUnsafe(`
+    UPDATE "Category" SET "status" = 'HIDDEN' WHERE "isLive" = false AND "status" = 'VISIBLE';
+  `)
+
   // Phase-2 default flip: new experts/bookings default to CONSULTATION (instant
   // "available now"), not the legacy RECURRING calendar model. ALTER … SET
   // DEFAULT is idempotent and also updates existing DBs whose columns were

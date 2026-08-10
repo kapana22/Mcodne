@@ -16,12 +16,16 @@ import { ABROAD_EUR_PER_GEL } from '@/lib/flags'
 /**
  * The Category.slug the whole vertical keys off.
  *
- * The row itself is created with `isLive: false` (see scripts/abroad-category.mjs),
- * which is the EXISTING mechanism for a hidden category and does all the hiding
- * for us: lib/tutorsQuery filters browse on `category.isLive`, app/sitemap.ts
- * mirrors that filter, and /categories only lists live rows. A profile in it
- * still opens by direct link — app/tutors/[id]/page.tsx never checks isLive —
- * which is exactly the „reachable only from /abroad" behaviour we want.
+ * The row itself is HIDDEN (`Category.status`, since 2026-08-10; it was
+ * `isLive: false` before — see scripts/abroad-category.mjs), which is the
+ * EXISTING mechanism for a hidden category and does all the hiding for us:
+ * lib/categoryTree states the rule, lib/tutorsQuery and app/sitemap.ts both
+ * apply it, and /categories lists spheres only. A profile in it still opens by
+ * direct link — app/tutors/[id]/page.tsx never checks the category — which is
+ * exactly the „reachable only from /abroad" behaviour we want.
+ *
+ * It is HIDDEN and NOT redirected, deliberately: a redirect would fold it into
+ * another sphere, and this row is a marker, not an absorbed category.
  */
 export const ABROAD_CATEGORY_SLUG = 'diaspora'
 
@@ -36,7 +40,7 @@ export function isAbroadCategory(slug?: string | null): boolean {
  * ⚠️ READ THIS BEFORE MOVING AN EXPERT INTO THE `diaspora` CATEGORY. DON'T.
  *
  * `TutorProfile.categoryId` is single-valued, and `lib/tutorsQuery` excludes any
- * expert whose category is not `isLive` — from the category page, from the
+ * expert whose category is not browsable — from the category page, from the
  * general /tutors browse, from search, and from the sitemap. So assigning a
  * lawyer to the hidden `diaspora` category does not ADD them to /abroad, it
  * DELETES them from the public catalog. The one action that looks like „turn

@@ -34,10 +34,11 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
-  // Fallback MUST mirror the deployed category NAMES (prisma/seedCategories.ts +
-  // the /tutors filter), because the discovery filter matches by name — a stale
-  // fallback lets an applicant pick a category that then never shows in browse.
-  const ALL_CATS = dbCats.length ? dbCats : ['ბიზნესი', 'გადასახადები', 'ფინანსები', 'სამართალი', 'მარკეტინგი', 'გაყიდვები', 'IT და პროგრამირება', 'პროდაქტი', 'დიზაინი', 'კარიერა', 'HR და რეკრუტინგი', 'უძრავი ქონება', 'რელოკაცია', 'კრიპტო']
+  // Fallback MUST mirror the deployed SPHERE names (the ones /api/categories
+  // returns), because the discovery filter matches by name — a stale fallback
+  // lets an applicant pick a category that then never shows in browse. It is
+  // six since 2026-08-10, not fifteen: the absorbed ones are not offered.
+  const ALL_CATS = dbCats.length ? dbCats : ['ბიზნესი და ფინანსები', 'მარკეტინგი და გაყიდვები', 'ტექნოლოგია და პროდუქტი', 'გადასახადები', 'ფსიქოლოგია', 'სამართალი']
   const cats = form.cats
   const toggle = (c: string) => set({ cats: cats.includes(c) ? cats.filter(x => x !== c) : [...cats, c] })
 

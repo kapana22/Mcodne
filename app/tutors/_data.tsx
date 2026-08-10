@@ -11,7 +11,7 @@ import { TUTOR_DEFAULTS, type ConsultationItem } from '@/components/booking/slot
 // Category identity is DB-driven (GET /api/categories → live categories only).
 // The hero chips and the sidebar checkboxes toggle the SAME `filters.cats`, and
 // that array now holds category SLUGS — so filtering is robust to renames and a
-// hidden (isLive:false) category simply stops appearing (no dead chip). The
+// category that stops being a sphere simply stops appearing (no dead chip). The
 // filter matches an expert's `catSlug` (category.slug), never a display string.
 // `expertCount` drives which categories are OFFERED as a filter: an option that
 // can only ever return zero results is a dead end, not a filter.

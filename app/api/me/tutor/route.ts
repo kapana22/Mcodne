@@ -103,9 +103,11 @@ export async function PATCH(req: Request) {
     if (categoryId === null) {
       data.categoryId = null
     } else {
-      // Only allow a real, live category — otherwise the profile would set an
-      // invalid FK (or point at a hidden category and vanish from browse).
-      const cat = await prisma.category.findFirst({ where: { id: categoryId, isLive: true }, select: { id: true } })
+      // Only a SPHERE can be chosen — otherwise the profile would set an
+      // invalid FK, or point at a hidden category and vanish from browse. An
+      // expert already sitting in an absorbed category keeps it (nothing is
+      // re-pointed); they simply cannot move INTO one.
+      const cat = await prisma.category.findFirst({ where: { id: categoryId, status: 'VISIBLE' }, select: { id: true } })
       if (!cat) return NextResponse.json({ ok: false, error: 'BAD_CATEGORY' }, { status: 400 })
       data.categoryId = cat.id
     }

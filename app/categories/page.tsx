@@ -3,6 +3,7 @@ import { pageMetadata } from '@/lib/pageSeo'
 import { socialMeta } from '@/lib/seo'
 import { jsonLdString } from '@/lib/jsonLd'
 import { prisma } from '@/lib/prisma'
+import { expertCountsBySphere } from '@/lib/categoryCounts'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
 import { Reveal } from '@/components/Reveal'
 import { Footer } from '@/components/Footer'
@@ -57,8 +58,12 @@ export default async function CategoriesPage() {
   // context leaf into a plain `string` prop.
   const map = await getSiteTextMap()
   const t = (k: string) => map[k] ?? SITE_TEXT_DEFAULTS[k] ?? ''
-  const cats = await prisma.category.findMany({
-    where: { isLive: true },
+  // The whole tree is read because the count has to fold redirected categories
+  // into their sphere; only spheres are rendered. The „X ექსპერტი" number and
+  // the gates behind it live in lib/categoryCounts — it has to match what
+  // clicking through actually shows, and stating it twice is how the home page
+  // came to say „10 ექსპერტი" over a 9-expert list.
+  const all = await prisma.category.findMany({
     orderBy: [{ order: 'asc' }, { name: 'asc' }],
     select: {
       id: true,
@@ -66,26 +71,14 @@ export default async function CategoriesPage() {
       name: true,
       icon: true,
       defaultServiceType: true,
-      // Count only PUBLICLY VISIBLE experts so the „X ექსპერტი" trust number
-      // matches what clicking through actually shows. The three gates MUST stay
-      // in step with lib/tutorsQuery: available (not self-paused), not
-      // admin-suspended, and — added 2026-07-31 — at least one service, because
-      // a serviceless expert is hidden from browse and counting them here would
-      // promise a person the destination then withholds. Same drift that made
-      // the home page say „10 ექსპერტი" over a 9-expert list.
-      _count: {
-        select: {
-          tutors: {
-            where: {
-              available: true,
-              user: { is: { suspendedAt: null } },
-              consultations: { some: {} },
-            },
-          },
-        },
-      },
+      status: true,
+      parentId: true,
     },
   })
+  const counts = await expertCountsBySphere(all)
+  const cats = all
+    .filter(c => c.status === 'VISIBLE')
+    .map(c => ({ ...c, expertCount: counts.get(c.id) ?? 0 }))
 
   // Split the roster by whether the sphere can actually be entered today.
   // 11 of the 15 live categories have nobody in them, and every one of those
@@ -95,8 +88,8 @@ export default async function CategoriesPage() {
   // read as an apology rather than as a directory. Populated spheres stay cards;
   // the rest keep their links (they are real, indexable landing pages) but as
   // one quiet line, which is the weight a „not yet" deserves.
-  const populated = cats.filter(c => c._count.tutors > 0)
-  const upcoming = cats.filter(c => c._count.tutors === 0)
+  const populated = cats.filter(c => c.expertCount > 0)
+  const upcoming = cats.filter(c => c.expertCount === 0)
 
   // CollectionPage + ItemList: tells a crawler this URL IS the index of the
   // sphere pages, and names each one. Without it the page was structurally
@@ -173,7 +166,7 @@ export default async function CategoriesPage() {
             }`}
           >
             {populated.map(c => {
-              const tutorCount = c._count.tutors
+              const tutorCount = c.expertCount
               return (
                 <Link
                   key={c.id}

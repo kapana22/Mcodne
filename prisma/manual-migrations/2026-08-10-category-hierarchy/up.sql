@@ -48,6 +48,20 @@ UPDATE "Category" SET "status" = 'VISIBLE'                                     W
 -- entry goes, so nobody is sent to an empty room.
 UPDATE "Category" SET "status" = 'HIDDEN' WHERE "slug" IN ('career', 'relocation', 'real-estate');
 
+-- `diaspora` is NOT an absorbed sphere and must not be redirected into one. It
+-- is the hidden marker the /abroad vertical keys off (lib/abroad.ts): a real
+-- category row whose entire job is to stay out of the public catalogue. Stated
+-- explicitly rather than left to the isLive backfill, so a stray „turn it on"
+-- in the panel cannot quietly put it in the menu.
+UPDATE "Category" SET "status" = 'HIDDEN' WHERE "slug" = 'diaspora';
+
+-- Two names lose a borrowed word the site does not need (owner, 2026-08-10):
+-- „HR და რეკრუტინგი" → „კადრები", „პროდაქტი" → „პროდუქტი". Neither is shown
+-- publicly after this migration; the words are removed so they cannot come back
+-- through a seed or a future un-hiding.
+UPDATE "Category" SET "name" = 'კადრები'  WHERE "slug" = 'hr';
+UPDATE "Category" SET "name" = 'პროდუქტი' WHERE "slug" = 'product';
+
 -- Absorbed into a parent. Experts keep their own categoryId — the parent counts
 -- them through the hierarchy instead, so no row is re-pointed here.
 UPDATE "Category" AS c
@@ -60,7 +74,6 @@ UPDATE "Category" AS c
          ('design',   'it'),
          ('crypto',   'tax'),
          ('hr',       'career'),
-         ('diaspora', 'relocation'),
          ('advokati', 'law')
        ) AS v(child, parent)
   JOIN "Category" AS p ON p."slug" = v.parent

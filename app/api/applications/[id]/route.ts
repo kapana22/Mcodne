@@ -83,7 +83,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // appear. A custom/niche specialty that matches nothing stays null (that's the
     // genuine "admin must add this category" case; the expert can also self-set it
     // from the profile editor once the category exists).
-    const liveCats = await prisma.category.findMany({ where: { isLive: true }, select: { id: true, name: true, defaultServiceType: true } })
+    const liveCats = await prisma.category.findMany({ where: { status: 'VISIBLE' }, select: { id: true, name: true, defaultServiceType: true } })
     const nrm = (s: string) => s.toLowerCase().trim()
     const sp = nrm(app.specialty || '')
     const matchedCat = sp

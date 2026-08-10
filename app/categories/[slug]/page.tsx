@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { socialMeta } from '@/lib/seo'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
 import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { Container } from '@/components/Container'
@@ -27,9 +27,17 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').repla
 async function getCategory(slug: string) {
   try {
     await ensureDbReady()
+    // Every status is fetched, and the caller branches. A HIDDEN sphere keeps
+    // this page — it is a real, indexable landing page that simply is not
+    // advertised while nobody works in it — and a REDIRECTED one is answered
+    // with a 301 below rather than a 404, because a 404 is how a URL loses the
+    // history this whole change exists to keep.
     return await prisma.category.findFirst({
-      where: { slug, isLive: true },
-      select: { id: true, slug: true, name: true },
+      where: { slug },
+      select: {
+        id: true, slug: true, name: true, status: true,
+        parent: { select: { slug: true } },
+      },
     })
   } catch {
     // Sentinel (not null) so a transient DB blip yields a 5xx (Google retries)
@@ -42,6 +50,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params
   const cat = await getCategory(slug)
   if (!cat || cat === 'error') return { title: 'კატეგორია — მცოდნე' }
+  // Absorbed into a sphere — the page below 301s, so it claims no metadata.
+  if (cat.status === 'REDIRECTED') return { title: 'კატეგორია — მცოდნე' }
   const seo = categorySeo[cat.slug] ?? fallbackSeo(cat.name)
   // The SERP snippet, not the page's opening paragraph — `intro` runs ~300
   // chars and was being cut mid-sentence in the results.
@@ -73,6 +83,11 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
   const cat = await getCategory(slug)
   if (cat === 'error') throw new Error('category temporarily unavailable') // → 5xx, not a deindexing 404
   if (!cat) notFound()
+  // 301, permanently: the sphere it was absorbed into now answers for it, and
+  // its experts are listed there. The parent is guaranteed by lib/categoryTree
+  // — a REDIRECTED row without one cannot be saved, and the migration refuses
+  // to commit if one exists.
+  if (cat.status === 'REDIRECTED' && cat.parent) permanentRedirect(`/categories/${cat.parent.slug}`)
 
   // Posts are matched by TAG = the category's own name. That is the contract
   // for the admin blog editor too: tag a post with the exact sphere name

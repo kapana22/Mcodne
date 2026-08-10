@@ -381,7 +381,7 @@ export async function GET(req: Request) {
     // a row. Those are the rows worth reading — an empty category is invisible
     // in any list built from the events alone.
     prisma.category
-      .findMany({ where: { isLive: true }, select: { slug: true, name: true }, orderBy: { name: 'asc' } })
+      .findMany({ where: { status: 'VISIBLE' }, select: { slug: true, name: true }, orderBy: { name: 'asc' } })
       .catch(() => []),
 
     // ── 12. Do clients come BACK. One booking is curiosity; the second one is

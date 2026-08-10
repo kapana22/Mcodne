@@ -149,10 +149,24 @@ test('§C the FK-less dbBoot tables are deleted BY HAND, not left to a cascade',
   // DDL only — case-sensitive and followed by a quoted identifier, so the
   // file's own prose („a bare TEXT column with NO foreign key on purpose")
   // cannot pass or fail this.
-  assert.ok(
-    !/\b(REFERENCES|FOREIGN KEY)\s+"/.test(boot),
-    'dbBoot grew a real foreign key — re-check whether these hand-deletes are still needed',
-  )
+  //
+  // NARROWED 2026-08-10, and the narrowing is the point. dbBoot now declares
+  // ONE real foreign key: Category.parentId → Category.id, for the sphere
+  // hierarchy. It says nothing about deleting a person — it joins two category
+  // rows — so a blanket „no FK anywhere" would fail on a change that cannot
+  // affect this route, and the usual fix for a test that cries wolf is to
+  // delete it. What actually matters is that no dbBoot table hangs off a User
+  // or a TutorProfile: that is the edge a cascade would have to travel, and its
+  // absence is why the rows below are removed by hand.
+  const edges = [...boot.matchAll(/\bREFERENCES\s+"(\w+)"/g)].map(m => m[1])
+  for (const table of edges) {
+    assert.ok(
+      table !== 'User' && table !== 'TutorProfile',
+      `dbBoot grew a foreign key to "${table}" — re-check whether these hand-deletes are still needed`,
+    )
+  }
+  assert.ok(!/\bFOREIGN KEY\s+\("(userId|tutorId)"\)/.test(boot),
+    'dbBoot grew a foreign key on a person column — re-check the hand-deletes')
   assert.match(ROUTE, /tx\.package\.deleteMany/)
   assert.match(ROUTE, /tx\.enrollment\.deleteMany/)
 })

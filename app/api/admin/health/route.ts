@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { hasFutureWindow } from '@/lib/bookability'
+import { BROWSABLE_CATEGORY } from '@/lib/categoryTree'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { lastSweepRun, SWEEP_STALE_MIN } from '@/lib/sweepRunner'
 import { getIntegrations } from '@/lib/integrations'
@@ -54,7 +55,7 @@ export async function GET() {
     prisma.booking.count({ where: { status: 'CONFIRMED', startAt: { gt: now, lte: in24h } } }),
     // Publicly bookable experts = the same visibility rule lib/tutorsQuery uses.
     prisma.tutorProfile.count({
-      where: { available: true, user: { suspendedAt: null }, category: { is: { isLive: true } } },
+      where: { available: true, user: { suspendedAt: null }, category: { is: BROWSABLE_CATEGORY } },
     }),
     // …of those, how many actually have a future availability WINDOW. An expert
     // with none cannot be booked at all, which is the single most common reason
@@ -64,7 +65,7 @@ export async function GET() {
         where: {
           available: true,
           user: { suspendedAt: null },
-          category: { is: { isLive: true } },
+          category: { is: BROWSABLE_CATEGORY },
           availability: hasFutureWindow(now),
         },
       })
