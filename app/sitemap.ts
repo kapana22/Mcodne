@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { professions } from '@/lib/professionSeo'
 import { BROWSABLE_CATEGORY } from '@/lib/categoryTree'
 import { categoryPath } from '@/lib/categoryRoutes'
+import { ABROAD_CATEGORY_SLUG } from '@/lib/abroad'
 
 // Next auto-serves this at /sitemap.xml. We keep the surface small and static
 // for public routes, then splice in tutor detail pages sourced directly from
@@ -145,8 +146,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // the /categories index while still resolving — which is how a URL quietly
     // loses the history this change exists to keep. Only REDIRECTED is absent,
     // because it answers with a 301 and its target is listed below.
+    // …except the /abroad marker. It is a Category row whose entire job is to
+    // stay out of the public catalogue (lib/abroad.ts) — not a sphere waiting
+    // for its first expert — and /abroad itself is deliberately absent from
+    // this file for the same reason. Listing its category page would submit the
+    // one URL the vertical exists to keep unlisted.
     const cats = await prisma.category.findMany({
-      where: { status: { in: ['VISIBLE', 'HIDDEN'] } },
+      where: { status: { in: ['VISIBLE', 'HIDDEN'] }, slug: { not: ABROAD_CATEGORY_SLUG } },
       select: {
         slug: true,
         // One row per category: the freshest visible expert in it. Mirrors the
