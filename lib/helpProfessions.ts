@@ -96,7 +96,12 @@ export const HELP_PROFESSIONS: HelpProfession[] = [
     topics: ['კარიერა', 'კარიერული', 'სამსახური', 'სამსახურის ძებნა', 'cv', 'რეზიუმე', 'გასაუბრება', 'ინტერვიუ'] },
   { slug: 'hr-specialisti', label: 'HR სპეციალისტი',
     words: ['hr სპეციალისტი'],
-    topics: ['hr', 'ადამიანური რესურსები', 'პერსონალი', 'თანამშრომლების აყვანა', 'რეკრუტინგი'] },
+    // `topics` are what a VISITOR TYPES, not what the site says. „რეკრუტინგი"
+    // stays here for the same reason it stays in lib/searchSynonyms: removing a
+    // word from the matcher does not stop people using it, it only stops them
+    // being answered. „კადრები" is added because that is now what the site
+    // calls it, and the widget has to recognise both.
+    topics: ['hr', 'ადამიანური რესურსები', 'პერსონალი', 'თანამშრომლების აყვანა', 'კადრები', 'კადრების შერჩევა', 'რეკრუტინგი'] },
   { slug: 'it-specialisti', label: 'IT სპეციალისტი',
     words: ['it სპეციალისტი', 'პროგრამისტი', 'დეველოპერი'],
     topics: ['it', 'საიტის გაკეთება', 'აპლიკაციის შექმნა', 'ტექნიკური'] },
@@ -108,7 +113,7 @@ export const HELP_PROFESSIONS: HelpProfession[] = [
     topics: ['გაყიდვები', 'გაყიდვებში', 'sales', 'კლიენტების მოზიდვა'] },
   { slug: 'produkt-menejeri', label: 'პროდაქტ მენეჯერი',
     words: ['პროდაქტ მენეჯერი', 'product manager', 'პროდუქტის მენეჯერი'],
-    topics: ['პროდაქტი'] },
+    topics: ['პროდუქტი', 'პროდაქტი'] },
   { slug: 'rieltori', label: 'რიელტორი',
     words: ['რიელტორი', 'რიელტორთან', 'რიელტორები'],
     topics: ['უძრავი ქონება', 'ბინის ყიდვა', 'ქირავდება'] },
