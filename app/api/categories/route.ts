@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { expertCountsBySphere } from '@/lib/categoryCounts'
+import { ABROAD_CATEGORY_SLUG } from '@/lib/abroad'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,12 +32,25 @@ export async function GET() {
     // made to call themselves something else. The two audiences want opposite
     // things from the same taxonomy, so the payload carries both and each
     // caller takes the half it needs.
+    // HIDDEN spheres are RETURNED, flagged `browsable: false`.
+    //
+    // They must be, or the catalogue deadlocks: „კარიერა" is hidden precisely
+    // because it has no expert yet, and if the application cannot offer it,
+    // nobody can ever be its first — it stays empty forever for the reason it
+    // was hidden. Somebody has to be able to go first.
+    //
+    // So the flag decides, not the query: BROWSE consumers (the /tutors filter,
+    // the home tiles) drop anything not browsable, while the screens where an
+    // expert DESCRIBES THEMSELVES offer the whole list. Only the /abroad marker
+    // is withheld outright — it is not a sphere anybody should be filed under
+    // (lib/abroad.ts), and assigning an expert to it removes them from the site.
     const rows = all
-      .filter(c => c.status === 'VISIBLE')
+      .filter(c => (c.status === 'VISIBLE' || c.status === 'HIDDEN') && c.slug !== ABROAD_CATEGORY_SLUG)
       .map(c => ({
         id: c.id,
         slug: c.slug,
         name: c.name,
+        browsable: c.status === 'VISIBLE',
         expertCount: counts.get(c.id) ?? 0,
         children: all
           .filter(k => k.status === 'REDIRECTED' && k.parentId === c.id)

@@ -386,8 +386,14 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
         // Offer only categories that actually have a visible expert — an option
         // that can only return zero results is a dead end. A deep-linked
         // ?category= still works: the server query is independent of this list.
+        //
+        // `browsable` is checked as well as the count, and not as a belt: the
+        // endpoint now also returns the spheres that are hidden BECAUSE they
+        // have nobody yet (so the application can offer them — somebody has to
+        // be first). Their count is zero today, so the count alone would filter
+        // them out; relying on that would make this correct by coincidence.
         setLiveCats(rows
-          .filter(r => r && r.slug && r.name && (r.expertCount ?? 0) > 0)
+          .filter(r => r && r.slug && r.name && r.browsable !== false && (r.expertCount ?? 0) > 0)
           .map(r => ({ id: r.id, slug: r.slug, name: r.name, expertCount: r.expertCount })))
       })
       .catch(() => {})

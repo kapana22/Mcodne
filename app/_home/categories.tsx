@@ -30,7 +30,9 @@ export const Categories = ({ initialCategories = [] }: { initialCategories?: Hom
         // leads to „ვერ ვიპოვეთ" is a dead end, and today 11 of 15 categories
         // are empty. If none are populated yet, fall through to the seeded
         // fallback rather than rendering an empty section.
-        const populated = rows.filter(r => (r.expertCount ?? 0) > 0)
+        // `browsable` too — the endpoint also serves the not-yet-advertised
+        // spheres so the application can offer them. See app/api/categories.
+        const populated = rows.filter(r => r.browsable !== false && (r.expertCount ?? 0) > 0)
         if (populated.length === 0) return
         setCats(populated.map(r => ({ slug: r.slug, name: r.name })))
         // POPULATED ONLY — same predicate as the tiles (2026-08-02). This row

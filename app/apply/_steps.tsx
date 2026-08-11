@@ -40,10 +40,14 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
-  // Fallback MUST mirror the deployed SPHERE names (the ones /api/categories
-  // returns), because the discovery filter matches by name — a stale fallback
-  // lets an applicant pick a category that then never shows in browse. It is
-  // six since 2026-08-10, not fifteen; the sub-fields arrive with the fetch.
+  // Fallback MUST mirror the deployed SPHERE names, because the approval step
+  // matches the applicant's answer BY NAME — a stale fallback lets somebody
+  // pick a category that then resolves to nothing.
+  //
+  // Nine, not six: the three spheres that are hidden from browse are offered
+  // here on purpose. „კარიერა" is hidden because it has no expert yet, and if
+  // this screen cannot offer it, nobody can ever be its first. Sub-fields
+  // arrive with the fetch; the fallback only has to keep the form usable.
   const SPHERES: Sphere[] = dbCats.length ? dbCats : [
     { name: 'ბიზნესი და ფინანსები', children: [] },
     { name: 'მარკეტინგი და გაყიდვები', children: [] },
@@ -51,9 +55,35 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
     { name: 'გადასახადები', children: [] },
     { name: 'ფსიქოლოგია', children: [] },
     { name: 'სამართალი', children: [] },
+    { name: 'კარიერა', children: [] },
+    { name: 'უძრავი ქონება', children: [] },
+    { name: 'რელოკაცია', children: [] },
   ]
   const cats = form.cats
   const toggle = (c: string) => set({ cats: cats.includes(c) ? cats.filter(x => x !== c) : [...cats, c] })
+
+  /* A sub-field REPLACES its sphere in the selection rather than adding to it.
+     The applicant is asked for 1–3 directions and the FIRST is their main
+     category, so „მარკეტინგი და გაყიდვები" + „გაყიდვები" would spend two of
+     three slots saying one thing — and would leave it ambiguous which of the
+     two is the answer. One slot, the most precise name they picked. */
+  const sphereOn = (s: Sphere) => cats.includes(s.name) || s.children.some(k => cats.includes(k))
+  const slotOf = (s: Sphere) => cats.findIndex(c => c === s.name || s.children.includes(c))
+  const pickSphere = (s: Sphere) => {
+    if (sphereOn(s)) set({ cats: cats.filter(c => c !== s.name && !s.children.includes(c)) })
+    else set({ cats: [...cats, s.name] })
+  }
+  /* Swapped IN PLACE: position is meaning here (cats[0] is the main category),
+     so narrowing „მარკეტინგი და გაყიდვები" to „გაყიდვები" must not quietly
+     demote it behind whatever was picked second. */
+  const pickChild = (s: Sphere, k: string) => {
+    const target = cats.includes(k) ? s.name : k
+    const at = slotOf(s)
+    if (at === -1) { set({ cats: [...cats, target] }); return }
+    const next = [...cats]
+    next[at] = target
+    set({ cats: next })
+  }
 
   return (
     <>
@@ -137,27 +167,29 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
         {/* The `cats` anchor moved here from the deleted free-text box. Without
             it „აირჩიე სფერო." would render with nowhere to scroll to —
             tests/apply-error-focus.test.ts F2 catches exactly that. */}
-        {/* TWO TIERS, and the second one appears only after the first is
-            answered (2026-08-10). Six spheres is what a CLIENT should have to
-            read; it is not what an EXPERT should have to call themselves. A
-            designer picking „ტექნოლოგია და პროდუქტი" is filed under a name that
-            is not what they do — so once a sphere is chosen, the sub-fields
-            absorbed into it appear beneath it and can be picked instead.
-            Whichever chip is chosen FIRST becomes the specialty, and either
-            answer lands somewhere real: a sub-field still shows up under its
-            sphere in browse (the count folds), and it also has a page of its
-            own. Nothing is lost by being precise.
-            No heading, on purpose — a second tier that appears under the chip
-            you just pressed does not need a sentence to explain it. */}
-        <div data-field="cats" className="flex flex-col gap-2">
+        {/* TWO TIERS (2026-08-10, reworked 08-11). Six spheres is what a
+            CLIENT should have to read; it is not what an EXPERT should have to
+            call themselves — a designer's only answer would otherwise be
+            „ტექნოლოგია და პროდუქტი".
+
+            The first attempt put the sub-fields in a bare indented row under
+            the whole chip wall. Chips wrap, so that row landed nowhere near the
+            sphere it belonged to: „გაყიდვები" appeared alone at the bottom
+            while its parent sat two rows up, reading as a stray seventh option.
+            A relationship you cannot see is not a hierarchy. Hence a panel that
+            NAMES its sphere — the name is data, not a caption to write.
+
+            Being precise costs nothing: a sub-field's experts fold up into its
+            sphere for the count and the filter, and it has a page of its own. */}
+        <div data-field="cats" className="flex flex-col gap-2.5">
           <div className="flex flex-wrap gap-1.5">
             {SPHERES.map(s => {
-              const on = cats.includes(s.name)
+              const on = sphereOn(s)
               return (
                 <button
                   key={s.name}
                   type="button"
-                  onClick={() => toggle(s.name)}
+                  onClick={() => pickSphere(s)}
                   className={`h-9 px-3.5 rounded-pill border font-display text-small font-semibold tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] ${
                     on ? 'bg-brand-600 text-white border-brand-500 shadow-sm' : 'bg-white text-ink-700 border-ink-200 hover:border-ink-400'
                   }`}
@@ -168,24 +200,27 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
               )
             })}
           </div>
-          {SPHERES.filter(s => cats.includes(s.name) && s.children.length > 0).map(s => (
-            <div key={s.name} className="flex flex-wrap gap-1.5 pl-3 border-l-2 border-ink-100">
-              {s.children.map(k => {
-                const on = cats.includes(k)
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => toggle(k)}
-                    className={`h-8 px-3 rounded-pill border font-display text-meta font-semibold inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] ${
-                      on ? 'bg-brand-50 text-brand-800 border-brand-300' : 'bg-white text-ink-600 border-ink-200 hover:border-ink-400'
-                    }`}
-                  >
-                    {on && <Icon.check className="w-3 h-3" />}
-                    {k}
-                  </button>
-                )
-              })}
+          {SPHERES.filter(s => sphereOn(s) && s.children.length > 0).map(s => (
+            <div key={s.name} className="rounded-btn border border-ink-200 bg-ink-50/70 px-3 py-2.5">
+              <div className="font-display text-micro font-semibold uppercase text-ink-500 mb-2">{s.name}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {s.children.map(k => {
+                  const on = cats.includes(k)
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => pickChild(s, k)}
+                      className={`h-8 px-3 rounded-pill border font-display text-small font-semibold inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] ${
+                        on ? 'bg-brand-600 text-white border-brand-500' : 'bg-white text-ink-700 border-ink-200 hover:border-ink-400'
+                      }`}
+                    >
+                      {on && <Icon.check className="w-3 h-3" />}
+                      {k}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           ))}
         </div>

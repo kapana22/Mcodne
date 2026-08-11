@@ -250,7 +250,14 @@ export default function TutorProfilePage() {
         if (cancelled) return
         setMe(meRes?.user ?? null)
         setFullNameInput(meRes?.user?.fullName ?? '')
-        setCategories(Array.isArray(catRes) ? catRes : (catRes?.items ?? []))
+        // Browsable only, plus whatever they already hold (the <select> adds
+        // that itself). The endpoint also serves the not-yet-advertised spheres
+        // so the APPLICATION can offer them — but that is a request an admin
+        // approves. Letting an expert move themselves into one would take them
+        // off the site with no warning, and PATCH /api/me/tutor refuses it, so
+        // offering it here would only produce a 400 they cannot explain.
+        const cats = Array.isArray(catRes) ? catRes : (catRes?.items ?? [])
+        setCategories(cats.filter((c: any) => c?.browsable !== false))
         const p = tRes?.profile ?? null
         setProfile(p)
         if (p) {

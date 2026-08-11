@@ -91,8 +91,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // A sub-field still surfaces under its sphere in browse, because the count
     // and the filter fold; the rule is lib/categoryTree's, once.
     const liveCats = await prisma.category.findMany({
-      where: BROWSABLE_CATEGORY,
-      select: { id: true, slug: true, name: true, defaultServiceType: true },
+      where: { OR: [BROWSABLE_CATEGORY, { status: 'HIDDEN' }] },
+      select: { id: true, slug: true, name: true, status: true, defaultServiceType: true },
     })
     const nrm = (s: string) => s.toLowerCase().trim()
     const sp = nrm(app.specialty || '')
@@ -120,6 +120,24 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
     const chosenCat = overrideCat ?? matchedCat
     const resolvedCategoryId = chosenCat?.id
+
+    // A sphere is HIDDEN because it has no expert yet — that is the whole
+    // reason. Approving one into it makes the reason false, so the sphere comes
+    // back into view here rather than waiting for somebody to notice. Leaving
+    // it hidden would publish an expert nobody can find: the same activation
+    // lapse that killed 46% of booking attempts on 2026-08-03, arriving by a
+    // new door. `isLive` is written alongside `status`, as everywhere.
+    if (chosenCat?.status === 'HIDDEN') {
+      await prisma.category.update({
+        where: { id: chosenCat.id },
+        data: { status: 'VISIBLE', isLive: true },
+      })
+      await audit(admin.id, 'category.show', {
+        targetType: 'Category',
+        targetId: chosenCat.id,
+        meta: { name: chosenCat.name, reason: 'first approved expert' },
+      })
+    }
 
     // Carry the languages the applicant selected (stored in professionData as
     // free-text tags like „ქართული · მშობლიური") into the structured

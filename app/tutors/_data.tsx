@@ -23,6 +23,9 @@ export type LiveCat = {
   slug: string
   name: string
   expertCount?: number
+  /** False for a sphere that has no expert yet and is not advertised. Browse
+   *  MUST drop these — the application offers them so somebody can be first. */
+  browsable?: boolean
   /** Sub-fields folded into this sphere. NOT rendered as browse chips — a
    *  client picks a sphere, and its count already includes these. They exist
    *  for the screens where an expert describes themselves. */
