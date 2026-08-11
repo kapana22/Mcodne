@@ -26,7 +26,7 @@ import { B2B_VISIBILITY, PAYMENTS_LIVE, type B2BVisibility } from '../lib/flags'
 import {
   B2B_ROUTE, canSeeB2B, b2bVisibleTo, b2bFeatureExists,
   paymentSourceOf, isBalancePaid, canSpendBalance,
-  BusinessLeadInput, businessLeadRow,
+  BusinessLeadInput, businessLeadRow, servicePriceLabel, groupByDirection,
 } from '../lib/b2b'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -661,4 +661,54 @@ test('the company detail endpoint returns every field the panel reads', () => {
   }
   // The two that actually broke, pinned by name so the reason survives.
   assert.match(route, /_count: \{ select: \{ members: true, transactions: true \} \}/)
+})
+
+/* ═══════════ 6. the service catalogue ══════════════════════════════════ */
+
+test('the catalogue endpoint carries both gates, like every other admin route', () => {
+  const src = codeOf('app/api/admin/b2b-services/route.ts')
+  assert.match(src, /canSeeB2B\(/)
+  assert.match(src, /requireRoleApi\('ADMIN'\)/)
+  assert.ok(src.indexOf('canSeeB2B') < src.indexOf("requireRoleApi('ADMIN')"))
+})
+
+test('a retired service never deletes the requests it produced', () => {
+  // The requests are the record of who asked for what. A CASCADE here would
+  // erase that history the first time somebody tidied the price list — so the
+  // FK is SET NULL, in BOTH places the DDL lives.
+  for (const f of ['lib/dbBoot.ts', 'prisma/manual-migrations/2026-08-11-b2b-services/up.sql']) {
+    assert.match(read(f), /"BusinessLead_serviceId_fkey"\s+FOREIGN KEY \("serviceId"\) REFERENCES "B2BService"\("id"\) ON DELETE SET NULL/, f)
+  }
+  assert.match(read('prisma/schema.prisma'), /service\s+B2BService\? @relation\(fields: \[serviceId\], references: \[id\], onDelete: SetNull\)/)
+})
+
+test('the requested service is verified against the catalogue, never trusted', () => {
+  // A crafted POST must not be able to attach an enquiry to a hidden service —
+  // or to a string that is not a service at all.
+  const src = codeOf('app/api/business/lead/route.ts')
+  assert.match(src, /b2BService\.findFirst\(\{[\s\S]*?where: \{ id: wantedId, visible: true \}/)
+  // …and an unknown id is DROPPED, not rejected: a stale bookmark must not cost
+  // us the enquiry.
+  assert.match(src, /serviceId: service\?\.id \?\? null/)
+})
+
+test('the price label is decided in one place', () => {
+  // The page and the admin list both show a price, and „ფასი შეთანხმებით" is a
+  // price too. Two copies of that rule is how one surface starts showing 0₾.
+  assert.equal(servicePriceLabel({ priceGel: 800, priceOnRequest: false }), '800₾')
+  assert.equal(servicePriceLabel({ priceGel: 1500, priceOnRequest: false }), '1,500₾')
+  assert.equal(servicePriceLabel({ priceGel: 0, priceOnRequest: true }), 'ფასი შეთანხმებით')
+  assert.equal(servicePriceLabel({ priceGel: 800, priceOnRequest: true }), 'ფასი შეთანხმებით',
+    'priceOnRequest must win over a stored number')
+})
+
+test('services group by direction and keep their order', () => {
+  const rows = [
+    { direction: 'იურიდიული', order: 2, id: 'b' },
+    { direction: 'ფინანსური', order: 0, id: 'c' },
+    { direction: 'იურიდიული', order: 1, id: 'a' },
+  ]
+  const grouped = groupByDirection(rows)
+  assert.deepEqual(grouped.map(([d]) => d), ['იურიდიული', 'ფინანსური'])
+  assert.deepEqual(grouped[0][1].map(r => r.id), ['a', 'b'], 'order is not respected inside a direction')
 })

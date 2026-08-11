@@ -644,6 +644,41 @@ async function runMigrations() {
     )
   }
 
+  // ── B2B services: the fixed-price catalogue (2026-08-11) ───────────────
+  // The product is the SERVICE, not the expert — see the model comment in
+  // schema.prisma. Additive: one new table and three nullable columns on
+  // BusinessLead, no existing column touched.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "B2BService" (
+      "id"             TEXT NOT NULL,
+      "direction"      TEXT NOT NULL,
+      "title"          TEXT NOT NULL,
+      "description"    TEXT,
+      "priceGel"       INTEGER NOT NULL,
+      "priceOnRequest" BOOLEAN NOT NULL DEFAULT false,
+      "order"          INTEGER NOT NULL DEFAULT 0,
+      "visible"        BOOLEAN NOT NULL DEFAULT true,
+      "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"      TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "B2BService_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "B2BService_price_nonnegative" CHECK ("priceGel" >= 0)
+    );
+  `)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "B2BService_visible_direction_order_idx" ON "B2BService"("visible", "direction", "order");`)
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "BusinessLead"
+      ADD COLUMN IF NOT EXISTS "serviceId"   TEXT,
+      ADD COLUMN IF NOT EXISTS "agreedPrice" INTEGER,
+      ADD COLUMN IF NOT EXISTS "adminNote"   TEXT;
+  `)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BusinessLead_serviceId_idx" ON "BusinessLead"("serviceId");`)
+  // SET NULL, not CASCADE: retiring a service must never delete the requests it
+  // produced — those are the record of who asked for what.
+  await prisma.$executeRawUnsafe(
+    `DO $$ BEGIN ALTER TABLE "BusinessLead" ADD CONSTRAINT "BusinessLead_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "B2BService"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  )
+
   // Booking.paidBy — NULLABLE, NO DEFAULT, NO BACKFILL, and that is the point.
   // `null` is what every booking that already exists says, and it MEANS 'CARD'
   // (read it through paymentSourceOf() in lib/b2b.ts, never directly). A

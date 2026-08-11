@@ -196,6 +196,12 @@ export const BusinessLeadInput = z.object({
   email: z.string().trim().email().max(200),
   interest: z.string().trim().max(200).optional().or(z.literal('')),
   message: z.string().trim().max(4000).optional().or(z.literal('')),
+  // Which service card they came from. Optional: the general form at the bottom
+  // of the page still exists, and a request that names no service is a real
+  // enquiry rather than a malformed one. Validity of the id is the server's
+  // business — an unknown one is dropped rather than rejected, for the same
+  // reason a malformed alternate never costs a booking.
+  serviceId: z.string().trim().max(40).optional().or(z.literal('')),
 })
 export type BusinessLeadInput = z.infer<typeof BusinessLeadInput>
 
@@ -223,4 +229,17 @@ export function businessLeadRow(input: BusinessLeadInput) {
     interest: blank(input.interest),
     message: blank(input.message),
   }
+}
+
+/** Services grouped by direction, in the order the page renders them. */
+export function groupByDirection<T extends { direction: string; order: number }>(rows: T[]) {
+  const out = new Map<string, T[]>()
+  for (const r of rows) out.set(r.direction, [...(out.get(r.direction) ?? []), r])
+  for (const list of out.values()) list.sort((a, b) => a.order - b.order)
+  return [...out.entries()]
+}
+
+/** „800₾" or „ფასი შეთანხმებით" — one place, so the page and the admin agree. */
+export function servicePriceLabel(s: { priceGel: number; priceOnRequest: boolean }): string {
+  return s.priceOnRequest ? 'ფასი შეთანხმებით' : `${s.priceGel.toLocaleString('en-US')}₾`
 }

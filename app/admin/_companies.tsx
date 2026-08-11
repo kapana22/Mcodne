@@ -37,6 +37,12 @@ type Lead = {
   id: string; companyName: string; taxId: string | null; contactName: string
   phone: string; email: string; interest: string | null; message: string | null
   status: 'NEW' | 'CONTACTED' | 'CLOSED'; createdAt: string
+  service: { id: string; direction: string; title: string } | null
+}
+type Service = {
+  id: string; direction: string; title: string; description: string | null
+  priceGel: number; priceOnRequest: boolean; order: number; visible: boolean
+  _count: { requests: number }
 }
 
 const GEL = (n: number) => `${n.toLocaleString('en-US')}₾`
@@ -379,6 +385,11 @@ function LeadsView({ onCount, onChanged }: { onCount: (n: number) => void; onCha
                 {l.contactName} · {l.phone} · {l.email}
                 {l.taxId && ` · ს/კ ${l.taxId}`}
               </div>
+              {l.service && (
+                <div className="mt-1.5 inline-flex items-center h-6 px-2 rounded-pill border border-brand-200 text-brand-700 text-micro font-display font-semibold uppercase">
+                  {l.service.direction} · {l.service.title}
+                </div>
+              )}
               {l.interest && <div className="mt-1 text-small text-ink-700">{l.interest}</div>}
               {l.message && <div className="mt-1 text-small text-ink-600 whitespace-pre-wrap">{l.message}</div>}
               <div className="mt-1 text-meta text-ink-400">{fmtKaDateTime(new Date(l.createdAt))}</div>
@@ -402,9 +413,114 @@ function LeadsView({ onCount, onChanged }: { onCount: (n: number) => void; onCha
   )
 }
 
+/* ───── Services — the price list a company reads on /business ───── */
+
+function ServicesView() {
+  const [list, setList] = useState<Service[] | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [draft, setDraft] = useState({ direction: '', title: '', description: '', priceGel: '', priceOnRequest: false })
+
+  const load = useCallback(async () => {
+    setErr(null)
+    try {
+      const r = await fetch('/api/admin/b2b-services', { cache: 'no-store' })
+      const j = await r.json()
+      if (!r.ok || !j.ok) throw new Error(j?.error)
+      setList(j.services)
+    } catch (e: any) { setErr(errText(e?.message)) }
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  const act = async (fn: () => Promise<unknown>) => {
+    setBusy(true); setErr(null)
+    try { await fn(); await load() }
+    catch (e: any) { setErr(errText(e?.message)) }
+    finally { setBusy(false) }
+  }
+
+  if (err && !list) return <AdminError message={err} onRetry={load} />
+  if (!list) return <AdminLoading />
+
+  const price = Number(draft.priceGel || 0)
+  const canAdd = draft.direction.trim().length >= 2 && draft.title.trim().length >= 2
+    && Number.isInteger(price) && price >= 0 && !busy
+
+  return (
+    <div className="space-y-5">
+      <SectionCard
+        eyebrow="ახალი"
+        title="სერვისის დამატება"
+        sub="მიმართულება არის სათაური, რომლის ქვეშაც სერვისი /business-ზე დგება — მაგ. „იურიდიული“."
+      >
+        <div className="grid sm:grid-cols-2 gap-3">
+          <input value={draft.direction} onChange={e => setDraft(d => ({ ...d, direction: e.target.value }))}
+            className={INPUT} placeholder="მიმართულება — მაგ. იურიდიული" />
+          <input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
+            className={INPUT} placeholder="სერვისი — მაგ. სამართლებრივი აუდიტი" />
+          <input value={draft.description} onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
+            className={`${INPUT} sm:col-span-2`} placeholder="აღწერა (არასავალდებულო)" />
+          <div className="flex items-center gap-3">
+            <input type="number" min={0} step={1} inputMode="numeric" disabled={draft.priceOnRequest}
+              value={draft.priceGel} onChange={e => setDraft(d => ({ ...d, priceGel: e.target.value }))}
+              className={`${INPUT} disabled:opacity-40`} placeholder="ფასი ₾" />
+            <label className="flex items-center gap-2 shrink-0 text-small text-ink-700 cursor-pointer">
+              <input type="checkbox" checked={draft.priceOnRequest}
+                onChange={e => setDraft(d => ({ ...d, priceOnRequest: e.target.checked }))}
+                className="w-4 h-4 rounded accent-brand-600" />
+              შეთანხმებით
+            </label>
+          </div>
+          <Btn disabled={!canAdd} aria-busy={busy} onClick={() => act(async () => {
+            await post('/api/admin/b2b-services', {
+              direction: draft.direction.trim(), title: draft.title.trim(),
+              description: draft.description.trim(),
+              priceGel: draft.priceOnRequest ? 0 : price,
+              priceOnRequest: draft.priceOnRequest,
+            })
+            setDraft({ direction: '', title: '', description: '', priceGel: '', priceOnRequest: false })
+          })}>
+            {busy ? 'ემატება…' : 'დამატება'}
+          </Btn>
+        </div>
+        {err && <div role="alert" className="mt-3 text-small text-danger-700">{err}</div>}
+      </SectionCard>
+
+      {list.length === 0
+        ? <AdminEmpty text="სერვისი ჯერ არ დამატებულა — გვერდზე მხოლოდ ფორმა ჩანს." />
+        : (
+          <RowList>
+            {list.map(s => (
+              <div key={s.id} className="px-4 py-3.5 flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="font-display text-small font-semibold text-ink-900 truncate">
+                    {s.title}
+                    {!s.visible && <span className="ml-2 text-micro uppercase text-ink-400">დამალული</span>}
+                  </div>
+                  <div className="text-meta text-ink-500 truncate">
+                    {s.direction}
+                    {s._count.requests > 0 && ` · ${s._count.requests} მოთხოვნა`}
+                  </div>
+                </div>
+                <div className="font-display text-body font-bold text-ink-900 tabular-nums shrink-0">
+                  {s.priceOnRequest ? 'შეთანხმებით' : `${s.priceGel.toLocaleString('en-US')}₾`}
+                </div>
+                <button type="button" disabled={busy}
+                  onClick={() => act(() => post('/api/admin/b2b-services', { id: s.id, visible: !s.visible }, 'PATCH'))}
+                  className="h-9 px-3 rounded-btn text-small font-display font-semibold text-ink-700 border border-ink-200 hover:bg-ink-50 transition-colors duration-fast shrink-0">
+                  {s.visible ? 'დამალვა' : 'გამოჩენა'}
+                </button>
+              </div>
+            ))}
+          </RowList>
+        )}
+    </div>
+  )
+}
+
 /* ───── The tab ───── */
 
-type Sub = 'leads' | 'companies'
+type Sub = 'leads' | 'services' | 'companies'
 
 export function CompaniesSection({ onLeadsChanged }: { onLeadsChanged?: () => void } = {}) {
   const [sub, setSub] = useState<Sub>('leads')
@@ -445,12 +561,15 @@ export function CompaniesSection({ onLeadsChanged }: { onLeadsChanged?: () => vo
           onChange={setSub}
           tabs={[
             { id: 'leads', label: 'განაცხადები', count: openLeads },
+            { id: 'services', label: 'სერვისები' },
             { id: 'companies', label: 'კომპანიები' },
           ]}
         />
       </div>
       <div className="mt-6">
-        {sub === 'leads' ? <LeadsView onCount={setOpenLeads} onChanged={onLeadsChanged} /> : <CompaniesView />}
+        {sub === 'leads' && <LeadsView onCount={setOpenLeads} onChanged={onLeadsChanged} />}
+        {sub === 'services' && <ServicesView />}
+        {sub === 'companies' && <CompaniesView />}
       </div>
     </div>
   )

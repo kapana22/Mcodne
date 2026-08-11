@@ -61,6 +61,18 @@ export async function POST(req: Request) {
   }
   const row = businessLeadRow(parsed.data)
 
+  // The service they asked for, VERIFIED against the catalogue rather than
+  // trusted. An unknown or hidden id is dropped to null rather than rejected:
+  // a stale bookmark must not cost us the enquiry, and „they asked for
+  // something" is still worth more than a 400.
+  const wantedId = (parsed.data.serviceId ?? '').trim()
+  const service = wantedId
+    ? await prisma.b2BService.findFirst({
+        where: { id: wantedId, visible: true },
+        select: { id: true, title: true, direction: true },
+      }).catch(() => null)
+    : null
+
   // BusinessLead is a dbBoot-created table — make sure the boot DDL has run on
   // this process before the first enquiry touches it. Idempotent and already
   // resolved after the first call, so it costs nothing on a warm process.
@@ -70,7 +82,7 @@ export async function POST(req: Request) {
   // failed and can send again — which is the honest outcome, because nothing
   // was recorded.
   const lead = await prisma.businessLead.create({
-    data: row,
+    data: { ...row, serviceId: service?.id ?? null },
     select: { id: true },
   })
 
@@ -88,6 +100,10 @@ export async function POST(req: Request) {
         ['ტელეფონი', row.phone],
         ['ელფოსტა', row.email],
         ['მიმართულება', row.interest],
+        // Named first-class in the notification: „which service" is the one
+        // thing that decides who the owner assigns, and burying it under the
+        // free-text fields would mean opening the panel to find out.
+        ['სერვისი', service ? `${service.direction} · ${service.title}` : null],
       ]
       const html = `
         <div style="font-family:sans-serif;line-height:1.6;color:#181B20">

@@ -1032,6 +1032,50 @@ model CompanyTransaction {
   @@index([bookingId])
 }
 
+// A service we sell to companies, at a fixed price.  2026-08-11
+//
+// THE PRODUCT IS THE SERVICE, NOT THE EXPERT — and that is the whole difference
+// from the rest of this platform. On /tutors a client picks a person and books
+// their hour; here a company buys „იურიდიული აუდიტი — 800₾" and WE decide who
+// delivers it. That choice happens off the platform entirely: the owner agrees
+// it by phone or mail and assigns somebody they already know. There is
+// deliberately NO expert field on this model and no assignment flow — modelling
+// a decision that is made in a conversation would only produce a column nobody
+// keeps up to date.
+//
+// No booking, no calendar, no escrow. A request arrives, the owner agrees a
+// price, and the invoice happens outside this system.
+model B2BService {
+  id       String @id @default(cuid())
+  // The heading it sits under on /business („იურიდიული", „ფინანსური").
+  // Free text and NOT a Category FK on purpose: the sphere taxonomy describes
+  // what EXPERTS do and is admin-edited for the public catalogue. Borrowing it
+  // here would tie a B2B price list to a rename made for a different reason.
+  direction   String
+  title       String
+  description String?
+  // Lari, like every other price in this database. This is the number a company
+  // reads on the page — the one actually invoiced may differ after a
+  // conversation, which is what BusinessLead.agreedPrice records.
+  priceGel    Int
+  // „ფასი შეთანხმებით" — shown instead of the number when true, for work that
+  // cannot honestly carry a fixed figure. priceGel stays as the internal
+  // estimate so the list can still be ordered and reasoned about.
+  priceOnRequest Boolean @default(false)
+  order       Int     @default(0)
+  // Hidden services keep their row and their history; they simply leave the
+  // page. Nothing here is ever deleted — a request may still point at it.
+  visible     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  requests BusinessLead[]
+
+  // The page reads: visible services, grouped by direction, in order.
+  @@index([visible, direction, order])
+}
+
 // An inbound enquiry from /business. NOT a Company — nobody is a customer until
 // an admin says so, and a form anyone can post must never create a billable
 // entity. Converting a lead into a Company is a deliberate admin action.
@@ -1047,8 +1091,27 @@ model BusinessLead {
   interest    String?
   message     String?
   status      BusinessLeadStatus @default(NEW)
+  // Which service they asked for, when they came through a service card rather
+  // than the general form at the bottom of the page. Nullable because the
+  // general form still exists and because every lead created before 2026-08-11
+  // predates the catalogue.
+  //
+  // SetNull, not Cascade: a retired service must never take the requests it
+  // generated with it — those are the record of who asked for what.
+  serviceId   String?
+  service     B2BService? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  // What the owner actually agreed after talking to them, in lari. The price on
+  // the card is the advertised one; this is the real one, and the two are
+  // deliberately separate — editing the catalogue must not rewrite a deal that
+  // was already struck.
+  agreedPrice Int?
+  // The owner's own notes on the deal: invoice number, what was promised, who
+  // it was handed to. Free text because the process it describes lives in a
+  // conversation, not in this system.
+  adminNote   String?
   createdAt   DateTime           @default(now())
 
   // The admin queue: unhandled first, newest first.
   @@index([status, createdAt])
+  @@index([serviceId])
 }

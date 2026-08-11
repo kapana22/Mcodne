@@ -14,10 +14,11 @@
 // worse outcome than a little duplication, and a shared <Field> abstraction is
 // a decision for whoever needs the third one.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PhoneInput } from '@/components/PhoneInput'
 import { Btn } from '@/components/Btn'
-import { BusinessLeadInput } from '@/lib/b2b'
+import { BusinessLeadInput, servicePriceLabel } from '@/lib/b2b'
+import type { PublicService } from './BusinessLanding'
 
 type Status = 'idle' | 'sending' | 'ok' | 'error'
 
@@ -42,10 +43,30 @@ const Label = ({ children, optional }: { children: React.ReactNode; optional?: b
   </span>
 )
 
-export function LeadForm() {
+export function LeadForm({ services = [] }: { services?: PublicService[] }) {
   const [form, setForm] = useState({
     companyName: '', taxId: '', contactName: '', phone: '', email: '', interest: '', message: '',
+    serviceId: '',
   })
+
+  // A „მოთხოვნა" button on a service card is an anchor to #form-<id>. Reading
+  // the hash here is what turns that jump into a PRESELECTION — otherwise the
+  // person lands on a form that has forgotten which card they came from and has
+  // to say it again in free text.
+  //
+  // Hash and not a query string: a query would reload the server component and
+  // lose the scroll position, for a choice that is purely about this form.
+  useEffect(() => {
+    const apply = () => {
+      const m = window.location.hash.match(/^#form-(.+)$/)
+      if (m && services.some(s => s.id === m[1])) {
+        setForm(f => ({ ...f, serviceId: m[1] }))
+      }
+    }
+    apply()
+    window.addEventListener('hashchange', apply)
+    return () => window.removeEventListener('hashchange', apply)
+  }, [services])
   const [status, setStatus] = useState<Status>('idle')
   const [errorText, setErrorText] = useState<string | null>(null)
 
@@ -84,7 +105,7 @@ export function LeadForm() {
         return
       }
       setStatus('ok')
-      setForm({ companyName: '', taxId: '', contactName: '', phone: '', email: '', interest: '', message: '' })
+      setForm({ companyName: '', taxId: '', contactName: '', phone: '', email: '', interest: '', message: '', serviceId: '' })
     } catch {
       setStatus('error')
       setErrorText('დაფიქსირდა შეცდომა — სცადეთ თავიდან.')
@@ -144,6 +165,24 @@ export function LeadForm() {
             className={INPUT} placeholder="you@company.ge"
           />
         </label>
+        {services.length > 0 && (
+          <label className="block sm:col-span-2">
+            <Label optional>სერვისი</Label>
+            <select
+              value={form.serviceId}
+              onChange={e => set('serviceId')(e.target.value)}
+              className={INPUT}
+            >
+              <option value="">— აირჩიეთ (არასავალდებულო) —</option>
+              {services.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.direction} · {s.title} — {servicePriceLabel(s)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <label className="block sm:col-span-2">
           <Label optional>რომელი მიმართულება</Label>
           {/* Free text, NOT a list of the site's spheres. The taxonomy is

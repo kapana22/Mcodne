@@ -34,6 +34,10 @@ export async function GET() {
     // is (status, createdAt), so this is the read it was built for.
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
     take: 500,
+    // The service they asked for, named on the row. „Which service" is the one
+    // thing that decides who the owner assigns, so it must be readable without
+    // opening anything.
+    include: { service: { select: { id: true, direction: true, title: true } } },
   })
   const open = leads.filter(l => l.status === 'NEW').length
   return NextResponse.json({ ok: true, leads, open })
