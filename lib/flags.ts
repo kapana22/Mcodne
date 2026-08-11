@@ -170,4 +170,4 @@ export const ABROAD_EUR_PER_GEL = 0.33
 // at call sites, and do not add an env var beside it — one switch, or the next
 // person adds a third.
 export type B2BVisibility = 'off' | 'admin' | 'public'
-export const B2B_VISIBILITY: B2BVisibility = 'off'
+export const B2B_VISIBILITY: B2BVisibility = 'admin'
