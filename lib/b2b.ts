@@ -70,6 +70,36 @@ export function canSeeB2B(role: string | null | undefined): boolean {
 }
 
 /**
+ * May THIS PERSON spend a balance they are a member of?
+ *
+ * ⚠️ NOT `canSeeB2B`, and the difference is the whole reason this function
+ * exists. It was `canSeeB2B` and the feature was unusable — found by driving
+ * the real flow end-to-end against production, 2026-08-11:
+ *
+ *   at stage 'admin', canSeeB2B('STUDENT') is false, so an employee could not
+ *   spend their company's balance … and canSeeB2B('ADMIN') is true but
+ *   POST /api/bookings refuses role ADMIN outright. There was NO account that
+ *   could complete the flow. The booking silently fell back to card, which is
+ *   worse than an error: the balance was never charged and nothing said so.
+ *
+ * The fix is not another stage. It is noticing that MEMBERSHIP IS ITSELF THE
+ * ALLOWLIST — an admin adds a named person to a named company by hand, and
+ * nobody else has anything to spend. Gating that on the rollout stage asks the
+ * same question twice and gets a wrong answer the second time.
+ *
+ * So the stage gates what it is for — who may SEE the vertical: the landing
+ * page, the admin tab, the admin APIs. Spending is gated by being a member,
+ * which is checked where it must be anyway: claimed inside the booking
+ * transaction, against the database.
+ *
+ * A non-member calling a member-facing endpoint learns nothing either way —
+ * they get „you have no company", which is true for them at every stage.
+ */
+export function canSpendAsMember(): boolean {
+  return b2bFeatureExists()
+}
+
+/**
  * True when this deployment knows the feature exists at all.
  *
  * Separate from canSeeB2B on purpose, and it is NOT „canSeeB2B for admins".

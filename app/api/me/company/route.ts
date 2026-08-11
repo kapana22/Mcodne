@@ -12,11 +12,15 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { canSeeB2B } from '@/lib/b2b'
+import { canSpendAsMember } from '@/lib/b2b'
 
 export async function GET() {
   const user = await getCurrentUser()
-  if (!canSeeB2B(user?.role)) {
+  // canSpendAsMember, NOT canSeeB2B — see the long note on that function. The
+  // rollout stage gates who may SEE the vertical; spending is gated by being a
+  // member, which is an allowlist an admin maintains by hand. Gating this on
+  // the stage made the feature unusable at every stage it is ever in.
+  if (!canSpendAsMember()) {
     return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
   }
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })

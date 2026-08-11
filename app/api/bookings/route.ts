@@ -8,7 +8,7 @@ import { stripTutorBlobs } from '@/lib/stripTutorBlobs'
 import { isStartOpen } from '@/lib/availability'
 import { FEATURE_REQUEST_BOOKING } from '@/lib/flags'
 import { isAbroadCategory } from '@/lib/abroad'
-import { canSeeB2B } from '@/lib/b2b'
+import { canSpendAsMember } from '@/lib/b2b'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { sendMail } from '@/lib/mailer'
 import { bookingRequestEmail, bookingChangedEmail, fmtWhenTz } from '@/lib/emailTemplates'
@@ -74,7 +74,7 @@ const Body = z.object({
   // same terms as `proposed`.
   proposedAlternates: z.array(z.string().datetime()).max(2).optional(),
   // B2B (2026-08-11): spend the client's company balance instead of paying by
-  // card. Ignored entirely unless canSeeB2B() AND the client is actually a
+  // card. Ignored entirely unless the vertical exists AND the client is a
   // member of an ACTIVE company with enough on it — an older or hostile client
   // cannot use it to book for free, because nothing about this field is
   // trusted: membership, price and balance are all re-read server-side inside
@@ -291,10 +291,16 @@ export async function POST(req: Request) {
   // charge below and the row that records it cannot disagree about which kind
   // of payment this was.
   //
-  // The FLAG and the request must BOTH say yes. Membership is not checked here
-  // on purpose — it is claimed inside the transaction, because a membership
-  // read out here is a check-before-write and this one guards real money.
-  const wantsBalance = canSeeB2B(user.role) && parsed.data.paidBy === 'COMPANY_BALANCE'
+  // `canSpendAsMember()` and NOT `canSeeB2B(user.role)` — see the long note on
+  // that function. Gating this on the viewer's ROLE made the feature impossible
+  // to use at the 'admin' stage: an employee is a STUDENT (refused) and an
+  // ADMIN cannot book at all (refused above). The booking then fell through to
+  // card silently, charging nothing and saying nothing.
+  //
+  // Membership is not checked here on purpose — it is claimed inside the
+  // transaction, because a membership read out here is a check-before-write and
+  // this one guards real money.
+  const wantsBalance = canSpendAsMember() && parsed.data.paidBy === 'COMPANY_BALANCE'
 
   class SlotTaken extends Error {}
   class StudentOverlap extends Error {}

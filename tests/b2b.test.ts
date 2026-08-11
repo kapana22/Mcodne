@@ -49,12 +49,23 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
  * explaining it, which makes source-text assertions unusually easy to satisfy
  * by accident. Strip first, then assert.
  */
+/* ⚠️ LINE COMMENTS COME OFF FIRST, AND THE ORDER IS THE WHOLE FUNCTION.
+ *
+ * The first version stripped block comments first and destroyed 465 lines of
+ * app/api/bookings/route.ts: line 129 of that file is a LINE comment reading
+ * „the /student/* surfaces…", so the block-comment regex opened at that `/*`
+ * and closed at the next real `*​/` four hundred lines later. Every assertion
+ * built on it then matched nothing — which surfaced as a confusing failure on
+ * an assertion whose subject was in fact correct.
+ *
+ * Line-first cannot have that failure: a `/*` inside a `//` line is gone before
+ * the block pass ever runs. */
 const codeOf = (p: string) =>
   read(p)
-    .replace(/\/\*[\s\S]*?\*\//g, '')   // block comments
     .split('\n')
     .filter(l => !/^\s*\/\//.test(l) && !/^import\b/.test(l))
     .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
 
 /* ═══════════ 1. it ships dark ══════════════════════════════════════════ */
 
@@ -455,8 +466,20 @@ test('the charge uses the SERVER price and re-reads membership', () => {
   // Nothing about the request is trusted. `price` is derived above from the
   // consultation row or the expert's rate — a client that sends price 0 and
   // paidBy COMPANY_BALANCE must still be charged the real amount.
-  const src = read('app/api/bookings/route.ts')
-  assert.match(src, /const wantsBalance = canSeeB2B\(user\.role\) && parsed\.data\.paidBy === 'COMPANY_BALANCE'/)
+  //
+  // codeOf, not read — the FOURTH time in this file that a comment satisfied an
+  // assertion meant for code. The note in the route explaining why the gate is
+  // NOT canSeeB2B(user.role) contains that exact string, so the negative
+  // assertion below failed against prose while the code was already correct.
+  const src = codeOf('app/api/bookings/route.ts')
+  // canSpendAsMember(), NOT canSeeB2B(user.role). Pinned as the exact
+  // expression because the difference is what made the feature work at all:
+  // gating the CHARGE on the rollout stage left no account able to use it —
+  // an employee is a STUDENT (refused by the stage) and an ADMIN cannot book
+  // (refused by this route). Found by driving the real flow, not by reading.
+  assert.match(src, /const wantsBalance = canSpendAsMember\(\) && parsed\.data\.paidBy === 'COMPANY_BALANCE'/)
+  assert.doesNotMatch(src, /canSeeB2B\(user\.role\)/,
+    'the charge is gated on the viewer role again — no account can complete the flow')
   assert.match(src, /amount: price/, 'the ledger records a client-supplied amount')
   assert.match(src, /companyMember\.findFirst/, 'membership is not re-read server-side')
   // The status term: a frozen company may receive money but never spend it.
