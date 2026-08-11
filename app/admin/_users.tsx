@@ -219,12 +219,12 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
               {tab === 'profile' && (
                 <div className="px-6 py-5 space-y-5">
                   <div className="grid sm:grid-cols-2 gap-3">
-                    <Stat label="რეგისტრაცია" value={fmtShort(u.createdAt)} />
-                    <Stat label="ტელეფონი" value={u.phone ?? '—'} />
-                    <Stat label="მიმოწერები" value={String(u._count.sentMessages)} />
-                    <Stat label="ჯავშნები (სტუდენტი)" value={String(u._count.bookingsAsStudent)} />
-                    <Stat label="დაწერილი შეფასებები" value={String(u._count.reviewsGiven)} />
-                    <Stat label="ფავორიტები" value={String(u._count.favorites)} />
+                    <Field label="რეგისტრაცია" value={fmtShort(u.createdAt)} />
+                    <Field label="ტელეფონი" value={u.phone ?? '—'} />
+                    <Field label="მიმოწერები" value={String(u._count.sentMessages)} />
+                    <Field label="ჯავშნები (სტუდენტი)" value={String(u._count.bookingsAsStudent)} />
+                    <Field label="დაწერილი შეფასებები" value={String(u._count.reviewsGiven)} />
+                    <Field label="ფავორიტები" value={String(u._count.favorites)} />
                   </div>
                   {u.bio && (
                     <div>
@@ -602,7 +602,10 @@ const PackagesToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
   )
 }
 
-const Stat = ({ label, value }: { label: string; value: string }) => (
+// A compact detail FIELD inside the user drawer — deliberately not the panel's
+// <Stat> KPI tile (./_parts), which it used to share a name with in the same
+// folder. One word for two different things is how the wrong one gets imported.
+const Field = ({ label, value }: { label: string; value: string }) => (
   <div className="rounded-card border border-ink-200 bg-ink-50/40 p-3">
     <div className="font-display text-micro font-semibold uppercase text-ink-500">{label}</div>
     <div className="mt-1 font-display text-body-lg font-bold text-ink-900 tabular-nums truncate">{value}</div>

@@ -1,11 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { ExpertsAttentionSection } from './_expertsAttention'
 import Link from 'next/link'
 import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
 import { fmtKaDateTime } from '@/lib/kaDate'
-import { TabHeader } from './_parts'
+import { AdminError, AdminLoading, TabHeader } from './_parts'
 
 /* System health.
  *
@@ -88,11 +87,8 @@ export function SystemSection() {
       />
 
       <div className="px-6 lg:px-8 py-6 space-y-6">
-        {err && (
-          <div className="rounded-card border border-danger-200 p-4 text-small text-danger-700">
-            მდგომარეობა ვერ ჩაიტვირთა. <button type="button" onClick={load} className="underline underline-offset-2 font-semibold hover:text-danger-900 transition-colors duration-fast">სცადე თავიდან</button>
-          </div>
-        )}
+        {err && <AdminError message="მდგომარეობა ვერ ჩაიტვირთა." onRetry={load} />}
+        {!d && !err && <AdminLoading />}
 
         {/* ── Sweep health — the headline. A stale sweep must be impossible to miss. */}
         {s && (
@@ -160,12 +156,14 @@ export function SystemSection() {
               <Count
                 n={a.expertsWithoutAvailability} warn
                 label="ექსპერტი დროის გარეშე"
-                sub={`${a.liveExperts} ხილული ექსპერტიდან — ვინ არიან, სიაშია ქვემოთ`}
+                sub={`${a.liveExperts} ხილული ექსპერტიდან — ვინ არიან, ინსაითებშია`}
+                href="/admin#insights"
               />
               <Count
                 n={a.expertsWithoutService} warn
                 label="ექსპერტი სერვისის გარეშე"
-                sub="ჯავშნის ღილაკს გასაყიდი არაფერი აქვს — ვინ არიან, სიაშია ქვემოთ"
+                sub="ჯავშნის ღილაკს გასაყიდი არაფერი აქვს — ვინ არიან, ინსაითებშია"
+                href="/admin#insights"
               />
               <Count n={a.pendingApplications} warn label="განაცხადი მოლოდინში" sub="ელოდება მოდერაციას" href="/admin#moderation" />
               <Count n={a.bookingsAwaitingExpert} warn label="ჯავშანი უპასუხოდ" sub="ექსპერტს ჯერ არ უპასუხია" href="/admin#bookings" />
@@ -175,13 +173,13 @@ export function SystemSection() {
           </section>
         )}
 
-        {/* ── …and WHO they are. The counts above answer „is there a leak"; this
-            answers „which five", which is the only question an admin can act
-            on. Loads independently, so a slow query here never blanks the tab. */}
-        <section>
-          <div className="font-display text-micro font-semibold uppercase text-ink-900 mb-3">ვის სჭირდება ყურადღება</div>
-          <ExpertsAttentionSection />
-        </section>
+        {/* The NAMED list behind the two expert counts above used to be rendered
+            here as well. It was the same five people the „ინსაითები → ხალხი"
+            pane lists — one idea in two tabs, which meant „who needs chasing"
+            had two answers depending on which tab you opened, and the two could
+            not stay in step. This tab keeps the counts (is there a leak?); the
+            names, and the reminders already sent, live where the rest of the
+            per-person work is. */}
 
         {/* ── Config truth — each item plainly true/false with what it means. */}
         {c && (

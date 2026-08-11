@@ -4,7 +4,7 @@
 // sync, and the nav badge counts that the sidebar and top bar both read.
 
 import { useState, useEffect } from 'react'
-import { AdminSidebar, TopBar, VALID_TABS, type AdminTab } from './_nav'
+import { AdminSidebar, TopBar, VALID_TABS, TAB_ALIASES, type AdminTab } from './_nav'
 import { OverviewSection } from './_overview'
 import { ModerationSection } from './_moderation'
 import { UsersSection } from './_users'
@@ -12,7 +12,6 @@ import { BookingsSection } from './_bookings'
 import { ReviewsSection } from './_reviews'
 import { DisputesSection } from './_disputes'
 import { FinanceSection } from './_finance'
-import { AnalyticsSection } from './_analytics'
 import { BroadcastSection } from './_broadcast'
 import { CategoriesSection } from './_categories'
 import { AuditSection } from './_audit'
@@ -49,7 +48,8 @@ export default function AdminOverview() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const applyHash = () => {
-      const h = window.location.hash.replace('#', '') as AdminTab
+      const raw = window.location.hash.replace('#', '')
+      const h = (TAB_ALIASES[raw] ?? raw) as AdminTab
       if (VALID_TABS.includes(h)) setActive(h)
     }
     applyHash()
@@ -95,7 +95,6 @@ export default function AdminOverview() {
         {active === 'reviews' && <ReviewsSection />}
         {active === 'disputes' && <DisputesSection />}
         {active === 'finance' && <FinanceSection />}
-        {active === 'analytics' && <AnalyticsSection />}
         {active === 'insights' && <InsightsSection />}
         {active === 'help' && <HelpSection />}
         {active === 'broadcast' && <BroadcastSection />}

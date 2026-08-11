@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Icon } from '@/components/Icon'
+import { copyToClipboard } from '@/lib/clipboard'
 import { KA_MONTHS_SHORT_DOT } from '@/lib/kaDate'
 
 const FOCUSABLE = [
@@ -208,6 +209,166 @@ export function PeriodSwitch({ value, onChange, options = [7, 30, 90] }: {
           {n === 1 ? 'დღეს' : `${n} დღე`}
         </button>
       ))}
+    </div>
+  )
+}
+
+/**
+ * ONE stat tile. It existed three times — byte-identical in `_insights` and
+ * `_profileViews`, and a fourth shape in `_system` (`Count`). Same idea, same
+ * markup, three files to keep in step.
+ *
+ * `bad` is the only tone: a number on this panel is either neutral or it is a
+ * problem. A „good" green tier was deliberately not added — colouring healthy
+ * numbers is what makes a dashboard read as decoration.
+ */
+export function Stat({ n, label, sub, bad }: {
+  n: ReactNode; label: string; sub?: ReactNode; bad?: boolean
+}) {
+  return (
+    <div className="rounded-card border border-ink-200 bg-white p-5">
+      <div className={`font-display text-h2 font-bold tabular-nums leading-none ${bad ? 'text-danger-700' : 'text-ink-900'}`}>{n}</div>
+      <div className="font-display text-small font-semibold text-ink-900 mt-1.5">{label}</div>
+      {sub && <div className="text-meta text-ink-600 mt-0.5 leading-snug">{sub}</div>}
+    </div>
+  )
+}
+
+/**
+ * „Nothing here, and that is a fact rather than a failure." Distinct from
+ * <AdminError> on purpose — the two must never look alike (see AdminError).
+ */
+export function AdminEmpty({ text, ok = false }: { text: string; ok?: boolean }) {
+  return (
+    <div className={`rounded-card border bg-white px-5 py-6 flex items-center gap-3 ${ok ? 'border-brand-200' : 'border-ink-200'}`}>
+      {ok
+        ? <Icon.check className="w-4 h-4 text-brand-600 shrink-0" />
+        : <Icon.search className="w-4 h-4 text-ink-400 shrink-0" />}
+      <span className="text-small text-ink-600">{text}</span>
+    </div>
+  )
+}
+
+/**
+ * Copy-to-clipboard with its own confirmation. Written four times across the
+ * panel with three different labels for the same action; the confirmation
+ * timeout had drifted too. Height and label size follow the canon pairing
+ * (h-9 → text-small), which the hand-built copies did not.
+ */
+export function CopyBtn({ value, label = 'კოპირება', done = 'დაკოპირდა' }: {
+  value: string; label?: string; done?: string
+}) {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const t = window.setTimeout(() => setCopied(false), 1500)
+    return () => window.clearTimeout(t)
+  }, [copied])
+  return (
+    <button
+      type="button"
+      onClick={async () => { if (await copyToClipboard(value)) setCopied(true) }}
+      className="h-9 px-3 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display text-small font-semibold inline-flex items-center transition-colors duration-fast"
+    >
+      {copied ? done : label}
+    </button>
+  )
+}
+
+/** „Open in a new tab" — same shape as <CopyBtn>, so a row's two actions match. */
+export function OpenBtn({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="h-9 px-3 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display text-small font-semibold inline-flex items-center gap-1.5 transition-colors duration-fast"
+    >
+      <Icon.external className="w-3.5 h-3.5" /> {label}
+    </a>
+  )
+}
+
+/**
+ * SECTIONS OF ONE TAB — not a second navigation.
+ *
+ * „ინსაითები" had grown to fifteen blocks and twenty-three numbers on a single
+ * scroll, answering four unrelated questions at once. Splitting it into more
+ * sidebar entries would have made the panel bigger; this splits the PAGE while
+ * the tab stays one thing. Rendered as an underlined bar rather than filled
+ * pills so it reads as „where am I in this page", not „which page am I on" —
+ * the sidebar already owns that question.
+ *
+ * Sticky under the 64px TopBar, so switching section does not require scrolling
+ * back up. The count is the whole point of putting a badge here: you can see
+ * there are three people waiting without opening the section.
+ */
+export function SubTabs<T extends string>({ value, onChange, tabs }: {
+  value: T
+  onChange: (v: T) => void
+  tabs: { id: T; label: string; count?: number }[]
+}) {
+  return (
+    <div className="sticky top-16 z-20 bg-white border-b border-ink-100">
+      <div
+        role="tablist"
+        aria-label="სექციები"
+        className="px-6 lg:px-8 flex items-stretch gap-1 overflow-x-auto scrollbar-hide"
+      >
+        {tabs.map(t => {
+          const on = value === t.id
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => onChange(t.id)}
+              className={`relative h-12 px-3 shrink-0 inline-flex items-center gap-2 font-display text-small font-semibold transition-colors duration-fast ${
+                on ? 'text-ink-900' : 'text-ink-500 hover:text-ink-800'
+              }`}
+            >
+              {t.label}
+              {typeof t.count === 'number' && t.count > 0 && (
+                <span className={`min-w-[20px] h-5 px-1.5 rounded-pill inline-flex items-center justify-center text-meta font-bold tabular-nums ${
+                  on ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600'
+                }`}>
+                  {t.count}
+                </span>
+              )}
+              {on && <span aria-hidden className="absolute left-0 right-0 -bottom-px h-[2px] bg-ink-900 rounded-t-[2px]" />}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The heading every section on a data tab shares: eyebrow, title, one muted
+ * line. Written eleven times by hand across `_insights` alone, in two different
+ * wrappers (`<Card as="section">` and a raw `<section className="rounded-card
+ * …">`) that render the same box.
+ */
+export function SectionCard({ eyebrow, title, sub, children, className = '' }: {
+  eyebrow: string; title: string; sub?: ReactNode; children: ReactNode; className?: string
+}) {
+  return (
+    <section className={`rounded-card border border-ink-200 bg-white p-5 sm:p-6 ${className}`}>
+      <div className="font-display text-micro font-semibold uppercase text-brand-700">{eyebrow}</div>
+      <h3 className="mt-1 font-display text-h3 font-bold text-ink-900 tracking-tight">{title}</h3>
+      {sub && <p className="text-small text-ink-600 mt-1 leading-relaxed max-w-[680px]">{sub}</p>}
+      <div className="mt-5">{children}</div>
+    </section>
+  )
+}
+
+/** A bordered, hairline-divided list — the row container every named list uses. */
+export function RowList({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-card border border-ink-200 divide-y divide-ink-100 overflow-hidden bg-white">
+      {children}
     </div>
   )
 }

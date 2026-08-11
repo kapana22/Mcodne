@@ -1,12 +1,23 @@
 'use client'
-// Admin tab: მიმოხილვა — hero greeting, KPI tiles, 30-day trend.
+// Admin tab: მიმოხილვა — the dashboard. Greeting, KPI tiles, 30-day trend, and
+// the product cuts that used to be a second tab.
+//
+// ── WHY „ანალიტიკა" IS GONE (2026-08-11, owner's audit) ───────────────────
+// The two tabs rendered THE SAME THREE CHARTS from the same
+// `/api/admin/analytics/series` fetch, and their KPI rows overlapped. One of
+// them linked to the other with „სრული ანალიტიკა →", which was the tell: nobody
+// could say what was in the other tab that wasn't here, because the answer was
+// „four tiles and two lists". Those four tiles and two lists now sit under the
+// trend row, where they read as the detail behind the headline instead of a
+// second, competing dashboard. `#analytics` still resolves — page.tsx maps the
+// old hash here, so bookmarks and the sidebar's history do not break.
 
 import React, { useState, useEffect } from 'react'
 import { KA_MONTHS_LONG as KA_MONTHS } from '@/lib/kaDate'
-import { MiniChart, CHART } from './_charts'
+import { MiniChart, CHART, type SeriesData } from './_charts'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
-import type { SeriesData } from './_analytics'
+import { AdminError, Stat } from './_parts'
 
 /* ───── Hero ───── */
 // Node's built-in ICU has en-US only, so `toLocaleDateString('ka-GE', …)`
@@ -31,17 +42,18 @@ const Hero = () => {
             მიმოხილვა
           </h1>
           <p className="mt-2 text-body text-ink-600 max-w-[600px]">
-            პლატფორმის ცოცხალი ინდიკატორები. მოდერაცია, მომხმარებლები, ფინანსები და ანალიტიკა.
+            პლატფორმის ცოცხალი ინდიკატორები — მოცულობა, ზრდა და ის, რაც რიგში დგას.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button type="button" onClick={() => { window.location.hash = 'analytics' }} className="h-11 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-small inline-flex items-center gap-1.5 transition-colors duration-fast">
-            <Icon.doc className="w-3.5 h-3.5" /> ანალიტიკა
-          </button>
-          <button type="button" onClick={() => { window.location.hash = 'moderation' }} className="h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body inline-flex items-center gap-2 transition-colors duration-fast">
-            <Icon.bolt className="w-3.5 h-3.5" /> მოდერაცია
-          </button>
-        </div>
+        {/* One action, not two. „ანალიტიკა" pointed at a tab that no longer
+            exists as a separate thing; the queue is the only place a dashboard
+            should be able to send you. */}
+        <a
+          href="#moderation"
+          className="h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body inline-flex items-center gap-2 transition-colors duration-fast shrink-0"
+        >
+          <Icon.bolt className="w-3.5 h-3.5" /> მოდერაცია
+        </a>
       </div>
     </section>
   )
@@ -50,33 +62,32 @@ const Hero = () => {
 /* ───── KPI Stat ─────
    Sparklines were removed 2026-07: they rendered FABRICATED series (hardcoded
    arrays) next to real numbers — decorative fiction an admin could mistake for
-   trend data. KPI cards now show only real values from /api/admin/stats. */
-type Stat = { label: string; value: string; sub: React.ReactNode; cat: string }
+   trend data. KPI cards now show only real values from /api/admin/stats.
+   The „№ 01" counter went the same way 2026-08-11: it numbered four cards that
+   have no order, and it was the first thing the eye hit on every one of them. */
+type Kpi = { label: string; value: string; sub: React.ReactNode; cat: string }
 
 // Skeleton card definitions — labels/categories only; values start blank ('—')
 // and are only ever filled from the real /api/admin/stats response.
-const STAT_DEFS: Pick<Stat, 'cat' | 'label'>[] = [
+const STAT_DEFS: Pick<Kpi, 'cat' | 'label'>[] = [
   { cat: 'მოცულობა · სულ', label: 'ჯავშანი პლატფორმაზე' },
   { cat: 'ფინანსები', label: 'GMV სულ' },
   { cat: 'რიგი', label: 'მოლოდინში (განაცხადი)' },
   { cat: 'აქტიური', label: 'მომხმარებელი / ექსპერტი' },
 ]
 
-const StatCard = ({ s, idx }: { s: Stat; idx: number }) => (
-  <div className="relative p-5 rounded-card bg-white border border-ink-200 hover:border-ink-300 transition-colors duration-fast">
-    <div className="flex items-baseline justify-between gap-2">
-      <Eyebrow as="span" tone="muted" aria-hidden className="tabular-nums">№ {String(idx + 1).padStart(2, '0')}</Eyebrow>
-      <Eyebrow as="span" tone="muted" className="truncate">{s.cat}</Eyebrow>
-    </div>
-    <Eyebrow tone="muted" className="mt-4">{s.label}</Eyebrow>
+const KpiCard = ({ s }: { s: Kpi }) => (
+  <div className="p-5 rounded-card bg-white border border-ink-200 hover:border-ink-300 transition-colors duration-fast">
+    <Eyebrow as="span" tone="muted" className="truncate block">{s.cat}</Eyebrow>
+    <Eyebrow tone="muted" className="mt-3">{s.label}</Eyebrow>
     <div className="mt-1 font-display text-display font-bold text-ink-900 tracking-tight tabular-nums leading-none">{s.value}</div>
     <div className="mt-4 pt-3 border-t border-ink-100 text-meta text-ink-600 leading-snug">{s.sub}</div>
   </div>
 )
 
-const Stats = () => {
-  const PLACEHOLDER: Stat[] = STAT_DEFS.map(s => ({ ...s, value: '—', sub: <span className="text-ink-400">—</span> }))
-  const [live, setLive] = useState<Stat[] | null>(null)
+const Kpis = () => {
+  const PLACEHOLDER: Kpi[] = STAT_DEFS.map(s => ({ ...s, value: '—', sub: <span className="text-ink-400">—</span> }))
+  const [live, setLive] = useState<Kpi[] | null>(null)
   useEffect(() => {
     let cancelled = false
     fetch('/api/admin/stats', { cache: 'no-store' })
@@ -96,29 +107,101 @@ const Stats = () => {
   return (
     <section className="px-6 lg:px-8 mt-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {(live ?? PLACEHOLDER).map((s, i) => <StatCard key={i} s={s} idx={i} />)}
+        {(live ?? PLACEHOLDER).map((s, i) => <KpiCard key={i} s={s} />)}
       </div>
     </section>
   )
 }
 
-/* ───── Section: Overview (default) — real Stats + a jump to moderation ───── */
-// Compact 30-day trend row for the overview — the dashboard's first impression.
-const OverviewTrends = () => {
+/* ───── The product cuts (formerly the „ანალიტიკა" tab) ───── */
+type AnalyticsData = {
+  users: { total: number; students: number; new7d: number; new30d: number }
+  tutors: { total: number }
+  bookings: { total: number; new7d: number }
+  reviews: { total: number; avgRating: number }
+  activationPct: number
+  activatedStudents: number
+}
+
+const Divider = ({ label }: { label: string }) => (
+  <div className="flex items-center gap-3 mb-3">
+    <span className="text-micro font-bold text-ink-500 uppercase shrink-0">{label}</span>
+    <div className="flex-1 h-px bg-ink-100" />
+  </div>
+)
+
+const ListRow = ({ label, value, tone }: { label: string; value: React.ReactNode; tone?: 'brand' | 'success' }) => (
+  <li className="flex items-center justify-between">
+    <span className="text-ink-700">{label}</span>
+    <span className={`font-display font-bold tabular-nums ${tone === 'brand' ? 'text-brand-700' : tone === 'success' ? 'text-success-700' : 'text-ink-900'}`}>{value}</span>
+  </li>
+)
+
+const Product = () => {
   const [s, setS] = useState<SeriesData | null>(null)
-  useEffect(() => { fetch('/api/admin/analytics/series', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(setS).catch(() => {}) }, [])
-  if (!s) return null
+  const [data, setData] = useState<AnalyticsData | null>(null)
+  const [err, setErr] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/admin/analytics/series', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(setS).catch(() => {})
+    // A non-2xx has to surface, not silently hold every number at „—“.
+    fetch('/api/admin/analytics', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('analytics')))
+      .then(setData)
+      .catch(() => setErr(true))
+  }, [])
+
   return (
-    <section className="px-6 lg:px-8 mt-8">
-      <div className="flex items-center gap-3 mb-3">
-        <span className="text-micro font-bold text-ink-500 uppercase shrink-0">ბოლო 30 დღე</span>
-        <a href="#analytics" className="text-meta font-semibold text-brand-700 hover:underline shrink-0">სრული ანალიტიკა →</a>
-        <div className="flex-1 h-px bg-ink-100" />
-      </div>
-      <div className="grid md:grid-cols-3 gap-3">
-        <MiniChart title="ახალი ანგარიშები" data={s.signups} labels={s.days} kind="area" color={CHART.brand} />
-        <MiniChart title="ჯავშნები" data={s.bookings} labels={s.days} kind="area" color={CHART.ink} />
-        <MiniChart title="შემოსავალი" data={s.revenue} labels={s.days} kind="bar" color={CHART.brand} format={(n) => `₾${n}`} />
+    <section className="px-6 lg:px-8 mt-8 space-y-6">
+      {err && <AdminError message="ანალიტიკა ვერ ჩაიტვირთა." />}
+
+      {s && (
+        <div>
+          <Divider label="ბოლო 30 დღე" />
+          <div className="grid md:grid-cols-3 gap-3">
+            <MiniChart title="ახალი ანგარიშები" data={s.signups} labels={s.days} kind="area" color={CHART.brand} />
+            <MiniChart title="ჯავშნები" data={s.bookings} labels={s.days} kind="area" color={CHART.ink} />
+            <MiniChart title="შემოსავალი" data={s.revenue} labels={s.days} kind="bar" color={CHART.brand} format={(n) => `₾${n}`} />
+          </div>
+        </div>
+      )}
+
+      <div>
+        <Divider label="პროდუქტი" />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Stat
+            n={data ? `${data.activationPct}%` : '—'}
+            label="აქტივაცია"
+            sub={data ? `${data.activatedStudents} სტუდენტმა დაჯავშნა` : undefined}
+          />
+          <Stat n={data ? data.users.new7d : '—'} label="ახალი ანგარიში" sub="ბოლო 7 დღეში" />
+          <Stat n={data ? data.bookings.new7d : '—'} label="ახალი ჯავშანი" sub="ბოლო 7 დღეში" />
+          <Stat
+            n={data ? data.reviews.avgRating.toFixed(2) : '—'}
+            label="საშ. შეფასება"
+            sub={data ? `${data.reviews.total} შეფასების საშუალო` : undefined}
+          />
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-3 mt-3">
+          <div className="p-5 rounded-card border border-ink-200 bg-white">
+            <Eyebrow tone="muted" className="mb-3">მომხმარებლების ბაზა</Eyebrow>
+            <ul className="space-y-2 text-small">
+              <ListRow label="სულ" value={data?.users.total ?? '—'} />
+              <ListRow label="სტუდენტი" value={data?.users.students ?? '—'} />
+              <ListRow label="ექსპერტი" value={data?.tutors.total ?? '—'} />
+              <ListRow label="30 დღეში ახალი" value={data?.users.new30d ?? '—'} tone="brand" />
+            </ul>
+          </div>
+          <div className="p-5 rounded-card border border-ink-200 bg-white">
+            <Eyebrow tone="muted" className="mb-3">აქტივობა</Eyebrow>
+            <ul className="space-y-2 text-small">
+              <ListRow label="სულ ჯავშნები" value={data?.bookings.total ?? '—'} />
+              <ListRow label="სულ შეფასებები" value={data?.reviews.total ?? '—'} />
+              <ListRow label="აქტიური სტუდენტი" value={data?.activatedStudents ?? '—'} tone="success" />
+            </ul>
+          </div>
+        </div>
       </div>
     </section>
   )
@@ -127,8 +210,8 @@ const OverviewTrends = () => {
 export const OverviewSection = () => (
   <>
     <Hero />
-    <Stats />
-    <OverviewTrends />
+    <Kpis />
+    <Product />
     <section className="px-6 lg:px-8 mt-8 pb-12">
       <div className="rounded-card border border-ink-200 bg-white p-6 flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -136,11 +219,10 @@ export const OverviewSection = () => (
           <h3 className="font-display text-h3 font-bold text-ink-900">ექსპერტების განაცხადები</h3>
           <p className="text-small text-ink-500 mt-1">დაამტკიცე, უარყავი და მართე ახალი ექსპერტის მოთხოვნები.</p>
         </div>
-        <a href="#moderation" className="h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body inline-flex items-center gap-2">
+        <a href="#moderation" className="h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body inline-flex items-center gap-2 transition-colors duration-fast">
           მოდერაცია
         </a>
       </div>
     </section>
   </>
 )
-

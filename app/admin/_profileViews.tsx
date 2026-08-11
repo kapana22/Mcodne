@@ -1,10 +1,9 @@
 'use client'
-import { AdminLoading } from './_parts'
+import { AdminEmpty, AdminError, AdminLoading, CopyBtn, OpenBtn, Stat } from './_parts'
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { Avatar } from '@/components/Avatar'
 import { fmtKaDateTime } from '@/lib/kaDate'
-import { copyToClipboard } from '@/lib/clipboard'
 
 /* WHO LOOKED, AND DID THEY BOOK.
  *
@@ -53,14 +52,6 @@ const ratePct = (a: number, b: number): string => {
   return p < 1 ? '<1%' : `${Math.round(p)}%`
 }
 
-const Stat = ({ n, label, sub, bad }: { n: string; label: string; sub: string; bad?: boolean }) => (
-  <div className="rounded-card border border-ink-200 bg-white p-5">
-    <div className={`font-display text-h2 font-bold tabular-nums leading-none ${bad ? 'text-danger-700' : 'text-ink-900'}`}>{n}</div>
-    <div className="font-display text-small font-semibold text-ink-900 mt-1.5">{label}</div>
-    <div className="text-meta text-ink-600 mt-0.5 leading-snug">{sub}</div>
-  </div>
-)
-
 /** Why this expert cannot take a booking, in the fewest words that still say
  *  what to do. Nothing at all when they are bookable — a green „ok" badge on
  *  every healthy row is noise that hides the three that matter. */
@@ -79,7 +70,6 @@ const Blocker = ({ e }: { e: Expert }) => {
 }
 
 const ViewerRow = ({ v }: { v: Viewer }) => {
-  const [copied, setCopied] = useState(false)
   return (
     <div className="py-2.5 px-4 border-b border-ink-100 last:border-0 flex items-center gap-3 flex-wrap">
       <div className="min-w-0 flex-1">
@@ -101,13 +91,7 @@ const ViewerRow = ({ v }: { v: Viewer }) => {
           დაბრუნდა, არ დაჯავშნა
         </span>
       ) : null}
-      <button
-        type="button"
-        onClick={async () => { if (await copyToClipboard(v.email)) { setCopied(true); setTimeout(() => setCopied(false), 1500) } }}
-        className="h-9 px-3 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display text-meta font-semibold inline-flex items-center transition-colors duration-fast shrink-0"
-      >
-        {copied ? 'დაკოპირდა' : 'ელფოსტა'}
-      </button>
+      <span className="shrink-0"><CopyBtn value={v.email} label="ელფოსტა" /></span>
     </div>
   )
 }
@@ -149,27 +133,17 @@ export function ProfileViewsSection({ days }: { days: number }) {
     }
   }
 
-  if (err) {
-    return (
-      <div className="rounded-card border border-danger-200 p-4 text-small text-danger-700">
-        პროფილების ნახვები ვერ ჩაიტვირთა.
-      </div>
-    )
-  }
-  if (!d) {
-    return <div className="rounded-card border border-ink-200 bg-white px-5 py-6 text-small text-ink-600">{busy ? 'იტვირთება…' : '—'}</div>
-  }
+  if (err) return <AdminError message="პროფილების ნახვები ვერ ჩაიტვირთა." />
+  if (!d) return <AdminLoading />
   if (d.experts.length === 0) {
-    return (
-      <div className="rounded-card border border-ink-200 bg-white px-5 py-6 flex items-center gap-3">
-        <Icon.eye className="w-4 h-4 text-ink-400 shrink-0" />
-        <span className="text-small text-ink-600">ბოლო {d.days} დღეში პროფილი არავის უნახავს.</span>
-      </div>
-    )
+    return <AdminEmpty text={`ბოლო ${d.days} დღეში პროფილი არავის უნახავს.`} />
   }
 
   return (
-    <div className="space-y-4">
+    /* While a period change is in flight the OLD numbers are still on screen.
+       Left alone they read as this period's answer, which is a lie for as long
+       as the query takes; dimmed + aria-busy they read as „being replaced". */
+    <div className={`space-y-4 ${busy ? 'opacity-60 transition-opacity duration-fast' : ''}`} aria-busy={busy || undefined}>
       <div className="grid gap-3 sm:grid-cols-4">
         <Stat n={String(d.totals.views)} label="პროფილის ნახვა" sub={`ბოლო ${d.days} დღეში`} />
         <Stat n={String(d.totals.bookings)} label="ჯავშანი" sub="იმავე პერიოდში" />
@@ -244,19 +218,9 @@ export function ProfileViewsSection({ days }: { days: number }) {
                       )}
                       {e.slug && (
                         <div className="px-4 py-2.5 border-t border-ink-100">
-                          {/* A plain <a>, not <Btn href>: Btn's prop type is
-                              button-shaped, so `target` is not assignable even
-                              though it renders a Link. Opening in a new tab
-                              matters here — the admin is mid-review and must
-                              not lose the expanded row. */}
-                          <a
-                            href={`/tutors/${e.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="h-9 px-3 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display text-meta font-semibold inline-flex items-center gap-1.5 transition-colors duration-fast"
-                          >
-                            <Icon.external className="w-3.5 h-3.5" /> პროფილის ნახვა
-                          </a>
+                          {/* Opens in a new tab on purpose — the admin is
+                              mid-review and must not lose the expanded row. */}
+                          <OpenBtn href={`/tutors/${e.slug}`} label="პროფილის ნახვა" />
                         </div>
                       )}
                     </>

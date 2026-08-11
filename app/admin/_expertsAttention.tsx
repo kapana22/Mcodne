@@ -1,9 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Icon } from '@/components/Icon'
 import { Avatar } from '@/components/Avatar'
 import { fmtKaDateTime } from '@/lib/kaDate'
-import { copyToClipboard } from '@/lib/clipboard'
+import { AdminEmpty, AdminError, AdminLoading, CopyBtn, OpenBtn } from './_parts'
 
 /* WHO is unbookable — the named list behind the count.
  *
@@ -27,7 +26,6 @@ type Data = { days: number; total: number; lostViews: number; neverNudged: numbe
 const daysSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
 
 const Row = ({ e }: { e: Item }) => {
-  const [copied, setCopied] = useState(false)
   const label = e.blocker === 'service' ? 'სერვისი არ აქვს' : 'თავისუფალი დრო არ აქვს'
   return (
     <div className="py-3 px-4 sm:px-5 border-b border-ink-100 last:border-0 flex items-center gap-3 flex-wrap">
@@ -51,25 +49,8 @@ const Row = ({ e }: { e: Item }) => {
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        {e.slug && (
-          <a
-            href={`/tutors/${e.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-9 px-3 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display text-meta font-semibold inline-flex items-center gap-1.5 transition-colors duration-fast"
-          >
-            <Icon.external className="w-3.5 h-3.5" /> პროფილი
-          </a>
-        )}
-        {e.email && (
-          <button
-            type="button"
-            onClick={async () => { if (await copyToClipboard(e.email!)) { setCopied(true); setTimeout(() => setCopied(false), 1500) } }}
-            className="h-9 px-3 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 text-ink-700 font-display text-meta font-semibold inline-flex items-center transition-colors duration-fast"
-          >
-            {copied ? 'დაკოპირდა' : 'ელფოსტა'}
-          </button>
-        )}
+        {e.slug && <OpenBtn href={`/tutors/${e.slug}`} label="პროფილი" />}
+        {e.email && <CopyBtn value={e.email} label="ელფოსტა" />}
       </div>
     </div>
   )
@@ -90,39 +71,26 @@ export function ExpertsAttentionSection() {
     return () => { alive = false }
   }, [])
 
-  if (err) {
-    return (
-      <div className="rounded-card border border-danger-200 p-4 text-small text-danger-700">
-        სია ვერ ჩაიტვირთა.
-      </div>
-    )
-  }
-  if (!d) return <div className="rounded-card border border-ink-200 bg-white px-5 py-6 text-small text-ink-600">იტვირთება…</div>
+  if (err) return <AdminError message="სია ვერ ჩაიტვირთა." />
+  if (!d) return <AdminLoading />
 
   if (d.items.length === 0) {
-    return (
-      <div className="rounded-card border border-brand-200 bg-white px-5 py-6 flex items-center gap-3">
-        <Icon.check className="w-4 h-4 text-brand-600 shrink-0" />
-        <span className="text-small text-ink-700">ყველა გამოქვეყნებული ექსპერტი დაჯავშნადია.</span>
-      </div>
-    )
+    return <AdminEmpty ok text="ყველა გამოქვეყნებული ექსპერტი დაჯავშნადია." />
   }
 
   return (
-    <div className="rounded-card border border-ink-200 bg-white overflow-hidden">
-      <div className="px-4 sm:px-5 py-3 border-b border-ink-100">
-        <div className="font-display text-small font-bold text-ink-900">
-          {d.items.length} ექსპერტი ვერ იღებს ჯავშანს
-        </div>
-        <div className="text-meta text-ink-600 mt-0.5 leading-snug">
-          {d.liveExperts} დაჯავშნადიდან · ბოლო {d.days} დღეში <b className="text-ink-900">{d.lostViews}</b> ნახვა მოხვდა ჩიხში
-          {d.neverNudged > 0 && <> · <span className="text-warning-800 font-semibold">{d.neverNudged}-ს შეხსენება ჯერ არ მიუღია</span></>}
-        </div>
+    <>
+      <div className="text-small text-ink-700 leading-snug mb-3">
+        <b className="font-display text-ink-900">{d.items.length}</b> ექსპერტი {d.liveExperts} დაჯავშნადიდან · ბოლო {d.days} დღეში{' '}
+        <b className="font-display text-ink-900">{d.lostViews}</b> ნახვა მოხვდა ჩიხში
+        {d.neverNudged > 0 && <> · <span className="text-warning-800 font-semibold">{d.neverNudged}-ს შეხსენება ჯერ არ მიუღია</span></>}
       </div>
-      {d.items.map(e => <Row key={e.tutorProfileId} e={e} />)}
-      <div className="px-4 sm:px-5 py-2.5 border-t border-ink-100 text-meta text-ink-500 leading-snug">
+      <div className="rounded-card border border-ink-200 bg-white overflow-hidden">
+        {d.items.map(e => <Row key={e.tutorProfileId} e={e} />)}
+      </div>
+      <p className="mt-2.5 text-meta text-ink-500 leading-snug">
         შეხსენება ავტომატურად იგზავნება — სერვისზე სამჯერ (1, 4, 14 დღე), დროზე კი ორ კვირაში ერთხელ, სანამ პროფილი გამოქვეყნებულია. 22:00–08:00 არ იგზავნება.
-      </div>
-    </div>
+      </p>
+    </>
   )
 }

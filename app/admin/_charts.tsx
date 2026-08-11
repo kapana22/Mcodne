@@ -29,6 +29,12 @@ export const CHART = {
   ink: '#1D1B15',
 } as const
 
+/** The 30-day series every trend row on this panel reads. Declared here, beside
+ *  the component that draws it — it used to live in `_analytics.tsx`, which made
+ *  the overview tab import a type from a sibling tab it had nothing else to do
+ *  with, and kept that file alive purely as a type holder. */
+export type SeriesData = { days: string[]; signups: number[]; bookings: number[]; revenue: number[] }
+
 type Props = {
   title: string
   data: number[]

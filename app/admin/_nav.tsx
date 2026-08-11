@@ -14,7 +14,19 @@ const Logo = () => (
 )
 
 /* ───── Admin shell — sidebar + top bar ───── */
-export type AdminTab = 'system' | 'insights' | 'help' | 'overview' | 'moderation' | 'users' | 'bookings' | 'reviews' | 'disputes' | 'finance' | 'analytics' | 'broadcast' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit'
+export type AdminTab = 'system' | 'insights' | 'help' | 'overview' | 'moderation' | 'users' | 'bookings' | 'reviews' | 'disputes' | 'finance' | 'broadcast' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit'
+
+/**
+ * Hashes that no longer name a tab, and where they now go.
+ *
+ * A deep link is a promise: somebody bookmarked `/admin#analytics`, and the
+ * browser's own history will keep offering it. Retiring a tab without this map
+ * turns that link into a silent no-op — the panel opens on the default tab and
+ * nothing says why.
+ */
+export const TAB_ALIASES: Record<string, AdminTab> = {
+  analytics: 'overview',
+}
 
 /**
  * THE ONE NAV SOURCE — id, Georgian label, icon and group, in one place.
@@ -64,8 +76,11 @@ const ADMIN_NAV: NavItem[] = [
   // rail it became unfindable. It belongs with the other things you WRITE.
   { id: 'integrations', l: 'კოდი და ანალიტიკა', icon: 'bolt', g: 'content' },
 
+  // „ანალიტიკა" was removed 2026-08-11: it rendered the same three charts from
+  // the same fetch as „მიმოხილვა" and linked to it, so the two were one tab
+  // wearing two names. Its unique content moved into the overview; the id stays
+  // on AdminTab and page.tsx maps `#analytics` there, so old links still land.
   { id: 'overview',   l: 'მიმოხილვა', icon: 'home', g: 'signals' },
-  { id: 'analytics',  l: 'ანალიტიკა', icon: 'graph', g: 'signals' },
   { id: 'insights',   l: 'ინსაითები', icon: 'pulse', g: 'signals' },
   { id: 'finance',    l: 'ფინანსები', icon: 'wallet', g: 'signals' },
 
