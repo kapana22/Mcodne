@@ -21,6 +21,7 @@ import { IntegrationsSection } from './_integrations'
 import { SystemSection } from './_system'
 import { InsightsSection } from './_insights'
 import { HelpSection } from './_help'
+import { CompaniesSection } from './_companies'
 
 /* ───── Impersonation banner ─────
    Polls the /status endpoint (a cheap read of the impersonation cookie, no DB
@@ -91,6 +92,10 @@ export default function AdminOverview() {
         {active === 'overview' && <OverviewSection />}
         {active === 'moderation' && <ModerationSection onDecision={() => setStatsTick(t => t + 1)} />}
         {active === 'users' && <UsersSection />}
+        {/* B2B. Unreachable while the vertical is off: `companies` is filtered
+            out of ADMIN_NAV, and VALID_TABS is derived from it, so `active` can
+            never hold this value. Its APIs are gated independently. */}
+        {active === 'companies' && <CompaniesSection />}
         {active === 'bookings' && <BookingsSection />}
         {active === 'reviews' && <ReviewsSection />}
         {active === 'disputes' && <DisputesSection />}

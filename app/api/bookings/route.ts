@@ -8,6 +8,7 @@ import { stripTutorBlobs } from '@/lib/stripTutorBlobs'
 import { isStartOpen } from '@/lib/availability'
 import { FEATURE_REQUEST_BOOKING } from '@/lib/flags'
 import { isAbroadCategory } from '@/lib/abroad'
+import { canSeeB2B } from '@/lib/b2b'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { sendMail } from '@/lib/mailer'
 import { bookingRequestEmail, bookingChangedEmail, fmtWhenTz } from '@/lib/emailTemplates'
@@ -72,6 +73,13 @@ const Body = z.object({
   // never anything but extra options, and at most two of them. Ignored on the
   // same terms as `proposed`.
   proposedAlternates: z.array(z.string().datetime()).max(2).optional(),
+  // B2B (2026-08-11): spend the client's company balance instead of paying by
+  // card. Ignored entirely unless canSeeB2B() AND the client is actually a
+  // member of an ACTIVE company with enough on it — an older or hostile client
+  // cannot use it to book for free, because nothing about this field is
+  // trusted: membership, price and balance are all re-read server-side inside
+  // the transaction below.
+  paidBy: z.enum(['CARD', 'COMPANY_BALANCE']).optional(),
 })
 
 export async function GET() {
@@ -279,9 +287,23 @@ export async function POST(req: Request) {
   // busy interval every later openness check subtracts. That is what lets a
   // 60-min service span two touching 30-min legacy rows, and stops a 15-min
   // service from destroying a whole 60-min row's remaining inventory.
+  // B2B: is this a balance-paid booking at all? Resolved here, once, so the
+  // charge below and the row that records it cannot disagree about which kind
+  // of payment this was.
+  //
+  // The FLAG and the request must BOTH say yes. Membership is not checked here
+  // on purpose — it is claimed inside the transaction, because a membership
+  // read out here is a check-before-write and this one guards real money.
+  const wantsBalance = canSeeB2B(user.role) && parsed.data.paidBy === 'COMPANY_BALANCE'
+
   class SlotTaken extends Error {}
   class StudentOverlap extends Error {}
   class NoAvailability extends Error {}
+  // B2B failures. Distinct classes for the same reason the three above are:
+  // „your company has no money" and „that time is taken" are different verdicts
+  // and the client says different things about them.
+  class NotCompanyMember extends Error {}
+  class InsufficientBalance extends Error {}
   let booking: {
     id: string
     ref: string
@@ -375,6 +397,52 @@ export async function POST(req: Request) {
         throw new SlotTaken()
       }
 
+      // ── The company charge ────────────────────────────────────────────────
+      // INSIDE this transaction, and after every availability verdict above, so
+      // a balance is never spent on a booking that then fails to be created.
+      // If anything below throws — including a Postgres serialization failure
+      // that runSerializable retries — the decrement rolls back with it, which
+      // is why the retry cannot double-charge.
+      //
+      // The membership is CLAIMED, not checked: `updateMany` with the whole
+      // condition in its WHERE, and `count !== 1` meaning somebody else won.
+      // A read-then-write here loses to the client's second tab and to an admin
+      // adjusting the same balance, and losing means an overdraw — real money.
+      // Same rule as app/api/bookings/[id]/cancel, and the database CHECK
+      // (balance >= 0) sits underneath it as a backstop.
+      let chargedCompanyId: string | null = null
+      let balanceAfter = 0
+      if (wantsBalance) {
+        // Membership is read here only to name the company for the claim below;
+        // the claim itself re-states every condition, so this read being stale
+        // cannot authorise anything.
+        const membership = await tx.companyMember.findFirst({
+          where: { userId: user.id },
+          select: { companyId: true },
+        })
+        if (!membership) throw new NotCompanyMember()
+
+        const claimed = await tx.company.updateMany({
+          where: {
+            id: membership.companyId,
+            // A frozen company may receive money but may not spend it.
+            status: 'ACTIVE',
+            // `price` is the SERVER's number — derived above from the
+            // consultation row or the expert's rate, never from the request.
+            balance: { gte: price },
+          },
+          data: { balance: { decrement: price } },
+        })
+        if (claimed.count !== 1) throw new InsufficientBalance()
+
+        const after = await tx.company.findUniqueOrThrow({
+          where: { id: membership.companyId },
+          select: { balance: true },
+        })
+        chargedCompanyId = membership.companyId
+        balanceAfter = after.balance
+      }
+
       const created = await tx.booking.create({
         data: {
           studentId: user.id,
@@ -385,6 +453,10 @@ export async function POST(req: Request) {
           durationMin,
           price,
           studentNotes,
+          // Only ever written when a balance was actually charged. An ordinary
+          // booking leaves this null, which `paymentSourceOf()` reads as CARD —
+          // the same value every booking made before this feature existed has.
+          ...(chargedCompanyId ? { paidBy: 'COMPANY_BALANCE' as const } : {}),
           // PREPARING already means „waiting for the expert to answer", which is
           // exactly what a request is — so a proposal needs no new status and
           // no new answer flow. Only its ORIGIN differs, recorded below.
@@ -411,6 +483,30 @@ export async function POST(req: Request) {
           alternates.length ? JSON.stringify(alternates.map(startAt => ({ startAt }))) : null,
         )
       }
+
+      // The ledger row, in the SAME transaction as the decrement and the
+      // booking. The number and the row that explains it are written together
+      // or not at all — a balance that moved with nothing recording why is the
+      // one state this feature must never reach.
+      //
+      // `bookingId` is a plain column with no FK (see schema.prisma), so this
+      // row survives the booking being deleted. It has to: the money was spent.
+      if (chargedCompanyId) {
+        await tx.companyTransaction.create({
+          data: {
+            companyId: chargedCompanyId,
+            type: 'CHARGE',
+            amount: price,
+            balanceAfter,
+            bookingId: created.id,
+            // No actorId — nobody at the company did this by hand; the booking
+            // flow did. A null here is the difference between „an admin took
+            // money off" and „a session was booked".
+            actorId: null,
+            note: topic.slice(0, 300),
+          },
+        })
+      }
       return created
     }, { isolationLevel: 'Serializable' })
 
@@ -425,6 +521,15 @@ export async function POST(req: Request) {
     }
     if (e instanceof NoAvailability) {
       return NextResponse.json({ ok: false, error: 'NO_AVAILABILITY' }, { status: 409 })
+    }
+    // B2B. Both are 409 — the request was well-formed and the state refused it,
+    // which is the same shape as SLOT_TAKEN. Nothing was created and nothing
+    // was charged: the whole transaction rolled back.
+    if (e instanceof NotCompanyMember) {
+      return NextResponse.json({ ok: false, error: 'NOT_COMPANY_MEMBER' }, { status: 409 })
+    }
+    if (e instanceof InsufficientBalance) {
+      return NextResponse.json({ ok: false, error: 'INSUFFICIENT_BALANCE' }, { status: 409 })
     }
     // P2034 after MAX_TX_ATTEMPTS retries (see runSerializable). Reaching here
     // means the transaction could not be serialized three times running, which

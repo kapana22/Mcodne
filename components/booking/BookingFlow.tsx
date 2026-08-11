@@ -32,6 +32,9 @@ import { Calendar } from './Calendar'
 import { DayTimeline } from './DayTimeline'
 import { AbroadTzNote } from './TzLabels'
 import { IntakeStep, TOPIC_OPTIONS, type DetailsState } from './IntakeStep'
+// B2B. Renders and fetches NOTHING unless the viewer is a company member — see
+// the header of ./CompanyBalance.
+import { useCompanyBalance, CompanyBalanceChoice } from './CompanyBalance'
 import { PaymentStep, INITIAL_PAYMENT, isPaymentValid, type PaymentState } from './PaymentStep'
 import { OrderSummary } from './OrderSummary'
 // Funnel instrumentation. Pure observation: nothing below changes what the flow
@@ -255,6 +258,11 @@ export const BookingFlow = ({
     goal: '',
   })
   const [payment, setPayment] = useState<PaymentState>(INITIAL_PAYMENT)
+  // B2B. `company` is null for everyone who is not a company member, which
+  // makes both of these inert: the choice renders nothing and `useBalance`
+  // never leaves false.
+  const company = useCompanyBalance(open)
+  const [useBalance, setUseBalance] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -503,6 +511,12 @@ export const BookingFlow = ({
           // request there is no such thing as an alternative time, and the
           // server drops the field on the same terms.
           proposedAlternates: proposed && altIsos.length ? altIsos : undefined,
+          // B2B. Sent ONLY when a company member ticked the box — undefined
+          // keys are dropped by JSON.stringify, so every other booking's
+          // payload is byte-for-byte what it was. The server re-reads
+          // membership, price and balance inside its transaction and ignores
+          // this field entirely unless all three agree.
+          paidBy: useBalance ? 'COMPANY_BALANCE' : undefined,
         }),
       })
       if (res.status === 401) {
@@ -531,6 +545,11 @@ export const BookingFlow = ({
           code === 'TUTOR_UNAVAILABLE' ? 'ექსპერტი პაუზაზეა — ვერ დაჯავშნი.' :
           code === 'RATE_LIMIT' ? 'ბევრი მცდელობა — სცადე ცოტა ხანში.' :
           code === 'STUDENT_OVERLAP' ? 'ამ დროს სხვა ჯავშანი გაქვს — აირჩიე სხვა.' :
+          // B2B. Both mean „the balance did not pay for this" and nothing was
+          // created — the whole transaction rolled back, so retrying without
+          // the tick books normally.
+          code === 'INSUFFICIENT_BALANCE' ? 'კომპანიის ბალანსზე საკმარისი თანხა არ არის.' :
+          code === 'NOT_COMPANY_MEMBER' ? 'კომპანიის ბალანსით გადახდა ვერ მოხერხდა.' :
           code === 'INVALID' ? 'შეავსე ყველა ველი.' :
           code === 'FORBIDDEN' ? 'ჯავშანი მხოლოდ სტუდენტს შეუძლია.' :
           // Surface the raw code when unmapped so a failure is never a silent
@@ -1125,7 +1144,20 @@ export const BookingFlow = ({
             </div>
             </div>
           ) : step === detailsStepN ? (
-            <div className="motion-safe:animate-slide-in-b"><IntakeStep value={details} onChange={setDetails} summary={summary} /></div>
+            <div className="motion-safe:animate-slide-in-b">
+              <IntakeStep value={details} onChange={setDetails} summary={summary} />
+              {/* Nothing for anybody who is not a company member: the component
+                  returns null and this is an empty node. The intake step above
+                  is untouched. */}
+              <div className="px-4 sm:px-7 lg:px-10 pb-4">
+                <CompanyBalanceChoice
+                  company={company}
+                  priceGel={priceNum}
+                  value={useBalance}
+                  onChange={setUseBalance}
+                />
+              </div>
+            </div>
           ) : (
             <div className="motion-safe:animate-slide-in-b"><PaymentStep value={payment} onChange={setPayment} summary={summary} /></div>
           )}

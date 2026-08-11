@@ -32,6 +32,30 @@ import {
 const ROOT = join(import.meta.dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 
+/**
+ * The file with its COMMENTS AND IMPORTS REMOVED.
+ *
+ * ⚠️ USE THIS FOR EVERY „X happens before Y" ASSERTION. Three separate
+ * assertions in this file were written against the raw source and were
+ * VACUOUS — each found its needle in a comment or an import line rather than
+ * in code, and each stayed green while mutation-testing deleted the very thing
+ * it was guarding:
+ *
+ *   · the admin gate-order check found `canSeeB2B` in the file header's prose;
+ *   · the same check found it in the `import` line;
+ *   · the balance-claim check matched a comment quoting `balance: { gte: … }`.
+ *
+ * The files here are heavily commented BY DESIGN and quote their own code while
+ * explaining it, which makes source-text assertions unusually easy to satisfy
+ * by accident. Strip first, then assert.
+ */
+const codeOf = (p: string) =>
+  read(p)
+    .replace(/\/\*[\s\S]*?\*\//g, '')   // block comments
+    .split('\n')
+    .filter(l => !/^\s*\/\//.test(l) && !/^import\b/.test(l))
+    .join('\n')
+
 /* ═══════════ 1. it ships dark ══════════════════════════════════════════ */
 
 test('the flag is the ONLY switch', () => {
@@ -172,7 +196,9 @@ test('the page 404s behind the gate — actually, not just in principle', () => 
 test('the API endpoint is gated too, and gated FIRST', () => {
   // The failure mode that makes „hidden" meaningless: the page 404s in the
   // browser while the endpoint behind it answers anyone with a curl command.
-  const route = read('app/api/business/lead/route.ts')
+  // Comments and imports stripped — this file's header names canSeeB2B() in
+  // prose, which made the ordering assertions below pass vacuously.
+  const route = codeOf('app/api/business/lead/route.ts')
   assert.match(route, /if \(!canSeeB2B\(me\?\.role\)\)/,
     'POST /api/business/lead does not check the gate')
   assert.match(route, /status: 404/, 'the gate must answer 404, not 403')
@@ -280,7 +306,145 @@ test('the landing renders with the gate open', () => {
   assert.ok(tree, 'the landing returned nothing')
 })
 
-/* ═══════════ 3. the money rules ════════════════════════════════════════ */
+/* ═══════════ 3. the admin surfaces ═════════════════════════════════════ */
+
+test('every admin B2B endpoint carries BOTH gates, in the right order', () => {
+  // canSeeB2B → 404 („no such endpoint here"), THEN requireRoleApi → 401/403
+  // („you are not an admin"). Two checks and not one, because at the 'public'
+  // stage they come apart: everyone may see /business, nobody but an admin may
+  // see these. And canSeeB2B first, so a non-admin learns nothing — not even
+  // that admin endpoints exist under this path.
+  const ROUTES = [
+    'app/api/admin/companies/route.ts',
+    'app/api/admin/companies/[id]/route.ts',
+    'app/api/admin/companies/[id]/balance/route.ts',
+    'app/api/admin/companies/[id]/members/route.ts',
+    'app/api/admin/business-leads/route.ts',
+  ]
+  for (const f of ROUTES) {
+    // Comments and imports stripped — see codeOf(). Without it this assertion
+    // was satisfied by the file's own header prose and passed while the two
+    // checks were swapped inside the handler.
+    const src = codeOf(f)
+    assert.match(src, /canSeeB2B\(/, `${f}: no B2B gate`)
+    assert.match(src, /requireRoleApi\('ADMIN'\)/, `${f}: no admin gate`)
+    assert.ok(
+      src.indexOf('canSeeB2B') < src.indexOf("requireRoleApi('ADMIN')"),
+      `${f}: the admin check runs before the B2B gate — a non-admin can tell the endpoint apart from a missing one`,
+    )
+    assert.match(src, /status: 404/, `${f}: the B2B gate must answer 404, not 403`)
+  }
+})
+
+test('a balance moves ONLY through the balance endpoint', () => {
+  // Every lari that has ever been on a balance must have a CompanyTransaction
+  // explaining it. Two ways that promise breaks, both checked here: an opening
+  // balance on create, and a `balance` field on the generic PATCH.
+  assert.doesNotMatch(read('app/api/admin/companies/route.ts'), /balance:\s*z\./,
+    'company creation accepts an opening balance — the first movement would have no ledger row')
+  const patch = read('app/api/admin/companies/[id]/route.ts')
+  const patchBody = patch.slice(patch.indexOf('const PatchBody'), patch.indexOf('export async function PATCH'))
+  assert.doesNotMatch(patchBody, /balance/,
+    'PATCH accepts a balance — it would move money with no transaction row')
+})
+
+test('the hand movement claims the row instead of checking it', () => {
+  // „A status check you read before the write is not a guard" (CLAUDE.md). Here
+  // losing that race overdraws real money, so the decrement carries its whole
+  // condition in the WHERE and rejects on count !== 1.
+  const src = read('app/api/admin/companies/[id]/balance/route.ts')
+  // ⚠️ Anchored to the WHOLE where-clause, not to the condition alone. The
+  // file's own comment quotes `balance: { gte: amount }` while explaining why
+  // it is there, so the looser pattern matched the PROSE — deleting the real
+  // condition from the query left this test green. Found by mutation-testing;
+  // it is the second time in this file that a comment satisfied an assertion
+  // meant for code, so treat quoted code in a comment as a hazard when writing
+  // one of these.
+  assert.match(src, /where: \{ id, balance: \{ gte: amount \} \}/, 'the decrement does not claim the row')
+  assert.match(src, /claimed\.count !== 1/)
+  // …and the number and its ledger row are written in ONE transaction, so a
+  // balance can never move with nothing recording why.
+  assert.match(src, /prisma\.\$transaction\(async tx =>/)
+  assert.ok(
+    src.indexOf('companyTransaction.create') > src.indexOf('$transaction'),
+    'the ledger row is written outside the transaction that moved the balance',
+  )
+  // balanceAfter is read back INSIDE the transaction — not computed from a
+  // value read before the write, which would record a number the balance never
+  // actually held.
+  assert.match(src, /findUniqueOrThrow\(\{\s*where: \{ id \},\s*select: \{ balance: true \}/)
+})
+
+test('the admin tab disappears with the vertical, from the SOURCE array', () => {
+  // Filtered out of ADMIN_NAV itself, not merely hidden at render — everything
+  // downstream (sidebar, mobile drawer, VALID_TABS) is derived from that array,
+  // so this is what makes /admin#companies a dead hash with the flag off
+  // rather than a tab that opens but is not drawn in the rail.
+  const nav = read('app/admin/_nav.tsx')
+  assert.match(nav, /\.filter\(it => it\.id !== 'companies' \|\| b2bFeatureExists\(\)\)/)
+  assert.match(nav, /VALID_TABS: AdminTab\[\] = ADMIN_NAV\.map/,
+    'VALID_TABS stopped being derived — the filter no longer reaches deep links')
+  // The tab id must be lowercase letters only: tests/adminNav.test.ts parses
+  // the nav with /\{ id: '([a-z]+)',\s+l: '/, so „b2b" would be invisible to
+  // every assertion in that file — including the one that stops a bad icon
+  // blanking the entire admin panel.
+  assert.match(nav, /\{ id: 'companies',\s+l: '/)
+})
+
+/* ═══════════ 4. the charge ═════════════════════════════════════════════ */
+
+test('the booking charge is inside the booking transaction', () => {
+  // If the charge sat outside, a balance could be spent on a booking that then
+  // failed to be created — and runSerializable RETRIES the transaction up to
+  // three times on P2034, so a charge outside it would double- or triple-bill.
+  const src = read('app/api/bookings/route.ts')
+  const txStart = src.indexOf('const attemptBooking = () => prisma.$transaction')
+  const txEnd = src.indexOf("{ isolationLevel: 'Serializable' }")
+  assert.ok(txStart > -1 && txEnd > txStart, 'the booking transaction moved — re-check this test')
+  const body = src.slice(txStart, txEnd)
+  assert.match(body, /company\.updateMany/, 'the charge is not inside the booking transaction')
+  assert.match(body, /companyTransaction\.create/, 'the ledger row is not inside the booking transaction')
+  assert.match(body, /balance: \{ gte: price \}/, 'the charge does not claim the row')
+})
+
+test('the charge uses the SERVER price and re-reads membership', () => {
+  // Nothing about the request is trusted. `price` is derived above from the
+  // consultation row or the expert's rate — a client that sends price 0 and
+  // paidBy COMPANY_BALANCE must still be charged the real amount.
+  const src = read('app/api/bookings/route.ts')
+  assert.match(src, /const wantsBalance = canSeeB2B\(user\.role\) && parsed\.data\.paidBy === 'COMPANY_BALANCE'/)
+  assert.match(src, /amount: price/, 'the ledger records a client-supplied amount')
+  assert.match(src, /companyMember\.findFirst/, 'membership is not re-read server-side')
+  // The status term: a frozen company may receive money but never spend it.
+  assert.match(src, /status: 'ACTIVE'/)
+})
+
+test('an ordinary booking is untouched by any of it', () => {
+  // The promise the whole stage rests on. paidBy is written ONLY when a balance
+  // was actually charged, so every other booking still stores null — which
+  // paymentSourceOf reads as CARD, the same value the entire history has.
+  const src = read('app/api/bookings/route.ts')
+  assert.match(src, /\.\.\.\(chargedCompanyId \? \{ paidBy: 'COMPANY_BALANCE' as const \} : \{\}\)/,
+    'paidBy is written unconditionally — ordinary bookings would stop reading as history')
+  // …and on the client, the key is absent rather than false: JSON.stringify
+  // drops undefined, so a non-member's payload is byte-for-byte the old one.
+  assert.match(read('components/booking/BookingFlow.tsx'),
+    /paidBy: useBalance \? 'COMPANY_BALANCE' : undefined/)
+})
+
+test('the booking sheet makes no request at all while the vertical is off', () => {
+  // Not „a request that 404s" — none. Otherwise every booking-sheet open on the
+  // site gains a network call for a feature nobody can use, which is a change
+  // to the booking path however harmless it looks.
+  const src = read('components/booking/CompanyBalance.tsx')
+  assert.match(src, /if \(!open \|\| !b2bFeatureExists\(\)\) return/)
+  // The fetch failing must never break the flow: this is an OPTIONAL payment
+  // method and its absence is exactly what every booking already does.
+  assert.match(src, /catch \{/)
+  assert.doesNotMatch(src, /setSubmitError|throw new/, 'a failed lookup surfaces an error into the booking flow')
+})
+
+/* ═══════════ 5. the money rules ════════════════════════════════════════ */
 
 test('a company balance is not a payment gateway', () => {
   // „There is a balance" and „payments are live" are different claims, and only

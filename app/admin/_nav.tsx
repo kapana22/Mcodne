@@ -5,6 +5,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { signOut } from '@/lib/signout'
 import { Icon } from '@/components/Icon'
+import { b2bFeatureExists } from '@/lib/b2b'
 
 const Logo = () => (
   <Link href="/" className="inline-flex items-center gap-2.5" aria-label="მცოდნე admin">
@@ -14,7 +15,7 @@ const Logo = () => (
 )
 
 /* ───── Admin shell — sidebar + top bar ───── */
-export type AdminTab = 'system' | 'insights' | 'help' | 'overview' | 'moderation' | 'users' | 'bookings' | 'reviews' | 'disputes' | 'finance' | 'broadcast' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit'
+export type AdminTab = 'system' | 'insights' | 'help' | 'overview' | 'moderation' | 'users' | 'bookings' | 'reviews' | 'disputes' | 'finance' | 'broadcast' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit' | 'companies'
 
 /**
  * Hashes that no longer name a tab, and where they now go.
@@ -57,7 +58,7 @@ const GROUP_LABEL: Record<NavGroup, string> = {
 
 type NavItem = { id: AdminTab; l: string; icon: keyof typeof Icon; g: NavGroup }
 
-const ADMIN_NAV: NavItem[] = [
+const ADMIN_NAV: NavItem[] = ([
   { id: 'moderation', l: 'განაცხადები', icon: 'doc', g: 'queue' },
   { id: 'bookings',   l: 'ჯავშნები', icon: 'cal', g: 'queue' },
   { id: 'help',       l: 'ჩატის კითხვები', icon: 'chat', g: 'queue' },
@@ -66,6 +67,10 @@ const ADMIN_NAV: NavItem[] = [
   { id: 'users',      l: 'მომხმარებლები', icon: 'users', g: 'people' },
   { id: 'reviews',    l: 'შეფასებები', icon: 'star', g: 'people' },
   { id: 'broadcast',  l: 'შეტყობინებები', icon: 'send', g: 'people' },
+  // B2B (2026-08-11). Filed under „ხალხი" and not „ციფრები": the tab opens on
+  // the inbound enquiry queue, and there is a person at the other end of it.
+  // The balances behind it are a ledger you open when you already know why.
+  { id: 'companies',  l: 'კომპანიები', icon: 'briefcase', g: 'people' },
 
   { id: 'texts',      l: 'ტექსტები', icon: 'quote', g: 'content' },
   { id: 'blog',       l: 'ბლოგი', icon: 'edit', g: 'content' },
@@ -86,7 +91,19 @@ const ADMIN_NAV: NavItem[] = [
 
   { id: 'system',     l: 'სისტემა', icon: 'settings', g: 'system' },
   { id: 'audit',      l: 'აუდიტი', icon: 'shield', g: 'system' },
-]
+] as NavItem[])
+  // ── The ONE line that hides a dark vertical from this panel ──────────────
+  // A tab whose feature does not exist on this deployment is filtered out of
+  // the source array itself, not merely hidden at render. That matters because
+  // everything downstream is DERIVED from this array: the sidebar, the mobile
+  // drawer, and VALID_TABS. Filtering here means /admin#companies does nothing
+  // at all with the flag off — exactly like any other unknown hash — instead of
+  // opening a tab that is simply not drawn in the rail.
+  //
+  // ⚠️ This is a nav-level hide, and a hide is not a guard. Every /api/admin/
+  // companies route checks canSeeB2B() AND requireRoleApi('ADMIN') on its own;
+  // nothing here is load-bearing for access control.
+  .filter(it => it.id !== 'companies' || b2bFeatureExists())
 
 const NAV_GROUPS: NavGroup[] = ['queue', 'people', 'content', 'signals', 'system']
 
