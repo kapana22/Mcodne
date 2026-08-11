@@ -15,6 +15,7 @@ import { signOut as doSignOut } from '@/lib/signout'
 import { useNotifications } from '@/lib/notifications'
 import { useMe } from '@/lib/me'
 import { useMenuKeys } from '@/lib/useMenuKeys'
+import { b2bFeatureExists } from '@/lib/b2b'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 
@@ -67,6 +68,17 @@ const TUTOR_ITEMS = (onSignout: () => void): MenuItem[] => [
 
 const ADMIN_ITEMS = (onSignout: () => void): MenuItem[] => [
   { href: '/admin',             label: 'ადმინი',        icon: Icon.shield },
+  // B2B (2026-08-11). THE ONLY LINK TO /business ANYWHERE ON THE SITE, and it
+  // is doubly gated: this array is built only for `role === 'ADMIN'` (see the
+  // ternary below), and the entry exists at all only while the vertical does.
+  //
+  // ⚠️ tests/b2b.test.ts scans the tree for exactly this and allowlists this
+  // one site by name. If a second link is ever wanted, it must be gated the
+  // same way and added to that allowlist deliberately — never by widening the
+  // scan, which is the whole guarantee that a dark vertical stays dark.
+  ...(b2bFeatureExists()
+    ? [{ href: '/business', label: 'ბიზნესი', icon: Icon.briefcase } as MenuItem]
+    : []),
   { href: '/settings',          label: 'პარამეტრები',   icon: Icon.settings },
   { href: '/help',              label: 'დახმარება',     icon: Icon.info },
   { label: 'გამოსვლა',          icon: Icon.logout, danger: true, onClick: onSignout },

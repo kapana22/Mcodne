@@ -120,7 +120,7 @@ test('the gate answers correctly at ALL THREE stages, not just this one', () => 
   assert.equal(b2bFeatureExists(), B2B_VISIBILITY !== 'off')
 })
 
-test('nothing on the site links to /business', () => {
+test('the ONLY links to /business are admin-gated, and there are exactly two', () => {
   // The strongest guarantee in the whole feature, and the easiest to lose: one
   // href in a nav array and the vertical is public regardless of every other
   // precaution here. Scan the real tree. Copied deliberately from
@@ -136,7 +136,30 @@ test('nothing on the site links to /business', () => {
   }
   for (const d of ['app', 'components', 'lib']) walk(join(ROOT, d))
 
+  // ── THE ALLOWLIST, AND WHY IT IS A LIST AND NOT A WIDER SCAN ─────────────
+  // This test started as „nothing links to /business" and it fired, correctly,
+  // the moment the owner asked for a way into the page that is not typing the
+  // URL (2026-08-11). That is exactly the re-check it exists to force, and the
+  // answer is that BOTH new links are admin-only by construction:
+  //
+  //   UserMenu.tsx      inside ADMIN_ITEMS, an array built only for
+  //                     `role === 'ADMIN'`, and behind b2bFeatureExists().
+  //   _companies.tsx    inside the admin tab, which is itself filtered out of
+  //                     ADMIN_NAV unless the vertical exists — and /admin is
+  //                     behind requireRole('ADMIN') at the layout.
+  //
+  // Named individually rather than excused by a pattern: „anything under
+  // app/admin/" would silently bless the next link somebody adds there, and the
+  // point of this test is that adding one is a decision, not an accident.
+  const ALLOWED = new Map<string, RegExp>([
+    // The gate must be ON the line or in its immediate neighbourhood — see the
+    // per-file assertions below, which check the mechanism rather than the text.
+    ['components/UserMenu.tsx', /b2bFeatureExists\(\)/],
+    ['app/admin/_companies.tsx', /OpenBtn href="\/business"/],
+  ])
+
   const offenders: string[] = []
+  const seen = new Set<string>()
   for (const f of files) {
     const rel = relative(ROOT, f)
     // The vertical's own files are allowed to know their own URL.
@@ -146,10 +169,31 @@ test('nothing on the site links to /business', () => {
     const src = readFileSync(f, 'utf8')
     src.split('\n').forEach((line, i) => {
       // A quoted "/business" or "/business/…" — a link target, not the word.
-      if (/["'`]\/business(["'`/?#])/.test(line)) offenders.push(`      ${rel}:${i + 1}  ${line.trim()}`)
+      if (!/["'`]\/business(["'`/?#])/.test(line)) return
+      if (ALLOWED.has(rel)) { seen.add(rel); return }
+      offenders.push(`      ${rel}:${i + 1}  ${line.trim()}`)
     })
   }
-  assert.equal(offenders.length, 0, `something links to ${B2B_ROUTE}:\n${offenders.join('\n')}`)
+  assert.equal(offenders.length, 0,
+    `something links to ${B2B_ROUTE} outside the admin-only allowlist:\n${offenders.join('\n')}`)
+
+  // A stale allowlist is its own hazard: an entry left behind after the link is
+  // removed silently pre-approves the next one added to that file.
+  for (const rel of ALLOWED.keys()) {
+    assert.ok(seen.has(rel), `${rel} is allowlisted but no longer links to ${B2B_ROUTE} — drop the entry`)
+  }
+
+  // …and each allowed link is actually gated. This is the assertion that
+  // matters; the allowlist above only says WHERE to look.
+  const menu = read('components/UserMenu.tsx')
+  const adminItems = menu.slice(menu.indexOf('const ADMIN_ITEMS'), menu.indexOf('export function UserMenu'))
+  assert.match(adminItems, /\/business/,
+    'the /business entry left ADMIN_ITEMS — it is no longer admin-only')
+  assert.match(adminItems, /b2bFeatureExists\(\)/,
+    'the /business entry is no longer behind b2bFeatureExists — it would show with the vertical off')
+  // ADMIN_ITEMS must stay reachable only for an admin. If that ternary is ever
+  // loosened, every item in the array leaks, this one included.
+  assert.match(menu, /role === 'ADMIN'\s*\?\s*ADMIN_ITEMS\(signOut\)/)
 })
 
 test('it is not in the sitemap, and not in the feed', () => {

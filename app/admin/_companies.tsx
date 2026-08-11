@@ -16,7 +16,7 @@ import { Icon } from '@/components/Icon'
 import { fmtKaDateTime } from '@/lib/kaDate'
 import {
   TabHeader, SubTabs, SectionCard, RowList,
-  AdminEmpty, AdminError, AdminLoading, CopyBtn,
+  AdminEmpty, AdminError, AdminLoading, CopyBtn, OpenBtn,
 } from './_parts'
 
 type Company = {
@@ -413,7 +413,29 @@ export function CompaniesSection() {
         eyebrow="B2B"
         title="კომპანიები"
         sub="შემოსული განაცხადები, კომპანიების ბალანსები და ტრანზაქციების ისტორია."
+        actions={<OpenBtn href="/business" label="გვერდის ნახვა" />}
       />
+
+      {/* The test path, on screen.
+          This panel is FOR THE OWNER WHILE THE VERTICAL IS DARK, and it says so:
+          the flow crosses four surfaces (this tab, the public page, a client's
+          booking sheet, then back here) and nothing else on the panel tells you
+          that the fourth step is where you find out whether the third worked.
+          When B2B_VISIBILITY goes 'public' this block should go — at that point
+          the reader is an operator doing a job, not somebody verifying a
+          feature, and a checklist about testing is noise on their screen. */}
+      <div className="mt-5 rounded-card border border-ink-200 bg-ink-50/60 p-5">
+        <div className="font-display text-small font-semibold text-ink-900">როგორ შევამოწმო</div>
+        <ol className="mt-2 space-y-1 text-small text-ink-700 list-decimal pl-4">
+          <li>ამ ტაბზე დაამატე კომპანია და ჩარიცხე ბალანსი.</li>
+          <li>წევრად დაამატე ჩვეულებრივი ანგარიში — ადმინი არ გამოდგება, ჯავშნა ადმინს არ შეუძლია.</li>
+          <li>იმ ანგარიშით შედი და დაჯავშნე კონსულტაცია — „დეტალების“ ბოლოს გამოჩნდება ბალანსით გადახდა.</li>
+          <li>დაბრუნდი აქ: ბალანსი შემცირებული უნდა იყოს და ტრანზაქციებში ახალი ჩანაწერი გაჩნდეს.</li>
+        </ol>
+        <p className="mt-2.5 text-meta text-ink-500">
+          გვერდი და ეს ტაბი ახლა მხოლოდ ადმინს უჩანს — დანარჩენები 404-ს იღებენ.
+        </p>
+      </div>
       <div className="mt-6">
         <SubTabs<Sub>
           value={sub}
