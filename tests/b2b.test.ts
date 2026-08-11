@@ -26,6 +26,7 @@ import { B2B_VISIBILITY, PAYMENTS_LIVE, type B2BVisibility } from '../lib/flags'
 import {
   B2B_ROUTE, canSeeB2B, b2bVisibleTo, b2bFeatureExists,
   paymentSourceOf, isBalancePaid, canSpendBalance,
+  BusinessLeadInput, businessLeadRow,
 } from '../lib/b2b'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -147,7 +148,139 @@ test('robots.txt does not name the route — deliberately', () => {
   assert.doesNotMatch(read('app/robots.ts'), /business/)
 })
 
-/* ═══════════ 2. the money rules ════════════════════════════════════════ */
+/* ═══════════ 2. the route ══════════════════════════════════════════════ */
+
+test('the page 404s behind the gate — actually, not just in principle', () => {
+  // Read as source rather than executed: notFound() throws a Next-internal
+  // control-flow error whose shape is a framework implementation detail, and a
+  // test that pins that shape breaks on a Next upgrade for no reason. What must
+  // not change is that the guard is the first thing the route body does, and
+  // that it runs BEFORE the page is built.
+  const page = read('app/business/page.tsx')
+  const body = page.slice(page.indexOf('export default async function Page()'))
+  assert.match(body, /^\s*if \(!canSeeB2B\(me\?\.role\)\) notFound\(\)/m)
+  assert.ok(
+    body.indexOf('notFound()') < body.indexOf('<BusinessLanding'),
+    'the guard runs after the page has already been built',
+  )
+  // notFound, never a redirect or a 403: a redirect to /signin tells an
+  // anonymous visitor the page is real and worth coming back to with an
+  // account, which is the one thing the 404 exists to deny.
+  assert.doesNotMatch(body, /redirect\(/)
+})
+
+test('the API endpoint is gated too, and gated FIRST', () => {
+  // The failure mode that makes „hidden" meaningless: the page 404s in the
+  // browser while the endpoint behind it answers anyone with a curl command.
+  const route = read('app/api/business/lead/route.ts')
+  assert.match(route, /if \(!canSeeB2B\(me\?\.role\)\)/,
+    'POST /api/business/lead does not check the gate')
+  assert.match(route, /status: 404/, 'the gate must answer 404, not 403')
+  // Before the rate limiter, before the body is read, before any DB work — a
+  // caller who may not see this vertical must not learn anything from it,
+  // including how fast it rate-limits.
+  assert.ok(
+    route.indexOf('canSeeB2B') < route.indexOf('rateLimit('),
+    'the gate runs after the rate limiter — an outsider can still probe the endpoint',
+  )
+  assert.ok(
+    route.indexOf('canSeeB2B') < route.indexOf('req.json()'),
+    'the gate runs after the body is parsed',
+  )
+})
+
+test('the public form endpoint is rate-limited', () => {
+  // Unauthenticated at the 'public' stage. Without a limit the table and the
+  // inbox are both a free target — the reason /api/contact carries the same
+  // budget, which this deliberately matches.
+  const route = read('app/api/business/lead/route.ts')
+  assert.match(route, /rateLimit\(`b2b-lead:\$\{ip\}`, 5, 60 \* 60\)/)
+  assert.match(route, /status: 429/)
+})
+
+test('the lead is a ROW first and an email second', () => {
+  // /api/contact only emails, and a dropped delivery there loses the message
+  // with nothing to recover from. A sales lead must not have that failure mode:
+  // the row decides the response, the mail happens afterwards, and a mail
+  // failure is swallowed because the lead is already safe.
+  const route = read('app/api/business/lead/route.ts')
+  // Matched on the CALL, anchored to its own line — `after(` also appears in
+  // the file's header comment, and matching that instead made this assertion
+  // measure the distance between two comments. It failed for the wrong reason,
+  // which is the only thing worse than passing for the wrong reason.
+  const afterCall = route.search(/^\s*after\(async \(\) => \{/m)
+  assert.ok(afterCall > -1, 'the email is no longer deferred with after()')
+  assert.ok(
+    route.indexOf('businessLead.create') < afterCall,
+    'the email is sent before the row is written',
+  )
+  assert.match(route, /catch \{ \/\* email is best-effort/)
+})
+
+test('the form and the API judge a lead by the SAME schema', () => {
+  // Two hand-written copies of „what is a valid lead" is how a field ends up
+  // accepted by the browser and rejected by the server. This project has been
+  // bitten twice by exactly that gap (certificates max(500), blog covers
+  // max(2000) — both named in the pre-deploy gate's header).
+  for (const f of ['app/business/LeadForm.tsx', 'app/api/business/lead/route.ts']) {
+    assert.match(read(f), /BusinessLeadInput/, `${f} does not use the shared schema`)
+  }
+  // …and the schema is the one that admits a real lead. Pinned as VALUES rather
+  // than as source text, so a ceiling cannot be quietly tightened.
+  const ok = {
+    companyName: 'შპს მაგალითი', contactName: 'ნინო მაგალიძე',
+    phone: '555123456', email: 'info@example.ge',
+  }
+  assert.equal(BusinessLeadInput.safeParse(ok).success, true, 'a minimal real lead is rejected')
+  assert.equal(
+    BusinessLeadInput.safeParse({ ...ok, message: 'ა'.repeat(4000) }).success, true,
+    'the message ceiling is below what a company actually writes',
+  )
+  // A foreign number with its country code — the audience this page is for
+  // includes companies registered abroad, so a +995-only rule would be wrong.
+  assert.equal(BusinessLeadInput.safeParse({ ...ok, phone: '+491701234567' }).success, true)
+  // …and the things that must NOT pass.
+  assert.equal(BusinessLeadInput.safeParse({ ...ok, phone: '123' }).success, false, 'a junk phone passes')
+  assert.equal(BusinessLeadInput.safeParse({ ...ok, email: 'not-an-email' }).success, false)
+  assert.equal(BusinessLeadInput.safeParse({ ...ok, companyName: '' }).success, false)
+})
+
+test('an unanswered optional field is stored as null, not as an empty string', () => {
+  // „They answered, with nothing" and „they did not answer" are different facts,
+  // and the admin list has to tell them apart to know what is left to ask.
+  const row = businessLeadRow({
+    companyName: '  შპს მაგალითი  ', contactName: 'ნინო', phone: '+995 555 12 34 56',
+    email: '  INFO@Example.GE ', taxId: '', interest: '   ', message: '',
+  })
+  assert.equal(row.taxId, null)
+  assert.equal(row.interest, null)
+  assert.equal(row.message, null)
+  assert.equal(row.companyName, 'შპს მაგალითი', 'the name is not trimmed')
+  // Normalised on the way in, so two people typing one number two ways produce
+  // one value an admin can dial or search.
+  assert.equal(row.phone, '+995555123456')
+  assert.equal(row.email, 'info@example.ge', 'the address is not lowercased')
+})
+
+test('the landing renders with the gate open', () => {
+  // The real thing: build the element tree. „Renders" means the function
+  // returns without throwing, which exercises every piece of JSX, the Icon
+  // lookups (a missing glyph is `undefined` and throws at render — the failure
+  // that blanks the admin panel, see tests/adminNav.test.ts) and the STEPS map.
+  // No browser, no DB, and it runs while the flag is 'off' — which is the whole
+  // point, because otherwise this page's first render is on the day it ships.
+  //
+  // tsconfig sets jsx:"preserve" (Next compiles the JSX itself), so tsx falls
+  // back to the CLASSIC runtime and every component module expects a free
+  // `React` binding only Next's compiler would inject. One global satisfies
+  // them all. A test-harness detail, not a claim about how the app runs.
+  ;(globalThis as any).React ??= require('react')
+  const { BusinessLanding } = require('../app/business/BusinessLanding')
+  const tree = BusinessLanding()
+  assert.ok(tree, 'the landing returned nothing')
+})
+
+/* ═══════════ 3. the money rules ════════════════════════════════════════ */
 
 test('a company balance is not a payment gateway', () => {
   // „There is a balance" and „payments are live" are different claims, and only

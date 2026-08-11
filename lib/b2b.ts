@@ -18,7 +18,9 @@
 // feed all keep working with no new code, exactly as `enrollmentId` did for
 // packages. There is deliberately no second booking system to maintain.
 
+import { z } from 'zod'
 import { B2B_VISIBILITY, type B2BVisibility } from '@/lib/flags'
+import { normalizePhone, phoneFormatError } from '@/lib/phone'
 
 /** The route the whole vertical lives on. */
 export const B2B_ROUTE = '/business'
@@ -125,4 +127,70 @@ export function canSpendBalance(
   if (!company) return false
   if (company.status !== 'ACTIVE') return false
   return company.balance >= priceGel
+}
+
+/* ── the /business enquiry form ──────────────────────────────────────────── */
+
+/**
+ * ONE schema, parsed on both sides.
+ *
+ * The form validates with it so the person is told before they submit, and
+ * POST /api/business/lead parses the request body with the SAME object so a
+ * crafted POST is judged identically. Two hand-written copies of „what is a
+ * valid lead" is how a field ends up accepted by the browser and rejected by
+ * the server — the shape this codebase already got bitten by twice, where a zod
+ * ceiling sized for a URL silently rejected a real upload.
+ *
+ * ⚠️ CEILINGS ARE SIZED FOR WHAT PEOPLE ACTUALLY TYPE, not for tidiness. The
+ * message ceiling matches /api/contact's 4000 exactly: a company describing
+ * what it needs writes at least as much as someone asking a support question.
+ */
+export const BusinessLeadInput = z.object({
+  companyName: z.string().trim().min(2).max(160),
+  // Optional: an admin may be handed the identification code later, and
+  // refusing the whole enquiry over a number the person does not have in front
+  // of them costs a customer to gain nothing.
+  //
+  // Deliberately NOT „9 or 11 Georgian digits". A company registered abroad has
+  // a different format entirely, and this form's whole audience is companies —
+  // including the ones a Georgian marketplace most wants to hear from. Same
+  // reasoning as lib/phone's refusal to be +995-only.
+  taxId: z.string().trim().min(4).max(32).optional().or(z.literal('')),
+  contactName: z.string().trim().min(2).max(120),
+  // Judged by THE phone rule (lib/phone), the same one signup, /apply and the
+  // profile editor use — so a number accepted here cannot fail on the next
+  // screen that asks for it.
+  phone: z.string().trim().refine(v => phoneFormatError(v, { required: true }) === null, {
+    message: 'ნომერი არასწორია',
+  }),
+  email: z.string().trim().email().max(200),
+  interest: z.string().trim().max(200).optional().or(z.literal('')),
+  message: z.string().trim().max(4000).optional().or(z.literal('')),
+})
+export type BusinessLeadInput = z.infer<typeof BusinessLeadInput>
+
+/**
+ * The row to write, from a parsed lead.
+ *
+ * Empty optional strings become `null` rather than `''`. A column holding an
+ * empty string reads as „they answered, with nothing", which is a different
+ * fact from „they did not answer" — and the admin list has to tell them apart
+ * to know whether there is anything left to ask.
+ */
+export function businessLeadRow(input: BusinessLeadInput) {
+  const blank = (v: string | undefined) => {
+    const t = (v ?? '').trim()
+    return t === '' ? null : t
+  }
+  return {
+    companyName: input.companyName.trim(),
+    taxId: blank(input.taxId),
+    contactName: input.contactName.trim(),
+    // Stored normalised (digits + one leading +) so two people typing the same
+    // number two ways produce one value an admin can actually dial or search.
+    phone: normalizePhone(input.phone),
+    email: input.email.trim().toLowerCase(),
+    interest: blank(input.interest),
+    message: blank(input.message),
+  }
 }
