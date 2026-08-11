@@ -520,6 +520,140 @@ async function runMigrations() {
   // Every expert profile view loads that expert's consultation offerings.
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Consultation_tutorId_idx" ON "Consultation"("tutorId");`)
 
+  // ── B2B: companies with a prepaid balance (2026-08-11) ─────────────────
+  //
+  // The vertical is dark behind `B2B_VISIBILITY` in lib/flags.ts. These tables
+  // are created on every deployment and stay EMPTY until an admin fills them —
+  // the same contract the packages and diaspora verticals ship on. Creating
+  // them here rather than only in the manual migration is what makes the flag
+  // the ONLY switch: flipping it must never also require somebody to remember
+  // a psql session.
+  //
+  // Reviewable as one document in prisma/manual-migrations/2026-08-11-b2b/,
+  // WITH a rollback. These statements and that file must stay identical.
+  //
+  // ⚠️ Every column here is also declared in prisma/schema.prisma. That is not
+  // duplication for its own sake — an undeclared dbBoot column is one
+  // `prisma db push` away from being dropped, which is what the warning block
+  // on model Booking is about. If you add a column here, declare it there.
+  for (const type of [
+    `CREATE TYPE "CompanyStatus" AS ENUM ('ACTIVE', 'SUSPENDED');`,
+    `CREATE TYPE "CompanyMemberRole" AS ENUM ('OWNER', 'MEMBER');`,
+    `CREATE TYPE "CompanyTransactionType" AS ENUM ('TOPUP', 'CHARGE');`,
+    `CREATE TYPE "PaymentSource" AS ENUM ('CARD', 'COMPANY_BALANCE');`,
+    `CREATE TYPE "BusinessLeadStatus" AS ENUM ('NEW', 'CONTACTED', 'CLOSED');`,
+  ]) {
+    // CREATE TYPE has no IF NOT EXISTS — the DO block is how the rest of this
+    // file spells "idempotent enum".
+    await prisma.$executeRawUnsafe(
+      `DO $$ BEGIN ${type} EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    )
+  }
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Company" (
+      "id"        TEXT NOT NULL,
+      "name"      TEXT NOT NULL,
+      "taxId"     TEXT,
+      "balance"   INTEGER NOT NULL DEFAULT 0,
+      "status"    "CompanyStatus" NOT NULL DEFAULT 'ACTIVE',
+      "note"      TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      -- NOT NULL with no DB default, exactly as prisma migrate diff emits it:
+      -- @updatedAt is applied by the client on every write, and a default here
+      -- would leave a difference for the next prisma db push to "fix".
+      -- (No backticks in this string — it is a JS template literal.)
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "Company_pkey" PRIMARY KEY ("id"),
+      -- The last line of defence under the conditional-decrement pattern the
+      -- API uses: an overdraw is refused by the database rather than recorded
+      -- as a debt this product has no concept of.
+      CONSTRAINT "Company_balance_nonnegative" CHECK ("balance" >= 0)
+    );
+  `)
+  // Nullable + unique: Postgres allows any number of NULLs under a unique
+  // constraint, so a company entered before its paperwork arrived does not
+  // collide with the next one.
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "Company_taxId_key" ON "Company"("taxId");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Company_status_createdAt_idx" ON "Company"("status", "createdAt");`)
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "CompanyMember" (
+      "id"        TEXT NOT NULL,
+      "companyId" TEXT NOT NULL,
+      "userId"    TEXT NOT NULL,
+      "role"      "CompanyMemberRole" NOT NULL DEFAULT 'MEMBER',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CompanyMember_pkey" PRIMARY KEY ("id")
+    );
+  `)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "CompanyMember_companyId_userId_key" ON "CompanyMember"("companyId", "userId");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "CompanyMember_userId_idx" ON "CompanyMember"("userId");`)
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "CompanyTransaction" (
+      "id"           TEXT NOT NULL,
+      "companyId"    TEXT NOT NULL,
+      "type"         "CompanyTransactionType" NOT NULL,
+      "amount"       INTEGER NOT NULL,
+      "balanceAfter" INTEGER NOT NULL,
+      -- "bookingId"/"actorId" are plain TEXT with NO foreign key: a ledger row
+      -- must outlive its subject. Same reasoning as "AuditLog"."targetId".
+      "bookingId"    TEXT,
+      "actorId"      TEXT,
+      "note"         TEXT,
+      "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CompanyTransaction_pkey" PRIMARY KEY ("id"),
+      -- Always positive; the direction lives in "type". Stops a negative TOPUP
+      -- from becoming an undocumented way to charge somebody.
+      CONSTRAINT "CompanyTransaction_amount_positive" CHECK ("amount" > 0)
+    );
+  `)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "CompanyTransaction_companyId_createdAt_idx" ON "CompanyTransaction"("companyId", "createdAt");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "CompanyTransaction_bookingId_idx" ON "CompanyTransaction"("bookingId");`)
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "BusinessLead" (
+      "id"          TEXT NOT NULL,
+      "companyName" TEXT NOT NULL,
+      "taxId"       TEXT,
+      "contactName" TEXT NOT NULL,
+      "phone"       TEXT NOT NULL,
+      "email"       TEXT NOT NULL,
+      "interest"    TEXT,
+      "message"     TEXT,
+      "status"      "BusinessLeadStatus" NOT NULL DEFAULT 'NEW',
+      "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "BusinessLead_pkey" PRIMARY KEY ("id")
+    );
+  `)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BusinessLead_status_createdAt_idx" ON "BusinessLead"("status", "createdAt");`)
+
+  // The foreign keys, after both sides exist. CASCADE on membership and
+  // deliberately unlike "Booking"'s Restrict: a membership is a permission, not
+  // a record of something that happened, and it must never be the reason an
+  // account cannot be deleted. The money lives in "CompanyTransaction", which
+  // has no FK to a user at all and survives the account either way.
+  for (const fk of [
+    `ALTER TABLE "CompanyMember" ADD CONSTRAINT "CompanyMember_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    `ALTER TABLE "CompanyMember" ADD CONSTRAINT "CompanyMember_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    `ALTER TABLE "CompanyTransaction" ADD CONSTRAINT "CompanyTransaction_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+  ]) {
+    await prisma.$executeRawUnsafe(
+      `DO $$ BEGIN ${fk} EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    )
+  }
+
+  // Booking.paidBy — NULLABLE, NO DEFAULT, NO BACKFILL, and that is the point.
+  // `null` is what every booking that already exists says, and it MEANS 'CARD'
+  // (read it through paymentSourceOf() in lib/b2b.ts, never directly). A
+  // DEFAULT would mean an UPDATE across live history to record a fact nobody
+  // asserted.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Booking"
+      ADD COLUMN IF NOT EXISTS "paidBy" "PaymentSource";
+  `)
+
   // ── pg_trgm: Georgian-aware expert search ──────────────────────────────
   // Georgian declines heavily („მარკეტინგი" → „მარკეტინგის"/„მარკეტინგში"),
   // so substring matching silently returns nothing for a perfectly normal

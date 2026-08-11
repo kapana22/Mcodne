@@ -158,14 +158,43 @@ test('§C the FK-less dbBoot tables are deleted BY HAND, not left to a cascade',
   // delete it. What actually matters is that no dbBoot table hangs off a User
   // or a TutorProfile: that is the edge a cascade would have to travel, and its
   // absence is why the rows below are removed by hand.
-  const edges = [...boot.matchAll(/\bREFERENCES\s+"(\w+)"/g)].map(m => m[1])
+  //
+  // NARROWED AGAIN 2026-08-11 (B2B), and for the opposite reason to last time.
+  // The 2026-08-10 narrowing excused an edge that cannot reach a person at all;
+  // this one excuses an edge that reaches a person ON PURPOSE.
+  //
+  // CompanyMember is a MEMBERSHIP — a permission, not a record of something
+  // that happened — and it carries a real DB-level ON DELETE CASCADE. That is
+  // exactly what Package and Enrollment lack and why THEY are deleted by hand:
+  // their cascade is an annotation in schema.prisma with no constraint behind
+  // it. This one is the constraint. So it needs no hand-delete, and adding one
+  // would be dead code in both deletion paths (admin purge + /api/me).
+  //
+  // It is allowlisted BY NAME and by its referential action, so the alarm keeps
+  // working: a second person-edge still fails here, and so does this one if
+  // somebody weakens it to RESTRICT (which would make a person undeletable) or
+  // to SET NULL (which would leave a membership belonging to nobody).
+  //
+  // ⚠️ The MONEY is deliberately not on this edge. CompanyTransaction has no FK
+  // to User at all, so deleting an account never erases the ledger that says
+  // what their company was charged. If that ever changes, this test will not
+  // catch it — tests/b2b.test.ts owns that invariant.
+  const ALLOWED_PERSON_EDGE =
+    /ALTER TABLE "CompanyMember" ADD CONSTRAINT "CompanyMember_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/
+  assert.match(boot, ALLOWED_PERSON_EDGE,
+    'the CompanyMember→User cascade is gone — a deleted account now leaves its membership behind')
+  // Scan everything EXCEPT that one statement, so the assertions below are
+  // byte-for-byte the ones that have always run.
+  const rest = boot.replace(ALLOWED_PERSON_EDGE, '')
+
+  const edges = [...rest.matchAll(/\bREFERENCES\s+"(\w+)"/g)].map(m => m[1])
   for (const table of edges) {
     assert.ok(
       table !== 'User' && table !== 'TutorProfile',
       `dbBoot grew a foreign key to "${table}" — re-check whether these hand-deletes are still needed`,
     )
   }
-  assert.ok(!/\bFOREIGN KEY\s+\("(userId|tutorId)"\)/.test(boot),
+  assert.ok(!/\bFOREIGN KEY\s+\("(userId|tutorId)"\)/.test(rest),
     'dbBoot grew a foreign key on a person column — re-check the hand-deletes')
   assert.match(ROUTE, /tx\.package\.deleteMany/)
   assert.match(ROUTE, /tx\.enrollment\.deleteMany/)
