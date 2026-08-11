@@ -1,6 +1,7 @@
 import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { BROWSABLE_CATEGORY } from '@/lib/categoryTree'
 import { requireRoleApi } from '@/lib/auth'
 import { notify, normalizePrefs } from '@/lib/notify'
 import { audit } from '@/lib/audit'
@@ -83,7 +84,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // appear. A custom/niche specialty that matches nothing stays null (that's the
     // genuine "admin must add this category" case; the expert can also self-set it
     // from the profile editor once the category exists).
-    const liveCats = await prisma.category.findMany({ where: { status: 'VISIBLE' }, select: { id: true, slug: true, name: true, defaultServiceType: true } })
+    // BROWSABLE, not just VISIBLE. Since 2026-08-10 the application offers the
+    // sub-fields absorbed into each sphere („ფინანსები" under „ბიზნესი და
+    // ფინანსები"), so `specialty` can legitimately BE one — and an applicant
+    // who answered precisely must not be the one who ends up filed nowhere.
+    // A sub-field still surfaces under its sphere in browse, because the count
+    // and the filter fold; the rule is lib/categoryTree's, once.
+    const liveCats = await prisma.category.findMany({
+      where: BROWSABLE_CATEGORY,
+      select: { id: true, slug: true, name: true, defaultServiceType: true },
+    })
     const nrm = (s: string) => s.toLowerCase().trim()
     const sp = nrm(app.specialty || '')
     // The SLUG is matched as well as the name, as a whole word. The name used to

@@ -73,7 +73,16 @@ const Body = z.object({
 export async function GET() {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ profile: null }, { status: 401 })
-  const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
+  // `include` the category, not just its id: since the 2026-08-10 merge an
+  // expert can legitimately hold a category the PICKER no longer offers
+  // („ფინანსები" was absorbed into „ბიზნესი და ფინანსები"). Without the name,
+  // the profile screen renders their category as an EMPTY dropdown — which
+  // reads as „my category was deleted", and the „აირჩიე კატეგორია" warning
+  // does not fire to explain it, because the field is not actually empty.
+  const profile = await prisma.tutorProfile.findUnique({
+    where: { userId: user.id },
+    include: { category: { select: { id: true, slug: true, name: true, status: true } } },
+  })
   return NextResponse.json({ profile })
 }
 

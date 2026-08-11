@@ -25,20 +25,33 @@ import { CertificateUploader, PhotoUploader } from './_upload'
  * in Georgian, and it was the last hard gate before the finish line — the
  * server has only ever asked for 20. */
 export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
-  const [dbCats, setDbCats] = useState<string[]>([])
+  type Sphere = { name: string; children: string[] }
+  const [dbCats, setDbCats] = useState<Sphere[]>([])
   useEffect(() => {
     let cancelled = false
     fetch('/api/categories')
       .then(r => (r.ok ? r.json() : []))
-      .then((rows: any[]) => { if (!cancelled && Array.isArray(rows)) setDbCats(rows.map(c => c?.name).filter(Boolean)) })
+      .then((rows: any[]) => {
+        if (cancelled || !Array.isArray(rows)) return
+        setDbCats(rows
+          .filter(c => c?.name)
+          .map(c => ({ name: c.name as string, children: (c.children ?? []).map((k: any) => k?.name).filter(Boolean) as string[] })))
+      })
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
   // Fallback MUST mirror the deployed SPHERE names (the ones /api/categories
   // returns), because the discovery filter matches by name — a stale fallback
   // lets an applicant pick a category that then never shows in browse. It is
-  // six since 2026-08-10, not fifteen: the absorbed ones are not offered.
-  const ALL_CATS = dbCats.length ? dbCats : ['ბიზნესი და ფინანსები', 'მარკეტინგი და გაყიდვები', 'ტექნოლოგია და პროდუქტი', 'გადასახადები', 'ფსიქოლოგია', 'სამართალი']
+  // six since 2026-08-10, not fifteen; the sub-fields arrive with the fetch.
+  const SPHERES: Sphere[] = dbCats.length ? dbCats : [
+    { name: 'ბიზნესი და ფინანსები', children: [] },
+    { name: 'მარკეტინგი და გაყიდვები', children: [] },
+    { name: 'ტექნოლოგია და პროდუქტი', children: [] },
+    { name: 'გადასახადები', children: [] },
+    { name: 'ფსიქოლოგია', children: [] },
+    { name: 'სამართალი', children: [] },
+  ]
   const cats = form.cats
   const toggle = (c: string) => set({ cats: cats.includes(c) ? cats.filter(x => x !== c) : [...cats, c] })
 
@@ -124,23 +137,57 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
         {/* The `cats` anchor moved here from the deleted free-text box. Without
             it „აირჩიე სფერო." would render with nowhere to scroll to —
             tests/apply-error-focus.test.ts F2 catches exactly that. */}
-        <div data-field="cats" className="flex flex-wrap gap-1.5">
-          {ALL_CATS.map(c => {
-            const on = cats.includes(c)
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => toggle(c)}
-                className={`h-9 px-3.5 rounded-pill border font-display text-small font-semibold tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] ${
-                  on ? 'bg-brand-600 text-white border-brand-500 shadow-sm' : 'bg-white text-ink-700 border-ink-200 hover:border-ink-400'
-                }`}
-              >
-                {on && <Icon.check className="w-3 h-3" />}
-                {c}
-              </button>
-            )
-          })}
+        {/* TWO TIERS, and the second one appears only after the first is
+            answered (2026-08-10). Six spheres is what a CLIENT should have to
+            read; it is not what an EXPERT should have to call themselves. A
+            designer picking „ტექნოლოგია და პროდუქტი" is filed under a name that
+            is not what they do — so once a sphere is chosen, the sub-fields
+            absorbed into it appear beneath it and can be picked instead.
+            Whichever chip is chosen FIRST becomes the specialty, and either
+            answer lands somewhere real: a sub-field still shows up under its
+            sphere in browse (the count folds), and it also has a page of its
+            own. Nothing is lost by being precise.
+            No heading, on purpose — a second tier that appears under the chip
+            you just pressed does not need a sentence to explain it. */}
+        <div data-field="cats" className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            {SPHERES.map(s => {
+              const on = cats.includes(s.name)
+              return (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => toggle(s.name)}
+                  className={`h-9 px-3.5 rounded-pill border font-display text-small font-semibold tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] ${
+                    on ? 'bg-brand-600 text-white border-brand-500 shadow-sm' : 'bg-white text-ink-700 border-ink-200 hover:border-ink-400'
+                  }`}
+                >
+                  {on && <Icon.check className="w-3 h-3" />}
+                  {s.name}
+                </button>
+              )
+            })}
+          </div>
+          {SPHERES.filter(s => cats.includes(s.name) && s.children.length > 0).map(s => (
+            <div key={s.name} className="flex flex-wrap gap-1.5 pl-3 border-l-2 border-ink-100">
+              {s.children.map(k => {
+                const on = cats.includes(k)
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => toggle(k)}
+                    className={`h-8 px-3 rounded-pill border font-display text-meta font-semibold inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] ${
+                      on ? 'bg-brand-50 text-brand-800 border-brand-300' : 'bg-white text-ink-600 border-ink-200 hover:border-ink-400'
+                    }`}
+                  >
+                    {on && <Icon.check className="w-3 h-3" />}
+                    {k}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
         </div>
         <FieldError name="cats" />
 

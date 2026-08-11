@@ -18,7 +18,16 @@ import { TUTOR_DEFAULTS, type ConsultationItem } from '@/components/booking/slot
 // the count beside them is folded. Their own category is still `catOwnSlug`.
 // `expertCount` drives which categories are OFFERED as a filter: an option that
 // can only ever return zero results is a dead end, not a filter.
-export type LiveCat = { id: string; slug: string; name: string; expertCount?: number }
+export type LiveCat = {
+  id: string
+  slug: string
+  name: string
+  expertCount?: number
+  /** Sub-fields folded into this sphere. NOT rendered as browse chips — a
+   *  client picks a sphere, and its count already includes these. They exist
+   *  for the screens where an expert describes themselves. */
+  children?: { id: string; slug: string; name: string }[]
+}
 // Resolve a slug → its display name from the live list; falls back to the slug
 // itself so a not-yet-loaded / unknown category never renders as blank.
 export const catNameOf = (cats: LiveCat[], slug: string) => cats.find(c => c.slug === slug)?.name ?? slug

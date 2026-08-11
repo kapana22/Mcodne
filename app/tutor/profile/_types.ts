@@ -30,9 +30,16 @@ export type TutorProfile = {
   websiteUrl?: string | null
   responseHours?: number
   categoryId?: string | null
+  category?: { id: string; slug: string; name: string; status?: string } | null
 } | null
 
-export type Category = { id: string; slug: string; name: string }
+export type Category = {
+  id: string
+  slug: string
+  name: string
+  /** Sub-fields absorbed into this sphere — offered here, never in browse. */
+  children?: { id: string; slug: string; name: string }[]
+}
 
 // `hasFile` replaces the scan itself in list payloads — see
 // app/api/me/tutor/certificates/route.ts.

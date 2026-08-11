@@ -256,14 +256,15 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
     } catch { /* keep current page */ } finally { setLoadingMore(false) }
   }
 
-  // Same endpoint the „კატეგორიები“ tab uses — only SPHERES are offered,
-  // because assigning a hidden or absorbed category would keep the expert
-  // invisible, or file them under a name the site no longer shows.
+  // Same endpoint the „კატეგორიები“ tab uses. Spheres AND the sub-fields
+  // absorbed into them: a sub-field is where its experts are folded from, so
+  // filing someone there is precise, not invisible. Only HIDDEN is excluded —
+  // that one really would keep the expert off the site.
   useEffect(() => {
     let cancelled = false
     fetch('/api/admin/categories', { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : []))
-      .then((d: AdminCategory[]) => { if (!cancelled) setLiveCats(Array.isArray(d) ? d.filter(c => c.status === 'VISIBLE') : []) })
+      .then((d: AdminCategory[]) => { if (!cancelled) setLiveCats(Array.isArray(d) ? d.filter(c => c.status === 'VISIBLE' || (c.status === 'REDIRECTED' && d.some(p => p.id === c.parentId && p.status === 'VISIBLE'))) : []) })
       .catch(() => {})
     return () => { cancelled = true }
   }, [])

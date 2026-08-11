@@ -23,9 +23,25 @@ export async function GET() {
     // empty result and reads as a dead end), while the /apply picker must keep
     // offering all of them — somebody has to be the first expert in a sphere.
     const counts = await expertCountsBySphere(all)
+    // `children` = the sub-fields absorbed into this sphere. They are offered
+    // where somebody DESCRIBES THEMSELVES (the application, the profile editor,
+    // the approval screen) and ignored where somebody BROWSES — a client
+    // choosing „ბიზნესი და ფინანსები" should not have to know the platform once
+    // had a separate „ფინანსები", but an expert who IS a financier should not be
+    // made to call themselves something else. The two audiences want opposite
+    // things from the same taxonomy, so the payload carries both and each
+    // caller takes the half it needs.
     const rows = all
       .filter(c => c.status === 'VISIBLE')
-      .map(c => ({ id: c.id, slug: c.slug, name: c.name, expertCount: counts.get(c.id) ?? 0 }))
+      .map(c => ({
+        id: c.id,
+        slug: c.slug,
+        name: c.name,
+        expertCount: counts.get(c.id) ?? 0,
+        children: all
+          .filter(k => k.status === 'REDIRECTED' && k.parentId === c.id)
+          .map(k => ({ id: k.id, slug: k.slug, name: k.name })),
+      }))
     return NextResponse.json(rows)
   } catch {
     return NextResponse.json([], { status: 200 })

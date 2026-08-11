@@ -133,8 +133,33 @@ export function ProfileTab({ me, profile, loading, form, setForm, dirty, savingP
                 className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-400 focus:outline-none"
               >
                 <option value="">აირჩიე კატეგორია</option>
+                {/* Their OWN category first, when it is no longer one of the
+                    spheres. „ფინანსები" was folded into „ბიზნესი და
+                    ფინანსები" on 2026-08-10 — the expert was not moved, and
+                    their profile still says „ფინანსები", so the picker has to
+                    be able to show it. Without this the select renders blank
+                    and reads as „my category was deleted"; the unset warning
+                    below cannot explain it, because the field is not unset. */}
+                {profile?.category
+                  && categories.every(c => c.id !== profile.category!.id)
+                  && categories.every(c => (c.children ?? []).every(k => k.id !== profile.category!.id)) && (
+                  <option value={profile.category.id}>{profile.category.name}</option>
+                )}
+                {/* Grouped: the sphere is the heading, its sub-fields sit under
+                    it. An expert should be able to say „ფინანსები" rather than
+                    „ბიზნესი და ფინანსები" — they still appear under the sphere
+                    in browse, because the count and the filter fold. */}
                 {categories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  (c.children ?? []).length > 0
+                    ? (
+                      <optgroup key={c.id} label={c.name}>
+                        <option value={c.id}>{c.name}</option>
+                        {(c.children ?? []).map(k => (
+                          <option key={k.id} value={k.id}>{k.name}</option>
+                        ))}
+                      </optgroup>
+                    )
+                    : <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
               {!form.categoryId && (
