@@ -163,13 +163,14 @@ export async function BusinessLanding() {
                             many people, where — and a company scanning a
                             direction rules services in or out on it. Buried in
                             a sentence they would have to read for it.
-                            Hairline border, no fill: canon for a badge. */}
+                            Hairline border, no fill: canon for a badge.
+
+                            `self-start` is load-bearing: the card is a
+                            flex-col, whose default align-items is `stretch`,
+                            so an inline-flex child still spans the full width
+                            and the badge rendered as a wide empty-looking box
+                            — it read as a disabled input, not a label. */}
                         {s.format && (
-                          {/* `self-start` is load-bearing: the card is a
-                              flex-col, whose default align-items is `stretch`,
-                              so an inline-flex child still spans the full width
-                              and the badge rendered as a wide empty-looking box
-                              — it read as a disabled input, not a label. */}
                           <div className="mt-2 self-start inline-flex items-center h-6 px-2 rounded-pill border border-ink-200 text-ink-600 text-micro font-display font-semibold uppercase">
                             {s.format}
                           </div>
