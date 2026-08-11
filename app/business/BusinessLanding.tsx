@@ -181,7 +181,18 @@ export async function BusinessLanding() {
                         className="rounded-card border border-ink-200 bg-white p-5 flex flex-col hover:border-ink-300 transition-colors duration-fast"
                       >
                         <h4 className="font-display text-body-lg font-bold text-ink-900 tracking-tight">{s.title}</h4>
-                        <p className="mt-1.5 text-small text-ink-600 flex-1">
+                        {/* Format on its own line, above the prose. For a
+                            TRAINING this is the deciding fact — how long, how
+                            many people, where — and a company scanning a
+                            direction rules services in or out on it. Buried in
+                            a sentence they would have to read for it.
+                            Hairline border, no fill: canon for a badge. */}
+                        {s.format && (
+                          <div className="mt-2 inline-flex items-center h-6 px-2 rounded-pill border border-ink-200 text-ink-600 text-micro font-display font-semibold uppercase">
+                            {s.format}
+                          </div>
+                        )}
+                        <p className="mt-2 text-small text-ink-600 flex-1">
                           {s.description || ' '}
                         </p>
                         <div className="mt-4 pt-4 border-t border-ink-100 flex items-center justify-between gap-3">

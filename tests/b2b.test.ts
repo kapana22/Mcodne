@@ -712,3 +712,21 @@ test('services group by direction and keep their order', () => {
   assert.deepEqual(grouped.map(([d]) => d), ['იურიდიული', 'ფინანსური'])
   assert.deepEqual(grouped[0][1].map(r => r.id), ['a', 'b'], 'order is not respected inside a direction')
 })
+
+test('the service card actually renders its format line', () => {
+  // This shipped MISSING once. The edit that added it was a scripted
+  // string-replace whose target had already changed, and Python's str.replace
+  // returns the input unchanged rather than failing — so the field was added to
+  // the schema, the API, the admin form and the picker, and the one place a
+  // company would read it rendered nothing. Nothing caught it: types were
+  // clean, the build passed, and the page looked fine because every service
+  // seeded before that deploy had no format anyway.
+  const page = read('app/business/BusinessLanding.tsx')
+  assert.match(page, /\{s\.format && \(/, 'the card no longer renders format')
+  assert.match(page, /format: true/, 'the query no longer selects format')
+  // …and every surface that offers the field is still wired, so the next silent
+  // no-op edit is caught here rather than on the live page.
+  assert.match(read('app/api/admin/b2b-services/route.ts'), /format: \(parsed\.data\.format \?\? ''\)\.trim\(\) \|\| null/)
+  assert.match(read('app/admin/_companies.tsx'), /draft\.format/)
+  assert.match(read('app/business/LeadForm.tsx'), /s\.format \?/)
+})
