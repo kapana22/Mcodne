@@ -173,5 +173,14 @@ export const SERVER_FIELD: Record<string, string> = {
  * gate before the finish line. The server has only ever required 20; 40 keeps
  * the public profile from reading as empty without turning the form into an
  * essay. Both validators below read this, so there is one number to change. */
+/** „აირჩიე 1–3 მიმართულება" — the 3, enforced.
+ *
+ *  Nothing enforced it until 2026-08-11: the chips let an applicant select
+ *  every sphere, so the sentence above them was a suggestion, and the sub-field
+ *  panels that opened under each one turned the step into a wall. A cap you
+ *  cannot exceed needs no error message, so the picker disables the rest;
+ *  `validateStep` repeats it only so a stale draft cannot carry more past. */
+export const MAX_CATS = 3
+
 export const MIN_BIO = APPLY.BIO_MIN
 export const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())

@@ -23,7 +23,7 @@ import { phoneFormatError } from '@/lib/phone'
 import { FormFooter, ProgressNav } from './_chrome'
 import { clearApplyDraft, readApplyDraft, writeApplyDraft } from './_draft'
 import { ApplyErrCtx } from './_fields'
-import { AVAIL_WEEKS, ApplyErr, DEFAULT_AVAIL, FormState, INITIAL_FORM, MediaState, SERVER_FIELD, STEPS, StepId, StepPart, isValidEmail } from './_form'
+import { AVAIL_WEEKS, ApplyErr, DEFAULT_AVAIL, FormState, INITIAL_FORM, MAX_CATS, MediaState, SERVER_FIELD, STEPS, StepId, StepPart, isValidEmail } from './_form'
 import { LivePreview, Step1, Step2 } from './_steps'
 import { certificatesPayload } from './_upload'
 
@@ -323,6 +323,7 @@ export default function TutorApply() {
       // rule signup uses, so a number accepted there is accepted here.
       { const e = phoneFormatError(form.phone, { required: true }); if (e) return fail('phone', e) }
       if (form.cats.length < 1) return fail('cats', 'აირჩიე სფერო.')
+      if (form.cats.length > MAX_CATS) return fail('cats', `მაქსიმუმ ${MAX_CATS} მიმართულება.`)
       if (form.headline.trim().length < 2) return fail('headline', 'დაწერე ერთი წინადადება შენზე.')
       { const e = georgianError('ერთი წინადადება შენზე', checkGeorgian(form.headline)); if (e) return fail('headline', e) }
       // A profile with no face is the single weakest thing on the marketplace —

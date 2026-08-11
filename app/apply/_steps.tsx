@@ -12,7 +12,7 @@ import { HEADLINE_MAX } from '@/lib/headline'
 import { APPLY } from '@/lib/applyValidation'
 import { Collapsible, FormSection, StepHeader } from './_chrome'
 import { BioCounter, Field, FieldError, Input, NameScriptHint } from './_fields'
-import { DAY_LABELS, FREE_INTRO, FormState, MIN_BIO, StepId, StepProps } from './_form'
+import { DAY_LABELS, FREE_INTRO, FormState, MAX_CATS, MIN_BIO, StepId, StepProps } from './_form'
 import { CertificateUploader, PhotoUploader } from './_upload'
 
 /* ───── STEP 1 — Who you are + what you do (one screen) ─────
@@ -60,6 +60,7 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
     { name: 'რელოკაცია', children: [] },
   ]
   const cats = form.cats
+  const atCap = cats.length >= MAX_CATS
   const toggle = (c: string) => set({ cats: cats.includes(c) ? cats.filter(x => x !== c) : [...cats, c] })
 
   /* A sub-field REPLACES its sphere in the selection rather than adding to it.
@@ -79,7 +80,7 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
   const pickChild = (s: Sphere, k: string) => {
     const target = cats.includes(k) ? s.name : k
     const at = slotOf(s)
-    if (at === -1) { set({ cats: [...cats, target] }); return }
+    if (at === -1) { if (!atCap) set({ cats: [...cats, target] }); return }
     const next = [...cats]
     next[at] = target
     set({ cats: next })
@@ -190,7 +191,8 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
                   key={s.name}
                   type="button"
                   onClick={() => pickSphere(s)}
-                  className={`h-9 px-3.5 rounded-pill border font-display text-small font-semibold tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] ${
+                  disabled={!on && atCap}
+                  className={`h-9 px-3.5 rounded-pill border font-display text-small font-semibold tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-ink-200 ${
                     on ? 'bg-brand-600 text-white border-brand-500 shadow-sm' : 'bg-white text-ink-700 border-ink-200 hover:border-ink-400'
                   }`}
                 >
