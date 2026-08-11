@@ -130,3 +130,44 @@ export const PACKAGES_VISIBILITY: PackagesVisibility = 'signed-in'
 //
 // ⚠️ Review this by hand every few months. 2026-08-04: 1 GEL ≈ 0.33 EUR.
 export const ABROAD_EUR_PER_GEL = 0.33
+
+// ── B2B: companies with a prepaid balance (2026-08-11) ───────────────────────
+// /business, the company account, and paying for a booking out of a company
+// balance instead of a card. Same one-line contract as FEATURE_ABROAD and
+// PACKAGES_VISIBILITY above — 'off' ships the whole vertical dark: the route
+// 404s, no admin tab exists, no API answers, and not one existing page changes
+// by a pixel.
+//
+// WHAT IT IS. A company pays us somehow — bank transfer, invoice, a phone call,
+// it does not matter and we do not model it — and an admin types the amount
+// onto a balance BY HAND. Employees who are members of that company can then
+// spend it on ordinary bookings. That is the entire feature.
+//
+// WHAT IT DELIBERATELY IS NOT, so nobody builds it by accident: no gateway, no
+// automatic charge, no invoice generator, no escrow, no subscription, no
+// self-serve top-up. `PAYMENTS_LIVE` below is still false and this vertical
+// does not move it — a company balance is bookkeeping, not a card on file.
+//
+// THREE STATES, NOT A BOOLEAN PAIR — the same reasoning PACKAGES_VISIBILITY
+// spells out at length: two flags („enabled" + „adminOnly") can contradict each
+// other, and the contradiction always resolves in whichever surface someone
+// forgot to update. There is one question — who can see this? — so one answer.
+//
+//   'off'     nothing exists: no route, no admin tab, no API. Ships here.
+//   'admin'   signed-in ADMINs only. Every surface 404s for everyone else —
+//             404 and not 403, because a 403 confirms the thing is there.
+//   'public'  live for everyone. Only ever set together with the linking,
+//             sitemap and noindex work; see lib/b2b.ts → B2B_ROUTE.
+//
+// There is NO 'signed-in' stage, unlike packages. Packages needed one because
+// the owner had to hand a URL to a real client and watch them use it. Here the
+// thing being tested is an admin typing a balance and an EMPLOYEE OF A NAMED
+// COMPANY spending it — membership is already an allowlist an admin maintains
+// by hand, so „any signed-in account" would widen the audience without
+// widening what anyone can actually do. Add the stage if that stops being true.
+//
+// ⚠️ Read it through `canSeeB2B()` in lib/b2b.ts. Do not compare this constant
+// at call sites, and do not add an env var beside it — one switch, or the next
+// person adds a third.
+export type B2BVisibility = 'off' | 'admin' | 'public'
+export const B2B_VISIBILITY: B2BVisibility = 'off'
