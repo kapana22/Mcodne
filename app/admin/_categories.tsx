@@ -23,7 +23,10 @@ export type AdminCategory = {
   isLive: boolean
   status: CategoryStatus
   parentId: string | null
+  /** Profiles pointing HERE — the blast radius of hiding or deleting. */
   tutorCount: number
+  /** What the public sees under it: gated, and folded for a sphere. */
+  listedCount: number
   childCount: number
 }
 
@@ -215,6 +218,20 @@ export const CategoriesSection = () => {
         actions={undefined}
       />
       <section className="px-6 lg:px-8 py-6">
+        {/* The three statuses, stated where they are chosen. The difference
+            between „დამალული" and „გადამისამართებული" is the one that matters
+            and the one a dropdown cannot convey: hiding takes a category's
+            experts off the site, redirecting moves them to the parent. Getting
+            those two the wrong way round is the only way to lose somebody from
+            this screen. */}
+        <dl className="mb-4 rounded-btn border border-ink-200 bg-ink-50/60 px-3.5 py-3 grid gap-1.5 sm:grid-cols-3 text-meta">
+          <div><dt className="inline font-display font-semibold text-ink-800">ჩანს</dt>
+            <dd className="inline text-ink-600"> — მენიუსა და კატალოგშია.</dd></div>
+          <div><dt className="inline font-display font-semibold text-ink-800">დამალული</dt>
+            <dd className="inline text-ink-600"> — გვერდი მუშაობს, სიაში არაა. ექსპერტები არსად ჩანან.</dd></div>
+          <div><dt className="inline font-display font-semibold text-ink-800">გადამისამართებული</dt>
+            <dd className="inline text-ink-600"> — ბმული მშობელზე გადადის, ექსპერტები მშობელში ითვლება.</dd></div>
+        </dl>
         {err && <AdminError message={err} className="mb-4" />}
         {flash && (
           <div role="alert" className={`mb-4 rounded-btn border px-3 py-2 text-small font-medium ${flash.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
@@ -260,17 +277,24 @@ export const CategoriesSection = () => {
           </div>
         ) : (
           <div className="rounded-card border border-ink-200 bg-white overflow-hidden">
-            <div className="hidden lg:grid grid-cols-[1.4fr_10rem_1fr_3.5rem_auto] gap-4 px-4 py-2.5 border-b border-ink-200 bg-ink-50/60 font-display text-micro font-semibold uppercase text-ink-500">
+            <div className="hidden lg:grid grid-cols-[1.3fr_9.5rem_1fr_3.5rem_3.5rem_auto] gap-4 px-4 py-2.5 border-b border-ink-200 bg-ink-50/60 font-display text-micro font-semibold uppercase text-ink-500">
               <div>სახელი</div>
               <div>სტატუსი</div>
               <div>მშობელი</div>
-              <div>ექსპერტი</div>
+              {/* TWO numbers, and they answer different questions. „ექსპერტი" is
+                  how many profiles point at this row — what hiding or deleting
+                  it would affect. „საიტზე" is what a visitor actually sees under
+                  it, folded, by the same rule /categories uses. The panel used
+                  to print only the first and label it as if it were the second,
+                  so „ბიზნესი და ფინანსები" read 2 in here and 4 out there. */}
+              <div title="პროფილი, რომელიც ამ კატეგორიაშია">ექსპერტი</div>
+              <div title="რამდენს ხედავს ვიზიტორი — ქვე-მიმართულებების ჩათვლით">საიტზე</div>
               <div className="text-right">მართვა</div>
             </div>
             {listed.length === 0 ? (
               <div className="px-4 py-8 text-center text-small text-ink-500">ვერაფერი მოიძებნა.</div>
             ) : listed.map(({ row: r, child }) => (
-              <div key={r.id} className="grid grid-cols-1 lg:grid-cols-[1.4fr_10rem_1fr_3.5rem_auto] gap-2 lg:gap-4 items-center px-4 py-3 border-b border-ink-100 last:border-b-0">
+              <div key={r.id} className="grid grid-cols-1 lg:grid-cols-[1.3fr_9.5rem_1fr_3.5rem_3.5rem_auto] gap-2 lg:gap-4 items-center px-4 py-3 border-b border-ink-100 last:border-b-0">
                 <div className={`min-w-0 ${child ? 'lg:pl-5' : ''}`}>
                   {editingId === r.id ? (
                     <input
@@ -323,6 +347,15 @@ export const CategoriesSection = () => {
                 </div>
                 <div className="font-display font-semibold text-small text-ink-800 tabular-nums">
                   <span className="lg:hidden text-ink-500 font-normal">ექსპერტი: </span>{r.tutorCount}
+                </div>
+                <div className="font-display font-semibold text-small tabular-nums">
+                  <span className="lg:hidden text-ink-500 font-normal">საიტზე: </span>
+                  {/* „—" for a row the public cannot browse: a hidden sphere
+                      shows nobody, and an absorbed one is counted under its
+                      parent rather than under itself. */}
+                  {r.status === 'VISIBLE'
+                    ? <span className="text-ink-800">{r.listedCount}</span>
+                    : <span className="text-ink-400" title={r.status === 'REDIRECTED' ? 'ითვლება მშობელში' : 'დამალულია — არავინ ჩანს'}>—</span>}
                 </div>
                 <div className="flex items-center gap-1 lg:justify-end">
                   <button type="button" onClick={() => { setEditingId(r.id); setEditName(r.name) }} className="h-8 px-2.5 rounded-btn text-meta font-display font-semibold text-ink-600 hover:bg-ink-100 transition-colors duration-fast">რედაქტ.</button>

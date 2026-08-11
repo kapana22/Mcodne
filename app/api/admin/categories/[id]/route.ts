@@ -105,6 +105,8 @@ export async function PATCH(
         status: updated.status,
         parentId: updated.parentId,
         tutorCount: updated._count.tutors,
+        // Recomputed on the next load; the row only needs it to stay a number.
+        listedCount: updated.status === 'VISIBLE' ? updated._count.tutors : 0,
         childCount: updated._count.children,
       },
     })

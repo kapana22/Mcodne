@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { slugify } from '@/lib/slug'
+import { expertCountsBySphere } from '@/lib/categoryCounts'
 
 // GET /api/admin/categories
 // Returns EVERY category whatever its status, with the counts the screen needs
@@ -26,6 +27,18 @@ export async function GET() {
       _count: { select: { tutors: true, children: true } },
     },
   })
+  // TWO numbers, because they answer two different questions and the panel was
+  // showing only the first — which is why it disagreed with the site.
+  //
+  //   tutorCount   how many profiles POINT HERE. Ungated and unfolded: it is
+  //                the blast radius of hiding or deleting this row.
+  //   listedCount  what the PUBLIC actually sees under it — the same gates and
+  //                the same fold lib/categoryCounts applies everywhere else, so
+  //                a sphere shows its children's experts too.
+  //
+  // For „ბიზნესი და ფინანსები" those are 2 and 4. One number could not have
+  // been both, and the panel printed the one that matched nothing on the site.
+  const listed = await expertCountsBySphere(rows)
   const out = rows.map(r => ({
     id: r.id,
     slug: r.slug,
@@ -35,6 +48,7 @@ export async function GET() {
     status: r.status,
     parentId: r.parentId,
     tutorCount: r._count.tutors,
+    listedCount: r.status === 'VISIBLE' ? (listed.get(r.id) ?? 0) : 0,
     childCount: r._count.children,
   }))
   return NextResponse.json(out)
@@ -80,7 +94,7 @@ export async function POST(req: Request) {
       id: created.id, slug: created.slug, name: created.name,
       defaultServiceType: created.defaultServiceType,
       isLive: created.isLive, status: created.status, parentId: created.parentId,
-      tutorCount: created._count.tutors, childCount: created._count.children,
+      tutorCount: created._count.tutors, listedCount: 0, childCount: created._count.children,
     },
   }, { status: 201 })
 }
