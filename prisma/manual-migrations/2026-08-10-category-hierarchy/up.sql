@@ -91,7 +91,9 @@ BEGIN
            ('finance',  'business'),
            ('sales',    'marketing'),
            ('product',  'it'),
-           ('design',   'it'),
+           -- moved to marketing 2026-08-11 (owner): the chip says „დიზაინი",
+         -- and most people who read that word mean brand, not product/UX.
+         ('design',   'marketing'),
            ('crypto',   'tax'),
            ('hr',       'business'),
            ('advokati', 'law')
