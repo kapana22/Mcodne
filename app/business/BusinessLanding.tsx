@@ -45,25 +45,15 @@ export type PublicService = {
   order: number
 }
 
-/* How it works. Three steps, and the middle one is the whole product: the
-   company does not search, compare or interview — we do that part. Written as
-   what HAPPENS, not as benefits. */
-const STEPS: { icon: keyof typeof Icon; title: string; body: string }[] = [
-  {
-    icon: 'send',
-    title: 'გვწერთ მოთხოვნას',
-    body: 'აირჩევთ სერვისს ან უბრალოდ აღწერთ ამოცანას. ვალდებულებას არ იღებთ.',
-  },
-  {
-    icon: 'users',
-    title: 'ექსპერტს ვარჩევთ ჩვენ',
-    body: 'თქვენ არავის ეძებთ და არ ადარებთ — ამოცანას შესაბამის ექსპერტს გადავცემთ.',
-  },
-  {
-    icon: 'doc',
-    title: 'ვთანხმდებით და ვიწყებთ',
-    body: 'ვადასა და თანხაზე წინასწარ ვთანხმდებით. ანგარიშსწორება ინვოისით.',
-  },
+/* How it works — three lines, and that is the whole explanation.
+   It was three headings plus three sentences; the owner read the page and said
+   „სულ ტექსტი ტექსტი". A process nobody reads explains nothing, so each step
+   is now one phrase somebody takes in at a glance. The middle one is the
+   product: the company does not search or compare — we do. */
+const STEPS: { icon: keyof typeof Icon; text: string }[] = [
+  { icon: 'send', text: 'გვიგზავნით მოთხოვნას' },
+  { icon: 'users', text: 'ექსპერტს ვარჩევთ ჩვენ' },
+  { icon: 'doc', text: 'ვთანხმდებით ფასზე და ვიწყებთ' },
 ]
 
 export async function BusinessLanding() {
@@ -105,7 +95,7 @@ export async function BusinessLanding() {
             სერვისები კომპანიებისთვის
           </h1>
           <p className="mt-6 text-body-lg text-ink-600">
-            აღწერეთ ამოცანა — ექსპერტს ჩვენ შევარჩევთ. ფასი და ვადა წინასწარ ცნობილია.
+            აღწერეთ ამოცანა — ექსპერტს ჩვენ შევარჩევთ.
           </p>
 
           {/* The one honest number, and only when there IS one. Below three
@@ -132,25 +122,17 @@ export async function BusinessLanding() {
         </div>
 
         {/* ── How it works ── */}
-        <section className="mt-16 lg:mt-24">
-          <Eyebrow tone="muted" className="mb-2">პროცესი</Eyebrow>
-          <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight">როგორ მუშაობს</h2>
-          <div className="mt-7 grid sm:grid-cols-3 gap-6 lg:gap-8">
+        <section className="mt-12 lg:mt-16">
+          <div className="grid sm:grid-cols-3 gap-4">
             {STEPS.map((s, i) => {
               const Glyph = Icon[s.icon]
               return (
-                <div key={s.title}>
-                  <div className="flex items-center gap-2.5">
-                    {/* The step number carries the sequence; the glyph carries
-                        recognition. No arrows between them — canon bans
-                        decorative arrows, and a 3-up grid already reads L→R. */}
-                    <span className="w-7 h-7 shrink-0 rounded-pill bg-ink-900 text-white inline-flex items-center justify-center font-display text-micro font-bold tabular-nums">
-                      {i + 1}
-                    </span>
-                    <Glyph className="w-4 h-4 text-ink-400" aria-hidden="true" />
-                  </div>
-                  <h3 className="mt-3 font-display text-h3 font-bold text-ink-900 tracking-tight">{s.title}</h3>
-                  <p className="mt-1.5 text-body text-ink-600">{s.body}</p>
+                <div key={s.text} className="flex items-center gap-3 rounded-card border border-ink-200 bg-white px-4 py-3.5">
+                  <span className="w-6 h-6 shrink-0 rounded-pill bg-ink-900 text-white inline-flex items-center justify-center font-display text-micro font-bold tabular-nums">
+                    {i + 1}
+                  </span>
+                  <Glyph className="w-4 h-4 shrink-0 text-ink-400" aria-hidden="true" />
+                  <span className="font-display text-small font-semibold text-ink-900">{s.text}</span>
                 </div>
               )
             })}
@@ -160,13 +142,8 @@ export async function BusinessLanding() {
         {/* ── The catalogue ── */}
         {grouped.length > 0 && (
           <section className="mt-16 lg:mt-24">
-            <Eyebrow tone="muted" className="mb-2">სერვისები</Eyebrow>
-            <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight">მიმართულებები და ფასები</h2>
-            <p className="mt-2 text-body text-ink-600 max-w-[680px]">
-              ფასი მოცემულია ერთ სერვისზე. თუ ამოცანა უფრო დიდია, მოგვწერეთ და ცალკე შევათანხმებთ.
-            </p>
-
-            <div className="mt-8 space-y-10">
+            <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight">სერვისები</h2>
+            <div className="mt-7 space-y-10">
               {grouped.map(([direction, list]) => (
                 <div key={direction}>
                   <h3 className="font-display text-h3 font-bold text-ink-900 tracking-tight">{direction}</h3>
@@ -218,52 +195,38 @@ export async function BusinessLanding() {
           </section>
         )}
 
-        {/* ── What a company actually gets. Three facts, each verifiable. ── */}
-        <section className="mt-16 lg:mt-24 rounded-card border border-ink-200 bg-ink-50/50 p-6 sm:p-8">
-          <div className="grid sm:grid-cols-3 gap-6 lg:gap-10">
-            <div>
-              <Icon.shieldCheck className="w-5 h-5 text-brand-600" aria-hidden="true" />
-              <h3 className="mt-2.5 font-display text-body-lg font-bold text-ink-900 tracking-tight">
-                ექსპერტები შემოწმებულია
-              </h3>
-              <p className="mt-1 text-small text-ink-600">
-                პლატფორმაზე ექსპერტი განაცხადისა და დოკუმენტების შემოწმების შემდეგ ხვდება.
-              </p>
-            </div>
-            <div>
-              <Icon.doc className="w-5 h-5 text-ink-500" aria-hidden="true" />
-              <h3 className="mt-2.5 font-display text-body-lg font-bold text-ink-900 tracking-tight">
-                ანგარიშსწორება ინვოისით
-              </h3>
-              <p className="mt-1 text-small text-ink-600">
-                იურიდიულ პირზე ინვოისს ვუგზავნით. საიტზე გადახდა საჭირო არ არის.
-              </p>
-            </div>
-            <div>
-              <Icon.check className="w-5 h-5 text-ink-500" aria-hidden="true" />
-              <h3 className="mt-2.5 font-display text-body-lg font-bold text-ink-900 tracking-tight">
-                ფასი წინასწარ
-              </h3>
-              <p className="mt-1 text-small text-ink-600">
-                თანხასა და ვადაზე მუშაობის დაწყებამდე ვთანხმდებით.
-              </p>
-            </div>
+        {/* ── Three facts, one line each. ──
+            Was three headings with a sentence under each — six blocks of prose
+            for three ideas. A reassurance nobody finishes reassures nobody. */}
+        <section className="mt-12 lg:mt-16 rounded-card border border-ink-200 bg-ink-50/50 px-5 py-4 sm:px-6">
+          <div className="grid sm:grid-cols-3 gap-3 sm:gap-6">
+            {[
+              { icon: 'shieldCheck' as const, text: 'ექსპერტები შემოწმებულია', brand: true },
+              { icon: 'doc' as const, text: 'ანგარიშსწორება ინვოისით', brand: false },
+              { icon: 'check' as const, text: 'ფასი წინასწარ შეთანხმებული', brand: false },
+            ].map(f => {
+              const Glyph = Icon[f.icon]
+              return (
+                <div key={f.text} className="flex items-center gap-2.5">
+                  <Glyph className={`w-4 h-4 shrink-0 ${f.brand ? 'text-brand-600' : 'text-ink-500'}`} aria-hidden="true" />
+                  <span className="text-small text-ink-700">{f.text}</span>
+                </div>
+              )
+            })}
           </div>
         </section>
 
         {/* ── The form ── */}
         <section id="form" className="mt-16 lg:mt-24 scroll-mt-24">
           <div className="max-w-[680px]">
-            <Eyebrow tone="muted" className="mb-1">მოთხოვნა</Eyebrow>
             <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight">
-              დაგვიტოვეთ კონტაქტი
+              მოთხოვნა
             </h2>
             <p className="mt-2 text-body text-ink-600">
-              შეავსეთ ფორმა და დაგიკავშირდებით. თუ გირჩევნიათ —{' '}
+              ან მოგვწერეთ:{' '}
               <a href={`mailto:${SUPPORT_EMAIL}`} className="text-brand-700 font-semibold underline underline-offset-2 hover:text-brand-800 transition-colors duration-fast">
                 {SUPPORT_EMAIL}
               </a>
-              .
             </p>
           </div>
           <div className="mt-6 max-w-[680px]">
