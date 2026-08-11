@@ -33,6 +33,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     where: { id },
     select: {
       id: true, name: true, taxId: true, balance: true, status: true, note: true, createdAt: true,
+      // ⚠️ REQUIRED BY THE PANEL, and its absence was a hard 500 (found by
+      // opening a real company on production, 2026-08-11). `transactions` below
+      // is capped at 200, so the LIST cannot be counted client-side — the panel
+      // reads `_count.transactions` to say „the last 200 of N". It read
+      // `_count.members` too, and with `_count` undefined that is a TypeError
+      // on the first render of the detail view.
+      //
+      // TypeScript did not catch it: the client types this response by hand
+      // (type Detail = Company & …), so the declaration was a claim about the
+      // API, not a check of it.
+      _count: { select: { members: true, transactions: true } },
       members: {
         orderBy: { createdAt: 'asc' },
         select: {

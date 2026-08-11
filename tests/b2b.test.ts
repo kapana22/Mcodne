@@ -637,3 +637,28 @@ test('every dbBoot column is declared in schema.prisma', () => {
   assert.doesNotMatch(schema, /paidBy\s+PaymentSource\?\s*@default/,
     'paidBy grew a default — every existing booking would have to be backfilled')
 })
+
+test('the company detail endpoint returns every field the panel reads', () => {
+  // A hard 500 shipped here (found by opening a real company on production,
+  // 2026-08-11): the panel reads `_count.members` and `_count.transactions`,
+  // the endpoint did not select `_count`, and the detail view threw a
+  // TypeError on first render. TypeScript could not catch it — the client
+  // declares the response shape BY HAND (`type Detail = Company & …`), so the
+  // declaration is a claim about the API rather than a check of it.
+  //
+  // This test is that check, in the only form available without a running
+  // server: every `d.<field>` the component reads must appear in the route's
+  // select. Crude, and it would have caught the bug.
+  const route = codeOf('app/api/admin/companies/[id]/route.ts')
+  const panel = read('app/admin/_companies.tsx')
+  const detailBody = panel.slice(panel.indexOf('function CompanyDetail'), panel.indexOf('function CompaniesView'))
+  const readFields = new Set([...detailBody.matchAll(/\bd\.(\w+)/g)].map(m => m[1]))
+  for (const f of readFields) {
+    assert.ok(
+      new RegExp(`\\b${f}:`).test(route),
+      `the panel reads d.${f} but GET /api/admin/companies/[id] does not select it — that is a 500, not a missing value`,
+    )
+  }
+  // The two that actually broke, pinned by name so the reason survives.
+  assert.match(route, /_count: \{ select: \{ members: true, transactions: true \} \}/)
+})
