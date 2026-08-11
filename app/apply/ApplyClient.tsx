@@ -203,7 +203,10 @@ export default function TutorApply() {
       website: f.website.trim() ? f.website : (a.websiteUrl ?? ''),
       introVideoUrl: f.introVideoUrl.trim() ? f.introVideoUrl : (a.introVideoUrl ?? ''),
       headline: f.headline.trim() ? f.headline : (typeof pd.headline === 'string' ? pd.headline : ''),
-      cats: f.cats.length ? f.cats : (requestedCategory || !specialty ? [] : [specialty]),
+      // Trimmed to one: a draft saved while the step asked for „1–3" would
+      // otherwise fail validation on a value the form can no longer produce,
+      // blocking somebody on a choice they made yesterday. See MAX_CATS.
+      cats: (f.cats.length ? f.cats : (requestedCategory || !specialty ? [] : [specialty])).slice(0, MAX_CATS),
       languages: languages ?? f.languages,
       services: services ?? f.services,
       avail: avail ?? f.avail,
@@ -323,7 +326,7 @@ export default function TutorApply() {
       // rule signup uses, so a number accepted there is accepted here.
       { const e = phoneFormatError(form.phone, { required: true }); if (e) return fail('phone', e) }
       if (form.cats.length < 1) return fail('cats', 'აირჩიე სფერო.')
-      if (form.cats.length > MAX_CATS) return fail('cats', `მაქსიმუმ ${MAX_CATS} მიმართულება.`)
+      if (form.cats.length > MAX_CATS) return fail('cats', 'აირჩიე ერთი სფერო.')
       if (form.headline.trim().length < 2) return fail('headline', 'დაწერე ერთი წინადადება შენზე.')
       { const e = georgianError('ერთი წინადადება შენზე', checkGeorgian(form.headline)); if (e) return fail('headline', e) }
       // A profile with no face is the single weakest thing on the marketplace —

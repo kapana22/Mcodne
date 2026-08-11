@@ -60,31 +60,15 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
     { name: 'რელოკაცია', children: [] },
   ]
   const cats = form.cats
-  const atCap = cats.length >= MAX_CATS
   const toggle = (c: string) => set({ cats: cats.includes(c) ? cats.filter(x => x !== c) : [...cats, c] })
 
-  /* A sub-field REPLACES its sphere in the selection rather than adding to it.
-     The applicant is asked for 1–3 directions and the FIRST is their main
-     category, so „მარკეტინგი და გაყიდვები" + „გაყიდვები" would spend two of
-     three slots saying one thing — and would leave it ambiguous which of the
-     two is the answer. One slot, the most precise name they picked. */
+  /* ONE answer — see MAX_CATS in ./_form for why the „1–3" it used to ask for
+     was undeliverable. Tapping a sphere replaces whatever was chosen; tapping
+     its sub-field narrows that same answer; tapping the chosen one again
+     clears it. There is no cap to explain and no „main one" to work out. */
   const sphereOn = (s: Sphere) => cats.includes(s.name) || s.children.some(k => cats.includes(k))
-  const slotOf = (s: Sphere) => cats.findIndex(c => c === s.name || s.children.includes(c))
-  const pickSphere = (s: Sphere) => {
-    if (sphereOn(s)) set({ cats: cats.filter(c => c !== s.name && !s.children.includes(c)) })
-    else set({ cats: [...cats, s.name] })
-  }
-  /* Swapped IN PLACE: position is meaning here (cats[0] is the main category),
-     so narrowing „მარკეტინგი და გაყიდვები" to „გაყიდვები" must not quietly
-     demote it behind whatever was picked second. */
-  const pickChild = (s: Sphere, k: string) => {
-    const target = cats.includes(k) ? s.name : k
-    const at = slotOf(s)
-    if (at === -1) { if (!atCap) set({ cats: [...cats, target] }); return }
-    const next = [...cats]
-    next[at] = target
-    set({ cats: next })
-  }
+  const pickSphere = (s: Sphere) => set({ cats: sphereOn(s) ? [] : [s.name] })
+  const pickChild = (s: Sphere, k: string) => set({ cats: cats.includes(k) ? [s.name] : [k] })
 
   return (
     <>
@@ -164,7 +148,7 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
       {/* „პირველივე გახდება მთავარი" is not a style note: submitApplication()
           sends `cats[0]` as the specialty, and approval resolves the live
           Category from it — the rest are context for the moderator. */}
-      <FormSection title="სფერო" required fields={['cats']} sub="აირჩიე 1–3 მიმართულება. პირველივე გახდება შენი მთავარი კატეგორია ძებნაში.">
+      <FormSection title="სფერო" required fields={['cats']} sub="აირჩიე შენი სფერო. თუ უფრო კონკრეტული მიმართულება გაქვს, ქვემოთ აირჩიე.">
         {/* The `cats` anchor moved here from the deleted free-text box. Without
             it „აირჩიე სფერო." would render with nowhere to scroll to —
             tests/apply-error-focus.test.ts F2 catches exactly that. */}
@@ -191,8 +175,7 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
                   key={s.name}
                   type="button"
                   onClick={() => pickSphere(s)}
-                  disabled={!on && atCap}
-                  className={`h-9 px-3.5 rounded-pill border font-display text-small font-semibold tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-ink-200 ${
+                  className={`h-9 px-3.5 rounded-pill border font-display text-small font-semibold tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] ${
                     on ? 'bg-brand-600 text-white border-brand-500 shadow-sm' : 'bg-white text-ink-700 border-ink-200 hover:border-ink-400'
                   }`}
                 >

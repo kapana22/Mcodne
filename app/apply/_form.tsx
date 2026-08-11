@@ -173,14 +173,32 @@ export const SERVER_FIELD: Record<string, string> = {
  * gate before the finish line. The server has only ever required 20; 40 keeps
  * the public profile from reading as empty without turning the form into an
  * essay. Both validators below read this, so there is one number to change. */
-/** „აირჩიე 1–3 მიმართულება" — the 3, enforced.
+/**
+ * ONE sphere. Not „1–3".
  *
- *  Nothing enforced it until 2026-08-11: the chips let an applicant select
- *  every sphere, so the sentence above them was a suggestion, and the sub-field
- *  panels that opened under each one turned the step into a wall. A cap you
- *  cannot exceed needs no error message, so the picker disables the rest;
- *  `validateStep` repeats it only so a stale draft cannot carry more past. */
-export const MAX_CATS = 3
+ * The step asked for up to three directions from the day it was written, and
+ * the platform could never keep more than one — this is measured, not a
+ * preference:
+ *
+ *   • `TutorProfile.categoryId` is a single column. There is nowhere to put a
+ *     second category.
+ *   • the submit body carries `specialty = form.cats[0]` and NOT the array, so
+ *     the second and third answers were discarded in the browser and never
+ *     reached the server at all.
+ *   • the review screen printed `form.cats.join(', ')` — so the last thing an
+ *     applicant read before pressing send was a confirmation of two choices
+ *     that were about to be thrown away.
+ *
+ * A form must not ask for what it cannot keep. Asking once, and letting the
+ * answer be as precise as the applicant likes (a sphere, or one of the
+ * sub-fields inside it), says the same thing honestly and removes the „which of
+ * my three is the main one" question with it.
+ *
+ * `validateStep` still checks the bound so a draft saved before 2026-08-11
+ * cannot carry three past the gate; the draft loader trims those to their
+ * first entry, so nobody is blocked by a form they filled in yesterday.
+ */
+export const MAX_CATS = 1
 
 export const MIN_BIO = APPLY.BIO_MIN
 export const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
