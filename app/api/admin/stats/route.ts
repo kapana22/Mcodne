@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { isBookingLive } from '@/lib/bookingLive'
 import { ensureDbReady } from '@/lib/dbBoot'
+import { b2bFeatureExists } from '@/lib/b2b'
 
 export async function GET() {
   const auth = await requireRoleApi('ADMIN')
@@ -12,7 +13,7 @@ export async function GET() {
   const now = Date.now()
   const liveWindowStart = new Date(now - 240 * 60_000)
   await ensureDbReady().catch(() => {})
-  const [users, tutors, students, bookings, pendingApps, completed, revenue, liveCandidates, helpOpen] = await Promise.all([
+  const [users, tutors, students, bookings, pendingApps, completed, revenue, liveCandidates, helpOpen, b2bLeads] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { role: 'TUTOR' } }),
     prisma.user.count({ where: { role: 'STUDENT' } }),
@@ -32,11 +33,22 @@ export async function GET() {
     prisma.$queryRawUnsafe<{ n: number }[]>(
       `SELECT COUNT(*)::int AS n FROM "HelpMessage" WHERE "status" = 'new'`,
     ).then(r => Number(r[0]?.n ?? 0)).catch(() => 0),
+    // Unanswered B2B enquiries, riding along for the same reason the help count
+    // does: the shell already makes this request, and a queue with a person
+    // waiting at the other end of it has to announce itself. Without this a
+    // lead sat in a tab nobody opens until somebody thought to look.
+    //
+    // `.catch(() => 0)` because this table only exists once lib/dbBoot has run.
+    // A B2B count is never worth 500-ing the whole admin shell over — every
+    // other badge on the panel would go with it.
+    b2bFeatureExists()
+      ? prisma.businessLead.count({ where: { status: 'NEW' } }).catch(() => 0)
+      : Promise.resolve(0),
   ])
   // Derived truth — the stored LIVE status is never written (see lib/bookingLive).
   const live = liveCandidates.filter(isBookingLive).length
   return NextResponse.json({
-    users, tutors, students, bookings, pendingApps, completed, live, helpOpen,
+    users, tutors, students, bookings, pendingApps, completed, live, helpOpen, b2bLeads,
     revenue: (revenue as any)._sum?.price ?? 0,
   })
 }

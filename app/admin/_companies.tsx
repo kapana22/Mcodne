@@ -335,7 +335,7 @@ const LEAD_STATUS: Record<Lead['status'], string> = {
   NEW: 'ახალი', CONTACTED: 'დაკავშირებული', CLOSED: 'დახურული',
 }
 
-function LeadsView({ onCount }: { onCount: (n: number) => void }) {
+function LeadsView({ onCount, onChanged }: { onCount: (n: number) => void; onChanged?: () => void }) {
   const [list, setList] = useState<Lead[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
@@ -352,7 +352,10 @@ function LeadsView({ onCount }: { onCount: (n: number) => void }) {
   useEffect(() => { load() }, [load])
 
   const setStatus = async (id: string, status: Lead['status']) => {
-    try { await post('/api/admin/business-leads', { id, status }, 'PATCH'); await load() }
+    // …and tell the shell, so the nav badge drops the moment a lead is handled.
+    // Without it the count only refreshed on a full reload, i.e. the badge kept
+    // claiming work that was already done — which is worse than no badge.
+    try { await post('/api/admin/business-leads', { id, status }, 'PATCH'); await load(); onChanged?.() }
     catch (e: any) { setErr(errText(e?.message)) }
   }
 
@@ -403,7 +406,7 @@ function LeadsView({ onCount }: { onCount: (n: number) => void }) {
 
 type Sub = 'leads' | 'companies'
 
-export function CompaniesSection() {
+export function CompaniesSection({ onLeadsChanged }: { onLeadsChanged?: () => void } = {}) {
   const [sub, setSub] = useState<Sub>('leads')
   const [openLeads, setOpenLeads] = useState<number | undefined>(undefined)
 
@@ -447,7 +450,7 @@ export function CompaniesSection() {
         />
       </div>
       <div className="mt-6">
-        {sub === 'leads' ? <LeadsView onCount={setOpenLeads} /> : <CompaniesView />}
+        {sub === 'leads' ? <LeadsView onCount={setOpenLeads} onChanged={onLeadsChanged} /> : <CompaniesView />}
       </div>
     </div>
   )

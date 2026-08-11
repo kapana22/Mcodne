@@ -42,6 +42,9 @@ export default function AdminOverview() {
   // until now the only way to discover one was to open the tab and scroll past
   // four stat tiles.
   const [helpOpen, setHelpOpen] = useState<number | null>(null)
+  // Unanswered B2B enquiries — the same kind of number as the two above: a
+  // queue with a person waiting at the other end of it.
+  const [b2bLeads, setB2bLeads] = useState<number | null>(null)
   // Bump this to force <OverviewSection> KPI re-fetch after a moderation
   // decision (approve/reject changes counts).
   const [statsTick, setStatsTick] = useState(0)
@@ -67,6 +70,7 @@ export default function AdminOverview() {
       const d = await r.json()
       if (typeof d?.pendingApps === 'number') setPendingCount(d.pendingApps)
       if (typeof d?.helpOpen === 'number') setHelpOpen(d.helpOpen)
+      if (typeof d?.b2bLeads === 'number') setB2bLeads(d.b2bLeads)
     } catch {}
   }
   useEffect(() => { loadPending() }, [statsTick])
@@ -78,9 +82,9 @@ export default function AdminOverview() {
 
   return (
     <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen lg:flex lg:items-start">
-      <AdminSidebar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} />
+      <AdminSidebar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} />
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-      <TopBar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} />
+      <TopBar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} />
 
       {/* NB: the `key` used to be `active + ':' + statsTick` so that a moderation
           decision would remount the overview KPIs. But `statsTick` also
@@ -95,7 +99,7 @@ export default function AdminOverview() {
         {/* B2B. Unreachable while the vertical is off: `companies` is filtered
             out of ADMIN_NAV, and VALID_TABS is derived from it, so `active` can
             never hold this value. Its APIs are gated independently. */}
-        {active === 'companies' && <CompaniesSection />}
+        {active === 'companies' && <CompaniesSection onLeadsChanged={() => setStatsTick(t => t + 1)} />}
         {active === 'bookings' && <BookingsSection />}
         {active === 'reviews' && <ReviewsSection />}
         {active === 'disputes' && <DisputesSection />}

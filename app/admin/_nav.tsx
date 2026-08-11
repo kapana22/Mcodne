@@ -109,17 +109,22 @@ const NAV_GROUPS: NavGroup[] = ['queue', 'people', 'content', 'signals', 'system
 
 /** Both surfaces render this, so a badge can never mean two different things
  *  on desktop and mobile (it did: green here, grey there). */
-function navBadge(id: AdminTab, pending?: number | null, helpOpen?: number | null): number {
+function navBadge(id: AdminTab, pending?: number | null, helpOpen?: number | null, b2bLeads?: number | null): number {
   if (id === 'moderation') return pending ?? 0
   if (id === 'help') return helpOpen ?? 0
+  // Unanswered B2B enquiries. Same treatment as the two above and for the same
+  // reason: there is a person at the other end of it. Without this a lead sat
+  // in a tab nobody opens until somebody thought to look — which is what the
+  // owner hit on the first day it was live.
+  if (id === 'companies') return b2bLeads ?? 0
   return 0
 }
 
 /* Desktop-only left rail — moves the 11-item nav out of the cramped top header
    into a calm sidebar, so managing/moderating is comfortable (mobile keeps the
    TopBar drawer). */
-export const AdminSidebar = ({ active, onNav, pendingCount, helpOpen }: {
-  active: AdminTab; onNav: (t: AdminTab) => void; pendingCount?: number | null; helpOpen?: number | null
+export const AdminSidebar = ({ active, onNav, pendingCount, helpOpen, b2bLeads }: {
+  active: AdminTab; onNav: (t: AdminTab) => void; pendingCount?: number | null; helpOpen?: number | null; b2bLeads?: number | null
 }) => (
   <aside className="hidden lg:flex flex-col w-[240px] shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-ink-100 bg-white px-3 py-4">
     <div className="px-3">
@@ -134,7 +139,7 @@ export const AdminSidebar = ({ active, onNav, pendingCount, helpOpen }: {
           <div className="flex flex-col gap-0.5">
             {ADMIN_NAV.filter(it => it.g === g).map(it => {
               const on = active === it.id
-              const badge = navBadge(it.id, pendingCount, helpOpen)
+              const badge = navBadge(it.id, pendingCount, helpOpen, b2bLeads)
               const Glyph = Icon[it.icon]
               return (
                 <button
@@ -169,8 +174,8 @@ export const AdminSidebar = ({ active, onNav, pendingCount, helpOpen }: {
   </aside>
 )
 
-export const TopBar = ({ active, onNav, pendingCount, helpOpen }: {
-  active: AdminTab; onNav: (t: AdminTab) => void; pendingCount?: number | null; helpOpen?: number | null
+export const TopBar = ({ active, onNav, pendingCount, helpOpen, b2bLeads }: {
+  active: AdminTab; onNav: (t: AdminTab) => void; pendingCount?: number | null; helpOpen?: number | null; b2bLeads?: number | null
 }) => {
   const [mobOpen, setMobOpen] = useState(false)
   // Reads the SAME ADMIN_NAV as the sidebar. It used to be a second hand-typed
@@ -216,7 +221,7 @@ export const TopBar = ({ active, onNav, pendingCount, helpOpen }: {
               <div className="pb-1 text-micro uppercase font-display font-semibold text-ink-400">{GROUP_LABEL[g]}</div>
               {ADMIN_NAV.filter(it => it.g === g).map(it => {
                 const on = active === it.id
-                const badge = navBadge(it.id, pendingCount, helpOpen)
+                const badge = navBadge(it.id, pendingCount, helpOpen, b2bLeads)
                 const Glyph = Icon[it.icon]
                 return (
                   <button key={it.id} type="button" onClick={() => { onNav(it.id); setMobOpen(false) }} className={`h-12 w-full flex items-center gap-3 text-body font-display font-medium border-b border-ink-100 last:border-b-0 text-left ${on ? 'text-ink-900' : 'text-ink-700'}`}>
