@@ -1054,6 +1054,15 @@ model B2BService {
   direction   String
   title       String
   description String?
+  // One short meta line under the title: „4 საათი · ჯგუფური · ონლაინ",
+  // „ერთჯერადი", „თვეში 2 შეხვედრა". Optional and free text.
+  //
+  // WHY A SEPARATE FIELD AND NOT PART OF description. A TRAINING is a service
+  // like any other here, but it is the one where format decides whether it fits
+  // at all — how many people, how long, where. Buried in a sentence a company
+  // has to read for it; on its own line they can scan a whole direction and
+  // rule things in or out. Everything else may simply leave it empty.
+  format      String?
   // Lari, like every other price in this database. This is the number a company
   // reads on the page — the one actually invoiced may differ after a
   // conversation, which is what BusinessLead.agreedPrice records.

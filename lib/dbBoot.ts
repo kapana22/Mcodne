@@ -654,6 +654,7 @@ async function runMigrations() {
       "direction"      TEXT NOT NULL,
       "title"          TEXT NOT NULL,
       "description"    TEXT,
+      "format"         TEXT,
       "priceGel"       INTEGER NOT NULL,
       "priceOnRequest" BOOLEAN NOT NULL DEFAULT false,
       "order"          INTEGER NOT NULL DEFAULT 0,
@@ -664,6 +665,8 @@ async function runMigrations() {
       CONSTRAINT "B2BService_price_nonnegative" CHECK ("priceGel" >= 0)
     );
   `)
+  // Added after the table shipped, so an ALTER as well as the CREATE above.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "B2BService" ADD COLUMN IF NOT EXISTS "format" TEXT;`)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "B2BService_visible_direction_order_idx" ON "B2BService"("visible", "direction", "order");`)
 
   await prisma.$executeRawUnsafe(`

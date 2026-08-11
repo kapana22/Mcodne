@@ -66,6 +66,27 @@ export const COPY_RULES: CopyRule[] = [
   { id: 'term-slot', re: /სლოტ(ი|ს|ში|ზე|ებ)[ა-ჰ]*/, fix: 'დრო / თავისუფალი დრო', why: 'CLAUDE.md ლექსიკონი' },
   { id: 'term-escrow', re: /ესქროუ[ა-ჰ]*/, fix: 'დაცული გადახდა', why: 'CLAUDE.md ლექსიკონი' },
 
+  /* ── morphology: the perfect is not the aorist ──────────────────────────
+   *
+   * SHIPPED 2026-08-11 on the 404 page: „თუ ეს ბმული სადმე გინახე" — meant as
+   * „if you have seen this link somewhere", i.e. the perfect (თურმეობითი),
+   * whose 2nd-person form is გინახავს. „გინახე" is not a wrong choice between
+   * two forms; it is not a form at all. The object marker გ- with an aorist
+   * ending gives „გნახე" (= „I saw YOU"), and the ი- version vowel belongs to
+   * the perfect, which ends in -ავს. Gluing the two halves together produces a
+   * word Georgian does not have.
+   *
+   * THE LIMITS, stated so nobody trusts this further than it goes. This is a
+   * blocklist of the exact forms that are always wrong, in the same spirit as
+   * the terminology rules above — Georgian inflection gives a regex no word
+   * boundary to stand on, so a general morphology check is not a regex, it is a
+   * parser. A first attempt at a pattern („perfect prefix + aorist ending")
+   * matched 20 words in the tree and every single one was a legitimate
+   * imperative or noun (მიიღე, მიუთითე, მიწერე, მისამართზე…). Precision over
+   * reach: add forms here as they are found, never a shape that guesses. */
+  { id: 'perfect-nakhva', re: /(გვ|[გმ])ინახე(თ)?(?![ა-ჰ])/, fix: 'გინახავს / მინახავს — თურმეობითი, არა აორისტი',
+    why: '„გინახე" ფორმა არ არსებობს: გ- ობიექტს აორისტში „გნახე" გამოაქვს, თურმეობითი კი -ავს-ზე თავდება' },
+
   /* ── typography ─────────────────────────────────────────────────────────
    * A „ closed by an ASCII " instead of “ (U+201C). Stops at `<` because a
    * quoted phrase may wrap markup and the " ending an HTML attribute is not

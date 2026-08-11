@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS "B2BService" (
   "direction"      TEXT NOT NULL,
   "title"          TEXT NOT NULL,
   "description"    TEXT,
+  -- One short meta line: „4 საათი · ჯგუფური · ონლაინ". Matters most for a
+  -- TRAINING, where format decides whether the service fits at all.
+  "format"         TEXT,
   "priceGel"       INTEGER NOT NULL,
   "priceOnRequest" BOOLEAN NOT NULL DEFAULT false,
   "order"          INTEGER NOT NULL DEFAULT 0,
@@ -27,6 +30,9 @@ CREATE TABLE IF NOT EXISTS "B2BService" (
   CONSTRAINT "B2BService_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "B2BService_price_nonnegative" CHECK ("priceGel" >= 0)
 );
+
+-- Added after the table first shipped, so the ALTER is here too.
+ALTER TABLE "B2BService" ADD COLUMN IF NOT EXISTS "format" TEXT;
 
 CREATE INDEX IF NOT EXISTS "B2BService_visible_direction_order_idx"
   ON "B2BService"("visible", "direction", "order");

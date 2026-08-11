@@ -19,6 +19,7 @@
  *
  * Pinned by tests/categoryTree.test.ts.
  */
+import { ABROAD_CATEGORY_SLUG } from './abroad'
 
 export type CategoryStatus = 'VISIBLE' | 'HIDDEN' | 'REDIRECTED'
 
@@ -203,4 +204,144 @@ export function foldCounts(
     out.set(sphere.id, (out.get(sphere.id) ?? 0) + count)
   }
   return out
+}
+
+/* ═══════════ where an expert may be FILED ════════════════════════════════
+ *
+ * BROWSABLE answers „can this expert be found through their category". This
+ * answers a different question — „may an expert be PUT here" — and the two are
+ * deliberately not the same set:
+ *
+ *   + a HIDDEN SPHERE is assignable. „კარიერა" is hidden precisely because it
+ *     has no expert yet; if nobody may be filed there it stays empty for the
+ *     reason it was hidden. Approval un-hides it the moment someone lands in
+ *     it (see the approve route), so the hidden state is self-clearing.
+ *   − the /abroad marker is NEVER assignable. lib/abroad.ts spells out why:
+ *     it is a hidden marker row, and filing a real expert there deletes them
+ *     from the catalogue instead of adding them to the diaspora page. The
+ *     2026-08-10 migration protects it in SQL; before this constant the
+ *     approve route's own candidate list („browsable OR hidden") let it back
+ *     in through the one door nobody was watching.
+ *   − a REDIRECTED category whose parent is not VISIBLE is not assignable
+ *     either: its experts would be browsable from nowhere.
+ *
+ * Three surfaces ask this question — approval, the admin's expert drawer and
+ * the expert's own profile editor — and before this they answered it three
+ * different ways. The editor offered every REDIRECTED sub-field while
+ * PATCH /api/me/tutor accepted only VISIBLE, so 7 of 15 categories returned
+ * 400 and took the whole profile save down with them.
+ */
+
+/** The rows an expert may never be filed into. Read from lib/abroad rather than
+ *  restated — a second copy of that slug is exactly how the marker would get
+ *  protected in one place and left open in another. (No cycle: lib/abroad
+ *  imports only lib/flags.) */
+export const NEVER_ASSIGNABLE_SLUGS = [ABROAD_CATEGORY_SLUG] as const
+
+/** Prisma: every category an EXPERT may be filed into. Pair with
+ *  `slug: { notIn: [...NEVER_ASSIGNABLE_SLUGS] }` — expressed separately so the
+ *  caller can keep it in the same `where` without nesting another OR. */
+export const ASSIGNABLE_CATEGORY = {
+  OR: [
+    { status: 'VISIBLE' as const },
+    { status: 'HIDDEN' as const, parentId: null },
+    { status: 'REDIRECTED' as const, parent: { is: { status: 'VISIBLE' as const } } },
+  ],
+}
+
+/** Prisma: the whole rule, ready to drop into `category.findMany({ where })`. */
+export const ASSIGNABLE_CATEGORY_WHERE = {
+  ...ASSIGNABLE_CATEGORY,
+  slug: { notIn: [...NEVER_ASSIGNABLE_SLUGS] },
+}
+
+/** Deterministic read order for any candidate list. `order` is the admin's own
+ *  sequence and `slug` is unique, so this can never tie — which is the point:
+ *  the resolver below scans the list, and an unordered `findMany` made the same
+ *  application resolve differently after a VACUUM. */
+export const CATEGORY_READ_ORDER = [{ order: 'asc' as const }, { slug: 'asc' as const }]
+
+/** The client-side twin of ASSIGNABLE_CATEGORY_WHERE, for a list already
+ *  fetched (the admin panel holds every row and filters in the browser). */
+export function isAssignable(
+  cat: TreeNode & { slug: string },
+  all: readonly (TreeNode & { slug: string })[],
+): boolean {
+  if ((NEVER_ASSIGNABLE_SLUGS as readonly string[]).includes(cat.slug)) return false
+  if (cat.status === 'VISIBLE') return true
+  if (cat.status === 'HIDDEN') return !cat.parentId
+  return all.some(p => p.id === cat.parentId && p.status === 'VISIBLE')
+}
+
+/* ═══════════ specialty → category, ONCE ══════════════════════════════════
+ *
+ * `TutorApplication` has no categoryId — the applicant's answer arrives as the
+ * NAME they tapped, in `specialty`, and approval has to turn that string back
+ * into a row. That resolution existed in two places (the approve route and the
+ * moderation panel's pre-selection) with two different rule sets, so the
+ * dropdown regularly disagreed with what approval would actually do.
+ *
+ * It is one function now, and it is deterministic by construction: every arm
+ * either matches exactly one row or returns nothing. „Nothing" is a legitimate
+ * answer — it puts the choice in front of the moderator instead of guessing,
+ * which is what the old 4-character-stem arm did when it filed a „პროდიუსერი"
+ * under „პროდუქტი".
+ *
+ * Pinned by tests/categoryTree.test.ts §M.
+ */
+
+export type MatchableCategory = { id: string; slug: string; name: string }
+
+const nrm = (s: string) => (s ?? '').toLowerCase().trim().replace(/\s+/g, ' ')
+/** First word, minus the punctuation Georgian compounds carry („ბიზნეს-"). */
+const firstWord = (s: string) => nrm(s).split(/[\s,\/·—–-]+/)[0] ?? ''
+const commonPrefix = (a: string, b: string) => {
+  let i = 0
+  while (i < a.length && i < b.length && a[i] === b[i]) i++
+  return i
+}
+/** The slug as a WHOLE word, so `it` cannot match „digital". */
+const slugHit = (slug: string, sp: string) =>
+  new RegExp(`(^|[^a-z0-9])${slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`).test(sp)
+
+/** How many leading characters of two first words must agree for arm 4. Four
+ *  was the old value and it is too loose in Georgian — „პროდ" is the whole of
+ *  „პროდიუსერი"'s stem as well as „პროდუქტი"'s. */
+const STEM_MIN = 5
+
+export function resolveCategoryByName<T extends MatchableCategory>(
+  specialty: string,
+  cats: readonly T[],
+): T | undefined {
+  const sp = nrm(specialty)
+  if (sp.length < 2 || cats.length === 0) return undefined
+
+  // 1. the applicant tapped a chip and the name still reads the same.
+  const exact = cats.filter(c => nrm(c.name) === sp)
+  if (exact.length === 1) return exact[0]
+
+  // 2. the Latin term they typed IS a slug („IT" → `it`). Whole word only.
+  const bySlug = cats.filter(c => slugHit(c.slug, sp))
+  if (bySlug.length === 1) return bySlug[0]
+
+  // 3. one name contains the other — this is what carries an answer given
+  //    before a rename („ბიზნესი" against „ბიზნესი და ფინანსები"). The LONGEST
+  //    matching name wins, because it is the most specific reading of the same
+  //    string; the slug breaks a tie so the result never depends on row order.
+  const contains = cats
+    .filter(c => { const n = nrm(c.name); return n.length >= 3 && (sp.includes(n) || n.includes(sp)) })
+    .sort((a, b) => b.name.length - a.name.length || a.slug.localeCompare(b.slug))
+  if (contains.length) return contains[0]
+
+  // 4. same word, different ending — Georgian declines heavily and „ბიზნეს-
+  //    სტრატეგია" has to reach „ბიზნესი". Compared on FIRST WORDS only, and
+  //    only above STEM_MIN. An ambiguous result is refused, not guessed.
+  const scored = cats
+    .map(c => ({ c, n: commonPrefix(firstWord(c.name), firstWord(sp)) }))
+    .filter(x => x.n >= STEM_MIN)
+    .sort((a, b) => b.n - a.n || a.c.slug.localeCompare(b.c.slug))
+  if (scored.length === 1) return scored[0].c
+  if (scored.length > 1 && scored[0].n > scored[1].n) return scored[0].c
+
+  return undefined
 }

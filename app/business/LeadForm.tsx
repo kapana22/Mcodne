@@ -176,7 +176,7 @@ export function LeadForm({ services = [] }: { services?: PublicService[] }) {
               <option value="">— აირჩიეთ (არასავალდებულო) —</option>
               {services.map(s => (
                 <option key={s.id} value={s.id}>
-                  {s.direction} · {s.title} — {servicePriceLabel(s)}
+                  {s.direction} · {s.title}{s.format ? ` (${s.format})` : ''} — {servicePriceLabel(s)}
                 </option>
               ))}
             </select>

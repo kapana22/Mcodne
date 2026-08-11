@@ -36,6 +36,7 @@ const Fields = {
   direction: z.string().trim().min(2).max(80),
   title: z.string().trim().min(2).max(160),
   description: z.string().trim().max(1000).optional().or(z.literal('')),
+  format: z.string().trim().max(120).optional().or(z.literal('')),
   // Lari, whole. Zero is legal and means „the number is meaningless here" —
   // it is only ever shown when priceOnRequest is false, and the two travel
   // together.
@@ -61,6 +62,7 @@ const CreateBody = z.object({
   direction: Fields.direction,
   title: Fields.title,
   description: Fields.description,
+  format: Fields.format,
   priceGel: Fields.priceGel.default(0),
   priceOnRequest: Fields.priceOnRequest.default(false),
   order: Fields.order.default(0),
@@ -80,6 +82,7 @@ export async function POST(req: Request) {
       direction: parsed.data.direction,
       title: parsed.data.title,
       description: (parsed.data.description ?? '').trim() || null,
+      format: (parsed.data.format ?? '').trim() || null,
       priceGel: parsed.data.priceGel,
       priceOnRequest: parsed.data.priceOnRequest,
       order: parsed.data.order,
@@ -97,6 +100,7 @@ const PatchBody = z.object({
   direction: Fields.direction.optional(),
   title: Fields.title.optional(),
   description: Fields.description,
+  format: Fields.format,
   priceGel: Fields.priceGel.optional(),
   priceOnRequest: Fields.priceOnRequest.optional(),
   order: Fields.order.optional(),
@@ -117,6 +121,7 @@ export async function PATCH(req: Request) {
     if (rest[k] !== undefined) data[k] = rest[k]
   }
   if (rest.description !== undefined) data.description = (rest.description ?? '').trim() || null
+  if (rest.format !== undefined) data.format = (rest.format ?? '').trim() || null
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   }

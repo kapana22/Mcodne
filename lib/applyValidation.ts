@@ -39,6 +39,9 @@ export const APPLY = {
   NAME_MAX: 120,
   SPECIALTY_MIN: 2,
   SPECIALTY_MAX: 200,
+  /** „my field isn't listed" — a NAME for a sphere, not a description of one.
+   *  Same ceiling the headline uses; anything longer is a sentence. */
+  OTHER_CAT_MAX: 60,
   /** What the FORM asks for. */
   BIO_MIN: 40,
   /** What the API has always accepted — deliberately the looser of the two. */
@@ -88,6 +91,27 @@ export function specialtyError(raw: string): string | null {
   if (v.length < APPLY.SPECIALTY_MIN) return 'აირჩიე სფერო.'
   if (v.length > APPLY.SPECIALTY_MAX) return `სფერო ძალიან გრძელია — მაქსიმუმ ${APPLY.SPECIALTY_MAX} სიმბოლო.`
   return null
+}
+
+/**
+ * „ჩემი სფერო სიაში არ არის" — the applicant's own words. OPTIONAL: empty is
+ * fine, because a tapped chip is the other complete answer (the form gates on
+ * „one or the other", see ApplyClient.validateStep).
+ *
+ * Bounded and Georgian-checked for the same reason `specialty` is: this value
+ * becomes `specialty` when no chip was picked, so it is read by the approval
+ * matcher, printed in the moderation queue and aggregated in the admin. An
+ * unbounded field that reaches all three is a field somebody will paste a
+ * paragraph into.
+ */
+export function otherCatError(raw: string | null | undefined): string | null {
+  const v = (raw ?? '').trim()
+  if (!v) return null
+  if (v.length < APPLY.SPECIALTY_MIN) return 'სფერო ერთი სიტყვით მაინც დაწერე.'
+  if (v.length > APPLY.OTHER_CAT_MAX) {
+    return `მოკლედ დაწერე — მაქსიმუმ ${APPLY.OTHER_CAT_MAX} სიმბოლო (ახლა ${v.length}). მაგ. „დიეტოლოგია“.`
+  }
+  return georgianError('სფერო', checkGeorgian(v))
 }
 
 /** `min` differs by side: the form asks 40, the API accepts 20. See APPLY. */

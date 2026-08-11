@@ -40,7 +40,7 @@ type Lead = {
   service: { id: string; direction: string; title: string } | null
 }
 type Service = {
-  id: string; direction: string; title: string; description: string | null
+  id: string; direction: string; title: string; description: string | null; format: string | null
   priceGel: number; priceOnRequest: boolean; order: number; visible: boolean
   _count: { requests: number }
 }
@@ -419,7 +419,7 @@ function ServicesView() {
   const [list, setList] = useState<Service[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [draft, setDraft] = useState({ direction: '', title: '', description: '', priceGel: '', priceOnRequest: false })
+  const [draft, setDraft] = useState({ direction: '', title: '', description: '', format: '', priceGel: '', priceOnRequest: false })
 
   const load = useCallback(async () => {
     setErr(null)
@@ -459,7 +459,10 @@ function ServicesView() {
           <input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
             className={INPUT} placeholder="სერვისი — მაგ. სამართლებრივი აუდიტი" />
           <input value={draft.description} onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
-            className={`${INPUT} sm:col-span-2`} placeholder="აღწერა (არასავალდებულო)" />
+            className={`${INPUT} sm:col-span-2`} placeholder="აღწერა — რა პრობლემას ხსნის (არასავალდებულო)" />
+          {/* Matters most for a training: how long, how many people, where. */}
+          <input value={draft.format} onChange={e => setDraft(d => ({ ...d, format: e.target.value }))}
+            className={`${INPUT} sm:col-span-2`} placeholder="ფორმატი — მაგ. 4 საათი · ჯგუფური · ონლაინ (არასავალდებულო)" />
           <div className="flex items-center gap-3">
             <input type="number" min={0} step={1} inputMode="numeric" disabled={draft.priceOnRequest}
               value={draft.priceGel} onChange={e => setDraft(d => ({ ...d, priceGel: e.target.value }))}
@@ -475,10 +478,11 @@ function ServicesView() {
             await post('/api/admin/b2b-services', {
               direction: draft.direction.trim(), title: draft.title.trim(),
               description: draft.description.trim(),
+              format: draft.format.trim(),
               priceGel: draft.priceOnRequest ? 0 : price,
               priceOnRequest: draft.priceOnRequest,
             })
-            setDraft({ direction: '', title: '', description: '', priceGel: '', priceOnRequest: false })
+            setDraft({ direction: '', title: '', description: '', format: '', priceGel: '', priceOnRequest: false })
           })}>
             {busy ? 'ემატება…' : 'დამატება'}
           </Btn>
@@ -499,6 +503,7 @@ function ServicesView() {
                   </div>
                   <div className="text-meta text-ink-500 truncate">
                     {s.direction}
+                    {s.format && ` · ${s.format}`}
                     {s._count.requests > 0 && ` · ${s._count.requests} მოთხოვნა`}
                   </div>
                 </div>
