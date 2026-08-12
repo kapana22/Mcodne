@@ -19,7 +19,7 @@ import { useMe, type Me } from '@/lib/me'
 import { focusSearchInput } from '@/lib/searchFocus'
 import { TutorCard, VideoPreview } from './_card'
 import { LiveCat, Tutor, catNameOf, mapRows } from './_data'
-import { FILTER_AVAIL, FILTER_RATINGS, Facets, Filters, FiltersPanel, NO_CAP, availMatches, passesFilters, priceBandActive, priceBandLabel } from './_filters'
+import { FILTER_LANGS, FILTER_RATINGS, Facets, Filters, FiltersPanel, NO_CAP, passesFilters, priceBandActive, priceBandLabel } from './_filters'
 import { SearchHero } from './_hero'
 import { CompareModal, Pagination, ResultsBar } from './_results'
 
@@ -337,7 +337,6 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
       cats: seedCats,
       minRate: 0,
       langs: csv('langs'),
-      available: csv('avail'),
       minRating: num('minRating', 0),
       superOnly: p?.get('super') === '1',
       price: [num('priceMin', 0), num('priceMax', NO_CAP)],
@@ -368,7 +367,7 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   }, [filters, sort, page])
 
   const resetFilters = () => setFilters({
-    cats: [], minRate: 0, langs: [], available: [], minRating: 0, superOnly: false, price: [0, NO_CAP],
+    cats: [], minRate: 0, langs: [], minRating: 0, superOnly: false, price: [0, NO_CAP],
   })
 
   // The admin-managed SPHERES (GET /api/categories → VISIBLE only; a sphere's
@@ -412,7 +411,6 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
     // so there is no separate `category` param to keep in sync.
     if (filters.cats.length > 0) url.set('cats', filters.cats.join(','))
     if (filters.langs.length > 0) url.set('langs', filters.langs.join(','))
-    if (filters.available.length > 0) url.set('avail', filters.available.join(','))
     if (filters.minRating > 0) url.set('minRating', String(filters.minRating))
     if (filters.superOnly) url.set('super', '1')
     if (filters.price[0] > 0) url.set('priceMin', String(filters.price[0]))
@@ -424,7 +422,6 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   const removeFilter = (k: string, v: string) => {
     if (k === 'cat')   setFilters({ ...filters, cats:    filters.cats.filter(x => x !== v) })
     if (k === 'lang')  setFilters({ ...filters, langs:   filters.langs.filter(x => x !== v) })
-    if (k === 'avail') setFilters({ ...filters, available: filters.available.filter(x => x !== v) })
     if (k === 'rate')  setFilters({ ...filters, minRating: 0 })
     if (k === 'super') setFilters({ ...filters, superOnly: false })
     if (k === 'price') setFilters({ ...filters, price: [0, NO_CAP] })
@@ -438,7 +435,6 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
     ...filters.langs.map(l   => ({ k: 'lang',  v: l })),
     // `v` is what the chip PRINTS, so it must be the Georgian label — the raw
     // id („today“) leaked onto the chip while the hero dropdown showed „დღეს“.
-    ...filters.available.map(a => ({ k: 'avail', v: FILTER_AVAIL.find(x => x.id === a)?.l ?? a, raw: a })),
     ...(filters.minRating > 0 ? [{ k: 'rate', v: `${filters.minRating}+ ★` }] : []),
     ...(filters.superOnly ? [{ k: 'super', v: 'Super-ექსპერტი' }] : []),
     ...(priceBandActive(filters.price[0], filters.price[1]) ? [{ k: 'price', v: priceBandLabel(filters.price[0], filters.price[1]) }] : []),
@@ -449,7 +445,7 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
     const now = new Date()
     // `passesFilters` (module scope) is the ONE predicate — the facet counts
     // below call the same function with a dimension skipped.
-    let out = liveTutors.filter(t => passesFilters(t, filters, now))
+    let out = liveTutors.filter(t => passesFilters(t, filters))
     switch (sort) {
       // „ახლის მიხედვით" (DEFAULT): newest first. The server order is
       // verified→rating, which buries brand-new experts — so sort explicitly by
@@ -480,14 +476,16 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   // surfaces; see the `Facets` note near CheckOpt for why they exist at all.
   const facets = React.useMemo<Facets>(() => {
     const now = new Date()
-    const ratingBase = liveTutors.filter(t => passesFilters(t, filters, now, 'rating'))
-    const availBase = liveTutors.filter(t => passesFilters(t, filters, now, 'avail'))
-    const superBase = liveTutors.filter(t => passesFilters(t, filters, now, 'super'))
+    const ratingBase = liveTutors.filter(t => passesFilters(t, filters, 'rating'))
+    const superBase = liveTutors.filter(t => passesFilters(t, filters, 'super'))
     const rating: Record<string, number> = {}
     for (const r of FILTER_RATINGS) rating[String(r)] = ratingBase.filter(t => (t.rating ?? 0) >= r).length
-    const avail: Record<string, number> = {}
-    for (const a of FILTER_AVAIL) avail[a.id] = availBase.filter(t => availMatches(t, a.id, now)).length
-    return { rating, avail, superOnly: superBase.filter(t => t.superExpert).length }
+    // Language counts, on the same terms: measured with the language dimension
+    // itself excluded, against the roster this search actually loaded.
+    const langBase = liveTutors.filter(t => passesFilters(t, { ...filters, langs: [] }))
+    const langs: Record<string, number> = {}
+    for (const l of FILTER_LANGS) langs[l.l] = langBase.filter(t => t.langs.includes(l.l)).length
+    return { rating, langs, pool: langBase.length, superOnly: superBase.filter(t => t.superExpert).length }
   }, [liveTutors, filters])
 
   const total = visibleTutors.length

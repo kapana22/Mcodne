@@ -7,7 +7,7 @@ import { Container } from '@/components/Container'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { registerSearchInput } from '@/lib/searchFocus'
 import { LiveCat, catNameOf } from './_data'
-import { CheckOpt, FILTER_AVAIL, FILTER_LANGS, FILTER_RATINGS, Facets, FilterBox, Filters, PriceRange, priceBandActive, priceBandLabel, toggleIn } from './_filters'
+import { CheckOpt, FILTER_RATINGS, Facets, FilterBox, Filters, PriceRange, priceBandActive, priceBandLabel, ratingUseless, toggleIn, usefulLangs } from './_filters'
 
 export const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, total, loading, liveCats, facets }: { filters: Filters; setFilters: (f: Filters) => void; search: string; setSearch: (v: string) => void; onSearch: () => void; total: number; loading: boolean; liveCats: LiveCat[]; facets: Facets }) => {
   // Live result count as the page heading (DESIGN_FIX_PROMPT 1.9). The label
@@ -27,12 +27,13 @@ export const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, t
     : `${filters.cats.length} სფერო`
   const priceVal = priceBandLabel(filters.price[0], filters.price[1])
   const langVal = filters.langs.length === 0 ? 'ნებისმიერი ენა' : filters.langs.length === 1 ? filters.langs[0] : `${filters.langs.length} ენა`
-  const availVal = filters.available.length === 0 ? 'ნებისმიერ დროს' : filters.available.map(id => FILTER_AVAIL.find(a => a.id === id)?.l ?? id).join(', ')
   const ratingVal = filters.minRating > 0 ? `${filters.minRating.toFixed(1)}+` : 'ნებისმიერი'
+  // A control that cannot narrow anything is not shown at all — see
+  // usefulLangs / ratingUseless in ./_filters for the arithmetic.
+  const langOpts = usefulLangs(facets)
+  const ratingDead = ratingUseless(facets)
   // When EVERY option in a facet is zero, the disabled rows alone read like a
   // bug. One line says why — and it is the true reason, not a shrug.
-  const ratingAllZero = FILTER_RATINGS.every(r => (facets.rating[String(r)] ?? 0) === 0)
-  const availAllZero = FILTER_AVAIL.every(a => (facets.avail[a.id] ?? 0) === 0)
   // Hidden, not dimmed, while nobody is Super (owner, 2026-08-10). A greyed-out
   // control with „0" next to it still asks to be read and still says the
   // platform has a tier it cannot fill. It comes back on its own the moment an
@@ -94,16 +95,15 @@ export const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, t
                 <PriceRange value={filters.price} onChange={p => setFilters({ ...filters, price: p })} />
               </div>
             </FilterBox>
+            {langOpts.length > 0 && (
             <FilterBox label="ენა" value={langVal} active={filters.langs.length > 0}>
-              {FILTER_LANGS.map(l => <CheckOpt key={l.l} label={l.l} on={filters.langs.includes(l.l)} onToggle={() => setFilters({ ...filters, langs: toggleIn(filters.langs, l.l) })} />)}
+              {langOpts.map(l => <CheckOpt key={l.l} label={l.l} count={facets.langs[l.l] ?? 0} on={filters.langs.includes(l.l)} onToggle={() => setFilters({ ...filters, langs: toggleIn(filters.langs, l.l) })} />)}
             </FilterBox>
-            <FilterBox label="ხელმისაწვდომობა" value={availVal} active={filters.available.length > 0}>
-              {FILTER_AVAIL.map(a => <CheckOpt key={a.id} label={a.l} count={facets.avail[a.id] ?? 0} on={filters.available.includes(a.id)} onToggle={() => setFilters({ ...filters, available: toggleIn(filters.available, a.id) })} />)}
-              {availAllZero && <p className="px-2 pt-1 pb-0.5 text-meta text-ink-500 leading-snug">ამ პერიოდში თავისუფალი დრო არავის აქვს.</p>}
-            </FilterBox>
+            )}
             {/* Min-rating had no inline box before and was drawer-only, so a
                 desktop visitor who never opened the drawer couldn't reach it.
                 Single-select: tapping the active threshold clears it. */}
+            {!ratingDead && (
             <FilterBox label="შეფასება" value={ratingVal} active={filters.minRating > 0}>
               {FILTER_RATINGS.map(r => (
                 <CheckOpt
@@ -114,8 +114,8 @@ export const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, t
                   onToggle={() => setFilters({ ...filters, minRating: filters.minRating === r ? 0 : r })}
                 />
               ))}
-              {ratingAllZero && <p className="px-2 pt-1 pb-0.5 text-meta text-ink-500 leading-snug">შეფასება ჯერ არავის აქვს — პლატფორმა ახალია.</p>}
             </FilterBox>
+            )}
             {!superDead && (
             <button
               type="button"

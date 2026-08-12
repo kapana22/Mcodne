@@ -9,15 +9,24 @@ import { LiveCat, Tutor } from './_data'
 
 // Filtering is ONE state, TWO breakpoint-exclusive surfaces (2026-07-27):
 //   • lg and up  → the hero's inline row of labeled dropdowns (სფერო / ფასი /
-//     ენა / ხელმისაწვდომობა / შეფასება + the Super toggle). Every refinement is
-//     one click away, so the „ფილტრები" drawer trigger is `lg:hidden`.
+//     ენა / შეფასება + the Super toggle). Every refinement is one click away,
+//     so the „ფილტრები" drawer trigger is `lg:hidden`.
 //   • below lg   → the search field + the one-tap category rail, with the full
 //     set in the „ფილტრები" drawer (FiltersPanel) — five stacked h-12 boxes
 //     would push the first result off a phone screen.
 // They are never both on screen, and both write the SAME `filters` object, so
 // the page can no longer show two contradicting „active" states. The earlier
 // inline row was dropped partly because it lacked the rating filter; the box is
-// there now, so desktop reaches all six.
+// there now, so desktop reaches everything the drawer does.
+//
+// ⚠️ THE SET IS NOT FIXED — a refinement is offered only while it can actually
+// change the result set. See usefulLangs / ratingUseless below: the language
+// and rating controls hide themselves when their options would return everyone
+// or nobody, and reappear on their own as the roster grows. Measured on
+// 2026-08-12, ქართული matched 21 of 21 experts and no expert had a single
+// review, so both were pure decoration. The availability filter was removed
+// outright the same day (owner's call): it cut four of twenty-one results and
+// led the page with „when are they free", which is not how anybody chooses.
 
 // Price filter is now a BUDGET BAND (min + max), so budget-sensitive buyers
 // (law / therapy / finance) can cap spend, not just set a floor. NO_CAP is the
@@ -168,14 +177,46 @@ export const FILTER_RATINGS = [4.0, 4.5, 4.8, 4.9]
 // nobody is admin-featured, nobody has a slot left today). Tapping any of them
 // emptied the page with no explanation. Now every option carries its own count
 // and a zero one is disabled — the same honesty, one layer earlier.
-export type Facets = { rating: Record<string, number>; avail: Record<string, number>; superOnly: number }
+// `langs` and `pool` were added 2026-08-12, and the reason is arithmetic on the
+// live roster: ქართული is spoken by 21 of the 21 experts in browse. An option
+// that returns EVERYONE is not a filter — it is a button that appears to do
+// something and does nothing, which is the same trap as the zero-count option
+// this block already guards against, seen from the other end. `pool` is the
+// count that option would be measured against, so „matches all" is decidable.
+export type Facets = { rating: Record<string, number>; langs: Record<string, number>; pool: number; superOnly: number }
+
+/**
+ * The language options worth SHOWING, given what the current search loaded.
+ *
+ * Two ways an option is useless, and both were live on 2026-08-12:
+ *   count === 0     it returns nothing — the dead-end the file already guards
+ *                   against for ratings.
+ *   count === pool  it returns EVERYONE. ქართული was spoken by 21 of the 21
+ *                   experts in browse: a control that appears to narrow and
+ *                   cannot. That is worse than a dead option, because tapping
+ *                   it looks like it worked.
+ *
+ * Below three results nothing is filtered at all — the whole list fits on one
+ * screen — so the section hides entirely rather than offering to sort five
+ * cards into four.
+ */
+export const usefulLangs = (facets: Facets) =>
+  facets.pool < 3 ? [] : FILTER_LANGS.filter(l => {
+    const n = facets.langs[l.l] ?? 0
+    return n > 0 && n < facets.pool
+  })
+
+/** True when every rating option would return nothing — nobody has a review
+ *  yet. The section is then a row of disabled chips explaining an absence,
+ *  which is a sentence, not a control. */
+export const ratingUseless = (facets: Facets) =>
+  FILTER_RATINGS.every(r => (facets.rating[String(r)] ?? 0) === 0)
 
 /* ───── Filters sidebar ───── */
 export type Filters = {
   cats: string[]
   minRate: number
   langs: string[]
-  available: string[]
   minRating: number
   superOnly: boolean
   price: [number, number]
@@ -196,32 +237,12 @@ export type Filters = {
 // filter option is the same trap as a category chip pointing at an empty sphere.
 export const FILTER_LANGS = PRIMARY_LANG_CODES.map(c => ({ l: LANG_LABELS[c] }))
 
-// Only expose availability windows we can actually evaluate from the list
-// data (each tutor's soonest free slot, `nextSlotAt`). "Weekend/evening"
-// needed per-slot data the list endpoint doesn't return, so they were dropped
-// rather than shipped as no-op checkboxes.
-export const FILTER_AVAIL = [
-  { id: 'today', l: 'დღეს' },
-  { id: 'week',  l: 'ამ კვირას' },
-]
-
-const isSameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-
-// Does this expert's soonest free slot fall inside the window `id`?
-export const availMatches = (t: Tutor, id: string, now: Date): boolean => {
-  const next = t.nextSlotAt ? new Date(t.nextSlotAt) : null
-  if (!next) return false
-  if (id === 'today') return isSameDay(next, now)
-  if (id === 'week') return next.getTime() <= now.getTime() + 7 * 24 * 3600_000
-  return false
-}
-
 // THE filter predicate — one function, two consumers: the visible list and the
 // facet counts. `skip` drops exactly ONE dimension so a facet can count what its
 // own options would yield against the OTHER active refinements (standard facet
 // semantics). Sharing it is the point: a count computed by a second copy of this
 // logic would promise „4.5+ (3)" and then hand back two cards.
-export function passesFilters(t: Tutor, f: Filters, now: Date, skip?: 'rating' | 'avail' | 'super'): boolean {
+export function passesFilters(t: Tutor, f: Filters, skip?: 'rating' | 'super'): boolean {
   if (skip !== 'super' && f.superOnly && !t.superExpert) return false
   if (skip !== 'rating' && f.minRating > 0 && (t.rating ?? 0) < f.minRating) return false
   // Budget band — honor both the floor and the cap (NO_CAP = no ceiling).
@@ -230,8 +251,6 @@ export function passesFilters(t: Tutor, f: Filters, now: Date, skip?: 'rating' |
   // hidden category can never silently drop matching experts.
   if (f.cats.length > 0 && (!t.catSlug || !f.cats.includes(t.catSlug))) return false
   if (f.langs.length > 0 && !t.langs.some(l => f.langs.includes(l))) return false
-  // Availability window — evaluated against the soonest free slot.
-  if (skip !== 'avail' && f.available.length > 0 && !f.available.some(a => availMatches(t, a, now))) return false
   return true
 }
 
@@ -270,8 +289,8 @@ export const FiltersPanel = ({ filters, setFilters, liveCats, facets }: { filter
   // Super switch is the ONE exception — see the note in _hero.tsx: it is
   // hidden while nobody is Super, and returns by itself once someone is.
   const superDead = facets.superOnly === 0 && !filters.superOnly
-  const ratingAllZero = FILTER_RATINGS.every(r => (facets.rating[String(r)] ?? 0) === 0)
-  const availAllZero = FILTER_AVAIL.every(a => (facets.avail[a.id] ?? 0) === 0)
+  const ratingDead = ratingUseless(facets)
+  const langOpts = usefulLangs(facets)
 
   return (
     <aside>
@@ -329,45 +348,23 @@ export const FiltersPanel = ({ filters, setFilters, liveCats, facets }: { filter
         <PriceRange value={filters.price} onChange={p => setFilters({ ...filters, price: p })} />
       </FilterSection>
 
+      {langOpts.length > 0 && (
       <FilterSection title="ენა" defaultOpen={false}>
         <div className="space-y-1">
-          {FILTER_LANGS.map(l => (
+          {langOpts.map(l => (
             <CheckRow
               key={l.l}
               label={l.l}
-              count={0}
+              count={facets.langs[l.l] ?? 0}
               on={filters.langs.includes(l.l)}
               onToggle={() => setFilters({ ...filters, langs: toggleArr(filters.langs, l.l) })}
             />
           ))}
         </div>
       </FilterSection>
+      )}
 
-      <FilterSection title="ხელმისაწვდომობა" defaultOpen={false}>
-        {/* h-8 → h-11: these are tappable, and the drawer is the PHONE surface. */}
-        <div className="flex flex-wrap gap-1.5">
-          {FILTER_AVAIL.map(a => {
-            const on = filters.available.includes(a.id)
-            const n = facets.avail[a.id] ?? 0
-            const dead = n === 0 && !on
-            return (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => setFilters({ ...filters, available: toggleArr(filters.available, a.id) })}
-                disabled={dead}
-                className={`inline-flex items-center gap-1.5 px-3.5 h-11 rounded-pill text-small font-display font-medium tracking-wide transition-colors duration-fast ${on ? 'bg-brand-600 text-white' : dead ? 'bg-white text-ink-700 border border-ink-200 opacity-45 cursor-not-allowed' : 'bg-white text-ink-700 border border-ink-200 hover:bg-ink-50'}`}
-              >
-                {on && <Icon.check className="w-3 h-3" />}
-                {a.l}
-                <span className={`text-meta tabular-nums ${on ? 'text-white' : 'text-ink-500'}`}>{n}</span>
-              </button>
-            )
-          })}
-        </div>
-        {availAllZero && <p className="mt-2 text-meta text-ink-500 leading-snug">ამ პერიოდში თავისუფალი დრო არავის აქვს.</p>}
-      </FilterSection>
-
+      {!ratingDead && (
       <FilterSection title="მინ. რეიტინგი">
         <div className="grid grid-cols-2 gap-1.5">
           {FILTER_RATINGS.map(r => {
@@ -389,8 +386,8 @@ export const FiltersPanel = ({ filters, setFilters, liveCats, facets }: { filter
             )
           })}
         </div>
-        {ratingAllZero && <p className="mt-2 text-meta text-ink-500 leading-snug">შეფასება ჯერ არავის აქვს — პლატფორმა ახალია.</p>}
       </FilterSection>
+      )}
 
     </aside>
   )
