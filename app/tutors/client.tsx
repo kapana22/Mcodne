@@ -50,9 +50,21 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   const router = useRouter()
   // Hydrate from URL so /tutors?q=foo&category=business is shareable/refreshable.
   const [search, setSearch] = useState(() => params?.get('q') ?? '')
-  // Curated order by default (bookable first, then verified→rating) — see the
-  // note on SORT_OPTS for why this is no longer 'new'. An explicit ?sort= wins.
-  const [sort, setSort] = useState<string>(() => params?.get('sort') ?? 'rating')
+  // NEWEST FIRST by default (owner, 2026-08-12). An explicit ?sort= still wins,
+  // and a free-text search still defers to relevance — see the `case 'new'`
+  // note below, which is the guard that makes this safe.
+  //
+  // It was 'rating' — the server's curated verified→rating order. That order
+  // ranks on signal this catalogue does not have yet: measured the same day,
+  // ONE of 21 visible experts is verified and NONE has a single review. So
+  // „ჩვენი რჩევით" was sorting by two fields that are constant across almost
+  // the whole roster, which is not a recommendation, it is an arbitrary but
+  // STABLE order — and a stable order means a new expert lands wherever the
+  // seed put them and stays there. Newest-first at least answers a question
+  // („who is new here") truthfully. Revisit when reviews exist: at that point
+  // the curated order starts carrying real information and should probably
+  // take the default back.
+  const [sort, setSort] = useState<string>(() => params?.get('sort') ?? 'new')
   const [page, setPage] = useState(1)
   // Seed the list from the server-rendered rows so the FIRST paint shows real
   // expert cards (in the initial HTML) instead of a skeleton. Category / price
@@ -403,10 +415,10 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   useEffect(() => {
     const url = new URLSearchParams()
     if (search.trim()) url.set('q', search.trim())
-    // Only non-default sorts land in the URL — 'rating' (curated) IS the default.
+    // Only non-default sorts land in the URL — 'new' IS the default.
     // This MUST track the useState initializer above; when the two disagreed the
     // default sort was written into every URL as if the user had chosen it.
-    if (sort !== 'rating') url.set('sort', sort)
+    if (sort !== 'new') url.set('sort', sort)
     // Categories live entirely in `cats` now (the hero chips write here too),
     // so there is no separate `category` param to keep in sync.
     if (filters.cats.length > 0) url.set('cats', filters.cats.join(','))
@@ -447,7 +459,8 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
     // below call the same function with a dimension skipped.
     let out = liveTutors.filter(t => passesFilters(t, filters))
     switch (sort) {
-      // „ახლის მიხედვით" (DEFAULT): newest first. The server order is
+      // „ახლის მიხედვით" — THE DEFAULT (again, 2026-08-12). Newest first. The
+      // server order is
       // verified→rating, which buries brand-new experts — so sort explicitly by
       // createdAt desc. Rows without a createdAt fall to the end (epoch 0).
       //
@@ -457,7 +470,8 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
       // an 8-per-page list — the same silent loss as re-filtering client-side.
       // The user can still pick any explicit sort; only the DEFAULT defers.
       case 'new':      if (!rankedByRelevance) out = [...out].sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()); break
-      // „ჩვენი რჩევით": KEEP the server's curated order (verified→rating with
+      // „ჩვენი რჩევით" — no longer the default, still an explicit choice.
+      // KEEP the server's curated order (verified→rating with
       // bookable experts bubbled up, from queryTutors). Re-sorting purely by
       // rating here discarded that curation — a verified, bookable but brand-new
       // expert (rating 0) sank below a mediocre unverified one. Leaving the

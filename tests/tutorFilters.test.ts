@@ -127,3 +127,29 @@ test('every offered option still carries its own count', () => {
   }
   assert.ok(FILTER_LANGS.length >= 2 && FILTER_RATINGS.length >= 2)
 })
+
+/* ═══════════ the default order ═════════════════════════════════════════ */
+
+test('the default sort is newest-first, and the URL says so by staying silent', () => {
+  // Owner, 2026-08-12: new experts should lead. The two places that decide it
+  // MUST agree — when they disagreed once before, the default was written into
+  // every URL as if the visitor had chosen it, so every shared link carried a
+  // `?sort=` the sender never picked.
+  const src = read('app/tutors/client.tsx')
+  assert.match(src, /params\?\.get\('sort'\) \?\? 'new'/, 'the default sort is not newest-first')
+  assert.match(src, /if \(sort !== 'new'\) url\.set\('sort', sort\)/,
+    'the URL-sync default disagrees with the useState default')
+})
+
+test('a free-text search still ranks by relevance, not by date', () => {
+  // The guard that makes newest-first safe as a DEFAULT. The server has already
+  // ordered a search by trigram relevance (lib/tutorsQuery) — Georgian declines
+  // heavily, so that ranking is the whole reason the search works at all.
+  // Re-sorting it by createdAt would push the best match onto page 3.
+  // An EXPLICIT ?sort=new still wins; only the default defers.
+  assert.match(
+    read('app/tutors/client.tsx'),
+    /case 'new':\s*if \(!rankedByRelevance\)/,
+    'newest-first no longer defers to search relevance',
+  )
+})
