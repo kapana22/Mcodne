@@ -153,3 +153,34 @@ test('a free-text search still ranks by relevance, not by date', () => {
     'newest-first no longer defers to search relevance',
   )
 })
+
+/* ═══════════ what the heading is allowed to say ════════════════════════ */
+
+test('a typed query is never the page heading', () => {
+  // Searching „ტესტ" printed „ტესტ" as a 44px bold h1: the largest type on the
+  // page handed to an arbitrary string the visitor had just typed — and the one
+  // string on screen guaranteed not to be designed. It also said nothing, since
+  // the words were still in the field directly below it.
+  const hero = read('app/tutors/_hero.tsx')
+  const label = hero.slice(hero.indexOf('const headingLabel'), hero.indexOf('const catVal'))
+  assert.doesNotMatch(label, /search\.trim\(\)/, 'the h1 prints the raw query again')
+  // A CATEGORY may still title the page: it is a name we own, from a fixed
+  // list, and it genuinely describes where the visitor is.
+  assert.match(label, /catNameOf\(liveCats, filters\.cats\[0\]\)/)
+})
+
+test('the query is a removable chip instead', () => {
+  // It has to live somewhere: a refinement the visitor cannot see is one they
+  // cannot undo. The chip row is where every other refinement already is.
+  const client = read('app/tutors/client.tsx')
+  assert.match(client, /\{ k: 'q', v: `„\$\{search\.trim\(\)\}“` \}/, 'the query has no chip')
+  assert.match(client, /if \(k === 'q'\)\s+setSearch\(''\)/, 'the query chip cannot be removed')
+})
+
+test('no keyboard-shortcut furniture in the search field', () => {
+  // The „/" hint was invisible to the audience it was for (it hides below lg
+  // and on focus) and read as an artifact to everyone else — the owner saw it
+  // as a stray slash. A consumer marketplace in Georgian is not where a
+  // power-user affordance earns its space.
+  assert.doesNotMatch(read('app/tutors/_hero.tsx'), /<kbd/, 'the / shortcut badge is back')
+})

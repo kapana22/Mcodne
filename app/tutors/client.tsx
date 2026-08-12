@@ -432,6 +432,11 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   }, [search, sort, filters, router])
 
   const removeFilter = (k: string, v: string) => {
+    // The typed query is a refinement like any other, so it is removable like
+    // any other. It used to be the page's h1 instead — the largest type on the
+    // page given to a string the visitor had just typed, and the only way to
+    // undo it was to find the field and clear it by hand.
+    if (k === 'q')     setSearch('')
     if (k === 'cat')   setFilters({ ...filters, cats:    filters.cats.filter(x => x !== v) })
     if (k === 'lang')  setFilters({ ...filters, langs:   filters.langs.filter(x => x !== v) })
     if (k === 'rate')  setFilters({ ...filters, minRating: 0 })
@@ -443,6 +448,10 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
   // `v` is the human label shown on the chip (the category NAME). For every other
   // filter the two coincide.
   const activeFilters: { k: string; v: string; raw?: string }[] = [
+    // FIRST, because it is the refinement the visitor made most deliberately —
+    // they typed it. Quoted so „ბუღალტერი" reads as their words rather than as
+    // a label we chose.
+    ...(search.trim() ? [{ k: 'q', v: `„${search.trim()}“` }] : []),
     ...filters.cats.map(slug  => ({ k: 'cat',   v: catNameOf(liveCats, slug), raw: slug })),
     ...filters.langs.map(l   => ({ k: 'lang',  v: l })),
     // `v` is what the chip PRINTS, so it must be the Georgian label — the raw

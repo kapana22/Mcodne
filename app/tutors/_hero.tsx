@@ -14,10 +14,21 @@ export const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, t
   // reflects the active refinement: one category → its name; several → the
   // count; a text query → the query itself. While loading show a neutral
   // heading — never a stale or invented number.
+  // ⚠️ A TYPED QUERY IS NOT A PAGE TITLE (owner, 2026-08-12: „ძალიან ცუდად
+  // ჩანს"). Searching „ტესტ" printed „ტესტ" as a 44px bold h1 — the largest
+  // type on the page given to an arbitrary string the visitor had just typed,
+  // which is also the one string on screen that is guaranteed not to be
+  // designed: two letters, a paste, a misspelling, anything. It told the reader
+  // nothing they did not already know, since the words were still sitting in
+  // the field right below it.
+  //
+  // A CATEGORY still becomes the heading, and that is not the same thing: it is
+  // a name WE own, from a fixed list, and it genuinely titles the page the
+  // visitor is on. The query now lives in the results bar as a removable chip —
+  // visible, undoable, and the same size as every other refinement.
   const headingLabel =
     filters.cats.length === 1 ? catNameOf(liveCats, filters.cats[0])
     : filters.cats.length > 1 ? `${filters.cats.length} სფერო`
-    : search.trim() ? `„${search.trim()}“`
     : null
   // Current value shown on each inline dropdown. Categories are stored as
   // SLUGS, so the label always goes through catNameOf — printing the raw slug
@@ -90,7 +101,7 @@ export const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, t
                 ? <div className="px-2 py-2 text-small text-ink-500">კატეგორიები იტვირთება…</div>
                 : liveCats.map(c => <CheckOpt key={c.slug} label={c.name} on={filters.cats.includes(c.slug)} onToggle={() => setFilters({ ...filters, cats: toggleIn(filters.cats, c.slug) })} />)}
             </FilterBox>
-            <FilterBox label="ფასი / სესია" value={priceVal} active={priceBandActive(filters.price[0], filters.price[1])}>
+            <FilterBox label="ფასი" value={priceVal} active={priceBandActive(filters.price[0], filters.price[1])}>
               <div className="w-[240px] max-w-[calc(100vw-3rem)]">
                 <PriceRange value={filters.price} onChange={p => setFilters({ ...filters, price: p })} />
               </div>
@@ -151,16 +162,6 @@ export const SearchHero = ({ filters, setFilters, search, setSearch, onSearch, t
                 className="w-full h-12 pl-10 pr-3 bg-transparent text-body text-ink-900 placeholder:text-ink-400 focus:outline-none"
               />
             </div>
-            {/* Shortcut affordance. A shortcut nobody can see is a shortcut
-                nobody uses — this is the whole discoverability budget. Hidden
-                below lg (no hardware keyboard) and while the field has focus
-                (you're already there). */}
-            <kbd
-              aria-hidden
-              className="hidden lg:inline-flex items-center justify-center self-center mr-3 w-6 h-6 rounded-btn border border-ink-200 bg-ink-50 font-display text-meta font-bold text-ink-400 group-focus-within:opacity-0 transition-opacity duration-fast"
-            >
-              /
-            </kbd>
           </div>
         </div>
 
