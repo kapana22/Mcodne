@@ -85,12 +85,19 @@ export default async function HelpPage() {
           <SiteText k="help.hero.title" />
         </h1>
         <p className="mt-6 text-body-lg text-ink-600 leading-relaxed max-w-[640px]">
+          {/* `tap-area` on both: an inline link in prose is only as tall as its
+              line — 19px here — and the canon floor for anything tappable is
+              40px. Padding would push the sentence around, which is precisely
+              the case globals.css built this class for: it hangs an invisible
+              inset:-12px -6px ::before over the link and the paragraph does not
+              move a pixel. The two are separated by „ან", so their hit areas
+              cannot swallow each other. */}
           თუ ვერ იპოვე პასუხი აქ, დაწერე{' '}
-          <a href={`mailto:${SUPPORT_EMAIL}`} className="text-brand-700 hover:text-brand-800 font-semibold">
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="tap-area text-brand-700 hover:text-brand-800 font-semibold">
             {SUPPORT_EMAIL}
           </a>{' '}
           ან{' '}
-          <Link href="/contact" className="text-brand-700 hover:text-brand-800 font-semibold">
+          <Link href="/contact" className="tap-area text-brand-700 hover:text-brand-800 font-semibold">
             შეავსე ფორმა
           </Link>
           . პასუხს ჩვეულებრივ 24 საათში იღებ.
