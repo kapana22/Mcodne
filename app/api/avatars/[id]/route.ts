@@ -48,6 +48,31 @@ const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 // resize runs once per (user, version) and is then served from this LRU —
 // sharp never runs twice for the same bytes.
 const SERVE_MAX = 384
+
+/**
+ * The ONE larger size, for callers that are not a card.
+ *
+ * ⚠️ DO NOT JUST RAISE SERVE_MAX. The 384 above is a measured decision — cards
+ * render into ≤128px boxes and 512px originals meant ~80% of the bytes on
+ * /tutors were discarded pixels. But og:image and the Person JSON-LD now point
+ * at this same route (app/tutors/[id]/page.tsx), and there a bigger image is
+ * strictly better: Google will not show a thumbnail it considers too small.
+ * Two callers, two needs — so the SIZE IS THE CALLER'S CHOICE, and the card
+ * path keeps the weight it fought for.
+ *
+ * 512 and not 1200: every stored avatar is 512² or 256² (measured 2026-08-13,
+ * 19 of 19 data-URI avatars). Asking for more would upscale, which invents
+ * detail and costs bytes for nothing.
+ *
+ * AN ALLOWLIST, NOT A FREE PARAMETER. An arbitrary `?s=` is two problems: every
+ * distinct value is a fresh sharp resize (a cheap way to burn CPU from
+ * outside), and it fragments both this LRU and every downstream cache.
+ */
+const SERVE_SIZES = new Set([384, 512])
+function requestedSize(req: Request): number {
+  const raw = Number(new URL(req.url).searchParams.get('s'))
+  return SERVE_SIZES.has(raw) ? raw : SERVE_MAX
+}
 const memo = new Map<string, { body: Buffer; mime: string }>()
 const MEMO_MAX = 200
 function remember(key: string, v: { body: Buffer; mime: string }) {
@@ -118,7 +143,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const mime = ALLOWED.has(parsed.mime) ? parsed.mime : 'application/octet-stream'
   const versioned = new URL(req.url).searchParams.has('v')
 
-  const key = `d:${id}:${parsed.body.length}`
+  // The size is part of the key: without it the first caller's variant would be
+  // served to the other, and a card would get the 512 (or the crawler the 384).
+  const size = requestedSize(req)
+  const key = `d:${id}:${parsed.body.length}:${size}`
   const hit = memo.get(key)
   if (hit) return avatarResponse(hit.body, hit.mime, versioned)
   let body = parsed.body
@@ -127,9 +155,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (mime !== 'image/gif') {
     try {
       const meta = await sharp(parsed.body).metadata()
-      if ((meta.width ?? 0) > SERVE_MAX || (meta.height ?? 0) > SERVE_MAX) {
+      if ((meta.width ?? 0) > size || (meta.height ?? 0) > size) {
         body = await sharp(parsed.body)
-          .resize(SERVE_MAX, SERVE_MAX, { fit: 'inside', withoutEnlargement: true })
+          .resize(size, size, { fit: 'inside', withoutEnlargement: true })
           .webp({ quality: 78, effort: 4 })
           .toBuffer()
         outMime = 'image/webp'

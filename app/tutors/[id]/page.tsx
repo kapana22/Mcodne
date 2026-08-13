@@ -213,7 +213,10 @@ function absoluteAvatar(userId: string | null | undefined, url: string | null | 
   if (!url) return null
   if (/^https?:\/\//.test(url)) return url
   const src = avatarSrc(userId, url)
-  return src && src.startsWith('/') ? `${SITE_URL}${src}` : null
+  // `&s=512` — the full stored resolution. The route defaults to 384, which is
+  // sized for a ≤128px card; a search thumbnail wants every pixel we actually
+  // have. See SERVE_SIZES in app/api/avatars/[id]/route.ts.
+  return src && src.startsWith('/') ? `${SITE_URL}${src}${src.includes('?') ? '&' : '?'}s=512` : null
 }
 
 export async function generateMetadata(
