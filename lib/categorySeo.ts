@@ -261,8 +261,23 @@ export const categorySeo: Record<string, CategorySeo> = {
 export function fallbackSeo(categoryName: string): CategorySeo {
   const n = categoryName
   return {
-    keyword: `${n} — ონლაინ კონსულტაცია`,
-    titleTail: 'იპოვე ექსპერტი',
+    // ⚠️ THE TWO HALVES TOGETHER MUST STAY UNDER 60 — see the contract on
+    // `titleTail` above. They did not: the old pair put „ონლაინ კონსულტაცია"
+    // in the keyword AND „იპოვე ექსპერტი" in the tail, spending 37 characters
+    // of boilerplate before the sphere's own name counted. Measured live
+    // 2026-08-13, all SEVEN template-driven spheres blew the ceiling —
+    // „არქიტექტურა და მშენებლობა" rendered a 72-character title, so Google cut
+    // it mid-phrase.
+    //
+    // „იპოვე ექსპერტი" also contradicted the very purpose this field is
+    // documented to have: the tail is for words people SEARCH, and that is a
+    // slogan. It was identical on all eight pages, so it added nothing unique
+    // while pushing the unique part out of the visible width.
+    //
+    // Now: „<სფერო> — ონლაინ კონსულტაცია | მცოდნე" — 54 characters at the
+    // longest real sphere name, and the searched term survives the cut.
+    keyword: n,
+    titleTail: 'ონლაინ კონსულტაცია',
     metaDescription: `„${n}“ სფეროში ონლაინ კონსულტაცია — დაჯავშნე ვიდეოსესია ხელით შერჩეულ ქართველ ექსპერტთან მოსახერხებელ დროს.`,
     intro:
       `„${n}“ სფეროში ონლაინ კონსულტაცია გჭირდება? მცოდნეზე იპოვი ხელით შერჩეულ ქართველ ექსპერტებს, რომლებთანაც ერთ საათში, ვიდეოსესიაზე კონკრეტულ პასუხს მიიღებ. აირჩიე ექსპერტი გამოცდილებით, ფასითა და შეფასებით და დაჯავშნე შენთვის მოსახერხებელ დროს.`,

@@ -83,9 +83,30 @@ const entries = Object.entries(categorySeo)
 {
   // Any sphere seeded without its own entry renders through this — it must not
   // be the one page that ships a broken title.
+  // ⚠️ THE WORST REAL NAME, NOT A CONVENIENT ONE. This used to pass
+  // `'უძრავი ქონება'` — 13 characters, which rendered to exactly 60 and
+  // squeaked through — while SEVEN live spheres with longer names were shipping
+  // 63–72-character titles that Google was cutting. A ceiling checked against
+  // one hand-picked input is not a ceiling.
+  //
+  // The names below are the longest that exist in the seeded taxonomy
+  // (prisma/seedCategories + the 2026-08-10 hierarchy migration). If a longer
+  // sphere is ever added and this list is not updated, that page ships a cut
+  // title — so the list is deliberately explicit rather than a single sample.
+  const WORST_NAMES = [
+    'არქიტექტურა და მშენებლობა',
+    'გრანტები და დაფინანსება',
+    'ტურიზმი და მასპინძლობა',
+    'ჯანმრთელობა და კვება',
+    'უძრავი ქონება',
+  ]
+  const over = WORST_NAMES
+    .map(n => ({ n, len: renderTitle(fallbackSeo(n)).length }))
+    .filter(x => x.len > TITLE_MAX)
+  check(`fallback title ≤ ${TITLE_MAX} for every real sphere name`, over.length === 0,
+    over.map(x => `${x.n}:${x.len}`).join(', '))
+
   const fb = fallbackSeo('უძრავი ქონება')
-  check('fallback produces a title within budget', renderTitle(fb).length <= TITLE_MAX,
-    `${renderTitle(fb).length}`)
   check('fallback description is within budget',
     fb.metaDescription.length <= DESC_MAX && fb.metaDescription.length >= 40,
     String(fb.metaDescription.length))
