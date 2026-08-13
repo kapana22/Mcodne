@@ -29,6 +29,17 @@ export default function robots(): MetadataRoute.Robots {
           '/cookies',
           '/apply',
           '/signin',
+          // ⚠️ THE ONE /api PATH GOOGLE MUST REACH, and it has to out-rank the
+          // `/api/*` Disallow below. Expert photos live in the database as
+          // `data:` URIs (19 of 24 on 2026-08-13), so /api/avatars/[id] is the
+          // ONLY form of them that exists as a fetchable image — it is what
+          // `og:image` and the Person JSON-LD point at. Blocked, those tags
+          // reference a URL the crawler is forbidden to open, and no search
+          // result or shared link can ever show a face.
+          //
+          // Google resolves Allow vs Disallow by LONGEST MATCH, so this beats
+          // '/api/*' for these URLs and nothing else under /api opens up.
+          '/api/avatars/',
         ],
         disallow: [
           '/admin',

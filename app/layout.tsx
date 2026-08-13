@@ -30,6 +30,19 @@ export const metadata: Metadata = {
   },
   description: 'ქართული ექსპერტ-კონსულტაციის პლატფორმა — დაჯავშნე ვიდეოსესია ბიზნესის, კარიერის, იურიდიულ და ფინანსურ საკითხებზე ხელით შერჩეულ ექსპერტებთან.',
   manifest: '/manifest.webmanifest',
+  // ⚠️ WITHOUT THIS GOOGLE SHOWS NO THUMBNAIL, whatever images the page
+  // carries. The default preview budget is small; `max-image-preview: large`
+  // is the documented opt-in that makes a result eligible for a real image,
+  // and `max-snippet: -1` lifts the description cap on the same terms.
+  //
+  // It is safe site-wide: the pages that must NOT be indexed at all set their
+  // own `robots: { index: false }` (/signin, /signup, /ask, /business,
+  // /abroad), and an index:false page ignores preview limits entirely.
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 },
+  },
   // Square monogram mark — the wide wordmark (logo.png, 2.6:1) squished into a
   // tab favicon read as an ugly smear; a compact „მ" square is legible at 16px.
   // ⚠️ THE .ico IS NOT OPTIONAL, and its absence was a real defect (2026-08-13):
