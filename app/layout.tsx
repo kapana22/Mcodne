@@ -32,10 +32,28 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   // Square monogram mark — the wide wordmark (logo.png, 2.6:1) squished into a
   // tab favicon read as an ugly smear; a compact „მ" square is legible at 16px.
+  // ⚠️ THE .ico IS NOT OPTIONAL, and its absence was a real defect (2026-08-13):
+  // the site declared ONLY the SVG and `/favicon.ico` answered 404. Google
+  // fetches the root `/favicon.ico` when it cannot resolve a declared icon, and
+  // Search Console was drawing the generic globe next to every one of our
+  // pages. Older browsers and several link-preview bots never look for anything
+  // else.
+  //
+  // ORDER MATTERS: the SVG is listed first so a modern browser takes the
+  // sharp, scalable one, and the raster files are the fallback rather than the
+  // default. Sizes are multiples of 48 (Google's documented favicon guidance);
+  // the SVG's own 64×64 is fine for something that scales and is not a size to
+  // rasterise to. All of them are generated from that one SVG by
+  // scripts/build-favicons.mjs — re-run it if the mark ever changes, or the
+  // tab and the search result start showing two different logos.
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
-    apple: '/favicon.svg',
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icon-48.png', sizes: '48x48', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
   },
   openGraph: {
     title: 'მცოდნე — ონლაინ კონსულტაცია ექსპერტებთან',
