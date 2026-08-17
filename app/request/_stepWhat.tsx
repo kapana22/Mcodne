@@ -32,6 +32,35 @@ import {
 import { StepPick } from './_stepPick'
 import type { Draft } from './_model'
 
+/**
+ * One example, one tap.
+ *
+ * ⚠️ MODULE SCOPE, NOT INSIDE StepWhat. It was defined in the component body
+ * and closed over `draft`/`onPick`, which meant React saw a NEW component type
+ * on every keystroke in the search box and remounted all six chips — throwing
+ * away their DOM, and with it any focus or press state mid-tap. The props it
+ * used to close over are now passed; that is the whole difference.
+ */
+function Chip({ t, on, onPick }: { t: Topic; on: boolean; onPick: (id: string) => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={() => onPick(t.id)}
+      // 0.97, the BUTTON press tier (components/Btn) — a pill is a
+      // button-sized control, unlike the full-width option rows in
+      // _stepPick, which press at the card tier.
+      className={`h-11 px-4 rounded-pill border font-display text-small font-semibold transition-[background-color,border-color,color,transform] duration-fast motion-safe:active:scale-[0.97] ${
+        on
+          ? 'border-brand-600 bg-brand-50 text-brand-800'
+          : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300'
+      }`}
+    >
+      {t.label}
+    </button>
+  )
+}
+
 const INPUT =
   'w-full h-12 pl-11 pr-4 rounded-field border border-ink-200 bg-white text-body text-ink-900 ' +
   'placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none ' +
@@ -77,27 +106,6 @@ export function StepWhat({ draft, onPick }: {
       e.preventDefault()
       onPick(hits[Math.max(0, activeIx)].topic.id)
     }
-  }
-
-  const Chip = ({ t }: { t: Topic }) => {
-    const on = draft.topic === t.id
-    return (
-      <button
-        type="button"
-        aria-pressed={on}
-        onClick={() => onPick(t.id)}
-        // 0.97, the BUTTON press tier (components/Btn) — a pill is a
-        // button-sized control, unlike the full-width option rows in
-        // _stepPick, which press at the card tier.
-        className={`h-11 px-4 rounded-pill border font-display text-small font-semibold transition-[background-color,border-color,color,transform] duration-fast motion-safe:active:scale-[0.97] ${
-          on
-            ? 'border-brand-600 bg-brand-50 text-brand-800'
-            : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300'
-        }`}
-      >
-        {t.label}
-      </button>
-    )
   }
 
   return (
@@ -150,7 +158,7 @@ export function StepWhat({ draft, onPick }: {
           // go in the description.
           <div className="mt-5">
             <p className="text-body text-ink-600">ზუსტად ეს ვერ ვიპოვეთ — აირჩიე „სხვა“ და აღწერაში დაწერე.</p>
-            <div className="mt-3"><Chip t={OTHER_TOPIC} /></div>
+            <div className="mt-3"><Chip t={OTHER_TOPIC} on={draft.topic === OTHER_TOPIC.id} onPick={onPick} /></div>
           </div>
         )
       ) : (
@@ -163,7 +171,7 @@ export function StepWhat({ draft, onPick }: {
               does not. */}
           <p className="text-meta text-ink-500">მაგალითად</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            {SUGGESTED_TOPICS.map(t => <Chip key={t.id} t={t} />)}
+            {SUGGESTED_TOPICS.map(t => <Chip key={t.id} t={t} on={draft.topic === t.id} onPick={onPick} />)}
           </div>
 
           <div className="mt-6 rounded-card border border-ink-200 bg-white divide-y divide-ink-100 overflow-hidden">
@@ -194,7 +202,7 @@ export function StepWhat({ draft, onPick }: {
                   </button>
                   {open && (
                     <div className="px-4 pb-4 pt-1 flex flex-wrap gap-2 motion-safe:animate-fade-in-fast">
-                      {g.topics.map(t => <Chip key={t.id} t={t} />)}
+                      {g.topics.map(t => <Chip key={t.id} t={t} on={draft.topic === t.id} onPick={onPick} />)}
                     </div>
                   )}
                 </div>
@@ -203,7 +211,7 @@ export function StepWhat({ draft, onPick }: {
           </div>
 
           <div className="mt-4">
-            <Chip t={OTHER_TOPIC} />
+            <Chip t={OTHER_TOPIC} on={draft.topic === OTHER_TOPIC.id} onPick={onPick} />
           </div>
         </div>
       )}

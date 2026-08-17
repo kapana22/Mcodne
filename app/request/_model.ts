@@ -28,6 +28,9 @@
 import {
   ServiceRequestInput, bandOf, TIMING, isTopicOfKind, kindsOfTopic, extrasFor,
   KIND, kindOf,
+  // The label vocabulary, for the transcript — see answerLabel. Imported rather
+  // than re-derived so a renamed band or city renames in the conversation too.
+  topicLabel, budgetLabel, timingLabel, formatLabel, cityLabel,
   type RequestKindName,
 } from '@/lib/requests'
 
@@ -160,6 +163,56 @@ export function stepsFor(d: Draft): StepDef[] {
   out.push({ id: 'details', title: 'დაამატებ დეტალებს?', skippable: true })
   out.push({ id: 'contact', title: 'როგორ დაგიკავშირდეთ?' })
   return out
+}
+
+/**
+ * What the person ANSWERED on a screen, in the words they would recognise.
+ *
+ * ⚠️ THE TRANSCRIPT IS THE PRODUCT NOW (2026-08-17). The wizard reads as a
+ * conversation — every answered screen stays on the page as a pair of bubbles,
+ * ours asking and theirs answering — and this is the second half of every pair.
+ * Owner: „ეს ფორმასავით შემოდის და პირდაპირ ლაივ ჩათი რომ ეხსნებოდეს."
+ *
+ * ⚠️ IT RETURNS THE LABEL, NEVER THE ID. `budgetBand` is „c2" in the draft and
+ * „100–250₾ ერთ კონსულტაციაზე" to a reader, and the difference is the whole
+ * point of showing the answer back: a transcript of ids is a debug view. Every
+ * label comes from the ONE function that already owns that vocabulary in
+ * lib/requestTopics, so a renamed band renames here too.
+ *
+ * Null means „nothing to show" — a screen not yet answered, or one that was
+ * skipped. A skipped screen deliberately leaves NO bubble rather than an empty
+ * one: „—" in a conversation is a person who said nothing, which is exactly
+ * what happened and is not worth a line.
+ */
+export function answerLabel(id: string, d: Draft): string | null {
+  if (id === 'what') return d.topic ? topicLabel(d.topic) : null
+  if (id === 'kind') return d.kind ? KIND[kindOf(d.kind)].label : null
+  if (id.startsWith('extra:')) {
+    if (!d.kind) return null
+    const q = extrasFor(kindOf(d.kind), d.topic).find(x => `extra:${x.id}` === id)
+    const picked = q ? d.details[q.id] : undefined
+    return q && picked ? (q.options.find(o => o.id === picked)?.label ?? null) : null
+  }
+  if (id === 'budget') {
+    if (!d.kind) return null
+    const band = bandOf(kindOf(d.kind), d.budgetBand)
+    return band ? budgetLabel(kindOf(d.kind), band.min, band.max) : null
+  }
+  if (id === 'timing') {
+    return d.kind && d.timing ? timingLabel(kindOf(d.kind), d.timing) : null
+  }
+  if (id === 'format') {
+    if (!d.format) return null
+    // The city rides on the format answer rather than getting a bubble of its
+    // own: it is a sub-question of „ადგილზე" and only ever asked there, so two
+    // bubbles would show a question the transcript never printed.
+    const f = formatLabel(d.format)
+    return d.format === 'IN_PERSON' && d.city ? `${f} · ${cityLabel(d.city)}` : f
+  }
+  if (id === 'details') return d.description.trim() || null
+  // The contact screen is the one that is never behind the reader — it is where
+  // the send button lives, so it has no answered state to restate.
+  return null
 }
 
 /**

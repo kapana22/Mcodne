@@ -20,6 +20,7 @@ import {
   progressOf, reviveDraft, withTopic, withKind, withAccountContact,
   type Draft, type AccountContact,
 } from './_model'
+import { Transcript } from './_transcript'
 import { StepWhat, StepKindPick } from './_stepWhat'
 import { StepPick } from './_stepPick'
 import { StepDetails } from './_stepDetails'
@@ -223,19 +224,36 @@ export function RequestWizard({ account }: {
         </div>
       )}
 
-      <h1 className="font-display text-h1 font-bold text-ink-900 tracking-tight">{step.title}</h1>
+      {/* ── The conversation so far ─────────────────────────────────────────
+          Everything already answered, kept on the page as bubbles. See
+          _transcript for why the run stopped erasing itself. */}
+      <Transcript
+        steps={steps}
+        currentId={step.id}
+        draft={draft}
+        onEdit={id => setStepId(id)}
+      />
+
+      {/* The current question keeps the h1 — it is still the page's heading and
+          the thing a screen reader announces on arrival. Only the SIZE steps
+          down once there is a transcript above it: at text-h1 the live question
+          shouted over the conversation it belongs to, and the reader's eye had
+          nothing to follow from one bubble to the next. */}
+      <h1 className={`font-display font-bold text-ink-900 tracking-tight ${
+        step.id === 'what' ? 'text-h1' : 'text-h2'
+      }`}>
+        {step.title}
+      </h1>
       {step.id === 'what' && (
         <p className="mt-2 text-body text-ink-600">აღწერე — გადავამოწმებთ და ექსპერტები ფასს შემოგთავაზებენ. უფასოა.</p>
       )}
-      {/* What was picked, restated once the run is topic-scoped — the reader is
-          several taps in and should not have to remember.
-          ⚠️ NOT on the contact screen: that one prints its own fuller line
-          (kind · topic · budget · timing), and the two rendered together put
-          „მასწავლებელი · Python" twice on the last screen before a submit —
-          owner, 2026-08-17, reading it off the live page. */}
-      {step.id !== 'what' && step.id !== 'kind' && step.id !== 'contact' && draft.topic !== '' && (
-        <p className="mt-1.5 text-small text-ink-500">{KIND[kind].label} · {topicLabel(draft.topic)}</p>
-      )}
+      {/* ⚠️ THE „kind · topic" RESTATEMENT LIVED HERE AND IS GONE (2026-08-17).
+          It existed because the reader was several taps in with nothing on
+          screen to remind them what this run was about — the transcript above
+          now says it in their own words, at the top, where they said it. Kept,
+          it printed „კონსულტაცია · ხელშეკრულება" a second time three lines
+          under its own bubble. The same reasoning retires the contact screen's
+          summary line; see _stepContact. */}
 
       <div key={step.id} className="mt-6 motion-safe:animate-slide-in-b">
         {step.id === 'what' && (

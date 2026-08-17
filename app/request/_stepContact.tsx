@@ -44,14 +44,17 @@ export function StepContact({ draft, patch, signedIn }: {
     // note there). This screen used to set 440 and was the only one that did,
     // so the column narrowed on the last tap.
     <div className="space-y-5">
-      {/* One line, not a table: what is about to be sent, compressed to the
-          three facts that could be wrong. „უკან" walks the screens — per-row
-          edit links were a control panel on a screen whose job is two fields. */}
-      <p className="text-small text-ink-600">
-        {KIND[kind].label} · {topicLabel(draft.topic)}
-        {band && <> · {budgetLabel(kind, band.min, band.max)}</>}
-        {draft.timing && <> · {timingLabel(kind, draft.timing)}</>}
-      </p>
+      {/* ⚠️ THE SUMMARY LINE LIVED HERE AND IS GONE (2026-08-17). It was one
+          compressed line — kind · topic · budget · timing — because a form's
+          last screen has to show what is about to be sent and there was nowhere
+          else for it. The transcript above now carries all four AS BUBBLES, in
+          order, each with its own „შეცვლა" — which is strictly more than the
+          line did: it was read-only, and the edit story was „press უკან four
+          times". Keeping both put every one of those facts on this screen
+          twice, three lines apart.
+
+          ⚠️ Do not restore it as a „confirmation". The transcript IS the
+          confirmation, and it is the version somebody can act on. */}
 
       {/* ⚠️ THE FIELDS COME FIRST. The reassurance used to sit above them and
           pushed all three below the fold at 390px — on the last screen before

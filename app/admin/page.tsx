@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { AdminSidebar, TopBar, VALID_TABS, TAB_ALIASES, type AdminTab } from './_nav'
+import { PresenceBeat } from './_presence'
 import { OverviewSection } from './_overview'
 import { ModerationSection } from './_moderation'
 import { UsersSection } from './_users'
@@ -88,6 +89,9 @@ export default function AdminOverview() {
 
   return (
     <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen lg:flex lg:items-start">
+      {/* Renders nothing. Here rather than inside the requests tab because an
+          operator reading any tab is still an operator — see _presence. */}
+      <PresenceBeat />
       <AdminSidebar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} />
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
       <TopBar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} />

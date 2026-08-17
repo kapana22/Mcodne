@@ -34,8 +34,12 @@ import {
   placesLeft, requestIsOpen,
   providerRequestView, clientOfferView, clientContactFor,
   ServiceRequestInput, RequestOfferInput, AdminRequestPatch,
-  serviceRequestRow,
+  serviceRequestRow, topicLabel,
 } from '../lib/requests'
+import {
+  threadIsOpen, threadClosedReason, staffIsOnline, PRESENCE_TTL_MS,
+} from '../lib/requestThread'
+import { answerLabel, EMPTY_DRAFT, type Draft } from '../app/request/_model'
 
 const ROOT = join(import.meta.dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -344,6 +348,7 @@ test('every page and every route ALSO gates itself — the middleware is not the
     ['app/api/requests/route.ts', 'clientAllowed'],
     ['app/api/requests/[ref]/accept/route.ts', 'clientAllowed'],
     ['app/api/request-chat/route.ts', 'clientAllowed'],
+    ['app/api/request-thread/route.ts', 'clientAllowed'],
     ['app/api/provider/offers/route.ts', 'providerAllowed'],
     ['app/api/admin/requests/route.ts', 'providerAllowed'],
     ['app/api/admin/requests/[id]/route.ts', 'providerAllowed'],
@@ -1574,10 +1579,110 @@ test('the honeypot stays invisible and stays dumb', () => {
     'the honeypot branch stopped answering ok:true — it now tells bots they were caught')
 })
 
-test('the last screen does not print the same thing twice', () => {
+test('no screen prints the same answer twice', () => {
+  // This test used to assert the OPPOSITE arrangement — that the wizard's
+  // „kind · topic" line was suppressed on the contact screen, because that
+  // screen printed its own fuller summary. Both lines are gone (2026-08-17):
+  // the transcript now restates every answer as a bubble, in the person's own
+  // order, each with its own „შეცვლა". Keeping either line printed the same
+  // four facts a second time, a few lines under their own bubbles.
   const wizard = codeOf('app/request/RequestWizard.tsx')
-  // The wizard's generic „kind · topic" line is suppressed on the contact
-  // screen, which prints its own fuller version.
-  assert.match(wizard, /step\.id !== 'contact' && draft\.topic !== ''/,
-    'the wizard restated kind · topic on the contact screen, where the step already prints it')
+  const contact = codeOf('app/request/_stepContact.tsx')
+  assert.match(wizard, /<Transcript/, 'the wizard no longer renders the transcript')
+  assert.doesNotMatch(wizard, /KIND\[kind\]\.label\} · \{topicLabel/,
+    'the wizard restates kind · topic again — the transcript already says it')
+  assert.doesNotMatch(contact, /budgetLabel\(kind, band\.min, band\.max\)/,
+    'the contact screen printed its summary line again — the transcript already carries it')
+})
+
+test('the transcript restates ANSWERS, in words, and only answered ones', () => {
+  // The half of every bubble pair that is not the question. Executed rather
+  // than described, because the failure it guards is invisible in a diff: an
+  // id leaking into the transcript („c2" instead of „100–250₾") still renders,
+  // still looks like a chat, and is a debug view shown to a customer.
+  const d: Draft = {
+    ...EMPTY_DRAFT,
+    kind: 'CONSULTATION', topic: 'contract',
+    budgetBand: 'c2', timing: 'this_week',
+    format: 'IN_PERSON', city: 'BATUMI',
+  }
+  const budget = answerLabel('budget', d)
+  assert.ok(budget && !budget.includes('c2'), `the budget bubble shows the raw band id: ${budget}`)
+  assert.equal(budget, budgetLabel('CONSULTATION', 100, 250))
+  const timing = answerLabel('timing', d)
+  assert.ok(timing && !timing.includes('this_week'), `the timing bubble shows the raw id: ${timing}`)
+  assert.equal(answerLabel('what', d), topicLabel('contract'))
+
+  // The city rides on the format answer — it is a sub-question only ever asked
+  // under „ადგილზე", so a bubble of its own would answer a question the
+  // transcript never printed.
+  const fmt = answerLabel('format', d)
+  assert.ok(fmt?.includes('·'), `the in-person answer dropped the city: ${fmt}`)
+
+  // An unanswered or skipped screen leaves NO pair. „—" in a conversation is a
+  // person who said nothing, which is not worth a line.
+  assert.equal(answerLabel('details', d), null, 'an empty description produced a bubble')
+  assert.equal(answerLabel('budget', EMPTY_DRAFT), null, 'an unanswered screen produced a bubble')
+  // The contact screen is never behind the reader — it is where send lives.
+  assert.equal(answerLabel('contact', d), null)
+})
+
+test('the thread with us is open when a person most needs it', () => {
+  // ⚠️ REJECTED STAYS OPEN, and it is the case worth executing. Somebody under
+  // the budget floor is told „ამ ბიუჯეტში ვერ დაგეხმარებით" and is never
+  // phoned — closing their thread would make the only person actively turned
+  // away also the only one who cannot ask why, or say „და 300₾-ზე?".
+  for (const status of ['NEW', 'VERIFIED', 'REJECTED', 'MATCHED']) {
+    assert.equal(threadIsOpen({ status }), true, `the thread is shut on ${status}`)
+    assert.equal(threadClosedReason({ status }), null)
+  }
+  assert.equal(threadIsOpen({ status: 'CLOSED' }), false)
+  assert.ok(threadClosedReason({ status: 'CLOSED' }))
+})
+
+test('„ონლაინ ვართ" is a heartbeat, and it goes dark on its own', () => {
+  const now = Date.parse('2026-08-17T12:00:00Z')
+  assert.equal(staffIsOnline(null, now), false, 'an account that never beat reads as online')
+  assert.equal(staffIsOnline(new Date(now - 1_000), now), true)
+  assert.equal(staffIsOnline(new Date(now - (PRESENCE_TTL_MS - 1_000)), now), true)
+  // The whole point: a closed tab stops beating and the badge must follow,
+  // rather than claiming somebody is at the desk until the laptop dies.
+  assert.equal(staffIsOnline(new Date(now - (PRESENCE_TTL_MS + 1_000)), now), false)
+  // The panel's own interval must sit comfortably inside the window, or a
+  // single missed beat blinks the badge off for every waiting client.
+  const beat = read('app/admin/_presence.tsx').match(/BEAT_MS = ([\d_]+)/)?.[1]
+  assert.ok(beat, 'the heartbeat interval is no longer stated as BEAT_MS')
+  assert.ok(Number(beat!.replace(/_/g, '')) * 2 < PRESENCE_TTL_MS,
+    'the heartbeat interval is no longer at least twice inside the staleness window')
+  // …and it must only beat while somebody is LOOKING. A tab left open all night
+  // would otherwise report an operator at the desk until morning.
+  assert.match(codeOf('app/admin/_presence.tsx'), /visibilityState !== 'visible'/,
+    'the heartbeat beats from a backgrounded tab — that is a badge that lies')
+})
+
+test('the platform thread cannot leak the provider conversations', () => {
+  const route = codeOf('app/api/request-thread/route.ts')
+  // ⚠️ `offerId: null` IS THE THREAD SELECTOR. Without it, a read scoped only
+  // by requestId returns every message on the request — including the client's
+  // separate conversations with each provider, which is the exact leak the
+  // per-offer threads exist to prevent. Asserted on the READ and the WRITE.
+  const reads = route.match(/offerId: null/g) ?? []
+  assert.ok(reads.length >= 3,
+    `the platform thread is not scoped by offerId: null everywhere (found ${reads.length}: read, receipt, write)`)
+  assert.doesNotMatch(route, /where: \{ requestId: r\.request\.id \}/,
+    'a query is scoped by requestId alone — that reads every provider thread too')
+
+  // Contacts are NOT masked here, deliberately — see lib/requestThread. Stated
+  // as an assertion so „add masking for consistency" fails loudly instead of
+  // quietly gagging the operator who has to give a callback number.
+  assert.doesNotMatch(route, /maskContacts/,
+    'the platform thread started masking contacts — the client is talking to the platform they already gave a number to')
+
+  // And the operator side is ADMIN, never the allowlist: `providerAllowed` is
+  // also true for an allowlisted expert, and handing a bidder this thread hands
+  // them the client's private half of the conversation.
+  assert.match(route, /viewer\.user\?\.role !== 'ADMIN'/,
+    'the staff side no longer requires ADMIN — an allowlisted bidder could read it')
+  assert.doesNotMatch(route, /viewer\.providerAllowed/,
+    'the platform thread gates on providerAllowed, which admits bidders')
 })
