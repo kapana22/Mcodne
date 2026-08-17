@@ -13,6 +13,7 @@ import { requestsViewer } from '@/lib/requestsServer'
 import { PageHeader } from '@/components/PageHeader'
 import { Card } from '@/components/Card'
 import { Btn } from '@/components/Btn'
+import { RequestMessage } from './_message'
 import { OfferForm } from './OfferForm'
 
 export const dynamic = 'force-dynamic'
@@ -53,11 +54,18 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   //
   // Read BEFORE the visibility rule below, because on a settled request it IS
   // the visibility rule.
+  // ⚠️ AN INVITED ROW IS NOT AN ANSWER (2026-08-18). Since a client can now
+  // write to an expert before anybody has bid, this provider may already OWN a
+  // row on this request without having offered anything — and without the
+  // filter below the page would tell them „უკვე გაქვს გაგზავნილი" and hide the
+  // form, so the one expert the client actually reached out to would be the one
+  // expert who could not answer with a price.
   const p = viewer.provider
   const mine = p
     ? await prisma.requestOffer.findFirst({
         where: {
           requestId: row.id,
+          status: { not: 'INVITED' },
           ...(p.kind === 'EXPERT' ? { expertUserId: p.userId } : { companyId: p.companyId }),
         },
         select: { id: true, status: true },
@@ -131,26 +139,35 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           : `${timeAgoKa(r.createdAt)} · დახურულია`}
       />
 
-      <div className="mt-6 grid lg:grid-cols-[1fr_400px] gap-5 items-start">
-        <Card>
-          {r.description && (
-            <p className="text-body text-ink-800 whitespace-pre-wrap leading-relaxed">{r.description}</p>
-          )}
-          <dl className="mt-5 grid sm:grid-cols-2 gap-x-6 gap-y-3">
-            {([
-              ['ბიუჯეტი', r.budgetLabel],
-              [r.kind === 'LEARNING' ? 'სიხშირე' : 'ვადა', r.timingLabel],
-              ...r.extras.map(e => [e.label, e.value] as [string, string]),
-              ['ფორმატი', r.formatLabel],
-              ['ქალაქი', r.cityLabel],
-            ] as [string, string][]).map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-meta text-ink-500">{k}</dt>
-                <dd className="text-body text-ink-900">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </Card>
+      {/* ── ONE COLUMN, NOT TWO (2026-08-17) ───────────────────────────────
+          It was `1fr / 400px`: the request on the left, the offer form parked in
+          a right rail. That layout says the two are separate objects a provider
+          consults side by side — and they are not. One is what somebody asked;
+          the other is the answer to it. Stacked, in a reading column, the page
+          reads in the order the work happens: read the message, write the reply.
+
+          720 rather than the shell's full width for the ordinary reason a
+          conversation is narrow — at 1280 the message bubble ran to a line
+          length nobody reads comfortably, and the form's two number fields sat
+          marooned in a rail with white space either side (owner, 2026-08-17:
+          the screen „უფრო კომფორტული" is the one that looks like a chat). */}
+      <div className="mt-6 max-w-[720px] flex flex-col gap-6">
+        <RequestMessage
+          topicLabel={r.topicLabel}
+          description={r.description}
+          createdAt={r.createdAt}
+          facts={[
+            { label: 'ბიუჯეტი', value: r.budgetLabel },
+            { label: r.kind === 'LEARNING' ? 'სიხშირე' : r.kind === 'SERVICE' ? 'როდის' : 'ვადა', value: r.timingLabel },
+            ...r.extras.map(e => ({ label: e.label, value: e.value })),
+            // ⚠️ NO „ფორმატი" ON A SERVICE. The kind decides it — somebody has
+            // to be in the room — so the row would print „ადგილზე" on every
+            // single one, which is a line that has never told anybody anything.
+            // The city, which DOES vary, stays.
+            ...(r.kind === 'SERVICE' ? [] : [{ label: 'ფორმატი', value: r.formatLabel }]),
+            { label: 'ქალაქი', value: r.cityLabel },
+          ]}
+        />
 
         {/* ── What happened, and the one place to go next ──────────────────
             Four states, one card. WON links to /provider/offers because that is

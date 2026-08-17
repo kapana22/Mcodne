@@ -1019,8 +1019,16 @@ test('a below-floor request is STORED, with status REJECTED — per kind', () =>
   const route = codeOf('app/api/requests/route.ts')
   assert.match(route, /const rejected = budgetIsBelowFloor\(parsed\.data\.kind, parsed\.data\.budgetBand\)/,
     'the endpoint no longer applies the per-kind floor')
-  assert.match(route, /status: rejected \? 'REJECTED' : 'NEW'/,
-    'a below-floor request no longer lands as REJECTED')
+  // ⚠️ THE LADDER GREW A RUNG (2026-08-18) AND `rejected` MUST KEEP THE TOP.
+  // It used to read `rejected ? 'REJECTED' : 'NEW'`, because every accepted
+  // request waited for an operator's call. Now an unflagged one verifies itself
+  // (lib/requestTriage) — and the ONLY thing that matters here is that a
+  // below-floor request cannot reach that branch: it is answered, never
+  // broadcast to a sphere full of experts who will refuse it.
+  assert.match(route, /status: rejected \? 'REJECTED' :/,
+    'a below-floor request no longer lands as REJECTED first')
+  assert.match(route, /const autoVerified = !rejected &&/,
+    'auto-verification stopped deferring to the budget floor')
   // THE ROW IS STILL WRITTEN. If this ever becomes an early return, the
   // measurement is gone and nothing says so.
   const beforeCreate = route.slice(0, route.indexOf('createServiceRequest'))
@@ -1892,19 +1900,38 @@ test('the record folds — the live question does not sink', () => {
   // to a fixed pane and let old messages scroll away behind it; products with a
   // document layout (Typeform, Bark, Thumbtack) show one question and no
   // transcript. This was the second layout carrying the first one's content.
+  // ⚠️ THIS TEST PINNED A HALFWAY HOUSE AND NOW PINS THE END STATE. The first
+  // fix folded the OLD answers into chips but kept the newest exchange as a
+  // pair of bubbles, „so the seam into the live question still reads as a
+  // conversation". That seam was the remaining defect: it put a grey bubble and
+  // a filled brand-600 bubble directly above the question, and since the
+  // question and the option labels are both `text-body`, the loudest element on
+  // the screen was the answer the person had already given. All chips now.
   const t = codeOf('app/request/_transcript.tsx')
-  assert.match(t, /const folded = rows\.slice\(0, -1\)/,
-    'the transcript stopped folding — every answered pair is a bubble stack again')
-  assert.match(t, /const last = rows\[rows\.length - 1\]/,
-    'the newest exchange no longer keeps its bubbles — the seam into the live question is a form again')
-  // Every folded answer stays editable. Folding that cost the edit affordance
-  // would be a summary, and a summary is what the transcript replaced.
+
+  // No bubbles left at all — neither ours nor theirs.
+  assert.doesNotMatch(t, /bg-brand-600/,
+    'the filled answer bubble is back — it outshouts the question above the options')
+  assert.doesNotMatch(t, /bg-ink-75/,
+    'the grey question bubble is back inside the record')
+  // Every answer stays editable. A record that cost the edit affordance would
+  // be a summary, and a summary is what this replaced.
   assert.match(t, /aria-label=\{`შეცვლა: \$\{label\}`\}/,
-    'a folded answer is no longer a control — the record became read-only')
+    'an answer is no longer a control — the record became read-only')
   // The instruction line is gone: a row of chips does not need to be explained,
   // and a sentence printed on every screen of a run is furniture.
   assert.doesNotMatch(t, /პასუხზე დააჭირე/,
     'the hint line is back — it was an instruction on every screen of the run')
+
+  // …and the question it must not sink under is now the page's loudest element,
+  // at ONE size across the whole run. It rendered at `text-body` on steps 2..n
+  // — exactly the size of the option labels below it — and `text-h1` on step 1,
+  // so the run changed voice after the first tap.
+  const w = codeOf('app/request/RequestWizard.tsx')
+  assert.match(w, /<h1 className="font-display text-h1 font-bold/,
+    'the live question is no longer an h1 at text-h1 — a question set at its answers’ size is a label')
+  assert.doesNotMatch(w, /<Ask/,
+    'the question went back into a bubble component')
 })
 
 test('no screen prints the same answer twice', () => {

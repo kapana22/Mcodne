@@ -158,24 +158,47 @@ test('§C nonsense returns nothing rather than a shrug of a list', () => {
 
 /* ═══════════ D. the gap an algorithm cannot close ═══════════════════════ */
 
-test('§D a missing topic is a VOCABULARY gap, and it is not silent', () => {
-  // ⚠️ THESE ARE EXPECTED TO FIND NOTHING TODAY, and that is the honest state:
-  // the catalogue has 23 groups and not one of them covers everyday home
-  // services — no cleaning, no plumber, no electrician, no moving. It is the
-  // single biggest category on every comparable platform (Bark leads its home
-  // page with House Cleaning), and the owner walked straight into it.
+test('§D the home-services gap is CLOSED, and the trade names are what find it', () => {
+  // ⚠️ THIS TEST USED TO ASSERT THE OPPOSITE, and the flip is the point.
   //
-  // The test asserts the CURRENT truth so that the day somebody adds those
-  // topics, this fails and is deleted deliberately — rather than the gap
-  // living on as a comment nobody reads.
-  const MISSING = ['დალაგება', 'სანტექნიკოსი', 'ელექტრიკოსი', 'გადაზიდვა', 'ავეჯის აწყობა']
-  const found = MISSING.filter(q => searchAllTopics(q).length > 0)
-  assert.deepEqual(found, [],
-    `these now match — the home-services gap was closed, so delete this test: ${found.join(', ')}`)
+  // Until 2026-08-17 the catalogue had 23 groups and not one covered everyday
+  // home services — no cleaning, no plumber, no electrician, no moving. It is
+  // the single biggest category on every comparable platform (Bark leads its
+  // home page with House Cleaning). The old test pinned that absence so the day
+  // somebody closed the gap it would fail loudly rather than let a stale comment
+  // describe a catalogue that had moved on. The gap is now closed by the eight
+  // `kinds: S` groups in lib/requestTopics, so the assertion inverts.
+  //
+  // ⚠️ IT SEARCHES BY THE TRADE'S NAME, NOT THE JOB'S. Nobody types „ონკანის
+  // შეკეთება" — they type „სანტექნიკოსი", the person, because a person is what
+  // they are looking for. Those words live in each topic's `alt`, and this is
+  // what stops somebody „tidying" them away as duplicates of the label.
+  const TRADES: [string, string][] = [
+    ['დალაგება',       'clean-flat'],
+    ['დამლაგებელი',    'clean-flat'],
+    ['სანტექნიკოსი',   'plumb-leak'],
+    ['ელექტრიკოსი',    'elec-wiring'],
+    ['გადაზიდვა',      'move-flat'],
+    ['ავეჯის აწყობა',  'rep-assembly'],
+    ['კონდიციონერი',   'app-ac'],
+  ]
+  for (const [query, expectedId] of TRADES) {
+    const hits = searchAllTopics(query)
+    assert.ok(hits.length > 0, `„${query}" finds nothing — the trade name left the vocabulary`)
+    assert.equal(hits[0].topic.id, expectedId,
+      `„${query}" ranked ${hits[0].topic.id} first, expected ${expectedId}`)
+  }
 
-  // …and the wizard must keep its answer for exactly this case: the typed
-  // sentence carries forward as the request itself.
-  assert.equal(searchAllTopics('მჭირდება სახლის დალაგება').length, 0)
+  // A whole sentence still has to land, because that is how people type — the
+  // matcher's own reason for existing.
+  const sentence = searchAllTopics('მჭირდება სახლის დალაგება')
+  assert.ok(sentence.length > 0, 'the sentence form stopped matching')
+  assert.equal(sentence[0].topic.id, 'clean-flat')
+
+  // …and the free-text escape hatch must still work for what is STILL missing,
+  // or the wizard loses its answer for the next gap. Nothing in the catalogue
+  // teaches horses.
+  assert.equal(searchAllTopics('მჭირდება ცხენით ჯირითის მასწავლებელი').length, 0)
 })
 
 /* ═══════════ E. the ranker is stable and bounded ════════════════════════ */

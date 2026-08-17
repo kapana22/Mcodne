@@ -112,9 +112,15 @@ export default async function Page() {
                   <span className="font-display text-h3 font-bold text-ink-900">
                     {topicLabel(o.request.topic)}
                   </span>
-                  <span className="font-display text-h3 font-bold text-ink-900 tabular-nums shrink-0">
-                    {gel(o.priceGel)}
-                  </span>
+                  {/* ⚠️ AN INVITED ROW HAS NO PRICE, and `priceGel` is 0 on it
+                      as a placeholder rather than a number anybody named.
+                      Printing „0₾" would tell the expert they had offered to
+                      work for nothing. */}
+                  {o.status !== 'INVITED' && (
+                    <span className="font-display text-h3 font-bold text-ink-900 tabular-nums shrink-0">
+                      {gel(o.priceGel)}
+                    </span>
+                  )}
                 </div>
                 {/* ⚠️ NO `publicRef` HERE — see the note on the request detail
                     page. It is the client's credential, not a reference number,
@@ -137,11 +143,20 @@ export default async function Page() {
                 {/* ⚠️ „კლიენტი" until the choice is made — the NAME is part of
                     the contact, and clientContactFor is the only thing allowed
                     to reveal it. A peer label is not a loophole. */}
-                {(o.status === 'SENT' || o.status === 'ACCEPTED') && (
+                {/* ⚠️ INVITED IS OPEN TOO (2026-08-18) — that row exists
+                    BECAUSE the client wrote, so refusing the pane on it would
+                    deliver a message with no way to answer it. It is the one
+                    status where the conversation exists before the offer. */}
+                {(o.status === 'INVITED' || o.status === 'SENT' || o.status === 'ACCEPTED') && (
                   <RequestChat
                     thread={{ kind: 'OFFER', offerId: o.id }}
                     unread={o._count.messages}
                     peerName={contact ? contact.contactName : 'კლიენტი'}
+                    // Opened by default on an invited thread: the client is
+                    // waiting on a reply and a collapsed link is one tap between
+                    // them and it. Every other status collapses, because there
+                    // the news is the price, not the transcript.
+                    defaultOpen={o.status === 'INVITED'}
                   />
                 )}
 

@@ -158,6 +158,7 @@ model User {
   requestOffers     RequestOffer[]
   requestMessages   RequestMessage[]
   requestAccess     RequestAccess?
+  serviceProfile    ServiceProfile?
 
   // Admin filters + list order-by
   @@index([role])
@@ -1252,6 +1253,28 @@ enum ServiceRequestStatus {
 // kind-independent, and is exactly what the database should be guarding.
 
 enum RequestOfferStatus {
+  /// ⚠️ THE CLIENT WROTE FIRST, AND THERE IS NO OFFER YET (2026-08-18).
+  ///
+  /// Until now a client could only wait: a conversation existed once an expert
+  /// had answered, and not one second earlier. That is the passive half of this
+  /// product and it is the half Profi.ru does not have — there the client picks
+  /// somebody from the catalogue and offers them the job („Клиент предлагает
+  /// вам заказ"). Owner, 2026-08-18: „ეს გვინდა."
+  ///
+  /// It is a status on the OFFER row rather than a table of its own, and that
+  /// is the whole reason this is cheap: the per-offer thread, the unread counts,
+  /// the event journal and the accept path all key on an offer id and none of
+  /// them learns a new case. The unique index on (requestId, expertUserId) also
+  /// does the right thing for free — a client writing to somebody who has
+  /// already bid finds the existing row instead of making a second one.
+  ///
+  /// ⚠️ AN INVITED ROW IS NOT AN OFFER AND MUST NEVER COUNT AS ONE. It holds no
+  /// price (`priceGel` is 0 and means nothing), it does NOT consume a place
+  /// against `offerLimit`, it is not listed among the offers the client
+  /// compares, and it cannot be accepted — `accept` matches `status: 'SENT'`
+  /// and so refuses it by construction. The expert turns it into a real offer
+  /// by naming a price, which claims a place at THAT moment.
+  INVITED
   SENT
   WITHDRAWN
   ACCEPTED
@@ -1462,6 +1485,7 @@ model RequestOffer {
   // price by sending a second offer would make the offerCount claim above count
   // the same provider twice and eat a competitor's place.
   messages RequestMessage[]
+  events   OfferEvent[]
 
   @@unique([requestId, expertUserId])
   @@unique([requestId, companyId])
@@ -1589,4 +1613,126 @@ model RequestAccess {
   // same trick Company.taxId relies on.
   @@unique([userId])
   @@unique([companyId])
+}
+
+/// WHAT HAPPENED TO AN OFFER — the append-only record the price will be read
+/// from.
+///
+/// ⚠️ THIS EXISTS BECAUSE MONEY IS GOING TO DEPEND ON IT (owner, 2026-08-17:
+/// the expert pays „როცა კლიენტმა წაიკითხა"). The moment a billing rule reads
+/// „the client opened it", that fact stops being a UI nicety and becomes a
+/// financial record — and the one we already had could not carry the weight:
+///
+///   · `RequestMessage.readByClientAt` is written inside `after()` with a bare
+///     `catch {}`, so a failed write loses the event in silence;
+///   · it is a MUTABLE column with no history, so „why was I charged" has no
+///     evidence behind it;
+///   · `updateMany` stamps every unread message at once, so „opened the thread"
+///     and „read this offer" are indistinguishable.
+///
+/// A receipt you cannot show is not a receipt. This table is append-only: rows
+/// are inserted, never updated and never deleted, and the billing question is
+/// always „what is the FIRST event of this type" rather than „what does the
+/// column say now".
+///
+/// ⚠️ IT RECORDS BOTH `VIEWED` AND `REPLIED`, DELIBERATELY, AND THE PRICE IS 0
+/// TODAY. Which of the two should cost money is an open question with real
+/// money behind it and no data yet: Profi.ru bills on the open (and refunds if
+/// it never happens within five days), Thumbtack bills on the reply — and
+/// Thumbtack ABANDONED an open-based refund window, which is evidence the open
+/// is the noisier signal. A client who opens five offers out of curiosity and
+/// hires nobody has cost five experts money. Recording both while the lead is
+/// free costs nothing and buys the decision: after a month the ratio says which
+/// signal is worth charging for, and switching is one constant.
+model OfferEvent {
+  id String @id @default(cuid())
+
+  offerId String
+  offer   RequestOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  /// 'SENT' | 'DELIVERED' | 'VIEWED' | 'REPLIED' | 'ACCEPTED' | 'DECLINED'.
+  /// A String rather than an enum for the reason the rest of this subsystem
+  /// gives: the set will grow (a charge type, a refund) and a taxonomy expected
+  /// to grow is not worth an ALTER TYPE each time. Validated by lib/offerEvents
+  /// at the only place that writes.
+  type String
+
+  /// When it happened, from the server clock. Never supplied by a caller — the
+  /// browser's clock is not evidence.
+  at DateTime @default(now())
+
+  /// Free-form context for the row: which message triggered it, which page. Not
+  /// read by any rule — it is what an operator looks at when somebody disputes
+  /// a charge, which is the whole reason the table exists.
+  meta Json?
+
+  /// ⚠️ THE BILLABLE EVENTS ARE UNIQUE PER OFFER, ENFORCED BY THE DATABASE.
+  /// „Opened twice" must cost once, and a uniqueness rule written in TypeScript
+  /// is a rule two concurrent requests can both pass. The insert is expected to
+  /// violate this and the violation is the answer — see lib/offerEvents.
+  @@unique([offerId, type])
+  @@index([type, at])
+}
+
+/// WHAT A VISITING MASTER DOES, AND WHERE — the supply side of `kind: SERVICE`.
+///
+/// ⚠️ IT IS A PROFILE, NOT AN ACCESS ROW, and the split is the whole design.
+/// `RequestAccess` answers „may you bid at all"; this answers „on what". A
+/// plumber is still an ordinary allowlisted person there (`kind: EXPERT` — one
+/// named human who writes offers), so nothing about ownership, offers, chat or
+/// acceptance learns a new case. Adding a third `RequestProviderKind` would
+/// have rippled into every one of those for no gain: the difference between a
+/// lawyer and a plumber is not HOW they bid, it is WHAT they are filed under.
+///
+/// ⚠️ `services` HOLDS TOPIC IDS FROM lib/requestTopics — the SAME vocabulary a
+/// request is written in, and that is the point of this table existing.
+/// `TutorProfile` files an expert under ONE `categoryId` from the sphere
+/// taxonomy, and a request carries a `topic`; the two only meet through
+/// `categorySlugOfTopic`, which is null for 65 of 171 topics. Storing the
+/// topics themselves means demand and supply finally speak one language, and
+/// routing becomes an exact match on a string rather than a translation that
+/// mostly fails.
+///
+/// A String[] and not a join table, for the same reason `TutorProfile
+/// .professions` is one: the list is short, always read whole, never queried
+/// from the other side, and adding a service must stay an edit to
+/// requestTopics.ts with no migration behind it.
+model ServiceProfile {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Topic ids of `kind: SERVICE` — 'plumb-leak', 'clean-flat'. Validated
+  /// against the vocabulary on write (lib/serviceProfile), never trusted from a
+  /// form: an id that is not a service topic would be a row no request can ever
+  /// match, i.e. a provider who silently never hears from us.
+  services String[]
+
+  /// Where they will travel. CityName values ('TBILISI', 'BATUMI', …) — the
+  /// same set a request's `city` is drawn from, so the two are directly
+  /// comparable. Districts are the finer answer this eventually wants; a
+  /// request carries no district yet, and a provider picking one we cannot
+  /// match against would be a promise the data cannot keep.
+  areas String[]
+
+  /// „გამოძახება 30₾" — indicative, shown before anybody bids. Null means „ask",
+  /// which is an honest answer and must stay expressible.
+  calloutFee Int?
+  /// „50₾-დან" — the same, for the work itself.
+  priceFrom  Int?
+
+  /// Off without deleting: a master on holiday stops being routed to and keeps
+  /// their list. Separate from `RequestAccess.active`, which is the admin's
+  /// switch — this one is the master's own.
+  available Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The stage-3 routing query is „who lists this topic", so the index goes on
+  /// the array. GIN is the only kind that answers `services @> ARRAY[…]`
+  /// without a sequential scan; it is created in lib/dbBoot, because Prisma
+  /// cannot express a GIN index on a scalar list.
+  @@index([available])
 }

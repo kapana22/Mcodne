@@ -27,7 +27,7 @@
 
 import {
   ServiceRequestInput, bandOf, TIMING, isTopicOfKind, kindsOfTopic, extrasFor,
-  KIND, kindOf,
+  KIND, kindOf, REQUEST_KINDS,
   // The label vocabulary, for the transcript — see answerLabel. Imported rather
   // than re-derived so a renamed band or city renames in the conversation too.
   topicLabel, budgetLabel, timingLabel, formatLabel, cityLabel,
@@ -156,7 +156,17 @@ export function stepsFor(d: Draft): StepDef[] {
     out.push({ id: 'budget', title: 'ბიუჯეტი' })
     out.push({ id: 'timing', title: 'როდის' })
   }
-  out.push({ id: 'format', title: 'ონლაინ თუ ადგილზე?' })
+  // ⚠️ A SERVICE IS NEVER ASKED „ONLINE OR IN PERSON" — there is no online
+  // plumber, so the question has exactly one answer and asking it is the wizard
+  // performing a choice nobody has. What a visit DOES need is the city, which
+  // until now only existed as a sub-question hidden behind „ადგილზე". For this
+  // kind it is the question.
+  //
+  // (The finer-grained district this really wants is the address work, and it
+  // is deliberately not here yet — see the services model. City is the honest
+  // amount of place we can route on today.)
+  if (kind === 'SERVICE') out.push({ id: 'city', title: 'რომელ ქალაქში?' })
+  else out.push({ id: 'format', title: 'ონლაინ თუ ადგილზე?' })
   // Free text LAST among the questions and OPTIONAL — the reference decision.
   // The structured taps above already carry a quotable request, and the
   // admin's verification call fills any gap a sentence would have.
@@ -201,6 +211,9 @@ export function answerLabel(id: string, d: Draft): string | null {
   if (id === 'timing') {
     return d.kind && d.timing ? timingLabel(kindOf(d.kind), d.timing) : null
   }
+  // The service run's own place question. It reads back as just the city —
+  // „ადგილზე · თბილისი" would restate a format nobody was offered a choice of.
+  if (id === 'city') return d.city ? cityLabel(d.city) : null
   if (id === 'format') {
     if (!d.format) return null
     // The city rides on the format answer rather than getting a bubble of its
@@ -227,8 +240,9 @@ export function stepComplete(id: string, d: Draft): boolean {
   if (id === 'kind') return d.kind !== '' && d.topic !== '' && isTopicOfKind(d.kind, d.topic)
   if (id === 'budget') return d.kind !== '' && bandOf(kindOf(d.kind), d.budgetBand) !== undefined
   if (id === 'timing') return d.kind !== '' && TIMING[kindOf(d.kind)].some(t => t.id === d.timing)
-  // format has an honest default, details and the clarifiers are optional.
-  if (id === 'format' || id === 'details' || id.startsWith('extra:')) return true
+  // format and city both carry an honest default (ONLINE / თბილისი) that the
+  // screen shows pre-selected; details and the clarifiers are optional.
+  if (id === 'format' || id === 'city' || id === 'details' || id.startsWith('extra:')) return true
   if (id === 'contact') return ServiceRequestInput.safeParse(d).success
   return false
 }
@@ -288,7 +302,17 @@ export function progressOf(id: string, d: Draft): number {
  */
 export function withKind(d: Draft, kind: RequestKindName): Draft {
   if (d.kind === kind) return d
-  return { ...d, kind, budgetBand: '', timing: '', details: {} }
+  return {
+    ...d, kind, budgetBand: '', timing: '', details: {},
+    // ⚠️ THE FORMAT IS DECIDED BY THE KIND FOR A SERVICE, not asked. Somebody
+    // has to be in the room, so the row must say IN_PERSON whatever the draft
+    // was carrying — and the run never shows the format screen for this kind
+    // (see stepsFor), so nothing else would ever set it. Leaving the ONLINE
+    // default in place would file every plumbing request as an online job.
+    // Moving OFF the kind restores the default rather than leaving a stale
+    // IN_PERSON behind, for the same reason the budget band is cleared here.
+    format: kind === 'SERVICE' ? 'IN_PERSON' : EMPTY_DRAFT.format,
+  }
 }
 
 /**
@@ -315,7 +339,13 @@ export function reviveDraft(raw: unknown): Draft {
   if (!raw || typeof raw !== 'object') return EMPTY_DRAFT
   const d = { ...EMPTY_DRAFT, ...(raw as Partial<Draft>) }
   if (typeof d.details !== 'object' || d.details === null || Array.isArray(d.details)) d.details = {}
-  if (d.kind !== '' && !(['LEARNING', 'CONSULTATION', 'PROJECT'] as const).includes(d.kind)) {
+  // ⚠️ READ FROM `REQUEST_KINDS`, NEVER RE-TYPED HERE (2026-08-17). This was a
+  // literal `['LEARNING', 'CONSULTATION', 'PROJECT']`, so the day a fourth kind
+  // was added every revived SERVICE draft silently reset to EMPTY_DRAFT — a
+  // person who refreshed mid-request would have lost every answer, and nothing
+  // would have thrown. A list of the legal values already exists; a second copy
+  // of it is a copy that goes stale exactly once and expensively.
+  if (d.kind !== '' && !(REQUEST_KINDS as readonly string[]).includes(d.kind)) {
     return EMPTY_DRAFT
   }
   if (d.kind !== '') {

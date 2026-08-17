@@ -111,5 +111,21 @@ export async function GET(req: Request) {
   })
   const counts = Object.fromEntries(grouped.map(g => [g.status, g._count._all]))
 
-  return NextResponse.json({ ok: true, requests, counts, candidatesByCategory })
+  // ── THE NUMBER THAT WILL SET THE PRICE ───────────────────────────────────
+  // The lead is free today and will not stay free (owner, 2026-08-17). What
+  // decides the first real number is the ratio below: of the offers experts
+  // send, how many does a client ever OPEN, and how many do they answer.
+  //
+  // It is also the health of the whole marketplace and the thing comparable
+  // platforms get told about rather than knowing — Bark's own users measure
+  // roughly 44% of paid leads ever responding and quote it back at them. One
+  // grouped query over lib/offerEvents, so the panel shows it beside the queue
+  // instead of it living in somebody's spreadsheet.
+  const eventTotals = await prisma.offerEvent.groupBy({
+    by: ['type'],
+    _count: { _all: true },
+  })
+  const funnel = Object.fromEntries(eventTotals.map(e => [e.type, e._count._all]))
+
+  return NextResponse.json({ ok: true, requests, counts, candidatesByCategory, funnel })
 }

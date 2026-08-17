@@ -98,7 +98,12 @@ export function OfferForm({ requestId, kind, budgetMin, budgetMax, unitLabel }: 
     <Card as="form" onSubmit={submit} noValidate>
       <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">შეთავაზება</h2>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      {/* ⚠️ CAPPED, NOT STRETCHED. The form moved out of a 400px rail and into
+          a 720px reading column (see page.tsx), and two number inputs that grow
+          to 350px each are two fields announcing themselves as the important
+          part of the reply. They are not — the sentence below is. A price of
+          three digits needs about this much box. */}
+      <div className="mt-4 grid grid-cols-2 gap-3 max-w-[320px]">
         <label className="block">
           <Label>ფასი, ₾ <span className="font-normal text-ink-400">{unitLabel}</span></Label>
           <input

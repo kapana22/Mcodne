@@ -20,6 +20,11 @@ import { Container } from '@/components/Container'
 const LINKS = [
   { href: '/provider/requests', label: 'მოთხოვნები' },
   { href: '/provider/offers', label: 'ჩემი შეთავაზებები' },
+  // LAST, and that is the order it earns: the first two are the work, this is
+  // the setup you touch once. It is in the nav at all because a master whose
+  // list is empty is never routed anything and has no other way to find that
+  // out — see app/provider/service-profile.
+  { href: '/provider/service-profile', label: 'ჩემი სერვისები' },
 ]
 
 export function ProviderShell({ isProvider, openCount = 0, children }: {

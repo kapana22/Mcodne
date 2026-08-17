@@ -26,6 +26,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Btn } from '@/components/Btn'
+import { Card } from '@/components/Card'
 import { RequestChat } from '@/components/RequestChat'
 import {
   TabHeader, RowList, AdminEmpty, AdminError, AdminLoading, CopyBtn, OpenBtn,
@@ -313,6 +314,9 @@ export function RequestsSection({ onChanged }: { onChanged?: () => void }) {
   const [rows, setRows] = useState<Req[] | null>(null)
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [candidatesByCategory, setCandidatesByCategory] = useState<Record<string, Candidate[]>>({})
+  /** Offer lifecycle totals — see lib/offerEvents. The ratio here is what the
+   *  first real lead price will be set from. */
+  const [funnel, setFunnel] = useState<Record<string, number>>({})
   const [filter, setFilter] = useState<'' | RequestStatusName>('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -328,6 +332,7 @@ export function RequestsSection({ onChanged }: { onChanged?: () => void }) {
       setRows(j.requests)
       setCounts(j.counts ?? {})
       setCandidatesByCategory(j.candidatesByCategory ?? {})
+      setFunnel(j.funnel ?? {})
     } catch (e: any) {
       setErr(errText(e?.message))
     }
@@ -392,6 +397,51 @@ export function RequestsSection({ onChanged }: { onChanged?: () => void }) {
             </button>
           ))}
         </div>
+
+        {/* ── The offer funnel ────────────────────────────────────────────
+            Shown here because it answers the one question this queue cannot:
+            not „how many requests" but „does anybody on the other side ever
+            look". Of the offers experts send, how many did a client open, and
+            how many did they answer.
+
+            ⚠️ THIS IS WHAT THE FIRST LEAD PRICE WILL BE SET FROM. The lead is
+            0₾ today and will not stay that way; charging on „opened" before
+            knowing what share ever opens is picking a number and finding out.
+            Comparable platforms get told this ratio by their own angry experts
+            (Bark's users measure ~44%); knowing it first is the difference
+            between fixing routing and reading about it.
+
+            Hidden until an offer exists — a funnel of zeros teaches nothing and
+            reads as a broken widget. */}
+        {(funnel.SENT ?? 0) > 0 && (
+          // `<Card>` and not a hand-rolled shell: the same three classes
+          // written out here would be a 202nd copy of the surface <Card>
+          // exists to own, and tests/primitiveAdoption ratchets that count
+          // downwards only.
+          <Card padding="compact" className="mt-5 flex flex-wrap gap-x-6 gap-y-2">
+            {([
+              ['გაგზავნილი', funnel.SENT ?? 0],
+              ['გახსნილი', funnel.VIEWED ?? 0],
+              ['პასუხი', funnel.REPLIED ?? 0],
+              ['არჩეული', funnel.ACCEPTED ?? 0],
+            ] as [string, number][]).map(([label, n]) => {
+              const sent = funnel.SENT ?? 0
+              // Share of SENT, so every column is read against the same base —
+              // „opened" as a share of „delivered" would flatter us by hiding
+              // the mail that never went.
+              const pct = sent > 0 && label !== 'გაგზავნილი' ? Math.round((n / sent) * 100) : null
+              return (
+                <div key={label}>
+                  <div className="text-meta text-ink-500">{label}</div>
+                  <div className="font-display text-h3 font-bold text-ink-900 tabular-nums">
+                    {n}
+                    {pct !== null && <span className="ml-1.5 text-small font-semibold text-ink-500">{pct}%</span>}
+                  </div>
+                </div>
+              )
+            })}
+          </Card>
+        )}
 
         <div className="mt-5">
           {err && !rows ? <AdminError message={err} onRetry={load} />

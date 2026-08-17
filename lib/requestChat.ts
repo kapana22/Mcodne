@@ -56,8 +56,17 @@ export function chatIsOpen(
 ): boolean {
   if (offer.status === 'WITHDRAWN') return false
   if (request.status === 'MATCHED') return offer.status === 'ACCEPTED'
-  // NEW should be impossible (no offers exist yet) but is refused explicitly
-  // rather than by accident.
+  // ⚠️ NEW IS NOW A LEGAL STATE FOR AN INVITED THREAD (2026-08-18). It used to
+  // be refused on the reasoning that no offers can exist yet — true then, and
+  // no longer: a client may now write to an expert before anybody has bid, and
+  // that conversation is the whole point of the change. It must not have to
+  // wait for an admin's phone call to become writable, because the wait is
+  // exactly what it exists to fill.
+  //
+  // The seal is untouched: an INVITED row carries no price, cannot be accepted
+  // (`accept` matches SENT), and its messages are masked like every other
+  // pre-acceptance message.
+  if (offer.status === 'INVITED') return request.status === 'NEW' || request.status === 'VERIFIED'
   return request.status === 'VERIFIED'
 }
 

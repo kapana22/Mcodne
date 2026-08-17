@@ -15,14 +15,28 @@ import { Container } from '@/components/Container'
 
 export function RequestShell({
   progress,
+  step,
   children,
 }: {
   /** 0..1. Omit on pages that are not a wizard — the bar is then absent
-   *  rather than drawn at zero. A FRACTION and not „N / M": the run's length
-   *  depends on answers (_model → stepsFor), and a denominator that shrinks
-   *  mid-flight reads as the form growing under you — the reference products
-   *  show a bar for the same reason. */
+   *  rather than drawn at zero. */
   progress?: number
+  /**
+   * „3 / 5", when the run's length is settled.
+   *
+   * ⚠️ THIS USED TO BE REFUSED ON PRINCIPLE, and the principle was half right.
+   * The old note said a denominator that shrinks mid-flight reads as the form
+   * growing under you — true, and the reason the bar exists. But the length
+   * only moves ONCE, at the first screen, where picking a topic decides whether
+   * the „აირჩიე ტიპი" screen and the clarifiers exist at all. From the second
+   * screen onward `stepsFor` returns the same list every time.
+   *
+   * So the counter is shown from step two, and never on step one. „How much is
+   * left" is the first thing anybody wants from a multi-step form, and refusing
+   * to answer it because the answer is unknown for one screen was the wrong
+   * trade. Omit the prop and only the bar draws.
+   */
+  step?: { index: number; total: number }
   children: React.ReactNode
 }) {
   const showBar = typeof progress === 'number'
@@ -39,6 +53,14 @@ export function RequestShell({
             <img src="/logo.svg" alt="მცოდნე" className="h-7 w-auto object-contain select-none" draggable={false} />
           </Link>
 
+          {/* `text-micro` is the numeric-counter tier the canon reserves for
+              exactly this, and `tabular-nums` so the digits do not shift the
+              line as the number grows. */}
+          {step && (
+            <span className="shrink-0 text-micro font-bold tabular-nums text-ink-500">
+              {step.index} / {step.total}
+            </span>
+          )}
         </Container>
         {showBar && (
           // A real <progress> semantic, drawn by hand so it can carry the brand

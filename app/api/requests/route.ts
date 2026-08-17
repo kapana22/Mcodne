@@ -26,6 +26,8 @@ import { accountForRequest } from '@/lib/requestAccount'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { sendMail } from '@/lib/mailer'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
+import { triageFlags, triageNote } from '@/lib/requestTriage'
+import { mailVerifiedRequest } from '@/lib/requestJobs'
 
 export async function POST(req: Request) {
   const viewer = await requestsViewer()
@@ -105,6 +107,34 @@ export async function POST(req: Request) {
   // numbers here.
   const rejected = budgetIsBelowFloor(parsed.data.kind, parsed.data.budgetBand)
 
+  // ── Does a person have to look at this before any expert does? ───────────
+  // Until 2026-08-18 the answer was always yes, and that made the operator's
+  // phone call the longest pause in the product — a request sent at 23:00 sat
+  // untouched until morning while its sender watched „ვამოწმებთ" pulse. The
+  // call is not gone; it is now the exception. See lib/requestTriage for why
+  // every flag is a fact rather than a score.
+  //
+  // The repeat count is the one input this rule cannot compute for itself. A
+  // narrow window on purpose: „four requests this hour" is worth a look, „four
+  // requests this year" is a returning customer.
+  const recentFromPhone = await prisma.serviceRequest.count({
+    where: {
+      phone: row.phone,
+      createdAt: { gte: new Date(Date.now() - 3_600_000) },
+    },
+  })
+  const flags = triageFlags({
+    kind: parsed.data.kind,
+    budgetBand: parsed.data.budgetBand,
+    topic: parsed.data.topic,
+    description: row.description ?? '',
+    phone: row.phone,
+    recentFromPhone,
+  })
+  // REJECTED wins over everything: a request under the floor is answered, not
+  // routed, whatever else is true about it.
+  const autoVerified = !rejected && flags.length === 0
+
   // The write decides the response. If this throws, the person is told it
   // failed and can send again — the honest outcome, because nothing was
   // recorded.
@@ -114,7 +144,20 @@ export async function POST(req: Request) {
   const created = await createServiceRequest({
     ...columns,
     categoryId: category?.id ?? null,
-    status: rejected ? 'REJECTED' : 'NEW',
+    // ⚠️ VERIFIED WITHOUT A HUMAN, when nothing was flagged. „Verified" has
+    // always meant „somebody spoke to them", and this widens it to „nothing
+    // about this needs a call first" — which is the honest reading of what the
+    // status gates: whether experts may see it. The operator still phones every
+    // row; they simply no longer stand in front of it.
+    status: rejected ? 'REJECTED' : autoVerified ? 'VERIFIED' : 'NEW',
+    // Set here rather than by the admin, because the lifecycle clock measures
+    // from it (lib/requestRouting → the nudge and close timers all read
+    // `verifiedAt`). An auto-verified row with a null stamp would never be
+    // nudged and never close.
+    ...(autoVerified ? { verifiedAt: new Date() } : {}),
+    // The operator's queue must say WHY this one is waiting, or „NEW" is just a
+    // pile. Written into the note they already read.
+    ...(flags.length ? { adminNote: triageNote(flags) } : {}),
     // Attached when a signed-in account submitted it. At stage 1 that is
     // usually the tester; the column exists so the client's own history is
     // findable later without them retyping a reference.
@@ -151,6 +194,20 @@ export async function POST(req: Request) {
   // A REJECTED request is deliberately NOT mailed: nobody is going to phone it,
   // so a mail about it is a mail that trains the reader to ignore the subject
   // line. It is still in the panel under its own filter.
+  // ⚠️ AND IF IT VERIFIED ITSELF, THE EXPERTS HEAR NOW. This is the half of the
+  // change that actually removes the wait — a VERIFIED row that nobody was told
+  // about is the same silence with a different status on it. Same function the
+  // admin's „დამოწმება" button calls, so there is one routing path and not two.
+  //
+  // After the response: the sender should not wait on a fan-out of emails, and
+  // a failure here loses notifications rather than the request. The admin's
+  // queue still holds the row and can re-send.
+  if (autoVerified) {
+    after(async () => {
+      try { await mailVerifiedRequest(created.id) } catch { /* best-effort */ }
+    })
+  }
+
   if (!rejected) {
     after(async () => {
       try {

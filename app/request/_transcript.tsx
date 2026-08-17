@@ -37,65 +37,29 @@
 import type { Draft, StepDef } from './_model'
 import { answerLabel } from './_model'
 
-/**
- * Ours: the question.
+/* ⚠️ THE BUBBLES ARE GONE (2026-08-17, second pass), AND THIS IS THE WHOLE
+ * REDESIGN.
  *
- * Exported because the CURRENT question renders through it too — the live
- * question used to be a `text-h1` heading sitting on a column of bubbles, i.e.
- * two visual languages with a seam across the middle of the screen. One
- * component, so the conversation cannot develop two voices.
- */
-export function Ask({ children, as: Tag = 'div' }: {
-  children: React.ReactNode
-  /** „h1" for the live question — it is still the page's heading and what a
-   *  screen reader announces on arrival. The bubble is styling, not semantics. */
-  as?: 'div' | 'h1'
-}) {
-  return (
-    <div className="flex justify-start">
-      <Tag className="max-w-[85%] rounded-card bg-ink-75 text-ink-900 px-3.5 py-2 font-display text-body font-semibold leading-relaxed">
-        {children}
-      </Tag>
-    </div>
-  )
-}
-
-/**
- * Theirs: the answer, restated — AND the control that changes it.
+ * There used to be two more components here: `Ask`, a grey bubble carrying the
+ * live question, and `Said`, a brand-600 filled bubble carrying the newest
+ * answer. With the option rows below them that put FOUR visual languages on one
+ * screen — underlined chip, grey bubble, green bubble, outlined card — and the
+ * hierarchy came out backwards. Measured: the question rendered at `text-body`
+ * (14px) and every option label rendered at `text-body` (14px) as well, so the
+ * question was not merely weaker than the choices, it was IDENTICAL to them and
+ * sitting on a quieter ground. The loudest thing on the screen was the filled
+ * green bubble — the answer the person had already given.
  *
- * ⚠️ THE BUBBLE IS THE BUTTON. It used to be a bubble with the word „შეცვლა"
- * underlined beside it, and with three answers on screen that was three
- * identical underlined links, each starting at a different x because the
- * bubbles are different widths — a ragged column that was the loudest thing on
- * the page. Pressing the thing you said to change the thing you said is the
- * most direct mapping available, and it costs zero pixels.
+ * The conversational feel was the right instinct and the bubbles were the wrong
+ * carrier. Bubbles work where the composer is pinned to the bottom of a fixed
+ * pane and old turns scroll away behind it (Lemonade, Intercom). This is a
+ * document that grows downwards, and every reference product with that layout —
+ * Typeform, Bark, Thumbtack, Angi — shows one loud question and a quiet record.
+ * So: ONE language, the form. The record is chips, the question is the page's
+ * heading, and the conversation is carried by rhythm rather than by colour.
  */
-function Said({ children, onEdit }: { children: string; onEdit: () => void }) {
-  return (
-    <div className="flex justify-end">
-      <button
-        type="button"
-        onClick={onEdit}
-        aria-label={`შეცვლა: ${children}`}
-        className="group max-w-[85%] flex items-center gap-2 text-left rounded-card motion-safe:active:scale-[0.99] transition-transform duration-fast"
-      >
-        {/* Reserved, not conditional: rendering this only on hover would move
-            the bubble sideways under the cursor at the moment of the hover. */}
-        <span
-          aria-hidden
-          className="shrink-0 text-meta text-ink-500 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-fast"
-        >
-          შეცვლა
-        </span>
-        <span className="rounded-card bg-brand-600 text-white px-3.5 py-2 text-body leading-relaxed whitespace-pre-wrap group-hover:bg-brand-700 group-focus-visible:bg-brand-700 transition-colors duration-fast">
-          {children}
-        </span>
-      </button>
-    </div>
-  )
-}
 
-/** One folded answer. The label only — the QUESTION is dropped, because at this
+/** One answered step. The label only — the QUESTION is dropped, because at this
  *  size „დამწყები" is recognisable and „რა დონეა: დამწყები" is twice the width
  *  for a word the reader chose sixty seconds ago. */
 function Chip({ label, onEdit }: { label: string; onEdit: () => void }) {
@@ -133,32 +97,26 @@ export function Transcript({ steps, currentId, draft, onEdit }: {
 
   if (rows.length === 0) return null
 
-  // The last exchange keeps its bubbles; the rest folds.
-  const folded = rows.slice(0, -1)
-  const last = rows[rows.length - 1]
-
   return (
-    <div className="mb-5">
-      {folded.length > 0 && (
-        // ⚠️ ONE LINE, WRAPPING — not a grid and not a list. The whole point is
-        // that six answers cost one line of height instead of six rows; a
-        // layout that gives each its own row is the stack again with smaller
-        // type. `·` is a separator, not a bullet: it is aria-hidden so a screen
-        // reader hears six buttons and not six interpuncts.
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-4">
-          {folded.map(({ step, answer }, i) => (
-            <span key={step.id} className="inline-flex items-center gap-2">
-              {i > 0 && <span aria-hidden className="text-ink-300">·</span>}
-              <Chip label={answer} onEdit={() => onEdit(step.id)} />
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <Ask>{last.step.title}</Ask>
-        <Said onEdit={() => onEdit(last.step.id)}>{last.answer}</Said>
-      </div>
+    // ⚠️ EVERY ANSWER IS A CHIP NOW, INCLUDING THE NEWEST. It used to keep the
+    // last exchange as a pair of bubbles „so the seam into the live question
+    // still reads as a conversation" — and that seam was exactly the problem:
+    // it put a second visual language directly above the question, and the
+    // filled bubble outshouted it. One row, one language, ~40px for the whole
+    // record however many answers it holds.
+    //
+    // ONE LINE, WRAPPING — not a grid and not a list. Six answers cost one line
+    // of height instead of six rows; a layout that gives each its own row is
+    // the stack again with smaller type. `·` is a separator, not a bullet: it
+    // is aria-hidden so a screen reader hears six buttons and not six
+    // interpuncts.
+    <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1">
+      {rows.map(({ step, answer }, i) => (
+        <span key={step.id} className="inline-flex items-center gap-2">
+          {i > 0 && <span aria-hidden className="text-ink-300">·</span>}
+          <Chip label={answer} onEdit={() => onEdit(step.id)} />
+        </span>
+      ))}
     </div>
   )
 }

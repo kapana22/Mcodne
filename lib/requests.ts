@@ -313,10 +313,21 @@ export const STATUS_LABEL: Record<RequestStatusName, string> = {
   CLOSED: 'დახურული',
 }
 
-export const OFFER_STATUSES = ['SENT', 'WITHDRAWN', 'ACCEPTED', 'DECLINED'] as const
+// ⚠️ INVITED IS FIRST BECAUSE IT COMES FIRST IN LIFE, and it is deliberately in
+// this list even though it is not an offer: the admin panel and every status
+// map read from here, and an unlisted value renders as a raw code the moment
+// somebody writes to an expert. What keeps it from being counted AS an offer is
+// not its absence from this array — it is the queries, which name the statuses
+// they mean (the client's list asks for SENT/ACCEPTED/DECLINED) and never say
+// „everything except".
+export const OFFER_STATUSES = ['INVITED', 'SENT', 'WITHDRAWN', 'ACCEPTED', 'DECLINED'] as const
 export type OfferStatusName = (typeof OFFER_STATUSES)[number]
 
 export const OFFER_STATUS_LABEL: Record<OfferStatusName, string> = {
+  // Not „მოწვევა": nothing was offered and nothing was promised — the client
+  // started a conversation. The word has to say that, because on the expert's
+  // screen it is the difference between „answer this" and „you have work".
+  INVITED: 'მიმოწერა',
   SENT: 'გაგზავნილი',
   WITHDRAWN: 'გატანილი',
   ACCEPTED: 'მიღებული',

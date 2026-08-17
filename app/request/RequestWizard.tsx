@@ -21,7 +21,7 @@ import {
   progressOf, reviveDraft, withTopic, withKind, withAccountContact,
   type Draft, type AccountContact,
 } from './_model'
-import { Transcript, Ask } from './_transcript'
+import { Transcript } from './_transcript'
 import { StepWhat } from './_stepWhat'
 import { StepPick } from './_stepPick'
 import { StepDetails } from './_stepDetails'
@@ -209,6 +209,10 @@ export function RequestWizard({ account, initialQuery = '' }: {
       ? (draft.format === 'IN_PERSON'
           ? [...CITIES]
           : FORMATS.map(f => f.id === 'IN_PERSON' ? { ...f, hint: 'ქალაქს შემდეგ იკითხავს' } : f))
+    // The service run's place screen. Same list the format screen reveals after
+    // „ადგილზე", except here it is the whole question rather than a follow-up —
+    // see _model → stepsFor.
+    : step.id === 'city' ? [...CITIES]
     : []
 
   /**
@@ -252,6 +256,7 @@ export function RequestWizard({ account, initialQuery = '' }: {
       return
     }
     if (step.id === 'timing') { pickAndGo({ timing: id }); return }
+    if (step.id === 'city') { pickAndGo({ city: id as Draft['city'] }); return }
     if (step.id === 'format') {
       if (CITIES.some(c => c.id === id)) { pickAndGo({ city: id as Draft['city'] }); return }
       // In-person needs the city; online does not — the sub-question appears
@@ -312,7 +317,17 @@ export function RequestWizard({ account, initialQuery = '' }: {
   }
 
   return (
-    <RequestShell progress={progressOf(step.id, draft)}>
+    <RequestShell
+      progress={progressOf(step.id, draft)}
+      // Not on the first screen: until a topic is picked the run's length is a
+      // guess, and a denominator that changes on the first tap is the „form
+      // growing under you" the bar exists to avoid. From step two it is settled
+      // — see _shell.
+      step={step.id === 'what' ? undefined : {
+        index: steps.findIndex(s => s.id === step.id) + 1,
+        total: steps.length,
+      }}
+    >
       {/* ── ONE COLUMN, 560px ────────────────────────────────────────────────
           The shell's container is 820 (it also serves /request/[ref], which
           lists offers and needs the width). A wizard does not: every screen
@@ -376,26 +391,33 @@ export function RequestWizard({ account, initialQuery = '' }: {
         onEdit={id => setStepId(id)}
       />
 
-      {/* ⚠️ THE LIVE QUESTION IS A BUBBLE (2026-08-17), same component as every
-          answered one — it was a `text-h1` heading sitting on a column of
-          bubbles, which put two visual languages on one screen with the seam
-          across the middle. Still an h1: the bubble is styling, not semantics.
-          The FIRST screen keeps the big heading, because there is no
-          conversation above it yet — it is the page's opening, not a turn in a
-          conversation, and it carries the sub-copy below. */}
-      {step.id === 'what' ? (
-        <>
-          <h1 className="font-display text-h1 font-bold text-ink-900 tracking-tight">{step.title}</h1>
-          <p className="mt-2 text-body text-ink-600">აღწერე — გადავამოწმებთ და ექსპერტები ფასს შემოგთავაზებენ. უფასოა.</p>
-        </>
-      ) : (
-        // Keyed on the step so each new question ENTERS rather than swapping in
-        // place — `slide-in-b` is the existing token the booking steps use; no
-        // new animation was minted for this.
-        <div key={`q:${step.id}`} className="motion-safe:animate-slide-in-b">
-          <Ask as="h1">{step.title}</Ask>
-        </div>
-      )}
+      {/* ⚠️ ONE HEADING, ONE SIZE, ON EVERY SCREEN (2026-08-17, second pass).
+          The live question was a `text-body` bubble on steps 2..n and a
+          `text-h1` heading on step 1 — so the run changed its voice after the
+          first tap, and on every later screen the question was set at exactly
+          the size of the option labels below it (both `text-body`). A question
+          that is the same size as its answers is not a question, it is a label.
+
+          `text-h1` and not `text-h2`: this element IS the page's h1, so the
+          canon's „no h2 at or above its own page's h1" makes 28 the honest
+          step — and using the same token on the first screen as on the last is
+          what removes the seam rather than moving it.
+
+          Keyed on the step so each new question ENTERS rather than swapping in
+          place — `slide-in-b` is the existing token the booking steps use; no
+          new animation was minted for this. */}
+      <div key={`q:${step.id}`} className="motion-safe:animate-slide-in-b">
+        <h1 className="font-display text-h1 font-bold text-ink-900 tracking-tight text-balance">
+          {step.title}
+        </h1>
+        {/* The sub-copy belongs to the opening screen alone: it explains what
+            the whole run is for, which nobody needs repeated at step four. */}
+        {step.id === 'what' && (
+          <p className="mt-2 text-body text-ink-600">
+            აღწერე — გადავამოწმებთ და ექსპერტები ფასს შემოგთავაზებენ. უფასოა.
+          </p>
+        )}
+      </div>
       {/* ⚠️ THE „kind · topic" RESTATEMENT LIVED HERE AND IS GONE (2026-08-17).
           It existed because the reader was several taps in with nothing on
           screen to remind them what this run was about — the transcript above
@@ -492,6 +514,11 @@ export function RequestWizard({ account, initialQuery = '' }: {
             // chosen the numbers belong to the city list below.
             numbered={draft.format !== 'IN_PERSON'}
           />
+        )}
+        {/* The service run asks the city on its own screen — one list, one
+            question, no format rows above it. */}
+        {step.id === 'city' && (
+          <StepPick options={options} value={draft.city} onPick={pickOption} numbered />
         )}
         {step.id === 'format' && draft.format === 'IN_PERSON' && (
           <div className="mt-5">

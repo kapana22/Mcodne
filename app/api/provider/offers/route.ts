@@ -26,6 +26,7 @@ import { RequestOfferInput, offerProviderError, kindOf, KIND, gel, topicLabel } 
 import { requestsViewer } from '@/lib/requestsServer'
 import { sendMail } from '@/lib/mailer'
 import { offerArrivedClientEmail } from '@/lib/emailTemplates'
+import { recordOfferEvent } from '@/lib/offerEvents'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
@@ -56,6 +57,22 @@ export async function POST(req: Request) {
 
   await ensureDbReady()
 
+  // ── Is the client already talking to me? ─────────────────────────────────
+  // An INVITED row means they wrote first (see the invite route). Answering
+  // with a price does not create a second offer — it TURNS THAT ROW into one,
+  // because the unique index on (requestId, expertUserId) allows exactly one
+  // and because the conversation already hanging on it must survive the
+  // transition. The place against `offerLimit` is claimed here, at the moment a
+  // price appears, and not when the client said hello.
+  const invited = await prisma.requestOffer.findFirst({
+    where: {
+      requestId: parsed.data.requestId,
+      status: 'INVITED',
+      ...(expertUserId ? { expertUserId } : { companyId }),
+    },
+    select: { id: true },
+  })
+
   // ── THE CLAIM ────────────────────────────────────────────────────────────
   // Status and place, in one conditional write. Note what is NOT here: no
   // findUnique, no `if (count < limit)`, no transaction wrapping a read. The
@@ -81,23 +98,49 @@ export async function POST(req: Request) {
   // else leaks a place per failure and a request silently accepts two offers
   // instead of three.
   try {
-    const offer = await prisma.requestOffer.create({
-      data: {
-        requestId: parsed.data.requestId,
-        providerKind: provider.kind,
-        expertUserId,
-        companyId,
-        priceGel: parsed.data.priceGel,
-        daysEstimate: parsed.data.daysEstimate ?? null,
-        message: parsed.data.message.trim(),
-      },
-      select: {
-        id: true,
-        expertUser: { select: { fullName: true } },
-        company: { select: { name: true } },
-        request: { select: { publicRef: true, topic: true, kind: true, email: true, offerCount: true } },
-      },
-    })
+    const data = {
+      priceGel: parsed.data.priceGel,
+      daysEstimate: parsed.data.daysEstimate ?? null,
+      message: parsed.data.message.trim(),
+    }
+    const offer = invited
+      // The conversation keeps its id, so every message already in it stays
+      // attached and the client does not watch a thread vanish and reappear.
+      ? await prisma.requestOffer.update({
+          where: { id: invited.id },
+          data: { ...data, status: 'SENT' },
+          select: {
+            id: true,
+            expertUser: { select: { fullName: true } },
+            company: { select: { name: true } },
+            request: { select: { publicRef: true, topic: true, kind: true, email: true, offerCount: true } },
+          },
+        })
+      : await prisma.requestOffer.create({
+          data: {
+            requestId: parsed.data.requestId,
+            providerKind: provider.kind,
+            expertUserId,
+            companyId,
+            ...data,
+          },
+          select: {
+            id: true,
+            expertUser: { select: { fullName: true } },
+            company: { select: { name: true } },
+            request: { select: { publicRef: true, topic: true, kind: true, email: true, offerCount: true } },
+          },
+        })
+
+    // ── The clock every later event is measured against ──────────────────
+    // SENT is what „how long did the client take to open it" subtracts from,
+    // and that number is the health of the whole marketplace — see
+    // lib/offerEvents → minutesToView. Recorded inline: an offer whose SENT is
+    // missing has no measurable lifecycle at all.
+    {
+      const rec = await recordOfferEvent(offer.id, 'SENT', { providerKind: provider.kind })
+      if (!rec.ok) console.error('[offerEvents] SENT not recorded', offer.id, rec.error)
+    }
 
     // ── The client hears about it ────────────────────────────────────────
     // They usually have NO account: the emailed link is their only door back
@@ -123,7 +166,13 @@ export async function POST(req: Request) {
         offerCount: offer.request.offerCount,
       })
       after(async () => {
-        try { await sendMail({ to, ...mail }) } catch { /* mail is best-effort */ }
+        try {
+          await sendMail({ to, ...mail })
+          // „We did our part" — the first thing an expert asks when nobody
+          // opened their offer. Recorded only on an actual successful send, so
+          // it never claims a delivery that did not happen.
+          await recordOfferEvent(offer.id, 'DELIVERED', { channel: 'email' })
+        } catch { /* mail is best-effort */ }
       })
     }
 

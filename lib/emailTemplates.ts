@@ -685,6 +685,41 @@ export function offerArrivedClientEmail(o: {
   }
 }
 
+/**
+ * „Nobody answered" — to the client, when their request closes unanswered.
+ *
+ * ⚠️ THIS IS THE ONLY MAIL THAT CARRIES BAD NEWS, and it exists because the
+ * alternative was worse: a request with no offers sat for STALE_OPEN_DAYS and
+ * was then set CLOSED by the cron in silence. The person who described their
+ * problem, left a number and waited two weeks was never told that nobody came —
+ * and because a closed request also closes their thread with us, the moment
+ * they stopped hearing from us was the same moment they lost the only place
+ * they could ask why.
+ *
+ * Plain, and it does not apologise in paragraphs: what they need is the fact,
+ * and a way back in. The CTA is a NEW request rather than the old page —
+ * the old one is closed, and sending somebody to a dead screen to read „closed"
+ * is the same silence with an extra click.
+ */
+export function requestClosedNoOffersClientEmail(o: {
+  publicRef: string
+  topicLabel: string
+}) {
+  return {
+    subject: `ვერ მოგიძებნეთ ექსპერტი — ${o.publicRef}`,
+    html: shell({
+      heading: 'ამ მოთხოვნაზე შეთავაზება არ მოვიდა',
+      bodyHtml:
+        detail([
+          { label: 'მოთხოვნა', value: `${o.topicLabel} · ${o.publicRef}` },
+        ]) +
+        p('ვცადეთ, მაგრამ ამ მიმართულებით თავისუფალი ექსპერტი ვერ მოვძებნეთ. მოთხოვნა დავხურეთ.') +
+        p('თუ პირობები შეიცვალა — ბიუჯეტი, ვადა ან ფორმატი — გამოგვიგზავნე ახალი მოთხოვნა და თავიდან ვცდით.'),
+      cta: { label: 'ახალი მოთხოვნა', href: `${BASE}/request` },
+    }),
+  }
+}
+
 /** To the chosen provider when the client accepts. The page it links to is
  *  where the contact now lives — the mail itself still carries none, so a
  *  forwarded or mis-addressed mail leaks nothing. */

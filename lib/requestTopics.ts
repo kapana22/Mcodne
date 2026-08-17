@@ -43,22 +43,41 @@
  *                  second question is „how soon".
  *   PROJECT        something delivered. The price is for THE WHOLE JOB, and the
  *                  second question is a deadline.
+ *   SERVICE        somebody comes and does it. The price is for ONE VISIT, the
+ *                  second question is a DATE, and there is a third thing no
+ *                  other kind has: an address.
  *
- * A single budget enum cannot serve all three: „500–1000₾" and „20–40₾" are
+ * A single budget enum cannot serve all four: „500–1000₾" and „20–40₾" are
  * both correct answers to „what is your budget" and they are not the same
  * question. That is the mistake `B2BService.kind` exists to undo, and this
  * splits the axis before it is made rather than after.
+ *
+ * ⚠️ WHY SERVICE IS NOT PROJECT (added 2026-08-17). It was the obvious place to
+ * put a plumber and it is wrong on all three axes this file tests for:
+ *
+ *   money    a project is priced whole („რემონტი 8 000₾"); a visit is priced
+ *            per call-out and the real number is often set ON SITE.
+ *   time     a project has a DEADLINE — „ორ კვირაში". A visit has a DATE —
+ *            somebody is at the door on Tuesday at 14:00. „By when" and „when"
+ *            are not the same question and cannot share a column of options.
+ *   place    a project can be done anywhere; a visit has an address, and it is
+ *            the routing key, not a detail.
+ *
+ * Filed under PROJECT, „500₾-მდე" would have been the FLOOR band — so every
+ * request to unblock a drain would have been refused on arrival as too cheap.
+ * That is the concrete cost of the wrong kind, and it is why this is a fourth
+ * one rather than a topic group.
  */
 import { rankCandidates } from './topicMatch'
 
-export const REQUEST_KINDS = ['LEARNING', 'CONSULTATION', 'PROJECT'] as const
+export const REQUEST_KINDS = ['LEARNING', 'CONSULTATION', 'PROJECT', 'SERVICE'] as const
 export type RequestKindName = (typeof REQUEST_KINDS)[number]
 
 /** What the money is attached to. Snapshotted on the row rather than derived
  *  from `kind` at read time, for the same reason Booking snapshots its
  *  serviceType: changing the mapping later must not rewrite what somebody
  *  already answered. */
-export const BUDGET_UNITS = ['PER_LESSON', 'PER_SESSION', 'TOTAL'] as const
+export const BUDGET_UNITS = ['PER_LESSON', 'PER_SESSION', 'TOTAL', 'PER_VISIT'] as const
 export type BudgetUnitName = (typeof BUDGET_UNITS)[number]
 
 export const KIND: Record<RequestKindName, {
@@ -92,6 +111,16 @@ export const KIND: Record<RequestKindName, {
     unit: 'TOTAL',
     unitLabel: 'მთლიანად',
     timingLabel: 'რა ვადაში',
+  },
+  SERVICE: {
+    label: 'ოსტატი',
+    hint: 'მოვა და ადგილზე გააკეთებს',
+    unit: 'PER_VISIT',
+    unitLabel: 'ერთ ვიზიტზე',
+    // „როდის მოვიდეს" and not „როდის" — the difference is the whole kind. Every
+    // other kind asks when the WORK happens; this one asks when a person is at
+    // the door.
+    timingLabel: 'როდის მოვიდეს',
   },
 }
 
@@ -146,6 +175,22 @@ export const BUDGET_BANDS: Record<RequestKindName, BudgetBand[]> = {
     { id: 'p3', min: 3000,  max: 7000,  label: '3 000–7 000₾' },
     { id: 'p4', min: 7000,  max: 15000, label: '7 000–15 000₾' },
     { id: 'p5', min: 15000, max: null,  label: '15 000₾-ზე მეტი' },
+  ],
+  // Per VISIT — the call-out plus the work, as a household actually reads a
+  // bill. The floor is 30₾ because below it nobody crosses the city: a plumber's
+  // bare call-out in Tbilisi is 30–50₾ before anything is touched, so „20₾-მდე"
+  // is not a small budget, it is a request nobody will answer.
+  //
+  // ⚠️ FIVE BANDS THAT STOP AT 250₾+, deliberately. A whole bathroom is a
+  // PROJECT and belongs on that ladder, which runs to 15 000₾. If this one grows
+  // a 1 000₾ band it means the two kinds have blurred — the fix then is the
+  // topic's `kinds`, not another band here.
+  SERVICE: [
+    { id: 's0', min: 0,   max: 30,   label: '30₾-მდე', floor: true },
+    { id: 's1', min: 30,  max: 60,   label: '30–60₾' },
+    { id: 's2', min: 60,  max: 120,  label: '60–120₾' },
+    { id: 's3', min: 120, max: 250,  label: '120–250₾' },
+    { id: 's4', min: 250, max: null, label: '250₾-ზე მეტი' },
   ],
 }
 
@@ -207,6 +252,23 @@ export const TIMING: Record<RequestKindName, TimingOption[]> = {
     { id: 'one_month', label: 'ერთ თვეში' },
     { id: 'flexible',  label: 'დრო არ მაწვება' },
   ],
+  // ⚠️ DAYS, NOT DURATIONS — the one place this kind visibly differs from
+  // PROJECT one line above. „ორ კვირაში" is a deadline you measure backwards
+  // from; „ხვალ" is a day somebody knocks on the door. A household that needs a
+  // leak stopped is answering „when can you come", and every option here is a
+  // point in time rather than a window to finish inside.
+  //
+  // These stay BUCKETS rather than a calendar for now, and that is honest at
+  // this stage: a real date needs the provider's availability behind it, and
+  // there is no service provider in the model yet to have any. „ზუსტ დროს
+  // შევათანხმებთ" is what the offer thread is for.
+  SERVICE: [
+    { id: 'today',      label: 'დღეს' },
+    { id: 'tomorrow',   label: 'ხვალ' },
+    { id: 'this_week',  label: 'ამ კვირაში' },
+    { id: 'next_week',  label: 'მომავალ კვირას' },
+    { id: 'flexible',   label: 'დრო არ მაწვება' },
+  ],
 }
 
 export function timingLabel(kind: RequestKindName, id: string): string {
@@ -258,10 +320,156 @@ const LEARNING_EXTRAS: ExtraQuestion[] = [
   },
 ]
 
-/** The questions for THIS request. `topic` is accepted and unused today — see
- *  the block comment for why the signature is already the per-topic one. */
-export function extrasFor(kind: RequestKindName, _topic?: string): ExtraQuestion[] {
-  return kind === 'LEARNING' ? LEARNING_EXTRAS : []
+/**
+ * What a visiting master cannot quote without.
+ *
+ * ONE QUESTION, and holding it to one is the point. „ბინა" and „კერძო სახლი"
+ * are different jobs at the same task — a house has stairs, a yard, its own
+ * water, and two hours more of it — so this single tap moves the price more
+ * than any sentence the client would write. Everything else a master needs
+ * (which floor, is there a lift, how many rooms) belongs in the description or
+ * the offer thread, where it costs no screen.
+ */
+const SERVICE_EXTRAS: ExtraQuestion[] = [
+  {
+    id: 'property',
+    label: 'სად',
+    options: [
+      { id: 'flat',   label: 'ბინა' },
+      { id: 'house',  label: 'კერძო სახლი' },
+      { id: 'office', label: 'ოფისი' },
+      { id: 'other',  label: 'სხვა' },
+    ],
+  },
+]
+
+/* ── the per-TOPIC questions ───────────────────────────────────────────────
+ *
+ * ⚠️ THIS IS THE LEAD'S QUALITY, AND ON A PAID-LEAD PLATFORM THAT IS THE
+ * PRODUCT (owner, 2026-08-17: the expert will pay for the lead). The failure
+ * mode of every comparable marketplace is documented and identical: the expert
+ * pays, opens the request, finds it says „მანქანის შეკეთება · 60–120₾", cannot
+ * quote from it, phones, gets no answer, and writes the review that costs the
+ * platform its supply. Bark's own users measure it — roughly 44% of paid leads
+ * ever respond.
+ *
+ * A generic form cannot fix that, because what makes a request quotable differs
+ * per TRADE and not per kind: a car needs a model and a symptom, a
+ * waterproofing job needs an area and where the water is coming in, a move needs
+ * a floor and a lift. Two taps each, and they are the difference between a lead
+ * an expert can price and one they have to ring about.
+ *
+ * ⚠️ KEYED BY GROUP, NOT BY TOPIC ID, deliberately. Every plumbing topic wants
+ * the same two questions; writing them per topic would be 39 copies to keep in
+ * step. A topic may still override its group later — the lookup below reads the
+ * topic first — and that is exactly how a single unusual service gets its own
+ * question without disturbing its neighbours.
+ *
+ * ⚠️ ALL OPTIONAL, like every other clarifier here. „არ ვიცი" is a real answer
+ * from somebody whose boiler is leaking, and a required tap-row is a place the
+ * wizard can strand them.
+ */
+const GROUP_EXTRAS: Record<string, ExtraQuestion[]> = {
+  plumbing: [
+    {
+      id: 'urgency',
+      label: 'რა მდგომარეობაა',
+      options: [
+        { id: 'flooding', label: 'წყალი გადმოდის ახლა' },
+        { id: 'dripping', label: 'წვეთავს' },
+        { id: 'broken',   label: 'არ მუშაობს' },
+        { id: 'install',  label: 'ახლის დაყენება' },
+      ],
+    },
+  ],
+  electrical: [
+    {
+      id: 'scope',
+      label: 'რამდენი წერტილია',
+      options: [
+        { id: 'one',    label: 'ერთი' },
+        { id: 'few',    label: 'რამდენიმე' },
+        { id: 'room',   label: 'მთელი ოთახი' },
+        { id: 'whole',  label: 'მთელი ბინა ან სახლი' },
+      ],
+    },
+  ],
+  appliances: [
+    {
+      id: 'symptom',
+      label: 'რა ემართება',
+      options: [
+        { id: 'dead',    label: 'საერთოდ არ ირთვება' },
+        { id: 'noise',   label: 'ხმაურობს' },
+        { id: 'leak',    label: 'წყალს უშვებს' },
+        { id: 'partial', label: 'ნაწილობრივ მუშაობს' },
+      ],
+    },
+  ],
+  moving: [
+    {
+      id: 'lift',
+      label: 'ლიფტი არის',
+      options: [
+        { id: 'both',  label: 'ორივე მხარეს' },
+        { id: 'one',   label: 'ერთ მხარეს' },
+        { id: 'none',  label: 'არცერთ მხარეს' },
+        { id: 'ground', label: 'პირველი სართული' },
+      ],
+    },
+  ],
+  cleaning: [
+    {
+      id: 'size',
+      label: 'რამდენი ოთახია',
+      options: [
+        { id: 'studio', label: 'სტუდიო' },
+        { id: 'r2',     label: '2 ოთახი' },
+        { id: 'r3',     label: '3 ოთახი' },
+        { id: 'r4',     label: '4 ან მეტი' },
+      ],
+    },
+  ],
+  repairs: [
+    {
+      id: 'material',
+      label: 'მასალა ვისი იქნება',
+      options: [
+        { id: 'mine',    label: 'ჩემი' },
+        { id: 'master',  label: 'ოსტატის' },
+        { id: 'unsure',  label: 'ჯერ არ ვიცი' },
+      ],
+    },
+  ],
+}
+
+/** Which group a topic belongs to.
+ *
+ * ⚠️ BUILT LAZILY, and it has to be: this function is declared ABOVE
+ * `TOPIC_GROUPS` (the questions read better beside each other than three hundred
+ * lines apart), and a `const` initialised from it at module load would throw
+ * „used before its declaration" — in a file `middleware.ts` imports, which means
+ * every route on the site. Built on the first lookup and kept. */
+let groupOfTopic: Map<string, string> | null = null
+function groupIdOf(topicId: string): string | undefined {
+  if (!groupOfTopic) {
+    groupOfTopic = new Map(TOPIC_GROUPS.flatMap(g => g.topics.map(t => [t.id, g.id] as const)))
+  }
+  return groupOfTopic.get(topicId)
+}
+
+/**
+ * The questions for THIS request.
+ *
+ * Order matters and it is the order a master asks on the phone: WHAT the object
+ * is (the kind-wide question), then the trade's own detail. Both are one tap.
+ */
+export function extrasFor(kind: RequestKindName, topic?: string): ExtraQuestion[] {
+  if (kind === 'LEARNING') return LEARNING_EXTRAS
+  if (kind !== 'SERVICE') return []
+  const group = topic ? groupIdOf(topic) : undefined
+  const perTrade = group ? GROUP_EXTRAS[group] ?? [] : []
+  return [...SERVICE_EXTRAS, ...perTrade]
 }
 
 /**
@@ -357,6 +565,10 @@ export type TopicGroup = {
 
 const L = ['LEARNING'] as const
 const CP = ['CONSULTATION', 'PROJECT'] as const
+/** ⚠️ ONE KIND, ON PURPOSE — so the „აირჩიე ტიპი" screen never appears for a
+ *  service. „მჭირდება სანტექნიკოსი" is not ambiguous between a consultation and
+ *  a job, and asking would be the wizard performing a choice nobody has. */
+const S = ['SERVICE'] as const
 
 export const TOPIC_GROUPS: TopicGroup[] = [
   /* ── learning ─────────────────────────────────────────────────────── */
@@ -632,6 +844,116 @@ export const TOPIC_GROUPS: TopicGroup[] = [
       { id: 'wine',     label: 'მეღვინეობა' },
     ],
   },
+
+  /* ── services: somebody comes and does it ──────────────────────────────────
+   *
+   * ⚠️ EIGHT GROUPS THAT NAME A TRADE, NOT A PROFESSION. Everything above this
+   * line is somebody who KNOWS something; everything below is somebody who
+   * COMES somewhere. That is the same split `kinds: S` makes in the type system,
+   * and keeping it visible in the file is the point — a new group added below
+   * without `kinds: S` would be a household service priced per project, which is
+   * the mistake the kind exists to prevent.
+   *
+   * ⚠️ NOT ONE `categorySlug` AMONG THEM, and this is correct rather than
+   * unfinished. The sphere taxonomy holds 16 professional spheres and no trades;
+   * minting „სანტექნიკა" there would create a sphere page with zero experts
+   * behind it — the empty room with a URL this file's header refuses. These
+   * topics are demand the platform has no supply for YET, and a request that
+   * discovers exactly that is the most valuable row in the table.
+   *
+   * ⚠️ THE `alt` WORDS ARE THE TRADE'S NAME, and they carry more weight here
+   * than anywhere above. Nobody types „ონკანის შეკეთება" — they type
+   * „სანტექნიკოსი", the person, because that is who they are looking for. The
+   * matcher (lib/topicMatch) reads these, so the trade name IS the search term
+   * and the label is only what we call the job afterwards.
+   */
+  {
+    id: 'cleaning', label: 'დასუფთავება', kinds: S,
+    template: 'რა ფართობია: … კვ.მ / … ოთახი\nრა სჭირდება: …\nსართული და ლიფტი: …',
+    topics: [
+      { id: 'clean-flat',   label: 'ბინის დალაგება', alt: ['დამლაგებელი', 'დალაგება', 'დასუფთავება', 'ქალი დასალაგებლად'] },
+      { id: 'clean-deep',   label: 'გენერალური დალაგება', alt: ['გენერალური წმენდა'] },
+      { id: 'clean-repair', label: 'რემონტის შემდეგ დალაგება', alt: ['სამშენებლო ნარჩენები'] },
+      { id: 'clean-window', label: 'ფანჯრების წმენდა', alt: ['მინების წმენდა'] },
+      { id: 'clean-sofa',   label: 'ავეჯის ქიმწმენდა', alt: ['დივნის წმენდა', 'ხალიჩის წმენდა', 'ქიმწმენდა'] },
+      { id: 'clean-office', label: 'ოფისის დალაგება' },
+    ],
+  },
+  {
+    id: 'plumbing', label: 'სანტექნიკა', kinds: S,
+    template: 'რა პრობლემაა: …\nრამდენი ხანია: …\nსართული და ლიფტი: …',
+    topics: [
+      { id: 'plumb-leak',   label: 'ონკანი და მილი', alt: ['სანტექნიკოსი', 'სანტექნიკა', 'წყალი გადის', 'ჟონავს', 'ონკანი'] },
+      { id: 'plumb-boiler', label: 'ბოილერი', alt: ['წყალგამაცხელებელი', 'ავზი'] },
+      { id: 'plumb-drain',  label: 'კანალიზაციის გაწმენდა', alt: ['გაჭედილი', 'ჩამდინარე', 'სუნი'] },
+      { id: 'plumb-bath',   label: 'სველი წერტილი', alt: ['უნიტაზი', 'აბაზანა', 'ნიჟარა', 'შხაპი'] },
+      { id: 'plumb-heat',   label: 'გათბობის სისტემა', alt: ['რადიატორი', 'ქვაბი', 'გათბობა'] },
+    ],
+  },
+  {
+    id: 'electrical', label: 'ელექტრიკა', kinds: S,
+    template: 'რა პრობლემაა: …\nრამდენი წერტილია: …\nსართული და ლიფტი: …',
+    topics: [
+      { id: 'elec-wiring', label: 'ელექტროგაყვანილობა', alt: ['ელექტრიკოსი', 'ელექტრიკა', 'სადენი', 'გაყვანილობა'] },
+      { id: 'elec-socket', label: 'როზეტი და ჩამრთველი', alt: ['როზეტი', 'ჩამრთველი', 'ჩამრთველები'] },
+      { id: 'elec-light',  label: 'განათება', alt: ['ლამპა', 'ჭაღი', 'სანათი'] },
+      { id: 'elec-panel',  label: 'მრიცხველი და ავტომატი', alt: ['ავტომატი', 'მრიცხველი', 'ფარი', 'დენი წყდება'] },
+    ],
+  },
+  {
+    id: 'repairs', label: 'სარემონტო სამუშაოები', kinds: S,
+    template: 'რა უნდა გაკეთდეს: …\nრა ფართობია: …\nმასალა ვისი იქნება: …',
+    topics: [
+      { id: 'rep-tile',     label: 'კაფელი და მეტლახი', alt: ['კაფელი', 'მეტლახი', 'პლიტკა'] },
+      { id: 'rep-drywall',  label: 'თაბაშირმუყაო', alt: ['გიფსოკარტონი', 'ჭერი'] },
+      { id: 'rep-paint',    label: 'შეღებვა და შპალერი', alt: ['მღებავი', 'შეღებვა', 'შპალერი', 'კედლის შეღებვა'] },
+      { id: 'rep-floor',    label: 'იატაკი', alt: ['პარკეტი', 'ლამინატი', 'ლინოლეუმი'] },
+      { id: 'rep-door',     label: 'კარ-ფანჯარა', alt: ['კარი', 'ფანჯარა', 'საკეტი', 'ბოქლომი'] },
+      { id: 'rep-assembly', label: 'ავეჯის აწყობა', alt: ['ავეჯის აწყობა', 'კარადის აწყობა', 'ხელოსანი'] },
+    ],
+  },
+  {
+    id: 'appliances', label: 'ტექნიკის შეკეთება', kinds: S,
+    template: 'რა ტექნიკაა: … (მოდელი, თუ იცი)\nრა ემართება: …\nრამდენი ხანია: …',
+    topics: [
+      { id: 'app-washer', label: 'სარეცხი მანქანა', alt: ['სარეცხი მანქანა', 'სარეცხის შეკეთება'] },
+      { id: 'app-fridge', label: 'მაცივარი', alt: ['მაცივარი', 'საყინულე'] },
+      { id: 'app-ac',     label: 'კონდიციონერი', alt: ['კონდიციონერი', 'გასუფთავება', 'ფრეონი'] },
+      { id: 'app-dish',   label: 'ჭურჭლის სარეცხი მანქანა' },
+      { id: 'app-stove',  label: 'ღუმელი და ქურა', alt: ['ღუმელი', 'ქურა', 'გაზქურა'] },
+      { id: 'app-tv',     label: 'ტელევიზორი და ტექნიკა', alt: ['ტელევიზორი', 'ტექნიკის შეკეთება'] },
+    ],
+  },
+  {
+    id: 'moving', label: 'გადაზიდვა', kinds: S,
+    template: 'საიდან და სად: … → …\nრა უნდა გადავიდეს: …\nსართული და ლიფტი ორივე მხარეს: …',
+    topics: [
+      { id: 'move-flat',   label: 'ბინის გადაზიდვა', alt: ['გადაზიდვა', 'გადასვლა', 'მზიდავი', 'ევაკუატორი'] },
+      { id: 'move-office', label: 'ოფისის გადაზიდვა' },
+      { id: 'move-lift',   label: 'ავეჯის ატანა და ჩამოტანა', alt: ['ატანა', 'მძიმე ნივთი'] },
+      { id: 'move-item',   label: 'ნივთის მიტანა', alt: ['კურიერი', 'მიტანა'] },
+    ],
+  },
+  {
+    id: 'outdoor', label: 'ეზო და მებაღეობა', kinds: S,
+    template: 'რა ფართობია: …\nრა სჭირდება: …\nროდის გერჩივნება: …',
+    topics: [
+      { id: 'out-lawn',   label: 'ბალახის თიბვა', alt: ['ბალახი', 'თიბვა', 'გაზონი'] },
+      { id: 'out-tree',   label: 'ხის გასხვლა და მოჭრა', alt: ['ხის მოჭრა', 'გასხვლა'] },
+      { id: 'out-garden', label: 'ეზოს მოწყობა', alt: ['მებაღე', 'ლანდშაფტი'] },
+      { id: 'out-pest',   label: 'დეზინსექცია', alt: ['ტარაკანი', 'მღრღნელი', 'დეზინფექცია', 'მწერები'] },
+    ],
+  },
+  {
+    id: 'systems', label: 'სისტემები და ინტერნეტი', kinds: S,
+    template: 'რა უნდა დაიდგას: …\nრამდენი წერტილი: …\nობიექტი: … (ბინა / სახლი / ოფისი)',
+    topics: [
+      { id: 'sys-camera', label: 'ვიდეოსათვალთვალო', alt: ['კამერა', 'ვიდეოკამერა', 'სათვალთვალო'] },
+      { id: 'sys-intercom', label: 'დომოფონი' },
+      { id: 'sys-alarm',  label: 'სიგნალიზაცია', alt: ['დაცვა', 'სიგნალიზაცია'] },
+      { id: 'sys-network', label: 'ინტერნეტი და ქსელი', alt: ['ვაიფაი', 'როუტერი', 'ქსელი', 'ინტერნეტი'] },
+    ],
+  },
 ]
 
 /* ═══════════ the description templates ══════════════════════════════════
@@ -657,6 +979,10 @@ const KIND_TEMPLATE: Record<RequestKindName, string> = {
   LEARNING: 'ვინ ისწავლის: …\nამჟამინდელი დონე: …\nმიზანი: …',
   CONSULTATION: 'სიტუაცია: …\nკითხვა: …\nრა ვსცადე აქამდე: …',
   PROJECT: 'რა უნდა გაკეთდეს: …\nვისთვის არის: …\nშედეგი, რომელსაც ველი: …',
+  // The three things a master asks on the phone before naming a price, in the
+  // order they ask them. „სართული და ლიფტი" is in here because it is the single
+  // most common reason a quoted price changes at the door.
+  SERVICE: 'რა პრობლემაა: …\nსართული და ლიფტი: …\nროდის გერჩივნება: …',
 }
 
 /** The scaffold for this request: the topic's group first, the kind's fallback
@@ -684,6 +1010,12 @@ const OFFER_TEMPLATE: Record<RequestKindName, string> = {
   LEARNING: 'გამარჯობა! ამ საგანს ვასწავლი … წელია.\nგაკვეთილი: … წუთი, …\nშემიძლია დავიწყო: …',
   CONSULTATION: 'გამარჯობა! ამ საკითხზე ვმუშაობ … წელია.\nშეხვედრაზე განვიხილავთ: …\nთავისუფალი დრო მაქვს: …',
   PROJECT: 'გამარჯობა! მსგავსი სამუშაო გაკეთებული მაქვს: …\nროგორ შევასრულებ: …\nვადა: …',
+  // ⚠️ THE THIRD LINE IS THE ONE THAT MATTERS, and it is why this template is
+  // not PROJECT's. On a visit the honest answer is often „I will price it when
+  // I see it", and a master with no way to say that either invents a number or
+  // does not bid at all. Saying it in the offer means the client reads it
+  // BEFORE choosing rather than at the door.
+  SERVICE: 'გამარჯობა! ამ სამუშაოს ვაკეთებ … წელია.\nმოვალ: …\nფასი: … (ან: ვიზიტი …₾, დანარჩენს ადგილზე შევაფასებ)',
 }
 
 export function offerTemplateFor(kind: RequestKindName): string {
@@ -709,14 +1041,20 @@ export function topicById(id: string | null | undefined): Topic | undefined {
   return id ? BY_ID.get(id) : undefined
 }
 
-/* ── the six shown before anything is typed ────────────────────────────────
+/* ── the eight shown before anything is typed ──────────────────────────────
  *
  * WHY THEY EXIST. Step 1 opened on an empty search box and 23 folded headings.
  * Nothing on that screen showed what a valid answer LOOKS like — the only
- * example was a placeholder, which disappears on the first keystroke. Six
- * one-tap examples turn a blank start into a start (owner, 2026-08-17: „დაწყება
- * ცოტა რთულია"). Recognition over recall, the same reason the accordion is
- * there at all.
+ * example was a placeholder, which disappears on the first keystroke. A handful
+ * of one-tap examples turn a blank start into a start (owner, 2026-08-17:
+ * „დაწყება ცოტა რთულია"). Recognition over recall, the same reason the
+ * accordion is there at all.
+ *
+ * ⚠️ IT WAS SIX AND IS NOW EIGHT, because a fourth kind arrived (2026-08-17).
+ * The rule below is two per kind and it is not negotiable downward — with
+ * services in the catalogue and no service on this row, the first screen would
+ * say „professionals and tutors" to somebody whose leak is spreading across the
+ * floor. The count follows the rule; the rule does not follow the count.
  *
  * ⚠️ „მაგალითად", NOT „ხშირად ეძებენ". We have no search data — the subsystem
  * has never been open — and a popularity claim we cannot back is a lie printed
@@ -733,6 +1071,11 @@ export const SUGGESTED_TOPIC_IDS = [
   'english', 'math',           // LEARN
   'contract', 'accounting',    // CONSULT
   'logo', 'renovation',        // JOB
+  // The two most-asked-for trades in any household. „დამლაგებელი" and
+  // „სანტექნიკოსი" are also the two words most likely to be TYPED, so a visitor
+  // who recognises one here learns in a single glance that this half of the
+  // product exists at all.
+  'clean-flat', 'plumb-leak',  // SERVICE
 ] as const
 
 /**
@@ -743,7 +1086,7 @@ export const SUGGESTED_TOPIC_IDS = [
  * throw at module load would not fail the one screen that reads this list, it
  * would take down EVERY route on the site because somebody renamed a topic.
  * A missing id costs one chip; the guarantee that there is no missing id is a
- * test's job, and tests/requests.test.ts asserts the full six.
+ * test's job, and tests/requests.test.ts asserts the full list.
  */
 export const SUGGESTED_TOPICS: Topic[] =
   SUGGESTED_TOPIC_IDS.map(id => BY_ID.get(id)).filter((t): t is Topic => !!t)

@@ -767,6 +767,19 @@ async function runMigrations() {
     )
   }
 
+  // ⚠️ A VALUE ADDED TO AN EXISTING ENUM, and it cannot ride in the loop above.
+  // `CREATE TYPE` only runs on a database that has never seen the type, so every
+  // deployment that already has "RequestOfferStatus" would skip it and then fail
+  // on the first INSERT of the new value. `ADD VALUE IF NOT EXISTS` is the
+  // statement that is correct on both.
+  //
+  // INVITED = the client wrote to an expert before that expert offered anything
+  // (2026-08-18). See prisma/schema for why it is a status on the offer row
+  // rather than a table of its own, and why it must never count as an offer.
+  await prisma.$executeRawUnsafe(
+    `ALTER TYPE "RequestOfferStatus" ADD VALUE IF NOT EXISTS 'INVITED';`,
+  )
+
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ServiceRequest" (
       "id"           TEXT NOT NULL,
@@ -916,6 +929,75 @@ async function runMigrations() {
   // Nullable + unique on both, the same trick "Company"."taxId" relies on:
   // Postgres allows any number of NULLs under a unique constraint, so the two
   // nullable columns do not fight each other.
+
+  // ── What a visiting master does, and where (2026-08-17) ─────────────────
+  // The supply side of `kind: SERVICE`. NOT an access row — see prisma/schema:
+  // a plumber is an ordinary allowlisted person, and this only says what they
+  // are filed under. "services" holds TOPIC IDS from lib/requestTopics, the same
+  // vocabulary a request is written in, which is what lets stage-3 routing be an
+  // exact string match instead of a sphere translation that is null for 65 of
+  // 171 topics.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ServiceProfile" (
+      "id"         TEXT NOT NULL,
+      "userId"     TEXT NOT NULL,
+      -- Empty is legal and means „filled nothing in yet": a profile that exists
+      -- but lists no service is simply never routed to, which is the honest
+      -- outcome and not an error state to guard against.
+      "services"   TEXT[] NOT NULL DEFAULT '{}',
+      "areas"      TEXT[] NOT NULL DEFAULT '{}',
+      "calloutFee" INTEGER,
+      "priceFrom"  INTEGER,
+      "available"  BOOLEAN NOT NULL DEFAULT true,
+      "createdAt"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ServiceProfile_pkey" PRIMARY KEY ("id"),
+      -- A price nobody can charge is a typo, not an offer. The ceiling is
+      -- deliberately generous; the floor is what stops a 0₾ call-out reading as
+      -- „free" when it means „not filled in" (that is what NULL is for).
+      CONSTRAINT "ServiceProfile_prices_sane" CHECK (
+        ("calloutFee" IS NULL OR ("calloutFee" > 0 AND "calloutFee" <= 100000))
+        AND ("priceFrom" IS NULL OR ("priceFrom" > 0 AND "priceFrom" <= 1000000))
+      )
+    );
+  `)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ServiceProfile_userId_key" ON "ServiceProfile"("userId");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceProfile_available_idx" ON "ServiceProfile"("available");`)
+  // ⚠️ GIN, and it is the reason this table can be routed on at all. Stage 3
+  // asks „who lists this topic" — `"services" @> ARRAY['plumb-leak']` — and a
+  // btree cannot answer a containment test on an array, so without this every
+  // routed request is a sequential scan of every provider. Prisma cannot express
+  // a GIN index on a scalar list, which is why it lives here and not in the
+  // schema alongside the others.
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceProfile_services_gin" ON "ServiceProfile" USING GIN ("services");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceProfile_areas_gin" ON "ServiceProfile" USING GIN ("areas");`)
+
+  // ── What happened to an offer (2026-08-17) ──────────────────────────────
+  // The append-only record a PRICE will be read from: the owner's decision is
+  // that an expert pays when the client opens their offer. The read receipt we
+  // already had (RequestMessage.readByClientAt) cannot carry that — it is
+  // written inside `after()` with a bare catch, it is mutable, and it stamps
+  // every unread message at once. See prisma/schema → OfferEvent.
+  //
+  // ⚠️ THE UNIQUE INDEX IS THE BILLING RULE. „Opened twice costs once" is
+  // enforced here, by the database, and not by a read-then-write that two
+  // 15-second polls arriving together would both pass.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "OfferEvent" (
+      "id"      TEXT NOT NULL,
+      "offerId" TEXT NOT NULL,
+      "type"    TEXT NOT NULL,
+      "at"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      -- Context for a dispute, never read by a rule.
+      "meta"    JSONB,
+      CONSTRAINT "OfferEvent_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "OfferEvent_offer_fk" FOREIGN KEY ("offerId")
+        REFERENCES "RequestOffer"("id") ON DELETE CASCADE
+    );
+  `)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "OfferEvent_offerId_type_key" ON "OfferEvent"("offerId", "type");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "OfferEvent_type_at_idx" ON "OfferEvent"("type", "at");`)
+
   // ── One conversation per offer (2026-08-17) ─────────────────────────────
   // The client has NO ACCOUNT, so the existing "Message" table (both sides are
   // User FKs) cannot carry this: the client side is identified by possession of

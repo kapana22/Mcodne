@@ -19,6 +19,7 @@ import { sendMail } from './mailer'
 import { notifyMany } from './notify'
 import {
   requestVerifiedProviderEmail, offerArrivedClientEmail,
+  requestClosedNoOffersClientEmail,
 } from './emailTemplates'
 import { KIND, kindOf, budgetLabel, timingLabel, topicLabel } from './requests'
 import {
@@ -152,13 +153,48 @@ export async function runRequestJobs(now: number = Date.now()): Promise<RequestJ
   // lost — the row keeps everything it ever said and stops occupying a live
   // queue.
   try {
-    const staleOpen = await prisma.serviceRequest.updateMany({
+    // ⚠️ CLAIMED ONE BY ONE, NOT SWEPT — and the reason is the mail below.
+    // This was a single `updateMany`, which is why nobody was ever told: a bulk
+    // status change has no rows to write to. The person who described their
+    // problem, left a number and waited two weeks learnt that nobody came by
+    // never hearing anything again, and the same transition closed their thread
+    // with us, so the moment they stopped hearing from us was the moment they
+    // could no longer ask why.
+    //
+    // Same claim-then-act shape as the two nudges: the status is written first
+    // and the mail follows, so a crash costs one notification rather than
+    // re-closing (and re-mailing) the row on every tick. Bounded by BATCH.
+    const staleDue = await prisma.serviceRequest.findMany({
       where: {
         status: 'VERIFIED', offerCount: 0,
         verifiedAt: { lte: new Date(now - STALE_OPEN_DAYS * 86_400_000) },
       },
-      data: { status: 'CLOSED' },
+      take: BATCH,
+      select: {
+        id: true, status: true, offerCount: true, verifiedAt: true, createdAt: true,
+        updatedAt: true, providerNudgeAt: true, clientNudgeAt: true,
+        publicRef: true, topic: true, email: true,
+      },
     })
+    let staleClosed = 0
+    for (const r of staleDue) {
+      // The pure predicate re-checked against the row we actually loaded — the
+      // `where` above is an index hint, `shouldAutoClose` is the rule.
+      if (!shouldAutoClose(r, now)) continue
+      const claimed = await prisma.serviceRequest.updateMany({
+        where: { id: r.id, status: 'VERIFIED', offerCount: 0 },
+        data: { status: 'CLOSED' },
+      })
+      if (claimed.count !== 1) continue
+      staleClosed++
+      if (!r.email) continue
+      const mail = requestClosedNoOffersClientEmail({
+        publicRef: r.publicRef,
+        topicLabel: topicLabel(r.topic),
+      })
+      try { await sendMail({ to: r.email, ...mail }) } catch { /* best-effort */ }
+    }
+
     const oldMatched = await prisma.serviceRequest.updateMany({
       where: {
         status: 'MATCHED',
@@ -166,7 +202,7 @@ export async function runRequestJobs(now: number = Date.now()): Promise<RequestJ
       },
       data: { status: 'CLOSED' },
     })
-    out.autoClosed = staleOpen.count + oldMatched.count
+    out.autoClosed = staleClosed + oldMatched.count
   } catch { /* one job's failure is not the tick's */ }
 
   // ── 2. Unanswered → re-mail, WIDENED ────────────────────────────────────

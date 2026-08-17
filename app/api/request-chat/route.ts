@@ -32,6 +32,7 @@ import {
 import { notify } from '@/lib/notify'
 import { sendMail } from '@/lib/mailer'
 import { requestChatEmail } from '@/lib/emailTemplates'
+import { recordOfferEvent } from '@/lib/offerEvents'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
@@ -122,6 +123,29 @@ export async function GET(req: Request) {
     },
   })
 
+  // ── THE BILLABLE MOMENT ──────────────────────────────────────────────────
+  // Owner, 2026-08-17: the expert pays „როცა კლიენტმა წაიკითხა". This is that
+  // instant, and it is recorded BEFORE the response is sent rather than in the
+  // `after()` below — a badge may be lost to a swallowed error, an invoice line
+  // may not.
+  //
+  // ⚠️ IT IS THE CLIENT OPENING A THREAD, NOT A PAGE LOAD, and that is what
+  // makes it an honest signal: components/RequestChat mounts offer threads
+  // COLLAPSED and only fetches when the pane is opened, so reaching this line
+  // means somebody deliberately opened this expert's offer. If that ever
+  // changes to `defaultOpen`, every expert on the request is billed at once for
+  // an intention nobody had — which is why it is written down here rather than
+  // left as a property of a component nobody reads.
+  //
+  // Price is 0 today; the row is what a price will later be attached to.
+  if (r.side === 'CLIENT') {
+    const rec = await recordOfferEvent(offerId, 'VIEWED', { via: 'chat-open' })
+    // Never fails the read. A client must not be shown an error because our
+    // bookkeeping stumbled — but it is LOGGED, because a lost billable event
+    // that nobody hears about is the failure mode this table exists to end.
+    if (!rec.ok) console.error('[offerEvents] VIEWED not recorded', offerId, rec.error)
+  }
+
   // Reading IS the receipt — marked here rather than by a separate call, so a
   // reader who never clicks anything still clears the badge. Only the OTHER
   // side's messages: marking your own read would be meaningless.
@@ -184,6 +208,14 @@ export async function POST(req: Request) {
     },
     select: { id: true, createdAt: true },
   })
+
+  // The stronger of the two engagement signals, recorded beside the weaker one
+  // so the billing trigger can be chosen from real numbers rather than from an
+  // opinion — see lib/offerEvents for why both exist while the lead is free.
+  if (r.side === 'CLIENT') {
+    const rec = await recordOfferEvent(r.offer.id, 'REPLIED', { via: 'chat-post' })
+    if (!rec.ok) console.error('[offerEvents] REPLIED not recorded', r.offer.id, rec.error)
+  }
 
   // ── Telling the other side ───────────────────────────────────────────────
   // After the response has flushed. A client has no account, so their only

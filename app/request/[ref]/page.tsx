@@ -97,6 +97,21 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
   // would hand out a person's details they never offered.
   const unreadByOffer = new Map(request.offers.map(o => [o.id, o._count.messages]))
 
+  // ── Conversations the client started ─────────────────────────────────────
+  // A SECOND query rather than widening the one above, deliberately: that
+  // query's `where` names the statuses an OFFER can have, and adding INVITED to
+  // it would put a priceless row into the list the client compares prices in.
+  // Two questions, two queries.
+  const invited = await prisma.requestOffer.findMany({
+    where: { requestId: request.id, status: 'INVITED' },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      expertUser: { select: { fullName: true } },
+      _count: { select: { messages: { where: { fromClient: false, readByClientAt: null } } } },
+    },
+  })
+
   // The platform thread's unread count — ours to them, still unread. Counted
   // here rather than joined into the query above because it hangs off the
   // REQUEST, not off an offer: `offerId: null` is the thread selector, and
@@ -191,6 +206,37 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
           offers={offers.map(o => ({ ...o, unread: unreadByOffer.get(o.id) ?? 0 }))}
           matched={matched}
         />
+      )}
+
+      {/* ── The experts the client wrote to first ───────────────────────────
+          Threads opened from the waiting panel, before anybody had bid
+          (2026-08-18). They are NOT offers and are not listed as ones: no
+          price, no „choose" button, no place taken. What they are is the
+          conversation the client started while waiting — and the moment that
+          expert names a price the same row becomes a real offer above, keeping
+          every message already in it. */}
+      {invited.length > 0 && (
+        <div className="mt-6">
+          <h2 className="font-display text-h3 font-bold text-ink-900">მიმოწერა ექსპერტებთან</h2>
+          <p className="mt-1 text-small text-ink-500">
+            შეთავაზება ჯერ არ გამოუგზავნიათ.
+          </p>
+          <div className="mt-3 flex flex-col gap-3">
+            {invited.map(o => (
+              <Card key={o.id} padding="compact">
+                <div className="font-display text-small font-semibold text-ink-900">
+                  {o.expertUser?.fullName ?? 'ექსპერტი'}
+                </div>
+                <RequestChat
+                  thread={{ kind: 'OFFER', offerId: o.id, refCode: request.publicRef }}
+                  unread={o._count.messages}
+                  peerName={o.expertUser?.fullName ?? 'ექსპერტი'}
+                  emptyHint="დაწერე — ტელეფონის ნომრის გაზიარების გარეშე."
+                />
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* ── The thread with us ──────────────────────────────────────────────
