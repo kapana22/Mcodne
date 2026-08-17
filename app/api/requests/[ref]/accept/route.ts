@@ -106,9 +106,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
   // both ways — a client who chose and heard nothing for a day books elsewhere).
   // The mail itself carries NO client contact: the page it links to does, so a
   // forwarded mail leaks nothing.
+  // ⚠️ NO publicRef IN A PROVIDER'S MAIL (2026-08-17) — it is the client's
+  // credential, and this route is the proof: it authorises on that string
+  // alone. See app/provider/requests/[id]/page.
   const mail = offerAcceptedProviderEmail({
     topicLabel: topicLabel(offer.request.topic),
-    publicRef: offer.request.publicRef,
   })
   const emails = recipients.length
     ? (await prisma.user.findMany({ where: { id: { in: recipients } }, select: { email: true } })).map(u => u.email)

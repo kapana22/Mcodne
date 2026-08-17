@@ -116,9 +116,13 @@ export default async function Page() {
                     {gel(o.priceGel)}
                   </span>
                 </div>
+                {/* ⚠️ NO `publicRef` HERE — see the note on the request detail
+                    page. It is the client's credential, not a reference number,
+                    and it authorises accepting an offer on their behalf. The
+                    offer is already identified by the topic above it and by the
+                    status below. */}
                 <p className="mt-0.5 text-meta text-ink-500 tabular-nums">
-                  {o.request.publicRef}
-                  {' · '}{OFFER_STATUS_LABEL[o.status as OfferStatusName]}
+                  {OFFER_STATUS_LABEL[o.status as OfferStatusName]}
                   {' · '}{budgetLabel(kindOf(o.request.kind), o.request.budgetMin, o.request.budgetMax)}
                   {o.daysEstimate ? ` · ${o.daysEstimate} დღე` : ''}
                   {' · '}{timeAgoKa(o.createdAt)}

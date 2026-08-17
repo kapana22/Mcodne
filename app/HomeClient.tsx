@@ -14,10 +14,20 @@ import { HomeCat } from './_home/data'
 import { FeaturedExperts } from './_home/experts'
 import { HomeHero } from './_home/hero'
 import { HowItWorks } from './_home/how'
+import { RequestBand } from './_home/request'
+import { requestsOn } from '@/lib/requests'
 
 const HomeView = ({ initialCategories = [] }: { initialCategories?: HomeCat[] }) => (
   <>
     <HomeHero />
+    {/* ── The second way in ───────────────────────────────────────────────
+        Directly under the hero, because the hero answers „I know who I want"
+        and this answers „I don't". Both paths visible at once is the Angi
+        shape and the owner's call (2026-08-17) — see _home/request for why it
+        is a band rather than a third link inside the hero.
+        Rendered only where the subsystem exists; `requestsOn()` works in this
+        client component because next.config.js inlines FEATURE_REQUESTS. */}
+    {requestsOn() && <RequestBand />}
     <Categories initialCategories={initialCategories} />
     <FeaturedExperts />
     {/* „როგორ მუშაობს" now also carries the former „რატომ მცოდნე" cells —

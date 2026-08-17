@@ -43,15 +43,34 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-export default async function Page() {
+export default async function Page({ searchParams }: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const viewer = await requestsViewer()
   if (!viewer.clientAllowed) notFound()
+
+  // ⚠️ `?q=` IS A HANDOVER, NOT A FILTER. The home band asks „რა გჭირდება" in
+  // its own field and sends the words here; without this the first thing the
+  // wizard did was show an empty search box to somebody who had just typed the
+  // answer into one. Retyping at step one is the cheapest way to lose a person.
+  //
+  // It only SEEDS the search — it never picks a topic. What somebody typed is
+  // their words, not a vocabulary id, and quietly choosing „ხელშეკრულება"
+  // because they wrote „ხელშეკრულებაზე მჭირდება იურისტი" is the wizard putting
+  // an answer in their mouth. They still tap the hit they meant.
+  const sp = await searchParams
+  const raw = typeof sp.q === 'string' ? sp.q : ''
+  // Bounded before it reaches a component: this is a URL anybody can craft, and
+  // the search box has no business rendering a novel.
+  const initialQuery = raw.trim().slice(0, 60)
+
   // The three fields the contact screen would otherwise ask a signed-in person
   // to retype. Passed down rather than fetched by the wizard — see the prop's
   // note in RequestWizard, and app/request/_model → withAccountContact for the
   // fill rule (empty fields only, never an overwrite).
   return (
     <RequestWizard
+      initialQuery={initialQuery}
       account={viewer.user
         ? { fullName: viewer.user.fullName, phone: viewer.user.phone, email: viewer.user.email }
         : null}

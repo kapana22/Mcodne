@@ -104,7 +104,13 @@ export async function GET(req: Request) {
     // message on the request, including the client's private conversations with
     // each provider — the exact leak the per-offer threads exist to prevent.
     where: { requestId: r.request.id, offerId: null },
-    orderBy: { createdAt: 'asc' },
+    // ⚠️ THE LAST 200, NOT THE FIRST (2026-08-17). This read `asc` + `take: 200`
+    // while the comment claimed „the tail is what anybody reads" — so past the
+    // cap every NEW message became invisible to both sides, and the read-receipt
+    // sweep below (which is not capped) marked them read anyway. Messages
+    // vanished and their badge cleared. Taken from the end and re-ordered here,
+    // so the cap drops the OLDEST, which is what a chat window does.
+    orderBy: { createdAt: 'desc' },
     take: 200,
     select: {
       id: true, fromClient: true, body: true, createdAt: true,
@@ -138,7 +144,9 @@ export async function GET(req: Request) {
     // `chatMessageView` maps a side to `mine`, and STAFF sits where PROVIDER
     // sits: not the client. Reused rather than re-derived so a change to what a
     // bubble carries lands on both threads at once.
-    messages: rows.map(m => chatMessageView(m, r.side === 'CLIENT' ? 'CLIENT' : 'PROVIDER')),
+    // Re-ordered oldest-first for the reader: the CAP takes from the end, the
+    // BUBBLES read from the start.
+    messages: [...rows].reverse().map(m => chatMessageView(m, r.side === 'CLIENT' ? 'CLIENT' : 'PROVIDER')),
   })
 }
 

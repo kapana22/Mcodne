@@ -10,7 +10,9 @@
 // them, and not before. That is the product, not a courtesy.
 
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { requestsViewer } from '@/lib/requestsServer'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { providerRequestView, timeAgoKa, REQUEST_KINDS, KIND, type RequestKindName } from '@/lib/requests'
 import { PageHeader } from '@/components/PageHeader'
@@ -25,6 +27,17 @@ export const dynamic = 'force-dynamic'
 export default async function Page({ searchParams }: {
   searchParams: Promise<{ kind?: string }>
 }) {
+  // ⚠️ ITS OWN GATE, not the layout's (2026-08-17, found in review). The segment
+  // layout checks `providerAllowed`, and this page checked NOTHING — so the
+  // allowlist was enforced in exactly one place for the whole open queue.
+  // lib/requestsServer states the rule this file was breaking: „Every route
+  // checks here as well… neither layer is load-bearing alone." A layout is not
+  // a reliable authorization boundary in the App Router, and every API route in
+  // this subsystem already double-checks. What this page hands out — every open
+  // request, with descriptions and budgets — is worth the one line.
+  const viewer = await requestsViewer()
+  if (!viewer.providerAllowed) notFound()
+
   await ensureDbReady()
 
   // The kind filter, from the URL — a link, not client state, so a provider
@@ -59,7 +72,10 @@ export default async function Page({ searchParams }: {
     take: 100,
     // The select is the shape providerRequestView takes, and nothing wider.
     select: {
-      id: true, publicRef: true, kind: true, topic: true, description: true,
+      // ⚠️ NOT publicRef — it is the client's credential and no provider
+      // surface may hold it, let alone render it. See lib/requests →
+      // ProviderRequestRow.
+      id: true, kind: true, topic: true, description: true,
       budgetMin: true, budgetMax: true, budgetUnit: true,
       timing: true, format: true, city: true, status: true, details: true,
       offerCount: true, offerLimit: true, createdAt: true,

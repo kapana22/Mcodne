@@ -77,9 +77,12 @@ export function StepContact({ draft, patch, signedIn }: {
       </label>
 
       <label className="block">
-        <Label optional>ელფოსტა</Label>
+        {/* ⚠️ NO LONGER `optional` (2026-08-17). See ServiceRequestInput: every
+            message this subsystem sends a client is an email, so an absent one
+            meant the system never spoke to them again. */}
+        <Label>ელფოსტა</Label>
         <input
-          type="email" autoComplete="email"
+          type="email" autoComplete="email" required
           value={draft.email}
           onChange={e => patch({ email: e.target.value })}
           className={INPUT} placeholder="you@example.ge"
@@ -92,10 +95,14 @@ export function StepContact({ draft, patch, signedIn }: {
             already signed in. lib/requestAccount returns SIGNED_IN for them and
             creates nothing, so „ანგარიში თავისით შეიქმნება" would be promising
             a thing that will not happen to a person who already has it. */}
+        {/* ⚠️ „ელფოსტაზეც" BECAME „ელფოსტაზე" (2026-08-17), one letter, and it
+            is the difference between a courtesy and the channel. „-ც" implied a
+            second route alongside some first one; there is no first one — this
+            is where offers and replies are announced, and nowhere else. */}
         <Hint>
           {signedIn
-            ? 'შეთავაზებები ელფოსტაზეც მოგივა.'
-            : 'შეთავაზებები ელფოსტაზეც მოგივა და ანგარიში თავისით შეიქმნება.'}
+            ? 'შეთავაზებები ელფოსტაზე მოგივა.'
+            : 'შეთავაზებები ელფოსტაზე მოგივა და ანგარიში თავისით შეიქმნება.'}
         </Hint>
       </label>
 

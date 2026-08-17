@@ -61,7 +61,10 @@ function loadDraft(): Draft {
   }
 }
 
-export function RequestWizard({ account }: {
+export function RequestWizard({ account, initialQuery = '' }: {
+  /** What they typed on the home band, handed to the first screen's search so
+   *  nobody retypes the answer they just gave. See app/request/page. */
+  initialQuery?: string
   /** The signed-in person's contact details, or null for a guest. Passed from
    *  the server page rather than fetched: /api/me would arrive after the first
    *  paint, so the last screen would render its fields empty and then fill
@@ -385,6 +388,7 @@ export function RequestWizard({ account }: {
         {step.id === 'what' && (
           <StepWhat
             draft={draft}
+            initialQuery={initialQuery}
             onPick={topicId => {
               const d = withTopic(draft, topicId)
               setDraft(d)

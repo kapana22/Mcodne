@@ -66,11 +66,17 @@ const INPUT =
   'placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none ' +
   'transition-colors duration-fast'
 
-export function StepWhat({ draft, onPick }: {
+export function StepWhat({ draft, onPick, initialQuery = '' }: {
   draft: Draft
   onPick: (topicId: string) => void
+  /** Handed over from the home band's own field — see app/request/page for why
+   *  it seeds the search and deliberately does NOT pick a topic. */
+  initialQuery?: string
 }) {
-  const [q, setQ] = useState('')
+  // Seeded, not controlled: after the first paint this field belongs entirely
+  // to the person typing in it. A `useEffect` syncing it back to the prop would
+  // fight them on every keystroke of a client-side navigation.
+  const [q, setQ] = useState(initialQuery)
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   // Keyboard focus within the hit list. -1 = nothing chosen; Enter then takes
   // the FIRST hit, because a person who typed „ქიმია" and hit Enter meant the

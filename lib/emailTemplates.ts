@@ -4,6 +4,7 @@
 
 import { SUPPORT_EMAIL } from './supportEmails'
 import { fmtKaDateTime, type KaDateOpts } from './kaDate'
+import { topicLabel } from './requestTopics'
 
 const BASE = 'https://mcodne.ge'
 
@@ -687,13 +688,17 @@ export function offerArrivedClientEmail(o: {
 /** To the chosen provider when the client accepts. The page it links to is
  *  where the contact now lives — the mail itself still carries none, so a
  *  forwarded or mis-addressed mail leaks nothing. */
-export function offerAcceptedProviderEmail(o: { topicLabel: string; publicRef: string }) {
+export function offerAcceptedProviderEmail(o: { topicLabel: string }) {
   return {
     subject: 'შენი შეთავაზება აირჩიეს 🎉',
     html: shell({
       heading: 'შენი შეთავაზება აირჩიეს',
       bodyHtml:
-        p(`კლიენტმა აირჩია შენი შეთავაზება — <b>${esc(o.topicLabel)}</b> (${esc(o.publicRef)}).`) +
+        // ⚠️ NO publicRef (2026-08-17). It used to be printed here in brackets.
+        // It is the CLIENT'S CREDENTIAL, not a reference number — see
+        // app/provider/requests/[id]/page — and a mail is the easiest place in
+        // the system to read one off and keep it.
+        p(`კლიენტმა აირჩია შენი შეთავაზება — <b>${esc(o.topicLabel)}</b>.`) +
         p('კლიენტის კონტაქტი უკვე შენს გვერდზეა. დაუკავშირდი მალე — ის ამას ელოდება.'),
       cta: { label: 'კონტაქტის ნახვა', href: gatedLink('/provider/offers') },
     }),
@@ -753,7 +758,13 @@ export function requestChatEmail(o: {
   // back to the site to answer — and answering is the point.
   const preview = o.preview.length > 140 ? `${o.preview.slice(0, 140)}…` : o.preview
   return {
-    subject: `ახალი შეტყობინება — ${o.publicRef}`,
+    // ⚠️ THE SUBJECT FORKS ON THE AUDIENCE, and only for this reason: the
+    // reference is the CLIENT'S credential. In their own inbox it is the thing
+    // that opens their request and belongs there; in a provider's inbox it is a
+    // key to somebody else's account, sitting in a searchable archive forever.
+    subject: o.toProvider
+      ? `ახალი შეტყობინება — ${topicLabel(o.topic)}`
+      : `ახალი შეტყობინება — ${o.publicRef}`,
     html: shell({
       heading: 'ახალი შეტყობინება',
       bodyHtml:

@@ -22,6 +22,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   // IDENTITY, which decides whether the form is drawn and whether their own
   // offer already exists.
   const viewer = await requestsViewer()
+  // ⚠️ THE ALLOWLIST, CHECKED HERE TOO (2026-08-17). This call used to be for
+  // the provider IDENTITY only, leaving the segment layout as the single
+  // enforcement point for the whole detail page — and lib/requestsServer says
+  // plainly that neither layer may be load-bearing alone.
+  if (!viewer.providerAllowed) notFound()
   const { id } = await params
 
   await ensureDbReady()
@@ -29,7 +34,10 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const row = await prisma.serviceRequest.findUnique({
     where: { id },
     select: {
-      id: true, publicRef: true, kind: true, topic: true, description: true,
+      // ⚠️ NOT publicRef — it is the client's credential and no provider
+      // surface may hold it, let alone render it. See lib/requests →
+      // ProviderRequestRow.
+      id: true, kind: true, topic: true, description: true,
       budgetMin: true, budgetMax: true, budgetUnit: true,
       timing: true, format: true, city: true, status: true, details: true,
       offerCount: true, offerLimit: true, createdAt: true,
@@ -98,8 +106,20 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </Btn>
       </div>
 
+      {/* ⚠️ THE CLIENT'S REFERENCE IS NOT PRINTED ON THIS PAGE, AND MUST NEVER
+          BE (2026-08-17). `publicRef` is not a display code — it is the
+          client's ENTIRE credential: possession of it authorises reading their
+          thread with us, writing to us AS them, and POSTing
+          /api/requests/<ref>/accept, which settles the request and opens the
+          contact. The eyebrow below used to read `${kindLabel} · ${publicRef}`,
+          so every allowlisted provider read it on every VERIFIED request
+          BEFORE bidding — and could then accept their own offer on the client's
+          behalf. Nothing else was needed: the accept route authorises on the
+          reference alone, by design, because the client has no account.
+          A provider needs no code. They arrive by a link carrying the request
+          id, and the topic is what they recognise it by. */}
       <PageHeader
-        eyebrow={`${r.kindLabel} · ${r.publicRef}`}
+        eyebrow={r.kindLabel}
         title={r.topicLabel}
         // „N ადგილი" is an invitation to bid, so it is said only while bidding
         // is possible. On a settled request the same line would be an invitation

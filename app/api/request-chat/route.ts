@@ -23,7 +23,7 @@
 import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { normalizePublicRef } from '@/lib/requests'
+import { normalizePublicRef, topicLabel } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
 import {
   RequestMessageInput, chatIsOpen, chatClosedReason, maskContacts,
@@ -108,9 +108,13 @@ export async function GET(req: Request) {
 
   const rows = await prisma.requestMessage.findMany({
     where: { offerId },
-    orderBy: { createdAt: 'asc' },
-    // A conversation this long is not a conversation; the tail is what anybody
-    // reads and the cap keeps one payload from becoming a page.
+    // ⚠️ THE LAST 200, NOT THE FIRST (2026-08-17). This read `asc` + `take: 200`
+    // while the comment claimed „the tail is what anybody reads" — so past the
+    // cap every NEW message became invisible to both sides, and the read-receipt
+    // sweep below (which is not capped) marked them read anyway. Messages
+    // vanished and their badge cleared. Taken from the end and re-ordered here,
+    // so the cap drops the OLDEST, which is what a chat window does.
+    orderBy: { createdAt: 'desc' },
     take: 200,
     select: {
       id: true, fromClient: true, body: true, createdAt: true,
@@ -139,7 +143,9 @@ export async function GET(req: Request) {
     side: r.side,
     open: chatIsOpen(r.offer.request, r.offer),
     closedReason: chatClosedReason(r.offer.request, r.offer),
-    messages: rows.map(m => chatMessageView(m, r.side)),
+    // Re-ordered oldest-first for the reader: the CAP takes from the end, the
+    // BUBBLES read from the start.
+    messages: [...rows].reverse().map(m => chatMessageView(m, r.side)),
   })
 }
 
@@ -190,7 +196,11 @@ export async function POST(req: Request) {
           await notify(userId, {
             type: 'GENERIC',
             title: 'ახალი შეტყობინება მოთხოვნაზე',
-            body: r.offer.request.publicRef,
+            // ⚠️ THE TOPIC, NOT THE REFERENCE. `publicRef` is the client's
+            // credential — see app/provider/requests/[id]/page. A bell body is
+            // a place a provider reads it at a glance, which is exactly what
+            // must not happen.
+            body: topicLabel(r.offer.request.topic),
             href: '/provider/offers',
           })
         }

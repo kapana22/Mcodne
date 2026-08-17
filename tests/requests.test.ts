@@ -247,6 +247,127 @@ test('the two gates are different answers, and each is the right one', () => {
     'the client gate started asking who the caller is — it must not')
 })
 
+test('the client’s reference is never shown to a provider', () => {
+  // ⚠️ THE WORST BUG THIS SUBSYSTEM HAS HAD (found 2026-08-17, in review).
+  //
+  // `publicRef` is not a reference number. It is the client's ENTIRE
+  // credential — they have no account, by design, so possession of that string
+  // authorises:
+  //     · reading their private thread with us      (/api/request-thread?ref=)
+  //     · writing to us AS them                     (POST the same)
+  //     · POST /api/requests/<ref>/accept           — which settles the
+  //       request, declines every rival offer, and OPENS THE CLIENT'S PHONE.
+  // The accept route checks nothing else. It cannot: the client has no session.
+  //
+  // And the provider request page printed it in the eyebrow. So any allowlisted
+  // provider read it on every open request BEFORE bidding, and could then
+  // accept their own offer on the client's behalf. The one transition the whole
+  // product is built on — „WE open the contact when the client chooses" — was
+  // available to the counterparty for the price of reading a heading.
+  //
+  // The type is where this is enforced, so a future card cannot compile.
+  const reqs = read('lib/requests.ts')
+  const shape = reqs.slice(reqs.indexOf('export type ProviderRequestRow'))
+    .slice(0, reqs.slice(reqs.indexOf('export type ProviderRequestRow')).indexOf('}') + 1)
+  assert.doesNotMatch(shape, /publicRef/,
+    'publicRef is back on ProviderRequestRow — every provider surface can now render the client’s credential')
+  const view = reqs.slice(reqs.indexOf('export function providerRequestView'))
+    .slice(0, 600)
+  assert.doesNotMatch(view, /publicRef/, 'providerRequestView emits publicRef again')
+
+  // …and no provider-facing surface may print it directly either.
+  for (const f of [
+    'app/provider/requests/page.tsx',
+    'app/provider/requests/[id]/page.tsx',
+    'app/provider/offers/page.tsx',
+  ]) {
+    const body = codeOf(f)
+    assert.doesNotMatch(body, /\{[^}]*\.publicRef[^}]*\}/,
+      `${f} renders the client’s reference — that hands the counterparty the key to accept on the client’s behalf`)
+  }
+
+  // A provider's NOTIFICATION and MAIL are archives somebody can read it out of
+  // at leisure, so they carry the topic instead.
+  assert.doesNotMatch(codeOf('app/api/request-chat/route.ts'), /body: r\.offer\.request\.publicRef/,
+    'the provider bell body is the client’s reference again')
+  const mail = read('lib/emailTemplates.ts')
+  assert.match(mail, /o\.toProvider\s*\n?\s*\?\s*`ახალი შეტყობინება — \$\{topicLabel\(o\.topic\)\}`/,
+    'the provider chat mail subject carries the client’s reference again')
+  // codeOf, not read: the comment explaining the removal names `publicRef`, and
+  // a negative assertion that trips on its own documentation is a test nobody
+  // can keep true.
+  const mailCode = codeOf('lib/emailTemplates.ts')
+  assert.doesNotMatch(mailCode.slice(mailCode.indexOf('offerAcceptedProviderEmail')).slice(0, 500), /publicRef/,
+    'the accepted-offer mail to the provider carries the client’s reference again')
+})
+
+test('a client we cannot reach is refused at the door', () => {
+  // ⚠️ EMAIL IS REQUIRED, AND IT USED TO BE OPTIONAL ON PURPOSE. The old rule
+  // („the whole flow runs on the phone number") was good and was defeated by
+  // something outside the schema: every automated message this subsystem sends
+  // a client is an EMAIL, and there is no SMS anywhere in the codebase. So an
+  // absent email did not mean „reach me by phone" — it meant the system never
+  // spoke to them again: no offer notice, no reply notice, no nudge.
+  const base = {
+    kind: 'CONSULTATION', topic: 'contract',
+    description: 'ხელშეკრულება მჭირდება იჯარაზე.',
+    budgetBand: 'c2', timing: 'this_week', format: 'ONLINE', city: 'TBILISI',
+    contactName: 'ნინო მაგალიძე', phone: '555123456',
+  }
+  assert.equal(ServiceRequestInput.safeParse({ ...base, email: 'nino@example.ge' }).success, true)
+  assert.equal(ServiceRequestInput.safeParse(base).success, false,
+    'a request with no email is accepted again — that client can never be told an offer arrived')
+  assert.equal(ServiceRequestInput.safeParse({ ...base, email: '' }).success, false,
+    'an empty email is accepted again')
+
+  // ⚠️ THE DOWNSTREAM GUARDS STAY. Rows written before this rule have no email
+  // and must still be readable; every notifier keeps its `if (email)` so an old
+  // row degrades to silence instead of throwing.
+  assert.match(codeOf('app/api/provider/offers/route.ts'), /const to = offer\.request\.email\s*\n\s*if \(to\)/,
+    'the offer notifier stopped guarding on a missing email — old rows predate the requirement')
+  assert.match(codeOf('lib/requestJobs.ts'), /!r\.email/,
+    'the client nudge stopped guarding on a missing email')
+
+  // When SMS exists this requirement should come back OUT. Pinned so that the
+  // reason is findable from the test rather than only from a git blame.
+  assert.match(read('lib/requests.ts'), /THE HONEST FIX IS SMS/,
+    'the note explaining why this requirement is temporary was removed')
+})
+
+test('NOBODY outside the allowlist can be mailed about a request', () => {
+  // ⚠️ THE OWNER'S STANDING CONSTRAINT (2026-08-17): „რადგან კლიენტები
+  // ახლანდელი ექსპერტები არიან, არ მინდა შეწუხდნენ — ამ ეტაპზე რექვესთი არავის
+  // მეილზე არ უნდა მივიდეს." The platform has 26 experts who applied to be
+  // BOOKED; not one of them asked to receive leads. Mailing them would be
+  // shipping an unfinished product to people who never opted in, and it is the
+  // kind of mistake that is made once and remembered.
+  //
+  // The guarantee already holds — routing reads the allowlist and the allowlist
+  // has one row. But „it happens to be true today" is not a guarantee; a
+  // `findMany` that loses its `where` is one careless edit. This is the test
+  // that makes it one.
+  const jobs = codeOf('lib/requestJobs.ts')
+
+  // The audience is built from RequestAccess, and only from rows that are ON.
+  assert.match(jobs, /prisma\.requestAccess\.findMany\(\{\s*where: \{ active: true/,
+    'the routable audience is no longer restricted to ACTIVE allowlist rows')
+  assert.match(jobs, /company: \{ requestAccess: \{ active: true \} \}/,
+    'company members are no longer restricted to companies with an active allowlist row')
+
+  // …and it is NEVER built from the expert catalogue. This is the assertion
+  // that matters: `tutorProfile.findMany` here would silently turn every
+  // approved expert on the site into a lead recipient.
+  assert.doesNotMatch(jobs, /prisma\.tutorProfile\.(findMany|findFirst)/,
+    'the router reads the EXPERT CATALOGUE — that mails 26 people who never asked for leads')
+  assert.doesNotMatch(jobs, /prisma\.user\.findMany\(\{\s*where: \{ role:/,
+    'the router selects recipients by ROLE — the allowlist is the only opt-in')
+
+  // The one place that mails providers takes its addresses from that audience
+  // and from nowhere else.
+  assert.match(jobs, /const byId = new Map\(providers\.map/,
+    'provider addresses are no longer resolved from the routed audience')
+})
+
 test('the waiting screen animates FACTS — no invented audience', () => {
   // ⚠️ THE MOST TEMPTING LIE IN THE PRODUCT, and the reason this test exists
   // rather than a comment. A waiting screen is easy to make feel busy: „N
@@ -528,14 +649,51 @@ test('a non-allowlisted account gets 404, never 403', () => {
 
 /* ═══════════ 3. nothing links to it ════════════════════════════════════ */
 
-test('NOTHING links to /request or /provider from any navigation', () => {
-  // The strongest guarantee in the whole subsystem and the easiest to lose:
-  // one href in a nav array and it is discoverable regardless of every other
-  // precaution here. Scan the real tree — copied from tests/b2b.test.ts, where
-  // this check has already justified itself once.
+test('the PROVIDER side is linked from nowhere, and /request only from named places', () => {
+  // ⚠️ THIS TEST CHANGED SHAPE ON 2026-08-17 AND THE OLD SHAPE IS WORTH KNOWING.
+  // It used to assert that NOTHING linked to /request or /provider from
+  // anywhere — the subsystem was dark, and one href in a nav array made it
+  // discoverable regardless of every other precaution. That was right while the
+  // client side was allowlist-only.
+  //
+  // It is not right any more. The owner opened the client form to everyone and
+  // then put it in the header and on the home page (Bark/Angi are the reference
+  // — a browsable catalogue and a describe-it path running side by side). A
+  // test that forbids the thing the product now does is a test that gets
+  // deleted in frustration, taking the half that still matters with it.
+  //
+  // So the halves are separated:
+  //   /provider — STILL linked from nowhere. It is the bidder's side; nobody
+  //               arrives there by browsing, only by an admin's invitation.
+  //               This is the guarantee that has to survive.
+  //   /request  — allowed, from a SHORT NAMED LIST, and every entry must check
+  //               the feature flag. Named individually rather than excused by a
+  //               pattern, so the next link somebody adds still fails here and
+  //               has to be argued for.
+  // Each entry point, paired with the file that GATES it. They are not always
+  // the same file, and that is correct: the home band does not check the flag
+  // itself because it is never rendered unless HomeClient decides it should be.
+  // A component that re-checks a gate its parent already applied is a second
+  // place the answer lives.
+  const CLIENT_ENTRY_POINTS: [file: string, gatedIn: string][] = [
+    ['components/PublicTopBar.tsx', 'components/PublicTopBar.tsx'],
+    ['app/_home/request.tsx', 'app/HomeClient.tsx'],
+  ]
+  for (const [f, gate] of CLIENT_ENTRY_POINTS) {
+    assert.match(read(gate), /requestsOn\(\)/,
+      `${f} reaches /request but ${gate} does not check the flag — it would show on a deployment where the subsystem does not exist`)
+    assert.doesNotMatch(read(f), /["'`]\/provider/,
+      `${f} links to the PROVIDER side — that surface is reached by invitation only`)
+  }
+  const ENTRY_FILES = CLIENT_ENTRY_POINTS.flatMap(([f, g]) => [f, g])
+
   const offenders: string[] = []
   for (const f of sourceFiles()) {
     const rel = relative(ROOT, f)
+    // The named client entry points, already checked above for the flag and for
+    // not reaching the provider side. Skipped here rather than pattern-excused,
+    // so a NEW file linking to /request still lands in `offenders`.
+    if (ENTRY_FILES.includes(rel)) continue
     // The subsystem's own files are allowed to know their own URLs.
     if (rel.startsWith('app/request/') || rel.startsWith('app/provider/')) continue
     if (rel.startsWith('app/api/requests/') || rel.startsWith('app/api/provider/')) continue
@@ -978,7 +1136,7 @@ test('the run is one question per screen, derived from the draft', () => {
   assert.equal(ServiceRequestInput.safeParse({
     kind: 'LEARNING', topic: 'chemistry', description: '',
     budgetBand: 'l2', timing: 'twice_week', format: 'ONLINE', city: 'TBILISI',
-    contactName: 'ნინო მაგალიძე', phone: '555123456',
+    contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
   }).success, true, 'an empty description is rejected — the essay wall is back')
 
   // Cross-kind topic switch still clears the kind-scoped answers.
@@ -1313,7 +1471,7 @@ test('the ceilings admit what a person actually types', () => {
     topic: 'accounting',
     description: 'ვეძებ ბუღალტერს შპს-სთვის, საგადასახადო შემოწმება მოვიდა და დახმარება მჭირდება.',
     budgetBand: 'c2', timing: 'this_week', format: 'ONLINE', city: 'TBILISI',
-    contactName: 'ნინო მაგალიძე', phone: '555123456',
+    contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
   }
   assert.equal(ServiceRequestInput.safeParse(ok).success, true, 'a minimal real request is rejected')
   // …and a teaching one, which is the audience this redesign happened for.
@@ -1409,7 +1567,7 @@ test('the honeypot answers ok and writes nothing', () => {
     kind: 'CONSULTATION', topic: 'accounting',
     description: 'ვეძებ ბუღალტერს შპს-სთვის, საგადასახადო შემოწმება მოვიდა და დახმარება მჭირდება.',
     budgetBand: 'c2', timing: 'this_week', format: 'ONLINE', city: 'TBILISI',
-    contactName: 'ნინო მაგალიძე', phone: '555123456',
+    contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
     website: 'http://spam.example',
   }).success, true, 'zod rejects a filled honeypot — the route branch is dead and the bot is told which field it was')
 })

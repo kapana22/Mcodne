@@ -436,9 +436,26 @@ export function requestIsOpen(r: { status: string; offerCount: number; offerLimi
 /** The shape a provider is allowed to receive. Note what it does NOT take: the
  *  row's `contactName`, `phone`, `email` and `adminNote` are not parameters, so
  *  a caller cannot pass them in and have them survive by accident. */
+/**
+ * ⚠️ `publicRef` IS NOT IN THIS SHAPE, AND MUST NOT BE ADDED (2026-08-17).
+ *
+ * It is the CLIENT'S ENTIRE CREDENTIAL. Possession of that string authorises
+ * reading their private thread with us, writing to us as them, and POSTing
+ * /api/requests/<ref>/accept — which settles the request, declines every rival,
+ * and opens the client's phone number. The accept route checks nothing else, by
+ * design, because the client has no account.
+ *
+ * It used to be here, and the detail page printed it in the eyebrow, so every
+ * allowlisted provider read it on every open request BEFORE bidding. Removing
+ * it from the TYPE rather than from the two render sites is deliberate: this is
+ * the funnel every provider surface is shaped through, so a future card that
+ * „just shows the reference" cannot compile.
+ *
+ * The same reasoning already keeps contactName / phone / email out of here —
+ * `clientContactFor` is the one place allowed to reveal those.
+ */
 export type ProviderRequestRow = {
   id: string
-  publicRef: string
   kind: string
   topic: string
   description: string
@@ -460,7 +477,6 @@ export function providerRequestView(r: ProviderRequestRow) {
   const kind = kindOf(r.kind)
   return {
     id: r.id,
-    publicRef: r.publicRef,
     kind,
     kindLabel: KIND[kind].label,
     topic: r.topic,
@@ -616,9 +632,36 @@ export const ServiceRequestInput = z.object({
   // normalizeExtras (lib/requestTopics) strips every key and value that is not
   // on the question list, so nothing off-vocabulary reaches the column.
   details: z.record(z.string(), z.string().max(40)).optional(),
-  // Optional on purpose: the whole flow runs on the phone number. An email is a
-  // convenience for sending the reference, not a requirement to be helped.
-  email: z.string().trim().email().max(200).optional().or(z.literal('')),
+  /**
+   * ⚠️ REQUIRED SINCE 2026-08-17, AND IT USED TO BE OPTIONAL ON PURPOSE. The
+   * old note said: „the whole flow runs on the phone number. An email is a
+   * convenience for sending the reference, not a requirement to be helped."
+   * That was a good rule and it was WRONG IN PRACTICE, because of something
+   * outside this file: every automated message this subsystem sends a client —
+   * an offer arrived, a provider replied, the 48-hour nudge — is an EMAIL, and
+   * there is no SMS anywhere in the codebase. So „optional email" did not mean
+   * „reachable by phone instead". It meant the system went permanently silent:
+   *
+   *     offers arrive   →  `if (to)`            →  nothing
+   *     provider writes →  `else if (…email)`   →  nothing
+   *     client nudge    →  `|| !r.email` → skip →  nothing
+   *
+   * A person who left only a phone got a code on a screen and was never
+   * contacted again unless the operator happened to ring. In a market where
+   * services run on the phone, that is most of them.
+   *
+   * ⚠️ THE HONEST FIX IS SMS, NOT THIS. Requiring an email adds friction to the
+   * last screen before a submit, which is exactly where forms die — the old
+   * rule knew that. This is the smaller wrong: a person who is asked for one
+   * more field is annoyed, a person we never contact again is lost. When an SMS
+   * channel exists, this goes back to optional and the note above becomes true
+   * again. Until then it would be a lie.
+   *
+   * The DB column stays nullable: rows written before today have no email and
+   * must still be readable, and every `if (email)` guard downstream stays for
+   * exactly that reason.
+   */
+  email: z.string().trim().email().max(200),
   // ⚠️ THE HONEYPOT. A field no human ever sees, so anything in it came from
   // something filling every input on the page.
   //
