@@ -29,8 +29,9 @@ import { requestsOn } from '@/lib/requests'
 const NAV: { label: string; href: string }[] = [
   { label: 'ექსპერტები',     href: '/tutors' },
   { label: 'კატეგორიები',    href: '/categories' },
-  // The requests wizard. IN the array but FILTERED below for everyone the
-  // subsystem does not admit — see the nav filter for why that is not optional.
+  // The requests wizard. IN the array but filtered below when the flag is off —
+  // see the nav filter, which is also where the 2026-08-17 change from
+  // „admins only" to „everyone" is argued.
   { label: 'მოთხოვნა',       href: '/request' },
   { label: 'გახდი ექსპერტი', href: '/apply' },
   { label: 'დახმარება',      href: '/help' },
@@ -129,22 +130,35 @@ export function PublicTopBar({
   // expert/admin. showApplyCta(null) is true, so anon + not-yet-resolved keep
   // it (no flash-in for real visitors); only a known TUTOR/ADMIN drops it.
   //
-  // „მოთხოვნა" is the OPPOSITE filter — hidden from everyone until PROVEN an
-  // admin (owner's call, 2026-08-14: „მხოლოდ ადმინებს რომ გამოუჩნდეს"). Not
-  // `showApplyCta`-style optimistic: an anonymous visitor shown this link would
-  // click into a 404, and a link that 404s is worse than no link — it also
-  // publishes the URL the subsystem's whole hiding story depends on keeping
-  // unlisted. Allowlisted PROVIDERS don't get it either, deliberately: knowing
-  // who is on the allowlist needs a DB read, and /api/me is the hottest
-  // endpoint on the site — not the place to add a query for a dark-stage
-  // feature. They enter through /provider, which the admin hands them.
+  // „მოთხოვნა" is shown to EVERYONE the flag admits — including a visitor with
+  // no account, which is most of the people it is for.
+  //
+  // ⚠️ IT WAS `me?.role === 'ADMIN'` UNTIL 2026-08-17, and the reason it stopped
+  // being that is worth keeping, because the old reason was CORRECT when it was
+  // written. It read: „an anonymous visitor shown this link would click into a
+  // 404, and a link that 404s is worse than no link." True — back when one gate
+  // covered the whole subsystem and only allowlisted providers and admins got
+  // through it. Splitting that gate (lib/requests → canOpenRequestForm: the
+  // client side asks nothing of the caller) made /request answer 200 to
+  // anonymous, and the moment it did, this filter was hiding a working page
+  // from the only people it exists for. Owner, holding the signed-out header:
+  // „აქ ხო უნდა ჩანდეს რეალურად როცა არაა დარეგისტრირებული მაშინაც."
+  //
+  // Providers still do NOT reach their side from here, unchanged and for the
+  // original reason: knowing who is on the allowlist needs a DB read, and
+  // /api/me is the hottest endpoint on the site. They enter through /provider,
+  // which the admin hands them.
   //
   // ⚠️ A nav-level hide, and a hide is not a guard — every /request route gates
   // itself (lib/requestsServer). requestsOn() works in this client component
   // only because next.config.js inlines FEATURE_REQUESTS; see the note there.
+  //
+  // ⚠️ NOT role-dependent any more, which also means NO FLASH: the item's
+  // visibility no longer waits for /api/me to resolve, so it is in the first
+  // paint rather than appearing a beat later under the cursor.
   const nav = NAV.filter(i => {
     if (i.href === '/apply') return showApplyCta(me?.role)
-    if (i.href === '/request') return requestsOn() && me?.role === 'ADMIN'
+    if (i.href === '/request') return requestsOn()
     return true
   })
 

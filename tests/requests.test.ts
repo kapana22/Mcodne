@@ -471,17 +471,25 @@ test('NOTHING links to /request or /provider from any navigation', () => {
   assert.equal(offenders.length, 0,
     `something links to the requests subsystem from outside it:\n${offenders.join('\n')}`)
 
-  // …and the allowed link is actually GATED, which is the assertion that
-  // matters — the allowlist entry above only says where to look. Same shape as
-  // b2b.test.ts pins for UserMenu's /business entry.
+  // …and the ONE allowed link is actually gated on the flag, which is the
+  // assertion that matters — the allowlist entry above only says where to look.
+  //
+  // ⚠️ THIS USED TO REQUIRE `&& me?.role === 'ADMIN'` (2026-08-14 → 2026-08-17).
+  // The rule was right for as long as one gate covered the whole subsystem:
+  // /request 404ed for anonymous, so showing them the item was a link into a
+  // wall. Splitting the gate (canOpenRequestForm) made the client side answer
+  // 200 to everyone, and the filter was then hiding a working page from exactly
+  // the people it is for. What survives is the part that never depended on the
+  // audience: the item must not appear when the FLAG is off.
   const bar = read('components/PublicTopBar.tsx')
-  assert.match(bar, /if \(i\.href === '\/request'\) return requestsOn\(\) && me\?\.role === 'ADMIN'/,
-    'the header „მოთხოვნა" item is no longer admin-gated — anonymous visitors are shown a link into a 404')
-  // Proven an admin, never optimistic: showApplyCta-style „show while
-  // unresolved" would flash the link to every visitor for a frame and publish
-  // the URL the hiding depends on.
-  assert.doesNotMatch(bar, /showApplyCta\(me\?\.role\) && i\.href === '\/request'/,
-    'the requests item borrowed the optimistic apply filter')
+  assert.match(bar, /if \(i\.href === '\/request'\) return requestsOn\(\)/,
+    'the header „მოთხოვნა" item no longer checks the flag — it would show on a deployment where the subsystem does not exist')
+  assert.doesNotMatch(bar, /i\.href === '\/request'\) return requestsOn\(\) &&/,
+    'the requests item narrowed its audience again — the client form is open to everyone the flag admits')
+  // The FLAG check is the whole gate now, so it must be the real thing and not
+  // a literal somebody inlined while removing the role test.
+  assert.doesNotMatch(bar, /i\.href === '\/request'\) return true/,
+    'the requests item is shown unconditionally — FEATURE_REQUESTS=off must still hide it')
 })
 
 test('it is not in the sitemap, not in the feed, and not named in robots.txt', () => {
