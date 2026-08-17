@@ -767,18 +767,33 @@ async function runMigrations() {
     )
   }
 
-  // ⚠️ A VALUE ADDED TO AN EXISTING ENUM, and it cannot ride in the loop above.
-  // `CREATE TYPE` only runs on a database that has never seen the type, so every
-  // deployment that already has "RequestOfferStatus" would skip it and then fail
-  // on the first INSERT of the new value. `ADD VALUE IF NOT EXISTS` is the
-  // statement that is correct on both.
+  // ── INVITED, added to an enum that already exists ────────────────────────
   //
-  // INVITED = the client wrote to an expert before that expert offered anything
-  // (2026-08-18). See prisma/schema for why it is a status on the offer row
-  // rather than a table of its own, and why it must never count as an offer.
-  await prisma.$executeRawUnsafe(
-    `ALTER TYPE "RequestOfferStatus" ADD VALUE IF NOT EXISTS 'INVITED';`,
-  )
+  // The client writing to an expert before that expert has offered anything
+  // (2026-08-18). See prisma/schema for why it is a status on the offer row.
+  //
+  // ⚠️ IT CANNOT RIDE IN THE LOOP ABOVE. `CREATE TYPE` only runs on a database
+  // that has never seen the type, so every existing deployment would skip it
+  // and then fail on the first INSERT of the new value.
+  //
+  // ⚠️ AND IT CANNOT RIDE IN A `DO $$ … $$` BLOCK EITHER, which is why it does
+  // not use this file's usual idiom for enums. `ALTER TYPE … ADD VALUE` is
+  // refused inside a transaction block, and a DO block IS one — so the
+  // defensive wrapper that makes every other enum statement idempotent is
+  // exactly what would make this one throw (25001).
+  //
+  // ⚠️ WRAPPED IN try/catch ON PURPOSE, like the pg_trgm block at the bottom of
+  // this file. `ensureDbReady` RE-THROWS, and every route awaits it — so a
+  // statement that fails here does not degrade one feature, it 500s the entire
+  // site. An enum value is additive and harmless to miss: without it the invite
+  // button errors and nothing else changes. That trade is not close.
+  try {
+    await prisma.$executeRawUnsafe(
+      `ALTER TYPE "RequestOfferStatus" ADD VALUE IF NOT EXISTS 'INVITED';`,
+    )
+  } catch (err) {
+    console.error('[dbBoot] RequestOfferStatus.INVITED not added (invites will fail):', err)
+  }
 
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ServiceRequest" (
