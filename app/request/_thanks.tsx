@@ -22,6 +22,7 @@ import { useEffect, useState } from 'react'
 import { Card } from '@/components/Card'
 import { Btn } from '@/components/Btn'
 import { RequestChat } from '@/components/RequestChat'
+import { LiveStatus } from './_live'
 import { copyToClipboard } from '@/lib/clipboard'
 import { categorySlugOfTopic, topicLabel } from '@/lib/requests'
 import type { Sent } from './RequestWizard'
@@ -112,6 +113,15 @@ export function ThanksCard({ sent, topic }: {
           </p>
         )}
       </Card>
+
+      {/* ── Where it stands, live ───────────────────────────────────────────
+          The four stations it really has, the current one pulsing, and the
+          counts that are true. See _live for what this screen deliberately
+          does NOT claim, and why the honest version turned out to be the
+          better one. Not drawn on a REJECTED request: the card above already
+          said we cannot help, and a progress track under it would be a journey
+          that is not going to happen. */}
+      {sent.publicRef && !sent.rejected && <LiveStatus publicRef={sent.publicRef} />}
 
       {/* ── The conversation ────────────────────────────────────────────────
           Open, not collapsed: it is the only thing on this screen that can be

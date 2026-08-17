@@ -10,7 +10,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Btn } from '@/components/Btn'
 import {
   ServiceRequestInput, KIND, kindOf, BUDGET_BANDS, TIMING, FORMATS, CITIES,
-  extrasFor, topicLabel,
+  extrasFor, topicLabel, kindsOfTopic,
+  type RequestKindName,
 } from '@/lib/requests'
 import { newFlowId } from '@/components/booking/funnelEvents'
 import { REQUEST_FUNNEL_EVENTS, trackRequestFunnel } from './requestFunnelEvents'
@@ -20,8 +21,8 @@ import {
   progressOf, reviveDraft, withTopic, withKind, withAccountContact,
   type Draft, type AccountContact,
 } from './_model'
-import { Transcript } from './_transcript'
-import { StepWhat, StepKindPick } from './_stepWhat'
+import { Transcript, Ask } from './_transcript'
+import { StepWhat } from './_stepWhat'
 import { StepPick } from './_stepPick'
 import { StepDetails } from './_stepDetails'
 import { StepContact } from './_stepContact'
@@ -182,6 +183,103 @@ export function RequestWizard({ account }: {
     advance(d)
   }
 
+  const kind = kindOf(draft.kind)
+  const extraQ = step.extraId ? extrasFor(kind, draft.topic).find(q => q.id === step.extraId) : null
+
+  /**
+   * Every option the LIVE question offers, in the order it is drawn.
+   *
+   * One list, two consumers: the rows render from it and the number keys index
+   * into it. Deriving the keyboard's list separately from the screen's is how
+   * „press 3" and „tap the third row" start meaning different things.
+   *
+   * On the format screen after „ადგილზე" the live question is the CITY — the
+   * format row above it is already answered, so the numbers belong to the
+   * question actually being asked.
+   */
+  const options: { id: string; label: string; hint?: string }[] =
+    step.id === 'kind' ? kindsOfTopic(draft.topic).map((k: RequestKindName) => ({ id: k, label: KIND[k].label, hint: KIND[k].hint }))
+    : extraQ ? [...extraQ.options]
+    : step.id === 'budget' ? [...BUDGET_BANDS[kind]]
+    : step.id === 'timing' ? [...TIMING[kind]]
+    : step.id === 'format'
+      ? (draft.format === 'IN_PERSON'
+          ? [...CITIES]
+          : FORMATS.map(f => f.id === 'IN_PERSON' ? { ...f, hint: 'ქალაქს შემდეგ იკითხავს' } : f))
+    : []
+
+  /**
+   * Answer the live question with one option id — from a tap OR from a number
+   * key, through the same door.
+   *
+   * ⚠️ DISAMBIGUATED BY ID, not by which list was clicked. On the format screen
+   * both the format rows and the city rows are on screen at once; their ids
+   * cannot collide (ONLINE/IN_PERSON/EITHER vs TBILISI/…), so one function
+   * serves both and there is no „which list did this come from" to get wrong.
+   */
+  const pickOption = (id: string) => {
+    if (step.id === 'kind') {
+      const k = id as Exclude<Draft['kind'], ''>
+      const d = withKind(draft, k)
+      setDraft(d)
+      trackRequestFunnel(REQUEST_FUNNEL_EVENTS.kindChosen, { flowId: flowIdRef.current, kind: k })
+      advance(d, 'kind')
+      return
+    }
+    if (extraQ) { pickAndGo({ details: { ...draft.details, [extraQ.id]: id } }); return }
+    if (step.id === 'budget') { pickAndGo({ budgetBand: id }); return }
+    if (step.id === 'timing') { pickAndGo({ timing: id }); return }
+    if (step.id === 'format') {
+      if (CITIES.some(c => c.id === id)) { pickAndGo({ city: id as Draft['city'] }); return }
+      // In-person needs the city; online does not — the sub-question appears
+      // only on the answer that earns it, so this one does NOT advance.
+      if (id === 'ONLINE' || id === 'EITHER') { pickAndGo({ format: id as Draft['format'] }); return }
+      patch({ format: id as Draft['format'] })
+    }
+  }
+
+  /* ── The keyboard ────────────────────────────────────────────────────────
+   *
+   * 1–9 answers, Esc and Backspace go back. Nothing here is the only way to do
+   * anything — it is the shortcut a person who fills forms all day reaches for,
+   * and its whole value is that it costs nothing to ignore.
+   *
+   * ⚠️ ENTER IS DELIBERATELY NOT BOUND. It already belongs to the text fields:
+   * a newline in the details box, submit in the contact form. Taking it would
+   * be removing behaviour people already have to add behaviour they did not
+   * ask for.
+   *
+   * ⚠️ AND NOTHING FIRES WHILE SOMEBODY IS TYPING. Backspace inside an input is
+   * „delete a character" and always was; a global handler that stole it would
+   * throw away the phone number somebody was correcting. The tag test is the
+   * whole guard and it runs first.
+   *
+   * No dependency array: the handler closes over `draft` and `step`, both of
+   * which change every answer. Re-subscribing per render is a listener swap;
+   * a stale closure would be a key that answers the previous question.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        if (step.id === 'what') return
+        e.preventDefault()
+        back()
+        return
+      }
+      if (/^[1-9]$/.test(e.key)) {
+        const o = options[Number(e.key) - 1]
+        if (!o) return
+        e.preventDefault()
+        pickOption(o.id)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
   if (sent) {
     return (
       <RequestShell>
@@ -189,9 +287,6 @@ export function RequestWizard({ account }: {
       </RequestShell>
     )
   }
-
-  const kind = kindOf(draft.kind)
-  const extraQ = step.extraId ? extrasFor(kind, draft.topic).find(q => q.id === step.extraId) : null
 
   return (
     <RequestShell progress={progressOf(step.id, draft)}>
@@ -234,18 +329,49 @@ export function RequestWizard({ account }: {
         onEdit={id => setStepId(id)}
       />
 
-      {/* The current question keeps the h1 — it is still the page's heading and
-          the thing a screen reader announces on arrival. Only the SIZE steps
-          down once there is a transcript above it: at text-h1 the live question
-          shouted over the conversation it belongs to, and the reader's eye had
-          nothing to follow from one bubble to the next. */}
-      <h1 className={`font-display font-bold text-ink-900 tracking-tight ${
-        step.id === 'what' ? 'text-h1' : 'text-h2'
-      }`}>
-        {step.title}
-      </h1>
-      {step.id === 'what' && (
-        <p className="mt-2 text-body text-ink-600">აღწერე — გადავამოწმებთ და ექსპერტები ფასს შემოგთავაზებენ. უფასოა.</p>
+      {/* ── Back, ABOVE the question ────────────────────────────────────────
+          It used to live in the footer, under the options — and on a five-row
+          budget list that is off the bottom of a phone, so the one control a
+          person reaches for after a mis-tap was the one they had to scroll to
+          find (owner, 2026-08-17). Here it is the first thing above the live
+          question, which is also where the eye already is.
+          ONE back control on the screen: the footer's was removed rather than
+          duplicated — two buttons doing the same thing is a reader wondering
+          whether they differ. */}
+      {step.id !== 'what' && (
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={back}
+            className="inline-flex items-center gap-1.5 h-9 -ml-1 px-2 rounded-btn text-small font-display font-semibold text-ink-600 hover:text-ink-900 hover:bg-ink-75 motion-safe:active:scale-[0.97] transition-[color,background-color,transform] duration-fast"
+          >
+            {/* Functional, not decoration: it is the direction of travel and the
+                whole label at 390px where the word is what shrinks first. */}
+            <span aria-hidden>←</span>
+            უკან
+          </button>
+        </div>
+      )}
+
+      {/* ⚠️ THE LIVE QUESTION IS A BUBBLE (2026-08-17), same component as every
+          answered one — it was a `text-h1` heading sitting on a column of
+          bubbles, which put two visual languages on one screen with the seam
+          across the middle. Still an h1: the bubble is styling, not semantics.
+          The FIRST screen keeps the big heading, because there is no
+          conversation above it yet — it is the page's opening, not a turn in a
+          conversation, and it carries the sub-copy below. */}
+      {step.id === 'what' ? (
+        <>
+          <h1 className="font-display text-h1 font-bold text-ink-900 tracking-tight">{step.title}</h1>
+          <p className="mt-2 text-body text-ink-600">აღწერე — გადავამოწმებთ და ექსპერტები ფასს შემოგთავაზებენ. უფასოა.</p>
+        </>
+      ) : (
+        // Keyed on the step so each new question ENTERS rather than swapping in
+        // place — `slide-in-b` is the existing token the booking steps use; no
+        // new animation was minted for this.
+        <div key={`q:${step.id}`} className="motion-safe:animate-slide-in-b">
+          <Ask as="h1">{step.title}</Ask>
+        </div>
       )}
       {/* ⚠️ THE „kind · topic" RESTATEMENT LIVED HERE AND IS GONE (2026-08-17).
           It existed because the reader was several taps in with nothing on
@@ -268,38 +394,33 @@ export function RequestWizard({ account }: {
             }}
           />
         )}
+        {/* ⚠️ EVERY TAP SCREEN RENDERS FROM `options` AND ANSWERS THROUGH
+            `pickOption` (2026-08-17). It used to be five branches, each with its
+            own list and its own handler — fine while a tap was the only way to
+            answer. The number keys made that a liability: the keyboard indexed
+            one list while the screen drew another, and „press 3" and „tap the
+            third row" were two implementations of one promise. Now there is one
+            of each, so they cannot disagree.
+            The format screen is the exception that proves it: after „ადგილზე"
+            it shows the answered format rows AND the live city question, so it
+            keeps its own list for the part that is already answered. */}
         {step.id === 'kind' && (
-          <StepKindPick
-            draft={draft}
-            onPick={k => {
-              const d = withKind(draft, k)
-              setDraft(d)
-              trackRequestFunnel(REQUEST_FUNNEL_EVENTS.kindChosen, { flowId: flowIdRef.current, kind: k })
-              advance(d, 'kind')
-            }}
-          />
+          <StepPick options={options} value={draft.kind} onPick={pickOption} numbered />
         )}
         {extraQ && (
           <StepPick
-            options={extraQ.options}
+            options={options}
             value={draft.details[extraQ.id] ?? ''}
-            onPick={id => pickAndGo({ details: { ...draft.details, [extraQ.id]: id } })}
+            onPick={pickOption}
             onSkip={() => advance(draft)}
+            numbered
           />
         )}
         {step.id === 'budget' && (
-          <StepPick
-            options={BUDGET_BANDS[kind]}
-            value={draft.budgetBand}
-            onPick={id => pickAndGo({ budgetBand: id })}
-          />
+          <StepPick options={options} value={draft.budgetBand} onPick={pickOption} numbered />
         )}
         {step.id === 'timing' && (
-          <StepPick
-            options={TIMING[kind]}
-            value={draft.timing}
-            onPick={id => pickAndGo({ timing: id })}
-          />
+          <StepPick options={options} value={draft.timing} onPick={pickOption} numbered />
         )}
         {step.id === 'format' && (
           <StepPick
@@ -307,25 +428,16 @@ export function RequestWizard({ account }: {
               ? { id: f.id, label: f.label, hint: 'ქალაქს შემდეგ იკითხავს' }
               : f)}
             value={draft.format}
-            onPick={id => {
-              // In-person needs the city; online does not — the sub-question
-              // appears only on the answer that earns it.
-              if (id === 'ONLINE' || id === 'EITHER') {
-                pickAndGo({ format: id as Draft['format'] })
-              } else {
-                patch({ format: id as Draft['format'] })
-              }
-            }}
+            onPick={pickOption}
+            // Numbered only while it IS the live question — once „ადგილზე" is
+            // chosen the numbers belong to the city list below.
+            numbered={draft.format !== 'IN_PERSON'}
           />
         )}
         {step.id === 'format' && draft.format === 'IN_PERSON' && (
           <div className="mt-5">
             <p className="text-small font-display font-semibold text-ink-800 mb-2.5">რომელ ქალაქში?</p>
-            <StepPick
-              options={CITIES}
-              value={draft.city}
-              onPick={id => pickAndGo({ city: id as Draft['city'] })}
-            />
+            <StepPick options={options} value={draft.city} onPick={pickOption} numbered />
           </div>
         )}
         {step.id === 'details' && <StepDetails draft={draft} patch={patch} />}
@@ -340,10 +452,12 @@ export function RequestWizard({ account }: {
 
       {/* Tap-screens advance on the tap; the two typing screens keep explicit
           controls, and the optional details screen carries its skip. */}
+      {/* ⚠️ „უკან" IS NOT HERE ANY MORE — it moved above the question (2026-08-17;
+          see the note there). The empty span stays so `justify-between` keeps
+          the primary action on the right rather than jumping to the left edge
+          on the screens that have one. */}
       <div className="mt-6 flex items-center justify-between gap-3">
-        {step.id !== 'what' ? (
-          <Btn variant="ghost" onClick={back}>უკან</Btn>
-        ) : <span />}
+        <span />
         {step.id === 'details' && (
           <Btn onClick={() => advance(draft)}>
             {draft.description.trim() === '' ? 'გამოტოვება' : 'შემდეგი'}

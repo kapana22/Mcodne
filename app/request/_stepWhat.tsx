@@ -219,26 +219,15 @@ export function StepWhat({ draft, onPick }: {
   )
 }
 
-/** The disambiguation step — only the kinds this topic can honestly be.
- *  Exported from here rather than a separate file because the two screens are
- *  one decision split across two taps.
- *
- *  ⚠️ IT RENDERS StepPick, and that is the whole change of 2026-08-17. This
- *  screen used to draw its OWN row — `p-6` instead of `py-4`, `text-h3`
- *  instead of `text-body`, and a chevron nobody else had. One wizard, two row
- *  designs, for the same shape of question: tap one of N. The chevron went with
- *  it — a row that is entirely a button does not need an arrow saying so, and
- *  the canon bans decorative ones. */
-export function StepKindPick({ draft, onPick }: {
-  draft: Draft
-  onPick: (kind: (typeof KIND) extends Record<infer K, unknown> ? K : never) => void
-}) {
-  const kinds = draft.topic ? kindsOfTopic(draft.topic) : []
-  return (
-    <StepPick
-      options={kinds.map(k => ({ id: k, label: KIND[k].label, hint: KIND[k].hint }))}
-      value={draft.kind}
-      onPick={id => onPick(id as Parameters<typeof onPick>[0])}
-    />
-  )
-}
+/* ⚠️ `StepKindPick` LIVED HERE AND IS GONE (2026-08-17). It was a four-line
+   wrapper that mapped `kindsOfTopic(topic)` to StepPick rows — and when the
+   number keys arrived, RequestWizard had to build that same mapping again so
+   the keyboard and the screen could share one list. Two copies of one mapping
+   is the drift this file has been bitten by before, so the wrapper went and the
+   wizard's `options` is the single source. The kind screen renders through the
+   same StepPick every other tap screen does.
+
+   What it taught, kept: that screen used to draw its OWN row — `p-6` instead of
+   `py-4`, `text-h3` instead of `text-body`, and a chevron nobody else had. One
+   wizard, two row designs, for the same shape of question. Do not reintroduce
+   either. */

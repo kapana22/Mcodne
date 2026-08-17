@@ -19,6 +19,7 @@ import { ensureDbReady } from '@/lib/dbBoot'
 import {
   normalizePublicRef, clientOfferView, kindOf, KIND,
   budgetLabel, timingLabel, formatLabel, cityLabel, topicLabel, extrasLabels,
+  REQUEST_STATIONS, stationsReached,
 } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
 import { Card } from '@/components/Card'
@@ -224,15 +225,12 @@ function StatusTrack({ status }: { status: string }) {
       </p>
     )
   }
-  const STATIONS = [
-    { label: 'მივიღეთ' },
-    { label: 'ვამოწმებთ' },
-    { label: 'შეთავაზებები' },
-    { label: 'არჩეული' },
-  ]
-  // NEW = received and being checked (station 2 is CURRENT, not done —
-  // „ვამოწმებთ" is happening now). VERIFIED = the offers are open. MATCHED done.
-  const reached = status === 'MATCHED' ? 4 : status === 'VERIFIED' ? 3 : 2
+  // ⚠️ THE LABELS AND THE MAPPING COME FROM lib/requests (2026-08-17). The
+  // thanks screen draws the same four stations from a polling client component,
+  // and two copies of this list is how one request comes to read „ვამოწმებთ" on
+  // one screen and „შეთავაზებები" on the other.
+  const STATIONS = REQUEST_STATIONS.map(label => ({ label }))
+  const reached = stationsReached(status)
   return (
     <ol className="mt-4 flex items-center gap-0" aria-label="სტატუსი">
       {STATIONS.map((st, i) => {

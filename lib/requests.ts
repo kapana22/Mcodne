@@ -276,6 +276,34 @@ export type {
 export const REQUEST_STATUSES = ['NEW', 'VERIFIED', 'REJECTED', 'MATCHED', 'CLOSED'] as const
 export type RequestStatusName = (typeof REQUEST_STATUSES)[number]
 
+/* ═══════════ where the request stands, as the CLIENT reads it ═══════════
+ *
+ * Four stations, because that is the whole journey the person who sent it
+ * cares about. REJECTED and CLOSED are not stations — they are exits, and a
+ * track would have to draw progress going nowhere.
+ *
+ * ⚠️ ONE DEFINITION, TWO RENDERERS (2026-08-17). The server track on
+ * /request/<ref> and the live panel on the thanks screen both draw from here.
+ * They were about to be two copies of the same four labels and the same
+ * mapping, which is how a person sees „ვამოწმებთ" on one screen and
+ * „შეთავაზებები" on the other for one request.
+ */
+export const REQUEST_STATIONS = ['მივიღეთ', 'ვამოწმებთ', 'შეთავაზებები', 'არჩეული'] as const
+
+/**
+ * How many stations this status has REACHED — 1-based, and the last one reached
+ * is the one happening NOW rather than one that is finished.
+ *
+ * NEW reaches 2: received, and being checked. „ვამოწმებთ" is a person about to
+ * pick up a phone, not a box already ticked — which is exactly why the live
+ * panel pulses the last reached station instead of filling it.
+ */
+export function stationsReached(status: string): number {
+  if (status === 'MATCHED') return 4
+  if (status === 'VERIFIED') return 3
+  return 2
+}
+
 /** The admin's words for each state. */
 export const STATUS_LABEL: Record<RequestStatusName, string> = {
   NEW: 'ახალი',

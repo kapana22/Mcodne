@@ -14,17 +14,30 @@
 
 export type PickOption = { id: string; label: string; hint?: string }
 
-export function StepPick({ options, value, onPick, onSkip }: {
+export function StepPick({ options, value, onPick, onSkip, numbered = false }: {
   options: readonly PickOption[]
   value: string
   onPick: (id: string) => void
   /** Present only on skippable screens — see _model → StepDef.skippable. */
   onSkip?: () => void
+  /**
+   * Show the number key that answers this row.
+   *
+   * ⚠️ ONLY WHERE A KEYBOARD IS NEARLY CERTAIN. The badge is drawn at `lg:` and
+   * up and is invisible below it — a key hint on a phone is a symbol for a
+   * thing that does not exist, and it would sit in the one column of a 390px
+   * row that the label needs. The shortcut itself works wherever a keyboard is
+   * plugged in; the badge is only how somebody FINDS OUT, and a person on a
+   * laptop is who finds out.
+   *
+   * Off on a list that is not the live question — see the format screen.
+   */
+  numbered?: boolean
 }) {
   return (
     <div>
       <div className="grid gap-2.5">
-        {options.map(o => {
+        {options.map((o, i) => {
           const on = value === o.id
           return (
             <button
@@ -41,14 +54,33 @@ export function StepPick({ options, value, onPick, onSkip }: {
               // reads as a jolt), and the selected row now carries a fill, not
               // just an outline — an outline alone is the weakest possible
               // „chosen" and is the first thing lost on a dim phone screen.
-              className={`w-full text-left rounded-card border px-5 py-4 transition-[background-color,border-color,transform] duration-fast motion-safe:active:scale-[0.99] ${
+              className={`group w-full text-left rounded-card border px-5 py-4 flex items-center gap-4 transition-[background-color,border-color,transform] duration-fast motion-safe:active:scale-[0.99] ${
                 on
                   ? 'border-brand-600 bg-brand-50'
                   : 'border-ink-200 bg-white hover:border-ink-300 hover:bg-ink-50'
               }`}
             >
-              <span className="block font-display text-body font-semibold text-ink-900">{o.label}</span>
-              {o.hint && <span className="block text-small text-ink-500 mt-0.5">{o.hint}</span>}
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-body font-semibold text-ink-900">{o.label}</span>
+                {o.hint && <span className="block text-small text-ink-500 mt-0.5">{o.hint}</span>}
+              </span>
+              {/* The key that answers this row. `text-micro` is the uppercase +
+                  tracked + numeric tier the canon reserves for exactly this —
+                  a counter, not reading text. aria-hidden because a screen
+                  reader announcing „1" before every label is noise for somebody
+                  who is already navigating by keyboard. */}
+              {numbered && i < 9 && (
+                <span
+                  aria-hidden
+                  className={`hidden lg:inline-flex shrink-0 w-5 h-5 items-center justify-center rounded-field border text-micro font-bold tabular-nums transition-colors duration-fast ${
+                    on
+                      ? 'border-brand-300 text-brand-700'
+                      : 'border-ink-200 text-ink-400 group-hover:border-ink-300 group-hover:text-ink-600'
+                  }`}
+                >
+                  {i + 1}
+                </span>
+              )}
             </button>
           )
         })}

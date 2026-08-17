@@ -6,6 +6,39 @@ import { SUPPORT_EMAIL } from './supportEmails'
 import { fmtKaDateTime, type KaDateOpts } from './kaDate'
 
 const BASE = 'https://mcodne.ge'
+
+/**
+ * A link to a page that REQUIRES A SESSION, routed through sign-in.
+ *
+ * ⚠️ THE BUG THIS EXISTS FOR (2026-08-17, owner holding the dead link). Every
+ * provider-side surface answers `notFound()` rather than redirecting — a
+ * deliberate rule, and the right one: a redirect to /signin tells a stranger
+ * guessing URLs that the page is real and worth coming back to with an account.
+ *
+ * But an EMAIL RECIPIENT is not a stranger guessing URLs. We sent them the
+ * link. And on the phone or the browser where they were not signed in, that
+ * link answered „page not found" — for a request we had just told them about,
+ * with nothing on the screen suggesting signing in would help. The rule that
+ * protects the subsystem from strangers was punishing the exact person it was
+ * written to serve.
+ *
+ * /signin resolves it without weakening anything: it is a PUBLIC page, so
+ * landing on it reveals nothing about whether the target exists, and it already
+ * 307s a visitor who turns out to have a live session straight through to
+ * `redirect` (app/signin/page.tsx, validated by safeInternalPath). So:
+ *   · signed in   → bounced onward, never sees the form
+ *   · signed out  → signs in, lands exactly on the thing the email was about
+ *   · a stranger  → a sign-in page, and no information
+ *
+ * ⚠️ NOT FOR CLIENT LINKS. /request/<ref> is reachable with NO account at all —
+ * possession of the reference is the client's identity, by design — so sending
+ * a client through sign-in would invent a wall the product spent its whole
+ * design removing. Client emails link direct. This is for /provider and /admin.
+ */
+function gatedLink(path: string): string {
+  return `${BASE}/signin?redirect=${encodeURIComponent(path)}`
+}
+
 const BRAND = '#2F9C86'
 const INK = '#1c1a17'
 const MUTED = '#6b6862'
@@ -619,7 +652,7 @@ export function requestVerifiedProviderEmail(o: {
         // The one line that matters after the facts: places are limited and the
         // first answers win — true, and the reason to open the mail now.
         p('ადგილები შეზღუდულია — პირველი შეთავაზებები იგებენ.'),
-      cta: { label: 'ნახე და შესთავაზე', href: `${BASE}/provider/requests/${o.requestId}` },
+      cta: { label: 'ნახე და შესთავაზე', href: gatedLink(`/provider/requests/${o.requestId}`) },
     }),
   }
 }
@@ -662,7 +695,7 @@ export function offerAcceptedProviderEmail(o: { topicLabel: string; publicRef: s
       bodyHtml:
         p(`კლიენტმა აირჩია შენი შეთავაზება — <b>${esc(o.topicLabel)}</b> (${esc(o.publicRef)}).`) +
         p('კლიენტის კონტაქტი უკვე შენს გვერდზეა. დაუკავშირდი მალე — ის ამას ელოდება.'),
-      cta: { label: 'კონტაქტის ნახვა', href: `${BASE}/provider/offers` },
+      cta: { label: 'კონტაქტის ნახვა', href: gatedLink('/provider/offers') },
     }),
   }
 }
@@ -691,7 +724,7 @@ export function requestThreadEmail(o: {
   publicRef: string
   preview: string
 }) {
-  const href = o.toStaff ? `${BASE}/admin?tab=requests` : `${BASE}/request/${o.publicRef}`
+  const href = o.toStaff ? gatedLink('/admin?tab=requests') : `${BASE}/request/${o.publicRef}`
   const preview = o.preview.length > 140 ? `${o.preview.slice(0, 140)}…` : o.preview
   return {
     subject: o.toStaff
@@ -715,7 +748,7 @@ export function requestChatEmail(o: {
   publicRef: string
   preview: string
 }) {
-  const href = o.toProvider ? `${BASE}/provider/offers` : `${BASE}/request/${o.publicRef}`
+  const href = o.toProvider ? gatedLink('/provider/offers') : `${BASE}/request/${o.publicRef}`
   // Trimmed to a glance. A full message in the body is a message nobody comes
   // back to the site to answer — and answering is the point.
   const preview = o.preview.length > 140 ? `${o.preview.slice(0, 140)}…` : o.preview

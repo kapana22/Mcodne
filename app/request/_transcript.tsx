@@ -1,7 +1,7 @@
 'use client'
 // THE CONVERSATION SO FAR — every screen already answered, kept on the page.
 //
-// ⚠️ WHY THE WIZARD KEEPS ITS ANSWERS NOW (2026-08-17). It used to replace one
+// ⚠️ WHY THE WIZARD KEEPS ITS ANSWERS (2026-08-17). It used to replace one
 // question with the next, which is what a form does and what made it read like
 // one: seven screens, each erasing the last, and no sense of having got
 // anywhere. Owner: „ეს ფორმასავით შემოდის და პირდაპირ ლაივ ჩათი რომ ეხსნებოდეს
@@ -23,39 +23,69 @@
 import type { Draft, StepDef } from './_model'
 import { answerLabel } from './_model'
 
-/** Ours: the question. Full width, plain — it is the page's own voice. */
-function Ask({ children }: { children: React.ReactNode }) {
+/**
+ * Ours: the question.
+ *
+ * Exported because the CURRENT question renders through it too — the live
+ * question used to be a `text-h1` heading sitting on top of a column of
+ * bubbles, i.e. two visual languages with a seam across the middle of the
+ * screen (owner, 2026-08-17: „ძალიან არაპროფესიონალურად ჩანს"). One component,
+ * so the conversation cannot develop two voices.
+ */
+export function Ask({ children, as: Tag = 'div' }: {
+  children: React.ReactNode
+  /** „h1" for the live question — it is still the page's heading and what a
+   *  screen reader announces on arrival. The bubble is styling, not semantics. */
+  as?: 'div' | 'h1'
+}) {
   return (
     <div className="flex justify-start">
-      <div className="max-w-[85%] rounded-card bg-ink-75 text-ink-900 px-3.5 py-2 text-body leading-relaxed">
+      <Tag className="max-w-[85%] rounded-card bg-ink-75 text-ink-900 px-3.5 py-2 font-display text-body font-semibold leading-relaxed">
         {children}
-      </div>
+      </Tag>
     </div>
   )
 }
 
-/** Theirs: the answer, restated. Brand fill on the right, the same geometry the
- *  chat pane already uses (components/RequestChat) — one bubble language on the
- *  site, so the transcript and the live thread below it read as one surface. */
+/**
+ * Theirs: the answer, restated — AND the control that changes it.
+ *
+ * ⚠️ THE BUBBLE IS THE BUTTON. It used to be a bubble with the word „შეცვლა"
+ * underlined beside it, and with three answers on screen that was three
+ * identical underlined links, each starting at a different x because the
+ * bubbles are different widths — a ragged column that was the loudest thing on
+ * the page and the reason the screen read as unfinished. The affordance did not
+ * need its own text: pressing the thing you said to change the thing you said
+ * is the most direct mapping available, and it costs zero pixels.
+ *
+ * WHAT REPLACES THE LOST LABEL, because „it is obvious" is not a plan:
+ *   · the accessible name spells it out — „შეცვლა: ინგლისური"
+ *   · a pointer gets the word back on hover/focus, in a slot that is ALWAYS
+ *     reserved, so nothing shifts when it appears
+ *   · touch, which has no hover, gets one quiet line under the whole
+ *     transcript — see Transcript. One line for the run, not one per answer.
+ */
 function Said({ children, onEdit }: { children: React.ReactNode; onEdit: () => void }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] flex items-center gap-2">
-        {/* ⚠️ EDIT LIVES ON THE ANSWER, not in a summary table at the end. The
-            wizard already walks backwards with „უკან", but that is a door out of
-            the current question — this is the one thing a transcript can do that
-            a form cannot: point at what you said and change THAT. */}
-        <button
-          type="button"
-          onClick={onEdit}
-          className="shrink-0 text-meta font-semibold text-ink-500 underline underline-offset-2 hover:text-ink-700 transition-colors duration-fast"
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label={`შეცვლა: ${typeof children === 'string' ? children : ''}`}
+        className="group max-w-[85%] flex items-center gap-2 text-left rounded-card motion-safe:active:scale-[0.99] transition-transform duration-fast"
+      >
+        {/* Reserved, not conditional: rendering this only on hover would move
+            the bubble sideways under the cursor at the moment of the hover. */}
+        <span
+          aria-hidden
+          className="shrink-0 text-meta text-ink-500 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-fast"
         >
           შეცვლა
-        </button>
-        <span className="rounded-card bg-brand-600 text-white px-3.5 py-2 text-body leading-relaxed whitespace-pre-wrap">
+        </span>
+        <span className="rounded-card bg-brand-600 text-white px-3.5 py-2 text-body leading-relaxed whitespace-pre-wrap group-hover:bg-brand-700 group-focus-visible:bg-brand-700 transition-colors duration-fast">
           {children}
         </span>
-      </div>
+      </button>
     </div>
   )
 }
@@ -83,13 +113,22 @@ export function Transcript({ steps, currentId, draft, onEdit }: {
   if (rows.length === 0) return null
 
   return (
-    <div className="space-y-2 mb-6">
-      {rows.map(({ step, answer }) => (
-        <div key={step.id} className="space-y-2">
-          <Ask>{step.title}</Ask>
-          <Said onEdit={() => onEdit(step.id)}>{answer}</Said>
-        </div>
-      ))}
+    <div className="mb-6">
+      <div className="space-y-2">
+        {rows.map(({ step, answer }) => (
+          <div key={step.id} className="space-y-2">
+            <Ask>{step.title}</Ask>
+            <Said onEdit={() => onEdit(step.id)}>{answer}</Said>
+          </div>
+        ))}
+      </div>
+      {/* ONE line for the whole run — the thing that replaced one „შეცვლა" per
+          answer. It is the only way a touch reader learns the bubbles are
+          pressable, and at three answers it is already two lines cheaper than
+          what it replaced. */}
+      <p className="mt-2.5 text-meta text-ink-500 text-right">
+        პასუხზე დააჭირე, თუ შეცვლა გინდა.
+      </p>
     </div>
   )
 }

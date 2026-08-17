@@ -34,7 +34,7 @@ import {
   placesLeft, requestIsOpen,
   providerRequestView, clientOfferView, clientContactFor,
   ServiceRequestInput, RequestOfferInput, AdminRequestPatch,
-  serviceRequestRow, topicLabel,
+  serviceRequestRow, topicLabel, REQUEST_STATIONS, stationsReached,
 } from '../lib/requests'
 import {
   threadIsOpen, threadClosedReason, staffIsOnline, PRESENCE_TTL_MS,
@@ -247,6 +247,108 @@ test('the two gates are different answers, and each is the right one', () => {
     'the client gate started asking who the caller is — it must not')
 })
 
+test('the waiting screen animates FACTS — no invented audience', () => {
+  // ⚠️ THE MOST TEMPTING LIE IN THE PRODUCT, and the reason this test exists
+  // rather than a comment. A waiting screen is easy to make feel busy: „N
+  // ექსპერტი ათვალიერებს", a pulse, done. At the moment somebody presses send
+  // the request is NEW, no provider has been told it exists, and none will be
+  // until an operator phones — so that number is ZERO by construction and any
+  // other number is fabricated. It is the „3 people are viewing this room"
+  // pattern, and it is worse here: the person is asked to WAIT on it, and what
+  // they are waiting for is a phone call we would have misrepresented.
+  const live = codeOf('app/request/_live.tsx')
+  const api = codeOf('app/api/requests/[ref]/status/route.ts')
+
+  // Every number on that screen must come from the endpoint, and every number
+  // in the endpoint must come from a count.
+  assert.doesNotMatch(live, /Math\.random|setTimeout\([^)]*\d{3,}[^)]*\)\s*=>\s*set|\+\s*Math\.floor/,
+    'the waiting screen invented a number instead of reading one')
+  assert.doesNotMatch(live, /ათვალიერებ|უყურებ|ნახულობ/,
+    'the waiting screen claims people are LOOKING at the request — nobody is until it is routed')
+  assert.match(api, /prisma\.notification\.count/,
+    '„how many were told" stopped being a count of what we actually sent')
+  assert.match(api, /prisma\.tutorProfile\.count/,
+    '„how many experts are in this sphere" stopped being a count')
+
+  // „N ექსპერტს ვაცნობეთ" may only render when the count is real and non-zero.
+  assert.match(live, /d\.notified > 0/,
+    'the notified line renders unconditionally — it would claim an audience before routing ran')
+
+  // The motion is the site's own closed library — the canon shut it at eight
+  // tokens and says to prefer removing motion to adding it.
+  const anims = [...live.matchAll(/animate-([a-z-]+)/g)].map(m => m[1])
+  for (const a of anims) {
+    assert.ok(['pulse-soft', 'fade-in-fast', 'fade-in', 'rise-in', 'slide-in-b', 'slide-in-r', 'scale-in'].includes(a),
+      `the waiting screen minted a new animation: ${a}`)
+  }
+  // …and every one of them is reduced-motion gated. Unrequested movement is an
+  // accessibility contract, not a preference.
+  for (const m of live.matchAll(/(\S*)animate-[a-z-]+/g)) {
+    assert.match(m[1], /motion-safe:/, `an animation on the waiting screen is not motion-safe gated: ${m[0]}`)
+  }
+})
+
+test('the two screens describe one journey', () => {
+  // The thanks screen polls and the /request/<ref> page renders on the server;
+  // both draw the same four stations. Two copies of the list is how one request
+  // reads „ვამოწმებთ" on one screen and „შეთავაზებები" on the other.
+  assert.equal(REQUEST_STATIONS.length, 4)
+  assert.match(codeOf('app/request/[ref]/page.tsx'), /REQUEST_STATIONS\.map/,
+    'the server track went back to its own copy of the station labels')
+  assert.match(codeOf('app/request/_live.tsx'), /REQUEST_STATIONS\.map/,
+    'the live panel went back to its own copy of the station labels')
+  // NEW reaches „ვამოწმებთ" and stops there — the station in progress, not one
+  // already ticked. Getting this wrong tells somebody their request has been
+  // checked when nobody has looked at it.
+  assert.equal(stationsReached('NEW'), 2)
+  assert.equal(stationsReached('VERIFIED'), 3)
+  assert.equal(stationsReached('MATCHED'), 4)
+})
+
+test('an emailed provider link survives not being signed in', () => {
+  // ⚠️ THE SHAPE OF THE BUG (owner, 2026-08-17, holding the dead link twice).
+  // Every /provider surface answers notFound() rather than redirecting, and
+  // that rule is right: a redirect to /signin tells a stranger guessing URLs
+  // that the page is real. But we EMAIL these links. On the phone where the
+  // recipient was not signed in, „ნახე და შესთავაზე" led to „page not found"
+  // about a request we had just told them existed — the rule protecting the
+  // subsystem from strangers punishing the one person it was written for.
+  //
+  // /signin is public (it reveals nothing about the target) and already 307s a
+  // visitor who turns out to have a session straight through to `redirect`.
+  const t = read('lib/emailTemplates.ts')
+
+  // ⚠️ /provider ONLY, and the exemption is the whole distinction. /admin is
+  // guarded by requireRole, which REDIRECTS a signed-out visitor to sign-in —
+  // so an emailed /admin link has always worked and was never the bug. The
+  // requests subsystem is the one that answers notFound(), deliberately, and
+  // that is exactly why its emailed links needed routing. (The admin links in
+  // this file go through the helper too, which saves a redirect hop, but
+  // asserting it would fail this test on an unrelated moderation email that
+  // is not broken.)
+  const bare = [...t.matchAll(/href: `\$\{BASE\}(\/provider[^`]*)`/g)].map(m => m[1])
+  assert.deepEqual(bare, [],
+    `these email links go straight to a 404-on-signed-out page: ${bare.join(', ')}`)
+  const bareTernary = [...t.matchAll(/\?\s*`\$\{BASE\}(\/provider[^`]*)`/g)].map(m => m[1])
+  assert.deepEqual(bareTernary, [], `same, in a ternary: ${bareTernary.join(', ')}`)
+
+  // …and the helper must keep doing the one thing it is for.
+  assert.match(t, /\/signin\?redirect=\$\{encodeURIComponent\(path\)\}/,
+    'gatedLink no longer routes through /signin — the emailed links 404 again')
+
+  // ⚠️ AND THE CLIENT LINK MUST NOT BE GATED. /request/<ref> is reachable with
+  // no account at all — the reference IS the client's identity — so sending a
+  // client through sign-in would invent the wall this product removed.
+  assert.match(t, /`\$\{BASE\}\/request\/\$\{o\.publicRef\}`/,
+    'the client link was routed through sign-in — they have no account by design')
+  assert.doesNotMatch(t, /gatedLink\([`']\/request/,
+    'a client reference link is being sent through sign-in')
+
+  // The signin page must actually honour the parameter this depends on.
+  assert.match(read('app/signin/page.tsx'), /safeInternalPath\(typeof sp\.redirect === 'string'/,
+    'the sign-in page stopped honouring ?redirect= — every emailed provider link now lands on the wrong page')
+})
+
 test('a settled request stays open to the people who bid on it', () => {
   // ⚠️ THE LINK IN THE NOTIFICATION POINTS HERE. A provider is told about a
   // request by an email and a bell that both link to /provider/requests/<id>;
@@ -446,6 +548,15 @@ test('NOTHING links to /request or /provider from any navigation', () => {
     // its hrefs go INTO the subsystem's mails, they are not a way in from
     // outside it.
     if (rel === 'lib/requests.ts' || rel === 'lib/requestJobs.ts') continue
+    // lib/requestThread.ts is the platform thread's rules, and
+    // lib/emailTemplates.ts is where those mails are BUILT — its /provider
+    // paths are the destinations inside the subsystem's own letters, reached
+    // only by somebody we already wrote to. They are not a way in from a page
+    // a stranger can browse, which is the thing this scan exists to stop.
+    // Pinned separately by „an emailed provider link survives not being signed
+    // in", which is stricter than this scan: it requires every one of them to
+    // be routed through sign-in.
+    if (rel === 'lib/requestThread.ts' || rel === 'lib/emailTemplates.ts') continue
     // The admin panel is behind requireRole('ADMIN') at the layout, and both
     // its tabs are filtered out of ADMIN_NAV when the subsystem is off. Named
     // individually rather than excused by a pattern: „anything under app/admin"
