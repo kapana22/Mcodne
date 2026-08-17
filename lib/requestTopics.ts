@@ -49,6 +49,8 @@
  * question. That is the mistake `B2BService.kind` exists to undo, and this
  * splits the axis before it is made rather than after.
  */
+import { rankCandidates } from './topicMatch'
+
 export const REQUEST_KINDS = ['LEARNING', 'CONSULTATION', 'PROJECT'] as const
 export type RequestKindName = (typeof REQUEST_KINDS)[number]
 
@@ -486,12 +488,12 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     id: 'law', label: 'სამართალი', kinds: CP,
     template: 'სიტუაცია მოკლედ: …\nვინ არის მეორე მხარე: …\nრა შედეგი მინდა: …',
     topics: [
-      { id: 'contract',   label: 'ხელშეკრულება', categorySlug: 'law' },
+      { id: 'contract',   label: 'ხელშეკრულება', alt: ['იურისტი', 'ადვოკატი', 'ხელშეკრულების შედგენა', 'კონტრაქტი'], categorySlug: 'law' },
       { id: 'labor-law',  label: 'შრომითი დავა', categorySlug: 'law' },
       { id: 'family-law', label: 'საოჯახო სამართალი', alt: ['განქორწინება'], categorySlug: 'law' },
       { id: 'corp-law',   label: 'კორპორატიული სამართალი', categorySlug: 'law' },
       { id: 'ip-law',     label: 'ინტელექტუალური საკუთრება', categorySlug: 'law' },
-      { id: 'court',      label: 'სასამართლო დავა', categorySlug: 'law' },
+      { id: 'court',      label: 'სასამართლო დავა', alt: ['ადვოკატი', 'იურისტი', 'სარჩელი'], categorySlug: 'law' },
       { id: 'company-reg',label: 'კომპანიის რეგისტრაცია', categorySlug: 'law' },
     ],
   },
@@ -536,7 +538,7 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     id: 'psychology', label: 'ფსიქოლოგია', kinds: CP,
     template: 'რაზე მინდა მუშაობა: …\nფორმატი: … (ინდივიდუალური / წყვილი / ბავშვი)\nსიხშირე: …',
     topics: [
-      { id: 'psy-individual', label: 'ინდივიდუალური კონსულტაცია', categorySlug: 'psychology' },
+      { id: 'psy-individual', label: 'ინდივიდუალური კონსულტაცია', alt: ['ფსიქოლოგი', 'ფსიქოთერაპევტი', 'თერაპია'], categorySlug: 'psychology' },
       { id: 'psy-couple',     label: 'წყვილის თერაპია', categorySlug: 'psychology' },
       { id: 'psy-child',      label: 'ბავშვისა და მოზარდის ფსიქოლოგი', categorySlug: 'psychology' },
       { id: 'psy-org',        label: 'ორგანიზაციული ფსიქოლოგია', categorySlug: 'psychology' },
@@ -837,22 +839,29 @@ export function searchAllTopics(query: string, limit = 24): TopicHit[] {
   return out.slice(0, limit)
 }
 
+/**
+ * ⚠️ THE MATCHING MOVED OUT (2026-08-17) — see lib/topicMatch, and the note at
+ * the top of it for what the one-line version could not do. In short: it
+ * stemmed and compared WHOLE STRINGS, so „დავა მაქვს სასამართლოში" could never
+ * find „სასამართლო დავა", nothing was ranked, and a single typo was fatal.
+ *
+ * This function is now only the part that is about TOPICS: which candidates
+ * exist for a kind, and what each one can be called. The scoring, the
+ * tokenising and the tolerance belong to a file that can be tested against a
+ * corpus of real phrases without knowing what a topic is.
+ */
 export function searchTopics(kind: RequestKindName, query: string, limit = 24): TopicHit[] {
-  const q = stem(query)
-  if (q.length < 2) return []
-  const out: TopicHit[] = []
+  const candidates: TopicHit[] = []
   for (const group of groupsForKind(kind)) {
-    const groupHit = stem(group.label).includes(q)
-    for (const topic of group.topics) {
-      const hay = [topic.label, ...(topic.alt ?? [])].map(stem)
-      if (groupHit || hay.some(h => h.includes(q) || q.includes(h))) {
-        out.push({ topic, group })
-      }
-    }
+    for (const topic of group.topics) candidates.push({ topic, group })
   }
-  // Exact-ish matches first: somebody typing „ქიმია" wants the subject, not
-  // every row in the group it happens to sit in.
-  return out
-    .sort((a, b) => Number(stem(b.topic.label).startsWith(q)) - Number(stem(a.topic.label).startsWith(q)))
-    .slice(0, limit)
+  return rankCandidates(
+    query,
+    candidates,
+    ({ topic, group }) => ({
+      phrases: [topic.label, ...(topic.alt ?? [])],
+      groupLabel: group.label,
+    }),
+    limit,
+  ).map(r => r.item)
 }

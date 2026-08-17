@@ -66,9 +66,12 @@ const INPUT =
   'placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none ' +
   'transition-colors duration-fast'
 
-export function StepWhat({ draft, onPick, initialQuery = '' }: {
+export function StepWhat({ draft, onPick, onFreeText, initialQuery = '' }: {
   draft: Draft
   onPick: (topicId: string) => void
+  /** They typed something the catalogue cannot name. Their sentence becomes the
+   *  description and the topic becomes „სხვა" — see the no-match branch. */
+  onFreeText: (text: string) => void
   /** Handed over from the home band's own field — see app/request/page for why
    *  it seeds the search and deliberately does NOT pick a topic. */
   initialQuery?: string
@@ -114,6 +117,16 @@ export function StepWhat({ draft, onPick, initialQuery = '' }: {
     }
   }
 
+  // Enter on a query that matched NOTHING carries the sentence forward, rather
+  // than doing nothing — the keyboard path to the same button the no-match
+  // branch draws. `onSearchKey` returns early when there are no hits, so this
+  // is a separate handler and not a branch inside it.
+  const onNoMatchKey = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter' || !searching || hits.length > 0) return
+    e.preventDefault()
+    onFreeText(q.trim())
+  }
+
   return (
     <div>
       <div className="relative">
@@ -123,7 +136,7 @@ export function StepWhat({ draft, onPick, initialQuery = '' }: {
           type="search"
           value={q}
           onChange={e => { setQ(e.target.value); setActiveIx(-1) }}
-          onKeyDown={onSearchKey}
+          onKeyDown={e => { onSearchKey(e); onNoMatchKey(e) }}
           role="combobox"
           aria-expanded={searching && hits.length > 0}
           aria-autocomplete="list"
@@ -159,12 +172,41 @@ export function StepWhat({ draft, onPick, initialQuery = '' }: {
             ))}
           </div>
         ) : (
-          // No match is an ANSWER, not a dead end: what they typed is what the
-          // list lacks, and „სხვა" carries the need forward — their own words
-          // go in the description.
+          // ⚠️ NO MATCH IS NOT A DEAD END, AND IT USED TO BE ONE. This branch
+          // said „ზუსტად ეს ვერ ვიპოვეთ — აირჩიე „სხვა" და აღწერაში დაწერე"
+          // and offered a chip. Owner, 2026-08-17, having typed the most
+          // ordinary sentence there is — „მჭირდება სახლის დალაგება": the
+          // catalogue has no cleaning topic, so a real person with a real job
+          // and money to spend was told to go and file it themselves.
+          //
+          // That is our filing problem handed to the visitor, which is the one
+          // thing the header of this file says the whole screen was rebuilt to
+          // stop doing.
+          //
+          // ⚠️ THEIR SENTENCE IS THE REQUEST NOW. The button carries the words
+          // they typed, sends them on as the description, and files the topic
+          // as „სხვა" — which is TRUE, not a fudge: it is a request this
+          // catalogue cannot name, and an operator phones every request anyway.
+          // Nobody is asked to translate their need into our vocabulary.
+          //
+          // What we lose is the sphere, so it routes to everyone rather than to
+          // a filed expert — the same honest outcome a school subject already
+          // gets. What we gain is the request.
           <div className="mt-5">
-            <p className="text-body text-ink-600">ზუსტად ეს ვერ ვიპოვეთ — აირჩიე „სხვა“ და აღწერაში დაწერე.</p>
-            <div className="mt-3"><Chip t={OTHER_TOPIC} on={draft.topic === OTHER_TOPIC.id} onPick={onPick} /></div>
+            <p className="text-body text-ink-700">ამ სახელით ვერ ვიპოვეთ — მაგრამ მაინც მოგვწერე.</p>
+            <button
+              type="button"
+              onClick={() => onFreeText(q.trim())}
+              className="mt-3 w-full text-left rounded-card border border-brand-600 bg-brand-50 px-5 py-4 flex items-center gap-4 transition-[background-color,transform] duration-fast motion-safe:active:scale-[0.99] hover:bg-brand-100"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-body font-semibold text-ink-900 break-words">
+                  „{q.trim()}"
+                </span>
+                <span className="block text-small text-ink-600 mt-0.5">გავაგრძელოთ ამით</span>
+              </span>
+              <Icon.chevR aria-hidden className="w-4 h-4 text-brand-600 shrink-0" />
+            </button>
           </div>
         )
       ) : (

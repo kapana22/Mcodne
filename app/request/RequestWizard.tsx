@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Btn } from '@/components/Btn'
 import {
   ServiceRequestInput, KIND, kindOf, BUDGET_BANDS, TIMING, FORMATS, CITIES,
-  extrasFor, topicLabel, kindsOfTopic, budgetIsBelowFloor,
+  extrasFor, topicLabel, kindsOfTopic, budgetIsBelowFloor, OTHER_TOPIC,
   type RequestKindName,
 } from '@/lib/requests'
 import { newFlowId } from '@/components/booking/funnelEvents'
@@ -409,6 +409,23 @@ export function RequestWizard({ account, initialQuery = '' }: {
           <StepWhat
             draft={draft}
             initialQuery={initialQuery}
+            // ⚠️ THE CATALOGUE COULD NOT NAME IT, SO THE SENTENCE BECOMES THE
+            // REQUEST (2026-08-17). „მჭირდება სახლის დალაგება" matched nothing
+            // — there is no cleaning topic — and the screen used to answer
+            // „choose „სხვა" and write it in the description", which is our
+            // filing problem handed to somebody with a job and money.
+            // Their words go straight into the description, the topic is filed
+            // as „სხვა" (which is true), and the run continues. The operator
+            // phones every request anyway; a taxonomy gap is ours to close, not
+            // theirs to work around.
+            onFreeText={text => {
+              const d = { ...withTopic(draft, OTHER_TOPIC.id), description: text }
+              setDraft(d)
+              trackRequestFunnel(REQUEST_FUNNEL_EVENTS.topicChosen, {
+                flowId: flowIdRef.current, topic: OTHER_TOPIC.id, kind: d.kind || 'pending',
+              })
+              advance(d, 'what')
+            }}
             onPick={topicId => {
               const d = withTopic(draft, topicId)
               setDraft(d)
