@@ -1,24 +1,38 @@
 'use client'
-// THE CONVERSATION SO FAR — every screen already answered, kept on the page.
+// THE CONVERSATION SO FAR — the last exchange in full, everything older as one
+// line of chips.
 //
-// ⚠️ WHY THE WIZARD KEEPS ITS ANSWERS (2026-08-17). It used to replace one
-// question with the next, which is what a form does and what made it read like
-// one: seven screens, each erasing the last, and no sense of having got
-// anywhere. Owner: „ეს ფორმასავით შემოდის და პირდაპირ ლაივ ჩათი რომ ეხსნებოდეს
-// ეს უკვე სხვა ლეველია." A transcript is the cheap half of that — the run
-// becomes something you are IN rather than something you are filling — and it
-// runs straight into the real thread with us on the last screen.
+// ⚠️ THIS WAS SIX STACKED BUBBLE PAIRS UNTIL 2026-08-17, AND THE NUMBERS ARE
+// WHY IT IS NOT ANY MORE. Measured in the browser at 1440×900:
 //
-// ⚠️ WHAT DID NOT CHANGE, deliberately: the controls. The chips, the option
-// rows, the search box are all exactly what they were, because they are what
-// makes this answerable in one tap. A „chat" that asks you to TYPE what you
-// could tap is a downgrade wearing a costume — the bubbles are the framing, the
-// taps are the interface.
+//     pairs 1 → live question at y=302, page  931px
+//     pairs 3 → live question at y=489, page 1080px
+//     pairs 6 → live question at y=769, page 1425px
 //
-// ⚠️ AND NO FAKE TYPING. No „…" delay before our question appears, no staged
-// reveal. The answer is already known and the person is mid-task; a simulated
-// pause is a wait we invented to look human, and it is felt as slowness by
-// everybody who has used the form twice.
+// Every answer pushed the live question down 93px, so by the sixth there were
+// 131px left under it on a laptop — less than the option rows or the textarea
+// need. The wizard got HARDER TO USE THE FURTHER YOU GOT, which is backwards,
+// and on a phone the bubbles wrap so it arrives sooner.
+//
+// ⚠️ THE TRANSCRIPT WAS NOT THE MISTAKE — THE LAYOUT WAS. Every product that
+// runs a real chat transcript (Lemonade's Maya, Intercom, Drift) pins the
+// composer to the bottom of a fixed-height pane and lets old messages scroll
+// away BEHIND it; the live question never moves. Every product that keeps a
+// document layout (Typeform, Bark, Thumbtack, Angi) shows ONE question and no
+// transcript at all. What was built here was the second layout with the first
+// one's content: a document that grows downwards forever.
+//
+// So the record stays — a person can still see and change what they said — but
+// it stops being paid for in vertical space:
+//   · the NEWEST exchange keeps its bubbles, so the seam into the live question
+//     still reads as a conversation rather than a form
+//   · everything older folds into one chip row, ~40px instead of ~520px
+//   · each chip is still the edit control, so nothing is lost but the scroll
+//
+// ⚠️ AND THE HINT LINE IS GONE. „პასუხზე დააჭირე, თუ შეცვლა გინდა" was a line
+// of instruction printed on every screen of the run. A row of chips that
+// highlight under the cursor does not need to be told to somebody, and an
+// instruction nobody reads is furniture.
 
 import type { Draft, StepDef } from './_model'
 import { answerLabel } from './_model'
@@ -27,10 +41,9 @@ import { answerLabel } from './_model'
  * Ours: the question.
  *
  * Exported because the CURRENT question renders through it too — the live
- * question used to be a `text-h1` heading sitting on top of a column of
- * bubbles, i.e. two visual languages with a seam across the middle of the
- * screen (owner, 2026-08-17: „ძალიან არაპროფესიონალურად ჩანს"). One component,
- * so the conversation cannot develop two voices.
+ * question used to be a `text-h1` heading sitting on a column of bubbles, i.e.
+ * two visual languages with a seam across the middle of the screen. One
+ * component, so the conversation cannot develop two voices.
  */
 export function Ask({ children, as: Tag = 'div' }: {
   children: React.ReactNode
@@ -54,24 +67,16 @@ export function Ask({ children, as: Tag = 'div' }: {
  * underlined beside it, and with three answers on screen that was three
  * identical underlined links, each starting at a different x because the
  * bubbles are different widths — a ragged column that was the loudest thing on
- * the page and the reason the screen read as unfinished. The affordance did not
- * need its own text: pressing the thing you said to change the thing you said
- * is the most direct mapping available, and it costs zero pixels.
- *
- * WHAT REPLACES THE LOST LABEL, because „it is obvious" is not a plan:
- *   · the accessible name spells it out — „შეცვლა: ინგლისური"
- *   · a pointer gets the word back on hover/focus, in a slot that is ALWAYS
- *     reserved, so nothing shifts when it appears
- *   · touch, which has no hover, gets one quiet line under the whole
- *     transcript — see Transcript. One line for the run, not one per answer.
+ * the page. Pressing the thing you said to change the thing you said is the
+ * most direct mapping available, and it costs zero pixels.
  */
-function Said({ children, onEdit }: { children: React.ReactNode; onEdit: () => void }) {
+function Said({ children, onEdit }: { children: string; onEdit: () => void }) {
   return (
     <div className="flex justify-end">
       <button
         type="button"
         onClick={onEdit}
-        aria-label={`შეცვლა: ${typeof children === 'string' ? children : ''}`}
+        aria-label={`შეცვლა: ${children}`}
         className="group max-w-[85%] flex items-center gap-2 text-left rounded-card motion-safe:active:scale-[0.99] transition-transform duration-fast"
       >
         {/* Reserved, not conditional: rendering this only on hover would move
@@ -87,6 +92,22 @@ function Said({ children, onEdit }: { children: React.ReactNode; onEdit: () => v
         </span>
       </button>
     </div>
+  )
+}
+
+/** One folded answer. The label only — the QUESTION is dropped, because at this
+ *  size „დამწყები" is recognisable and „რა დონეა: დამწყები" is twice the width
+ *  for a word the reader chose sixty seconds ago. */
+function Chip({ label, onEdit }: { label: string; onEdit: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      aria-label={`შეცვლა: ${label}`}
+      className="text-meta text-ink-600 hover:text-ink-900 underline decoration-ink-200 hover:decoration-ink-400 underline-offset-4 transition-colors duration-fast"
+    >
+      {label}
+    </button>
   )
 }
 
@@ -106,29 +127,38 @@ export function Transcript({ steps, currentId, draft, onEdit }: {
 
   const rows = done
     .map(s => ({ step: s, answer: answerLabel(s.id, draft) }))
-    // A skipped screen leaves no pair. See answerLabel: „—" in a conversation
-    // is a person who said nothing, and it is not worth a line.
-    .filter(r => r.answer !== null)
+    // A skipped screen leaves no trace. „—" in a conversation is a person who
+    // said nothing, and it is not worth a chip either.
+    .filter((r): r is { step: StepDef; answer: string } => r.answer !== null)
 
   if (rows.length === 0) return null
 
+  // The last exchange keeps its bubbles; the rest folds.
+  const folded = rows.slice(0, -1)
+  const last = rows[rows.length - 1]
+
   return (
-    <div className="mb-6">
+    <div className="mb-5">
+      {folded.length > 0 && (
+        // ⚠️ ONE LINE, WRAPPING — not a grid and not a list. The whole point is
+        // that six answers cost one line of height instead of six rows; a
+        // layout that gives each its own row is the stack again with smaller
+        // type. `·` is a separator, not a bullet: it is aria-hidden so a screen
+        // reader hears six buttons and not six interpuncts.
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-4">
+          {folded.map(({ step, answer }, i) => (
+            <span key={step.id} className="inline-flex items-center gap-2">
+              {i > 0 && <span aria-hidden className="text-ink-300">·</span>}
+              <Chip label={answer} onEdit={() => onEdit(step.id)} />
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="space-y-2">
-        {rows.map(({ step, answer }) => (
-          <div key={step.id} className="space-y-2">
-            <Ask>{step.title}</Ask>
-            <Said onEdit={() => onEdit(step.id)}>{answer}</Said>
-          </div>
-        ))}
+        <Ask>{last.step.title}</Ask>
+        <Said onEdit={() => onEdit(last.step.id)}>{last.answer}</Said>
       </div>
-      {/* ONE line for the whole run — the thing that replaced one „შეცვლა" per
-          answer. It is the only way a touch reader learns the bubbles are
-          pressable, and at three answers it is already two lines cheaper than
-          what it replaced. */}
-      <p className="mt-2.5 text-meta text-ink-500 text-right">
-        პასუხზე დააჭირე, თუ შეცვლა გინდა.
-      </p>
     </div>
   )
 }

@@ -1856,6 +1856,57 @@ test('the honeypot stays invisible and stays dumb', () => {
     'the honeypot branch stopped answering ok:true — it now tells bots they were caught')
 })
 
+test('a below-floor budget is said at the tap, not after the submit', () => {
+  // ⚠️ SEVEN SCREENS OF WORK TO BE TOLD SOMETHING TRUE AT THE FIRST OF THEM.
+  // `budgetIsBelowFloor` has existed since the band ladder was written, and the
+  // wizard never asked it. So somebody who tapped „20₾-მდე" answered four more
+  // questions, typed their name, phone and email, pressed send — and read „ამ
+  // ბიუჯეტში ვერ დაგეხმარებით" on the thanks card. The floor was known the
+  // instant they tapped (owner, 2026-08-17, holding that exact screenshot).
+  const w = codeOf('app/request/RequestWizard.tsx')
+  assert.match(w, /budgetIsBelowFloor\(kind, id\)\) \{ patch\(\{ budgetBand: id \}\); return \}/,
+    'a floor band advances again — the person learns after the submit')
+  assert.match(w, /budgetIsBelowFloor\(kind, draft\.budgetBand\)/,
+    'the floor notice is no longer rendered on the budget screen')
+
+  // ⚠️ IT WARNS, IT DOES NOT BLOCK. „How many arrive under the floor" is the
+  // measurement this stage exists for, and the endpoint still writes the row —
+  // so the screen must offer a way past it.
+  assert.match(w, /მაინც გავაგრძელებ/, 'the continue-anyway control is gone; the floor now blocks')
+  assert.doesNotMatch(w, /disabled=\{[^}]*budgetIsBelowFloor/,
+    'the floor disables a control — it is a warning, not a gate')
+
+  // …and the rule itself still lives in one place.
+  assert.equal(budgetIsBelowFloor('LEARNING', 'l0'), true)
+  assert.equal(budgetIsBelowFloor('LEARNING', 'l1'), false)
+})
+
+test('the record folds — the live question does not sink', () => {
+  // Measured before this change, at 1440×900: the live question sat at y=302
+  // with one answer behind it and y=769 with six, because every answered pair
+  // added 93px of bubbles above it. By the sixth there were 131px left under
+  // the question — less than the option rows need — so the wizard got HARDER
+  // to use the further you got.
+  //
+  // Products that keep a real transcript (Lemonade, Intercom) pin the composer
+  // to a fixed pane and let old messages scroll away behind it; products with a
+  // document layout (Typeform, Bark, Thumbtack) show one question and no
+  // transcript. This was the second layout carrying the first one's content.
+  const t = codeOf('app/request/_transcript.tsx')
+  assert.match(t, /const folded = rows\.slice\(0, -1\)/,
+    'the transcript stopped folding — every answered pair is a bubble stack again')
+  assert.match(t, /const last = rows\[rows\.length - 1\]/,
+    'the newest exchange no longer keeps its bubbles — the seam into the live question is a form again')
+  // Every folded answer stays editable. Folding that cost the edit affordance
+  // would be a summary, and a summary is what the transcript replaced.
+  assert.match(t, /aria-label=\{`შეცვლა: \$\{label\}`\}/,
+    'a folded answer is no longer a control — the record became read-only')
+  // The instruction line is gone: a row of chips does not need to be explained,
+  // and a sentence printed on every screen of a run is furniture.
+  assert.doesNotMatch(t, /პასუხზე დააჭირე/,
+    'the hint line is back — it was an instruction on every screen of the run')
+})
+
 test('no screen prints the same answer twice', () => {
   // This test used to assert the OPPOSITE arrangement — that the wizard's
   // „kind · topic" line was suppressed on the contact screen, because that

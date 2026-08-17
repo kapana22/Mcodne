@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Btn } from '@/components/Btn'
 import {
   ServiceRequestInput, KIND, kindOf, BUDGET_BANDS, TIMING, FORMATS, CITIES,
-  extrasFor, topicLabel, kindsOfTopic,
+  extrasFor, topicLabel, kindsOfTopic, budgetIsBelowFloor,
   type RequestKindName,
 } from '@/lib/requests'
 import { newFlowId } from '@/components/booking/funnelEvents'
@@ -230,7 +230,27 @@ export function RequestWizard({ account, initialQuery = '' }: {
       return
     }
     if (extraQ) { pickAndGo({ details: { ...draft.details, [extraQ.id]: id } }); return }
-    if (step.id === 'budget') { pickAndGo({ budgetBand: id }); return }
+    if (step.id === 'budget') {
+      // ⚠️ A BELOW-FLOOR BAND SELECTS BUT DOES NOT ADVANCE (2026-08-17).
+      //
+      // The floor is known the instant they tap it — `budgetIsBelowFloor` has
+      // always been there — and until today the wizard never asked. So somebody
+      // who chose „20₾-მდე" answered four more screens, typed their name, phone
+      // and email, pressed send, and read „ამ ბიუჯეტში ვერ დაგეხმარებით" on the
+      // thanks card. Seven screens of work to be told something true at the
+      // first of them.
+      //
+      // Said HERE instead, where it is still a decision: they can raise the
+      // budget, or continue knowingly. The row stays either way — „how many
+      // arrive under the floor" is exactly what this stage exists to measure,
+      // and the endpoint still writes it as REJECTED.
+      //
+      // Not-advancing is the same shape „ადგილზე" already uses two branches
+      // down: a tap that opens something rather than closing the screen.
+      if (budgetIsBelowFloor(kind, id)) { patch({ budgetBand: id }); return }
+      pickAndGo({ budgetBand: id })
+      return
+    }
     if (step.id === 'timing') { pickAndGo({ timing: id }); return }
     if (step.id === 'format') {
       if (CITIES.some(c => c.id === id)) { pickAndGo({ city: id as Draft['city'] }); return }
@@ -322,17 +342,7 @@ export function RequestWizard({ account, initialQuery = '' }: {
         </div>
       )}
 
-      {/* ── The conversation so far ─────────────────────────────────────────
-          Everything already answered, kept on the page as bubbles. See
-          _transcript for why the run stopped erasing itself. */}
-      <Transcript
-        steps={steps}
-        currentId={step.id}
-        draft={draft}
-        onEdit={id => setStepId(id)}
-      />
-
-      {/* ── Back, ABOVE the question ────────────────────────────────────────
+      {/* ── Back, then the record, then the live question ───────────────────
           It used to live in the footer, under the options — and on a five-row
           budget list that is off the bottom of a phone, so the one control a
           person reaches for after a mis-tap was the one they had to scroll to
@@ -355,6 +365,16 @@ export function RequestWizard({ account, initialQuery = '' }: {
           </button>
         </div>
       )}
+
+      {/* Everything already answered: the newest exchange as bubbles, the rest
+          folded into one chip row. See _transcript for the measurements that
+          retired the six-pair stack. */}
+      <Transcript
+        steps={steps}
+        currentId={step.id}
+        draft={draft}
+        onEdit={id => setStepId(id)}
+      />
 
       {/* ⚠️ THE LIVE QUESTION IS A BUBBLE (2026-08-17), same component as every
           answered one — it was a `text-h1` heading sitting on a column of
@@ -422,6 +442,24 @@ export function RequestWizard({ account, initialQuery = '' }: {
         )}
         {step.id === 'budget' && (
           <StepPick options={options} value={draft.budgetBand} onPick={pickOption} numbered />
+        )}
+        {/* ── The floor, said at the moment of choosing ─────────────────────
+            Only on the band that earns it, and it does not block: the request
+            is written either way (see the endpoint — the row is the
+            measurement). What it buys is the chance to change the answer
+            before spending four more screens on it. */}
+        {step.id === 'budget' && draft.budgetBand !== '' && budgetIsBelowFloor(kind, draft.budgetBand) && (
+          <div className="mt-4 rounded-card border border-warning-200 bg-warning-50 px-4 py-3">
+            <p className="text-body text-ink-900">ამ ბიუჯეტში ექსპერტს ვერ მოგიძებნით.</p>
+            <p className="mt-1 text-small text-ink-700">
+              აირჩიე სხვა ბიუჯეტი, ან გააგრძელე — მოთხოვნას მაინც მივიღებთ.
+            </p>
+            <div className="mt-3">
+              <Btn variant="secondary" size="sm" onClick={() => advance(draft)}>
+                მაინც გავაგრძელებ
+              </Btn>
+            </div>
+          </div>
         )}
         {step.id === 'timing' && (
           <StepPick options={options} value={draft.timing} onPick={pickOption} numbered />
