@@ -46,10 +46,20 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     return new NextResponse('Not found', { status: 404 })
   }
 
-  // An https:// scan (legacy / externally hosted) — just point at it.
-  if (/^https?:\/\//i.test(cert.fileUrl)) {
+  /* An https:// scan (legacy / externally hosted) — point at it, but ONLY over
+     https, and never over http.
+     THE HOLE THIS CLOSES: `fileUrl` is `z.string().max(35_000_000)` with no
+     scheme test (it cannot be `.url()` — a real diploma is a megabyte-long
+     `data:` URI), and the applications path copies the value across verbatim at
+     approval. So any string an expert stored was handed to `NextResponse
+     .redirect`, turning mcodne.ge into a redirector to an arbitrary destination
+     — a link that starts on our domain and lands anywhere. Bounded here rather
+     than only at write time, because the rows that already exist were written
+     without the rule. */
+  if (/^https:\/\//i.test(cert.fileUrl)) {
     return NextResponse.redirect(cert.fileUrl, 302)
   }
+  if (/^http:\/\//i.test(cert.fileUrl)) return new NextResponse('Not found', { status: 404 })
 
   const parsed = parseDataUrl(cert.fileUrl)
   if (!parsed) return new NextResponse('Not found', { status: 404 })

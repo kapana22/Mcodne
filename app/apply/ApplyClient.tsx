@@ -3,7 +3,7 @@
 // events, validation wiring and submit; every part lives in a `_*.tsx` beside it.
 //
 // Chrome: the bespoke local TopBar (logo + „დახურვა“ ✕) is gone — /apply now
-// mounts the SHARED <PublicTopBar activeHref="/apply" /> + <Footer />, so the
+// mounts the SHARED <PublicTopBar activeHref="/apply" initialUser={initialUser} /> + <Footer />, so the
 // header doesn't swap out and the footer doesn't vanish when a visitor taps
 // „გახდი ექსპერტი“. The ✕ escape hatch isn't missed: the shared header carries
 // the full site nav (and the logo → home). PublicTopBar is h-16 sm:h-20 — the
@@ -15,20 +15,22 @@ import { Container } from '@/components/Container'
 import { Icon } from '@/components/Icon'
 import { Illustration } from '@/components/Illustration'
 import { PublicTopBar } from '@/components/PublicTopBar'
+import type { Me } from '@/lib/me'
 import { Footer } from '@/components/Footer'
 import { APPLY_FUNNEL_EVENTS, newApplyFlowId, trackApply } from './applyFunnelEvents'
 import { checkGeorgian, georgianError } from '@/lib/georgianText'
-import { bioError, nameError, priceError, specialtyError, videoError, yearsError } from '@/lib/applyValidation'
+import { bioError, nameError, otherCatError, priceError, specialtyError, videoError, yearsError } from '@/lib/applyValidation'
 import { phoneFormatError } from '@/lib/phone'
 import { FormFooter, ProgressNav } from './_chrome'
 import { clearApplyDraft, readApplyDraft, writeApplyDraft } from './_draft'
 import { ApplyErrCtx } from './_fields'
 import { AVAIL_WEEKS, ApplyErr, DEFAULT_AVAIL, FormState, INITIAL_FORM, MAX_CATS, MediaState, SERVER_FIELD, STEPS, StepId, StepPart, isValidEmail } from './_form'
+import { MAX_PROFESSIONS } from '@/lib/professions'
 import { LivePreview, Step1, Step2 } from './_steps'
 import { certificatesPayload } from './_upload'
 
 /* ───── Page ───── */
-export default function TutorApply() {
+export default function TutorApply({ initialUser }: { initialUser?: Me | null }) {
   const [submitted, setSubmitted] = useState(false)
   const [step, setStep] = useState<StepId>(1)
   const [part, setPart] = useState<StepPart>(1)
@@ -164,6 +166,9 @@ export default function TutorApply() {
     // lands in professionData.requestedCategory (cats was empty); otherwise
     // specialty is the picked category name.
     const requestedCategory: string = typeof pd.requestedCategory === 'string' ? pd.requestedCategory : ''
+    const professions: string[] = Array.isArray(pd.professions)
+      ? pd.professions.map((x: any) => String(x)).filter(Boolean)
+      : []
     const specialty: string = typeof a.specialty === 'string' ? a.specialty : ''
     const services = Array.isArray(pd.services) && pd.services.length
       ? pd.services.map((s: any) => ({
@@ -207,6 +212,11 @@ export default function TutorApply() {
       // otherwise fail validation on a value the form can no longer produce,
       // blocking somebody on a choice they made yesterday. See MAX_CATS.
       cats: (f.cats.length ? f.cats : (requestedCategory || !specialty ? [] : [specialty])).slice(0, MAX_CATS),
+      // The typed niche comes back too. Without this a „needs revision" resubmit
+      // silently dropped it and the applicant was blocked by the sphere gate on
+      // an answer they had already given.
+      otherCat: f.otherCat.trim() ? f.otherCat : requestedCategory,
+      professions: f.professions.length ? f.professions : professions,
       languages: languages ?? f.languages,
       services: services ?? f.services,
       avail: avail ?? f.avail,
@@ -269,7 +279,7 @@ export default function TutorApply() {
   }
   /** Which screen each anchor lives on — so a jump can change steps first. */
   const FIELD_STEP: Record<string, StepId> = {
-    firstName: 1, lastName: 1, email: 1, phone: 1, cats: 1, headline: 1,
+    firstName: 1, lastName: 1, email: 1, phone: 1, cats: 1, otherCat: 1, headline: 1,
     photo: 1, motivation: 1, yearsExp: 1, city: 1, introVideoUrl: 1,
     // Moved onto step 1 with the third screen's removal (2026-08-07).
     linkedin: 1, website: 1, certificates: 1,
@@ -319,13 +329,30 @@ export default function TutorApply() {
    * applicant should meet is a wall on the final screen. */
   const validateStep = (s: StepId, _p: StepPart = 1): string | null => {
     if (s === 1) {
-      const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`.trim()
-      { const e = nameError(fullName); if (e) return fail('firstName', e) }
+      // EACH FIELD ON ITS OWN. This used to join them and validate the pair,
+      // so „ნინო" + „Beridze" put the red line under სახელი — the one field
+      // that was right — and said „name and surname". A form must point at the
+      // thing that is wrong. The server still checks the joined value (it only
+      // ever receives `fullName`), which is the backstop, not the first word.
+      { const e = nameError(form.firstName); if (e) return fail('firstName', e) }
+      { const e = nameError(form.lastName, 'გვარი'); if (e) return fail('lastName', e) }
       if (!isValidEmail(form.email)) return fail('email', 'შეიყვანე სწორი ელფოსტა.')
       // Required: the moderator phones the applicant. lib/phone is the same
       // rule signup uses, so a number accepted there is accepted here.
       { const e = phoneFormatError(form.phone, { required: true }); if (e) return fail('phone', e) }
-      if (form.cats.length < 1) return fail('cats', 'აირჩიე სფერო.')
+      // EITHER a chip OR the applicant's own words. Until 2026-08-11 this was
+      // chip-only, which meant anyone whose field is not on the list could not
+      // finish the form at all — they picked the nearest wrong sphere or left.
+      // See OTHER_CAT_MAX in ./_form for the whole reasoning.
+      { const e = otherCatError(form.otherCat); if (e) return fail('cats', e) }
+      // The SPHERE is the required answer; professions are the detail inside
+      // it, and the typed-in niche is still a complete answer on its own.
+      if (!form.cats.length && !form.otherCat.trim()) {
+        return fail('cats', 'აირჩიე სფერო, ან დაწერე შენი.')
+      }
+      if (form.professions.length > MAX_PROFESSIONS) {
+        return fail('cats', `მაქსიმუმ ${MAX_PROFESSIONS} პროფესია.`)
+      }
       if (form.cats.length > MAX_CATS) return fail('cats', 'აირჩიე ერთი სფერო.')
       if (form.headline.trim().length < 2) return fail('headline', 'დაწერე ერთი წინადადება შენზე.')
       { const e = georgianError('ერთი წინადადება შენზე', checkGeorgian(form.headline)); if (e) return fail('headline', e) }
@@ -361,7 +388,7 @@ export default function TutorApply() {
     validateStep(1) ?? validateStep(2) ?? (() => {
       // `specialty` is derived at submit (cats[0], else the headline) — so it is
       // the one value no single input owns and no step gate covers.
-      const specialty = form.cats[0] || form.headline.trim().slice(0, 60)
+      const specialty = form.cats[0] || form.otherCat.trim() || form.headline.trim().slice(0, 60)
       const e = specialtyError(specialty)
       return e ? fail('cats', e) : null
     })()
@@ -434,10 +461,13 @@ export default function TutorApply() {
     setSubmitError(null)
     try {
       const paidService = form.services.find(s => !s.free && s.price > 0)!
-      // Custom/niche field falls back into specialty so a not-listed expert is
-      // never blocked; it's also stashed in professionData so the admin can
-      // review it and promote it to a real category.
-      const specialty = form.cats[0] || form.headline.trim().slice(0, 60)
+      // The niche the applicant typed falls back into `specialty` so a
+      // not-listed expert is never blocked — and it is ALSO stashed in
+      // professionData below, unconditionally. That „unconditionally" is the
+      // whole repair: the deleted version wrote it only when no chip was
+      // picked, so 7 of 8 answers were discarded in the browser and the admin
+      // never saw what people were asking for.
+      const specialty = form.cats[0] || form.otherCat.trim() || form.headline.trim().slice(0, 60)
       const body = {
         fullName: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
         phone: form.phone.trim(),
@@ -453,6 +483,14 @@ export default function TutorApply() {
         // may surface). Verification docs stay on their own admin-only fields.
         professionData: (() => {
           const pd: Record<string, any> = { ...form.professionData }
+          // ALWAYS, chip or no chip. This is the signal the taxonomy grows from:
+          // the moderator reads it on the application, and the „კატეგორიები" tab
+          // aggregates it into „who asked for what, how many times".
+          if (form.otherCat.trim()) pd.requestedCategory = form.otherCat.trim()
+          // WHAT THEY ARE — „ბუღალტერი", „მარკეტოლოგი", several of them.
+          // Approval copies these onto TutorProfile.professions; `specialty`
+          // still carries the SPHERE, so the category match is untouched.
+          if (form.professions.length) pd.professions = form.professions
           if (form.languages.length) pd.languages = form.languages
           // The one-line pitch the applicant wrote (and saw in the live preview)
           // used to be discarded at submit — the approved profile then showed the
@@ -568,7 +606,7 @@ export default function TutorApply() {
     ]
     return (
       <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen flex flex-col">
-        <PublicTopBar activeHref="/apply" />
+        <PublicTopBar activeHref="/apply" initialUser={initialUser} />
         <Container as="main" size="content" className="flex-1 py-16 lg:py-24">
           <div className="max-w-[560px] mx-auto text-center">
             {/* The illustration REPLACES the green check medallion — a tinted
@@ -612,7 +650,7 @@ export default function TutorApply() {
   if (appLoaded && appStatus === 'SUBMITTED' && !forceEdit) {
     return (
       <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen flex flex-col">
-        <PublicTopBar activeHref="/apply" />
+        <PublicTopBar activeHref="/apply" initialUser={initialUser} />
         <Container as="main" size="content" className="flex-1 py-16 lg:py-24">
           <div className="max-w-[560px] mx-auto text-center">
             <div className="w-16 h-16 rounded-full bg-brand-50 text-brand-700 inline-flex items-center justify-center mb-6 motion-safe:animate-scale-in">
@@ -640,7 +678,7 @@ export default function TutorApply() {
   if (appLoaded && appStatus === 'NEEDS_REVISION' && !forceEdit) {
     return (
       <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen flex flex-col">
-        <PublicTopBar activeHref="/apply" />
+        <PublicTopBar activeHref="/apply" initialUser={initialUser} />
         <Container as="main" size="content" className="flex-1 py-16 lg:py-24">
           <div className="max-w-[560px] mx-auto text-center">
             <div className="w-16 h-16 rounded-full bg-warning-50 text-warning-700 inline-flex items-center justify-center mb-6 motion-safe:animate-scale-in">
@@ -674,7 +712,7 @@ export default function TutorApply() {
   if (appLoaded && appStatus === 'APPROVED') {
     return (
       <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen flex flex-col">
-        <PublicTopBar activeHref="/apply" />
+        <PublicTopBar activeHref="/apply" initialUser={initialUser} />
         <Container as="main" size="content" className="flex-1 py-16 lg:py-24">
           <div className="max-w-[560px] mx-auto text-center">
             <div className="w-16 h-16 rounded-full bg-success-100 text-success-700 inline-flex items-center justify-center mb-6 motion-safe:animate-scale-in">
@@ -697,7 +735,7 @@ export default function TutorApply() {
 
   return (
     <div className="font-sans bg-ink-50/50 text-ink-900 antialiased min-h-[1000px] flex flex-col">
-      <PublicTopBar activeHref="/apply" />
+      <PublicTopBar activeHref="/apply" initialUser={initialUser} />
 
       {/* Top horizontal progress (mobile + desktop) */}
       <div className="border-b border-ink-200 bg-white">
@@ -822,7 +860,7 @@ export default function TutorApply() {
           </div>
         </main>
 
-        <LivePreview step={step} form={form} />
+        <LivePreview step={step} form={form} media={media} />
       </div>
 
       {/* The wizard's own next/back bar is `max-lg:sticky bottom-0` INSIDE the

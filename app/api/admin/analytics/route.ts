@@ -9,7 +9,16 @@ export async function GET() {
   const now = new Date()
   const dayMs = 24 * 60 * 60 * 1000
   const sevenDaysAgo   = new Date(now.getTime() - 7 * dayMs)
-  const thirtyDaysAgo  = new Date(now.getTime() - 30 * dayMs)
+  /* The 30-day window has to be THE SAME WINDOW the chart above it draws, or
+     the dashboard contradicts itself in one glance — it read „ახალი ანგარიშები
+     48" in the chart and „30 დღეში ახალი 49" in the list directly below.
+     /api/admin/analytics/series charts 30 whole Tbilisi days (today back 29),
+     so this counts from the START of that first day rather than from this
+     instant minus 30×24h. */
+  const thirtyDaysAgo = (() => {
+    const todayTb = new Date(`${now.toLocaleDateString('sv-SE', { timeZone: 'Asia/Tbilisi' })}T00:00:00+04:00`)
+    return new Date(todayTb.getTime() - 29 * dayMs)
+  })()
 
   const [
     totalUsers, totalStudents, totalTutors, totalBookings, totalReviews,
@@ -18,6 +27,16 @@ export async function GET() {
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { role: 'STUDENT' } }),
+    /* AN EXPERT IS A PROFILE, NOT A ROLE — and the KPI card three rows up now
+       counts the same thing, so the two agree.
+       This was briefly the other way round (2026-08-12): both sides counted
+       `User.role = TUTOR`, because the one profile attached to an ADMIN account
+       looked like drift. It is not drift — the owner runs the platform AND
+       consults on it, and the roles are deliberately independent: every expert
+       surface (app/tutor/layout, /api/tutor/*, /api/me/tutor) already accepts
+       `['TUTOR', 'ADMIN']` and resolves the profile by userId.
+       Counting by role would therefore report one fewer expert than /tutors
+       actually lists, which is the same disagreement pointing the other way. */
     prisma.tutorProfile.count(),
     prisma.booking.count(),
     prisma.review.count(),

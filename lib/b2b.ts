@@ -231,6 +231,74 @@ export function businessLeadRow(input: BusinessLeadInput) {
   }
 }
 
+/* ═══════════ WHAT WE SELL, ON TWO AXES ═══════════════════════════════════
+ *
+ * The offer is „a consultation or a training, in business or sales or
+ * something else" (owner, 2026-08-12). That is TWO questions, and the catalogue
+ * used to have one field for both: production held „HR", „იურიდიული" and
+ * „ფინანსური" — areas — sitting in the same column as „ტრენინგები", a kind. So
+ * „a sales training" could be filed under its kind or under its area, never
+ * both, and /business grouped them as though they were the same axis.
+ *
+ *   kind      — CONSULTATION | TRAINING. What we do.
+ *   direction — the AREA. What it is about. Free text, the owner's words.
+ *
+ * The page leads with KIND because that is the question a company answers
+ * first, and shows the area beside each row.
+ */
+export const B2B_KINDS = ['CONSULTATION', 'TRAINING'] as const
+export type B2BKind = (typeof B2B_KINDS)[number]
+
+/** Its Georgian name. One place, so the page and the admin never disagree. */
+export function kindLabel(kind: string): string {
+  return kind === 'TRAINING' ? 'ტრენინგი' : 'კონსულტაცია'
+}
+
+/** Anything unrecognised reads as a consultation — the safe default, and the
+ *  same one the column carries, so a row can never fall out of the page. */
+export function normalizeKind(kind: string | null | undefined): B2BKind {
+  return kind === 'TRAINING' ? 'TRAINING' : 'CONSULTATION'
+}
+
+/**
+ * Does this row's AREA merely restate its KIND?
+ *
+ * Rows written before the split said „training" the only way the model let
+ * them: in `direction`. The backfill can read the kind back out of that, but it
+ * cannot invent the area that was never recorded — so „გაყიდვების ტრენინგი"
+ * still sits in direction „ტრენინგები" until the owner re-files it, and the
+ * page would print „ტრენინგი · ტრენინგები": a chip that repeats the heading
+ * above it and says nothing.
+ *
+ * So the page asks this before showing the chip, and the count of areas asks it
+ * before counting one. Nothing is rewritten in the database on a guess — the
+ * row keeps saying what it says, the page just declines to repeat itself.
+ */
+export function areaRestatesKind(kind: string | null | undefined, direction: string): boolean {
+  const d = direction.trim().toLowerCase()
+  if (!d) return true
+  return normalizeKind(kind) === 'TRAINING'
+    ? d.startsWith('ტრენინგ')
+    : d.startsWith('კონსულტაცი')
+}
+
+/** Services split by kind, in the order the page renders them: consultations
+ *  first, then trainings, each keeping the admin's `direction`/`order` sort.
+ *  A kind with nothing in it is omitted rather than rendered empty. */
+export function groupByKind<T extends { id: string; kind?: string | null; direction: string; order: number }>(rows: T[]) {
+  return B2B_KINDS
+    .map(k => [k, rows.filter(r => normalizeKind(r.kind) === k)] as const)
+    .filter(([, list]) => list.length > 0)
+    .map(([k, list]) => [
+      k,
+      // `id` is the final tiebreaker for the same reason the query carries one:
+      // two services with the same area and the same `order` must not trade
+      // places just because one of them was edited.
+      [...list].sort((a, b) =>
+        a.direction.localeCompare(b.direction, 'ka') || a.order - b.order || a.id.localeCompare(b.id)),
+    ] as [B2BKind, T[]])
+}
+
 /** Services grouped by direction, in the order the page renders them. */
 export function groupByDirection<T extends { direction: string; order: number }>(rows: T[]) {
   const out = new Map<string, T[]>()

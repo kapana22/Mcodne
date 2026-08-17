@@ -12,8 +12,65 @@ import { HEADLINE_MAX } from '@/lib/headline'
 import { APPLY } from '@/lib/applyValidation'
 import { Collapsible, FormSection, StepHeader } from './_chrome'
 import { BioCounter, Field, FieldError, Input, NameScriptHint } from './_fields'
-import { DAY_LABELS, FREE_INTRO, FormState, MAX_CATS, MIN_BIO, StepId, StepProps } from './_form'
+import { DAY_LABELS, FREE_INTRO, FormState, MAX_CATS, MediaState, MIN_BIO, OTHER_CAT_MAX, StepId, StepProps } from './_form'
 import { CertificateUploader, PhotoUploader } from './_upload'
+import { ProfessionPicker } from '@/components/ProfessionPicker'
+
+/** A sphere plus the sub-fields folded into it, as /api/categories returns it. */
+export type Sphere = { name: string; slug?: string; children: string[] }
+
+/* „ჩემი სფერო სიაში არ არის" — the escape hatch that makes the sphere step
+ * answerable by ANYONE, not only by people the taxonomy already anticipated.
+ * See OTHER_CAT_MAX in ./_form for why it is back and what is wired differently.
+ *
+ * Closed by default and opened by a plain text button: an input sitting open
+ * beside the list competes with it, which is how the deleted version collected
+ * „IT" three times while the „IT" option was on screen. Opening it CLEARS the
+ * chosen sphere, and choosing a sphere clears this — they are one answer, and a
+ * form that appears to hold both would be lying about which one it sends.
+ */
+const OtherSphere = ({ form, set }: { form: FormState; set: (patch: Partial<FormState>) => void }) => {
+  const [open, setOpen] = useState(!!form.otherCat.trim())
+  // PICKING A SPHERE CLOSES THIS PANEL. `open` is local state, so choosing one
+  // cleared `otherCat` but left the box on screen — the form then showed a
+  // chosen sphere AND an empty „write your own" input at the same time, which
+  // reads as two answers when submit only ever sends one (`cats[0] || otherCat`).
+  useEffect(() => {
+    if (form.cats.length > 0 && open) setOpen(false)
+  }, [form.cats.length, open])
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => { setOpen(true); set({ cats: [] }) }}
+        className="mt-2.5 tap-area inline-flex items-center gap-1.5 text-small font-medium text-ink-500 hover:text-brand-700 underline underline-offset-2 decoration-ink-300 hover:decoration-brand-300 transition-colors duration-fast"
+      >
+        ჩემი სფერო სიაში არ არის
+      </button>
+    )
+  }
+  return (
+    <div className="mt-2.5 rounded-btn border border-ink-200 bg-ink-50/70 px-3 py-3">
+      <Field l="დაწერე შენი სფერო" sub="ერთი-ორი სიტყვა — მაგ. „დიეტოლოგია“ ან „არქიტექტურა“. განაცხადს ეს სრულად ავსებს.">
+        <Input
+          data-field="otherCat"
+          autoFocus
+          value={form.otherCat}
+          onChange={(e: any) => set({ otherCat: e.target.value, cats: [] })}
+          placeholder="მაგ. დიეტოლოგია"
+          maxLength={OTHER_CAT_MAX}
+        />
+      </Field>
+      <button
+        type="button"
+        onClick={() => { setOpen(false); set({ otherCat: '' }) }}
+        className="mt-2 tap-area inline-flex items-center gap-1.5 text-meta font-medium text-ink-500 hover:text-ink-900 transition-colors duration-fast"
+      >
+        <Icon.x className="w-3 h-3" /> სიიდან ავირჩევ
+      </button>
+    </div>
+  )
+}
 
 /* ───── STEP 1 — Who you are + what you do (one screen) ─────
  * Merges the old "contact" step with the old expertise step, minus everything
@@ -25,7 +82,6 @@ import { CertificateUploader, PhotoUploader } from './_upload'
  * in Georgian, and it was the last hard gate before the finish line — the
  * server has only ever asked for 20. */
 export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
-  type Sphere = { name: string; children: string[] }
   const [dbCats, setDbCats] = useState<Sphere[]>([])
   useEffect(() => {
     let cancelled = false
@@ -35,7 +91,11 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
         if (cancelled || !Array.isArray(rows)) return
         setDbCats(rows
           .filter(c => c?.name)
-          .map(c => ({ name: c.name as string, children: (c.children ?? []).map((k: any) => k?.name).filter(Boolean) as string[] })))
+          .map(c => ({
+            name: c.name as string,
+            slug: c.slug as string | undefined,
+            children: (c.children ?? []).map((k: any) => k?.name).filter(Boolean) as string[],
+          })))
       })
       .catch(() => {})
     return () => { cancelled = true }
@@ -44,31 +104,31 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
   // matches the applicant's answer BY NAME — a stale fallback lets somebody
   // pick a category that then resolves to nothing.
   //
-  // Nine, not six: the three spheres that are hidden from browse are offered
-  // here on purpose. „კარიერა" is hidden because it has no expert yet, and if
-  // this screen cannot offer it, nobody can ever be its first. Sub-fields
-  // arrive with the fetch; the fallback only has to keep the form usable.
+  // It went stale exactly that way and this is the repair (2026-08-11, verified
+  // against all 15 production rows): „ბიზნესი და ფინანსები" and „გადასახადები"
+  // were renamed by the taxonomy realignment, and „რელოკაცია" was offered here
+  // while no such category has ever existed in the database — an applicant who
+  // picked it during an API blip was guaranteed to be filed nowhere.
+  //
+  // Eight, not six: the two spheres hidden from browse are offered here on
+  // purpose. „კარიერა" is hidden because it has no expert yet, and if this
+  // screen cannot offer it, nobody can ever be its first. Sub-fields arrive
+  // with the fetch; the fallback only has to keep the form usable.
   const SPHERES: Sphere[] = dbCats.length ? dbCats : [
-    { name: 'ბიზნესი და ფინანსები', children: [] },
-    { name: 'მარკეტინგი და გაყიდვები', children: [] },
-    { name: 'ტექნოლოგია და პროდუქტი', children: [] },
-    { name: 'გადასახადები', children: [] },
-    { name: 'ფსიქოლოგია', children: [] },
-    { name: 'სამართალი', children: [] },
-    { name: 'კარიერა', children: [] },
-    { name: 'უძრავი ქონება', children: [] },
-    { name: 'რელოკაცია', children: [] },
+    { name: 'ბიზნესი და სტრატეგია', slug: 'business', children: [] },
+    { name: 'ფინანსები და გადასახადები', slug: 'tax', children: [] },
+    { name: 'სამართალი', slug: 'law', children: [] },
+    { name: 'მარკეტინგი და გაყიდვები', slug: 'marketing', children: [] },
+    { name: 'ტექნოლოგია და პროდუქტი', slug: 'it', children: [] },
+    { name: 'ფსიქოლოგია', slug: 'psychology', children: [] },
+    { name: 'კარიერა', slug: 'career', children: [] },
+    { name: 'უძრავი ქონება', slug: 'real-estate', children: [] },
   ]
-  const cats = form.cats
-  const toggle = (c: string) => set({ cats: cats.includes(c) ? cats.filter(x => x !== c) : [...cats, c] })
 
-  /* ONE answer — see MAX_CATS in ./_form for why the „1–3" it used to ask for
-     was undeliverable. Tapping a sphere replaces whatever was chosen; tapping
-     its sub-field narrows that same answer; tapping the chosen one again
-     clears it. There is no cap to explain and no „main one" to work out. */
-  const sphereOn = (s: Sphere) => cats.includes(s.name) || s.children.some(k => cats.includes(k))
-  const pickSphere = (s: Sphere) => set({ cats: sphereOn(s) ? [] : [s.name] })
-  const pickChild = (s: Sphere, k: string) => set({ cats: cats.includes(k) ? [s.name] : [k] })
+  /* ONE answer — see MAX_CATS in ./_form for why the „1–3" it once asked for
+     was undeliverable. The picker enforces it by shape: choosing anything
+     replaces the previous answer, so there is no cap to explain and no „which
+     of my three is the main one" to work out. */
 
   return (
     <>
@@ -145,81 +205,37 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
         </div>
       </Collapsible>
 
-      {/* „პირველივე გახდება მთავარი" is not a style note: submitApplication()
-          sends `cats[0]` as the specialty, and approval resolves the live
-          Category from it — the rest are context for the moderator. */}
-      <FormSection title="სფერო" required fields={['cats']} sub="აირჩიე შენი სფერო. თუ უფრო კონკრეტული მიმართულება გაქვს, ქვემოთ აირჩიე.">
-        {/* The `cats` anchor moved here from the deleted free-text box. Without
-            it „აირჩიე სფერო." would render with nowhere to scroll to —
-            tests/apply-error-focus.test.ts F2 catches exactly that. */}
-        {/* TWO TIERS (2026-08-10, reworked 08-11). Six spheres is what a
-            CLIENT should have to read; it is not what an EXPERT should have to
-            call themselves — a designer's only answer would otherwise be
-            „ტექნოლოგია და პროდუქტი".
-
-            The first attempt put the sub-fields in a bare indented row under
-            the whole chip wall. Chips wrap, so that row landed nowhere near the
-            sphere it belonged to: „გაყიდვები" appeared alone at the bottom
-            while its parent sat two rows up, reading as a stray seventh option.
-            A relationship you cannot see is not a hierarchy. Hence a panel that
-            NAMES its sphere — the name is data, not a caption to write.
-
-            Being precise costs nothing: a sub-field's experts fold up into its
-            sphere for the count and the filter, and it has a page of its own. */}
-        <div data-field="cats" className="flex flex-col gap-2.5">
-          <div className="flex flex-wrap gap-1.5">
-            {SPHERES.map(s => {
-              const on = sphereOn(s)
-              return (
-                <button
-                  key={s.name}
-                  type="button"
-                  onClick={() => pickSphere(s)}
-                  className={`h-9 px-3.5 rounded-pill border font-display text-small font-semibold tracking-wide inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] ${
-                    on ? 'bg-brand-600 text-white border-brand-500 shadow-sm' : 'bg-white text-ink-700 border-ink-200 hover:border-ink-400'
-                  }`}
-                >
-                  {on && <Icon.check className="w-3 h-3" />}
-                  {s.name}
-                </button>
-              )
-            })}
-          </div>
-          {SPHERES.filter(s => sphereOn(s) && s.children.length > 0).map(s => (
-            <div key={s.name} className="rounded-btn border border-ink-200 bg-ink-50/70 px-3 py-2.5">
-              <div className="font-display text-micro font-semibold uppercase text-ink-500 mb-2">{s.name}</div>
-              <div className="flex flex-wrap gap-1.5">
-                {s.children.map(k => {
-                  const on = cats.includes(k)
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => pickChild(s, k)}
-                      className={`h-8 px-3 rounded-pill border font-display text-small font-semibold inline-flex items-center gap-1.5 transition-all duration-fast motion-safe:active:scale-[0.97] ${
-                        on ? 'bg-brand-600 text-white border-brand-500' : 'bg-white text-ink-700 border-ink-200 hover:border-ink-400'
-                      }`}
-                    >
-                      {on && <Icon.check className="w-3 h-3" />}
-                      {k}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
+      {/* SPHERE + PROFESSIONS — see ./_professionPicker for why both levels are
+          on screen at once and why the sphere is control number one.
+          The sphere is now CHOSEN rather than derived, so `cats[0]` is set
+          directly: submit still sends it as `specialty` and approval still
+          resolves the Category from that name. Nothing downstream changed. */}
+      <FormSection title="სფერო და პროფესია" required fields={['cats']} sub="აირჩიე სფერო, მერე მონიშნე რას აკეთებ — რამდენიც გინდა.">
+        {/* The `cats` anchor lives HERE, not inside the shared picker: it is
+            this form's scroll target for „აირჩიე სფერო." and a component used
+            on two screens must not carry one screen's error plumbing.
+            tests/apply-error-focus.test.ts F2 reads this directory for it. */}
+        <div data-field="cats">
+        <ProfessionPicker
+          spheres={SPHERES.map(s => ({ slug: s.slug ?? '', name: s.name }))}
+          sphere={form.cats[0] ?? ''}
+          onSphere={name => set({ cats: name ? [name] : [], otherCat: '' })}
+          value={form.professions}
+          onChange={next => set({ professions: next, otherCat: '' })}
+        />
         </div>
         <FieldError name="cats" />
 
-        {/* The „სფერო სიაში არ არის?" free-text box was removed 2026-08-05.
-            MEASURED before deleting: 8 of the 16 people who finished step 1 typed
-            something into it, and exactly ONE of those strings was ever stored —
-            `requestedCategory` was written only when NO chip was picked, so the
-            other seven were discarded at submit and nobody ever read them. What
-            the surviving entries showed was not rare professions but people
-            retyping a category that already exists („IT" three times, with the
-            „IT და პროგრამირება" chip on screen). That is a chip-labelling
-            problem, and it is not solved by a second input. */}
+        {/* RESTORED 2026-08-11 — see OTHER_CAT_MAX in ./_form for the full
+            reasoning, including why the 2026-08-05 deletion was right about the
+            old field and wrong about the need.
+            Short version: the step gate gated on `cats.length >= 1`, so anyone
+            whose field is not on the list could not submit at all. Now typing
+            here IS a complete answer.
+            It sits behind a link on purpose. The deleted version was an open
+            input beside the chip wall, which is what invited „IT" to be typed
+            instead of tapped; you have to go looking for this one. */}
+        <OtherSphere form={form} set={set} />
       </FormSection>
 
       {/* The placeholder used to read „მაგ. ბიზნეს-სტრატეგი · 12 წელი" — a worked
@@ -531,7 +547,7 @@ const AvailabilityPicker = ({ form, set }: { form: FormState; set: (patch: Parti
 }
 
 /* ───── Live preview card (right side) ───── */
-export const LivePreview = ({ step, form }: { step: StepId; form: FormState }) => {
+export const LivePreview = ({ step, form, media }: { step: StepId; form: FormState; media?: MediaState }) => {
   const displayName = `${form.firstName} ${form.lastName}`.trim() || 'შენი სახელი'
   // City and years are no longer asked for during onboarding (they moved to the
   // profile editor), so this line is normally empty. It stays because a
@@ -554,10 +570,27 @@ export const LivePreview = ({ step, form }: { step: StepId; form: FormState }) =
     <article className="rounded-card border border-ink-200 bg-white shadow-card overflow-hidden transition-shadow duration-fast hover:shadow-float">
       <div className="h-14 bg-gradient-to-br from-brand-100 to-brand-50 border-b border-ink-100" aria-hidden />
       <div className="px-4 pb-4 -mt-8">
+        {/* THE PHOTO THEY JUST UPLOADED — not an initial (2026-08-11).
+            This card is captioned „თქვენი პროფილი" and sits beside the form as
+            the answer to „ასე დაინახავენ სტუდენტები". The photo is REQUIRED and
+            is uploaded on this very screen, yet the preview always drew a
+            letter on a green tile: the applicant added their face and the
+            preview kept showing a monogram, which says the photo did not take.
+            It is also the single most consequential thing on a real card, so
+            previewing everything except it is previewing the wrong card.
+            The initial stays as the empty state, where it belongs. */}
         <div className="relative inline-block">
-          <div className="w-16 h-16 rounded-card bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center ring-4 ring-white shadow-sm font-display text-h2 font-bold text-white">
-            {(form.firstName[0] || 'მ').toUpperCase()}
-          </div>
+          {media?.photoUrl ? (
+            <img
+              src={media.photoUrl}
+              alt=""
+              className="w-16 h-16 rounded-card object-cover ring-4 ring-white shadow-sm bg-ink-100"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-card bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center ring-4 ring-white shadow-sm font-display text-h2 font-bold text-white">
+              {(form.firstName[0] || 'მ').toUpperCase()}
+            </div>
+          )}
         </div>
         <div className="mt-2.5 min-w-0">
           <div className="flex items-center gap-1.5">

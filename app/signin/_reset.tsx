@@ -135,7 +135,8 @@ export const ResetView = ({ setView }: { setView: (v: View) => void }) => {
         })}
       </ol>
 
-      <div className="bg-white rounded-card border border-ink-200 shadow-card p-7 lg:p-10 motion-safe:animate-scale-in">
+      {/* Same card, same fix as _signin.tsx — see the note there. */}
+      <div className="bg-white rounded-card border border-ink-200 shadow-card p-7 lg:p-10 motion-safe:animate-fade-in">
 
         {errMsg && (
           <div role="alert" className="mb-4 rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-small font-medium">

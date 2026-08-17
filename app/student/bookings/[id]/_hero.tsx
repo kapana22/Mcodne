@@ -56,7 +56,8 @@ export const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; on
   // empty room is misleading, so past-end sessions get an honest closing state.
   const sessionOver = Date.now() > end.getTime()
   const tutorFullName = booking.tutor.user.fullName
-  const tutorSpecialty = booking.tutor.specialty ?? booking.tutor.category?.name ?? 'ექსპერტი'
+  // Category first, `specialty` only as the fallback — see app/tutors/_data.tsx.
+  const tutorSpecialty = booking.tutor.category?.name ?? booking.tutor.specialty ?? 'ექსპერტი'
 
   return (
     <Container as="section" className="pt-5">

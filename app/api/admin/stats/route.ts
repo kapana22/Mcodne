@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
+import { BOOKING_REVENUE_ONLY } from '@/lib/packages'
 import { isBookingLive } from '@/lib/bookingLive'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { b2bFeatureExists } from '@/lib/b2b'
+import { requestsFeatureExists } from '@/lib/requests'
 
 export async function GET() {
   const auth = await requireRoleApi('ADMIN')
@@ -13,14 +15,23 @@ export async function GET() {
   const now = Date.now()
   const liveWindowStart = new Date(now - 240 * 60_000)
   await ensureDbReady().catch(() => {})
-  const [users, tutors, students, bookings, pendingApps, completed, revenue, liveCandidates, helpOpen, b2bLeads] = await Promise.all([
+  const [users, tutors, students, bookings, pendingApps, completed, revenue, pkgRevenue, liveCandidates, helpOpen, b2bLeads, newRequests] = await Promise.all([
     prisma.user.count(),
-    prisma.user.count({ where: { role: 'TUTOR' } }),
+    // Profiles, not roles — see the note in /api/admin/analytics. An expert is
+    // somebody with a TutorProfile; the role decides what else they may do.
+    prisma.tutorProfile.count(),
     prisma.user.count({ where: { role: 'STUDENT' } }),
     prisma.booking.count(),
     prisma.tutorApplication.count({ where: { status: 'SUBMITTED' } }),
     prisma.booking.count({ where: { status: 'COMPLETED' } }),
-    prisma.booking.aggregate({ _sum: { price: true }, where: { status: 'COMPLETED' } }),
+    // THE REVENUE RULE (lib/packages → BOOKING_REVENUE_ONLY). Without the
+    // exclusion this summed a package lesson's per-lesson SHARE on top of the
+    // lump already taken at the Enrollment — so the dashboard headline, and the
+    // „კომისია ≈ 15%" derived from it, both over-reported. The package money is
+    // added back below from the Enrollment, exactly as /api/admin/finance and
+    // /api/tutor/earnings do it; all three now answer the same number.
+    prisma.booking.aggregate({ _sum: { price: true }, where: { status: 'COMPLETED', ...BOOKING_REVENUE_ONLY } }),
+    prisma.enrollment.aggregate({ _sum: { priceTotal: true }, where: { paidAt: { not: null } } }),
     prisma.booking.findMany({
       where: { status: { in: ['CONFIRMED', 'LIVE'] }, startAt: { gte: liveWindowStart, lte: new Date(now) } },
       select: { status: true, startAt: true, durationMin: true },
@@ -44,11 +55,18 @@ export async function GET() {
     b2bFeatureExists()
       ? prisma.businessLead.count({ where: { status: 'NEW' } }).catch(() => 0)
       : Promise.resolve(0),
+    // Unverified requests — the same kind of number as the two above: a queue
+    // with a person waiting for a PHONE CALL at the other end, and the whole
+    // feature dies if it goes unopened for a day. Same .catch(() => 0)
+    // contract: a badge is never worth 500-ing the shell over.
+    requestsFeatureExists()
+      ? prisma.serviceRequest.count({ where: { status: 'NEW' } }).catch(() => 0)
+      : Promise.resolve(0),
   ])
   // Derived truth — the stored LIVE status is never written (see lib/bookingLive).
   const live = liveCandidates.filter(isBookingLive).length
   return NextResponse.json({
-    users, tutors, students, bookings, pendingApps, completed, live, helpOpen, b2bLeads,
-    revenue: (revenue as any)._sum?.price ?? 0,
+    users, tutors, students, bookings, pendingApps, completed, live, helpOpen, b2bLeads, newRequests,
+    revenue: ((revenue as any)._sum?.price ?? 0) + ((pkgRevenue as any)._sum?.priceTotal ?? 0),
   })
 }

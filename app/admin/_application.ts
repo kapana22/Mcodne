@@ -102,6 +102,7 @@ const EXTRA_LABELS: Record<string, string> = {
   certifications: 'სერტიფიკატები',
   industries: 'ინდუსტრიები',
   requestedCategory: 'მოთხოვნილი სფერო',
+  professions: 'პროფესიები',
 }
 
 function flatten(v: unknown): string {

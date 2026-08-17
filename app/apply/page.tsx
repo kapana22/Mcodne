@@ -31,5 +31,5 @@ export default async function Page() {
   if (user.role === 'TUTOR') redirect('/tutor')
   if (user.role === 'ADMIN') redirect('/admin')
 
-  return <TutorApply />
+  return <TutorApply initialUser={user as any} />
 }

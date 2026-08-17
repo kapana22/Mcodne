@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { notify } from '@/lib/notify'
@@ -7,7 +8,10 @@ import { notify } from '@/lib/notify'
 const Body = z.object({
   bookingId: z.string(),
   rating: z.number().int().min(1).max(5),
-  body: z.string().min(3).max(2000),
+  // Public on the expert's profile, so it carries the same language gate as
+  // every other public text. The SHARE rule (lib/georgianText), not the strict
+  // name one — a review legitimately names „Google Ads" or „1C".
+  body: z.string().min(3).max(2000).superRefine(georgianRefine('შეფასება')),
   // Hide the reviewer's identity on the public tutor profile (the tutor still
   // sees the review content; /api/tutors/[id] nulls `student` when set).
   anonymous: z.boolean().optional(),
@@ -21,7 +25,12 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
 
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
-  if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+  if (!parsed.success) {
+    // Our own copy (the Georgian-language gate) reaches the field; zod's
+    // English stays behind the generic code.
+    const msg = firstGeorgianMessage(parsed.error)
+    return NextResponse.json({ ok: false, error: msg ? 'INVALID_TEXT' : 'INVALID', message: msg ?? undefined }, { status: 400 })
+  }
 
   const booking = await prisma.booking.findFirst({
     where: { id: parsed.data.bookingId, studentId: user.id },

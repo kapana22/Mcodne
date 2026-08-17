@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
-import { georgianRefine } from '@/lib/georgianText'
+import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
 import { packagesFeatureExists, PACKAGE_LESSON_COUNTS } from '@/lib/packages'
 
 // Edit / remove one package. Same ownership rules as the consultations route
@@ -46,7 +46,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const parsed = UpdateBody.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) {
-    const msg = parsed.error.issues.find(i => /[Ⴀ-ჿᲐ-Ჿ]/.test(i.message))?.message ?? null
+    const msg = firstGeorgianMessage(parsed.error)
     return NextResponse.json({ ok: false, error: msg ? 'INVALID_TEXT' : 'INVALID', message: msg ?? undefined }, { status: 400 })
   }
 

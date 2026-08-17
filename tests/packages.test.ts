@@ -19,7 +19,7 @@
 //   D. Booking.enrollmentId must stay NULLABLE — every booking that exists
 //      today has no enrollment, and a NOT NULL column would fail to add.
 
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
 const root = join(__dirname, '..')
@@ -412,6 +412,38 @@ const flags = read('lib/flags.ts')
 // Found 2026-08-05 during a review pass: the rule below existed as a COMMENT on
 // the schema for two days and was never applied to either aggregate. A rule that
 // lives only in prose is a rule that is not enforced.
+// ⚠️ AND IT WAS PINNED TOO NARROWLY (2026-08-12). This block named the two
+// files where the rule had ALREADY been applied, so it could only ever pass. It
+// never looked at /api/admin/stats, /api/admin/analytics/series or
+// /api/tutor/bookings — all three of which were summing package lessons as
+// revenue, and the first two feed the admin dashboard's headline number and the
+// „კომისია ≈ 15%" derived from it. The sweep below finds the call sites instead
+// of trusting a list somebody has to remember to update.
+{
+  const moneyRoutes: string[] = []
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name)
+      if (e.isDirectory()) walk(p)
+      else if (e.name === 'route.ts') moneyRoutes.push(p)
+    }
+  }
+  walk(join(root, 'app/api'))
+  const offenders = moneyRoutes.filter(p => {
+    const src = readFileSync(p, 'utf8')
+    // Prisma aggregates over Booking.price…
+    const sums = (src.match(/_sum: \{ price: true \}/g) || []).length
+    const excl = (src.match(/BOOKING_REVENUE_ONLY/g) || []).length
+    if (sums > excl) return true
+    // …and the raw-SQL form, which no `BOOKING_REVENUE_ONLY` spread can reach.
+    return /sum\(price\)/i.test(src) && !/"enrollmentId" IS NULL/.test(src)
+  })
+  check(
+    `L0: every booking money sum in app/api excludes package lessons${offenders.length ? ` — ${offenders.map(p => p.slice(root.length + 1)).join(', ')}` : ''}`,
+    offenders.length === 0,
+    'A package lesson price is a share of money already taken at the Enrollment. Spread BOOKING_REVENUE_ONLY in (or add `"enrollmentId" IS NULL` in raw SQL), then add the Enrollment back.',
+  )
+}
 {
   const earn = read('app/api/tutor/earnings/route.ts')
   const fin = read('app/api/admin/finance/route.ts')

@@ -9,6 +9,7 @@ import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { EmptyState } from '@/components/EmptyState'
 import { queryTutors } from '@/lib/tutorsQuery'
+import { primaryPrice } from '@/components/booking/slots'
 import { categorySeo, fallbackSeo } from '@/lib/categorySeo'
 import { professions, professionBySlug } from '@/lib/professionSeo'
 import { jsonLdString } from '@/lib/jsonLd'
@@ -168,7 +169,10 @@ export default async function ProfessionPage({ params }: { params: Promise<{ slu
               {experts.map(t => {
                 const name = t.user?.fullName ?? 'ექსპერტი'
                 const rating = typeof t.rating === 'number' ? t.rating : 0
-                const price = typeof t.price === 'number' ? t.price : null
+                // The FLAGSHIP service's price, never the flat rate — the same
+                // shared rule /tutors, the profile and the home grid use. The
+                // two differ for any expert who set one and priced the other.
+                const price = primaryPrice(t.consultations ?? [], typeof t.price === 'number' ? t.price : 0) || null
                 return (
                   <Link key={t.id} href={`/tutors/${t.slug || t.id}`} className="group rounded-card border border-ink-200 bg-white p-5 flex flex-col hover-lift transition-all duration-fast">
                     <div className="flex items-center gap-3">
@@ -178,12 +182,26 @@ export default async function ProfessionPage({ params }: { params: Promise<{ slu
                       <img src={t.user?.avatarUrl || DEFAULT_AVATAR} alt={name} loading="lazy" decoding="async" width={56} height={56} className="w-14 h-14 rounded-full object-cover ring-1 ring-ink-200" />
                       <div className="min-w-0">
                         <div className="font-display text-body-lg font-bold text-ink-900 truncate group-hover:text-brand-700 transition-colors duration-fast">{name}</div>
-                        {t.specialty && <div className="text-meta text-ink-500 truncate">{t.specialty}</div>}
+                        {/* The CATEGORY, not `specialty` — every card on this
+                            page is already inside one sphere, and `specialty`
+                            is a frozen copy of the category name from approval
+                            day that contradicts it after a rename. */}
+                        {(t.category?.name ?? t.specialty) && <div className="text-meta text-ink-500 truncate">{t.category?.name ?? t.specialty}</div>}
                       </div>
                     </div>
                     <div className="mt-4 pt-3 border-t border-ink-100 flex items-center justify-between text-meta">
                       <span className="inline-flex items-center gap-1 text-ink-600">
-                        {rating > 0 ? <><Icon.star className="w-3.5 h-3.5 text-warning-500" /> {rating.toFixed(1)}</> : <span className="text-ink-400">ახალი</span>}
+                        {/* An unrated expert renders NOTHING here — the same decision
+                            app/tutors/_card.tsx took on 2026-07-31 and wrote down:
+                            „a badge earns its place by DISTINGUISHING, and on
+                            production it sat on 9 of 9 cards, so it distinguished
+                            nobody and instead told every first-time visitor, once
+                            per card, that the marketplace is empty."
+                            That decision never reached this page. Measured
+                            2026-08-13: „ახალი" was on 6 of 6 cards here and 0 of 21
+                            on /tutors — and THIS is the page a stranger lands on
+                            from Google. */}
+                        {rating > 0 && <><Icon.star className="w-3.5 h-3.5 text-warning-500" /> {rating.toFixed(1)}</>}
                       </span>
                       {price != null && <span className="font-display font-bold text-ink-900 tabular-nums">₾{price}</span>}
                     </div>
@@ -195,11 +213,19 @@ export default async function ProfessionPage({ params }: { params: Promise<{ slu
         </section>
 
         {/* Cross-link to the sphere page. This is the pair that keeps the two
-            keyword families connected instead of competing. */}
+            keyword families connected instead of competing.
+            GUARDED on there being experts (2026-08-11): a profession page whose
+            `categorySlug` no longer resolves — twelve empty sub-categories were
+            retired once professions replaced them — would link straight to a
+            404. `experts.length > 0` is the honest proxy: the category exists
+            and has somebody in it, which is also the only case where „see the
+            whole sphere" leads anywhere worth going. */}
         <div className="mt-12 flex flex-wrap items-center gap-x-6 gap-y-2">
-          <Link href={`/categories/${p.categorySlug}`} className="tap-area inline-flex items-center gap-1.5 text-body font-semibold text-brand-700 hover:underline">
-            {sphere.keyword} <Icon.arrow className="w-3.5 h-3.5" />
-          </Link>
+          {experts.length > 0 && (
+            <Link href={`/categories/${p.categorySlug}`} className="tap-area inline-flex items-center gap-1.5 text-body font-semibold text-brand-700 hover:underline">
+              {sphere.keyword} <Icon.arrow className="w-3.5 h-3.5" />
+            </Link>
+          )}
           <Link href="/tutors" className="tap-area inline-flex items-center gap-1.5 text-body font-semibold text-ink-700 hover:underline">
             ყველა ექსპერტი
           </Link>

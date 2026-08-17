@@ -13,6 +13,7 @@ import { HEADLINE_MAX } from '@/lib/headline'
 import { normalizeLangs } from '@/lib/languages'
 import { Field } from './_parts'
 import type { Category, Me, ProfileForm, TutorProfile } from './_types'
+import { ProfessionPicker } from '@/components/ProfessionPicker'
 
 type Props = {
   me: Me
@@ -122,53 +123,29 @@ export function ProfileTab({ me, profile, loading, form, setForm, dirty, savingP
                 in `form.specialty` and saved unchanged, so nothing is lost
                 for existing profiles and the approval flow keeps writing it. */}
 
-            {/* Category — REQUIRED for public discovery. Without a live category
-                the browse query hides the expert entirely, so surface a quiet
-                inline warning while it's unset. Saved via the shared saveProfile
-                PATCH (categoryId is part of `form`). */}
-            <Field label="კატეგორია">
-              <select
-                value={form.categoryId}
-                onChange={e => setForm({ ...form, categoryId: e.target.value })}
-                className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-400 focus:outline-none"
-              >
-                <option value="">აირჩიე კატეგორია</option>
-                {/* Their OWN category first, when it is no longer one of the
-                    spheres. „ფინანსები" was folded into „ბიზნესი და
-                    ფინანსები" on 2026-08-10 — the expert was not moved, and
-                    their profile still says „ფინანსები", so the picker has to
-                    be able to show it. Without this the select renders blank
-                    and reads as „my category was deleted"; the unset warning
-                    below cannot explain it, because the field is not unset. */}
-                {profile?.category
-                  && categories.every(c => c.id !== profile.category!.id)
-                  && categories.every(c => (c.children ?? []).every(k => k.id !== profile.category!.id)) && (
-                  <option value={profile.category.id}>{profile.category.name}</option>
-                )}
-                {/* Grouped: the sphere is the heading, its sub-fields sit under
-                    it. An expert should be able to say „ფინანსები" rather than
-                    „ბიზნესი და ფინანსები" — they still appear under the sphere
-                    in browse, because the count and the filter fold. */}
-                {categories.map(c => (
-                  (c.children ?? []).length > 0
-                    ? (
-                      <optgroup key={c.id} label={c.name}>
-                        <option value={c.id}>{c.name}</option>
-                        {(c.children ?? []).map(k => (
-                          <option key={k.id} value={k.id}>{k.name}</option>
-                        ))}
-                      </optgroup>
-                    )
-                    : <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+            {/* SPHERE + PROFESSIONS — the SAME control /apply uses
+                (components/ProfessionPicker). It replaced a lone category
+                <select> here, which asked half the question: an expert could
+                say „მარკეტინგი და გაყიდვები" but not that they are a
+                marketer AND a graphic designer. Two screens asking one question
+                two different ways is how the category vocabulary drifted apart
+                in the first place.
+                Both values ride the existing saveProfile PATCH. */}
+            <div className="mb-5">
+              <ProfessionPicker
+                spheres={categories.map(c => ({ slug: c.slug, name: c.name }))}
+                sphere={categories.find(c => c.id === form.categoryId)?.name ?? ''}
+                onSphere={name => setForm({ ...form, categoryId: categories.find(c => c.name === name)?.id ?? '' })}
+                value={form.professions}
+                onChange={next => setForm({ ...form, professions: next })}
+              />
               {!form.categoryId && (
-                <p className="mt-1.5 flex items-start gap-1.5 text-meta text-warning-700 leading-snug">
+                <p className="mt-2 flex items-start gap-1.5 text-meta text-warning-700 leading-snug">
                   <Icon.warn className="w-3.5 h-3.5 shrink-0 mt-px" />
-                  <span>მის გარეშე პროფილი ვერ გამოჩნდება.</span>
+                  <span>მის გარეშე ვერცერთ სფეროში და ვერც ფილტრში ვერ მოგნახავენ.</span>
                 </p>
               )}
-            </Field>
+            </div>
 
             {/* The single most consequential text on the profile — it is what
                 a client reads before booking and what Google indexes — and it

@@ -74,7 +74,16 @@ export type MediaState = {
 
 export type FormState = {
   firstName: string; lastName: string; email: string; phone: string
-  cats: string[]; headline: string; motivation: string; city: string; yearsExp: string; linkedin: string; website: string
+  /** The SPHERE, as a one-element array. Derived from `professions` since
+   *  2026-08-11 — see MAX_CATS. Kept an array so `cats[0]` stays the submit
+   *  contract and nothing downstream had to change. */
+  cats: string[]
+  /** What the applicant IS — „ბუღალტერი", „მარკეტოლოგი". Several allowed
+   *  (lib/professions → MAX_PROFESSIONS); the sphere is read off the first. */
+  professions: string[]
+  /** „ჩემი სფერო სიაში არ არის" — the applicant's own words. See OTHER_CAT_MAX. */
+  otherCat: string
+  headline: string; motivation: string; city: string; yearsExp: string; linkedin: string; website: string
   introVideoUrl: string
   languages: string[]
   services: { name: string; dur: number; price: number; free: boolean; desc: string }[]
@@ -103,7 +112,7 @@ export const FREE_INTRO: FormState['services'][number] = {
 
 export const INITIAL_FORM: FormState = {
   firstName: '', lastName: '', email: '', phone: '',
-  cats: [], headline: '', motivation: '', city: '', yearsExp: '', linkedin: '', website: '',
+  cats: [], professions: [], otherCat: '', headline: '', motivation: '', city: '', yearsExp: '', linkedin: '', website: '',
   introVideoUrl: '',
   languages: ['ქართული'],
   services: [
@@ -199,6 +208,37 @@ export const SERVER_FIELD: Record<string, string> = {
  * first entry, so nobody is blocked by a form they filled in yesterday.
  */
 export const MAX_CATS = 1
+
+/**
+ * „ჩემი სფერო სიაში არ არის" — RESTORED 2026-08-11, wired differently.
+ *
+ * THE VERSION THAT WAS DELETED (2026-08-05) DESERVED IT. It stored the typed
+ * value only when NO chip was picked, so 7 of the 8 people who used it had
+ * their answer thrown away in the browser; and what the one surviving entry
+ * showed was somebody retyping a category that already existed. Both true.
+ *
+ * But removing it closed the only door a NEW field can come through. The step-1
+ * gate requires `cats.length >= 1`, so today a dietician, an architect or a
+ * customs consultant literally cannot submit the form: they pick the nearest
+ * wrong chip, or they leave. Neither outcome reaches anyone who could act on it.
+ *
+ * Three things are different now, and each one answers a specific failure of
+ * the old field:
+ *
+ *   1. IT IS ALWAYS STORED (professionData.requestedCategory), chip or no chip.
+ *      That was the actual bug — not the field's existence.
+ *   2. IT SATISFIES THE GATE. Typing here is a complete answer: `specialty`
+ *      falls back to it and the application submits. Nobody has to lie to pass.
+ *   3. IT IS BEHIND A LINK, not a second input under the chips. The old one sat
+ *      open beside the wall of chips and invited „IT" to be typed instead of
+ *      tapped. You have to go looking for this one, which is the right amount of
+ *      friction for the rarer answer.
+ *
+ * The moderator sees it on the application (the approve-time category select is
+ * where it turns into a real category) and the admin sees the aggregate, so the
+ * taxonomy grows from what people asked for instead of from guesswork.
+ */
+export const OTHER_CAT_MAX = APPLY.OTHER_CAT_MAX
 
 export const MIN_BIO = APPLY.BIO_MIN
 export const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())

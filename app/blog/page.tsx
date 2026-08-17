@@ -41,9 +41,26 @@ async function getPosts() {
     return await prisma.post.findMany({
       where: { status: 'PUBLISHED' },
       orderBy: { publishedAt: 'desc' },
-      select: { slug: true, title: true, excerpt: true, tag: true, coverUrl: true, publishedAt: true, body: true },
+      select: { slug: true, title: true, excerpt: true, tag: true, publishedAt: true, body: true },
     })
   } catch { return [] }
+}
+
+/* COVER VERSIONS, NOT COVER BYTES. `coverUrl` is a base64 image; selecting it
+   here put every cover into the HTML — measured 2026-08-14, that took /blog to
+   622 KB, re-sent on every navigation and cached by nothing (the /api/avatars
+   measurement, again). Prisma cannot compute a boolean, so the column is read
+   in a second, narrow query and reduced to (slug → cache key) immediately.
+   The <img> then points at /api/blog/[slug]/cover?v=…, which the browser
+   caches per post. */
+async function coverVersions(): Promise<Map<string, string>> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<{ slug: string; v: string }[]>(
+      `SELECT "slug", (length("coverUrl") || right("coverUrl", 8)) AS v
+         FROM "Post" WHERE "status" = 'PUBLISHED' AND "coverUrl" IS NOT NULL AND "coverUrl" <> ''`,
+    )
+    return new Map(rows.map(r => [r.slug, r.v]))
+  } catch { return new Map() }
 }
 
 // Reading time, from the real body — Georgian mkhedruli reads at roughly 160
@@ -56,7 +73,7 @@ function readMin(body: string): number {
 }
 
 export default async function BlogPage() {
-  const [rows, tagSlugs] = await Promise.all([getPosts(), getTagSlugs()])
+  const [rows, tagSlugs, covers] = await Promise.all([getPosts(), getTagSlugs(), coverVersions()])
   const posts = rows.map(({ body, ...p }) => ({ ...p, readMin: readMin(body || '') }))
 
   // Blog + ItemList so the index is understood as a publication with N posts,
@@ -121,9 +138,9 @@ export default async function BlogPage() {
                       quiet neutral with the section glyph: it reads as „no
                       image yet", not as a broken one. */}
                   <div className="aspect-[16/9] w-full overflow-hidden bg-ink-100 border-b border-ink-100 relative">
-                    {p.coverUrl ? (
+                    {covers.has(p.slug) ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.coverUrl} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-slow ease-out-quart group-hover:scale-[1.03]" />
+                      <img src={`/api/blog/${p.slug}/cover?v=${encodeURIComponent(covers.get(p.slug)!)}`} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-slow ease-out-quart group-hover:scale-[1.03]" />
                     ) : (
                       <div className="w-full h-full bg-ink-50 grain inline-flex items-center justify-center text-ink-300 transition-colors duration-mid group-hover:text-brand-300">
                         {p.tag && tagSlugs[p.tag]

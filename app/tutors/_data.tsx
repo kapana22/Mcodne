@@ -55,6 +55,8 @@ export type Tutor = {
   // `video` gates the play button on the card; the popup extracts the
   // 11-char ID at open time to render the nocookie iframe.
   videoUrl?: string | null
+  /** The category's display NAME, or '' when the expert has none. NEVER the
+   *  `specialty` free text — see the mapper below. The card omits the chip on ''. */
   cat: string
   // Category SLUG (category.slug) — the stable filter key. `cat` above stays the
   // display NAME the card shows; filtering matches on this slug so renames and
@@ -62,6 +64,9 @@ export type Tutor = {
   catSlug?: string | null
   /** The expert's actual category, when it differs from the sphere. */
   catOwnSlug?: string | null
+  /** What they call themselves (lib/professions) — what tells two experts in
+   *  the same sphere apart. Several; the card shows the first two. */
+  professions: string[]
   headline: string
   bio: string
   langs: string[]
@@ -178,9 +183,20 @@ function mapTutorRow(t: any, i: number): Tutor {
     photo: 11 + i,
     avatarUrl: t.user?.avatarUrl ?? null,
     videoUrl: t.videoUrl ?? null,
-    cat: t.category?.name ?? t.specialty ?? 'სფერო',
+    // ONLY the real category. The fallback chain used to be
+    // `category?.name ?? specialty ?? 'სფერო'`, which meant an expert with no
+    // category had their own free text rendered inside the taxonomy pill —
+    // „ბუღალტერია" wearing the exact chip that „გადასახადები" wears. That is
+    // the precise failure the 2026-07-31 card rework existed to remove (see the
+    // long note in _card.tsx: an unvalidated string must not look like a
+    // platform-verified label), reintroduced through the back door. And the
+    // literal „სფერო" was worse still — a placeholder printed as a fact.
+    // Nothing is lost: the bio sits directly under the chip and says what they
+    // do, in their own words, where it belongs.
+    cat: t.category?.name ?? '',
     catSlug: (t.category?.status === 'REDIRECTED' ? t.category?.parent?.slug : t.category?.slug) ?? t.category?.slug ?? null,
     catOwnSlug: t.category?.slug ?? null,
+    professions: Array.isArray(t.professions) ? t.professions : [],
     headline: t.headline ?? '',
     bio: t.bio ?? '',
     langs: Array.isArray(t.languages) && t.languages.length ? t.languages.map(toLangLabel) : ['ქართული'],

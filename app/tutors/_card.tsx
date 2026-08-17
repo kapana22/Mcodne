@@ -228,7 +228,18 @@ export const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, 
                   here left a level gap that a screen reader navigating by heading
                   reads as a missing section. Size is unchanged — the token is the
                   design, the tag is the outline. */}
-              <h2 className="font-display text-body-lg sm:text-h3 font-bold text-ink-900 tracking-tight leading-[1.2] min-w-0 break-words">
+              {/* CLAMPED AT TWO LINES, and it was the only user-written string
+                  on this card that wasn't. Measured on production 2026-08-12:
+                  every real name renders in 1–2 lines at 390px, while ONE row
+                  („Lawyer Besik guliashvili (ადვოკატი ბესიკ გულიაშვილი)" — a
+                  marketing line typed into the name field) took FOUR, pushing
+                  its own price row down and breaking the grid's rhythm beside
+                  it. The bio is `line-clamp-2`, the chips `truncate`, the
+                  languages `truncate`; the heading was the one place a single
+                  bad row could set the height of a card in a grid.
+                  Two, not one: two is what a long real Georgian name needs, so
+                  the clamp costs nothing that is genuinely a name. */}
+              <h2 className="font-display text-body-lg sm:text-h3 font-bold text-ink-900 tracking-tight leading-[1.2] min-w-0 break-words line-clamp-2">
                 <Link href={`/tutors/${t.slug || t.id}`} className="tap-area relative z-10 hover:text-brand-700 transition-colors duration-fast">{t.name}</Link>
               </h2>
               {t.verified && <VerifiedMark size={14} />}
@@ -286,9 +297,30 @@ export const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, 
                 specific of the two.
                 `pr-2` on the row: at 390px a truncated label ended 17px from the
                 card border and its ellipsis collided with the frame. */}
-            <div className="mt-1.5 pr-2 flex items-center gap-1.5 flex-wrap min-w-0">
-              <span className="inline-flex items-center h-[22px] px-2 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 font-display text-meta font-semibold tracking-tight max-w-full truncate">{t.cat}</span>
-            </div>
+            {/* WHAT THIS PERSON IS — professions first, the sphere only when
+                they have none.
+                THE MEASUREMENT (2026-08-11): three experts share „სამართალი",
+                three „მარკეტინგი და გაყიდვები", three „ფსიქოლოგია". A card that
+                prints only the sphere prints the SAME word on every one of
+                them, and on a filtered list it prints the word you just
+                filtered by — it cannot tell two experts apart, which is the one
+                job a card in a grid has.
+                „ადვოკატი · იურისტი" can. Two, not five: the card gives this row
+                one line, and the profile is where the full set belongs.
+                This does not reopen the „free text in the taxonomy chip" bug
+                (see the 2026-07-31 note below): professions are a CLOSED list
+                (lib/professions) validated server-side on both write paths —
+                unlike `specialty`, which was whatever the applicant typed. */}
+            {(t.professions.length > 0 || t.cat) && (
+              <div className="mt-1.5 pr-2 flex items-center gap-1.5 flex-wrap min-w-0">
+                {(t.professions.length ? t.professions.slice(0, 2) : [t.cat]).map(label => (
+                  <span key={label} className="inline-flex items-center h-[22px] px-2 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 font-display text-meta font-semibold tracking-tight max-w-full truncate">{label}</span>
+                ))}
+                {t.professions.length > 2 && (
+                  <span className="text-meta text-ink-400 tabular-nums">+{t.professions.length - 2}</span>
+                )}
+              </div>
+            )}
             {hasExtraLanguage(t.langs) && (
               <div className="mt-1.5 inline-flex items-center gap-1.5 text-meta text-ink-500 max-w-full">
                 <Icon.globe className="w-3.5 h-3.5 text-ink-400 shrink-0" />

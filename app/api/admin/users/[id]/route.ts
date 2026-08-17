@@ -445,6 +445,25 @@ async function purge(
       await tx.$executeRaw`DELETE FROM "HelpMessage" WHERE "userId" = ${id}`
       await tx.$executeRaw`UPDATE "Event" SET "userId" = NULL WHERE "userId" = ${id}`
 
+      /* ServiceRequest (2026-08-14) — the row SURVIVES, the person does not.
+         Its FK is ON DELETE SET NULL, so the `userId` link goes by itself; what
+         the cascade cannot touch is `contactName`/`phone`/`email`, which are
+         PLAIN COLUMNS on the request rather than a join to User. A „სრული
+         წაშლა" that leaves a phone number behind is not one.
+         The rest of the row — the description, the budget, the city — is kept
+         on purpose, and it is the one deliberate difference from Booking above:
+         a request is the record of WHAT THE MARKET ASKED FOR, and that fact is
+         not about this person once their name is off it. Deleting it would
+         throw away the only measurement stage 1 produces. Same reasoning as
+         "Event" on the line above.
+         RequestOffer and RequestAccess need no line here: unlike Package and
+         Enrollment, both carry REAL ON DELETE CASCADE constraints in
+         lib/dbBoot, so the database removes them with the user. */
+      await tx.$executeRaw`
+        UPDATE "ServiceRequest"
+           SET "contactName" = ${ANON_NAME}, "phone" = '', "email" = NULL
+         WHERE "userId" = ${id}`
+
       await tx.user.delete({ where: { id } })
 
       // Atomic with the delete — see the note at the call site. AuditLog has no
@@ -524,6 +543,26 @@ async function anonymize(
          half of a conversation the other side still needs. */
       await tx.$executeRaw`
         UPDATE "HelpMessage" SET "email" = ${anonEmail(id)}, "name" = ${ANON_NAME} WHERE "userId" = ${id}`
+
+      /* ServiceRequest (2026-08-14) carries the person's NAME, PHONE and EMAIL
+         as plain columns — the three this mode exists to remove — and no
+         cascade can reach them because they are not a join to User. The
+         request itself stays: what the market asked for is not about the
+         person once their name is off it. Same treatment as HelpMessage above,
+         and the purge path does the identical UPDATE for the identical reason. */
+      await tx.$executeRaw`
+        UPDATE "ServiceRequest"
+           SET "contactName" = ${ANON_NAME}, "phone" = '', "email" = ${anonEmail(id)}
+         WHERE "userId" = ${id}`
+      /* The requests allowlist is a PERMISSION, not history — the same bucket
+         as `favorite` and `notification` above, and worthless once there is
+         nobody behind the account. Left in place it would keep naming a dead
+         account in the admin's access list, which is a list whose whole value
+         is that every row is somebody you could phone.
+         Their OFFERS are deliberately NOT deleted here: an offer is one half of
+         a conversation the client still needs to see, exactly like a chat
+         message, and it carries no contact detail of its own. */
+      await tx.requestAccess.deleteMany({ where: { userId: id } })
 
       if (tutorId) {
         // Diplomas and CVs carry the person's name and photo — these are the

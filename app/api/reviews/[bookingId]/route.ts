@@ -3,12 +3,15 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { notify } from '@/lib/notify'
+import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
 
 // Expert reply to a student review. One reply per review (editing the existing
 // reply is allowed — it overwrites). Shown publicly next to the review on the
 // expert profile (tutorResponse/respondedAt already ship in /api/tutors/[id]).
 const ReplyBody = z.object({
-  response: z.string().min(2).max(600),
+  // Public text, so the same language gate as the review it answers. The two
+  // sit side by side on the profile; gating one and not the other is not a rule.
+  response: z.string().min(2).max(600).superRefine(georgianRefine('პასუხი')),
 })
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ bookingId: string }> }) {
@@ -17,7 +20,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ bookingId: st
 
   const { bookingId } = await ctx.params
   const parsed = ReplyBody.safeParse(await req.json().catch(() => ({})))
-  if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+  if (!parsed.success) {
+    const msg = firstGeorgianMessage(parsed.error)
+    return NextResponse.json({ ok: false, error: msg ? 'INVALID_TEXT' : 'INVALID', message: msg ?? undefined }, { status: 400 })
+  }
 
   const review = await prisma.review.findUnique({
     where: { bookingId },

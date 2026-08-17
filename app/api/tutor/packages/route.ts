@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
-import { georgianRefine } from '@/lib/georgianText'
+import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
 import { packagesFeatureExists, PACKAGE_LESSON_COUNTS, DEFAULT_VALID_DAYS, readTeacherFields } from '@/lib/packages'
 import { packageFits, tutorScheduleCapacity } from '@/lib/packageFit'
 
@@ -16,12 +16,6 @@ import { packageFits, tutorScheduleCapacity } from '@/lib/packageFit'
 //   · feature on, expert not   → 403 NOT_ENABLED. They ARE the owner of this
 //     enabled                    resource, they simply have not been let in;
 //                                a 404 here would read as "your data vanished".
-
-/** First human-readable custom message from a zod error, if any. */
-function firstCustomMessage(err: { issues: { code: string; message: string }[] }): string | null {
-  const hit = err.issues.find(i => i.code === 'custom' && /[Ⴀ-ჿᲐ-Ჿ]/.test(i.message))
-  return hit?.message ?? null
-}
 
 const CreateBody = z.object({
   title: z.string().min(2).max(80).superRefine(georgianRefine('პაკეტის სახელი')),
@@ -112,7 +106,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     // Surface OUR validation copy (the Georgian-language gate, the lesson-count
     // rule); zod's own English messages stay behind the generic code.
-    const msg = firstCustomMessage(parsed.error) ?? parsed.error.issues.find(i => /[Ⴀ-ჿᲐ-Ჿ]/.test(i.message))?.message ?? null
+    const msg = firstGeorgianMessage(parsed.error)
     return NextResponse.json({ ok: false, error: msg ? 'INVALID_TEXT' : 'INVALID', message: msg ?? undefined }, { status: 400 })
   }
 

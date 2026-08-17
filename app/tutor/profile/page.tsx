@@ -15,6 +15,7 @@ import { normalizeLangs } from '@/lib/languages'
 import { LanguagePicker } from '@/components/LanguagePicker'
 import { useUnsavedGuard } from '@/lib/useUnsavedGuard'
 import { HEADLINE_MAX } from '@/lib/headline'
+import { georgianNameError } from '@/lib/georgianText'
 import { PackagesSection } from './_packages'
 import { StudentsSection } from './_students'
 import {
@@ -52,6 +53,7 @@ export default function TutorProfilePage() {
     languages: [] as string[],
     linkedinUrl: '', websiteUrl: '',
     categoryId: '' as string,
+    professions: [] as string[],
   })
   // Snapshot of the last-saved form values. `dirty` drives the save button:
   // active "შეინახე ცვლილებები" when there are unsaved edits, disabled
@@ -201,7 +203,7 @@ export default function TutorProfilePage() {
         body: JSON.stringify({ ...consForm, tier: tierFromMinutes(consForm.minutes) }),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) { setConsErr('ვერ დაემატა'); return }
+      if (!res.ok || !j.ok) { setConsErr(j?.message || 'ვერ დაემატა'); return }
       setConsultations(prev => [...prev, j.item])
       setConsForm({ title: '', description: '', minutes: 60, price: 80 })
       toast('სერვისი დაემატა', 'success')
@@ -230,7 +232,7 @@ export default function TutorProfilePage() {
         body: JSON.stringify(body),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) { setConsEditErr('ვერ შეინახა'); return }
+      if (!res.ok || !j.ok) { setConsEditErr(j?.message || 'ვერ შეინახა'); return }
       setConsultations(prev => prev.map(c => (c.id === id ? j.item : c)))
       setConsEdit(null)
       toast('სერვისი განახლდა', 'success')
@@ -257,7 +259,13 @@ export default function TutorProfilePage() {
         // off the site with no warning, and PATCH /api/me/tutor refuses it, so
         // offering it here would only produce a 400 they cannot explain.
         const cats = Array.isArray(catRes) ? catRes : (catRes?.items ?? [])
-        setCategories(cats.filter((c: any) => c?.browsable !== false))
+        // EVERY sphere, hidden ones included — the same list /apply offers.
+        // This filtered them out, so the editor showed 6 of 16: an expert could
+        // be approved into „ჯანმრთელობა და კვება" on the application and then
+        // not find it in their own profile. A hidden sphere is one with no
+        // expert yet, not one nobody may join; approval and the admin re-file
+        // both un-hide it the moment somebody lands there.
+        setCategories(cats.filter((c: any) => c?.name))
         const p = tRes?.profile ?? null
         setProfile(p)
         if (p) {
@@ -274,6 +282,7 @@ export default function TutorProfilePage() {
             linkedinUrl: p.linkedinUrl ?? '',
             websiteUrl: p.websiteUrl ?? '',
             categoryId: p.categoryId ?? '',
+            professions: Array.isArray(p.professions) ? p.professions : [],
           }
           setForm(initial)
           setSavedForm(initial)
@@ -305,6 +314,7 @@ export default function TutorProfilePage() {
           linkedinUrl: form.linkedinUrl,
           websiteUrl: form.websiteUrl,
           categoryId: form.categoryId || null,
+          professions: form.professions,
         }),
       })
       const j = await res.json()
@@ -412,6 +422,15 @@ export default function TutorProfilePage() {
       toast('სახელი ძალიან მოკლეა', 'error')
       return
     }
+    // The SAME rule /api/me enforces, checked here so the answer arrives before
+    // the round-trip. Without it the server's 400 was the first feedback — and
+    // the catch below reported it as „შენახვა ვერ მოხერხდა", which names no
+    // field and no reason.
+    const script = georgianNameError('სახელი და გვარი', name)
+    if (script) {
+      toast(script, 'error')
+      return
+    }
     setSavingName(true)
     try {
       const res = await fetch('/api/me', {
@@ -421,7 +440,8 @@ export default function TutorProfilePage() {
       })
       const j = await res.json().catch(() => ({} as any))
       if (!res.ok || !j.ok) {
-        toast('შენახვა ვერ მოხერხდა', 'error')
+        // `message` carries our own validation copy — same as /settings does.
+        toast(j?.message || 'შენახვა ვერ მოხერხდა', 'error')
         return
       }
       setMe(prev => prev ? { ...prev, fullName: name } : prev)
@@ -496,7 +516,9 @@ export default function TutorProfilePage() {
         loadCredentials()
         toast('სერტიფიკატი დაემატა', 'success')
       } else {
-        toast('დამატება ვერ მოხერხდა', 'error')
+        // `message` is the field-level reason (the Georgian-language gate);
+        // the generic line names neither the field nor the fix.
+        toast(j?.message || 'დამატება ვერ მოხერხდა', 'error')
       }
     } catch {
       toast('ქსელის შეცდომა — სცადე თავიდან', 'error')
@@ -530,7 +552,9 @@ export default function TutorProfilePage() {
         loadCredentials()
         toast('განათლება დაემატა', 'success')
       } else {
-        toast('დამატება ვერ მოხერხდა', 'error')
+        // `message` is the field-level reason (the Georgian-language gate);
+        // the generic line names neither the field nor the fix.
+        toast(j?.message || 'დამატება ვერ მოხერხდა', 'error')
       }
     } catch {
       toast('ქსელის შეცდომა — სცადე თავიდან', 'error')
@@ -564,7 +588,9 @@ export default function TutorProfilePage() {
         loadCredentials()
         toast('გამოცდილება დაემატა', 'success')
       } else {
-        toast('დამატება ვერ მოხერხდა', 'error')
+        // `message` is the field-level reason (the Georgian-language gate);
+        // the generic line names neither the field nor the fix.
+        toast(j?.message || 'დამატება ვერ მოხერხდა', 'error')
       }
     } catch {
       toast('ქსელის შეცდომა — სცადე თავიდან', 'error')

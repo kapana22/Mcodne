@@ -186,7 +186,10 @@ export const SessionsPanel = ({ bookings, loading, loadError, reload, onOpenSess
       // Guard every tutor dereference — a booking whose tutor was deleted has
       // `tutor: null`, which previously threw inside data.map and dumped the
       // user into the fake-fixture fallback below.
-      expert: { name: b.tutor?.user?.fullName ?? 'ექსპერტი', avatarUrl: b.tutor?.user?.avatarUrl ?? null, cat: b.tutor?.specialty ?? '', headline: b.tutor?.headline ?? '' },
+      // `cat` = the CATEGORY (the API already selects it), `specialty` only as
+      // the fallback. `specialty` is a frozen copy of the category name from
+      // approval day, so it contradicted the same expert's card after a rename.
+      expert: { name: b.tutor?.user?.fullName ?? 'ექსპერტი', avatarUrl: b.tutor?.user?.avatarUrl ?? null, cat: b.tutor?.category?.name ?? b.tutor?.specialty ?? '', headline: b.tutor?.headline ?? '' },
       topic: b.topic,
       startAt: b.startAt,
       // Tbilisi wall-clock, always — these strings feed the date pill, the row

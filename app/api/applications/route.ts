@@ -7,6 +7,8 @@ import { notifyMany } from '@/lib/notify'
 import { after } from 'next/server'
 import { sendMail } from '@/lib/mailer'
 import { newApplicationAdminEmail } from '@/lib/emailTemplates'
+import { georgianRefine } from '@/lib/georgianText'
+import { isUploadedFileUrl } from '@/lib/safeUrl'
 import {
   APPLY,
   applyValidationFailure,
@@ -43,7 +45,16 @@ const Body = z.object({
   // validate + extract the ID server-side and reject any URL we can't parse,
   // so what lands in the DB is always a real YouTube reference.
   introVideoUrl: z.string().optional().nullable().superRefine(refine(videoError)),
-  professionData: z.record(z.string(), z.any()).optional().nullable(),
+  // THE HOLE THIS CLOSES. `headline` is public — it is the lead sentence under
+  // the expert's name — but it travels inside this blob, so the schema saw
+  // `any` and only the BROWSER ever checked it. Anything posted straight to the
+  // API got in. The blob stays open (it carries languages, services and the
+  // weekly pattern, all shaped elsewhere); the one public STRING in it is
+  // checked by the same rule the form uses.
+  professionData: z.record(z.string(), z.any()).optional().nullable().superRefine((pd, ctx) => {
+    const h = pd && typeof pd === 'object' ? (pd as Record<string, unknown>).headline : null
+    if (typeof h === 'string') georgianRefine('ერთი წინადადება შენზე')(h, ctx)
+  }),
   // Verification docs — data: URLs (or https) produced by /api/uploads. Stored
   // admin-only on the application, never on the public profile.
   idDocUrl: z.string().max(15_000_000).optional().nullable(),
@@ -53,7 +64,9 @@ const Body = z.object({
     // Captured on /apply since 2026-07-29 so the approved profile shows a real
     // issuer instead of a placeholder. Optional — an expert may not know it.
     issuer: z.string().max(200).optional(),
-    url: z.string().max(35_000_000),
+    // Copied verbatim onto Certificate.fileUrl at approval, so it obeys the
+    // same scheme rule the certificates route now states.
+    url: z.string().max(35_000_000).refine(isUploadedFileUrl, 'BAD_FILE_URL'),
   })).max(20).optional().nullable(),
 })
 

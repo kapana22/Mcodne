@@ -91,7 +91,7 @@ export function NotFoundClient() {
         </nav>
 
         <div className="mt-8 text-small text-ink-500 motion-safe:animate-fade-in" style={{ animationDelay: '280ms' }}>
-          თუ ეს ბმული სადმე გინახე — {' '}
+          თუ ეს ბმული სადმე გინახავს — {' '}
           <a href={`mailto:${SUPPORT_EMAIL}`} className="font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2">
             მოგვწერე
           </a>

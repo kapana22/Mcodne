@@ -248,6 +248,23 @@ export function primaryService<T extends TierShape>(consultations: T[]): T | nul
   return pool.reduce((best, c) => (c.minutes > best.minutes ? c : best), pool[0])
 }
 
+/**
+ * The NUMBER behind `primaryPriceLabel` — the flagship tier's price, or the flat
+ * profile price when the expert has published no tiers.
+ *
+ * WHY IT EXISTS: `primaryPriceLabel` answers „what does the card SAY", and for a
+ * long time nothing answered „what should the card be FILTERED by". So /tutors
+ * compared the raw flat rate while every card rendered the flagship, and the two
+ * disagree for any expert who set one and then priced the other differently.
+ * Measured live 2026-08-13: „₾50-მდე" returned ლიზა ზუბაშვილი (flat 20) whose
+ * card reads ₾60, and „₾50–100" returned მარიამ ფოფხაძე (flat 60) whose card
+ * reads ₾30 — a budget filter that answers with prices outside the budget.
+ * A filter must compare the number the reader can see. This is that number.
+ */
+export function primaryPrice(consultations: TierShape[], flatPrice: number): number {
+  return primaryService(consultations ?? [])?.price ?? flatPrice
+}
+
 /** Minutes of `primaryService`, or the profile-level duration when there are no tiers. */
 export function primaryServiceMin(consultations: TierShape[], fallbackMin: number): number {
   return primaryService(consultations)?.minutes ?? fallbackMin

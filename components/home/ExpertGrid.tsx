@@ -39,6 +39,7 @@ export type GridExpert = {
   cat: string
   headline: string
   price: number
+  priceLabel: string
   durationMin: number
   photo: string
   rate: number
@@ -152,13 +153,16 @@ export function ExpertGrid({ experts, loading }: { experts: GridExpert[]; loadin
             {e.headline && (
               <p className="mt-1.5 text-small text-ink-600 leading-snug line-clamp-2">{e.headline}</p>
             )}
-            <div className="mt-1.5 text-meta text-ink-500">{e.cat}</div>
+            {/* `cat` is '' for an expert with no category (the mappers no
+                longer fall back to their free-text `specialty`) — the row goes
+                away rather than reserving space for nothing. */}
+            {e.cat && <div className="mt-1.5 text-meta text-ink-500">{e.cat}</div>}
             <Facts e={e} />
           </div>
 
           <div className="px-5 pb-5 pt-4 border-t border-ink-200 flex items-end justify-between gap-3">
             <div>
-              <span className="block font-display text-h2 font-bold text-ink-900 tabular-nums tracking-tight leading-none">₾{e.price}</span>
+              <span className="block font-display text-h2 font-bold text-ink-900 tabular-nums tracking-tight leading-none">{e.priceLabel}</span>
               <span className="mt-1 block text-meta text-ink-500 tabular-nums">{e.durationMin}-წუთიანი სესია</span>
             </div>
             {/* ?rebook=1 opens the booking flow on arrival, so the label is

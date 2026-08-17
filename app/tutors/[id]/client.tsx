@@ -645,9 +645,19 @@ function ExpertProfile({ initialTutor, initialUser }: { initialTutor: any; initi
             {/* Inline availability (1.6) — the shared flow's calendar/slot
                 view rendered in-page, viewer-local tz. Tapping a time opens
                 the booking Sheet with the slot preselected. Hidden while the
-                expert is paused (booking is closed anyway). */}
+                expert is paused (booking is closed anyway).
+
+                `lg:pb-20` CLEARS THE FLOATING SECTION-NAV PILL. Measured on
+                production 2026-08-13: the pill is 54px tall and sits at
+                `bottom-6` (24px), so it owns the last 78px of the viewport —
+                and it is `hidden lg:block`, which is why the padding is
+                lg-only. Without it the last row of the time grid sat under the
+                pill: a bookable time you could see but not read. 80 is the
+                nearest step above 78, and this is the one section where it
+                matters — the only one whose content is a grid of small tap
+                targets rather than prose. */}
             {!isPaused && (
-              <section id="schedule" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-24">
+              <section id="schedule" className="mt-14 lg:mt-16 pt-10 lg:pb-20 border-t border-ink-100 scroll-mt-24">
                 <Eyebrow className="mb-3">განრიგი</Eyebrow>
                 <h2 className="font-display text-h2 lg:text-h1 font-bold tracking-[-0.022em] text-ink-900 leading-tight">თავისუფალი დროები</h2>
                 <p className="mt-2 text-body text-ink-500 max-w-[520px]">აირჩიე დრო — ჯავშანი არჩეული დროით გაიხსნება.</p>

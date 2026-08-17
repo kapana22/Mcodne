@@ -71,7 +71,12 @@ export const NextSession = ({ bookings, loading, onOpenDetail }: { bookings: any
 
   const tutorName = next.tutor?.user?.fullName ?? 'ექსპერტი'
   const tutorAvatar = next.tutor?.user?.avatarUrl
-  const specialty = next.tutor?.specialty ?? next.tutor?.category?.name ?? ''
+  // CATEGORY first, `specialty` only as the fallback — the reverse of what this
+  // said until 2026-08-11. `specialty` is a frozen copy of the category NAME as
+  // it read on approval day, so after a rename this line contradicted the same
+  // expert's own card and profile („ბიზნესი" here, „ბიზნესი და ფინანსები"
+  // there). The card and the profile show the category; so does this.
+  const specialty = next.tutor?.category?.name ?? next.tutor?.specialty ?? ''
   // Same wording as the shared StatusPill so the hero never contradicts the
   // list below. "ცოცხალია" only when the CLOCK says the session is running
   // (derived via isBookingLive) — never from the dead raw 'LIVE' status.

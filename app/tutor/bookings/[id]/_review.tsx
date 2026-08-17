@@ -38,7 +38,7 @@ export function ReviewBlock({
       })
       const j = await res.json().catch(() => ({} as any))
       if (!res.ok || !j.ok) {
-        toast('პასუხის შენახვა ვერ მოხერხდა', 'error')
+        toast(j?.message || 'პასუხის შენახვა ვერ მოხერხდა', 'error')
         return
       }
       onUpdated(j.tutorResponse, j.respondedAt)

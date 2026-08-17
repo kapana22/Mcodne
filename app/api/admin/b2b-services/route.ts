@@ -19,7 +19,8 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser, requireRoleApi } from '@/lib/auth'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { canSeeB2B } from '@/lib/b2b'
+import { B2B_KINDS, canSeeB2B } from '@/lib/b2b'
+import { isUploadedImageUrl } from '@/lib/safeUrl'
 import { audit } from '@/lib/audit'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
@@ -33,10 +34,21 @@ async function gate() {
 }
 
 const Fields = {
+  // CONSULTATION | TRAINING — see lib/b2b for why this is a separate axis from
+  // `direction`. Optional on create so an older client still works; the column
+  // defaults to CONSULTATION.
+  kind: z.enum(B2B_KINDS),
   direction: z.string().trim().min(2).max(80),
   title: z.string().trim().min(2).max(160),
   description: z.string().trim().max(1000).optional().or(z.literal('')),
   format: z.string().trim().max(120).optional().or(z.literal('')),
+  // The card image. Only what /api/uploads emits (`kind=cover` → a webp
+  // data: URI) — an unchecked string here reaches an <img src> and a serving
+  // route. '' CLEARS it, which is how „remove the picture" is expressed.
+  // The ceiling matches the blog cover's; a 1200x675 webp base64s well under it.
+  imageUrl: z.string().trim().max(1_200_000)
+    .refine(v => v === '' || isUploadedImageUrl(v), 'BAD_IMAGE')
+    .optional(),
   // Lari, whole. Zero is legal and means „the number is meaningless here" —
   // it is only ever shown when priceOnRequest is false, and the two travel
   // together.
@@ -50,8 +62,14 @@ export async function GET() {
   const g = await gate()
   if (g.response) return g.response
   await ensureDbReady()
+  /* This one DOES ship `imageUrl` (base64), unlike the public page. Two
+     reasons: the row thumbnail is how an admin sees which service still has no
+     picture, and a HIDDEN service has no serving route to point at — /api/b2b
+     -services/[id]/image 404s on hidden, deliberately, so „stop selling this"
+     removes its picture from the internet too. One operator, occasional load;
+     the blog admin ships its covers the same way. `take` is what bounds it. */
   const services = await prisma.b2BService.findMany({
-    orderBy: [{ direction: 'asc' }, { order: 'asc' }],
+    orderBy: [{ kind: 'asc' }, { direction: 'asc' }, { order: 'asc' }],
     take: 300,
     include: { _count: { select: { requests: true } } },
   })
@@ -59,6 +77,8 @@ export async function GET() {
 }
 
 const CreateBody = z.object({
+  kind: Fields.kind.default('CONSULTATION'),
+  imageUrl: Fields.imageUrl,
   direction: Fields.direction,
   title: Fields.title,
   description: Fields.description,
@@ -79,6 +99,8 @@ export async function POST(req: Request) {
   await ensureDbReady()
   const service = await prisma.b2BService.create({
     data: {
+      kind: parsed.data.kind,
+      imageUrl: (parsed.data.imageUrl ?? '').trim() || null,
       direction: parsed.data.direction,
       title: parsed.data.title,
       description: (parsed.data.description ?? '').trim() || null,
@@ -90,13 +112,15 @@ export async function POST(req: Request) {
   })
   await audit(admin.id, 'b2bService.create', {
     targetType: 'B2BService', targetId: service.id,
-    meta: { direction: service.direction, title: service.title, priceGel: service.priceGel },
+    meta: { kind: service.kind, direction: service.direction, title: service.title, priceGel: service.priceGel },
   })
   return NextResponse.json({ ok: true, service })
 }
 
 const PatchBody = z.object({
   id: z.string().min(1),
+  kind: Fields.kind.optional(),
+  imageUrl: Fields.imageUrl,
   direction: Fields.direction.optional(),
   title: Fields.title.optional(),
   description: Fields.description,
@@ -117,11 +141,12 @@ export async function PATCH(req: Request) {
   const { id, ...rest } = parsed.data
 
   const data: Record<string, unknown> = {}
-  for (const k of ['direction', 'title', 'priceGel', 'priceOnRequest', 'order', 'visible'] as const) {
+  for (const k of ['kind', 'direction', 'title', 'priceGel', 'priceOnRequest', 'order', 'visible'] as const) {
     if (rest[k] !== undefined) data[k] = rest[k]
   }
   if (rest.description !== undefined) data.description = (rest.description ?? '').trim() || null
   if (rest.format !== undefined) data.format = (rest.format ?? '').trim() || null
+  if (rest.imageUrl !== undefined) data.imageUrl = (rest.imageUrl ?? '').trim() || null
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   }

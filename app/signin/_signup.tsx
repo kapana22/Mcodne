@@ -12,6 +12,7 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { Field, GoogleMark, PwInput, StrengthBar, inputCls } from './_fields'
 import { PhoneInput } from '@/components/PhoneInput'
 import { phoneFormatError } from '@/lib/phone'
+import { georgianNameError } from '@/lib/georgianText'
 import { View, clearSignupDraft, readEmailParam, readSignupDraft, redirectAfterSignin, startGoogleSignin, writeSignupDraft } from './_model'
 
 /* ═══════════════════════════════════════════════════════════════════ */
@@ -72,6 +73,8 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
     // Server requires fullName ≥ 2 chars — mirror it here so the user gets a
     // specific message instead of the generic INVALID error.
     if (first.trim().length < 2) { setErrMsg('სახელი — მინიმუმ 2 სიმბოლო'); return }
+    // Said here, not by a 400 — the API's generic „შეავსე ყველა ველი" names nothing.
+    { const e = georgianNameError('სახელი', first); if (e) { setErrMsg(e); return } }
     if (!email) { setErrMsg('შეიყვანე ელფოსტა'); return }
     const phoneMsg = phoneFormatError(phone, { required: true })
     if (phoneMsg) { setErrMsg(phoneMsg); return }
@@ -89,6 +92,7 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
         setErrMsg(
           data.error === 'EMAIL_TAKEN' ? 'ეს ელფოსტა უკვე გამოყენებულია' :
           data.error === 'INVALID_PHONE' ? (data.message ?? 'ტელეფონის ნომერი არასწორია') :
+          data.error === 'INVALID_TEXT' ? (data.message ?? 'სახელი ქართულად ჩაწერე') :
           data.error === 'INVALID' ? 'შეავსე ყველა ველი (პაროლი მინიმუმ 8 სიმბოლო)' :
           data.error === 'RATE_LIMITED' ? `ბევრი მცდელობა — სცადე ${Math.ceil((data.retryInSec ?? 60)/60)} წუთში` :
           'შეცდომა, სცადე თავიდან'
@@ -198,6 +202,10 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
     if (!email) { setErrMsg('შეიყვანე ელფოსტა'); return }
     const phoneMsg = phoneFormatError(phone, { required: true })
     if (phoneMsg) { setErrMsg(phoneMsg); return }
+    // Each box judged on its own, so „ნინო" + „Beridze" complains about the
+    // SURNAME rather than about „name and surname".
+    { const e = georgianNameError('სახელი', first); if (e) { setErrMsg(e); return } }
+    { const e = georgianNameError('გვარი', last); if (e) { setErrMsg(e); return } }
     if (pw.length < 8) { setErrMsg('პაროლი მინიმუმ 8 სიმბოლო'); return }
     if (!agree) { setErrMsg('დაეთანხმე წესებს'); return }
     setSubmitting(true); setErrMsg(null)
@@ -212,6 +220,7 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
         setErrMsg(
           data.error === 'EMAIL_TAKEN' ? 'ეს ელფოსტა უკვე გამოყენებულია' :
           data.error === 'INVALID_PHONE' ? (data.message ?? 'ტელეფონის ნომერი არასწორია') :
+          data.error === 'INVALID_TEXT' ? (data.message ?? 'სახელი ქართულად ჩაწერე') :
           data.error === 'INVALID' ? 'შეავსე ყველა ველი (პაროლი მინიმუმ 8 სიმბოლო)' :
           data.error === 'RATE_LIMITED' ? `ბევრი მცდელობა — სცადე ${Math.ceil((data.retryInSec ?? 60)/60)} წუთში` :
           'შეცდომა, სცადე თავიდან'
@@ -305,10 +314,6 @@ const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
               {!first.trim() ? 'შეიყვანე სახელი' : !last.trim() ? 'შეიყვანე გვარი' : !email ? 'შეიყვანე ელფოსტა' : pw.length < 8 ? 'პაროლი — მინიმუმ 8 სიმბოლო' : 'დაეთანხმე წესებს გასაგრძელებლად'}
             </p>
           )}
-
-          <p className="text-center text-small text-ink-500 mt-2 leading-relaxed">
-            შემდეგ — ექსპერტის განაცხადი, <span className="font-display font-semibold text-brand-700">ერთხელ</span>.
-          </p>
         </form>
       </div>
     </div>

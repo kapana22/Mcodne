@@ -5,6 +5,7 @@ import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { slugify } from '@/lib/slug'
 import { expertCountsBySphere } from '@/lib/categoryCounts'
+import { TREE_ERROR } from '@/lib/categoryTree'
 
 // GET /api/admin/categories
 // Returns EVERY category whatever its status, with the counts the screen needs
@@ -59,6 +60,15 @@ export async function GET() {
 const CreateBody = z.object({
   name: z.string().trim().min(2).max(60),
   defaultServiceType: z.enum(['CONSULTATION', 'RECURRING']).default('CONSULTATION'),
+  // Create it AS a sub-category. Absent = a sphere of its own, as before.
+  //
+  // Added 2026-08-11 because sub-categories were effectively uncreatable: this
+  // route only ever made top-level VISIBLE rows, so the admin had to create one
+  // and then set BOTH `status` and `parentId` on it afterwards, in that order —
+  // parent first, because a REDIRECTED row with no parent is refused. Nobody
+  // worked that sequence out, and the catalogue ended up with sub-categories
+  // only where a migration had written them by hand.
+  parentId: z.string().min(1).max(64).optional(),
 })
 
 export async function POST(req: Request) {
@@ -69,7 +79,24 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   }
-  const { name, defaultServiceType } = parsed.data
+  const { name, defaultServiceType, parentId } = parsed.data
+  // A sub-category's parent must be a VISIBLE sphere — the same rule
+  // `canBeParent` greys the picker out with, re-asserted here because a screen
+  // is not a guard. A child of a hidden or already-absorbed sphere would be
+  // browsable from nowhere and counted under nothing.
+  const parent = parentId
+    ? await prisma.category.findFirst({
+      where: { id: parentId, status: 'VISIBLE', parentId: null },
+      select: { id: true, name: true },
+    })
+    : null
+  if (parentId && !parent) {
+    return NextResponse.json({
+      ok: false,
+      error: 'BAD_PARENT',
+      message: TREE_ERROR.PARENT_IS_HIDDEN,
+    }, { status: 400 })
+  }
   // Unique slug: base, then base-2, base-3, … if taken.
   const base = slugify(name)
   let slug = base
@@ -77,16 +104,20 @@ export async function POST(req: Request) {
     slug = `${base}-${i}`
   }
   const last = await prisma.category.findFirst({ orderBy: { order: 'desc' }, select: { order: true } })
-  // A new sphere is visible and stands on its own; a parent is assigned later,
-  // deliberately, from the row itself.
+  // A sub-category is REDIRECTED + parentId (that pair IS what „sub-category"
+  // means in this schema — /api/categories builds its `children` list from it,
+  // which is what the /apply picker and the profile editor render). A sphere is
+  // VISIBLE and stands on its own.
   const created = await prisma.category.create({
-    data: { name, slug, defaultServiceType, order: (last?.order ?? 0) + 1, isLive: true, status: 'VISIBLE' },
+    data: parent
+      ? { name, slug, defaultServiceType, order: (last?.order ?? 0) + 1, isLive: false, status: 'REDIRECTED', parentId: parent.id }
+      : { name, slug, defaultServiceType, order: (last?.order ?? 0) + 1, isLive: true, status: 'VISIBLE' },
     select: { id: true, slug: true, name: true, defaultServiceType: true, isLive: true, status: true, parentId: true, _count: { select: { tutors: true, children: true } } },
   })
   await audit(admin.id, 'category.create', {
     targetType: 'Category',
     targetId: created.id,
-    meta: { name: created.name, slug: created.slug, defaultServiceType: created.defaultServiceType },
+    meta: { name: created.name, slug: created.slug, defaultServiceType: created.defaultServiceType, parentName: parent?.name ?? null },
   })
   return NextResponse.json({
     ok: true,

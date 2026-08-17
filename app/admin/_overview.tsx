@@ -18,6 +18,7 @@ import { MiniChart, CHART, type SeriesData } from './_charts'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { AdminError, Stat } from './_parts'
+import { COMMISSION_PCT, PAYMENTS_LIVE } from '@/lib/flags'
 
 /* ───── Hero ───── */
 // Node's built-in ICU has en-US only, so `toLocaleDateString('ka-GE', …)`
@@ -96,7 +97,7 @@ const Kpis = () => {
         if (!d || cancelled) return
         setLive([
           { ...STAT_DEFS[0], value: (d.bookings ?? 0).toLocaleString('ka-GE'), sub: <span><span className="font-semibold text-success-700">{d.completed ?? 0}</span> დასრულებული · {d.live ?? 0} ცოცხალი</span> },
-          { ...STAT_DEFS[1], value: `₾${(d.revenue ?? 0).toLocaleString('ka-GE')}`, sub: <span>კომისია ≈ ₾{Math.round((d.revenue ?? 0) * 0.15).toLocaleString('ka-GE')}</span> },
+          { ...STAT_DEFS[1], value: `₾${(d.revenue ?? 0).toLocaleString('ka-GE')}`, sub: <span>კომისია ≈ ₾{Math.round((d.revenue ?? 0) * (PAYMENTS_LIVE ? COMMISSION_PCT / 100 : 0)).toLocaleString('ka-GE')}</span> },
           { ...STAT_DEFS[2], value: String(d.pendingApps ?? 0), sub: <span>ექსპერტების განაცხადი მოდერაციისთვის</span> },
           { ...STAT_DEFS[3], value: `${d.students ?? 0} / ${d.tutors ?? 0}`, sub: <span>სულ {(d.users ?? 0).toLocaleString('ka-GE')} რეგისტრირებული</span> },
         ])

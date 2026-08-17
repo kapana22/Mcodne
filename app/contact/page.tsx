@@ -2,6 +2,7 @@ import { pageMetadata } from '@/lib/pageSeo'
 import { socialMeta } from '@/lib/seo'
 import { jsonLdString } from '@/lib/jsonLd'
 import ContactPage from './ContactClient'
+import { getCurrentUser } from '@/lib/auth'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
@@ -47,12 +48,20 @@ const breadcrumbLd = {
   ],
 }
 
-export default function Page() {
+/* `initialUser` is not optional in practice — see the docblock on
+   components/PublicTopBar. Without it the header's right side renders EMPTY on
+   the server and then pops to the auth buttons once the client's /api/me probe
+   resolves, which is (a) the flip that docblock says the header must never do
+   and (b) a real hydration mismatch: measured on production 2026-08-13, this
+   page threw React #418 on 2 of 3 cold loads, with the SSR text missing
+   „შესვლა" that the client then inserted. /tutors and / already pass it. */
+export default async function Page() {
+  const initialUser = await getCurrentUser()
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(contactLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbLd) }} />
-      <ContactPage />
+      <ContactPage initialUser={initialUser as any} />
     </>
   )
 }

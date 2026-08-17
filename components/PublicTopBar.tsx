@@ -8,7 +8,9 @@ import { NotifBell } from './NotifBell'
 import { UserMenu } from './UserMenu'
 import { Container } from '@/components/Container'
 import { useMe, type Me } from '@/lib/me'
+import { useMessagesUnread, type MessagesSpace } from '@/lib/messagesUnread'
 import { showApplyCta } from '@/lib/roleHome'
+import { requestsOn } from '@/lib/requests'
 
 // The single public header. Rendered on every guest/browse/marketing page.
 //
@@ -27,6 +29,9 @@ import { showApplyCta } from '@/lib/roleHome'
 const NAV: { label: string; href: string }[] = [
   { label: 'ექსპერტები',     href: '/tutors' },
   { label: 'კატეგორიები',    href: '/categories' },
+  // The requests wizard. IN the array but FILTERED below for everyone the
+  // subsystem does not admit — see the nav filter for why that is not optional.
+  { label: 'მოთხოვნა',       href: '/request' },
   { label: 'გახდი ექსპერტი', href: '/apply' },
   { label: 'დახმარება',      href: '/help' },
 ]
@@ -49,6 +54,14 @@ export function PublicTopBar({
   const ssr = initialUser !== undefined
   const me = fetchedReady ? fetchedMe : (ssr ? initialUser : null)
   const ready = fetchedReady || ssr
+  // Which inbox this reader's badge counts. SPACE, not role: on a public page an
+  // approved expert is wearing their expert hat (the Logo above routes them to
+  // /tutor for the same reason), so the count must be the expert inbox and never
+  // the client-side one they also own. null → guest or ADMIN: no inbox, and
+  // useMessagesUnread then subscribes to nothing at all.
+  const msgSpace: MessagesSpace | null =
+    me?.role === 'TUTOR' ? 'tutor' : me?.role === 'STUDENT' ? 'student' : null
+  const msgUnread = useMessagesUnread(msgSpace)
   const [mobOpen, setMobOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
@@ -115,7 +128,25 @@ export function PublicTopBar({
   // Hide the "გახდი ექსპერტი" (→/apply) item from users who are already an
   // expert/admin. showApplyCta(null) is true, so anon + not-yet-resolved keep
   // it (no flash-in for real visitors); only a known TUTOR/ADMIN drops it.
-  const nav = NAV.filter(i => i.href !== '/apply' || showApplyCta(me?.role))
+  //
+  // „მოთხოვნა" is the OPPOSITE filter — hidden from everyone until PROVEN an
+  // admin (owner's call, 2026-08-14: „მხოლოდ ადმინებს რომ გამოუჩნდეს"). Not
+  // `showApplyCta`-style optimistic: an anonymous visitor shown this link would
+  // click into a 404, and a link that 404s is worse than no link — it also
+  // publishes the URL the subsystem's whole hiding story depends on keeping
+  // unlisted. Allowlisted PROVIDERS don't get it either, deliberately: knowing
+  // who is on the allowlist needs a DB read, and /api/me is the hottest
+  // endpoint on the site — not the place to add a query for a dark-stage
+  // feature. They enter through /provider, which the admin hands them.
+  //
+  // ⚠️ A nav-level hide, and a hide is not a guard — every /request route gates
+  // itself (lib/requestsServer). requestsOn() works in this client component
+  // only because next.config.js inlines FEATURE_REQUESTS; see the note there.
+  const nav = NAV.filter(i => {
+    if (i.href === '/apply') return showApplyCta(me?.role)
+    if (i.href === '/request') return requestsOn() && me?.role === 'ADMIN'
+    return true
+  })
 
   /* WHICH ITEM IS LIT IS DERIVED HERE, from the URL — it is NOT something a
      page passes in.
@@ -249,6 +280,53 @@ export function PublicTopBar({
                   className="inline-flex w-10 h-10 rounded-btn text-ink-600 hover:text-ink-900 hover:bg-ink-100 items-center justify-center transition-colors duration-fast"
                 >
                   <Icon.heart className="w-[18px] h-[18px]" />
+                </Link>
+              )}
+              {/* MESSAGES — desktop only, and only here (2026-08-17).
+                  The gap it closes is exactly one cell of the matrix:
+                    · phone, any page   → BottomNav's „მიმოწერა" tab, 1 tap
+                    · desktop, workspace → the sidebar item (with its badge), 1 click
+                    · desktop, PUBLIC page → the avatar dropdown. TWO clicks, and
+                      the first one reveals nothing about where the second goes.
+                  A marketplace conversation is the thread a client returns to
+                  while browsing other experts — i.e. precisely on the pages this
+                  header owns. `hidden lg:` is not a guess: BottomNav is
+                  `lg:hidden`, so the icon appears at the exact width its tab
+                  disappears and the two can never both be on screen. It also
+                  keeps the 390px row at four controls — the measurement above
+                  („if a fifth control is ever added here, re-measure") stays
+                  untested rather than quietly broken.
+                  THE BADGE (owner's call, 2026-08-17 — I had argued for the
+                  icon alone). It is NOT the bell's number: the bell counts
+                  notifications, this counts unread THREADS, and the two legitimately
+                  disagree — reading the MESSAGE_NEW notice does not read the
+                  message, and opening the thread in another tab clears this while
+                  the bell still holds a booking notice. Same source and same
+                  arithmetic as the workspace sidebar pill (lib/messagesUnread →
+                  /api/messages?space=…), so the two can never show different
+                  numbers for one inbox; same `bg-danger-500` and 9+ cap as every
+                  other count in this row.
+                  The cost I flagged is paid down by the store, not ignored: one
+                  refcounted 90s poll per space, visibility-gated, and it clears
+                  on `mcodne:threads-refresh` rather than waiting out the interval.
+                  SPACE, not just role: a dual-role expert must see their EXPERT
+                  unread here, never their client-side one.
+                  STUDENT/TUTOR only: those are the two roles with a messages
+                  route. An admin has none, and an icon into a 404 is worse than
+                  no icon. */}
+              {msgSpace && (
+                <Link
+                  href={msgSpace === 'tutor' ? '/tutor/messages' : '/student/messages'}
+                  aria-label={msgUnread > 0 ? `მიმოწერა — ${msgUnread} წაუკითხავი` : 'მიმოწერა'}
+                  title="მიმოწერა"
+                  className="relative hidden lg:inline-flex w-10 h-10 rounded-btn text-ink-600 hover:text-ink-900 hover:bg-ink-100 items-center justify-center transition-colors duration-fast"
+                >
+                  <Icon.chat className="w-[18px] h-[18px]" />
+                  {msgUnread > 0 && (
+                    <span className="absolute top-1 right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-danger-500 text-white font-display text-meta font-bold tabular-nums inline-flex items-center justify-center ring-2 ring-white motion-safe:animate-scale-in">
+                      {msgUnread > 9 ? '9+' : msgUnread}
+                    </span>
+                  )}
                 </Link>
               )}
               <NotifBell />

@@ -19,7 +19,12 @@ export type SavedExpert = {
   name: string
   avatar: string | null
   cat: string
-  price: number
+  /** The FLAGSHIP price, already formatted — the same field DiscoverTutor
+   *  carries, and for the same reason. It was a raw `price` (the flat rate
+   *  typed at /apply) while the „რეკომენდებული" strip six rows above it on the
+   *  SAME screen resolved the flagship, so one expert could be quoted twice at
+   *  two figures without scrolling. */
+  priceLabel: string
   rating: number
 }
 

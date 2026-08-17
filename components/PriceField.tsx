@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useState } from 'react'
+import { useId } from 'react'
 import { Eyebrow } from '@/components/Eyebrow'
 import { COMMISSION_PCT, PAYMENTS_LIVE, TUTOR_PAYOUT_PCT } from '@/lib/flags'
 
@@ -11,19 +11,21 @@ import { COMMISSION_PCT, PAYMENTS_LIVE, TUTOR_PAYOUT_PCT } from '@/lib/flags'
    chips only PREFILL the same input — they are shortcuts, not options, and
    nothing here judges or blocks the number.
 
-   There is still NO RECOMMENDED range and there must never be one again. The
-   band that existed („ჩვენი რჩევა ₾60–₾150" + a below/within/above verdict)
-   told a new expert pricing low that they were „რჩევაზე დაბალი" — and pricing
-   low to win the first clients is the rational move at this stage.
+   There is NO RECOMMENDED range and NO COMPARISON TO OTHER EXPERTS, and there
+   must never be one again. Two versions have now been removed:
 
-   What IS shown, since 2026-08-02, is the real DISTRIBUTION (25th–75th
-   percentile + median of live paid services, from /api/tutors/stats). The
-   difference is not cosmetic: a recommendation judges the number you typed, a
-   distribution just tells you where it sits. It exists because the opposite
-   failure turned out to be the real one — measured, 10 of 19 profiles carried
-   exactly the ₾80 this form used to pre-fill, i.e. half the roster never made
-   a pricing decision at all, and the affordable end of the market never
-   appeared. The pre-fill is gone; the fact stays. */
+     • „ჩვენი რჩევა ₾60–₾150" with a below/within/above verdict — it told a new
+       expert pricing low that they were „რჩევაზე დაბალი", and pricing low to
+       win the first clients is the rational move at this stage.
+     • „სხვა ექსპერტები: ₾30–₾80 · მედიანა ₾50" — the real p25–p75 distribution
+       from /api/tutors/stats (removed 2026-08-11, owner's call). It was framed
+       as a fact rather than a verdict, but on a screen where someone is
+       choosing their own number a peer band is read as one anyway. The anchor
+       problem it was meant to fix belongs to the PRE-FILL, and that is already
+       gone — the field starts empty.
+
+   The endpoint still exists and is still used by the home hero; only this
+   screen stopped reading it. */
 
 /* Chip values are scaled linearly by the service duration and rounded to ₾5,
    so a 30-minute service offers half the hour's shortcuts. */
@@ -61,18 +63,6 @@ export function PriceField({
   className?: string
 }) {
   const id = useId()
-  // One tiny fetch, shared by both call sites via this component. Failure is
-  // silent on purpose: the line is context, and a missing context line must
-  // never block someone from typing a price.
-  const [market, setMarket] = useState<{ p25: number; median: number; p75: number; n: number } | null>(null)
-  useEffect(() => {
-    let off = false
-    fetch('/api/tutors/stats')
-      .then(r => (r.ok ? r.json() : null))
-      .then(j => { if (!off && j && j.pricedServices >= 8) setMarket({ p25: j.priceP25, median: j.priceMedian, p75: j.priceP75, n: j.pricedServices }) })
-      .catch(() => {})
-    return () => { off = true }
-  }, [])
   const mins = safeMinutes(minutes)
   const factor = mins / 60
 
@@ -154,38 +144,18 @@ export function PriceField({
             ))}
           </div>
 
-          {/* Reference, not controls. Grouped below the shortcut row and behind
-              one divider: four separately-spaced meta lines under a single input
-              read as noise, and none of these two change anything.
+          {/* Reference, not a control. One line, behind one divider.
 
-              The market line is a FACT, never a verdict — no „low/high", no
-              colour, no comparison to what was just typed. Scaled to this
-              service's length so a 30-minute row isn't measured against hour
-              prices.
-
-              Take-home: payments aren't live and the platform takes no cut
-              today, so no commission and no reduced amount may be shown. The
-              commission branch stays (reading COMMISSION_PCT, never a literal)
-              so flipping PAYMENTS_LIVE restores the net line by itself, and the
-              note says „ჯერ" rather than „სრულად შენია" — 0% is today's truth,
-              not a permanent promise. */}
-          <div className="mt-3 pt-3 border-t border-ink-100 space-y-1 text-meta">
-            {market && market.median > 0 && (
-              <p className="text-ink-500">
-                სხვა ექსპერტები: <span className="tabular-nums text-ink-700">₾{round5(market.p25 * factor)}–₾{round5(market.p75 * factor)}</span>
-                {' · '}მედიანა <span className="tabular-nums text-ink-700">₾{round5(market.median * factor)}</span>
-              </p>
-            )}
+              Take-home, and the commission beside it — always, whatever
+              PAYMENTS_LIVE says. This is the one screen where the expert
+              decides a number, and until 2026-08-10 it answered „მიიღებ ₾{the
+              full price}" with „საკომისიოს ჯერ არ ვიღებთ" next to it. Someone
+              pricing a service against that figure was being told the wrong
+              one. The flag governs whether money MOVES; it was never a licence
+              to quote a take-home that will not arrive. */}
+          <div className="mt-3 pt-3 border-t border-ink-100 text-meta">
             <div className="flex items-center justify-between gap-3">
               <span className="text-ink-600">
-                {/* NET, and the commission beside it — always, whatever
-                    PAYMENTS_LIVE says. This is the one screen where the expert
-                    decides a number, and until 2026-08-10 it answered „მიიღებ
-                    ₾{the full price}" with „საკომისიოს ჯერ არ ვიღებთ" next to
-                    it. Someone pricing a service against that figure was being
-                    told the wrong one. The flag governs whether money MOVES; it
-                    was never a licence to quote a take-home that will not
-                    arrive. */}
                 {!hasPrice ? 'მიუთითე ფასი'
                   : <>მიიღებ <span className="font-display font-bold text-brand-700 tabular-nums">₾{net.toFixed(2)}</span></>}
               </span>

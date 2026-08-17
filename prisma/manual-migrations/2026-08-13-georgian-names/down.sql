@@ -1,0 +1,22 @@
+-- Exact restore of every value this migration overwrote.
+UPDATE "User" SET "fullName" = 'Lawyer Besik guliashvili (ადვოკატი ბესიკ გულიაშვილი)' WHERE email = 'besikiguliashvili@gmail.com';
+UPDATE "User" SET "fullName" = 'Nona Kvitsiani'      WHERE email = 'nonakvitsiani4@gmail.com';
+UPDATE "User" SET "fullName" = 'luka kapanadze'      WHERE email = 'lukakapanadze313@gmail.com';
+UPDATE "User" SET "fullName" = 'giorgi'              WHERE email = 'giorgi.dzvelaia.3@gmail.com';
+UPDATE "User" SET "fullName" = 'Edgar'               WHERE email = 'akopov43@gmail.com';
+UPDATE "User" SET "fullName" = 'giorgi'              WHERE email = 'giorgi1999.dzvelaia@gmail.com';
+UPDATE "User" SET "fullName" = 'giorgi dzvelaia'     WHERE email = 'giorgi.dzvelaia.2@gmail.com';
+UPDATE "User" SET "fullName" = 'beka chkhirodze'     WHERE email = 'bekachkhirodze1@gmail.com';
+UPDATE "User" SET "fullName" = 'Dea Melkadze'        WHERE email = 'melkadzedea7@gmail.com';
+UPDATE "User" SET "fullName" = 'Beqa Chxirodze'      WHERE email = 'beqachxirodze@gmail.com';
+UPDATE "User" SET "fullName" = 'kasim guliev'        WHERE email = 'gulievkasim@gmail.com';
+UPDATE "User" SET "fullName" = 'Data'                WHERE email = 'datiobashvili1@gmail.com';
+UPDATE "User" SET "fullName" = 'Nini'                WHERE email = 'ninibenashvili9@gmail.com';
+UPDATE "User" SET "fullName" = 'Nanako Ustarashvili' WHERE email = 'ustarashvili.nanako@gmail.com';
+UPDATE "User" SET "fullName" = 'Luka Vashakidze'     WHERE email = 'lukavashakidze0@gmail.com';
+UPDATE "User" SET "fullName" = 'giorgi kharatishvili' WHERE email = 'hr@gkharatishvili.com';
+UPDATE "User" SET "fullName" = 'Sevilia Isaeva'      WHERE email = 'seviliaisaeva1@gmail.com';
+UPDATE "User" SET "fullName" = 'Natia Adamova'       WHERE email = 'natiaadamova@gmail.com';
+UPDATE "User" SET "fullName" = 'Davit Tskabelia'     WHERE email = 'datotsk12@gmail.com';
+UPDATE "User" SET "fullName" = 'Nini Benashvili'     WHERE email = 'beberoo85@gmail.com';
+UPDATE "User" SET "fullName" = 'Luka Kapanadze'      WHERE email = 'grubela22@gmail.com';

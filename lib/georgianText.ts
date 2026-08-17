@@ -58,22 +58,66 @@ export function isGeorgian(value: string | null | undefined): boolean {
   return checkGeorgian(value).ok
 }
 
-/** The message the user sees. One sentence, informal, says what to do. */
 export function georgianError(field: string, c: ScriptCheck): string | null {
   if (c.ok) return null
   return c.reason === 'no-georgian'
     ? `${field} ქართულად დაწერე — საიტი ქართულენოვანია.`
     : `${field} ძირითადად ქართულად უნდა იყოს. ბრენდები და აბრევიატურები (SEO, HR, Google Ads) რჩება ლათინურად.`
 }
-
-/**
- * Zod refinement helper — `z.string().superRefine(georgianRefine('სახელი'))`.
- * Kept separate from the check so non-zod callers (client hints) share the
- * exact same predicate and message.
- */
 export function georgianRefine(field: string) {
-  return (value: string, ctx: { addIssue: (i: { code: 'custom'; message: string }) => void }) => {
+  return (value: string | null | undefined, ctx: { addIssue: (i: { code: 'custom'; message: string }) => void }) => {
     const c = checkGeorgian(value)
     if (!c.ok) ctx.addIssue({ code: 'custom', message: georgianError(field, c)! })
   }
+}
+
+/* ═══════════ A PERSON'S NAME ═════════════════════════════════════════════
+ *
+ * `checkGeorgian` above is a SHARE test (half the letters) and that is right for
+ * prose — „Google Ads-ის სპეციალისტი" is real Georgian copy. A name has no
+ * brands, acronyms or digits in it, so the share test was simply the wrong
+ * instrument: it passed „Marietta Dzvelaia", and „luka kapanadze" is a live
+ * ADMIN row. Names are Georgian letters, plus the hyphen of a double surname
+ * and an apostrophe. Nothing else.
+ *
+ * Google sign-in is exempt by necessity — refusing the name would refuse the
+ * sign-in — so it is caught at /apply instead, before anything becomes public.
+ */
+const GEORGIAN_NAME = /^[Ⴀ-ჿᲐ-Ჿⴀ-⴯\s'’-]+$/
+
+/** The sentence to show, or null. Empty passes — required-ness is the field's
+ *  own job. Names the fix and shows it: this usually fires on a value the
+ *  person never typed, because it came from their Google account. */
+export function georgianNameError(label: string, value: string | null | undefined): string | null {
+  const v = (value ?? '').trim()
+  if (!v || GEORGIAN_NAME.test(v)) return null
+  return `${label} ქართულად ჩაწერე — მაგ. „ნინო ბერიძე“. ციფრი და ლათინური ასო არ გამოიყენება.`
+}
+
+/** zod adapter, so a schema states the rule by importing it, never by copy. */
+export function georgianNameRefine(label: string) {
+  return (value: string | null | undefined, ctx: { addIssue: (i: { code: 'custom'; message: string }) => void }) => {
+    const msg = georgianNameError(label, value)
+    if (msg) ctx.addIssue({ code: 'custom', message: msg })
+  }
+}
+
+/* ═══════════ GETTING THE REASON BACK TO THE PERSON ══════════════════════
+ *
+ * A rule whose reason never reaches the field is half a rule: the save is
+ * refused and „შენახვა ვერ მოხერხდა" names neither the field nor the fix, so
+ * the only way forward is guessing. Four routes had grown their own private
+ * copy of this and four more returned a bare 'INVALID' — same gate, four
+ * different answers. One function, so a route surfaces the copy by importing
+ * it rather than by remembering to.
+ *
+ * It reads OUR messages only, and the test for „ours" is the script: every
+ * message we author is Georgian. zod's own English („String must contain at
+ * least 2 character(s)") stays behind the generic code — it is a developer
+ * string, not copy. That also catches messages written inline on a rule
+ * (`.min(2, 'ძალიან მოკლეა')`), which the older per-route copies missed by
+ * matching on `code === 'custom'` alone.
+ */
+export function firstGeorgianMessage(err: { issues: { message: string }[] }): string | null {
+  return err.issues.find(i => /[Ⴀ-ჿᲐ-Ჿ]/.test(i.message))?.message ?? null
 }

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { PublicTopBar } from '@/components/PublicTopBar'
+import type { Me } from '@/lib/me'
 import { Container } from '@/components/Container'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
@@ -60,7 +61,7 @@ const CHANNELS = [
   },
 ]
 
-export default function ContactPage() {
+export default function ContactPage({ initialUser }: { initialUser?: Me | null }) {
   const { me } = useMe()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -129,7 +130,7 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <PublicTopBar />
+      <PublicTopBar initialUser={initialUser} />
 
       <Container as="main" size="wide" className="py-16 lg:py-24">
         <div className="max-w-[680px]">

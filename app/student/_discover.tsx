@@ -165,7 +165,14 @@ export const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => 
                     <div className="font-display text-body font-bold text-ink-900 truncate">{t.name}</div>
                     {t.verified && <VerifiedMark size={12} />}
                   </div>
-                  <div className="text-meta text-brand-700 font-display font-semibold truncate">{t.specialty}</div>
+                  {/* The CATEGORY (already mapped above), not `specialty` —
+                      that field is a frozen copy of the category name from
+                      approval day and disagrees with the card after a rename.
+                      Falls back to `specialty` only when there is no category
+                      at all, and renders nothing when there is neither. */}
+                  {(t.category || t.specialty) && (
+                    <div className="text-meta text-brand-700 font-display font-semibold truncate">{t.category || t.specialty}</div>
+                  )}
                 </div>
               </div>
               {/* Normalised like every other headline render — the trailing

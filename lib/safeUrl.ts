@@ -47,3 +47,32 @@ export function safeStoredFileUrl(u?: string | null): string | null {
   const trimmed = u.trim()
   return /^(https?:\/\/|data:image\/|data:application\/pdf;base64,)/i.test(trimmed) ? trimmed : null
 }
+
+/**
+ * Exactly the shapes /api/uploads emits — nothing else may be STORED as a
+ * document scan.
+ *
+ * The two guards above answer „is this safe to render/navigate to". This one
+ * answers a narrower question: „did we produce this?". It matters because
+ * `Certificate.fileUrl` cannot be `z.string().url()` (a real diploma is a
+ * megabyte-long `data:` URI, and the `.url()` ceiling is what once made every
+ * upload fail) — so the column had no scheme rule at all, and /api/certificates
+ * /[id]/file hands an `https://…` value straight to `NextResponse.redirect`.
+ * That made mcodne.ge a redirector to any destination an expert cared to type.
+ *
+ * There is no object storage: every scan the product creates is base64 inline,
+ * so refusing external URLs at the door costs nothing and closes it. Rows
+ * written before this rule are unaffected — the read route still serves them.
+ */
+export function isUploadedFileUrl(u?: string | null): boolean {
+  if (!u) return false
+  return /^data:(image\/(png|jpe?g|webp|gif)|application\/pdf);base64,/i.test(u.trim())
+}
+
+/** The image-only half of the rule above — for columns that reach an `<img
+ *  src>` and a serving route (B2BService.imageUrl). A PDF is a legitimate
+ *  certificate scan but never a card picture, so the two allow-lists differ. */
+export function isUploadedImageUrl(u?: string | null): boolean {
+  if (!u) return false
+  return /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(u.trim())
+}

@@ -32,6 +32,7 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { Icon } from '@/components/Icon'
 import { Avatar, VerifiedMark } from '@/components/Avatar'
 import { SiteText } from '@/components/SiteTextProvider'
+import { primaryPrice } from '@/components/booking/slots'
 
 type AbroadExpert = {
   id: string
@@ -85,18 +86,29 @@ async function loadExperts(): Promise<AbroadExpert[]> {
         headline: true,
         specialty: true,
         price: true,
+        // Needed to price the FLAGSHIP service rather than the flat rate — the
+        // shared rule every other expert surface follows (components/booking
+        // /slots → primaryPrice). Without it this page would ship the „one
+        // expert, two prices" bug the moment FEATURE_ABROAD is switched on.
+        consultationDurationMin: true,
+        consultations: { select: { minutes: true, price: true, tier: true } },
         rating: true,
         reviewsCount: true,
         verified: true,
         user: { select: { id: true, fullName: true, avatarUrl: true } },
+        // The label the rest of the site shows. `specialty` alone made this
+        // page say „ბიზნესი" about an expert whose card says „ბიზნესი და
+        // ფინანსები" — it is a frozen copy of the category name from approval
+        // day, kept only as the fallback for an expert who has no category.
+        category: { select: { name: true } },
       },
     })
     return rows.map(r => ({
       id: r.id,
       slug: r.slug,
       headline: r.headline,
-      specialty: r.specialty,
-      price: r.price,
+      specialty: r.category?.name ?? r.specialty,
+      price: primaryPrice(r.consultations ?? [], r.price),
       rating: r.rating,
       reviewsCount: r.reviewsCount,
       verified: r.verified,

@@ -1,0 +1,236 @@
+'use client'
+// Step 1 — „რა გჭირდება?". One search box; categories unfold under it.
+//
+// THE THUMBTACK/PROFI ENTRY, adopted deliberately (owner, 2026-08-14:
+// „ჩასაწერი უნდა იყოს და მერე კატეგორიები უნდა იშლებოდეს"): the person types
+// what they need IN THEIR OWN WORDS and the system does the classifying. The
+// previous revision opened on three abstract cards — asking somebody to file
+// their problem under our taxonomy before they had even named it, which is our
+// filing problem exported to the visitor.
+//
+// TWO ROADS, ONE TAP. Typing searches every direction at once (the stemmer
+// handles Georgian declension, so „ქიმიის" finds ქიმია); a person who does not
+// know the word browses the folded categories instead — recognition over
+// recall, both ending on the same topic tap. The tap advances; the kind is
+// derived from the topic and asked about ONLY when genuinely ambiguous
+// (see _model → withTopic / stepVisible).
+//
+// THE CATEGORIES ARE AN ACCORDION, not a chip wall. 132 topics rendered flat
+// was two screens of pills on a phone — scanning them was the machine's job
+// pushed onto the reader. Folded groups show 23 recognisable headings; one tap
+// opens the one that matches. One group open at a time: the accordion is a
+// table of contents, and a table of contents with three chapters open is a
+// wall again.
+
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Icon } from '@/components/Icon'
+import {
+  TOPIC_GROUPS, searchAllTopics, OTHER_TOPIC, KIND, kindsOfTopic,
+  SUGGESTED_TOPICS,
+  type Topic, type TopicGroup,
+} from '@/lib/requests'
+import { StepPick } from './_stepPick'
+import type { Draft } from './_model'
+
+const INPUT =
+  'w-full h-12 pl-11 pr-4 rounded-field border border-ink-200 bg-white text-body text-ink-900 ' +
+  'placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none ' +
+  'transition-colors duration-fast'
+
+export function StepWhat({ draft, onPick }: {
+  draft: Draft
+  onPick: (topicId: string) => void
+}) {
+  const [q, setQ] = useState('')
+  const [openGroup, setOpenGroup] = useState<string | null>(null)
+  // Keyboard focus within the hit list. -1 = nothing chosen; Enter then takes
+  // the FIRST hit, because a person who typed „ქიმია" and hit Enter meant the
+  // obvious thing and making them arrow down to say so is ceremony.
+  const [activeIx, setActiveIx] = useState(-1)
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const hits = useMemo(() => searchAllTopics(q), [q])
+  const searching = q.trim().length >= 2
+
+  // ⚠️ FOCUS ONLY WHERE FOCUS IS FREE. A static `autoFocus` opened the phone
+  // keyboard on arrival — and the keyboard covers the bottom half of the
+  // screen, i.e. exactly the examples and the fold headings that exist to show
+  // somebody who does not yet know what to type WHAT THERE IS TO TYPE. On a
+  // mouse, focus costs nothing and saves a click; `pointer: fine` is the query
+  // that separates the two, not a user-agent string.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (window.matchMedia?.('(pointer: fine)').matches) inputRef.current?.focus()
+  }, [])
+
+  const onSearchKey = (e: React.KeyboardEvent) => {
+    if (!searching || hits.length === 0) return
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      const next = e.key === 'ArrowDown'
+        ? Math.min(activeIx + 1, hits.length - 1)
+        : Math.max(activeIx - 1, 0)
+      setActiveIx(next)
+      // Keep the highlighted row on screen without yanking the page.
+      listRef.current?.children[next]?.scrollIntoView({ block: 'nearest' })
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      onPick(hits[Math.max(0, activeIx)].topic.id)
+    }
+  }
+
+  const Chip = ({ t }: { t: Topic }) => {
+    const on = draft.topic === t.id
+    return (
+      <button
+        type="button"
+        aria-pressed={on}
+        onClick={() => onPick(t.id)}
+        // 0.97, the BUTTON press tier (components/Btn) — a pill is a
+        // button-sized control, unlike the full-width option rows in
+        // _stepPick, which press at the card tier.
+        className={`h-11 px-4 rounded-pill border font-display text-small font-semibold transition-[background-color,border-color,color,transform] duration-fast motion-safe:active:scale-[0.97] ${
+          on
+            ? 'border-brand-600 bg-brand-50 text-brand-800'
+            : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300'
+        }`}
+      >
+        {t.label}
+      </button>
+    )
+  }
+
+  return (
+    <div>
+      <div className="relative">
+        <Icon.search className="w-5 h-5 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <input
+          ref={inputRef}
+          type="search"
+          value={q}
+          onChange={e => { setQ(e.target.value); setActiveIx(-1) }}
+          onKeyDown={onSearchKey}
+          role="combobox"
+          aria-expanded={searching && hits.length > 0}
+          aria-autocomplete="list"
+          className={INPUT}
+          placeholder="მაგ. ქიმია, ინგლისური, ხელშეკრულება, ლოგო…"
+        />
+      </div>
+
+      {searching ? (
+        hits.length > 0 ? (
+          // Search hits are ROWS, not chips: labels legitimately repeat across
+          // directions („ბუღალტერია" is a subject to learn AND a service to
+          // hire), so every hit carries its category — the context a bare chip
+          // cannot show.
+          <div ref={listRef} className="mt-5 rounded-card border border-ink-200 bg-white divide-y divide-ink-100 overflow-hidden">
+            {hits.map((h, i) => (
+              <button
+                key={`${h.group.id}:${h.topic.id}`}
+                type="button"
+                onClick={() => onPick(h.topic.id)}
+                onMouseEnter={() => setActiveIx(i)}
+                aria-selected={i === activeIx}
+                className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-[background-color,transform] duration-fast motion-safe:active:scale-[0.99] ${
+                  i === activeIx ? 'bg-ink-50' : 'hover:bg-ink-50'
+                }`}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-body font-semibold text-ink-900">{h.topic.label}</span>
+                  <span className="block text-meta text-ink-500">{h.group.label}</span>
+                </span>
+                <Icon.chevR className="w-4 h-4 text-ink-300 shrink-0" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          // No match is an ANSWER, not a dead end: what they typed is what the
+          // list lacks, and „სხვა" carries the need forward — their own words
+          // go in the description.
+          <div className="mt-5">
+            <p className="text-body text-ink-600">ზუსტად ეს ვერ ვიპოვეთ — აირჩიე „სხვა“ და აღწერაში დაწერე.</p>
+            <div className="mt-3"><Chip t={OTHER_TOPIC} /></div>
+          </div>
+        )
+      ) : (
+        <div className="mt-6">
+          {/* ── Six examples, one tap each ────────────────────────────────
+              The blank-start fix. See lib/requestTopics → SUGGESTED_TOPICS for
+              why these six and why the label is „მაგალითად" and not a claim
+              about what people search for. Above the fold headings, because a
+              heading has to be opened before it teaches anything and this row
+              does not. */}
+          <p className="text-meta text-ink-500">მაგალითად</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {SUGGESTED_TOPICS.map(t => <Chip key={t.id} t={t} />)}
+          </div>
+
+          <div className="mt-6 rounded-card border border-ink-200 bg-white divide-y divide-ink-100 overflow-hidden">
+            {TOPIC_GROUPS.map(g => {
+              const open = openGroup === g.id
+              return (
+                <div key={g.id}>
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setOpenGroup(open ? null : g.id)}
+                    className="w-full text-left px-4 h-12 flex items-center gap-3 hover:bg-ink-50 transition-colors duration-fast"
+                  >
+                    <span className="min-w-0 flex-1 font-display text-body font-semibold text-ink-900 truncate">
+                      {g.label}
+                    </span>
+                    {/* The direction a group belongs to, said once on the header
+                        — a browser should know „this is learning territory"
+                        before unfolding it. Groups with both kinds say nothing:
+                        the disambiguation step will ask, and a two-word hedge
+                        here answers nothing. */}
+                    {g.kinds.length === 1 && (
+                      <span className="text-meta text-ink-400 shrink-0">{KIND[g.kinds[0]].label}</span>
+                    )}
+                    <Icon.chevD
+                      className={`w-4 h-4 text-ink-400 shrink-0 transition-transform duration-fast ${open ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  {open && (
+                    <div className="px-4 pb-4 pt-1 flex flex-wrap gap-2 motion-safe:animate-fade-in-fast">
+                      {g.topics.map(t => <Chip key={t.id} t={t} />)}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="mt-4">
+            <Chip t={OTHER_TOPIC} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The disambiguation step — only the kinds this topic can honestly be.
+ *  Exported from here rather than a separate file because the two screens are
+ *  one decision split across two taps.
+ *
+ *  ⚠️ IT RENDERS StepPick, and that is the whole change of 2026-08-17. This
+ *  screen used to draw its OWN row — `p-6` instead of `py-4`, `text-h3`
+ *  instead of `text-body`, and a chevron nobody else had. One wizard, two row
+ *  designs, for the same shape of question: tap one of N. The chevron went with
+ *  it — a row that is entirely a button does not need an arrow saying so, and
+ *  the canon bans decorative ones. */
+export function StepKindPick({ draft, onPick }: {
+  draft: Draft
+  onPick: (kind: (typeof KIND) extends Record<infer K, unknown> ? K : never) => void
+}) {
+  const kinds = draft.topic ? kindsOfTopic(draft.topic) : []
+  return (
+    <StepPick
+      options={kinds.map(k => ({ id: k, label: KIND[k].label, hint: KIND[k].hint }))}
+      value={draft.kind}
+      onPick={id => onPick(id as Parameters<typeof onPick>[0])}
+    />
+  )
+}

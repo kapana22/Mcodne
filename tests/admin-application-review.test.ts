@@ -118,5 +118,22 @@ check('the list payload carries per-status counts', listRoute.includes('groupBy'
 const submitRoute = readFileSync(join(process.cwd(), 'app/api/applications/route.ts'), 'utf8')
 check('a new application emails the admins, not only the bell', submitRoute.includes('newApplicationAdminEmail'))
 
+/* A DECISION ROUTE MUST NOT LIE ABOUT WHAT IT DID.
+   `approve` promotes: role=TUTOR, a public profile, a published calendar.
+   `reject`/`revise` move only the APPLICATION's status — so on an already
+   APPROVED row they told the applicant „შენი განაცხადი უარყოფილია" while the
+   person stayed listed and bookable, and told the moderator nothing. */
+const decideRoute = readFileSync(join(process.cwd(), 'app/api/applications/[id]/route.ts'), 'utf8')
+check(
+  'reject/revise are refused on an already-approved application',
+  /app\.status === 'APPROVED' && action !== 'approve'/.test(decideRoute) && /ALREADY_APPROVED/.test(decideRoute),
+  'Without this the application record and the live site disagree about whether the person is an expert.',
+)
+check(
+  'the moderation panel shows the server\u2019s reason, not a generic line',
+  readFileSync(join(process.cwd(), 'app/admin/_moderation.tsx'), 'utf8').includes('r.message ||'),
+  'A refusal the moderator cannot read is a refusal they will retry.',
+)
+
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

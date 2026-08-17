@@ -4,13 +4,9 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { CONSULTATION_DURATIONS } from '@/lib/consultation'
 import { extractYouTubeId, canonicalYouTubeUrl } from '@/lib/youtube'
-import { georgianRefine } from '@/lib/georgianText'
-
-/** First human-readable custom message from a zod error, if any. */
-function firstCustomMessage(err: { issues: { code: string; message: string }[] }): string | null {
-  const hit = err.issues.find(i => i.code === 'custom' && /[Ⴀ-ჿᲐ-Ჿ]/.test(i.message))
-  return hit?.message ?? null
-}
+import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
+import { ASSIGNABLE_CATEGORY_WHERE } from '@/lib/categoryTree'
+import { ALL_PROFESSIONS, MAX_PROFESSIONS } from '@/lib/professions'
 
 
 // Very loose URL validator — we don't want to reject unusual TLDs or protocols
@@ -23,7 +19,11 @@ const optionalUrl = z.string().max(500).refine(
 const Body = z.object({
   headline: z.string().min(2).max(200).superRefine(georgianRefine('ერთი წინადადება შენზე')).optional(),
   bio: z.string().max(2000).superRefine(georgianRefine('აღწერა')).nullable().optional(),
-  specialty: z.string().min(2).max(200).optional(),
+  // Public: it is the card's fallback line when the category pill is empty.
+  // /apply already gates the free-text form of this value (otherCatError); this
+  // path did not, so the same string had a rule on one route and none on the
+  // other. A real sphere name („IT და ტექნოლოგიები") passes untouched.
+  specialty: z.string().min(2).max(200).superRefine(georgianRefine('სფერო')).optional(),
   yearsExp: z.number().int().min(0).max(80).optional(),
   // Rate limits opened up — the old 10-5000 range was arbitrary and blocked
   // both low-cost tutors (₾5 for a quick homework check) and premium C-level
@@ -36,6 +36,10 @@ const Body = z.object({
   // null-category profile is hidden from /tutors (lib/tutorsQuery.ts). Validated
   // against the live Category set in the handler so an arbitrary id can't be set.
   categoryId: z.string().min(1).max(40).nullable().optional(),
+  // What the expert calls themselves (lib/professions). Validated against the
+  // real vocabulary rather than stored as free text: this is a taxonomy field,
+  // and an unchecked one silently becomes a second, worse `specialty`.
+  professions: z.array(z.string().max(80)).max(MAX_PROFESSIONS).optional(),
   serviceType: z.enum(['CONSULTATION', 'RECURRING']).optional(),
   // DEFAULT session length only — it does not slice the calendar. Availability
   // rows are windows and bookable starts are derived per service (lib/availability).
@@ -97,14 +101,14 @@ export async function PATCH(req: Request) {
   if (!parsed.success) {
     // Surface OUR validation copy (e.g. the Georgian-language gate); zod's
     // own English messages stay behind the generic code.
-    const msg = firstCustomMessage(parsed.error)
+    const msg = firstGeorgianMessage(parsed.error)
     return NextResponse.json({ ok: false, error: msg ? 'INVALID_TEXT' : 'INVALID', message: msg ?? undefined }, { status: 400 })
   }
 
   const data: any = {}
   const {
     headline, bio, specialty, yearsExp, hourlyRate, languages,
-    serviceType, consultationDurationMin, bufferMin, categoryId,
+    serviceType, consultationDurationMin, bufferMin, categoryId, professions,
     videoUrl, available, linkedinUrl, websiteUrl, responseHours,
   } = parsed.data
   if (available !== undefined) data.available = available
@@ -112,26 +116,53 @@ export async function PATCH(req: Request) {
     if (categoryId === null) {
       data.categoryId = null
     } else {
-      // Only a SPHERE can be CHOSEN — otherwise the profile would set an
-      // invalid FK, or point at a hidden category and vanish from browse.
+      // ASSIGNABLE, which is what the picker actually offers — and until
+      // 2026-08-11 this said `status: 'VISIBLE'`, which it did not.
       //
-      // …but the one they ALREADY have always passes, and that exception is
-      // load-bearing. The profile form sends `categoryId` on every save, and
-      // after the 2026-08-10 merge an expert filed under „ფინანსები" holds an
-      // id the picker no longer offers. Without this they could not save their
-      // bio, their price, their languages — anything — and the 400 arrives as
-      // „შენახვა ვერ მოხერხდა" with nothing on screen naming the category.
-      // Nobody is re-pointed by this merge, so this case is not an edge one.
+      // THE BUG THAT FIXES. The editor renders the sub-fields absorbed into
+      // each sphere inside an <optgroup> („ფინანსები" under „ბიზნესი და
+      // ფინანსები"), and every one of those rows is REDIRECTED — so 7 of the 15
+      // categories on screen were guaranteed 400s. And `categoryId` travels in
+      // the SAME PATCH as the headline, the bio, the price and the languages,
+      // so choosing one did not just fail to save the category: it took the
+      // whole form down with a toast reading „შენახვა ვერ მოხერხდა — სცადე
+      // თავიდან", which names nothing and is therefore unfixable from inside
+      // the screen. Filing yourself precisely was the one action the editor
+      // could not survive.
+      //
+      // The one they ALREADY have still always passes, and that exception is
+      // still load-bearing: the form sends `categoryId` on every save, and an
+      // expert whose sphere was later hidden must not lose the ability to edit
+      // their own bio because of an admin action they had no part in.
       const current = await prisma.tutorProfile.findUnique({
         where: { userId: user.id },
         select: { categoryId: true },
       })
       const cat = categoryId === current?.categoryId
         ? { id: categoryId }
-        : await prisma.category.findFirst({ where: { id: categoryId, status: 'VISIBLE' }, select: { id: true } })
-      if (!cat) return NextResponse.json({ ok: false, error: 'BAD_CATEGORY' }, { status: 400 })
+        : await prisma.category.findFirst({
+          where: { ...ASSIGNABLE_CATEGORY_WHERE, id: categoryId },
+          select: { id: true },
+        })
+      // Say WHICH field refused. The client shows `message` when it is Georgian
+      // (see saveProfile) and otherwise falls back to the generic sentence, so
+      // without this the only signal was the generic one.
+      if (!cat) {
+        return NextResponse.json({
+          ok: false,
+          error: 'BAD_CATEGORY',
+          message: 'ეს კატეგორია აღარ არის ხელმისაწვდომი — აირჩიე სხვა.',
+        }, { status: 400 })
+      }
       data.categoryId = cat.id
     }
+  }
+  if (professions !== undefined) {
+    // Unknown entries are DROPPED, not refused: the list can be edited between
+    // the page loading and the save, and refusing the whole PATCH would lose
+    // the bio the expert also just wrote. De-duplicated and capped.
+    const known = new Set(ALL_PROFESSIONS.map(p => p.job))
+    data.professions = [...new Set(professions.map(p => p.trim()).filter(p => known.has(p)))].slice(0, MAX_PROFESSIONS)
   }
   if (responseHours !== undefined) data.responseHours = responseHours
   if (linkedinUrl !== undefined) {

@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { isUploadedFileUrl } from '@/lib/safeUrl'
 
 const Body = z.object({
-  title: z.string().min(2).max(200),
+  // The title is prose and gated; the ISSUER is an institution („ACCA",
+  // „Coursera") and is not. Short tokens pass the share rule anyway.
+  title: z.string().min(2).max(200).superRefine(georgianRefine('სერტიფიკატის სახელი')),
   // Optional now. /apply captures a title but not always an issuer, and an
   // unknown issuer must be ABSENT, not the literal string „მითითებული არ არის"
   // that used to be written into the column and then rendered as if it were data.
@@ -30,7 +34,11 @@ const Body = z.object({
    * Payload cost is handled by never shipping this field in list responses
    * (see GET below) — it is served only by /api/certificates/[id]/file.
    */
-  fileUrl: z.string().max(35_000_000).optional().nullable(),
+  // …and the SCHEME rule the size rule never carried: only what /api/uploads
+  // emits. Without it any string was stored and later handed to
+  // NextResponse.redirect by /api/certificates/[id]/file — see lib/safeUrl.
+  fileUrl: z.string().max(35_000_000).optional().nullable()
+    .refine(v => !v || isUploadedFileUrl(v), 'BAD_FILE_URL'),
 })
 
 async function tutorProfileForUser(userId: string) {
@@ -63,7 +71,12 @@ export async function POST(req: Request) {
   if (!profile) return NextResponse.json({ ok: false, error: 'NO_PROFILE' }, { status: 404 })
 
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
-  if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+  if (!parsed.success) {
+    // Our own copy (the Georgian-language gate) reaches the field; zod's
+    // English stays behind the generic code.
+    const msg = firstGeorgianMessage(parsed.error)
+    return NextResponse.json({ ok: false, error: msg ? 'INVALID_TEXT' : 'INVALID', message: msg ?? undefined }, { status: 400 })
+  }
 
   const item = await prisma.certificate.create({
     data: {

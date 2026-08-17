@@ -9,6 +9,8 @@ import { sendExpertRequestEscalations, PREPARING_TTL_HOURS, ESCALATION_STAGES } 
 import { sendExpertActivationNudges } from '@/lib/expertActivation'
 import { pruneEvents, EVENT_RETENTION_DAYS } from '@/lib/events'
 import { cronAuth } from '@/lib/cronAuth'
+import { requestsOn } from '@/lib/requests'
+import { runRequestJobs } from '@/lib/requestJobs'
 import { lastSweepRunAt } from '@/lib/sweepRunner'
 import { topUpAvailability } from '@/lib/availabilityTopUp'
 
@@ -494,10 +496,34 @@ export async function POST(req: Request) {
         where: { enrollmentId: e.id, status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] } },
       })
       if (outstanding > 0) continue
-      await prisma.enrollment.update({ where: { id: e.id }, data: { status: 'COMPLETED' } })
+      // CLAIM the row, don't just write it. The status was read at the top of
+      // this loop and the loop awaits a COUNT per candidate, so the gap is real
+      // — long enough for the expiry sweep above (or a second sweep runner) to
+      // move the same row to EXPIRED, which this would then overwrite with
+      // COMPLETED. `count !== 1` means somebody else got there first.
+      const claim = await prisma.enrollment.updateMany({
+        where: { id: e.id, status: 'ACTIVE' },
+        data: { status: 'COMPLETED' },
+      })
+      if (claim.count !== 1) continue
       enrollmentsCompleted++
     }
   } catch { /* best-effort, like every other step here */ }
+
+  // ── The requests subsystem's own background work ──────────────────────
+  // Four jobs, all of them messages or sweeping: re-mail an unanswered
+  // request (once, widened past the sphere that stayed silent), remind a
+  // client sitting on unchosen offers (once), and close what has gone stale.
+  // ⚠️ Nothing here verifies, accepts or opens a contact — those three stay
+  // human, and the admin's phone call is the quality gate this platform is
+  // built on. See lib/requestJobs for the whole argument.
+  //
+  // Gated on the flag so a deployment with the subsystem off does no work and
+  // touches no table; wrapped because a requests failure must never cost the
+  // booking cleanup its tick.
+  const requestJobs = requestsOn()
+    ? await runRequestJobs(now.getTime()).catch(() => ({ providerNudges: 0, clientNudges: 0, autoClosed: 0 }))
+    : null
 
   return NextResponse.json({
     ok: true,
@@ -521,6 +547,7 @@ export async function POST(req: Request) {
     expertActivation,
     eventsPruned,
     enrollments: { expired: enrollmentsExpired, completed: enrollmentsCompleted },
+    requests: requestJobs,
     at: now.toISOString(),
   })
 }

@@ -7,6 +7,7 @@ import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { fmtRating } from '@/lib/fmt'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
+import { TUTOR_DEFAULTS, primaryPriceLabel } from '@/components/booking/slots'
 
 /* ───── Similar experts — fetches real tutors in the same category ───── */
 type SimilarTutor = {
@@ -18,7 +19,8 @@ type SimilarTutor = {
   categoryName: string
   rating: number
   sessions: number
-  price: number
+  /** Already formatted („₾60", „უფასო") — see the mapping below. */
+  priceLabel: string
 }
 
 export const SimilarExperts = ({ excludeId, categorySlug, categoryName }: { excludeId?: string; categorySlug?: string | null; categoryName?: string | null }) => {
@@ -47,7 +49,20 @@ export const SimilarExperts = ({ excludeId, categorySlug, categoryName }: { excl
             categoryName: t.category?.name ?? '',
             rating: t.rating ?? 0,
             sessions: t.sessionsCount ?? 0,
-            price: t.price ?? 0,
+            /* THE SHARED RULE, not the raw column. This tile rendered
+               `₾{t.price}` — TutorProfile.price, the flat rate typed at /apply —
+               while the expert's own card and their profile rail both resolve
+               the FLAGSHIP service through primaryPriceLabel. Measured on
+               production 2026-08-13: ლიზა ზუბაშვილი reads „₾60 · 60 წთ"
+               everywhere and „₾20/სესია" here, because her flat rate is 20 and
+               her real consultation is 60. That is the same „one expert, three
+               prices" failure primaryPriceLabel was written to end (see its
+               docblock) — this tile was simply never migrated to it. */
+            priceLabel: primaryPriceLabel(
+              t.consultations ?? [],
+              t.price ?? 0,
+              t.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin,
+            ).label,
           }))
         setTutors(mapped)
       })
@@ -112,7 +127,7 @@ export const SimilarExperts = ({ excludeId, categorySlug, categoryName }: { excl
                   <span className="text-ink-400 text-meta">ახალი</span>
                 )}
               </div>
-              <div className="font-display text-body font-bold text-ink-900 tabular-nums tracking-tight">₾{t.price}<span className="text-meta font-medium text-ink-500 tracking-normal">/ სესია</span></div>
+              <div className="font-display text-body font-bold text-ink-900 tabular-nums tracking-tight">{t.priceLabel}<span className="text-meta font-medium text-ink-500 tracking-normal">/ სესია</span></div>
             </div>
           </Link>
         ))}

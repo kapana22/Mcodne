@@ -111,7 +111,20 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
 
   return (
     <div className="w-full">
-      <div className="bg-white rounded-card border border-ink-200 shadow-card p-7 sm:p-8 lg:p-9 motion-safe:animate-scale-in" style={{ animationDelay: '160ms' }}>
+      {/* FADE, NOT SCALE — and no delay. `scale-in` on a card this big is the
+          wrong instrument, measured 2026-08-13: the card is 553px tall on a
+          390px screen, and scaling 0.96 → 1 about the default centre origin
+          starts its BOTTOM edge 11px high and travels it down into place. The
+          password field, „დაგავიწყდა?" and the submit button all sit in that
+          lower half, so the part of the form you are about to touch is the part
+          that visibly drops — while every glyph, border and the `shadow-card`
+          re-rasterises at a fractional scale each frame, which is the shimmer.
+          Opacity moves nothing and rasterises once. The 160ms delay goes with
+          it: `fade-in` deliberately carries no fill-mode (see CLAUDE.md), so a
+          delay would hold the card at full opacity and then snap it to zero —
+          and CLAUDE.md's own rule is that an entrance must never delay a
+          control becoming usable. */}
+      <div className="bg-white rounded-card border border-ink-200 shadow-card p-7 sm:p-8 lg:p-9 motion-safe:animate-fade-in">
         <div className="mb-7 lg:mb-8">
           <Eyebrow className="mb-2">შესვლა</Eyebrow>
           <div className="font-display text-h2 font-bold text-ink-900 tracking-tight">შენი ანგარიში</div>

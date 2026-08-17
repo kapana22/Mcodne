@@ -21,6 +21,7 @@
 //     funnel signal, the text itself is not ours to log.
 
 import { APPLY_FUNNEL_EVENT_NAMES, APPLY_FUNNEL_PROP_KEYS } from '@/app/apply/applyFunnelEvents'
+import { REQUEST_FUNNEL_EVENT_NAMES, REQUEST_FUNNEL_PROP_KEYS, REQUEST_SLUG_RE } from '@/app/request/requestFunnelEvents'
 import { HELP_EVENT_NAMES, HELP_EVENTS, HELP_ROUTE_RE, HELP_TOPIC_IDS } from '@/lib/helpTopics'
 
 /** Every event the booking funnel may emit. The API allow-list is derived from this. */
@@ -160,6 +161,9 @@ const NAME_SET: ReadonlySet<string> = new Set<string>([
   ...BOOKING_FUNNEL_EVENT_NAMES,
   ...APPLY_FUNNEL_EVENT_NAMES,
   ...HELP_EVENT_NAMES,
+  // The request wizard (app/request/requestFunnelEvents) — fourth funnel, same
+  // discipline: fixed names, allow-listed scalar keys, no free text.
+  ...REQUEST_FUNNEL_EVENT_NAMES,
 ])
 
 /**
@@ -174,6 +178,7 @@ const HELP_NAME_SET: ReadonlySet<string> = new Set<string>(HELP_EVENT_NAMES)
 const KEY_SET: ReadonlySet<string> = new Set<string>([
   ...BOOKING_FUNNEL_PROP_KEYS,
   ...APPLY_FUNNEL_PROP_KEYS,
+  ...REQUEST_FUNNEL_PROP_KEYS,
   // help widget: which page it was opened from, which question, how many
   // answers were read before giving up — and `text`, the one exception below.
   'route', 'q', 'seen', 'text',
@@ -266,6 +271,9 @@ export function parseEventBody(raw: unknown): ParsedEvent {
       //           browser cannot put a word of its own in the column.
       if (k === 'route' && HELP_ROUTE_RE.test(v)) { props[k] = v; continue }
       if (k === 'q' && HELP_TOPIC_IDS.has(v)) { props[k] = v; continue }
+      // Request wizard: three vocabulary slugs (lib/requestTopics ids). Same
+      // firewall shape — a strict pattern, so free text cannot ride these keys.
+      if ((k === 'kind' || k === 'topic' || k === 'band') && REQUEST_SLUG_RE.test(v)) { props[k] = v; continue }
       return { ok: false, reason: `PROP_STR:${k}` }
     }
     // objects, arrays, null, undefined, functions → out.

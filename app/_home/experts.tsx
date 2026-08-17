@@ -8,7 +8,7 @@ import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { Reveal } from '@/components/Reveal'
 import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
-import { primaryServiceMin } from '@/components/booking/slots'
+import { primaryPriceLabel, primaryService } from '@/components/booking/slots'
 import { ExpertGrid, type GridExpert } from '@/components/home/ExpertGrid'
 import { categoryIcon } from '@/lib/categoryMarks'
 
@@ -58,15 +58,25 @@ export const FeaturedExperts = () => {
           urlSlug: t?.slug ?? null,
           slug: t?.category?.slug ?? '',
           name: t?.user?.fullName ?? 'ექსპერტი',
-          cat: t?.category?.name ?? t?.specialty ?? '',
+          // Real category or nothing — see app/tutors/_data.tsx.
+          cat: t?.category?.name ?? '',
           headline: t?.headline ?? '',
-          price: t?.price ?? 80,
-          // The flagship tier, never `consultationDurationMin` — that default is
-          // why every card used to read „30 წთ" against a one-hour offer.
-          durationMin: primaryServiceMin(
-            Array.isArray(t?.consultations) ? t.consultations : [],
-            t?.consultationDurationMin ?? 60,
-          ),
+          /* PRICE AND DURATION FROM THE SAME TIER. The duration was already
+             resolved from the flagship, but the price stayed `t.price` — the
+             flat rate typed at /apply — so the two halves of one line described
+             two different things. Measured 2026-08-13: ლიზა ზუბაშვილი's flat
+             rate is 20 and her real consultation is ₾60/60წთ, so the home grid
+             advertised „₾20 · 60-წუთიანი სესია" — an hour at a third of its
+             price, on the front page. `primaryPriceLabel` returns BOTH from one
+             tier, which is the entire reason it exists (see its docblock). */
+          ...(() => {
+            const tiers = Array.isArray(t?.consultations) ? t.consultations : []
+            const f = primaryPriceLabel(tiers, t?.price ?? 80, t?.consultationDurationMin ?? 60)
+            // `price` stays a NUMBER because the hero animates it with <CountUp>;
+            // it comes off the SAME tier as the label and the duration, so the
+            // three can no longer describe different services.
+            return { price: primaryService(tiers)?.price ?? (t?.price ?? 80), priceLabel: f.label, durationMin: f.minutes }
+          })(),
           photo: t?.user?.avatarUrl ?? DEFAULT_AVATAR,
           rate: typeof t?.rating === 'number' ? t.rating : 0,
           reviews: t?.reviewsCount ?? 0,

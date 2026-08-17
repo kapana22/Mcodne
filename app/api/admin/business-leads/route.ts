@@ -43,9 +43,21 @@ export async function GET() {
   return NextResponse.json({ ok: true, leads, open })
 }
 
+/* THE DEAL, not just the queue position.
+   `agreedPrice` and `adminNote` have been columns since the vertical shipped —
+   with a written intent („what the owner actually agreed", „invoice number,
+   what was promised") — and nothing ever wrote to them. This is the paid side
+   of the product and the work goes out on a contract, so the number that was
+   actually agreed has to live somewhere other than a conversation.
+   Every field is optional and applied only when SENT, so the „დავუკავშირდი"
+   button keeps posting a status alone and nothing else is overwritten. */
 const PatchBody = z.object({
   id: z.string().min(1),
-  status: z.enum(['NEW', 'CONTACTED', 'CLOSED']),
+  status: z.enum(['NEW', 'CONTACTED', 'CLOSED']).optional(),
+  // null CLEARS it — „we agreed nothing after all" is a real edit, and it must
+  // not be indistinguishable from „field not sent".
+  agreedPrice: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  adminNote: z.string().max(2000).optional(),
 })
 
 export async function PATCH(req: Request) {
@@ -58,18 +70,34 @@ export async function PATCH(req: Request) {
 
   await ensureDbReady()
 
+  const { id, status, agreedPrice, adminNote } = parsed.data
+  const data: Record<string, unknown> = {}
+  if (status !== undefined) data.status = status
+  if (agreedPrice !== undefined) data.agreedPrice = agreedPrice
+  if (adminNote !== undefined) data.adminNote = adminNote.trim() || null
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+  }
+
   // updateMany + count, not update: an id that no longer exists answers 404
   // instead of throwing P2025 into the 500 handler.
-  const done = await prisma.businessLead.updateMany({
-    where: { id: parsed.data.id },
-    data: { status: parsed.data.status },
-  })
+  const done = await prisma.businessLead.updateMany({ where: { id }, data })
   if (done.count !== 1) return notFound()
 
-  await audit(admin.id, 'businessLead.status', {
-    targetType: 'BusinessLead', targetId: parsed.data.id,
-    meta: { status: parsed.data.status },
-  })
+  // Two separate audit actions: a status move and a money decision are not the
+  // same event, and the audit tab filters by action string. „Who agreed 2400₾
+  // on this, and when" has to be answerable on its own.
+  if (status !== undefined) {
+    await audit(admin.id, 'businessLead.status', {
+      targetType: 'BusinessLead', targetId: id, meta: { status },
+    })
+  }
+  if (agreedPrice !== undefined || adminNote !== undefined) {
+    await audit(admin.id, 'businessLead.deal', {
+      targetType: 'BusinessLead', targetId: id,
+      meta: { agreedPrice: agreedPrice ?? null, hasNote: adminNote !== undefined && !!adminNote.trim() },
+    })
+  }
 
   return NextResponse.json({ ok: true })
 }

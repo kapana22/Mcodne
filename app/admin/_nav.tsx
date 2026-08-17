@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { signOut } from '@/lib/signout'
 import { Icon } from '@/components/Icon'
 import { b2bFeatureExists } from '@/lib/b2b'
+import { requestsFeatureExists } from '@/lib/requests'
 
 const Logo = () => (
   <Link href="/" className="inline-flex items-center gap-2.5" aria-label="მცოდნე admin">
@@ -15,7 +16,7 @@ const Logo = () => (
 )
 
 /* ───── Admin shell — sidebar + top bar ───── */
-export type AdminTab = 'system' | 'insights' | 'help' | 'overview' | 'moderation' | 'users' | 'bookings' | 'reviews' | 'disputes' | 'finance' | 'broadcast' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit' | 'companies'
+export type AdminTab = 'system' | 'insights' | 'help' | 'overview' | 'moderation' | 'users' | 'bookings' | 'reviews' | 'disputes' | 'finance' | 'broadcast' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit' | 'companies' | 'requests' | 'access'
 
 /**
  * Hashes that no longer name a tab, and where they now go.
@@ -60,6 +61,11 @@ type NavItem = { id: AdminTab; l: string; icon: keyof typeof Icon; g: NavGroup }
 
 const ADMIN_NAV: NavItem[] = ([
   { id: 'moderation', l: 'განაცხადები', icon: 'doc', g: 'queue' },
+  // Requests (2026-08-14). Filed in „ყოველდღიური" and directly under the
+  // application queue, because it is the same KIND of work: a list where
+  // somebody is waiting for a phone call. The whole feature dies if this tab
+  // goes unopened for a day.
+  { id: 'requests',   l: 'მოთხოვნები', icon: 'list', g: 'queue' },
   { id: 'bookings',   l: 'ჯავშნები', icon: 'cal', g: 'queue' },
   { id: 'help',       l: 'ჩატის კითხვები', icon: 'chat', g: 'queue' },
   { id: 'disputes',   l: 'დავები', icon: 'flag', g: 'queue' },
@@ -91,6 +97,11 @@ const ADMIN_NAV: NavItem[] = ([
 
   { id: 'system',     l: 'სისტემა', icon: 'settings', g: 'system' },
   { id: 'audit',      l: 'აუდიტი', icon: 'shield', g: 'system' },
+  // The requests allowlist. Filed under „სისტემა" and NOT beside „მოთხოვნები":
+  // it is a setting you change on the day somebody joins the test, not a queue
+  // you work. Putting it next to the queue would put a permission control one
+  // mis-click from a phone list.
+  { id: 'access',     l: 'წვდომა', icon: 'lock', g: 'system' },
 ] as NavItem[])
   // ── The ONE line that hides a dark vertical from this panel ──────────────
   // A tab whose feature does not exist on this deployment is filtered out of
@@ -104,14 +115,25 @@ const ADMIN_NAV: NavItem[] = ([
   // companies route checks canSeeB2B() AND requireRoleApi('ADMIN') on its own;
   // nothing here is load-bearing for access control.
   .filter(it => it.id !== 'companies' || b2bFeatureExists())
+  // Same line, same contract, for the requests subsystem: both its tabs leave
+  // the source array when FEATURE_REQUESTS is off, so /admin#requests does
+  // nothing at all rather than opening a tab that is simply not drawn.
+  //
+  // ⚠️ Still a nav-level hide, and a hide is not a guard. Every
+  // /api/admin/requests route calls requestsViewer() AND requireRoleApi('ADMIN')
+  // on its own; nothing here is load-bearing for access control.
+  .filter(it => (it.id !== 'requests' && it.id !== 'access') || requestsFeatureExists())
 
 const NAV_GROUPS: NavGroup[] = ['queue', 'people', 'content', 'signals', 'system']
 
 /** Both surfaces render this, so a badge can never mean two different things
  *  on desktop and mobile (it did: green here, grey there). */
-function navBadge(id: AdminTab, pending?: number | null, helpOpen?: number | null, b2bLeads?: number | null): number {
+function navBadge(id: AdminTab, pending?: number | null, helpOpen?: number | null, b2bLeads?: number | null, newRequests?: number | null): number {
   if (id === 'moderation') return pending ?? 0
   if (id === 'help') return helpOpen ?? 0
+  // Unverified requests — a person waiting for a phone call. Same rationale as
+  // every badge in this function.
+  if (id === 'requests') return newRequests ?? 0
   // Unanswered B2B enquiries. Same treatment as the two above and for the same
   // reason: there is a person at the other end of it. Without this a lead sat
   // in a tab nobody opens until somebody thought to look — which is what the
@@ -123,8 +145,8 @@ function navBadge(id: AdminTab, pending?: number | null, helpOpen?: number | nul
 /* Desktop-only left rail — moves the 11-item nav out of the cramped top header
    into a calm sidebar, so managing/moderating is comfortable (mobile keeps the
    TopBar drawer). */
-export const AdminSidebar = ({ active, onNav, pendingCount, helpOpen, b2bLeads }: {
-  active: AdminTab; onNav: (t: AdminTab) => void; pendingCount?: number | null; helpOpen?: number | null; b2bLeads?: number | null
+export const AdminSidebar = ({ active, onNav, pendingCount, helpOpen, b2bLeads, newRequests }: {
+  active: AdminTab; onNav: (t: AdminTab) => void; pendingCount?: number | null; helpOpen?: number | null; b2bLeads?: number | null; newRequests?: number | null
 }) => (
   <aside className="hidden lg:flex flex-col w-[240px] shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-ink-100 bg-white px-3 py-4">
     <div className="px-3">
@@ -139,7 +161,7 @@ export const AdminSidebar = ({ active, onNav, pendingCount, helpOpen, b2bLeads }
           <div className="flex flex-col gap-0.5">
             {ADMIN_NAV.filter(it => it.g === g).map(it => {
               const on = active === it.id
-              const badge = navBadge(it.id, pendingCount, helpOpen, b2bLeads)
+              const badge = navBadge(it.id, pendingCount, helpOpen, b2bLeads, newRequests)
               const Glyph = Icon[it.icon]
               return (
                 <button
@@ -174,8 +196,8 @@ export const AdminSidebar = ({ active, onNav, pendingCount, helpOpen, b2bLeads }
   </aside>
 )
 
-export const TopBar = ({ active, onNav, pendingCount, helpOpen, b2bLeads }: {
-  active: AdminTab; onNav: (t: AdminTab) => void; pendingCount?: number | null; helpOpen?: number | null; b2bLeads?: number | null
+export const TopBar = ({ active, onNav, pendingCount, helpOpen, b2bLeads, newRequests }: {
+  active: AdminTab; onNav: (t: AdminTab) => void; pendingCount?: number | null; helpOpen?: number | null; b2bLeads?: number | null; newRequests?: number | null
 }) => {
   const [mobOpen, setMobOpen] = useState(false)
   // Reads the SAME ADMIN_NAV as the sidebar. It used to be a second hand-typed
@@ -221,7 +243,7 @@ export const TopBar = ({ active, onNav, pendingCount, helpOpen, b2bLeads }: {
               <div className="pb-1 text-micro uppercase font-display font-semibold text-ink-400">{GROUP_LABEL[g]}</div>
               {ADMIN_NAV.filter(it => it.g === g).map(it => {
                 const on = active === it.id
-                const badge = navBadge(it.id, pendingCount, helpOpen, b2bLeads)
+                const badge = navBadge(it.id, pendingCount, helpOpen, b2bLeads, newRequests)
                 const Glyph = Icon[it.icon]
                 return (
                   <button key={it.id} type="button" onClick={() => { onNav(it.id); setMobOpen(false) }} className={`h-12 w-full flex items-center gap-3 text-body font-display font-medium border-b border-ink-100 last:border-b-0 text-left ${on ? 'text-ink-900' : 'text-ink-700'}`}>

@@ -27,6 +27,14 @@ type ToastCtx = {
 const Ctx = createContext<ToastCtx | null>(null)
 
 const AUTO_DISMISS_MS = 3500
+/* An ERROR toast is not a receipt, it is an instruction: the person has to read
+   it AND then act on the field it names. Since the validation messages started
+   carrying the actual reason („… ძირითადად ქართულად უნდა იყოს. ბრენდები და
+   აბრევიატურები რჩება ლათინურად."), the longest of them wraps to four lines at
+   390px — measured, not guessed. 3.5s is about the time it takes to read that
+   once, leaving nothing for noticing it first. Success and info stay at 3.5s;
+   they only confirm something the user already did. */
+const AUTO_DISMISS_ERROR_MS = 7000
 // Cap the visible stack so a burst of toasts doesn't fill the viewport.
 // When the queue is full we drop the OLDEST first — the user's most recent
 // action is the most relevant, and pushing off a still-visible toast is
@@ -63,7 +71,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       }
       return next
     })
-    const handle = setTimeout(() => dismiss(id), AUTO_DISMISS_MS)
+    const handle = setTimeout(() => dismiss(id), kind === 'error' ? AUTO_DISMISS_ERROR_MS : AUTO_DISMISS_MS)
     timers.current.set(id, handle)
   }, [dismiss])
 
@@ -83,7 +91,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         // z-toast: above page modals (z-sheet) and ConfirmModal (z-confirm) — a
         // toast fired while a dialog is open must stay visible, not paint
         // behind the scrim. Below only the skip-link (z-skip).
-        className="toast-host fixed bottom-4 right-4 z-toast flex flex-col gap-2 pointer-events-none safe-area-bottom"
+        // `left-4` on mobile, not just `right-4`: the toast is capped at 380px
+        // but a 390px screen leaves it 374px, so it sat flush against the left
+        // edge with the accent bar touching x=0 — measured, both gutters are
+        // 16px now. From sm up the host shrinks to the toast again.
+        className="toast-host fixed bottom-4 left-4 right-4 sm:left-auto z-toast flex flex-col items-end gap-2 pointer-events-none safe-area-bottom"
         aria-live="polite"
       >
         {items.map(t => (

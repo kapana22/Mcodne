@@ -12,7 +12,21 @@ import { prisma } from './prisma'
 // The `bootPromise` module-level cache guarantees this runs at most once per
 // warm process; subsequent requests await the same promise instead of racing.
 
-let bootPromise: Promise<void> | null = null
+// ⚠️ CACHED ON globalThis IN DEV, exactly as lib/prisma.ts caches its client and
+// for exactly the same reason: `next dev` throws the module registry away on
+// every recompile, so a module-level `let` is a cache that never hits. Measured
+// 2026-08-14 against the Railway proxy — 258ms per round trip × 108 statements
+// = 67 SECONDS — and before this line that 67s was paid again after every file
+// save, which made local development of anything touching the database
+// unusable. Production keeps the plain module-level variable: a server process
+// there boots once and the global would only outlive a deploy it must not.
+//
+// The DDL is idempotent, so a stale cache can never mean an unmigrated schema —
+// the worst case is one skipped no-op run inside a single dev session, and
+// restarting `npm run dev` clears it.
+const globalForBoot = globalThis as unknown as { dbBootPromise?: Promise<void> | null }
+
+let bootPromise: Promise<void> | null = globalForBoot.dbBootPromise ?? null
 
 async function runMigrations() {
   // Enum first — column defaults reference it.
@@ -60,6 +74,16 @@ async function runMigrations() {
     ALTER TABLE "TutorProfile"
       ADD COLUMN IF NOT EXISTS "responseMedianMin" INTEGER,
       ADD COLUMN IF NOT EXISTS "responseSampleN" INTEGER;
+  `)
+
+  // What the expert calls themselves — „ბუღალტერი", „მარკეტოლოგი" — several of
+  // them, from lib/professions.ts. A text[] with an empty default, so every
+  // existing profile keeps working untouched and no backfill is needed.
+  // Its own statement: `$executeRawUnsafe` takes ONE query, and a second
+  // template literal after a comma is passed as a PARAMETER, not executed.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "TutorProfile"
+      ADD COLUMN IF NOT EXISTS "professions" TEXT[] NOT NULL DEFAULT '{}';
   `)
 
   // Public profile slug — „/tutors/ana-gagoshidze" instead of a raw cuid.
@@ -165,9 +189,14 @@ async function runMigrations() {
   await prisma.$executeRawUnsafe(`ALTER TABLE "Category" ALTER COLUMN "defaultServiceType" SET DEFAULT 'CONSULTATION';`)
 
   // User — per-user notification opt-outs (JSON). Nullable → all types enabled.
+  // …and the operator heartbeat (2026-08-17): the ONLY input to the „ონლაინ
+  // ვართ" badge on a client's thread. Stamped by an admin with the panel open;
+  // null on every other account forever. See prisma/schema for why it is a
+  // heartbeat and not an opening-hours table.
   await prisma.$executeRawUnsafe(`
     ALTER TABLE "User"
-      ADD COLUMN IF NOT EXISTS "notificationPrefs" JSONB;
+      ADD COLUMN IF NOT EXISTS "notificationPrefs" JSONB,
+      ADD COLUMN IF NOT EXISTS "supportSeenAt" TIMESTAMP(3);
   `)
 
   // Message — stamp for the delayed "unread message" reminder email. Set once a
@@ -667,6 +696,23 @@ async function runMigrations() {
   `)
   // Added after the table shipped, so an ALTER as well as the CREATE above.
   await prisma.$executeRawUnsafe(`ALTER TABLE "B2BService" ADD COLUMN IF NOT EXISTS "format" TEXT;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "B2BService" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;`)
+  // `kind` — CONSULTATION | TRAINING. Added 2026-08-12; see the schema comment
+  // for why the one `direction` field could not carry both questions.
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "B2BService" ADD COLUMN IF NOT EXISTS "kind" TEXT NOT NULL DEFAULT 'CONSULTATION';`,
+  )
+  // ONE-TIME, IDEMPOTENT BACKFILL. Rows written before the column existed said
+  // „training" the only way they could: in the direction or the title. This
+  // reads that back out so nothing has to be re-typed by hand. It only ever
+  // touches rows still holding the default, so re-running it cannot undo an
+  // admin's later correction.
+  await prisma.$executeRawUnsafe(`
+    UPDATE "B2BService"
+       SET "kind" = 'TRAINING'
+     WHERE "kind" = 'CONSULTATION'
+       AND ("direction" ILIKE '%ტრენინგ%' OR "title" ILIKE '%ტრენინგ%');
+  `)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "B2BService_visible_direction_order_idx" ON "B2BService"("visible", "direction", "order");`)
 
   await prisma.$executeRawUnsafe(`
@@ -691,6 +737,291 @@ async function runMigrations() {
     ALTER TABLE "Booking"
       ADD COLUMN IF NOT EXISTS "paidBy" "PaymentSource";
   `)
+
+  // ── Requests: the client describes, providers bid (2026-08-14) ─────────
+  //
+  // The subsystem is dark behind FEATURE_REQUESTS (lib/requests.ts). These
+  // three tables are created on every deployment and stay EMPTY until somebody
+  // uses them — the same contract the B2B block above ships on, and the reason
+  // the flag can be the only switch: flipping it must never also require
+  // somebody to remember a psql session.
+  //
+  // Reviewable as one document in prisma/manual-migrations/2026-08-14-requests/,
+  // WITH a rollback. These statements and that file must stay identical.
+  //
+  // ⚠️ Additive only. Not one existing table is altered — `Booking`,
+  // `Consultation`, `Package`, `Enrollment`, `AvailabilitySlot`, `BusinessLead`
+  // and `B2BService` are untouched by every statement below.
+  // ⚠️ `RequestBudget` and `RequestDeadline` are ABSENT ON PURPOSE — they were
+  // here for one day and the 2026-08-14-request-topics migration drops them.
+  // A budget that must express „500–1 000₾" and „20–40₾ ერთ გაკვეთილზე" is not
+  // one enum, and a timing whose legal values depend on `kind` cannot be an
+  // enum at all. Do not add them back; see that migration's header.
+  for (const type of [
+    `CREATE TYPE "ServiceRequestStatus" AS ENUM ('NEW', 'VERIFIED', 'REJECTED', 'MATCHED', 'CLOSED');`,
+    `CREATE TYPE "RequestOfferStatus" AS ENUM ('SENT', 'WITHDRAWN', 'ACCEPTED', 'DECLINED');`,
+    `CREATE TYPE "RequestProviderKind" AS ENUM ('EXPERT', 'COMPANY');`,
+  ]) {
+    await prisma.$executeRawUnsafe(
+      `DO $$ BEGIN ${type} EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    )
+  }
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ServiceRequest" (
+      "id"           TEXT NOT NULL,
+      -- The code we read down a phone line. UNIQUE below, and minted from
+      -- crypto randomness rather than a sequence: it is the client's only key
+      -- to their own request, so a guessable one hands out a phone number.
+      "publicRef"    TEXT NOT NULL,
+      -- The shape of the need, and what it is FOR. Both TEXT and read through
+      -- lib/requestTopics — see the 2026-08-14-request-topics migration for why
+      -- neither is an enum and why "topic" is not a Category FK.
+      "kind"         TEXT NOT NULL DEFAULT 'CONSULTATION',
+      "topic"        TEXT NOT NULL DEFAULT 'other',
+      "categoryId"   TEXT,
+      "description"  TEXT NOT NULL,
+      -- Numbers, not a band enum: „500–1 000₾“ and „20–40₾ ერთ გაკვეთილზე“ are
+      -- not the same question. NULL max is the open top band.
+      "budgetMin"    INTEGER NOT NULL DEFAULT 0,
+      "budgetMax"    INTEGER,
+      "budgetUnit"   TEXT NOT NULL DEFAULT 'PER_SESSION',
+      "timing"       TEXT NOT NULL DEFAULT 'flexible',
+      "format"       TEXT NOT NULL DEFAULT 'EITHER',
+      "city"         TEXT NOT NULL,
+      "contactName"  TEXT NOT NULL,
+      "phone"        TEXT NOT NULL,
+      "email"        TEXT,
+      "userId"       TEXT,
+      "status"       "ServiceRequestStatus" NOT NULL DEFAULT 'NEW',
+      "adminNote"    TEXT,
+      "verifiedAt"   TIMESTAMP(3),
+      -- Plain TEXT with no FK, like "AuditLog"."actorId": a record of something
+      -- that happened must outlive the account that did it.
+      "verifiedById" TEXT,
+      "offerLimit"   INTEGER NOT NULL DEFAULT 3,
+      "offerCount"   INTEGER NOT NULL DEFAULT 0,
+      "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      -- NOT NULL with no DB default, exactly as prisma migrate diff emits it
+      -- for @updatedAt (see the "Company" table above for the full reasoning).
+      "updatedAt"    TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "ServiceRequest_pkey" PRIMARY KEY ("id"),
+      -- The last line of defence under the conditional-increment the offer
+      -- endpoint uses: a fourth offer is refused by the database rather than
+      -- recorded as a limit this product does not enforce.
+      CONSTRAINT "ServiceRequest_offerCount_within_limit" CHECK ("offerCount" >= 0 AND "offerCount" <= "offerLimit"),
+      CONSTRAINT "ServiceRequest_offerLimit_positive" CHECK ("offerLimit" > 0)
+    );
+  `)
+  // ── Grown to cover every sphere, 2026-08-14 ────────────────────────────
+  // The CREATE above already carries these for a fresh deployment; this ALTER
+  // is what moves the one that shipped hours earlier with the enum columns.
+  // Idempotent, and safe with or without rows — the defaults exist so the
+  // statement cannot fail, not because anything relies on them.
+  // Reviewable as prisma/manual-migrations/2026-08-14-request-topics/.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "ServiceRequest"
+      ADD COLUMN IF NOT EXISTS "kind"       TEXT    NOT NULL DEFAULT 'CONSULTATION',
+      ADD COLUMN IF NOT EXISTS "topic"      TEXT    NOT NULL DEFAULT 'other',
+      ADD COLUMN IF NOT EXISTS "budgetMin"  INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS "budgetMax"  INTEGER,
+      ADD COLUMN IF NOT EXISTS "budgetUnit" TEXT    NOT NULL DEFAULT 'PER_SESSION',
+      ADD COLUMN IF NOT EXISTS "timing"     TEXT    NOT NULL DEFAULT 'flexible',
+      ADD COLUMN IF NOT EXISTS "format"     TEXT    NOT NULL DEFAULT 'EITHER';
+  `)
+  await prisma.$executeRawUnsafe(
+    `DO $$ BEGIN ALTER TABLE "ServiceRequest" ADD CONSTRAINT "ServiceRequest_budget_range" CHECK ("budgetMin" >= 0 AND ("budgetMax" IS NULL OR "budgetMax" >= "budgetMin")); EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  )
+  // The clarifying answers ("audience", "level", ...) — a JSONB bag whose legal
+  // content lives in lib/requestTopics -> EXTRAS and is zod-checked at the
+  // door. Reviewable as prisma/manual-migrations/2026-08-14-request-details/.
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "ServiceRequest" ADD COLUMN IF NOT EXISTS "details" JSONB;`,
+  )
+  // The automation flags (2026-08-17). Timestamps rather than derivations: the
+  // cron ticks every 15 minutes, so „already nudged" must be WRITTEN or every
+  // tick inside the eligible window re-sends. Reviewable as
+  // prisma/manual-migrations/2026-08-17-request-automation/.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "ServiceRequest"
+      ADD COLUMN IF NOT EXISTS "providerNudgeAt" TIMESTAMP(3),
+      ADD COLUMN IF NOT EXISTS "clientNudgeAt"   TIMESTAMP(3);
+  `)
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "ServiceRequest_status_verifiedAt_idx" ON "ServiceRequest"("status", "verifiedAt");`,
+  )
+  // The enum-backed columns, and their types with them. Nothing outside this
+  // subsystem ever referenced either.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "ServiceRequest"
+      DROP COLUMN IF EXISTS "budget",
+      DROP COLUMN IF EXISTS "deadline";
+  `)
+  for (const t of ['RequestBudget', 'RequestDeadline']) {
+    await prisma.$executeRawUnsafe(`DROP TYPE IF EXISTS "${t}";`)
+  }
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ServiceRequest_publicRef_key" ON "ServiceRequest"("publicRef");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceRequest_status_createdAt_idx" ON "ServiceRequest"("status", "createdAt");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceRequest_categoryId_status_idx" ON "ServiceRequest"("categoryId", "status");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceRequest_topic_status_idx" ON "ServiceRequest"("topic", "status");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceRequest_kind_status_idx" ON "ServiceRequest"("kind", "status");`)
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "RequestOffer" (
+      "id"           TEXT NOT NULL,
+      "requestId"    TEXT NOT NULL,
+      "providerKind" "RequestProviderKind" NOT NULL,
+      "expertUserId" TEXT,
+      "companyId"    TEXT,
+      "priceGel"     INTEGER NOT NULL,
+      "daysEstimate" INTEGER,
+      "message"      TEXT NOT NULL,
+      "status"       "RequestOfferStatus" NOT NULL DEFAULT 'SENT',
+      "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"    TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "RequestOffer_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "RequestOffer_price_positive" CHECK ("priceGel" > 0),
+      -- EXACTLY ONE provider column, asserted here as well as in
+      -- offerProviderError() (lib/requests.ts). The function is the one place
+      -- the rule is CHECKED — it can name which half was wrong. This is the
+      -- backstop for anything that ever writes the table without going through
+      -- it, which is the shape of bug that only shows up in a report months on.
+      CONSTRAINT "RequestOffer_exactly_one_provider" CHECK (
+        ("expertUserId" IS NOT NULL AND "companyId" IS NULL)
+        OR ("expertUserId" IS NULL AND "companyId" IS NOT NULL)
+      )
+    );
+  `)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "RequestOffer_requestId_expertUserId_key" ON "RequestOffer"("requestId", "expertUserId");`)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "RequestOffer_requestId_companyId_key" ON "RequestOffer"("requestId", "companyId");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RequestOffer_expertUserId_status_idx" ON "RequestOffer"("expertUserId", "status");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RequestOffer_companyId_status_idx" ON "RequestOffer"("companyId", "status");`)
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "RequestAccess" (
+      "id"        TEXT NOT NULL,
+      "kind"      "RequestProviderKind" NOT NULL,
+      "userId"    TEXT,
+      "companyId" TEXT,
+      "active"    BOOLEAN NOT NULL DEFAULT true,
+      "note"      TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "RequestAccess_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "RequestAccess_exactly_one_subject" CHECK (
+        ("userId" IS NOT NULL AND "companyId" IS NULL)
+        OR ("userId" IS NULL AND "companyId" IS NOT NULL)
+      )
+    );
+  `)
+  // Nullable + unique on both, the same trick "Company"."taxId" relies on:
+  // Postgres allows any number of NULLs under a unique constraint, so the two
+  // nullable columns do not fight each other.
+  // ── One conversation per offer (2026-08-17) ─────────────────────────────
+  // The client has NO ACCOUNT, so the existing "Message" table (both sides are
+  // User FKs) cannot carry this: the client side is identified by possession of
+  // the request. Reviewable as prisma/manual-migrations/2026-08-17-request-chat/.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "RequestMessage" (
+      "id"        TEXT NOT NULL,
+      -- NULLABLE, and null is a THREAD: the client talking to us, from the
+      -- moment they press send until an offer exists. See prisma/schema.
+      "offerId"   TEXT,
+      "requestId" TEXT NOT NULL,
+      "fromClient" BOOLEAN NOT NULL,
+      "fromUserId" TEXT,
+      "body"      TEXT NOT NULL,
+      "readByClientAt"   TIMESTAMP(3),
+      "readByProviderAt" TIMESTAMP(3),
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "RequestMessage_pkey" PRIMARY KEY ("id"),
+      -- A CLIENT message carries no author. That is the security half — the
+      -- endpoint DERIVES the side and a row claiming to be the client while
+      -- naming a User is the exact forgery it refuses.
+      --
+      -- ⚠️ The mirror half ("fromClient" = false AND "fromUserId" IS NOT NULL)
+      -- was here for one day and had to go: the FK below is SET NULL, so
+      -- deleting a provider account nulls their author column, the mirror half
+      -- then rejects the update, and the DELETE fails — an account that can
+      -- never be deleted because the person once typed a sentence. Same trap
+      -- RequestOffer avoided by choosing CASCADE. Here CASCADE is wrong (a
+      -- company-owned offer outlives the member who wrote on it, and the thread
+      -- is what the company answers for), so the CHECK gives way instead.
+      -- „A provider message names its author" survives as an INSERT-time rule
+      -- in lib/requestChat's only writer, pinned by tests/requests.test.ts.
+      CONSTRAINT "RequestMessage_author_matches_side" CHECK (
+        "fromClient" = false OR "fromUserId" IS NULL
+      ),
+      CONSTRAINT "RequestMessage_body_not_empty" CHECK (length(btrim("body")) > 0)
+    );
+  `)
+  // The same relaxation for a database that already booted the one-day-old
+  // strict version — CREATE TABLE IF NOT EXISTS cannot reach it. Conditional,
+  // so this runs once and every later boot skips it: the replacement definition
+  // contains no „IS NOT NULL".
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'RequestMessage_author_matches_side'
+          AND pg_get_constraintdef(oid) LIKE '%IS NOT NULL%'
+      ) THEN
+        ALTER TABLE "RequestMessage" DROP CONSTRAINT "RequestMessage_author_matches_side";
+        ALTER TABLE "RequestMessage" ADD CONSTRAINT "RequestMessage_author_matches_side"
+          CHECK ("fromClient" = false OR "fromUserId" IS NULL);
+      END IF;
+    END $$;
+  `)
+  // ── The platform thread's one schema requirement (2026-08-17) ────────────
+  // Same shape of repair, same reason: the table already exists in production
+  // with "offerId" NOT NULL, and CREATE TABLE IF NOT EXISTS cannot reach it.
+  // DROP NOT NULL is idempotent in effect but not in log noise, so it is asked
+  // for only when it is actually still there.
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'RequestMessage' AND column_name = 'offerId'
+          AND is_nullable = 'NO'
+      ) THEN
+        ALTER TABLE "RequestMessage" ALTER COLUMN "offerId" DROP NOT NULL;
+      END IF;
+    END $$;
+  `)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RequestMessage_offerId_createdAt_idx" ON "RequestMessage"("offerId", "createdAt");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RequestMessage_requestId_createdAt_idx" ON "RequestMessage"("requestId", "createdAt");`)
+  for (const fk of [
+    `ALTER TABLE "RequestMessage" ADD CONSTRAINT "RequestMessage_offerId_fkey" FOREIGN KEY ("offerId") REFERENCES "RequestOffer"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    `ALTER TABLE "RequestMessage" ADD CONSTRAINT "RequestMessage_requestId_fkey" FOREIGN KEY ("requestId") REFERENCES "ServiceRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    `ALTER TABLE "RequestMessage" ADD CONSTRAINT "RequestMessage_fromUserId_fkey" FOREIGN KEY ("fromUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;`,
+  ]) {
+    await prisma.$executeRawUnsafe(`DO $$ BEGIN ${fk} EXCEPTION WHEN duplicate_object THEN NULL; END $$;`)
+  }
+
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "RequestAccess_userId_key" ON "RequestAccess"("userId");`)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "RequestAccess_companyId_key" ON "RequestAccess"("companyId");`)
+
+  // The foreign keys, after every side exists.
+  //
+  // ServiceRequest → Category is RESTRICT: a sphere with live requests must
+  // fail loudly on delete rather than silently unfile them.
+  // ServiceRequest → User is SET NULL, deliberately unlike "Booking"'s Restrict:
+  // deleting an account must not be refused because of a request, and must not
+  // erase it either — what somebody asked for stays readable with no name on it.
+  // Everything else cascades: an offer without its request, or an allowlist row
+  // without its subject, is a row that cannot be read at all.
+  for (const fk of [
+    `ALTER TABLE "ServiceRequest" ADD CONSTRAINT "ServiceRequest_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE RESTRICT ON UPDATE CASCADE;`,
+    `ALTER TABLE "ServiceRequest" ADD CONSTRAINT "ServiceRequest_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;`,
+    `ALTER TABLE "RequestOffer" ADD CONSTRAINT "RequestOffer_requestId_fkey" FOREIGN KEY ("requestId") REFERENCES "ServiceRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    `ALTER TABLE "RequestOffer" ADD CONSTRAINT "RequestOffer_expertUserId_fkey" FOREIGN KEY ("expertUserId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    `ALTER TABLE "RequestOffer" ADD CONSTRAINT "RequestOffer_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    `ALTER TABLE "RequestAccess" ADD CONSTRAINT "RequestAccess_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    `ALTER TABLE "RequestAccess" ADD CONSTRAINT "RequestAccess_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+  ]) {
+    await prisma.$executeRawUnsafe(
+      `DO $$ BEGIN ${fk} EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    )
+  }
 
   // ── pg_trgm: Georgian-aware expert search ──────────────────────────────
   // Georgian declines heavily („მარკეტინგი" → „მარკეტინგის"/„მარკეტინგში"),
@@ -740,11 +1071,16 @@ export function ensureDbReady(): Promise<void> {
       // block requests — reset so the NEXT call retries a clean boot…
       console.error('[dbBoot] migration error:', err)
       bootPromise = null
+      // Cleared on BOTH sides, or a failed boot would be remembered as done for
+      // the rest of the dev session and every later request would run against a
+      // schema that was never migrated.
+      globalForBoot.dbBootPromise = null
       // …but the CURRENT caller must fail fast instead of proceeding against a
       // possibly-unmigrated schema (which would surface as opaque 500s on
       // missing columns). Re-throw so awaiting routes can return 503.
       throw err
     })
+    if (process.env.NODE_ENV !== 'production') globalForBoot.dbBootPromise = bootPromise
   }
   return bootPromise
 }

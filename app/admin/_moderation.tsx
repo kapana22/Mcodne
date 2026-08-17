@@ -14,8 +14,9 @@ import { fmtKaDate } from '@/lib/kaDate'
 import { normalizeCertificates, summarizeProfessionData, hasVerificationDocument, missingApplicationParts, fileLabel } from './_application'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
-import { AdminConfirmDialog, TabHeader, adminOk, AdminLoading, fmtDT, LoadMoreBar } from './_parts'
-import type { AdminCategory } from './_categories'
+import { AdminConfirmDialog, TabHeader, adminOk, adminResult, AdminLoading, fmtDT, LoadMoreBar } from './_parts'
+import { CategorySelect, asMatchable, useAssignableCategories } from './_categoryPicker'
+import { resolveCategoryByName } from '@/lib/categoryTree'
 
 /* ───── Shared SectionHeader (for non-overview tabs) ───── */
 /* ───── Section: Moderation (tutor applications queue) ───── */
@@ -64,16 +65,12 @@ type AppDetail = {
   professionData?: Record<string, unknown> | null
 }
 
-/* Mirrors the category resolver inside PATCH /api/applications/:id — the admin
-   UI must pre-select exactly what approval would pick on its own, otherwise the
-   dropdown quietly lies about the outcome. */
-const matchCategory = (specialty: string, cats: AdminCategory[]): AdminCategory | undefined => {
-  const nrm = (s: string) => s.toLowerCase().trim()
-  const sp = nrm(specialty || '')
-  if (!sp) return undefined
-  return cats.find(c => nrm(c.name) === sp)
-    ?? cats.find(c => { const n = nrm(c.name); const stem = n.slice(0, 4); return sp.includes(n) || n.includes(sp) || (stem.length >= 3 && sp.includes(stem)) })
-}
+/* The resolver is lib/categoryTree's, imported — it is NOT re-stated here.
+   This file used to carry its own copy, and the copy had drifted: it was
+   missing the server's slug arm, so an applicant whose სფერო reads „IT" showed
+   up as „matched nothing" in the panel while approval would have filed them
+   under „ტექნოლოგია და პროდუქტი" without being asked. A dropdown that
+   disagrees with the button beneath it is worse than no pre-selection. */
 
 /* One labelled fact in the review grid. A missing value is SAID out loud —
    a blank cell is indistinguishable from a field the form never asked for, and
@@ -159,11 +156,12 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
   // the applications queue was the only list you could not search.
   const [qInput, setQInput] = useState('')
   const [query, setQuery] = useState('')
-  // Live categories for the approve-time selector. A free-text niche („cat“ is
-  // the applicant's specialty) matches no preset → the profile is born
-  // category-less and /tutors never shows it, so the moderator needs a way to
-  // assign one at the moment of approval.
-  const [liveCats, setLiveCats] = useState<AdminCategory[]>([])
+  // Every category an expert may be filed into (lib/categoryTree's ASSIGNABLE
+  // rule), grouped by sphere. A free-text niche („cat“ is the applicant's
+  // specialty) matches no preset, and the expert is then born category-less:
+  // still listed on /tutors, but absent from every sphere page and from the
+  // browse filter. This is where that gets decided.
+  const { flat: liveCats, groups: catGroups } = useAssignableCategories()
   const [catId, setCatId] = useState('')
   // Photo + document blobs + professionData are excluded from the list payload
   // and lazy-loaded for the selected application only (see effect below).
@@ -256,19 +254,6 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
     } catch { /* keep current page */ } finally { setLoadingMore(false) }
   }
 
-  // Same endpoint the „კატეგორიები“ tab uses. Spheres AND the sub-fields
-  // absorbed into them: a sub-field is where its experts are folded from, so
-  // filing someone there is precise, not invisible. Only HIDDEN is excluded —
-  // that one really would keep the expert off the site.
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/admin/categories', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : []))
-      .then((d: AdminCategory[]) => { if (!cancelled) setLiveCats(Array.isArray(d) ? d.filter(c => c.status === 'VISIBLE' || (c.status === 'REDIRECTED' && d.some(p => p.id === c.parentId && p.status === 'VISIBLE'))) : []) })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [])
-
   const toggleCheck = (id: string) => {
     setChecked(prev => {
       const next = new Set(prev)
@@ -281,12 +266,13 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
     setChecked(prev => prev.size === APPS.length ? new Set() : new Set(APPS.map(a => a.id)))
   }
 
-  // The category an application would resolve to on approval. Bulk approve sends
-  // it EXPLICITLY per row (the single-application path already does) — without it
-  // an applicant with a free-text niche is approved with categoryId null and
-  // becomes an approved-but-INVISIBLE expert, since /tutors hard-requires a live
-  // category. Rows that match nothing are excluded from the bulk action instead.
-  const catIdFor = (appId: string) => matchCategory(APPS.find(a => a.id === appId)?.cat ?? '', liveCats)?.id
+  // The category an application would resolve to on approval — the SAME
+  // function the server runs, so this is a preview and not a second opinion.
+  // Bulk approve sends it explicitly per row; rows that resolve to nothing are
+  // held back from the bulk action so a taxonomy decision is never taken by a
+  // button that was pressed for twelve people at once.
+  const catIdFor = (appId: string) =>
+    resolveCategoryByName(APPS.find(a => a.id === appId)?.cat ?? '', asMatchable(liveCats))?.id
 
   const bulkDecide = async (action: 'approve' | 'reject', reason?: string, only?: string[]) => {
     const ids = only ?? Array.from(checked)
@@ -367,8 +353,10 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
       })
       // adminOk, not `data.ok === false` — see bulkDecide(). A moderation
       // decision must never claim success it can't prove.
-      if (!(await adminOk(res))) {
-        setFlash({ kind: 'error', msg: 'ოპერაცია ვერ შესრულდა.' })
+      const r = await adminResult(res)
+      if (!r.ok) {
+        // The server's own sentence when it has one (e.g. „already approved").
+        setFlash({ kind: 'error', msg: r.message || 'ოპერაცია ვერ შესრულდა.' })
         return
       }
       setFlash({ kind: 'success', msg: action === 'approve' ? 'განაცხადი დამტკიცდა.' : action === 'revise' ? 'განაცხადი შესასწორებლად დაბრუნდა.' : 'განაცხადი უარყოფილია.' })
@@ -418,6 +406,14 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
   // (a blank space and a field that does not exist look identical otherwise).
   const certs = normalizeCertificates(detail?.certificates)
   const prof = summarizeProfessionData(detail?.professionData)
+  // The sphere the applicant TYPED, when the list had nothing for them.
+  // `summarizeProfessionData` already flattens it into `extras` under its
+  // Georgian label; pulled out by key here so it can be shown at the decision.
+  const requestedSphere = prof.extras.find(e => e.key === 'requestedCategory')?.value ?? ''
+  // The professions the applicant ticked on /apply (lib/professions). They are
+  // the finest-grained thing they said about themselves and they land on the
+  // profile at approval, so the moderator sees them BEFORE deciding, not after.
+  const pickedProfessions = prof.extras.find(e => e.key === 'professions')?.value ?? ''
   const hasDoc = hasVerificationDocument(detail)
   const missing = active && detail
     ? missingApplicationParts({
@@ -433,10 +429,10 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
       docs: detail,
     })
     : []
-  // Pre-select the category the applicant's specialty resolves to; a niche that
-  // matches nothing leaves the select empty (and shows the warning below it).
+  // Pre-select the category the applicant's სფერო resolves to; a niche that
+  // matches nothing leaves the select empty (and shows the note below it).
   useEffect(() => {
-    setCatId(active ? (matchCategory(active.cat, liveCats)?.id ?? '') : '')
+    setCatId(active ? (resolveCategoryByName(active.cat, asMatchable(liveCats))?.id ?? '') : '')
   }, [active, liveCats])
   return (
     <>
@@ -841,22 +837,38 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
                 className="w-full px-3 py-2 rounded-field border border-ink-200 bg-white text-small focus:border-brand-400 focus:outline-none resize-none"
               />
             </div>
-            {/* Category assignment — sent with „დაამტკიცე“. Without a live
-                category the approved expert never appears on /tutors, so an
-                unmatched niche gets a loud (not decorative) warning. */}
+            {/* Category assignment — sent with „დაამტკიცე“.
+                THE COPY WAS WRONG and it mattered: it said an expert with no
+                category „არ გამოჩნდება /tutors-ზე". lib/tutorsQuery says the
+                opposite in code and in a comment — the category is a LABEL, not
+                a gate, and an unfiled expert still appears in the unfiltered
+                browse. A warning that overstates the stakes pushes a moderator
+                to pick SOMETHING, and something is how a psychologist ends up
+                in „ბიზნესი და ფინანსები". It now states the real cost.
+                It also only fires when the სფერო genuinely resolved to nothing
+                — clearing the select yourself is a decision, not a failure. */}
             <div className="mb-3">
               <Eyebrow as="label" tone="muted" className="block mb-1.5">კატეგორია</Eyebrow>
-              <select
-                value={catId}
-                onChange={(e) => setCatId(e.target.value)}
-                className="w-full sm:max-w-[280px] h-11 px-3 rounded-field border border-ink-200 bg-white text-small focus:border-brand-400 focus:outline-none"
-              >
-                <option value="">— არ არის მითითებული —</option>
-                {liveCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              {!catId && liveCats.length > 0 && (
-                <p className="mt-1.5 text-meta text-danger-700">
-                  „{active.cat}“ ვერცერთ სფეროს ვერ დაემთხვა. თუ კატეგორიას არ მიუთითებ, ექსპერტი /tutors-ზე არ გამოჩნდება — აირჩიე სფერო ან ჯერ დაამატე „კატეგორიები“ ტაბში.
+              <CategorySelect value={catId} onChange={setCatId} groups={catGroups} />
+              {/* WHAT THEY ASKED FOR, said out loud. When an applicant used
+                  „ჩემი სფერო სიაში არ არის" this is the only place their words
+                  exist, and it is the reason the field was restored — the
+                  moderator either maps it onto an existing sphere here, or adds
+                  the sphere. Buried inside „დამატებითი მონაცემები" it would be
+                  read after the decision instead of before it. */}
+              {pickedProfessions && (
+                <p className="mt-1.5 text-meta text-ink-700">
+                  პროფესიები: <b className="font-display font-semibold text-ink-900">{pickedProfessions}</b>
+                </p>
+              )}
+              {requestedSphere && (
+                <p className="mt-1.5 text-meta text-ink-700">
+                  განმცხადებელმა თავად ჩაწერა: <b className="font-display font-semibold text-ink-900">„{requestedSphere}“</b> — სიაში არ იყო.
+                </p>
+              )}
+              {!catId && liveCats.length > 0 && !resolveCategoryByName(active.cat, asMatchable(liveCats)) && (
+                <p className="mt-1.5 text-meta text-warning-800">
+                  „{active.cat}“ ვერცერთ სფეროს ვერ დაემთხვა. კატეგორიის გარეშე ექსპერტი /tutors-ზე გამოჩნდება, მაგრამ ვერცერთ სფეროში და ვერც ფილტრში — აირჩიე სფერო, ან დაამატე ახალი „კატეგორიები“ ტაბში.
                 </p>
               )}
             </div>
@@ -955,7 +967,7 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
           ეს {pendBulkApprove?.ids.length ?? 0} განმცხადებელი გახდება ექსპერტი — შეიქმნება პროფილი და გამოჩნდება საიტზე. უკან დაბრუნება არ არსებობს.
           {(pendBulkApprove?.skipped ?? 0) > 0 && (
             <span className="mt-2 block text-danger-700">
-              {pendBulkApprove?.skipped} განაცხადს სფერო ვერ დაემთხვა — გამოტოვდება. დაამტკიცე ცალ-ცალკე და ხელით მიუთითე კატეგორია, თორემ ექსპერტი /tutors-ზე არ გამოჩნდება.
+              {pendBulkApprove?.skipped} განაცხადს სფერო ვერ დაემთხვა — გამოტოვდება. დაამტკიცე ცალ-ცალკე და ხელით მიუთითე კატეგორია, თორემ ექსპერტი ვერცერთ სფეროში და ვერც ფილტრში გამოჩნდება.
             </span>
           )}
         </>}

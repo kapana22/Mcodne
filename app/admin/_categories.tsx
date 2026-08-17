@@ -5,6 +5,9 @@ import { useState, useEffect } from 'react'
 import { Icon } from '@/components/Icon'
 import { hierarchyError, canBeParent, strandedBy, TREE_ERROR } from '@/lib/categoryTree'
 import type { CategoryStatus } from '@/lib/categoryTree'
+import { Eyebrow } from '@/components/Eyebrow'
+import { PROFESSIONS } from '@/lib/professions'
+import { fmtKaDate } from '@/lib/kaDate'
 import { AdminConfirmDialog, TabHeader, adminOk, AdminError } from './_parts'
 
 /* ───── Section: Categories (status + parent + name) ─────
@@ -30,37 +33,92 @@ export type AdminCategory = {
   childCount: number
 }
 
-const STATUS_LABEL: Record<CategoryStatus, string> = {
-  VISIBLE: 'ჩანს',
-  HIDDEN: 'დამალული',
-  REDIRECTED: 'გადამისამართებული',
+/* „ვინ რა მოითხოვა" — the list this tab was missing.
+ *
+ * Adding a sphere was always a guess: /apply offered a fixed set and, until
+ * 2026-08-11, could not be completed by anyone outside it, so an expert in a
+ * field nobody had thought of mis-filed themselves or left. Neither reached
+ * this screen. Now „ჩემი სფერო სიაში არ არის" is stored on every application
+ * and aggregated here, so the taxonomy grows from what people typed.
+ *
+ * Renders NOTHING when nobody has asked — an empty „0 requests" panel on a
+ * management screen is furniture. It appears the day it has something to say.
+ */
+const RequestedSpheres = () => {
+  const [items, setItems] = useState<{ label: string; count: number; lastAt: string }[]>([])
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/admin/categories/requested', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (!cancelled && Array.isArray(d?.items)) setItems(d.items) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+  if (!items.length) return null
+  return (
+    <div className="mb-4 rounded-card border border-ink-200 bg-white p-4">
+      <Eyebrow tone="muted" className="mb-1">განმცხადებლებმა მოითხოვეს</Eyebrow>
+      <p className="text-meta text-ink-500 mb-3">სფეროები, რომლებიც სიაში არ იყო და ხელით ჩაწერეს. ბოლო 6 თვე.</p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map(r => (
+          <span
+            key={r.label}
+            title={`ბოლოს: ${fmtKaDate(new Date(r.lastAt))}`}
+            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border border-ink-200 bg-ink-50 text-small text-ink-800"
+          >
+            {r.label}
+            <b className="font-display text-micro font-bold text-ink-500 tabular-nums">{r.count}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
-/** Children follow their parent, so the structure is readable top to bottom. */
-function ordered(rows: AdminCategory[]): { row: AdminCategory; child: boolean }[] {
-  const byParent = new Map<string, AdminCategory[]>()
-  for (const r of rows) {
-    if (!r.parentId) continue
-    const list = byParent.get(r.parentId)
-    if (list) list.push(r); else byParent.set(r.parentId, [r])
-  }
-  const ids = new Set(rows.map(r => r.id))
-  const out: { row: AdminCategory; child: boolean }[] = []
-  for (const r of rows) {
-    // A row whose parent is missing from the list would otherwise vanish, so it
-    // is listed at the top level rather than dropped.
-    if (r.parentId && ids.has(r.parentId)) continue
-    out.push({ row: r, child: false })
-    for (const kid of byParent.get(r.id) ?? []) out.push({ row: kid, child: true })
-  }
-  return out
-}
+/* ONE checkbox, used on spheres and sub-categories alike — the only visibility
+   control on this screen. A sphere toggles VISIBLE ↔ HIDDEN; a sub-category
+   toggles REDIRECTED ↔ HIDDEN, keeping its parent either way. Both mean the
+   same thing to the person clicking: „is this offered or not". */
+const VisibleBox = ({ row, onToggle }: { row: AdminCategory; onToggle: (r: AdminCategory, on: boolean) => void }) => (
+  <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+    <input
+      type="checkbox"
+      checked={row.status !== 'HIDDEN'}
+      onChange={e => onToggle(row, e.target.checked)}
+      aria-label={`${row.name} — ჩანს`}
+      className="w-5 h-5 shrink-0 accent-brand-500"
+    />
+    <span className={`text-small ${row.status === 'HIDDEN' ? 'text-ink-400' : 'text-ink-800'}`}>
+      {row.status === 'HIDDEN' ? 'არ ჩანს' : row.parentId ? 'ჩანს სფეროში' : 'ჩანს საიტზე'}
+    </span>
+  </label>
+)
+
+/* Delete is blocked by the same two facts the server checks, and the button
+   SAYS which one — „disabled with no reason" is how an admin concludes the
+   screen is broken. Hiding is the answer in both cases. */
+const DeleteBtn = ({ row, onAsk }: { row: AdminCategory; onAsk: (r: AdminCategory) => void }) => (
+  <button
+    type="button"
+    onClick={() => onAsk(row)}
+    disabled={row.tutorCount > 0 || row.childCount > 0}
+    title={row.tutorCount > 0 ? 'ჯერ ექსპერტები ჰყავს — მოხსენი პტიჩკა' : row.childCount > 0 ? TREE_ERROR.HAS_CHILDREN : 'წაშლა'}
+    aria-label={`${row.name} — წაშლა`}
+    className="shrink-0 h-8 w-8 rounded-btn text-danger-600 hover:bg-danger-50 disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center justify-center transition-colors duration-fast"
+  >
+    <Icon.x className="w-3.5 h-3.5" />
+  </button>
+)
 
 export const CategoriesSection = () => {
   const [rows, setRows] = useState<AdminCategory[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [flash, setFlash] = useState<{ kind: 'success' | 'error'; msg: string } | null>(null)
   const [newName, setNewName] = useState('')
+  /** Per-sphere draft for the inline „+ ქვეკატეგორია" input, keyed by sphere
+   *  id — each block types independently, so one shared string would leak a
+   *  half-typed name into every other sphere on the screen. */
+  const [subDraft, setSubDraft] = useState<Record<string, string>>({})
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
@@ -129,14 +187,51 @@ export const CategoriesSection = () => {
     if (name.length < 2 || creating) return
     setCreating(true); setFlash(null)
     try {
-      const res = await fetch('/api/admin/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // `parentId` present → the row is created as a sub-category in one go
+        // (REDIRECTED + parent, server-side). Absent → a sphere, as before.
+        body: JSON.stringify({ name }),
+      })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) throw new Error()
+      // The server's own sentence first — a refused parent says WHY.
+      if (!res.ok || !j.ok) throw new Error(typeof j?.message === 'string' ? j.message : '')
       setRows(prev => [...(prev ?? []), j.category])
       setNewName('')
-      setFlash({ kind: 'success', msg: 'კატეგორია დაემატა.' })
-    } catch { setFlash({ kind: 'error', msg: 'დამატება ვერ მოხერხდა.' }) }
+      setFlash({ kind: 'success', msg: 'სფერო დაემატა.' })
+    } catch (e) {
+      const why = e instanceof Error ? e.message : ''
+      setFlash({ kind: 'error', msg: why || 'დამატება ვერ მოხერხდა.' })
+    }
     finally { setCreating(false) }
+  }
+
+  /* Add a sub-category from inside its sphere's block — the action this screen
+     is mostly used for, and the one that used to take a trip to the form at the
+     top plus a parent dropdown plus a hunt for where the row landed. The input
+     stays focused and clears itself, so four sub-fields is four names and four
+     Enters. */
+  const addSub = async (parent: AdminCategory) => {
+    const name = (subDraft[parent.id] ?? '').trim()
+    if (name.length < 2 || creating) return
+    setCreating(true); setFlash(null)
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, parentId: parent.id }),
+      })
+      const j = await res.json().catch(() => ({}))
+      // The server's own sentence first — a refused parent says WHY.
+      if (!res.ok || !j.ok) throw new Error(typeof j?.message === 'string' ? j.message : '')
+      setRows(prev => [...(prev ?? []), j.category])
+      setSubDraft(d => ({ ...d, [parent.id]: '' }))
+      setFlash({ kind: 'success', msg: `„${name}“ დაემატა „${parent.name}“-ში.` })
+    } catch (e) {
+      const why = e instanceof Error ? e.message : ''
+      setFlash({ kind: 'error', msg: why || 'დამატება ვერ მოხერხდა.' })
+    } finally { setCreating(false) }
   }
 
   const rename = async (id: string) => {
@@ -178,27 +273,67 @@ export const CategoriesSection = () => {
     )
   }
 
+  /* THE checkbox handler. „Is it offered?" is one question, and the answer is
+     one of two statuses depending on whether the row hangs off a sphere:
+     a sphere goes VISIBLE, a sub-category goes REDIRECTED (which is what makes
+     it appear under its sphere on /apply). Off is HIDDEN for both, and a
+     sub-category keeps its parent while hidden, so ticking it back on restores
+     exactly where it was. The three-value enum never reaches the screen. */
+  const toggleVisible = (row: AdminCategory, on: boolean) =>
+    changeStatus(row, on ? (row.parentId ? 'REDIRECTED' : 'VISIBLE') : 'HIDDEN')
+
   const changeStatus = (row: AdminCategory, next: CategoryStatus) => {
     if (next === row.status) return
     const bad = treeCheck(row, { status: next })
     if (bad) { setFlash({ kind: 'error', msg: TREE_ERROR[bad] }); return }
-    // Coming back into view needs no warning; leaving it does.
+    // Coming back into view needs no warning; leaving it does — but ONLY when
+    // leaving it costs somebody something. The dialog used to fire on every
+    // hide, and most categories are empty, so the common case was a modal
+    // asking to confirm that nothing would happen. It now appears exactly when
+    // it has a real number to show: this row's experts, plus the experts of any
+    // sub-category that would go dark with it (that second group is the one an
+    // admin cannot see from the row, which is the whole reason to interrupt).
     if (next === 'VISIBLE') { patch(row.id, { status: next }); return }
+    const alsoLost = strandedBy(rows ?? [], row, next)
+      .reduce((n, id) => n + ((rows ?? []).find(r => r.id === id)?.tutorCount ?? 0), 0)
+    if (row.tutorCount + alsoLost === 0) { patch(row.id, { status: next }); return }
     setPendStatus({ row, next })
   }
 
-  const changeParent = (row: AdminCategory, parentId: string | null) => {
+  /* „Make this a sub-category of X" — ONE action, both columns.
+   *
+   * The screen used to expose `status` and `parentId` as two independent
+   * controls, so becoming a sub-category meant setting both, in the right
+   * order: parent first then status, because a REDIRECTED row with no parent is
+   * refused (REDIRECT_NEEDS_PARENT) and the admin met that as a 409 with no
+   * hint about ordering. Nobody worked it out, which is why the catalogue has
+   * sub-categories only where a migration put them.
+   *
+   * Both directions are one PATCH now, and the hierarchy rules still run here
+   * first (and again on the server) so an impossible move is a sentence, not an
+   * error code. Going independent restores VISIBLE deliberately: the row was
+   * only REDIRECTED because it had a parent, and leaving it in that status
+   * without one is the exact shape the guard refuses.
+   */
+  const foldInto = (row: AdminCategory, parentId: string | null) => {
     if (parentId === row.parentId) return
-    const bad = treeCheck(row, { parentId })
+    const change = parentId
+      ? { parentId, status: 'REDIRECTED' as CategoryStatus }
+      : { parentId: null, status: 'VISIBLE' as CategoryStatus }
+    const bad = treeCheck(row, change)
     if (bad) { setFlash({ kind: 'error', msg: TREE_ERROR[bad] }); return }
-    patch(row.id, { parentId })
+    patch(row.id, change)
   }
 
-  const filtered = (rows ?? []).filter(r => {
-    const q = query.trim().toLowerCase()
-    return !q || r.name.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q)
-  })
-  const listed = ordered(filtered)
+  /* Search matches a sub-category too, and when it does its SPHERE stays on
+     screen — a child rendered without the block it belongs to would be a row
+     with no context, which is the shape this screen just stopped having. */
+  const q = query.trim().toLowerCase()
+  const hit = (r: AdminCategory) => !q || r.name.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q)
+  const childrenOf = (id: string) => (rows ?? []).filter(r => r.parentId === id)
+  const spheres = (rows ?? []).filter(r =>
+    !r.parentId && (hit(r) || childrenOf(r.id).some(hit)),
+  )
   /* Hiding a sphere takes its absorbed categories with it — their experts are
      browsable only through it. The dialog counted the row's OWN experts only,
      which is the number that is wrong in exactly the case that matters. */
@@ -224,14 +359,17 @@ export const CategoriesSection = () => {
             experts off the site, redirecting moves them to the parent. Getting
             those two the wrong way round is the only way to lose somebody from
             this screen. */}
-        <dl className="mb-4 rounded-btn border border-ink-200 bg-ink-50/60 px-3.5 py-3 grid gap-1.5 sm:grid-cols-3 text-meta">
-          <div><dt className="inline font-display font-semibold text-ink-800">ჩანს</dt>
-            <dd className="inline text-ink-600"> — მენიუსა და კატალოგშია.</dd></div>
-          <div><dt className="inline font-display font-semibold text-ink-800">დამალული</dt>
-            <dd className="inline text-ink-600"> — გვერდი მუშაობს, სიაში არაა. ექსპერტები არსად ჩანან.</dd></div>
-          <div><dt className="inline font-display font-semibold text-ink-800">გადამისამართებული</dt>
-            <dd className="inline text-ink-600"> — ბმული მშობელზე გადადის, ექსპერტები მშობელში ითვლება.</dd></div>
+        {/* Two controls, said in the words of what they DO. This used to
+            explain three status values, one of which („გადამისამართებული")
+            named a redirect mechanism rather than anything an admin wants —
+            and it was, in fact, the only way to create a sub-category. */}
+        <dl className="mb-4 rounded-btn border border-ink-200 bg-ink-50/60 px-3.5 py-3 grid gap-1.5 sm:grid-cols-2 text-meta">
+          <div><dt className="inline font-display font-semibold text-ink-800">ჩანს საიტზე</dt>
+            <dd className="inline text-ink-600"> — მენიუში, მთავარზე და ფილტრში. მოხსნისას გვერდი რჩება, სფერო კი სიებიდან ქრება.</dd></div>
+          <div><dt className="inline font-display font-semibold text-ink-800">ქვეკატეგორია</dt>
+            <dd className="inline text-ink-600"> — ექსპერტები სფეროში ჩანან და იქვე ითვლებიან, არჩევისას კი საკუთარი სახელით. სწორედ ეს გამოჩნდება /apply-ზე სფეროს ქვეშ.</dd></div>
         </dl>
+        <RequestedSpheres />
         {err && <AdminError message={err} className="mb-4" />}
         {flash && (
           <div role="alert" className={`mb-4 rounded-btn border px-3 py-2 text-small font-medium ${flash.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
@@ -241,12 +379,15 @@ export const CategoriesSection = () => {
 
         {/* Add a category + (once the list grows) filter it. */}
         <div className="mb-4 flex flex-col sm:flex-row gap-2 sm:items-center">
-          <div className="flex gap-2 flex-1">
+          {/* This form adds a SPHERE, and only a sphere. The parent dropdown it
+              briefly carried is gone: sub-categories are added inside the
+              sphere they belong to, which needs no dropdown at all. */}
+          <div className="flex flex-col sm:flex-row gap-2 flex-1">
             <input
               value={newName}
               onChange={e => setNewName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') create() }}
-              placeholder="ახალი სფერო — მაგ. ეთიკური ჰაკინგი"
+              placeholder="ახალი სფერო — მაგ. ჯანმრთელობა და კვება"
               maxLength={60}
               className="flex-1 h-11 px-3 rounded-btn border border-ink-200 text-small focus:border-brand-500 focus:outline-none"
             />
@@ -276,93 +417,181 @@ export const CategoriesSection = () => {
             <p className="text-small text-ink-500 mt-1.5">დაამატე პირველი სფერო ზემოთ ველიდან.</p>
           </div>
         ) : (
-          <div className="rounded-card border border-ink-200 bg-white overflow-hidden">
-            <div className="hidden lg:grid grid-cols-[1.3fr_9.5rem_1fr_3.5rem_3.5rem_auto] gap-4 px-4 py-2.5 border-b border-ink-200 bg-ink-50/60 font-display text-micro font-semibold uppercase text-ink-500">
-              <div>სახელი</div>
-              <div>სტატუსი</div>
-              <div>მშობელი</div>
-              {/* TWO numbers, and they answer different questions. „ექსპერტი" is
-                  how many profiles point at this row — what hiding or deleting
-                  it would affect. „საიტზე" is what a visitor actually sees under
-                  it, folded, by the same rule /categories uses. The panel used
-                  to print only the first and label it as if it were the second,
-                  so „ბიზნესი და ფინანსები" read 2 in here and 4 out there. */}
-              <div title="პროფილი, რომელიც ამ კატეგორიაშია">ექსპერტი</div>
-              <div title="რამდენს ხედავს ვიზიტორი — ქვე-მიმართულებების ჩათვლით">საიტზე</div>
-              <div className="text-right">მართვა</div>
-            </div>
-            {listed.length === 0 ? (
-              <div className="px-4 py-8 text-center text-small text-ink-500">ვერაფერი მოიძებნა.</div>
-            ) : listed.map(({ row: r, child }) => (
-              <div key={r.id} className="grid grid-cols-1 lg:grid-cols-[1.3fr_9.5rem_1fr_3.5rem_3.5rem_auto] gap-2 lg:gap-4 items-center px-4 py-3 border-b border-ink-100 last:border-b-0">
-                <div className={`min-w-0 ${child ? 'lg:pl-5' : ''}`}>
-                  {editingId === r.id ? (
-                    <input
-                      autoFocus
-                      value={editName}
-                      onChange={e => setEditName(e.target.value)}
-                      onBlur={() => rename(r.id)}
-                      onKeyDown={e => { if (e.key === 'Enter') rename(r.id); if (e.key === 'Escape') setEditingId(null) }}
-                      maxLength={60}
-                      className="w-full h-9 px-2.5 rounded-btn border border-brand-400 text-body font-display font-semibold focus:outline-none"
-                    />
-                  ) : (
-                    <>
-                      <div className="font-display font-semibold text-body text-ink-900 truncate">{r.name}</div>
-                      {/* The slug is the URL and never changes — reference, not a control. */}
-                      <div className="font-mono text-meta text-ink-400 truncate">{r.slug}</div>
-                    </>
+          /* ONE BLOCK PER SPHERE, with its sub-categories INSIDE it.
+           *
+           * This was a flat table: a sub-category was just another row, several
+           * screens away from its sphere, carrying the same six columns as a
+           * top-level one. To add one you went to the form at the top, typed a
+           * name, found the right parent in a dropdown — and then hunted for
+           * where the new row had landed. Editing one meant finding it again.
+           * All of that for the thing this screen is mostly used for.
+           *
+           * A sub-category only exists in relation to its sphere, so it is now
+           * rendered inside it: a line with a checkbox, its name (click to
+           * rename), its expert count and a delete — plus „+ ქვეკატეგორია" at
+           * the bottom of the same block, which is where you are already
+           * looking when you decide you need one. */
+          <div className="grid gap-3">
+            {spheres.length === 0 ? (
+              <div className="rounded-card border border-ink-200 bg-white px-4 py-8 text-center text-small text-ink-500">ვერაფერი მოიძებნა.</div>
+            ) : spheres.map(s => {
+              const kids = childrenOf(s.id)
+              return (
+                <div key={s.id} className="rounded-card border border-ink-200 bg-white overflow-hidden">
+                  {/* ── the sphere ── */}
+                  <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_11rem_4.5rem_4.5rem_auto] gap-2 lg:gap-4 items-center px-4 py-3 bg-ink-50/40 border-b border-ink-100">
+                    <div className="min-w-0">
+                      {editingId === s.id ? (
+                        <input
+                          autoFocus
+                          value={editName}
+                          onChange={e => setEditName(e.target.value)}
+                          onBlur={() => rename(s.id)}
+                          onKeyDown={e => { if (e.key === 'Enter') rename(s.id); if (e.key === 'Escape') setEditingId(null) }}
+                          maxLength={60}
+                          className="w-full h-9 px-2.5 rounded-btn border border-brand-400 text-body font-display font-semibold focus:outline-none"
+                        />
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { setEditingId(s.id); setEditName(s.name) }}
+                            title="სახელის შეცვლა"
+                            className="block w-full text-left font-display font-semibold text-body text-ink-900 truncate hover:text-brand-700 transition-colors duration-fast"
+                          >
+                            {s.name}
+                          </button>
+                          {/* The slug is the URL and never changes — reference, not a control. */}
+                          <div className="font-mono text-meta text-ink-400 truncate">{s.slug}</div>
+                        </>
+                      )}
+                    </div>
+                    <VisibleBox row={s} onToggle={toggleVisible} />
+                    <div className="font-display font-semibold text-small text-ink-800 tabular-nums">
+                      <span className="lg:hidden text-ink-500 font-normal">ექსპერტი: </span>{s.tutorCount}
+                    </div>
+                    <div className="font-display font-semibold text-small tabular-nums">
+                      <span className="lg:hidden text-ink-500 font-normal">საიტზე: </span>
+                      {/* „—" for a sphere the public cannot browse. */}
+                      {s.status === 'VISIBLE'
+                        ? <span className="text-ink-800">{s.listedCount}</span>
+                        : <span className="text-ink-400" title="დამალულია — არავინ ჩანს">—</span>}
+                    </div>
+                    <div className="flex items-center gap-1 lg:justify-end">
+                      {/* Merging one sphere into another is rare but it is the
+                          only way „ფინანსები" ever became a sub-field. Offered
+                          only when there is somewhere to merge INTO. */}
+                      {(rows ?? []).some(c => canBeParent(c, s)) && s.childCount === 0 && (
+                        <select
+                          value=""
+                          onChange={e => { if (e.target.value) foldInto(s, e.target.value) }}
+                          aria-label={`${s.name} — სხვა სფეროს ქვეშ გადატანა`}
+                          title="სხვა სფეროს ქვეკატეგორიად გადატანა"
+                          className="h-8 px-1.5 rounded-btn border border-ink-200 bg-white text-meta text-ink-600 focus:border-brand-500 focus:outline-none max-w-[7.5rem]"
+                        >
+                          <option value="">გადატანა…</option>
+                          {(rows ?? []).filter(c => canBeParent(c, s)).map(c => (
+                            <option key={c.id} value={c.id}>↳ {c.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      <DeleteBtn row={s} onAsk={setPendDelete} />
+                    </div>
+                  </div>
+
+                  {/* ── the professions inside this sphere ──
+                      READ-ONLY on purpose. These are the owner's list
+                      (lib/professions.ts, from კატეგორიები.docx) and they are
+                      what an applicant ticks on /apply — so the admin has to be
+                      able to SEE them here, next to the sphere they belong to.
+                      Editing them is a code change, deliberately: the list is
+                      the product's vocabulary, not per-deployment config. */}
+                  {(PROFESSIONS[s.slug]?.length ?? 0) > 0 && (
+                    <div className="px-4 pt-2.5">
+                      <div className="flex items-baseline gap-2 mb-1.5">
+                        <Eyebrow tone="muted">პროფესიები</Eyebrow>
+                        <span className="text-meta text-ink-400 tabular-nums">{PROFESSIONS[s.slug]!.length}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {PROFESSIONS[s.slug]!.map(job => (
+                          <span key={job} className="inline-flex items-center h-6 px-2 rounded-pill border border-ink-200 bg-ink-50 text-meta text-ink-700">
+                            {job}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </div>
-                <div>
-                  <label className="lg:hidden block text-micro font-display font-semibold uppercase text-ink-500 mb-1">სტატუსი</label>
-                  <select
-                    value={r.status}
-                    onChange={e => changeStatus(r, e.target.value as CategoryStatus)}
-                    aria-label={`${r.name} — სტატუსი`}
-                    className="w-full h-9 px-2 rounded-btn border border-ink-200 bg-white text-small text-ink-800 focus:border-brand-500 focus:outline-none"
-                  >
-                    {(['VISIBLE', 'HIDDEN', 'REDIRECTED'] as CategoryStatus[]).map(s => (
-                      <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+
+                  {/* ── its sub-categories ── */}
+                  <div className="px-4 py-2.5">
+                    {kids.map(k => (
+                      <div key={k.id} className="flex items-center gap-2 py-1.5 min-w-0">
+                        <span className="text-ink-300 shrink-0" aria-hidden>↳</span>
+                        <div className="w-[11rem] shrink-0"><VisibleBox row={k} onToggle={toggleVisible} /></div>
+                        <div className="flex-1 min-w-0">
+                          {editingId === k.id ? (
+                            <input
+                              autoFocus
+                              value={editName}
+                              onChange={e => setEditName(e.target.value)}
+                              onBlur={() => rename(k.id)}
+                              onKeyDown={e => { if (e.key === 'Enter') rename(k.id); if (e.key === 'Escape') setEditingId(null) }}
+                              maxLength={60}
+                              className="w-full h-8 px-2 rounded-btn border border-brand-400 text-small font-display font-semibold focus:outline-none"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => { setEditingId(k.id); setEditName(k.name) }}
+                              title="სახელის შეცვლა"
+                              className="block w-full text-left text-small font-display font-semibold text-ink-800 truncate hover:text-brand-700 transition-colors duration-fast"
+                            >
+                              {k.name}
+                            </button>
+                          )}
+                        </div>
+                        <span className="shrink-0 text-meta text-ink-500 tabular-nums" title="ამ ქვეკატეგორიაში მყოფი ექსპერტები">{k.tutorCount}</span>
+                        {/* Move to another sphere, or promote back to a sphere
+                            of its own. Same handler as the merge above. */}
+                        <select
+                          value={k.parentId ?? ''}
+                          onChange={e => foldInto(k, e.target.value || null)}
+                          aria-label={`${k.name} — რომელ სფეროშია`}
+                          className="shrink-0 h-8 px-1.5 rounded-btn border border-ink-200 bg-white text-meta text-ink-600 focus:border-brand-500 focus:outline-none max-w-[8rem]"
+                        >
+                          <option value="">დამოუკიდებელი</option>
+                          {(rows ?? []).filter(c => !c.parentId && c.status === 'VISIBLE').map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                        <DeleteBtn row={k} onAsk={setPendDelete} />
+                      </div>
                     ))}
-                  </select>
+                    {/* ADD, right here. The one action this screen exists for. */}
+                    <div className="flex items-center gap-2 pt-1.5">
+                      <span className="text-ink-300 shrink-0" aria-hidden>↳</span>
+                      <input
+                        value={subDraft[s.id] ?? ''}
+                        onChange={e => setSubDraft(d => ({ ...d, [s.id]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') addSub(s) }}
+                        placeholder={kids.length ? 'კიდევ ერთი ქვეკატეგორია…' : 'ქვეკატეგორიის დამატება — მაგ. დიეტოლოგია'}
+                        maxLength={60}
+                        aria-label={`${s.name} — ქვეკატეგორიის დამატება`}
+                        className="flex-1 min-w-0 h-9 px-2.5 rounded-btn border border-dashed border-ink-300 text-small placeholder:text-ink-400 focus:border-brand-500 focus:border-solid focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => addSub(s)}
+                        disabled={creating || (subDraft[s.id] ?? '').trim().length < 2}
+                        className="h-9 px-3 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 disabled:opacity-40 disabled:cursor-not-allowed text-ink-700 font-display font-semibold text-meta inline-flex items-center gap-1.5 transition-colors duration-fast shrink-0"
+                      >
+                        <Icon.plus className="w-3 h-3" /> დამატება
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <label className="lg:hidden block text-micro font-display font-semibold uppercase text-ink-500 mb-1">მშობელი</label>
-                  <select
-                    value={r.parentId ?? ''}
-                    onChange={e => changeParent(r, e.target.value || null)}
-                    aria-label={`${r.name} — მშობელი კატეგორია`}
-                    // A row with children cannot become somebody's child, so the
-                    // picker says so instead of offering a move that would 409.
-                    disabled={r.childCount > 0}
-                    title={r.childCount > 0 ? TREE_ERROR.HAS_CHILDREN : undefined}
-                    className="w-full h-9 px-2 rounded-btn border border-ink-200 bg-white text-small text-ink-800 focus:border-brand-500 focus:outline-none disabled:bg-ink-50 disabled:text-ink-400"
-                  >
-                    <option value="">—</option>
-                    {(rows ?? []).filter(c => canBeParent(c, r)).map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="font-display font-semibold text-small text-ink-800 tabular-nums">
-                  <span className="lg:hidden text-ink-500 font-normal">ექსპერტი: </span>{r.tutorCount}
-                </div>
-                <div className="font-display font-semibold text-small tabular-nums">
-                  <span className="lg:hidden text-ink-500 font-normal">საიტზე: </span>
-                  {/* „—" for a row the public cannot browse: a hidden sphere
-                      shows nobody, and an absorbed one is counted under its
-                      parent rather than under itself. */}
-                  {r.status === 'VISIBLE'
-                    ? <span className="text-ink-800">{r.listedCount}</span>
-                    : <span className="text-ink-400" title={r.status === 'REDIRECTED' ? 'ითვლება მშობელში' : 'დამალულია — არავინ ჩანს'}>—</span>}
-                </div>
-                <div className="flex items-center gap-1 lg:justify-end">
-                  <button type="button" onClick={() => { setEditingId(r.id); setEditName(r.name) }} className="h-8 px-2.5 rounded-btn text-meta font-display font-semibold text-ink-600 hover:bg-ink-100 transition-colors duration-fast">რედაქტ.</button>
-                  <button type="button" onClick={() => setPendDelete(r)} disabled={r.tutorCount > 0 || r.childCount > 0} title={r.tutorCount > 0 ? 'ჯერ ექსპერტები ჰყავს — დამალე' : r.childCount > 0 ? TREE_ERROR.HAS_CHILDREN : 'წაშლა'} className="h-8 px-2.5 rounded-btn text-meta font-display font-semibold text-danger-600 hover:bg-danger-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-fast">წაშლა</button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>

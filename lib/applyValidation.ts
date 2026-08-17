@@ -28,7 +28,7 @@
  *
  * Pinned by tests/applyValidation.test.ts.
  */
-import { checkGeorgian, georgianError } from './georgianText'
+import { checkGeorgian, georgianError, georgianNameError } from './georgianText'
 import { phoneFormatError } from './phone'
 import { extractYouTubeId } from './youtube'
 
@@ -74,16 +74,22 @@ export const APPLY_FIELD_LABEL: Record<string, string> = {
  * Empty is fine for every OPTIONAL field — required-ness is the form's job,
  * stated once per field, not smuggled in here. */
 
-export function nameError(raw: string): string | null {
+/**
+ * `label` names the FIELD being judged — „სახელი" on its own, „გვარი" for the
+ * second box, and the joined default on the server, which only receives
+ * `fullName`. The form validates the two separately so the red line lands on
+ * the box that is actually wrong.
+ */
+export function nameError(raw: string, label = 'სახელი და გვარი'): string | null {
   const v = (raw ?? '').trim()
-  if (v.length < APPLY.NAME_MIN) return 'შეავსე სახელი და გვარი.'
-  if (v.length > APPLY.NAME_MAX) return `სახელი ძალიან გრძელია — მაქსიმუმ ${APPLY.NAME_MAX} სიმბოლო.`
+  if (v.length < APPLY.NAME_MIN) return `შეავსე ${label}.`
+  if (v.length > APPLY.NAME_MAX) return `${label} ძალიან გრძელია — მაქსიმუმ ${APPLY.NAME_MAX} სიმბოლო.`
+  // STRICT since 2026-08-12 (owner): Georgian letters only, not „half the
+  // letters". The share test is right for prose and wrong for a name — it let
+  // „Marietta Dzvelaia" through, and „luka kapanadze" is a live ADMIN row.
   // The message names the fix and shows it, because this one usually fires on a
   // name the applicant did not type — it came from their Google account.
-  if (!checkGeorgian(v).ok) {
-    return 'სახელი და გვარი ქართულად ჩაწერე — მაგ. „ნინო ბერიძე“. საიტი ქართულენოვანია და სტუდენტები სწორედ ამ ჩანაწერს ხედავენ.'
-  }
-  return null
+  return georgianNameError(label, v)
 }
 
 export function specialtyError(raw: string): string | null {

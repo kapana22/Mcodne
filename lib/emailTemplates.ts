@@ -582,3 +582,153 @@ export function newMessageEmail(o: { name: string; fromName: string; preview: st
     }),
   }
 }
+
+/* ═══════════ the requests subsystem (2026-08-14) ═══════════════════════════
+ *
+ * THREE MAILS, AND EACH ONE IS THE LOOP-CLOSER FOR A PERSON WHO IS NOT ON THE
+ * SITE. The speed-to-lead research is unambiguous — the share of clients who go
+ * with the FIRST responder is ~78%, and a lead answered after 30 minutes is
+ * ~21× less likely to qualify — and an in-app bell only reaches somebody
+ * already sitting on the page. Same reasoning as newApplicationAdminEmail
+ * above, which exists because a bell nobody saw once cost applicants days.
+ *
+ * ⚠️ NO CLIENT CONTACT IN THE PROVIDER MAILS, for the same reason the provider
+ * screens carry none: the contact opening on acceptance IS the product. The
+ * mail says what the work is and where to answer it — never who is asking.
+ */
+
+/** To every allowlisted provider the moment a request is VERIFIED. */
+export function requestVerifiedProviderEmail(o: {
+  topicLabel: string
+  kindLabel: string
+  budgetLabel: string
+  timingLabel: string
+  requestId: string
+}) {
+  return {
+    subject: `ახალი მოთხოვნა — ${o.topicLabel}`,
+    html: shell({
+      heading: 'ახალი მოთხოვნა',
+      bodyHtml:
+        detail([
+          { label: 'რა', value: o.topicLabel },
+          { label: 'ტიპი', value: o.kindLabel },
+          { label: 'ბიუჯეტი', value: o.budgetLabel },
+          { label: 'ვადა', value: o.timingLabel },
+        ]) +
+        // The one line that matters after the facts: places are limited and the
+        // first answers win — true, and the reason to open the mail now.
+        p('ადგილები შეზღუდულია — პირველი შეთავაზებები იგებენ.'),
+      cta: { label: 'ნახე და შესთავაზე', href: `${BASE}/provider/requests/${o.requestId}` },
+    }),
+  }
+}
+
+/** To the CLIENT each time an offer lands. They usually have no account — this
+ *  link is their only door back in, so it is the mail's whole body. */
+export function offerArrivedClientEmail(o: {
+  publicRef: string
+  topicLabel: string
+  priceLabel: string
+  providerName: string
+  offerCount: number
+}) {
+  return {
+    subject: `ახალი შეთავაზება — ${o.publicRef}`,
+    html: shell({
+      heading: 'ახალი შეთავაზება მოგივიდა',
+      bodyHtml:
+        detail([
+          { label: 'მოთხოვნა', value: `${o.topicLabel} · ${o.publicRef}` },
+          { label: 'ვისგან', value: o.providerName },
+          { label: 'ფასი', value: o.priceLabel },
+        ]) +
+        p(o.offerCount > 1
+          ? `სულ ${o.offerCount} შეთავაზება გაქვს — შეადარე და აირჩიე.`
+          : 'ნახე დეტალები და თუ მოგეწონება, აირჩიე.'),
+      cta: { label: 'შეთავაზებების ნახვა', href: `${BASE}/request/${o.publicRef}` },
+    }),
+  }
+}
+
+/** To the chosen provider when the client accepts. The page it links to is
+ *  where the contact now lives — the mail itself still carries none, so a
+ *  forwarded or mis-addressed mail leaks nothing. */
+export function offerAcceptedProviderEmail(o: { topicLabel: string; publicRef: string }) {
+  return {
+    subject: 'შენი შეთავაზება აირჩიეს 🎉',
+    html: shell({
+      heading: 'შენი შეთავაზება აირჩიეს',
+      bodyHtml:
+        p(`კლიენტმა აირჩია შენი შეთავაზება — <b>${esc(o.topicLabel)}</b> (${esc(o.publicRef)}).`) +
+        p('კლიენტის კონტაქტი უკვე შენს გვერდზეა. დაუკავშირდი მალე — ის ამას ელოდება.'),
+      cta: { label: 'კონტაქტის ნახვა', href: `${BASE}/provider/offers` },
+    }),
+  }
+}
+
+/**
+ * „You have a new message" — the same mail to both sides, addressed
+ * differently.
+ *
+ * ⚠️ THE PREVIEW IS THE POST-MASK BODY. Whatever the contact firewall removed
+ * (lib/requestChat → maskContacts) is already gone by the time this is built,
+ * so a number a sender tried to slip past the platform cannot ride out in the
+ * notification email instead — which would be the firewall with a hole in the
+ * one channel that leaves the site.
+ */
+/**
+ * The PLATFORM thread — the client and us, not the client and a provider.
+ *
+ * A separate template rather than a flag on the one below, because the sentence
+ * that matters is different in kind. „ექსპერტმა გიპასუხა" is about somebody the
+ * reader chose to talk to; this one is about the platform they are waiting on,
+ * and to the operator it is a job rather than a notification. The CTA differs
+ * too — staff land in the panel, the client on their own page.
+ */
+export function requestThreadEmail(o: {
+  toStaff: boolean
+  publicRef: string
+  preview: string
+}) {
+  const href = o.toStaff ? `${BASE}/admin?tab=requests` : `${BASE}/request/${o.publicRef}`
+  const preview = o.preview.length > 140 ? `${o.preview.slice(0, 140)}…` : o.preview
+  return {
+    subject: o.toStaff
+      ? `[მცოდნე] შეტყობინება მოთხოვნაზე ${o.publicRef}`
+      : `პასუხი — ${o.publicRef}`,
+    html: shell({
+      heading: o.toStaff ? 'კლიენტი წერს' : 'გიპასუხეთ',
+      bodyHtml:
+        p(o.toStaff
+          ? `მოთხოვნა ${esc(o.publicRef)} — კლიენტმა მიმოწერაში დაწერა.`
+          : 'შენს მოთხოვნაზე გიპასუხეთ.') +
+        `<blockquote style="margin:0 0 12px;padding:10px 14px;border-left:3px solid ${BRAND};background:#f7f9f8;font-size:15px;line-height:1.6;color:${INK};white-space:pre-wrap">${esc(preview)}</blockquote>`,
+      cta: { label: 'პასუხის გაცემა', href },
+    }),
+  }
+}
+
+export function requestChatEmail(o: {
+  toProvider: boolean
+  topic: string
+  publicRef: string
+  preview: string
+}) {
+  const href = o.toProvider ? `${BASE}/provider/offers` : `${BASE}/request/${o.publicRef}`
+  // Trimmed to a glance. A full message in the body is a message nobody comes
+  // back to the site to answer — and answering is the point.
+  const preview = o.preview.length > 140 ? `${o.preview.slice(0, 140)}…` : o.preview
+  return {
+    subject: `ახალი შეტყობინება — ${o.publicRef}`,
+    html: shell({
+      heading: 'ახალი შეტყობინება',
+      bodyHtml:
+        p(o.toProvider
+          ? 'კლიენტმა მოგწერა შენს შეთავაზებაზე.'
+          : 'ექსპერტმა გიპასუხა.') +
+        `<blockquote style="margin:0 0 12px;padding:10px 14px;border-left:3px solid ${BRAND};background:#f7f9f8;font-size:15px;line-height:1.6;color:${INK};white-space:pre-wrap">${esc(preview)}</blockquote>`,
+      cta: { label: 'პასუხის გაცემა', href },
+    }),
+  }
+}

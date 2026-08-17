@@ -11,6 +11,7 @@ import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { EmptyState } from '@/components/EmptyState'
 import { AdminConfirmDialog, AdminMessageDialog, AdminDeleteUserDialog, TabHeader, adminOk, AdminLoading, AdminError, type DeleteImpact, type DeleteMode, downloadCsv, KA_STATUS, fmtShort, fmtDT, LoadMoreBar } from './_parts'
+import { CategorySelect, useAssignableCategories } from './_categoryPicker'
 
 /* ───── User detail modal (opens from Users row click) ───── */
 type UserDetail = {
@@ -26,6 +27,7 @@ type UserDetail = {
       sessionsCount: number; verified: boolean;
       featured?: boolean;
       packagesEnabled?: boolean;
+      professions?: string[];
       videoUrl?: string | null;
       category?: { id: string; slug: string; name: string } | null;
     } | null;
@@ -242,8 +244,14 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
                           <PackagesToggle tutorId={u.tutor.id} initial={!!u.tutor.packagesEnabled} onSaved={() => { dirtyRef.current = true }} />
                         </div>
                       </div>
-                      <div className="grid sm:grid-cols-2 gap-3 text-small">
-                        <div><span className="text-ink-500">კატეგორია:</span> <span className="font-display font-bold text-ink-900">{u.tutor.category?.name ?? '—'}</span></div>
+                      {/* Category is EDITABLE here — see CategoryPicker below
+                          for why a read-only line was the wrong control. */}
+                      <CategoryPicker
+                        tutorId={u.tutor.id}
+                        initial={u.tutor.category?.id ?? ''}
+                        onSaved={() => { dirtyRef.current = true }}
+                      />
+                      <div className="mt-3 grid sm:grid-cols-2 gap-3 text-small">
                         <div><span className="text-ink-500">სპეც.:</span> <span className="font-display font-bold text-ink-900">{u.tutor.specialty}</span></div>
                         <div><span className="text-ink-500">ფასი:</span> <span className="font-display font-bold text-ink-900 tabular-nums">₾{u.tutor.price}</span></div>
                         <div><span className="text-ink-500">გამოცდილება:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{u.tutor.yearsExp} წ.</span></div>
@@ -252,6 +260,20 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
                         <div><span className="text-ink-500">ინტრო ვიდეო:</span> <span className="font-display font-bold text-ink-900">{u.tutor.videoUrl ? '✓ ატვირთული' : '—'}</span></div>
                       </div>
                       <div className="mt-3 text-small text-ink-700"><span className="font-display font-semibold">სათაური:</span> {u.tutor.headline}</div>
+                      {/* What this expert calls themselves (lib/professions) —
+                          several, and the finest-grained thing on the profile.
+                          Read-only here: the expert owns it, and the one thing
+                          an admin needs is to SEE it while judging a report. */}
+                      {(u.tutor.professions?.length ?? 0) > 0 && (
+                        <div className="mt-3">
+                          <Eyebrow tone="muted" className="mb-1.5">პროფესიები</Eyebrow>
+                          <div className="flex flex-wrap gap-1">
+                            {u.tutor.professions!.map(job => (
+                              <span key={job} className="inline-flex items-center h-6 px-2 rounded-pill border border-ink-200 bg-white text-meta text-ink-700">{job}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -599,6 +621,64 @@ const PackagesToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
       </button>
       {failed && <span role="alert" className="font-display text-meta font-semibold text-danger-700">ვერ შეინახა</span>}
     </span>
+  )
+}
+
+/* Re-file an expert. 2026-08-11.
+ *
+ * This slot used to be a read-only line („კატეგორია: ბიზნესი და ფინანსები"),
+ * and that was the whole problem: approval is the only moment the platform
+ * chooses a category, it chooses by matching free text against names, and when
+ * it chose wrong nobody could undo it. The panel could grant a public trust
+ * badge, feature someone on the home page and make them an admin — but not move
+ * a psychologist out of the business sphere. The only remaining path was to ask
+ * the expert to fix our taxonomy in their own editor.
+ *
+ * Saves on change, immediately: there is nothing to compose here, and a „შენახვა"
+ * button next to a single <select> is a second click for no decision. The old
+ * value comes back if the request fails, and the failure is said out loud.
+ *
+ * „— არ არის მითითებული —" is offered on purpose. An expert with no category
+ * still appears in the unfiltered browse (lib/tutorsQuery), so clearing is a
+ * legitimate move — the line under the control states exactly what it costs
+ * instead of hiding the option behind a warning that isn't true.
+ */
+const CategoryPicker = ({ tutorId, initial, onSaved }: { tutorId: string; initial: string; onSaved?: () => void }) => {
+  const { groups, loaded } = useAssignableCategories()
+  const [val, setVal] = useState(initial)
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const save = async (next: string) => {
+    if (busy) return
+    const prev = val
+    setVal(next)
+    setBusy(true)
+    setFailed(false)
+    try {
+      const res = await fetch(`/api/admin/tutors/${tutorId}/category`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryId: next || null }),
+      })
+      // adminOk, not res.ok — an expired session answers with the sign-in HTML
+      // as a 200, which would read as a saved category that never moved.
+      if (await adminOk(res)) onSaved?.()
+      else { setVal(prev); setFailed(true) }
+    } catch { setVal(prev); setFailed(true) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div>
+      <Eyebrow as="label" tone="muted" className="block mb-1.5">კატეგორია</Eyebrow>
+      <div className="flex items-center gap-2 flex-wrap">
+        <CategorySelect value={val} onChange={save} groups={groups} disabled={busy || !loaded} />
+        {busy && <span className="text-meta text-ink-500">ინახება…</span>}
+        {failed && <span role="alert" className="font-display text-meta font-semibold text-danger-700">ვერ შეინახა</span>}
+      </div>
+      {loaded && !val && (
+        <p className="mt-1.5 text-meta text-ink-600">ჩანს /tutors-ზე, მაგრამ ვერცერთ სფეროში და ვერც ფილტრში.</p>
+      )}
+    </div>
   )
 }
 

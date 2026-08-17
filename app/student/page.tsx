@@ -13,6 +13,7 @@ import { NextSession } from './_next'
 import { SavedStrip } from './_saved'
 import { SessionsPanel } from './_sessions'
 import { OnboardingTour, Welcome } from './_welcome'
+import { primaryPriceLabel, TUTOR_DEFAULTS } from '@/components/booking/slots'
 
 /* ───── Page ───── */
 /* ───── Dashboard "home" section — wraps the original main content ───── */
@@ -123,8 +124,13 @@ export default function Dashboard() {
         id: f.tutor?.id ?? String(i),
         name: f.tutor?.user?.fullName ?? 'ექსპერტი',
         avatar: f.tutor?.user?.avatarUrl ?? null,
-        cat: f.tutor?.category?.name ?? f.tutor?.specialty ?? '',
-        price: f.tutor?.price ?? 0,
+        // Real category or nothing — see app/tutors/_data.tsx.
+        cat: f.tutor?.category?.name ?? '',
+        priceLabel: primaryPriceLabel(
+          Array.isArray(f.tutor?.consultations) ? f.tutor.consultations : [],
+          f.tutor?.price ?? 0,
+          f.tutor?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin,
+        ).label,
         rating: f.tutor?.rating ?? 0,
       })))
       setFavState('ready')

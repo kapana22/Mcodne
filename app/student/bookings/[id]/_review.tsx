@@ -47,7 +47,7 @@ export const InlineReviewCard = ({ booking, existing, onSaved }: { booking: Book
           j?.error === 'WINDOW_CLOSED' ? 'შეფასების ვადა ამოიწურა' :
           j?.error === 'NOT_COMPLETED' ? 'სესია ჯერ არ დასრულებულა' :
           j?.error === 'AUTO_COMPLETED' ? 'ეს სესია ავტომატურად დაიხურა — შეფასება მხოლოდ ხელით დადასტურებულ სესიებზეა შესაძლებელი' :
-          'შენახვა ვერ მოხერხდა',
+          j?.message || 'შენახვა ვერ მოხერხდა',
           'error',
         )
         return

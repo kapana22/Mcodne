@@ -17,12 +17,33 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').repla
 
 export const dynamic = 'force-dynamic'
 
+/* COVER VERSIONS, NOT COVER BYTES — see the note in app/blog/page.tsx. Here it
+   buys a second thing: `og:image` and the BlogPosting JSON-LD need an ABSOLUTE,
+   FETCHABLE url. A `data:` URI in an OG tag is unusable — no crawler can read
+   it — so a cover pasted straight into the tag would have looked present and
+   shared as nothing. */
+async function coverVersions(slugs: string[]): Promise<Map<string, string>> {
+  if (!slugs.length) return new Map()
+  try {
+    const rows = await prisma.$queryRawUnsafe<{ slug: string; v: string }[]>(
+      `SELECT "slug", (length("coverUrl") || right("coverUrl", 8)) AS v
+         FROM "Post" WHERE "status" = 'PUBLISHED' AND "coverUrl" IS NOT NULL AND "coverUrl" <> ''
+          AND "slug" = ANY($1)`,
+      slugs,
+    )
+    return new Map(rows.map(r => [r.slug, r.v]))
+  } catch { return new Map() }
+}
+
+const coverHref = (slug: string, v: string | undefined, absolute = false) =>
+  v ? `${absolute ? SITE_URL : ''}/api/blog/${slug}/cover?v=${encodeURIComponent(v)}` : undefined
+
 async function getPost(slug: string) {
   try {
     await ensureDbReady()
     return await prisma.post.findFirst({
       where: { slug, status: 'PUBLISHED' },
-      select: { slug: true, title: true, excerpt: true, body: true, tag: true, coverUrl: true, authorName: true, publishedAt: true, updatedAt: true },
+      select: { slug: true, title: true, excerpt: true, body: true, tag: true, authorName: true, publishedAt: true, updatedAt: true },
     })
   } catch {
     // Sentinel (not null) so a transient DB blip yields a 5xx (Google retries)
@@ -54,7 +75,7 @@ async function getMore(slug: string, tag: string | null) {
   try {
     const take = 3
     const base = { status: 'PUBLISHED' as const, slug: { not: slug } }
-    const sel = { slug: true, title: true, tag: true, coverUrl: true, publishedAt: true }
+    const sel = { slug: true, title: true, tag: true, publishedAt: true }
     const same = tag
       ? await prisma.post.findMany({ where: { ...base, tag }, orderBy: { publishedAt: 'desc' }, take, select: sel })
       : []
@@ -90,7 +111,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       title: post.title,
       description: desc,
       url: `/blog/${post.slug}`,
-      image: post.coverUrl,
+      image: coverHref(post.slug, (await coverVersions([post.slug])).get(post.slug), true),
       type: 'article',
     }),
   }
@@ -102,6 +123,9 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   if (post === 'error') throw new Error('blog post temporarily unavailable') // → 5xx, not a deindexing 404
   if (!post) notFound()
   const [more, tagSlugs] = await Promise.all([getMore(post.slug, post.tag), getTagSlugs()])
+  // One query for this post AND the three „კიდევ წასაკითხი" cards.
+  const covers = await coverVersions([post.slug, ...more.map(m => m.slug)])
+  const cover = coverHref(post.slug, covers.get(post.slug))
   const mins = readMin(post.body || '')
 
   // BlogPosting structured data — eligible for Google's article rich results
@@ -113,7 +137,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     '@type': 'BlogPosting',
     headline: post.title,
     ...(post.excerpt ? { description: post.excerpt } : {}),
-    ...(post.coverUrl ? { image: post.coverUrl } : {}),
+    ...(covers.get(post.slug) ? { image: coverHref(post.slug, covers.get(post.slug), true) } : {}),
     // dateModified was pinned to datePublished, so an edited post still looked
     // untouched. `updatedAt` is maintained by Prisma on every write.
     ...(published ? { datePublished: published } : {}),
@@ -159,13 +183,13 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           <h1 className="mt-4 font-display text-display lg:text-display-lg font-bold text-ink-900 tracking-tight leading-[1.1]">{post.title}</h1>
           {post.excerpt && <p className="mt-4 text-h3 text-ink-600 leading-relaxed">{post.excerpt}</p>}
 
-          {post.coverUrl && (
+          {cover && (
             /* Locked to the same 16:9 the uploader crops to. `h-auto` let a
                pasted portrait URL render a two-screen-tall image above the
                first paragraph. */
             <div className="mt-8 rounded-card overflow-hidden border border-ink-100 bg-ink-100 aspect-[16/9]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={post.coverUrl} alt="" className="w-full h-full object-cover" />
+              <img src={cover} alt="" className="w-full h-full object-cover" />
             </div>
           )}
 
@@ -179,9 +203,9 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               {more.map(m => (
                 <Link key={m.slug} href={`/blog/${m.slug}`} className="group rounded-card border border-ink-200 bg-white overflow-hidden flex flex-col transition-all duration-fast hover-lift">
                   <div className="aspect-[16/9] w-full overflow-hidden bg-ink-100 border-b border-ink-100">
-                    {m.coverUrl ? (
+                    {covers.has(m.slug) ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.coverUrl} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-slow ease-out-quart group-hover:scale-[1.03]" />
+                      <img src={coverHref(m.slug, covers.get(m.slug))} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-slow ease-out-quart group-hover:scale-[1.03]" />
                     ) : (
                       <div className="w-full h-full bg-ink-50 grain inline-flex items-center justify-center text-ink-300 transition-colors duration-mid group-hover:text-brand-300">
                         {m.tag && tagSlugs[m.tag] ? categoryIcon(tagSlugs[m.tag], 'w-8 h-8') : <Icon.doc className="w-6 h-6" />}

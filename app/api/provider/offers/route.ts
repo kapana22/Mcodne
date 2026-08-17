@@ -1,0 +1,149 @@
+// POST /api/provider/offers — a provider bids on a verified request.
+//
+// ⚠️ THE PLACE LIMIT IS THE WHOLE DIFFICULTY, and it cannot be enforced by
+// counting. Three providers may submit inside the same second; each would count
+// two existing offers, each would decide there is room, and the client would
+// open a page with four offers on a request they were promised three of.
+// „A status check you read before the write is not a guard" (CLAUDE.md).
+//
+// So the place is CLAIMED before the offer is written:
+//
+//   updateMany({ where: { status: 'VERIFIED', offerCount: { lt: offerLimit } },
+//                data:  { offerCount: { increment: 1 } } })
+//   count !== 1 → 409
+//
+// One statement, evaluated by Postgres against the row it is locking. The
+// fourth caller matches zero rows and is told the request is full — it does not
+// write and then discover the problem.
+//
+// THE COUNTER IS THEREFORE NOT DERIVABLE from the offers table and is not meant
+// to be. `_count` cannot be claimed conditionally; a column can.
+
+import { NextResponse, after } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { ensureDbReady } from '@/lib/dbBoot'
+import { RequestOfferInput, offerProviderError, kindOf, KIND, gel, topicLabel } from '@/lib/requests'
+import { requestsViewer } from '@/lib/requestsServer'
+import { sendMail } from '@/lib/mailer'
+import { offerArrivedClientEmail } from '@/lib/emailTemplates'
+
+const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
+
+export async function POST(req: Request) {
+  const viewer = await requestsViewer()
+  if (!viewer.providerAllowed) return notFound()
+
+  // An ADMIN is allowed to SEE this subsystem and is not a provider in it. They
+  // have no allowlist row, so `provider` is null and there is no identity to
+  // attach an offer to — answered 404 rather than 403 for the same reason
+  // everything else here is: it is the shape of „there is nothing for you at
+  // this URL", which for an admin is simply true.
+  const provider = viewer.provider
+  if (!provider) return notFound()
+
+  // THE SAME schema the provider's form validated with (lib/requests).
+  const parsed = RequestOfferInput.safeParse(await req.json().catch(() => ({})))
+  if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+
+  const expertUserId = provider.kind === 'EXPERT' ? provider.userId : null
+  const companyId = provider.kind === 'COMPANY' ? provider.companyId : null
+
+  // THE ONE PLACE „exactly one provider" is checked (lib/requests). The
+  // identity is built two lines above and could not currently be wrong — which
+  // is exactly when a rule stops being checked and starts being assumed.
+  const shapeErr = offerProviderError({ providerKind: provider.kind, expertUserId, companyId })
+  if (shapeErr) return NextResponse.json({ ok: false, error: shapeErr }, { status: 400 })
+
+  await ensureDbReady()
+
+  // ── THE CLAIM ────────────────────────────────────────────────────────────
+  // Status and place, in one conditional write. Note what is NOT here: no
+  // findUnique, no `if (count < limit)`, no transaction wrapping a read. The
+  // `where` IS the guard.
+  const claimed = await prisma.serviceRequest.updateMany({
+    where: {
+      id: parsed.data.requestId,
+      status: 'VERIFIED',
+      offerCount: { lt: prisma.serviceRequest.fields.offerLimit },
+    },
+    data: { offerCount: { increment: 1 } },
+  })
+  if (claimed.count !== 1) {
+    // One code for „not verified", „full" and „does not exist" alike. A
+    // provider who may not bid learns only that they may not bid — telling them
+    // WHICH of the three it was would be a way to enumerate requests they are
+    // not allowed to see.
+    return NextResponse.json({ ok: false, error: 'NOT_OPEN' }, { status: 409 })
+  }
+
+  // ── The offer itself ─────────────────────────────────────────────────────
+  // From here the place is spoken for, so a failure must give it back. Anything
+  // else leaks a place per failure and a request silently accepts two offers
+  // instead of three.
+  try {
+    const offer = await prisma.requestOffer.create({
+      data: {
+        requestId: parsed.data.requestId,
+        providerKind: provider.kind,
+        expertUserId,
+        companyId,
+        priceGel: parsed.data.priceGel,
+        daysEstimate: parsed.data.daysEstimate ?? null,
+        message: parsed.data.message.trim(),
+      },
+      select: {
+        id: true,
+        expertUser: { select: { fullName: true } },
+        company: { select: { name: true } },
+        request: { select: { publicRef: true, topic: true, kind: true, email: true, offerCount: true } },
+      },
+    })
+
+    // ── The client hears about it ────────────────────────────────────────
+    // They usually have NO account: the emailed link is their only door back
+    // to the page where offers live, and an offer nobody sees is an offer that
+    // rots until the admin thinks to phone. Per offer, not first-only —
+    // „compare and choose" is the product, and a person who accepts #1 having
+    // never heard #3 arrived chose from a list we hid from them. Bounded by
+    // offerLimit, so it cannot become a stream. Optional email → optional
+    // mail; the admin's call covers the rest at this stage.
+    //
+    // Contact-rule note: the PROVIDER'S NAME is in this mail and that is not a
+    // leak — the client's page already shows every offer's name; only phone
+    // and email wait for acceptance.
+    const to = offer.request.email
+    if (to) {
+      const mail = offerArrivedClientEmail({
+        publicRef: offer.request.publicRef,
+        topicLabel: topicLabel(offer.request.topic),
+        // The unit comes from the vocabulary, never re-derived here — a price
+        // with a guessed unit is a different number.
+        priceLabel: `${gel(parsed.data.priceGel)} ${KIND[kindOf(offer.request.kind)].unitLabel}`,
+        providerName: offer.expertUser?.fullName ?? offer.company?.name ?? 'ექსპერტი',
+        offerCount: offer.request.offerCount,
+      })
+      after(async () => {
+        try { await sendMail({ to, ...mail }) } catch { /* mail is best-effort */ }
+      })
+    }
+
+    return NextResponse.json({ ok: true, offerId: offer.id })
+  } catch (e: any) {
+    // GIVE THE PLACE BACK, in the same shape it was taken: a conditional
+    // decrement, guarded by `gt: 0` so a double-release can never drive the
+    // counter negative (which the database CHECK would refuse anyway, turning a
+    // handled error into a 500).
+    await prisma.serviceRequest.updateMany({
+      where: { id: parsed.data.requestId, offerCount: { gt: 0 } },
+      data: { offerCount: { decrement: 1 } },
+    }).catch(() => {})
+
+    // P2002 = one of the two unique indexes: this provider already has an offer
+    // on this request. Its own code, because „you already answered this" is a
+    // different thing from „it failed" and the panel should say so.
+    if (e?.code === 'P2002') {
+      return NextResponse.json({ ok: false, error: 'ALREADY_OFFERED' }, { status: 409 })
+    }
+    throw e
+  }
+}

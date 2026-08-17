@@ -58,7 +58,6 @@ export function ServiceTypeAndAvailability({
   onSaved: (next: NonNullable<TutorProfile>) => void
 }) {
   const [duration, setDuration] = useState<number>(profile.consultationDurationMin ?? 30)
-  const [buffer, setBuffer] = useState<number>(profile.bufferMin ?? 0)
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
 
@@ -75,7 +74,6 @@ export function ServiceTypeAndAvailability({
       if (j.ok) {
         onSaved(j.profile)
         setDuration(j.profile.consultationDurationMin ?? 30)
-        setBuffer(j.profile.bufferMin ?? 0)
         setFlash('შენახულია')
         setTimeout(() => setFlash(null), 2500)
       } else {
@@ -124,27 +122,15 @@ export function ServiceTypeAndAvailability({
         </p>
       </div>
 
-      {/* Buffer — a gap RESERVED around every booked session, so back-to-back
-          bookings become impossible. 0 = today's behavior (back-to-back allowed). */}
-      <div className="pt-5 border-t border-ink-100">
-        <Eyebrow tone="muted">შესვენება სესიებს შორის</Eyebrow>
-        <p className="text-small text-ink-500 mt-1 mb-3 max-w-[520px] leading-snug">
-          ყოველი დაჯავშნილი სესიის წინ და შემდეგ დაცული ინტერვალი — ზედიზედ ჯავშნები ვეღარ დაგიდგება.
-        </p>
-        <div className="inline-flex rounded-btn border border-ink-200 overflow-hidden">
-          {[0, 5, 10, 15, 30].map(b => (
-            <button key={b} type="button"
-              onClick={() => save({ bufferMin: b })}
-              disabled={busy}
-              className={`h-11 px-4 font-display text-small font-semibold transition-colors duration-fast ${
-                buffer === b ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-ink-50'
-              }`}>
-              {b === 0 ? 'გარეშე' : `${b} წთ`}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* „შესვენება სესიებს შორის" (0/5/10/15/30 წთ) was removed 2026-08-11 on
+          the owner's call — a setting nobody needed, on the screen where an
+          expert is trying to get published.
 
+          `TutorProfile.bufferMin` and the booking engine that honours it are
+          deliberately left in place: the column is read on the write path
+          (app/api/bookings, enrollments/*, computeNextFreeStart) and ripping it
+          out is a change to the booking path, not to this form. With no way to
+          set it, every profile stays at the 0 it already has. */}
       <div className="pt-4 border-t border-ink-100 text-small text-ink-500">
         თავისუფალი შუალედები იმართება <a href="/tutor/schedule" className="font-display font-semibold text-brand-700 hover:text-brand-800">გრაფიკის</a> გვერდზე.
       </div>

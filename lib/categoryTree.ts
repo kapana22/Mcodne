@@ -245,7 +245,24 @@ export const ASSIGNABLE_CATEGORY = {
   OR: [
     { status: 'VISIBLE' as const },
     { status: 'HIDDEN' as const, parentId: null },
-    { status: 'REDIRECTED' as const, parent: { is: { status: 'VISIBLE' as const } } },
+    // A sub-field of a sphere that is itself still waiting for its first
+    // expert IS assignable (2026-08-11). The narrower rule — parent must
+    // already be VISIBLE — was correct about stranding and wrong about people:
+    // it made every sub-field of the nine newly-opened spheres unreachable, so
+    // a dietician searching „დიეტ" on /apply found nothing and had to know to
+    // answer „ჯანმრთელობა და კვება" instead. Being precise is the thing this
+    // taxonomy exists to allow.
+    //
+    // It cannot strand anyone, because filing somebody here un-hides the PARENT
+    // in the same request — the approve route and the admin re-file endpoint
+    // both do it, exactly as they already did for a hidden sphere chosen
+    // directly. The row is only ever under a hidden parent while it is empty.
+    {
+      status: 'REDIRECTED' as const,
+      // Not `as const` on the array: Prisma's generated `in` filter wants a
+      // mutable string[], and a readonly tuple is refused at the type level.
+      parent: { is: { parentId: null, status: { in: ['VISIBLE', 'HIDDEN'] as ('VISIBLE' | 'HIDDEN')[] } } },
+    },
   ],
 }
 
@@ -270,7 +287,35 @@ export function isAssignable(
   if ((NEVER_ASSIGNABLE_SLUGS as readonly string[]).includes(cat.slug)) return false
   if (cat.status === 'VISIBLE') return true
   if (cat.status === 'HIDDEN') return !cat.parentId
-  return all.some(p => p.id === cat.parentId && p.status === 'VISIBLE')
+  // A sub-field is assignable under any SPHERE, visible or still hidden — see
+  // ASSIGNABLE_CATEGORY. What it may never hang off is another sub-field.
+  return all.some(p => p.id === cat.parentId && !p.parentId && p.status !== 'REDIRECTED')
+}
+
+/**
+ * The row whose visibility has to be repaired after filing an expert into
+ * `cat` — or null when nothing needs repairing.
+ *
+ * A HIDDEN category is hidden because it has no expert yet. Putting one there
+ * makes that false, so it comes back into view in the same request rather than
+ * waiting for somebody to notice; leaving it hidden would publish an expert
+ * nobody can find. For a sub-field the row to repair is its SPHERE, because
+ * that is what the sub-field is browsed through.
+ *
+ * Shared by the approve route and the admin re-file endpoint so the two cannot
+ * drift — they are the only two places an expert's category is ever set.
+ */
+export function sphereToReveal<T extends TreeNode>(
+  cat: T | undefined,
+  all: readonly T[],
+): T | undefined {
+  if (!cat) return undefined
+  if (cat.status === 'HIDDEN' && !cat.parentId) return cat
+  if (cat.status === 'REDIRECTED' && cat.parentId) {
+    const parent = all.find(c => c.id === cat.parentId)
+    if (parent?.status === 'HIDDEN') return parent
+  }
+  return undefined
 }
 
 /* ═══════════ specialty → category, ONCE ══════════════════════════════════

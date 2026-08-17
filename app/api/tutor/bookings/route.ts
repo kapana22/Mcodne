@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { avatarSrc } from '@/lib/avatarSrc'
+import { BOOKING_REVENUE_ONLY } from '@/lib/packages'
 
 export async function GET() {
   const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
@@ -19,7 +20,11 @@ export async function GET() {
     }),
     prisma.booking.count({ where: { tutorId: profile.id, status: { in: ['CONFIRMED', 'PREPARING'] } } }),
     prisma.booking.count({ where: { tutorId: profile.id, status: 'COMPLETED' } }),
-    prisma.booking.aggregate({ _sum: { price: true }, where: { tutorId: profile.id, status: 'COMPLETED' } }),
+    // BOOKING_REVENUE_ONLY, like every money sum over bookings: a package
+    // lesson's price is a share of the lump already taken at the Enrollment.
+    // /api/tutor/earnings is the screen that reports earnings properly (it adds
+    // the Enrollment back); this figure must at least not contradict it.
+    prisma.booking.aggregate({ _sum: { price: true }, where: { tutorId: profile.id, status: 'COMPLETED', ...BOOKING_REVENUE_ONLY } }),
   ])
 
   // rescheduleRequest is a dbBoot-added JSONB column Prisma can't select —

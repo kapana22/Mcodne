@@ -3,7 +3,7 @@
 // the verified mark every section reuses.
 
 import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
-import { primaryServiceMin } from '@/components/booking/slots'
+import { primaryPriceLabel, primaryService } from '@/components/booking/slots'
 
 export const VerifiedMark = ({ size = 16 }: { size?: number }) => (
   <span className="inline-flex items-center justify-center rounded-full bg-brand-600 text-white shrink-0" style={{ width: size, height: size }}>
@@ -28,13 +28,18 @@ export const VerifiedMark = ({ size = 16 }: { size?: number }) => (
 // so the home never renders an empty category section (SEO). Top-6 by demand;
 // once the live fetch resolves, hidden/renamed categories self-correct.
 export type HomeCat = { slug: string; name: string }
+// Names re-synced 2026-08-11 against all 15 production rows. Four of the six
+// were pre-rename strings („ბიზნესი", „მარკეტინგი", „IT და პროგრამირება"), so
+// the first paint printed one label and the fetch swapped in another — a flash
+// of a chip that no longer exists. `career` drops out: it is HIDDEN, and the
+// only thing tapping it can produce is an empty page.
 export const FALLBACK_CATS: HomeCat[] = [
-  { slug: 'business',  name: 'ბიზნესი' },
-  { slug: 'tax',       name: 'გადასახადები' },
-  { slug: 'marketing', name: 'მარკეტინგი' },
-  { slug: 'law',       name: 'სამართალი' },
-  { slug: 'it',        name: 'IT და პროგრამირება' },
-  { slug: 'career',    name: 'კარიერა' },
+  { slug: 'business',   name: 'ბიზნესი და სტრატეგია' },
+  { slug: 'tax',        name: 'ფინანსები და გადასახადები' },
+  { slug: 'law',        name: 'სამართალი' },
+  { slug: 'marketing',  name: 'მარკეტინგი და გაყიდვები' },
+  { slug: 'it',         name: 'ტექნოლოგია და პროდუქტი' },
+  { slug: 'psychology', name: 'ფსიქოლოგია' },
 ]
 
 /* ───── Top nav ─────
@@ -69,7 +74,10 @@ export type Expert = {
   rate: number
   reviews: number
   sessions: number
+  /** The flagship tier's price, as a number — the hero's <CountUp> needs one. */
   price: number
+  /** The same tier, formatted („₾60", „უფასო") — for everything that shows text. */
+  priceLabel: string
   durationMin: number
   // Real next open start (ISO) or null. Drives the SAME bookability gate the
   // /tutors card and the profile's StickyBookingCard use — a card must never
@@ -97,24 +105,31 @@ export function mapTutorToExpert(t: any): Expert {
     id: t.id,
     urlSlug: t?.slug ?? null,
     name: t?.user?.fullName ?? 'ექსპერტი',
-    cat: t?.category?.name ?? t?.specialty ?? 'სფერო',
+    // The real category or nothing — never `specialty`, never the literal
+    // „სფერო". See app/tutors/_data.tsx for the full reasoning; this mapper
+    // feeds the same card component.
+    cat: t?.category?.name ?? '',
     headline: t?.headline ?? '',
     quote: (t?.bio ?? '').slice(0, 140),
     rate: typeof t?.rating === 'number' ? t.rating : 0,
     reviews: t?.reviewsCount ?? 0,
     sessions: t?.sessionsCount ?? 0,
-    // Shared fallback — MUST match TUTOR_DEFAULTS.price (80) in the /tutors
-    // surfaces so the same missing-price row never shows two different numbers.
-    price: t?.price ?? 80,
-    // The FLAGSHIP length, not the profile default. `consultationDurationMin`
-    // is a fallback for experts with no tiers; using it directly printed
-    // „30-წუთიანი სესია" on every card while the actual headline offer is the
-    // one-hour consultation. primaryService = longest PAID tier (slots.ts) is
-    // the single source every pre-tier surface already agrees on.
-    durationMin: primaryServiceMin(
-      Array.isArray(t?.consultations) ? t.consultations : [],
-      t?.consultationDurationMin ?? 60,
-    ),
+    /* PRICE AND DURATION FROM THE SAME TIER. The duration was already
+       resolved from the flagship, but the price stayed `t.price` — the
+       flat rate typed at /apply — so the two halves of one line described
+       two different things. Measured 2026-08-13: ლიზა ზუბაშვილი's flat
+       rate is 20 and her real consultation is ₾60/60წთ, so the home grid
+       advertised „₾20 · 60-წუთიანი სესია" — an hour at a third of its
+       price, on the front page. `primaryPriceLabel` returns BOTH from one
+       tier, which is the entire reason it exists (see its docblock). */
+    ...(() => {
+      const tiers = Array.isArray(t?.consultations) ? t.consultations : []
+      const f = primaryPriceLabel(tiers, t?.price ?? 80, t?.consultationDurationMin ?? 60)
+      // `price` stays a NUMBER because the hero animates it with <CountUp>;
+      // it comes off the SAME tier as the label and the duration, so the
+      // three can no longer describe different services.
+      return { price: primaryService(tiers)?.price ?? (t?.price ?? 80), priceLabel: f.label, durationMin: f.minutes }
+    })(),
     nextSlotAt: t?.nextSlotAt ?? null,
     video: Boolean(t?.videoUrl),
     verified: t?.verified ?? false,

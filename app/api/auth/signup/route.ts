@@ -1,5 +1,6 @@
 import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
+import { firstGeorgianMessage, georgianNameRefine } from '@/lib/georgianText'
 import { prisma } from '@/lib/prisma'
 import { createSession, hashPassword } from '@/lib/auth'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
@@ -11,7 +12,9 @@ import { normalizePhone, phoneFormatError } from '@/lib/phone'
 // creates a STUDENT; promotion to TUTOR happens only through the moderated
 // application flow (POST /api/applications → PATCH /api/applications/[id]).
 const Body = z.object({
-  fullName: z.string().min(2).max(80),
+  // THE FRONT DOOR, and it was open: `min(2).max(80)` and nothing else, which
+  // is how every Latin-named row on the site got in.
+  fullName: z.string().min(2).max(80).superRefine(georgianNameRefine('სახელი')),
   email: z.string().email(),
   password: z.string().min(8).max(120),
   // Required since 2026-08-09 (owner). The rule lives in lib/phone so the form,
@@ -34,7 +37,14 @@ export async function POST(req: Request) {
 
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+    // The name rule right above states WHY it refused; a bare INVALID threw
+    // that sentence away, and this is the front door — the person has no other
+    // screen to learn it on. `field` is what the form focuses.
+    const msg = firstGeorgianMessage(parsed.error)
+    return NextResponse.json(
+      { ok: false, error: msg ? 'INVALID_TEXT' : 'INVALID', field: msg ? 'fullName' : undefined, message: msg ?? undefined },
+      { status: 400 },
+    )
   }
   const { fullName, email, password, phone } = parsed.data
   const phoneMsg = phoneFormatError(phone, { required: true })

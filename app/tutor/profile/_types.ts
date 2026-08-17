@@ -30,6 +30,7 @@ export type TutorProfile = {
   websiteUrl?: string | null
   responseHours?: number
   categoryId?: string | null
+  professions?: string[]
   category?: { id: string; slug: string; name: string; status?: string } | null
 } | null
 
@@ -70,6 +71,8 @@ export type ProfileForm = {
   linkedinUrl: string
   websiteUrl: string
   categoryId: string
+  /** What this expert calls themselves — several (lib/professions). */
+  professions: string[]
 }
 
 export type ConsForm = { title: string; description: string; minutes: number; price: number }

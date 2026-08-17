@@ -5,6 +5,7 @@ import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { PublicTopBar } from '@/components/PublicTopBar'
+import type { Me } from '@/lib/me'
 import { Footer as SharedFooter } from '@/components/Footer'
 import { frameQuestion } from '@/lib/askFraming'
 import { fmtKaDate, fmtKaTime } from '@/lib/kaDate'
@@ -37,7 +38,7 @@ function initialsAvatar(_name: string): string {
 }
 
 
-function AskInner() {
+function AskInner({ initialUser }: { initialUser?: Me | null }) {
   const params = useSearchParams()
   const router = useRouter()
   const q = (params?.get('q') ?? '').trim()
@@ -81,7 +82,8 @@ function AskInner() {
         setExperts(rows.slice(0, 6).map(t => ({
           id: t.id,
           name: t?.user?.fullName ?? 'ექსპერტი',
-          cat: t?.category?.name ?? t?.specialty ?? 'სფერო',
+          // Real category or nothing — see app/tutors/_data.tsx.
+          cat: t?.category?.name ?? '',
           headline: t?.headline ?? '',
           rating: typeof t?.rating === 'number' ? t.rating : 0,
           reviews: t?.reviewsCount ?? 0,
@@ -128,7 +130,7 @@ function AskInner() {
 
   return (
     <div className="font-sans bg-white text-ink-900 antialiased min-h-screen flex flex-col">
-      <PublicTopBar />
+      <PublicTopBar initialUser={initialUser} />
 
       <Container as="main" size="content" className="flex-1 w-full py-8 lg:py-12">
         {/* Question header (the "thread" title) */}
@@ -238,7 +240,9 @@ function AskInner() {
                         uses, so „AI ინჟინერი - 7 წელი" and „ფსიქოლოგი | …" don't
                         reach this row raw. Category leads (ours), the expert's
                         own words qualify it. */}
-                    <div className="text-meta text-ink-600 truncate">{e.cat}{displayHeadline(e.headline) ? ` · ${displayHeadline(e.headline)}` : ''}</div>
+                    {/* `cat` may be '' (no category) — join only what exists,
+                        so the line never opens or closes on a stray „ · ". */}
+                    <div className="text-meta text-ink-600 truncate">{[e.cat, displayHeadline(e.headline)].filter(Boolean).join(' · ')}</div>
                     <div className="mt-2 flex items-center gap-2.5 text-meta text-ink-500">
                       {/* „★ 0.0" is not a rating, it is the absence of one — and
                           on a young marketplace almost every card carried it, so
@@ -308,10 +312,10 @@ function AskInner() {
   )
 }
 
-export default function AskPage() {
+export default function AskPage({ initialUser }: { initialUser?: Me | null }) {
   return (
     <Suspense fallback={<div className="min-h-screen bg-white" />}>
-      <AskInner />
+      <AskInner initialUser={initialUser} />
     </Suspense>
   )
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isRequestPath, requestsOn } from '@/lib/requests'
 
 // Adds baseline security headers to every response. Kept conservative so it
 // won't clash with the app's inline styles / Tailwind runtime, and won't
@@ -23,6 +24,32 @@ export function middleware(req: NextRequest) {
     url.protocol = 'https:'
     url.port = ''
     return NextResponse.redirect(url, 308)
+  }
+
+  // ── The requests subsystem, off ───────────────────────────────────────────
+  // FEATURE_REQUESTS is not „on" → every path the subsystem owns answers 404,
+  // for everyone, ADMINS INCLUDED. Off that an admin can still see is not off,
+  // and the one person most likely to be testing would be the one person unable
+  // to verify the switch works.
+  //
+  // ⚠️ THIS IS THE OUTER GATE, NOT THE GUARD. It cannot know the allowlist —
+  // middleware runs with no database — and a matcher is one config edit away
+  // from not covering a new path. So every page and every route ALSO calls
+  // requestsViewer() (lib/requestsServer) for itself. Neither layer is
+  // load-bearing alone; that is the design, not redundancy.
+  //
+  // 404 with no body rather than a redirect: a redirect to /signin tells an
+  // anonymous visitor the page is real and worth returning to with an account,
+  // which is the one thing the 404 exists to deny.
+  //
+  // ⚠️ The variable is read at BUILD time here (Next inlines process.env into
+  // the middleware bundle), so flipping it in the Railway dashboard takes
+  // effect on the redeploy that follows — which Railway triggers on a variable
+  // change anyway. The server-side gate reads it per request, so the two can
+  // only ever disagree during a deploy, and only in the safe direction: the
+  // middleware still 404s while a stale build serves.
+  if (!requestsOn() && isRequestPath(req.nextUrl.pathname)) {
+    return new NextResponse(null, { status: 404 })
   }
 
   const path = req.nextUrl.pathname + req.nextUrl.search

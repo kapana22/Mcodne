@@ -9,6 +9,7 @@ import { usePathname } from 'next/navigation'
 import { ToastProvider } from './ToastProvider'
 import { CookieConsent } from './CookieConsent'
 import { BottomNav } from './BottomNav'
+import { isRequestPath } from '@/lib/requests'
 import { BackToTop } from './BackToTop'
 import { HelpWidget } from './HelpWidget'
 import { NavProgress } from './NavProgress'
@@ -23,6 +24,9 @@ const SCROLL_KEY = 'mcodne:scroll:'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname()
+  // The requests subsystem carries its own chrome and suppresses this one —
+  // see the block around <BottomNav> below.
+  const inRequests = isRequestPath(path ?? '')
   // Determines the user's role for the mobile bottom nav. `/api/me` returns
   // `{ user: null }` for anonymous visitors, which we pass through as `null`
   // — BottomNav short-circuits to render nothing.
@@ -186,14 +190,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </div>
       <CookieConsent />
-      {/* Long-page comfort. Self-gating (appears past 2 viewports), so it costs
-          nothing on short routes and needs no per-page opt-in. */}
-      <BackToTop />
-      {/* Sits above BackToTop (z-46 vs 45) and offset upward so the two never
-          overlap; hides itself entirely while a mobile booking CTA owns the
-          bottom edge — see HelpWidget. */}
-      <HelpWidget />
-      <BottomNav role={role} />
+      {/* ⚠️ THE REQUESTS SUBSYSTEM GETS NO SITE FURNITURE. It is a separate
+          space with its own chrome (app/request/_shell) and a wizard somebody
+          is meant to finish in one sitting — a bottom nav offering four other
+          destinations, a floating help bubble and a back-to-top button are
+          three invitations to leave mid-form. It also has to read as its own
+          world rather than as a page of this site, which is the whole reason
+          it is unlinked.
+
+          Path-based and therefore honest about what it is: a presentation
+          rule, not a guard. The routes gate themselves — see
+          lib/requestsServer → requestsViewer. */}
+      {!inRequests && (
+        <>
+          {/* Long-page comfort. Self-gating (appears past 2 viewports), so it
+              costs nothing on short routes and needs no per-page opt-in. */}
+          <BackToTop />
+          {/* Sits above BackToTop (z-46 vs 45) and offset upward so the two
+              never overlap; hides itself entirely while a mobile booking CTA
+              owns the bottom edge — see HelpWidget. */}
+          <HelpWidget />
+          <BottomNav role={role} />
+        </>
+      )}
     </ToastProvider>
   )
 }

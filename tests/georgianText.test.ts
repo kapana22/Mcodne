@@ -6,7 +6,9 @@
 // is full of Latin brands and acronyms, and a gate that blocks „Google Ads-ის
 // კამპანიები" would be wrong far more often than the drift it exists to stop.
 // Most of these cases are therefore things that MUST pass.
-import { checkGeorgian, isGeorgian } from '../lib/georgianText'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { checkGeorgian, firstGeorgianMessage, isGeorgian } from '../lib/georgianText'
 
 let passed = 0, failed = 0
 const ok = (name: string, cond: boolean) => { cond ? (passed++, console.log(`  ✓ ${name}`)) : (failed++, console.log(`  ✗ ${name}`)) }
@@ -47,6 +49,42 @@ console.log('\nმიზეზები')
   ok('prod: „luka kapanadze" blocked', !isGeorgian('luka kapanadze'))
   ok('prod: „SEO expert" blocked', !isGeorgian('SEO expert'))
   ok('prod: specialty „IT" allowed (a real category name)', isGeorgian('IT'))
+}
+
+/* ─── THE REASON HAS TO REACH THE FIELD ──────────────────────────────────────
+ *
+ * A gate whose message never leaves the server is half a rule: the save is
+ * refused and „შენახვა ვერ მოხერხდა" names neither the field nor the fix.
+ * Five routes shipped exactly that way — the gate was added, the message was
+ * not — and it is invisible from the outside, because the route DOES reject.
+ * So: every route that states a language rule must also return the sentence.
+ */
+console.log('\nშეცდომის ტექსტი უნდა დაბრუნდეს')
+ok('picks the Georgian message', firstGeorgianMessage({ issues: [
+  { message: 'String must contain at least 2 character(s)' },
+  { message: 'სახელი ქართულად ჩაწერე' },
+] }) === 'სახელი ქართულად ჩაწერე')
+ok('ignores zod English', firstGeorgianMessage({ issues: [{ message: 'Invalid input' }] }) === null)
+ok('null on no issues', firstGeorgianMessage({ issues: [] }) === null)
+
+{
+  const routes: string[] = []
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name)
+      if (e.isDirectory()) walk(p)
+      else if (e.name === 'route.ts') routes.push(p)
+    }
+  }
+  walk('app/api')
+  // `applyValidationFailure` is /apply's richer equivalent — it returns field +
+  // message from the same rules, so a route using it already answers.
+  const offenders = routes.filter(p => {
+    const src = readFileSync(p, 'utf8')
+    const gates = /georgianRefine|georgianNameRefine/.test(src)
+    return gates && !/firstGeorgianMessage|applyValidationFailure/.test(src)
+  })
+  ok(`every gated route surfaces its message${offenders.length ? ` — ${offenders.join(', ')}` : ''}`, offenders.length === 0)
 }
 
 console.log(`\n${passed} passed, ${failed} failed\n`)

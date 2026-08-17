@@ -1,11 +1,24 @@
 'use client'
 // ადმინი → „კომპანიები" — the B2B tab.
 //
-// Two sub-views behind SubTabs, because they are two different jobs done at
-// different times: „განაცხადები" is a QUEUE somebody is waiting at the other
-// end of, „კომპანიები" is a ledger you open when you already know why. Same
-// reasoning as the ინსაითები split; deliberately not two sidebar entries, since
-// the rail already carries sixteen.
+// ⚠️ IT HOLDS TWO DIFFERENT PRODUCTS, and they are easy to confuse because both
+// are called „B2B" and both involve a company. Read the sub-tab order as the
+// separation:
+//
+//   სერვისები + განაცხადები — WE SELL a consultation or a training at a price
+//       we set. No expert, no calendar, no escrow: a request arrives, a price
+//       is agreed, an invoice goes out (B2BService → BusinessLead). This is the
+//       monetisation channel; the deal fields on a lead are where its money is
+//       recorded.
+//
+//   ბალანსი — a company tops up and its members book ORDINARY EXPERTS with it
+//       (Company.balance → Booking.paidBy = COMPANY_BALANCE). Nothing to do
+//       with the catalogue above; it is the marketplace, paid differently.
+//
+// Do not merge the two into one narrative. „განაცხადები" is a QUEUE somebody is
+// waiting at the other end of, „ბალანსი" is a ledger you open when you already
+// know why. Deliberately not two sidebar entries, since the rail already
+// carries sixteen.
 //
 // The tab renders at all only when b2bFeatureExists() — see _nav.tsx. This file
 // therefore assumes it is allowed to be on screen and does not re-check.
@@ -14,6 +27,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
 import { fmtKaDateTime } from '@/lib/kaDate'
+import { B2B_KINDS, kindLabel } from '@/lib/b2b'
 import {
   TabHeader, SubTabs, SectionCard, RowList,
   AdminEmpty, AdminError, AdminLoading, CopyBtn, OpenBtn,
@@ -37,10 +51,12 @@ type Lead = {
   id: string; companyName: string; taxId: string | null; contactName: string
   phone: string; email: string; interest: string | null; message: string | null
   status: 'NEW' | 'CONTACTED' | 'CLOSED'; createdAt: string
-  service: { id: string; direction: string; title: string } | null
+  agreedPrice: number | null; adminNote: string | null
+  service: { id: string; kind: string; direction: string; title: string } | null
 }
 type Service = {
-  id: string; direction: string; title: string; description: string | null; format: string | null
+  id: string; kind: string; direction: string; title: string; description: string | null; format: string | null
+  imageUrl: string | null
   priceGel: number; priceOnRequest: boolean; order: number; visible: boolean
   _count: { requests: number }
 }
@@ -357,6 +373,15 @@ function LeadsView({ onCount, onChanged }: { onCount: (n: number) => void; onCha
   }, [onCount])
   useEffect(() => { load() }, [load])
 
+  /* THE DEAL. `agreedPrice` and `adminNote` were columns with a written intent
+     and no way to fill them in — so the number that was actually agreed, and
+     the invoice it went out on, lived only in somebody's inbox. This is the
+     paid side of the product; it needs a home in the panel. */
+  const saveDeal = async (id: string, agreedPrice: number | null, adminNote: string) => {
+    try { await post('/api/admin/business-leads', { id, agreedPrice, adminNote }, 'PATCH'); await load() }
+    catch (e: any) { setErr(errText(e?.message)) }
+  }
+
   const setStatus = async (id: string, status: Lead['status']) => {
     // …and tell the shell, so the nav badge drops the moment a lead is handled.
     // Without it the count only refreshed on a full reload, i.e. the badge kept
@@ -369,7 +394,22 @@ function LeadsView({ onCount, onChanged }: { onCount: (n: number) => void; onCha
   if (!list) return <AdminLoading />
   if (list.length === 0) return <AdminEmpty text="განაცხადი ჯერ არ შემოსულა." />
 
+  /* What this channel has actually agreed, summed off the leads themselves.
+     Counted, never written down — the same rule /business states for its own
+     numbers. Absent until there IS one: a „0₾" line on a channel nobody has
+     closed a deal in yet says nothing. */
+  const agreedTotal = list.reduce((n, l) => n + (l.agreedPrice ?? 0), 0)
+  const agreedCount = list.filter(l => l.agreedPrice != null).length
+
   return (
+    <div className="space-y-4">
+      {agreedCount > 0 && (
+        <div className="px-4 py-3 rounded-card border border-ink-200 bg-ink-50/50 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="text-small text-ink-600">შეთანხმებული:</span>
+          <span className="font-display text-body-lg font-bold text-ink-900 tabular-nums">{GEL(agreedTotal)}</span>
+          <span className="text-meta text-ink-500 tabular-nums">{agreedCount} განაცხადზე</span>
+        </div>
+      )}
     <RowList>
       {list.map(l => (
         <div key={l.id} className="px-4 py-4">
@@ -393,6 +433,7 @@ function LeadsView({ onCount, onChanged }: { onCount: (n: number) => void; onCha
               {l.interest && <div className="mt-1 text-small text-ink-700">{l.interest}</div>}
               {l.message && <div className="mt-1 text-small text-ink-600 whitespace-pre-wrap">{l.message}</div>}
               <div className="mt-1 text-meta text-ink-400">{fmtKaDateTime(new Date(l.createdAt))}</div>
+              <DealFields lead={l} onSave={saveDeal} />
             </div>
             <div className="flex flex-col gap-1.5 shrink-0">
               <CopyBtn value={l.email} label="ელფოსტა" />
@@ -410,16 +451,136 @@ function LeadsView({ onCount, onChanged }: { onCount: (n: number) => void; onCha
         </div>
       ))}
     </RowList>
+    </div>
+  )
+}
+
+/* One lead's money, edited in place. Local draft state so typing does not
+   re-render the list, and the save button only lights up when something
+   actually changed — a button that is always active teaches nobody whether
+   their edit landed. An empty price field means „nothing agreed" and clears
+   the column (the API takes null for exactly that). */
+function DealFields({ lead, onSave }: { lead: Lead; onSave: (id: string, price: number | null, note: string) => Promise<void> }) {
+  const [price, setPrice] = useState(lead.agreedPrice == null ? '' : String(lead.agreedPrice))
+  const [note, setNote] = useState(lead.adminNote ?? '')
+  const [busy, setBusy] = useState(false)
+  const parsed = price.trim() === '' ? null : Number(price)
+  const valid = parsed === null || (Number.isInteger(parsed) && parsed >= 0)
+  const dirty = (parsed ?? null) !== (lead.agreedPrice ?? null) || note !== (lead.adminNote ?? '')
+
+  return (
+    <div className="mt-3 pt-3 border-t border-ink-100 flex flex-wrap items-center gap-2">
+      <input
+        value={price} onChange={e => setPrice(e.target.value)}
+        inputMode="numeric" aria-label="შეთანხმებული ფასი"
+        className="h-9 w-[130px] px-3 rounded-field border border-ink-200 bg-white text-small text-ink-900 placeholder-ink-400 focus:border-brand-500 outline-none transition-colors duration-fast"
+        placeholder="შეთანხმდა ₾"
+      />
+      <input
+        value={note} onChange={e => setNote(e.target.value)}
+        aria-label="შენიშვნა"
+        className="h-9 flex-1 min-w-[180px] px-3 rounded-field border border-ink-200 bg-white text-small text-ink-900 placeholder-ink-400 focus:border-brand-500 outline-none transition-colors duration-fast"
+        placeholder="ინვოისი / შენიშვნა"
+      />
+      <button
+        type="button"
+        disabled={!dirty || !valid || busy}
+        onClick={async () => { setBusy(true); await onSave(lead.id, parsed, note); setBusy(false) }}
+        className="h-9 px-3 rounded-btn text-small font-display font-semibold text-ink-700 border border-ink-200 hover:bg-ink-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-fast"
+      >
+        {busy ? 'ინახება…' : 'შენახვა'}
+      </button>
+    </div>
   )
 }
 
 /* ───── Services — the price list a company reads on /business ───── */
 
+/* The card picture, edited from the row it belongs to.
+   /business shows services as CARDS, so the image is not decoration — a card
+   without one falls back to a plain panel. Uploading it anywhere other than
+   beside the service would mean remembering which row you were on.
+   `kind=cover` is the same /api/uploads path the blog uses: hard-cropped to
+   1200x675 webp, so a phone photo lands the right shape and the right weight
+   without the admin thinking about it. */
+function ServiceImage({
+  service, busy, onSaved, onError,
+}: {
+  service: Service
+  busy: boolean
+  onSaved: () => Promise<void> | void
+  onError: (msg: string) => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const has = !!service.imageUrl
+
+  const save = async (imageUrl: string) => {
+    setUploading(true)
+    try {
+      await post('/api/admin/b2b-services', { id: service.id, imageUrl }, 'PATCH')
+      await onSaved()
+    } catch (e: any) { onError(errText(e?.message)) }
+    finally { setUploading(false) }
+  }
+
+  return (
+    <div className="shrink-0">
+      <label className={`relative block w-[92px] aspect-[16/9] rounded-btn border border-ink-200 bg-ink-50 overflow-hidden ${busy || uploading ? 'opacity-50' : 'cursor-pointer hover:border-ink-300'} transition-colors duration-fast`}>
+        {has
+          ? <img src={service.imageUrl!} alt="" className="w-full h-full object-cover" />
+          : <span className="absolute inset-0 inline-flex items-center justify-center text-micro text-ink-400">სურათი</span>}
+        {uploading && (
+          <span className="absolute inset-0 inline-flex items-center justify-center bg-white/80 text-micro font-display font-semibold text-ink-700">
+            იტვირთება…
+          </span>
+        )}
+        <input
+          type="file" accept="image/*" className="sr-only" disabled={busy || uploading}
+          onChange={async e => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (!f) return
+            setUploading(true)
+            try {
+              const fd = new FormData()
+              fd.append('file', f)
+              fd.append('kind', 'cover')
+              const res = await fetch('/api/uploads', { method: 'POST', body: fd })
+              const j = await res.json().catch(() => null)
+              if (!res.ok || !j?.url) {
+                // Name the actual reason — „ვერ აიტვირთა" on a too-large file
+                // tells the admin nothing about what to do next.
+                onError(
+                  j?.error === 'TOO_LARGE' ? `ფაილი ძალიან დიდია — მაქსიმუმ ${Math.round((j.maxBytes ?? 0) / 1024 / 1024)}MB`
+                  : j?.error === 'BAD_TYPE' ? 'სურათი უნდა იყოს JPG, PNG ან WebP'
+                  : 'ატვირთვა ვერ მოხერხდა',
+                )
+                return
+              }
+              await save(j.url)
+            } catch { onError('ქსელის შეცდომა') }
+            finally { setUploading(false) }
+          }}
+        />
+      </label>
+      {has && (
+        <button
+          type="button" disabled={busy || uploading}
+          onClick={() => save('')}
+          className="mt-1 w-full text-micro text-ink-500 hover:text-danger-700 disabled:opacity-40 transition-colors duration-fast"
+        >
+          წაშლა
+        </button>
+      )}
+    </div>
+  )
+}
+
 function ServicesView() {
   const [list, setList] = useState<Service[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [draft, setDraft] = useState({ direction: '', title: '', description: '', format: '', priceGel: '', priceOnRequest: false })
+  const [draft, setDraft] = useState({ kind: 'CONSULTATION', direction: '', title: '', description: '', format: '', priceGel: '', priceOnRequest: false })
 
   const load = useCallback(async () => {
     setErr(null)
@@ -451,11 +612,18 @@ function ServicesView() {
       <SectionCard
         eyebrow="ახალი"
         title="სერვისის დამატება"
-        sub="მიმართულება არის სათაური, რომლის ქვეშაც სერვისი /business-ზე დგება — მაგ. „იურიდიული“."
+        sub="ორი კითხვა: რა არის — კონსულტაცია თუ ტრენინგი, და რაში — მიმართულება."
       >
         <div className="grid sm:grid-cols-2 gap-3">
+          {/* TWO AXES, TWO CONTROLS. They used to be one free-text field, so
+              „ტრენინგები" ended up sitting in the same column as „იურიდიული" and
+              a training in sales could not be filed as both. See lib/b2b. */}
+          <select value={draft.kind} onChange={e => setDraft(d => ({ ...d, kind: e.target.value }))}
+            className={INPUT} aria-label="ტიპი">
+            {B2B_KINDS.map(k => <option key={k} value={k}>{kindLabel(k)}</option>)}
+          </select>
           <input value={draft.direction} onChange={e => setDraft(d => ({ ...d, direction: e.target.value }))}
-            className={INPUT} placeholder="მიმართულება — მაგ. იურიდიული" />
+            className={INPUT} placeholder="მიმართულება — მაგ. გაყიდვები" />
           <input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
             className={INPUT} placeholder="სერვისი — მაგ. სამართლებრივი აუდიტი" />
           <input value={draft.description} onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
@@ -474,15 +642,18 @@ function ServicesView() {
               შეთანხმებით
             </label>
           </div>
-          <Btn disabled={!canAdd} aria-busy={busy} onClick={() => act(async () => {
+          {/* justify-self-start: the button is a grid CELL, and a grid cell
+              stretches — so the primary action rendered as a full-column pale
+              bar that read as a disabled input rather than a button. */}
+          <Btn className="justify-self-start" disabled={!canAdd} aria-busy={busy} onClick={() => act(async () => {
             await post('/api/admin/b2b-services', {
-              direction: draft.direction.trim(), title: draft.title.trim(),
+              kind: draft.kind, direction: draft.direction.trim(), title: draft.title.trim(),
               description: draft.description.trim(),
               format: draft.format.trim(),
               priceGel: draft.priceOnRequest ? 0 : price,
               priceOnRequest: draft.priceOnRequest,
             })
-            setDraft({ direction: '', title: '', description: '', format: '', priceGel: '', priceOnRequest: false })
+            setDraft({ kind: draft.kind, direction: '', title: '', description: '', format: '', priceGel: '', priceOnRequest: false })
           })}>
             {busy ? 'ემატება…' : 'დამატება'}
           </Btn>
@@ -496,13 +667,14 @@ function ServicesView() {
           <RowList>
             {list.map(s => (
               <div key={s.id} className="px-4 py-3.5 flex items-center gap-3">
+                <ServiceImage service={s} busy={busy} onSaved={load} onError={setErr} />
                 <div className="min-w-0 flex-1">
                   <div className="font-display text-small font-semibold text-ink-900 truncate">
                     {s.title}
                     {!s.visible && <span className="ml-2 text-micro uppercase text-ink-400">დამალული</span>}
                   </div>
                   <div className="text-meta text-ink-500 truncate">
-                    {s.direction}
+                    {kindLabel(s.kind)} · {s.direction}
                     {s.format && ` · ${s.format}`}
                     {s._count.requests > 0 && ` · ${s._count.requests} მოთხოვნა`}
                   </div>
@@ -536,7 +708,7 @@ export function CompaniesSection({ onLeadsChanged }: { onLeadsChanged?: () => vo
       <TabHeader
         eyebrow="B2B"
         title="კომპანიები"
-        sub="შემოსული განაცხადები, კომპანიების ბალანსები და ტრანზაქციების ისტორია."
+        sub="ორი რამ: სერვისები, რომლებსაც კომპანიას ვყიდით, და ბალანსები, რომლითაც კომპანია ჩვეულებრივ ექსპერტს უჯავშნის."
         actions={<OpenBtn href="/business" label="გვერდის ნახვა" />}
       />
 
@@ -565,9 +737,11 @@ export function CompaniesSection({ onLeadsChanged }: { onLeadsChanged?: () => vo
           value={sub}
           onChange={setSub}
           tabs={[
-            { id: 'leads', label: 'განაცხადები', count: openLeads },
+            // Catalogue first, then its queue, then the other product. The
+            // order is the separation: „what we sell" → „who asked" → „balances".
             { id: 'services', label: 'სერვისები' },
-            { id: 'companies', label: 'კომპანიები' },
+            { id: 'leads', label: 'განაცხადები', count: openLeads },
+            { id: 'companies', label: 'ბალანსი' },
           ]}
         />
       </div>

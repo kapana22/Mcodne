@@ -71,7 +71,8 @@ export const SavedStrip = ({ items, loadState, onRetry }: { items: SavedExpert[]
               <img src={w.avatar || DEFAULT_AVATAR} alt={w.name} className="w-11 h-11 rounded-full object-cover ring-1 ring-ink-200 shrink-0" />
               <div className="min-w-0">
                 <div className="font-display text-small font-bold text-ink-900 truncate group-hover:text-brand-800 transition-colors duration-fast">{w.name}</div>
-                <div className="text-meta text-ink-500 truncate">{w.cat}</div>
+                {/* '' for an expert with no category — see app/tutors/_data.tsx. */}
+                {w.cat && <div className="text-meta text-ink-500 truncate">{w.cat}</div>}
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between text-meta">
@@ -83,7 +84,7 @@ export const SavedStrip = ({ items, loadState, onRetry }: { items: SavedExpert[]
                   </>
                 )}
               </span>
-              <span className="font-display font-bold text-ink-900 tabular-nums">₾{w.price}</span>
+              <span className="font-display font-bold text-ink-900 tabular-nums">{w.priceLabel}</span>
             </div>
           </Link>
         ))}

@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react'
 import { Icon } from '@/components/Icon'
 import { LANG_LABELS, PRIMARY_LANG_CODES } from '@/lib/languages'
+import { primaryPrice } from '@/components/booking/slots'
 import { LiveCat, Tutor } from './_data'
 
 // Filtering is ONE state, TWO breakpoint-exclusive surfaces (2026-07-27):
@@ -245,8 +246,12 @@ export const FILTER_LANGS = PRIMARY_LANG_CODES.map(c => ({ l: LANG_LABELS[c] }))
 export function passesFilters(t: Tutor, f: Filters, skip?: 'rating' | 'super'): boolean {
   if (skip !== 'super' && f.superOnly && !t.superExpert) return false
   if (skip !== 'rating' && f.minRating > 0 && (t.rating ?? 0) < f.minRating) return false
-  // Budget band — honor both the floor and the cap (NO_CAP = no ceiling).
-  if (t.price < f.price[0] || t.price > f.price[1]) return false
+  /* Budget band — honor both the floor and the cap (NO_CAP = no ceiling).
+     Compared against `primaryPrice`, the SAME number the card prints, never the
+     raw flat rate — see that function's docblock for the two live rows this
+     got wrong. */
+  const shown = primaryPrice(t.consultations ?? [], t.price)
+  if (shown < f.price[0] || shown > f.price[1]) return false
   // Match by category SLUG (stable), not the display name — a rename or a
   // hidden category can never silently drop matching experts.
   if (f.cats.length > 0 && (!t.catSlug || !f.cats.includes(t.catSlug))) return false

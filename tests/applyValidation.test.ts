@@ -147,7 +147,43 @@ test('the form READS the server sentence — the regression that started this', 
     'knowing which field refused is useless unless the form jumps to it')
 })
 
-test('the form checks the name before the API does', () => {
-  assert.match(form, /nameError\(fullName\)/, 'step 1 must gate the name')
+test('the form checks the name before the API does — each box on its own', () => {
+  // It used to join the two boxes and validate the pair, so „ნინო" + „Beridze"
+  // put the red line under სახელი — the field that was right. Both are gated
+  // now, separately, and the second carries its own label so the message says
+  // „გვარი" rather than „name and surname".
+  assert.match(form, /nameError\(form\.firstName\)/, 'step 1 must gate the first name')
+  assert.match(form, /nameError\(form\.lastName, *'გვარი'\)/, 'step 1 must gate the surname separately')
   assert.match(form, /const NameScriptHint/, 'and say it before the gate — the value is pre-filled')
+})
+
+/* ═══════════ the STRICT name rule (2026-08-12, owner) ═══════════════════
+ *
+ * `checkGeorgian` is a SHARE test — half the letters — and that is correct for
+ * prose, where „Google Ads-ის სპეციალისტი" is real Georgian business copy. It
+ * is the wrong instrument for a NAME, and the live data proves it: „Marietta
+ * Dzvelaia" passed it, and „luka kapanadze" is an ADMIN row. A name carries no
+ * brands, no acronyms, no tools and no digits, so nothing is lost by requiring
+ * Georgian letters outright.
+ */
+test('a name must be Georgian letters — not „half the letters"', () => {
+  assert.equal(nameError('ნინო ბერიძე'), null)
+  // A double surname keeps its hyphen; mtavruli is Georgian too.
+  assert.equal(nameError('ჯავახიშვილი-ბერიძე'), null)
+  assert.equal(nameError('ᲜᲘᲜᲝ ᲑᲔᲠᲘᲫᲔ'), null)
+
+  // The two shapes that got in through the unvalidated signup route.
+  assert.match(nameError('luka kapanadze') ?? '', /ქართულად/)
+  assert.match(nameError('Marietta Dzvelaia') ?? '', /ქართულად/)
+  // Half-and-half used to PASS the share test. It must not.
+  assert.match(nameError('ნინო Beridze') ?? '', /ქართულად/)
+  // A name has no digits in it.
+  assert.match(nameError('ნინო 2') ?? '', /ქართულად/)
+})
+
+test('the name rule still yields to the length rules first', () => {
+  // „fill it in" must win over „write it in Georgian" — an empty field is not a
+  // script problem, and naming the wrong fix is how a form loses somebody.
+  assert.match(nameError('') ?? '', /შეავსე/)
+  assert.match(nameError('ა') ?? '', /შეავსე/)
 })

@@ -1,7 +1,7 @@
 import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { BROWSABLE_CATEGORY } from '@/lib/categoryTree'
+import { ASSIGNABLE_CATEGORY_WHERE, CATEGORY_READ_ORDER, resolveCategoryByName, sphereToReveal } from '@/lib/categoryTree'
 import { requireRoleApi } from '@/lib/auth'
 import { notify, normalizePrefs } from '@/lib/notify'
 import { audit } from '@/lib/audit'
@@ -11,6 +11,9 @@ import { sendMail } from '@/lib/mailer'
 import { applicationApprovedEmail } from '@/lib/emailTemplates'
 import { resolveVerifiedGrant } from '@/app/admin/_application'
 import { materializeWeekly } from '@/lib/availabilityRules'
+import { MAX_PROFESSIONS } from '@/lib/professions'
+import { georgianNameError } from '@/lib/georgianText'
+import { normalizePhone, phoneFormatError } from '@/lib/phone'
 
 const Body = z.object({
   action: z.enum(['approve', 'reject', 'revise']),
@@ -63,9 +66,38 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // their admin role and lock everyone out of /admin — this guard prevents it.
   const app = await prisma.tutorApplication.findUnique({
     where: { id },
-    include: { user: { select: { role: true } } },
+    // `phone` too: the promotion below only FILLS a missing number, never
+    // overwrites one the person set later in /settings.
+    include: { user: { select: { role: true, phone: true } } },
   })
   if (!app) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
+
+  /* AN APPROVAL IS NOT A PIECE OF PAPER — IT ALREADY PROMOTED SOMEBODY.
+   *
+   * `approve` writes role=TUTOR, creates the public TutorProfile, publishes a
+   * calendar and opens bookings. Nothing below undoes any of that: `reject` and
+   * `revise` only move the APPLICATION's status and send a message. So on an
+   * already-APPROVED row they produced a state where the record says REJECTED
+   * while the person stays listed, bookable and holding the TUTOR role — and
+   * the applicant is told „შენი განაცხადი უარყოფილია" while their profile is
+   * still live. The moderator gets no signal that nothing happened.
+   *
+   * Refused, rather than silently made to work: taking a live expert down is a
+   * different, deliberate act (suspend the account, or hide the profile from
+   * the „ექსპერტები" tab), and it must not be a side effect of re-reading an
+   * old application. Re-approving is still allowed — that path is idempotent
+   * by construction (every post-approval step is guarded on „already there").
+   */
+  if (app.status === 'APPROVED' && action !== 'approve') {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'ALREADY_APPROVED',
+        message: 'ეს განაცხადი უკვე დამტკიცებულია და ექსპერტი აქტიურია. პროფილის დახურვა ექსპერტების გვერდიდან ხდება.',
+      },
+      { status: 409 },
+    )
+  }
 
   if (action === 'approve') {
     if (app.user.role !== 'STUDENT') {
@@ -78,42 +110,40 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
     // Resolve the applicant's chosen category (stored as its NAME in `specialty`,
     // since /apply's preset list mirrors the live Category names) to a real
-    // Category id. WITHOUT this the freshly-minted profile is born category-less
-    // and is silently hidden from /tutors — the browse query hard-requires a live
-    // category (lib/tutorsQuery.ts), so an approved+available expert would never
-    // appear. A custom/niche specialty that matches nothing stays null (that's the
-    // genuine "admin must add this category" case; the expert can also self-set it
-    // from the profile editor once the category exists).
-    // BROWSABLE, not just VISIBLE. Since 2026-08-10 the application offers the
-    // sub-fields absorbed into each sphere („ფინანსები" under „ბიზნესი და
-    // ფინანსები"), so `specialty` can legitimately BE one — and an applicant
-    // who answered precisely must not be the one who ends up filed nowhere.
-    // A sub-field still surfaces under its sphere in browse, because the count
-    // and the filter fold; the rule is lib/categoryTree's, once.
-    const liveCats = await prisma.category.findMany({
-      where: { OR: [BROWSABLE_CATEGORY, { status: 'HIDDEN' }] },
-      select: { id: true, slug: true, name: true, status: true, defaultServiceType: true },
-    })
-    const nrm = (s: string) => s.toLowerCase().trim()
-    const sp = nrm(app.specialty || '')
-    // The SLUG is matched as well as the name, as a whole word. The name used to
-    // carry the Latin term by accident — „IT და პროგრამირება" contained „it", so
-    // an applicant who wrote „IT" landed in it. The 2026-08-10 rename to
-    // „ტექნოლოგია და პროდუქტი" took that away silently, and the failure mode is
-    // an approved expert filed under no category at all.
+    // Category id. A specialty that matches nothing stays null, and that is a
+    // real cost but NOT the disappearance this comment used to claim: since
+    // lib/tutorsQuery made the category a LABEL rather than a gate, an expert
+    // with no category still shows in the unfiltered browse. What they lose is
+    // every sphere page, the browse filter, and the category chip on their own
+    // card — so it is worth getting right, and the moderator's dropdown is where
+    // it gets fixed.
+    // The candidate set and the matcher both live in lib/categoryTree now.
     //
-    // Whole-word, and that is not pedantry: a bare `includes('it')` matches
-    // „digital", which would file a marketer as a programmer.
-    const slugHit = (slug: string) => new RegExp(`(^|[^a-z0-9])${slug}([^a-z0-9]|$)`).test(sp)
-    const matchedCat = sp
-      ? (liveCats.find(c => nrm(c.name) === sp)
-        ?? liveCats.find(c => { const n = nrm(c.name); const stem = n.slice(0, 4); return sp.includes(n) || n.includes(sp) || (stem.length >= 3 && sp.includes(stem)) })
-        ?? liveCats.find(c => slugHit(c.slug)))
-      : undefined
+    // ASSIGNABLE, not „browsable OR hidden". The old inline `where` pulled in
+    // EVERY hidden row — including the /abroad `diaspora` marker, which the
+    // 2026-08-10 migration protects in SQL specifically so it can never reach
+    // the public menu. Approving into it would have filed the expert nowhere
+    // AND flipped the marker VISIBLE via the un-hide below. Sub-fields stay in
+    // (an applicant who answered „ფინანსები" must not end up filed nowhere) and
+    // hidden SPHERES stay in (somebody has to be able to go first in „კარიერა").
+    //
+    // The read order is explicit because the resolver scans this list: an
+    // unordered findMany returns Postgres' physical order, so the same
+    // application could resolve differently after a VACUUM.
+    const liveCats = await prisma.category.findMany({
+      where: ASSIGNABLE_CATEGORY_WHERE,
+      orderBy: CATEGORY_READ_ORDER,
+      select: { id: true, slug: true, name: true, status: true, parentId: true, defaultServiceType: true },
+    })
+    // ONE matcher, shared with the moderation panel's pre-selection — the two
+    // used to state different rules, so the dropdown lied about the outcome.
+    const matchedCat = resolveCategoryByName(app.specialty || '', liveCats)
     // An explicit `categoryId` from the admin OVERRIDES the name match — that is
     // the whole point of the override (the name matched nothing, or matched the
-    // wrong bucket). It must name a real LIVE category; anything else is a
-    // mistake worth surfacing rather than silently ignoring.
+    // wrong bucket). It must name an ASSIGNABLE category — the same set the
+    // panel's dropdown is built from — so a stale id, a REDIRECTED row whose
+    // sphere has since been hidden, or the /abroad marker is refused rather
+    // than silently written onto a real person.
     const overrideCat = categoryId ? liveCats.find(c => c.id === categoryId) : undefined
     if (categoryId && !overrideCat) {
       return NextResponse.json({ ok: false, error: 'BAD_CATEGORY' }, { status: 400 })
@@ -122,20 +152,28 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const resolvedCategoryId = chosenCat?.id
 
     // A sphere is HIDDEN because it has no expert yet — that is the whole
-    // reason. Approving one into it makes the reason false, so the sphere comes
+    // reason. Filing one into it makes the reason false, so the sphere comes
     // back into view here rather than waiting for somebody to notice. Leaving
     // it hidden would publish an expert nobody can find: the same activation
     // lapse that killed 46% of booking attempts on 2026-08-03, arriving by a
-    // new door. `isLive` is written alongside `status`, as everywhere.
-    if (chosenCat?.status === 'HIDDEN') {
+    // new door.
+    //
+    // `sphereToReveal` also covers the case that made sub-fields usable at all
+    // (2026-08-11): the applicant answered „დიეტოლოგია", whose SPHERE is the
+    // hidden one. The row to reveal is then the parent, not the answer — a
+    // sub-field is browsed through its sphere, so revealing the child alone
+    // would leave the expert reachable from nowhere.
+    // `isLive` is written alongside `status`, as everywhere.
+    const reveal = sphereToReveal(chosenCat, liveCats)
+    if (reveal) {
       await prisma.category.update({
-        where: { id: chosenCat.id },
+        where: { id: reveal.id },
         data: { status: 'VISIBLE', isLive: true },
       })
       await audit(admin.id, 'category.show', {
         targetType: 'Category',
-        targetId: chosenCat.id,
-        meta: { name: chosenCat.name, reason: 'first approved expert' },
+        targetId: reveal.id,
+        meta: { name: reveal.name, reason: 'first approved expert', via: chosenCat?.slug ?? null },
       })
     }
 
@@ -148,18 +186,64 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // raw Georgian name here left the expert with zero chips selected and a
     // duplicated „ქართული · English · ქართული · English" card after they re-picked.
     const resolvedLanguages = normalizeLangs((app.professionData as any)?.languages)
+    // WHAT THEY CALLED THEMSELVES — „ბუღალტერი", „მარკეტოლოგი" (lib/professions).
+    // Carried onto the profile so the applicant never re-picks what they already
+    // answered. Bounded and de-duplicated here rather than trusted: professionData
+    // is an unbounded JSON bag written by the client.
+    const resolvedProfessions = Array.isArray((app.professionData as any)?.professions)
+      ? [...new Set(
+          ((app.professionData as any).professions as unknown[])
+            .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+            .map(x => x.trim().slice(0, 80)),
+        )].slice(0, MAX_PROFESSIONS)
+      : []
     // „გადამოწმებული" — granted ONLY when the moderator explicitly ticked it on
     // this approval. `hadDocument` records whether anything was actually
     // attached at that moment, so the audit trail can answer „why is this
     // person verified?" long after the fact. A grant with nothing attached is
     // permitted (a moderator may have verified out-of-band) but never silent.
     const badge = resolveVerifiedGrant(verified, app)
+
+    /* THE APPLICANT'S OWN ANSWERS, CARRIED ONTO THE ACCOUNT.
+     *
+     * Approval copied a dozen fields onto the TutorProfile and wrote exactly
+     * `{ role: 'TUTOR' }` to the User — so `fullName` and `phone`, the two
+     * things /apply validates hardest, were collected and then dropped.
+     * Measured on production 2026-08-17: 15 of 25 approved experts gave a phone
+     * on /apply and their account still had `phone: null`, and one gave
+     * „ნიკა წოწორია" while the account kept the Latin „nika tsotsoria" Google
+     * had supplied.
+     *
+     * That last one also broke a promise written in lib/georgianText: Google
+     * sign-in is exempt from the Georgian-name rule „by necessity — refusing the
+     * name would refuse the sign-in — so it is caught at /apply instead, before
+     * anything becomes public." /apply did catch it. Nothing wrote it back, so
+     * the exemption caught nothing and a Latin name went public anyway.
+     *
+     * NAME: taken only when the application's own name passes the strict rule
+     * (it was validated at submit, but a row predating that rule must not
+     * overwrite a good account name with a worse one).
+     * PHONE: FILLED, NEVER OVERWRITTEN — a number the person later set in
+     * /settings is newer than the one on the application. */
+    const promoted: { role: 'TUTOR'; fullName?: string; phone?: string } = { role: 'TUTOR' }
+    {
+      const appName = (app.fullName ?? '').trim()
+      if (appName && !georgianNameError('სახელი', appName)) promoted.fullName = appName
+      const appPhone = (app.phone ?? '').trim()
+      if (appPhone && !app.user.phone) {
+        // Same normalisation every other write path uses, so the column cannot
+        // hold „+995 555 15 13 13" here and „555151313" everywhere else.
+        const normalized = normalizePhone(appPhone)
+        if (normalized && !phoneFormatError(normalized, { required: true })) promoted.phone = normalized
+      }
+    }
+
     await prisma.$transaction([
       prisma.tutorApplication.update({
         where: { id },
         data: { status: 'APPROVED', moderatorNote: note, reviewedAt: new Date() },
       }),
-      prisma.user.update({ where: { id: app.userId }, data: { role: 'TUTOR' } }),
+      prisma.user.update({ where: { id: app.userId }, data: promoted }),
       prisma.tutorProfile.upsert({
         where: { userId: app.userId },
         create: {
@@ -180,6 +264,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           // Preserve the applicant's real languages (see derivation above) — only
           // when we actually parsed some, otherwise let the ["ka"] default stand.
           languages: resolvedLanguages.length ? resolvedLanguages : undefined,
+          professions: resolvedProfessions,
           yearsExp: app.yearsExp,
           price: app.hourlyRate,
           verified: badge.grant,
@@ -193,6 +278,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         },
         update: {
           linkedinUrl: app.linkedinUrl,
+          // Only ever ADDS: a re-approval must not wipe professions the expert
+          // has since edited on their own profile.
+          ...(resolvedProfessions.length ? { professions: resolvedProfessions } : {}),
           websiteUrl: app.websiteUrl,
           professionData: app.professionData ?? undefined,
           // Grant-only, never revoke: re-approving an existing profile with the

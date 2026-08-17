@@ -32,9 +32,13 @@ export function AccountTab({ profile, setProfile, form, fullNameInput, setFullNa
         {/* Display name — the account name (user.fullName), saved to /api/me
             (a DIFFERENT endpoint from the tutor-profile PATCH). Most
             fundamental account field, so it sits at the top of the tab. */}
+        {/* NO card-level <Eyebrow> here, unlike the two cards below. `Field`
+            renders the same muted Eyebrow for its label, so a card holding
+            exactly ONE field stacked „სახელი" above „სახელი და გვარი" — two
+            identical grey labels for one input. The other cards keep theirs:
+            they hold either a toggle with no label of its own, or three
+            fields that need a heading over them. */}
         <form onSubmit={saveName} className="p-6 rounded-card border border-ink-200 bg-white space-y-4">
-          <Eyebrow tone="muted" className="mb-2">სახელი</Eyebrow>
-
           <Field label="სახელი და გვარი">
             <input type="text" required minLength={2} maxLength={80}
                    value={fullNameInput} onChange={e => setFullNameInput(e.target.value)}

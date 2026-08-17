@@ -52,6 +52,19 @@ export async function GET() {
         name: c.name,
         browsable: c.status === 'VISIBLE',
         expertCount: counts.get(c.id) ?? 0,
+        // CHILDREN FOR EVERY SPHERE, hidden ones included.
+        //
+        // This briefly returned none for a hidden sphere, on the reasoning that
+        // a sub-field under one was not assignable — true at the time, and the
+        // wrong half of the problem to fix. It made all seven sub-fields of the
+        // newly-opened spheres unreachable, so a dietician searching „დიეტ" on
+        // /apply found nothing and had to work out that they were supposed to
+        // answer „ჯანმრთელობა და კვება". Precision is what this taxonomy is for.
+        //
+        // The rule moved instead: lib/categoryTree now treats a sub-field of a
+        // hidden SPHERE as assignable, and filing somebody there un-hides the
+        // sphere in the same request (sphereToReveal). Nobody is ever stranded,
+        // and the precise answer is available from day one.
         children: all
           .filter(k => k.status === 'REDIRECTED' && k.parentId === c.id)
           .map(k => ({ id: k.id, slug: k.slug, name: k.name })),

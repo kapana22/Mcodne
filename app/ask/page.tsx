@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import AskPage from './AskClient'
+import { getCurrentUser } from '@/lib/auth'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 const DESC = 'დაუსვი შენი კითხვა — მცოდნე გირჩევს შესაფერის ექსპერტს ბიზნესის, კარიერის, იურიდიულ თუ ფინანსურ საკითხზე. აღწერე რა გჭირდება და დაჯავშნე კონსულტაცია.'
@@ -17,6 +18,11 @@ export const metadata: Metadata = {
   openGraph: { title: 'დასვი კითხვა — მცოდნე', description: DESC, url: `${SITE_URL}/ask`, type: 'website' },
 }
 
-export default function Page() {
-  return <AskPage />
+/* See app/contact/page.tsx — the header needs the server-resolved user or it
+   flips (and mismatches) on hydration. */
+export const dynamic = 'force-dynamic'
+
+export default async function Page() {
+  const initialUser = await getCurrentUser()
+  return <AskPage initialUser={initialUser as any} />
 }

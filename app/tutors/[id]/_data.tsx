@@ -31,6 +31,8 @@ export type TutorDetail = {
   websiteUrl?: string | null
   user: { id: string; fullName: string; avatarUrl?: string | null; bio?: string | null }
   category?: { id: string; slug: string; name: string; icon?: string | null; status?: 'VISIBLE' | 'HIDDEN' | 'REDIRECTED'; parent?: { slug: string } | null } | null
+  /** What this person calls themselves — see lib/professions. Several. */
+  professions?: string[]
 }
 
 // Same vocabulary as the browse cards (lib/languages) — this used to be a private

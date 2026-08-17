@@ -179,13 +179,73 @@ test('§C the FK-less dbBoot tables are deleted BY HAND, not left to a cascade',
   // to User at all, so deleting an account never erases the ledger that says
   // what their company was charged. If that ever changes, this test will not
   // catch it — tests/b2b.test.ts owns that invariant.
-  const ALLOWED_PERSON_EDGE =
-    /ALTER TABLE "CompanyMember" ADD CONSTRAINT "CompanyMember_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/
-  assert.match(boot, ALLOWED_PERSON_EDGE,
-    'the CompanyMember→User cascade is gone — a deleted account now leaves its membership behind')
-  // Scan everything EXCEPT that one statement, so the assertions below are
-  // byte-for-byte the ones that have always run.
-  const rest = boot.replace(ALLOWED_PERSON_EDGE, '')
+  //
+  // NARROWED AGAIN 2026-08-14 (requests), by THREE edges, and the alarm did its
+  // job: it fired on the day they landed and forced the re-check it names.
+  // What the re-check found, edge by edge:
+  //
+  //   RequestAccess.userId  CASCADE — a permission, exactly like CompanyMember,
+  //       and a real constraint. Needs no hand-delete on purge. The ANONYMIZE
+  //       path deletes it explicitly anyway (see the assertion below): that mode
+  //       keeps the row and only scrubs the person, so nothing would remove an
+  //       allowlist entry naming a dead account.
+  //   RequestOffer.expertUserId  CASCADE — the offer is unreadable without the
+  //       provider (it has no name and no contact of its own). Deliberately NOT
+  //       SET NULL: the table carries a CHECK that exactly one provider column
+  //       is set, so a SET NULL would violate it and make the account
+  //       UNDELETABLE with a constraint error — the failure this alarm exists to
+  //       stop, arriving by the opposite route.
+  //   ServiceRequest.userId  SET NULL — and this is the one that needed work.
+  //       The row survives on purpose (what the market asked for is not about
+  //       the person), but `contactName`/`phone`/`email` are PLAIN COLUMNS on
+  //       it, not a join to User, so no referential action can reach them. BOTH
+  //       deletion paths therefore scrub them by hand, and both are asserted
+  //       below. Same shape as the HelpMessage problem this file already pins.
+  //
+  // Each is allowlisted BY NAME and BY ITS REFERENTIAL ACTION, so weakening any
+  // of them — or adding a fourth person-edge — still fails here.
+  const ALLOWED_PERSON_EDGES: [RegExp, string][] = [
+    [/ALTER TABLE "CompanyMember" ADD CONSTRAINT "CompanyMember_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
+      'the CompanyMember→User cascade is gone — a deleted account now leaves its membership behind'],
+    [/ALTER TABLE "RequestAccess" ADD CONSTRAINT "RequestAccess_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
+      'the RequestAccess→User cascade is gone — a deleted account keeps its requests allowlist row'],
+    [/ALTER TABLE "RequestOffer" ADD CONSTRAINT "RequestOffer_expertUserId_fkey" FOREIGN KEY \("expertUserId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
+      'the RequestOffer→User cascade changed — SET NULL would break the one-provider CHECK and make the account undeletable'],
+    [/ALTER TABLE "ServiceRequest" ADD CONSTRAINT "ServiceRequest_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE SET NULL[^;]*;/,
+      'the ServiceRequest→User edge changed — CASCADE would delete the market history, RESTRICT would block the delete'],
+    // RequestMessage.fromUserId  SET NULL — and it costs a CHECK to be safe.
+    //     The thread is what a company answers for and it outlives the member
+    //     who typed in it, so CASCADE (the RequestOffer answer) is wrong here.
+    //     But SET NULL only WORKS because the table's author CHECK is one-way:
+    //     the strict version rejected the very update this action performs, so
+    //     a provider who had ever sent a message could not be deleted at all.
+    //     Both halves are asserted — the action here, the CHECK below — because
+    //     restoring either one alone re-creates the undeletable account.
+    [/ALTER TABLE "RequestMessage" ADD CONSTRAINT "RequestMessage_fromUserId_fkey" FOREIGN KEY \("fromUserId"\) REFERENCES "User"\("id"\) ON DELETE SET NULL[^;]*;/,
+      'the RequestMessage→User edge changed — CASCADE would tear a departed member’s words out of a live company thread'],
+  ]
+
+  // The other half of that pair. A CHECK demanding an author on every provider
+  // message reads as obviously right and is why this alarm exists: paired with
+  // SET NULL it makes the account undeletable, and the failure surfaces as a
+  // constraint error inside the purge transaction, not here.
+  // Read the CHECK BODIES, not the file: dbBoot also carries a repair block
+  // that looks for the old definition by name, and „IS NOT NULL" appears there
+  // as the thing being searched FOR.
+  const authorChecks = [...boot.matchAll(/"RequestMessage_author_matches_side"\s*CHECK\s*\(([\s\S]{0,200}?)\)/g)]
+    .map(m => m[1])
+  assert.ok(authorChecks.length > 0, 'the RequestMessage author CHECK is gone entirely')
+  for (const c of authorChecks) {
+    assert.ok(!/IS NOT NULL/.test(c),
+      'the RequestMessage author CHECK demands an author again — SET NULL on that column will now fail the purge')
+  }
+  let rest = boot
+  for (const [re, msg] of ALLOWED_PERSON_EDGES) {
+    assert.match(boot, re, msg)
+    // Scan everything EXCEPT the allowed statements, so the assertions below
+    // are byte-for-byte the ones that have always run.
+    rest = rest.replace(re, '')
+  }
 
   const edges = [...rest.matchAll(/\bREFERENCES\s+"(\w+)"/g)].map(m => m[1])
   for (const table of edges) {
@@ -198,6 +258,15 @@ test('§C the FK-less dbBoot tables are deleted BY HAND, not left to a cascade',
     'dbBoot grew a foreign key on a person column — re-check the hand-deletes')
   assert.match(ROUTE, /tx\.package\.deleteMany/)
   assert.match(ROUTE, /tx\.enrollment\.deleteMany/)
+
+  // The two halves of the requests re-check, asserted rather than described.
+  // A cascade cannot reach a plain column, so if either of these disappears a
+  // „deleted" account keeps a working phone number in the request table.
+  const scrubs = ROUTE.match(/UPDATE "ServiceRequest"/g) ?? []
+  assert.equal(scrubs.length, 2,
+    'both deletion modes must scrub ServiceRequest\'s contact columns — no FK can reach them')
+  assert.match(ROUTE, /tx\.requestAccess\.deleteMany/,
+    'anonymize no longer drops the requests allowlist row — it would name a dead account')
 })
 
 test('§C purge removes the raw-SQL tables that hold the person outside Prisma', () => {

@@ -10,6 +10,7 @@ import { ConfirmModal } from '@/components/ConfirmModal'
 import { signOut as doSignOut } from '@/lib/signout'
 import { homeForRole } from '@/lib/roleHome'
 import { Eyebrow } from '@/components/Eyebrow'
+import { georgianNameError } from '@/lib/georgianText'
 
 // Local mirror of lib/notify.ts PrefKey. Keeping this in-file so the Settings
 // page doesn't import from a server helper. All keys default to true when
@@ -200,6 +201,12 @@ export default function SettingsPage() {
     if (savingProfile) return
     if (fullName.trim().length < 2) {
       setProfileMsg({ kind: 'error', text: 'სახელი მინიმუმ 2 სიმბოლო' })
+      return
+    }
+    // Same rule as /api/me, answered before the round-trip.
+    const nameMsg = georgianNameError('სახელი და გვარი', fullName.trim())
+    if (nameMsg) {
+      setProfileMsg({ kind: 'error', text: nameMsg })
       return
     }
     setSavingProfile(true)

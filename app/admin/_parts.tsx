@@ -77,10 +77,23 @@ function useModalChrome(opts: {
    ok:true. Consumes the body — use it where the call site doesn't need the
    payload (toggles, renames, hide/show). */
 export async function adminOk(res: Response): Promise<boolean> {
-  if (!res.ok || res.redirected) return false
-  if (!(res.headers.get('content-type') ?? '').includes('application/json')) return false
-  const j = (await res.json().catch(() => null)) as { ok?: unknown } | null
-  return j?.ok === true
+  return (await adminResult(res)).ok
+}
+
+/* Same check, but hands back the server's own sentence. A body can only be read
+   once, so a call site that wants the reason cannot call `adminOk` first — and
+   without this every refusal collapsed to „ოპერაცია ვერ შესრულდა.", which tells
+   a moderator nothing about WHY a decision was refused (e.g. the application was
+   already approved and the expert is live). */
+export async function adminResult(res: Response): Promise<{ ok: boolean; message?: string }> {
+  if (!res.ok || res.redirected) {
+    if (!(res.headers.get('content-type') ?? '').includes('application/json')) return { ok: false }
+    const j = (await res.json().catch(() => null)) as { message?: unknown } | null
+    return { ok: false, message: typeof j?.message === 'string' ? j.message : undefined }
+  }
+  if (!(res.headers.get('content-type') ?? '').includes('application/json')) return { ok: false }
+  const j = (await res.json().catch(() => null)) as { ok?: unknown; message?: unknown } | null
+  return { ok: j?.ok === true, message: typeof j?.message === 'string' ? j.message : undefined }
 }
 
 // Shared section header for every admin tab — consistent eyebrow + title + sub,

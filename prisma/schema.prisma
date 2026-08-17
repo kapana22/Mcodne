@@ -120,6 +120,15 @@ model User {
   // Admin safety switch: non-null → account is suspended (signin blocked).
   // Set/cleared via PATCH /api/admin/users/[id]; reason lives in the audit log.
   suspendedAt   DateTime?
+  // ⚠️ THE ONLY THING BEHIND „ონლაინ ვართ" (2026-08-17). Stamped every ~40s by
+  // an admin with the panel open, and read by nobody else: the client's thread
+  // asks „is anybody at the desk" and gets an answer computed from THIS, not
+  // from a working-hours table. A schedule would say „online" at 11:00 on a day
+  // the operator is ill, and a badge that lies is worse than no badge — the
+  // whole reason to show one is that the person deciding whether to wait can
+  // trust it. One nullable column rather than a presence table: there is one
+  // fact per account and it has no history worth keeping.
+  supportSeenAt DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -140,6 +149,15 @@ model User {
   sessions          Session[]
   otpCodes          OtpCode[]
   resetTokens       PasswordResetToken[]
+  // Requests (2026-08-14). All three are VIRTUAL — Prisma back-relations emit
+  // no SQL, so these lines add nothing to the User table. The subsystem is dark
+  // behind FEATURE_REQUESTS (lib/requests.ts); an account with no
+  // `requestAccess` row is indistinguishable from one on a deployment where the
+  // feature does not exist.
+  serviceRequests   ServiceRequest[]
+  requestOffers     RequestOffer[]
+  requestMessages   RequestMessage[]
+  requestAccess     RequestAccess?
 
   // Admin filters + list order-by
   @@index([role])
@@ -219,6 +237,10 @@ model Category {
   children           Category[]     @relation("CategoryTree")
 
   tutors             TutorProfile[]
+  // Requests filed under this sphere (2026-08-14). Virtual back-relation, no
+  // SQL. The FK on ServiceRequest is Restrict, so deleting a sphere that still
+  // carries requests fails loudly instead of silently unfiling them.
+  serviceRequests    ServiceRequest[]
 
   // Searching a sphere by its visible label („მარკეტინგში") must find that
   // sphere's experts — see the TutorProfile trigram block. Also in lib/dbBoot.
@@ -290,6 +312,16 @@ model TutorProfile {
   responseMedianMin       Int?
   responseSampleN         Int?
   languages               String[]    @default(["ka"])
+  // WHAT THIS PERSON IS, in their own words — „ბუღალტერი", „მარკეტოლოგი".
+  // Several on purpose (owner, 2026-08-11): „მარკეტოლოგმა იცის დიზაინი და
+  // რეკლამირებაც", and a field that holds one makes them under-describe
+  // themselves. The vocabulary is lib/professions.ts (16 spheres, 91 jobs).
+  //
+  // NOT a replacement for `categoryId`. The sphere stays single and keeps
+  // driving browse, the filter, /categories/*, the counts and the SEO; this is
+  // the finer grain that only ever shows on the profile and the card. Added
+  // idempotently in lib/dbBoot, so no `prisma db push` is required.
+  professions             String[]    @default([])
   linkedinUrl             String?
   websiteUrl              String?
   professionData          Json?
@@ -965,6 +997,10 @@ model Company {
 
   members      CompanyMember[]
   transactions CompanyTransaction[]
+  // Requests (2026-08-14) — virtual back-relations, no SQL. A company bids on a
+  // request as one counterparty; the members do not each get their own offer.
+  requestOffers RequestOffer[]
+  requestAccess RequestAccess?
 
   // The admin list: active companies first, newest first.
   @@index([status, createdAt])
@@ -1047,7 +1083,22 @@ model CompanyTransaction {
 // price, and the invoice happens outside this system.
 model B2BService {
   id       String @id @default(cuid())
-  // The heading it sits under on /business („იურიდიული", „ფინანსური").
+  // WHAT KIND of service it is — 'CONSULTATION' or 'TRAINING'.
+  //
+  // WHY THIS EXISTS (2026-08-12, owner): the offer is „a consultation or a
+  // training, in business or sales or something else" — two independent
+  // questions. There was only `direction`, so the two got mixed INTO one field:
+  // production held „HR", „იურიდიული", „ფინანსური" (areas) alongside
+  // „ტრენინგები" (a kind). The model therefore could not express „a training in
+  // sales" at all — a sales training had to be filed either under its kind or
+  // under its area, never both, and the page grouped them as if they were the
+  // same axis.
+  //
+  // A String and not a Postgres enum, deliberately: the set is read through
+  // lib/b2b (B2B_KINDS) and validated by zod at both ends, and a two-value enum
+  // type is not worth a migration that has to run before any column using it.
+  kind        String @default("CONSULTATION")
+  // The AREA it belongs to — „იურიდიული", „ფინანსური", „გაყიდვები".
   // Free text and NOT a Category FK on purpose: the sphere taxonomy describes
   // what EXPERTS do and is admin-edited for the public catalogue. Borrowing it
   // here would tie a B2B price list to a rename made for a different reason.
@@ -1063,6 +1114,16 @@ model B2BService {
   // has to read for it; on its own line they can scan a whole direction and
   // rule things in or out. Everything else may simply leave it empty.
   format      String?
+  // The card image, as a `data:image/webp;base64,…` produced by /api/uploads
+  // (kind=cover → hard-cropped to 1200x675). There is no object storage, so it
+  // lives in the column like every other image here.
+  //
+  // ⚠️ NEVER SELECT THIS INTO A PAGE PAYLOAD. Six cards of inline base64 is
+  // most of a megabyte re-sent on every navigation and cacheable by nothing —
+  // the exact shape /api/avatars/[id] was built to undo. /business selects a
+  // `hasImage` boolean and points <img> at /api/b2b-services/[id]/image, which
+  // the browser then caches per service.
+  imageUrl    String?
   // Lari, like every other price in this database. This is the number a company
   // reads on the page — the one actually invoiced may differ after a
   // conversation, which is what BusinessLead.agreedPrice records.
@@ -1123,4 +1184,409 @@ model BusinessLead {
   // The admin queue: unhandled first, newest first.
   @@index([status, createdAt])
   @@index([serviceId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REQUESTS — the client describes a problem, providers bid on it.  2026-08-14
+//
+// THE DIRECTION IS INVERTED, and that is the entire point. Everywhere else on
+// this platform a client picks a person and books their hour: they must already
+// know what they need and who does it. Here they say what is wrong and what
+// they can spend, an admin phones them to check the request is real, and the
+// providers come to them.
+//
+// ⚠️ IT IS NOT A BOOKING AND SHARES NOTHING WITH ONE. No calendar, no slot, no
+// duration, no escrow, no Booking row, no BookingStatus. `Booking`,
+// `Consultation`, `Package`, `Enrollment` and `AvailabilitySlot` are untouched
+// by this block and must stay that way — a request that quietly grew a startAt
+// is the point at which two products become one unmaintainable one.
+//
+// It is also NOT the B2B block above. `BusinessLead` is a company asking for a
+// service WE priced; this is an individual describing a problem NOBODY has
+// priced yet, and the price is what the providers compete on.
+//
+// WHAT STAGE 1 DELIBERATELY OMITS: payment, credits, buying a lead, escrow,
+// automatic matching, scoring, ranking, and messaging on a request. The one
+// question this stage answers is whether requests arrive at all and whether
+// providers answer them.
+//
+// The whole subsystem is dark behind `FEATURE_REQUESTS` (lib/requests.ts).
+// These three tables exist on every deployment and stay EMPTY until somebody
+// uses them — the same contract the B2B and packages verticals ship on.
+//
+// MONEY IS `Int` LARI, matching Company.balance, Booking.price and B2BService
+// .priceGel. There is no tetri in this database and this is not the feature
+// that should introduce one.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// The life of a request, and every state is a thing a HUMAN did.
+//
+// There is no automatic transition anywhere in this enum — nothing expires,
+// nothing is scored, nothing promotes itself. That is a stage-1 decision worth
+// naming: a request that changed state on its own would be a request nobody can
+// explain on the phone, and the phone is currently the whole verification story.
+enum ServiceRequestStatus {
+  NEW      // it arrived; no admin has looked at it
+  VERIFIED // an admin called and confirmed it — providers can see it
+  REJECTED // spam, an unreal budget, or nobody could reach them
+  MATCHED  // the client accepted an offer
+  CLOSED   // finished, or abandoned
+}
+
+// ⚠️ THERE ARE NO `RequestBudget` / `RequestDeadline` ENUMS, and there were,
+// for one day (2026-08-14). They were removed the moment the subsystem had to
+// cover teaching as well as professional work, and the reason is worth keeping:
+//
+//   „500–1 000₾" and „20–40₾ ერთ გაკვეთილზე" are both correct answers to „what
+//   is your budget", and they are NOT THE SAME QUESTION. One enum holding both
+//   is one field answering two — the exact defect the B2BService.kind comment
+//   below describes at length, arriving by a different road.
+//
+// So the money is stored as NUMBERS (`budgetMin`/`budgetMax`) plus the UNIT it
+// is measured in, the bands live in lib/requestTopics.ts, and adding a band is
+// an edit to an array rather than an ALTER TYPE. Same for the timing: its legal
+// values depend on `kind`, which a Postgres enum cannot express at all, so zod
+// validating `timing ∈ TIMING[kind]` is a STRONGER guarantee than the enum gave.
+//
+// `ServiceRequestStatus` below stays an enum on purpose — a lifecycle is closed,
+// kind-independent, and is exactly what the database should be guarding.
+
+enum RequestOfferStatus {
+  SENT
+  WITHDRAWN
+  ACCEPTED
+  DECLINED
+}
+
+// An offer comes from a PERSON or from a COMPANY, and the two are different
+// kinds of counterparty rather than two shapes of the same one — a company has
+// no `User` to notify and a person has no members. Kept as a discriminator so
+// `RequestOffer` never has to be read as „whichever of these two ids is set".
+enum RequestProviderKind {
+  EXPERT
+  COMPANY
+}
+
+model ServiceRequest {
+  id String @id @default(cuid())
+  // THE CODE WE SAY OUT LOUD. „MC-7A4K2" — five characters from an alphabet
+  // with no O/0/I/1, so it survives being read down a phone line, which is
+  // exactly what the admin does with it. A cuid cannot be dictated.
+  //
+  // It is also the client's only key to their own request, so it is minted from
+  // crypto randomness and NEVER from a sequence: a guessable ref would hand a
+  // stranger somebody's phone number. Minted by lib/requests → `makePublicRef`.
+  publicRef String @unique
+
+  // WHAT SHAPE THE NEED IS — 'LEARNING' | 'CONSULTATION' | 'PROJECT'.
+  //
+  // The discriminator the whole row is read through: it decides what `budgetMin`
+  // is measured in and what `timing` means. See lib/requestTopics → KIND for why
+  // there are exactly three and what the test for a fourth is.
+  //
+  // A String and not a Postgres enum, deliberately and for the same reason
+  // B2BService.kind is: the set is read through lib/requestTopics and validated
+  // by zod at both ends, and a taxonomy that is expected to grow is not worth an
+  // ALTER TYPE every time it does.
+  kind String
+
+  // WHAT THEY NEED — a stable slug from lib/requestTopics ('chemistry',
+  // 'contract', 'website'). 132 of them at the time of writing, built to reach
+  // hundreds.
+  //
+  // ⚠️ NOT A `Category` FK, and that is the central decision of this subsystem.
+  // The sphere taxonomy describes what the EXPERTS ON THIS PLATFORM DO — 16
+  // professional spheres, zero school subjects — so „ქიმია" cannot live there
+  // without minting a sphere page with no experts behind it. A REQUEST is the
+  // other direction: it says what somebody NEEDS, and people need things the
+  // catalogue does not carry yet. Discovering exactly that is the point.
+  topic String
+
+  // The sphere whose experts could serve this topic, when one exists —
+  // DERIVED from `topic` at write time (lib/requestTopics → categorySlugOfTopic)
+  // and stored so the admin panel can list candidate experts beside the request.
+  //
+  // Null is normal and informative: it means nobody on this platform is filed
+  // under what this person asked for.
+  //
+  // Restrict (the default) rather than SetNull: a sphere with live requests
+  // pointing at it must fail loudly on delete rather than silently unfile them.
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  // What is wrong, in their words. The 40-character floor is enforced by zod
+  // (lib/requests) and not here: a database CHECK cannot tell the person why.
+  description String
+
+  // ⚠️ THE MONEY IS NUMBERS, AND THE UNIT CARRIES THE DIFFERENCE. `budgetMax`
+  // null is the open top band („120₾-ზე მეტი"). See the block above the enums
+  // for why this is not an enum, and lib/requestTopics → BUDGET_BANDS for the
+  // bands themselves. Int lari, like every other price in this database.
+  budgetMin  Int
+  budgetMax  Int?
+  // 'PER_LESSON' | 'PER_SESSION' | 'TOTAL'. Determined by `kind` today and
+  // stored anyway — snapshotted for the same reason Booking snapshots its
+  // serviceType: changing the mapping later must not silently re-price history.
+  budgetUnit String
+
+  // The second question, whose MEANING depends on `kind`: a deadline for a
+  // project, urgency for a consultation, and FREQUENCY for learning — a weekly
+  // lesson has no „by when". One column rather than three mostly-null ones; the
+  // legal set per kind is lib/requestTopics → TIMING.
+  timing String
+
+  // The clarifying answers — { audience: 'pupil', level: 'beginner', … }.
+  //
+  // A JSON BAG, DELIBERATELY, because the questions are per kind today and per
+  // TOPIC tomorrow (a wedding photographer and a tax auditor need different
+  // clarifications), and a thumbtack-shaped catalogue asking each service its
+  // own two questions cannot mean a column per question. The vocabulary of
+  // legal ids lives in lib/requestTopics → EXTRAS and zod validates against it
+  // at the door — so the bag is free-form only in shape, never in content.
+  // Same pattern as TutorProfile.professionData.
+  //
+  // Null means „nothing to clarify for this kind", which is most rows.
+  details Json?
+
+  // 'ONLINE' | 'IN_PERSON' | 'EITHER'. Asked before the city because for most
+  // of this catalogue „ონლაინ" makes the city irrelevant.
+  format String
+
+  // A code („TBILISI"), not the Georgian label. Stored this way so renaming
+  // what the form SAYS never rewrites rows — lib/requestTopics → CITIES owns
+  // the words. A plain String and not an enum: the list will grow by cities,
+  // which is not worth a migration each time.
+  city     String
+
+  contactName String
+  phone       String
+  email       String?
+
+  // Set when a signed-in account submitted it. SetNull, deliberately unlike
+  // Booking's Restrict: deleting an account must not be refused because of a
+  // request, and must not erase the request either — what somebody asked for is
+  // a record of the market, and it stays readable with no name on it.
+  userId String?
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  status ServiceRequestStatus @default(NEW)
+
+  // The admin's own scratch note — who they spoke to, what was actually wanted.
+  // NEVER shown to a client or a provider; only /api/admin/requests selects it.
+  adminNote String?
+
+  verifiedAt DateTime?
+  // The admin who verified it. A plain String with no FK, for the same reason
+  // AuditLog.actorId and CompanyTransaction.actorId are: this is a record of
+  // something that happened, and it must outlive the account that did it.
+  verifiedById String?
+
+  // ⚠️ TWO „DONE" FLAGS FOR THE AUTOMATION, and they are columns rather than a
+  // derivation on purpose. The cron ticks every 15 minutes, so „has this
+  // already been nudged" cannot be inferred from the elapsed window — every
+  // tick inside the eligible period would re-send. A written timestamp is the
+  // idempotency, and it doubles as the record of WHEN it went.
+  //
+  // Null = never nudged, which is what every row starts as. See
+  // lib/requestRouting for the clock these two are read against.
+  /** The unanswered-request re-mail, widened to every provider. Once. */
+  providerNudgeAt DateTime?
+  /** The „you have offers waiting" reminder to the client. Once. */
+  clientNudgeAt   DateTime?
+
+  // HOW MANY OFFERS THIS REQUEST ACCEPTS. Three by default because that is what
+  // a person can actually compare on a phone screen; an admin can raise it for
+  // a request worth more attention.
+  offerLimit Int @default(3)
+  // ⚠️ A COUNTER, NOT A `_count`. It exists to be claimed conditionally:
+  // `updateMany({ where: { offerCount: { lt: offerLimit } }, data: { increment } })`
+  // + `count !== 1 → 409` is the only way the limit holds against two providers
+  // submitting in the same second. Counting the rows first and writing after is
+  // the read-then-write CLAUDE.md names, and here it means a fourth offer.
+  offerCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  offers   RequestOffer[]
+  messages RequestMessage[]
+
+  // The admin queue: unhandled first, newest first.
+  @@index([status, createdAt])
+  // The provider list: verified requests, optionally within a sphere.
+  @@index([categoryId, status])
+  // „what is being asked for, and how much of it" — the admin's topic filter
+  // and the only way to see demand the catalogue does not serve.
+  @@index([topic, status])
+  // The provider queue filtered to one shape of work.
+  @@index([kind, status])
+}
+
+model RequestOffer {
+  id        String         @id @default(cuid())
+  requestId String
+  // Cascade: an offer without its request is unreadable — it names a price for
+  // a problem nobody can see. Unlike a ledger row, it records no money moving.
+  request   ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  providerKind RequestProviderKind
+
+  expertUserId String?
+  expertUser   User?    @relation(fields: [expertUserId], references: [id], onDelete: Cascade)
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // ⚠️ EXACTLY ONE of expertUserId / companyId is set, and Prisma cannot say so
+  // — there is no cross-column constraint here and a partial-index CHECK would
+  // reject the row without telling the caller which half was wrong. The rule
+  // lives in ONE function, `offerProviderError()` in lib/requests.ts, and that
+  // function is the only place it is ever checked. Do not re-implement it at a
+  // call site: a second copy is how „both set" eventually becomes storable.
+
+  // Lari, whole, like every other price in this database.
+  priceGel Int
+  // „about ten days". Nullable because some work honestly cannot be estimated
+  // before a conversation, and forcing a number there produces a fictional one.
+  daysEstimate Int?
+  // What they will actually do. The 20-character floor is zod's (lib/requests):
+  // a price with no sentence beside it is not an offer, it is a guess.
+  message String
+
+  status RequestOfferStatus @default(SENT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One offer per provider per request. Not „one per provider": revising a
+  // price by sending a second offer would make the offerCount claim above count
+  // the same provider twice and eat a competitor's place.
+  messages RequestMessage[]
+
+  @@unique([requestId, expertUserId])
+  @@unique([requestId, companyId])
+
+  // „my offers, by state" — the /provider/offers page, for both kinds.
+  @@index([expertUserId, status])
+  @@index([companyId, status])
+}
+
+// ONE CONVERSATION PER OFFER — the client and that provider, before anybody
+// has anybody's phone number.  2026-08-17
+//
+// ⚠️ WHY NOT `Message`. That model exists and even carries pre-booking threads
+// (`bookingId: null` between a client and an expert) — but BOTH its sides are
+// `User` foreign keys, and the client of a request HAS NO ACCOUNT. That is not
+// an oversight to route around: „no registration, ever" is the decision the
+// whole intake was rebuilt on, and adding a signup step so the client can ask
+// „do you teach on Saturdays?" would undo it. So the client side is identified
+// by POSSESSION OF THE REQUEST — the same publicRef that already opens their
+// page — and only the provider side is a User.
+//
+// ⚠️ WHY IT OPENS BEFORE THE CHOICE, AND WHY THAT DOES NOT WEAKEN THE SEAL.
+// The reference products let a client talk to several providers and then pick;
+// research on marketplace disintermediation is blunt about why in-app
+// messaging exists at all — it is the channel that keeps the introduction on
+// the platform. Without it a client must either choose blind from a price and
+// a paragraph, or hand out their number early to ask one question. Chat is
+// what makes „the phone opens on acceptance" survivable rather than hostile.
+// The seal itself is unchanged: phone and email still appear only on ACCEPTED.
+model RequestMessage {
+  id String @id @default(cuid())
+
+  // The thread is per OFFER, because the client holds a separate conversation
+  // with each provider who answered — merging them into one per request would
+  // show every provider what their competitors wrote.
+  //
+  // ⚠️ NULL IS A THREAD, NOT A MISSING OFFER (2026-08-17). A row with no offer
+  // is the client talking to US — the conversation that opens the moment they
+  // press send, before any provider has been told the request exists. That gap
+  // used to be a thank-you card and a promise to phone; it is now the one place
+  // somebody can ask „did it arrive" and get an answer.
+  //
+  // ONE TABLE RATHER THAN TWO, and the reason is the reader: both threads are
+  // the same bubbles, the same receipts, the same unread count, and a second
+  // table would have meant a second of each. What genuinely differs — who may
+  // read, whether contacts are masked, when it closes — is rules, and rules
+  // live in lib/requestChat + lib/requestThread, not in a schema.
+  offerId String?
+  offer   RequestOffer? @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  // Denormalised from the offer so the client's own page can load every thread
+  // of their request in one query, and so a message survives being read
+  // without a join. Never written independently — see lib/requestChat.
+  requestId String
+  request   ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  // WHICH SIDE SPOKE. A boolean rather than two nullable FKs: there are
+  // exactly two parties to this thread and only one of them is ever a User,
+  // so „from the client" is a fact about the row, not an absence.
+  fromClient Boolean
+  // The provider who wrote it. Null on every client message — that is the
+  // shape, not a gap. SetNull rather than Cascade: a company-owned offer
+  // outlives the member who typed on it, and the thread is what the company
+  // answers for. ⚠️ This is why the table's author CHECK (lib/dbBoot) is
+  // ONE-WAY — a CHECK also demanding an author on every provider message would
+  // reject the very update SetNull performs, and the purge would fail.
+  fromUserId String?
+  fromUser   User?   @relation(fields: [fromUserId], references: [id], onDelete: SetNull)
+
+  body String
+
+  // Two read receipts, because there are two readers and neither has an
+  // account on both sides. Used for the „N ახალი" badges.
+  //
+  // ⚠️ „Provider" here means THE OTHER SIDE, whoever that is on this thread —
+  // the provider on an offer thread, us on a platform one. The column was not
+  // renamed when the platform thread arrived: it is one table with one „the
+  // side that is not the client", and a `readByStaffAt` beside it would have
+  // been a second column meaning the same thing, which is how two unread counts
+  // that disagree get born.
+  readByClientAt   DateTime?
+  readByProviderAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  // The thread itself: one offer, in order. Rows with no offer are excluded by
+  // Postgres from a btree lookup on a NULL, which is why the platform thread
+  // reads through the requestId index below instead.
+  @@index([offerId, createdAt])
+  // „every thread of my request", for the client's page.
+  @@index([requestId, createdAt])
+}
+
+// WHO CAN SEE THIS SUBSYSTEM AT ALL — the allowlist, maintained by hand.
+//
+// ⚠️ AN EXISTING EXPERT GETS NOTHING BY DEFAULT, and that is the whole reason
+// this table exists rather than a boolean on TutorProfile or a role check. The
+// twenty-odd approved experts on the platform applied to be booked, not to bid
+// on leads; switching them all on would ship an unfinished product to people
+// who never asked for it. An empty table can only ever produce an empty
+// audience, which is the only safe state for a stage-1 test.
+//
+// `active` rather than a delete: turning somebody off is a decision worth being
+// able to see and reverse, and the `note` beside it says why.
+model RequestAccess {
+  id String @id @default(cuid())
+
+  kind RequestProviderKind
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  active Boolean @default(true)
+  // The admin's reason: „ბესიკი — ტესტისთვის", „აღარ პასუხობს". Never shown to
+  // the person it is about.
+  note String?
+
+  createdAt DateTime @default(now())
+
+  // One row per person and one per company. Postgres allows any number of NULLs
+  // under a unique constraint, so the two nullable columns do not fight — the
+  // same trick Company.taxId relies on.
+  @@unique([userId])
+  @@unique([companyId])
 }

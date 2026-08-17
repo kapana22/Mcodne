@@ -7,13 +7,7 @@ import { getCurrentUser, hashPassword, verifyPassword, revokeOtherSessions } fro
 import { prisma } from '@/lib/prisma'
 import { normalizeAvatar } from '@/lib/normalizeAvatar'
 import { rateLimit } from '@/lib/rateLimit'
-import { georgianRefine } from '@/lib/georgianText'
-
-/** First human-readable custom message from a zod error, if any. */
-function firstCustomMessage(err: { issues: { code: string; message: string }[] }): string | null {
-  const hit = err.issues.find(i => i.code === 'custom' && /[Ⴀ-ჿᲐ-Ჿ]/.test(i.message))
-  return hit?.message ?? null
-}
+import { firstGeorgianMessage, georgianNameRefine, georgianRefine } from '@/lib/georgianText'
 
 
 // The header/nav reads role from here to decide what to render. If the browser
@@ -61,7 +55,8 @@ const Patch = z.object({
   // The site is Georgian-only at this stage (2026-08-02) — public text must
   // be written in Georgian. Latin brands/acronyms inside it stay fine; see
   // lib/georgianText.ts for the exact rule.
-  fullName: z.string().min(2).max(80).superRefine(georgianRefine('სახელი')).optional(),
+  // The STRICT name rule, not the prose share test — see lib/georgianText.
+  fullName: z.string().min(2).max(80).superRefine(georgianNameRefine('სახელი')).optional(),
   phone: z.string().max(40).optional(),
   bio: z.string().max(500).superRefine(georgianRefine('აღწერა')).optional(),
   // Only a same-origin uploaded image (data:image/…) or an https URL — never a
@@ -80,7 +75,7 @@ export async function PATCH(req: Request) {
   if (!parsed.success) {
     // Surface OUR validation copy (e.g. the Georgian-language gate); zod's
     // own English messages stay behind the generic code.
-    const msg = firstCustomMessage(parsed.error)
+    const msg = firstGeorgianMessage(parsed.error)
     return NextResponse.json({ ok: false, error: msg ? 'INVALID_TEXT' : 'INVALID', message: msg ?? undefined }, { status: 400 })
   }
 

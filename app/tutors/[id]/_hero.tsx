@@ -303,26 +303,43 @@ export const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false }
             {tutor?.verified && <VerifiedMark size={22} />}
           </div>
 
-          {/* The CATEGORY leads, `specialty` follows — same hierarchy as the
-              browse card (see the long note there). It used to be the other way
-              round: `specialty` wore the brand chip even though it is free text
-              carried over from /apply, while the category — our own, filterable
-              taxonomy — was the demoted second chip. On all nine live rows the
-              two strings are IDENTICAL, so this swap is invisible today; it
-              matters the moment they diverge, which is exactly when the reader
-              needs to know which one the platform stands behind. */}
-          <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
-            {tutor?.category?.name && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 h-7 rounded-pill bg-brand-50 border border-brand-200 text-meta font-display font-semibold text-brand-800">
-                {tutor.category.name}
-              </span>
-            )}
-            {tutor?.specialty && tutor.specialty !== tutor?.category?.name && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-7 rounded-pill bg-ink-50 border border-ink-200 text-meta font-display font-medium text-ink-700">
-                {tutor.specialty}
-              </span>
-            )}
-          </div>
+          {/* ONE chip: the CATEGORY. The `specialty` sibling is gone (2026-08-11).
+              It was added when the two strings were identical on all nine live
+              rows, on the reasoning that a second chip would only ever appear
+              when they diverged — i.e. when the reader needed to know which one
+              the platform stands behind. The 2026-08-10 rename made them
+              diverge everywhere at once and proved the reasoning wrong:
+              „ბიზნესი" beside „ბიზნესი და ფინანსები", „IT" beside „ტექნოლოგია
+              და პროდუქტი", „მარკეტინგი" beside „მარკეტინგი და გაყიდვები" — 9 of
+              22 profiles suddenly carrying a near-duplicate, and one carrying a
+              flat contradiction („ფსიქოლოგია" beside „ბიზნესი და ფინანსები").
+              `specialty` is a frozen copy of whatever the category was CALLED on
+              the day the application was approved; it has not been editable
+              since the field left the profile editor, and nothing keeps it in
+              sync. A stale label cannot arbitrate a live one. The headline
+              directly below already says what this person does, in their words.
+              Same rule as the browse card, which dropped its own copy of this
+              on 2026-07-31 for the same reason. */}
+          {(tutor?.category?.name || tutor?.professions?.length) && (
+            <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+              {tutor?.category?.name && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 h-7 rounded-pill bg-brand-50 border border-brand-200 text-meta font-display font-semibold text-brand-800">
+                  {tutor.category.name}
+                </span>
+              )}
+              {/* WHAT THEY ARE, in their own words — several of them, because
+                  one person is („მარკეტოლოგმა იცის დიზაინი და რეკლამირებაც").
+                  Neutral hairline chips, never the brand fill: the sphere is
+                  OUR taxonomy and leads; these are the finer grain beside it.
+                  This is also what replaced the old `specialty` chip, which was
+                  a frozen duplicate of the category name. */}
+              {(tutor?.professions ?? []).map(job => (
+                <span key={job} className="inline-flex items-center px-2.5 h-7 rounded-pill bg-ink-75 border border-ink-200 text-meta font-display font-medium text-ink-700">
+                  {job}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Meta row — separated by gap only. The old „•" spans were both
               banned by canon (no status dots) and orphaned: each one rendered

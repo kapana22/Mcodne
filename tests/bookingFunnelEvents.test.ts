@@ -129,7 +129,10 @@ for (const k of BOOKING_FUNNEL_PROP_KEYS) {
   check(`prop key: accepts "${k}"`, ok(body), reason(body))
 }
 
-for (const k of ['goal', 'notes', 'topic', 'email', 'userId', 'name', '__proto__', 'studentNotes']) {
+// 'topic' left this list 2026-08-14: the request funnel registered it as a
+// SLUG-CONSTRAINED key (REQUEST_SLUG_RE), so it is now legal by design — and a
+// separate check below pins that it still cannot carry free text.
+for (const k of ['goal', 'notes', 'subject', 'email', 'userId', 'name', '__proto__', 'studentNotes']) {
   const body = { name: OPENED, props: { flowId: FLOW, [k]: 'anything' } }
   check(`prop key: rejects "${k}"`, !ok(body), reason(body))
 }
@@ -160,6 +163,10 @@ check('free-text firewall: notesLen cannot carry a string',
   reason({ name: OPENED, props: { flowId: FLOW, notesLen: 'x' } }))
 check('free-text firewall: topicCustom cannot carry a string',
   !ok({ name: OPENED, props: { flowId: FLOW, topicCustom: 'სხვა თემა' } }))
+check('free-text firewall: the request funnel\'s topic key rejects non-slug text',
+  !ok({ name: 'request_sent', props: { flowId: FLOW, topic: 'თავისუფალი ტექსტი' } }))
+check('request funnel: a vocabulary slug passes through topic',
+  ok({ name: 'request_sent', props: { flowId: FLOW, topic: 'chemistry' } }))
 check('free-text firewall: durationMin cannot carry a string',
   !ok({ name: OPENED, props: { flowId: FLOW, durationMin: '60' } }))
 

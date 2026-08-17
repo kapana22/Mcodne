@@ -55,7 +55,12 @@ export default async function StudentFavoritesPage() {
       name: f.tutor.user.fullName,
       photo: f.tutor.user.avatarUrl ?? '',
       headline: f.tutor.headline,
-      specialty: f.tutor.specialty,
+      // The CATEGORY — `specialty` only when there is none. That field is a
+      // frozen copy of the category name from approval day and nothing keeps it
+      // in sync, so after the 2026-08-10 rename this list said „ბიზნესი" about
+      // an expert whose card said „ბიზნესი და ფინანსები". The category is
+      // already selected above; it costs nothing to be the same site twice.
+      specialty: f.tutor.category?.name ?? f.tutor.specialty ?? '',
       rating: f.tutor.rating,
       reviews: f.tutor.reviewsCount,
       price: primaryService(f.tutor.consultations ?? [])?.price ?? f.tutor.price,

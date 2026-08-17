@@ -22,6 +22,8 @@ import { SystemSection } from './_system'
 import { InsightsSection } from './_insights'
 import { HelpSection } from './_help'
 import { CompaniesSection } from './_companies'
+import { RequestsSection } from './_requests'
+import { AccessSection } from './_access'
 
 /* ───── Impersonation banner ─────
    Polls the /status endpoint (a cheap read of the impersonation cookie, no DB
@@ -45,6 +47,9 @@ export default function AdminOverview() {
   // Unanswered B2B enquiries — the same kind of number as the two above: a
   // queue with a person waiting at the other end of it.
   const [b2bLeads, setB2bLeads] = useState<number | null>(null)
+  // Unverified requests — a phone call waiting. Same treatment as the three
+  // queue badges above it, from the same stats fetch.
+  const [newRequests, setNewRequests] = useState<number | null>(null)
   // Bump this to force <OverviewSection> KPI re-fetch after a moderation
   // decision (approve/reject changes counts).
   const [statsTick, setStatsTick] = useState(0)
@@ -71,6 +76,7 @@ export default function AdminOverview() {
       if (typeof d?.pendingApps === 'number') setPendingCount(d.pendingApps)
       if (typeof d?.helpOpen === 'number') setHelpOpen(d.helpOpen)
       if (typeof d?.b2bLeads === 'number') setB2bLeads(d.b2bLeads)
+      if (typeof d?.newRequests === 'number') setNewRequests(d.newRequests)
     } catch {}
   }
   useEffect(() => { loadPending() }, [statsTick])
@@ -82,9 +88,9 @@ export default function AdminOverview() {
 
   return (
     <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen lg:flex lg:items-start">
-      <AdminSidebar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} />
+      <AdminSidebar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} />
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-      <TopBar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} />
+      <TopBar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} />
 
       {/* NB: the `key` used to be `active + ':' + statsTick` so that a moderation
           decision would remount the overview KPIs. But `statsTick` also
@@ -100,6 +106,12 @@ export default function AdminOverview() {
             out of ADMIN_NAV, and VALID_TABS is derived from it, so `active` can
             never hold this value. Its APIs are gated independently. */}
         {active === 'companies' && <CompaniesSection onLeadsChanged={() => setStatsTick(t => t + 1)} />}
+        {/* Requests. Unreachable while the subsystem is off: both ids are
+            filtered out of ADMIN_NAV, and VALID_TABS is derived from it, so
+            `active` can never hold either value. Their APIs are gated
+            independently — see app/api/admin/requests. */}
+        {active === 'requests' && <RequestsSection onChanged={() => setStatsTick(t => t + 1)} />}
+        {active === 'access' && <AccessSection />}
         {active === 'bookings' && <BookingsSection />}
         {active === 'reviews' && <ReviewsSection />}
         {active === 'disputes' && <DisputesSection />}
