@@ -201,7 +201,7 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
       {role !== 'TUTOR' && role !== 'ADMIN' && (
         <div className="rounded-card border border-brand-200 bg-brand-50/40 p-6 flex items-center justify-between">
           <div>
-            <div className="font-display text-small font-bold text-ink-900">გახდი ექსპერტი</div>
+            <div className="font-display text-small font-bold text-ink-900">შემოგვიერთდი</div>
             <div className="text-small text-ink-600 mt-0.5">გააზიარე ცოდნა, გამოიმუშავე.</div>
           </div>
           <a href="/apply" className="h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body inline-flex items-center gap-1.5">

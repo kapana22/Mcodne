@@ -40,7 +40,7 @@ export const CATALOG_LINK: NavItem = {
    client side, and telling an approved expert to become one is the exact
    2026-07-22 bug. The gate reads the real role from useMe. */
 export const APPLY_LINK: NavItem = {
-  href: '/apply', label: 'გახდი ექსპერტი', icon: 'briefcase', match: startsWith('/apply'),
+  href: '/apply', label: 'შემოგვიერთდი', icon: 'briefcase', match: startsWith('/apply'),
 }
 
 /** Page title for the top bar: longest matching workspace destination. */

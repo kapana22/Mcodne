@@ -139,7 +139,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'home.expertCta.eyebrow', group: 'მთავარი — გახდი ექსპერტი', label: 'პატარა იარლიყი (ზემოთ)', default: 'ექსპერტებისთვის' },
   { key: 'home.expertCta.title', group: 'მთავარი — გახდი ექსპერტი', label: 'სათაური (1-ლი ხაზი)', default: 'გააზიარე შენი ცოდნა.' },
   { key: 'home.expertCta.body', group: 'მთავარი — გახდი ექსპერტი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'შენ ადგენ ფასს, დროსა და თემას. დანარჩენს ჩვენ ვუვლით.' },
-  { key: 'home.expertCta.cta', group: 'მთავარი — გახდი ექსპერტი', label: 'ღილაკი', default: 'გახდი ექსპერტი' },
+  { key: 'home.expertCta.cta', group: 'მთავარი — გახდი ექსპერტი', label: 'ღილაკი', default: 'შემოგვიერთდი' },
 
   // ── Categories page ──
   { key: 'categories.hero.title', group: 'სფეროები', label: 'სათაური', default: 'აირჩიე შენი სფერო' },

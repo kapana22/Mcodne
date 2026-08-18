@@ -165,7 +165,7 @@ export default function AboutPage() {
                 href="/apply"
                 className="h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body inline-flex items-center gap-2 transition-colors duration-fast"
               >
-                გახდი ექსპერტი
+                დაიწყე
               </Link>
               <Link
                 href="/contact"

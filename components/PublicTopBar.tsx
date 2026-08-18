@@ -38,7 +38,13 @@ const NAV: { label: string; href: string }[] = [
   // left-to-right should say what the site is before it says what to press.
   { label: 'სერვისები',      href: '/services' },
   { label: 'მოთხოვნა',       href: '/request' },
-  { label: 'გახდი ექსპერტი', href: '/apply' },
+  // ⚠️ „შემოგვიერთდი", NOT „გახდი ექსპერტი" (2026-08-18). There are three ways
+  // to join now — expert, master, company — and the nav cannot grow one item
+  // each without becoming a list of everything the product does. It also stopped
+  // being TRUE: every person on the requests allowlist carries role STUDENT, so
+  // a working tradesperson was being invited to become an expert. One door; the
+  // door asks who you are.
+  { label: 'შემოგვიერთდი', href: '/apply' },
   { label: 'დახმარება',      href: '/help' },
 ]
 

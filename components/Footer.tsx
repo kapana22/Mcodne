@@ -13,7 +13,7 @@ const COLS: { titleKey: string; links: { label: string; href: string }[] }[] = [
     // Index of the profession landing pages (/konsultacia/[slug]). A site-wide
     // link is what gets the whole set crawled from any page.
     { label: 'კონსულტაციები', href: '/konsultacia' },
-    { label: 'გახდი ექსპერტი', href: '/apply' },
+    { label: 'შემოგვიერთდი', href: '/apply' },
     { label: 'როგორ მუშაობს', href: '/#how' },
   ]},
   { titleKey: 'footer.col2.title', links: [
