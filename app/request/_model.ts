@@ -139,16 +139,41 @@ export type StepDef = {
  */
 export function stepsFor(d: Draft): StepDef[] {
   const out: StepDef[] = [{ id: 'what', title: 'რა გჭირდება?' }]
-  if (d.topic === '' || kindsOfTopic(d.topic).length > 1) {
+  // ⚠️ „აირჩიე ტიპი" IS NO LONGER A SCREEN (2026-08-18). It asked one question
+  // with two or three answers, on a page of its own, immediately after the
+  // question it depends on — so a person who tapped „ხელშეკრულება" was made to
+  // press Next to be asked what they meant by it.
+  //
+  // It is now the SECOND HALF OF SCREEN ONE: pick a topic and, when the topic is
+  // genuinely ambiguous, the kinds appear under it in place. Same tap count,
+  // one fewer screen, and the two halves of one decision are finally on one
+  // page. See _stepWhat.
+  //
+  // The step id survives ONLY while nothing is chosen yet, so `stepsFor` still
+  // has a sane denominator for the counter before the first tap — it is never
+  // reachable once a topic exists.
+  if (d.topic === '') {
     out.push({ id: 'kind', title: 'აირჩიე ტიპი' })
   }
   const kind = d.kind !== '' ? d.kind : null
   if (kind) {
-    for (const q of extrasFor(kind, d.topic)) {
-      // Clarifiers are one tap each and honestly skippable — a required
-      // tap-row is a place the wizard can strand somebody whose answer is
-      // „none of these".
-      out.push({ id: `extra:${q.id}`, title: q.label, skippable: true, extraId: q.id })
+    // ⚠️ ALL THE CLARIFIERS ON ONE SCREEN (2026-08-18), not one screen each.
+    //
+    // They used to get a page apiece, so a chemistry request answered „ვისთვის"
+    // and „რა დონეა" on two consecutive screens that between them held nine
+    // words. Two one-tap questions about the same thing are one question in two
+    // parts, and splitting them cost a whole step in a run that was already too
+    // long.
+    //
+    // Still optional, still one tap each — what changed is the paper they are
+    // printed on. The title comes from the kind rather than the question,
+    // because a screen holding two questions cannot be named after one of them.
+    if (extrasFor(kind, d.topic).length > 0) {
+      out.push({
+        id: 'extras',
+        title: kind === 'SERVICE' ? 'ორიოდე დეტალი' : 'ვისთვის არის?',
+        skippable: true,
+      })
     }
     out.push({ id: 'budget', title: `ბიუჯეტი — ${KIND[kind].unitLabel}` })
     out.push({ id: 'timing', title: KIND[kind].timingLabel })
@@ -170,7 +195,17 @@ export function stepsFor(d: Draft): StepDef[] {
   // Free text LAST among the questions and OPTIONAL — the reference decision.
   // The structured taps above already carry a quotable request, and the
   // admin's verification call fills any gap a sentence would have.
-  out.push({ id: 'details', title: 'დაამატებ დეტალებს?', skippable: true })
+  // ⚠️ THE „დეტალები" SCREEN IS GONE (2026-08-18), and the measurement is why.
+  // Of 19 real requests, 8 carried a description — 58% walked through a whole
+  // screen to skip it. A step that most people advance past without typing is
+  // not an optional question, it is a tax on everybody for the benefit of two
+  // in five.
+  //
+  // The capability is not lost, it moved to where it costs no screen: the
+  // contact step carries it as a collapsed optional field, and the free-text
+  // entry on step one already writes a typed sentence straight into
+  // `description` (see RequestWizard → onFreeText). What used to be a screen is
+  // now a line somebody opens if they have more to say.
   out.push({ id: 'contact', title: 'როგორ დაგიკავშირდეთ?' })
   return out
 }
@@ -197,11 +232,15 @@ export function stepsFor(d: Draft): StepDef[] {
 export function answerLabel(id: string, d: Draft): string | null {
   if (id === 'what') return d.topic ? topicLabel(d.topic) : null
   if (id === 'kind') return d.kind ? KIND[kindOf(d.kind)].label : null
-  if (id.startsWith('extra:')) {
+  // One screen, so one chip — every answer given on it, joined. „—" for the
+  // unanswered halves would be a person who said nothing, which is not worth
+  // printing (see the note above).
+  if (id === 'extras') {
     if (!d.kind) return null
-    const q = extrasFor(kindOf(d.kind), d.topic).find(x => `extra:${x.id}` === id)
-    const picked = q ? d.details[q.id] : undefined
-    return q && picked ? (q.options.find(o => o.id === picked)?.label ?? null) : null
+    const said = extrasFor(kindOf(d.kind), d.topic)
+      .map(q => q.options.find(o => o.id === d.details[q.id])?.label)
+      .filter((v): v is string => !!v)
+    return said.length ? said.join(' · ') : null
   }
   if (id === 'budget') {
     if (!d.kind) return null
@@ -242,7 +281,7 @@ export function stepComplete(id: string, d: Draft): boolean {
   if (id === 'timing') return d.kind !== '' && TIMING[kindOf(d.kind)].some(t => t.id === d.timing)
   // format and city both carry an honest default (ONLINE / თბილისი) that the
   // screen shows pre-selected; details and the clarifiers are optional.
-  if (id === 'format' || id === 'city' || id === 'details' || id.startsWith('extra:')) return true
+  if (id === 'format' || id === 'city' || id === 'extras') return true
   if (id === 'contact') return ServiceRequestInput.safeParse(d).success
   return false
 }
@@ -273,7 +312,9 @@ export function resumeStepId(d: Draft): string {
     const s = steps[i]
     if (!stepComplete(s.id, d)) return s.id
     if (s.skippable) {
-      const answered = s.extraId ? d.details[s.extraId] !== undefined : d.description !== ''
+      const answered = s.id === 'extras'
+        ? Object.keys(d.details).length > 0
+        : d.description !== ''
       if (answered) continue
       const later = steps.slice(i + 1)
       const anyLaterAnswered = later.some(l =>

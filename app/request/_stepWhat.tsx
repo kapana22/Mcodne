@@ -27,7 +27,7 @@ import { Icon } from '@/components/Icon'
 import {
   TOPIC_GROUPS, searchAllTopics, OTHER_TOPIC, KIND, kindsOfTopic,
   SUGGESTED_TOPICS,
-  type Topic, type TopicGroup,
+  type Topic, type TopicGroup, type RequestKindName,
 } from '@/lib/requests'
 import { StepPick } from './_stepPick'
 import type { Draft } from './_model'
@@ -66,9 +66,15 @@ const INPUT =
   'placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none ' +
   'transition-colors duration-fast'
 
-export function StepWhat({ draft, onPick, onFreeText, initialQuery = '' }: {
+export function StepWhat({ draft, onPick, onPickKind, onFreeText, initialQuery = '' }: {
   draft: Draft
   onPick: (topicId: string) => void
+  /** ⚠️ THE SECOND HALF OF THIS SCREEN (2026-08-18). „აირჩიე ტიპი" used to be a
+   *  page of its own, asked immediately after the question it depends on — so
+   *  somebody who tapped „ხელშეკრულება" pressed Next only to be asked what they
+   *  meant by it. The kinds now appear under the chosen topic, in place, and
+   *  only when the topic is genuinely ambiguous. */
+  onPickKind: (kind: RequestKindName) => void
   /** They typed something the catalogue cannot name. Their sentence becomes the
    *  description and the topic becomes „სხვა" — see the no-match branch. */
   onFreeText: (text: string) => void
@@ -88,6 +94,12 @@ export function StepWhat({ draft, onPick, onFreeText, initialQuery = '' }: {
   const listRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const hits = useMemo(() => searchAllTopics(q), [q])
+  /** The kinds this topic honestly carries. One (or none) means the topic
+   *  answered the question by itself and nothing is drawn. */
+  const ambiguous = useMemo(
+    () => (draft.topic ? kindsOfTopic(draft.topic) : []),
+    [draft.topic],
+  )
   const searching = q.trim().length >= 2
 
   // ⚠️ FOCUS ONLY WHERE FOCUS IS FREE. A static `autoFocus` opened the phone
@@ -260,6 +272,25 @@ export function StepWhat({ draft, onPick, onFreeText, initialQuery = '' }: {
 
           <div className="mt-4">
             <Chip t={OTHER_TOPIC} on={draft.topic === OTHER_TOPIC.id} onPick={onPick} />
+          </div>
+        </div>
+      )}
+
+      {/* ── …and what kind of help, when the topic does not say ─────────────
+          Only for a topic that honestly carries more than one — most do not,
+          and `withTopic` has already resolved those, so this appears exactly
+          where a question exists. It is the same StepPick every other tap
+          screen uses; a second row design for one question is the drift the
+          note at the bottom of this file was written about. */}
+      {ambiguous.length > 1 && (
+        <div className="mt-6 motion-safe:animate-slide-in-b">
+          <h2 className="font-display text-h3 font-bold text-ink-900">რა სახის დახმარება?</h2>
+          <div className="mt-3">
+            <StepPick
+              options={ambiguous.map(k => ({ id: k, label: KIND[k].label, hint: KIND[k].hint }))}
+              value={draft.kind}
+              onPick={id => onPickKind(id as RequestKindName)}
+            />
           </div>
         </div>
       )}

@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 // The last screen — who to call. And it IS the registration, whole: name and
 // phone, no password, no account (owner: „რეგისტრაცია სულ ბოლოს და მარტივად").
 // The publicRef link on the thanks screen is the client's key; asking for a
@@ -38,6 +39,17 @@ export function StepContact({ draft, patch, signedIn }: {
 }) {
   const kind = kindOf(draft.kind)
   const band = draft.kind ? bandOf(kind, draft.budgetBand) : undefined
+  /** Opened by the reader, never by us. A textarea that appears on its own is
+   *  the screen this replaced. */
+  const [open, setOpen] = useState(false)
+  /** The same per-kind scaffold the old details screen used, kept as the
+   *  PLACEHOLDER rather than inserted text: a pre-filled box reads as already
+   *  answered and gets submitted with the blanks still in it. */
+  const placeholder =
+    kind === 'LEARNING' ? 'ვინ ისწავლის, რა დონეა და რა არის მიზანი'
+    : kind === 'CONSULTATION' ? 'რა კითხვა გაქვს და რა სიტუაციაა'
+    : kind === 'SERVICE' ? 'რა პრობლემაა, სართული და ლიფტი'
+    : 'რა უნდა გაკეთდეს და რა შედეგს ელი'
 
   return (
     // No width of its own — RequestWizard caps the whole run at 560 (see the
@@ -105,6 +117,41 @@ export function StepContact({ draft, patch, signedIn }: {
             : 'შეთავაზებები ელფოსტაზე მოგივა და ანგარიში თავისით შეიქმნება.'}
         </Hint>
       </label>
+
+      {/* ── The description, no longer worth a screen of its own ───────────
+          It WAS one — „დაამატებ დეტალებს?", a full step with a textarea and a
+          skip button. Measured on 19 real requests: 8 carried a description, so
+          58% walked through a whole screen to skip it. A step most people
+          advance past without typing is not an optional question, it is a tax
+          on everybody for the benefit of two in five.
+
+          Here it costs nothing when unused: one line, and the box only exists
+          once somebody asks for it. Whoever typed their need as a sentence on
+          step one already has it filled — `onFreeText` writes straight into
+          `description` — so for them it opens showing their own words. */}
+      {open || draft.description.trim() !== '' ? (
+        <label className="block">
+          <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">
+            დეტალები <span className="font-normal text-ink-400">არასავალდებულო</span>
+          </span>
+          <textarea
+            rows={4}
+            maxLength={4000}
+            value={draft.description}
+            onChange={e => patch({ description: e.target.value })}
+            placeholder={placeholder}
+            className="w-full px-3.5 py-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none resize-y transition-colors duration-fast"
+          />
+        </label>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="self-start text-small font-display font-semibold text-brand-700 underline underline-offset-2"
+        >
+          დეტალების დამატება
+        </button>
+      )}
 
       <p className="pt-1 text-small text-ink-600">
         დაგირეკავთ, გადავამოწმებთ და ექსპერტებს გადავცემთ. უფასოა.

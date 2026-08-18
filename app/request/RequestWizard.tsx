@@ -24,7 +24,6 @@ import {
 import { Transcript } from './_transcript'
 import { StepWhat } from './_stepWhat'
 import { StepPick } from './_stepPick'
-import { StepDetails } from './_stepDetails'
 import { StepContact } from './_stepContact'
 import type { AccountOutcome } from '@/lib/requestAccount'
 import { ThanksCard } from './_thanks'
@@ -187,7 +186,9 @@ export function RequestWizard({ account, initialQuery = '' }: {
   }
 
   const kind = kindOf(draft.kind)
-  const extraQ = step.extraId ? extrasFor(kind, draft.topic).find(q => q.id === step.extraId) : null
+  /** Every clarifier this draft asks — all of them on one screen now, so this
+   *  is a list rather than the single question it used to resolve. */
+  const extras = step.id === 'extras' ? extrasFor(kind, draft.topic) : []
 
   /**
    * Every option the LIVE question offers, in the order it is drawn.
@@ -202,7 +203,13 @@ export function RequestWizard({ account, initialQuery = '' }: {
    */
   const options: { id: string; label: string; hint?: string }[] =
     step.id === 'kind' ? kindsOfTopic(draft.topic).map((k: RequestKindName) => ({ id: k, label: KIND[k].label, hint: KIND[k].hint }))
-    : extraQ ? [...extraQ.options]
+    // ⚠️ THE NUMBER KEYS ANSWER THE FIRST UNANSWERED CLARIFIER. With two
+    // questions on one screen the keyboard has to pick one, and „the one you
+    // have not answered" is the only choice that matches what a person doing
+    // this by keyboard expects. Taps are unaffected — they name their own
+    // question.
+    : step.id === 'extras'
+      ? [...(extras.find(q => !draft.details[q.id]) ?? extras[0])?.options ?? []]
     : step.id === 'budget' ? [...BUDGET_BANDS[kind]]
     : step.id === 'timing' ? [...TIMING[kind]]
     : step.id === 'format'
@@ -233,7 +240,15 @@ export function RequestWizard({ account, initialQuery = '' }: {
       advance(d, 'kind')
       return
     }
-    if (extraQ) { pickAndGo({ details: { ...draft.details, [extraQ.id]: id } }); return }
+    if (step.id === 'extras') {
+      // ⚠️ ANSWERING ONE OF TWO DOES NOT ADVANCE. The screen holds every
+      // clarifier, so a tap records an answer and leaves the reader on the page
+      // to give the other one; „შემდეგი" is what leaves. The single-question
+      // screens still advance on the tap, exactly as before.
+      const q = extras.find(x => x.options.some(o => o.id === id))
+      if (q) patch({ details: { ...draft.details, [q.id]: id } })
+      return
+    }
     if (step.id === 'budget') {
       // ⚠️ A BELOW-FLOOR BAND SELECTS BUT DOES NOT ADVANCE (2026-08-17).
       //
@@ -448,11 +463,24 @@ export function RequestWizard({ account, initialQuery = '' }: {
               })
               advance(d, 'what')
             }}
+            // ⚠️ AN AMBIGUOUS TOPIC NO LONGER ADVANCES (2026-08-18). It used
+            // to go straight on to a „აირჩიე ტიპი" screen; the kinds now appear
+            // under the topic on THIS screen, so advancing here would skip past
+            // the question the tap just raised. A topic that resolves its own
+            // kind still advances on the tap, exactly as before.
             onPick={topicId => {
               const d = withTopic(draft, topicId)
               setDraft(d)
               trackRequestFunnel(REQUEST_FUNNEL_EVENTS.topicChosen, { flowId: flowIdRef.current, topic: topicId, kind: d.kind || 'pending' })
-              if (d.kind) trackRequestFunnel(REQUEST_FUNNEL_EVENTS.kindChosen, { flowId: flowIdRef.current, kind: d.kind })
+              if (d.kind) {
+                trackRequestFunnel(REQUEST_FUNNEL_EVENTS.kindChosen, { flowId: flowIdRef.current, kind: d.kind })
+                advance(d, 'what')
+              }
+            }}
+            onPickKind={k => {
+              const d = withKind(draft, k)
+              setDraft(d)
+              trackRequestFunnel(REQUEST_FUNNEL_EVENTS.kindChosen, { flowId: flowIdRef.current, kind: k })
               advance(d, 'what')
             }}
           />
@@ -470,14 +498,26 @@ export function RequestWizard({ account, initialQuery = '' }: {
         {step.id === 'kind' && (
           <StepPick options={options} value={draft.kind} onPick={pickOption} numbered />
         )}
-        {extraQ && (
-          <StepPick
-            options={options}
-            value={draft.details[extraQ.id] ?? ''}
-            onPick={pickOption}
-            onSkip={() => advance(draft)}
-            numbered
-          />
+        {step.id === 'extras' && (
+          <div className="flex flex-col gap-6">
+            {extras.map((q, i) => (
+              <div key={q.id}>
+                {/* The screen's own title names the group, so each question
+                    still has to name itself — two unlabelled chip rows are two
+                    questions nobody can tell apart. */}
+                <p className="text-small font-display font-semibold text-ink-800 mb-2.5">{q.label}</p>
+                <StepPick
+                  options={[...q.options]}
+                  value={draft.details[q.id] ?? ''}
+                  onPick={pickOption}
+                  // Numbered on the first UNANSWERED one only — the keys index
+                  // that list (see `options`), and a badge on a row the digits
+                  // do not reach is a lie about the shortcut.
+                  numbered={q.id === (extras.find(x => !draft.details[x.id]) ?? extras[0])?.id}
+                />
+              </div>
+            ))}
+          </div>
         )}
         {step.id === 'budget' && (
           <StepPick options={options} value={draft.budgetBand} onPick={pickOption} numbered />
@@ -526,7 +566,6 @@ export function RequestWizard({ account, initialQuery = '' }: {
             <StepPick options={options} value={draft.city} onPick={pickOption} numbered />
           </div>
         )}
-        {step.id === 'details' && <StepDetails draft={draft} patch={patch} />}
         {step.id === 'contact' && <StepContact draft={draft} patch={patch} signedIn={account !== null} />}
       </div>
 
@@ -544,9 +583,9 @@ export function RequestWizard({ account, initialQuery = '' }: {
           on the screens that have one. */}
       <div className="mt-6 flex items-center justify-between gap-3">
         <span />
-        {step.id === 'details' && (
+        {step.id === 'extras' && (
           <Btn onClick={() => advance(draft)}>
-            {draft.description.trim() === '' ? 'გამოტოვება' : 'შემდეგი'}
+            {Object.keys(draft.details).length === 0 ? 'გამოტოვება' : 'შემდეგი'}
           </Btn>
         )}
         {step.id === 'contact' && (

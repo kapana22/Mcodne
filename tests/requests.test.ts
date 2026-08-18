@@ -1111,36 +1111,54 @@ test('the run is one question per screen, derived from the draft', () => {
   const { withTopic, stepsFor, stepComplete, resumeStepId, EMPTY_DRAFT } =
     require('../app/request/_model') as typeof import('../app/request/_model')
 
-  // Unambiguous topic → no kind screen; the clarifiers splice in from the
-  // vocabulary; the free-text screen is skippable; contact is LAST — it is
-  // the whole „registration" and nothing may come after it.
+  // ⚠️ THE RUN GOT TWO SCREENS SHORTER (2026-08-18) AND THIS PINS THE NEW
+  // SHAPE. Two steps were retired for measured reasons, not tidiness:
+  //
+  //   „details"  a whole screen for an optional textarea. Of 19 real requests
+  //              8 carried a description, so 58% walked through it to skip it.
+  //              It is now a collapsed field on the contact screen.
+  //   „kind"     one question with two answers, on its own page, directly after
+  //              the question it depends on. It is now the second half of
+  //              screen one — the kinds appear under an ambiguous topic in
+  //              place. The step id survives ONLY before a topic exists, so the
+  //              counter has a denominator on screen one.
+  //
+  // …and the per-question clarifier screens became one „extras" screen: two
+  // one-tap questions about the same thing are one question in two parts.
   const chem = withTopic(EMPTY_DRAFT, 'chemistry')
   const chemRun = stepsFor(chem).map(st => st.id)
-  assert.deepEqual(chemRun,
-    ['what', 'extra:audience', 'extra:level', 'budget', 'timing', 'format', 'details', 'contact'])
-  assert.ok(stepsFor(chem).find(st => st.id === 'details')!.skippable, 'the free-text screen became required')
-  assert.ok(stepsFor(chem).find(st => st.id === 'extra:audience')!.skippable, 'a clarifier became required')
+  assert.deepEqual(chemRun, ['what', 'extras', 'budget', 'timing', 'format', 'contact'])
+  assert.ok(stepsFor(chem).find(st => st.id === 'extras')!.skippable, 'the clarifiers became required')
+  assert.ok(!chemRun.includes('details'), 'the free-text screen came back')
 
-  // Ambiguous topic → the kind screen survives, and no clarifiers exist for
-  // professional kinds today.
+  // An ambiguous topic no longer earns a screen — it is answered on screen one.
   const con = withTopic(EMPTY_DRAFT, 'contract')
   assert.deepEqual(stepsFor(con).map(st => st.id),
-    ['what', 'kind', 'budget', 'timing', 'format', 'details', 'contact'])
+    ['what', 'budget', 'timing', 'format', 'contact'])
+  // …but an EMPTY draft still lists it, so the counter can count before the
+  // first tap.
+  assert.ok(stepsFor(EMPTY_DRAFT).map(st => st.id).includes('kind'),
+    'the empty run lost its provisional kind step — the counter would jump')
+
+  // The shortest honest run is five screens. If this ever climbs, something was
+  // added back.
+  assert.equal(stepsFor(con).length, 5)
 
   // Titles speak the kind's own words once it is known.
   assert.ok(stepsFor(chem).find(st => st.id === 'budget')!.title.includes('ერთ გაკვეთილზე'))
 
   // Resume: a draft with budget answered but no timing lands on timing —
   // never dragged back to a skipped clarifier, never overshot to contact.
-  const mid = { ...chem, budgetBand: 'l2' }
+  const mid = { ...chem, budgetBand: 'l2', details: { audience: 'pupil' } }
   assert.equal(resumeStepId(mid), 'timing')
-  // …and a virgin restored draft with only the topic resumes at the first
-  // unanswered clarifier (the frontier).
-  assert.equal(resumeStepId(chem), 'extra:audience')
+  // …and a virgin restored draft with only the topic resumes at the clarifiers
+  // (the frontier), which are now one screen rather than one per question.
+  assert.equal(resumeStepId(chem), 'extras')
 
-  // The description is OPTIONAL now — the schema accepts an empty one, because
-  // the structured answers carry the request and the admin phones anyway.
-  assert.equal(stepComplete('details', chem), true)
+  // The description is OPTIONAL — the schema accepts an empty one, because the
+  // structured answers carry the request and the admin phones anyway. It no
+  // longer has a screen at all; the contact step carries it as a folded field.
+  assert.equal(stepComplete('extras', chem), true)
   assert.equal(ServiceRequestInput.safeParse({
     kind: 'LEARNING', topic: 'chemistry', description: '',
     budgetBand: 'l2', timing: 'twice_week', format: 'ONLINE', city: 'TBILISI',
