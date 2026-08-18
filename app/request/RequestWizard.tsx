@@ -11,6 +11,7 @@ import { Btn } from '@/components/Btn'
 import {
   ServiceRequestInput, KIND, kindOf, BUDGET_BANDS, TIMING, FORMATS, CITIES,
   extrasFor, topicLabel, kindsOfTopic, budgetIsBelowFloor, amountIsBelowFloor, OTHER_TOPIC,
+  PICK_MODES, PICK_MODE_OPTION,
   type RequestKindName,
 } from '@/lib/requests'
 import { newFlowId } from '@/components/booking/funnelEvents'
@@ -219,6 +220,8 @@ export function RequestWizard({ account, initialQuery = '' }: {
     // The service run's place screen. Same list the format screen reveals after
     // „ადგილზე", except here it is the whole question rather than a follow-up —
     // see _model → stepsFor.
+    : step.id === 'mode'
+      ? PICK_MODES.map(m => ({ id: m, label: PICK_MODE_OPTION[m].label, hint: PICK_MODE_OPTION[m].hint }))
     : step.id === 'city' ? [...CITIES]
     : []
 
@@ -272,6 +275,7 @@ export function RequestWizard({ account, initialQuery = '' }: {
     }
     if (step.id === 'timing') { pickAndGo({ timing: id }); return }
     if (step.id === 'city') { pickAndGo({ city: id as Draft['city'] }); return }
+    if (step.id === 'mode') { pickAndGo({ pickMode: id as Draft['pickMode'] }); return }
     if (step.id === 'format') {
       if (CITIES.some(c => c.id === id)) { pickAndGo({ city: id as Draft['city'] }); return }
       // In-person needs the city; online does not — the sub-question appears
@@ -610,6 +614,13 @@ export function RequestWizard({ account, initialQuery = '' }: {
             question, no format rows above it. */}
         {step.id === 'city' && (
           <StepPick options={options} value={draft.city} onPick={pickOption} numbered />
+        )}
+        {/* One tap, and the default is already highlighted — „შეთავაზებები
+            მომივიდეს" is what happens if somebody taps straight past, and it is
+            the honest default: waiting for offers is the product, choosing
+            yourself is the option. */}
+        {step.id === 'mode' && (
+          <StepPick options={options} value={draft.pickMode} onPick={pickOption} numbered />
         )}
         {step.id === 'format' && draft.format === 'IN_PERSON' && (
           <div className="mt-5">

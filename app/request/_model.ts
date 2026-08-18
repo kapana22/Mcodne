@@ -27,7 +27,7 @@
 
 import {
   ServiceRequestInput, bandOf, TIMING, isTopicOfKind, kindsOfTopic, extrasFor,
-  KIND, kindOf, REQUEST_KINDS,
+  KIND, kindOf, REQUEST_KINDS, PICK_MODE_OPTION,
   // The label vocabulary, for the transcript — see answerLabel. Imported rather
   // than re-derived so a renamed band or city renames in the conversation too.
   topicLabel, budgetLabel, timingLabel, formatLabel, cityLabel,
@@ -42,6 +42,8 @@ export type Draft = {
   topic: string
   description: string
   budgetBand: string
+  /** 'OFFERS' | 'SELF' — see lib/requests → PICK_MODES. */
+  pickMode: 'OFFERS' | 'SELF'
   /** A typed amount, in whole lari. Wins over the band when set — see
    *  lib/requests → serviceRequestRow. */
   budgetAmount: number | null
@@ -105,6 +107,7 @@ export const EMPTY_DRAFT: Draft = {
   topic: '',
   description: '',
   budgetBand: '',
+  pickMode: 'OFFERS',
   budgetAmount: null,
   timing: '',
   details: {},
@@ -210,6 +213,12 @@ export function stepsFor(d: Draft): StepDef[] {
   // entry on step one already writes a typed sentence straight into
   // `description` (see RequestWizard → onFreeText). What used to be a screen is
   // now a line somebody opens if they have more to say.
+  // ⚠️ A SCREEN, AND IT EARNS ONE. Every other cut this week removed a step
+  // that most people advanced past without answering; this one is a single tap
+  // that changes what the next screen offers them. The owner chose to ask it
+  // before sending rather than after (2026-08-18) — at that point they are
+  // still deciding how they want to be helped, and afterwards they are waiting.
+  out.push({ id: 'mode', title: 'როგორ გირჩევნია?' })
   out.push({ id: 'contact', title: 'როგორ დაგიკავშირდეთ?' })
   return out
 }
@@ -261,6 +270,7 @@ export function answerLabel(id: string, d: Draft): string | null {
   // The service run's own place question. It reads back as just the city —
   // „ადგილზე · თბილისი" would restate a format nobody was offered a choice of.
   if (id === 'city') return d.city ? cityLabel(d.city) : null
+  if (id === 'mode') return PICK_MODE_OPTION[d.pickMode].label
   if (id === 'format') {
     if (!d.format) return null
     // The city rides on the format answer rather than getting a bubble of its
@@ -293,6 +303,9 @@ export function stepComplete(id: string, d: Draft): boolean {
   // format and city both carry an honest default (ONLINE / თბილისი) that the
   // screen shows pre-selected; details and the clarifiers are optional.
   if (id === 'format' || id === 'city' || id === 'extras') return true
+  // Always answered — it ships with a default, and the screen shows that
+  // default pre-selected so one tap confirms or changes it.
+  if (id === 'mode') return true
   if (id === 'contact') return ServiceRequestInput.safeParse(d).success
   return false
 }

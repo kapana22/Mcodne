@@ -64,7 +64,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ ref: str
   await ensureDbReady()
   const r = await prisma.serviceRequest.findFirst({
     where: { publicRef: ref },
-    select: { id: true, status: true, offerCount: true, offerLimit: true, categoryId: true },
+    select: { id: true, status: true, pickMode: true, offerCount: true, offerLimit: true, categoryId: true },
   })
   if (!r) return notFound()
 
@@ -114,6 +114,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ ref: str
     status: r.status,
     offerCount: r.offerCount,
     offerLimit: r.offerLimit,
+    pickMode: r.pickMode,
     notified,
     expertsInField,
     experts: experts.map(e => ({

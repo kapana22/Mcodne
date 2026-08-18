@@ -52,6 +52,8 @@ type Expert = {
 
 type Live = {
   status: string
+  /** 'OFFERS' | 'SELF' — what this person asked for in the wizard. */
+  pickMode: string
   offerCount: number
   offerLimit: number
   notified: number
@@ -219,9 +221,17 @@ export function LiveStatus({ publicRef }: { publicRef: string }) {
           Only while there is still something to wait for: once an offer has
           arrived, the offers ARE the answer and a row of other people beside
           them is a second decision nobody asked for. */}
-      {!hasOffers && d.experts.length > 0 && (
+      {/* ⚠️ ONLY WHEN THEY ASKED FOR IT (2026-08-18). The list used to appear on
+          its own whenever there was no offer yet — which handed a decision to
+          somebody who had just said „შეთავაზებები მომივიდეს" and meant it.
+          Owner: „მხოლოდ ამ შემთხვევაში უნდა ჰქონდეს ღილაკი."
+
+          Both modes still reach experts; what SELF adds is a list to write to.
+          A preference about a button must not become a preference about who
+          hears you. */}
+      {d.pickMode === 'SELF' && !hasOffers && d.experts.length > 0 && (
         <div className="mt-5 pt-4 border-t border-ink-100">
-          <p className="text-small text-ink-600">ან თავად აირჩიე — ამ სფეროს ექსპერტები:</p>
+          <p className="text-small text-ink-600">ამ მიმართულების ექსპერტები — მისწერე პირდაპირ:</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {d.experts.map(e => (
               // ⚠️ TWO ACTIONS ON ONE ROW, and they are different decisions.

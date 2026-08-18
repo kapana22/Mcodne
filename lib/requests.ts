@@ -609,6 +609,21 @@ export function clientOfferView(o: {
  * cannot see another column. zod can, so the guarantee here is stronger than
  * the database could have given.
  */
+/* ═══════════ how somebody wants to be helped ════════════════════════════
+ *
+ * Asked in the wizard, one tap, before they send. Owner, 2026-08-18: „თუ
+ * აირჩია, რომ ექსპერტებს მე ავარჩევ, მხოლოდ ამ შემთხვევაში უნდა ჰქონდეს
+ * ღილაკი" — so this is a preference about a BUTTON, and deliberately not about
+ * routing. Both modes reach experts; only one of them offers a list to write to.
+ */
+export const PICK_MODES = ['OFFERS', 'SELF'] as const
+export type PickMode = (typeof PICK_MODES)[number]
+
+export const PICK_MODE_OPTION: Record<PickMode, { label: string; hint: string }> = {
+  OFFERS: { label: 'შეთავაზებები მომივიდეს', hint: 'ექსპერტები დაგიკავშირდებიან და ფასს შემოგთავაზებენ' },
+  SELF: { label: 'მე ავირჩევ ექსპერტს', hint: 'ნახავ ამ მიმართულების ექსპერტებს და თვითონ მისწერ' },
+}
+
 export const ServiceRequestInput = z.object({
   kind: z.enum(REQUEST_KINDS),
   // A topic id from lib/requestTopics. Validated against `kind` below — the
@@ -631,6 +646,9 @@ export const ServiceRequestInput = z.object({
   // this object. A band is a tap for somebody who does not know what the work
   // costs; an amount is what somebody who DOES know would rather type than
   // hunt for in a ladder. Owner, 2026-08-18: „აქ ხელით უნდა იწერებოდეს."
+  /** How they want to be helped. Defaults so a request written before this
+   *  question existed still parses. */
+  pickMode: z.enum(PICK_MODES).default('OFFERS'),
   budgetBand: z.string().trim().max(8).default(''),
   /** Lari, whole. Ceiling matches every other money field on this site. */
   budgetAmount: z.number().int().min(1).max(1_000_000).nullable().optional(),
@@ -773,6 +791,7 @@ export function serviceRequestRow(input: ServiceRequestInput) {
     budgetMin: band ? band.min : typed!,
     budgetMax: band ? band.max : typed!,
     budgetUnit: KIND[input.kind].unit,
+    pickMode: input.pickMode,
     timing: input.timing,
     // Stripped against the question list, never stored raw — see the schema
     // comment. Prisma.DbNull-shaped: `undefined` (column stays NULL) when

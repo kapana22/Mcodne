@@ -1166,22 +1166,29 @@ test('the run is one question per screen, derived from the draft', () => {
   // one-tap questions about the same thing are one question in two parts.
   const chem = withTopic(EMPTY_DRAFT, 'chemistry')
   const chemRun = stepsFor(chem).map(st => st.id)
-  assert.deepEqual(chemRun, ['what', 'extras', 'budget', 'timing', 'format', 'contact'])
+  // ⚠️ „mode" IS THE ONE STEP ADDED BACK, and it earns its screen (2026-08-18).
+  // Every cut this week removed a step most people advanced past without
+  // answering; this is a single tap that changes what the NEXT screen offers
+  // them — offers coming to you, or a list of experts to write to. The owner
+  // chose to ask before sending rather than after: at that point they are still
+  // deciding how they want to be helped; afterwards they are waiting.
+  assert.deepEqual(chemRun, ['what', 'extras', 'budget', 'timing', 'format', 'mode', 'contact'])
   assert.ok(stepsFor(chem).find(st => st.id === 'extras')!.skippable, 'the clarifiers became required')
   assert.ok(!chemRun.includes('details'), 'the free-text screen came back')
 
   // An ambiguous topic no longer earns a screen — it is answered on screen one.
   const con = withTopic(EMPTY_DRAFT, 'contract')
   assert.deepEqual(stepsFor(con).map(st => st.id),
-    ['what', 'budget', 'timing', 'format', 'contact'])
+    ['what', 'budget', 'timing', 'format', 'mode', 'contact'])
   // …but an EMPTY draft still lists it, so the counter can count before the
   // first tap.
   assert.ok(stepsFor(EMPTY_DRAFT).map(st => st.id).includes('kind'),
     'the empty run lost its provisional kind step — the counter would jump')
 
-  // The shortest honest run is five screens. If this ever climbs, something was
-  // added back.
-  assert.equal(stepsFor(con).length, 5)
+  // The shortest honest run is six screens. It was five until „mode" arrived —
+  // and that is the bar a future step has to clear: not „is this useful" but
+  // „does one tap here change what happens next".
+  assert.equal(stepsFor(con).length, 6)
 
   // Titles speak the kind's own words once it is known.
   assert.ok(stepsFor(chem).find(st => st.id === 'budget')!.title.includes('ერთ გაკვეთილზე'))
@@ -2228,4 +2235,43 @@ test('the client is told their request exists, at the moment they send it', () =
   const tpl = read('lib/emailTemplates.ts')
   assert.match(tpl, /requestReceivedClientEmail[\s\S]{0,900}\/request\/\$\{o\.publicRef\}/,
     'the receipt stopped linking to the request page')
+})
+
+test('„მე ავირჩევ" is a preference about a button, not about who hears you', () => {
+  const { PICK_MODES, PICK_MODE_OPTION, ServiceRequestInput, serviceRequestRow } =
+    require('../lib/requests') as typeof import('../lib/requests')
+
+  assert.deepEqual([...PICK_MODES], ['OFFERS', 'SELF'])
+  for (const m of PICK_MODES) {
+    assert.ok(PICK_MODE_OPTION[m].label, `${m} has no label`)
+    assert.ok(PICK_MODE_OPTION[m].hint, `${m} has no hint — the choice would be unexplained`)
+  }
+
+  // Omitted → OFFERS, so a request written before the question existed still
+  // parses and still means what it meant.
+  const base = {
+    kind: 'SERVICE' as const, topic: 'clean-flat', description: '',
+    budgetBand: 's2', timing: 'tomorrow', format: 'IN_PERSON' as const,
+    city: 'TBILISI' as const, details: {}, contactName: 'ნინო',
+    phone: '599112233', email: 'n@example.ge',
+  }
+  const d = ServiceRequestInput.safeParse(base)
+  assert.equal(d.success && d.data.pickMode, 'OFFERS')
+  if (d.success) assert.equal(serviceRequestRow(d.data).pickMode, 'OFFERS')
+
+  const self = ServiceRequestInput.safeParse({ ...base, pickMode: 'SELF' })
+  assert.equal(self.success && serviceRequestRow(self.data).pickMode, 'SELF')
+  assert.equal(ServiceRequestInput.safeParse({ ...base, pickMode: 'NOPE' }).success, false)
+
+  // ⚠️ THE LOAD-BEARING HALF. Owner: „მხოლოდ ამ შემთხვევაში უნდა ჰქონდეს
+  // ღილაკი." SELF adds a list to write to; it must NOT decide who is told about
+  // the request. Somebody who picks „I'll choose" and then picks nobody would
+  // otherwise hear from nobody — a silence produced by a preference about a
+  // button.
+  const live = read('app/request/_live.tsx')
+  assert.match(live, /d\.pickMode === 'SELF' && !hasOffers/,
+    'the expert list stopped honouring the choice')
+  const create = read('app/api/requests/route.ts')
+  assert.doesNotMatch(create, /pickMode[\s\S]{0,120}mailVerifiedRequest/,
+    'routing became conditional on pickMode — a button preference must not silence a request')
 })

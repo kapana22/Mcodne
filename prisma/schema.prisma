@@ -1338,6 +1338,22 @@ model ServiceRequest {
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
 
+  /// 'OFFERS' | 'SELF' — how this person wants to be helped, asked before they
+  /// send (2026-08-18).
+  ///
+  /// ⚠️ IT CONTROLS WHAT THE WAITING SCREEN OFFERS, NOT WHO IS TOLD. Owner:
+  /// „თუ [კლიენტმა] აირჩია, რომ ექსპერტებს მე ავარჩევ, მხოლოდ ამ შემთხვევაში
+  /// უნდა ჰქონდეს ღილაკი." So SELF adds the expert list and a message button;
+  /// it does NOT stop the request reaching experts. Suppressing that would mean
+  /// somebody who picked „I'll choose" and then picked nobody hears from
+  /// nobody — a silence they did not ask for, produced by a preference about a
+  /// button.
+  ///
+  /// A String and not an enum, like every other small vocabulary in this
+  /// subsystem: the set may grow (a „ორივე" is imaginable) and a taxonomy
+  /// expected to grow is not worth an ALTER TYPE.
+  pickMode String @default("OFFERS")
+
   // What is wrong, in their words. The 40-character floor is enforced by zod
   // (lib/requests) and not here: a database CHECK cannot tell the person why.
   description String

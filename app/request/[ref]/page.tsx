@@ -151,10 +151,21 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
     // The same chrome the wizard uses — this page is the other half of the same
     // errand, and it must not suddenly look like a page of the site.
     <RequestShell>
-      <Eyebrow>{KIND[kind].label} · {topicLabel(request.topic)}</Eyebrow>
-      <h1 className="mt-1 font-display text-h1 font-bold text-ink-900 tracking-tight tabular-nums">
-        {request.publicRef}
+      {/* ⚠️ THE HEADING IS WHAT THEY ASKED FOR, NOT OUR FILING CODE
+          (2026-08-18). `MC-T7UAG` was the h1 — the largest thing on a page
+          somebody opened because their house needs cleaning. A reference is how
+          WE find the row and how an operator reads it down a phone; it is not
+          what the page is about. Owner, looking at it live: „ძალიან
+          არაკომფორტულია."
+
+          The code keeps its place and its `tabular-nums` — it still has to be
+          readable aloud — but as meta beside the eyebrow, at the size of a
+          thing you look up rather than a thing you are here for. */}
+      <Eyebrow>{KIND[kind].label}</Eyebrow>
+      <h1 className="mt-1 font-display text-h1 font-bold text-ink-900 tracking-tight text-balance">
+        {topicLabel(request.topic)}
       </h1>
+      <p className="mt-1 text-meta text-ink-500 tabular-nums">{request.publicRef}</p>
 
       <StatusTrack status={request.status} />
 
@@ -169,7 +180,11 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
             // The clarifying answers, when any were given — the same lines the
             // provider reads, from the same function.
             ...extrasLabels(kind, request.topic, request.details).map(e => [e.label, e.value] as [string, string]),
-            ['ფორმატი', formatLabel(request.format)],
+            // ⚠️ NOT ON A SERVICE. The kind decides it — somebody has to be in
+            // the room — so this row prints „ადგილზე" on every service request
+            // ever written. The provider's page already stopped showing it;
+            // this is the client's half of the same fix.
+            ...(kind === 'SERVICE' ? [] : [['ფორმატი', formatLabel(request.format)] as [string, string]]),
             ...(request.format !== 'ONLINE' ? [['ქალაქი', cityLabel(request.city)] as [string, string]] : []),
           ] as [string, string][]).map(([k, v]) => (
             <div key={k}>
@@ -248,10 +263,17 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
           count is what says „there is something here" — the same job the
           collapsed offer threads above do. */}
       <div className="mt-6">
+        {/* ⚠️ OPEN WHILE THERE IS NOTHING ELSE (2026-08-18). This was collapsed
+            on the reasoning that „on this page the offers are the news" — true
+            once offers exist, and exactly wrong before they do: on a page whose
+            whole job is waiting, the only live thing was a small underlined
+            link at the bottom, under an empty state. Now the two comments agree:
+            open while the reader is waiting, folded once there is news. */}
         <RequestChat
           thread={{ kind: 'PLATFORM', refCode: request.publicRef }}
           unread={platformUnread}
           peerName="მცოდნე"
+          defaultOpen={offers.length === 0}
           emptyHint="დაწერე, თუ რამე დასამატებელი გაქვს."
         />
       </div>

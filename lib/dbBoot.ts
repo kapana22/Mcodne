@@ -888,6 +888,15 @@ async function runMigrations() {
   for (const t of ['RequestBudget', 'RequestDeadline']) {
     await prisma.$executeRawUnsafe(`DROP TYPE IF EXISTS "${t}";`)
   }
+  // How this person wants to be helped — asked in the wizard, before they send
+  // (2026-08-18). It decides whether the waiting screen offers the expert list
+  // and a message button; it does NOT decide who is told about the request. See
+  // prisma/schema for why those two are separate.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "ServiceRequest"
+      ADD COLUMN IF NOT EXISTS "pickMode" TEXT NOT NULL DEFAULT 'OFFERS';
+  `)
+
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ServiceRequest_publicRef_key" ON "ServiceRequest"("publicRef");`)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceRequest_status_createdAt_idx" ON "ServiceRequest"("status", "createdAt");`)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceRequest_categoryId_status_idx" ON "ServiceRequest"("categoryId", "status");`)
