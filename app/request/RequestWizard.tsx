@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Btn } from '@/components/Btn'
 import {
   ServiceRequestInput, KIND, kindOf, BUDGET_BANDS, TIMING, FORMATS, CITIES,
-  extrasFor, topicLabel, kindsOfTopic, budgetIsBelowFloor, OTHER_TOPIC,
+  extrasFor, topicLabel, kindsOfTopic, budgetIsBelowFloor, amountIsBelowFloor, OTHER_TOPIC,
   type RequestKindName,
 } from '@/lib/requests'
 import { newFlowId } from '@/components/booking/funnelEvents'
@@ -520,14 +520,65 @@ export function RequestWizard({ account, initialQuery = '' }: {
           </div>
         )}
         {step.id === 'budget' && (
-          <StepPick options={options} value={draft.budgetBand} onPick={pickOption} numbered />
+          <>
+            <StepPick options={options} value={draft.budgetBand} onPick={pickOption} numbered />
+            {/* ── …or just type it (2026-08-18) ──────────────────────────────
+                Owner: „აქ ხელით უნდა იწერებოდეს." The ladder stays because
+                somebody who does not know what the work costs cannot type a
+                figure — that is why bands exist at all. But somebody who DOES
+                know was being made to hunt for the range containing their
+                number, and then we stored the range instead of the number.
+
+                Typing WINS over the band and is stored exactly: „45₾" is more
+                information than „30–60₾", and snapping it to a range throws
+                away the one thing they actually told us. */}
+            <div className="mt-4 pt-4 border-t border-ink-100">
+              <label className="block">
+                <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">
+                  ან ჩაწერე ზუსტი თანხა
+                </span>
+                <div className="flex items-center gap-2 max-w-[220px]">
+                  <input
+                    type="number" min={1} max={1000000} step={1} inputMode="numeric"
+                    value={draft.budgetAmount ?? ''}
+                    onChange={e => {
+                      const n = Number(e.target.value)
+                      // A typed amount clears the band: two answers to one
+                      // question, and the transcript would otherwise show the
+                      // one they abandoned.
+                      patch({
+                        budgetAmount: e.target.value.trim() === '' || !Number.isFinite(n) || n <= 0
+                          ? null : Math.trunc(n),
+                        budgetBand: '',
+                      })
+                    }}
+                    placeholder="45"
+                    className="w-full h-11 px-3.5 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-colors duration-fast"
+                  />
+                  <span className="text-body text-ink-600 shrink-0">₾ {KIND[kind].unitLabel}</span>
+                </div>
+              </label>
+              {(draft.budgetAmount ?? 0) > 0 && (
+                <div className="mt-3">
+                  <Btn onClick={() => advance(draft)}>შემდეგი</Btn>
+                </div>
+              )}
+            </div>
+          </>
         )}
         {/* ── The floor, said at the moment of choosing ─────────────────────
             Only on the band that earns it, and it does not block: the request
             is written either way (see the endpoint — the row is the
             measurement). What it buys is the chance to change the answer
             before spending four more screens on it. */}
-        {step.id === 'budget' && draft.budgetBand !== '' && budgetIsBelowFloor(kind, draft.budgetBand) && (
+        {step.id === 'budget' && (
+          draft.budgetBand !== ''
+            ? budgetIsBelowFloor(kind, draft.budgetBand)
+            // ⚠️ THE SAME RULE FOR A TYPED NUMBER. Warning somebody who tapped
+            // „20₾-მდე" and staying silent for somebody who typed „18" is one
+            // answer with two outcomes, decided by which control they used.
+            : amountIsBelowFloor(kind, draft.budgetAmount ?? 0)
+        ) && (
           <div className="mt-4 rounded-card border border-warning-200 bg-warning-50 px-4 py-3">
             <p className="text-body text-ink-900">ამ ბიუჯეტში ექსპერტს ვერ მოგიძებნით.</p>
             <p className="mt-1 text-small text-ink-700">

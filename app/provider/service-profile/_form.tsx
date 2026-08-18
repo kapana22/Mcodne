@@ -187,7 +187,7 @@ export function ServiceProfileForm() {
 
       {/* ── Where ───────────────────────────────────────────────────────── */}
       <Card>
-        <h2 className="font-display text-h3 font-bold text-ink-900">სად გადიხარ</h2>
+        <h2 className="font-display text-h3 font-bold text-ink-900">რომელ ქალაქებში მუშაობ</h2>
         <p className="mt-1 text-small text-ink-500">
           მოთხოვნა მხოლოდ არჩეული ქალაქებიდან მოგდის.
         </p>

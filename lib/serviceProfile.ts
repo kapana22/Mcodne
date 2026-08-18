@@ -74,7 +74,7 @@ export const ServiceProfileInput = z.object({
     // eleven of twelve ticks would leave them believing they are listed for
     // something they are not.
     .refine(ids => ids.every(isServiceTopic), {
-      message: 'ერთი სერვისი მაინც არ არსებობს სიაში',
+      message: 'არჩეულია სერვისი, რომელიც სიაში არ არის',
     })
     .refine(ids => new Set(ids).size === ids.length, {
       message: 'სერვისი ორჯერ არის არჩეული',
@@ -82,7 +82,7 @@ export const ServiceProfileInput = z.object({
   areas: z.array(z.string().trim().min(1).max(20))
     .max(CITIES.length)
     .refine(ids => ids.every(id => AREA_IDS.has(id as CityName)), {
-      message: 'ერთი ქალაქი მაინც არ არსებობს სიაში',
+      message: 'არჩეულია ქალაქი, რომელიც სიაში არ არის',
     })
     .refine(ids => new Set(ids).size === ids.length, {
       message: 'ქალაქი ორჯერ არის არჩეული',

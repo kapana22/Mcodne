@@ -706,7 +706,7 @@ export function requestClosedNoOffersClientEmail(o: {
   topicLabel: string
 }) {
   return {
-    subject: `ვერ მოგიძებნეთ ექსპერტი — ${o.publicRef}`,
+    subject: `შეთავაზება არ მოვიდა — ${o.publicRef}`,
     html: shell({
       heading: 'ამ მოთხოვნაზე შეთავაზება არ მოვიდა',
       bodyHtml:

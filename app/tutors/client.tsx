@@ -14,6 +14,7 @@ import { Sheet } from '@/components/Sheet'
 import { Container } from '@/components/Container'
 import { Illustration, hasIllustration } from '@/components/Illustration'
 import { frameQuestion } from '@/lib/askFraming'
+import { requestsOn } from '@/lib/requests'
 import { useToast } from '@/components/ToastProvider'
 import { useMe, type Me } from '@/lib/me'
 import { focusSearchInput } from '@/lib/searchFocus'
@@ -716,11 +717,39 @@ function Tutors({ initialTutors, initialUser }: { initialTutors: any[]; initialU
                       ამ პარამეტრებით ექსპერტი ვერ მოიძებნა
                     </div>
                     <p className="text-small text-ink-500 mt-1.5 max-w-[360px] mx-auto leading-snug">
-                      სცადე ფილტრების შეცვლა ან დასვი კითხვა ექსპერტს.
+                      სცადე ფილტრების შეცვლა ან აღწერე, რა გჭირდება.
                     </p>
-                    <a href="/ask" className="mt-4 h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 shadow-xs transition-colors duration-fast">
-                      დასვი კითხვა
-                    </a>
+                    {/* ── THE BRIDGE OUT OF A DEAD END (2026-08-18) ──────────
+                        The catalogue's empty state was a cul-de-sac: filters
+                        that found nobody, and one link to /ask. But „nobody
+                        matches these filters" is the single best moment to
+                        offer the other path — describe it and let experts come
+                        to you — and until now the two halves of this product
+                        did not know about each other at all. Owner: „არ მინდა,
+                        რომ ცალკე პლათფორმაზე ხდებოდეს."
+
+                        ⚠️ IT CARRIES THE SEARCH. Whatever they typed here
+                        seeds the request wizard's first screen (?q=), so the
+                        bridge does not cost them their sentence — the same
+                        hand-off the home band already makes.
+
+                        ⚠️ AND IT IS BEHIND THE FLAG. `requestsOn()` is checked
+                        here rather than inherited: this file is not the home
+                        page, and a deployment with the subsystem off must not
+                        grow a link to a 404. */}
+                    <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                      {requestsOn() && (
+                        <a
+                          href={search.trim() ? `/request?q=${encodeURIComponent(search.trim())}` : '/request'}
+                          className="h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 shadow-xs transition-colors duration-fast"
+                        >
+                          აღწერე, რა გჭირდება
+                        </a>
+                      )}
+                      <a href="/ask" className="h-11 px-4 rounded-btn border border-ink-200 text-ink-800 hover:bg-ink-50 font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast">
+                        დასვი კითხვა
+                      </a>
+                    </div>
                   </div>
                   )
                 ) : (

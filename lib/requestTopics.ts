@@ -113,10 +113,10 @@ export const KIND: Record<RequestKindName, {
     timingLabel: 'რა ვადაში',
   },
   SERVICE: {
-    label: 'ოსტატი',
-    hint: 'მოვა და ადგილზე გააკეთებს',
+    label: 'ხელოსანი',
+    hint: 'სამუშაო ადგილზე — ბინაში, სახლში ან ოფისში',
     unit: 'PER_VISIT',
-    unitLabel: 'ერთ ვიზიტზე',
+    unitLabel: 'ერთ გამოძახებაზე',
     // „როდის მოვიდეს" and not „როდის" — the difference is the whole kind. Every
     // other kind asks when the WORK happens; this one asks when a person is at
     // the door.
@@ -267,7 +267,7 @@ export const TIMING: Record<RequestKindName, TimingOption[]> = {
     { id: 'tomorrow',   label: 'ხვალ' },
     { id: 'this_week',  label: 'ამ კვირაში' },
     { id: 'next_week',  label: 'მომავალ კვირას' },
-    { id: 'flexible',   label: 'დრო არ მაწვება' },
+    { id: 'flexible',   label: 'არ მეჩქარება' },
   ],
 }
 
@@ -335,10 +335,10 @@ const SERVICE_EXTRAS: ExtraQuestion[] = [
     id: 'property',
     label: 'სად',
     options: [
-      { id: 'flat',   label: 'ბინა' },
-      { id: 'house',  label: 'კერძო სახლი' },
-      { id: 'office', label: 'ოფისი' },
-      { id: 'other',  label: 'სხვა' },
+      { id: 'flat',   label: 'ბინაში' },
+      { id: 'house',  label: 'კერძო სახლში' },
+      { id: 'office', label: 'ოფისში' },
+      { id: 'other',  label: 'სხვაგან' },
     ],
   },
 ]
@@ -373,9 +373,9 @@ const GROUP_EXTRAS: Record<string, ExtraQuestion[]> = {
   plumbing: [
     {
       id: 'urgency',
-      label: 'რა მდგომარეობაა',
+      label: 'რა პრობლემაა',
       options: [
-        { id: 'flooding', label: 'წყალი გადმოდის ახლა' },
+        { id: 'flooding', label: 'წყალი ახლა გადმოდის' },
         { id: 'dripping', label: 'წვეთავს' },
         { id: 'broken',   label: 'არ მუშაობს' },
         { id: 'install',  label: 'ახლის დაყენება' },
@@ -409,12 +409,12 @@ const GROUP_EXTRAS: Record<string, ExtraQuestion[]> = {
   moving: [
     {
       id: 'lift',
-      label: 'ლიფტი არის',
+      label: 'ლიფტი',
       options: [
         { id: 'both',  label: 'ორივე მხარეს' },
         { id: 'one',   label: 'ერთ მხარეს' },
         { id: 'none',  label: 'არცერთ მხარეს' },
-        { id: 'ground', label: 'პირველი სართული' },
+        { id: 'ground', label: 'პირველ სართულზე' },
       ],
     },
   ],
@@ -433,10 +433,10 @@ const GROUP_EXTRAS: Record<string, ExtraQuestion[]> = {
   repairs: [
     {
       id: 'material',
-      label: 'მასალა ვისი იქნება',
+      label: 'მასალა ვინ იყიდის',
       options: [
-        { id: 'mine',    label: 'ჩემი' },
-        { id: 'master',  label: 'ოსტატის' },
+        { id: 'mine',    label: 'მე' },
+        { id: 'master',  label: 'ხელოსანი' },
         { id: 'unsure',  label: 'ჯერ არ ვიცი' },
       ],
     },
@@ -868,8 +868,8 @@ export const TOPIC_GROUPS: TopicGroup[] = [
    * and the label is only what we call the job afterwards.
    */
   {
-    id: 'cleaning', label: 'დასუფთავება', kinds: S,
-    template: 'რა ფართობია: … კვ.მ / … ოთახი\nრა სჭირდება: …\nსართული და ლიფტი: …',
+    id: 'cleaning', label: 'დალაგება', kinds: S,
+    template: 'რა ფართობია: … კვ.მ / … ოთახი\nრა უნდა გაკეთდეს: …\nსართული და ლიფტი: …',
     topics: [
       { id: 'clean-flat',   label: 'ბინის დალაგება', alt: ['დამლაგებელი', 'დალაგება', 'დასუფთავება', 'ქალი დასალაგებლად'] },
       { id: 'clean-deep',   label: 'გენერალური დალაგება', alt: ['გენერალური წმენდა'] },
@@ -885,8 +885,8 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     topics: [
       { id: 'plumb-leak',   label: 'ონკანი და მილი', alt: ['სანტექნიკოსი', 'სანტექნიკა', 'წყალი გადის', 'ჟონავს', 'ონკანი'] },
       { id: 'plumb-boiler', label: 'ბოილერი', alt: ['წყალგამაცხელებელი', 'ავზი'] },
-      { id: 'plumb-drain',  label: 'კანალიზაციის გაწმენდა', alt: ['გაჭედილი', 'ჩამდინარე', 'სუნი'] },
-      { id: 'plumb-bath',   label: 'სველი წერტილი', alt: ['უნიტაზი', 'აბაზანა', 'ნიჟარა', 'შხაპი'] },
+      { id: 'plumb-drain',  label: 'კანალიზაციის გაწმენდა', alt: ['გაჭედილი', 'კანალიზაცია გაიჭედა', 'სუნი'] },
+      { id: 'plumb-bath',   label: 'უნიტაზი და ნიჟარა', alt: ['სველი წერტილი', 'აბაზანა', 'შხაპი'] },
       { id: 'plumb-heat',   label: 'გათბობის სისტემა', alt: ['რადიატორი', 'ქვაბი', 'გათბობა'] },
     ],
   },
@@ -895,7 +895,7 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     template: 'რა პრობლემაა: …\nრამდენი წერტილია: …\nსართული და ლიფტი: …',
     topics: [
       { id: 'elec-wiring', label: 'ელექტროგაყვანილობა', alt: ['ელექტრიკოსი', 'ელექტრიკა', 'სადენი', 'გაყვანილობა'] },
-      { id: 'elec-socket', label: 'როზეტი და ჩამრთველი', alt: ['როზეტი', 'ჩამრთველი', 'ჩამრთველები'] },
+      { id: 'elec-socket', label: 'როზეტი და ჩამრთველი', alt: ['როზეტი', 'ჩამრთველი'] },
       { id: 'elec-light',  label: 'განათება', alt: ['ლამპა', 'ჭაღი', 'სანათი'] },
       { id: 'elec-panel',  label: 'მრიცხველი და ავტომატი', alt: ['ავტომატი', 'მრიცხველი', 'ფარი', 'დენი წყდება'] },
     ],
@@ -907,28 +907,28 @@ export const TOPIC_GROUPS: TopicGroup[] = [
       { id: 'rep-tile',     label: 'კაფელი და მეტლახი', alt: ['კაფელი', 'მეტლახი', 'პლიტკა'] },
       { id: 'rep-drywall',  label: 'თაბაშირმუყაო', alt: ['გიფსოკარტონი', 'ჭერი'] },
       { id: 'rep-paint',    label: 'შეღებვა და შპალერი', alt: ['მღებავი', 'შეღებვა', 'შპალერი', 'კედლის შეღებვა'] },
-      { id: 'rep-floor',    label: 'იატაკი', alt: ['პარკეტი', 'ლამინატი', 'ლინოლეუმი'] },
+      { id: 'rep-floor',    label: 'იატაკის დაგება', alt: ['იატაკი', 'პარკეტი', 'ლამინატი', 'ლინოლეუმი'] },
       { id: 'rep-door',     label: 'კარ-ფანჯარა', alt: ['კარი', 'ფანჯარა', 'საკეტი', 'ბოქლომი'] },
-      { id: 'rep-assembly', label: 'ავეჯის აწყობა', alt: ['ავეჯის აწყობა', 'კარადის აწყობა', 'ხელოსანი'] },
+      { id: 'rep-assembly', label: 'ავეჯის აწყობა', alt: ['კარადის აწყობა', 'ხელოსანი'] },
     ],
   },
   {
     id: 'appliances', label: 'ტექნიკის შეკეთება', kinds: S,
     template: 'რა ტექნიკაა: … (მოდელი, თუ იცი)\nრა ემართება: …\nრამდენი ხანია: …',
     topics: [
-      { id: 'app-washer', label: 'სარეცხი მანქანა', alt: ['სარეცხი მანქანა', 'სარეცხის შეკეთება'] },
-      { id: 'app-fridge', label: 'მაცივარი', alt: ['მაცივარი', 'საყინულე'] },
-      { id: 'app-ac',     label: 'კონდიციონერი', alt: ['კონდიციონერი', 'გასუფთავება', 'ფრეონი'] },
+      { id: 'app-washer', label: 'სარეცხი მანქანა', alt: ['სარეცხი მანქანის შეკეთება'] },
+      { id: 'app-fridge', label: 'მაცივარი', alt: ['საყინულე'] },
+      { id: 'app-ac',     label: 'კონდიციონერი', alt: ['კონდიციონერის გასუფთავება', 'ფრეონი'] },
       { id: 'app-dish',   label: 'ჭურჭლის სარეცხი მანქანა' },
       { id: 'app-stove',  label: 'ღუმელი და ქურა', alt: ['ღუმელი', 'ქურა', 'გაზქურა'] },
-      { id: 'app-tv',     label: 'ტელევიზორი და ტექნიკა', alt: ['ტელევიზორი', 'ტექნიკის შეკეთება'] },
+      { id: 'app-tv',     label: 'ტელევიზორი' },
     ],
   },
   {
     id: 'moving', label: 'გადაზიდვა', kinds: S,
     template: 'საიდან და სად: … → …\nრა უნდა გადავიდეს: …\nსართული და ლიფტი ორივე მხარეს: …',
     topics: [
-      { id: 'move-flat',   label: 'ბინის გადაზიდვა', alt: ['გადაზიდვა', 'გადასვლა', 'მზიდავი', 'ევაკუატორი'] },
+      { id: 'move-flat',   label: 'ბინის გადაზიდვა', alt: ['გადაზიდვა', 'გადასვლა', 'მზიდავი', 'მტვირთავი'] },
       { id: 'move-office', label: 'ოფისის გადაზიდვა' },
       { id: 'move-lift',   label: 'ავეჯის ატანა და ჩამოტანა', alt: ['ატანა', 'მძიმე ნივთი'] },
       { id: 'move-item',   label: 'ნივთის მიტანა', alt: ['კურიერი', 'მიტანა'] },
@@ -936,21 +936,21 @@ export const TOPIC_GROUPS: TopicGroup[] = [
   },
   {
     id: 'outdoor', label: 'ეზო და მებაღეობა', kinds: S,
-    template: 'რა ფართობია: …\nრა სჭირდება: …\nროდის გერჩივნება: …',
+    template: 'რა ფართობია: …\nრა უნდა გაკეთდეს: …\nროდის მოვიდეს: …',
     topics: [
       { id: 'out-lawn',   label: 'ბალახის თიბვა', alt: ['ბალახი', 'თიბვა', 'გაზონი'] },
       { id: 'out-tree',   label: 'ხის გასხვლა და მოჭრა', alt: ['ხის მოჭრა', 'გასხვლა'] },
       { id: 'out-garden', label: 'ეზოს მოწყობა', alt: ['მებაღე', 'ლანდშაფტი'] },
-      { id: 'out-pest',   label: 'დეზინსექცია', alt: ['ტარაკანი', 'მღრღნელი', 'დეზინფექცია', 'მწერები'] },
+      { id: 'out-pest',   label: 'მწერების და მღრღნელების წამლობა', alt: ['ტარაკანი', 'ტარაკნები', 'მღრღნელები', 'დეზინსექცია', 'დეზინფექცია', 'მწერები'] },
     ],
   },
   {
-    id: 'systems', label: 'სისტემები და ინტერნეტი', kinds: S,
+    id: 'systems', label: 'უსაფრთხოება და ინტერნეტი', kinds: S,
     template: 'რა უნდა დაიდგას: …\nრამდენი წერტილი: …\nობიექტი: … (ბინა / სახლი / ოფისი)',
     topics: [
-      { id: 'sys-camera', label: 'ვიდეოსათვალთვალო', alt: ['კამერა', 'ვიდეოკამერა', 'სათვალთვალო'] },
+      { id: 'sys-camera', label: 'ვიდეოკამერების დაყენება', alt: ['კამერა', 'ვიდეოსათვალთვალო', 'სათვალთვალო'] },
       { id: 'sys-intercom', label: 'დომოფონი' },
-      { id: 'sys-alarm',  label: 'სიგნალიზაცია', alt: ['დაცვა', 'სიგნალიზაცია'] },
+      { id: 'sys-alarm',  label: 'სიგნალიზაცია', alt: ['დაცვა'] },
       { id: 'sys-network', label: 'ინტერნეტი და ქსელი', alt: ['ვაიფაი', 'როუტერი', 'ქსელი', 'ინტერნეტი'] },
     ],
   },
@@ -977,12 +977,12 @@ export const TOPIC_GROUPS: TopicGroup[] = [
  */
 const KIND_TEMPLATE: Record<RequestKindName, string> = {
   LEARNING: 'ვინ ისწავლის: …\nამჟამინდელი დონე: …\nმიზანი: …',
-  CONSULTATION: 'სიტუაცია: …\nკითხვა: …\nრა ვსცადე აქამდე: …',
-  PROJECT: 'რა უნდა გაკეთდეს: …\nვისთვის არის: …\nშედეგი, რომელსაც ველი: …',
+  CONSULTATION: 'სიტუაცია: …\nკითხვა: …\nრა ვცადე აქამდე: …',
+  PROJECT: 'რა უნდა გაკეთდეს: …\nვისთვის არის: …\nრა შედეგს ველოდები: …',
   // The three things a master asks on the phone before naming a price, in the
   // order they ask them. „სართული და ლიფტი" is in here because it is the single
   // most common reason a quoted price changes at the door.
-  SERVICE: 'რა პრობლემაა: …\nსართული და ლიფტი: …\nროდის გერჩივნება: …',
+  SERVICE: 'რა პრობლემაა: …\nსართული და ლიფტი: …\nროდის მოვიდეს: …',
 }
 
 /** The scaffold for this request: the topic's group first, the kind's fallback
@@ -1015,7 +1015,7 @@ const OFFER_TEMPLATE: Record<RequestKindName, string> = {
   // I see it", and a master with no way to say that either invents a number or
   // does not bid at all. Saying it in the offer means the client reads it
   // BEFORE choosing rather than at the door.
-  SERVICE: 'გამარჯობა! ამ სამუშაოს ვაკეთებ … წელია.\nმოვალ: …\nფასი: … (ან: ვიზიტი …₾, დანარჩენს ადგილზე შევაფასებ)',
+  SERVICE: 'გამარჯობა! … წელია, რაც ამ საქმეს ვაკეთებ.\nმოვალ: …\nფასი: … (ან: გამოძახება …₾, დანარჩენს ადგილზე შევაფასებ)',
 }
 
 export function offerTemplateFor(kind: RequestKindName): string {

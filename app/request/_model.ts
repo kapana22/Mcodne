@@ -42,6 +42,9 @@ export type Draft = {
   topic: string
   description: string
   budgetBand: string
+  /** A typed amount, in whole lari. Wins over the band when set — see
+   *  lib/requests → serviceRequestRow. */
+  budgetAmount: number | null
   timing: string
   /** The clarifying answers ({ audience: 'pupil' }). Optional per key and as a
    *  whole — see the schema comment in lib/requests. */
@@ -102,6 +105,7 @@ export const EMPTY_DRAFT: Draft = {
   topic: '',
   description: '',
   budgetBand: '',
+  budgetAmount: null,
   timing: '',
   details: {},
   // Pre-set, and only these two. „ონლაინ" is the honest default for most of
@@ -244,6 +248,10 @@ export function answerLabel(id: string, d: Draft): string | null {
   }
   if (id === 'budget') {
     if (!d.kind) return null
+    // A typed amount reads back as the exact figure, not as the range that
+    // happens to contain it — restating „45₾" as „30–60₾" would show somebody
+    // an answer they did not give.
+    if (d.budgetAmount) return budgetLabel(kindOf(d.kind), d.budgetAmount, d.budgetAmount)
     const band = bandOf(kindOf(d.kind), d.budgetBand)
     return band ? budgetLabel(kindOf(d.kind), band.min, band.max) : null
   }
@@ -277,7 +285,10 @@ export function answerLabel(id: string, d: Draft): string | null {
 export function stepComplete(id: string, d: Draft): boolean {
   if (id === 'what') return d.topic !== '' && kindsOfTopic(d.topic).length > 0
   if (id === 'kind') return d.kind !== '' && d.topic !== '' && isTopicOfKind(d.kind, d.topic)
-  if (id === 'budget') return d.kind !== '' && bandOf(kindOf(d.kind), d.budgetBand) !== undefined
+  if (id === 'budget') {
+    if (d.kind === '') return false
+    return (d.budgetAmount ?? 0) > 0 || bandOf(kindOf(d.kind), d.budgetBand) !== undefined
+  }
   if (id === 'timing') return d.kind !== '' && TIMING[kindOf(d.kind)].some(t => t.id === d.timing)
   // format and city both carry an honest default (ONLINE / თბილისი) that the
   // screen shows pre-selected; details and the clarifiers are optional.
@@ -318,7 +329,7 @@ export function resumeStepId(d: Draft): string {
       if (answered) continue
       const later = steps.slice(i + 1)
       const anyLaterAnswered = later.some(l =>
-        (l.id === 'budget' && d.budgetBand !== '') ||
+        (l.id === 'budget' && (d.budgetBand !== '' || (d.budgetAmount ?? 0) > 0)) ||
         (l.id === 'timing' && d.timing !== '') ||
         (l.id === 'contact' && (d.contactName !== '' || d.phone !== '')))
       if (!anyLaterAnswered) return s.id
@@ -366,7 +377,7 @@ export function withTopic(d: Draft, topicId: string): Draft {
   const next = { ...d, topic: topicId }
   if (kinds.length === 1) return withKind(next, kinds[0])
   if (next.kind !== '' && !kinds.includes(next.kind)) {
-    return { ...next, kind: '', budgetBand: '', timing: '', details: {} }
+    return { ...next, kind: '', budgetBand: '', budgetAmount: null, timing: '', details: {} }
   }
   return next
 }
@@ -392,6 +403,9 @@ export function reviveDraft(raw: unknown): Draft {
   if (d.kind !== '') {
     if (d.topic && !isTopicOfKind(d.kind, d.topic)) d.topic = ''
     if (d.budgetBand && bandOf(d.kind, d.budgetBand) === undefined) d.budgetBand = ''
+    if (typeof d.budgetAmount !== 'number' || !Number.isFinite(d.budgetAmount) || d.budgetAmount <= 0) {
+      d.budgetAmount = null
+    }
     if (d.timing && !TIMING[d.kind].some(t => t.id === d.timing)) d.timing = ''
   }
   for (const k of ['description', 'contactName', 'phone', 'email', 'website'] as const) {

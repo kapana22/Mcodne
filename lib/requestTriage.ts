@@ -34,12 +34,12 @@ export type TriageFlag =
   | 'SUSPECT_PHONE'
 
 export const TRIAGE_LABEL: Record<TriageFlag, string> = {
-  BELOW_FLOOR: 'ბიუჯეტი ზღვარს ქვემოთაა',
+  BELOW_FLOOR: 'ბიუჯეტი ზღვარზე დაბალია',
   NO_TOPIC: 'თემა ვერ დადგინდა',
   CONTACT_IN_TEXT: 'აღწერაში კონტაქტია',
   LINK_IN_TEXT: 'აღწერაში ბმულია',
-  REPEAT_SENDER: 'ამ ნომრიდან უკვე მოვიდა',
-  SUSPECT_PHONE: 'ნომერი უცნაურია',
+  REPEAT_SENDER: 'ამ ნომრიდან უკვე იყო მოთხოვნა',
+  SUSPECT_PHONE: 'ნომერი საეჭვოა',
 }
 
 /* ═══════════ the tests, one per flag ════════════════════════════════════ */

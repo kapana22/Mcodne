@@ -254,6 +254,7 @@ export function normalizePublicRef(raw: string | null | undefined): string | nul
  */
 import {
   REQUEST_KINDS, KIND, kindOf, bandOf, budgetLabel, TIMING, timingLabel,
+  BUDGET_BANDS, type RequestKindName,
   formatLabel, cityLabel, topicLabel, categorySlugOfTopic, isTopicOfKind,
   normalizeExtras, extrasLabels,
 } from './requestTopics'
@@ -626,7 +627,13 @@ export const ServiceRequestInput = z.object({
   // what the work costs cannot type one, and free text would produce
   // „договорная" in four spellings. The numbers are resolved server-side from
   // the band so a crafted body cannot invent a range.
-  budgetBand: z.string().trim().min(1).max(8),
+  // ⚠️ ONE OF THE TWO IS REQUIRED, NOT BOTH — see the refinement at the end of
+  // this object. A band is a tap for somebody who does not know what the work
+  // costs; an amount is what somebody who DOES know would rather type than
+  // hunt for in a ladder. Owner, 2026-08-18: „აქ ხელით უნდა იწერებოდეს."
+  budgetBand: z.string().trim().max(8).default(''),
+  /** Lari, whole. Ceiling matches every other money field on this site. */
+  budgetAmount: z.number().int().min(1).max(1_000_000).nullable().optional(),
   timing: z.string().trim().min(1).max(24),
   format: z.enum(['ONLINE', 'IN_PERSON', 'EITHER']),
   city: z.enum(['TBILISI', 'BATUMI', 'KUTAISI', 'RUSTAVI', 'OTHER']),
@@ -702,10 +709,22 @@ export const ServiceRequestInput = z.object({
   // so the error names the field that is actually wrong — a single „INVALID" on
   // a four-step form leaves the person hunting through steps they already
   // finished.
+  // ⚠️ A BUDGET IS REQUIRED AND MAY ARRIVE AS EITHER (2026-08-18). Checked here
+  // rather than by making both fields required: they are two ways to answer one
+  // question, and demanding both would make the typed box a second tax on
+  // somebody who already tapped a range.
+  .refine(v => (v.budgetAmount ?? 0) > 0 || bandOf(v.kind, v.budgetBand) !== undefined, {
+    path: ['budgetBand'], message: 'ბიუჯეტი მიუთითე',
+  })
   .refine(v => isTopicOfKind(v.kind, v.topic), {
     path: ['topic'], message: 'ეს თემა ამ ტიპს არ ეკუთვნის',
   })
-  .refine(v => bandOf(v.kind, v.budgetBand) !== undefined, {
+  // ⚠️ A BAND IS CHECKED ONLY WHEN THERE IS ONE (2026-08-18). This used to
+  // demand a valid band unconditionally, which is correct while a band is the
+  // only way to answer — and refuses every typed amount the moment a second way
+  // exists. The „one of the two is present" rule is the refinement above; this
+  // one now only says that a band, IF given, must be real.
+  .refine(v => v.budgetBand === '' || bandOf(v.kind, v.budgetBand) !== undefined, {
     path: ['budgetBand'], message: 'ბიუჯეტი არასწორია',
   })
   .refine(v => TIMING[v.kind].some(t => t.id === v.timing), {
@@ -738,15 +757,21 @@ export function serviceRequestRow(input: ServiceRequestInput) {
     const t = (v ?? '').trim()
     return t === '' ? null : t
   }
-  const band = bandOf(input.kind, input.budgetBand)!
+  // ⚠️ A TYPED AMOUNT WINS OVER THE BAND, and it is stored as an exact figure
+  // rather than snapped to whichever range contains it. „ვიხდი 45₾-ს" is more
+  // information than „30–60₾", and rounding it into a band throws away the one
+  // thing the person actually told us. Both halves land in the same two
+  // columns, so every reader downstream is unaffected.
+  const typed = input.budgetAmount ?? null
+  const band = typed === null ? bandOf(input.kind, input.budgetBand)! : null
   return {
     kind: input.kind,
     topic: input.topic,
     // '' rather than null: the column is NOT NULL, and an empty description is
     // an ordinary state now — the pages simply do not render the paragraph.
     description: (input.description ?? '').trim(),
-    budgetMin: band.min,
-    budgetMax: band.max,
+    budgetMin: band ? band.min : typed!,
+    budgetMax: band ? band.max : typed!,
     budgetUnit: KIND[input.kind].unit,
     timing: input.timing,
     // Stripped against the question list, never stored raw — see the schema
@@ -805,9 +830,29 @@ export function offerPriceLabel(priceGel: number, kind: string): string {
   if (kind === 'ON_SITE') {
     // A free call-out is a selling point and has to say so — „0₾" would read as
     // an empty field.
-    return priceGel > 0 ? `ვიზიტი ${money} · სამუშაო ადგილზე` : 'ვიზიტი უფასოდ · სამუშაო ადგილზე'
+    return priceGel > 0 ? `გამოძახება ${money} · სამუშაო ადგილზე` : 'გამოძახება უფასოდ · სამუშაო ადგილზე'
   }
   return money
+}
+
+/**
+ * The lowest amount this kind can be served at, in lari — the FLOOR BAND'S TOP.
+ *
+ * ⚠️ IT EXISTS BECAUSE THE BUDGET CAN NOW BE TYPED (2026-08-18). The floor was
+ * only ever a property of a band id, so a person who tapped „20₾-მდე" was
+ * warned and a person who typed „18" was not — the same answer, two different
+ * outcomes, decided by which control they happened to use. Derived from the
+ * ladder rather than written down again, so re-pricing a band re-prices this.
+ */
+export function budgetFloorFor(kind: RequestKindName): number {
+  const floor = BUDGET_BANDS[kind].find(b => b.floor)
+  return floor?.max ?? 0
+}
+
+/** Is this TYPED amount below what the platform can serve? The numeric twin of
+ *  `budgetIsBelowFloor`, so a band and a number are judged by one rule. */
+export function amountIsBelowFloor(kind: RequestKindName, amount: number): boolean {
+  return amount > 0 && amount < budgetFloorFor(kind)
 }
 
 export const RequestOfferInput = z.object({

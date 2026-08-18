@@ -678,6 +678,14 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   const CLIENT_ENTRY_POINTS: [file: string, gatedIn: string][] = [
     ['components/PublicTopBar.tsx', 'components/PublicTopBar.tsx'],
     ['app/_home/request.tsx', 'app/HomeClient.tsx'],
+    // ⚠️ THE CATALOGUE'S DEAD END (2026-08-18). „Nobody matches these filters"
+    // is the single best moment to offer the other path, and until this link
+    // the two halves of the product did not know about each other — browsing
+    // ended in a cul-de-sac. Owner: „არ მინდა, რომ ცალკე პლათფორმაზე
+    // ხდებოდეს." It gates itself (this file is not the home page) and it
+    // carries the typed search through as ?q=, so the bridge costs nobody
+    // their sentence.
+    ['app/tutors/client.tsx', 'app/tutors/client.tsx'],
   ]
   for (const [f, gate] of CLIENT_ENTRY_POINTS) {
     assert.match(read(gate), /requestsOn\(\)/,
@@ -2083,7 +2091,7 @@ test('a price says which of three things it is', () => {
   // invented figure or no bid at all.
   assert.equal(offerPriceLabel(80, 'FIXED'), '80₾')
   assert.equal(offerPriceLabel(80, 'FROM'), '80₾-დან')
-  assert.match(offerPriceLabel(20, 'ON_SITE'), /ვიზიტი 20₾/)
+  assert.match(offerPriceLabel(20, 'ON_SITE'), /გამოძახება 20₾/)
   // A free call-out is a selling point and must say so — „0₾" reads as an
   // unfilled field.
   assert.match(offerPriceLabel(0, 'ON_SITE'), /უფასოდ/)
@@ -2118,4 +2126,46 @@ test('the database allows exactly the three zeroes it should', () => {
     'a free call-out is refused')
   assert.match(boot, /DROP CONSTRAINT IF EXISTS "RequestOffer_price_positive"/,
     'the old constraint is no longer replaced — CREATE TABLE IF NOT EXISTS cannot repair a live table')
+})
+
+test('a budget can be typed, and the floor judges both the same way', () => {
+  const {
+    serviceRequestRow, ServiceRequestInput, budgetFloorFor, amountIsBelowFloor,
+  } = require('../lib/requests') as typeof import('../lib/requests')
+
+  // ⚠️ THE FLOOR USED TO BE A PROPERTY OF A BAND ID ONLY. Somebody who tapped
+  // „30₾-მდე" was warned and somebody who typed „18" was not — one answer, two
+  // outcomes, decided by which control they happened to use.
+  assert.equal(budgetFloorFor('SERVICE'), 30)
+  assert.equal(amountIsBelowFloor('SERVICE', 18), true)
+  assert.equal(amountIsBelowFloor('SERVICE', 45), false)
+  // Zero is „not answered", not „below the floor" — the schema refuses it
+  // separately and a warning there would be about a field nobody filled in.
+  assert.equal(amountIsBelowFloor('SERVICE', 0), false)
+
+  const base = {
+    kind: 'SERVICE' as const, topic: 'clean-flat', description: '',
+    timing: 'tomorrow', format: 'IN_PERSON' as const, city: 'TBILISI' as const,
+    details: {}, contactName: 'ნინო', phone: '599112233', email: 'n@example.ge',
+  }
+
+  // A typed amount is stored EXACTLY, not snapped to the range containing it:
+  // „45₾" is more information than „30–60₾".
+  const typed = ServiceRequestInput.safeParse({ ...base, budgetBand: '', budgetAmount: 45 })
+  assert.equal(typed.success, true, typed.success ? '' : JSON.stringify(typed.error.issues))
+  if (typed.success) {
+    const row = serviceRequestRow(typed.data)
+    assert.equal(row.budgetMin, 45)
+    assert.equal(row.budgetMax, 45)
+  }
+
+  // A band still works untouched.
+  const banded = ServiceRequestInput.safeParse({ ...base, budgetBand: 's2', budgetAmount: null })
+  assert.equal(banded.success, true)
+  if (banded.success) assert.equal(serviceRequestRow(banded.data).budgetMin, 60)
+
+  // …but neither is refused: a budget is required, and which of the two it
+  // arrives as is the person's business.
+  assert.equal(ServiceRequestInput.safeParse({ ...base, budgetBand: '', budgetAmount: null }).success,
+    false, 'a request with no budget at all was accepted')
 })

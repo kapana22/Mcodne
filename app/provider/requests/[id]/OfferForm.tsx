@@ -138,7 +138,7 @@ export function OfferForm({ requestId, kind, budgetMin, budgetMax, unitLabel }: 
       <div className="mt-4 grid grid-cols-2 gap-3 max-w-[320px]">
         <label className="block">
           <Label>
-            {priceKind === 'ON_SITE' ? 'ვიზიტი, ₾' : 'ფასი, ₾'}
+            {priceKind === 'ON_SITE' ? 'გამოძახება, ₾' : 'ფასი, ₾'}
             {priceKind !== 'ON_SITE' && <span className="font-normal text-ink-400"> {unitLabel}</span>}
           </Label>
           <input
