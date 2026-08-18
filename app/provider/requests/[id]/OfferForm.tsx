@@ -15,7 +15,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Btn } from '@/components/Btn'
 import { Card } from '@/components/Card'
-import { RequestOfferInput, offerTemplateFor, kindOf } from '@/lib/requests'
+import {
+  RequestOfferInput, offerTemplateFor, kindOf,
+  OFFER_PRICE_KINDS, OFFER_PRICE_KIND_LABEL, type OfferPriceKind,
+} from '@/lib/requests'
 
 type Status = 'idle' | 'sending' | 'error'
 
@@ -53,6 +56,9 @@ export function OfferForm({ requestId, kind, budgetMin, budgetMax, unitLabel }: 
 }) {
   const router = useRouter()
   const [price, setPrice] = useState('')
+  /** ⚠️ WHAT THE NUMBER MEANS. A single integer made honest tradespeople either
+   *  invent a figure or not bid at all — see lib/requests → OFFER_PRICE_KINDS. */
+  const [priceKind, setPriceKind] = useState<OfferPriceKind>('FIXED')
   const [days, setDays] = useState('')
   const [message, setMessage] = useState('')
   const [status, setStatus] = useState<Status>('idle')
@@ -67,7 +73,10 @@ export function OfferForm({ requestId, kind, budgetMin, budgetMax, unitLabel }: 
     // so the person is told before a round-trip.
     const body = {
       requestId,
-      priceGel: Number(price),
+      priceKind,
+      // ON_SITE with an empty box means „the visit is free", which is a real
+      // offer and a selling point. Every other kind needs a number.
+      priceGel: price.trim() === '' && priceKind === 'ON_SITE' ? 0 : Number(price),
       daysEstimate: days.trim() === '' ? null : Number(days),
       message,
     }
@@ -98,6 +107,29 @@ export function OfferForm({ requestId, kind, budgetMin, budgetMax, unitLabel }: 
     <Card as="form" onSubmit={submit} noValidate>
       <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">შეთავაზება</h2>
 
+      {/* ── What kind of price is this ────────────────────────────────────
+          Three chips rather than a select: the choice changes the field below
+          it, and a control whose effect is visible has to be visible itself.
+          „ადგილზე შევაფასებ" is the one that did not exist — and its absence is
+          why a plumber either invented a number or walked away. */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {OFFER_PRICE_KINDS.map(k => (
+          <button
+            key={k}
+            type="button"
+            aria-pressed={priceKind === k}
+            onClick={() => setPriceKind(k)}
+            className={`h-9 px-3.5 rounded-pill border font-display text-small font-semibold transition-[background-color,border-color,transform] duration-fast motion-safe:active:scale-[0.97] ${
+              priceKind === k
+                ? 'border-brand-600 bg-brand-600 text-white'
+                : 'border-ink-200 text-ink-700 hover:border-ink-300 hover:bg-ink-50'
+            }`}
+          >
+            {OFFER_PRICE_KIND_LABEL[k]}
+          </button>
+        ))}
+      </div>
+
       {/* ⚠️ CAPPED, NOT STRETCHED. The form moved out of a 400px rail and into
           a 720px reading column (see page.tsx), and two number inputs that grow
           to 350px each are two fields announcing themselves as the important
@@ -105,11 +137,15 @@ export function OfferForm({ requestId, kind, budgetMin, budgetMax, unitLabel }: 
           three digits needs about this much box. */}
       <div className="mt-4 grid grid-cols-2 gap-3 max-w-[320px]">
         <label className="block">
-          <Label>ფასი, ₾ <span className="font-normal text-ink-400">{unitLabel}</span></Label>
+          <Label>
+            {priceKind === 'ON_SITE' ? 'ვიზიტი, ₾' : 'ფასი, ₾'}
+            {priceKind !== 'ON_SITE' && <span className="font-normal text-ink-400"> {unitLabel}</span>}
+          </Label>
           <input
-            type="number" required min={1} max={1000000} step={1} inputMode="numeric"
+            type="number" required={priceKind !== 'ON_SITE'} min={0} max={1000000} step={1} inputMode="numeric"
             value={price} onChange={e => setPrice(e.target.value)}
-            className={INPUT} placeholder={String(budgetMin || 100)}
+            className={INPUT}
+            placeholder={priceKind === 'ON_SITE' ? '0 = უფასოდ' : String(budgetMin || 100)}
           />
         </label>
         <label className="block">
@@ -158,6 +194,10 @@ export function OfferForm({ requestId, kind, budgetMin, budgetMax, unitLabel }: 
           to say so, with the price making the argument. Below-band is a plain
           fact, not praise — cheap is a strategy, not a virtue. */}
       {(() => {
+        // Nothing to compare on an on-site estimate: the number in the box is a
+        // call-out fee, and holding it against the job's budget would tell the
+        // provider their visit is „under budget", which means nothing.
+        if (priceKind === 'ON_SITE') return null
         const n = Number(price)
         if (!price.trim() || !Number.isFinite(n) || n <= 0) return null
         const fit = budgetMax === null

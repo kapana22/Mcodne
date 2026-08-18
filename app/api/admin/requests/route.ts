@@ -67,7 +67,7 @@ export async function GET(req: Request) {
       offers: {
         orderBy: { createdAt: 'asc' },
         select: {
-          id: true, priceGel: true, daysEstimate: true, message: true,
+          id: true, priceGel: true, priceKind: true, daysEstimate: true, message: true,
           status: true, createdAt: true, providerKind: true,
           expertUser: { select: { id: true, fullName: true, email: true, phone: true } },
           company: { select: { id: true, name: true } },

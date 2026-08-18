@@ -13,7 +13,7 @@
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import {
-  clientContactFor, gel, budgetLabel, topicLabel, kindOf, timeAgoKa,
+  clientContactFor, gel, offerPriceLabel, budgetLabel, topicLabel, kindOf, timeAgoKa,
   OFFER_STATUS_LABEL, type OfferStatusName,
 } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
@@ -53,7 +53,7 @@ export default async function Page() {
     orderBy: { createdAt: 'desc' },
     take: 200,
     select: {
-      id: true, priceGel: true, daysEstimate: true, message: true,
+      id: true, priceGel: true, priceKind: true, daysEstimate: true, message: true,
       status: true, createdAt: true,
       // Unread FOR THE PROVIDER: client messages this side has not opened.
       _count: { select: { messages: { where: { fromClient: true, readByProviderAt: null } } } },
@@ -118,7 +118,7 @@ export default async function Page() {
                       work for nothing. */}
                   {o.status !== 'INVITED' && (
                     <span className="font-display text-h3 font-bold text-ink-900 tabular-nums shrink-0">
-                      {gel(o.priceGel)}
+                      {offerPriceLabel(o.priceGel, o.priceKind)}
                     </span>
                   )}
                 </div>

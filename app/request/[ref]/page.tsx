@@ -69,7 +69,7 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
         where: { status: { in: ['SENT', 'ACCEPTED', 'DECLINED'] } },
         orderBy: { priceGel: 'asc' },
         select: {
-          id: true, priceGel: true, daysEstimate: true, message: true,
+          id: true, priceGel: true, priceKind: true, daysEstimate: true, message: true,
           status: true, createdAt: true,
           // Unread FOR THE CLIENT: provider messages this side has not opened.
           // A count, never the bodies — the pane fetches those when opened.

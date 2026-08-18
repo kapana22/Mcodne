@@ -35,12 +35,12 @@ import {
 import {
   STATUS_LABEL, OFFER_STATUS_LABEL, REQUEST_STATUSES,
   KIND, kindOf, budgetLabel, timingLabel, formatLabel, cityLabel, topicLabel,
-  extrasLabels, gel,
+  extrasLabels, gel, offerPriceLabel,
   type RequestStatusName, type OfferStatusName,
 } from '@/lib/requests'
 
 type Offer = {
-  id: string; priceGel: number; daysEstimate: number | null; message: string
+  id: string; priceGel: number; priceKind: string; daysEstimate: number | null; message: string
   status: string; createdAt: string; providerKind: string
   expertUser: { id: string; fullName: string; email: string; phone: string | null } | null
   company: { id: string; name: string } | null
@@ -283,7 +283,7 @@ function RequestDetail({ r, candidates, notified, experts, onChanged }: {
                   <span className="text-body font-display font-semibold text-ink-900">
                     {o.expertUser?.fullName ?? o.company?.name ?? '—'}
                   </span>
-                  <span className="text-body text-ink-900 tabular-nums">{gel(o.priceGel)}</span>
+                  <span className="text-body text-ink-900 tabular-nums">{offerPriceLabel(o.priceGel, o.priceKind)}</span>
                   <span className="text-meta text-ink-500">
                     {OFFER_STATUS_LABEL[o.status as OfferStatusName]}
                     {o.daysEstimate ? ` · ${o.daysEstimate} დღე` : ''}

@@ -1468,7 +1468,30 @@ model RequestOffer {
   // call site: a second copy is how „both set" eventually becomes storable.
 
   // Lari, whole, like every other price in this database.
+  //
+  // ⚠️ WHAT THE NUMBER MEANS IS `priceKind`'S JOB, NOT THIS COLUMN'S. On a
+  // FIXED offer it is the price; on FROM it is where the price starts; on
+  // ON_SITE it is the CALL-OUT FEE and the real price is set at the door. Read
+  // without the kind beside it, this integer says three different things.
   priceGel Int
+
+  /// 'FIXED' | 'FROM' | 'ON_SITE' — how to read `priceGel`.
+  ///
+  /// ⚠️ IT EXISTS BECAUSE A SINGLE INTEGER MADE HONEST TRADESPEOPLE LIE. A
+  /// consultant knows the price of an hour; somebody coming to look at a leak
+  /// often does not, and a form that demands one number either gets an invented
+  /// figure or gets no bid at all. YouDo has carried „по договорённости" beside
+  /// a fixed price for exactly this reason.
+  ///
+  /// ON_SITE is also what decides, later, whether an offer can be BOOKED
+  /// straight from a calendar or has to go through the request flow: a price
+  /// that only exists after somebody looks at the job cannot be paid for in
+  /// advance.
+  ///
+  /// A String and not an enum, for the reason the rest of this subsystem gives:
+  /// the set will grow (a per-hour form is the obvious fourth) and a taxonomy
+  /// expected to grow is not worth an ALTER TYPE each time.
+  priceKind String @default("FIXED")
   // „about ten days". Nullable because some work honestly cannot be estimated
   // before a conversation, and forcing a number there produces a fictional one.
   daysEstimate Int?

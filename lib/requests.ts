@@ -547,6 +547,9 @@ export type ProviderContact = {
 export function clientOfferView(o: {
   id: string
   priceGel: number
+  /** How to read `priceGel` — see OFFER_PRICE_KINDS. Carried through to the
+   *  client, because a number without its kind is three different offers. */
+  priceKind: string
   daysEstimate: number | null
   message: string
   status: string
@@ -558,6 +561,7 @@ export function clientOfferView(o: {
   return {
     id: o.id,
     priceGel: o.priceGel,
+    priceKind: o.priceKind,
     daysEstimate: o.daysEstimate,
     message: o.message,
     status: o.status,
@@ -764,6 +768,48 @@ export function serviceRequestRow(input: ServiceRequestInput) {
 
 /** THE ONE schema for an offer. Same contract as above: the provider's form and
  *  POST /api/provider/offers parse with this identical object. */
+/* ═══════════ how a price is meant ═══════════════════════════════════════
+ *
+ * ⚠️ ONE INTEGER WAS MAKING HONEST PEOPLE LIE. A consultant knows what an hour
+ * costs; somebody driving out to look at a leak often does not, and a form that
+ * demands a single number gets either an invented figure or no bid at all.
+ * YouDo has carried „по договорённости" beside a fixed price for exactly this
+ * reason, and Angi's whole instant-booking lane depends on knowing which offers
+ * have a real number behind them.
+ *
+ * The kind also decides, later, whether an offer can be booked straight from a
+ * calendar: a price that only exists after somebody looks at the job cannot be
+ * agreed in advance.
+ */
+export const OFFER_PRICE_KINDS = ['FIXED', 'FROM', 'ON_SITE'] as const
+export type OfferPriceKind = (typeof OFFER_PRICE_KINDS)[number]
+
+/** What the provider picks, in their own words. */
+export const OFFER_PRICE_KIND_LABEL: Record<OfferPriceKind, string> = {
+  FIXED: 'ფიქსირებული',
+  FROM: 'დან',
+  ON_SITE: 'ადგილზე შევაფასებ',
+}
+
+/**
+ * „80₾" · „80₾-დან" · „ვიზიტი 20₾, სამუშაო ადგილზე" — the price as the CLIENT
+ * reads it.
+ *
+ * One function, so the offer card, the provider's list and the admin never
+ * describe the same number three ways — the rule this file already applies to
+ * budgets and timings.
+ */
+export function offerPriceLabel(priceGel: number, kind: string): string {
+  const money = gel(priceGel)
+  if (kind === 'FROM') return `${money}-დან`
+  if (kind === 'ON_SITE') {
+    // A free call-out is a selling point and has to say so — „0₾" would read as
+    // an empty field.
+    return priceGel > 0 ? `ვიზიტი ${money} · სამუშაო ადგილზე` : 'ვიზიტი უფასოდ · სამუშაო ადგილზე'
+  }
+  return money
+}
+
 export const RequestOfferInput = z.object({
   requestId: z.string().trim().min(1).max(40),
   // Lari, whole. The floor is 1 because a free offer is not an offer — it is a
@@ -771,7 +817,17 @@ export const RequestOfferInput = z.object({
   // matching the company balance top-up ceiling in the admin panel, so the two
   // places a person types a lari amount agree on what „too big to be a typo"
   // means. Int, because there is no tetri anywhere in this database.
-  priceGel: z.number().int().min(1).max(1_000_000),
+  priceGel: z.number().int().min(0).max(1_000_000),
+  /**
+   * How to read the number above.
+   *
+   * ⚠️ ZERO IS LEGAL ONLY ON `ON_SITE`, and the refinement below is what says
+   * so. „ვიზიტი უფასოა, სამუშაოს ადგილზე შევაფასებ" is a real offer with a real
+   * zero in it; „0₾ ფიქსირებული" is somebody who has not filled the field in.
+   * The database CHECK carries the same rule, so neither layer is load-bearing
+   * alone.
+   */
+  priceKind: z.enum(OFFER_PRICE_KINDS).default('FIXED'),
   // Optional: some work honestly cannot be estimated before a conversation, and
   // a required field there produces a fictional number. 365 rather than a
   // rounder ceiling because a year is the longest estimate that is still an
@@ -782,6 +838,9 @@ export const RequestOfferInput = z.object({
   // client has nothing to compare. Same 4000 ceiling as the description above,
   // for the same reason: the two halves of one conversation.
   message: z.string().trim().min(20).max(4000),
+}).refine(o => o.priceKind === 'ON_SITE' || o.priceGel > 0, {
+  message: 'ფასი მიუთითე',
+  path: ['priceGel'],
 })
 export type RequestOfferInput = z.infer<typeof RequestOfferInput>
 

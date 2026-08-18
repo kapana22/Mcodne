@@ -875,7 +875,7 @@ test('a provider gets the client‘s contact only once their offer is ACCEPTED',
 test('a client gets the provider‘s contact only on the offer they accepted', () => {
   // The mirror of the rule above, written once so the two sides cannot drift.
   const base = {
-    id: 'o1', priceGel: 1200, daysEstimate: 10, message: 'გავაკეთებ',
+    id: 'o1', priceGel: 1200, priceKind: 'FIXED', daysEstimate: 10, message: 'გავაკეთებ',
     createdAt: new Date('2026-08-14T10:00:00Z'),
     provider: { name: 'ბესიკ მაგალიძე', phone: '+995599111222', email: 'besik@example.ge' },
   }
@@ -2070,4 +2070,52 @@ test('the platform thread cannot leak the provider conversations', () => {
     'the staff side no longer requires ADMIN — an allowlisted bidder could read it')
   assert.doesNotMatch(route, /viewer\.providerAllowed/,
     'the platform thread gates on providerAllowed, which admits bidders')
+})
+
+/* ═══════════ 12. three ways to name a price ════════════════════════════ */
+
+test('a price says which of three things it is', () => {
+  const { offerPriceLabel, OFFER_PRICE_KINDS, RequestOfferInput } =
+    require('../lib/requests') as typeof import('../lib/requests')
+
+  // ⚠️ ONE INTEGER WAS MAKING HONEST TRADESPEOPLE LIE. Somebody driving out to
+  // look at a leak often cannot name a number, and a form demanding one gets an
+  // invented figure or no bid at all.
+  assert.equal(offerPriceLabel(80, 'FIXED'), '80₾')
+  assert.equal(offerPriceLabel(80, 'FROM'), '80₾-დან')
+  assert.match(offerPriceLabel(20, 'ON_SITE'), /ვიზიტი 20₾/)
+  // A free call-out is a selling point and must say so — „0₾" reads as an
+  // unfilled field.
+  assert.match(offerPriceLabel(0, 'ON_SITE'), /უფასოდ/)
+  // An unknown kind falls back to the plain number rather than throwing: a row
+  // written before this column existed must still render.
+  assert.equal(offerPriceLabel(80, 'WHATEVER'), '80₾')
+
+  // ⚠️ ZERO IS LEGAL ONLY ON ON_SITE. „0₾ ფიქსირებული" is somebody who did not
+  // fill the field in; the database CHECK carries the same rule, so neither
+  // layer is load-bearing alone.
+  const base = { requestId: 'r1', message: 'x'.repeat(20), daysEstimate: null }
+  assert.equal(RequestOfferInput.safeParse({ ...base, priceGel: 0, priceKind: 'ON_SITE' }).success, true)
+  assert.equal(RequestOfferInput.safeParse({ ...base, priceGel: 0, priceKind: 'FIXED' }).success, false,
+    'a zero fixed price was accepted')
+  assert.equal(RequestOfferInput.safeParse({ ...base, priceGel: 100, priceKind: 'NOPE' }).success, false)
+  // Omitted → FIXED, so every offer written before this column existed still
+  // parses and still means what it meant.
+  const d = RequestOfferInput.safeParse({ ...base, priceGel: 100 })
+  assert.equal(d.success && d.data.priceKind, 'FIXED')
+  assert.equal(OFFER_PRICE_KINDS.length, 3)
+})
+
+test('the database allows exactly the three zeroes it should', () => {
+  // The CHECK had to change: INVITED rows carry 0 because a conversation has no
+  // price, and that broke every „მიმოწერა" tap the day it shipped. Stated
+  // explicitly rather than relaxed to `>= 0` — a plain offer with no price is
+  // still a mistake.
+  const boot = read('lib/dbBoot.ts')
+  assert.match(boot, /RequestOffer_price_positive[\s\S]{0,400}"status" = 'INVITED'/,
+    'the INVITED zero is refused again — the invite button would 500')
+  assert.match(boot, /RequestOffer_price_positive[\s\S]{0,400}"priceKind" = 'ON_SITE'/,
+    'a free call-out is refused')
+  assert.match(boot, /DROP CONSTRAINT IF EXISTS "RequestOffer_price_positive"/,
+    'the old constraint is no longer replaced — CREATE TABLE IF NOT EXISTS cannot repair a live table')
 })

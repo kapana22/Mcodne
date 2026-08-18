@@ -22,7 +22,7 @@
 import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { RequestOfferInput, offerProviderError, kindOf, KIND, gel, topicLabel } from '@/lib/requests'
+import { RequestOfferInput, offerProviderError, kindOf, KIND, gel, offerPriceLabel, topicLabel } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
 import { sendMail } from '@/lib/mailer'
 import { offerArrivedClientEmail } from '@/lib/emailTemplates'
@@ -161,7 +161,12 @@ export async function POST(req: Request) {
         topicLabel: topicLabel(offer.request.topic),
         // The unit comes from the vocabulary, never re-derived here — a price
         // with a guessed unit is a different number.
-        priceLabel: `${gel(parsed.data.priceGel)} ${KIND[kindOf(offer.request.kind)].unitLabel}`,
+        // ⚠️ THROUGH `offerPriceLabel`, and the unit is appended only when the
+        // number is a rate. „ვიზიტი 20₾ · სამუშაო ადგილზე ერთ ვიზიტზე" is what
+        // the naive concatenation produced.
+        priceLabel: parsed.data.priceKind === 'FIXED'
+          ? `${offerPriceLabel(parsed.data.priceGel, 'FIXED')} ${KIND[kindOf(offer.request.kind)].unitLabel}`
+          : offerPriceLabel(parsed.data.priceGel, parsed.data.priceKind),
         providerName: offer.expertUser?.fullName ?? offer.company?.name ?? 'ექსპერტი',
         offerCount: offer.request.offerCount,
       })

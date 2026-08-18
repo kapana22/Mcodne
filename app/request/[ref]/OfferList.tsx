@@ -12,11 +12,12 @@ import { useRouter } from 'next/navigation'
 import { Btn } from '@/components/Btn'
 import { Card } from '@/components/Card'
 import { RequestChat } from '@/components/RequestChat'
-import { gel, OFFER_STATUS_LABEL, type OfferStatusName } from '@/lib/requests'
+import { gel, offerPriceLabel, OFFER_STATUS_LABEL, type OfferStatusName } from '@/lib/requests'
 
 type Offer = {
   id: string
   priceGel: number
+  priceKind: string
   daysEstimate: number | null
   message: string
   status: string
@@ -104,7 +105,10 @@ export function OfferList({ publicRef, offers, matched }: {
               ) : (
                 <span className="font-display text-h3 font-bold text-ink-900">{o.providerName}</span>
               )}
-              <span className="font-display text-h2 font-bold text-ink-900 tabular-nums">{gel(o.priceGel)}</span>
+              {/* Read through the ONE function that knows what the number means —
+                  „80₾-დან" and „ვიზიტი 20₾ · სამუშაო ადგილზე" are the same
+                  column with a different kind beside it. */}
+              <span className="font-display text-h2 font-bold text-ink-900 tabular-nums">{offerPriceLabel(o.priceGel, o.priceKind)}</span>
             </div>
             <p className="mt-0.5 text-meta text-ink-500">
               {/* Verified = the green check the whole site uses; rating shown

@@ -920,6 +920,35 @@ async function runMigrations() {
       )
     );
   `)
+  // ── How to read `priceGel`, and the CHECK that had to move with it ──────
+  //
+  // ⚠️ THIS FIXES A BUG THAT WAS ALREADY LIVE. `RequestOffer_price_positive`
+  // demanded `priceGel > 0`, and the INVITED rows added on 2026-08-18 carry 0
+  // because a conversation has no price — so every „მიმოწერა" tap failed at the
+  // database. `CREATE TABLE IF NOT EXISTS` cannot repair an existing table, so
+  // the constraint is dropped and re-added explicitly.
+  //
+  // The replacement states all three legal zeroes rather than relaxing to
+  // `>= 0`: a plain offer with no price is still a mistake, and saying so in
+  // the constraint is what stops the next reader from assuming otherwise.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "RequestOffer"
+      ADD COLUMN IF NOT EXISTS "priceKind" TEXT NOT NULL DEFAULT 'FIXED';
+  `)
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      ALTER TABLE "RequestOffer" DROP CONSTRAINT IF EXISTS "RequestOffer_price_positive";
+      ALTER TABLE "RequestOffer" ADD CONSTRAINT "RequestOffer_price_positive" CHECK (
+        "priceGel" > 0
+        -- The client wrote first; nobody has named a price yet.
+        OR "status" = 'INVITED'
+        -- „ვიზიტი უფასოა, სამუშაოს ადგილზე შევაფასებ“ — a real offer with a
+        -- real zero in it.
+        OR "priceKind" = 'ON_SITE'
+      );
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `)
+
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "RequestOffer_requestId_expertUserId_key" ON "RequestOffer"("requestId", "expertUserId");`)
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "RequestOffer_requestId_companyId_key" ON "RequestOffer"("requestId", "companyId");`)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RequestOffer_expertUserId_status_idx" ON "RequestOffer"("expertUserId", "status");`)
