@@ -92,39 +92,77 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     },
   })
 
-  // ── Verification is the moment providers hear about it ───────────────────
-  // …and ONLY on the NEW → VERIFIED edge. Re-saving a note on an already
-  // verified request must not re-notify everybody, which is how a working
-  // notification becomes one people mute.
-  if (status === 'VERIFIED' && before.status !== 'VERIFIED') {
-    // ── The one moment providers hear about a request ────────────────────
-    // ROUTED, not broadcast: the mail goes to the providers filed under the
-    // request's sphere, and falls back to everybody when the sphere is unknown
-    // or empty (lib/requestRouting explains why the fallback is the point).
-    // Everyone still SEES it in the queue — the mail is a nudge, not a
-    // permission.
-    //
-    // ONLY on the NEW → VERIFIED edge: re-saving a note on an already-verified
-    // request must not re-notify, which is how a working notification becomes
-    // one people mute.
-    //
-    // After the response has flushed. The routing, the bell and the sending
-    // all live in lib/requestJobs so the cron's 6-hour re-mail runs the exact
-    // same code — two copies of „who should hear about this" is how the nudge
-    // and the first mail end up disagreeing.
-    after(async () => {
-      try {
-        const { audience, sent } = await mailVerifiedRequest(before.id)
-        await audit(admin.id, 'request.routed', {
-          targetType: 'ServiceRequest', targetId: before.id,
-          // Recorded because it is the one thing the panel cannot recompute
-          // later: the allowlist moves, so „who was told, and was it targeted"
-          // is only knowable now.
-          meta: { publicRef: before.publicRef, audience, sent },
-        })
-      } catch { /* notification is best-effort; the verification stands */ }
-    })
-  }
+  // ⚠️ VERIFYING NO LONGER SENDS ANYTHING (2026-08-18), and the block that did
+  // is gone rather than disabled.
+  //
+  // Verification and distribution used to be one edge: NEW → VERIFIED mailed
+  // the routed audience on the spot. Fusing them meant the operator could not
+  // verify without broadcasting, could not choose who heard, and could not
+  // re-send without first un-verifying. Owner: „ხელით მართვაც დამატე, რომ
+  // გავაგზავნო ყველა ქიმიის მასწავლებელთან."
+  //
+  // They are two actions now. This PATCH sets the status; POST (below) sends,
+  // takes an explicit recipient list, and can be run again.
 
   return NextResponse.json({ ok: true, request: updated })
+}
+
+/**
+ * POST /api/admin/requests/[id] — tell providers about it. On purpose, by hand.
+ *
+ * ⚠️ SEPARATE FROM VERIFICATION, AND THAT IS THE WHOLE POINT (2026-08-18).
+ * Sending used to be a side effect of marking a request verified, so the
+ * operator got one shot, at a moment chosen by a status change, at an audience
+ * chosen by a rule. Owner: „ხელით მართვაც დამატე, რომ გავაგზავნო ყველა ქიმიის
+ * მასწავლებელთან." Now it is a button, it takes a list, and it can be pressed
+ * again tomorrow.
+ *
+ * Body: `{ userIds?: string[] }` — omit to use the routing rules, pass a list to
+ * override them. An EMPTY array sends to nobody and is not the same as omitting
+ * it (see lib/requestJobs).
+ *
+ * ⚠️ IT IS DELIBERATELY REPEATABLE. Re-sending is how an operator reaches
+ * somebody who joined the allowlist after the first send — and every run writes
+ * its own audit row, so „who was told, and when" is a history rather than a
+ * single overwritten fact.
+ */
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const viewer = await requestsViewer()
+  if (!viewer.providerAllowed) return requestsNotFound()
+  const auth = await requireRoleApi('ADMIN')
+  if (auth.response) return auth.response
+  const admin = auth.user
+
+  const { id } = await params
+  await ensureDbReady()
+
+  const row = await prisma.serviceRequest.findUnique({
+    where: { id },
+    select: { id: true, publicRef: true, status: true },
+  })
+  if (!row) return requestsNotFound()
+
+  // A request nobody may bid on must not be advertised. REJECTED and CLOSED are
+  // dead; NEW has not been checked by anybody yet, and sending it would undo the
+  // reason verification exists at all.
+  if (row.status !== 'VERIFIED') {
+    return NextResponse.json({ ok: false, error: 'NOT_VERIFIED' }, { status: 409 })
+  }
+
+  const body = await req.json().catch(() => ({})) as { userIds?: unknown }
+  const userIds = Array.isArray(body.userIds)
+    ? body.userIds.filter((v): v is string => typeof v === 'string')
+    : undefined
+
+  const { audience, sent } = await mailVerifiedRequest(row.id, userIds)
+
+  await audit(admin.id, 'request.routed', {
+    targetType: 'ServiceRequest',
+    targetId: row.id,
+    // The allowlist moves, so „who was told, and was it targeted or chosen" is
+    // only knowable at this moment. Recorded per send, never overwritten.
+    meta: { publicRef: row.publicRef, audience, sent, manual: userIds !== undefined },
+  })
+
+  return NextResponse.json({ ok: true, audience, sent })
 }

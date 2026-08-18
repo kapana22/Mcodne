@@ -111,6 +111,62 @@ export async function GET(req: Request) {
   })
   const counts = Object.fromEntries(grouped.map(g => [g.status, g._count._all]))
 
+  // ── Who was actually told, per request ───────────────────────────────────
+  // Owner, 2026-08-18: „ადმინ პანელშიც ჩანდეს ვისთან რა მივიდა, რომ ეს პროცესი
+  // გამართვადი იყოს."
+  //
+  // ⚠️ READ FROM THE NOTIFICATIONS THEMSELVES, not recomputed from the routing
+  // rules. The allowlist moves and the rules change, so „who would this reach
+  // today" is a different question from „who did it reach" — and only the second
+  // one is debuggable. One row per person actually notified, written by
+  // lib/requestJobs at the moment it happened.
+  //
+  // The href carries the request id (`/provider/requests/<id>`), which is what
+  // makes this joinable at all — there is no notification→request foreign key,
+  // deliberately, because a Notification belongs to no subsystem.
+  const notified = requests.length
+    ? await prisma.notification.findMany({
+        where: { OR: requests.map(r => ({ href: { contains: r.id } })) },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          href: true, createdAt: true,
+          user: { select: { id: true, fullName: true, email: true } },
+        },
+      })
+    : []
+  const notifiedByRequest: Record<string, { id: string; name: string; email: string; at: string }[]> = {}
+  for (const n of notified) {
+    const r = requests.find(x => n.href?.includes(x.id))
+    if (!r) continue
+    ;(notifiedByRequest[r.id] ??= []).push({
+      id: n.user.id, name: n.user.fullName, email: n.user.email,
+      at: n.createdAt.toISOString(),
+    })
+  }
+
+  // Everybody a request COULD be sent to, for the manual picker. The allowlist
+  // is short by construction — it is hand-maintained — so this is one query and
+  // not a search.
+  const roster = await prisma.requestAccess.findMany({
+    where: { active: true, kind: 'EXPERT', userId: { not: null } },
+    select: {
+      user: {
+        select: {
+          id: true, fullName: true, email: true,
+          tutor: { select: { categoryId: true } },
+        },
+      },
+    },
+  })
+  const roster_experts = roster
+    .filter(r => r.user)
+    .map(r => ({
+      id: r.user!.id,
+      name: r.user!.fullName,
+      email: r.user!.email,
+      categoryId: r.user!.tutor?.categoryId ?? null,
+    }))
+
   // ── THE NUMBER THAT WILL SET THE PRICE ───────────────────────────────────
   // The lead is free today and will not stay free (owner, 2026-08-17). What
   // decides the first real number is the ratio below: of the offers experts
@@ -127,5 +183,5 @@ export async function GET(req: Request) {
   })
   const funnel = Object.fromEntries(eventTotals.map(e => [e.type, e._count._all]))
 
-  return NextResponse.json({ ok: true, requests, counts, candidatesByCategory, funnel })
+  return NextResponse.json({ ok: true, requests, counts, candidatesByCategory, funnel, notifiedByRequest, experts: roster_experts })
 }

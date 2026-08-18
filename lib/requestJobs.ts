@@ -79,7 +79,23 @@ export async function routableProviders(): Promise<(RoutableProvider & { email: 
 
 /** The verification mail, addressed by the routing rules. Returns what it did
  *  so the caller can audit and the admin panel can say which audience got it. */
-export async function mailVerifiedRequest(requestId: string): Promise<{
+export async function mailVerifiedRequest(
+  requestId: string,
+  /**
+   * ⚠️ AN EXPLICIT LIST BEATS THE ROUTING RULES (2026-08-18). Owner: „ხელით
+   * მართვაც დამატე, რომ გავაგზავნო ყველა ქიმიის მასწავლებელთან."
+   *
+   * While the supply side is one person, automatic routing is not a feature —
+   * it is a way to lose track of who was told what. So the operator may name
+   * the recipients, and the rules below apply only when they do not.
+   *
+   * ⚠️ AN EMPTY ARRAY IS NOT THE SAME AS `undefined`. `[]` means „send to
+   * nobody" and is answered with sent: 0; omitting it means „work out who".
+   * Collapsing the two would make an operator who deselected everybody
+   * broadcast to everybody.
+   */
+  only?: string[],
+): Promise<{
   audience: string
   sent: number
 }> {
@@ -93,7 +109,13 @@ export async function mailVerifiedRequest(requestId: string): Promise<{
   if (!r) return { audience: 'NONE', sent: 0 }
 
   const providers = await routableProviders()
-  const { audience, recipients } = routeRequest(r.categoryId, providers)
+  const routed = routeRequest(r.categoryId, providers)
+  // A named list is filtered against the allowlist rather than trusted: the
+  // panel's checkboxes are a UI, and an id that is no longer routable must not
+  // become a mail because it was on screen when somebody pressed send.
+  const allowed = new Set(providers.map(p => p.userId))
+  const audience = only ? 'MANUAL' : routed.audience
+  const recipients = only ? only.filter(id => allowed.has(id)) : routed.recipients
   if (recipients.length === 0) return { audience, sent: 0 }
 
   const kind = kindOf(r.kind)

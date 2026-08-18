@@ -58,6 +58,8 @@ type Req = {
   user: { id: string; fullName: string; email: string } | null
   offers: Offer[]
 }
+type Notified = { id: string; name: string; email: string; at: string }
+type RosterExpert = { id: string; name: string; email: string; categoryId: string | null }
 type Candidate = {
   id: string; slug: string | null; verified: boolean; rating: number
   user: { fullName: string; email: string }
@@ -101,11 +103,20 @@ function metaLine(r: Req): string {
 
 /* ───── Detail: the request being worked ───── */
 
-function RequestDetail({ r, candidates, onChanged }: {
+function RequestDetail({ r, candidates, notified, experts, onChanged }: {
   r: Req
   candidates: Candidate[]
+  /** Who this request actually reached, from Notification rows. */
+  notified: Notified[]
+  /** The whole hand-maintained allowlist, for the manual send. */
+  experts: RosterExpert[]
   onChanged: () => void
 }) {
+  /** Ids ticked for a manual send. Empty means „use the routing rules" — the
+   *  endpoint distinguishes an omitted list from an empty one, and so does
+   *  this: `send()` only passes a list when something is ticked. */
+  const [picked, setPicked] = useState<string[]>([])
+  const [sendMsg, setSendMsg] = useState<string | null>(null)
   const [note, setNote] = useState(r.adminNote ?? '')
   const [limit, setLimit] = useState(String(r.offerLimit))
   const [busy, setBusy] = useState(false)
@@ -118,7 +129,42 @@ function RequestDetail({ r, candidates, onChanged }: {
     setNote(r.adminNote ?? '')
     setLimit(String(r.offerLimit))
     setErr(null)
+    setPicked([])
+    setSendMsg(null)
   }, [r.id, r.adminNote, r.offerLimit])
+
+  /**
+   * Tell providers about this request, now, on purpose.
+   *
+   * ⚠️ REPEATABLE BY DESIGN. Sending used to be a side effect of verifying, so
+   * it happened once at a moment nobody chose. This can be pressed again — to
+   * reach somebody who joined the allowlist afterwards, or to send one request
+   * to every chemistry teacher deliberately.
+   */
+  const send = async () => {
+    setBusy(true); setErr(null); setSendMsg(null)
+    try {
+      const res = await fetch(`/api/admin/requests/${r.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Only when something is ticked: an empty array would mean „send to
+        // nobody" and silently do nothing.
+        body: JSON.stringify(picked.length ? { userIds: picked } : {}),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.ok) {
+        setErr(j?.error === 'NOT_VERIFIED' ? 'ჯერ დაამოწმე.' : errText(j?.error))
+        return
+      }
+      setSendMsg(`გაიგზავნა ${j.sent} ადამიანთან.`)
+      setPicked([])
+      onChanged()
+    } catch {
+      setErr(errText())
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const patch = async (body: Record<string, unknown>) => {
     setBusy(true); setErr(null)
@@ -251,6 +297,78 @@ function RequestDetail({ r, candidates, onChanged }: {
         )}
       </div>
 
+      {/* ── WHO WAS ACTUALLY TOLD, AND SENDING TO MORE ────────────────────
+          Owner, 2026-08-18: „ადმინ პანელშიც ჩანდეს ვისთან რა მივიდა."
+
+          ⚠️ THE LIST IS HISTORY, NOT A PREDICTION. It is read from the
+          notifications that were written at the time, so it keeps saying who
+          was told even after the allowlist changes underneath it — which is the
+          only version of this that can be debugged.
+
+          Sending is separate from verifying and can be run again: tick nobody
+          to use the routing rules, or tick people to send exactly there. */}
+      <Card className="xl:col-start-2" as="aside">
+        <div className="font-display text-micro font-semibold uppercase text-ink-500">
+          ვის მიუვიდა <span className="tabular-nums">· {notified.length}</span>
+        </div>
+
+        {notified.length === 0 ? (
+          <p className="mt-3 text-small text-ink-600">ჯერ არავის.</p>
+        ) : (
+          <div className="mt-3 divide-y divide-ink-100">
+            {notified.map(n => (
+              <div key={`${n.id}:${n.at}`} className="py-2">
+                <div className="text-small text-ink-900">{n.name}</div>
+                <div className="text-meta text-ink-500">{n.email} · {fmtDT(n.at)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {r.status === 'VERIFIED' && (
+          <div className="mt-4 pt-4 border-t border-ink-100">
+            <div className="font-display text-micro font-semibold uppercase text-ink-500">
+              გაგზავნა
+            </div>
+            {experts.length === 0 ? (
+              <p className="mt-2 text-small text-ink-600">allowlist ცარიელია.</p>
+            ) : (
+              <>
+                <div className="mt-2 max-h-56 overflow-y-auto divide-y divide-ink-100">
+                  {experts.map(e => (
+                    <label key={e.id} className="py-2 flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={picked.includes(e.id)}
+                        onChange={ev => setPicked(p => ev.target.checked
+                          ? [...p, e.id]
+                          : p.filter(x => x !== e.id))}
+                        className="mt-1 w-4 h-4 accent-brand-600 shrink-0"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-small text-ink-900 truncate">{e.name}</span>
+                        <span className="block text-meta text-ink-500 truncate">{e.email}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-meta text-ink-500">
+                  {picked.length === 0
+                    ? 'არავინ არ არის მონიშნული — გაიგზავნება წესების მიხედვით.'
+                    : `მონიშნულია ${picked.length}.`}
+                </p>
+                <div className="mt-3">
+                  <Btn size="sm" onClick={send} disabled={busy} aria-busy={busy}>
+                    {busy ? 'იგზავნება…' : 'გაგზავნა'}
+                  </Btn>
+                </div>
+                {sendMsg && <p className="mt-2 text-small text-brand-700">{sendMsg}</p>}
+              </>
+            )}
+          </div>
+        )}
+      </Card>
+
       {/* ── the right rail: who could do this ─────────────────────────────
           The experts already filed under the request's sphere — the operator's
           next question after „is it real" is „who do I tell". Empty is an
@@ -317,6 +435,11 @@ export function RequestsSection({ onChanged }: { onChanged?: () => void }) {
   /** Offer lifecycle totals — see lib/offerEvents. The ratio here is what the
    *  first real lead price will be set from. */
   const [funnel, setFunnel] = useState<Record<string, number>>({})
+  /** Who each request actually reached — read from Notification rows, never
+   *  recomputed from the routing rules. See the API for why. */
+  const [notifiedByRequest, setNotifiedByRequest] = useState<Record<string, Notified[]>>({})
+  /** The whole hand-maintained allowlist, for the manual picker. */
+  const [experts, setExperts] = useState<RosterExpert[]>([])
   const [filter, setFilter] = useState<'' | RequestStatusName>('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -333,6 +456,8 @@ export function RequestsSection({ onChanged }: { onChanged?: () => void }) {
       setCounts(j.counts ?? {})
       setCandidatesByCategory(j.candidatesByCategory ?? {})
       setFunnel(j.funnel ?? {})
+      setNotifiedByRequest(j.notifiedByRequest ?? {})
+      setExperts(j.experts ?? [])
     } catch (e: any) {
       setErr(errText(e?.message))
     }
@@ -487,6 +612,8 @@ export function RequestsSection({ onChanged }: { onChanged?: () => void }) {
                   <RequestDetail
                     r={selected}
                     candidates={selected.category ? (candidatesByCategory[selected.category.id] ?? []) : []}
+                    notified={notifiedByRequest[selected.id] ?? []}
+                    experts={experts}
                     onChanged={() => { load(); onChanged?.() }}
                   />
                 ) : (

@@ -194,20 +194,29 @@ export async function POST(req: Request) {
   // A REJECTED request is deliberately NOT mailed: nobody is going to phone it,
   // so a mail about it is a mail that trains the reader to ignore the subject
   // line. It is still in the panel under its own filter.
-  // ⚠️ AND IF IT VERIFIED ITSELF, THE EXPERTS HEAR NOW. This is the half of the
-  // change that actually removes the wait — a VERIFIED row that nobody was told
-  // about is the same silence with a different status on it. Same function the
-  // admin's „დამოწმება" button calls, so there is one routing path and not two.
+  // ⚠️ AUTOMATIC, AND IT CAN ONLY EVER REACH PEOPLE YOU ADDED BY HAND.
   //
-  // After the response: the sender should not wait on a fan-out of emails, and
-  // a failure here loses notifications rather than the request. The admin's
-  // queue still holds the row and can re-send.
+  // Owner, 2026-08-18: „ამ ეტაპზე ავტომატიზირებული იყოს, თუმცა მხოლოდ ხელით
+  // შექმნილ ექსპერტებს გაუგზავნე." The second half needs no switch — it is how
+  // the audience is built. `routableProviders()` reads `RequestAccess`, a table
+  // nothing populates but an admin, so „everybody" here has never meant every
+  // account on the site; it means every person on a list somebody curated. A
+  // request cannot reach a stranger because there are no strangers on it.
+  //
+  // ⚠️ AND THE OPERATOR STILL HAS THE WHEEL, IN PARALLEL. This is the automatic
+  // path; POST /api/admin/requests/[id] is the manual one — an explicit list of
+  // recipients, repeatable, audited per run. Neither replaces the other: the
+  // automatic send stops requests dying in the queue, the manual send is how you
+  // reach somebody who joined afterwards, or how you send one request to every
+  // chemistry teacher on purpose.
+  //
+  // After the response: the sender should not wait on a fan-out of emails, and a
+  // failure here loses notifications rather than the request.
   if (autoVerified) {
     after(async () => {
       try { await mailVerifiedRequest(created.id) } catch { /* best-effort */ }
     })
   }
-
   if (!rejected) {
     after(async () => {
       try {

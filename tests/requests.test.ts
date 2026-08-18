@@ -1675,12 +1675,24 @@ test('every admin decision writes an audit row', () => {
   assert.doesNotMatch(access, /export async function DELETE/)
 })
 
-test('verification notifies providers once, on the edge only', () => {
-  // Re-saving a note on an already-verified request must not re-notify
-  // everybody — that is how a working notification becomes one people mute.
+test('verifying does not notify anybody — sending is its own action', () => {
+  // ⚠️ THIS TEST USED TO PIN THE OPPOSITE ARRANGEMENT, and the new one is the
+  // stronger guarantee. Sending was a side effect of the NEW → VERIFIED edge,
+  // guarded by a transition check so that re-saving a note did not re-notify
+  // everybody. That guard is now unnecessary: PATCH cannot notify at all.
+  //
+  // Fusing them meant the operator could not verify without broadcasting, could
+  // not choose who heard, and could not re-send. Owner, 2026-08-18: „ხელით
+  // მართვაც დამატე." Two actions, and this asserts they stayed apart.
   const patch = codeOf('app/api/admin/requests/[id]/route.ts')
-  assert.match(patch, /if \(status === 'VERIFIED' && before\.status !== 'VERIFIED'\)/,
-    'verification notifies on every save, not only on the transition')
+  const patchBody = patch.slice(patch.indexOf('export async function PATCH'), patch.indexOf('export async function POST'))
+  assert.doesNotMatch(patchBody, /mailVerifiedRequest\(/,
+    'PATCH sends again — verifying must not broadcast')
+  assert.match(patch, /export async function POST/,
+    'the explicit send action is gone')
+  // …and it must refuse to advertise a request nobody may bid on.
+  assert.match(patch, /row\.status !== 'VERIFIED'[\s\S]{0,120}NOT_VERIFIED/,
+    'the send action stopped requiring a verified request')
   // The bell and the mail both live in lib/requestJobs → mailVerifiedRequest,
   // so the cron's 6-hour re-mail runs the same code as the first one. Two
   // copies of „who should hear about this" is how the two end up disagreeing.
