@@ -700,6 +700,30 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     assert.doesNotMatch(read(f), /["'`]\/provider/,
       `${f} links to the PROVIDER side — that surface is reached by invitation only`)
   }
+  // ⚠️ ONE FILE REACHES THE PROVIDER SIDE ON PURPOSE, AND IT IS NOT A LINK.
+  //
+  // `lib/hats.ts` maps an allowlisted tradesperson to their workspace after
+  // sign-in. That is a REDIRECT FOR SOMEBODY THE ALLOWLIST ALREADY NAMES, not a
+  // door anybody can find by browsing — the guarantee this test protects is
+  // that nobody ARRIVES here without an invitation, and a person who already
+  // has one is not arriving, they are going home.
+  //
+  // It passes the scan below because it quotes `PROVIDER_ROUTE` rather than the
+  // literal, which is the correct dependency direction (the subsystem publishes
+  // its own address). That would have let it slip through SILENTLY, so it is
+  // asserted here instead: the case was considered, and if the file ever stops
+  // going through the constant this fails and has to be argued again.
+  {
+    const hats = read('lib/hats.ts')
+    assert.match(hats, /PROVIDER_ROUTE/,
+      'lib/hats.ts stopped using the subsystem’s own route constant')
+    assert.doesNotMatch(hats, /["'`]\/provider/,
+      'lib/hats.ts hard-codes the provider path instead of importing it')
+    // …and it must never become a browsable entry point: no link, no nav item.
+    assert.doesNotMatch(hats, /<Link|href=/,
+      'lib/hats.ts started rendering a link to the provider side')
+  }
+
   const ENTRY_FILES = CLIENT_ENTRY_POINTS.flatMap(([f, g]) => [f, g])
 
   const offenders: string[] = []

@@ -5,6 +5,7 @@ import { randomBytes, createHash } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 import { homeForRole } from './roleHome'
+import { hatsOf, homeForHats } from './hats'
 import type { Role } from '@prisma/client'
 
 // Re-exported so existing `import { homeForRole } from '@/lib/auth'` server
@@ -156,7 +157,21 @@ export async function postAuthHome(user: { id: string; role: Role }): Promise<st
     })
     if (app && (app.status === 'DRAFT' || app.status === 'SUBMITTED')) return '/apply'
   }
-  return homeForRole(user.role)
+
+  // ⚠️ THE HAT DECIDES, NOT THE ROLE (2026-08-18). `Role` has three values and
+  // none of them is „somebody who bids on requests", so an allowlisted
+  // tradesperson keeps role STUDENT and was being dropped onto the LEARNER'S
+  // dashboard — „იპოვე მასწავლებელი", „ჩემი შენახული ექსპერტები". Owner:
+  // „სერვისი სტუდენტი ხომ ვერ იქნება."
+  //
+  // ⚠️ AND THIS IS NOT THE ALLOWLIST QUERY IT REPLACED. An earlier attempt put
+  // a `requestAccess.findFirst` straight into this function, which put one
+  // subsystem's table into the sign-in path and papered over the real gap
+  // instead of naming it. `hatsOf` is the model: every hat is an existing
+  // table, the order in HATS is the priority, and this file asks one question
+  // rather than knowing four answers.
+  const hats = await hatsOf(user.id)
+  return homeForHats(hats, user.role)
 }
 
 async function currentPath(): Promise<string | null> {
