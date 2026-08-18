@@ -204,7 +204,7 @@ test('the middleware 404s every path the subsystem owns', () => {
     assert.equal(isRequestPath(p), true, `${p} is not gated`)
     assert.equal(isRequestPath(p + '/MC-7A4K2'), true, `${p}/… is not gated`)
   }
-  for (const p of ['/', '/tutors', '/student', '/tutor', '/admin', '/business', '/api/bookings', '/requests-archive', '/providers']) {
+  for (const p of ['/', '/tutors', '/services', '/student', '/tutor', '/admin', '/business', '/api/bookings', '/requests-archive', '/providers']) {
     assert.equal(isRequestPath(p), false, `${p} was swallowed by the requests gate`)
   }
 })
@@ -686,6 +686,13 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     // carries the typed search through as ?q=, so the bridge costs nobody
     // their sentence.
     ['app/tutors/client.tsx', 'app/tutors/client.tsx'],
+    // ⚠️ THE TRADES VERTICAL'S FRONT DOOR (2026-08-18). Unlike the three above
+    // it is a SECTION rather than a link — an indexable page whose whole job is
+    // to lead into the intake. It gates itself and, deliberately, only the CTAs
+    // are gated: the page must survive FEATURE_REQUESTS being off, because it
+    // is in the sitemap and a submitted URL that 404s teaches the crawler to
+    // distrust the file.
+    ['app/services/page.tsx', 'app/services/page.tsx'],
   ]
   for (const [f, gate] of CLIENT_ENTRY_POINTS) {
     assert.match(read(gate), /requestsOn\(\)/,

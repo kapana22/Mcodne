@@ -14,6 +14,9 @@ export default function robots(): MetadataRoute.Robots {
           '/',
           '/tutors',
           '/tutors/*',
+          // The trades vertical. Its own front door, indexable — unlike the
+          // intake it leads into, which stays dark.
+          '/services',
           // The two SEO landing-page families: spheres and professions. Allowed
           // by the bare '/' anyway — listed for the same explicitness as the rest.
           '/categories',

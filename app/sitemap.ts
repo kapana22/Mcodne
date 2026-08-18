@@ -44,6 +44,7 @@ const STATIC_ROUTES: Array<{
 }> = [
   { path: '/', changeFrequency: 'daily', priority: 1.0 },
   { path: '/tutors', changeFrequency: 'daily', priority: 0.9 },
+  { path: '/services', changeFrequency: 'weekly', priority: 0.7 },
   { path: '/categories', changeFrequency: 'weekly', priority: 0.7 },
   { path: '/konsultacia', changeFrequency: 'weekly', priority: 0.8 },
   // Public again as of 2026-07-29: guests get a crawlable „გახდი ექსპერტი"

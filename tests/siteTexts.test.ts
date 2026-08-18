@@ -40,6 +40,7 @@ const FILE_BY_PAGE: Record<string, string> = {
   about: 'app/about/page.tsx',
   blog: 'app/blog/page.tsx',
   categories: 'app/categories/page.tsx',
+  services: 'app/services/page.tsx',
   konsultacia: 'app/konsultacia/page.tsx',
   contact: 'app/contact/page.tsx',
 }

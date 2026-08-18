@@ -32,6 +32,11 @@ const NAV: { label: string; href: string }[] = [
   // The requests wizard. IN the array but filtered below when the flag is off —
   // see the nav filter, which is also where the 2026-08-17 change from
   // „admins only" to „everyone" is argued.
+  // ⚠️ A SECTION, NOT AN ACTION — and it sits before „მოთხოვნა" for that
+  // reason. „ექსპერტები" and „სერვისები" name the two halves of the product;
+  // „მოთხოვნა" is the thing you DO in either of them. Reading the bar
+  // left-to-right should say what the site is before it says what to press.
+  { label: 'სერვისები',      href: '/services' },
   { label: 'მოთხოვნა',       href: '/request' },
   { label: 'გახდი ექსპერტი', href: '/apply' },
   { label: 'დახმარება',      href: '/help' },
@@ -158,6 +163,10 @@ export function PublicTopBar({
   // paint rather than appearing a beat later under the cursor.
   const nav = NAV.filter(i => {
     if (i.href === '/apply') return showApplyCta(me?.role)
+    // Its own line: the /request filter below is matched by three exact
+    // regexes in tests/requests.test.ts, and folding the two together breaks
+    // all of them.
+    if (i.href === '/services') return requestsOn()
     if (i.href === '/request') return requestsOn()
     return true
   })
