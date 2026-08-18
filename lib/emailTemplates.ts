@@ -686,6 +686,45 @@ export function offerArrivedClientEmail(o: {
 }
 
 /**
+ * „We have it" — to the CLIENT, the moment they press send.
+ *
+ * ⚠️ THIS DID NOT EXIST AND ITS ABSENCE WAS A HOLE (2026-08-18). Submitting
+ * mailed exactly one address — the operator's inbox. The client got their code
+ * and their link on the thanks SCREEN and nowhere else, so closing the tab
+ * before the first offer arrived left them with no way back to their own
+ * request: the code was on the page they had just closed. Owner: „ვთქვათ
+ * ჩამეკეცა — მერე როდის და როგორ უნდა ვნახო?"
+ *
+ * The address was already there. Email was made REQUIRED on 2026-08-17
+ * precisely because „every client notification is an email and there is no
+ * SMS" — and then the first and most important notification was not sent.
+ *
+ * ⚠️ IT PROMISES A CALL, NOT A TIME. What happens next depends on a person
+ * picking up a phone, and „within 15 minutes" is a number nobody here can keep
+ * at 02:00. What is promised is true and checkable: the request is recorded,
+ * the link works, and offers arrive at this address.
+ */
+export function requestReceivedClientEmail(o: {
+  publicRef: string
+  topicLabel: string
+}) {
+  return {
+    subject: `მოთხოვნა მივიღეთ — ${o.publicRef}`,
+    html: shell({
+      heading: 'მოთხოვნა მივიღეთ',
+      bodyHtml:
+        detail([
+          { label: 'რა', value: o.topicLabel },
+          { label: 'კოდი', value: o.publicRef },
+        ]) +
+        p('შევამოწმებთ და ექსპერტებს გადავცემთ. შეთავაზებები ამ ელფოსტაზე მოგივა.') +
+        p('ეს ბმული შენი მოთხოვნის გვერდია — შეინახე, აქ ნახავ შეთავაზებებს და მოგვწერ, თუ რამე დასამატებელი გაქვს.'),
+      cta: { label: 'ჩემი მოთხოვნა', href: `${BASE}/request/${o.publicRef}` },
+    }),
+  }
+}
+
+/**
  * „Nobody answered" — to the client, when their request closes unanswered.
  *
  * ⚠️ THIS IS THE ONLY MAIL THAT CARRIES BAD NEWS, and it exists because the

@@ -27,6 +27,7 @@ import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { sendMail } from '@/lib/mailer'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 import { triageFlags, triageNote } from '@/lib/requestTriage'
+import { requestReceivedClientEmail } from '@/lib/emailTemplates'
 import { mailVerifiedRequest } from '@/lib/requestJobs'
 
 export async function POST(req: Request) {
@@ -217,6 +218,32 @@ export async function POST(req: Request) {
       try { await mailVerifiedRequest(created.id) } catch { /* best-effort */ }
     })
   }
+  // ⚠️ THE CLIENT'S OWN RECEIPT, AND IT GOES FIRST (2026-08-18). Until now this
+  // endpoint mailed exactly one address — the operator's — so somebody who
+  // closed the tab before an offer arrived had no route back to their own
+  // request: the code lived only on the screen they had just closed. The
+  // address has been REQUIRED since 2026-08-17 „because every client
+  // notification is an email"; this was the notification that was missing.
+  //
+  // Sent even on a REJECTED request. Being told „we cannot help at this budget"
+  // and being told nothing at all are different things, and the thread on their
+  // page is open precisely so a refused person can ask „და 300₾-ზე?" — a thread
+  // they cannot find is a thread that is not open.
+  if (row.email) {
+    const to = row.email
+    after(async () => {
+      try {
+        await sendMail({
+          to,
+          ...requestReceivedClientEmail({
+            publicRef: created.publicRef,
+            topicLabel: topicLabel(parsed.data.topic),
+          }),
+        })
+      } catch { /* best-effort; the request is committed either way */ }
+    })
+  }
+
   if (!rejected) {
     after(async () => {
       try {

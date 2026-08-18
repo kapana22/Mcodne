@@ -998,6 +998,7 @@ model Company {
 
   members      CompanyMember[]
   transactions CompanyTransaction[]
+  serviceProfile ServiceProfile?
   // Requests (2026-08-14) — virtual back-relations, no SQL. A company bids on a
   // request as one counterparty; the members do not each get their own offer.
   requestOffers RequestOffer[]
@@ -1723,8 +1724,22 @@ model OfferEvent {
 model ServiceProfile {
   id String @id @default(cuid())
 
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// ⚠️ EXACTLY ONE OF THESE, and the difference is the product's own
+  /// (2026-08-18). Owner: „სერვისების ნაწილი დარეგისტრირებული ბიზნესმენები და
+  /// ნაწილი ინდივიდუალური." A one-man plumber and a cleaning firm are both
+  /// masters, they are told about work the same way and they bid the same way —
+  /// what differs is who the client is dealing with, and a client is entitled
+  /// to know which.
+  ///
+  /// Modelled as two nullable columns rather than a `kind` enum plus one id,
+  /// matching `RequestOffer` and `RequestAccess`: Postgres allows any number of
+  /// NULLs under a unique constraint, so both stay unique without fighting, and
+  /// the „exactly one" rule is a CHECK in lib/dbBoot rather than a convention.
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  companyId String?  @unique
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   /// Topic ids of `kind: SERVICE` — 'plumb-leak', 'clean-flat'. Validated
   /// against the vocabulary on write (lib/serviceProfile), never trusted from a

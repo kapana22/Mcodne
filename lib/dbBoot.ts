@@ -1005,6 +1005,35 @@ async function runMigrations() {
       )
     );
   `)
+  // ── A company can be a master too (2026-08-18) ──────────────────────────
+  // Owner: „სერვისების ნაწილი დარეგისტრირებული ბიზნესმენები და ნაწილი
+  // ინდივიდუალური." Same table, because a firm and a one-man plumber are told
+  // about work identically and bid identically — only the counterparty differs,
+  // and the client is entitled to know which.
+  //
+  // `userId` becomes nullable so the other half can exist. The „exactly one"
+  // rule is a CHECK rather than a convention, the same shape RequestOffer and
+  // RequestAccess already use.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "ServiceProfile"
+      ADD COLUMN IF NOT EXISTS "companyId" TEXT;
+  `)
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      ALTER TABLE "ServiceProfile" ALTER COLUMN "userId" DROP NOT NULL;
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `)
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      ALTER TABLE "ServiceProfile" DROP CONSTRAINT IF EXISTS "ServiceProfile_exactly_one_subject";
+      ALTER TABLE "ServiceProfile" ADD CONSTRAINT "ServiceProfile_exactly_one_subject" CHECK (
+        ("userId" IS NOT NULL AND "companyId" IS NULL)
+        OR ("userId" IS NULL AND "companyId" IS NOT NULL)
+      );
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ServiceProfile_companyId_key" ON "ServiceProfile"("companyId");`)
+
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ServiceProfile_userId_key" ON "ServiceProfile"("userId");`)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceProfile_available_idx" ON "ServiceProfile"("available");`)
   // ⚠️ GIN, and it is the reason this table can be routed on at all. Stage 3

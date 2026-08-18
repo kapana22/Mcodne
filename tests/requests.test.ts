@@ -2200,3 +2200,32 @@ test('a budget can be typed, and the floor judges both the same way', () => {
   assert.equal(ServiceRequestInput.safeParse({ ...base, budgetBand: '', budgetAmount: null }).success,
     false, 'a request with no budget at all was accepted')
 })
+
+test('the client is told their request exists, at the moment they send it', () => {
+  // ⚠️ THE HOLE THIS CLOSES. Submitting mailed exactly ONE address — the
+  // operator's inbox. The client's code and link lived on the thanks SCREEN and
+  // nowhere else, so closing the tab before the first offer arrived left them
+  // with no route back to their own request. Owner, 2026-08-18: „ვთქვათ
+  // ჩამეკეცა — მერე როდის და როგორ უნდა ვნახო?"
+  //
+  // The address was already required (2026-08-17, „every client notification is
+  // an email and there is no SMS"), which makes the omission worse, not better:
+  // we insisted on it and then did not use it for the first notification.
+  const route = read('app/api/requests/route.ts')
+  assert.match(route, /requestReceivedClientEmail/,
+    'the client no longer gets a receipt — closing the tab loses the request')
+
+  // ⚠️ SENT ON A REJECTED REQUEST TOO, and this is deliberate. Being told „we
+  // cannot help at this budget" and being told nothing are different things,
+  // and the thread on their page is open precisely so a refused person can ask
+  // „და 300₾-ზე?" — a thread they cannot find is not open.
+  const receipt = route.indexOf('requestReceivedClientEmail')
+  const rejectedGate = route.indexOf('if (!rejected) {')
+  assert.ok(receipt > 0 && rejectedGate > 0 && receipt < rejectedGate,
+    'the client receipt moved inside the !rejected branch — a refused person would hear nothing')
+
+  // It must carry the way back, not just the news.
+  const tpl = read('lib/emailTemplates.ts')
+  assert.match(tpl, /requestReceivedClientEmail[\s\S]{0,900}\/request\/\$\{o\.publicRef\}/,
+    'the receipt stopped linking to the request page')
+})

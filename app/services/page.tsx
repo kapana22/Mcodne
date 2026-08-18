@@ -28,6 +28,7 @@ import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
 import { Card } from '@/components/Card'
 import { Btn } from '@/components/Btn'
+import { Masters } from './_masters'
 import { getCurrentUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
@@ -99,6 +100,14 @@ export default async function Page() {
               </Card>
             ))}
           </div>
+        </Container>
+
+        {/* Who actually does it. AFTER the trades, because „what can I ask for"
+            is the question somebody arrives with and „who are they" is the one
+            they ask second. Renders nothing at all while nobody is listed —
+            see _masters. */}
+        <Container className="pb-14 sm:pb-20">
+          <Masters />
         </Container>
       </main>
 
