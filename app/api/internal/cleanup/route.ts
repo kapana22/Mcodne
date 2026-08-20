@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { notify } from '@/lib/notify'
+import { notify, notifyMany, normalizePrefs } from '@/lib/notify'
 import { fmtKaDateTime, fmtKaTime } from '@/lib/kaDate'
 import { sendSessionReminders } from '@/lib/sessionReminders'
 import { sendMessageReminders } from '@/lib/messageReminders'
@@ -9,10 +9,14 @@ import { sendExpertRequestEscalations, PREPARING_TTL_HOURS, ESCALATION_STAGES } 
 import { sendExpertActivationNudges } from '@/lib/expertActivation'
 import { pruneEvents, EVENT_RETENTION_DAYS } from '@/lib/events'
 import { cronAuth } from '@/lib/cronAuth'
-import { requestsOn } from '@/lib/requests'
+import { requestsOn, PROVIDER_ROUTE, topicLabel } from '@/lib/requests'
 import { runRequestJobs } from '@/lib/requestJobs'
+import { runOfferLifecycleJobs, DONE_REMINDER_DAYS, DONE_CLOSE_DAYS } from '@/lib/offerLifecycle'
+import { sendMail } from '@/lib/mailer'
+import { offerDoneReminderClientEmail, bookingChangedEmail } from '@/lib/emailTemplates'
 import { lastSweepRunAt } from '@/lib/sweepRunner'
 import { topUpAvailability } from '@/lib/availabilityTopUp'
+import { releaseBookingCredit } from '@/lib/bookingCredit'
 
 // Cleanup job for expired auth artifacts + stale bookings.
 //
@@ -112,7 +116,7 @@ export async function POST(req: Request) {
       durationMin: true,
       topic: true,
       studentId: true,
-      heldSlotId: true,
+      enrollmentId: true,
       tutor: { select: { userId: true } },
     },
   })
@@ -196,29 +200,23 @@ export async function POST(req: Request) {
       type: 'BOOKING_CREATED',
       title: 'ჯავშანი ძველ დროზე დარჩა',
       body: `${sessionRef} — გადადების მოთხოვნას ვადა გაუვიდა, ჯავშანი ძველ დროზე ძალაშია`,
-      href: `/student/bookings/${b.id}`,
+      href: `/me/bookings/${b.id}`,
     })
     await notify(b.tutor.userId, {
       type: 'BOOKING_CREATED',
       title: 'ჯავშანი ძველ დროზე დარჩა',
       body: `${sessionRef} — გადადების მოთხოვნას ვადა გაუვიდა, ჯავშანი ძველ დროზე ძალაშია`,
-      href: `/tutor/bookings/${b.id}`,
+      href: `/work/bookings/${b.id}`,
     })
   }
 
   let preparingCanceled = 0
   for (const b of stalePrep) {
-    // Release the EXACT slot this booking claimed (heldSlotId) — same as the
-    // cancel/decline flows. Null is a harmless no-op: under the windows model a
-    // booking claims nothing (a row is a WINDOW and bookable starts are derived
-    // from windows − active bookings), so cancelling one automatically returns
-    // its time to the derivation. Only legacy rows still carry a heldSlotId
-    // worth clearing. The old time-containment fallback that matched a row by
-    // `startAt <= b.startAt AND endAt >= end AND booked = true` is gone: every
-    // new booking has a null heldSlotId, so it fired against whatever unrelated
-    // legacy row happened to contain the time — to clear a flag that no longer
-    // means anything.
-    const slotId: string | null = b.heldSlotId
+    // Nothing is released: under the windows model a booking claims nothing
+    // (a row is a WINDOW and bookable starts are derived from windows − active
+    // bookings), so cancelling one automatically returns its time to the
+    // derivation. The legacy `booked` flag is retired (stage 11) — heldSlotId
+    // is only nulled in the claim below.
     const claimed = await prisma.$transaction(async tx => {
       // Status-guarded claim: the tutor could have accepted (PREPARING →
       // CONFIRMED) between our findMany snapshot and this write. count === 1
@@ -226,12 +224,34 @@ export async function POST(req: Request) {
       // clobber a just-confirmed booking back to CANCELED and free its slot.
       const c = await tx.booking.updateMany({
         where: { id: b.id, status: 'PREPARING' },
-        data: { status: 'CANCELED', payoutStatus: 'REFUNDED', heldSlotId: null },
+        data: {
+          status: 'CANCELED',
+          payoutStatus: 'REFUNDED',
+          heldSlotId: null,
+          // ⚠️ `cancelledBy` IS DELIBERATELY LEFT NULL, and the null is the
+          // answer (2026-08-19). The column is typed `Role?` — STUDENT, TUTOR,
+          // ADMIN — and nobody here acted. Widening that enum with a SYSTEM
+          // value was tried and reverted the same hour: `Role` is the ACCOUNT
+          // role, so a machine value in it leaks into every `Me` in the tree
+          // and every switch that thought it had three cases.
+          //
+          // What was actually broken is the READER. app/me/bookings/[id] fell
+          // through to „შენ გააუქმა" for anything it did not recognise, so the
+          // one cancellation the client had no part in — an expert who never
+          // answered — was the one their screen blamed them for. That fallback
+          // is fixed at the two places that draw it; null now reads „the
+          // platform did this", which is true.
+          //
+          // The REASON is the part that was genuinely missing, and it is a
+          // plain string with no enum to widen. Both other exits write it; this
+          // is the third, and the client's screen renders it.
+          cancelReason: `ექსპერტმა ${PREPARING_TTL_HOURS} საათში არ უპასუხა — ჯავშანი ავტომატურად გაუქმდა`,
+        },
       })
       if (c.count !== 1) return false
-      if (slotId) {
-        await tx.availabilitySlot.updateMany({ where: { id: slotId }, data: { booked: false } })
-      }
+      // Nobody answered, so nobody is at fault: the credit comes back, the
+      // month does not move (lib/bookingCredit).
+      await releaseBookingCredit(tx, b.enrollmentId)
       return true
     })
     // Lost the race (a concurrent accept won) — don't free the slot and don't
@@ -246,14 +266,47 @@ export async function POST(req: Request) {
       type: 'BOOKING_CANCELED',
       title: 'ჯავშანი გაუქმდა',
       body: `${sessionRef} — შენი მოთხოვნა უპასუხოდ დარჩა და ავტომატურად გაუქმდა`,
-      href: `/student/bookings/${b.id}`,
+      href: `/me/bookings/${b.id}`,
     })
     await notify(b.tutor.userId, {
       type: 'BOOKING_CANCELED',
       title: 'ჯავშანი გაუქმდა',
       body: `${sessionRef} — მოთხოვნა უპასუხოდ დარჩა და ავტომატურად გაუქმდა`,
-      href: `/tutor/bookings/${b.id}`,
+      href: `/work/bookings/${b.id}`,
     })
+
+    // ── And the email the other two exits have always sent ────────────────
+    //
+    // ⚠️ THIS SWEEP WAS THE ONLY TERMINAL PATH WITH NO MAIL (2026-08-19). A
+    // decline emails the client; a cancel emails the other side; this one left
+    // an in-app bell and nothing else — so a client who was not sitting in an
+    // open tab was never told at all, on the one ending they did nothing to
+    // cause. It is TERMINAL: this booking will never produce another signal
+    // (the reminder sweep only reads CONFIRMED rows), so the bell alone means
+    // silence forever.
+    //
+    // `declined` is the honest template, not a new one: „<name>-მა ვერ
+    // დაადასტურა ეს მოთხოვნა — სესია არ შედგება" is exactly what happened,
+    // and the client does not need to know whether the words „no" were typed
+    // or the clock ran out. Same pref gate the in-app notify() applies
+    // (BOOKING_CANCELED belongs to the BOOKING_CREATED group), and best-effort
+    // throughout: a mail failure must never affect a sweep that already wrote.
+    try {
+      const [student, profile] = await Promise.all([
+        prisma.user.findUnique({ where: { id: b.studentId }, select: { email: true, notificationPrefs: true } }),
+        prisma.tutorProfile.findUnique({ where: { id: b.tutorId }, select: { user: { select: { fullName: true } } } }),
+      ])
+      if (student?.email && normalizePrefs(student.notificationPrefs).BOOKING_CREATED) {
+        const { subject, html } = bookingChangedEmail('declined', {
+          counterpartName: profile?.user.fullName || 'ექსპერტი',
+          topic: b.topic,
+          whenText: fmtKaDateTime(b.startAt, { year: true }),
+          note: 'იმავე ექსპერტთან სხვა დროს ან სხვა ექსპერტს მარტივად აირჩევ.',
+          href: `/experts/${b.tutorId}`,
+        })
+        await sendMail({ to: student.email, subject, html })
+      }
+    } catch { /* email is best-effort — the cancellation is the deliverable */ }
   }
 
   // CONFIRMED / LIVE past (startAt + duration + 48h) with nobody having
@@ -343,13 +396,13 @@ export async function POST(req: Request) {
           type: 'BOOKING_COMPLETED',
           title: 'სესია დასრულებულად ჩაითვალა',
           body: `${sessionRef} — ავტომატურად მოინიშნა დასრულებულად`,
-          href: `/student/bookings/${b.id}`,
+          href: `/me/bookings/${b.id}`,
         }),
         notify(b.tutor.userId, {
           type: 'BOOKING_COMPLETED',
           title: 'სესია დასრულებულად ჩაითვალა',
           body: `${sessionRef} — ავტომატურად მოინიშნა დასრულებულად`,
-          href: `/tutor/bookings/${b.id}`,
+          href: `/work/bookings/${b.id}`,
         }),
       ]
     }))
@@ -387,8 +440,8 @@ export async function POST(req: Request) {
         ? `სესია იწყება 1 საათში · ${fmtKaTime(b.startAt)}`
         : `შეხსენება: სესია 24 საათში · ${fmtKaTime(b.startAt)}-ზე`
       const body = `${b.topic} · ${fmtKaDateTime(b.startAt, { year: true })}`
-      planned.push({ userId: b.studentId, href: `/student/bookings/${b.id}?reminder=${kind}`, title, body })
-      planned.push({ userId: b.tutor.userId, href: `/tutor/bookings/${b.id}?reminder=${kind}`, title, body })
+      planned.push({ userId: b.studentId, href: `/me/bookings/${b.id}?reminder=${kind}`, title, body })
+      planned.push({ userId: b.tutor.userId, href: `/work/bookings/${b.id}?reminder=${kind}`, title, body })
     }
     const existing = await prisma.notification.findMany({
       where: { type: 'BOOKING_REMINDER', href: { in: planned.map(p => p.href) } },
@@ -525,6 +578,29 @@ export async function POST(req: Request) {
     ? await runRequestJobs(now.getTime()).catch(() => ({ providerNudges: 0, clientNudges: 0, autoClosed: 0 }))
     : null
 
+  // ── After the choice: „დასრულდა?" (stage 7, lib/offerLifecycle) ─────────
+  // Two phases, both claim-style: an ACCEPTED offer nobody marked done for
+  // DONE_REMINDER_DAYS gets ONE reminder — the client by mail, the provider by
+  // bell — claimed by the OfferEvent 'REMINDED' row; at DONE_CLOSE_DAYS the
+  // offer is closed silently (`closedAt`). Same flag, same wrapping.
+  const offerJobs = requestsOn()
+    ? await runOfferLifecycleJobs(now.getTime(), {
+        remindClient: async o => {
+          await sendMail({ to: o.email, ...offerDoneReminderClientEmail({ publicRef: o.publicRef, topicLabel: topicLabel(o.topic) }) })
+        },
+        remindProvider: async (ids, o) => {
+          await notifyMany(ids, {
+            type: 'REQUEST_DONE',
+            title: 'დასრულდა სამუშაო?',
+            // The topic, never the reference — a provider bell never carries
+            // the client's credential.
+            body: topicLabel(o.topic),
+            href: `${PROVIDER_ROUTE}/offers`,
+          })
+        },
+      }).catch(() => ({ reminded: 0, closed: 0 }))
+    : null
+
   return NextResponse.json({
     ok: true,
     deleted: {
@@ -548,6 +624,7 @@ export async function POST(req: Request) {
     eventsPruned,
     enrollments: { expired: enrollmentsExpired, completed: enrollmentsCompleted },
     requests: requestJobs,
+    offers: offerJobs,
     at: now.toISOString(),
   })
 }
@@ -587,6 +664,7 @@ export async function GET(req: Request) {
       'Send BOOKING_REMINDER (24h + 1h before start) to both parties of CONFIRMED bookings — run every 15–30 min for reliable 1h reminders',
       'Nudge the client to review a completed, unreviewed session ~3h after it ended (auto-completed / disputed excluded) — one in-app notification + one email, plus a rebook invite when they have nothing booked with that expert',
       `Escalate an unanswered PREPARING request to the EXPERT at ${ESCALATION_STAGES.map(s => `${s.hoursLeft}h`).join(' and ')} before it auto-cancels — in-app + email, exactly once per stage, never for an answered/reschedule-pending/past-start request`,
+      `Requests: remind ONCE about an ACCEPTED offer nobody marked done after ${DONE_REMINDER_DAYS} days (client by email, provider by bell), and close it silently at ${DONE_CLOSE_DAYS} days`,
     ],
     // HEARTBEAT. The whole sweep was silently dark for days because a „Completed"
     // cron proved nothing — it never carried a valid secret and this very page is

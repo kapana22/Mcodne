@@ -112,7 +112,12 @@ export const FEATURE_ABROAD = false
 // Read it through `canSeePackages()` in lib/packages.ts; do not compare this
 // constant directly at call sites.
 export type PackagesVisibility = 'off' | 'admin' | 'signed-in' | 'public'
-export const PACKAGES_VISIBILITY: PackagesVisibility = 'signed-in'
+// ⚠️ 'off' SINCE 2026-08-19, and it is a STAGE, not a verdict. Four verticals
+// running in parallel is four sets of texts, admin tabs, tests and decisions
+// for one person to hold, on a site whose traffic has not arrived yet. Owner's
+// call: narrow to the one thing the site sells until it sells it. Turning this
+// back to 'signed-in' is the whole of undoing it — no code was removed.
+export const PACKAGES_VISIBILITY: PackagesVisibility = 'off'
 
 // GEL → EUR, for DISPLAY ONLY in the /abroad context.
 //
@@ -170,4 +175,8 @@ export const ABROAD_EUR_PER_GEL = 0.33
 // at call sites, and do not add an env var beside it — one switch, or the next
 // person adds a third.
 export type B2BVisibility = 'off' | 'admin' | 'public'
-export const B2B_VISIBILITY: B2BVisibility = 'admin'
+// ⚠️ 'off' SINCE 2026-08-19 — same reasoning as PACKAGES_VISIBILITY above, and
+// the same one-line undo. It was 'admin', which cost nothing to a visitor but
+// still carried an admin tab, a route, an API surface and a test suite through
+// every change.
+export const B2B_VISIBILITY: B2BVisibility = 'off'
