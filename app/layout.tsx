@@ -12,7 +12,7 @@ import { KeyboardShortcuts } from '@/components/KeyboardShortcuts'
 import { ImpersonationBanner } from '@/components/ImpersonationBanner'
 import { Analytics } from '@/components/Analytics'
 import { SiteTextProvider } from '@/components/SiteTextProvider'
-import { getSiteTextMap } from '@/lib/siteText'
+import { getPublicSiteTextMap } from '@/lib/siteText'
 import { CodeInjector } from '@/components/CodeInjector'
 import { getIntegrations } from '@/lib/integrations'
 
@@ -96,7 +96,14 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Editable site copy resolved once per request (defaults if DB is down), then
   // handed to the client provider so <SiteText>/useSiteText work everywhere.
-  const siteTexts = await getSiteTextMap()
+  //
+  // ⚠️ THE *PUBLIC* MAP, and the word matters: this value is serialized into
+  // the RSC payload of every page, so anything in it is delivered to every
+  // visitor and every crawler whether or not a component reads it. The full
+  // map still holds retired keys — the copy of pages that were replaced — and
+  // shipping those put „ხელოსნები" in the HTML of the whole site for weeks
+  // after the pages saying it were gone (lib/siteText).
+  const siteTexts = await getPublicSiteTextMap()
   // Admin-managed integrations (GA id + raw header/footer code).
   const integrations = await getIntegrations()
   return (

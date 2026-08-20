@@ -113,7 +113,7 @@ export const PAGE_SEO: PageSeoDef[] = [
     page: 'apply-master',
     label: 'დაარეგისტრირე შენი სერვისი',
     title: 'დაარეგისტრირე შენი სერვისი — მიიღე შეკვეთები | მცოდნე',
-    description: 'დარეგისტრირდი ხელოსნად და მიიღე შეკვეთები შენს ქალაქში — სანტექნიკა, ელექტრიკა, დალაგება, ტექნიკის შეკეთება. რეგისტრაცია უფასოა.',
+    description: 'დაარეგისტრირე შენი სერვისი და მიიღე შეკვეთები შენს ქალაქში — სანტექნიკა, ელექტრიკა, დალაგება, ტექნიკის შეკეთება. რეგისტრაცია უფასოა.',
     ogTitle: 'დაარეგისტრირე შენი სერვისი — მცოდნე',
     ogDescription: 'დარეგისტრირდი და მიიღე შეკვეთები შენს ქალაქში.',
   },
@@ -131,9 +131,9 @@ export const PAGE_SEO: PageSeoDef[] = [
     // requestTopics → LIVE_SERVICE_GROUP_IDS. A meta description is a promise
     // made in a search result, which is the one place a visitor decides before
     // they can see that a category is empty.
-    description: 'აღწერე რა გჭირდება — სანტექნიკა, ელექტრიკა, დალაგება, ტექნიკის შეკეთება — და ხელოსნები ფასს შემოგთავაზებენ. უფასოა.',
+    description: 'აღწერე რა გჭირდება — სანტექნიკა, ელექტრიკა, დალაგება, ტექნიკის შეკეთება — და ფასს შემოგთავაზებენ. უფასოა.',
     ogTitle: 'სერვისები — მცოდნე',
-    ogDescription: 'აღწერე რა გჭირდება და ხელოსნები ფასს შემოგთავაზებენ.',
+    ogDescription: 'აღწერე რა გჭირდება და ფასს შემოგთავაზებენ.',
   },
   {
     // ⚠️ RETIRED 2026-08-19 (stage 10): the trades catalogue and the expert one
@@ -141,17 +141,17 @@ export const PAGE_SEO: PageSeoDef[] = [
     // under `seo.masters.*` — never delete a key.
     page: 'masters',
     retired: true,
-    label: 'ხელოსნები',
+    label: 'სერვისები',
     // ⚠️ THE CATALOGUE'S PROMISE IS THE LIST AND THE FILTER — nothing else.
     // the deleted /services door sold the intake; this page shows who is there, so its SERP
     // text must describe browsing and must NOT advertise ratings, reviews or
     // response times. There is no such data, and a description that promises
     // it is a promise broken in the first second on the page. Same four trades
     // as that door, and it stays in step with LIVE_SERVICE_GROUP_IDS.
-    title: 'ხელოსნები — სანტექნიკოსი, ელექტრიკოსი, დამლაგებელი | მცოდნე',
-    description: 'ნახე ხელოსნები — სანტექნიკა, ელექტრიკა, დალაგება, ტექნიკის შეკეთება. გაფილტრე სერვისითა და ქალაქით.',
-    ogTitle: 'ხელოსნები — მცოდნე',
-    ogDescription: 'ნახე ხელოსნები სერვისისა და ქალაქის მიხედვით.',
+    title: 'სერვისები — სანტექნიკოსი, ელექტრიკოსი, დამლაგებელი | მცოდნე',
+    description: 'ნახე სერვისები — სანტექნიკა, ელექტრიკა, დალაგება, ტექნიკის შეკეთება. გაფილტრე სერვისითა და ქალაქით.',
+    ogTitle: 'სერვისები — მცოდნე',
+    ogDescription: 'ნახე სერვისები კატეგორიისა და ქალაქის მიხედვით.',
   },
   {
     // ⚠️ RETIRED 2026-08-19 (stage 10). The profession HUB moved from

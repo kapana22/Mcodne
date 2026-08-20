@@ -52,7 +52,19 @@ export function roleLabel(role: string | null | undefined): string {
  *  Four different phrasings used to sit in the same menu slot. */
 export const SPACE_LABEL = {
   CLIENT: 'ჩემი სივრცე',
-  EXPERT: 'ექსპერტის სივრცე',
-  MASTER: 'ხელოსნის სივრცე',
+  // ⚠️ ONE LABEL FOR THE SUPPLY SIDE SINCE 2026-08-20, and it names the ROOM
+  // rather than a kind of person. There were two — „ექსპერტის სივრცე" and
+  // „ხელოსნის სივრცე" — sitting in the same menu, pointing at two doors into
+  // what is now ONE workspace (/work serves both capabilities). The second
+  // also carried a retired word into the live menu for weeks; owner, on the
+  // label itself: „ხელოსნის სივრცე ზედმეტია… ჩემი აზრით არასწორია", and on the
+  // word: „ხელოსნები აღარ უნდა გამოგყევენებინა არსად".
+  //
+  // EXPERT and MASTER are kept as separate keys and given the SAME words: the
+  // callers still ask a different question („do they consult" / „are they on
+  // the allowlist"), and collapsing the keys would hide that they are two
+  // checks. What is collapsed is the SENTENCE, which is all a person reads.
+  EXPERT: 'სამუშაო სივრცე',
+  MASTER: 'სამუშაო სივრცე',
   ADMIN: 'ადმინის სივრცე',
 } as const

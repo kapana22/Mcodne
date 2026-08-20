@@ -496,6 +496,35 @@ export const SITE_TEXT_DEFAULTS: Record<string, string> = Object.fromEntries(
   SITE_TEXTS.map(t => [t.key, t.default]),
 )
 
+/**
+ * The same map WITHOUT retired keys — what a browser is allowed to receive.
+ *
+ * ⚠️ `retired: true` STOPPED RENDERING, IT NEVER STOPPED DELIVERY (fixed
+ * 2026-08-20). `getSiteTextMap` spread every key into one object and
+ * app/layout handed the whole thing to `<SiteTextProvider>`, a CLIENT
+ * component — so every retired default was serialized into the RSC payload of
+ * EVERY page on the site. Measured that day: seven copies of the retired word
+ * „ხელოსნები" in the HTML of every page measured — the home, the catalogue,
+ * the door, the intake, help, about, signup and the workspace — all of it from
+ * `seo.masters.*` and `seo.services.*`, pages that had not existed for a day.
+ * (Written without the paths: tests/requests scans this tree for anything that
+ * names the intake route, and a comment is indistinguishable from a link.) View-source found it; the comments
+ * above claimed „no page reads them", which was true and beside the point.
+ *
+ * A retired key is kept (never deleted — the registry is the record of what a
+ * URL used to say) and it stays readable on the SERVER, where a redirect or an
+ * old sitemap entry may still want it. It just does not travel.
+ */
+export const SITE_TEXT_PUBLIC_DEFAULTS: Record<string, string> = Object.fromEntries(
+  SITE_TEXTS.filter(t => !t.retired).map(t => [t.key, t.default]),
+)
+
+/** Is this key retired? The one place the answer is computed. */
+const RETIRED_KEYS = new Set(SITE_TEXTS.filter(t => t.retired).map(t => t.key))
+export function isRetiredSiteTextKey(key: string): boolean {
+  return RETIRED_KEYS.has(key)
+}
+
 // Guard: only known keys can be written from the admin API.
 export function isKnownSiteTextKey(key: string): boolean {
   return key in SITE_TEXT_DEFAULTS

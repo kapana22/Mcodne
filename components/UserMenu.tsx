@@ -173,8 +173,14 @@ export function UserMenu({
   // tradesperson keeps role STUDENT, and the hat requires the same allowlist
   // row the workspace itself checks (tests/requests.test.ts pins this).
   const switchItems: MenuItem[] = []
-  if (isDualRole && !inExpertSpace) switchItems.push({ href: '/work', label: SPACE_LABEL.EXPERT, icon: Icon.briefcase })
-  if (isMaster && !inProviderSpace) switchItems.push({ href: `${PROVIDER_ROUTE}/requests`, label: SPACE_LABEL.MASTER, icon: Icon.briefcase })
+  // ⚠️ ONE DOOR, NOT TWO (2026-08-20). Both branches used to push an item —
+  // an expert got „ექსპერტის სივრცე" → /work and a provider „ხელოსნის სივრცე"
+  // → /work/requests — so somebody holding both hats read two entries for one
+  // room, and the provider's entry skipped the home screen carrying their
+  // balance. /work now serves both, so the two checks answer one item.
+  if ((isDualRole || isMaster) && !inExpertSpace && !inProviderSpace) {
+    switchItems.push({ href: '/work', label: SPACE_LABEL.EXPERT, icon: Icon.briefcase })
+  }
   if ((isDualRole || isMaster) && !inClientSpace) switchItems.push({ href: '/me', label: SPACE_LABEL.CLIENT, icon: Icon.home })
   // ADMIN manages all three worlds — give the menu direct doors into both
   // spaces (user request 2026-08-01: „ადმინადაც და სტუდენტადაც… იკარგება").

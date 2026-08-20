@@ -220,7 +220,7 @@ export function newMasterApplicationAdminEmail(o: {
     subject: `ახალი განაცხადი — სერვისი — ${String(o.name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 60)}`,
     html: shell({
       heading: 'ახალი განაცხადი მოდერაციაში',
-      bodyHtml: p(`<b>${esc(o.name)}</b> გამოგზავნა განაცხადი ხელოსნად.`) + detail(rows),
+      bodyHtml: p(`<b>${esc(o.name)}</b> გამოგზავნა განაცხადი სერვისზე.`) + detail(rows),
       cta: { label: 'გახსენი მოდერაცია', href: `${BASE}/admin#masters` },
       footerNote: 'ადმინის შეტყობინება',
     }),
@@ -239,7 +239,7 @@ export function masterApprovedEmail(o: { name: string; note?: string | null }) {
       heading: first ? `${esc(first)}, დამტკიცდი` : 'დამტკიცდი',
       bodyHtml:
         p('შენი მიმართულების და შენს ქალაქში გამოგზავნილი მოთხოვნები ახლა შენთან მოდის.') +
-        p('გახსენი სია, წაიკითხე და ფასი თვითონ დაწერე. სხვა ხელოსნები შენს შეთავაზებას ვერ ხედავენ.') +
+        p('გახსენი სია, წაიკითხე და ფასი თვითონ დაწერე. სხვები შენს შეთავაზებას ვერ ხედავენ.') +
         (o.note ? p(`<span style="color:${MUTED};">კომენტარი:</span> ${esc(o.note)}`) : ''),
       // ⚠️ THROUGH SIGN-IN, NOT DIRECT — and this mail is exactly the case the
       // rule was written for. Every /provider surface answers notFound() rather

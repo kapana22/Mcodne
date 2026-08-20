@@ -956,7 +956,11 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   const menu = read('components/UserMenu.tsx')
   assert.match(menu, /const isMaster = hats\.includes\('MASTER'\)/,
     'the user menu stopped deriving the master door from the hat')
-  assert.match(menu, /if \(isMaster && !inProviderSpace\) switchItems\.push\(\{ href: `\$\{PROVIDER_ROUTE\}\/requests`/,
+  // ⚠️ THE DOOR IS /work SINCE 2026-08-20 and there is only one of it — what
+  // this pins is unchanged: a provider reaches the supply side through the
+  // MASTER HAT, never through a role, and the hat requires the same allowlist
+  // row the workspace itself checks.
+  assert.match(menu, /if \(\(isDualRole \|\| isMaster\) && !inExpertSpace && !inProviderSpace\) \{\s*\n\s*switchItems\.push\(\{ href: '\/work'/,
     'the provider link in the user menu is no longer behind the MASTER hat')
 
   // Same shape for /work/jobs: the allowlist entry above says WHERE to look,

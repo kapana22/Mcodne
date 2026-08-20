@@ -302,8 +302,8 @@ export async function generateMetadata(
   if (trade) {
     const label = tradeLabel(trade)
     const canonical = `${SITE_URL}/experts/${param}`
-    const title = `${label} — ხელოსნები | მცოდნე`
-    const description = `${label}: ხელოსნები მცოდნეზე. აღწერე, რა გჭირდება, და მიიღე შეთავაზებები.`
+    const title = `${label} — სერვისები | მცოდნე`
+    const description = `${label}: სერვისები მცოდნეზე. აღწერე, რა გჭირდება, და მიიღე შეთავაზებები.`
     return { title, description, alternates: { canonical }, ...socialMeta({ title, description, url: canonical }) }
   }
   // ── 3. the expert profile ───────────────────────────────────────────────

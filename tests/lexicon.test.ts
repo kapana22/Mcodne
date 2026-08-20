@@ -40,10 +40,17 @@ const RULES: Rule[] = [
   // ⚠️ RETIRED 2026-08-19. It names a KIND OF PERSON, and the model says there is
   // one provider who offers services (CLAUDE.md → THE PRODUCT MODEL). Owner:
   // the word should not be mentioned at all.
-  { word: /ხელოსან/, say: 'a person-kind word — the model has one provider offering სერვისი',
-    // A SEARCH SYNONYM is not a label: somebody typing it must still find
-    // furniture assembly, so lib/requestTopics keeps it inside `alt` only.
-    allow: (f, l) => f === 'lib/requestTopics.ts' && /alt: \[/.test(l) },
+  // ⚠️ „ხელოსა?ნ" AND NOT „ხელოსან" — THE PLURAL DROPS THE „ა" (2026-08-20).
+  // „ხელოსანი" is ხ-ე-ლ-ო-ს-ა-ნ-ი; „ხელოსნები" is ხ-ე-ლ-ო-ს-ნ-ე-ბ-ი. The old
+  // pattern therefore matched only the singular, and the admin's own tab sat
+  // there reading „ხელოსნები" through every sweep of this file — the owner
+  // found it, this test did not. A Georgian stem that loses a vowel in the
+  // plural has to be written to match both, or the rule guards half the word.
+  //
+  // AND THE `alt` EXEMPTION IS GONE with it. A search synonym is not printed,
+  // which is exactly how it survived — but the instruction was „არსად", and
+  // the data is somewhere. „ავეჯის აწყობა" is found by its own name.
+  { word: /ხელოსა?ნ/, say: 'a person-kind word — the model has one provider offering სერვისი' },
   { word: /დამკვეთ/, say: '„დამკვეთი" is contract language — „კლიენტი" or the second person' },
   { word: /სფერო/, say: '„სფერო" → „კატეგორია" on screens (the menu already says კატეგორიები)',
     // Prose where the word means „a field of work", not the UI concept, and
@@ -65,14 +72,20 @@ const RULES: Rule[] = [
     allow: (f) => ['lib/categorySeo.ts', 'lib/helpSearch.ts'].includes(f) },
   { word: /ვერიფიცირებ/, say: '„ვერიფიცირებული" → „გადამოწმებული"' },
   { word: /პირადი კაბინეტი/, say: '„პირადი კაბინეტი" is a calque — „ჩემი სივრცე"' },
-  { word: /მასტერ(?!კლას)/, say: '„მასტერი" is salon jargon — „ხელოსანი"' },
+  { word: /მასტერ(?!კლას)/, say: '„მასტერი" is salon jargon — say „ექსპერტი", or name the service' },
   { word: /ვეძებ სპეციალისტს/, say: 'the signup tile says „ვეძებ ექსპერტს" — one widget, one word' },
 ]
 
 test('the forbidden words do not appear in screen strings', () => {
   const offenders: string[] = []
   for (const f of FILES) {
-    if (f.startsWith('lib/roles')) continue
+    // ⚠️ lib/roles IS SCANNED SINCE 2026-08-20 — it used to be skipped, and it
+    // is the file that DEFINES every role and space label. „ხელოსნის სივრცე"
+    // therefore sat in the live avatar menu through every sweep of this test,
+    // exempted by the one line that was meant to stop the rule tripping over
+    // its own vocabulary. It does not need the exemption: the words it holds
+    // are the APPROVED ones, so if a forbidden word appears there it is a real
+    // regression, and a more serious one than anywhere else.
     const lines = codeOf(f).split('\n')
     lines.forEach((line, i) => {
       for (const r of RULES) {

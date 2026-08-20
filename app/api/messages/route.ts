@@ -1,6 +1,7 @@
 import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { isListedProvider } from '@/lib/publicProvider'
 import { getCurrentUser } from '@/lib/auth'
 import { rateLimit } from '@/lib/rateLimit'
 import { notify } from '@/lib/notify'
@@ -116,13 +117,20 @@ export async function GET(req: Request) {
       },
     })
     if (!other) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
-    // A pre-booking consultation thread needs an EXPERT to consult, so at least
-    // one party must be a TUTOR (the same trust boundary the POST guard
-    // enforces). STUDENT↔TUTOR and TUTOR↔TUTOR (a dual-role expert asking
-    // another expert as a client) are both valid; STUDENT↔STUDENT (no expert)
-    // and anything involving an ADMIN are not.
-    const roles = new Set([(user as any).role, other.role])
-    if (!roles.has(ROLE.EXPERT) || roles.has('ADMIN')) {
+    // ⚠️ „IS EITHER PARTY LISTED", NOT „IS EITHER PARTY A TUTOR" (2026-08-20).
+    // This asked for `ROLE.EXPERT` on one side, which excluded every SERVICE
+    // PROVIDER: they are admitted through `RequestAccess`, not by being granted
+    // the role — all seven live ones are STUDENT. See lib/publicProvider for the
+    // measurement and why the role was the wrong question to ask.
+    // ADMIN is still never a counterparty: staff are not a listing.
+    if (new Set([(user as any).role, other.role]).has('ADMIN')) {
+      return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
+    }
+    const [iAmListed, otherIsListed] = await Promise.all([
+      isListedProvider(user.id),
+      isListedProvider(other.id),
+    ])
+    if (!iAmListed && !otherIsListed) {
       return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
     }
 
@@ -136,7 +144,14 @@ export async function GET(req: Request) {
     // them, booking POST refuses them), so a cold ?withUser probe must not
     // resolve them either — while an EXISTING thread still passes (the check is
     // "do we already talk?"), so history never breaks under a suspension.
-    if (other.role !== ROLE.EXPERT || other.suspendedAt) {
+    // ⚠️ THE SAME CORRECTION HERE. „Not a TUTOR" used to mean „prove you already
+    // talk"; for a service provider that made a COLD inquiry impossible, which
+    // is the only kind a browse visitor ever sends. A LISTED provider is public
+    // by definition — their name and photo are on a card and a profile page —
+    // so resolving them by id reveals nothing. Anyone NOT listed still has to
+    // show a real relationship, which is what stops a provider enumerating
+    // clients by id.
+    if (!otherIsListed || other.suspendedAt) {
       const rel = await prisma.message.findFirst({
         where: { bookingId: null, OR: [{ fromId: user.id, toId: withUser }, { fromId: withUser, toId: user.id }] },
         select: { id: true },
@@ -608,11 +623,17 @@ export async function POST(req: Request) {
     })
     if (!other) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
 
-    // A pre-booking inquiry needs an expert to consult — at least one party must
-    // be a TUTOR, and never an ADMIN. STUDENT→TUTOR and TUTOR→TUTOR (a dual-role
-    // expert asking another expert as a client) are both valid.
-    const roles = new Set([(user as any).role, other.role])
-    if (!roles.has(ROLE.EXPERT) || roles.has('ADMIN')) {
+    // The write side of the same rule — see the GET branch and lib/publicProvider.
+    // At least one party must be LISTED (a live expert OR a visible service
+    // provider); never an ADMIN.
+    if (new Set([(user as any).role, other.role]).has('ADMIN')) {
+      return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
+    }
+    const [iAmListed, otherIsListed] = await Promise.all([
+      isListedProvider(user.id),
+      isListedProvider(other.id),
+    ])
+    if (!iAmListed && !otherIsListed) {
       return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
     }
 
@@ -634,7 +655,10 @@ export async function POST(req: Request) {
     // This stops an expert cold-opening to a client (the old "reply-only" rule);
     // once a client has opened the thread, either side may continue freely —
     // an already-open conversation keeps working even if the expert is suspended.
-    if (isNewThread && (other.role !== ROLE.EXPERT || other.suspendedAt)) {
+    // Opening a new thread is a CLIENT act: the recipient must be LISTED and not
+    // suspended. „role !== EXPERT" here is what refused every cold inquiry to a
+    // service provider — the exact action the profile's new „მიწერე" offers.
+    if (isNewThread && (!otherIsListed || other.suspendedAt)) {
       return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
     }
 

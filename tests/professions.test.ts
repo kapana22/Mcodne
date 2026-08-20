@@ -22,8 +22,12 @@ test('the shape of the list the owner supplied', () => {
   // category, so a client could ask for them and the catalogue had nobody to
   // show — and three names that sell nothing left the list („მეწარმე",
   // „სტრატეგი", „ჟურნალისტი"). Net: +2 spheres, −3 professions.
-  assert.equal(Object.keys(PROFESSIONS).length, 19, '19 spheres')
-  assert.equal(ALL_PROFESSIONS.length, 93, '93 professions')
+  // ⚠️ 21 AND 99 SINCE ტალღა 1 (2026-08-20): `remonti` and `dalageba` are the
+  // owner's own launch categories and the first SERVICE spheres this file has
+  // ever held — until today every one of its 93 names was a consultant, which
+  // is what „the taxonomy is still the old site" meant in CLAUDE.md.
+  assert.equal(Object.keys(PROFESSIONS).length, 21, '21 spheres')
+  assert.equal(ALL_PROFESSIONS.length, 99, '99 professions')
   // ⚠️ AND THE THREE DO NOT COME BACK. „მეწარმე" is an identity, not something
   // anybody can buy — the exact fault that retired „ხელოსანი".
   for (const banned of ['მეწარმე', 'სტრატეგი', 'ჟურნალისტი']) {

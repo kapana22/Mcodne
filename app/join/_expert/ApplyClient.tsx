@@ -687,7 +687,7 @@ export default function TutorApply({ initialUser, seed, onContinueMaster }: {
               {/* Both halves ticked on the door: the master form is the next
                   step, so it takes the primary slot and home steps aside. */}
               {onContinueMaster ? (
-                <Btn onClick={onContinueMaster}>გააგრძელე ხელოსნის ნაწილით</Btn>
+                <Btn onClick={onContinueMaster}>გააგრძელე სერვისის ნაწილით</Btn>
               ) : (
                 <Link href="/" className="h-11 px-6 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center justify-center transition-colors duration-fast">მთავარზე დაბრუნება</Link>
               )}

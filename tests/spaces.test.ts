@@ -257,7 +257,12 @@ test('§F the subsystem owns three /work screens, never /work — and the chrome
   assert.match(menu, /const inExpertSpace = pathname\.startsWith\('\/work'\) && !inProviderSpace/)
   assert.match(menu, /\{ href: '\/work', label: SPACE_LABEL\.EXPERT/)
   assert.match(menu, /\{ href: '\/me', label: SPACE_LABEL\.CLIENT/)
-  assert.match(menu, /href: `\$\{PROVIDER_ROUTE\}\/requests`, label: SPACE_LABEL\.MASTER/)
+  // ⚠️ ONE DOOR SINCE 2026-08-20. The menu used to push two items — /work for
+  // an expert and /work/requests for a provider — so somebody holding both
+  // hats read two entries for one room, and the provider's skipped the home
+  // screen carrying their balance. /work serves both capabilities now.
+  assert.match(menu, /if \(\(isDualRole \|\| isMaster\) && !inExpertSpace && !inProviderSpace\)/)
+  assert.doesNotMatch(menu, /label: SPACE_LABEL\.MASTER/, 'the second door came back')
   const hats = read('lib/hats.ts')
   assert.match(hats, /EXPERT: '\/work'/); assert.match(hats, /CLIENT: '\/me'/)
   assert.match(hats, /MASTER: `\$\{PROVIDER_ROUTE\}\/requests`/)

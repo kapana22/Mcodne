@@ -410,7 +410,7 @@ export const VideoHero = ({ tutorId, tutor, requireAuth, viewerCantFav = false, 
                     step 4 of ./page.tsx. One plain link. */}
                 {masterHref && (
                   <Link href={masterHref} className="inline-flex items-center gap-1.5 h-10 sm:h-8 px-3.5 sm:px-3 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 hover:border-ink-300 hover:text-ink-900 font-display text-meta font-semibold transition-colors duration-fast">
-                    <Icon.briefcase className="w-3.5 h-3.5" /> ხელოსნის პროფილი
+                    <Icon.briefcase className="w-3.5 h-3.5" /> სერვისის პროფილი
                   </Link>
                 )}
                 {li && (

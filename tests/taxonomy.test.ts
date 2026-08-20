@@ -52,8 +52,20 @@ test('A. every profession carries `can`, defaulting to CONSULT, and the WORK lis
   }
   assert.equal(Object.keys(PROFESSION_CAN).length, ALL_PROFESSIONS.length, 'a profession is missing from PROFESSION_CAN')
   // Short and obvious: designers, developers, photographers — not everybody.
+  //
+  // ⚠️ THE CEILING WENT 16 → 20 WITH ტალღა 1 (2026-08-20). The owner's launch
+  // list added six professions that sell a JOB and nothing else — სანტექნიკოსი,
+  // ელექტრიკოსი, კონდიციონერის სპეციალისტი, ტექნიკის სპეციალისტი,
+  // დამლაგებელი, ავეჯის ამწყობი — and they are the first entries in this file
+  // that exist for the WORK half rather than being consultants who also
+  // deliver. „Short" still means „nameable in one breath", not „a dozen".
+  //
+  // They keep CONSULT as well, and that is the owner's own reasoning rather
+  // than a default: „სანტექნიკოსი, რომელმაც იცის რატომ ჟონავს მილი, ისეთივე
+  // მცოდნეა, როგორც იურისტი." A ten-minute call about whether the pipe needs
+  // replacing is a real thing to sell.
   const workers = professionsThatCan('WORK')
-  assert.ok(workers.length >= 8 && workers.length <= 16, `${workers.length} professions do WORK — the list was meant to be short`)
+  assert.ok(workers.length >= 8 && workers.length <= 20, `${workers.length} professions do WORK — the list was meant to be short`)
   assert.ok(workers.includes('გრაფიკული დიზაინერი') && workers.includes('ფოტოგრაფი') && workers.includes('დეველოპერი'))
   assert.ok(!workers.includes('ფსიქოლოგი') && !workers.includes('ადვოკატი'), 'a conversation-only profession was marked WORK')
   assert.equal(professionsThatCan('CONSULT').length, ALL_PROFESSIONS.length)

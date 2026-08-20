@@ -208,6 +208,40 @@ export const PROFESSIONS: Record<string, readonly string[]> = {
   // written that way they would reintroduce exactly the mixture this file was
   // created to remove, so they are named for the person who does the work.
   // The SUBJECT is not lost — it is the searchable half of each name.
+  /* ═══════════ THE SERVICE SIDE (ტალღა 1, 2026-08-20) ═══════════════════
+   *
+   * ⚠️ THESE ARE THE OWNER'S OWN LAUNCH LIST and they are the reason this file
+   * stopped being a consulting directory. Owner: „მცოდნე = ვინც იცის…
+   * სანტექნიკოსი, რომელმაც იცის რატომ ჟონავს მილი, ისეთივე მცოდნეა, როგორც
+   * იურისტი. ეს არ არის სამი პროდუქტი — ეს ერთი დაპირების სამი ფორმაა."
+   *
+   * Every profile in this file was a consultant until today, which is exactly
+   * what CLAUDE.md warned about: „No amount of copy makes a site read as a
+   * services marketplace while its own category list is 86% consulting."
+   *
+   * ⚠️ THREE OF THE SIX ARE RENAMED FROM THE OWNER'S OWN TEXT, and deliberately.
+   * The list wrote „კონდიციონერის ხელოსანი" and „სარეცხი მანქანის და მაცივრის
+   * ხელოსანი", and „ხელოსანი" is retired — the owner reaffirmed it the same
+   * day („ხელოსნები აღარ უნდა გამოგყევენებინა არსად"). „ავეჯის გადაზიდვა და
+   * აწყობა" was written as an ACTIVITY, and every entry in this file is a
+   * PERSON — that is the file's founding rule.
+   *
+   * ⚠️ AND THE SECOND CATEGORY IS NOT THE OWNER'S NAME. They wrote
+   * „საყოფაცხოვრებო" and then rejected it („sayofacxovrebo არ გვინდა"), asking
+   * what to do with the rest. Cleaning and furniture are not repair, so they
+   * are not filed under „სახლის რემონტი" — they get a name that says what they
+   * are.
+   */
+  'remonti': [
+    'სანტექნიკოსი',
+    'ელექტრიკოსი',
+    'კონდიციონერის სპეციალისტი',
+    'ტექნიკის სპეციალისტი',
+  ],
+  'dalageba': [
+    'დამლაგებელი',
+    'ავეჯის ამწყობი',
+  ],
   'swavleba': [
     'ინგლისურის მასწავლებელი',
     'მათემატიკის მასწავლებელი',
@@ -264,6 +298,16 @@ const ALSO_WORKS: readonly string[] = [
   'ინტერიერის დიზაინერი',
   'არქიტექტორი',
   'SMM სპეციალისტი',
+  // ტალღა 1 — the six that sell a JOB and nothing else. They are listed here
+  // rather than given a flag of their own because `PROFESSION_CAN` is the one
+  // answer to „what can this person sell", and a second mechanism for the same
+  // question is how the two halves drifted apart the last time.
+  'სანტექნიკოსი',
+  'ელექტრიკოსი',
+  'კონდიციონერის სპეციალისტი',
+  'ტექნიკის სპეციალისტი',
+  'დამლაგებელი',
+  'ავეჯის ამწყობი',
 ]
 
 /** job → what it can do. Every profession is present; default `['CONSULT']`. */

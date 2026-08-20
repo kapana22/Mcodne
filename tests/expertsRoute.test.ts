@@ -86,7 +86,7 @@ test('§B the page reads `slug`, resolves id OR slug, and 308s a cuid to /expert
   assert.match(client, /initialTutor\?\.id \?\? params\?\.slug/, 'the fallback id must come from the renamed param')
 })
 
-test('§C dual providers: the profile links „ხელოსნის პროფილი" → /experts/<slug>, photos never selected', () => {
+test('§C dual providers: the profile links „სერვისის პროფილი" → /experts/<slug>, photos never selected', () => {
   const page = read('app/experts/[slug]/page.tsx')
   assert.match(page, /serviceProfile: \{ select: \{ slug: true, published: true \} \}/,
     'the select must be exactly slug + published — ServiceProfile photo columns are base64')
@@ -96,7 +96,10 @@ test('§C dual providers: the profile links „ხელოსნის პრ�
   assert.match(page, /masterHref=\{masterHref\}/)
   const hero = read('app/experts/[slug]/_hero.tsx')
   assert.match(hero, /<Link href=\{masterHref\}/)
-  assert.match(hero, /ხელოსნის პროფილი/)
+  // ⚠️ „ხელოსნის" UNTIL 2026-08-20 — the retired word, in the one link a dual
+  // provider follows to their other half. Owner: „ხელოსნები აღარ უნდა
+  // გამოგყევენებინა არსად."
+  assert.match(hero, /სერვისის პროფილი/)
 })
 
 /* ═══════════ 2. the redirect ════════════════════════════════════════════ */

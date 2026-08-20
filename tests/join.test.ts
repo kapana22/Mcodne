@@ -146,7 +146,7 @@ test('§F the door: shared picker + two tiles, nothing ticked cannot continue, c
   assert.match(door, /seed=\{seed\}/)
   assert.match(door, /onContinueMaster=\{work \? \(\) => setStage\('master'\) : undefined\}/)
   const expert = codeOf('app/join/_expert/ApplyClient.tsx')
-  assert.match(expert, /გააგრძელე ხელოსნის ნაწილით/, 'the expert success screen lost the hand-off to the master form')
+  assert.match(expert, /გააგრძელე სერვისის ნაწილით/, 'the expert success screen lost the hand-off to the master form')
   assert.match(expert, /onContinueMaster \? \(/)
   // The `?can=` pre-tick, narrowed to what is actually offered.
   assert.match(codeOf('app/join/page.tsx'), /preset=\{can\.filter\(c => offer\.includes\(c\)\)\}/)

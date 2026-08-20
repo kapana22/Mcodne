@@ -44,6 +44,7 @@
 import { Icon } from '@/components/Icon'
 import { useState } from 'react'
 import { ALL_PROFESSIONS, MAX_PROFESSIONS, PROFESSIONS } from '@/lib/professions'
+import { isLaunchCategory, launchFirst } from '@/lib/launchTaxonomy'
 
 export type PickerSphere = { slug: string; name: string }
 
@@ -60,15 +61,33 @@ export function ProfessionPicker({
   onChange: (next: string[]) => void
 }) {
   const [sphereQuery, setSphereQuery] = useState('')
+  const [showRest, setShowRest] = useState(false)
   const q = sphereQuery.trim().toLowerCase()
   const searching = q.length >= 2
 
   /** ⚠️ THE CHOSEN SPHERE IS NEVER FILTERED OUT. A search that hides the row
    *  you already ticked reads as „your answer was lost", and the tick is the
    *  only thing on this step that carries state. */
-  const shownSpheres = !searching
+  const shownSpheres = launchFirst(!searching
     ? spheres
-    : spheres.filter(sp => sp.name.toLowerCase().includes(q) || sp.name === sphere)
+    : spheres.filter(sp => sp.name.toLowerCase().includes(q) || sp.name === sphere))
+
+  /**
+   * ⚠️ ტალღა 1 IS WHAT A NEW APPLICANT MEETS (2026-08-20). The owner handed
+   * over a launch taxonomy — seven categories, fifteen professions, teaching
+   * and services beside consulting — and this screen was still offering the
+   * nineteen-sphere consulting directory it grew out of: „ახლებს უნდა
+   * დავახვედროთ უკვე გამოსწორებული ვარიანტი."
+   *
+   * The rest are NOT hidden and NOT deleted — twenty-six experts are filed
+   * under them. They sit behind one line, because nineteen options is a
+   * taxonomy to study and seven is a choice to make. A search that matches
+   * anything in the tail opens the tail on its own, so nobody has to know the
+   * fold is there.
+   */
+  const launch = shownSpheres.filter(sp => isLaunchCategory(sp.slug))
+  const rest = shownSpheres.filter(sp => !isLaunchCategory(sp.slug))
+  const restOpen = showRest || searching || (!!sphere && rest.some(sp => sp.name === sphere))
 
   /**
    * ⚠️ THE SEARCH READS PROFESSIONS TOO, AND THAT IS THE POINT (2026-08-20).
@@ -183,6 +202,10 @@ export function ProfessionPicker({
           </div>
         )}
 
+        {/* A ROW IS A ROW WHEREVER IT SITS. The launch set and the rest use
+            the same button — the fold is the only thing that separates them,
+            because a second visual treatment would read as „these are the
+            real ones" and the rest already carry twenty-six experts. */}
         <div
           role="radiogroup"
           aria-label="კატეგორია"
@@ -195,32 +218,18 @@ export function ProfessionPicker({
                 : 'ვერაფერი მოიძებნა — მოხსენი ძებნა და გადახედე სიას.'}
             </p>
           )}
-          {shownSpheres.map(sp => {
-            const on = sphere === sp.name
-            return (
-              <button
-                key={sp.slug}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => onSphere(on ? '' : sp.name)}
-                className={`min-w-0 min-h-11 px-2.5 py-2 flex items-center gap-2.5 text-left rounded-btn border transition-colors duration-fast ${
-                  on
-                    ? 'border-brand-500 bg-brand-50 text-brand-800 font-display font-semibold'
-                    : 'border-transparent bg-white text-ink-900 hover:border-ink-200'
-                }`}
-              >
-                <span className={`w-[18px] h-[18px] shrink-0 rounded-full border-[1.5px] inline-flex items-center justify-center ${
-                  on ? 'bg-brand-600 border-brand-600 text-white' : 'border-ink-300 bg-white'
-                }`}>
-                  {on && <Icon.check className="w-3 h-3" />}
-                </span>
-                {/* Wraps, never truncates — „არქიტექტურა და მშენებლობა" is
-                    two words long and a cut label is not a choice. */}
-                <span className="min-w-0 flex-1 text-body leading-snug">{sp.name}</span>
-              </button>
-            )
-          })}
+          {launch.map(sp => <SphereRow key={sp.slug} sp={sp} on={sphere === sp.name} onPick={onSphere} />)}
+
+          {rest.length > 0 && !restOpen && (
+            <button
+              type="button"
+              onClick={() => setShowRest(true)}
+              className="col-span-full min-h-11 px-2.5 py-2 text-left rounded-btn text-small text-ink-600 hover:text-ink-900 hover:bg-white transition-colors duration-fast"
+            >
+              სხვა კატეგორიები ({rest.length}) ↓
+            </button>
+          )}
+          {restOpen && rest.map(sp => <SphereRow key={sp.slug} sp={sp} on={sphere === sp.name} onPick={onSphere} />)}
         </div>
       </div>
 
@@ -331,4 +340,30 @@ const StepLabel = ({ n, on, right, children }: { n: number; on: boolean; right?:
       <span className="ml-auto font-display text-meta font-semibold tabular-nums text-brand-700">{right}</span>
     )}
   </div>
+)
+
+/* One category row. Extracted the day the list gained a fold: the launch set
+   and the tail must be the SAME control, and two copies of a 20-line button is
+   how they stop being. */
+const SphereRow = ({ sp, on, onPick }: { sp: PickerSphere; on: boolean; onPick: (name: string) => void }) => (
+  <button
+    type="button"
+    role="radio"
+    aria-checked={on}
+    onClick={() => onPick(on ? '' : sp.name)}
+    className={`min-w-0 min-h-11 px-2.5 py-2 flex items-center gap-2.5 text-left rounded-btn border transition-colors duration-fast ${
+      on
+        ? 'border-brand-500 bg-brand-50 text-brand-800 font-display font-semibold'
+        : 'border-transparent bg-white text-ink-900 hover:border-ink-200'
+    }`}
+  >
+    <span className={`w-[18px] h-[18px] shrink-0 rounded-full border-[1.5px] inline-flex items-center justify-center ${
+      on ? 'bg-brand-600 border-brand-600 text-white' : 'border-ink-300 bg-white'
+    }`}>
+      {on && <Icon.check className="w-3 h-3" />}
+    </span>
+    {/* Wraps, never truncates — „არქიტექტურა და მშენებლობა" is two words long
+        and a cut label is not a choice. */}
+    <span className="min-w-0 flex-1 text-body leading-snug">{sp.name}</span>
+  </button>
 )

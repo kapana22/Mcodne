@@ -84,11 +84,18 @@ const ADMIN_NAV: NavItem[] = ([
   // somebody is waiting for a phone call. The whole feature dies if this tab
   // goes unopened for a day.
   { id: 'requests',   l: 'მოთხოვნები', icon: 'list', g: 'queue' },
-  // Masters (2026-08-18). Beside the two queues it belongs between: a
-  // tradesperson's application is the same kind of work as an expert's
-  // („განაცხადები") and it is what fills the one above it („მოთხოვნები") with
-  // somebody to route to. An unopened tab here is an empty supply side.
-  { id: 'masters',    l: 'ხელოსნები', icon: 'award', g: 'queue' },
+  // Masters (2026-08-18). Beside the two queues it belongs between: this
+  // application is the same kind of work as an expert's („განაცხადები") and it
+  // is what fills the one above it („მოთხოვნები") with somebody to route to.
+  // An unopened tab here is an empty supply side.
+  //
+  // ⚠️ IT READ „ხელოსნები" UNTIL 2026-08-20 and must not again. The word is
+  // retired everywhere a person can see it, the admin included — owner:
+  // „ხელოსნები აღარ უნდა გამოგყევენებინა არსად". The queue is not a kind of
+  // PERSON, it is applications to sell a SERVICE, which is what it now says.
+  // The route id stays `masters` — a URL is not copy, and renaming it would
+  // break every bookmark an admin has.
+  { id: 'masters',    l: 'სერვისის განაცხადები', icon: 'award', g: 'queue' },
   { id: 'bookings',   l: 'ჯავშნები', icon: 'cal', g: 'queue' },
   { id: 'help',       l: 'ჩატის კითხვები', icon: 'chat', g: 'queue' },
   { id: 'disputes',   l: 'დავები', icon: 'flag', g: 'queue' },

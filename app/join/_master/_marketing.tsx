@@ -20,7 +20,7 @@ const STEPS = [
   { t: 'შეავსე განაცხადი', d: 'რას აკეთებ, რომელ ქალაქში და როგორ დაგიკავშირდნენ. ხუთი წუთი.' },
   { t: 'გადავამოწმებთ', d: 'დაგირეკავთ და ვისაუბრებთ. დამტკიცების შემდეგ სისტემაში ხარ.' },
   { t: 'მოთხოვნები მოგდის', d: 'მხოლოდ შენი მიმართულების და შენი ქალაქის. სხვას ვერ ნახავ.' },
-  { t: 'შენ წერ ფასს', d: 'პირდაპირ კლიენტს. სხვა ხელოსნები შენს შეთავაზებას ვერ ხედავენ.' },
+  { t: 'შენ წერ ფასს', d: 'პირდაპირ კლიენტს. სხვები შენს შეთავაზებას ვერ ხედავენ.' },
 ]
 
 export function MasterApplyMarketing() {
@@ -37,7 +37,7 @@ export function MasterApplyMarketing() {
       <PublicTopBar />
       <main>
         <Container className="pt-10 sm:pt-14 pb-8">
-          <Eyebrow>ხელოსნებისთვის</Eyebrow>
+          <Eyebrow>სერვისებისთვის</Eyebrow>
           <h1 className="mt-2 font-display text-h1 sm:text-display font-bold text-ink-900 tracking-tight max-w-[18ch]">
             დაარეგისტრირე შენი სერვისი
           </h1>

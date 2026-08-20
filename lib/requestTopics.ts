@@ -989,7 +989,13 @@ export const TOPIC_GROUPS: TopicGroup[] = [
       { id: 'rep-paint',    label: 'შეღებვა და შპალერი', alt: ['მღებავი', 'შეღებვა', 'შპალერი', 'კედლის შეღებვა'] },
       { id: 'rep-floor',    label: 'იატაკის დაგება', alt: ['იატაკი', 'პარკეტი', 'ლამინატი', 'ლინოლეუმი'] },
       { id: 'rep-door',     label: 'კარ-ფანჯარა', alt: ['კარი', 'ფანჯარა', 'საკეტი', 'ბოქლომი'] },
-      { id: 'rep-assembly', label: 'ავეჯის აწყობა', alt: ['კარადის აწყობა', 'ხელოსანი'] },
+      // ⚠️ „ხელოსანი" WAS AN `alt` HERE UNTIL 2026-08-20 and must not return.
+      // An alt is never printed — it is only matched against — which is exactly
+      // why it survived every sweep of the visible copy. Owner: „ხელოსნები
+      // აღარ უნდა გამოგყევენებინა არსად". The topic is still found by its own
+      // name and by „კარადის აწყობა"; what is gone is the site keeping a
+      // retired word alive in its own data.
+      { id: 'rep-assembly', label: 'ავეჯის აწყობა', alt: ['კარადის აწყობა', 'ავეჯის შეკრება'] },
     ],
   },
   {
@@ -1380,7 +1386,7 @@ export const VERTICAL_COPY: Record<Vertical, {
     // dispatch this platform does not perform: what happens is a mail to the
     // masters who cover that trade, and a wait. Saying the true thing costs
     // nothing and is the difference between a promise and a description.
-    hint: 'დაწერე შენი სიტყვებით — ხელოსნები ფასს შემოგთავაზებენ.',
+    hint: 'დაწერე შენი სიტყვებით — ფასს შემოგთავაზებენ.',
     placeholder: 'ონკანი ჟონავს',
     suggested: ['plumb-leak', 'clean-flat', 'elec-socket', 'app-washer', 'plumb-drain', 'clean-deep'],
   },
