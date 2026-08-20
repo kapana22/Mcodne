@@ -131,28 +131,32 @@ test('§E the page: guest → pitch, admin → /admin, and the WORK half is gate
   assert.match(page, /PROVIDER_ROUTE/)
 })
 
-test('§F the door: shared picker + two tiles, nothing ticked cannot continue, choice persists', () => {
+test('§F the door: one question, the capability derived, the choice persists', () => {
   const door = codeOf('app/join/JoinClient.tsx')
   assert.match(door, /<ProfessionPicker/, 'the door grew its own profession control instead of the shared one')
   assert.match(door, /useSpheres\(\)/, 'the door fetches spheres its own way — one fetch shape, one fallback')
-  assert.match(door, /role="checkbox"/)
-  assert.match(door, /aria-checked=\{on\}/)
-  assert.match(door, /disabled=\{picked\.length === 0\}/, 'a person who ticks nothing can continue')
+  // ⚠️ THE TWO CAPABILITY TILES WERE REMOVED ON 2026-08-20 and the checkbox
+  // assertions went with them (tests/joinDoor pins their absence). What a
+  // person can sell follows from WHAT THEY DO — see `picked` in the door.
+  assert.match(door, /const picked = useMemo<Capability\[\]>/, 'the capability is state again instead of a consequence')
+  assert.match(door, /professionCan\(job\)/, 'the capability is no longer read from the profession table')
+  assert.match(door, /disabled=\{picked\.length === 0\}/, 'a person who has answered nothing can continue')
   assert.match(door, /'mcodne:join'/, 'the choice is not persisted')
   assert.match(read('lib/signout.ts'), /'mcodne:join'/, 'sign-out leaves the door choice for the next person on a shared device')
-  // Which wizard opens: CONSULT first when both, the master form when WORK alone.
-  assert.match(door, /setStage\(consult \? 'expert' : 'master'\)/)
+  // Which wizard opens: the SERVICE form when they can do both (CLAUDE.md
+  // rule 4), the expert wizard only when consulting is all they can do.
+  assert.match(door, /setStage\(work \? 'master' : 'expert'\)/)
   // The expert wizard is seeded from the door and offered the master hand-off.
   assert.match(door, /seed=\{seed\}/)
   assert.match(door, /onContinueMaster=\{work \? \(\) => setStage\('master'\) : undefined\}/)
   const expert = codeOf('app/join/_expert/ApplyClient.tsx')
   assert.match(expert, /გააგრძელე სერვისის ნაწილით/, 'the expert success screen lost the hand-off to the master form')
   assert.match(expert, /onContinueMaster \? \(/)
-  // The `?can=` pre-tick, narrowed to what is actually offered.
+  // `?can=` still wins over the derivation — somebody followed that link on
+  // purpose — and is still narrowed to what is actually offered.
   assert.match(codeOf('app/join/page.tsx'), /preset=\{can\.filter\(c => offer\.includes\(c\)\)\}/)
-  assert.match(door, /useState<Capability\[\]>\(preset\)/)
+  assert.match(door, /if \(preset\.length > 0\) return preset/)
 })
-
 /* ═══════════ 3. the redirects ══════════════════════════════════════════ */
 
 test('§G the middleware 308s /apply, /apply/master and /apply/* onto /join, query kept', () => {

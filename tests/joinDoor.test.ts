@@ -25,9 +25,11 @@ const codeOf = (p: string) =>
   read(p).split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n').replace(/\/\*[\s\S]*?\*\//g, '')
 
 test('the door offers the SERVICE first', () => {
-  // This array is the order the tiles are drawn in, and the tiles are the first
-  // thing anybody who wants to sell here reads. CONSULT was pushed first — a
-  // statement about what this site is, made by a line nobody thought of as copy.
+  // ⚠️ THE TILES ARE GONE (see the next test) BUT THE ORDER STILL DECIDES.
+  // `offer` is what the door will honour from a derived capability, and it is
+  // read in order everywhere it is consumed — including `?can=` and the „both"
+  // branch. CONSULT was pushed first once: a statement about what this site is,
+  // made by a line nobody thought of as copy.
   const page = codeOf('app/join/page.tsx')
   const w = page.indexOf("offer.push('WORK')")
   const c = page.indexOf("offer.push('CONSULT')")
@@ -35,17 +37,34 @@ test('the door offers the SERVICE first', () => {
   assert.ok(w < c, 'the consultation tile is built before the service tile — CLAUDE.md, THE HIERARCHY rule 4')
 })
 
-test('both tiles name an OFFER, never a person', () => {
-  // „ვარ ექსპერტი" beside „ვთავაზობ სერვისს" — one tile answering „who am I",
-  // the other „what do I offer". That is the framing retired with „ხელოსანი".
-  const tiles = codeOf('app/join/JoinClient.tsx')
-  assert.doesNotMatch(tiles, /'ვარ ექსპერტი'/, 'a tile names an identity again — CLAUDE.md, THE HIERARCHY rule 5')
-  assert.doesNotMatch(tiles, /t: 'ვარ /, 'a tile starts with „ვარ" — that is a person, not an offer')
-  assert.match(tiles, /WORK: \{ t: 'ვასრულებ სერვისს'/)
-  assert.match(tiles, /CONSULT: \{ t: 'ვატარებ კონსულტაციას'/)
-  // …and the service tile is declared first, so a reader of this file sees the
-  // same order the page draws.
-  assert.ok(tiles.indexOf('WORK: {') < tiles.indexOf('CONSULT: {'), 'the tile map lists the consultation first')
+test('the door does not ask which half they are', () => {
+  /* ⚠️ THE TILES ARE GONE AND MUST NOT COME BACK (2026-08-20). Owner, looking
+   * at the two of them: „აქ არჩევანი საერთოდ არ უნდა იყოს და გაერთიანებული
+   * უნდა იყოს — უბრალოდ შიგნით უნდა იყოს ჩაშენებული."
+   *
+   * Two failures in one control. It put the „კონსულტაცია / სერვისი" axis on
+   * the first screen a provider ever sees — the one thing CLAUDE.md says must
+   * never be primary — and it asked a question the site could already answer:
+   * `PROFESSION_CAN` has known what each job sells since stage 8, and it is
+   * the same table the request router reads. */
+  const door = codeOf('app/join/JoinClient.tsx')
+  assert.doesNotMatch(door, /'ვასრულებ სერვისს'|'ვატარებ კონსულტაციას'|'ვარ ექსპერტი'/,
+    'the capability tiles are back — the profession decides, CLAUDE.md rule 1')
+  assert.doesNotMatch(door, /role="checkbox"[\s\S]{0,400}CAPABILITY_LABEL/,
+    'a capability is being ticked again')
+  // Derived, and from the ONE table that already holds the answer.
+  assert.match(door, /professionCan\(job\)/, 'the capability is no longer derived from the profession')
+  assert.match(door, /const picked = useMemo<Capability\[\]>/, 'the capability became state again — it is a consequence')
+})
+
+test('when they can do both, the SERVICE form opens first', () => {
+  // A ბუღალტერი is CONSULT + WORK. The door used to send them into the
+  // consultation wizard and offer the service afterwards, which is the
+  // hierarchy upside down — CLAUDE.md rule 4: wherever both appear, the
+  // service comes first.
+  const door = codeOf('app/join/JoinClient.tsx')
+  assert.match(door, /setStage\(work \? 'master' : 'expert'\)/,
+    'the consultation wizard opens first again for somebody who can do both')
 })
 
 test('neither door makes the applicant retype what they already answered', () => {

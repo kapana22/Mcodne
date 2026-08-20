@@ -1,14 +1,27 @@
 'use client'
-// /join — the ONE onboarding door (2026-08-19). It asks two things and then
-// re-homes the person into the wizard that already exists: „ვარ ექსპერტი" →
-// the expert application (./_expert), „ვარ ხელოსანი" → the master form
-// (./_master), both → expert first, then the master form from its success
-// screen. Neither wizard was rewritten; this file only decides which one opens
-// and hands it what the door already learned.
+// /join — THE ONE ONBOARDING DOOR, AND IT ASKS ONE QUESTION (2026-08-20).
+//
+// ⚠️ THERE IS NO „კონსულტაცია / სერვისი" CHOICE HERE ANY MORE, and there must
+// not be one again. Owner, looking at the two tiles: „აქ არჩევანი საერთოდ არ
+// უნდა იყოს და გაერთიანებული უნდა იყოს — უბრალოდ შიგნით უნდა იყოს ჩაშენებული."
+//
+// The tiles asked a person to classify THEMSELVES before the site had told
+// them anything — and it was the same axis CLAUDE.md says must never be
+// primary („A „კონსულტაცია / სერვისი" primary axis… a switcher, a nav item,
+// the first filter section"). It was also a question with a knowable answer:
+// a სანტექნიკოსი sells a job, a ფსიქოლოგი sells a conversation, a ბუღალტერი
+// sells both, and lib/professions → PROFESSION_CAN has said so since stage 8.
+// Asking the applicant to repeat what the taxonomy already knows is how the
+// door ended up with two mechanisms for one fact.
+//
+// SO: they name what they do, and the capabilities are DERIVED. The wizard
+// that opens is decided the same way — WORK-capable goes to the service form
+// first, because the service always arrives first (CLAUDE.md rule 4); the
+// consultation half is offered from its success screen.
 //
 // The choice survives a reload in localStorage (`mcodne:join`), so a person
-// who comes back lands on the door with their ticks in place, and the sphere
-// + professions picked here are seeded into the expert wizard's own draft.
+// who comes back lands on the door with their answer in place, and the
+// category + professions picked here are seeded into the wizard's own draft.
 
 import { useEffect, useMemo, useState } from 'react'
 import { Container } from '@/components/Container'
@@ -19,26 +32,11 @@ import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
 import { ProfessionPicker } from '@/components/ProfessionPicker'
 import type { Me } from '@/lib/me'
-import { CAPABILITIES, CAPABILITY_LABEL, type Capability } from '@/lib/capabilities'
+import { CAPABILITIES, type Capability } from '@/lib/capabilities'
+import { professionCan } from '@/lib/professions'
 import TutorApply from './_expert/ApplyClient'
 import { useSpheres } from './_expert/_steps'
 import { MasterApplyClient } from './_master/client'
-
-/** The signup tiles' own words (app/signin/_signup.tsx), one per capability. */
-/**
- * ⚠️ BOTH TILES NAME AN OFFER, NEVER A PERSON (2026-08-20).
- *
- * It read „ვარ ექსპერტი" beside „ვთავაზობ სერვისს" — one tile answering „who
- * am I", the other „what do I offer", side by side on the same screen. That is
- * the framing the product model retired with „ხელოსანი": the type belongs to
- * what somebody OFFERS, never to what kind of person they are (CLAUDE.md →
- * THE HIERARCHY, rule 5). The second line under each is the capability's own
- * label and is unchanged.
- */
-const TILE: Record<Capability, { t: string; s: string }> = {
-  WORK: { t: 'ვასრულებ სერვისს', s: CAPABILITY_LABEL.WORK },
-  CONSULT: { t: 'ვატარებ კონსულტაციას', s: CAPABILITY_LABEL.CONSULT },
-}
 
 const JOIN_KEY = 'mcodne:join'
 type JoinDraft = { can: Capability[]; sphere: string; professions: string[]; savedAt: number }
@@ -73,7 +71,6 @@ export function JoinClient({ offer, preset, me }: {
   me: Me
 }) {
   const [stage, setStage] = useState<'door' | 'expert' | 'master'>('door')
-  const [picked, setPicked] = useState<Capability[]>(preset)
   const [sphere, setSphere] = useState('')
   const [professions, setProfessions] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -85,7 +82,6 @@ export function JoinClient({ offer, preset, me }: {
   useEffect(() => {
     const d = readJoin()
     if (d) {
-      if (preset.length === 0) setPicked(d.can.filter(c => offer.includes(c)))
       setSphere(d.sphere)
       setProfessions(d.professions)
     }
@@ -93,13 +89,41 @@ export function JoinClient({ offer, preset, me }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /**
+   * ⚠️ THE CAPABILITIES ARE DERIVED FROM THE PROFESSION, NEVER ASKED.
+   *
+   * `PROFESSION_CAN` (lib/professions) already says what each job can sell —
+   * a სანტექნიკოსი a job, a ფსიქოლოგი a conversation, a ბუღალტერი both — and
+   * it is the same table the request router reads. Asking the applicant to
+   * classify themselves on top of it was a second answer to a question that
+   * already had one, and it put the retired „კონსულტაცია / სერვისი" axis on
+   * the first screen a provider ever sees.
+   *
+   * `offer` still narrows it: the page decides which halves are open at all
+   * (an expert is not offered CONSULT twice; WORK is absent while providers
+   * are off), and a derived capability the site is not offering is dropped
+   * rather than honoured. `preset` (?can= in the URL) is the one deliberate
+   * override — a link that names a half wins over the derivation, because
+   * somebody followed it on purpose.
+   */
+  const picked = useMemo<Capability[]>(() => {
+    if (preset.length > 0) return preset
+    const derived = new Set<Capability>()
+    for (const job of professions) for (const c of professionCan(job)) derived.add(c as Capability)
+    // A category with no profession ticked is still an answer — they consult in
+    // it until they say otherwise. Empty stays empty so the button stays off.
+    if (derived.size === 0 && sphere) derived.add('CONSULT')
+    return CAPABILITIES.filter(c => derived.has(c) && offer.includes(c))
+  }, [professions, sphere, preset, offer])
+
+  // Persist AFTER the derivation, not before it — `picked` is computed from
+  // the two fields above and the draft records the outcome, so a return visit
+  // restores the same answer without re-deriving it against a taxonomy that
+  // may have moved on.
   useEffect(() => {
     if (!loaded) return
     writeJoin({ can: picked, sphere, professions })
   }, [loaded, picked, sphere, professions])
-
-  const toggle = (c: Capability) =>
-    setPicked(p => (p.includes(c) ? p.filter(x => x !== c) : CAPABILITIES.filter(x => x === c || p.includes(x))))
 
   const consult = picked.includes('CONSULT')
   const work = picked.includes('WORK')
@@ -131,56 +155,45 @@ export function JoinClient({ offer, preset, me }: {
       <Container as="main" size="narrow" className="flex-1 py-10 sm:py-14">
         <h1 className="font-display text-h1 font-bold tracking-tight">შემოგვიერთდი</h1>
 
-        {/* Two tiles, any number ticked. Square ticks — „any of", the same
-            convention ProfessionPicker uses for its professions. */}
-        <div role="group" aria-label="შემოგვიერთდი" className="mt-6 grid gap-3">
-          {offer.map(c => {
-            const on = picked.includes(c)
-            return (
-              <Card
-                key={c}
-                as="button"
-                type="button"
-                role="checkbox"
-                aria-checked={on}
-                onClick={() => toggle(c)}
-                padding="compact"
-                className={`text-left flex items-center gap-3 transition-colors duration-fast ${on ? 'border-brand-500 bg-brand-50' : 'hover:border-ink-300'}`}
-              >
-                <span className={`w-[18px] h-[18px] shrink-0 rounded-[4px] border-[1.5px] inline-flex items-center justify-center ${
-                  on ? 'bg-brand-600 border-brand-600 text-white' : 'border-ink-300 bg-white'
-                }`}>
-                  {on && <Icon.check className="w-3 h-3" />}
-                </span>
-                <span className="min-w-0">
-                  <span className={`block font-display text-body font-bold ${on ? 'text-brand-800' : 'text-ink-900'}`}>{TILE[c].t}</span>
-                  <span className="block text-meta text-ink-500 mt-0.5">{TILE[c].s}</span>
-                </span>
-              </Card>
-            )
-          })}
-        </div>
+        <p className="mt-2 text-body text-ink-600">დაასახელე, რას აკეთებ — დანარჩენს ჩვენ მოვაწყობთ.</p>
 
-        {/* The expert taxonomy, so it belongs to the expert half: shown once
-            that tile is on. Optional here — the wizard asks again if skipped. */}
-        {consult && (
-          <Card className="mt-4">
-            <h2 className="font-display text-h3 font-bold text-ink-900 mb-4">კატეგორია და პროფესია</h2>
-            <ProfessionPicker
-              spheres={spheres.map(s => ({ slug: s.slug ?? '', name: s.name }))}
-              sphere={sphere}
-              onSphere={setSphere}
-              value={professions}
-              onChange={setProfessions}
-            />
-          </Card>
+        {/* ⚠️ ONE QUESTION AND NO TILES (2026-08-20). The category and the
+            profession ARE the answer; what they can sell follows from it (see
+            `picked` above). The block is no longer conditional on a tick and
+            no longer carries a number — it is the screen. */}
+        <Card className="mt-6">
+          <ProfessionPicker
+            spheres={spheres.map(s => ({ slug: s.slug ?? '', name: s.name }))}
+            sphere={sphere}
+            onSphere={setSphere}
+            value={professions}
+            onChange={setProfessions}
+          />
+        </Card>
+
+        {/* What that answer means, said back to them in one line rather than
+            asked as a question. Never „კონსულტაცია / სერვისი" as a CHOICE —
+            this is a consequence, and it only appears once there is one. */}
+        {picked.length > 0 && (
+          <p className="mt-3 text-small text-ink-600">
+            {work && consult
+              ? 'შენს პროფესიაზე შეგიძლია სერვისიც შეასრულო და კონსულტაციაც ჩაატარო.'
+              : work
+                ? 'შენს პროფესიაზე სერვისებს შეასრულებ.'
+                : 'შენს პროფესიაზე კონსულტაციებს ჩაატარებ.'}
+          </p>
         )}
 
         <div className="mt-6">
           <Btn
             size="lg"
             disabled={picked.length === 0}
-            onClick={() => setStage(consult ? 'expert' : 'master')}
+            // ⚠️ THE SERVICE FORM FIRST WHEN THEY CAN DO BOTH — CLAUDE.md
+            // rule 4. This read `consult ? 'expert' : 'master'`, which sent a
+            // ბუღალტერი (CONSULT + WORK) into the consultation wizard and made
+            // the service an afterthought on its success screen. Reversed: the
+            // consultation half is the one offered afterwards.
+            onClick={() => setStage(work ? 'master' : 'expert')}
           >
             გაგრძელება
           </Btn>

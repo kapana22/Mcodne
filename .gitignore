@@ -11,3 +11,8 @@ tsconfig.tsbuildinfo
 # Agent scratch — one-off seeds, snapshots and backups. Excluded from tsconfig
 # too (a stray .tsx here once broke the Railway build while the gate stayed green).
 scratch/
+
+# Throwaway one-off DB probes (scripts/_qa*.ts). They are written against
+# whatever the schema looked like that afternoon, so a stale one breaks the
+# gate’s type stage for a file nothing imports.
+scripts/_qa*.ts
