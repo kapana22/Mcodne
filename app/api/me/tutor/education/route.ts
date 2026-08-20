@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { ROLE } from '@/lib/roles'
 
 const Body = z.object({
   // `school` is deliberately NOT gated — „London Business School" and
@@ -34,7 +35,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
-  if (user.role !== 'TUTOR' && user.role !== 'ADMIN') {
+  if (user.role !== ROLE.EXPERT && user.role !== 'ADMIN') {
     return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
   }
   const profile = await tutorProfileForUser(user.id)

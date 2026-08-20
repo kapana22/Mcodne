@@ -9,8 +9,10 @@ import { UserMenu } from './UserMenu'
 import { Container } from '@/components/Container'
 import { useMe, type Me } from '@/lib/me'
 import { useMessagesUnread, type MessagesSpace } from '@/lib/messagesUnread'
-import { showApplyCta } from '@/lib/roleHome'
+import { JOIN_HREF } from '@/lib/roleHome'
+import { showJoinInvite } from '@/lib/capabilities'
 import { requestsOn } from '@/lib/requests'
+import { ROLE } from '@/lib/roles'
 
 // The single public header. Rendered on every guest/browse/marketing page.
 //
@@ -26,26 +28,49 @@ import { requestsOn } from '@/lib/requests'
 // lib/me probe, but with the uniform nav there's no rearrange either way.
 
 // ONE nav for everyone — the professional marketplace pattern (Airbnb/Intro).
-const NAV: { label: string; href: string }[] = [
-  { label: 'ექსპერტები',     href: '/tutors' },
-  { label: 'კატეგორიები',    href: '/categories' },
-  // The requests wizard. IN the array but filtered below when the flag is off —
-  // see the nav filter, which is also where the 2026-08-17 change from
-  // „admins only" to „everyone" is argued.
-  // ⚠️ A SECTION, NOT AN ACTION — and it sits before „მოთხოვნა" for that
-  // reason. „ექსპერტები" and „სერვისები" name the two halves of the product;
-  // „მოთხოვნა" is the thing you DO in either of them. Reading the bar
-  // left-to-right should say what the site is before it says what to press.
-  { label: 'სერვისები',      href: '/services' },
-  { label: 'მოთხოვნა',       href: '/request' },
-  // ⚠️ „შემოგვიერთდი", NOT „გახდი ექსპერტი" (2026-08-18). There are three ways
-  // to join now — expert, master, company — and the nav cannot grow one item
-  // each without becoming a list of everything the product does. It also stopped
-  // being TRUE: every person on the requests allowlist carries role STUDENT, so
-  // a working tradesperson was being invited to become an expert. One door; the
-  // door asks who you are.
-  { label: 'შემოგვიერთდი', href: '/apply' },
-  { label: 'დახმარება',      href: '/help' },
+//
+// STAGE 10 (2026-08-19): ONE SECTION, „ექსპერტები" → /experts, plus ONE action,
+// „მოთხოვნის გაგზავნა". Owner: „სერვისები საერთოდ ხო ამოსაგდებია" and
+// „სათაურში ჩემი აზრით ექსპერტები უნდა დარჩეს მარტო". The second word named a
+// separate trades door that no longer exists — the two catalogues and that door
+// are one list at one address, so a second item would have pointed at the page
+// the first item already opens. Naming one half of one list in the bar is how a
+// reader concludes the site has two of them.
+//
+// STAGE 9 (2026-08-19, plan §9 „ერთი კითხვა, ორი კარი"): what left the bar and
+// where it went:
+//   · „კატეგორიები" → /experts  — a second item to the same page as the first
+//                              (/categories was retired in stage 8); gone.
+//   · „სერვისები" → /services   — the trades door, deleted in stage 10; the one
+//                              item covers it, and the rail's type filter is
+//                              where „just the jobs" is now said. The whole
+//                              /services prefix went in stage 11.
+//   · „მოთხოვნა"               — became the button (`cta: true` below), same
+//                              href, same flag, same filter line the requests
+//                              test pins.
+//   · the JOIN door           — ⚠ PARTLY BACK (2026-08-19). Owner: „სათაურში
+//                              ვფიქრობ საჭიროა". A marketplace's narrow side is
+//                              SUPPLY, and the bar is the strongest place on the
+//                              site to ask for it. It returns as a QUIET TEXT
+//                              LINK on the right — never a second button: one
+//                              filled action per bar, and „მოთხოვნის გაგზავნა"
+//                              already owns the outlined one. Gated by
+//                              showApplyCta, so an existing expert never reads
+//                              an invitation to become one. Same words and same
+//                              address as the footer's item — one string, one
+//                              meaning. A guest still gets „დაწყება" (JOIN_HREF,
+//                              the door that asks who you are) as the filled
+//                              action; a signed-in person keeps the UserMenu
+//                              item (K5).
+//   · „დახმარება"              — the UserMenu and the footer.
+// Reading the bar left-to-right should say what the site is before it says
+// what to press — so the two sections come first and the action is a button
+// on the right, not a fourth word in the row.
+const NAV: { label: string; href: string; cta?: boolean }[] = [
+  { label: 'ექსპერტები',     href: '/experts' },
+  // The one ACTION. Rendered as a button (desktop: right of the nav; phone:
+  // inside the drawer), never as a nav word.
+  { label: 'მოთხოვნის გაგზავნა', href: '/request', cta: true },
 ]
 
 export function PublicTopBar({
@@ -72,7 +97,7 @@ export function PublicTopBar({
   // the client-side one they also own. null → guest or ADMIN: no inbox, and
   // useMessagesUnread then subscribes to nothing at all.
   const msgSpace: MessagesSpace | null =
-    me?.role === 'TUTOR' ? 'tutor' : me?.role === 'STUDENT' ? 'student' : null
+    me?.role === ROLE.EXPERT ? 'expert' : me?.role === ROLE.CLIENT ? 'client' : null
   const msgUnread = useMessagesUnread(msgSpace)
   const [mobOpen, setMobOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -137,11 +162,10 @@ export function PublicTopBar({
     }
   }, [mobOpen])
 
-  // Hide the "გახდი ექსპერტი" (→/apply) item from users who are already an
-  // expert/admin. showApplyCta(null) is true, so anon + not-yet-resolved keep
-  // it (no flash-in for real visitors); only a known TUTOR/ADMIN drops it.
+  // (The join item and its showApplyCta gate left this list in stage 9 — see
+  // the NAV note above; the gated door lives in the UserMenu now.)
   //
-  // „მოთხოვნა" is shown to EVERYONE the flag admits — including a visitor with
+  // „მოთხოვნის გაგზავნა" is shown to EVERYONE the flag admits — including a visitor with
   // no account, which is most of the people it is for.
   //
   // ⚠️ IT WAS `me?.role === 'ADMIN'` UNTIL 2026-08-17, and the reason it stopped
@@ -168,11 +192,9 @@ export function PublicTopBar({
   // visibility no longer waits for /api/me to resolve, so it is in the first
   // paint rather than appearing a beat later under the cursor.
   const nav = NAV.filter(i => {
-    if (i.href === '/apply') return showApplyCta(me?.role)
-    // Its own line: the /request filter below is matched by three exact
-    // regexes in tests/requests.test.ts, and folding the two together breaks
-    // all of them.
-    if (i.href === '/services') return requestsOn()
+    // ⚠️ ITS OWN LINE, UNTOUCHED. Three exact regexes in tests/requests.test.ts
+    // match this statement character for character; the „სერვისები" item that
+    // used to be gated beside it left the bar in stage 10, this one did not.
     if (i.href === '/request') return requestsOn()
     return true
   })
@@ -181,7 +203,7 @@ export function PublicTopBar({
      page passes in.
      Reported 2026-08-07: „the whole menu changes on the expert page." It did.
      `activeHref` was threaded by hand and exactly TWO surfaces ever passed it
-     (/tutors and /apply). So „ექსპერტები" was lit on the browse list and went
+     (/experts and /apply). So „ექსპერტები" was lit on the browse list and went
      dark the moment you opened an expert; /categories, /categories/[slug],
      /help and every other marketing page lit nothing at all while you stood on
      them. The highlight moved for reasons that had nothing to do with where the
@@ -190,6 +212,19 @@ export function PublicTopBar({
      under its section. The prop is kept only as an override; nothing needs it. */
   const pathname = usePathname() ?? ''
   const activePath = activeHref ?? pathname
+  // ⚠️ THE PREFIX RULE IS THE WHOLE MECHANISM AGAIN (stage 11, 2026-08-19).
+  // „ექსპერტები" is /experts, and `activePath.startsWith(h + '/')` lights it on
+  // every page under it — which is now ALL FOUR: the expert profile, the
+  // provider profile, the profession landing and the trade landing
+  // (app/experts/[slug] resolves them in one chain). There used to be a
+  // SECTION_ALIAS here mapping '/experts' → ['/services'], because the trades
+  // side of the same catalogue answered under a second prefix; that prefix is
+  // gone (it 308s into this one), so the alias mapped nothing and a second
+  // mechanism nobody exercises is a mechanism that quietly rots. If an item
+  // ever again needs to light on an address it does not name, bring it back
+  // WITH the address that needs it — not before.
+  const links = nav.filter(i => !i.cta)
+  const cta = nav.find(i => i.cta)
   const isActive = (href: string) => activePath === href || activePath.startsWith(href + '/')
 
   return (
@@ -225,7 +260,7 @@ export function PublicTopBar({
               expert lands on /tutor, not the anonymous marketing page). */}
           <Logo size="sm" />
           <nav className="hidden lg:flex items-center gap-1">
-            {nav.map(item => {
+            {links.map(item => {
               const active = isActive(item.href)
               return (
                 <Link
@@ -243,6 +278,30 @@ export function PublicTopBar({
           </nav>
         </div>
         <div className="flex items-center gap-2">
+          {/* SUPPLY, as a quiet word (2026-08-19). Text, not a button: the bar
+              already carries one outlined action and one filled one, and a
+              third would make the row a shelf of buttons. Gated — an existing
+              expert must never be invited to become one. */}
+          {showJoinInvite(me?.role, me?.capabilities) && (
+            <Link
+              href="/join?can=CONSULT"
+              className="hidden lg:inline-flex h-11 px-3 rounded-btn font-display font-semibold text-meta uppercase text-ink-600 hover:text-ink-900 hover:bg-ink-100 items-center whitespace-nowrap transition-colors duration-fast"
+            >
+              გახდი ექსპერტი
+            </Link>
+          )}
+          {/* THE ACTION (stage 9). Desktop only — at 390px a signed-in client's
+              row is already four controls (measured below), and the drawer
+              carries the same button for the phone. Secondary, not primary:
+              the guest's „დაწყება" keeps the one filled button in the bar. */}
+          {cta && (
+            <Link
+              href={cta.href}
+              className="hidden lg:inline-flex h-11 px-4 rounded-btn border border-ink-200 bg-white hover:border-ink-300 hover:bg-ink-50 text-ink-900 font-display font-semibold text-meta uppercase items-center whitespace-nowrap transition-colors duration-fast"
+            >
+              {cta.label}
+            </Link>
+          )}
           {!ready ? (
             // Reserve space so the layout doesn't jump when auth resolves.
             <div className="w-10 h-10" />
@@ -255,15 +314,16 @@ export function PublicTopBar({
                   around. On a phone a guest reading /blog or a profile had to
                   open the drawer and tap „ექსპერტები" to get to the catalogue.
                   ADDED, not swapped: replacing „დაწყება" would have gambled the
-                  signup metric for a modest gain, since /tutors and the home
-                  hero both already carry a real search field — this only helps
-                  on the pages that don't. Measured at 390px: logo 63 + this 40 +
+                  signup metric for a modest gain. (Since stage 9 the home hero
+                  has no search field — its two doors do the same job — so this
+                  icon is the one-tap route to the catalogue on every page.)
+                  Measured at 390px: logo 63 + this 40 +
                   „დაწყება" 94 + ☰ 40 = 237px of the 342px content width. Fits.
                   GUEST-ONLY on purpose: a signed-in student's header already
                   carries ♥ + bell + avatar + ☰, and a fifth control does not
                   fit at 390px. They also have the workspace nav. */}
               <Link
-                href="/tutors"
+                href="/experts"
                 aria-label="ექსპერტების ძებნა"
                 title="ექსპერტების ძებნა"
                 className="w-10 h-10 rounded-btn text-ink-600 hover:text-ink-900 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast"
@@ -277,7 +337,7 @@ export function PublicTopBar({
                 შესვლა
               </Link>
               <Link
-                href="/signup"
+                href={JOIN_HREF}
                 className="tap-shrink h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-bold text-body uppercase transition-all duration-fast ease-out-quart inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)]"
               >
                 დაწყება
@@ -302,9 +362,9 @@ export function PublicTopBar({
                   Still STUDENT-only on purpose: the favourites API 403s every
                   other role (saved-experts is a client feature), so showing the
                   heart to a TUTOR/ADMIN would open a page that cannot load. */}
-              {me.role === 'STUDENT' && (
+              {me.role === ROLE.CLIENT && (
                 <Link
-                  href="/student/favorites"
+                  href="/me/favorites"
                   aria-label="შენახული"
                   className="inline-flex w-10 h-10 rounded-btn text-ink-600 hover:text-ink-900 hover:bg-ink-100 items-center justify-center transition-colors duration-fast"
                 >
@@ -345,7 +405,7 @@ export function PublicTopBar({
                   no icon. */}
               {msgSpace && (
                 <Link
-                  href={msgSpace === 'tutor' ? '/tutor/messages' : '/student/messages'}
+                  href={msgSpace === 'expert' ? '/work/messages' : '/me/messages'}
                   aria-label={msgUnread > 0 ? `მიმოწერა — ${msgUnread} წაუკითხავი` : 'მიმოწერა'}
                   title="მიმოწერა"
                   className="relative hidden lg:inline-flex w-10 h-10 rounded-btn text-ink-600 hover:text-ink-900 hover:bg-ink-100 items-center justify-center transition-colors duration-fast"
@@ -416,7 +476,7 @@ export function PublicTopBar({
             </div>
             <nav className="flex-1 overflow-y-auto px-3 py-3">
               <ul className="stagger space-y-0.5">
-                {nav.map(item => {
+                {links.map(item => {
                   const active = isActive(item.href)
                   return (
                     <li key={item.href}>
@@ -433,6 +493,28 @@ export function PublicTopBar({
                     </li>
                   )
                 })}
+                {cta && (
+                  <li className="pt-2">
+                    <Link
+                      href={cta.href}
+                      onClick={() => setMobOpen(false)}
+                      className="tap-shrink w-full h-12 rounded-btn border border-ink-200 bg-white hover:border-ink-300 hover:bg-ink-50 text-ink-900 font-display font-bold text-small uppercase inline-flex items-center justify-center transition-colors duration-fast"
+                    >
+                      {cta.label}
+                    </Link>
+                  </li>
+                )}
+                {showJoinInvite(me?.role, me?.capabilities) && (
+                  <li>
+                    <Link
+                      href="/join?can=CONSULT"
+                      onClick={() => setMobOpen(false)}
+                      className="flex items-center h-12 px-3 rounded-btn text-small font-display font-semibold uppercase text-ink-800 hover:bg-ink-100 transition-colors duration-fast"
+                    >
+                      გახდი ექსპერტი
+                    </Link>
+                  </li>
+                )}
                 {!me && (
                   <li>
                     <Link
@@ -449,7 +531,7 @@ export function PublicTopBar({
             {!me && (
               <div className="px-5 pb-5 pt-3 border-t border-ink-100">
                 <Link
-                  href="/signup"
+                  href={JOIN_HREF}
                   onClick={() => setMobOpen(false)}
                   className="tap-shrink w-full h-12 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-bold text-body-lg uppercase inline-flex items-center justify-center gap-2 shadow-brand-glow transition-all duration-fast"
                 >

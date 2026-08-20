@@ -8,7 +8,13 @@ import { UserMenu } from '@/components/UserMenu'
 /* Compact workspace header: page title (from nav config) + bell + user menu.
    The old TutorAppBar's 7-link nav lives in WorkspaceSidebar on desktop;
    mobile navigation = global BottomNav + UserMenu items. */
-export function WorkspaceTopBar({ user }: { user?: { name: string; avatar?: string | null } }) {
+export function WorkspaceTopBar({ user, role = 'TUTOR' }: {
+  user?: { name: string; avatar?: string | null }
+  /** The viewer's REAL role. A master keeps role STUDENT (lib/hats) and shares
+   *  this bar since stage 6 — a hardcoded TUTOR would hand them the expert's
+   *  menu, whose every link bounces them out. */
+  role?: 'STUDENT' | 'TUTOR' | 'ADMIN'
+}) {
   const path = usePathname() ?? ''
   const [scrolled, setScrolled] = useState(false)
 
@@ -34,7 +40,7 @@ export function WorkspaceTopBar({ user }: { user?: { name: string; avatar?: stri
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <NotifBell />
-          <UserMenu user={user} role="TUTOR" />
+          <UserMenu user={user} role={role} />
         </div>
       </div>
     </header>

@@ -23,7 +23,10 @@
 // the same screen are ONE request, not two.
 import { useSyncExternalStore } from 'react'
 
-export type MessagesSpace = 'student' | 'tutor'
+// The two spaces by their addresses — /me is the client's, /work the expert's.
+// Renamed from `student|tutor` in lock-step with app/api/messages (stage 6,
+// 2026-08-19); the endpoint still maps the old pair for one release.
+export type MessagesSpace = 'client' | 'expert'
 
 type Store = {
   subscribe: (onChange: () => void) => () => void

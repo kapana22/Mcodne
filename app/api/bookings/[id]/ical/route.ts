@@ -52,7 +52,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const summary = escapeICS(`მცოდნე — ${booking.topic}`)
   const description = escapeICS(
     `ექსპერტი: ${booking.tutor.user.fullName}\n` +
-    `სტუდენტი: ${booking.student.fullName}\n` +
+    `კლიენტი: ${booking.student.fullName}\n` +
     `ხანგრძლივობა: ${booking.durationMin} წუთი\n` +
     (booking.meetingUrl ? `ვიდეოოთახი: ${booking.meetingUrl}\n` : '') +
     `\nდეტალები: ${siteUrl(req)}/student/bookings/${booking.id}`,

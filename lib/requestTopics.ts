@@ -2,7 +2,9 @@
 //
 // ⚠️ THIS IS NOT `Category`, AND IT MUST NEVER BECOME IT. The sphere taxonomy
 // (prisma → Category, lib/professionSeo) describes what the EXPERTS ON THIS
-// PLATFORM DO: it drives browse, /categories, the counts and the SEO pages.
+// PLATFORM DO: it drives browse (/experts?category=), the counts and the SEO
+// pages (/categories/* itself was retired in stage 8 — the catalogue filter is
+// the sphere page now).
 // Measured 2026-08-14 it holds 16 professional spheres and 91 professions, and
 // not one school subject — so „ვეძებ ქიმიის მასწავლებელს" has nowhere to go in
 // it. Adding „ქიმია" there would mint a sphere page with zero experts, which is
@@ -92,7 +94,12 @@ export const KIND: Record<RequestKindName, {
   timingLabel: string
 }> = {
   LEARNING: {
-    label: 'მასწავლებელი',
+    // ⚠️ „სწავლება", NOT „მასწავლებელი" (2026-08-19). This label sits in a row
+    // with „კონსულტაცია", „სამუშაო" and „სერვისი" — three things somebody
+    // BUYS and one kind of PERSON. The odd one out is the same mistake the
+    // model retired with „ხელოსანი": a filter names what is being asked for,
+    // never who does it.
+    label: 'სწავლება',
     hint: 'გაკვეთილები, მომზადება, ენები',
     unit: 'PER_LESSON',
     unitLabel: 'ერთ გაკვეთილზე',
@@ -113,7 +120,7 @@ export const KIND: Record<RequestKindName, {
     timingLabel: 'რა ვადაში',
   },
   SERVICE: {
-    label: 'ხელოსანი',
+    label: 'სერვისი',
     hint: 'სამუშაო ადგილზე — ბინაში, სახლში ან ოფისში',
     unit: 'PER_VISIT',
     unitLabel: 'ერთ გამოძახებაზე',
@@ -194,8 +201,32 @@ export const BUDGET_BANDS: Record<RequestKindName, BudgetBand[]> = {
   ],
 }
 
+/**
+ * NOT STATED — the band a request carries when nobody was asked (2026-08-19).
+ *
+ * ⚠️ IT IS NOT IN `BUDGET_BANDS`, and that is the point: every picker on the
+ * site builds its options from that record, so this can never appear as a
+ * choice. It exists for the run that asks no money question at all — a message
+ * written to ONE named provider, who will ask in the thread (see Draft.directTo
+ * in app/request/_model). Without it that run submitted a draft the schema
+ * refuses and every direct message died on „INVALID".
+ *
+ * `min: 0, max: null` reads as „unbounded", never as „cheap" — the row says
+ * nothing about money rather than saying something false about it, and
+ * `floor` is absent so it can never be refused on arrival for a number nobody
+ * gave. `budgetLabel` renders it as words, not as „0₾+".
+ */
+export const UNSTATED = 'x'
+export const UNSTATED_BUDGET: BudgetBand = { id: UNSTATED, min: 0, max: null, label: 'არ არის მითითებული' }
+
 export function bandOf(kind: RequestKindName, bandId: string): BudgetBand | undefined {
+  if (bandId === UNSTATED) return UNSTATED_BUDGET
   return BUDGET_BANDS[kind].find(b => b.id === bandId)
+}
+
+/** The timing of a run that was never asked — same reasoning as UNSTATED_BUDGET. */
+export function isUnstated(id: string): boolean {
+  return id === UNSTATED
 }
 
 /**
@@ -213,6 +244,9 @@ export function budgetIsBelowFloor(kind: RequestKindName, bandId: string): boole
 /** „40–70₾ ერთ გაკვეთილზე" — one place, so the form, the provider card and the
  *  admin never describe the same number three ways. */
 export function budgetLabel(kind: RequestKindName, min: number, max: number | null): string {
+  // „0₾+" is what the arithmetic would print for a request nobody asked about
+  // money, and it reads as a budget of nothing. Say the true thing instead.
+  if (min === 0 && max === null) return UNSTATED_BUDGET.label
   const band = BUDGET_BANDS[kind].find(b => b.min === min && b.max === max)
   const range = band?.label ?? (max === null ? `${min.toLocaleString('en-US')}₾+` : `${min.toLocaleString('en-US')}–${max.toLocaleString('en-US')}₾`)
   return `${range} ${KIND[kind].unitLabel}`
@@ -272,6 +306,7 @@ export const TIMING: Record<RequestKindName, TimingOption[]> = {
 }
 
 export function timingLabel(kind: RequestKindName, id: string): string {
+  if (id === UNSTATED) return 'არ არის მითითებული'
   return TIMING[kind].find(t => t.id === id)?.label ?? id
 }
 
@@ -436,7 +471,7 @@ const GROUP_EXTRAS: Record<string, ExtraQuestion[]> = {
       label: 'მასალა ვინ იყიდის',
       options: [
         { id: 'mine',    label: 'მე' },
-        { id: 'master',  label: 'ხელოსანი' },
+        { id: 'master',  label: 'ექსპერტი' },
         { id: 'unsure',  label: 'ჯერ არ ვიცი' },
       ],
     },
@@ -552,6 +587,18 @@ export type Topic = {
   alt?: string[]
   /** The live sphere whose experts could serve this, when one exists. */
   categorySlug?: string
+  /**
+   * The PROFESSIONS (job labels from lib/professions) that answer this need —
+   * stage 8 (2026-08-19), CONSULTATION / PROJECT topics only. The second and
+   * narrower place the two vocabularies touch: `categorySlug` says which
+   * SPHERE, this says which PERSON, and routing (lib/requestRouting) mails an
+   * expert whose `TutorProfile.professions` names one of these — union the
+   * sphere match. Set only where the mapping is obvious; absent is „the sphere
+   * alone decides", not a gap. ⚠️ NEVER on a LEARNING or SERVICE topic: a
+   * school subject is not a profession and a trade is not an expert
+   * (tests/taxonomy.test.ts pins both).
+   */
+  professions?: string[]
 }
 
 export type TopicGroup = {
@@ -675,11 +722,11 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     id: 'business', label: 'ბიზნესი და სტრატეგია', kinds: CP,
     template: 'რა მაქვს: … (მოქმედი ბიზნესი / იდეა)\nსფერო: …\nკონკრეტულად რაში მჭირდება დახმარება: …',
     topics: [
-      { id: 'business-plan', label: 'ბიზნესგეგმა', categorySlug: 'business' },
-      { id: 'strategy',      label: 'სტრატეგია', categorySlug: 'business' },
+      { id: 'business-plan', label: 'ბიზნესგეგმა', categorySlug: 'business', professions: ['ბიზნეს-კონსულტანტი', 'ბიზნესგეგმის სპეციალისტი'] },
+      { id: 'strategy',      label: 'სტრატეგია', categorySlug: 'business', professions: ['სტრატეგი', 'ბიზნეს-კონსულტანტი'] },
       { id: 'startup',       label: 'სტარტაპი', categorySlug: 'business' },
-      { id: 'operations',    label: 'ოპერაციები და პროცესები', categorySlug: 'business' },
-      { id: 'project-mgmt',  label: 'პროექტის მართვა', categorySlug: 'business' },
+      { id: 'operations',    label: 'ოპერაციები და პროცესები', categorySlug: 'business', professions: ['ოპერაციების მენეჯერი'] },
+      { id: 'project-mgmt',  label: 'პროექტის მართვა', categorySlug: 'business', professions: ['პროექტის მენეჯერი'] },
       { id: 'franchise',     label: 'ფრანშიზა', categorySlug: 'business' },
     ],
   },
@@ -687,25 +734,25 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     id: 'finance', label: 'ფინანსები და გადასახადები', kinds: CP,
     template: 'საქმიანობა: … (შპს / ინდმეწარმე / ფიზიკური პირი)\nრა მჭირდება: …\nპერიოდი ან მოცულობა: …',
     topics: [
-      { id: 'accounting',  label: 'ბუღალტერია', categorySlug: 'tax' },
-      { id: 'declaration', label: 'დეკლარაცია', alt: ['გადასახადი', 'RS'], categorySlug: 'tax' },
-      { id: 'vat',         label: 'დღგ', categorySlug: 'tax' },
-      { id: 'audit',       label: 'აუდიტი', categorySlug: 'tax' },
-      { id: 'fin-analysis',label: 'ფინანსური ანალიზი', categorySlug: 'finance' },
-      { id: 'investment',  label: 'ინვესტიციები', categorySlug: 'finance' },
-      { id: 'crypto',      label: 'კრიპტო', categorySlug: 'crypto' },
+      { id: 'accounting',  label: 'ბუღალტერია', categorySlug: 'tax', professions: ['ბუღალტერი'] },
+      { id: 'declaration', label: 'დეკლარაცია', alt: ['გადასახადი', 'RS'], categorySlug: 'tax', professions: ['ბუღალტერი', 'საგადასახადო კონსულტანტი'] },
+      { id: 'vat',         label: 'დღგ', categorySlug: 'tax', professions: ['ბუღალტერი', 'საგადასახადო კონსულტანტი'] },
+      { id: 'audit',       label: 'აუდიტი', categorySlug: 'tax', professions: ['აუდიტორი'] },
+      { id: 'fin-analysis',label: 'ფინანსური ანალიზი', categorySlug: 'finance', professions: ['ფინანსური ანალიტიკოსი', 'ფინანსური დირექტორი'] },
+      { id: 'investment',  label: 'ინვესტიციები', categorySlug: 'finance', professions: ['საინვესტიციო კონსულტანტი'] },
+      { id: 'crypto',      label: 'კრიპტო', categorySlug: 'crypto', professions: ['კრიპტოს კონსულტანტი'] },
     ],
   },
   {
     id: 'law', label: 'სამართალი', kinds: CP,
     template: 'სიტუაცია მოკლედ: …\nვინ არის მეორე მხარე: …\nრა შედეგი მინდა: …',
     topics: [
-      { id: 'contract',   label: 'ხელშეკრულება', alt: ['იურისტი', 'ადვოკატი', 'ხელშეკრულების შედგენა', 'კონტრაქტი'], categorySlug: 'law' },
-      { id: 'labor-law',  label: 'შრომითი დავა', categorySlug: 'law' },
-      { id: 'family-law', label: 'საოჯახო სამართალი', alt: ['განქორწინება'], categorySlug: 'law' },
-      { id: 'corp-law',   label: 'კორპორატიული სამართალი', categorySlug: 'law' },
-      { id: 'ip-law',     label: 'ინტელექტუალური საკუთრება', categorySlug: 'law' },
-      { id: 'court',      label: 'სასამართლო დავა', alt: ['ადვოკატი', 'იურისტი', 'სარჩელი'], categorySlug: 'law' },
+      { id: 'contract',   label: 'ხელშეკრულება', alt: ['იურისტი', 'ადვოკატი', 'ხელშეკრულების შედგენა', 'კონტრაქტი'], categorySlug: 'law', professions: ['იურისტი', 'ადვოკატი'] },
+      { id: 'labor-law',  label: 'შრომითი დავა', categorySlug: 'law', professions: ['შრომითი სამართლის სპეციალისტი', 'იურისტი'] },
+      { id: 'family-law', label: 'საოჯახო სამართალი', alt: ['განქორწინება'], categorySlug: 'law', professions: ['საოჯახო სამართლის სპეციალისტი', 'ადვოკატი'] },
+      { id: 'corp-law',   label: 'კორპორატიული სამართალი', categorySlug: 'law', professions: ['კორპორატიული იურისტი'] },
+      { id: 'ip-law',     label: 'ინტელექტუალური საკუთრება', categorySlug: 'law', professions: ['ინტელექტუალური საკუთრების იურისტი'] },
+      { id: 'court',      label: 'სასამართლო დავა', alt: ['ადვოკატი', 'იურისტი', 'სარჩელი'], categorySlug: 'law', professions: ['ადვოკატი'] },
       { id: 'company-reg',label: 'კომპანიის რეგისტრაცია', categorySlug: 'law' },
     ],
   },
@@ -713,25 +760,25 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     id: 'marketing', label: 'მარკეტინგი და გაყიდვები', kinds: CP,
     template: 'პროდუქტი ან სერვისი: …\nმიზანი: … (გაყიდვები / ცნობადობა)\nდღეს რა არხები მაქვს: …',
     topics: [
-      { id: 'smm',       label: 'SMM და სოციალური ქსელები', categorySlug: 'marketing' },
-      { id: 'seo',       label: 'SEO', categorySlug: 'marketing' },
-      { id: 'ads',       label: 'რეკლამა', alt: ['Google Ads', 'Facebook'], categorySlug: 'marketing' },
-      { id: 'branding',  label: 'ბრენდინგი', categorySlug: 'marketing' },
-      { id: 'content',   label: 'კონტენტი და კოპირაითინგი', categorySlug: 'marketing' },
-      { id: 'pr',        label: 'PR', categorySlug: 'marketing' },
-      { id: 'sales-sys', label: 'გაყიდვების სისტემა', categorySlug: 'sales' },
+      { id: 'smm',       label: 'SMM და სოციალური ქსელები', categorySlug: 'marketing', professions: ['SMM სპეციალისტი', 'მარკეტოლოგი'] },
+      { id: 'seo',       label: 'SEO', categorySlug: 'marketing', professions: ['SEO სპეციალისტი'] },
+      { id: 'ads',       label: 'რეკლამა', alt: ['Google Ads', 'Facebook'], categorySlug: 'marketing', professions: ['რეკლამის სპეციალისტი', 'მარკეტოლოგი'] },
+      { id: 'branding',  label: 'ბრენდინგი', categorySlug: 'marketing', professions: ['ბრენდ-სტრატეგი'] },
+      { id: 'content',   label: 'კონტენტი და კოპირაითინგი', categorySlug: 'marketing', professions: ['კონტენტ-მარკეტოლოგი', 'კოპირაითერი'] },
+      { id: 'pr',        label: 'PR', categorySlug: 'marketing', professions: ['PR სპეციალისტი'] },
+      { id: 'sales-sys', label: 'გაყიდვების სისტემა', categorySlug: 'sales', professions: ['გაყიდვების მენეჯერი'] },
     ],
   },
   {
     id: 'it', label: 'IT და ტექნოლოგიები', kinds: CP,
     template: 'რა უნდა გაკეთდეს: … (საიტი / აპლიკაცია / ავტომატიზაცია)\nვისთვის არის: …\nმთავარი ფუნქციები: …',
     topics: [
-      { id: 'website',    label: 'ვებგვერდი', categorySlug: 'it' },
-      { id: 'mobile-app', label: 'მობილური აპლიკაცია', categorySlug: 'it' },
+      { id: 'website',    label: 'ვებგვერდი', categorySlug: 'it', professions: ['დეველოპერი'] },
+      { id: 'mobile-app', label: 'მობილური აპლიკაცია', categorySlug: 'it', professions: ['დეველოპერი'] },
       { id: 'automation', label: 'ავტომატიზაცია', categorySlug: 'it' },
-      { id: 'data-an',    label: 'მონაცემთა ანალიზი', categorySlug: 'it' },
-      { id: 'ai',         label: 'ხელოვნური ინტელექტი', categorySlug: 'it' },
-      { id: 'security',   label: 'კიბერუსაფრთხოება', categorySlug: 'it' },
+      { id: 'data-an',    label: 'მონაცემთა ანალიზი', categorySlug: 'it', professions: ['მონაცემთა ანალიტიკოსი'] },
+      { id: 'ai',         label: 'ხელოვნური ინტელექტი', categorySlug: 'it', professions: ['AI ინჟინერი'] },
+      { id: 'security',   label: 'კიბერუსაფრთხოება', categorySlug: 'it', professions: ['კიბერუსაფრთხოების სპეციალისტი'] },
       { id: 'crm',        label: 'CRM და სისტემები', categorySlug: 'it' },
     ],
   },
@@ -739,10 +786,10 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     id: 'design', label: 'დიზაინი', kinds: CP,
     template: 'რა მჭირდება: … (ლოგო / ბრენდბუქი / UI)\nბიზნესი ან პროექტი: …\nმაგალითები, რომლებიც მომწონს: …',
     topics: [
-      { id: 'logo',       label: 'ლოგო და ბრენდბუქი', categorySlug: 'design' },
-      { id: 'uxui',       label: 'UX/UI', categorySlug: 'design' },
-      { id: 'print',      label: 'ბეჭდვითი დიზაინი', categorySlug: 'design' },
-      { id: 'interior',   label: 'ინტერიერი', categorySlug: 'architecture' },
+      { id: 'logo',       label: 'ლოგო და ბრენდბუქი', categorySlug: 'design', professions: ['გრაფიკული დიზაინერი'] },
+      { id: 'uxui',       label: 'UX/UI', categorySlug: 'design', professions: ['UX/UI დიზაინერი'] },
+      { id: 'print',      label: 'ბეჭდვითი დიზაინი', categorySlug: 'design', professions: ['გრაფიკული დიზაინერი'] },
+      { id: 'interior',   label: 'ინტერიერი', categorySlug: 'architecture', professions: ['ინტერიერის დიზაინერი'] },
       { id: 'presentation', label: 'პრეზენტაცია', categorySlug: 'design' },
     ],
   },
@@ -750,10 +797,10 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     id: 'psychology', label: 'ფსიქოლოგია', kinds: CP,
     template: 'რაზე მინდა მუშაობა: …\nფორმატი: … (ინდივიდუალური / წყვილი / ბავშვი)\nსიხშირე: …',
     topics: [
-      { id: 'psy-individual', label: 'ინდივიდუალური კონსულტაცია', alt: ['ფსიქოლოგი', 'ფსიქოთერაპევტი', 'თერაპია'], categorySlug: 'psychology' },
-      { id: 'psy-couple',     label: 'წყვილის თერაპია', categorySlug: 'psychology' },
-      { id: 'psy-child',      label: 'ბავშვისა და მოზარდის ფსიქოლოგი', categorySlug: 'psychology' },
-      { id: 'psy-org',        label: 'ორგანიზაციული ფსიქოლოგია', categorySlug: 'psychology' },
+      { id: 'psy-individual', label: 'ინდივიდუალური კონსულტაცია', alt: ['ფსიქოლოგი', 'ფსიქოთერაპევტი', 'თერაპია'], categorySlug: 'psychology', professions: ['ფსიქოლოგი', 'ფსიქოთერაპევტი'] },
+      { id: 'psy-couple',     label: 'წყვილის თერაპია', categorySlug: 'psychology', professions: ['წყვილისა და ოჯახის კონსულტანტი'] },
+      { id: 'psy-child',      label: 'ბავშვისა და მოზარდის ფსიქოლოგი', categorySlug: 'psychology', professions: ['ბავშვისა და მოზარდის ფსიქოლოგი'] },
+      { id: 'psy-org',        label: 'ორგანიზაციული ფსიქოლოგია', categorySlug: 'psychology', professions: ['ორგანიზაციული ფსიქოლოგი'] },
     ],
   },
   {
@@ -762,30 +809,30 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     topics: [
       { id: 'cv',        label: 'რეზიუმე და CV', categorySlug: 'career' },
       { id: 'interview', label: 'გასაუბრებისთვის მომზადება', categorySlug: 'career' },
-      { id: 'career-adv',label: 'კარიერული კონსულტაცია', categorySlug: 'career' },
-      { id: 'hiring',    label: 'დაქირავება', categorySlug: 'hr' },
-      { id: 'training',  label: 'ტრენინგი გუნდისთვის', categorySlug: 'hr' },
+      { id: 'career-adv',label: 'კარიერული კონსულტაცია', categorySlug: 'career', professions: ['კარიერული კონსულტანტი'] },
+      { id: 'hiring',    label: 'დაქირავება', categorySlug: 'hr', professions: ['HR-მენეჯერი'] },
+      { id: 'training',  label: 'ტრენინგი გუნდისთვის', categorySlug: 'hr', professions: ['ბიზნეს-ტრენერი'] },
     ],
   },
   {
     id: 'media', label: 'მედია და კონტენტი', kinds: CP,
     template: 'რა უნდა გადაიღოს/გაკეთდეს: …\nთარიღი და ადგილი: …\nხანგრძლივობა ან მოცულობა: …',
     topics: [
-      { id: 'photo',      label: 'ფოტოგრაფია' },
-      { id: 'video',      label: 'ვიდეოგადაღება' },
-      { id: 'editing',    label: 'მონტაჟი' },
-      { id: 'translation',label: 'თარგმანი' },
-      { id: 'podcast',    label: 'პოდკასტი' },
+      { id: 'photo',      label: 'ფოტოგრაფია', professions: ['ფოტოგრაფი'] },
+      { id: 'video',      label: 'ვიდეოგადაღება', professions: ['ვიდეოგრაფი'] },
+      { id: 'editing',    label: 'მონტაჟი', professions: ['მონტაჟის სპეციალისტი'] },
+      { id: 'translation',label: 'თარგმანი', professions: ['თარჯიმანი'] },
+      { id: 'podcast',    label: 'პოდკასტი', professions: ['პოდკასტის პროდიუსერი'] },
     ],
   },
   {
     id: 'property', label: 'უძრავი ქონება და მშენებლობა', kinds: CP,
     template: 'ობიექტი: … (ბინა / სახლი / კომერციული)\nსად მდებარეობს: …\nრა მჭირდება: …',
     topics: [
-      { id: 'architecture', label: 'არქიტექტურა', categorySlug: 'architecture' },
-      { id: 'valuation',    label: 'ქონების შეფასება', categorySlug: 'real-estate' },
-      { id: 'estimate',     label: 'ხარჯთაღრიცხვა', categorySlug: 'architecture' },
-      { id: 'broker',       label: 'ყიდვა-გაყიდვა', categorySlug: 'real-estate' },
+      { id: 'architecture', label: 'არქიტექტურა', categorySlug: 'architecture', professions: ['არქიტექტორი'] },
+      { id: 'valuation',    label: 'ქონების შეფასება', categorySlug: 'real-estate', professions: ['შემფასებელი'] },
+      { id: 'estimate',     label: 'ხარჯთაღრიცხვა', categorySlug: 'architecture', professions: ['ხარჯთაღრიცხვის სპეციალისტი'] },
+      { id: 'broker',       label: 'ყიდვა-გაყიდვა', categorySlug: 'real-estate', professions: ['უძრავი ქონების ბროკერი'] },
       { id: 'renovation',   label: 'რემონტის დაგეგმვა' },
     ],
   },
@@ -793,18 +840,18 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     id: 'relocation', label: 'ვიზა, მიგრაცია და რელოკაცია', kinds: CP,
     template: 'რომელი ქვეყანა: …\nჩემი სტატუსი ახლა: …\nრა მჭირდება: … (ვიზა / ბინადრობა / სწავლა)',
     topics: [
-      { id: 'visa',        label: 'ვიზა', categorySlug: 'relocation' },
-      { id: 'residence',   label: 'ბინადრობის ნებართვა', categorySlug: 'relocation' },
-      { id: 'study-abroad',label: 'საზღვარგარეთ სწავლა', categorySlug: 'relocation' },
-      { id: 'tax-residence', label: 'საგადასახადო რეზიდენტობა', categorySlug: 'relocation' },
+      { id: 'visa',        label: 'ვიზა', categorySlug: 'relocation', professions: ['საიმიგრაციო იურისტი', 'რელოკაციის კონსულტანტი'] },
+      { id: 'residence',   label: 'ბინადრობის ნებართვა', categorySlug: 'relocation', professions: ['საიმიგრაციო იურისტი'] },
+      { id: 'study-abroad',label: 'საზღვარგარეთ სწავლა', categorySlug: 'relocation', professions: ['საზღვარგარეთ სწავლის კონსულტანტი'] },
+      { id: 'tax-residence', label: 'საგადასახადო რეზიდენტობა', categorySlug: 'relocation', professions: ['საგადასახადო რეზიდენტობის კონსულტანტი'] },
     ],
   },
   {
     id: 'grants', label: 'გრანტები და ტენდერები', kinds: CP,
     template: 'პროექტი მოკლედ: …\nსავარაუდო თანხა: …\nდედლაინი: …',
     topics: [
-      { id: 'grant',   label: 'გრანტის განაცხადი' },
-      { id: 'tender',  label: 'ტენდერი' },
+      { id: 'grant',   label: 'გრანტის განაცხადი', professions: ['გრანტების კონსულტანტი'] },
+      { id: 'tender',  label: 'ტენდერი', professions: ['ტენდერების სპეციალისტი'] },
       { id: 'funding', label: 'დაფინანსების მოძიება' },
     ],
   },
@@ -812,36 +859,36 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     id: 'logistics', label: 'ლოგისტიკა და საბაჟო', kinds: CP,
     template: 'ტვირთი ან საკითხი: …\nმარშრუტი: … → …\nრა მჭირდება: …',
     topics: [
-      { id: 'customs',  label: 'საბაჟო' },
-      { id: 'import',   label: 'ექსპორტ-იმპორტი' },
-      { id: 'supply',   label: 'მიწოდების ჯაჭვი' },
+      { id: 'customs',  label: 'საბაჟო', professions: ['საბაჟო ბროკერი'] },
+      { id: 'import',   label: 'ექსპორტ-იმპორტი', professions: ['ექსპორტ-იმპორტის კონსულტანტი'] },
+      { id: 'supply',   label: 'მიწოდების ჯაჭვი', professions: ['მიწოდების ჯაჭვის მენეჯერი', 'ლოგისტიკის სპეციალისტი'] },
     ],
   },
   {
     id: 'health', label: 'ჯანმრთელობა და კვება', kinds: CP,
     template: 'მიზანი: … (კვება / წონა / ვარჯიში)\nჯანმრთელობის შეზღუდვები: …',
     topics: [
-      { id: 'dietitian', label: 'დიეტოლოგი', categorySlug: 'health' },
-      { id: 'nutrition', label: 'კვების გეგმა', categorySlug: 'health' },
-      { id: 'training-plan', label: 'ვარჯიშის გეგმა', categorySlug: 'health' },
+      { id: 'dietitian', label: 'დიეტოლოგი', categorySlug: 'health', professions: ['დიეტოლოგი'] },
+      { id: 'nutrition', label: 'კვების გეგმა', categorySlug: 'health', professions: ['ნუტრიციოლოგი', 'დიეტოლოგი'] },
+      { id: 'training-plan', label: 'ვარჯიშის გეგმა', categorySlug: 'health', professions: ['ფიტნეს-ტრენერი'] },
     ],
   },
   {
     id: 'events', label: 'ტურიზმი და ღონისძიებები', kinds: CP,
     template: 'რა ღონისძიებაა: …\nთარიღი: …\nსტუმრების რაოდენობა: …\nრა შედის ბიუჯეტში: …',
     topics: [
-      { id: 'event',   label: 'ღონისძიების ორგანიზება' },
-      { id: 'tour',    label: 'ტურის დაგეგმვა' },
-      { id: 'guide',   label: 'გიდი' },
+      { id: 'event',   label: 'ღონისძიების ორგანიზება', professions: ['ღონისძიების ორგანიზატორი'] },
+      { id: 'tour',    label: 'ტურის დაგეგმვა', professions: ['ტურ-ოპერატორი'] },
+      { id: 'guide',   label: 'გიდი', professions: ['გიდი'] },
     ],
   },
   {
     id: 'agriculture', label: 'სოფლის მეურნეობა', kinds: CP,
     template: 'მეურნეობა: …\nმოცულობა: … (ფართობი / სულადობა)\nპრობლემა ან საჭიროება: …',
     topics: [
-      { id: 'agronomy', label: 'აგრონომია' },
-      { id: 'vet',      label: 'ვეტერინარია' },
-      { id: 'wine',     label: 'მეღვინეობა' },
+      { id: 'agronomy', label: 'აგრონომია', professions: ['აგრონომი'] },
+      { id: 'vet',      label: 'ვეტერინარია', professions: ['ვეტერინარი'] },
+      { id: 'wine',     label: 'მეღვინეობა', professions: ['მეღვინე და ენოლოგი'] },
     ],
   },
 
@@ -1103,8 +1150,188 @@ export function categorySlugOfTopic(id: string | null | undefined): string | nul
   return topicById(id)?.categorySlug ?? null
 }
 
+/** The professions (lib/professions job labels) a topic names — see
+ *  `Topic.professions`. Empty for every LEARNING / SERVICE topic and for a
+ *  CONSULTATION / PROJECT topic that maps only through its sphere. */
+export function professionsOfTopic(id: string | null | undefined): string[] {
+  return topicById(id)?.professions ?? []
+}
+
 export function groupsForKind(kind: RequestKindName): TopicGroup[] {
   return TOPIC_GROUPS.filter(g => g.kinds.includes(kind))
+}
+
+/* ═══════════ what is OPEN, as opposed to what is DESCRIBED ══════════════ */
+
+/**
+ * The four trades the services side launches with.
+ *
+ * ⚠️ THIS IS A SUPPLY DECISION AND IT DOES NOT SHRINK THE VOCABULARY. Owner,
+ * 2026-08-18: „რაღაცა მინიმალურად უნდა შემოვიფარგლოთ, ყველაფერს არ უნდა
+ * მივედოთ ჯერ." Eight groups drawn on the page is eight promises, and at zero
+ * providers seven of them are promises we cannot keep — a client who taps
+ * „ბინის გადაზიდვა" and hears nothing back does not conclude that one category
+ * is empty, they conclude the site is.
+ *
+ * These four, specifically, because each one is (a) year-round rather than
+ * seasonal, (b) served by one person across a whole city, so a handful of
+ * providers genuinely covers Tbilisi, and (c) small enough that the job is done
+ * the same day — which is the only kind of outcome a first cohort can produce
+ * fast enough to be worth anything.
+ *
+ * WHAT STAYS ON: every retired group is still MATCHED. `searchAllTopics` and
+ * the text classifier keep the full 39, so somebody who types „კარი გაფუჭდა"
+ * still gets filed under კარ-ფანჯარა and lands in the admin queue, rather than
+ * dissolving into OTHER. We stop OFFERING them; we do not stop UNDERSTANDING
+ * them. That distinction is the whole design — opening a group later is one
+ * line here and costs no re-classification of anything already stored.
+ */
+export const LIVE_SERVICE_GROUP_IDS: readonly string[] = [
+  'plumbing', 'electrical', 'cleaning', 'appliances',
+]
+
+/**
+ * Is this group offered in a picker?
+ *
+ * Non-SERVICE groups are always live — the gate is about trades we have to
+ * staff, and a consultation group needs no van in the city to answer.
+ */
+export function groupIsLive(g: TopicGroup): boolean {
+  return !g.kinds.includes('SERVICE') || LIVE_SERVICE_GROUP_IDS.includes(g.id)
+}
+
+/** Every group a picker may draw. The full catalogue stays available to the
+ *  matcher — see LIVE_SERVICE_GROUP_IDS for why those are two different lists. */
+export const BROWSABLE_GROUPS: TopicGroup[] = TOPIC_GROUPS.filter(groupIsLive)
+
+/* ═══════════ the two verticals, kept apart ══════════════════════════════ */
+
+/**
+ * ⚠️ THE CATALOGUE IS DRAWN AS TWO LISTS, NEVER ONE.
+ *
+ * Owner, 2026-08-18: „ერთ საიტზე რჩება, მაგრამ მკვეთრად უნდა გაიმიჯნოს, რომ
+ * ესენი არ აირიოს … კატეგორიები კარგად უნდა გაიმიჯნოს, რომ არ აირიოს."
+ *
+ * The intake stays ONE system — same wizard, same ServiceRequest row, same
+ * queue — and that is deliberate and unchanged. What was wrong was the PICKER:
+ * twenty-odd groups in a single accordion, with „სასკოლო საგნები" three rows
+ * above „სანტექნიკა", so choosing a plumber and choosing a maths tutor looked
+ * like the same decision made from the same list. They are not the same
+ * decision. One ends in a video call you book; the other ends in somebody
+ * standing in your kitchen.
+ *
+ * `groupIsService` is the split, and it is read off `kinds` rather than a
+ * second hand-kept list — the same derivation SERVICE_GROUPS already uses, so a
+ * trade added to the vocabulary lands on the correct side of the page the same
+ * day and cannot land on both.
+ */
+export function groupIsService(g: TopicGroup): boolean {
+  return g.kinds.includes('SERVICE')
+}
+
+/** „ხელოსანი მოვა" — the trades. */
+export const SERVICE_BROWSE_GROUPS: TopicGroup[] = BROWSABLE_GROUPS.filter(groupIsService)
+
+/** „ექსპერტი" — learning, consultation and project work. Everything else, by
+ *  subtraction, so the two lists cannot drift apart or double-count. */
+export const EXPERT_BROWSE_GROUPS: TopicGroup[] = BROWSABLE_GROUPS.filter(g => !groupIsService(g))
+
+/**
+ * WHICH DOOR SOMEBODY CAME THROUGH — the vertical.
+ *
+ * ⚠️ THE DOOR DECIDES, AND THE WIZARD NEVER ASKS AGAIN (owner, 2026-08-18,
+ * approving option „ა"). This is the ss.ge shape the owner named twice: you
+ * pick the world at the entrance, and everything inside is that world's.
+ *
+ * The two verticals are not two menus over one catalogue, they are two
+ * different ACTIONS. A leaking tap is urgent, local, and nobody browses for it
+ * — you describe it and wait. A consultation is considered, remote, and
+ * browsing IS the decision — you read profiles and compare. Showing „სასკოლო
+ * საგნები" three rows above „სანტექნიკა" told somebody with water on the floor
+ * that these are the same kind of choice.
+ *
+ * ⚠️ WHAT DOES **NOT** SPLIT: the intake. One wizard, one ServiceRequest row,
+ * one admin queue, one routing pass — the owner was explicit („როცა გამოგზავნას
+ * ეხება, აუცილებლად ერთ სისტემაში იგზავნება"). This type narrows what is
+ * OFFERED on one screen. It touches nothing that is stored.
+ *
+ * ⚠️ AND FREE-TEXT SEARCH STAYS GLOBAL — `searchAllTopics` is deliberately not
+ * filtered by this. Somebody on the expert side who types „დალაგება" must still
+ * be filed under cleaning and reach the queue. A separation that loses a
+ * request is worse than the confusion it fixed, and this is the net under it.
+ */
+export const VERTICALS = ['SERVICE', 'EXPERT'] as const
+export type Vertical = (typeof VERTICALS)[number]
+
+export function isVertical(v: string | null | undefined): v is Vertical {
+  return v === 'SERVICE' || v === 'EXPERT'
+}
+
+/** The groups a given door offers. */
+export function browseGroupsFor(v: Vertical): TopicGroup[] {
+  return v === 'SERVICE' ? SERVICE_BROWSE_GROUPS : EXPERT_BROWSE_GROUPS
+}
+
+/**
+ * The vertical a chosen topic belongs to.
+ *
+ * Needed because the search box crosses the line on purpose: somebody may enter
+ * through the services door, type „ინგლისური", and land on a learning topic.
+ * The screen then has to stop calling itself the trades screen — the copy
+ * follows the ANSWER, not the door, the moment the two disagree.
+ */
+export function verticalOfTopic(id: string | null | undefined): Vertical | null {
+  const t = topicById(id)
+  if (!t) return null
+  const g = TOPIC_GROUPS.find(gr => gr.topics.some(x => x.id === t.id))
+  return g ? (groupIsService(g) ? 'SERVICE' : 'EXPERT') : null
+}
+
+/**
+ * The door's own words. Two questions, because one question that fits both is a
+ * question that fits neither — „რა გჭირდება?" is what you ask a person who is
+ * shopping, and the person with water on their floor is not shopping.
+ */
+export const VERTICAL_COPY: Record<Vertical, {
+  label: string
+  title: string
+  hint: string
+  placeholder: string
+  suggested: readonly string[]
+}> = {
+  SERVICE: {
+    label: 'სერვისები',
+    // ⚠️ NOT „რა გაფუჭდა?" (2026-08-18). Cleaning is one of the four live
+    // groups — a third of the open catalogue — and nothing is broken when
+    // somebody wants their flat cleaned. Both the home tile „ბინის დალაგება"
+    // and the /services cleaning card landed on a screen headed „what broke?".
+    // One title has to cover repair and cleaning, and this is the plainest one
+    // that does.
+    title: 'რა გჭირდება სახლში?',
+    // ⚠️ AND THE HINT NO LONGER DISPATCHES ANYBODY. „ხელოსანი მოვა" describes a
+    // dispatch this platform does not perform: what happens is a mail to the
+    // masters who cover that trade, and a wait. Saying the true thing costs
+    // nothing and is the difference between a promise and a description.
+    hint: 'დაწერე შენი სიტყვებით — ხელოსნები ფასს შემოგთავაზებენ.',
+    placeholder: 'ონკანი ჟონავს',
+    suggested: ['plumb-leak', 'clean-flat', 'elec-socket', 'app-washer', 'plumb-drain', 'clean-deep'],
+  },
+  EXPERT: {
+    label: 'ექსპერტები',
+    title: 'რაში გჭირდება დახმარება?',
+    hint: 'დაწერე შენი სიტყვებით — ექსპერტები შემოგთავაზებენ.',
+    placeholder: 'მათემატიკა, ბუღალტერია, იურისტი…',
+    suggested: ['math', 'nat-exams', 'english', 'accounting', 'contract', 'cv'],
+  },
+}
+
+/** The door's example chips, resolved. Filters rather than throws, for the
+ *  reason SUGGESTED_TOPICS states: this module is in middleware's import graph
+ *  and a throw at load takes down every route on the site. */
+export function suggestedFor(v: Vertical): Topic[] {
+  return VERTICAL_COPY[v].suggested
+    .map(id => BY_ID.get(id))
+    .filter((t): t is Topic => !!t)
 }
 
 export function isTopicOfKind(kind: RequestKindName, id: string): boolean {
@@ -1207,4 +1434,65 @@ export function searchTopics(kind: RequestKindName, query: string, limit = 24): 
     }),
     limit,
   ).map(r => r.item)
+}
+
+/**
+ * THE TOPICS A CHOSEN PROVIDER ALREADY ANSWERS — the vocabulary half of
+ * „hire this person directly" (2026-08-19).
+ *
+ * ⚠️ WHY IT IS HERE AND NOT BESIDE THE QUERY. Somebody who arrived at /request
+ * from a plumber's profile has already answered „რა გჭირდება" by tapping that
+ * plumber, and asking them to find „სანტექნიკა" in a catalogue of 31 groups is
+ * the wizard pretending the choice did not happen. What that provider offers is
+ * a fact about the VOCABULARY — trade ids on a ServiceProfile, professions and
+ * a sphere on a TutorProfile — so the mapping lives with the vocabulary, stays
+ * pure, and is testable without a database.
+ *
+ * Two sources, and the narrower one wins:
+ *   • a MASTER carries `services` — SERVICE topic ids, already our own words.
+ *   • an EXPERT carries professions and a sphere. `professions` names the
+ *     PERSON and `categorySlug` names the SPHERE (see Topic above), so a match
+ *     on professions is the sharper answer and is used alone when it exists —
+ *     „ბუღალტერი" yields three topics, „tax" would yield the whole sphere.
+ *
+ * LEARNING and SERVICE topics are never inferred for an expert: a school
+ * subject is not what somebody hires a consultant for, and a trade is not an
+ * expert at all (the same line tests/taxonomy.test.ts already draws).
+ *
+ * Returns ids in the catalogue's own order, deduped. An empty array means
+ * „nothing could be inferred" — the wizard then behaves exactly as it does for
+ * a visitor who arrived with no provider at all, which is the only safe answer.
+ */
+export function topicsForProvider(p: {
+  kind: 'MASTER' | 'EXPERT'
+  /** ServiceProfile.services — SERVICE topic ids. */
+  services?: string[]
+  /** TutorProfile.professions — job labels from lib/professions. */
+  professions?: string[]
+  /** The expert's sphere slug. */
+  categorySlug?: string | null
+}): string[] {
+  if (p.kind === 'MASTER') {
+    const want = new Set(p.services ?? [])
+    return TOPIC_GROUPS
+      .filter(groupIsService)
+      .flatMap(g => g.topics)
+      .filter(t => want.has(t.id))
+      .map(t => t.id)
+  }
+  // The expert half: consultation/project topics only.
+  const rows = TOPIC_GROUPS
+    .filter(g => g.kinds.includes('CONSULTATION') || g.kinds.includes('PROJECT'))
+    .flatMap(g => g.topics)
+  // Whole label, case-insensitively trimmed — the same comparison
+  // lib/requestRouting makes, never a substring: „იურისტი" must not match
+  // „კორპორატიული იურისტი" by accident.
+  const mine = new Set((p.professions ?? []).map(s => s.trim().toLowerCase()).filter(Boolean))
+  const byProfession = mine.size
+    ? rows.filter(t => (t.professions ?? []).some(x => mine.has(x.trim().toLowerCase())))
+    : []
+  if (byProfession.length) return [...new Set(byProfession.map(t => t.id))]
+  const sphere = (p.categorySlug ?? '').trim()
+  if (!sphere) return []
+  return [...new Set(rows.filter(t => t.categorySlug === sphere).map(t => t.id))]
 }

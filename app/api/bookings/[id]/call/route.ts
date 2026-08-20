@@ -69,7 +69,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     type: 'MESSAGE_NEW',
     title: 'ვიდეოზარზე გიწვევენ',
     body: `${user.fullName} — ${booking.topic}`,
-    href: `${otherIsStudent ? '/student' : '/tutor'}/messages/${id}`,
+    href: `${otherIsStudent ? '/me' : '/work'}/messages/${id}`,
   })
 
   return NextResponse.json({ ok: true, message })

@@ -47,13 +47,15 @@ import { PAGE_SEO, pageSeoKey } from '@/lib/pageSeoDefs'
  */
 const SEO_TEXTS: SiteTextDef[] = PAGE_SEO.flatMap(p => {
   const group = `SEO — ${p.label}`
+  // A retired page's rows are retired rows — see PageSeoDef.retired.
+  const retired = p.retired ? { retired: true as const } : {}
   const rows: SiteTextDef[] = [
-    { key: pageSeoKey(p.page, 'title'), group, label: 'Google-ის სათაური', default: p.title },
-    { key: pageSeoKey(p.page, 'ogTitle'), group, label: 'გაზიარების სათაური (Facebook)', default: p.ogTitle },
+    { key: pageSeoKey(p.page, 'title'), group, label: 'Google-ის სათაური', default: p.title, ...retired },
+    { key: pageSeoKey(p.page, 'ogTitle'), group, label: 'გაზიარების სათაური (Facebook)', default: p.ogTitle, ...retired },
   ]
   if (!p.lockedDescription) {
-    rows.splice(1, 0, { key: pageSeoKey(p.page, 'description'), group, label: 'Google-ის აღწერა', multiline: true, default: p.description })
-    rows.push({ key: pageSeoKey(p.page, 'ogDescription'), group, label: 'გაზიარების აღწერა (Facebook)', multiline: true, default: p.ogDescription })
+    rows.splice(1, 0, { key: pageSeoKey(p.page, 'description'), group, label: 'Google-ის აღწერა', multiline: true, default: p.description, ...retired })
+    rows.push({ key: pageSeoKey(p.page, 'ogDescription'), group, label: 'გაზიარების აღწერა (Facebook)', multiline: true, default: p.ogDescription, ...retired })
   }
   return rows
 })
@@ -71,9 +73,9 @@ export const SITE_TEXTS: SiteTextDef[] = [
 
   // ── Home · Categories section ──
   { key: 'home.categories.eyebrow', group: 'მთავარი — კატეგორიები', label: 'პატარა იარლიყი (ზემოთ)', default: 'კატეგორიები' },
-  { key: 'home.categories.title', group: 'მთავარი — კატეგორიები', label: 'სათაური', default: 'აირჩიე შენი სფერო' },
+  { key: 'home.categories.title', group: 'მთავარი — კატეგორიები', label: 'სათაური', default: 'აირჩიე შენი კატეგორია' },
   { key: 'home.categories.subtitle', group: 'მთავარი — კატეგორიები', label: 'ქვესათაური', default: 'შეადარე ექსპერტები და დაჯავშნე ვიდეოსესია.' },
-  { key: 'home.categories.allEyebrow', group: 'მთავარი — კატეგორიები', label: 'იარლიყი სფეროების სიის ზემოთ', default: 'ყველა სფერო' },
+  { key: 'home.categories.allEyebrow', group: 'მთავარი — კატეგორიები', label: 'იარლიყი კატეგორიების სიის ზემოთ', default: 'ყველა კატეგორია' },
 
   // ── Home · Experts section ──
   // `home.experts.title` is the section h2 — but ONLY while no sphere is
@@ -81,9 +83,9 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // which is generated and cannot be edited. Worth knowing before someone
   // concludes the field is broken because their text „disappeared".
   { key: 'home.experts.eyebrow', group: 'მთავარი — ექსპერტები', label: 'პატარა იარლიყი (ზემოთ)', default: 'ექსპერტები' },
-  { key: 'home.experts.empty', group: 'მთავარი — ექსპერტები', label: 'როცა სფეროში ექსპერტი არაა', default: 'ამ სფეროში ჯერ არ არის ექსპერტი' },
+  { key: 'home.experts.empty', group: 'მთავარი — ექსპერტები', label: 'როცა კატეგორიაში ექსპერტი არაა', default: 'ამ კატეგორიაში ჯერ არ არის ექსპერტი' },
   { key: 'home.experts.allCta', group: 'მთავარი — ექსპერტები', label: 'ღილაკი სიის ბოლოს', default: 'ნახე ყველა ექსპერტი' },
-  { key: 'home.experts.title', group: 'მთავარი — ექსპერტები', label: 'სათაური (როცა სფერო არჩეული არაა)', default: 'ხელით შერჩეული ექსპერტები.' },
+  { key: 'home.experts.title', group: 'მთავარი — ექსპერტები', label: 'სათაური (როცა კატეგორია არჩეული არაა)', default: 'ხელით შერჩეული ექსპერტები.' },
 
   // ── Home · How it works ──
   // The WHOLE section is editable, top to bottom (2026-08-04). Before that, the
@@ -141,18 +143,26 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'home.expertCta.body', group: 'მთავარი — გახდი ექსპერტი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'შენ ადგენ ფასს, დროსა და თემას. დანარჩენს ჩვენ ვუვლით.' },
   { key: 'home.expertCta.cta', group: 'მთავარი — გახდი ექსპერტი', label: 'ღილაკი', default: 'შემოგვიერთდი' },
 
-  // ── Categories page ──
-  { key: 'categories.hero.title', group: 'სფეროები', label: 'სათაური', default: 'აირჩიე შენი სფერო' },
-  { key: 'categories.hero.subtitle', group: 'სფეროები', label: 'ქვესათაური', multiline: true, default: 'აირჩიე მიმართულება, შეადარე ექსპერტები და დაჯავშნე ვიდეოსესია.' },
-  { key: 'categories.emptySpheres.eyebrow', group: 'სფეროები', label: 'ცარიელი სფეროების იარლიყი', default: 'ჯერ ცარიელი სფეროები' },
-  { key: 'categories.empty.title', group: 'სფეროები', label: 'ცარიელი გვერდი — სათაური', default: 'სფეროები ჯერ არ არის' },
-  { key: 'categories.empty.body', group: 'სფეროები', label: 'ცარიელი გვერდი — ტექსტი', multiline: true, default: 'მალე დავამატებთ. სცადე მოგვიანებით.' },
-  { key: 'categories.empty.cta', group: 'სფეროები', label: 'ცარიელი გვერდი — ღილაკი', default: 'ექსპერტების ძებნა' },
+  // ── Categories page — RETIRED 2026-08-19 (stage 8) ──
+  // app/categories/* was deleted; the URLs 308 to /experts?category=. The keys
+  // stay (a SiteText DB row is keyed by them — see `retired` on SiteTextDef)
+  // and are hidden from the editor. Nothing reads them.
+  { key: 'categories.hero.title', group: 'კატეგორიები', label: 'სათაური', default: 'აირჩიე შენი კატეგორია', retired: true },
+  { key: 'categories.hero.subtitle', group: 'კატეგორიები', label: 'ქვესათაური', multiline: true, default: 'აირჩიე მიმართულება, შეადარე ექსპერტები და დაჯავშნე ვიდეოსესია.', retired: true },
+  { key: 'categories.emptySpheres.eyebrow', group: 'კატეგორიები', label: 'ცარიელი კატეგორიების იარლიყი', default: 'ჯერ ცარიელი კატეგორიები', retired: true },
+  { key: 'categories.empty.title', group: 'კატეგორიები', label: 'ცარიელი გვერდი — სათაური', default: 'კატეგორიები ჯერ არ არის', retired: true },
+  { key: 'categories.empty.body', group: 'კატეგორიები', label: 'ცარიელი გვერდი — ტექსტი', multiline: true, default: 'მალე დავამატებთ. სცადე მოგვიანებით.', retired: true },
+  { key: 'categories.empty.cta', group: 'კატეგორიები', label: 'ცარიელი გვერდი — ღილაკი', default: 'ექსპერტების ძებნა', retired: true },
 
-  // ── /konsultacia — the profession-pages hub ──
-  { key: 'konsultacia.eyebrow', group: 'კონსულტაციები (hub)', label: 'პატარა იარლიყი', default: 'კონსულტაციები' },
-  { key: 'konsultacia.title', group: 'კონსულტაციები (hub)', label: 'სათაური', default: 'ონლაინ კონსულტაცია სპეციალისტთან' },
-  { key: 'konsultacia.subtitle', group: 'კონსულტაციები (hub)', label: 'ქვესათაური', multiline: true, default: 'აირჩიე, რომელი სპეციალისტი გჭირდება, და ნახე რას გაივლი მასთან ერთსაათიან ვიდეოსესიაზე. ფასს ექსპერტი თავად ადგენს და პროფილში წინასწარ ხედავ.' },
+  // ── The profession hub — RETIRED 2026-08-19 (stage 10) ──
+  // The KEYS say konsultacia (the address it had until stage 8); the page moved
+  // to /experts then, and in stage 10 the CATALOGUE took that address — a hub of
+  // professions is a pre-filtered catalogue, and every landing it indexed still
+  // answers at /experts/<profession>. The keys stay (a SiteText DB row is keyed
+  // by them — see `retired` on SiteTextDef) and are hidden from the editor.
+  { key: 'konsultacia.eyebrow', group: 'კონსულტაციები (hub)', label: 'პატარა იარლიყი', default: 'კონსულტაციები', retired: true },
+  { key: 'konsultacia.title', group: 'კონსულტაციები (hub)', label: 'სათაური', default: 'ონლაინ კონსულტაცია სპეციალისტთან', retired: true },
+  { key: 'konsultacia.subtitle', group: 'კონსულტაციები (hub)', label: 'ქვესათაური', multiline: true, default: 'აირჩიე, რომელი სპეციალისტი გჭირდება, და ნახე რას გაივლი მასთან ერთსაათიან ვიდეოსესიაზე. ფასს ექსპერტი თავად ადგენს და პროფილში წინასწარ ხედავ.', retired: true },
 
   // ── Blog ──
   { key: 'blog.eyebrow', group: 'ბლოგი', label: 'პატარა იარლიყი', default: 'ბლოგი' },
@@ -200,7 +210,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
 
   { key: 'apply.how.eyebrow', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'პატარა იარლიყი', default: 'როგორ მუშაობს' },
   { key: 'apply.how.step1.title', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 1 — სათაური', default: 'შეავსე განაცხადი' },
-  { key: 'apply.how.step1.desc', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'მიუთითე ინფორმაცია შენს შესახებ, აირჩიე საქმიანობის სფერო და დააწესე კონსულტაციის ღირებულება.' },
+  { key: 'apply.how.step1.desc', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'მიუთითე ინფორმაცია შენს შესახებ, აირჩიე კატეგორია და დააწესე კონსულტაციის ფასი.' },
   { key: 'apply.how.step2.title', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 2 — სათაური', default: 'ჩვენ გადავხედავთ' },
   { key: 'apply.how.step2.desc', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'თითოეულ განაცხადს დეტალურად განვიხილავთ და პასუხს 24–48 საათში მიიღებ.' },
   { key: 'apply.how.step3.title', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'გამოაქვეყნე თავისუფალი დრო' },
@@ -210,15 +220,15 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // One profession per LINE. Empty lines are ignored, so the list length is
   // edited by pressing Enter — no code change to add or drop a row.
   { key: 'apply.who.list', group: 'გახდი ექსპერტი — ვის ვეძებთ', label: 'სია — ერთი პროფესია ერთ ხაზზე', multiline: true, default: 'ბუღალტერი ან საგადასახადო კონსულტანტი\nიურისტი\nფინანსისტი\nმარკეტოლოგი\nბიზნესის ან კარიერის კონსულტანტი\nHR, IT, პროდაქტ-მენეჯერი ან დიზაინის სპეციალისტი\nფსიქოლოგი\nუძრავი ქონების, რელოკაციის ან კრიპტოს ექსპერტი' },
-  { key: 'apply.who.note', group: 'გახდი ექსპერტი — ვის ვეძებთ', label: 'ხაზი სიის ქვეშ', multiline: true, default: 'თუ შენი სფერო სიაში არ არის, დაამატე განაცხადში.' },
+  { key: 'apply.who.note', group: 'გახდი ექსპერტი — ვის ვეძებთ', label: 'ხაზი სიის ქვეშ', multiline: true, default: 'თუ შენი კატეგორია სიაში არ არის, დაამატე განაცხადში.' },
 
   { key: 'apply.get.eyebrow', group: 'გახდი ექსპერტი — რას იღებ', label: 'პატარა იარლიყი', default: 'რას იღებ' },
   { key: 'apply.get.card1.title', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 1 — სათაური', default: 'ფასს შენ ადგენ' },
-  { key: 'apply.get.card1.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 1 — ტექსტი', multiline: true, default: 'თითოეულ სერვისს ცალ-ცალკე მიუთითე ფასი — მომხმარებელი ზუსტად შენს მიერ განსაზღვრულ ღირებულებას დაინახავს.' },
+  { key: 'apply.get.card1.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 1 — ტექსტი', multiline: true, default: 'თითოეულ სერვისს ცალ-ცალკე მიუთითე ფასი — მომხმარებელი ზუსტად შენს მიერ განსაზღვრულ ფასს დაინახავს.' },
   { key: 'apply.get.card2.title', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 2 — სათაური', default: 'დროც შენია' },
   { key: 'apply.get.card2.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 2 — ტექსტი', multiline: true, default: 'მიუთითებ შენთვის მოსახერხებელ თავისუფალ დროს — ჯავშნები მხოლოდ ამ საათებში იქნება შესაძლებელი.' },
   { key: 'apply.get.card3.title', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 3 — სათაური', default: 'პროფილი ძებნაში' },
-  { key: 'apply.get.card3.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 3 — ტექსტი', multiline: true, default: 'დამტკიცების შემდეგ ჩნდები კატალოგსა და შენი სფეროს გვერდზე.' },
+  { key: 'apply.get.card3.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 3 — ტექსტი', multiline: true, default: 'დამტკიცების შემდეგ ჩნდები კატალოგსა და შენი კატეგორიის გვერდზე.' },
   // Card 4 was PAYMENTS_LIVE-branched with a COMMISSION_PCT template until
   // 2026-08-05. ⚠ It no longer follows the flag — re-type it here when paid
   // bookings ship.
@@ -231,9 +241,9 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'apply.faq.q2', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 2', default: 'რამდენი დრო სჭირდება განაცხადს?' },
   { key: 'apply.faq.a2', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 2', multiline: true, default: 'რამდენიმე წუთი. დანარჩენს — ვიდეო, სერტიფიკატები, ბმულები — პროფილში ავსებ დამტკიცების შემდეგ.' },
   { key: 'apply.faq.q3', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 3', default: 'ვინ ადგენს ფასს?' },
-  { key: 'apply.faq.a3', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 3', multiline: true, default: 'შენ. ფასს თითოეულ სერვისზე ცალკე ადგენ და სტუდენტი მას წინასწარ ხედავს.' },
+  { key: 'apply.faq.a3', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 3', multiline: true, default: 'შენ. ფასს თითოეულ სერვისზე ცალკე ადგენ და კლიენტი მას წინასწარ ხედავს.' },
   { key: 'apply.faq.q4', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 4', default: 'როგორ ტარდება კონსულტაცია?' },
-  { key: 'apply.faq.a4', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 4', multiline: true, default: 'ვიდეოსესიის ფორმატში, ბრაუზერიდან — ცალკე აპლიკაცია არც შენ გჭირდება და არც სტუდენტს.' },
+  { key: 'apply.faq.a4', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 4', multiline: true, default: 'ვიდეოსესიის ფორმატში, ბრაუზერიდან — ცალკე აპლიკაცია არც შენ გჭირდება და არც კლიენტს.' },
   // Q6 is the money question. It sits FOURTH on the page (see ApplyMarketing's
   // FAQ array) but is numbered 6 because keys may never be renumbered — its
   // predecessor was hardcoded, so there is simply no q6 row anywhere yet.
@@ -430,6 +440,23 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'signup.learn.step3.desc', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 3 — აღწერა', default: 'ყველა ექსპერტი — სანამ პლატფორმაზე მოვა.' },
   { key: 'signup.learn.trust.title', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნდობის ხაზი — სათაური', default: 'ექსპერტებს ხელით განვიხილავთ' },
   { key: 'signup.learn.trust.desc', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნდობის ხაზი — აღწერა', default: 'გამოცდილება და რეპუტაცია გამოწმებული.' },
+
+  /* ⚠️ THE THIRD IDENTITY (2026-08-18). Owner: „სამი ვარიანტი უნდა დაემატოს …
+     მესამე სერვისები — ვინც ტვირთავს, ჩვეულებრივი ადამიანი და ბიზნესი."
+     Individual-vs-business is NOT asked here on purpose — it is the first
+     question on /apply/master, where the answer changes which fields appear.
+     Asking it twice would make the signup form pretend to a decision it cannot
+     act on. */
+  { key: 'signup.serve.pill', group: 'რეგისტრაცია — სერვისი', label: 'იარლიყის ტექსტი', default: 'სერვისის განაცხადი' },
+  { key: 'signup.serve.title1', group: 'რეგისტრაცია — სერვისი', label: 'სათაური, 1-ლი ხაზი', default: 'დაარეგისტრირე შენი სერვისი.' },
+  { key: 'signup.serve.title2', group: 'რეგისტრაცია — სერვისი', label: 'სათაური, აქცენტი (მწვანე)', default: 'შეკვეთები შენს ქალაქში.' },
+  { key: 'signup.serve.sub', group: 'რეგისტრაცია — სერვისი', label: 'ქვესათაური', multiline: true, default: 'კლიენტი წერს, რა გაფუჭდა. შენ ფასს თვითონ წერ.' },
+  { key: 'signup.serve.step1.title', group: 'რეგისტრაცია — სერვისი', label: 'ნაბიჯი 1 — სათაური', default: 'შეავსე განაცხადი' },
+  { key: 'signup.serve.step1.desc', group: 'რეგისტრაცია — სერვისი', label: 'ნაბიჯი 1 — აღწერა', default: 'რას აკეთებ და რომელ ქალაქში.' },
+  { key: 'signup.serve.step2.title', group: 'რეგისტრაცია — სერვისი', label: 'ნაბიჯი 2 — სათაური', default: 'გადავამოწმებთ' },
+  { key: 'signup.serve.step2.desc', group: 'რეგისტრაცია — სერვისი', label: 'ნაბიჯი 2 — აღწერა', default: 'დაგირეკავთ და ვისაუბრებთ.' },
+  { key: 'signup.serve.step3.title', group: 'რეგისტრაცია — სერვისი', label: 'ნაბიჯი 3 — სათაური', default: 'მოთხოვნები მოგდის' },
+  { key: 'signup.serve.step3.desc', group: 'რეგისტრაცია — სერვისი', label: 'ნაბიჯი 3 — აღწერა', default: 'მხოლოდ შენი მიმართულების და შენი ქალაქის.' },
 
   { key: 'signup.teach.pill', group: 'რეგისტრაცია — ვასწავლი', label: 'იარლიყის ტექსტი', default: 'ექსპერტის განაცხადი' },
   { key: 'signup.teach.title1', group: 'რეგისტრაცია — ვასწავლი', label: 'სათაური, 1-ლი ხაზი', default: 'გახდი მცოდნე.' },

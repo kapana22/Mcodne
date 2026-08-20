@@ -23,12 +23,19 @@
  * name would have broken this file on its first rename.
  *
  * THE SPHERE IS STILL SINGLE, and derived rather than asked for. `categoryId`
- * drives browse, the filter, /categories/*, the counts and the SEO — one
+ * drives browse, the filter (/experts?category=), the counts and the SEO — one
  * column, one sphere. The applicant picks professions; `sphereOfProfessions`
  * reads the sphere off the first one. Nothing downstream changed.
  *
+ * WHAT A PROFESSION CAN DO (stage 8, 2026-08-19): `PROFESSION_CAN` marks each
+ * one CONSULT (a conversation — every profession) and, for a short obvious
+ * list, WORK as well (a delivered job: a designer draws the logo, a
+ * photographer shoots the wedding). ⚠️ WORK for an expert profession is DATA
+ * ONLY today — nothing routes on it yet; it is what stage 9+ and /join will
+ * read when the expert side learns to take PROJECT work. Default is CONSULT.
+ *
  * Adding a profession: add it here. Nothing else needs to know.
- * Pinned by tests/professions.test.ts.
+ * Pinned by tests/professions.test.ts and tests/taxonomy.test.ts.
  */
 
 /** slug → the professions that belong to that sphere, in the owner's order. */
@@ -179,6 +186,47 @@ export function sphereOfProfession(job: string): string | undefined {
 export function sphereOfProfessions(jobs: readonly string[]): string | undefined {
   for (const j of jobs) { const s = sphereOfProfession(j); if (s) return s }
   return undefined
+}
+
+/* ═══════════ what a profession can do ══════════════════════════════════ */
+
+/** Mirrors lib/capabilities → Capability, restated here so this file stays a
+ *  leaf a client component can import (capabilities.ts pulls in prisma). */
+export type ProfessionCapability = 'CONSULT' | 'WORK'
+
+/**
+ * The professions that plausibly DELIVER something as well as advise. Kept
+ * short and obvious on purpose — a claim that everybody does jobs is no claim.
+ * ⚠️ Not routed anywhere yet (see the header): stage 9+ / join data.
+ */
+const ALSO_WORKS: readonly string[] = [
+  'ბუღალტერი',
+  'გრაფიკული დიზაინერი',
+  'UX/UI დიზაინერი',
+  'დეველოპერი',
+  'ფოტოგრაფი',
+  'ვიდეოგრაფი',
+  'მონტაჟის სპეციალისტი',
+  'თარჯიმანი',
+  'კოპირაითერი',
+  'ინტერიერის დიზაინერი',
+  'არქიტექტორი',
+  'SMM სპეციალისტი',
+]
+
+/** job → what it can do. Every profession is present; default `['CONSULT']`. */
+export const PROFESSION_CAN: Record<string, readonly ProfessionCapability[]> = Object.fromEntries(
+  ALL_PROFESSIONS.map(p => [p.job, ALSO_WORKS.includes(p.job) ? ['CONSULT', 'WORK'] : ['CONSULT']]),
+)
+
+/** What one profession can do; an unknown job can only consult. */
+export function professionCan(job: string): readonly ProfessionCapability[] {
+  return PROFESSION_CAN[job] ?? ['CONSULT']
+}
+
+/** Every profession that can do `cap`, in the owner's order. */
+export function professionsThatCan(cap: ProfessionCapability): string[] {
+  return ALL_PROFESSIONS.filter(p => professionCan(p.job).includes(cap)).map(p => p.job)
 }
 
 /** How many professions one expert may claim. Not a technical limit — a claim

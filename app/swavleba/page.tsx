@@ -28,10 +28,10 @@ import { RequestButton } from './RequestButton'
 // operator-facing is now behind `isAdmin` — check that list before the next
 // stage change rather than after it.
 //
-// WHY A SEPARATE ROUTE AND NOT A FILTER ON /tutors. Two different search
+// WHY A SEPARATE ROUTE AND NOT A FILTER ON /experts. Two different search
 // intents deserve two pages — „ინგლისურის მასწავლებელი" is not the same query
 // as „ბიზნეს კონსულტანტი" — and a route is a hard boundary where a toggle is a
-// soft one people leave set wrong. It also means /tutors is not touched at all.
+// soft one people leave set wrong. It also means /experts is not touched at all.
 //
 // This page is a VIEW over the same supply, keyed on TutorProfile.packagesEnabled.
 // It is deliberately NOT a hidden Category: lib/abroad.ts documents why that
@@ -77,7 +77,7 @@ export default async function TeachingPage() {
       specialty: true,
       languages: true,
       // No `avatarUrl` on the list payload by accident — it is a data: URI in
-      // Postgres and shipping it raw is what once made /tutors 556KB of HTML.
+      // Postgres and shipping it raw is what once made /experts 556KB of HTML.
       // avatarSrc() below turns it into the cacheable /api/avatars/<id> route.
       user: { select: { id: true, fullName: true, avatarUrl: true } },
       category: { select: { name: true } },
@@ -136,13 +136,13 @@ export default async function TeachingPage() {
           <p className="mt-1 text-meta text-ink-700">
             {isAdmin
               ? 'ექსპერტი აქ ჩნდება მხოლოდ მას შემდეგ, რაც ადმინში ჩართავ „პაკეტებს“.'
-              : 'პაკეტის მოთხოვნის შემდეგ მასწავლებელი დაგიდასტურებს და გადახდაზე შეგითანხმდება.'}
+              : 'პაკეტის მოთხოვნის შემდეგ ექსპერტი დაგიდასტურებს და გადახდაზე შეგითანხმდება.'}
           </p>
         </div>
 
         <Eyebrow className="mb-3">სწავლება</Eyebrow>
         <h1 className="font-display text-h1 lg:text-display font-bold text-ink-900 tracking-tight leading-[1.08]">
-          მასწავლებლები თვიური პაკეტით
+          ექსპერტები თვიური პაკეტით
         </h1>
         {/* An operator tally („N ჩართული ექსპერტი · M პაკეტს განრიგი ვერ
             იტევს"), so it is shown to operators. A parent has no use for how
@@ -197,7 +197,7 @@ export default async function TeachingPage() {
                     />
                     <div className="min-w-0 flex-1">
                       <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight leading-tight">
-                        <Link href={`/tutors/${t.slug || t.id}`} className="hover:text-brand-700 transition-colors duration-fast">
+                        <Link href={`/experts/${t.slug || t.id}`} className="hover:text-brand-700 transition-colors duration-fast">
                           {t.user?.fullName}
                         </Link>
                       </h2>

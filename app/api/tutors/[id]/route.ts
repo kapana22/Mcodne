@@ -12,7 +12,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   // Accept the public SLUG as well as the internal id.
   //
-  // WHY THIS EXISTS: profile URLs became /tutors/<slug>, and the client used to
+  // WHY THIS EXISTS: profile URLs became /experts/<slug>, and the client used to
   // pass the URL segment straight through to this endpoint — which only ever
   // matched on id, so every profile returned 404 and booking broke site-wide.
   // The client now sends the real id, and this resolver is the second line of
@@ -182,7 +182,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     // verify. `label` is the display string; medianMin/sampleN are exposed so
     // the UI can show the sample if it ever wants to.
     // NOTE: `responseHours` still ships (above, via the profile row) only
-    // because app/tutors/[id]/client.tsx has not migrated yet — it must stop
+    // because app/experts/[slug]/client.tsx has not migrated yet — it must stop
     // reading it and read `responseTime.label` instead.
     responseTime: responseTimeLabelKa(tutor.responseMedianMin, tutor.responseSampleN)
       ? {

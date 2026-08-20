@@ -22,7 +22,7 @@
 // threshold that drifts, nothing learned. The same refusal lib/requestRouting
 // makes about matching, made again here.
 
-import { budgetIsBelowFloor, type RequestKindName } from './requestTopics'
+import { type RequestKindName } from './requestTopics'
 
 /** Why a request is being held for a person. Empty means „let it go". */
 export type TriageFlag =
@@ -89,9 +89,17 @@ export const REPEAT_LIMIT = 3
 export function triageFlags(r: TriageInput): TriageFlag[] {
   const out: TriageFlag[] = []
 
-  // Already refused on arrival by the endpoint, and it must never route: the
-  // whole point of the floor is that nobody here can serve it.
-  if (budgetIsBelowFloor(r.kind, r.budgetBand)) out.push('BELOW_FLOOR')
+  // ⚠️ BELOW_FLOOR NO LONGER FLAGS ANYTHING (2026-08-18), and the flag is kept
+  // rather than deleted on purpose — three months of stored requests carry it,
+  // and an admin reading „why did this wait" on an old row must still get an
+  // answer instead of a raw string.
+  //
+  // The floor used to REFUSE a request on arrival. It refused one in three, and
+  // the closest local competitor asks for no budget at all — see
+  // app/api/requests for the measurement and the owner's decision. A low budget
+  // is now simply a low budget: the request routes, the expert sees the number,
+  // and the expert decides. That is the judgement they are better placed to
+  // make than we are.
 
   // ⚠️ „სხვა" MEANS THE CATALOGUE COULD NOT NAME IT, which is the most valuable
   // row in the table and also the one nobody can route: with no topic there is

@@ -8,12 +8,27 @@ import { SiteText } from '@/components/SiteTextProvider'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 const COLS: { titleKey: string; links: { label: string; href: string }[] }[] = [
   { titleKey: 'footer.col1.title', links: [
-    { label: 'ექსპერტების ძებნა', href: '/tutors' },
-    { label: 'კატეგორიები', href: '/categories' },
-    // Index of the profession landing pages (/konsultacia/[slug]). A site-wide
-    // link is what gets the whole set crawled from any page.
-    { label: 'კონსულტაციები', href: '/konsultacia' },
-    { label: 'შემოგვიერთდი', href: '/apply' },
+    { label: 'ექსპერტების ძებნა', href: '/experts' },
+    // ⚠️ ONE CATALOGUE, TWO WORDS (stage 10, 2026-08-19). This column carried
+    // FOUR entries — „ექსპერტების ძებნა" /tutors, „კონსულტაციები" /experts,
+    // „სერვისები" /services and „ხელოსნები" /masters — which was two
+    // catalogues and a door. They are ONE list now (owner: „ექსპერტები და
+    // სერვისები ხო ერთია"), three of those addresses 308 here, and four
+    // links to one page is a menu that teaches nothing. What survives is the
+    // pair of words people actually arrive with: the list, and the list with
+    // the job half ticked. Not gated on the flag — like the sitemap, the page
+    // survives FEATURE_REQUESTS being off (only its CTA is gated).
+    // …and since 2026-08-19 not even that pair: the „სერვისები" entry pointed
+    // at the SAME page with a filter pre-ticked, which in a footer reads as a
+    // second section and is not one. Owner: „იყოს ამ ეტაპზე ექსპერტები
+    // მხოლოდ." One list, one word, one link.
+    { label: 'გახდი ექსპერტი', href: '/join?can=CONSULT' },
+    // ⚠️ TWO ENTRIES, NOT ONE „შემოგვიერთდი" (2026-08-18). A single join link
+    // has to land somewhere, and either destination is the wrong form for half
+    // the people who tap it — a plumber reading „become an expert" concludes
+    // the site is not for him and does not look for a second door. Owner:
+    // „კარგად უნდა გამინჯნო ექსპერტი და სტუდენტი." Same rule, one level up.
+    { label: 'დაარეგისტრირე სერვისი', href: '/join?can=WORK' },
     { label: 'როგორ მუშაობს', href: '/#how' },
   ]},
   { titleKey: 'footer.col2.title', links: [
@@ -35,7 +50,7 @@ const COLS: { titleKey: string; links: { label: string; href: string }[] }[] = [
    no text and no image in it between the last card and the footer. If a page
    needs air above the footer it should say so itself.
    (A `{/* … *\/}` cannot be the first thing inside a parenthesised return —
-   same trap as app/HomeClient's ExpertCta.) */
+   same trap as app/_home/cta's ExpertCta.) */
 export function Footer() {
   return (
     <footer className="relative">
@@ -86,7 +101,7 @@ export function Footer() {
                     </li>
                   )
                   // "გახდი ექსპერტი" is meaningless for an existing expert.
-                  return l.href === '/apply' ? <ApplyCtaGate key={l.href}>{li}</ApplyCtaGate> : li
+                  return l.href === '/join?can=CONSULT' ? <ApplyCtaGate key={l.href}>{li}</ApplyCtaGate> : li
                 })}
               </ul>
             </div>

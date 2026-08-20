@@ -47,7 +47,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const fit = await packageFits(pkg.tutor.id, [pkg])
   if (!fit[pkg.id]?.fits) {
     return NextResponse.json(
-      { ok: false, error: 'NO_CAPACITY', message: 'მასწავლებელს ამ პერიოდში საკმარისი თავისუფალი დრო არ აქვს.' },
+      { ok: false, error: 'NO_CAPACITY', message: 'ექსპერტს ამ პერიოდში საკმარისი თავისუფალი დრო არ აქვს.' },
       { status: 409 },
     )
   }
@@ -85,7 +85,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       type: 'BOOKING_CREATED',
       title: 'ახალი პაკეტის მოთხოვნა',
       body: `${me.fullName} — ${pkg.lessonsCount} გაკვეთილი · ₾${pkg.price}`,
-      href: '/tutor/profile#section-students',
+      href: '/work/services#section-students',
     }).catch(() => {})
   })
 

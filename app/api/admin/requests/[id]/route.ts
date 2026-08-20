@@ -71,9 +71,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: false, error: 'NOTHING_TO_DO' }, { status: 400 })
   }
 
-  const updated = await prisma.serviceRequest.update({
-    where: { id },
+  // A CLAIM, NOT AN UPDATE (D4, 2026-08-18). Two admins with the same row open
+  // — or one admin's second tab — used to overwrite each other silently: the
+  // status the second one saw when they clicked is not the status the row had
+  // when their write landed. The row is claimed on the status it was read at;
+  // a mismatch is a 409 the panel can show („ეს მოთხოვნა ახლახან შეიცვალა"),
+  // and the audit row is written only for a write that actually happened.
+  // Same pattern as bookings/[id]/cancel and the CLAUDE.md rule on guards.
+  const claim = await prisma.serviceRequest.updateMany({
+    where: { id, status: before.status },
     data,
+  })
+  if (claim.count !== 1) {
+    return NextResponse.json({ ok: false, error: 'CHANGED', message: 'ეს მოთხოვნა ახლახან შეიცვალა — განაახლე გვერდი.' }, { status: 409 })
+  }
+  const updated = await prisma.serviceRequest.findUniqueOrThrow({
+    where: { id },
     select: { id: true, publicRef: true, status: true, adminNote: true, offerLimit: true, offerCount: true },
   })
 

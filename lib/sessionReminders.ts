@@ -99,7 +99,7 @@ export async function sendSessionReminders(): Promise<{
     if (r.student_email && normalizePrefs(r.student_prefs).BOOKING_CREATED) {
       const { subject, html } = sessionReminderEmail({
         name: r.student_name || '', counterpartName: r.tutor_name || 'ექსპერტი',
-        topic: r.topic, whenText, durationText, href: `/student/bookings/${r.id}`,
+        topic: r.topic, whenText, durationText, href: `/me/bookings/${r.id}`,
       })
       attempted++
       // Count only what actually went out — sendMail RESOLVES on a provider
@@ -108,8 +108,8 @@ export async function sendSessionReminders(): Promise<{
     }
     if (r.tutor_email && normalizePrefs(r.tutor_prefs).BOOKING_CREATED) {
       const { subject, html } = sessionReminderEmail({
-        name: r.tutor_name || '', counterpartName: r.student_name || 'სტუდენტი',
-        topic: r.topic, whenText, durationText, href: `/tutor/bookings/${r.id}`,
+        name: r.tutor_name || '', counterpartName: r.student_name || 'კლიენტი',
+        topic: r.topic, whenText, durationText, href: `/work/bookings/${r.id}`,
       })
       attempted++
       await sendMail({ to: r.tutor_email, subject, html }).then(res => { if (res.ok) { emails++; delivered++ } }).catch(() => {})
@@ -229,7 +229,7 @@ export function imminentTargets(rows: ImminentRow[]): ImminentTarget[] {
         startAt: r.startAt,
         email: r.student_email,
         counterpartName: r.tutor_name || 'ექსპერტი',
-        href: `/student/bookings/${r.id}?reminder=soon`,
+        href: `/me/bookings/${r.id}?reminder=soon`,
       })
     }
     if (normalizePrefs(r.tutor_prefs)[PREF_KEY]) {
@@ -240,8 +240,8 @@ export function imminentTargets(rows: ImminentRow[]): ImminentTarget[] {
         topic: r.topic,
         startAt: r.startAt,
         email: r.tutor_email,
-        counterpartName: r.student_name || 'სტუდენტი',
-        href: `/tutor/bookings/${r.id}?reminder=soon`,
+        counterpartName: r.student_name || 'კლიენტი',
+        href: `/work/bookings/${r.id}?reminder=soon`,
       })
     }
   }

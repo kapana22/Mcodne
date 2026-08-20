@@ -1,8 +1,11 @@
-// Profession-level SEO landing pages — /konsultacia/[slug].
+// Profession-level SEO landing pages — /experts/<slug> (was /konsultacia/[slug]
+// until stage 8, 2026-08-19; served by app/experts/[slug]/_profession.tsx, and
+// the slug is resolved as a profession BEFORE an expert — see that page).
 //
 // WHY THIS EXISTS SEPARATELY FROM categorySeo:
 // Georgian search splits into two different head terms for the same need.
-//   • SPHERE terms — „საგადასახადო კონსულტაცია" → served by /categories/tax
+//   • SPHERE terms — „საგადასახადო კონსულტაცია" → were served by /categories/tax
+//     (retired stage 8; that URL 308s to /experts?category=tax)
 //   • PROFESSION terms — „ბუღალტერთან კონსულტაცია" → served by this route
 // They are not synonyms to a search engine and a single page cannot own both,
 // so each gets its own URL, H1 and body copy. The two are cross-linked, and the
@@ -22,7 +25,8 @@
 import type { CategoryFaq } from './categorySeo'
 
 export type ProfessionSeo = {
-  /** URL segment: /konsultacia/<slug>. Latin, matches the category slug style. */
+  /** URL segment: /experts/<slug>. Latin, matches the category slug style.
+   *  ⚠️ Reserved in lib/expertSlug so no expert profile can be minted onto it. */
   slug: string
   /** The exact head term this page targets. Used in <title>, H1 and anchors. */
   keyword: string
@@ -441,8 +445,8 @@ export const professionBySlug: Record<string, ProfessionSeo> = Object.fromEntrie
   professions.map(p => [p.slug, p]),
 )
 
-/** Professions that point at a given category — powers the cross-links on
- *  /categories/[slug]. Empty array is normal for spheres with no profession page. */
+/** Professions that point at a given category. Empty array is normal for
+ *  spheres with no profession page. */
 export function professionsForCategory(categorySlug: string): ProfessionSeo[] {
   return professions.filter(p => p.categorySlug === categorySlug)
 }

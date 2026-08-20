@@ -1,4 +1,5 @@
 // /settings — shapes shared by the page and its section components.
+import { ROLE } from '@/lib/roles'
 
 /** The success/error line every settings card renders under its form. */
 export type Msg = { kind: 'success' | 'error'; text: string } | null
@@ -14,16 +15,16 @@ export const DEFAULT_PREFS: PrefsMap = {
 }
 /* The same pref KEY means different things to the two sides, so the copy is
    derived from the viewer's role — it used to be hardcoded tutor-side and a
-   student was told „სტუდენტმა შეგაფასა" about a notification they get when an
+   student was told „კლიენტმა შეგაფასა" about a notification they get when an
    EXPERT replies to their review (see app/api/reviews/[bookingId] vs
    app/api/reviews). Keys never change; only the wording does. */
 export const prefRows = (role: Me['role'] | null | undefined): Array<{ key: PrefKey; label: string; hint: string }> => {
-  const expert = role === 'TUTOR' || role === 'ADMIN'
+  const expert = role === ROLE.EXPERT || role === 'ADMIN'
   return [
     { key: 'BOOKING_CREATED',    label: 'ჯავშნის ცვლილება',      hint: 'ახალი, გაუქმებული, დადასტურებული' },
     { key: 'MESSAGE_NEW',        label: 'ახალი შეტყობინება',     hint: 'ახალი ტექსტი მიმოწერაში' },
     expert
-      ? { key: 'REVIEW_NEW' as const, label: 'ახალი შეფასება',      hint: 'სტუდენტმა შეგაფასა' }
+      ? { key: 'REVIEW_NEW' as const, label: 'ახალი შეფასება',      hint: 'კლიენტმა შეგაფასა' }
       : { key: 'REVIEW_NEW' as const, label: 'პასუხი შეფასებაზე',  hint: 'ექსპერტმა უპასუხა შენს შეფასებას' },
     expert
       ? { key: 'APPLICATION_STATUS' as const, label: 'განაცხადი და პროფილი', hint: 'განაცხადის პასუხი და პროფილის შეხსენებები' }

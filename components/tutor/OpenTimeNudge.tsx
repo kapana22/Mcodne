@@ -39,7 +39,7 @@ export function OpenTimeNudge({ noAvailability }: { noAvailability: boolean | nu
       setOpen(false)
       return
     }
-    if (path?.startsWith('/tutor/schedule')) {
+    if (path?.startsWith('/work/schedule')) {
       try { localStorage.setItem(SNOOZE_KEY, String(Date.now())) } catch {}
       setOpen(false)
       return
@@ -74,7 +74,7 @@ export function OpenTimeNudge({ noAvailability }: { noAvailability: boolean | nu
               ორშ–პარ 10:00–18:00 (app/tutor/schedule/page.tsx), so this is one
               tap from nudge to a ready-to-publish schedule. Nothing is written
               until they press „შექმნა" there. */}
-          <Btn href="/tutor/schedule?template=1">ორშ–პარ 10:00–18:00 გახსნა</Btn>
+          <Btn href="/work/schedule?template=1">ორშ–პარ 10:00–18:00 გახსნა</Btn>
         </>
       }
     >

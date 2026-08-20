@@ -13,7 +13,7 @@ import { View } from './_model'
 /* ═══════════════════════════════════════════════════════════════════ */
 
 const ONB_STEPS = [
-  { id: 1, l: 'სფეროები',    s: 'რას ეძებ' },
+  { id: 1, l: 'კატეგორიები',    s: 'რას ეძებ' },
   { id: 2, l: 'შენი ფონი',   s: 'რომელ ეტაპზე ხარ' },
   { id: 3, l: 'ხელმისაწვდომი', s: 'როდის ხარ თავისუფალი' },
   { id: 4, l: 'პირველი შერჩევა', s: 'შერჩეული ექსპერტი' },
@@ -62,7 +62,7 @@ export const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
         const params = new URLSearchParams()
         if (primarySlug) params.set('q', primarySlug)
         if (budget) params.set('maxPrice', String(budget))
-        window.location.href = `/tutors${params.toString() ? `?${params}` : ''}`
+        window.location.href = `/experts${params.toString() ? `?${params}` : ''}`
         return
       }
     } catch {}
@@ -120,12 +120,12 @@ export const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
 
           {step === 1 && (
             <div className="max-w-[720px]">
-              <Eyebrow className="mb-2">№ 01 — სფეროები</Eyebrow>
+              <Eyebrow className="mb-2">№ 01 — კატეგორიები</Eyebrow>
               <h1 className="font-display text-display lg:text-display-lg font-bold text-ink-900 tracking-[-0.02em] leading-[1.05]">
                 რაში გჭირდება ცოდნა?
               </h1>
               <p className="mt-3 text-body-lg text-ink-600 leading-[1.55] max-w-[520px]">
-                აირჩიე 1—4 სფერო. <span className="font-display font-semibold text-ink-900">{areas.length}/4</span> არჩეული.
+                აირჩიე 1—4 კატეგორია. <span className="font-display font-semibold text-ink-900">{areas.length}/4</span> არჩეული.
               </p>
 
               <div className="mt-7 grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -278,7 +278,7 @@ export const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
                 <Eyebrow tone="muted" className="mb-4">შენი არჩევანი</Eyebrow>
                 <div className="space-y-4">
                   <div>
-                    <div className="font-mono text-micro uppercase text-ink-500 mb-1.5">სფეროები</div>
+                    <div className="font-mono text-micro uppercase text-ink-500 mb-1.5">კატეგორიები</div>
                     <div className="flex flex-wrap gap-1.5">
                       {areas.length ? areas.map(id => (
                         <span key={id} className="inline-flex items-center h-7 px-3 rounded-pill bg-ink-50 border border-ink-200 font-display text-meta font-semibold text-ink-800">
@@ -293,7 +293,7 @@ export const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
                           onClick={() => setStep(1)}
                           className="inline-flex items-center min-h-[40px] font-display text-small font-semibold text-brand-700 hover:text-brand-800 transition-colors duration-fast"
                         >
-                          აირჩიე სფერო
+                          აირჩიე კატეგორია
                         </button>
                       )}
                     </div>

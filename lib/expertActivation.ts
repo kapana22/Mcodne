@@ -193,13 +193,13 @@ export function selectActivationNudges(rows: ActivationCandidate[], now: Date): 
 const COPY: Record<Blocker, { title: string; body: string; href: string }> = {
   slots: {
     title: 'შენი პროფილი ჯავშანს ვერ იღებს',
-    body: 'თავისუფალი დროები არ გაქვს მითითებული — სტუდენტი პროფილს ხედავს, მაგრამ დაჯავშნა არ შეუძლია.',
-    href: '/tutor/schedule',
+    body: 'თავისუფალი დროები არ გაქვს მითითებული — კლიენტი პროფილს ხედავს, მაგრამ დაჯავშნა არ შეუძლია.',
+    href: '/work/schedule',
   },
   service: {
     title: 'შენი პროფილი ჯავშანს ვერ იღებს',
     body: 'სერვისი არ გაქვს დამატებული — ჯავშნის ღილაკს გასაყიდი არაფერი აქვს.',
-    href: '/tutor/profile#section-services',
+    href: '/work/services',
   },
 }
 

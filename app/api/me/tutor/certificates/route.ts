@@ -4,6 +4,7 @@ import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { isUploadedFileUrl } from '@/lib/safeUrl'
+import { ROLE } from '@/lib/roles'
 
 const Body = z.object({
   // The title is prose and gated; the ISSUER is an institution („ACCA",
@@ -64,7 +65,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
-  if (user.role !== 'TUTOR' && user.role !== 'ADMIN') {
+  if (user.role !== ROLE.EXPERT && user.role !== 'ADMIN') {
     return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
   }
   const profile = await tutorProfileForUser(user.id)

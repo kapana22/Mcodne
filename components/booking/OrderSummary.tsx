@@ -1,6 +1,6 @@
 'use client'
 // Booking summary card (right column of the intake/payment steps) — moved from
-// app/tutors/[id]/client.tsx (DESIGN_FIX_PROMPT 1.1).
+// app/experts/[slug]/client.tsx (DESIGN_FIX_PROMPT 1.1).
 import React from 'react'
 import { Icon } from '@/components/Icon'
 import { PAYMENTS_LIVE } from '@/lib/flags'

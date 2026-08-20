@@ -50,7 +50,7 @@ export const buildProfileChecks = (
     { id: 'certificates',label: 'დაამატე მინ. ერთი სერტიფიკატი',            done: certificates >= 1,     weight: 8,  anchor: '#section-certificates' },
     { id: 'education',   label: 'დაამატე განათლების ჩანაწერი',              done: education >= 1,        weight: 8,  anchor: '#section-education' },
     { id: 'experience',  label: 'დაამატე სამუშაო გამოცდილება',              done: experience >= 1,       weight: 8,  anchor: '#section-experience' },
-    { id: 'availability',label: 'დაამატე თავისუფალი დრო',                   done: slotCount > 0,         weight: 15, anchor: '/tutor/schedule' },
+    { id: 'availability',label: 'დაამატე თავისუფალი დრო',                   done: slotCount > 0,         weight: 15, anchor: '/work/schedule' },
   ]
 }
 

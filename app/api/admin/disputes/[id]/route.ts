@@ -91,13 +91,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     type: 'GENERIC',
     title: 'შენი საჩივარი განიხილულია',
     body: outcomeLabel + (parsed.data.resolution ? ` — ${parsed.data.resolution}` : ''),
-    href: `/student/bookings/${dispute.bookingId}`,
+    href: `/me/bookings/${dispute.bookingId}`,
   })
   await notify(dispute.booking.tutor.userId, {
     type: 'GENERIC',
     title: 'საჩივარი გადაწყდა',
     body: outcomeLabel,
-    href: `/tutor/bookings/${dispute.bookingId}`,
+    href: `/work/bookings/${dispute.bookingId}`,
   })
 
   await audit(admin.id, 'dispute.resolve', {

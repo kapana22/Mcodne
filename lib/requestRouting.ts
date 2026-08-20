@@ -13,15 +13,29 @@
 // everybody. Sphere-agreement does that without inventing a ranking nobody can
 // audit.
 //
+// STAGE 8 (2026-08-19) ADDED THE SECOND FACT: the PROFESSION. A CONSULTATION /
+// PROJECT topic may name the professions that answer it (lib/requestTopics →
+// Topic.professions, job labels from lib/professions), and an expert lists the
+// professions they are (TutorProfile.professions). Those either intersect or
+// they do not — still a fact, still explainable: „you were mailed because you
+// are a ბუღალტერი and the request is a დღგ question". The two facts are UNIONED:
+// the sphere match keeps everybody it reached before, the profession match
+// adds the expert filed under another sphere who is nonetheless the person.
+// The shipped bug this closes: `categoryId` was the ONLY expert key, and a
+// topic with no sphere („ფოტოგრაფია", „გიდი", „საბაჟო") went to everyone.
+//
 // PURE — no prisma, no react, so the cron, the admin route and the tests share
 // one copy of every rule. The queries live at the call sites; the DECISIONS
-// live here.
+// live here. The one import is the topic vocabulary, itself pure.
+import { professionsOfTopic } from './requestTopics'
 
 /* ═══════════ who gets the email ═════════════════════════════════════════
  *
  * Two audiences, and the second one is the honest half:
  *
- *   TARGETED   the request maps onto a sphere and somebody is filed under it.
+ *   TARGETED   the request maps onto a sphere and somebody is filed under it,
+ *              OR its topic names a profession somebody claims (stage 8) —
+ *              or, on the trades side, a master lists the topic and the city.
  *              They are mailed. Everybody else still SEES the request in the
  *              queue — the mail is a nudge, never a permission.
  *
@@ -43,7 +57,29 @@ export type RoutableProvider = {
    *  category, because „no profile" and „profile with no sphere" are different
    *  facts and only one of them is a gap. */
   isCompanyMember?: boolean
+
+  /** ⚠️ WHAT THIS PROVIDER ACTUALLY DOES, AND WHERE (2026-08-18). A trades
+   *  request carries no `categoryId` — the sphere table is the EXPERT
+   *  taxonomy and no service topic maps into it — so `routeRequest` fell
+   *  straight through to „EVERYONE" for every single one. Measured: a Tbilisi
+   *  flat-cleaning request was mailed to all six allowlisted providers,
+   *  including the Batumi electrician and the appliance repairman.
+   *
+   *  Harmless at five masters and fatal at fifty: lib/requestJobs opens by
+   *  saying the file exists so this platform is not the lead-mill whose
+   *  providers drown in work they cannot do, and the trades path was exactly
+   *  that. Empty arrays mean „this provider has no service profile", which is
+   *  every expert, and they are matched the old way. */
+  services?: string[]
+  areas?: string[]
+
+  /** What this expert calls themselves (TutorProfile.professions, stage 8) —
+   *  the second expert key beside the sphere. Empty/absent = matched by
+   *  sphere alone, exactly as before. */
+  professions?: string[]
 }
+
+const norm = (s: string) => s.trim().toLowerCase()
 
 export type RoutingResult = {
   audience: RoutingAudience
@@ -65,12 +101,43 @@ export type RoutingResult = {
 export function routeRequest(
   categoryId: string | null,
   providers: RoutableProvider[],
+  /** ⚠️ THE TRADES MATCH, and it is a different question from the sphere one.
+   *  An expert is filed under one sphere; a master lists up to twelve topics
+   *  and the cities they travel to, and the request names exactly one of each.
+   *  Passed as an option so every existing caller and test keeps its meaning. */
+  service?: { topic: string | null; city: string | null } | null,
 ): RoutingResult {
   const all = providers.map(p => p.userId)
-  if (!categoryId) return { audience: 'EVERYONE', recipients: all }
 
+  // The service side FIRST, because a request that has a topic a master lists
+  // is targeted whether or not it also has a sphere — and a trades request
+  // never has a sphere, which is how every one of them was reaching everybody.
+  if (service?.topic) {
+    const matched = providers
+      .filter(p => (p.services ?? []).includes(service.topic!))
+      // A city they do not travel to is not their work. A request with no city
+      // matches on trade alone rather than not at all — `city` has a default
+      // today, but a row written before it did must not become unroutable.
+      .filter(p => !service.city || (p.areas ?? []).length === 0 || (p.areas ?? []).includes(service.city))
+      .map(p => p.userId)
+
+    if (matched.length > 0) return { audience: 'TARGETED', recipients: matched }
+    // …and if nobody covers it, the fallback below applies for the reason the
+    // header states: silence teaches us nothing about demand we cannot serve.
+  }
+
+  // ── The expert side: sphere ∪ profession ─────────────────────────────────
+  // Case-insensitive, trimmed — a label typed by an applicant and the label in
+  // lib/professions are the same word whether or not somebody's keyboard left
+  // a space on the end. Never a substring: „იურისტი" must not catch
+  // „კორპორატიული იურისტი" — those are two entries in the owner's list, and
+  // the corporate lawyer's request names the corporate lawyer.
+  const wanted = new Set(professionsOfTopic(service?.topic).map(norm))
   const targeted = providers
-    .filter(p => !p.isCompanyMember && p.categoryId === categoryId)
+    .filter(p => !p.isCompanyMember && (
+      (categoryId !== null && p.categoryId === categoryId) ||
+      (wanted.size > 0 && (p.professions ?? []).some(j => wanted.has(norm(j))))
+    ))
     .map(p => p.userId)
 
   return targeted.length > 0

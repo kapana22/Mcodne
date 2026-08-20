@@ -18,8 +18,8 @@
 
 import { z } from 'zod'
 import {
-  TOPIC_GROUPS, CITIES, topicLabel, cityLabel, isTopicOfKind,
-  type Topic, type CityName,
+  TOPIC_GROUPS, CITIES, topicLabel, cityLabel, isTopicOfKind, groupIsLive,
+  type Topic, type TopicGroup, type CityName,
 } from './requestTopics'
 
 /* ═══════════ the vocabulary a master may choose from ════════════════════ */
@@ -43,6 +43,20 @@ export function isServiceTopic(id: string): boolean {
 
 /** Every service topic, flat — for a picker that does not group. */
 export const SERVICE_TOPICS: Topic[] = SERVICE_GROUPS.flatMap(g => g.topics)
+
+/**
+ * The subset a master may actually TICK today — see requestTopics →
+ * LIVE_SERVICE_GROUP_IDS for which four and why.
+ *
+ * ⚠️ VALIDATION DELIBERATELY DOES NOT USE THIS. `isServiceTopic` still accepts
+ * all 39, because the gate is a supply decision that will move and a stored row
+ * must survive it moving: a master admitted by hand into a group we have not
+ * opened yet is a real thing we will want to do, and a profile saved today must
+ * not become unsavable the week we close a group to re-staff it. The picker
+ * narrows what is OFFERED; the schema keeps meaning what it meant.
+ */
+export const LIVE_SERVICE_GROUPS = SERVICE_GROUPS.filter(groupIsLive)
+export const LIVE_SERVICE_TOPICS: Topic[] = LIVE_SERVICE_GROUPS.flatMap(g => g.topics)
 
 const AREA_IDS = new Set(CITIES.map(c => c.id))
 
@@ -93,6 +107,24 @@ export const ServiceProfileInput = z.object({
   calloutFee: z.number().int().positive().max(100_000).nullable(),
   priceFrom: z.number().int().positive().max(1_000_000).nullable(),
   available: z.boolean(),
+
+  /* ⚠️ THE FACE AND THE SENTENCE BECAME EDITABLE 2026-08-18, AND UNTIL THEN
+     THEY WERE FROZEN AT APPLICATION DAY — PERMANENTLY.
+
+     `photoUrl` and `about` had exactly one writer: the approval transaction.
+     The application is sealed afterwards (the page redirects an approved master
+     away, and the endpoint 409s), and this form offered services, cities,
+     prices and a switch — nothing else. So a master who changed their photo,
+     grew a beard, or wanted to rewrite a sentence they typed in a hurry had no
+     route to it at all. It is the FIRST thing a client sees on their card.
+
+     Both are `.optional()` rather than required: this endpoint is a full
+     replace, and an older client that does not send them must not blank a photo
+     it never knew about. */
+  photoUrl: z.string().trim().max(4_000_000)
+    .refine(v => v.startsWith('data:image/'), { message: 'ფოტო ვერ აიტვირთა' })
+    .nullable().optional(),
+  about: z.string().trim().max(1500).nullable().optional(),
 })
 export type ServiceProfileInput = z.infer<typeof ServiceProfileInput>
 
@@ -199,6 +231,84 @@ export function sanitizeStored(p: { services: string[]; areas: string[] }): {
     services: p.services.filter(isServiceTopic),
     areas: p.areas.filter(id => AREA_IDS.has(id as CityName)),
   }
+}
+
+/**
+ * THE ROUTING NARROWING, AS A PRISMA `where` FRAGMENT.
+ *
+ * ⚠️ IT EXISTS BECAUSE THE BADGE AND THE LIST DISAGREED (2026-08-18). The queue
+ * page filtered by `topic ∈ services` and `city ∈ areas`; the nav badge beside
+ * it counted every open request on the platform. Measured against production:
+ * the badge read 2 while two of the three open requests were school subjects
+ * that no master can answer — and a master who had switched themselves OFF saw
+ * „შენ თავი გამორთე" with a number next to it insisting work was waiting.
+ *
+ * A badge that disagrees with the list it points at is worse than no badge:
+ * the first time somebody taps a „2" and finds nothing, the badge stops meaning
+ * anything.
+ *
+ * Returns `null` when the viewer should see EVERYTHING (an expert bidding on
+ * consultations has no ServiceProfile and never will — narrowing them to
+ * nothing would take a working screen away to fix somebody else's), and an
+ * impossible clause when they are paused, so „off" means off in both readers.
+ */
+export function routingWhere(p: {
+  services: string[]
+  areas: string[]
+  available: boolean
+} | null): Record<string, unknown> | null {
+  if (!p) return null
+  // Paused: match nothing. Expressed as an empty `in` rather than a boolean
+  // flag so both callers can spread it into a `where` without a second branch.
+  if (!p.available) return { topic: { in: [] } }
+  if (p.services.length === 0) return null
+  return {
+    topic: { in: p.services },
+    ...(p.areas.length > 0 ? { city: { in: p.areas } } : {}),
+  }
+}
+
+/* ═══════════ the trade landing (stage 8, §3.6) ═════════════════════════ */
+
+/**
+ * ⚠️ HOW MANY PUBLISHED MASTERS A TRADE NEEDS BEFORE /experts/<trade> IS A
+ * LANDING PAGE rather than a door. Below this the URL still answers 200 with a
+ * heading, one sentence and the intake CTA — NEVER an empty list, because a
+ * page that says „ელექტრიკოსები" over nobody teaches a stranger the site is
+ * empty. At or above it, the page is the catalogue filtered to the trade. The
+ * sitemap submits only trades at or above the bar (counted LIVE, per request).
+ * Three, not one: one master is a profile, not a category.
+ */
+export const TRADE_LANDING_MIN = 3
+
+/**
+ * The slug of /experts/<slug> resolved against the trade vocabulary — a LIVE
+ * group id, or a topic id inside a live group. Resolved BEFORE the master
+ * lookup by app/experts/[slug]/page.tsx — step 2 of its chain (the vocabulary
+ * is a fixed list;
+ * master slugs are generated, and lib/masterSlug reserves every trade id).
+ * Null = not a trade, try the masters.
+ */
+export function resolveTrade(slug: string): { group: TopicGroup; topic: Topic | null } | null {
+  for (const g of LIVE_SERVICE_GROUPS) {
+    if (g.id === slug) return { group: g, topic: null }
+    const t = g.topics.find(t => t.id === slug)
+    if (t) return { group: g, topic: t }
+  }
+  return null
+}
+
+/** The topic ids a trade slug covers — the whole group, or the one topic. */
+export function tradeTopicIds(t: { group: TopicGroup; topic: Topic | null }): string[] {
+  return t.topic ? [t.topic.id] : t.group.topics.map(x => x.id)
+}
+
+/** How many of these (public) rows cover any of the topics — a master counts
+ *  ONCE however many of the group's topics they list. Pure, so the page, the
+ *  sitemap and the tests count with one rule. */
+export function countCovering(rows: { services: string[] }[], topicIds: string[]): number {
+  const owned = new Set(topicIds)
+  return rows.filter(r => r.services.some(s => owned.has(s))).length
 }
 
 /** Every service topic still belongs to the SERVICE kind — the invariant that

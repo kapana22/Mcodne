@@ -28,6 +28,7 @@ export function PhoneInput({
   className = '',
   placeholder = '5XX XX XX XX',
   autoFocus,
+  required,
 }: {
   value: string
   onChange: (v: string) => void
@@ -35,6 +36,12 @@ export function PhoneInput({
   className?: string
   placeholder?: string
   autoFocus?: boolean
+  /** ⚠️ Where the server already demands one. The request intake's zod bound
+   *  (lib/requests → ServiceRequestInput.phone, `required: true`) rejects an
+   *  empty number, so without this the only way to learn the field was needed
+   *  was to press send and be handed an error for a field two scrolls up. The
+   *  browser says it at the field, before the round trip. */
+  required?: boolean
 }) {
   return (
     <input
@@ -47,6 +54,7 @@ export function PhoneInput({
       // 40 matches APPLY.PHONE_MAX and the signup route's zod bound, so the
       // field cannot hold a value the server will reject on length alone.
       maxLength={40}
+      required={required}
       value={value}
       onChange={e => onChange(sanitizePhoneInput(e.target.value))}
       placeholder={placeholder}

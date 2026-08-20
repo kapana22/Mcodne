@@ -113,7 +113,7 @@ export const ReviewsSection = () => {
               { v: 2, label: '≤ 2 ★' },
               { v: 1, label: '1 ★ (ცუდი)' },
             ].map(o => (
-              <button key={o.v} type="button" onClick={() => setMaxRating(o.v)} className={`h-8 px-3 rounded-pill font-display text-meta font-semibold tracking-wide transition-colors duration-fast ${maxRating === o.v ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}>{o.label}</button>
+              <button key={o.v} type="button" onClick={() => setMaxRating(o.v)} className={`h-10 sm:h-9 px-3.5 rounded-pill font-display text-small font-semibold tracking-wide transition-colors duration-fast ${maxRating === o.v ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}>{o.label}</button>
             ))}
           </div>
         </div>

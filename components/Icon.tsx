@@ -58,6 +58,13 @@ export const Icon = {
   plus: (p: IconProps) => (<svg {...S(p)} strokeWidth={2}><path d="M12 5v14M5 12h14" /></svg>),
   more: (p: IconProps) => (<svg viewBox="0 0 24 24" fill="currentColor" {...p}><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>),
   globe: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg>),
+  // ⚠️ A PIN, BECAUSE THE GLOBE WAS DOING TWO JOBS (2026-08-20). One catalogue
+  // draws two kinds of card side by side, and both put their meta line behind
+  // the globe: on a consultation it meant LANGUAGES („ქართული, ინგლისური"),
+  // on a service it meant CITIES („თბილისი, რუსთავი"). The same mark for two
+  // different facts, adjacent on one screen, is a mark that says nothing.
+  // Same 24-box, same stroke, same construction as its neighbours.
+  pin: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" /><circle cx="12" cy="10" r="2.6" /></svg>),
   x: (p: IconProps) => (<svg {...S(p)} strokeWidth={2}><path d="m6 6 12 12M18 6 6 18" /></svg>),
   xC: (p: IconProps) => (<svg {...S(p)} strokeWidth={2}><path d="m6 6 12 12M18 6 6 18" /></svg>),
   download: (p: IconProps) => (<svg {...S(p)} strokeWidth={1.7}><path d="M12 4v12m0 0 5-5m-5 5-5-5M4 20h16" /></svg>),
@@ -137,4 +144,53 @@ export const CatIcon = {
   tax: (<svg {...catS}><path d="M7 4h11a1 1 0 0 1 1 1v19l-3-2-2.5 2-2.5-2-2.5 2L6 24V5a1 1 0 0 1 1-1Z" /><path d="M10 10h6M10 14h6M10 18h3.5" /></svg>),
   // Code brackets — IT / programming.
   it: (<svg {...catS}><path d="m9.5 9-5 5 5 5M18.5 9l5 5-5 5M16 5.5l-4 17" /></svg>),
+
+  /* ── THE TRADES, 2026-08-18 ────────────────────────────────────────────────
+   * Owner, pointing at a competitor's category row: „მსგავსი რაიმე ხომ
+   * გვჭირდება ჩვენც … რომ აქცენტი აღარ იყოს მხოლოდ ახლანდელ ექსპერტზე."
+   *
+   * ⚠️ THEY LIVE HERE, NOT IN A PAGE. The canon is explicit — „Single source:
+   * components/Icon.tsx — never define page-local icon sets" — and this file's
+   * own header records what happens otherwise: fourteen categories once shared
+   * seven drawings because two pages each kept their own map.
+   *
+   * ⚠️ AND THEY ARE ONE COLOUR, DELIBERATELY. The reference row draws navy
+   * outlines with gold fills. This site has a strict two-colour system (brand
+   * green + the ink ramp) and gold is reserved for ratings and genuine
+   * cautions, never decoration — so a second hue here would be the first crack
+   * in a rule the whole site is drawn to. The plate carries the colour: a white
+   * disc on the ink ramp with the mark in brand green reads as an icon row
+   * without inventing a palette.
+   *
+   * ⚠️ EVERY ONE IS A DISTINCT SILHOUETTE. Same rule as the spheres above and
+   * for the same measured reason — on a grid the eye reads two similar stamps
+   * as one thing, and these six sit in a single row where that failure is at
+   * its most visible. Tap/pipe, socket/plug, spray bottle, drum, drain grate,
+   * AC unit: no two share an outline. */
+
+  // Tap over a drop — plumbing. The spout and the falling drop, nothing else.
+  plumbing: (<svg {...catS}><path d="M4.5 8h6a4 4 0 0 1 4 4v2" /><path d="M10.5 5.5v5" /><path d="M14.5 11h5" /><path d="M17 11V8.5h4V11" /><path d="M14.5 19.5c0 1.4-1.1 2.5-2.5 2.5s-2.5-1.1-2.5-2.5c0-1.6 2.5-4 2.5-4s2.5 2.4 2.5 4Z" /></svg>),
+
+  // Socket plate with two pins — electrical. Not a bolt: a bolt is „power",
+  // and half of what this group covers is a switch that will not switch.
+  electrical: (<svg {...catS}><rect x="5" y="5" width="18" height="18" rx="3" /><circle cx="10.5" cy="12" r="1.4" /><circle cx="17.5" cy="12" r="1.4" /><path d="M9.5 17.5h9" /></svg>),
+
+  // Spray bottle — cleaning. A broom was the first draft and it collided with
+  // the garden group's silhouette, which is closed today but will not be.
+  cleaning: (<svg {...catS}><path d="M10 10h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2Z" /><path d="M11 10V6.5h4V10" /><path d="M15 5h4.5v3" /><path d="M8 15h10" /></svg>),
+
+  // Washing-machine drum — appliance repair. The drum is the one shape every
+  // machine in this group shares.
+  appliances: (<svg {...catS}><rect x="5" y="4" width="18" height="20" rx="2.5" /><circle cx="14" cy="16" r="5" /><circle cx="14" cy="16" r="1.8" /><path d="M9 8h3" /><path d="M18.5 8h1" /></svg>),
+
+  /* Two more, because the home row shows SIX TOPICS rather than four groups —
+   * see lib/serviceMarks for that argument. A row of six drawn from four marks
+   * would repeat two of them side by side, which is the one thing this set is
+   * not allowed to do. */
+
+  // Drain grate — a blocked drain. Reads as „the floor", not „the tap".
+  drain: (<svg {...catS}><circle cx="14" cy="14" r="9.5" /><path d="M9 10.5h10M8 14h12M9 17.5h10" /><path d="M14 5v18" /></svg>),
+
+  // Wall unit with air below it — air conditioning.
+  climate: (<svg {...catS}><rect x="4" y="5.5" width="20" height="8" rx="2" /><path d="M8 10h12" /><path d="M9 17.5c1.5 0 1.5 2 3 2s1.5-2 3-2 1.5 2 3 2" /><path d="M9 22c1.5 0 1.5 2 3 2s1.5-2 3-2" /></svg>),
 }

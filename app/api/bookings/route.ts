@@ -207,7 +207,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'SELF_BOOKING' }, { status: 400 })
   }
 
-  // Server-side guard for paused tutors. The /tutors/[id] client hides all
+  // Server-side guard for paused tutors. The /experts/[slug] client hides all
   // booking CTAs when available=false, but the API must independently refuse —
   // anyone can craft a direct POST /api/bookings from an old deep link or
   // scripted client. Existing bookings for this tutor are unaffected.
@@ -469,9 +469,9 @@ export async function POST(req: Request) {
           status: 'PREPARING',
           // Snapshot the tutor's current type so past bookings never rewrite.
           serviceType: tutor.serviceType,
-          // heldSlotId deliberately left null — nothing is claimed. The release
-          // paths (cancel/decline/cleanup) treat null as a no-op and stay in
-          // place only to free LEGACY rows that really were flipped booked.
+          // heldSlotId deliberately left null — nothing is claimed. Since stage
+          // 11 nothing is released either: the legacy `booked` flag is retired
+          // (`@ignore` in the schema), cancel/decline/cleanup only null this.
         },
         select: { id: true, ref: true, startAt: true, durationMin: true, price: true, status: true },
       })
@@ -565,7 +565,7 @@ export async function POST(req: Request) {
       // only thing an expert reads, and „why is this not in my schedule?" is
       // the first question an unannounced proposal raises.
       body: isRequest ? `${topic} — დრო კლიენტმა შემოგვთავაზა` : topic,
-      href: `/tutor/bookings/${booking.id}`,
+      href: `/work/bookings/${booking.id}`,
     })
     // ALSO email the expert — a request they don't act on within 24h gets
     // auto-canceled by the cleanup cron, so the in-app bell alone isn't enough.
@@ -608,7 +608,7 @@ export async function POST(req: Request) {
           counterpartName: expertName,
           topic,
           whenText,
-          href: `/student/bookings/${booking.id}`,
+          href: `/me/bookings/${booking.id}`,
         })
         await sendMail({ to: student.email, subject, html })
       }

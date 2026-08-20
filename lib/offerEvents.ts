@@ -44,6 +44,16 @@ export const OFFER_EVENTS = [
   'ACCEPTED',
   /** The client chose somebody else. */
   'DECLINED',
+  // ── After the choice (stage 7, lib/offerLifecycle) ─────────────────────
+  // The provider took a SENT offer back; the job was marked finished (by
+  // either side, once — see markOfferDone); the 14-day „დასრულდა?" reminder
+  // went out — a MARKER as much as an event, because the unique (offerId,
+  // type) constraint is what makes the cron send it exactly once; the offer
+  // was silently closed at 21 days with nobody saying it finished.
+  'WITHDRAWN',
+  'DONE',
+  'REMINDED',
+  'CLOSED',
 ] as const
 
 export type OfferEventName = (typeof OFFER_EVENTS)[number]
@@ -70,6 +80,10 @@ export const OFFER_EVENT_LABEL: Record<OfferEventName, string> = {
   REPLIED: 'კლიენტმა უპასუხა',
   ACCEPTED: 'კლიენტმა აირჩია',
   DECLINED: 'კლიენტმა სხვა აირჩია',
+  WITHDRAWN: 'გატანილი',
+  DONE: 'დასრულდა',
+  REMINDED: 'შეხსენება გაიგზავნა',
+  CLOSED: 'დაიხურა',
 }
 
 /* ═══════════ writing one ════════════════════════════════════════════════ */

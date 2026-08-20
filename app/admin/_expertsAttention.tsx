@@ -49,7 +49,7 @@ const Row = ({ e }: { e: Item }) => {
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        {e.slug && <OpenBtn href={`/tutors/${e.slug}`} label="პროფილი" />}
+        {e.slug && <OpenBtn href={`/experts/${e.slug}`} label="პროფილი" />}
         {e.email && <CopyBtn value={e.email} label="ელფოსტა" />}
       </div>
     </div>

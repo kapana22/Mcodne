@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/Icon'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
+import { ROLE } from '@/lib/roles'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 type Me = { role: Role; fullName?: string } | null
@@ -22,12 +23,12 @@ export function NotFoundClient() {
     return () => { cancelled = true }
   }, [])
 
-  const homeHref = me?.role === 'TUTOR' ? '/tutor'
+  const homeHref = me?.role === ROLE.EXPERT ? '/work'
     : me?.role === 'ADMIN' ? '/admin'
-    : me?.role === 'STUDENT' ? '/student'
+    : me?.role === ROLE.CLIENT ? '/me'
     : '/'
   const homeLabel = me
-    ? (me.role === 'TUTOR' ? 'ჩემი სივრცე' : me.role === 'ADMIN' ? 'ადმინი' : 'ჩემი სივრცე')
+    ? (me.role === ROLE.EXPERT ? 'ჩემი სივრცე' : me.role === 'ADMIN' ? 'ადმინი' : 'ჩემი სივრცე')
     : 'მთავარი'
 
   return (
@@ -61,7 +62,7 @@ export function NotFoundClient() {
             {homeLabel}
           </Link>
           <Link
-            href="/tutors"
+            href="/experts"
             className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-100 text-ink-800 font-display font-semibold text-body tracking-tight inline-flex items-center gap-2 transition-colors duration-fast"
           >
             <Icon.search className="w-4 h-4" />
@@ -76,8 +77,8 @@ export function NotFoundClient() {
           <div className="text-meta text-ink-500 mb-3">ან გადადი პირდაპირ:</div>
           <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
             {[
-              { href: '/categories', l: 'სფეროები' },
-              { href: '/konsultacia', l: 'კონსულტაციები' },
+              { href: '/experts', l: 'ექსპერტები' },
+              { href: '/experts', l: 'კონსულტაციები' },
               { href: '/blog', l: 'ბლოგი' },
               { href: '/help', l: 'დახმარება' },
             ].map(x => (

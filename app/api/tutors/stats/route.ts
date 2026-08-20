@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { BROWSABLE_CATEGORY_SQL } from '@/lib/categoryTree'
 
-// Public aggregate stats for the /tutors hero.
+// Public aggregate stats for the /experts hero.
 export async function GET() {
   // Compute the four hero numbers in a single aggregate query instead of pulling
   // every live tutor row into JS.
@@ -11,7 +11,7 @@ export async function GET() {
   // ⚠️ THE WHERE CLAUSE MUST MIRROR lib/tutorsQuery EXACTLY. This is a PUBLIC
   // COUNT of a list the visitor can then go and count themselves, so any gate
   // that file applies and this one doesn't becomes a visible lie. Measured on
-  // production 2026-07-31: the home page said „10 ექსპერტი" while /tutors said
+  // production 2026-07-31: the home page said „10 ექსპერტი" while /experts said
   // „9 ექსპერტი შენთვის" — two numbers for one roster, from these two files
   // drifting apart on both of the gates below.
   //
@@ -51,7 +51,7 @@ export async function GET() {
   // WINDOWS (lib/availability derives the actual start times), so "a window
   // that hasn't fully passed and begins inside the week" is the honest
   // definition of open. Same gates as above, same warning: this number is
-  // checkable by hand on /tutors, so it must never over-count.
+  // checkable by hand on /experts, so it must never over-count.
   const [openRow] = await prisma.$queryRaw<{ openThisWeek: number }[]>`
     SELECT COUNT(DISTINCT tp."id")::int AS "openThisWeek"
     FROM "TutorProfile" tp

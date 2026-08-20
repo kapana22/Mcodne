@@ -7,19 +7,20 @@
 // _model or lib/requests — the container holds no validation of its own.
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Btn } from '@/components/Btn'
 import {
-  ServiceRequestInput, KIND, kindOf, BUDGET_BANDS, TIMING, FORMATS, CITIES,
-  extrasFor, topicLabel, kindsOfTopic, budgetIsBelowFloor, amountIsBelowFloor, OTHER_TOPIC,
-  PICK_MODES, PICK_MODE_OPTION,
-  type RequestKindName,
+  ServiceRequestInput, KIND, kindOf, TIMING, FORMATS, CITIES,
+  extrasFor, topicLabel, kindsOfTopic, OTHER_TOPIC,
+  PICK_MODES, PICK_MODE_OPTION, VERTICAL_COPY,
+  type RequestKindName, type Vertical,
 } from '@/lib/requests'
 import { newFlowId } from '@/components/booking/funnelEvents'
 import { REQUEST_FUNNEL_EVENTS, trackRequestFunnel } from './requestFunnelEvents'
 import { RequestShell } from './_shell'
 import {
-  EMPTY_DRAFT, stepsFor, stepComplete, nextStepId, prevStepId, resumeStepId,
-  progressOf, reviveDraft, withTopic, withKind, withAccountContact,
+  EMPTY_DRAFT, stepsFor, stepComplete, nextStepId, prevStepId, resumeStepId, stageOfStep,
+  stagesFor, progressOf, reviveDraft, withTopic, withKind, withAccountContact, withTarget,
   type Draft, type AccountContact,
 } from './_model'
 import { Transcript } from './_transcript'
@@ -33,6 +34,9 @@ type Status = 'idle' | 'sending' | 'error'
 export type Sent = {
   publicRef: string | null
   rejected: boolean
+  /** Did it go straight to the providers, or is somebody reading it first?
+   *  See the endpoint — the screen cannot work this out for itself. */
+  autoVerified: boolean
   /** What happened to the account while the request was sending — see
    *  lib/requestAccount. The thanks screen is the only reader. */
   account: AccountOutcome
@@ -61,7 +65,17 @@ function loadDraft(): Draft {
   }
 }
 
-export function RequestWizard({ account, initialQuery = '' }: {
+export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT', to = null }: {
+  /** ⚠️ THE DOOR, FROM THE URL (`?for=service`). Owner, 2026-08-18, approving
+   *  option „ა": the entry point picks the vertical and the wizard never asks
+   *  again — the ss.ge shape, where you choose the world at the entrance and
+   *  everything inside is that world's.
+   *
+   *  Defaulted rather than required, because /request is reached bare from the
+   *  home band's field and from the expert half of the site, and a missing
+   *  parameter must land somebody somewhere sensible rather than on a chooser
+   *  they did not ask for. */
+  vertical?: Vertical
   /** What they typed on the home band, handed to the first screen's search so
    *  nobody retypes the answer they just gave. See app/request/page. */
   initialQuery?: string
@@ -71,11 +85,30 @@ export function RequestWizard({ account, initialQuery = '' }: {
    *  them under the cursor — and a field that changes while you are typing in
    *  it is worse than one that was never prefilled. */
   account: AccountContact | null
+  /**
+   * ⚠️ WHO THIS REQUEST IS BEING WRITTEN TO — `?to=<slug>`, already resolved to
+   * a visible provider on the server (lib/requestTarget). Null is the ordinary
+   * case and changes nothing: the wizard this component draws without a
+   * recipient is exactly the wizard it drew before this existed.
+   *
+   * Three things it does, and no fourth: names the recipient in the chrome,
+   * narrows the first screen's catalogue to that provider's own topics, and
+   * rides back to the server on submit so the endpoint can open the INVITED
+   * thread. The SLUG is what is sent, never a user id — the browser holds a
+   * public address, and the endpoint resolves it again anyway.
+   */
+  to?: { slug: string; name: string; photoSrc?: string | null; topics: string[] } | null
 }) {
-  // Seeded WITH the account, so the fields are already right in the server's
-  // HTML — no flash, nothing to reconcile at hydration.
-  const [draft, setDraft] = useState<Draft>(() => withAccountContact(EMPTY_DRAFT, account))
-  const [stepId, setStepId] = useState('what')
+  // Seeded WITH the account AND with the chosen provider's topic, so the first
+  // paint is already the right screen — no flash, nothing to reconcile at
+  // hydration.
+  const seed = () => withTarget(withAccountContact({ ...EMPTY_DRAFT, vertical }, account), to?.topics ?? [], !!to)
+  const [draft, setDraft] = useState<Draft>(seed)
+  // ⚠️ NOT THE LITERAL 'what'. With a provider chosen the run starts on the
+  // budget question and there IS no „what" screen — a hard-coded first step
+  // would park the wizard on a screen `stepsFor` does not list, which renders
+  // as the first one anyway and then disagrees with the counter.
+  const [stepId, setStepId] = useState(() => stepsFor(seed())[0].id)
   const [restored, setRestored] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [errorText, setErrorText] = useState<string | null>(null)
@@ -84,6 +117,64 @@ export function RequestWizard({ account, initialQuery = '' }: {
   const sentRef = useRef(false)
   const flowIdRef = useRef('')
   if (!flowIdRef.current) flowIdRef.current = newFlowId()
+  const router = useRouter()
+
+  // ── THE ROOM'S ADDRESS, WITHOUT LEAVING THE ROOM (stage 10) ───────────────
+  // Owner: „ფორმა გაიგზავნა → ფანჯარა ღია რჩება." On send this component does
+  // NOT navigate: the same screen becomes the room (ThanksCard — the stations,
+  // the thread), so nothing flashes and nothing reloads. What changes is the
+  // ADDRESS BAR: `history.replaceState` to /request/<ref>, so a refresh, a
+  // bookmark or a shared tab lands on the server-rendered room for this
+  // request rather than on an empty wizard. Next's router hears the
+  // replaceState (it patches it) and updates `usePathname` — AppShell keys its
+  // page wrapper on the pathname and would remount this whole tree, so it
+  // treats the intake as ONE room (see components/AppShell). Never
+  // `router.push`/`router.replace` here — either is a navigation, and a
+  // navigation is the flash this exists to remove.
+  useEffect(() => {
+    if (!sent?.publicRef) return
+    const target = `/request/${sent.publicRef}`
+    if (window.location.pathname === target) return
+    try { window.history.replaceState(window.history.state, '', target) } catch { /* the room still works at /request */ }
+  }, [sent])
+
+  // ⚠️ THE ONE CASE THAT IS A NAVIGATION: this wizard MOUNTING under a room's
+  // address. That happens on Back — room → „შეთავაზებების ნახვა" (the [ref]
+  // page) → Back lands on the history entry whose URL is /request/<ref> but
+  // whose tree is still the wizard's (the entry was replaced in place, not
+  // pushed). A fresh, empty wizard at a room's address is a lie about where you
+  // are, so it hands over to the page that owns that URL — a replace, so the
+  // history stack stays the same length.
+  useEffect(() => {
+    if (sentRef.current) return
+    const here = window.location.pathname
+    if (/^\/request\/[^/]+$/.test(here)) router.replace(here)
+    // Mount-only by design.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ⚠️ THE COOKIE BANNER WAS SITTING ON THE ANSWERS AND ON THE SEND BUTTON
+  // (2026-08-18, measured at 390×844 on a first visit).
+  //
+  //   extras screen — the option „4 ან მეტი" occupied y 806–862, the banner
+  //                   787–844. The option was UNREACHABLE.
+  //   contact screen — „გაგზავნა" occupied 813–857, the banner 787–844: 31 of
+  //                   its 44 pixels covered, on the last screen of the funnel.
+  //
+  // _shell reserves `pb-28 sm:pb-32` and its comment claims that handles it. It
+  // does not, and the reason is worth writing down: that reserve is PAGE-BOTTOM
+  // padding, while a wizard step's controls sit mid-page — a short screen puts
+  // them exactly where a `fixed bottom-0` banner floats, and no amount of
+  // padding under them moves them.
+  //
+  // The mechanism already existed: globals.css lifts the banner 132px for
+  // `body[data-mobile-cta]`, and four other screens set it. The wizard never
+  // did. `'lift'` rather than `'1'` because this route does not want the body
+  // reserve that value also carries — see the rule's own note.
+  useEffect(() => {
+    document.body.setAttribute('data-mobile-cta', 'lift')
+    return () => { document.body.removeAttribute('data-mobile-cta') }
+  }, [])
 
   useEffect(() => {
     trackRequestFunnel(REQUEST_FUNNEL_EVENTS.opened, { flowId: flowIdRef.current })
@@ -93,9 +184,19 @@ export function RequestWizard({ account, initialQuery = '' }: {
     // the seeded state. A signed-in person's name and number are not something
     // they started filling in — announcing „დაწყებული ფორმა აღდგა" because we
     // prefilled their own account details would be the banner lying.
-    if (JSON.stringify(d) !== JSON.stringify(EMPTY_DRAFT)) {
-      setDraft(withAccountContact(d, account))
-      setStepId(resumeStepId(d))
+    if (JSON.stringify(d) !== JSON.stringify({ ...EMPTY_DRAFT, vertical: d.vertical })) {
+      // ⚠️ THE URL WINS OVER THE SAVED DRAFT ON THIS ONE FIELD. Somebody who
+      // abandoned an expert request last week and then arrived through a trades
+      // door (`?for=service`) has just told us which door they are at now;
+      // restoring the old vertical would answer their tap with the other half's
+      // questions and there is no control on screen to correct it.
+      // ⚠️ THE URL WINS ON THE RECIPIENT TOO, for the same reason it wins on
+      // the vertical: `withTarget` re-applies the pin (and clears it when there
+      // is no provider — see _model → reviveDraft), so a run once started from
+      // somebody's profile cannot go on shortening a bare /request.
+      const revived = withTarget(withAccountContact({ ...d, vertical }, account), to?.topics ?? [], !!to)
+      setDraft(revived)
+      setStepId(resumeStepId(revived))
       setRestored(true)
     }
     // Mount-only by design.
@@ -114,8 +215,9 @@ export function RequestWizard({ account, initialQuery = '' }: {
     try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* nicety */ }
     // „თავიდან" means the ANSWERS, not the identity — starting over should not
     // make a signed-in person type their own name again.
-    setDraft(withAccountContact(EMPTY_DRAFT, account))
-    setStepId('what')
+    const fresh = seed()
+    setDraft(fresh)
+    setStepId(stepsFor(fresh)[0].id)
     setRestored(false)
   }
 
@@ -138,7 +240,14 @@ export function RequestWizard({ account, initialQuery = '' }: {
       const res = await fetch('/api/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.data),
+        // ⚠️ `to` RIDES OUTSIDE THE PARSED BODY, and it is a SLUG. It is not a
+        // field of the request (ServiceRequestInput strips it — the row records
+        // what was asked for, not who it was aimed at; the aim is the INVITED
+        // offer the endpoint writes). The endpoint resolves this string again
+        // against the same visibility rule the page used, so a crafted value
+        // buys nothing: the worst case is a thread with somebody the catalogue
+        // already shows publicly.
+        body: JSON.stringify(to ? { ...parsed.data, to: to.slug } : parsed.data),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) {
@@ -152,6 +261,7 @@ export function RequestWizard({ account, initialQuery = '' }: {
       setSent({
         publicRef: j.publicRef ?? null,
         rejected: Boolean(j.rejected),
+        autoVerified: Boolean(j.autoVerified),
         account: (j.account ?? 'NONE') as AccountOutcome,
       })
     } catch {
@@ -189,7 +299,9 @@ export function RequestWizard({ account, initialQuery = '' }: {
   const kind = kindOf(draft.kind)
   /** Every clarifier this draft asks — all of them on one screen now, so this
    *  is a list rather than the single question it used to resolve. */
-  const extras = step.id === 'extras' ? extrasFor(kind, draft.topic) : []
+  // The clarifiers now live ON the timing screen — see _model → stepsFor for
+  // why they lost their own page.
+  const extras = step.id === 'timing' ? extrasFor(kind, draft.topic) : []
 
   /**
    * Every option the LIVE question offers, in the order it is drawn.
@@ -209,9 +321,11 @@ export function RequestWizard({ account, initialQuery = '' }: {
     // have not answered" is the only choice that matches what a person doing
     // this by keyboard expects. Taps are unaffected — they name their own
     // question.
-    : step.id === 'extras'
-      ? [...(extras.find(q => !draft.details[q.id]) ?? extras[0])?.options ?? []]
-    : step.id === 'budget' ? [...BUDGET_BANDS[kind]]
+    // ⚠️ THE NUMBER KEYS ANSWER THE TIMING, even when clarifiers share the
+    // screen. It is the question everybody is asked and the only one that
+    // advances the run; pointing the digits at an optional chip row would make
+    // „press 2" mean something different on 94 of 171 topics. The clarifiers
+    // answer by tap, which names its own question.
     : step.id === 'timing' ? [...TIMING[kind]]
     : step.id === 'format'
       ? (draft.format === 'IN_PERSON'
@@ -252,27 +366,6 @@ export function RequestWizard({ account, initialQuery = '' }: {
       if (q) patch({ details: { ...draft.details, [q.id]: id } })
       return
     }
-    if (step.id === 'budget') {
-      // ⚠️ A BELOW-FLOOR BAND SELECTS BUT DOES NOT ADVANCE (2026-08-17).
-      //
-      // The floor is known the instant they tap it — `budgetIsBelowFloor` has
-      // always been there — and until today the wizard never asked. So somebody
-      // who chose „20₾-მდე" answered four more screens, typed their name, phone
-      // and email, pressed send, and read „ამ ბიუჯეტში ვერ დაგეხმარებით" on the
-      // thanks card. Seven screens of work to be told something true at the
-      // first of them.
-      //
-      // Said HERE instead, where it is still a decision: they can raise the
-      // budget, or continue knowingly. The row stays either way — „how many
-      // arrive under the floor" is exactly what this stage exists to measure,
-      // and the endpoint still writes it as REJECTED.
-      //
-      // Not-advancing is the same shape „ადგილზე" already uses two branches
-      // down: a tap that opens something rather than closing the screen.
-      if (budgetIsBelowFloor(kind, id)) { patch({ budgetBand: id }); return }
-      pickAndGo({ budgetBand: id })
-      return
-    }
     if (step.id === 'timing') { pickAndGo({ timing: id }); return }
     if (step.id === 'city') { pickAndGo({ city: id as Draft['city'] }); return }
     if (step.id === 'mode') { pickAndGo({ pickMode: id as Draft['pickMode'] }); return }
@@ -311,7 +404,9 @@ export function RequestWizard({ account, initialQuery = '' }: {
       if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === 'Escape' || e.key === 'Backspace') {
-        if (step.id === 'what') return
+        // The FIRST screen of THIS run — which is no longer always „what" (a
+        // chosen provider drops it; see _model → stepsFor).
+        if (step.id === steps[0].id) return
         e.preventDefault()
         back()
         return
@@ -330,7 +425,13 @@ export function RequestWizard({ account, initialQuery = '' }: {
   if (sent) {
     return (
       <RequestShell>
-        <ThanksCard sent={sent} topic={draft.topic} />
+        {/* The transform, not a page: the last screen leaves and the room
+            arrives with the same entrance every step used (`slide-in-b`), so
+            it reads as the next step of the same errand — which it is. One
+            entrance, on the root, nothing staggered. */}
+        <div className="motion-safe:animate-slide-in-b">
+          <ThanksCard sent={sent} topic={draft.topic} />
+        </div>
       </RequestShell>
     )
   }
@@ -338,10 +439,23 @@ export function RequestWizard({ account, initialQuery = '' }: {
   return (
     <RequestShell
       progress={progressOf(step.id, draft)}
+      // ⚠️ SHOWN FROM THE FIRST SCREEN, unlike the counter below it. The whole
+      // point is that the SHAPE of the run is legible before the first tap —
+      // three named parts, so „how long is this" has an answer that does not
+      // depend on knowing the topic yet. The counter cannot do that (its
+      // denominator is unsettled until a topic lands); the stage names never
+      // move, whatever gets picked.
+      stage={stageOfStep(step.id)}
+      // Two when the person is already chosen, three otherwise — one source,
+      // `stepsFor`, so a stage cannot be named that this run never reaches.
+      stages={stagesFor(draft)}
+      // The recipient's name, said once, for the whole run — see _shell.
+      to={to ? { name: to.name, photoSrc: to.photoSrc } : null}
       // Not on the first screen: until a topic is picked the run's length is a
       // guess, and a denominator that changes on the first tap is the „form
       // growing under you" the bar exists to avoid. From step two it is settled
-      // — see _shell.
+      // — see _shell. With the topic already answered by the provider there is
+      // no such screen and the counter is honest from the start.
       step={step.id === 'what' ? undefined : {
         index: steps.findIndex(s => s.id === step.id) + 1,
         total: steps.length,
@@ -358,11 +472,14 @@ export function RequestWizard({ account, initialQuery = '' }: {
           already use. It is stated ONCE, here, rather than per step: the
           contact screen used to cap itself at 440 while every other screen ran
           full width, so the column jumped on the last tap. */}
-      {/* Centred, like every other focused form on the site (auth is
-          Container size="narrow", which is 560 and mx-auto). Left-aligned
-          inside the 820 shell it sat off-centre — a column that is neither
-          full width nor centred reads as a layout that lost an argument. */}
-      <div className="max-w-[560px] mx-auto">
+      {/* ⚠️ THE `mx-auto` IS GONE AND THE CAP STAYS (2026-08-18). The shell now
+          uses `Container size="narrow"` — the same 560 — for its logo row,
+          stage row, counter and footer, so this column is already in the right
+          place and centring it again inside an equal container did nothing but
+          make the two disagree whenever the shell's token changed. The cap
+          survives because the shell's container is the page's, and a step that
+          set its own width would jump on the tap that rendered it. */}
+      <div className="max-w-[560px]">
       {restored && (
         <div className="mb-4 rounded-field border border-ink-200 bg-white px-3.5 py-2.5 flex items-center justify-between gap-3">
           <span className="text-small text-ink-600">დაწყებული ფორმა აღდგა.</span>
@@ -385,7 +502,7 @@ export function RequestWizard({ account, initialQuery = '' }: {
           ONE back control on the screen: the footer's was removed rather than
           duplicated — two buttons doing the same thing is a reader wondering
           whether they differ. */}
-      {step.id !== 'what' && (
+      {step.id !== steps[0].id && (
         <div className="mb-3">
           <button
             type="button"
@@ -431,9 +548,17 @@ export function RequestWizard({ account, initialQuery = '' }: {
         </h1>
         {/* The sub-copy belongs to the opening screen alone: it explains what
             the whole run is for, which nobody needs repeated at step four. */}
-        {step.id === 'what' && (
+        {/* …and only while the search box is still on screen: once a topic is
+            chosen the screen's live question is „რა სახის დახმარება", and
+            „აღწერე" would be pointing at a field that is no longer there. */}
+        {/* ⚠️ „ექსპერტები ფასს შემოგთავაზებენ" WAS WRONG ON HALF THE SITE
+            (2026-08-18). One sentence served both doors, so somebody who came
+            in to have a tap fixed was told experts would quote them — the word
+            for the other product, in the first paragraph they read. The line
+            now comes from the door's own copy. */}
+        {step.id === 'what' && draft.topic === '' && (
           <p className="mt-2 text-body text-ink-600">
-            აღწერე — გადავამოწმებთ და ექსპერტები ფასს შემოგთავაზებენ. უფასოა.
+            {VERTICAL_COPY[draft.vertical].hint}
           </p>
         )}
       </div>
@@ -449,7 +574,15 @@ export function RequestWizard({ account, initialQuery = '' }: {
         {step.id === 'what' && (
           <StepWhat
             draft={draft}
+            // The door, straight off the draft — see _model → Draft.vertical.
+            vertical={draft.vertical}
             initialQuery={initialQuery}
+            // ⚠️ THE CATALOGUE, NARROWED TO THE PERSON THEY CHOSE. Reached only
+            // when the provider does SEVERAL things (one unambiguous thing
+            // drops this screen entirely — _model → withTarget), and then the
+            // honest question is „which of THEIRS", not „which of the 132".
+            // Empty = every topic, i.e. exactly the screen as it was.
+            onlyTopics={to?.topics ?? []}
             // ⚠️ THE CATALOGUE COULD NOT NAME IT, SO THE SENTENCE BECOMES THE
             // REQUEST (2026-08-17). „მჭირდება სახლის დალაგება" matched nothing
             // — there is no cleaning topic — and the screen used to answer
@@ -481,6 +614,14 @@ export function RequestWizard({ account, initialQuery = '' }: {
                 advance(d, 'what')
               }
             }}
+            // ⚠️ THE ONLY WAY OUT OF THE KIND QUESTION. It replaces the browse
+            // list rather than sitting under it (see _stepWhat → awaitingKind),
+            // and step one draws no „უკან", so the chip carrying the chosen
+            // topic has to undo the tap. `withTopic(draft, '')` and not a hand
+            // written reset: that function already owns „a kind that no longer
+            // fits clears the priced answers", and a second copy of the rule is
+            // the copy that goes stale.
+            onClearTopic={() => setDraft(withTopic(draft, ''))}
             onPickKind={k => {
               const d = withKind(draft, k)
               setDraft(d)
@@ -502,8 +643,8 @@ export function RequestWizard({ account, initialQuery = '' }: {
         {step.id === 'kind' && (
           <StepPick options={options} value={draft.kind} onPick={pickOption} numbered />
         )}
-        {step.id === 'extras' && (
-          <div className="flex flex-col gap-6">
+        {step.id === 'timing' && extras.length > 0 && (
+          <div className="flex flex-col gap-6 mb-6">
             {extras.map((q, i) => (
               <div key={q.id}>
                 {/* The screen's own title names the group, so each question
@@ -517,84 +658,34 @@ export function RequestWizard({ account, initialQuery = '' }: {
                   // Numbered on the first UNANSWERED one only — the keys index
                   // that list (see `options`), and a badge on a row the digits
                   // do not reach is a lie about the shortcut.
-                  numbered={q.id === (extras.find(x => !draft.details[x.id]) ?? extras[0])?.id}
+                  // Never numbered: the digits belong to the timing list below,
+                  // which is the question that advances.
+                  numbered={false}
                 />
               </div>
             ))}
           </div>
         )}
-        {step.id === 'budget' && (
-          <>
-            <StepPick options={options} value={draft.budgetBand} onPick={pickOption} numbered />
-            {/* ── …or just type it (2026-08-18) ──────────────────────────────
-                Owner: „აქ ხელით უნდა იწერებოდეს." The ladder stays because
-                somebody who does not know what the work costs cannot type a
-                figure — that is why bands exist at all. But somebody who DOES
-                know was being made to hunt for the range containing their
-                number, and then we stored the range instead of the number.
+        {/* ⚠️ THE BUDGET SCREEN IS GONE (2026-08-19). Owner: „არ გვინდა
+            ბიუჯეტი საერთოდ, 5 ეტაპამდე უნდა შემცირდეს."
 
-                Typing WINS over the band and is stored exactly: „45₾" is more
-                information than „30–60₾", and snapping it to a range throws
-                away the one thing they actually told us. */}
-            <div className="mt-4 pt-4 border-t border-ink-100">
-              <label className="block">
-                <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">
-                  ან ჩაწერე ზუსტი თანხა
-                </span>
-                <div className="flex items-center gap-2 max-w-[220px]">
-                  <input
-                    type="number" min={1} max={1000000} step={1} inputMode="numeric"
-                    value={draft.budgetAmount ?? ''}
-                    onChange={e => {
-                      const n = Number(e.target.value)
-                      // A typed amount clears the band: two answers to one
-                      // question, and the transcript would otherwise show the
-                      // one they abandoned.
-                      patch({
-                        budgetAmount: e.target.value.trim() === '' || !Number.isFinite(n) || n <= 0
-                          ? null : Math.trunc(n),
-                        budgetBand: '',
-                      })
-                    }}
-                    placeholder="45"
-                    className="w-full h-11 px-3.5 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-colors duration-fast"
-                  />
-                  <span className="text-body text-ink-600 shrink-0">₾ {KIND[kind].unitLabel}</span>
-                </div>
-              </label>
-              {(draft.budgetAmount ?? 0) > 0 && (
-                <div className="mt-3">
-                  <Btn onClick={() => advance(draft)}>შემდეგი</Btn>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-        {/* ── The floor, said at the moment of choosing ─────────────────────
-            Only on the band that earns it, and it does not block: the request
-            is written either way (see the endpoint — the row is the
-            measurement). What it buys is the chance to change the answer
-            before spending four more screens on it. */}
-        {step.id === 'budget' && (
-          draft.budgetBand !== ''
-            ? budgetIsBelowFloor(kind, draft.budgetBand)
-            // ⚠️ THE SAME RULE FOR A TYPED NUMBER. Warning somebody who tapped
-            // „20₾-მდე" and staying silent for somebody who typed „18" is one
-            // answer with two outcomes, decided by which control they used.
-            : amountIsBelowFloor(kind, draft.budgetAmount ?? 0)
-        ) && (
-          <div className="mt-4 rounded-card border border-warning-200 bg-warning-50 px-4 py-3">
-            <p className="text-body text-ink-900">ამ ბიუჯეტში ექსპერტს ვერ მოგიძებნით.</p>
-            <p className="mt-1 text-small text-ink-700">
-              აირჩიე სხვა ბიუჯეტი, ან გააგრძელე — მოთხოვნას მაინც მივიღებთ.
-            </p>
-            <div className="mt-3">
-              <Btn variant="secondary" size="sm" onClick={() => advance(draft)}>
-                მაინც გავაგრძელებ
-              </Btn>
-            </div>
-          </div>
-        )}
+            It asked the one person on the screen who cannot know what the work
+            costs to name a figure BEFORE anybody had looked at the job — and
+            that figure then set the ceiling on every offer that came back.
+            Guess low and the providers who could help skip it; guess high and
+            you have bid against yourself. The same objection that took the
+            price off the catalogue card („არ იცის კლიენტმა რამდენი ღირს
+            სერვისი"), one screen earlier.
+
+            Do NOT bring it back as an optional question either: an optional
+            money field on a funnel's most abandoned screen is the same anchor
+            with a skip button. What replaced it is the model — the provider
+            quotes („ფასს შემოგთავაზებს"), and the conversation settles it.
+
+            The band still exists in the schema as UNSTATED (min 0, max null =
+            „not asked"), so the row and every reader of it keep working. The
+            floor warning that lived here went with the question: nothing left
+            to warn about. */}
         {step.id === 'timing' && (
           <StepPick options={options} value={draft.timing} onPick={pickOption} numbered />
         )}
@@ -645,11 +736,6 @@ export function RequestWizard({ account, initialQuery = '' }: {
           on the screens that have one. */}
       <div className="mt-6 flex items-center justify-between gap-3">
         <span />
-        {step.id === 'extras' && (
-          <Btn onClick={() => advance(draft)}>
-            {Object.keys(draft.details).length === 0 ? 'გამოტოვება' : 'შემდეგი'}
-          </Btn>
-        )}
         {step.id === 'contact' && (
           <Btn
             onClick={() => advance(draft)}

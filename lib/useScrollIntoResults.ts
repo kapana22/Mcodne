@@ -4,7 +4,7 @@ import { useEffect, useRef, type RefObject } from 'react'
 /**
  * „The content under you just changed — come and look at it."
  *
- * WHY. Reported on /tutors and reproduced: scrolled to the bottom of a list,
+ * WHY. Reported on /experts and reproduced: scrolled to the bottom of a list,
  * tapping a category chip swapped every card underneath while the viewport
  * stayed put. From where the reader was sitting the control simply did nothing.
  * The same shape exists on every surface where a tab or filter REPLACES a list

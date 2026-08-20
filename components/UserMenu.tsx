@@ -5,7 +5,7 @@
 // drop this in without duplicating the menu logic.
 
 import Link from 'next/link'
-import { showApplyCta } from '@/lib/roleHome'
+import { missingCapability, enableCapabilityHref, CAPABILITY_ENABLE_LABEL, showJoinInvite } from '@/lib/capabilities'
 import { usePathname } from 'next/navigation'
 import { Fragment, useEffect, useRef, useState, type ReactElement } from 'react'
 import { Avatar } from './Avatar'
@@ -16,6 +16,8 @@ import { useNotifications } from '@/lib/notifications'
 import { useMe } from '@/lib/me'
 import { useMenuKeys } from '@/lib/useMenuKeys'
 import { b2bFeatureExists } from '@/lib/b2b'
+import { ROLE, HAT_LABEL, roleLabel, SPACE_LABEL } from '@/lib/roles'
+import { PROVIDER_ROUTE, isProviderWorkspacePath } from '@/lib/requests'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 
@@ -34,7 +36,7 @@ type MenuItem = {
 }
 
 const STUDENT_ITEMS = (onSignout: () => void): MenuItem[] => [
-  { href: '/student/profile',   label: 'პროფილი',       icon: Icon.user },
+  { href: '/me/profile',   label: 'პროფილი',       icon: Icon.user },
   // „გახდი ექსპერტი" belongs HERE, not only at the bottom of /student/profile.
   // Traced from a real signup (2026-07-29): the person registered as a STUDENT,
   // spent ten minutes looking for how to offer consultations, edited her profile,
@@ -42,7 +44,7 @@ const STUDENT_ITEMS = (onSignout: () => void): MenuItem[] => [
   // in exactly ONE place: below the sign-out button on a page she had to seek out.
   // The account menu is where someone hunting for „how do I…" actually looks.
   // Only for a plain STUDENT — an expert/admin has no use for it.
-  { href: '/apply',             label: 'შემოგვიერთდი', icon: Icon.briefcase },
+  { href: '/join',              label: 'შემოგვიერთდი', icon: Icon.briefcase },
   { href: '/settings',          label: 'პარამეტრები',   icon: Icon.settings },
   { href: '/notifications',     label: 'შეტყობინებები', icon: Icon.bell },
   { href: '/help',              label: 'დახმარება',     icon: Icon.info },
@@ -57,10 +59,10 @@ const STUDENT_ITEMS = (onSignout: () => void): MenuItem[] => [
 //     the BottomNav on mobile and the sidebar on desktop.
 //  2. Account menu — profile/settings/help/sign-out, shown at every breakpoint.
 const TUTOR_ITEMS = (onSignout: () => void): MenuItem[] => [
-  { href: '/tutor/schedule',    label: 'გრაფიკი',       icon: Icon.clock,  mobileOnly: true },
-  { href: '/tutor/earnings',    label: 'შემოსავალი',    icon: Icon.wallet, mobileOnly: true },
-  { href: '/tutors',            label: 'ექსპერტები', icon: Icon.search, mobileOnly: true },
-  { href: '/tutor/profile',     label: 'პროფილი',       icon: Icon.user },
+  { href: '/work/schedule',    label: 'გრაფიკი',       icon: Icon.clock,  mobileOnly: true },
+  { href: '/work/earnings',    label: 'შემოსავალი',    icon: Icon.wallet, mobileOnly: true },
+  { href: '/experts',            label: 'ექსპერტები', icon: Icon.search, mobileOnly: true },
+  { href: '/work/profile',     label: 'პროფილი',       icon: Icon.user },
   { href: '/settings',          label: 'პარამეტრები',   icon: Icon.settings },
   { href: '/help',              label: 'დახმარება',     icon: Icon.info },
   { label: 'გამოსვლა',          icon: Icon.logout, danger: true, onClick: onSignout },
@@ -109,8 +111,21 @@ export function UserMenu({
   // STUDENT first, so they can hold both an expert workspace AND client-side
   // bookings/messages — give them a switch between the two spaces.
   const { me } = useMe()
-  const isDualRole = me?.role === 'TUTOR'
-  const inClientSpace = pathname.startsWith('/student')
+  const isDualRole = me?.role === ROLE.EXPERT
+  // The two spaces (stage 6, 2026-08-19): /me is the client's, /work the supply
+  // side's — and inside /work the master's three screens are their own room.
+  const inClientSpace = pathname.startsWith('/me')
+  // ⚠️ THE HATS, BECAUSE `role` CANNOT SEE A MASTER (2026-08-18). An
+  // allowlisted tradesperson keeps role STUDENT by design (lib/hats), so this
+  // menu was labelling them „სტუდენტი", offering them „შემოგვიერთდი" pointing
+  // at the EXPERT application, and gating its space switcher on
+  // `role === ROLE.EXPERT` — with the result that there was NO route back to
+  // the master's screens from anywhere on the site. Their own workspace was
+  // reachable only by typing the URL or signing in again.
+  const hats = me?.hats ?? []
+  const isMaster = hats.includes('MASTER')
+  const inProviderSpace = isProviderWorkspacePath(pathname)
+  const inExpertSpace = pathname.startsWith('/work') && !inProviderSpace
 
   // Close on outside click / Escape.
   useEffect(() => {
@@ -144,30 +159,45 @@ export function UserMenu({
 
   const baseItems =
     role === 'ADMIN'   ? ADMIN_ITEMS(signOut) :
-    role === 'STUDENT' ? STUDENT_ITEMS(signOut) :
+    role === ROLE.CLIENT ? STUDENT_ITEMS(signOut) :
                          TUTOR_ITEMS(signOut)
 
-  // Space switcher for a dual-role user (expert who also has a client side).
-  // Sits at the top of the menu: „სტუდენტის სივრცე" from the expert workspace,
-  // „ექსპერტის სივრცე" from the client space — so student-side messages/bookings
-  // stay reachable after becoming an expert (they used to be locked away).
-  const switchItem: MenuItem | null = isDualRole
-    ? inClientSpace
-      ? { href: '/tutor', label: 'ექსპერტის სივრცე', icon: Icon.briefcase }
-      : { href: '/student', label: 'სტუდენტის სივრცე', icon: Icon.home }
-    : null
+  // Space switcher for somebody with more than one room. Sits at the top of
+  // the menu and offers every space they hold EXCEPT the one they are in:
+  // „ექსპერტის სივრცე" (/work) for a dual-role expert, „ხელოსნის სივრცე"
+  // (the master's screens) for a MASTER hat, „კლიენტის სივრცე" (/me) for
+  // either — so client-side messages/bookings stay reachable after becoming
+  // an expert (they used to be locked away), and a person holding both supply
+  // hats can reach both rooms rather than only the first one checked. The
+  // master's door is gated on the HAT, never on a role: an approved
+  // tradesperson keeps role STUDENT, and the hat requires the same allowlist
+  // row the workspace itself checks (tests/requests.test.ts pins this).
+  const switchItems: MenuItem[] = []
+  if (isDualRole && !inExpertSpace) switchItems.push({ href: '/work', label: SPACE_LABEL.EXPERT, icon: Icon.briefcase })
+  if (isMaster && !inProviderSpace) switchItems.push({ href: `${PROVIDER_ROUTE}/requests`, label: SPACE_LABEL.MASTER, icon: Icon.briefcase })
+  if ((isDualRole || isMaster) && !inClientSpace) switchItems.push({ href: '/me', label: SPACE_LABEL.CLIENT, icon: Icon.home })
   // ADMIN manages all three worlds — give the menu direct doors into both
   // spaces (user request 2026-08-01: „ადმინადაც და სტუდენტადაც… იკარგება").
   const adminSpaceItems: MenuItem[] = role === 'ADMIN'
     ? [
-        { href: '/student', label: 'სტუდენტის სივრცე', icon: Icon.home },
-        { href: '/tutor', label: 'ექსპერტის სივრცე', icon: Icon.briefcase },
+        { href: '/me', label: SPACE_LABEL.CLIENT, icon: Icon.home },
+        { href: '/work', label: SPACE_LABEL.EXPERT, icon: Icon.briefcase },
       ]
     : []
   // „გახდი ექსპერტი" only for someone who can actually apply — an approved
   // expert browsing their client space was still being invited to become one.
-  const gated = baseItems.filter(i => i.href !== '/apply' || showApplyCta(role))
-  const items = [...(switchItem ? [switchItem] : []), ...adminSpaceItems, ...gated]
+  const gated = baseItems.filter(i => i.href !== '/join' || showJoinInvite(role, me?.capabilities))
+  // ⚠️ THE OTHER HALF (2026-08-19). A provider who holds one capability is the
+  // one person `showApplyCta` hides the join door from — so the switch the
+  // product is built on („ვიღაცას ექნებოდა ჩართული კონსულტაციის ფუნქცია,
+  // ვიღაცას არა") could only be reached by typing /join. This row is that
+  // switch, and it is here rather than in the workspace rail because the menu
+  // is the one surface present in every space and on a phone.
+  const missing = missingCapability(me?.capabilities)
+  const enableItem: MenuItem[] = missing
+    ? [{ href: enableCapabilityHref(missing), label: CAPABILITY_ENABLE_LABEL[missing], icon: Icon.spark }]
+    : []
+  const items = [...switchItems, ...adminSpaceItems, ...enableItem, ...gated]
 
   const initialName = user?.name ?? ''
 
@@ -202,8 +232,14 @@ export function UserMenu({
           {initialName && (
             <div className="px-4 pt-3 pb-2 border-b border-ink-100">
               <div className="font-display text-small font-bold text-ink-900 truncate">{initialName}</div>
+              {/* ⚠️ THE HAT, NOT THE ROLE (2026-08-18). An approved
+                  tradesperson keeps role STUDENT, so this line printed
+                  „კლიენტი" under the name of somebody whose whole relationship
+                  with the site is that they fix taps. The hat is what they
+                  actually are; the role stays the fallback for everybody
+                  without one. */}
               <Eyebrow tone="muted" className="mt-0.5">
-                {role === 'TUTOR' ? 'ექსპერტი' : role === 'ADMIN' ? 'ადმინი' : 'სტუდენტი'}
+                {isMaster ? HAT_LABEL.MASTER : roleLabel(role)}
               </Eyebrow>
             </div>
           )}

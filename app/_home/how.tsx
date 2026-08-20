@@ -69,7 +69,7 @@ export const HowItWorks = () => (
               expert, and it was the one place on the page where the secondary
               path outranked „find an expert". Signing up still happens — it is
               the first thing the booking flow asks for, in context. */}
-          <Link href="/tutors" className="mt-7 h-12 px-6 rounded-btn bg-white hover:bg-white/90 text-ink-900 font-display font-semibold text-small tracking-wide inline-flex items-center gap-2 transition-colors duration-fast">
+          <Link href="/experts" className="mt-7 h-12 px-6 rounded-btn bg-white hover:bg-white/90 text-ink-900 font-display font-semibold text-small tracking-wide inline-flex items-center gap-2 transition-colors duration-fast">
             <SiteText k="home.how.cta" />
           </Link>
         </Reveal>

@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 /**
  * Warn before losing unsaved edits.
  *
- * WHY. `/tutor/profile` is a long editor with a manual save button and a
+ * WHY. `/work/profile` is a long editor with a manual save button and a
  * `dirty` flag — and nothing whatsoever guarding it. Closing the tab, hitting
  * reload, or clicking any link in the sidebar discarded the work silently. Ten
  * minutes of writing a bio could vanish to one stray click, with no undo and no

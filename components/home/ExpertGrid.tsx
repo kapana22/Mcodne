@@ -119,7 +119,7 @@ export function ExpertGrid({ experts, loading }: { experts: GridExpert[]; loadin
               photo morph works whichever one is clicked. */}
           {e.id && (
             <Link
-              href={`/tutors/${e.urlSlug || e.id}`}
+              href={`/experts/${e.urlSlug || e.id}`}
               aria-label={`${e.name} — პროფილი`}
               className="absolute inset-0 z-10 rounded-[20px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
             />
@@ -168,7 +168,7 @@ export function ExpertGrid({ experts, loading }: { experts: GridExpert[]; loadin
             {/* ?rebook=1 opens the booking flow on arrival, so the label is
                 honest — it books, it does not merely view. */}
             <Link
-              href={e.id ? `/tutors/${e.urlSlug || e.id}?rebook=1` : '/tutors'}
+              href={e.id ? `/experts/${e.urlSlug || e.id}?rebook=1` : '/experts'}
               // z-20: above the whole-card overlay, so „დაჯავშნე" still books.
               className="relative z-20 shrink-0 h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 motion-safe:active:scale-[0.97] transition-all duration-fast"
             >

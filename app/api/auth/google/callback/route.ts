@@ -8,6 +8,7 @@ import { resolveGoogleLink } from '@/lib/googleLink'
 import { safeInternalPath } from '@/lib/roleHome'
 import { sendMail } from '@/lib/mailer'
 import { welcomeEmail, googleLinkedEmail } from '@/lib/emailTemplates'
+import { ROLE } from '@/lib/roles'
 
 // GET /api/auth/google/callback — Google redirects here with ?code&state.
 export async function GET(req: Request) {
@@ -102,7 +103,7 @@ export async function GET(req: Request) {
           // OAuth accounts have no usable password — store a random unusable hash
           // (schema requires the column). They sign in only via Google.
           passwordHash: await hashPassword(crypto.randomBytes(24).toString('hex')),
-          role: 'STUDENT',
+          role: ROLE.CLIENT,
           emailVerified: true, // Google-verified email → skip our OTP step.
         },
       })

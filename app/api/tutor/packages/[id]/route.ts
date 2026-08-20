@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
 import { packagesFeatureExists, PACKAGE_LESSON_COUNTS } from '@/lib/packages'
+import { ROLE } from '@/lib/roles'
 
 // Edit / remove one package. Same ownership rules as the consultations route
 // next door: the row must belong to the caller, or the caller must be an admin.
@@ -34,7 +35,7 @@ async function loadOwned(id: string, userId: string, role: string) {
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   if (!packagesFeatureExists()) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
@@ -77,7 +78,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   if (!packagesFeatureExists()) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 

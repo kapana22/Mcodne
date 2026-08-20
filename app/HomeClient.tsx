@@ -7,9 +7,8 @@
 import { Footer } from '@/components/Footer'
 import { PublicTopBar } from '@/components/PublicTopBar'
 import { type Me } from '@/lib/me'
-import { ApplyCtaGate } from '@/components/ApplyCtaGate'
 import { Categories } from './_home/categories'
-import { ExpertCta, JourneyBand } from './_home/cta'
+import { ClosingBand } from './_home/cta'
 import { HomeCat } from './_home/data'
 import { FeaturedExperts } from './_home/experts'
 import { HomeHero } from './_home/hero'
@@ -28,14 +27,22 @@ const HomeView = ({ initialCategories = [] }: { initialCategories?: HomeCat[] })
         Rendered only where the subsystem exists; `requestsOn()` works in this
         client component because next.config.js inlines FEATURE_REQUESTS. */}
     {requestsOn() && <RequestBand />}
+    {/* ⚠️ `<HomeTrades />` LIVED HERE AND HAS MOVED INSIDE `<RequestBand />`
+        (2026-08-18). It was its own band directly under the request band, and
+        the two said the same thing to the same reader — „describe what you
+        need", twice, with two headings and two links, on a home page already
+        carrying ten sections. The six tiles are now under the band's own field,
+        which is where they always belonged: the field is the general answer and
+        they are six specific ones, so tapping a tile IS filling it in. */}
     <Categories initialCategories={initialCategories} />
     <FeaturedExperts />
     {/* „როგორ მუშაობს" now also carries the former „რატომ მცოდნე" cells —
         see the note above HowItWorks for why those two sections merged. */}
     <HowItWorks />
-    {/* „გახდი ექსპერტი“ section is meaningless for an existing expert/admin. */}
-    <ApplyCtaGate><ExpertCta /></ApplyCtaGate>
-    <JourneyBand />
+    {/* One closing band: „გახდი ექსპერტი“ (gated inside, for an existing
+        expert/admin it is meaningless) over the page's closing illustration —
+        see _home/cta. */}
+    <ClosingBand />
   </>
 )
 

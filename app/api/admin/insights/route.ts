@@ -5,7 +5,7 @@ import { futureWindowWhere, hasFutureWindow } from '@/lib/bookability'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { EVENTS, EVENT_RETENTION_DAYS } from '@/lib/events'
 import { BOOKING_FUNNEL_EVENTS } from '@/components/booking/funnelEvents'
-import { APPLY_FUNNEL_EVENTS } from '@/app/apply/applyFunnelEvents'
+import { APPLY_FUNNEL_EVENTS } from '@/app/join/_expert/applyFunnelEvents'
 import { buildProfileChecks, profilePercent } from '@/lib/profileScore'
 
 // Behavioural insights for the admin „ინსაითები" tab — the two questions GA

@@ -14,11 +14,11 @@ export type StudentBadges = {
  * refcounted and single-flight, so this hook now costs nothing on a screen that
  * already has another subscriber.
  *
- * Behaviour is unchanged: space=student → the count reflects ONLY client-side
+ * Behaviour is unchanged: space=client → the count reflects ONLY client-side
  * threads, so a dual-role user's expert unread never shows on this pill; it
  * polls every 90s while visible and refreshes on `mcodne:threads-refresh`, the
  * event the chat pane fires after send/receive, so the pill clears the moment a
  * thread is opened. */
 export function useStudentBadges(): StudentBadges {
-  return { messages: useMessagesUnread('student') }
+  return { messages: useMessagesUnread('client') }
 }

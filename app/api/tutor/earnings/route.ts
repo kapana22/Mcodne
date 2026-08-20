@@ -4,6 +4,7 @@ import { requireRoleApi } from '@/lib/auth'
 import { PAYMENTS_LIVE, TUTOR_PAYOUT_PCT } from '@/lib/flags'
 import { fmtKaDateTime } from '@/lib/kaDate'
 import { BOOKING_REVENUE_ONLY } from '@/lib/packages'
+import { ROLE } from '@/lib/roles'
 
 // Single source of truth for the tutor's cut — derived from the canonical
 // commission percentage in lib/flags.ts (never a hardcoded 0.85 that could drift).
@@ -36,7 +37,7 @@ const csvResponse = (filename: string, rows: (string | number | null | undefined
 // While payments aren't live, gross === share, so the second money column
 // would just repeat the first — drop it until the commission actually applies.
 const CSV_HEADER = [
-  'თარიღი', 'თემა', 'სტუდენტი', 'ხანგრძლივობა (წთ)', 'თანხა (₾)',
+  'თარიღი', 'თემა', 'კლიენტი', 'ხანგრძლივობა (წთ)', 'თანხა (₾)',
   ...(PAYMENTS_LIVE ? ['ჩემი წილი (₾)'] : []),
   'სტატუსი', 'ჯავშნის ID',
 ]
@@ -46,7 +47,7 @@ const PAYOUT_KA: Record<string, string> = PAYMENTS_LIVE
   : { PENDING: 'მოლოდინში', RELEASED: 'დასრულდა', REFUNDED: 'ანულირდა' }
 
 export async function GET(req: Request) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const wantsCsv = new URL(req.url).searchParams.get('format') === 'csv'

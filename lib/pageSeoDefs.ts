@@ -35,6 +35,13 @@ export type PageSeoDef = {
    * is still editable.
    */
   lockedDescription?: boolean
+  /**
+   * The page was deleted on purpose (stage 8: /categories). The rows stay in
+   * the registry — a SiteText DB row is keyed by these strings and dropping the
+   * key would orphan whatever the admin typed — but they are hidden from the
+   * editor and no page reads them. Same mechanism as SiteTextDef.retired.
+   */
+  retired?: true
 }
 
 export const PAGE_SEO: PageSeoDef[] = [
@@ -47,6 +54,11 @@ export const PAGE_SEO: PageSeoDef[] = [
     ogDescription: 'დაჯავშნე ონლაინ კონსულტაცია ქართველ ექსპერტთან — ბიზნესი, ფინანსები, კარიერა და სამართალი. ხელით შერჩეული ბაზა, ვიდეოსესია, გამჭვირვალე ფასი.',
   },
   {
+    // THE CATALOGUE. The KEY is historical — the page was /tutors until stage 10
+    // (2026-08-19) and now answers at /experts; the key never moves, because a
+    // SiteText DB row is keyed by the string `seo.tutors.*` and renaming it
+    // orphans whatever the admin typed. app/experts/page.tsx reads it as
+    // pageMetadata('tutors', '/experts').
     page: 'tutors',
     label: 'ექსპერტების ძებნა',
     title: 'ონლაინ კონსულტაცია ექსპერტთან — იპოვე და დაჯავშნე | მცოდნე',
@@ -87,23 +99,69 @@ export const PAGE_SEO: PageSeoDef[] = [
     ogDescription: 'პრაქტიკული სახელმძღვანელოები ქართველი ექსპერტებისგან — ბიზნესი, გადასახადები, სამართალი, მარკეტინგი.',
   },
   {
+    // ⚠️ RETIRED 2026-08-19 (stage 8): /categories/* 308s to /experts?category=.
+    // Kept for the DB rows under `seo.categories.*` — never delete a key.
     page: 'categories',
-    label: 'სფეროები',
-    title: 'კონსულტაციის სფეროები — აირჩიე მიმართულება | მცოდნე',
+    retired: true,
+    label: 'კატეგორიები',
+    title: 'კონსულტაციის კატეგორიები — აირჩიე მიმართულება | მცოდნე',
     description: 'აირჩიე შენი პროფესიული სფერო — ბიზნესი, ფინანსები, კარიერა, სამართალი და სხვ. — და იპოვე ხელით შერჩეული ექსპერტი.',
-    ogTitle: 'სფეროები — მცოდნე',
+    ogTitle: 'კატეგორიები — მცოდნე',
     ogDescription: 'აირჩიე შენი პროფესიული სფერო და იპოვე ხელით შერჩეული ექსპერტი.',
   },
   {
+    page: 'apply-master',
+    label: 'დაარეგისტრირე შენი სერვისი',
+    title: 'დაარეგისტრირე შენი სერვისი — მიიღე შეკვეთები | მცოდნე',
+    description: 'დარეგისტრირდი ხელოსნად და მიიღე შეკვეთები შენს ქალაქში — სანტექნიკა, ელექტრიკა, დალაგება, ტექნიკის შეკეთება. რეგისტრაცია უფასოა.',
+    ogTitle: 'დაარეგისტრირე შენი სერვისი — მცოდნე',
+    ogDescription: 'დარეგისტრირდი და მიიღე შეკვეთები შენს ქალაქში.',
+  },
+  {
+    // ⚠️ RETIRED 2026-08-19 (stage 10): the trades DOOR was deleted and
+    // /services 308s to /experts. Kept for the DB rows under `seo.services.*` —
+    // never delete a key. Its children moved to /experts/<slug> and
+    // /experts/<trade> in stage 11 (the whole /services prefix now 308s); they
+    // build their metadata themselves, not from this registry.
     page: 'services',
+    retired: true,
     label: 'სერვისები',
-    title: 'ხელოსანი სახლში — სანტექნიკოსი, ელექტრიკოსი, დალაგება | მცოდნე',
-    description: 'აღწერე რა გჭირდება — სანტექნიკა, ელექტრიკა, დალაგება, გადაზიდვა, ტექნიკის შეკეთება — და ხელოსნები ფასს შემოგთავაზებენ. უფასოა.',
+    title: 'სერვისი სახლში — სანტექნიკოსი, ელექტრიკოსი, დალაგება | მცოდნე',
+    // ⚠️ THE FOUR OPEN TRADES, and it has to stay in step with
+    // requestTopics → LIVE_SERVICE_GROUP_IDS. A meta description is a promise
+    // made in a search result, which is the one place a visitor decides before
+    // they can see that a category is empty.
+    description: 'აღწერე რა გჭირდება — სანტექნიკა, ელექტრიკა, დალაგება, ტექნიკის შეკეთება — და ხელოსნები ფასს შემოგთავაზებენ. უფასოა.',
     ogTitle: 'სერვისები — მცოდნე',
     ogDescription: 'აღწერე რა გჭირდება და ხელოსნები ფასს შემოგთავაზებენ.',
   },
   {
+    // ⚠️ RETIRED 2026-08-19 (stage 10): the trades catalogue and the expert one
+    // became ONE list at /experts, and /masters 308s there. Kept for the DB rows
+    // under `seo.masters.*` — never delete a key.
+    page: 'masters',
+    retired: true,
+    label: 'ხელოსნები',
+    // ⚠️ THE CATALOGUE'S PROMISE IS THE LIST AND THE FILTER — nothing else.
+    // the deleted /services door sold the intake; this page shows who is there, so its SERP
+    // text must describe browsing and must NOT advertise ratings, reviews or
+    // response times. There is no such data, and a description that promises
+    // it is a promise broken in the first second on the page. Same four trades
+    // as that door, and it stays in step with LIVE_SERVICE_GROUP_IDS.
+    title: 'ხელოსნები — სანტექნიკოსი, ელექტრიკოსი, დამლაგებელი | მცოდნე',
+    description: 'ნახე ხელოსნები — სანტექნიკა, ელექტრიკა, დალაგება, ტექნიკის შეკეთება. გაფილტრე სერვისითა და ქალაქით.',
+    ogTitle: 'ხელოსნები — მცოდნე',
+    ogDescription: 'ნახე ხელოსნები სერვისისა და ქალაქის მიხედვით.',
+  },
+  {
+    // ⚠️ RETIRED 2026-08-19 (stage 10). The profession HUB moved from
+    // /konsultacia to /experts in stage 8 and was replaced by the catalogue in
+    // stage 10 — a hub of professions is a pre-filtered catalogue, and the
+    // landings it indexed still answer at /experts/<profession>, each with its
+    // own metadata (lib/professionSeo). The rows stay for the DB under
+    // `seo.konsultacia.*`; never delete a key.
     page: 'konsultacia',
+    retired: true,
     label: 'კონსულტაციები',
     title: 'ონლაინ კონსულტაცია სპეციალისტთან | მცოდნე',
     description: 'ონლაინ კონსულტაცია ქართველ სპეციალისტთან — ბუღალტერი, იურისტი, ფინანსისტი, ფსიქოლოგი, მარკეტოლოგი და სხვა. აირჩიე მიმართულება და დაჯავშნე ვიდეოსესია.',

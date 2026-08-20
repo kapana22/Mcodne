@@ -1,5 +1,5 @@
-// Public URL slug for an expert profile: /tutors/ana-gagoshidze, not
-// /tutors/cms4yyus7000bns01yu8liwai.
+// Public URL slug for an expert profile: /experts/ana-gagoshidze, not
+// /experts/cms4yyus7000bns01yu8liwai.
 //
 // WHY: a cuid tells a visitor nothing, looks broken when the profile is shared
 // in a chat, and carries none of the expert's name into the URL — the one place
@@ -7,7 +7,7 @@
 //
 // SAFETY MODEL — read this before changing anything here:
 //   • `slug` is NULLABLE. A profile without one is never broken, because
-//     app/tutors/[id] resolves by slug OR by id.
+//     app/experts/[slug] resolves by slug OR by id.
 //   • Once a slug is assigned it is PERMANENT. Renaming it would break every
 //     link anyone ever shared, and search engines would have to re-learn the
 //     URL. `ensureExpertSlug` therefore never overwrites an existing value —
@@ -15,15 +15,17 @@
 //   • Uniqueness is enforced by a UNIQUE index (lib/dbBoot.ts), and the
 //     generator is written to lose the race safely: on a collision it retries
 //     with the next suffix rather than trusting an earlier existence check.
+//
+// ⚠️ ONE NAMESPACE SINCE STAGE 11 (2026-08-19). This file used to check
+// `TutorProfile.slug` alone, and that was right while a ServiceProfile answered
+// under its own prefix (/services/<slug>): two prefixes, two namespaces, and
+// „ana-gagoshidze" on both sides named two different URLs. Both profiles answer
+// under /experts/ now — CLAUDE.md → THE PRODUCT MODEL, ONE provider — so a slug
+// is an identity and the question „is this taken?" spans BOTH tables. It is
+// asked once, in lib/slugSpace → slugTaken, which lib/masterSlug asks too.
 import { prisma } from './prisma'
 import { slugify } from './slug'
-
-/** Reserved segments — a slug that collides with a real route would shadow it. */
-const RESERVED = new Set([
-  'new', 'edit', 'search', 'all', 'me', 'admin', 'api', 'apply', 'ask',
-  'about', 'blog', 'help', 'contact', 'terms', 'privacy', 'cookies',
-  'categories', 'konsultacia', 'signin', 'signup', 'tutors', 'student', 'tutor',
-])
+import { slugReserved, slugTaken } from './slugSpace'
 
 /**
  * Base slug from a display name. Falls back to „ekspert" when a name
@@ -34,7 +36,7 @@ function baseExpertSlug(fullName: string | null | undefined): string {
   const base = slugify((fullName ?? '').trim())
   // slugify() returns its own 'cat' stub for empty input — that stub is meant
   // for categories and would be a bizarre expert URL.
-  if (!base || base === 'cat' || RESERVED.has(base)) return 'ekspert'
+  if (!base || base === 'cat' || slugReserved(base)) return 'ekspert'
   return base
 }
 
@@ -57,6 +59,10 @@ export async function ensureExpertSlug(profileId: string): Promise<string | null
   const base = baseExpertSlug(profile.user?.fullName)
   for (let n = 0; n < 50; n++) {
     const candidate = n === 0 ? base : `${base}-${n + 1}`
+    // BOTH tables and the reserved list (lib/slugSpace). The unique index below
+    // still guards a race inside THIS table; this guards the other one, which
+    // no index can see.
+    if (await slugTaken(candidate)) continue
     try {
       const updated = await prisma.tutorProfile.update({
         where: { id: profileId },
@@ -73,4 +79,3 @@ export async function ensureExpertSlug(profileId: string): Promise<string | null
   }
   return null
 }
-

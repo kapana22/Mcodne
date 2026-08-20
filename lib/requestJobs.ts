@@ -21,7 +21,7 @@ import {
   requestVerifiedProviderEmail, offerArrivedClientEmail,
   requestClosedNoOffersClientEmail,
 } from './emailTemplates'
-import { KIND, kindOf, budgetLabel, timingLabel, topicLabel } from './requests'
+import { KIND, kindOf, budgetLabel, timingLabel, topicLabel, PROVIDER_ROUTE } from './requests'
 import {
   routeRequest, needsProviderNudge, needsClientNudge, shouldAutoClose,
   UNANSWERED_NUDGE_HOURS, CLIENT_NUDGE_HOURS, STALE_OPEN_DAYS, MATCHED_CLOSE_DAYS,
@@ -48,7 +48,22 @@ export async function routableProviders(): Promise<(RoutableProvider & { email: 
       where: { active: true, kind: 'EXPERT', userId: { not: null } },
       select: {
         user: {
-          select: { id: true, email: true, tutor: { select: { categoryId: true } } },
+          select: {
+            id: true, email: true,
+            // The sphere AND the professions (stage 8): lib/requestRouting
+            // unions the two, so an expert filed under one sphere is still
+            // mailed about a topic that names their profession.
+            tutor: { select: { categoryId: true, professions: true } },
+            // ⚠️ THE TRADES SIDE OF THE MATCH (2026-08-18). A master has no
+            // TutorProfile and therefore no `categoryId`, so without this every
+            // service request fell through to „EVERYONE" — a Tbilisi cleaning
+            // job was mailed to the Batumi electrician. `available` is read,
+            // not filtered on: a paused master must be EXCLUDED, and filtering
+            // here would instead make them look like somebody with no profile,
+            // i.e. put them back in the everybody audience. The same mistake
+            // the provider queue made and had to be fixed for.
+            serviceProfile: { select: { services: true, areas: true, available: true } },
+          },
         },
       },
     }),
@@ -61,10 +76,17 @@ export async function routableProviders(): Promise<(RoutableProvider & { email: 
   const out = new Map<string, RoutableProvider & { email: string }>()
   for (const p of people) {
     if (!p.user) continue
+    const svc = p.user.serviceProfile
     out.set(p.user.id, {
       userId: p.user.id,
       email: p.user.email,
       categoryId: p.user.tutor?.categoryId ?? null,
+      professions: p.user.tutor?.professions ?? [],
+      // A paused master keeps an empty list, which matches no topic — so they
+      // fall out of every TARGETED audience and are only ever reached by a
+      // deliberate „everyone" broadcast, which is what pausing should mean.
+      services: svc?.available ? svc.services : [],
+      areas: svc?.available ? svc.areas : [],
     })
   }
   for (const m of members) {
@@ -102,14 +124,17 @@ export async function mailVerifiedRequest(
   const r = await prisma.serviceRequest.findUnique({
     where: { id: requestId },
     select: {
-      id: true, kind: true, topic: true, categoryId: true,
+      id: true, kind: true, topic: true, categoryId: true, city: true,
       budgetMin: true, budgetMax: true, timing: true,
     },
   })
   if (!r) return { audience: 'NONE', sent: 0 }
 
   const providers = await routableProviders()
-  const routed = routeRequest(r.categoryId, providers)
+  // ⚠️ THE TOPIC AND THE CITY ARE PASSED, and their absence was the bug: a
+  // trades request carries no sphere (the sphere table is the expert taxonomy),
+  // so this call used to hand `null` and get „EVERYONE" every single time.
+  const routed = routeRequest(r.categoryId, providers, { topic: r.topic, city: r.city })
   // A named list is filtered against the allowlist rather than trusted: the
   // panel's checkboxes are a UI, and an id that is no longer routable must not
   // become a mail because it was on screen when somebody pressed send.
@@ -131,7 +156,7 @@ export async function mailVerifiedRequest(
     type: 'GENERIC',
     title: 'ახალი მოთხოვნა',
     body: topicLabel(r.topic),
-    href: `/provider/requests/${r.id}`,
+    href: `${PROVIDER_ROUTE}/requests/${r.id}`,
   })
 
   const byId = new Map(providers.map(p => [p.userId, p.email]))

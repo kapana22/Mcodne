@@ -1,6 +1,6 @@
 'use client'
 // Per-day time picker (band-grouped) — moved verbatim from
-// app/tutors/[id]/client.tsx (DESIGN_FIX_PROMPT 1.1). Times render in the
+// app/experts/[slug]/client.tsx (DESIGN_FIX_PROMPT 1.1). Times render in the
 // viewer's local tz; the Calendar footer carries the honest tz label.
 //
 // Every `timeChoices` entry is BOOKABLE: openness is derived (windows − busy −

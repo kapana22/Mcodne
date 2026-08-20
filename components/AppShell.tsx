@@ -9,7 +9,7 @@ import { usePathname } from 'next/navigation'
 import { ToastProvider } from './ToastProvider'
 import { CookieConsent } from './CookieConsent'
 import { BottomNav } from './BottomNav'
-import { isRequestPath } from '@/lib/requests'
+import { isRequestPath, isProviderWorkspacePath } from '@/lib/requests'
 import { BackToTop } from './BackToTop'
 import { HelpWidget } from './HelpWidget'
 import { NavProgress } from './NavProgress'
@@ -27,6 +27,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // The requests subsystem carries its own chrome and suppresses this one —
   // see the block around <BottomNav> below.
   const inRequests = isRequestPath(path ?? '')
+  // …except the master's WORKSPACE (M1, 2026-08-18). Its three screens
+  // (/work/requests, /work/offers, /work/service-profile — since stage 6 under
+  // the shared /work prefix, and ONLY those three) are inside the subsystem's
+  // path list, so they inherited the wizard's „no furniture" rule and a master
+  // working from a phone had neither a top nav that fit nor a bottom one at
+  // all. The rule was written for the intake, which somebody finishes in one
+  // sitting; a workspace is the opposite — you come back to it. So the
+  // workspace keeps the tab bar (and BackToTop, its lists are long) and only
+  // the help bubble stays away, its content being the expert product's.
+  const inProviderSpace = isProviderWorkspacePath(path ?? '')
   // Determines the user's role for the mobile bottom nav. `/api/me` returns
   // `{ user: null }` for anonymous visitors, which we pass through as `null`
   // — BottomNav short-circuits to render nothing.
@@ -138,7 +148,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       // careful thing to do and is the exact opposite: by the time this runs the
       // router has already reset the scroll for the incoming page, so `save()`
       // wrote 0 OVER the position we spent the whole visit recording. Measured:
-      // /tutors held 1400 while browsing and 0 the moment a card was clicked.
+      // /experts held 1400 while browsing and 0 the moment a card was clicked.
       // The rAF writes during the scroll itself are the record; this only tidies.
       if (raf) cancelAnimationFrame(raf)
     }
@@ -186,7 +196,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Keyed on pathname so every client-side route change remounts the
           subtree and re-plays the `animate-fade-in` entrance. Server-side navigations
           get the same effect naturally on initial paint. */}
-      <div key={path ?? '/'} className="motion-safe:animate-fade-in">
+      {/* ⚠️ EXCEPT INSIDE THE INTAKE, WHICH IS ONE ROOM (stage 10, 2026-08-19).
+          The wizard turns into the live room in place — no navigation — and
+          rewrites the address bar to /request/<ref> with history.replaceState
+          so a refresh lands on the room. Next hears that and updates the
+          pathname; a key on the pathname would then remount this subtree, throw
+          the just-sent state away and put an empty wizard under the room's
+          address. So the request pages share one key: moving between the
+          wizard, its room and /request/<ref> is a step inside the same errand,
+          drawn by the same chrome (app/request/_shell), and does not re-play a
+          page entrance. The master's workspace keeps the per-path key like the
+          rest of the site — it is a workspace, not the intake. */}
+      <div key={inRequests && !inProviderSpace ? '/request' : (path ?? '/')} className="motion-safe:animate-fade-in">
         {children}
       </div>
       <CookieConsent />
@@ -201,7 +222,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           Path-based and therefore honest about what it is: a presentation
           rule, not a guard. The routes gate themselves — see
           lib/requestsServer → requestsViewer. */}
-      {!inRequests && (
+      {(!inRequests || inProviderSpace) && (
         <>
           {/* Long-page comfort. Self-gating (appears past 2 viewports), so it
               costs nothing on short routes and needs no per-page opt-in. */}
@@ -209,7 +230,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* Sits above BackToTop (z-46 vs 45) and offset upward so the two
               never overlap; hides itself entirely while a mobile booking CTA
               owns the bottom edge — see HelpWidget. */}
-          <HelpWidget />
+          {!inProviderSpace && <HelpWidget />}
           <BottomNav role={role} />
         </>
       )}

@@ -13,6 +13,7 @@ import { Logo } from '@/components/Logo'
 import { NotifBell } from '@/components/NotifBell'
 import { UserMenu } from '@/components/UserMenu'
 import { homeForRole } from '@/lib/roleHome'
+import { ROLE } from '@/lib/roles'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 
@@ -59,6 +60,11 @@ const TYPE_LABEL: Record<string, { l: string; cls: string }> = {
   PAYOUT:             { l: 'ანგარიშსწორება', cls: 'border-brand-300 text-brand-800' },
   ADMIN_BROADCAST:    { l: 'გუნდიდან',     cls: 'border-ink-300 text-ink-800' },
   GENERIC:            { l: 'შეტყობინება',  cls: 'border-ink-200 text-ink-500' },
+  // The requests subsystem (2026-08-19) — neutral like the conversational rows.
+  REQUEST_NEW:        { l: 'მოთხოვნა',     cls: 'border-ink-200 text-ink-700' },
+  REQUEST_INVITE:     { l: 'მოთხოვნა',     cls: 'border-ink-200 text-ink-700' },
+  REQUEST_MESSAGE:    { l: 'შეტყობინება',  cls: 'border-ink-200 text-ink-700' },
+  REQUEST_DONE:       { l: 'დასრულდა',     cls: 'border-success-200 text-success-700' },
 }
 
 export default function NotificationsPage() {
@@ -196,9 +202,9 @@ export default function NotificationsPage() {
             <Logo size="sm" href="/" />
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {me?.role === 'STUDENT' && (
+            {me?.role === ROLE.CLIENT && (
             <Link
-              href="/student/favorites"
+              href="/me/favorites"
               aria-label="შენახული ექსპერტები"
               className="w-10 h-10 rounded-btn inline-flex items-center justify-center text-ink-500 hover:text-ink-900 hover:bg-ink-100 transition-colors duration-fast"
             >

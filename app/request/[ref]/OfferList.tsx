@@ -7,12 +7,14 @@
 // sees; `providerPhone` and `providerEmail` arrive null unless that offer is
 // the accepted one, decided by clientOfferView in lib/requests.
 
-import { useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Btn } from '@/components/Btn'
 import { Card } from '@/components/Card'
+import { Icon } from '@/components/Icon'
 import { RequestChat } from '@/components/RequestChat'
 import { gel, offerPriceLabel, OFFER_STATUS_LABEL, type OfferStatusName } from '@/lib/requests'
+import { REVIEW_BODY_MAX } from '@/lib/offerLifecycle'
 
 type Offer = {
   id: string
@@ -29,6 +31,10 @@ type Offer = {
   providerPhone: string | null
   providerEmail: string | null
   unread: number
+  /** After the choice (stage 7): QUOTE offers can be marked done and reviewed. */
+  kind: string
+  doneAt: string | null
+  review: { rating: number; body: string } | null
 }
 
 /** Server codes → Georgian. Never surface a raw code to a reader. */
@@ -38,18 +44,59 @@ function errText(code?: string): string {
     // another tab or on another device. Said as a fact rather than as an error,
     // because nothing went wrong — the page is simply out of date.
     case 'ALREADY_DECIDED': return 'ეს მოთხოვნა უკვე დახურულია — გვერდი განაახლე.'
+    // The done/review claims: the page is out of date, not broken.
+    case 'ALREADY_DONE':
+    case 'ALREADY_REVIEWED': return 'უკვე შესრულებულია — გვერდი განაახლე.'
     default: return 'ვერ შესრულდა — სცადე თავიდან.'
   }
 }
 
-export function OfferList({ publicRef, offers, matched }: {
+export function OfferList({ publicRef, offers, matched, canReview, empty }: {
   publicRef: string
   offers: Offer[]
   matched: boolean
+  /** The request has an account user to sign a review as (lib/offerLifecycle
+   *  → reviewGate). Without one the picker is not drawn — a form that can only
+   *  answer NO_ACCOUNT is not a form. */
+  canReview: boolean
+  /** What to draw while there is nothing — the page's own words, passed in so
+   *  this list stays mounted across „nothing" → „one", see below. */
+  empty: ReactNode
 }) {
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // ── Which offers ARRIVED while you were looking (stage 10) ────────────────
+  // The page is re-rendered by the room's stream (../_liveRefresh) the moment
+  // an offer is written; React keeps the cards already on screen and mounts
+  // the new one. Only THAT one enters (`slide-in-b`, motion-safe) — the ids
+  // present at first render are remembered and never animate, so a reload
+  // does not play four entrances over a list the reader has already seen.
+  // Owner: „პასუხები სათითაოდ მოდის, ჩვეულებრივი ჩატივით." A card that
+  // arrived keeps its class; an animation runs once, on the node's mount, and
+  // a re-render does not restart it.
+  const seenAtMount = useRef<Set<string> | null>(null)
+  if (seenAtMount.current === null) seenAtMount.current = new Set(offers.map(o => o.id))
+  const arrived = (id: string) => !seenAtMount.current!.has(id)
+
+  // „დასრულდა" — the same POST-then-refresh shape as accept: the server owns
+  // the claim (once, 409 on a second tap) and the page re-reads the result.
+  const done = async (id: string) => {
+    if (busyId) return
+    setBusyId(id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/requests/${publicRef}/offers/${id}/done`, { method: 'POST' })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.ok) { setError(errText(j?.error)); return }
+      router.refresh()
+    } catch {
+      setError(errText())
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   const accept = async (id: string) => {
     if (busyId) return
@@ -75,6 +122,8 @@ export function OfferList({ publicRef, offers, matched }: {
     }
   }
 
+  if (offers.length === 0) return <div className="mt-4">{empty}</div>
+
   return (
     <div className="mt-4 space-y-3">
       {error && (
@@ -86,7 +135,13 @@ export function OfferList({ publicRef, offers, matched }: {
       {offers.map(o => {
         const accepted = o.status === 'ACCEPTED'
         return (
-          <Card key={o.id} className={accepted ? 'border-brand-300' : undefined}>
+          <Card
+            key={o.id}
+            className={[
+              accepted ? 'border-brand-300' : '',
+              arrived(o.id) ? 'motion-safe:animate-slide-in-b' : '',
+            ].filter(Boolean).join(' ') || undefined}
+          >
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
               {/* The name IS the door to the public profile — the client's
                   decision runs on reviews and verification, not the name alone,
@@ -171,9 +226,118 @@ export function OfferList({ publicRef, offers, matched }: {
                 </Btn>
               </div>
             )}
+
+            {/* ── After the choice (stage 7) ──────────────────────────────
+                On the ACCEPTED offer, in order: „დასრულდა" while nobody has
+                said so; the ★ picker once somebody has and the request has an
+                account to sign as; the stars, read-only, once it is reviewed.
+                QUOTE only — a BOOKING offer's completion is the booking's. */}
+            {accepted && o.kind === 'QUOTE' && !o.doneAt && (
+              <div className="mt-4">
+                <Btn
+                  variant="secondary"
+                  onClick={() => done(o.id)}
+                  disabled={busyId !== null}
+                  aria-busy={busyId === o.id}
+                >
+                  {busyId === o.id ? 'ინახება…' : 'დასრულდა'}
+                </Btn>
+              </div>
+            )}
+            {accepted && o.doneAt && !o.review && canReview && (
+              <ReviewForm publicRef={publicRef} offerId={o.id} onSaved={() => router.refresh()} />
+            )}
+            {accepted && o.review && (
+              <div className="mt-4 pt-4 border-t border-ink-100">
+                <Stars n={o.review.rating} />
+                {o.review.body && (
+                  <p className="mt-2 text-body text-ink-800 whitespace-pre-wrap">{o.review.body}</p>
+                )}
+              </div>
+            )}
           </Card>
         )
       })}
+    </div>
+  )
+}
+
+/* ── ★ read-only ──────────────────────────────────────────────────────────
+   The expert profile's Stars (app/experts/[slug]/_bits), at the same size. */
+function Stars({ n }: { n: number }) {
+  return (
+    <span className="inline-flex items-center gap-0.5" aria-label={`${n} 5-დან`}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <Icon.star key={i} aria-hidden className={`w-3.5 h-3.5 ${i <= n ? 'text-warning-500' : 'text-ink-200'}`} />
+      ))}
+    </span>
+  )
+}
+
+/* ── ★ picker + one sentence ──────────────────────────────────────────────
+   The lesson review's star row (app/me/bookings/[id]/_review), without the
+   four sub-ratings — a job has one question. Submit is the same claim as
+   everything else here: the server refuses a second one (409), the page
+   re-reads. */
+function ReviewForm({ publicRef, offerId, onSaved }: { publicRef: string; offerId: string; onSaved: () => void }) {
+  const [rating, setRating] = useState(0)
+  const [body, setBody] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async () => {
+    if (busy || rating === 0) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/requests/${publicRef}/offers/${offerId}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating, body: body.trim() }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.ok) { setError(errText(j?.error)); return }
+      onSaved()
+    } catch {
+      setError(errText())
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mt-4 pt-4 border-t border-ink-100">
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map(n => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => setRating(n)}
+            aria-label={`${n} ვარსკვლავი`}
+            aria-pressed={rating === n}
+            className={`w-10 h-10 rounded-btn inline-flex items-center justify-center transition-colors duration-fast ${rating >= n ? 'text-warning-500' : 'text-ink-300 hover:text-ink-400'}`}
+          >
+            <Icon.star aria-hidden className="w-7 h-7" />
+          </button>
+        ))}
+      </div>
+      <textarea
+        value={body}
+        onChange={e => setBody(e.target.value.slice(0, REVIEW_BODY_MAX))}
+        rows={2}
+        maxLength={REVIEW_BODY_MAX}
+        placeholder="ერთი წინადადება"
+        aria-label="შეფასება"
+        className="mt-3 w-full px-3.5 py-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none resize-y transition-colors duration-fast"
+      />
+      {error && (
+        <p role="alert" className="mt-2 text-small text-danger-700">{error}</p>
+      )}
+      <div className="mt-3">
+        <Btn onClick={submit} disabled={busy || rating === 0} aria-busy={busy}>
+          {busy ? 'ინახება…' : 'შეფასების გაგზავნა'}
+        </Btn>
+      </div>
     </div>
   )
 }

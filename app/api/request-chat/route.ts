@@ -226,14 +226,15 @@ export async function POST(req: Request) {
       if (r.side === 'CLIENT') {
         for (const userId of r.providerUserIds) {
           await notify(userId, {
-            type: 'GENERIC',
+            // Typed (D12, 2026-08-19): same always-delivered group as GENERIC.
+            type: 'REQUEST_MESSAGE',
             title: 'ახალი შეტყობინება მოთხოვნაზე',
             // ⚠️ THE TOPIC, NOT THE REFERENCE. `publicRef` is the client's
             // credential — see app/provider/requests/[id]/page. A bell body is
             // a place a provider reads it at a glance, which is exactly what
             // must not happen.
             body: topicLabel(r.offer.request.topic),
-            href: '/provider/offers',
+            href: '/work/offers',
           })
         }
         const emails = r.providerUserIds.length

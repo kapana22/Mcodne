@@ -20,7 +20,7 @@
 //     person describing a personal problem — a length or a boolean is a
 //     funnel signal, the text itself is not ours to log.
 
-import { APPLY_FUNNEL_EVENT_NAMES, APPLY_FUNNEL_PROP_KEYS } from '@/app/apply/applyFunnelEvents'
+import { APPLY_FUNNEL_EVENT_NAMES, APPLY_FUNNEL_PROP_KEYS } from '@/app/join/_expert/applyFunnelEvents'
 import { REQUEST_FUNNEL_EVENT_NAMES, REQUEST_FUNNEL_PROP_KEYS, REQUEST_SLUG_RE } from '@/app/request/requestFunnelEvents'
 import { HELP_EVENT_NAMES, HELP_EVENTS, HELP_ROUTE_RE, HELP_TOPIC_IDS } from '@/lib/helpTopics'
 

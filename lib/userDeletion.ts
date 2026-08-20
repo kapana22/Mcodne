@@ -29,7 +29,7 @@ export const anonEmail = (userId: string) => `deleted-${userId}${ANON_EMAIL_DOMA
    would need a migration for a state the email already encodes unambiguously
    (the domain is reserved, so no real account can ever collide with it).
    Used to refuse un-suspending an anonymized account: `suspendedAt` is what
-   404s an expert's public profile (app/tutors/[id]/page gates on it and NOTHING
+   404s an expert's public profile (app/experts/[slug]/page gates on it and NOTHING
    else — browse's `available` filter does not cover the profile URL), so
    clearing it would put a „წაშლილი პროფილი" tombstone back on the public web. */
 export const isAnonymized = (email: string | null | undefined) =>
@@ -69,10 +69,11 @@ export function asEitherParty(userId: string, tutorId: string | null) {
  * account's reviews disappear. The account's own profile is excluded — it is
  * being deleted in the same transaction. */
 export function staleRatingTargets(
-  reviews: { tutorId: string }[],
+  reviews: { tutorId: string | null }[],
   ownTutorId: string | null,
 ): Set<string> {
-  return new Set(reviews.map(r => r.tutorId).filter(t => t !== ownTutorId))
+  // Job reviews (tutorId null) have no expert aggregate to refresh.
+  return new Set(reviews.map(r => r.tutorId).filter((t): t is string => !!t && t !== ownTutorId))
 }
 
 /* How much to subtract from each OTHER expert's `sessionsCount`.

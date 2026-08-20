@@ -213,7 +213,7 @@ export async function sendExpertRequestEscalations(): Promise<{ bookings: number
   // silent. Raw SQL rather than notify(), which generates a random id — there
   // would be no key to conflict on. The pref gate notify() applies is enforced
   // above (both in SQL and in selectExpertEscalations).
-  const hrefFor = (id: string) => `/tutor/bookings/${id}`
+  const hrefFor = (id: string) => `/work/bookings/${id}`
   const titleFor = (stage: StageKey) =>
     stage === 'h3' ? 'ბოლო შეხსენება — მოთხოვნა მალე გაუქმდება' : 'ჯავშნის მოთხოვნა შენს პასუხს ელოდება'
   const bodyFor = (e: Escalation) =>
@@ -240,7 +240,7 @@ export async function sendExpertRequestEscalations(): Promise<{ bookings: number
     if (!e.row.tutorEmail) continue
     const { subject, html } = expertRequestEscalationEmail({
       expertName: e.row.tutorName || '',
-      studentName: e.row.studentName || 'სტუდენტი',
+      studentName: e.row.studentName || 'კლიენტი',
       topic: e.row.topic,
       whenText: fmtWhenTz(new Date(e.row.startAt), { year: false }),
       leftText: remainingText(e.remainingMs),

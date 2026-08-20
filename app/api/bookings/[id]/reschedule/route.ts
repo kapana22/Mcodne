@@ -180,11 +180,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const otherPartyUserId = proposedBy === 'STUDENT' ? booking.tutor.userId : booking.studentId
   const otherPartyHref = proposedBy === 'STUDENT'
-    ? `/tutor/bookings/${booking.id}`
-    : `/student/bookings/${booking.id}`
+    ? `/work/bookings/${booking.id}`
+    : `/me/bookings/${booking.id}`
   await notify(otherPartyUserId, {
     type: 'RESCHEDULE_REQUEST',
-    title: proposedBy === 'STUDENT' ? 'სტუდენტმა გადადება ითხოვა' : 'ექსპერტმა გადადება ითხოვა',
+    title: proposedBy === 'STUDENT' ? 'კლიენტმა გადადება ითხოვა' : 'ექსპერტმა გადადება ითხოვა',
     body: `ახალი დრო: ${fmtWhenTz(newStart, { year: true })}`,
     href: otherPartyHref,
   })
@@ -204,11 +204,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       // in-app notify() above.
       if (other?.email && normalizePrefs(other.notificationPrefs).BOOKING_CREATED) {
         const { subject, html } = bookingChangedEmail('reschedule_proposed', {
-          counterpartName: proposer?.fullName || (proposedBy === 'STUDENT' ? 'სტუდენტი' : 'ექსპერტი'),
+          counterpartName: proposer?.fullName || (proposedBy === 'STUDENT' ? 'კლიენტი' : 'ექსპერტი'),
           topic: booking.topic,
           whenText: fmtWhenTz(booking.startAt, { year: true }),
           newWhenText: fmtWhenTz(newStart, { year: true }),
-          actorLabel: proposedBy === 'STUDENT' ? 'სტუდენტმა' : 'ექსპერტმა',
+          actorLabel: proposedBy === 'STUDENT' ? 'კლიენტმა' : 'ექსპერტმა',
           reason: payload.reason,
           href: otherPartyHref,
         })

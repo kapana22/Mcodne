@@ -85,7 +85,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return NextResponse.json({ ok: false, error: 'STALE_PROPOSAL' }, { status: 400 })
     }
     const newEnd = new Date(newStart.getTime() + booking.durationMin * 60_000)
-    const oldHeldSlotId = booking.heldSlotId
     const bufferMin = booking.tutor.bufferMin ?? 0
 
     // Move atomically: re-verify the new time is genuinely open, then move
@@ -172,12 +171,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         })
         if (!open) throw new SlotConflict()
 
-        // Legacy release: rows created before the windows model flipped a slot's
-        // `booked`. Freeing it here keeps that inventory visible; a null
-        // heldSlotId (every booking made since) is a no-op.
-        if (oldHeldSlotId) {
-          await tx.availabilitySlot.updateMany({ where: { id: oldHeldSlotId }, data: { booked: false } })
-        }
+        // Nothing to release: the legacy `booked` flag is retired (stage 11);
+        // heldSlotId is only nulled below.
 
         await tx.booking.update({
           where: { id: booking.id },
@@ -202,8 +197,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ? booking.studentId
       : booking.tutor.userId
     const proposerHref = pending.proposedBy === 'STUDENT'
-      ? `/student/bookings/${booking.id}`
-      : `/tutor/bookings/${booking.id}`
+      ? `/me/bookings/${booking.id}`
+      : `/work/bookings/${booking.id}`
     await notify(otherPartyUserId, {
       type: 'BOOKING_CREATED',
       title: 'გადადება დადასტურდა',
@@ -222,7 +217,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         ])
         if (proposer?.email && normalizePrefs(proposer.notificationPrefs).BOOKING_CREATED) {
           const { subject, html } = bookingChangedEmail('reschedule_accepted', {
-            counterpartName: responder?.fullName || (pending.proposedBy === 'STUDENT' ? 'ექსპერტი' : 'სტუდენტი'),
+            counterpartName: responder?.fullName || (pending.proposedBy === 'STUDENT' ? 'ექსპერტი' : 'კლიენტი'),
             topic: booking.topic,
             whenText: fmtWhenTz(booking.startAt, { year: true }),
             newWhenText: fmtWhenTz(newStart, { year: true }),
@@ -234,10 +229,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     })
     // The responder has now acted on the pending reschedule — clear their
     // RESCHEDULE_REQUEST notif so it doesn't sit unread.
-    const responderHref = isStudent
-      ? `/student/bookings/${booking.id}`
-      : `/tutor/bookings/${booking.id}`
-    await markRelatedRead(user.id, responderHref, 'RESCHEDULE_REQUEST')
+    // `contains` on the booking segment: the userId + type already scope
+    // this to the responder's own row, and rows written before the /student →
+    // /me, /tutor → /work move (stage 6) still carry the old prefix.
+    await markRelatedRead(user.id, `bookings/${booking.id}`, 'RESCHEDULE_REQUEST')
     return NextResponse.json({ ok: true, accepted: true, status: 'CONFIRMED', newStartAt: newStart.toISOString() })
   }
 
@@ -274,8 +269,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // original time, and the canceled type renders as a red „გაუქმება" chip,
   // which read as „the session was killed". Same pref group either way.
   const proposerHrefRej = pending.proposedBy === 'STUDENT'
-    ? `/student/bookings/${booking.id}`
-    : `/tutor/bookings/${booking.id}`
+    ? `/me/bookings/${booking.id}`
+    : `/work/bookings/${booking.id}`
   await notify(otherPartyUserId, {
     type: 'RESCHEDULE_REQUEST',
     title: 'გადადება უარყოფილია',
@@ -294,7 +289,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ])
       if (proposer?.email && normalizePrefs(proposer.notificationPrefs).BOOKING_CREATED) {
         const { subject, html } = bookingChangedEmail('reschedule_rejected', {
-          counterpartName: responder?.fullName || (pending.proposedBy === 'STUDENT' ? 'ექსპერტი' : 'სტუდენტი'),
+          counterpartName: responder?.fullName || (pending.proposedBy === 'STUDENT' ? 'ექსპერტი' : 'კლიენტი'),
           topic: booking.topic,
           whenText: fmtWhenTz(booking.startAt, { year: true }),
           note: 'სესია ძველ დროზე რჩება ძალაში.',
@@ -305,10 +300,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     } catch { /* email is best-effort */ }
   })
   // Responder acted — clear their own RESCHEDULE_REQUEST notif for this booking.
-  const responderHrefR = isStudent
-    ? `/student/bookings/${booking.id}`
-    : `/tutor/bookings/${booking.id}`
-  await markRelatedRead(user.id, responderHrefR, 'RESCHEDULE_REQUEST')
+  await markRelatedRead(user.id, `bookings/${booking.id}`, 'RESCHEDULE_REQUEST')
   // Return the RESULTING status (PREPARING or CONFIRMED) so the client doesn't
   // wrongly assume CONFIRMED — a rejected reschedule on a not-yet-accepted
   // (PREPARING) booking must stay PREPARING and keep its accept/decline actions.

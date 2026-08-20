@@ -1,23 +1,22 @@
 /**
- * WHERE A CATEGORY LIVES — the one function that answers it, for redirects,
- * canonicals, the sitemap and every internal link.
+ * WHERE A CATEGORY LIVES — the one function that answers it, for the sitemap,
+ * the breadcrumbs and every internal link.
  *
- * There are two kinds of absorbed category and they must not be treated alike:
+ * STAGE 8 (2026-08-19, restructuring v2 §8.7): /categories/* was RETIRED. The
+ * sphere landing pages (a hub, one page per sphere, a nested page per absorbed
+ * category that carried copy) are gone, and the middleware 308s every one of
+ * those addresses to the catalogue filtered to the slug — /experts?category=<x>
+ * — which is where the experts of a sphere were always listed anyway. The
+ * copy in lib/categorySeo stays as data (the profession landings still print
+ * a sphere's keyword from it); only the route usage went.
  *
- *   • one that carried its own keyword copy („ფინანსური კონსულტაცია" — an
- *     intro, a FAQ, FAQPage structured data) keeps a page of its own, nested
- *     under the sphere that absorbed it. Folding that copy into a 301 would
- *     throw away the only thing on the site targeting that search.
- *   • one that never had any („advokati") has nothing to keep, so its URL goes
- *     straight to the sphere. A page whose entire content is a heading is worse
- *     than no page.
- *
- * THE TEST IS THE PRESENCE OF COPY IN lib/categorySeo, deliberately — a fact of
- * the codebase, not of the database. A redirect target that moved when an
- * expert joined or left would be a redirect target that cannot be trusted, and
- * a 301 is a promise about a URL forever.
+ * So the answer is now ONE shape for every state: a VISIBLE sphere, a HIDDEN
+ * one, and an absorbed (REDIRECTED) category all resolve to the catalogue with
+ * their OWN slug — `lib/categoryTree → categorySlugFilter` accepts an absorbed
+ * slug and lists its experts through the sphere that took it, so a bookmark to
+ * „finance" keeps returning people. Never a redirecting URL, never
+ * `/categories/undefined` from a bad row.
  */
-import { categorySeo } from './categorySeo'
 import type { CategoryStatus } from './categoryTree'
 
 export type RoutedCategory = {
@@ -26,16 +25,12 @@ export type RoutedCategory = {
   parent?: { slug: string } | null
 }
 
-/** True when this absorbed category has copy worth keeping a page for. */
-export function keepsOwnPage(slug: string): boolean {
-  return Boolean(categorySeo[slug])
-}
+/** The catalogue, filtered to this category. */
+export const CATEGORY_BROWSE_PATH = '/experts'
 
-/** The canonical, site-relative URL of a category. Never a redirecting one. */
+/** The canonical, site-relative URL of a category. Never a redirecting one.
+ *  Takes the full row shape so every caller keeps compiling; only `slug`
+ *  decides now (see the header for why status no longer changes the answer). */
 export function categoryPath(cat: RoutedCategory): string {
-  // A sphere, visible or hidden, answers at its own URL.
-  if (cat.status !== 'REDIRECTED' || !cat.parent) return `/categories/${cat.slug}`
-  return keepsOwnPage(cat.slug)
-    ? `/categories/${cat.parent.slug}/${cat.slug}`
-    : `/categories/${cat.parent.slug}`
+  return `${CATEGORY_BROWSE_PATH}?category=${encodeURIComponent(cat.slug)}`
 }

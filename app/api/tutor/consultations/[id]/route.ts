@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
+import { ROLE } from '@/lib/roles'
 
 const UpdateBody = z.object({
   title: z.string().min(2).max(80).optional(),
@@ -23,7 +24,7 @@ async function loadOwned(id: string, userId: string, role: string) {
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const { id } = await ctx.params
@@ -39,7 +40,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const { id } = await ctx.params

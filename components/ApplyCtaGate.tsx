@@ -1,16 +1,18 @@
 'use client'
 import type { ReactNode } from 'react'
 import { useMe } from '@/lib/me'
-import { showApplyCta } from '@/lib/roleHome'
+import { showJoinInvite } from '@/lib/capabilities'
 
-// Renders its children only for viewers who should see a "become an expert" /
-// apply CTA — anonymous visitors and STUDENTs. A logged-in TUTOR/ADMIN gets
-// nothing. Wrap any become-expert nav item, footer link, or marketing section
-// in this so the whole surface gates uniformly (server pages included) and the
-// "expert sees 'become an expert'" bug can't reappear per-surface.
+// Renders its children only for viewers who should see a "become a provider"
+// invitation — people who offer NOTHING yet (guests and plain clients). Anyone
+// who already holds a capability gets the „ჩართე…" switch instead (UserMenu,
+// lib/capabilities → missingCapability); somebody with both, and every admin,
+// gets neither. Wrap any join nav item, footer link or marketing section in
+// this so the whole surface gates uniformly and the "a provider is invited to
+// become one" bug cannot reappear per-surface.
 export function ApplyCtaGate({ children }: { children: ReactNode }) {
   const { me } = useMe()
-  if (!showApplyCta(me?.role)) return null
+  if (!showJoinInvite(me?.role, me?.capabilities)) return null
   return <>{children}</>
 }
 

@@ -5,6 +5,7 @@ import { requireRoleApi } from '@/lib/auth'
 import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
 import { packagesFeatureExists, PACKAGE_LESSON_COUNTS, DEFAULT_VALID_DAYS, readTeacherFields } from '@/lib/packages'
 import { packageFits, tutorScheduleCapacity } from '@/lib/packageFit'
+import { ROLE } from '@/lib/roles'
 
 // The teacher's own packages. Mirrors app/api/tutor/consultations exactly —
 // same guard, same Georgian-text gate, same error shapes — because it is the
@@ -43,7 +44,7 @@ async function callerTutor(userId: string) {
 }
 
 export async function GET(req: Request) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   if (!packagesFeatureExists()) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
@@ -89,7 +90,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   if (!packagesFeatureExists()) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
   // A consultant cannot create a package even if an admin ticked the allowlist:
   // the product belongs to the type, not to the permission.
   if (tutor.profileType !== 'TEACHER') {
-    return NextResponse.json({ ok: false, error: 'NOT_TEACHER', message: 'პაკეტს მხოლოდ მასწავლებელი ქმნის.' }, { status: 403 })
+    return NextResponse.json({ ok: false, error: 'NOT_TEACHER', message: 'პაკეტს მხოლოდ ექსპერტი ქმნის.' }, { status: 403 })
   }
   if (!tutor.packagesEnabled) return NextResponse.json({ ok: false, error: 'NOT_ENABLED' }, { status: 403 })
 

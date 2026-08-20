@@ -9,7 +9,7 @@ import { ensureDbReady } from '@/lib/dbBoot'
 // image into the HTML: measured 2026-08-14, the moment nine posts got covers
 // the /blog document went to 622 KB — re-sent on every navigation and cacheable
 // by nothing. That is the exact measurement behind /api/avatars/[id] (a 556 KB
-// /tutors page of inline avatars) and /api/b2b-services/[id]/image. Behind this
+// /experts page of inline avatars) and /api/b2b-services/[id]/image. Behind this
 // route each cover is fetched once per (post, version) and then served from the
 // browser cache.
 //

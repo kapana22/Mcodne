@@ -79,13 +79,13 @@ export const Categories = ({ initialCategories = [] }: { initialCategories?: Hom
           {/* Only 6 of the 14 live spheres fit the grid — say where the rest are
               instead of leaving the row looking like the whole catalogue.
               HIDDEN <sm (2026-08-02): at 390px this link and the h2 shared one
-              flex row, so „ყველა სფერო" sat jammed against „აირჩიე შენი სფერო"
+              flex row, so „ყველა კატეგორია" sat jammed against „აირჩიე შენი კატეგორია"
               at the heading's own baseline — two different things reading as one
               broken line. Nothing is lost by dropping it there: the „ყველა
-              სფერო" nav directly below the tiles carries the same links, and on
+              კატეგორია" nav directly below the tiles carries the same links, and on
               mobile it is one thumb-flick away rather than a corner tap. */}
-          <Link href="/categories" className="hidden sm:inline-flex font-display text-small font-semibold text-brand-700 hover:text-brand-800 transition-colors duration-fast items-center h-11">
-            ყველა სფერო
+          <Link href="/experts" className="hidden sm:inline-flex font-display text-small font-semibold text-brand-700 hover:text-brand-800 transition-colors duration-fast items-center h-11">
+            ყველა კატეგორია
           </Link>
         </Reveal>
         {/* Tile = icon + name + one line. The two label strips that used to ride
@@ -102,12 +102,11 @@ export const Categories = ({ initialCategories = [] }: { initialCategories?: Hom
                  narrow enough that Georgian compounds („გადასახადები",
                  „მარკეტინგი") broke mid-word. Stacked, the name gets the full
                  column; from sm the row has the width to go horizontal. */
-              /* → /categories/<slug>, NOT /tutors?category=<slug>. The filtered
-                 listing canonicalises to /tutors, so every link into it dropped
-                 its equity on the floor while the real, indexable landing page
-                 got none. Same destination for the user, ranking value kept. */
-              <Link key={c.slug} href={`/categories/${c.slug}`} className="group relative overflow-hidden rounded-card border border-ink-200 bg-white p-4 sm:p-5 shadow-xs hover:border-brand-200 hover-lift motion-safe:active:scale-[0.99] flex flex-col sm:flex-row items-start gap-2.5 sm:gap-3.5 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
-                {/* Brand accent hairline — reveals on hover (matches /categories). */}
+              /* → /experts?category=<slug> (stage 8, 2026-08-19): /categories/*
+                 was retired and 308s to exactly this — the catalogue's own
+                 filter is the sphere page now. */
+              <Link key={c.slug} href={`/experts?category=${c.slug}`} className="group relative overflow-hidden rounded-card border border-ink-200 bg-white p-4 sm:p-5 shadow-xs hover:border-brand-200 hover-lift motion-safe:active:scale-[0.99] flex flex-col sm:flex-row items-start gap-2.5 sm:gap-3.5 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2">
+                {/* Brand accent hairline — reveals on hover. */}
                 <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-brand-500 transition-transform duration-mid ease-out-quart group-hover:scale-x-100" />
                 <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-btn flex items-center justify-center shrink-0 bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-900/[0.04] shadow-xs transition-all duration-mid ease-out-quart group-hover:text-brand-700 motion-safe:group-hover:scale-110 motion-safe:group-active:scale-105">
                   {categoryIcon(c.slug, 'w-5 h-5 sm:w-6 sm:h-6')}
@@ -137,13 +136,13 @@ export const Categories = ({ initialCategories = [] }: { initialCategories?: Hom
             SCOPE (2026-08-02): populated spheres only — see the setAllCats note
             above. „ყველა" now means every sphere you can actually book in. */}
         {untiledCats.length > 0 && (
-          <nav aria-label="ყველა სფერო" className="mt-6 sm:mt-8">
+          <nav aria-label="ყველა კატეგორია" className="mt-6 sm:mt-8">
             <Eyebrow tone="muted" className="mb-2.5"><SiteText k="home.categories.allEyebrow" /></Eyebrow>
             <ul className="flex flex-wrap gap-x-5 gap-y-2">
               {allCats.map(c => (
                 <li key={c.slug}>
                   <Link
-                    href={`/categories/${c.slug}`}
+                    href={`/experts?category=${c.slug}`}
                     // min-h-[40px] below sm: these are real navigation links and
                     // a 20px-tall text line is half the minimum touch target.
                     className="text-small text-ink-600 hover:text-brand-700 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 rounded-sm inline-flex items-center min-h-[40px] sm:min-h-0"

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { packagesFeatureExists, lessonsLeft } from '@/lib/packages'
+import { ROLE } from '@/lib/roles'
 
 // „ჩემი მოსწავლეები" — the roster. The teacher's real working surface once
 // packages are running: who is on one, how far through they are, when it runs
@@ -10,7 +11,7 @@ import { packagesFeatureExists, lessonsLeft } from '@/lib/packages'
 // relationship, not a list of discrete bookings.
 
 export async function GET() {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   if (!packagesFeatureExists()) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 

@@ -3,7 +3,7 @@ import { queryTutors } from '@/lib/tutorsQuery'
 import { EVENTS, normalizeQuery, track } from '@/lib/events'
 
 // Thin wrapper over the shared queryTutors() (lib/tutorsQuery) — the SAME
-// function the server-rendered /tutors page calls for its initial list, so the
+// function the server-rendered /experts page calls for its initial list, so the
 // SSR seed and every client refetch share one query + one output shape. This
 // route only parses searchParams; the query/shaping logic lives in the lib.
 export async function GET(req: Request) {

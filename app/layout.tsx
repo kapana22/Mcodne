@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   // and `max-snippet: -1` lifts the description cap on the same terms.
   //
   // It is safe site-wide: the pages that must NOT be indexed at all set their
-  // own `robots: { index: false }` (/signin, /signup, /ask, /business,
+  // own `robots: { index: false }` (/signin, /signup, /business,
   // /abroad), and an index:false page ignores preview limits entirely.
   robots: {
     index: true,

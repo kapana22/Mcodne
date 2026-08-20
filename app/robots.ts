@@ -12,17 +12,16 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: '*',
         allow: [
           '/',
-          '/tutors',
-          '/tutors/*',
-          // The trades vertical. Its own front door, indexable — unlike the
-          // intake it leads into, which stays dark.
-          '/services',
-          // The two SEO landing-page families: spheres and professions. Allowed
-          // by the bare '/' anyway — listed for the same explicitness as the rest.
-          '/categories',
-          '/categories/*',
-          '/konsultacia',
-          '/konsultacia/*',
+          // THE ONE CATALOGUE AND EVERYTHING UNDER IT — and since stage 11
+          // (2026-08-19) that is literally everything a visitor can browse.
+          // Four pages share the segment: the profession landing
+          // (/experts/<profession>), the trade landing (/experts/<trade>) and
+          // the two profiles, an expert's and a service one (/experts/<slug>).
+          // One Allow covers all four. /tutors, /masters, /services and every
+          // /services/<x> now 308 into this prefix, and a redirecting URL does
+          // not belong in an Allow.
+          '/experts',
+          '/experts/*',
           '/about',
           '/blog',
           '/contact',
@@ -30,7 +29,7 @@ export default function robots(): MetadataRoute.Robots {
           '/terms',
           '/privacy',
           '/cookies',
-          '/apply',
+          '/join',
           '/signin',
           // ⚠️ THE ONE /api PATH GOOGLE MUST REACH, and it has to out-rank the
           // `/api/*` Disallow below. Expert photos live in the database as
@@ -43,22 +42,27 @@ export default function robots(): MetadataRoute.Robots {
           // Google resolves Allow vs Disallow by LONGEST MATCH, so this beats
           // '/api/*' for these URLs and nothing else under /api opens up.
           '/api/avatars/',
+          // The same, for the trades side: a master's face and work photos are
+          // base64 columns served only by /api/masters/[id]/photo, which is
+          // what the service profile's og:image and JSON-LD point at
+          // (/experts/<slug>, 2026-08-19).
+          '/api/masters/',
         ],
         disallow: [
           '/admin',
           '/admin/*',
           '/api/*',
           '/api/dev/*',
-          '/student',
-          '/student/*',
-          // The expert WORKSPACE only. A bare '/tutor' is a PREFIX rule: it also
-          // matches /tutors and /tutors/{id} — the whole public catalog. Google
-          // resolves that by longest-match against the Allow rules above, but a
-          // first-match crawler would block the entire catalog. '/tutor$' pins the
-          // exact route; '/tutor/' covers everything under it without touching
-          // '/tutors…'. Never reintroduce a bare '/tutor' or '/tutor*'.
-          '/tutor$',
-          '/tutor/',
+          '/me',
+          '/me/*',
+          // The WORKSPACE only (/work — the expert's AND the master's, stage 6).
+          // Its predecessor was '/tutor', where a bare rule is a PREFIX rule
+          // that also matched /experts and /experts/{id} — the whole public
+          // catalog. Nothing public starts with /work today, but the same
+          // discipline: '/work$' pins the exact route; '/work/' covers
+          // everything under it. Never a bare '/work' or '/work*'.
+          '/work$',
+          '/work/',
           '/session/*',
           '/notifications',
           '/settings',

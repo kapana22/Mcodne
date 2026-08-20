@@ -9,6 +9,9 @@ import { safeStoredFileUrl } from '@/lib/safeUrl'
 import { preThreadInitiators } from '@/lib/preThreadInitiators'
 import { recomputeResponseTime } from '@/lib/responseTimeStore'
 import { avatarSrc } from '@/lib/avatarSrc'
+import { ROLE } from '@/lib/roles'
+import { requestAccessOf } from '@/lib/requestsServer'
+import { bookingInboxRow, inboxUnreadTotal, offerInboxRows, sortInboxRows } from '@/lib/inboxRows'
 
 // New-message email is NOT sent inline here anymore. Emailing the instant a
 // message arrives pings people who are actively reading in-app. Instead, the
@@ -63,11 +66,19 @@ export async function GET(req: Request) {
   // Threads-mode space filter. A dual-role user (STUDENT promoted to TUTOR) has
   // BOTH a client identity (bookings where they're the studentId, pre-booking
   // inquiries they started) and an expert identity (bookings on their
-  // TutorProfile, inquiries a client started with them). ?space=student|tutor
+  // TutorProfile, inquiries a client started with them). ?space=client|expert
   // scopes the inbox to one hat so the two spaces don't show the same merged
   // list. Absent → legacy union (kept for any un-scoped caller).
+  // ⚠️ RENAMED IN LOCK-STEP WITH lib/messagesUnread (stage 6, 2026-08-19):
+  // the values follow the spaces (/me = client, /work = expert). The old
+  // `student|tutor` are still accepted for one release — a browser holding a
+  // cached bundle from before the deploy must not lose its inbox — mapped
+  // onto the new pair here and nowhere else.
   const spaceParam = params.get('space')
-  const space = spaceParam === 'student' || spaceParam === 'tutor' ? spaceParam : null
+  const space: 'client' | 'expert' | null =
+    spaceParam === 'client' || spaceParam === 'student' ? 'client'
+    : spaceParam === 'expert' || spaceParam === 'tutor' ? 'expert'
+    : null
   // Incremental polling: with ?since=<ISO> the thread endpoints return ONLY
   // messages newer than that timestamp and skip re-sending the participant
   // header the client already holds — so a 20s poll with nothing new is a few
@@ -111,7 +122,7 @@ export async function GET(req: Request) {
     // another expert as a client) are both valid; STUDENT↔STUDENT (no expert)
     // and anything involving an ADMIN are not.
     const roles = new Set([(user as any).role, other.role])
-    if (!roles.has('TUTOR') || roles.has('ADMIN')) {
+    if (!roles.has(ROLE.EXPERT) || roles.has('ADMIN')) {
       return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
     }
 
@@ -125,7 +136,7 @@ export async function GET(req: Request) {
     // them, booking POST refuses them), so a cold ?withUser probe must not
     // resolve them either — while an EXISTING thread still passes (the check is
     // "do we already talk?"), so history never breaks under a suspension.
-    if (other.role !== 'TUTOR' || other.suspendedAt) {
+    if (other.role !== ROLE.EXPERT || other.suspendedAt) {
       const rel = await prisma.message.findFirst({
         where: { bookingId: null, OR: [{ fromId: user.id, toId: withUser }, { fromId: withUser, toId: user.id }] },
         select: { id: true },
@@ -257,7 +268,7 @@ export async function GET(req: Request) {
     const messages = initialLoadB ? messagesRaw.reverse() : messagesRaw
     const tMsgs = performance.now()
     const preThread = preFirst && (preFirst.fromId === user.id) === iAmStudent
-      ? { userId: otherId, href: `/${iAmStudent ? 'student' : 'tutor'}/messages/u/${otherId}` }
+      ? { userId: otherId, href: `/${iAmStudent ? 'me' : 'work'}/messages/u/${otherId}` }
       : null
 
     // Read receipts + notif cleanup were the chat's dominant latency: two WRITES
@@ -372,8 +383,8 @@ export async function GET(req: Request) {
     // never both (self-booking is refused). Scope to the active space.
     .filter(b => {
       const iAmStudent = b.studentId === user.id
-      if (space === 'student') return iAmStudent
-      if (space === 'tutor') return !iAmStudent
+      if (space === 'client') return iAmStudent
+      if (space === 'expert') return !iAmStudent
       return true
     })
     .map(b => {
@@ -399,7 +410,7 @@ export async function GET(req: Request) {
         unreadCount: b._count.messages,
         // Both sides open in their two-pane messages center now (the student
         // side used to deep-link to the booking-page #chat anchor).
-        href: iAmStudent ? `/student/messages/${b.id}` : `/tutor/messages/${b.id}`,
+        href: iAmStudent ? `/me/messages/${b.id}` : `/work/messages/${b.id}`,
       }
     })
 
@@ -468,8 +479,8 @@ export async function GET(req: Request) {
       // suppressing before the space check would fold a client-side inquiry
       // into an expert-side booking thread and count it in the wrong space.)
       const iAmClient = preInitiators.get(g.other.id) === user.id
-      if (space === 'student' && !iAmClient) return false
-      if (space === 'tutor' && iAmClient) return false
+      if (space === 'client' && !iAmClient) return false
+      if (space === 'expert' && iAmClient) return false
       // Then suppress: a booking thread with this same person already exists,
       // so the conversation shows there — folded, not dropped (below).
       return !bookingPartnerIds.has(g.other.id)
@@ -490,8 +501,8 @@ export async function GET(req: Request) {
   const preThreads = preSurviving
     .map(g => {
       // Deep-link into the space that matches my hat in THIS thread, not my
-      // global role (a dual-role expert's client inquiries must open in /student).
-      const area = preInitiators.get(g.other.id) === user.id ? 'student' : 'tutor'
+      // global role (a dual-role expert's client inquiries must open in /me).
+      const area = preInitiators.get(g.other.id) === user.id ? 'me' : 'work'
       return {
         key: `u-${g.other.id}`,
         bookingId: undefined as string | undefined,
@@ -519,8 +530,8 @@ export async function GET(req: Request) {
   for (const g of preByPartner.values()) {
     if (!g.unread) continue
     const iAmClient = preInitiators.get(g.other.id) === user.id
-    if (space === 'student' && !iAmClient) continue
-    if (space === 'tutor' && iAmClient) continue
+    if (space === 'client' && !iAmClient) continue
+    if (space === 'expert' && iAmClient) continue
     const host = bookingThreads
       .filter(t => t.otherId === g.other.id)
       .sort((a, z) => new Date(z.at).getTime() - new Date(a.at).getTime())[0]
@@ -529,13 +540,30 @@ export async function GET(req: Request) {
     host.unread = true
   }
 
+  // ── THE THIRD KIND: offer conversations (2026-08-19) ─────────────────────
+  // A provider used to talk to clients in two places — this inbox and a chat
+  // embedded in every row of /work/offers. One workspace with two inboxes is
+  // somebody not knowing where they were written to, so the LIST is one. The
+  // rows come back already MASKED (lib/inboxRows → offerPeerName: „კლიენტი"
+  // until that offer is ACCEPTED) — this endpoint never sees a phone.
+  //
+  // Supply side only: the client half of a request conversation lives in the
+  // client's own request room, keyed by a reference rather than by an account.
+  // `requestAccessOf` answers „is this account a provider" in one indexed
+  // lookup and returns [] for everybody else, so a plain client pays nothing.
+  const offerRows = space === 'client'
+    ? []
+    : await offerInboxRows(await requestAccessOf(user.id))
+
   const allThreads = [...bookingThreads, ...preThreads]
     .sort((a, z) => new Date(z.at).getTime() - new Date(a.at).getTime())
-  // unreadCount is the sidebar/badge number, so sum it over EVERY thread — an
-  // unread conversation older than the 20 most-recent must still be counted. The
-  // returned `threads` list itself is capped at 20 for payload size.
-  const unreadCount = allThreads.reduce((n, t) => n + t.unreadCount, 0)
-  const threads = allThreads.slice(0, 20)
+  // ONE ROW SHAPE, ONE ORDER, ONE NUMBER — lib/inboxRows. unreadCount is the
+  // sidebar/badge number, so it sums EVERY row, not the 20 that are returned:
+  // an unread conversation older than the most-recent 20 must still be counted,
+  // while the payload stays capped.
+  const allRows = sortInboxRows([...allThreads.map(bookingInboxRow), ...offerRows])
+  const unreadCount = inboxUnreadTotal(allRows)
+  const threads = allRows.slice(0, 20)
 
   return NextResponse.json({
     ok: true,
@@ -584,7 +612,7 @@ export async function POST(req: Request) {
     // be a TUTOR, and never an ADMIN. STUDENT→TUTOR and TUTOR→TUTOR (a dual-role
     // expert asking another expert as a client) are both valid.
     const roles = new Set([(user as any).role, other.role])
-    if (!roles.has('TUTOR') || roles.has('ADMIN')) {
+    if (!roles.has(ROLE.EXPERT) || roles.has('ADMIN')) {
       return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
     }
 
@@ -606,7 +634,7 @@ export async function POST(req: Request) {
     // This stops an expert cold-opening to a client (the old "reply-only" rule);
     // once a client has opened the thread, either side may continue freely —
     // an already-open conversation keeps working even if the expert is suspended.
-    if (isNewThread && (other.role !== 'TUTOR' || other.suspendedAt)) {
+    if (isNewThread && (other.role !== ROLE.EXPERT || other.suspendedAt)) {
       return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
     }
 
@@ -631,10 +659,10 @@ export async function POST(req: Request) {
 
     const preview = msg.body.length > 80 ? msg.body.slice(0, 77) + '…' : msg.body
     // Recipient opens the thread in the space matching THEIR hat: if I opened it
-    // I'm the client and they're the expert (tutor space); if they opened it
-    // they're the client (student space). Keyed by the OTHER user — from their
-    // view that is me (the sender).
-    const recipientArea = iInitiated ? 'tutor' : 'student'
+    // I'm the client and they're the expert (/work); if they opened it they're
+    // the client (/me). Keyed by the OTHER user — from their view that is me
+    // (the sender).
+    const recipientArea = iInitiated ? 'work' : 'me'
     after(async () => {
       await notify(toUserId, {
         type: 'MESSAGE_NEW',
@@ -647,7 +675,7 @@ export async function POST(req: Request) {
       // throws, no-ops without a TutorProfile, self-throttled to once per
       // 10 min per process (lib/responseTimeStore). Only for a TUTOR sender —
       // the role is already loaded on `user`, so the guard is free.
-      if ((user as any).role === 'TUTOR') await recomputeResponseTime(user.id)
+      if ((user as any).role === ROLE.EXPERT) await recomputeResponseTime(user.id)
     })
 
     return NextResponse.json({ ok: true, message: msg })
@@ -694,7 +722,7 @@ export async function POST(req: Request) {
       type: 'MESSAGE_NEW',
       title: `ახალი შეტყობინება — ${msg.from.fullName}`,
       body: preview,
-      href: isFromStudent ? `/tutor/messages/${b.id}` : `/student/messages/${b.id}`,
+      href: isFromStudent ? `/work/messages/${b.id}` : `/me/messages/${b.id}`,
     })
     // Sender is actively in the thread — clear any outstanding MESSAGE_NEW
     // notifs on their side for this booking. Matched on the bare booking id

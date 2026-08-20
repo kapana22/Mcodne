@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { EVENTS } from '@/lib/events'
+import { ROLE } from '@/lib/roles'
 
 // „PROFILE SIGNAL" — the expert-facing half of the insights the admin panel
 // already has. It exists to answer ONE question an approved expert currently
@@ -50,7 +51,7 @@ export type InsightsDays = (typeof ALLOWED_DAYS)[number]
 const ID_RE = /^[A-Za-z0-9_-]{6,64}$/
 
 export async function GET(req: Request) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
 

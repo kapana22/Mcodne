@@ -38,7 +38,7 @@ const SignInIntro = () => (
     </p>
 
     {/* Honest value points — no invented counts or stock (pravatar) faces. The
-        landing and /tutors deliberately removed exactly that pattern; sign-in,
+        landing and /experts deliberately removed exactly that pattern; sign-in,
         the last screen before a booking, must not reintroduce a trust lie. */}
     <ul className="mt-10 lg:mt-12 pt-8 border-t border-ink-200 space-y-4">
       {[
@@ -215,8 +215,8 @@ export const SignInView = ({ setView }: { setView: (v: View) => void }) => {
   // it had remembered the expert and the slot being held.
   const params = useSearchParams()
   const redirect = params?.get('redirect') || params?.get('next') || ''
-  const bookingIntent = redirect.includes('/tutors/')
-  const applyIntent = !bookingIntent && redirect.startsWith('/apply')
+  const bookingIntent = redirect.includes('/experts/')
+  const applyIntent = !bookingIntent && redirect.startsWith('/join')
   return (
   <Container as="main" id="main" className="relative pt-6 sm:pt-14 lg:pt-20 pb-16 sm:pb-20 lg:pb-24">
     {/* Mobile is form-first: the marketing intro (headline, avatars,

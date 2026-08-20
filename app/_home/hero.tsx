@@ -1,14 +1,15 @@
 'use client'
-// Home — the hero: headline, search, and the trust strip under it.
+// Home — the hero: the one question (SiteText), two doors, and the trust
+// strip above it. No search field (stage 9, 2026-08-19).
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { SiteText } from '@/components/SiteTextProvider'
-import { useRouter } from 'next/navigation'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { fmtRating } from '@/lib/fmt'
 import { CountUp } from '@/components/CountUp'
 import { Icon } from '@/components/Icon'
+import { Btn } from '@/components/Btn'
 import { Container } from '@/components/Container'
 import { Avatar } from '@/components/Avatar'
 import { GlyphBackdrop } from '@/components/home/GlyphBackdrop'
@@ -17,30 +18,6 @@ import { WordReveal } from '@/components/home/WordReveal'
 import { Expert, ROTATE_MS, VerifiedMark, mapTutorToExpert, shuffled } from './data'
 
 export const HomeHero = () => {
-  const router = useRouter()
-  const [query, setQuery] = useState('')
-  // Placeholder length is the only thing this drives. Starts false so the
-  // server render and the first client render agree (no hydration mismatch);
-  // the effect corrects it before anyone can read the field.
-  const [isNarrow, setIsNarrow] = useState(false)
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)')
-    const sync = () => setIsNarrow(mq.matches)
-    sync()
-    mq.addEventListener('change', sync)
-    return () => mq.removeEventListener('change', sync)
-  }, [])
-  // Span the spheres we actually serve (business/career/law/psychology/…),
-  // not just VC/tech — a startup-only list bounces the broader audience.
-  // SPHERES WE ACTUALLY STAFF. „ბიზნეს-სტრატეგია" and „კარიერა და CV" both
-  // landed on ZERO experts (measured 2026-07-31) — the first thing a visitor is
-  // invited to tap, and two of the three went nowhere. These are the real ones,
-  // linked by slug so the destination cannot mis-detect them.
-  const quickTopics: { label: string; slug: string }[] = [
-    { label: 'მარკეტინგი', slug: 'marketing' },
-    { label: 'გაყიდვები', slug: 'sales' },
-    { label: 'ფსიქოლოგიური მხარდაჭერა', slug: 'psychology' },
-  ]
   // Real featured tutors — replaces the previous hardcoded fixture that leaked
   // "გიორგი მელაძე" and other fake names to SSR HTML (crawler / social preview
   // saw them as real tutors). Starts empty so first paint has no fake identities.
@@ -145,7 +122,7 @@ export const HomeHero = () => {
             small enough to read as a thumbnail. The headline still leads; the
             card is now close enough in weight to be looked AT. */}
         <div className="relative z-10 grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-12 xl:gap-14 items-start">
-          {/* Left — headline + search + stats */}
+          {/* Left — headline, promise, the two doors */}
           <div className="min-w-0">
             {/* STEPPED DOWN ONE NOTCH, 2026-08-04 (44/52 → 36/44). The headline
                 is authored as TWO lines and the size is what keeps it there. It
@@ -181,71 +158,29 @@ export const HomeHero = () => {
               </LineReveal>
             </h1>
             {/* The hero arrives as ONE sequence, ~90ms apart: headline lines,
-                then the promise, then the field, then the topics. Each step is
+                then the promise, then the two doors. Each step is
                 the next thing you would read, so the motion follows the eye
                 instead of decorating the box. */}
             <p className="mt-5 sm:mt-6 text-body-lg sm:text-h3 text-ink-700 max-w-[520px] leading-[1.62] motion-safe:animate-rise-in" style={{ animationDelay: '180ms' }}>
               <SiteText k="home.hero.subtitle" /> <span className="font-display font-semibold text-ink-900"><SiteText k="home.hero.subtitleEmphasis" /></span>
             </p>
 
-            {/* Search bar */}
-            <div className="mt-7 sm:mt-8 max-w-[560px] motion-safe:animate-rise-in" style={{ animationDelay: '270ms' }}>
-              {/* Label/destination agreement (1.5): the button says „ექსპერტის
-                  ძიება", so the form goes to /tutors?q=…. /ask stays reachable
-                  via the secondary „დასვი კითხვა“ link below. */}
-              <form action="/tutors" method="get" onSubmit={e => { e.preventDefault(); router.push(query ? `/tutors?q=${encodeURIComponent(query)}` : '/tutors') }} className="rounded-card bg-white border border-ink-200 shadow-card p-2 flex flex-col sm:flex-row gap-2 focus-within:border-brand-400 focus-within:shadow-brand-glow transition-[box-shadow,border-color] duration-mid">
-                <div className="relative flex-1">
-                  <Icon.search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
-                  {/* Two placeholders, because a placeholder cannot ellipsize:
-                      the long one was cut dead at „…გადასახადი, კა" on a 390px
-                      screen, so the example list ended mid-word and read as a
-                      rendering fault. The wide one was ALSO clipped — measured
-                      at 1440px it ended on „…იურიდი", so the long version never
-                      fitted anywhere; it is now short enough to land whole. */}
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={e => setQuery(e.target.value)}
-                    name="q" aria-label="ექსპერტების ძებნა" placeholder={isNarrow ? 'რა გჭირდება?' : 'რა გჭირდება? მაგ. გადასახადი ან კარიერა'}
-                    className="w-full h-12 pl-11 pr-3 bg-transparent text-body-lg text-ink-900 placeholder:text-ink-400 focus:outline-none"
-                  />
-                </div>
-                <button type="submit" className="h-12 px-6 rounded-btn bg-gradient-cta hover:brightness-105 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center justify-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.4)] transition-all duration-fast">
-                  ძებნა
-                </button>
-              </form>
-              {/* The live „ამ კვირაში ღია დრო აქვს N ექსპერტს" line was removed
-                  2026-08-05 (owner's call). It was the only reader of
-                  `openThisWeek`, so the field is no longer pulled off the
-                  /api/tutors/stats payload either — the endpoint still returns
-                  it, and `total` / `avgRating` are still used below. */}
+            {/* ONE DOOR (2026-08-19, owner: „იყოს ამ ეტაპზე ექსპერტები
+                მხოლოდ"). It was two — „ექსპერტები" and „სერვისები" — and by
+                stage 10 both opened the SAME room, the second merely arriving
+                with a filter pre-ticked. A choice whose branches land in one
+                place is not a choice; it is a pause the visitor pays for, and
+                it re-stated the very split the product model retired: the type
+                belongs to what somebody OFFERS, never to what kind of person
+                they are. Do not add a second button back — if a view needs
+                narrowing, that is the catalogue's filter rail, one screen in.
 
-              {/* The topics land last, one after another — the sequence's tail.
-                  `stagger` gives each child its own delay; the wrapper delay
-                  hands over from the search field above. */}
-              {/* No „პოპულარული:" label. A row of tappable topics under a search
-                  field needs no introduction, and the word was the only thing
-                  forcing a fourth chip onto a second line — the block wrapped
-                  into a ragged two-row stack that read as a list of leftovers
-                  rather than as a row of shortcuts. */}
-              <div className="mt-4 flex items-center gap-2 flex-wrap motion-safe:stagger" style={{ animationDelay: '360ms' }}>
-                {quickTopics.map(t => (
-                  <Link key={t.slug} href={`/ask?q=${encodeURIComponent(t.label)}&cat=${encodeURIComponent(t.slug)}`} // h-10 below sm (28px missed the 40px tap floor on the surface most
-                    // likely to be used one-handed); the compact chip returns from sm up.
-                    className="h-10 sm:h-7 px-3 sm:px-2.5 rounded-pill bg-white/60 border border-ink-200 hover:bg-white hover:border-ink-300 text-meta font-display font-medium text-ink-700 transition-colors duration-fast inline-flex items-center">
-                    {t.label}
-                  </Link>
-                ))}
-              </div>
-              {/* One clear secondary action instead of a sentence with a link
-                  buried in the middle. „— ექსპერტი გიპასუხებს" restated the
-                  hero's whole promise a third time, four lines under it. */}
-              <div className="mt-4 text-small">
-                <Link href={query ? `/ask?q=${encodeURIComponent(query)}` : '/ask'} className="inline-flex items-center gap-1.5 min-h-[40px] sm:min-h-0 font-display font-semibold text-brand-700 hover:text-brand-800 transition-colors duration-fast">
-                  ვერ პოულობ? დაუსვი კითხვა ექსპერტს
-                  <Icon.arrow aria-hidden className="w-3.5 h-3.5" />
-                </Link>
-              </div>
+                No search field either (stage 9): the headline is the question,
+                and a box here would pre-answer it. */}
+            <div className="mt-7 sm:mt-8 flex flex-col sm:flex-row gap-3 motion-safe:animate-rise-in" style={{ animationDelay: '270ms' }}>
+              <Btn href="/experts" variant="hero" size="lg" className="sm:min-w-[220px]">
+                ექსპერტები
+              </Btn>
             </div>
 
             {/* The three-column claim row that sat here is GONE (2026-07-31).
@@ -297,7 +232,7 @@ export const HomeHero = () => {
                     Overlay → the profile, CTA → the profile with ?rebook=1. */}
                 {featured.id && (
                   <Link
-                    href={`/tutors/${featured.urlSlug || featured.id}`}
+                    href={`/experts/${featured.urlSlug || featured.id}`}
                     aria-label={`${featured.name} — პროფილი`}
                     className="absolute inset-0 z-10 rounded-[20px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
                   />
@@ -392,7 +327,7 @@ export const HomeHero = () => {
                   </div>
                   {/* ?rebook=1 opens the booking modal on arrival, so the CTA
                       label is honest — it books, not just views. */}
-                  <Link href={featured.id ? `/tutors/${featured.urlSlug || featured.id}?rebook=1` : '/tutors'} className="relative z-20 shrink-0 h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] motion-safe:active:scale-[0.97] transition-all duration-fast">
+                  <Link href={featured.id ? `/experts/${featured.urlSlug || featured.id}?rebook=1` : '/experts'} className="relative z-20 shrink-0 h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] motion-safe:active:scale-[0.97] transition-all duration-fast">
                     დაჯავშნე
                   </Link>
                 </div>
@@ -469,7 +404,7 @@ export const HomeHero = () => {
                     ? `${fmtRating(stats.avg)}★ საშუალო შეფასება`
                     : <SiteText k="home.hero.browseAll" />}
                 </div>
-                <Link href="/tutors" className="mt-0.5 inline-flex items-center gap-1 font-display text-meta font-semibold text-brand-700 hover:text-brand-800 transition-colors duration-fast">
+                <Link href="/experts" className="mt-0.5 inline-flex items-center gap-1 font-display text-meta font-semibold text-brand-700 hover:text-brand-800 transition-colors duration-fast">
                   ყველა ექსპერტი
                 </Link>
               </div>

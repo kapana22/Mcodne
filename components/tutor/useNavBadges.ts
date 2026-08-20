@@ -11,9 +11,13 @@ export type NavBadges = {
   // unbookable). NULL until the first response lands — consumers must treat
   // „unknown" differently from „has time", or they'd act on the initial zero.
   noAvailability: boolean | null
+  // The master's queue badge — verified requests with a place left. Counted
+  // once per page load by app/work/layout.tsx (server), not polled: it is
+  // seeded here so the sidebar reads every pill from one object.
+  openRequests: number
 }
 
-const ZERO: NavBadges = { requests: 0, messages: 0, reschedules: 0, profilePercent: null, noAvailability: null }
+const ZERO: NavBadges = { requests: 0, messages: 0, reschedules: 0, profilePercent: null, noAvailability: null, openRequests: 0 }
 
 /* Sidebar badge counts. Refreshes: on mount, every 60s while the tab is
    visible, on route change (so acting on a request clears its pill without
@@ -29,11 +33,15 @@ export function refreshNavBadges() {
     localStorage.setItem('mcodne:notif-check', String(Date.now()))
   } catch {}
 }
-export function useNavBadges(): NavBadges {
+export function useNavBadges(opts: { enabled?: boolean; openRequests?: number } = {}): NavBadges {
+  const { enabled = true, openRequests = 0 } = opts
   const [badges, setBadges] = useState<NavBadges>(ZERO)
   const path = usePathname()
 
   useEffect(() => {
+    // /api/tutor/nav-badges answers the EXPERT's counts and 403s anybody else;
+    // a WORK-only master in the shared shell has nothing to poll for.
+    if (!enabled) return
     let cancelled = false
     const load = () => {
       if (document.visibilityState === 'hidden') return
@@ -47,6 +55,7 @@ export function useNavBadges(): NavBadges {
             reschedules: d.reschedules ?? 0,
             profilePercent: typeof d.profilePercent === 'number' ? d.profilePercent : null,
             noAvailability: typeof d.noAvailability === 'boolean' ? d.noAvailability : null,
+            openRequests,
           })
         })
         .catch(() => {})
@@ -64,7 +73,7 @@ export function useNavBadges(): NavBadges {
       window.removeEventListener('storage', onStorage)
       window.removeEventListener('mcodne:badges-refresh', load)
     }
-  }, [path])
+  }, [path, enabled, openRequests])
 
-  return badges
+  return { ...badges, openRequests }
 }

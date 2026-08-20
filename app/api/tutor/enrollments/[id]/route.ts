@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { packagesFeatureExists, DEFAULT_VALID_DAYS } from '@/lib/packages'
+import { ROLE } from '@/lib/roles'
 
 // The teacher acts on one enrollment: accept (= mark paid, which starts the
 // clock) or decline.
@@ -18,7 +19,7 @@ import { packagesFeatureExists, DEFAULT_VALID_DAYS } from '@/lib/packages'
 const Body = z.object({ action: z.enum(['accept', 'decline']) })
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   if (!packagesFeatureExists()) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
@@ -94,7 +95,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       type: 'BOOKING_CREATED',
       title: 'პაკეტი აქტიურია',
       body: `${e.lessonsTotal} გაკვეთილი — დაგეგმე განრიგი`,
-      href: '/student',
+      href: '/me',
     }).catch(() => {})
   })
 

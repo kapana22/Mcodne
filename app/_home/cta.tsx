@@ -1,15 +1,16 @@
 'use client'
-// Home — the closing pair: „გააზიარე შენი ცოდნა“ and the illustration band
-// that ends the page beneath it.
+// Home — the closing band: „გააზიარე შენი ცოდნა“ (gated for existing experts)
+// with the illustration that ends the page beneath it. One section, one
+// component (`ClosingBand`) — 2026-08-19 the two were merged so the home page
+// carries six sections instead of seven; the copy, links and gate are unchanged.
 
 import Link from 'next/link'
 import { SiteText } from '@/components/SiteTextProvider'
-import { PAYMENTS_LIVE, COMMISSION_PCT, TUTOR_PAYOUT_PCT } from '@/lib/flags'
 import { Reveal } from '@/components/Reveal'
-import { CountUp } from '@/components/CountUp'
 import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
 import { IllustrationBand } from '@/components/Illustration'
+import { ApplyCtaGate } from '@/components/ApplyCtaGate'
 
 /* Testimonials removed (Phase 0.2): the previous section showed invented
    people with i.pravatar.cc stock faces and fabricated outcomes. It returns
@@ -36,79 +37,52 @@ import { IllustrationBand } from '@/components/Illustration'
    (A `{/* … *\/}` here is a SYNTAX error — a JSX comment cannot be the first
    thing inside an arrow function's parenthesised return. Keep it a /* *\/ block
    above the arrow.) */
-export const ExpertCta = () => (
-  <section className="relative bg-ink-50/50 grain">
-    <Container className="relative z-10 py-10 sm:py-12 lg:py-16">
-      <div className="grid lg:grid-cols-[1.4fr_1fr] gap-8 lg:gap-12 items-center">
-        <Reveal>
-          {/* Canon section-header pattern (eyebrow + heading), replacing the
-              bespoke badge — whose „ხელით მოდერაცია" tail also repeated the
-              „ყოველი ჯავშანი მოიცავს" cell directly above this section. */}
-          <Eyebrow className="mb-3"><SiteText k="home.expertCta.eyebrow" /></Eyebrow>
-          <h2 className="font-display text-h2 sm:text-display font-bold leading-[1.08] tracking-[-0.02em] text-ink-900">
-            <SiteText k="home.expertCta.title" /><br />
-            <span className="text-brand-600">გასამრჯელო — სესიის შემდეგ.</span>
-          </h2>
-          <p className="text-body-lg text-ink-700 mt-5 max-w-[520px] leading-relaxed">
-            {/* The commission clause was removed 2026-08-05 (owner) — with it
-                went the PAYMENTS_LIVE branch and the COMMISSION_PCT template,
-                which is exactly why this paragraph is editable now. */}
-            <SiteText k="home.expertCta.body" />
-          </p>
-          {/* One CTA. The „როგორ მუშაობს" button next to it pointed at /apply
-              too — the same destination twice reads as a choice and isn't one. */}
-          <Link href="/apply" className="tap-shrink mt-7 h-12 px-6 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center gap-2 transition-colors duration-fast">
-            <SiteText k="home.expertCta.cta" />
-          </Link>
-        </Reveal>
-        {/* One hairline lattice instead of three shadowed cards — the same three
-            facts, read as one object. Single-block reveal: the gap-px /
-            overflow-hidden lattice would clip per-cell staggered motion. */}
-        <Reveal delay={120} className="grid grid-cols-1 gap-px bg-ink-200 border border-ink-200 rounded-card overflow-hidden">
-          {visible => (
-            (PAYMENTS_LIVE
-              // No percentage in EITHER branch (2026-08-05): the payout share
-              // states the commission by subtraction (85% ⇒ 15%), which is the
-              // very thing this section no longer advertises.
-              ? [
-                  { n: null as number | null, txt: 'მალე', l: 'გასამრჯელო', s: 'სესიის დასრულების შემდეგ' },
-                  { n: null as number | null, txt: 'შენ', l: 'ადგენ ფასს', s: 'დროსა და თემას' },
-                  { n: null as number | null, txt: '60', l: 'წუთი სესია', s: 'ხანგრძლივობასა და ფასს შენ ადგენ' },
-                ]
-              // The cells state the DEAL, not today's till. „0% / 100%" was
-              // here until 2026-08-10 and it was the loudest zero-commission
-              // claim on the site — two numbers in stat type, with the real
-              // figure demoted to a caption. Owner: the 15% goes everywhere and
-              // the 0% goes nowhere.
-              : [
-                  { n: null as number | null, txt: `${COMMISSION_PCT}%`, l: 'საკომისიო', s: 'ონლაინ გადახდების ამოქმედების შემდეგ' },
-                  { n: null as number | null, txt: `${TUTOR_PAYOUT_PCT}%`, l: 'შენი ნაწილი', s: 'ფასს შენ ადგენ' },
-                  // Was „მალე / შემოსავალი" — a stat cell whose figure is the
-                  // word „soon". A number slot holding roadmap status is the
-                  // emptiest thing on the page; this states what the expert
-                  // actually controls today.
-                  { n: null as number | null, txt: '60', l: 'წუთი სესია', s: 'ხანგრძლივობასა და ფასს შენ ადგენ' },
-                ]
-            ).map((s, i) => (
-              <div key={i} className="bg-white px-5 py-4 flex items-baseline gap-4">
-                <div className="font-display text-h1 font-bold text-brand-600 tabular-nums tracking-tight leading-none shrink-0 min-w-[68px]">
-                  {/* Static number until scroll-enter (SSR/crawlers always see
-                      the real value — never a fake 0%), then CountUp 0→n. */}
-                  {s.n !== null
-                    ? (visible ? <CountUp value={s.n} from={0} duration={900} suffix="%" /> : <span className="tabular-nums">{s.n}%</span>)
-                    : s.txt}
-                </div>
-                <div className="min-w-0">
-                  <Eyebrow>{s.l}</Eyebrow>
-                  <div className="text-meta text-ink-600 mt-1 leading-snug">{s.s}</div>
-                </div>
-              </div>
-            ))
-          )}
-        </Reveal>
-      </div>
+const ExpertCta = () => (
+  <div className="relative grain">
+    <Container className="relative z-10 pt-12 sm:pt-16 pb-8 sm:pb-10">
+      {/* ⚠️ ONE CENTRED COLUMN — THE STATS LATTICE IS GONE (2026-08-19).
+          Owner, holding a screenshot of this band: „მარჯვენა მხარე მოვაშოროთ,
+          15 საკომისიო და ეგ ქარდი სრულად, და მარცხნივ რაც წარწერაა, ის ლამაზად
+          ცენტრში იქნება ფოტოსი."
+
+          The lattice printed „15% საკომისიო / 85% შენი ნაწილი / 60 წუთი სესია"
+          beside the invitation — so the first hard number an expert met on the
+          home page was what we take, stated in the same stat type as what they
+          keep, in the block whose job is to make them want to apply. The
+          commission is not hidden by removing it: it is in the help centre
+          (`COMMISSION_PCT`, pinned by tests/helpTopics) and in the terms, which
+          is where somebody looks for it, and it is stated before anybody is
+          asked to price anything.
+
+          What the removal leaves is the actual invitation, and a two-column
+          grid with one column left in it is not a layout — so the copy is now
+          one centred column over the full width, reading straight down into the
+          drawing that closes the page. `max-w` is the measure, not the grid: a
+          centred `text-display` line that runs the full 1280 is a banner, not a
+          sentence. */}
+      <Reveal className="mx-auto max-w-[680px] flex flex-col items-center text-center">
+        {/* Canon section-header pattern (eyebrow + heading), replacing the
+            bespoke badge — whose „ხელით მოდერაცია" tail also repeated the
+            „ყოველი ჯავშანი მოიცავს" cell directly above this section. */}
+        <Eyebrow className="mb-3"><SiteText k="home.expertCta.eyebrow" /></Eyebrow>
+        <h2 className="font-display text-h2 sm:text-display font-bold leading-[1.08] tracking-[-0.02em] text-ink-900 text-balance">
+          <SiteText k="home.expertCta.title" /><br />
+          <span className="text-brand-600">გასამრჯელო — სესიის შემდეგ.</span>
+        </h2>
+        <p className="text-body-lg text-ink-700 mt-5 max-w-[520px] leading-relaxed text-pretty">
+          {/* The commission clause was removed 2026-08-05 (owner) — with it
+              went the PAYMENTS_LIVE branch and the COMMISSION_PCT template,
+              which is exactly why this paragraph is editable now. */}
+          <SiteText k="home.expertCta.body" />
+        </p>
+        {/* One CTA. The „როგორ მუშაობს" button next to it pointed at /apply
+            too — the same destination twice reads as a choice and isn't one. */}
+        <Link href="/join" className="tap-shrink mt-7 h-12 px-6 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center gap-2 transition-colors duration-fast">
+          <SiteText k="home.expertCta.cta" />
+        </Link>
+      </Reveal>
     </Container>
-  </section>
+  </div>
 )
 
 /* ───── The page's closing image ─────
@@ -130,11 +104,15 @@ export const ExpertCta = () => (
    components/Illustration. No border either side: the footer below draws its
    own full-bleed hairline, and the tone step above IS the divider.
 
-   OUTSIDE `<ApplyCtaGate>` deliberately — an existing expert doesn't see the
-   „გახდი ექსპერტი" section, but the page still needs something between the
-   dark band and the footer. */
-export const JourneyBand = () => (
+   The illustration sits OUTSIDE `<ApplyCtaGate>` deliberately — an existing
+   expert doesn't see the „გახდი ექსპერტი" block, but the page still needs
+   something between the dark band and the footer. Both live in ONE section
+   (`bg-ink-75` — the paper tone the art was exported to, see above), so the
+   expert copy and the drawing read as one closing band, not two. */
+export const ClosingBand = () => (
   <section className="bg-ink-75">
+    {/* „გახდი ექსპერტი“ is meaningless for an existing expert/admin. */}
+    <ApplyCtaGate><ExpertCta /></ApplyCtaGate>
     <IllustrationBand name="consultationJourney" />
   </section>
 )

@@ -30,6 +30,8 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { requestsViewer } from '@/lib/requestsServer'
+import { isVertical } from '@/lib/requests'
+import { resolveRequestTarget } from '@/lib/requestTarget'
 import { RequestWizard } from './RequestWizard'
 
 // A dark page must never be pre-rendered into the build's static output — and
@@ -64,6 +66,30 @@ export default async function Page({ searchParams }: {
   // the search box has no business rendering a novel.
   const initialQuery = raw.trim().slice(0, 60)
 
+  // ⚠️ `?for=service` IS THE DOOR — the one thing the owner approved as option
+  // „ა" (2026-08-18): the entry point picks the vertical and the wizard never
+  // asks again. The trades surfaces set it (the catalogue's CTA via
+  // `REQUEST_HREF`, /experts/<trade>, /experts/<slug>, the home band's trade
+  // tiles); every other entry leaves it off and gets the expert side.
+  //
+  // Validated through `isVertical` rather than cast: this is a URL anybody can
+  // craft, and an unrecognised value must fall back to a working screen rather
+  // than index into VERTICAL_COPY with undefined and blank the first question.
+  const forParam = typeof sp.for === 'string' ? sp.for.trim().toUpperCase() : ''
+  const vertical = isVertical(forParam) ? forParam : 'EXPERT'
+
+  // ⚠️ `?to=<slug>` IS WHO IT GOES TO (2026-08-19) — the parameter that turns
+  // this form from „post into the void and hope" into „hire this person". A
+  // profile CTA carries its own slug (app/experts/[slug]/_providerCta, the expert rail),
+  // this resolves it against the SAME visibility rule the catalogue uses, and
+  // the wizard names the recipient in its chrome.
+  //
+  // ⚠️ AN UNKNOWN, HIDDEN OR MISTYPED `to` IS SIMPLY IGNORED — never a 404. The
+  // form has to work for everybody who reaches it, and taking the whole intake
+  // away because a decoration did not resolve is the trade nobody would make.
+  // See lib/requestTarget; the door decides which namespace is asked first.
+  const target = await resolveRequestTarget(typeof sp.to === 'string' ? sp.to : null, vertical)
+
   // The three fields the contact screen would otherwise ask a signed-in person
   // to retype. Passed down rather than fetched by the wizard — see the prop's
   // note in RequestWizard, and app/request/_model → withAccountContact for the
@@ -71,6 +97,13 @@ export default async function Page({ searchParams }: {
   return (
     <RequestWizard
       initialQuery={initialQuery}
+      vertical={vertical}
+      // Only what the browser has any use for: a public slug, a name to print,
+      // a photo route and the topics that narrow one screen. Never the user id
+      // the INVITED offer is written with — the endpoint resolves that itself.
+      to={target
+        ? { slug: target.slug, name: target.name, photoSrc: target.photoSrc, topics: target.topics }
+        : null}
       account={viewer.user
         ? { fullName: viewer.user.fullName, phone: viewer.user.phone, email: viewer.user.email }
         : null}

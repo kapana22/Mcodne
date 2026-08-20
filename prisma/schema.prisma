@@ -159,6 +159,7 @@ model User {
   requestMessages   RequestMessage[]
   requestAccess     RequestAccess?
   serviceProfile    ServiceProfile?
+  masterApplication MasterApplication?
 
   // Admin filters + list order-by
   @@index([role])
@@ -565,16 +566,21 @@ model AvailabilitySlot {
   tutorId String
   startAt DateTime
   endAt   DateTime
-  // LEGACY. Nothing claims a window any more — a booking's own [startAt, end)
-  // is the single source of "busy". Kept only so old rows (and the wire shape
-  // /api/tutors/[id] still emits) stay valid; never written true for new rows.
-  booked  Boolean      @default(false)
+  // RETIRED (stage 11, 2026-08-19). Nothing claims a window any more — a
+  // booking's own [startAt, end) is the single source of "busy". No code reads
+  // or writes this column since stage 11; `@ignore` drops it from the Prisma
+  // client while the COLUMN STAYS (DEFAULT false, so creates are fine). It may
+  // be dropped by hand — `ALTER TABLE "AvailabilitySlot" DROP COLUMN "booked"`
+  // — once no old instance runs; a rolling deploy still has the previous
+  // instance writing it, which is why tonight only the code went. The wire
+  // shape /api/tutors/[id] emits still carries `booked: false` for old clients.
+  booked  Boolean      @default(false) @ignore
   tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
 
   @@index([tutorId, startAt])
   // Legacy companion of the `booked` column (the old browse "next free slot"
   // query). Kept so no db push is needed; the new browse query rides
-  // [tutorId, startAt] above.
+  // [tutorId, startAt] above. Goes with the column when it is dropped by hand.
   @@index([tutorId, booked, startAt])
 }
 
@@ -600,8 +606,8 @@ model Booking {
   payoutStatus   PayoutStatus  @default(PENDING)
   // LEGACY. Bookings no longer claim an AvailabilitySlot — availability rows are
   // windows and this booking's own [startAt, startAt+durationMin) IS the busy
-  // interval. Always `null` for new bookings; kept (and still released) so old
-  // rows that DID flip a slot's `booked` get it freed on cancel/decline/cleanup.
+  // interval. Always `null` for new bookings; cancel/decline/cleanup only null
+  // it (the `booked` flag it used to release is retired — stage 11).
   heldSlotId     String?
   studentNotes   String?
   tutorNotes     String?
@@ -664,7 +670,7 @@ model Booking {
   enrollment         Enrollment?         @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
   messages           Message[]
   review             Review?
-  rescheduleRequests RescheduleRequest[]
+  legacyRescheduleRequests LegacyRescheduleRequest[]
   dispute            Dispute?
 
   @@index([serviceType])
@@ -725,9 +731,15 @@ model Message {
 
 model Review {
   id                String    @id @default(cuid())
-  bookingId         String    @unique
+  /// ONE of bookingId / offerId is set (CHECK in lib/dbBoot). A review of a
+  /// consultation hangs off the booking; a review of a job (stage 7, 2026-08-19)
+  /// hangs off the accepted offer. Made nullable by the ONE real column
+  /// migration in the restructuring — an ALTER, not a @map.
+  bookingId         String?   @unique
+  offerId           String?   @unique
   studentId         String
-  tutorId           String
+  /// Nullable for the same reason: a job review has no TutorProfile.
+  tutorId           String?
   rating            Int
   body              String
   // Multi-dimensional ratings (1..5). Overall `rating` is derived (avg).
@@ -742,9 +754,10 @@ model Review {
 
   // Default Restrict — reviews are permanent record; /api/me DELETE refuses
   // accounts with review history rather than cascade-deleting it.
-  booking Booking      @relation(fields: [bookingId], references: [id])
+  booking Booking?     @relation(fields: [bookingId], references: [id])
+  offer   RequestOffer? @relation(fields: [offerId], references: [id])
   student User         @relation("ReviewsGiven", fields: [studentId], references: [id])
-  tutor   TutorProfile @relation(fields: [tutorId], references: [id])
+  tutor   TutorProfile? @relation(fields: [tutorId], references: [id])
 
   @@index([tutorId, createdAt])
   // "reviews written by this student" + FK maintenance on user delete
@@ -815,11 +828,14 @@ enum RescheduleStatus {
   CANCELLED
 }
 
-// ⚠️ UNUSED — do not write to this model. The live reschedule feature stores its
-// pending proposal in Booking."rescheduleRequest" (a dbBoot-added JSONB column,
-// accessed via raw SQL), NOT in this relational table. Kept only to avoid a
-// destructive prod `db push` drop; treat the JSONB column as the source of truth.
-model RescheduleRequest {
+// ⚠️ LEGACY / UNUSED — do not write to this model. The live reschedule feature
+// stores its pending proposal in Booking."rescheduleRequest" (a dbBoot-added
+// JSONB column, accessed via raw SQL), NOT in this relational table. Kept only
+// to avoid a destructive prod `db push` drop; treat the JSONB column as the
+// source of truth. Renamed in the client to `LegacyRescheduleRequest` (stage 11,
+// 2026-08-19) so `prisma.legacyRescheduleRequest` reads as what it is; the TABLE
+// name is unchanged via @@map — no DDL.
+model LegacyRescheduleRequest {
   id           String           @id @default(cuid())
   bookingId    String
   proposedBy   String           // userId of proposer (student or tutor)
@@ -834,6 +850,7 @@ model RescheduleRequest {
 
   @@index([bookingId, status])
   @@index([status, createdAt])
+  @@map("RescheduleRequest")
 }
 
 // Formal dispute filed by student against a booking. Different from cancel:
@@ -1253,6 +1270,12 @@ enum ServiceRequestStatus {
 // `ServiceRequestStatus` below stays an enum on purpose — a lifecycle is closed,
 // kind-independent, and is exactly what the database should be guarding.
 
+/// See RequestOffer.kind.
+enum RequestOfferKind {
+  QUOTE
+  BOOKING
+}
+
 enum RequestOfferStatus {
   /// ⚠️ THE CLIENT WROTE FIRST, AND THERE IS NO OFFER YET (2026-08-18).
   ///
@@ -1518,6 +1541,17 @@ model RequestOffer {
 
   status RequestOfferStatus @default(SENT)
 
+  /// QUOTE = a price for a job (accepting marks the work as agreed; the client
+  /// later says „დასრულდა"); BOOKING = an offer that, accepted, creates a
+  /// Booking (the consultation path). Stage 7, 2026-08-19.
+  kind RequestOfferKind @default(QUOTE)
+  /// Completion of a QUOTE: who pressed „დასრულდა" and when; closedAt = the
+  /// silent close after the 14-day reminder. No Job table on purpose (§3.3).
+  doneAt   DateTime?
+  doneBy   String?
+  closedAt DateTime?
+  review   Review?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1630,6 +1664,94 @@ model RequestMessage {
 //
 // `active` rather than a delete: turning somebody off is a decision worth being
 // able to see and reverse, and the `note` beside it says why.
+/// ⚠️ ENUM VALUES ARE THE SAME FOUR A TUTOR APPLICATION USES — reusing
+/// `ApplicationStatus` deliberately, so „SUBMITTED" means the same thing in
+/// both admin queues and a reviewer does not have to hold two vocabularies.
+
+/// WHO IS APPLYING — a person with a toolbox, or a firm with vans.
+///
+/// Owner, 2026-08-17: „რეგისტრაციას უნდა გავითვალისწინოთ ორი რამე — ერთი
+/// როგორც ბიზნესი, მეორე როგორც ინდივიდუალური." It is not a cosmetic label:
+/// a firm owes us a name and a tax id and is answerable as an entity, while a
+/// one-man plumber owes us a face and is answerable as himself. The two
+/// therefore collect different fields and, at approval, hang their
+/// `ServiceProfile` off different columns — `companyId` or `userId`.
+enum MasterKind {
+  INDIVIDUAL
+  COMPANY
+}
+
+/// A TRADESPERSON ASKING TO BE LISTED — the object that did not exist.
+///
+/// ⚠️ WHY THIS IS A SEPARATE MODEL AND NOT A FLAG ON TutorApplication.
+/// They share a shape and almost nothing else. An expert application is
+/// judged on credentials — a diploma, a bar number, a headline, an hourly
+/// rate — and grants `role: TUTOR` plus a public `TutorProfile` with
+/// consultations and a calendar. A master's is judged on trade, area and
+/// whether the face is real, and grants a `RequestAccess` row plus a
+/// `ServiceProfile`. Folding them together would mean a `kind` check on every
+/// one of the ten approval steps in /api/applications/[id], which is the
+/// version of this that gets one branch wrong in silence.
+///
+/// ⚠️ THIS ROW CARRIES BASE64 IMAGES AND MUST NEVER BE IN A LIST PAYLOAD.
+/// `photoUrl` and `workPhotos` are data URIs — the site has no object storage
+/// (see /api/uploads), so an image IS the column. The admin list therefore
+/// `omit`s them and loads them per opened row, exactly as the tutor queue
+/// already does with `idDocUrl`/`certificates`. Forget this and the
+/// moderation tab ships twenty megabytes to draw twenty names.
+model MasterApplication {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind MasterKind @default(INDIVIDUAL)
+
+  /// The person we will be speaking to, in both cases — a firm still has
+  /// somebody who answers the phone, and „the company" cannot be called.
+  fullName String
+  phone    String
+
+  /// COMPANY only. Enforced in lib/masterApplication, not by the column: a
+  /// draft that switches kind mid-form must not lose what was typed.
+  companyName String?
+  taxId       String?
+
+  /// Topic ids of `kind: SERVICE` and CityName values — the SAME vocabulary a
+  /// request is written in, so approval can copy them into `ServiceProfile`
+  /// verbatim and routing stays an equality test. Validated on write.
+  services String[]
+  areas    String[]
+
+  /// „12 წელი ვმუშაობ სანტექნიკაზე, ვმუშაობ თბილისში და რუსთავში." Free text,
+  /// shown to clients after approval.
+  about    String
+  yearsExp Int?
+
+  /// Indicative, both nullable — „ask" is an honest answer for a trade where
+  /// the price depends on what is behind the wall.
+  calloutFee Int?
+  priceFrom  Int?
+
+  /// The face, or the logo when kind = COMPANY. One image, 512×512 webp data
+  /// URI, produced by /api/uploads?kind=avatar.
+  photoUrl String?
+
+  /// Photos of finished work. Array of data URIs — capped hard in
+  /// lib/masterApplication, because there is no object storage to spill into.
+  workPhotos String[]
+
+  status        ApplicationStatus @default(SUBMITTED)
+  /// The reviewer's reason. Shown to the applicant on NEEDS_REVISION and
+  /// REJECTED — unlike RequestAccess.note, which never is.
+  moderatorNote String?
+  reviewedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
 model RequestAccess {
   id String @id @default(cuid())
 
@@ -1775,6 +1897,44 @@ model ServiceProfile {
   calloutFee Int?
   /// „50₾-დან" — the same, for the work itself.
   priceFrom  Int?
+
+  /// THE FACE ON THE CARD — or the logo, when this profile belongs to a company.
+  ///
+  /// ⚠️ IT IS A BASE64 DATA URI AND IT MUST NEVER BE SELECTED INTO A LIST. The
+  /// site has no object storage (see /api/uploads), so the image IS the column:
+  /// a 512×512 webp is ~40–200KB, and /services draws up to 60 of these. The
+  /// listing therefore selects `hasPhoto` — a computed boolean — and the card
+  /// points at /api/masters/[id]/photo, which serves one image with a cache
+  /// header. This is the pattern B2BService.imageUrl already uses, and the
+  /// reason it exists there is the same reason it exists here.
+  photoUrl String?
+
+  /// „12 წელია ვმუშაობ სანტექნიკაზე." Copied from the application at approval
+  /// and editable afterwards. Without it a card is a name and a list of tags,
+  /// which is what /services was and why it read as a directory of nobody.
+  about String?
+
+  /// PHOTOS OF FINISHED WORK.
+  ///
+  /// ⚠️ THE APPLICATION COLLECTED THESE AND APPROVAL THREW THEM AWAY
+  /// (2026-08-18). `MasterApplication.workPhotos` has held up to six since the
+  /// intake shipped — uploaded one at a time, thumbnails, a delete on each —
+  /// and there was no column here to copy them into, so the only place they
+  /// were ever seen was the admin drawer. Real effort from the applicant,
+  /// nothing back.
+  ///
+  /// ⚠️ AND LIKE `photoUrl`, THESE ARE BASE64 AND MUST NEVER BE SELECTED INTO A
+  /// LIST. Six of them is roughly a megabyte per master. The catalogue selects
+  /// neither; a profile page, when one exists, will serve them one at a time
+  /// through /api/masters/[id]/photo's sibling.
+  workPhotos String[]
+  /// Public address (stage 5, 2026-08-19): /services/<slug>. Its OWN namespace —
+  /// uniqueness is per table, so this never collides with TutorProfile.slug and
+  /// the two never share a URL prefix (§3.5 of the restructuring plan).
+  slug      String?  @unique
+  /// Listed in the catalogue and reachable at /services/<slug>. Approval sets
+  /// it; the master (or an admin) can take the page down without losing the row.
+  published Boolean  @default(true)
 
   /// Off without deleting: a master on holiday stops being routed to and keeps
   /// their list. Separate from `RequestAccess.active`, which is the admin's

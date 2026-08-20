@@ -121,7 +121,7 @@ export async function GET(req: Request) {
   // one is debuggable. One row per person actually notified, written by
   // lib/requestJobs at the moment it happened.
   //
-  // The href carries the request id (`/provider/requests/<id>`), which is what
+  // The href carries the request id (`/work/requests/<id>`), which is what
   // makes this joinable at all — there is no notification→request foreign key,
   // deliberately, because a Notification belongs to no subsystem.
   const notified = requests.length

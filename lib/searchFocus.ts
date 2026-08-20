@@ -37,4 +37,4 @@ export function focusSearchInput(): boolean {
 }
 
 /** Where `/` sends someone whose current page has no search box. */
-export const SEARCH_FALLBACK_HREF = '/tutors?focus=search'
+export const SEARCH_FALLBACK_HREF = '/experts?focus=search'

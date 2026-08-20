@@ -13,10 +13,10 @@ import { ExpertGrid, type GridExpert } from '@/components/home/ExpertGrid'
 import { categoryIcon } from '@/lib/categoryMarks'
 
 /* ───── Expert card ─────
-   The COMPACT HORIZONTAL card /tutors ships (2026-07-27): a fixed square thumb
+   The COMPACT HORIZONTAL card /experts ships (2026-07-27): a fixed square thumb
    on the left, content on the right, price + two actions on a bottom strip —
    ONE layout at every breakpoint. Deliberately MIRRORED, not imported:
-   app/tutors/client.tsx's card also carries browse-only machinery (favourite
+   app/experts/client.tsx's card also carries browse-only machinery (favourite
    toggle, hover-video, booking modal) that the home page has no business
    shipping. What must stay identical is the discipline — photo size,
    information order, „ახალი" for an unrated expert, an availability-gated CTA
@@ -58,7 +58,7 @@ export const FeaturedExperts = () => {
           urlSlug: t?.slug ?? null,
           slug: t?.category?.slug ?? '',
           name: t?.user?.fullName ?? 'ექსპერტი',
-          // Real category or nothing — see app/tutors/_data.tsx.
+          // Real category or nothing — see app/experts/_data.tsx.
           cat: t?.category?.name ?? '',
           headline: t?.headline ?? '',
           /* PRICE AND DURATION FROM THE SAME TIER. The duration was already
@@ -140,7 +140,7 @@ export const FeaturedExperts = () => {
         {spheres.length > 1 && (
           <div
             role="group"
-            aria-label="სფეროს ფილტრი"
+            aria-label="კატეგორიის ფილტრი"
             className="mb-6 lg:mb-8 flex items-center gap-2 flex-nowrap sm:flex-wrap overflow-x-auto sm:overflow-visible -mx-6 sm:mx-0 px-6 sm:px-0 pb-1 sm:pb-0 snap-x sm:snap-none"
           >
             {[{ slug: 'all', name: 'ყველა', n: (all ?? []).length }, ...spheres].map(s => {
@@ -180,7 +180,7 @@ export const FeaturedExperts = () => {
           {all !== null && shown.length === 0 ? (
             <div className="py-14 px-6 text-center rounded-card border border-dashed border-ink-200 bg-white">
               <div className="font-display text-body-lg font-bold text-ink-900"><SiteText k="home.experts.empty" /></div>
-              <Link href="/tutors" className="tap-shrink mt-4 inline-flex items-center gap-1.5 h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide transition-colors duration-fast">
+              <Link href="/experts" className="tap-shrink mt-4 inline-flex items-center gap-1.5 h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide transition-colors duration-fast">
                 ყველა ექსპერტი
               </Link>
             </div>
@@ -191,7 +191,7 @@ export const FeaturedExperts = () => {
 
         <div className="mt-9 flex justify-center">
           <Link
-            href={activeSphere ? `/tutors?cats=${encodeURIComponent(activeSphere.slug)}` : '/tutors'}
+            href={activeSphere ? `/experts?cats=${encodeURIComponent(activeSphere.slug)}` : '/experts'}
             className="h-12 px-6 rounded-btn bg-white border border-ink-200 hover:border-ink-300 hover:bg-ink-50 text-ink-900 font-display text-small font-semibold tracking-wide inline-flex items-center gap-2 transition-colors duration-fast"
           >
             {activeSphere ? `ყველა — ${activeSphere.name}` : <SiteText k="home.experts.allCta" />}

@@ -54,7 +54,7 @@ const breadcrumbLd = {
    resolves, which is (a) the flip that docblock says the header must never do
    and (b) a real hydration mismatch: measured on production 2026-08-13, this
    page threw React #418 on 2 of 3 cold loads, with the SSR text missing
-   „შესვლა" that the client then inserted. /tutors and / already pass it. */
+   „შესვლა" that the client then inserted. /experts and / already pass it. */
 export default async function Page() {
   const initialUser = await getCurrentUser()
   return (

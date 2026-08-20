@@ -57,7 +57,7 @@ export const APPLY = {
 /** Server field name → the words the applicant sees on the form. */
 export const APPLY_FIELD_LABEL: Record<string, string> = {
   fullName: 'სახელი და გვარი',
-  specialty: 'სფერო',
+  specialty: 'კატეგორია',
   motivation: 'მოკლე აღწერა',
   hourlyRate: 'ფასი',
   yearsExp: 'გამოცდილება',
@@ -94,8 +94,8 @@ export function nameError(raw: string, label = 'სახელი და გვ
 
 export function specialtyError(raw: string): string | null {
   const v = (raw ?? '').trim()
-  if (v.length < APPLY.SPECIALTY_MIN) return 'აირჩიე სფერო.'
-  if (v.length > APPLY.SPECIALTY_MAX) return `სფერო ძალიან გრძელია — მაქსიმუმ ${APPLY.SPECIALTY_MAX} სიმბოლო.`
+  if (v.length < APPLY.SPECIALTY_MIN) return 'აირჩიე კატეგორია.'
+  if (v.length > APPLY.SPECIALTY_MAX) return `კატეგორია ძალიან გრძელია — მაქსიმუმ ${APPLY.SPECIALTY_MAX} სიმბოლო.`
   return null
 }
 
@@ -113,11 +113,11 @@ export function specialtyError(raw: string): string | null {
 export function otherCatError(raw: string | null | undefined): string | null {
   const v = (raw ?? '').trim()
   if (!v) return null
-  if (v.length < APPLY.SPECIALTY_MIN) return 'სფერო ერთი სიტყვით მაინც დაწერე.'
+  if (v.length < APPLY.SPECIALTY_MIN) return 'კატეგორია ერთი სიტყვით მაინც დაწერე.'
   if (v.length > APPLY.OTHER_CAT_MAX) {
     return `მოკლედ დაწერე — მაქსიმუმ ${APPLY.OTHER_CAT_MAX} სიმბოლო (ახლა ${v.length}). მაგ. „დიეტოლოგია“.`
   }
-  return georgianError('სფერო', checkGeorgian(v))
+  return georgianError('კატეგორია', checkGeorgian(v))
 }
 
 /** `min` differs by side: the form asks 40, the API accepts 20. See APPLY. */

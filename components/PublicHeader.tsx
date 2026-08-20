@@ -7,7 +7,7 @@ import type { Me } from '@/lib/me'
 // renders the correct auth state on the FIRST paint — no client-side flip.
 //
 // Use this on SERVER-rendered public pages (marketing pages, and the server
-// wrappers of /tutors and /tutors/[id]). Client-only pages (home, /ask) render
+// wrappers of /experts and /experts/[slug]). Client-only pages (home) render
 // <PublicTopBar/> directly and fall back to the deduped client probe; the
 // uniform nav means there's no rearrange there either.
 //

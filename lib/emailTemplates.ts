@@ -128,7 +128,7 @@ export function welcomeEmail(name: string) {
       bodyHtml:
         p('დარეგისტრირდი <b>მცოდნეზე</b> — აქ შენს საკითხზე პირდაპირ ექსპერტს ესაუბრები.') +
         p('აირჩიე ექსპერტი, დაჯავშნე დრო და ისაუბრე ვიდეოზე.'),
-      cta: { label: 'იპოვე ექსპერტი', href: `${BASE}/tutors` },
+      cta: { label: 'იპოვე ექსპერტი', href: `${BASE}/experts` },
     }),
   }
 }
@@ -168,7 +168,7 @@ export function newApplicationAdminEmail(o: {
   yearsExp?: number | null; rate?: number | null; email?: string | null; phone?: string | null
 }) {
   const rows: { label: string; value: string }[] = [
-    { label: 'სფერო', value: o.specialty || '—' },
+    { label: 'კატეგორია', value: o.specialty || '—' },
     { label: 'გამოცდილება', value: o.yearsExp != null ? `${o.yearsExp} წელი` : '—' },
     { label: 'ფასი', value: o.rate != null ? `₾${o.rate}` : '—' },
     { label: 'ქალაქი', value: o.city || '—' },
@@ -188,6 +188,102 @@ export function newApplicationAdminEmail(o: {
   }
 }
 
+/* ═══════════ THE TRADES QUEUE ═══════════════════════════════════════════ */
+
+// ⚠️ THESE FOUR EXIST BECAUSE THE TRADES SIDE HAD NO EMAIL AT ALL (2026-08-18).
+//
+// Every master-side notification was a bell row and nothing else — and the bell
+// is only drawn on /student, /tutor, /notifications and the public pages, not
+// inside /provider. So an approval reached a person only if they happened to
+// come back and look. The expert queue solved this in August and wrote the
+// reason down beside its own send: „the in-app bell only lands if they come
+// back on their own." The same sentence applies here and was not acted on.
+//
+// It matters more here than there. An expert who misses their approval loses a
+// day; a master who misses theirs is the supply side of a vertical that has no
+// supply, and they are the person we asked to upload a photo of their face.
+
+export function newMasterApplicationAdminEmail(o: {
+  name: string; kind: string; company?: string | null
+  services: string[]; areas: string[]; phone?: string | null; email?: string | null
+}) {
+  const rows: { label: string; value: string }[] = [
+    { label: 'ტიპი', value: o.company ? `${o.kind} — ${o.company}` : o.kind },
+    { label: 'სერვისები', value: o.services.join(', ') || '—' },
+    { label: 'ქალაქი', value: o.areas.join(', ') || '—' },
+    { label: 'ტელეფონი', value: o.phone || '—' },
+    { label: 'ელფოსტა', value: o.email || '—' },
+  ]
+  return {
+    // The name rides in the subject, so strip CR/LF — header injection here
+    // would be user-controlled. Same rule as the expert queue's version.
+    subject: `ახალი განაცხადი — სერვისი — ${String(o.name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 60)}`,
+    html: shell({
+      heading: 'ახალი განაცხადი მოდერაციაში',
+      bodyHtml: p(`<b>${esc(o.name)}</b> გამოგზავნა განაცხადი ხელოსნად.`) + detail(rows),
+      cta: { label: 'გახსენი მოდერაცია', href: `${BASE}/admin#masters` },
+      footerNote: 'ადმინის შეტყობინება',
+    }),
+  }
+}
+
+// ⚠️ THE APPROVAL MAIL CARRIES THE LINK TO THE WORKSPACE, and that link is the
+// whole point of the message. /provider is reachable from nowhere on the site —
+// not the header, not the user menu — so until this mail existed an approved
+// master's only route in was to guess the URL or wait for the next sign-in.
+export function masterApprovedEmail(o: { name: string; note?: string | null }) {
+  const first = (o.name || '').trim().split(/\s+/)[0] || ''
+  return {
+    subject: 'დამტკიცდი — მოთხოვნები უკვე მოგდის',
+    html: shell({
+      heading: first ? `${esc(first)}, დამტკიცდი` : 'დამტკიცდი',
+      bodyHtml:
+        p('შენი მიმართულების და შენს ქალაქში გამოგზავნილი მოთხოვნები ახლა შენთან მოდის.') +
+        p('გახსენი სია, წაიკითხე და ფასი თვითონ დაწერე. სხვა ხელოსნები შენს შეთავაზებას ვერ ხედავენ.') +
+        (o.note ? p(`<span style="color:${MUTED};">კომენტარი:</span> ${esc(o.note)}`) : ''),
+      // ⚠️ THROUGH SIGN-IN, NOT DIRECT — and this mail is exactly the case the
+      // rule was written for. Every /provider surface answers notFound() rather
+      // than redirecting (a redirect would tell a stranger the page is real),
+      // so a master reading this on a phone where they are not signed in would
+      // tap „გახსენი მოთხოვნები" and land on „page not found" — about the
+      // workspace we had just told them they were approved for. `gatedLink`
+      // 307s straight through for anyone who does turn out to have a session.
+      cta: { label: 'გახსენი მოთხოვნები', href: gatedLink('/work/requests') },
+    }),
+  }
+}
+
+// The note is the message. A revision request without its reason is „fix it"
+// and nothing else, which is why the endpoint refuses to send one without.
+export function masterRevisionEmail(o: { name: string; note: string }) {
+  const first = (o.name || '').trim().split(/\s+/)[0] || ''
+  return {
+    subject: 'განაცხადს ერთი რამ აკლია',
+    html: shell({
+      heading: first ? `${esc(first)}, ერთი რამ აკლია` : 'ერთი რამ აკლია',
+      bodyHtml:
+        p(esc(o.note)) +
+        p('შეავსე და ხელახლა გამოგზავნე — თავიდან ყველაფრის შევსება არ დაგჭირდება.'),
+      cta: { label: 'გახსენი განაცხადი', href: `${BASE}/join?can=WORK` },
+    }),
+  }
+}
+
+// Sent, not silent. A refusal nobody is told about is somebody waiting for a
+// call that will not come — and /apply/master used to render nothing at all for
+// this status, so they could not have found out by visiting either.
+export function masterRejectedEmail(o: { name: string; note: string }) {
+  const first = (o.name || '').trim().split(/\s+/)[0] || ''
+  return {
+    subject: 'განაცხადი არ დამტკიცდა',
+    html: shell({
+      heading: first ? `${esc(first)}, განაცხადი არ დამტკიცდა` : 'განაცხადი არ დამტკიცდა',
+      bodyHtml: p(esc(o.note)),
+      footerNote: 'თუ რამე შეიცვალა, ხელახლა გამოგზავნა შეგიძლია.',
+    }),
+  }
+}
+
 // Sent the moment an application is APPROVED. The one thing that turns a fresh
 // expert into a bookable one is published free time (booking is slot-gated), so
 // this email is about the calendar — not about „finishing the profile". Subject
@@ -203,7 +299,7 @@ export function applicationApprovedEmail(o: { name: string; note?: string }) {
         p('პროფილი ცოცხალია და ძებნაში ჩანს.') +
         p('ერთი ნაბიჯიღა დარჩა: <b>გახსენი შენი თავისუფალი დრო</b>. სანამ განრიგში დროს არ გამოაქვეყნებ, დაჯავშნა არავის შეუძლია.') +
         (o.note ? p(`<span style="color:${MUTED};">მოდერატორის კომენტარი:</span> ${esc(o.note)}`) : ''),
-      cta: { label: 'დროის გამოქვეყნება', href: `${BASE}/tutor/schedule` },
+      cta: { label: 'დროის გამოქვეყნება', href: `${BASE}/work/schedule` },
     }),
   }
 }
@@ -253,12 +349,12 @@ export function bookingRequestEmail(o: {
           ? p('დროები კლიენტმა შემოგვთავაზა — ისინი შენს გამოქვეყნებულ განრიგში არაა.')
           : '') +
         detail([
-          { label: 'სტუდენტი', value: o.studentName },
+          { label: 'კლიენტი', value: o.studentName },
           { label: 'თემა', value: o.topic },
           { label: alts.length ? 'სასურველი დრო' : 'დრო', value: o.whenText },
           ...alts.map((w, i) => ({ label: `ალტერნატივა ${i + 1}`, value: w })),
         ]),
-      cta: { label: 'ჯავშნის ნახვა', href: `${BASE}/tutor/bookings` },
+      cta: { label: 'ჯავშნის ნახვა', href: `${BASE}/work/jobs?tab=attention` },
     }),
   }
 }
@@ -343,7 +439,7 @@ export function expertRequestEscalationEmail(o: {
 }) {
   const first = (o.expertName || '').trim().split(/\s+/)[0]
   const lead = o.final
-    ? `${esc(o.studentName)}-ის მოთხოვნას ჯერ არ გიპასუხია. დარჩა <b>${esc(o.leftText)}</b> — შემდეგ ჯავშანი ავტომატურად გაუქმდება და სტუდენტი სხვას მიმართავს.`
+    ? `${esc(o.studentName)}-ის მოთხოვნას ჯერ არ გიპასუხია. დარჩა <b>${esc(o.leftText)}</b> — შემდეგ ჯავშანი ავტომატურად გაუქმდება და კლიენტი სხვას მიმართავს.`
     : `${esc(o.studentName)}-ის მოთხოვნა კვლავ შენს პასუხს ელოდება. დარჩა <b>${esc(o.leftText)}</b> — პასუხის გარეშე ჯავშანი ავტომატურად გაუქმდება.`
   return {
     subject: o.final ? 'ბოლო შეხსენება — მოთხოვნა მალე გაუქმდება' : 'მოთხოვნა შენს პასუხს ელოდება',
@@ -354,12 +450,12 @@ export function expertRequestEscalationEmail(o: {
       bodyHtml:
         p(lead) +
         detail([
-          { label: 'სტუდენტი', value: o.studentName },
+          { label: 'კლიენტი', value: o.studentName },
           { label: 'თემა', value: o.topic },
           { label: 'დრო', value: o.whenText },
           { label: 'დარჩა', value: o.leftText },
         ]) +
-        p(`<span style="color:${MUTED};">უარის თქმაც პასუხია — თუ ეს დრო არ გამოგდგება, უარყავი და სტუდენტი მაშინვე სხვა დროს აირჩევს.</span>`),
+        p(`<span style="color:${MUTED};">უარის თქმაც პასუხია — თუ ეს დრო არ გამოგდგება, უარყავი და კლიენტი მაშინვე სხვა დროს აირჩევს.</span>`),
       cta: { label: 'მოთხოვნაზე პასუხი', href: `${BASE}${o.href}` },
     }),
   }
@@ -391,7 +487,7 @@ export function expertActivationEmail(o: {
         // since 2026-08-03 this also reaches experts whose published windows
         // simply RAN OUT. Telling someone who added 42 times that they never
         // added any is both wrong and slightly insulting.
-        lead: 'შენი პროფილი გამოქვეყნებულია, მაგრამ <b>თავისუფალი დრო აღარ გაქვს</b> — სტუდენტი პროფილს ხედავს, დაჯავშნა კი არ შეუძლია.',
+        lead: 'შენი პროფილი გამოქვეყნებულია, მაგრამ <b>თავისუფალი დრო აღარ გაქვს</b> — კლიენტი პროფილს ხედავს, დაჯავშნა კი არ შეუძლია.',
         step: 'მონიშნე მომავალი კვირის რამდენიმე დრო, როცა თავისუფალი ხარ. დროები ნებისმიერ მომენტში იცვლება.',
         cta: 'დროების მითითება',
       }
@@ -554,7 +650,7 @@ export const ADMIN_MESSAGE_BODY_MAX = 4000
 // href are the same destination. Kept server-side (never accepted from the
 // request body) so a typed message can't be turned into an arbitrary link.
 const ADMIN_MESSAGE_DEST: Record<AdminMessageTemplate, { href: string; ctaLabel: string }> = {
-  expert: { href: '/apply',         ctaLabel: 'ექსპერტად რეგისტრაცია' },
+  expert: { href: '/join',          ctaLabel: 'ექსპერტად რეგისტრაცია' },
   info:   { href: '/settings',      ctaLabel: 'ანგარიშის გახსნა' },
   blank:  { href: '/notifications', ctaLabel: 'შეტყობინების ნახვა' },
 }
@@ -653,7 +749,7 @@ export function requestVerifiedProviderEmail(o: {
         // The one line that matters after the facts: places are limited and the
         // first answers win — true, and the reason to open the mail now.
         p('ადგილები შეზღუდულია — პირველი შეთავაზებები იგებენ.'),
-      cta: { label: 'ნახე და შესთავაზე', href: gatedLink(`/provider/requests/${o.requestId}`) },
+      cta: { label: 'ნახე და შესთავაზე', href: gatedLink(`/work/requests/${o.requestId}`) },
     }),
   }
 }
@@ -774,7 +870,7 @@ export function offerAcceptedProviderEmail(o: { topicLabel: string }) {
         // the system to read one off and keep it.
         p(`კლიენტმა აირჩია შენი შეთავაზება — <b>${esc(o.topicLabel)}</b>.`) +
         p('კლიენტის კონტაქტი უკვე შენს გვერდზეა. დაუკავშირდი მალე — ის ამას ელოდება.'),
-      cta: { label: 'კონტაქტის ნახვა', href: gatedLink('/provider/offers') },
+      cta: { label: 'კონტაქტის ნახვა', href: gatedLink('/work/offers') },
     }),
   }
 }
@@ -827,7 +923,7 @@ export function requestChatEmail(o: {
   publicRef: string
   preview: string
 }) {
-  const href = o.toProvider ? gatedLink('/provider/offers') : `${BASE}/request/${o.publicRef}`
+  const href = o.toProvider ? gatedLink('/work/offers') : `${BASE}/request/${o.publicRef}`
   // Trimmed to a glance. A full message in the body is a message nobody comes
   // back to the site to answer — and answering is the point.
   const preview = o.preview.length > 140 ? `${o.preview.slice(0, 140)}…` : o.preview
@@ -847,6 +943,53 @@ export function requestChatEmail(o: {
           : 'ექსპერტმა გიპასუხა.') +
         `<blockquote style="margin:0 0 12px;padding:10px 14px;border-left:3px solid ${BRAND};background:#f7f9f8;font-size:15px;line-height:1.6;color:${INK};white-space:pre-wrap">${esc(preview)}</blockquote>`,
       cta: { label: 'პასუხის გაცემა', href },
+    }),
+  }
+}
+
+/* ── After the choice (stage 7, lib/offerLifecycle) ─────────────────────── */
+
+/** To the client when the PROVIDER marked the job finished. The page it links
+ *  to is where the client confirms and rates — the mail carries no name, no
+ *  price, and (to a client) their own reference is not a leak. */
+export function offerDoneClientEmail(o: { publicRef: string; topicLabel: string }) {
+  return {
+    subject: `სამუშაო დასრულდა — ${o.publicRef}`,
+    html: shell({
+      heading: 'სამუშაო დასრულდა',
+      bodyHtml:
+        detail([{ label: 'მოთხოვნა', value: `${o.topicLabel} · ${o.publicRef}` }]) +
+        p('ექსპერტმა მონიშნა, რომ სამუშაო დასრულდა. შეაფასე შენს გვერდზე.'),
+      cta: { label: 'შეფასება', href: `${BASE}/request/${o.publicRef}` },
+    }),
+  }
+}
+
+/** To the provider when the CLIENT marked the job finished. NO publicRef —
+ *  the client's credential never rides in a provider mail (see
+ *  offerAcceptedProviderEmail). */
+export function offerDoneProviderEmail(o: { topicLabel: string }) {
+  return {
+    subject: 'კლიენტმა სამუშაო დასრულებულად მონიშნა',
+    html: shell({
+      heading: 'სამუშაო დასრულდა',
+      bodyHtml: p(`კლიენტმა მონიშნა, რომ სამუშაო დასრულდა — <b>${esc(o.topicLabel)}</b>.`),
+      cta: { label: 'ჩემი შეთავაზებები', href: gatedLink('/work/offers') },
+    }),
+  }
+}
+
+/** The ONE reminder, 14 days after acceptance with nobody saying it finished
+ *  (lib/offerLifecycle → runOfferLifecycleJobs). A question, not a claim. */
+export function offerDoneReminderClientEmail(o: { publicRef: string; topicLabel: string }) {
+  return {
+    subject: `დასრულდა სამუშაო? — ${o.publicRef}`,
+    html: shell({
+      heading: 'დასრულდა სამუშაო?',
+      bodyHtml:
+        detail([{ label: 'მოთხოვნა', value: `${o.topicLabel} · ${o.publicRef}` }]) +
+        p('თუ სამუშაო დასრულდა, მონიშნე შენს გვერდზე და შეაფასე.'),
+      cta: { label: 'გახსნა', href: `${BASE}/request/${o.publicRef}` },
     }),
   }
 }

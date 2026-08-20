@@ -165,7 +165,7 @@ export function ProfileCompleteness({
 
       {percent < 100 && variant === 'card' && (
         <p className="mt-4 text-meta text-ink-500 leading-snug">
-          სრული პროფილი მეტ სტუდენტს იზიდავს.
+          სრული პროფილი მეტ კლიენტს იზიდავს.
         </p>
       )}
     </section>

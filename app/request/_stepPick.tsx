@@ -61,7 +61,14 @@ export function StepPick({ options, value, onPick, onSkip, numbered = false }: {
               }`}
             >
               <span className="min-w-0 flex-1">
-                <span className="block font-display text-body font-semibold text-ink-900">{o.label}</span>
+                <span // ⚠️ `no-caps` (2026-08-18). globals.css turns on the „case" feature for
+              // every `button`, and an option row IS a button — so „სანტექნიკა"
+              // rendered as „ᲡᲐᲜᲢᲔᲥᲜᲘᲙᲐ" here while the same word on /experts
+              // (an <a> pill, outside that selector) rendered normally. Six rows
+              // of shouted Georgian is markedly slower to scan, and the type
+              // note is explicit that mtavruli is for SHORT labels — these are
+              // sentences („ოთხი ან მეტი ოთახი").
+              className="block font-display text-body font-semibold text-ink-900 no-caps">{o.label}</span>
                 {o.hint && <span className="block text-small text-ink-500 mt-0.5">{o.hint}</span>}
               </span>
               {/* The key that answers this row. `text-micro` is the uppercase +

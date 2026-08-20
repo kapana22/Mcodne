@@ -11,7 +11,7 @@ type Segment = 'all' | 'students' | 'tutors' | 'recent'
 
 const SEGMENT_LABEL: Record<Segment, string> = {
   all: 'ყველა მომხმარებელი',
-  students: 'ყველა სტუდენტი',
+  students: 'ყველა კლიენტი',
   tutors: 'ყველა ექსპერტი',
   recent: 'ბოლო 7 დღის რეგისტრაცია',
 }
@@ -98,7 +98,7 @@ export const BroadcastSection = () => {
                 key={s}
                 type="button"
                 onClick={() => setSegment(s)}
-                className={`h-8 px-3 rounded-pill font-display text-meta font-semibold tracking-wide transition-colors duration-fast ${segment === s ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}
+                className={`h-10 sm:h-9 px-3.5 rounded-pill font-display text-small font-semibold tracking-wide transition-colors duration-fast ${segment === s ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}
               >{SEGMENT_LABEL[s]}</button>
             ))}
           </div>

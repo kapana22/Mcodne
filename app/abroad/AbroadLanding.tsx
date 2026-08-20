@@ -248,7 +248,7 @@ export async function AbroadLanding() {
                       308s to the slug, and that redirect downgrades the
                       navigation to a full load, silently killing the photo
                       view-transition (CLAUDE.md, 2026-08-01). */}
-                  <Link href={`/tutors/${e.slug || e.id}`} className="block h-full">
+                  <Link href={`/experts/${e.slug || e.id}`} className="block h-full">
                     <Card interactive padding="default" className="h-full min-w-0">
                       <div className="flex items-center gap-3 min-w-0">
                         <Avatar src={e.avatar} name={e.fullName} size={56} className="shrink-0" />

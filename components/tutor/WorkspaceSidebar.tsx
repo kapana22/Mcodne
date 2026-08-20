@@ -4,12 +4,17 @@ import { usePathname } from 'next/navigation'
 import { Icon } from '@/components/Icon'
 import { Logo } from '@/components/Logo'
 import { Eyebrow } from '@/components/Eyebrow'
-import { WORKSPACE_NAV, CATALOG_LINK, type NavItem } from './navConfig'
+import { navFor, CATALOG_LINK, type NavItem, type NavGroups } from './navConfig'
 import type { NavBadges } from './useNavBadges'
 
 function badgeCount(item: NavItem, badges: NavBadges): number {
   if (item.badgeKey === 'attention') return badges.requests + badges.reschedules
   if (item.badgeKey === 'messages') return badges.messages
+  // The queue badge — verified requests with a place left. Counted by the
+  // server layout (app/work/layout.tsx), the same narrowing the queue page
+  // reads (lib/serviceProfile → routingWhere); the same badge grammar as the
+  // admin rail: a number on a nav item means a person is waiting behind it.
+  if (item.badgeKey === 'openRequests') return badges.openRequests
   return 0
 }
 
@@ -31,7 +36,7 @@ function NavRow({ item, badges }: { item: NavItem; badges: NavBadges }) {
       {count > 0 && (
         <span
           className={`min-w-[20px] h-5 px-1.5 rounded-pill inline-flex items-center justify-center text-meta font-bold tabular-nums text-white ${
-            item.badgeKey === 'messages' ? 'bg-danger-500' : 'bg-brand-500'
+            item.badgeKey === 'messages' ? 'bg-danger-500' : item.badgeKey === 'openRequests' ? 'bg-brand-600' : 'bg-brand-500'
           }`}
         >
           {count > 99 ? '99+' : count}
@@ -42,9 +47,13 @@ function NavRow({ item, badges }: { item: NavItem; badges: NavBadges }) {
 }
 
 /* Desktop-only workspace navigation rail. Mobile navigation stays with the
-   global BottomNav (4 tabs) + UserMenu (schedule/earnings/catalog). */
-export function WorkspaceSidebar({ badges }: { badges: NavBadges }) {
+   global BottomNav (4 tabs) + UserMenu (schedule/earnings/catalog).
+   `groups` = which of the two /work groups this viewer holds (navConfig →
+   NAV_GROUPS): the expert's items, the master's items, or both with a divider
+   between them. Decided by capabilities on the server, never here. */
+export function WorkspaceSidebar({ badges, groups }: { badges: NavBadges; groups: NavGroups }) {
   const percent = badges.profilePercent
+  const sections = navFor(groups)
   return (
     <aside className="hidden lg:flex flex-col w-[240px] shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-ink-100 bg-white px-4 py-5">
       <div className="px-3">
@@ -52,8 +61,15 @@ export function WorkspaceSidebar({ badges }: { badges: NavBadges }) {
       </div>
 
       <nav aria-label="სამუშაო სივრცის ნავიგაცია" className="mt-6 flex flex-col gap-0.5">
-        {WORKSPACE_NAV.map(item => (
-          <NavRow key={item.href} item={item} badges={badges} />
+        {sections.map((section, i) => (
+          <div key={i} className={i > 0 ? 'mt-4 pt-4 border-t border-ink-100 flex flex-col gap-0.5' : 'flex flex-col gap-0.5'}>
+            {section.caption && (
+              <Eyebrow tone="muted" className="px-3 mb-1.5">{section.caption}</Eyebrow>
+            )}
+            {section.items.map(item => (
+              <NavRow key={item.href} item={item} badges={badges} />
+            ))}
+          </div>
         ))}
       </nav>
 
@@ -63,9 +79,9 @@ export function WorkspaceSidebar({ badges }: { badges: NavBadges }) {
 
       <div className="flex-1" />
 
-      {percent !== null && percent < 100 && (
+      {groups.expert && percent !== null && percent < 100 && (
         <Link
-          href="/tutor/profile"
+          href="/work/profile"
           className="mt-4 block rounded-card border border-brand-200 bg-brand-50/40 p-3.5 hover:bg-brand-50/70 transition-colors duration-fast"
         >
           <div className="flex items-baseline justify-between gap-2">

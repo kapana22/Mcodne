@@ -6,7 +6,7 @@
 // parent, which opens the booking Sheet with that slot preselected.
 //
 // Empty calendar: never a dead end — compact fallback with a real, existing
-// request path (email to the team, same channel the /tutors helper strip
+// request path (email to the team, same channel the /experts helper strip
 // uses; pre-booking chat does not exist yet).
 import React, { useState, useMemo } from 'react'
 import { Icon } from '@/components/Icon'
@@ -161,7 +161,7 @@ export const InlineAvailability = ({
             </button>
           )}
           <a
-            href={tutorId ? `/tutors/${tutorId}?intent=message` : `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`დროის მოთხოვნა — ${tutorName}`)}`}
+            href={tutorId ? `/experts/${tutorId}?intent=message` : `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`დროის მოთხოვნა — ${tutorName}`)}`}
             className={`mt-4 inline-flex h-11 px-5 rounded-btn font-display font-semibold text-small tracking-wide items-center gap-1.5 transition-colors duration-fast ${
               canProposeHere
                 ? 'ml-2 bg-white border border-ink-200 hover:border-ink-300 text-ink-800'

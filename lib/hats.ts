@@ -12,7 +12,7 @@
 // here is not. The same human is a CLIENT when they need a lawyer and a MASTER
 // when somebody needs a plumber; the owner is an ADMIN and on the allowlist; a
 // tutor may also do home repairs. `Role` cannot hold two of those at once, and
-// adding a value would force every `role === 'STUDENT'` check on the site —
+// adding a value would force every `role === ROLE.CLIENT` check on the site —
 // homeForRole, showApplyCta, requireRole, the nav, the shells, the booking flow
 // — to be re-examined to express something only one subsystem cares about.
 //
@@ -26,19 +26,12 @@ import { prisma } from './prisma'
 import { PROVIDER_ROUTE } from './requests'
 import { homeForRole } from './roleHome'
 
-/** What a person can do here. Ordered by how much of the site each one owns —
- *  `homeForHats` walks this order and the first match wins. */
-export const HATS = ['ADMIN', 'EXPERT', 'MASTER', 'COMPANY', 'CLIENT'] as const
-export type Hat = (typeof HATS)[number]
-
-/** The word for each, for a switcher or a label. Never a raw code on a screen. */
-export const HAT_LABEL: Record<Hat, string> = {
-  ADMIN: 'ადმინი',
-  EXPERT: 'ექსპერტი',
-  MASTER: 'ხელოსანი',
-  COMPANY: 'კომპანია',
-  CLIENT: 'კლიენტი',
-}
+// The vocabulary itself lives in lib/roles (a pure leaf, importable from a
+// client component); this file adds the database-backed `hatsOf`.
+import { HATS, HAT_LABEL, type Hat } from './roles'
+import { ROLE } from '@/lib/roles'
+export { HATS, HAT_LABEL }
+export type { Hat }
 
 /**
  * Where each hat lives.
@@ -52,10 +45,10 @@ export const HAT_LABEL: Record<Hat, string> = {
  */
 export const HAT_HOME: Record<Hat, string> = {
   ADMIN: '/admin',
-  EXPERT: '/tutor',
+  EXPERT: '/work',
   MASTER: `${PROVIDER_ROUTE}/requests`,
   COMPANY: `${PROVIDER_ROUTE}/offers`,
-  CLIENT: '/student',
+  CLIENT: '/me',
 }
 
 /**

@@ -12,6 +12,7 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { EmptyState } from '@/components/EmptyState'
 import { AdminConfirmDialog, AdminMessageDialog, AdminDeleteUserDialog, TabHeader, adminOk, AdminLoading, AdminError, type DeleteImpact, type DeleteMode, downloadCsv, KA_STATUS, fmtShort, fmtDT, LoadMoreBar } from './_parts'
 import { CategorySelect, useAssignableCategories } from './_categoryPicker'
+import { ROLE, roleLabel as roleLabelOf } from '@/lib/roles'
 
 /* ───── User detail modal (opens from Users row click) ───── */
 type UserDetail = {
@@ -168,9 +169,9 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
                   <div className="font-display text-h3 font-bold text-ink-900 truncate">{u.fullName}</div>
                   <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border font-display text-micro font-bold uppercase ${
                     u.role === 'ADMIN' ? 'bg-iris-50 border-iris-200 text-iris-700'
-                    : u.role === 'TUTOR' ? 'bg-brand-50 border-brand-200 text-brand-700'
+                    : u.role === ROLE.EXPERT ? 'bg-brand-50 border-brand-200 text-brand-700'
                     : 'bg-ink-50 border-ink-200 text-ink-600'
-                  }`}>{u.role === 'STUDENT' ? 'სტუდენტი' : u.role === 'TUTOR' ? 'ექსპერტი' : 'ადმინი'}</span>
+                  }`}>{roleLabelOf(u.role)}</span>
                   {u.emailVerified && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-success-50 border border-success-200 text-success-700 font-display text-micro font-bold uppercase"><Icon.check className="w-3 h-3" /> ვერიფ.</span>}
                   {/* Anonymized outranks suspended: the pause is not a pause
                       here, it is the thing keeping the tombstone off the public
@@ -224,7 +225,7 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
                     <Field label="რეგისტრაცია" value={fmtShort(u.createdAt)} />
                     <Field label="ტელეფონი" value={u.phone ?? '—'} />
                     <Field label="მიმოწერები" value={String(u._count.sentMessages)} />
-                    <Field label="ჯავშნები (სტუდენტი)" value={String(u._count.bookingsAsStudent)} />
+                    <Field label="ჯავშნები (კლიენტი)" value={String(u._count.bookingsAsStudent)} />
                     <Field label="დაწერილი შეფასებები" value={String(u._count.reviewsGiven)} />
                     <Field label="ფავორიტები" value={String(u._count.favorites)} />
                   </div>
@@ -282,7 +283,7 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
                 <div className="px-6 py-5 space-y-6">
                   {data.bookingsAsStudent.length > 0 && (
                     <div>
-                      <Eyebrow tone="muted" className="mb-3">როგორც სტუდენტი ({data.bookingsAsStudent.length})</Eyebrow>
+                      <Eyebrow tone="muted" className="mb-3">როგორც კლიენტი ({data.bookingsAsStudent.length})</Eyebrow>
                       <BookingList items={data.bookingsAsStudent} otherKey="tutor" />
                     </div>
                   )}
@@ -500,7 +501,7 @@ const VerifiedToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
     const next = !verified
     setVerified(next)
     try {
-      const res = await fetch(`/api/admin/tutors/${tutorId}/verified`, {
+      const res = await fetch(`/api/admin/experts/${tutorId}/verified`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ verified: next }),
@@ -516,12 +517,12 @@ const VerifiedToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
         type="button"
         onClick={toggle}
         disabled={busy}
-        className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border font-display text-micro font-bold uppercase transition-colors duration-fast disabled:opacity-60 ${
+        className={`tap-area inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border font-display text-micro font-bold uppercase transition-colors duration-fast disabled:opacity-60 ${
           verified
             ? 'bg-brand-600 border-brand-600 text-white hover:bg-brand-700'
             : 'bg-white border-ink-300 text-ink-600 hover:border-brand-500 hover:text-brand-700'
         }`}
-        title="ვერიფიცირებული ექსპერტი — გამოჩნდება ✓ ბეჯი ბარათსა და პროფილზე"
+        title="გადამოწმებული ექსპერტი — გამოჩნდება ✓ ბეჯი ბარათსა და პროფილზე"
       >
         <Icon.shieldCheck className="w-3 h-3" /> ვერიფ.
       </button>
@@ -541,7 +542,7 @@ const FeaturedToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
     const next = !featured
     setFeatured(next)
     try {
-      const res = await fetch(`/api/admin/tutors/${tutorId}/featured`, {
+      const res = await fetch(`/api/admin/experts/${tutorId}/featured`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ featured: next }),
@@ -558,7 +559,7 @@ const FeaturedToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
         type="button"
         onClick={toggle}
         disabled={busy}
-        className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border font-display text-micro font-bold uppercase transition-colors duration-fast disabled:opacity-60 ${
+        className={`tap-area inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border font-display text-micro font-bold uppercase transition-colors duration-fast disabled:opacity-60 ${
           featured
             ? 'bg-warning-600 border-warning-600 text-white hover:bg-warning-700'
             : 'bg-white border-ink-300 text-ink-600 hover:border-warning-500 hover:text-warning-700'
@@ -593,7 +594,7 @@ const PackagesToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
     const next = !on
     setOn(next)
     try {
-      const res = await fetch(`/api/admin/tutors/${tutorId}/packages`, {
+      const res = await fetch(`/api/admin/experts/${tutorId}/packages`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ packagesEnabled: next }),
@@ -610,7 +611,7 @@ const PackagesToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
         type="button"
         onClick={toggle}
         disabled={busy}
-        className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border font-display text-micro font-bold uppercase transition-colors duration-fast disabled:opacity-60 ${
+        className={`tap-area inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border font-display text-micro font-bold uppercase transition-colors duration-fast disabled:opacity-60 ${
           on
             ? 'bg-brand-600 border-brand-600 text-white hover:bg-brand-700'
             : 'bg-white border-ink-300 text-ink-600 hover:border-brand-500 hover:text-brand-700'
@@ -655,7 +656,7 @@ const CategoryPicker = ({ tutorId, initial, onSaved }: { tutorId: string; initia
     setBusy(true)
     setFailed(false)
     try {
-      const res = await fetch(`/api/admin/tutors/${tutorId}/category`, {
+      const res = await fetch(`/api/admin/experts/${tutorId}/category`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ categoryId: next || null }),
@@ -676,7 +677,7 @@ const CategoryPicker = ({ tutorId, initial, onSaved }: { tutorId: string; initia
         {failed && <span role="alert" className="font-display text-meta font-semibold text-danger-700">ვერ შეინახა</span>}
       </div>
       {loaded && !val && (
-        <p className="mt-1.5 text-meta text-ink-600">ჩანს /tutors-ზე, მაგრამ ვერცერთ სფეროში და ვერც ფილტრში.</p>
+        <p className="mt-1.5 text-meta text-ink-600">ჩანს /experts-ზე, მაგრამ ვერცერთ კატეგორიაში და ვერც ფილტრში.</p>
       )}
     </div>
   )
@@ -801,7 +802,7 @@ export const UsersSection = () => {
     } catch { /* keep current page */ } finally { setLoadingMore(false) }
   }
 
-  const roleLabel = (r: string) => r === 'STUDENT' ? 'სტუდენტი' : r === 'TUTOR' ? 'ექსპერტი' : 'ადმინი'
+  const roleLabel = (r: string) => roleLabelOf(r)
 
   // Impersonation goes through the shared confirm dialog (no native confirm()).
   const [pendImp, setPendImp] = useState<{ userId: string; fullName: string } | null>(null)
@@ -858,7 +859,7 @@ export const UsersSection = () => {
           </div>
           <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200">
             {(['all','STUDENT','TUTOR','ADMIN'] as const).map(r => (
-              <button key={r} type="button" onClick={() => setRole(r)} className={`h-8 px-3 rounded-pill font-display text-meta font-semibold tracking-wide transition-colors duration-fast ${role === r ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}>{r === 'all' ? 'ყველა' : roleLabel(r)}</button>
+              <button key={r} type="button" onClick={() => setRole(r)} className={`h-10 sm:h-9 px-3.5 rounded-pill font-display text-small font-semibold tracking-wide transition-colors duration-fast ${role === r ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}>{r === 'all' ? 'ყველა' : roleLabel(r)}</button>
             ))}
           </div>
           {loading && <span className="text-meta text-ink-500">იტვირთება…</span>}
@@ -922,7 +923,7 @@ export const UsersSection = () => {
                   <td className="px-3 py-3">
                     <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border font-display text-micro font-bold uppercase ${
                       u.role === 'ADMIN' ? 'bg-iris-50 border-iris-200 text-iris-700'
-                      : u.role === 'TUTOR' ? 'bg-brand-50 border-brand-200 text-brand-700'
+                      : u.role === ROLE.EXPERT ? 'bg-brand-50 border-brand-200 text-brand-700'
                       : 'bg-ink-50 border-ink-200 text-ink-600'
                     }`}>{roleLabel(u.role)}</span>
                   </td>
@@ -964,7 +965,7 @@ export const UsersSection = () => {
                       <span className="font-display text-small font-bold text-ink-900 truncate">{u.fullName}</span>
                       <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border font-display text-micro font-bold uppercase ${
                         u.role === 'ADMIN' ? 'bg-iris-50 border-iris-200 text-iris-700'
-                        : u.role === 'TUTOR' ? 'bg-brand-50 border-brand-200 text-brand-700'
+                        : u.role === ROLE.EXPERT ? 'bg-brand-50 border-brand-200 text-brand-700'
                         : 'bg-ink-50 border-ink-200 text-ink-600'
                       }`}>{roleLabel(u.role)}</span>
                       {u.emailVerified && <span className="text-success-700"><Icon.check className="w-3.5 h-3.5 inline" /></span>}

@@ -173,7 +173,7 @@ const Product = () => {
           <Stat
             n={data ? `${data.activationPct}%` : '—'}
             label="აქტივაცია"
-            sub={data ? `${data.activatedStudents} სტუდენტმა დაჯავშნა` : undefined}
+            sub={data ? `${data.activatedStudents} კლიენტმა დაჯავშნა` : undefined}
           />
           <Stat n={data ? data.users.new7d : '—'} label="ახალი ანგარიში" sub="ბოლო 7 დღეში" />
           <Stat n={data ? data.bookings.new7d : '—'} label="ახალი ჯავშანი" sub="ბოლო 7 დღეში" />
@@ -189,7 +189,7 @@ const Product = () => {
             <Eyebrow tone="muted" className="mb-3">მომხმარებლების ბაზა</Eyebrow>
             <ul className="space-y-2 text-small">
               <ListRow label="სულ" value={data?.users.total ?? '—'} />
-              <ListRow label="სტუდენტი" value={data?.users.students ?? '—'} />
+              <ListRow label="კლიენტი" value={data?.users.students ?? '—'} />
               <ListRow label="ექსპერტი" value={data?.tutors.total ?? '—'} />
               <ListRow label="30 დღეში ახალი" value={data?.users.new30d ?? '—'} tone="brand" />
             </ul>
@@ -199,7 +199,7 @@ const Product = () => {
             <ul className="space-y-2 text-small">
               <ListRow label="სულ ჯავშნები" value={data?.bookings.total ?? '—'} />
               <ListRow label="სულ შეფასებები" value={data?.reviews.total ?? '—'} />
-              <ListRow label="აქტიური სტუდენტი" value={data?.activatedStudents ?? '—'} tone="success" />
+              <ListRow label="აქტიური კლიენტი" value={data?.activatedStudents ?? '—'} tone="success" />
             </ul>
           </div>
         </div>

@@ -67,7 +67,7 @@ type AppDetail = {
 
 /* The resolver is lib/categoryTree's, imported — it is NOT re-stated here.
    This file used to carry its own copy, and the copy had drifted: it was
-   missing the server's slug arm, so an applicant whose სფერო reads „IT" showed
+   missing the server's slug arm, so an applicant whose კატეგორია reads „IT" showed
    up as „matched nothing" in the panel while approval would have filed them
    under „ტექნოლოგია და პროდუქტი" without being asked. A dropdown that
    disagrees with the button beneath it is worse than no pre-selection. */
@@ -159,7 +159,7 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
   // Every category an expert may be filed into (lib/categoryTree's ASSIGNABLE
   // rule), grouped by sphere. A free-text niche („cat“ is the applicant's
   // specialty) matches no preset, and the expert is then born category-less:
-  // still listed on /tutors, but absent from every sphere page and from the
+  // still listed on /experts, but absent from every sphere page and from the
   // browse filter. This is where that gets decided.
   const { flat: liveCats, groups: catGroups } = useAssignableCategories()
   const [catId, setCatId] = useState('')
@@ -323,7 +323,7 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
     const ids = Array.from(checked)
     const approvable = ids.filter(id => !!catIdFor(id))
     if (approvable.length === 0) {
-      setFlash({ kind: 'error', msg: 'ვერცერთ მონიშნულ განაცხადს სფერო ვერ დაემთხვა — დაამტკიცე ცალ-ცალკე და ხელით მიუთითე კატეგორია.' })
+      setFlash({ kind: 'error', msg: 'ვერცერთ მონიშნულ განაცხადს კატეგორია ვერ დაემთხვა — დაამტკიცე ცალ-ცალკე და ხელით მიუთითე კატეგორია.' })
       return
     }
     setPendBulkApprove({ ids: approvable, skipped: ids.length - approvable.length })
@@ -492,7 +492,7 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
               <input
                 value={qInput}
                 onChange={e => setQInput(e.target.value)}
-                placeholder="სახელი, სფერო, ქალაქი, ელფოსტა…"
+                placeholder="სახელი, კატეგორია, ქალაქი, ელფოსტა…"
                 aria-label="განაცხადების ძებნა"
                 className="w-full h-11 pl-9 pr-8 rounded-field border border-ink-200 bg-white text-small focus:border-brand-400 focus:outline-none"
               />
@@ -501,7 +501,7 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
                   type="button"
                   onClick={() => setQInput('')}
                   aria-label="ძებნის გასუფთავება"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-btn text-ink-500 hover:bg-ink-100 inline-flex items-center justify-center"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-btn text-ink-500 hover:bg-ink-100 inline-flex items-center justify-center"
                 >
                   <Icon.x className="w-3.5 h-3.5" />
                 </button>
@@ -539,7 +539,7 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
                     type="button"
                     onClick={() => setPendReject('bulk')}
                     disabled={busy}
-                    className="h-8 px-2.5 rounded-btn bg-white border border-danger-200 hover:bg-danger-50 disabled:opacity-50 text-danger-700 font-display font-semibold text-meta inline-flex items-center gap-1"
+                    className="h-10 sm:h-9 px-3 rounded-btn bg-white border border-danger-200 hover:bg-danger-50 disabled:opacity-50 text-danger-700 font-display font-semibold text-small inline-flex items-center gap-1"
                   >
                     <Icon.x className="w-3 h-3" /> მასობრივი უარყოფა
                   </button>
@@ -839,19 +839,19 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
             </div>
             {/* Category assignment — sent with „დაამტკიცე“.
                 THE COPY WAS WRONG and it mattered: it said an expert with no
-                category „არ გამოჩნდება /tutors-ზე". lib/tutorsQuery says the
+                category „არ გამოჩნდება /experts-ზე". lib/tutorsQuery says the
                 opposite in code and in a comment — the category is a LABEL, not
                 a gate, and an unfiled expert still appears in the unfiltered
                 browse. A warning that overstates the stakes pushes a moderator
                 to pick SOMETHING, and something is how a psychologist ends up
                 in „ბიზნესი და ფინანსები". It now states the real cost.
-                It also only fires when the სფერო genuinely resolved to nothing
+                It also only fires when the კატეგორია genuinely resolved to nothing
                 — clearing the select yourself is a decision, not a failure. */}
             <div className="mb-3">
               <Eyebrow as="label" tone="muted" className="block mb-1.5">კატეგორია</Eyebrow>
               <CategorySelect value={catId} onChange={setCatId} groups={catGroups} />
               {/* WHAT THEY ASKED FOR, said out loud. When an applicant used
-                  „ჩემი სფერო სიაში არ არის" this is the only place their words
+                  „ჩემი კატეგორია სიაში არ არის" this is the only place their words
                   exist, and it is the reason the field was restored — the
                   moderator either maps it onto an existing sphere here, or adds
                   the sphere. Buried inside „დამატებითი მონაცემები" it would be
@@ -868,7 +868,7 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
               )}
               {!catId && liveCats.length > 0 && !resolveCategoryByName(active.cat, asMatchable(liveCats)) && (
                 <p className="mt-1.5 text-meta text-warning-800">
-                  „{active.cat}“ ვერცერთ სფეროს ვერ დაემთხვა. კატეგორიის გარეშე ექსპერტი /tutors-ზე გამოჩნდება, მაგრამ ვერცერთ სფეროში და ვერც ფილტრში — აირჩიე სფერო, ან დაამატე ახალი „კატეგორიები“ ტაბში.
+                  „{active.cat}“ ვერცერთ კატეგორიას ვერ დაემთხვა. კატეგორიის გარეშე ექსპერტი /experts-ზე გამოჩნდება, მაგრამ ვერცერთ კატეგორიაში და ვერც ფილტრში — აირჩიე კატეგორია, ან დაამატე ახალი „კატეგორიები“ ტაბში.
                 </p>
               )}
             </div>
@@ -947,7 +947,7 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
           <span className="font-display font-semibold">{active?.name ?? ''}</span> გახდება ექსპერტი — შეიქმნება პროფილი და გამოჩნდება საიტზე. უკან დაბრუნება არ არსებობს.
           {active && !catId && (
             <span className="mt-2 block text-danger-700">
-              კატეგორია მითითებული არ არის — ექსპერტი /tutors-ზე არ გამოჩნდება, სანამ კატეგორიას არ მიანიჭებ.
+              კატეგორია მითითებული არ არის — ექსპერტი /experts-ზე არ გამოჩნდება, სანამ კატეგორიას არ მიანიჭებ.
             </span>
           )}
         </>}
@@ -967,7 +967,7 @@ export const ModerationSection = ({ onDecision }: { onDecision?: () => void }) =
           ეს {pendBulkApprove?.ids.length ?? 0} განმცხადებელი გახდება ექსპერტი — შეიქმნება პროფილი და გამოჩნდება საიტზე. უკან დაბრუნება არ არსებობს.
           {(pendBulkApprove?.skipped ?? 0) > 0 && (
             <span className="mt-2 block text-danger-700">
-              {pendBulkApprove?.skipped} განაცხადს სფერო ვერ დაემთხვა — გამოტოვდება. დაამტკიცე ცალ-ცალკე და ხელით მიუთითე კატეგორია, თორემ ექსპერტი ვერცერთ სფეროში და ვერც ფილტრში გამოჩნდება.
+              {pendBulkApprove?.skipped} განაცხადს კატეგორია ვერ დაემთხვა — გამოტოვდება. დაამტკიცე ცალ-ცალკე და ხელით მიუთითე კატეგორია, თორემ ექსპერტი ვერცერთ კატეგორიაში და ვერც ფილტრში გამოჩნდება.
             </span>
           )}
         </>}

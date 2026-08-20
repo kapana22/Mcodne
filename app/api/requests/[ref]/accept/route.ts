@@ -14,7 +14,7 @@
 import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { normalizePublicRef, topicLabel } from '@/lib/requests'
+import { normalizePublicRef, topicLabel, PROVIDER_ROUTE } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
 import { notifyMany } from '@/lib/notify'
 import { sendMail } from '@/lib/mailer'
@@ -131,7 +131,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
     // what a bell needs; the name and the contact live on the page the href
     // points at, behind the provider's own session.
     body: topicLabel(offer.request.topic),
-    href: '/provider/offers',
+    href: `${PROVIDER_ROUTE}/offers`,
   })
 
   // …and by MAIL, because being chosen is the moment the client starts waiting

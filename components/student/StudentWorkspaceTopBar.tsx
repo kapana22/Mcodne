@@ -14,7 +14,7 @@ import { UserMenu } from '@/components/UserMenu'
    glanceable tap on mobile, where the sidebar is hidden. */
 export function StudentWorkspaceTopBar({ user }: { user?: { name: string; avatar?: string | null } }) {
   const path = usePathname() ?? ''
-  const savedActive = path === '/student/favorites' || path.startsWith('/student/favorites/')
+  const savedActive = path === '/me/favorites' || path.startsWith('/me/favorites/')
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export function StudentWorkspaceTopBar({ user }: { user?: { name: string; avatar
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link
-            href="/student/favorites"
+            href="/me/favorites"
             aria-label="შენახული"
             aria-current={savedActive ? 'page' : undefined}
             className={`w-10 h-10 rounded-btn inline-flex items-center justify-center transition-colors duration-fast ${

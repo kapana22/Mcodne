@@ -70,7 +70,7 @@ export function StudentSidebar({ badges }: { badges: StudentBadges }) {
       {/* Quiet prompt to keep discovering — the client analogue of the tutor's
           profile-strength card. */}
       <Link
-        href="/tutors"
+        href="/experts"
         className="mt-4 block rounded-card border border-ink-200 bg-ink-50/50 p-3.5 hover:border-ink-300 hover:bg-ink-50 transition-colors duration-fast"
       >
         <Eyebrow tone="muted">

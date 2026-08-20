@@ -30,15 +30,61 @@
 //   · an offer arriving changes the number under the reader's eyes
 // See app/api/requests/[ref]/status for the counting.
 //
-// ⚠️ NO NEW ANIMATION TOKENS. `pulse-soft` (the ambient loop) and `fade-in-fast`
-// are what the site already has; the canon closed that library at eight and
-// says to prefer removing motion to adding it. Both are motion-safe gated.
+// ⚠️ NO NEW ANIMATION TOKENS. `pulse-soft` (the ambient loop), `fade-in-fast`
+// and `fade-in` are what the site already has; the canon closed that library
+// at eight and says to prefer removing motion to adding it. All motion-safe
+// gated, and every animated state also carries a WORD — a station label, a
+// count — so the frozen version still reads (canon: a spinner is not a state).
+//
+// ── LIVE, NOT POLLED (stage 10) ─────────────────────────────────────────────
+// Owner: „ფორმა გაიგზავნა → ფანჯარა ღია რჩება → ანიმაცია აჩვენებს რომ
+// მუშავდება → პასუხები სათითაოდ მოდის, ჩვეულებრივი ჩატივით." The panel now
+// listens to /api/requests/[ref]/events (lib/requestLiveClient — one stream
+// per room, shared with the threads) and repaints the moment the request
+// moves; the 20-second poll below is the FALLBACK, run only while the stream
+// reports itself down. Same payload either way — lib/requestLive builds it
+// for both routes.
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Btn } from '@/components/Btn'
 import { Card } from '@/components/Card'
 import { REQUEST_STATIONS, stationsReached } from '@/lib/requests'
+import { subscribeRequestLive, type LiveState } from '@/lib/requestLiveClient'
+
+/**
+ * THE SEARCH, SAID OUT LOUD.
+ *
+ * One moving thing (the ring, on the ambient `pulse-soft` the site already
+ * owns — the canon closed the animation library at eight) and, beside it, a
+ * WORD. With motion removed the sentence still states the state, which is the
+ * same rule that forbids a bare spinner anywhere on this site.
+ *
+ * It says „ვეძებთ", present tense, because that is what is happening: the
+ * request is stored and routing is picking the experts to notify. It does NOT
+ * say anybody is looking at it — see the note at the top of this file for why
+ * that number is zero at this moment and why inventing it would be the one lie
+ * the client could catch us in.
+ */
+const SearchingLine = () => (
+  <p className="flex items-center gap-2.5 text-body text-ink-900">
+    <span aria-hidden className="relative inline-flex w-2.5 h-2.5 shrink-0">
+      <span className="absolute inset-0 rounded-full bg-brand-200 motion-safe:animate-pulse-soft" />
+      <span className="relative w-2.5 h-2.5 rounded-full bg-brand-600" />
+    </span>
+    <span className="font-display font-semibold">ვეძებთ შესაფერის ექსპერტებს…</span>
+  </p>
+)
+
+/** The same line, holding the card's place until the first status arrives. */
+const Searching = () => (
+  <Card>
+    <SearchingLine />
+    {/* The receipt, in the same breath as the search — „it is saved" is the
+        half of the message that stops the screen reading as a loss. */}
+    <p className="mt-1.5 text-small text-ink-600">მოთხოვნა შენახულია. ამ გვერდს ნუ დახურავ — პასუხები აქვე გამოჩნდება.</p>
+  </Card>
+)
 
 type Expert = {
   id: string
@@ -61,13 +107,15 @@ type Live = {
   experts: Expert[]
 }
 
-/** Slow: the things this reports change on a human's timescale — an operator
- *  picking up a phone, a provider writing an offer. A tighter loop would be a
- *  request every few seconds to watch a number that moves twice an hour. */
+/** The FALLBACK cadence, when there is no stream. Slow on purpose: a poll is
+ *  a request every N seconds to watch a number that moves twice an hour, and
+ *  ./status is rate-limited per IP. With the stream up this timer never runs. */
 const POLL_MS = 20_000
 
 export function LiveStatus({ publicRef }: { publicRef: string }) {
   const [d, setD] = useState<Live | null>(null)
+  /** 'open' = events are flowing; 'down' = poll. See lib/requestLiveClient. */
+  const [live, setLive] = useState<LiveState>('down')
   /** Which expert's thread is being opened right now — the id, so only that
    *  one row shows it happening. */
   const [writing, setWriting] = useState<string | null>(null)
@@ -79,7 +127,7 @@ export function LiveStatus({ publicRef }: { publicRef: string }) {
    * ⚠️ IT RELOADS THE PAGE RATHER THAN OPENING A PANE HERE. The thread belongs
    * beside the other conversations on this request — a chat floating inside the
    * waiting panel would be a second place to look for messages, and the client
-   * would lose it the moment the panel re-renders on its 20-second poll.
+   * would lose it the moment the panel repaints on the next event.
    */
   const write = async (expertUserId: string) => {
     if (writing) return
@@ -115,17 +163,41 @@ export function LiveStatus({ publicRef }: { publicRef: string }) {
     } catch { /* a failed poll is a poll that tries again */ }
   }, [publicRef])
 
+  // The stream: the payload arrives as an event, the same shape ./status
+  // answers with. Subscribed for the life of the panel.
+  useEffect(() => subscribeRequestLive(publicRef, {
+    onStatus: p => {
+      const j = p as (Live & { ok?: boolean }) | null
+      if (j && j.ok) setD(j)
+    },
+    onState: setLive,
+  }), [publicRef])
+
+  // The fallback: only while the stream is down. Loads at once — a pane must
+  // not sit empty for a whole interval because the socket did not open — and
+  // then on the slow timer, visible tabs only.
   useEffect(() => {
+    if (live === 'open') return
     load()
     const id = window.setInterval(() => {
       if (document.visibilityState === 'visible') load()
     }, POLL_MS)
     return () => window.clearInterval(id)
-  }, [load])
+  }, [live, load])
 
-  // Until the first answer arrives there is nothing true to draw. A skeleton
-  // here would be motion standing in for information we do not have yet.
-  if (!d) return null
+  // ⚠️ THE FIRST SECONDS USED TO BE A BLANK (2026-08-19). This returned null
+  // until the first status answered, so the screen right after „გაგზავნა" —
+  // the one moment the person most needs to know their words survived — showed
+  // nothing at all where the track was about to appear. Owner: „განცდა არ უნდა
+  // შევუქმნათ რომ დაიკარგა მისი მონაწერი." A blank is not neutral there; it
+  // reads as the thing went nowhere.
+  //
+  // What is drawn instead is not a skeleton and not a spinner standing in for
+  // data. It is a claim that is TRUE at that instant: the row is written, and
+  // routing is choosing who to tell (app/api/requests → auto-VERIFIED when
+  // nothing is flagged, then lib/requestRouting fans it out). „ვეძებთ" is the
+  // literal description of what the server is doing while this paints.
+  if (!d) return <Searching />
 
   // Exits, not stations — a track would draw progress going nowhere.
   if (d.status === 'REJECTED' || d.status === 'CLOSED') return null
@@ -142,7 +214,11 @@ export function LiveStatus({ publicRef }: { publicRef: string }) {
           const done = i < reached - 1
           const current = i === reached - 1
           return (
-            <li key={label} className="flex items-center flex-1 last:flex-none min-w-0">
+            <li
+              key={label}
+              className="flex items-center flex-1 last:flex-none min-w-0"
+              aria-current={current ? 'step' : undefined}
+            >
               <span className="flex flex-col items-center gap-1.5 shrink-0">
                 <span className="relative inline-flex">
                   {/* ⚠️ THE PULSE IS ON THE STATION THAT IS HAPPENING, and it is
@@ -155,18 +231,27 @@ export function LiveStatus({ publicRef }: { publicRef: string }) {
                       className="absolute inset-0 rounded-full bg-brand-200 motion-safe:animate-pulse-soft"
                     />
                   )}
+                  {/* Keyed on WHICH state the dot is in, so the moment a
+                      station lights (current → done, or upcoming → current)
+                      the dot re-enters once with `fade-in` — the arrival is
+                      the news, and it is drawn as one. Nothing re-enters on a
+                      repaint that changed nothing. */}
                   <span
+                    key={done ? 'done' : current ? 'current' : 'next'}
                     className={`relative w-7 h-7 rounded-full border-2 inline-flex items-center justify-center text-meta font-bold ${
                       done
-                        ? 'bg-brand-600 border-brand-600 text-white'
+                        ? 'bg-brand-600 border-brand-600 text-white motion-safe:animate-fade-in'
                         : current
-                          ? 'border-brand-600 text-brand-700 bg-white'
+                          ? 'border-brand-600 text-brand-700 bg-white motion-safe:animate-fade-in'
                           : 'border-ink-200 text-ink-400 bg-white'
                     }`}
                   >
                     {done ? '✓' : i + 1}
                   </span>
                 </span>
+                {/* The WORD is the state. With motion removed the pulse is
+                    gone and this line still says which station is live —
+                    the same rule that pairs every spinner with a label. */}
                 <span className={`text-meta text-center ${current ? 'text-ink-900 font-semibold' : 'text-ink-500'}`}>
                   {label}
                 </span>
@@ -193,19 +278,34 @@ export function LiveStatus({ publicRef }: { publicRef: string }) {
           </div>
         ) : (
           <>
-            {/* The line the owner asked for, and the only promise on the screen
-                — it is what the platform actually does next. */}
+            {/* NOBODY TOLD YET → the search is the state, and it is drawn as
+                one. Once `notified` moves the sentence below becomes the news
+                and this line steps aside — the animation must never outlive
+                the thing it animates. */}
+            {d.notified === 0 && <SearchingLine />}
             <p className="text-body text-ink-900">დაელოდე შეთავაზებებს.</p>
             <p className="mt-1.5 text-small text-ink-600">
+              {/* ⚠️ THE CALL IS PROMISED ONLY WHERE A CALL IS COMING (2026-08-19).
+                  Every branch here used to end „ჯერ გადავამოწმებთ და
+                  დაგირეკავთ", written when a human verified every row. Since
+                  auto-verification (app/api/requests → autoVerified when no
+                  triage flag fires) the ordinary request is VERIFIED the
+                  instant it is written and nobody phones before the experts
+                  hear about it. Promising a call to those people made the wait
+                  longer than it is and the promise one we would break. NEW now
+                  means exactly what it always meant — a flag fired, an operator
+                  is the next step — and only NEW says so. */}
               {d.notified > 0
                 // Past tense, because it happened. This appears the moment
                 // routing runs and not one second earlier.
                 ? `${d.notified} ექსპერტს ვაცნობეთ.`
-                : d.expertsInField > 0
-                  // True from the instant the row is written — and deliberately
-                  // NOT phrased as anybody looking at anything.
-                  ? `ამ სფეროში ${d.expertsInField} ექსპერტია. ჯერ გადავამოწმებთ და დაგირეკავთ.`
-                  : 'ჯერ გადავამოწმებთ და დაგირეკავთ.'}
+                : d.status === 'NEW'
+                  ? 'ჯერ გადავამოწმებთ და დაგირეკავთ.'
+                  : d.expertsInField > 0
+                    // True from the instant the row is written — and deliberately
+                    // NOT phrased as anybody looking at anything.
+                    ? `ამ კატეგორიაში ${d.expertsInField} ექსპერტია.`
+                    : ''}
             </p>
           </>
         )}
@@ -269,7 +369,7 @@ export function LiveStatus({ publicRef }: { publicRef: string }) {
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
                     <span className="font-display text-small font-semibold text-ink-900 truncate">{e.name}</span>
-                    {e.verified && <span aria-label="დადასტურებული" className="text-brand-700 shrink-0">✓</span>}
+                    {e.verified && <span aria-label="გადამოწმებული" className="text-brand-700 shrink-0">✓</span>}
                   </span>
                   {e.headline && <span className="block text-meta text-ink-500 truncate">{e.headline}</span>}
                 </span>

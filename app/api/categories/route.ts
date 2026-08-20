@@ -39,7 +39,7 @@ export async function GET() {
     // nobody can ever be its first — it stays empty forever for the reason it
     // was hidden. Somebody has to be able to go first.
     //
-    // So the flag decides, not the query: BROWSE consumers (the /tutors filter,
+    // So the flag decides, not the query: BROWSE consumers (the /experts filter,
     // the home tiles) drop anything not browsable, while the screens where an
     // expert DESCRIBES THEMSELVES offer the whole list. Only the /abroad marker
     // is withheld outright — it is not a sphere anybody should be filed under

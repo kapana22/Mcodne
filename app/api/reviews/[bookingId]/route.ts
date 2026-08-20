@@ -31,7 +31,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ bookingId: st
   })
   if (!review) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
   // Only the reviewed expert may reply — not admins, not the student.
-  if (review.tutor.userId !== user.id) {
+  if (!review.tutor || review.tutor.userId !== user.id) {
     return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
   }
 
@@ -51,7 +51,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ bookingId: st
       type: 'REVIEW_NEW',
       title: 'ექსპერტმა უპასუხა შენს შეფასებას',
       body: response.slice(0, 80),
-      href: `/student/bookings/${bookingId}`,
+      href: `/me/bookings/${bookingId}`,
     })
   }
 
@@ -81,6 +81,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ bookingId: 
   // public listing sorts by that rating.
   await prisma.$transaction(async tx => {
     await tx.review.delete({ where: { bookingId } })
+    if (!tutorId) return
     const agg = await tx.review.aggregate({
       where: { tutorId },
       _avg: { rating: true },

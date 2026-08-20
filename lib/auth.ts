@@ -7,6 +7,7 @@ import { prisma } from './prisma'
 import { homeForRole } from './roleHome'
 import { hatsOf, homeForHats } from './hats'
 import type { Role } from '@prisma/client'
+import { ROLE } from '@/lib/roles'
 
 // Re-exported so existing `import { homeForRole } from '@/lib/auth'` server
 // call sites keep working; the implementation lives in the client-safe
@@ -144,18 +145,44 @@ export async function getImpersonatorId(): Promise<string | null> {
 
 // Post-auth landing for a freshly signed-in user. Same as homeForRole, except
 // a STUDENT with an open expert application (DRAFT/SUBMITTED) is routed back
-// to /apply — applicants keep role STUDENT until an admin approves, so without
+// to /join — applicants keep role STUDENT until an admin approves, so without
 // this they'd sign in and silently land on the student dashboard with no cue
 // that their application exists or where it stands. APPROVED means the role is
 // already TUTOR; REJECTED applicants get the normal student home (the /apply
 // status step still shows the outcome if they visit it themselves).
 export async function postAuthHome(user: { id: string; role: Role }): Promise<string> {
-  if (user.role === 'STUDENT') {
-    const app = await prisma.tutorApplication.findUnique({
-      where: { userId: user.id },
-      select: { status: true },
-    })
-    if (app && (app.status === 'DRAFT' || app.status === 'SUBMITTED')) return '/apply'
+  if (user.role === ROLE.CLIENT) {
+    // ⚠️ BOTH APPLICATIONS, AND THE SECOND ONE WAS MISSING (2026-08-18).
+    //
+    // The tutor half of this check has been here since the expert flow shipped,
+    // for the reason stated above: an applicant keeps role STUDENT, so without
+    // it they sign in and land on the learner's dashboard with no cue that
+    // their application exists. `MasterApplication` arrived with the trades
+    // vertical and nothing here was taught about it — so a tradesperson who
+    // applied got exactly the failure this block was written to prevent, plus a
+    // worse one: /student is a page inviting them to hire a tutor, and nothing
+    // anywhere in the signed-in site linked to the master form.
+    //
+    // Queried together rather than in sequence: this runs on every sign-in, and
+    // two awaited round-trips on the auth path for a branch that usually
+    // matches neither is a cost paid by everybody.
+    const [tutorApp, masterApp] = await Promise.all([
+      prisma.tutorApplication.findUnique({
+        where: { userId: user.id },
+        select: { status: true },
+      }),
+      prisma.masterApplication.findUnique({
+        where: { userId: user.id },
+        select: { status: true },
+      }),
+    ])
+    if (tutorApp && (tutorApp.status === 'DRAFT' || tutorApp.status === 'SUBMITTED')) return '/join?can=CONSULT'
+    // ⚠️ `!== 'APPROVED'` AND NOT A LIST OF THREE. SUBMITTED, NEEDS_REVISION and
+    // REJECTED all want the applicant on that page — the first to see where it
+    // stands, the second to fix it, the third to read why. An APPROVED row
+    // falls through on purpose: by then `hatsOf` returns MASTER and the hat
+    // below sends them to their workspace, which is where they belong.
+    if (masterApp && masterApp.status !== 'APPROVED') return '/join?can=WORK'
   }
 
   // ⚠️ THE HAT DECIDES, NOT THE ROLE (2026-08-18). `Role` has three values and
@@ -229,7 +256,7 @@ export async function requireRole(role: Role | Role[]) {
 // getCurrentUser (a suspended account reads as logged-out → 401).
 //
 // Usage:
-//   const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+//   const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
 //   if (auth.response) return auth.response
 //   const user = auth.user
 export async function requireRoleApi(role: Role | Role[]): Promise<

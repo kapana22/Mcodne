@@ -54,13 +54,13 @@ export const GROUPS: FaqGroup[] = [
         id: 'what-is',
         q: 'რა არის მცოდნე?',
         a: 'პლატფორმა, სადაც ხელით შერჩეულ ექსპერტებთან ჯავშნი ინდივიდუალურ ვიდეოკონსულტაციას — ბიზნესი, ფინანსები, კარიერა, სამართალი და სხვა.',
-        action: { label: 'ნახე ექსპერტები', href: '/tutors' },
+        action: { label: 'ნახე ექსპერტები', href: '/experts' },
       },
       {
         id: 'find-expert',
         q: 'როგორ ვიპოვო შესაფერისი ექსპერტი?',
         a: 'გვერდზე „ექსპერტები“ გაფილტრე კატეგორიით, ფასითა და შეფასებით. პროფილში ნახავ ვიდეოგაცნობას, გამოცდილებასა და შეფასებებს.',
-        action: { label: 'ექსპერტების მოძებნა', href: '/tutors' },
+        action: { label: 'ექსპერტების მოძებნა', href: '/experts' },
       },
       {
         id: 'price',
@@ -71,7 +71,7 @@ export const GROUPS: FaqGroup[] = [
         a: PAYMENTS_LIVE
           ? 'ფასს ადგენს ექსპერტი და წინასწარ ხედავ — გადაიხდი მხოლოდ დაჯავშნისას.'
           : 'ფასს ადგენს ექსპერტი და წინასწარ ხედავ. ონლაინ გადახდა ჯერ არ არის — დაჯავშნა ახლა უფასოა, ბარათს არ ვთხოვთ.',
-        action: { label: 'ნახე ფასები', href: '/tutors' },
+        action: { label: 'ნახე ფასები', href: '/experts' },
       },
     ],
   },
@@ -84,7 +84,7 @@ export const GROUPS: FaqGroup[] = [
         a: PAYMENTS_LIVE
           ? 'პროფილში აირჩიე თარიღი და დრო, გადაიხადე — დადასტურება ელფოსტით მოვა.'
           : 'პროფილში აირჩიე თარიღი და დრო — დადასტურება ელფოსტით მოვა. გადახდის ეტაპი ჯერ არ არის, დაჯავშნა ახლა უფასოა.',
-        action: { label: 'აირჩიე ექსპერტი', href: '/tutors' },
+        action: { label: 'აირჩიე ექსპერტი', href: '/experts' },
       },
       {
         id: 'where-session',
@@ -132,7 +132,7 @@ export const GROUPS: FaqGroup[] = [
         id: 'become-expert',
         q: 'როგორ ვხდები ექსპერტი?',
         a: '„გახდი ექსპერტი“ გვერდზე შეავსე განაცხადი — გამოცდილება, სპეციალიზაცია, პორტფოლიო. პასუხს 24–48 საათში მიიღებ.',
-        action: { label: 'განაცხადის შევსება', href: '/apply', gate: 'apply' },
+        action: { label: 'განაცხადის შევსება', href: '/join', gate: 'apply' },
       },
       {
         id: 'commission',
@@ -143,13 +143,13 @@ export const GROUPS: FaqGroup[] = [
         a: PAYMENTS_LIVE
           ? `პლატფორმა იტოვებს ${COMMISSION_PCT}%-ს. ეს მოიცავს ინფრასტრუქტურას, გადახდას, მხარდაჭერასა და მარკეტინგს.`
           : `პლატფორმა ${COMMISSION_PCT}%-ს იტოვებს — ონლაინ გადახდების ამოქმედების შემდეგ. ეს მოიცავს ინფრასტრუქტურას, გადახდას, მხარდაჭერასა და მარკეტინგს.`,
-        action: { label: 'განაცხადის შევსება', href: '/apply', gate: 'apply' },
+        action: { label: 'განაცხადის შევსება', href: '/join', gate: 'apply' },
       },
       {
         id: 'payout',
         q: 'როდის მივიღებ თანხას?',
         a: 'გადახდები მალე ამოქმედდება — მანამდე სესიები უფასოა. გაშვების შემდეგ შემოსავალი რეგულარული გრაფიკით გადმოგერიცხება.',
-        action: { label: 'განაცხადის შევსება', href: '/apply', gate: 'apply' },
+        action: { label: 'განაცხადის შევსება', href: '/join', gate: 'apply' },
       },
     ],
   },
@@ -212,7 +212,7 @@ export const GROUPS: FaqGroup[] = [
         // as the whole set becomes a lie the first time somebody sells a 45- or
         // 90-minute session.
         a: 'ხანგრძლივობას ექსპერტი ადგენს თითოეული სერვისისთვის — ყველაზე ხშირად 15, 30 ან 60 წუთი. დაჯავშნამდე ზუსტად ხედავ, რომელ ვარიანტს ირჩევ და რამდენი ხანი გაგრძელდება.',
-        action: { label: 'ნახე ექსპერტები', href: '/tutors' },
+        action: { label: 'ნახე ექსპერტები', href: '/experts' },
       },
       {
         id: 'location',
@@ -230,18 +230,18 @@ export const GROUPS: FaqGroup[] = [
         id: 'language',
         q: 'რომელ ენაზე ტარდება კონსულტაცია?',
         a: 'ენას ექსპერტი უთითებს და პროფილშივე ხედავ — უმეტესობა ქართულად მუშაობს, ნაწილი ინგლისურადაც. აირჩიე ის, ვისაც შენთვის სასურველი ენა უწერია.',
-        action: { label: 'ნახე ექსპერტები', href: '/tutors' },
+        action: { label: 'ნახე ექსპერტები', href: '/experts' },
       },
       {
         id: 'pre-contact',
         q: 'შემიძლია ექსპერტს დაჯავშნამდე მივწერო?',
         // The sign-in requirement is stated because it is enforced: a signed-out
         // visitor tapping „მიწერე ექსპერტს" gets the auth sheet („შედი, რომ
-        // მისწერო ექსპერტს" — app/tutors/[id]/client.tsx:951). An answer that
+        // მისწერო ექსპერტს" — app/experts/[slug]/client.tsx:951). An answer that
         // says „yes you can" and then hands over a login wall is the same
         // broken promise as a wrong price.
         a: 'დიახ — ექსპერტს შეტყობინებას დაჯავშნამდეც უგზავნი და საკითხს წინასწარ დააზუსტებ. ამისთვის ანგარიშში შესვლა დაგჭირდება, გადახდა კი არა. მიმოწერა „შეტყობინებებში“ გამოჩნდება.',
-        action: { label: 'ნახე ექსპერტები', href: '/tutors' },
+        action: { label: 'ნახე ექსპერტები', href: '/experts' },
       },
     ],
   },
@@ -322,7 +322,7 @@ export const HELP_TOPIC_IDS: ReadonlySet<string> = new Set(ALL_TOPICS.map(t => t
  * phrase it. So each route promotes the questions that belong to the doubt a
  * person actually has while standing there.
  *
- * Matched by prefix, longest first, so `/apply` and `/tutors/x` can differ from
+ * Matched by prefix, longest first, so `/apply` and `/experts/x` can differ from
  * `/`. Anything unmatched falls back to DEFAULT_LEAD — never to an empty list.
  *
  * Leads name topic IDS, not question text. The earlier version matched by
@@ -334,17 +334,17 @@ export const HELP_TOPIC_IDS: ReadonlySet<string> = new Set(ALL_TOPICS.map(t => t
 const LEAD_BY_ROUTE: { prefix: string; lead: string[] }[] = [
   // Becoming an expert: money and the process, in that order — those are the
   // two things that stop someone mid-application.
-  { prefix: '/apply', lead: ['become-expert', 'commission', 'payout'] },
+  { prefix: '/join', lead: ['become-expert', 'commission', 'payout'] },
   // On a profile / in the booking sheet the doubt is „what am I paying for and
   // what happens next", never „what is mcodne“.
-  { prefix: '/tutors/', lead: ['price', 'where-session', 'cancel', 'expert-noshow'] },
-  { prefix: '/tutors', lead: ['find-expert', 'price', 'how-to-book'] },
+  { prefix: '/experts/', lead: ['price', 'where-session', 'cancel', 'expert-noshow'] },
+  { prefix: '/experts', lead: ['find-expert', 'price', 'how-to-book'] },
   // Auth: the honest question is „why do you need an account at all“.
   { prefix: '/signup', lead: ['what-is', 'how-to-book', 'price'] },
   { prefix: '/signin', lead: ['account-security', 'what-is'] },
   // Inside a booking, the questions are about the session that already exists.
-  { prefix: '/student/bookings', lead: ['where-session', 'cancel', 'expert-noshow'] },
-  { prefix: '/tutor', lead: ['payout', 'commission'] },
+  { prefix: '/me/bookings', lead: ['where-session', 'cancel', 'expert-noshow'] },
+  { prefix: '/work', lead: ['payout', 'commission'] },
 ]
 
 const DEFAULT_LEAD = ['what-is', 'find-expert', 'price', 'how-to-book']

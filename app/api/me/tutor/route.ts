@@ -7,6 +7,7 @@ import { extractYouTubeId, canonicalYouTubeUrl } from '@/lib/youtube'
 import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
 import { ASSIGNABLE_CATEGORY_WHERE } from '@/lib/categoryTree'
 import { ALL_PROFESSIONS, MAX_PROFESSIONS } from '@/lib/professions'
+import { ROLE } from '@/lib/roles'
 
 
 // Very loose URL validator — we don't want to reject unusual TLDs or protocols
@@ -23,7 +24,7 @@ const Body = z.object({
   // /apply already gates the free-text form of this value (otherCatError); this
   // path did not, so the same string had a rule on one route and none on the
   // other. A real sphere name („IT და ტექნოლოგიები") passes untouched.
-  specialty: z.string().min(2).max(200).superRefine(georgianRefine('სფერო')).optional(),
+  specialty: z.string().min(2).max(200).superRefine(georgianRefine('კატეგორია')).optional(),
   yearsExp: z.number().int().min(0).max(80).optional(),
   // Rate limits opened up — the old 10-5000 range was arbitrary and blocked
   // both low-cost tutors (₾5 for a quick homework check) and premium C-level
@@ -33,7 +34,7 @@ const Body = z.object({
   languages: z.array(z.string().min(2).max(10)).max(20).optional(),
   // Product pivot fields.
   // The expert's browse category. Required (indirectly) for visibility — a
-  // null-category profile is hidden from /tutors (lib/tutorsQuery.ts). Validated
+  // null-category profile is hidden from /experts (lib/tutorsQuery.ts). Validated
   // against the live Category set in the handler so an arbitrary id can't be set.
   categoryId: z.string().min(1).max(40).nullable().optional(),
   // What the expert calls themselves (lib/professions). Validated against the
@@ -57,7 +58,7 @@ const Body = z.object({
   // video files are no longer supported — see /api/uploads (kind=video 410).
   videoUrl: z.string().max(500).nullable().optional(),
   // Public visibility. When false, the tutor is filtered out of /api/tutors
-  // and their /tutors/[id] page shows a "paused" banner instead of the
+  // and their /experts/[slug] page shows a "paused" banner instead of the
   // booking flow. Existing bookings continue as normal — students who
   // already have a session can still message and join the video room.
   available: z.boolean().optional(),
@@ -68,7 +69,7 @@ const Body = z.object({
   linkedinUrl: optionalUrl,
   websiteUrl: optionalUrl,
   // Response-time promise (hours). Shown as a "replies in X hours" badge on
-  // /tutors/[id] and browse cards — it's a real trust signal at booking time.
+  // /experts/[slug] and browse cards — it's a real trust signal at booking time.
   // Constrained to a fixed list so the badge stays legible and the tutor
   // can't over-promise ("1 hour").
   responseHours: z.union([z.literal(4), z.literal(12), z.literal(24), z.literal(48)]).optional(),
@@ -93,7 +94,7 @@ export async function GET() {
 export async function PATCH(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
-  if (user.role !== 'TUTOR' && user.role !== 'ADMIN') {
+  if (user.role !== ROLE.EXPERT && user.role !== 'ADMIN') {
     return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
   }
 

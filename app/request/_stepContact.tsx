@@ -84,8 +84,15 @@ export function StepContact({ draft, patch, signedIn }: {
 
       <label className="block">
         <Label>ტელეფონის ნომერი</Label>
-        <PhoneInput value={draft.phone} onChange={v => patch({ phone: v })} className={INPUT} />
-        <Hint>ამ ნომერზე დაგირეკავთ.</Hint>
+        <PhoneInput value={draft.phone} onChange={v => patch({ phone: v })} className={INPUT} required />
+        {/* ⚠️ NOT „დაგირეკავთ" ANY MORE (2026-08-19). A clean request is
+            auto-verified and routed the second it is written — nobody phones
+            first — so that hint promised a call most people never get, and it
+            answered a question nobody asked. What people actually want to know
+            about a phone field is WHO WILL SEE IT, and the firewall gives a
+            good answer: lib/requestChat → clientContactFor releases the number
+            at exactly one moment, when an offer is accepted. */}
+        <Hint>ნომერს მხოლოდ ის ექსპერტი ნახავს, ვისაც შენ აირჩევ.</Hint>
       </label>
 
       <label className="block">
@@ -129,10 +136,16 @@ export function StepContact({ draft, patch, signedIn }: {
           once somebody asks for it. Whoever typed their need as a sentence on
           step one already has it filled — `onFreeText` writes straight into
           `description` — so for them it opens showing their own words. */}
-      {open || draft.description.trim() !== '' ? (
+      {open || draft.directTo || draft.description.trim() !== '' ? (
         <label className="block">
           <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">
-            დეტალები <span className="font-normal text-ink-400">არასავალდებულო</span>
+            {draft.directTo
+              /* ⚠️ WRITING TO ONE PERSON, THE MESSAGE IS THE REQUEST (2026-08-19).
+                 With nobody chosen the structured taps carry a quotable request
+                 and this field is a nicety; with a provider named, the taps are
+                 gone and this sentence is the only thing they receive. */
+              ? 'რა გჭირდება?'
+              : <>დეტალები <span className="font-normal text-ink-400">არასავალდებულო</span></>}
           </span>
           <textarea
             rows={4}
@@ -154,7 +167,7 @@ export function StepContact({ draft, patch, signedIn }: {
       )}
 
       <p className="pt-1 text-small text-ink-600">
-        დაგირეკავთ, გადავამოწმებთ და ექსპერტებს გადავცემთ. უფასოა.
+        გადავამოწმებთ და ექსპერტებს გადავცემთ. უფასოა.
       </p>
 
       {/* ── The honeypot — see the schema comment in lib/requests ──

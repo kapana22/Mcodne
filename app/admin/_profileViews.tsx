@@ -220,7 +220,7 @@ export function ProfileViewsSection({ days }: { days: number }) {
                         <div className="px-4 py-2.5 border-t border-ink-100">
                           {/* Opens in a new tab on purpose — the admin is
                               mid-review and must not lose the expanded row. */}
-                          <OpenBtn href={`/tutors/${e.slug}`} label="პროფილის ნახვა" />
+                          <OpenBtn href={`/experts/${e.slug}`} label="პროფილის ნახვა" />
                         </div>
                       )}
                     </>

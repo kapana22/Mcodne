@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
+import { ROLE } from '@/lib/roles'
 
 export async function GET() {
   const auth = await requireRoleApi('ADMIN')
@@ -26,7 +27,7 @@ export async function GET() {
     activatedStudents, reviewsAgg,
   ] = await Promise.all([
     prisma.user.count(),
-    prisma.user.count({ where: { role: 'STUDENT' } }),
+    prisma.user.count({ where: { role: ROLE.CLIENT } }),
     /* AN EXPERT IS A PROFILE, NOT A ROLE — and the KPI card three rows up now
        counts the same thing, so the two agree.
        This was briefly the other way round (2026-08-12): both sides counted
@@ -35,7 +36,7 @@ export async function GET() {
        consults on it, and the roles are deliberately independent: every expert
        surface (app/tutor/layout, /api/tutor/*, /api/me/tutor) already accepts
        `['TUTOR', 'ADMIN']` and resolves the profile by userId.
-       Counting by role would therefore report one fewer expert than /tutors
+       Counting by role would therefore report one fewer expert than /experts
        actually lists, which is the same disagreement pointing the other way. */
     prisma.tutorProfile.count(),
     prisma.booking.count(),
@@ -43,7 +44,7 @@ export async function GET() {
     prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     prisma.booking.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-    prisma.user.count({ where: { role: 'STUDENT', bookingsAsStudent: { some: {} } } }),
+    prisma.user.count({ where: { role: ROLE.CLIENT, bookingsAsStudent: { some: {} } } }),
     prisma.review.aggregate({ _avg: { rating: true } }),
   ])
 

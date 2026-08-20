@@ -17,9 +17,18 @@ export type NotifType =
   | 'ADMIN_BROADCAST'
   | 'PAYOUT'
   | 'GENERIC'
+  // The requests subsystem (2026-08-19, D10/D12). Typed so the bell can tell
+  // „a client wrote first" from „a request came in" without parsing titles;
+  // pref-wise they are GENERIC — none maps to a PrefKey below, so all four are
+  // always delivered. REQUEST_NEW goes to admins only (the queue ping, like
+  // APPLICATION_NEW). PAYOUT never fires yet — payments are not live.
+  | 'REQUEST_NEW'
+  | 'REQUEST_INVITE'
+  | 'REQUEST_MESSAGE'
+  | 'REQUEST_DONE'
 
 // The 5 opt-outable categories. Types outside this list (PAYOUT, GENERIC,
-// APPLICATION_NEW) are always delivered — they carry money/audit/ops signal,
+// APPLICATION_NEW, REQUEST_*) are always delivered — they carry money/audit/ops signal,
 // not marketing. APPLICATION_NEW in particular goes only to admins as a
 // moderation-queue ping (same rationale as the GENERIC dispute pings).
 export type PrefKey =
@@ -38,6 +47,8 @@ function prefKeyForType(t: string): PrefKey | null {
   if (t === 'REVIEW_NEW') return 'REVIEW_NEW'
   if (t === 'APPLICATION_STATUS') return 'APPLICATION_STATUS'
   if (t === 'ADMIN_BROADCAST') return 'ADMIN_BROADCAST'
+  // REQUEST_NEW / REQUEST_INVITE / REQUEST_MESSAGE / REQUEST_DONE fall through
+  // to null on purpose — the same always-on group GENERIC sits in.
   return null
 }
 
@@ -63,7 +74,9 @@ export function normalizePrefs(raw: unknown): Record<PrefKey, boolean> {
 
 // Cheap single-row read + normalize. Returns defaults on any failure so a
 // prefs-lookup outage never suppresses notifications.
-async function isTypeEnabled(userId: string, type: string): Promise<boolean> {
+/** Exported 2026-08-18 so the trades queue can pref-gate its own mails the same
+ *  way `notify` does — see app/api/master-applications/[id]. */
+export async function isTypeEnabled(userId: string, type: string): Promise<boolean> {
   const key = prefKeyForType(type)
   if (!key) return true // uncontrolled types (PAYOUT, GENERIC) always fire
   try {

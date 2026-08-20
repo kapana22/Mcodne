@@ -1,5 +1,8 @@
 // Per-category SEO copy — keyword-targeted intro + FAQ for the category landing
-// pages (/categories/[slug]). Each entry targets a real Georgian search query
+// pages (/categories/[slug] — RETIRED in stage 8, 2026-08-19: those URLs 308 to
+// /experts?category=<slug>; this file stays as DATA — the profession landings
+// print a sphere's keyword from it, and the copy may return on another surface).
+// Each entry targets a real Georgian search query
 // („<sphere> კონსულტაცია") woven naturally into an intro paragraph and a short
 // FAQ. The page also emits FAQPage JSON-LD from these items.
 //
@@ -274,15 +277,15 @@ export function fallbackSeo(categoryName: string): CategorySeo {
     // slogan. It was identical on all eight pages, so it added nothing unique
     // while pushing the unique part out of the visible width.
     //
-    // Now: „<სფერო> — ონლაინ კონსულტაცია | მცოდნე" — 54 characters at the
+    // Now: „<კატეგორია> — ონლაინ კონსულტაცია | მცოდნე" — 54 characters at the
     // longest real sphere name, and the searched term survives the cut.
     keyword: n,
     titleTail: 'ონლაინ კონსულტაცია',
-    metaDescription: `„${n}“ სფეროში ონლაინ კონსულტაცია — დაჯავშნე ვიდეოსესია ხელით შერჩეულ ქართველ ექსპერტთან მოსახერხებელ დროს.`,
+    metaDescription: `„${n}“ კატეგორიაში ონლაინ კონსულტაცია — დაჯავშნე ვიდეოსესია ხელით შერჩეულ ქართველ ექსპერტთან მოსახერხებელ დროს.`,
     intro:
-      `„${n}“ სფეროში ონლაინ კონსულტაცია გჭირდება? მცოდნეზე იპოვი ხელით შერჩეულ ქართველ ექსპერტებს, რომლებთანაც ერთ საათში, ვიდეოსესიაზე კონკრეტულ პასუხს მიიღებ. აირჩიე ექსპერტი გამოცდილებით, ფასითა და შეფასებით და დაჯავშნე შენთვის მოსახერხებელ დროს.`,
+      `„${n}“ კატეგორიაში ონლაინ კონსულტაცია გჭირდება? მცოდნეზე იპოვი ხელით შერჩეულ ქართველ ექსპერტებს, რომლებთანაც ერთ საათში, ვიდეოსესიაზე კონკრეტულ პასუხს მიიღებ. აირჩიე ექსპერტი გამოცდილებით, ფასითა და შეფასებით და დაჯავშნე შენთვის მოსახერხებელ დროს.`,
     faq: [
-      { q: `როგორ დავჯავშნო კონსულტაცია სფეროში „${n}“?`, a: 'აირჩიე ექსპერტი, ნახე თავისუფალი დრო პროფილში და დაჯავშნე ვიდეოსესია შენთვის მოსახერხებელ საათზე.' },
+      { q: `როგორ დავჯავშნო კონსულტაცია კატეგორიაში „${n}“?`, a: 'აირჩიე ექსპერტი, ნახე თავისუფალი დრო პროფილში და დაჯავშნე ვიდეოსესია შენთვის მოსახერხებელ საათზე.' },
       { q: 'სად ტარდება შეხვედრა?', a: 'შეხვედრა მცოდნეზე ონლაინ, ვიდეოსესიის ფორმატში ტარდება — ცალკე აპლიკაცია არ გჭირდება.' },
       { q: 'რამდენი ღირს კონსულტაცია?', a: 'ფასს თითოეული ექსპერტი თავად ადგენს და პროფილში წინასწარ ხედავ; ერთი ფასი მოიცავს სრულ ვიდეოსესიას.' },
       { q: 'როგორ ავირჩიო ექსპერტი?', a: 'შეადარე გამოცდილება, სპეციალიზაცია და შეფასებები და აირჩიე ის, ვინც შენს საკითხს ყველაზე ახლოს დგას.' },

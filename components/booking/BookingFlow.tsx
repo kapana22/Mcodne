@@ -523,7 +523,7 @@ export const BookingFlow = ({
         // The signin bounce is a real funnel exit, not a completion — record it
         // before navigating away (the beacon is `keepalive`, so it survives).
         trackFail('UNAUTHENTICATED')
-        const here = typeof window !== 'undefined' ? window.location.pathname + window.location.search : `/tutors/${bookTutorId}`
+        const here = typeof window !== 'undefined' ? window.location.pathname + window.location.search : `/experts/${bookTutorId}`
         window.location.href = `/signin?redirect=${encodeURIComponent(here)}`
         return
       }
@@ -551,7 +551,7 @@ export const BookingFlow = ({
           code === 'INSUFFICIENT_BALANCE' ? 'კომპანიის ბალანსზე საკმარისი თანხა არ არის.' :
           code === 'NOT_COMPANY_MEMBER' ? 'კომპანიის ბალანსით გადახდა ვერ მოხერხდა.' :
           code === 'INVALID' ? 'შეავსე ყველა ველი.' :
-          code === 'FORBIDDEN' ? 'ჯავშანი მხოლოდ სტუდენტს შეუძლია.' :
+          code === 'FORBIDDEN' ? 'ჯავშანი მხოლოდ კლიენტს შეუძლია.' :
           // Surface the raw code when unmapped so a failure is never a silent
           // "try again" with no clue what went wrong.
           `ვერ დაიჯავშნა${code ? ` (${code})` : ''} — სცადე თავიდან.`
@@ -819,7 +819,7 @@ export const BookingFlow = ({
               </p>
               <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-2 motion-safe:animate-rise-in" style={{ animationDelay: '280ms' }}>
                 <Link
-                  href={createdId ? `/student/bookings/${createdId}` : '/student/bookings'}
+                  href={createdId ? `/me/bookings/${createdId}` : '/me/bookings'}
                   className="tap-shrink h-11 px-6 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-2 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)] transition-all duration-fast"
                 >
                   ჯავშნის ნახვა
@@ -1009,14 +1009,19 @@ export const BookingFlow = ({
                               <span className="font-display text-micro font-semibold uppercase text-ink-700">
                                 სათადარიგო დრო {i + 1}
                               </span>
-                              <div className="flex gap-2 mt-1.5">
+                              {/* Wraps below ~360px (M4): a fixed 7.5rem time
+                                  field beside a flex-1 date field left the date
+                                  ~100px on the narrowest phones — the year was
+                                  clipped. Wrapping puts the time on its own line
+                                  there and changes nothing from 390px up. */}
+                              <div className="flex flex-wrap gap-2 mt-1.5">
                                 <input
                                   type="date"
                                   aria-label={`სათადარიგო დრო ${i + 1} — დღე`}
                                   value={s.date}
                                   min={new Date(Date.now() + 3600_000).toISOString().slice(0, 10)}
                                   onChange={e => setAltSlots(prev => prev.map((p, j) => j === i ? { ...p, date: e.target.value } : p))}
-                                  className="flex-1 min-w-0 h-11 px-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body text-ink-900 transition-colors duration-fast"
+                                  className="flex-1 min-w-[10rem] h-11 px-3 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body text-ink-900 transition-colors duration-fast"
                                 />
                                 <input
                                   type="time"
@@ -1073,8 +1078,8 @@ export const BookingFlow = ({
                     )}
                     <div className="mt-5 flex flex-col sm:flex-row gap-2 items-center">
                       <Link
-                        href={`/tutors/${bookTutorId}?intent=message`}
-                        onClick={(e) => { e.preventDefault(); onClose(); if (bookTutorId) window.location.href = `/tutors/${bookTutorId}?intent=message` }}
+                        href={`/experts/${bookTutorId}?intent=message`}
+                        onClick={(e) => { e.preventDefault(); onClose(); if (bookTutorId) window.location.href = `/experts/${bookTutorId}?intent=message` }}
                         className={`tap-shrink h-11 px-4 rounded-btn font-display font-semibold text-small tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast ${
                           // Demoted to secondary once proposing is possible —
                           // two primary buttons would make neither one the
@@ -1087,7 +1092,7 @@ export const BookingFlow = ({
                         მიწერე ექსპერტს
                       </Link>
                       <Link
-                        href="/tutors"
+                        href="/experts"
                         onClick={() => onClose()}
                         className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-small tracking-wide inline-flex items-center transition-colors duration-fast"
                       >
@@ -1122,7 +1127,7 @@ export const BookingFlow = ({
                     {bookTutorId && (
                       <div className="mt-5 pt-4 border-t border-ink-100 text-center">
                         <Link
-                          href={`/tutors/${bookTutorId}?intent=message`}
+                          href={`/experts/${bookTutorId}?intent=message`}
                           onClick={() => onClose()}
                           className="text-small text-ink-500 hover:text-brand-700 font-display font-medium transition-colors duration-fast"
                         >

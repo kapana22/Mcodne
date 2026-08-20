@@ -7,7 +7,7 @@ import { NotFoundClient } from './NotFoundClient'
 // them were marked noindex.
 export const metadata: Metadata = {
   title: 'გვერდი ვერ მოიძებნა — მცოდნე',
-  description: 'ეს გვერდი აღარ არსებობს. იპოვე ექსპერტი, სფერო ან სტატია მცოდნეზე.',
+  description: 'ეს გვერდი აღარ არსებობს. იპოვე ექსპერტი, კატეგორია ან სტატია მცოდნეზე.',
   // A 404 already returns the right status, but an explicit noindex stops the
   // URL being kept as a candidate while the crawler re-checks it.
   robots: { index: false, follow: true },

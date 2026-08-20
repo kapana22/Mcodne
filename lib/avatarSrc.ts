@@ -2,7 +2,7 @@
  * Turns a stored avatar into something a payload can carry cheaply.
  *
  * `User.avatarUrl` holds a `data:` URI (files live in Postgres, not a bucket).
- * Shipping that string is what made /tutors 556KB of HTML — see the measurement
+ * Shipping that string is what made /experts 556KB of HTML — see the measurement
  * in app/api/avatars/[id]/route.ts. This replaces it with a URL to that route,
  * which the browser caches once and reuses on every later page.
  *

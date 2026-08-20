@@ -8,7 +8,7 @@ import { ensureDbReady } from '@/lib/dbBoot'
 // is no bucket). Selecting `imageUrl` into the page payload would put every
 // card's full image into the HTML — half a megabyte at six services, re-sent on
 // every navigation, cacheable by nothing. That is precisely the measurement
-// that produced /api/avatars/[id]: a 556 KB /tutors page of inline avatars.
+// that produced /api/avatars/[id]: a 556 KB /experts page of inline avatars.
 // Behind this route each image is fetched once per (service, version) and then
 // comes from the browser cache.
 //

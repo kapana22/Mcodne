@@ -31,6 +31,7 @@ export async function signOut(dest: string = '/'): Promise<void> {
       for (const k of [
         'mcodne:recent-tutors',   // removed feature — kept so old devices get cleaned
         'mcodne:apply-draft',     // expert-application form draft
+        'mcodne:join',            // /join door — which halves were ticked, sphere
         'mcodne:signup-draft',    // signup form draft (name + email)
         'mtsodne:onboarding',     // onboarding wizard answers
       ]) {

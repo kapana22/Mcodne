@@ -27,7 +27,7 @@ export type BookingChatProps = {
   /** Optional custom header: a node, or a render function that receives the
       booking summary, the pair summary, and (booking mode) the earlier
       pre-booking thread with the same partner, from the thread GET. The embedded
-      default renders the classic "მიმოწერა სტუდენტთან · N" bar; pass null to
+      default renders the classic "მიმოწერა კლიენტთან · N" bar; pass null to
       hide entirely. */
   header?: React.ReactNode | ((booking: ThreadBooking | null, pair: ThreadPair | null, preThread: ThreadPre | null) => React.ReactNode)
   /** Override the empty-thread copy (the default is client-facing). */
@@ -183,7 +183,7 @@ export function BookingChat({
 
   const defaultHeader = (
     <div className="px-5 sm:px-6 py-4 border-b border-ink-100 flex items-center justify-between">
-      <div className="font-display text-body-lg font-bold tracking-tight text-ink-900">მიმოწერა სტუდენტთან</div>
+      <div className="font-display text-body-lg font-bold tracking-tight text-ink-900">მიმოწერა კლიენტთან</div>
       {msgs.length > 0 && (
         <div className="text-meta text-ink-400 tabular-nums">{msgs.length} შეტყობინება</div>
       )}
@@ -315,7 +315,7 @@ export function BookingChat({
               disabled={calling || !me}
               aria-busy={calling}
               aria-label="ვიდეოზარის დაწყება"
-              title="დაიწყე ვიდეოზარი — სტუდენტი შემოუერთდება"
+              title="დაიწყე ვიდეოზარი — კლიენტი შემოუერთდება"
               className="h-10 w-10 rounded-full text-brand-600 hover:text-brand-700 hover:bg-brand-50 disabled:opacity-50 inline-flex items-center justify-center transition-colors duration-fast shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
             >
               {calling ? <span aria-hidden className="inline-block w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full motion-safe:animate-spin" /> : <Icon.video className="w-4 h-4" />}

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { materializeWeekly, type WeeklyBlock } from '@/lib/availabilityRules'
+import { ROLE } from '@/lib/roles'
 
 /**
  * ROLLING HORIZON — keep a working expert's calendar from quietly running out.
@@ -90,7 +91,7 @@ export async function topUpAvailability(now: Date = new Date()): Promise<TopUpRe
   try {
     const horizonEnd = new Date(now.getTime() + HORIZON_WEEKS * 7 * 86_400_000)
     const profiles = await prisma.tutorProfile.findMany({
-      where: { user: { role: 'TUTOR', suspendedAt: null } },
+      where: { user: { role: ROLE.EXPERT, suspendedAt: null } },
       select: { id: true, professionData: true },
     })
 

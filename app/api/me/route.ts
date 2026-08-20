@@ -3,11 +3,14 @@ import { normalizePhone, phoneFormatError } from '@/lib/phone'
 import { cookies } from 'next/headers'
 import { kickSweep } from '@/lib/sweepRunner'
 import { z } from 'zod'
+import { hatsOf } from '@/lib/hats'
+import { capabilitiesOf } from '@/lib/capabilities'
 import { getCurrentUser, hashPassword, verifyPassword, revokeOtherSessions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeAvatar } from '@/lib/normalizeAvatar'
 import { rateLimit } from '@/lib/rateLimit'
 import { firstGeorgianMessage, georgianNameRefine, georgianRefine } from '@/lib/georgianText'
+import { ROLE } from '@/lib/roles'
 
 
 // The header/nav reads role from here to decide what to render. If the browser
@@ -48,6 +51,22 @@ export async function GET() {
       // onboarding welcome banner for the first few days.
       createdAt: (user as any).createdAt ?? null,
     },
+    // ⚠️ THE HATS, AND WITHOUT THEM NO CLIENT COMPONENT COULD DRAW A MASTER'S
+    // OWN MENU (2026-08-18). `Role` has three values and none of them is
+    // „somebody who bids on requests" — an allowlisted tradesperson keeps role
+    // STUDENT (lib/hats states why). So `UserMenu` was labelling a master
+    // „სტუდენტი", offering them „შემოგვიერთდი → /apply" (the EXPERT form), and
+    // gating its space switcher on `role === ROLE.EXPERT` — which meant there was
+    // no route back to /provider from anywhere on the site. Their own workspace
+    // was reachable only by typing the URL or signing in again.
+    //
+    // `hatsOf` is one indexed read and this endpoint is already per-request and
+    // no-store, so nothing is being paid for twice.
+    hats: await hatsOf(user.id),
+    // What the person already OFFERS (lib/capabilities): CONSULT = a
+    // TutorProfile, WORK = a ServiceProfile plus active RequestAccess. The
+    // /join door reads it to stop offering a half somebody already has.
+    capabilities: await capabilitiesOf(user.id),
   }, { headers: NO_STORE })
 }
 

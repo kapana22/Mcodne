@@ -4,6 +4,7 @@ import type { Dispatch, SetStateAction } from 'react'
 
 import { Icon } from '@/components/Icon'
 import type { Me, Msg } from './_types'
+import { ROLE, roleLabel } from '@/lib/roles'
 
 type Props = {
   me: Me
@@ -32,14 +33,14 @@ export function AccountSection({ me, verifyStage, verifyCode, setVerifyCode, ver
         <div className="flex justify-between">
           <dt className="text-ink-500">როლი</dt>
           <dd className="font-display font-semibold text-ink-900">
-            {me.role === 'ADMIN' ? 'ადმინი' : me.role === 'TUTOR' ? 'ექსპერტი' : 'სტუდენტი'}
+            {roleLabel(me.role)}
           </dd>
         </div>
         <div className="flex justify-between items-center gap-3">
-          <dt className="text-ink-500">ვერიფიცირებული</dt>
+          <dt className="text-ink-500">გადამოწმებული</dt>
           <dd className="font-display font-semibold flex items-center gap-2">
             {me.emailVerified
-              ? <span className="text-success-700 inline-flex items-center gap-1"><Icon.check aria-hidden className="w-3.5 h-3.5" /> დადასტურებული</span>
+              ? <span className="text-success-700 inline-flex items-center gap-1"><Icon.check aria-hidden className="w-3.5 h-3.5" /> გადამოწმებულია</span>
               : (
                 <>
                   <span className="text-warning-700 inline-flex items-center gap-1"><Icon.x aria-hidden className="w-3.5 h-3.5" /> არ არის</span>

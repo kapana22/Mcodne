@@ -77,17 +77,20 @@ export async function DELETE(req: Request) {
   if (!review) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
   // Recompute tutor rating/count in a transaction so we don't drift.
+  // A job review (offerId set, tutorId null) has no expert aggregate to keep.
+  const tutorId = review.tutorId
   await prisma.$transaction(async tx => {
     await tx.review.delete({ where: { id } })
+    if (!tutorId) return
     const stats = await tx.review.aggregate({
-      where: { tutorId: review.tutorId },
+      where: { tutorId },
       _count: { _all: true },
       _avg: { rating: true },
     })
     const count = stats._count._all
     const avg = stats._avg.rating ?? 0
     await tx.tutorProfile.update({
-      where: { id: review.tutorId },
+      where: { id: tutorId },
       data: { reviewsCount: count, rating: avg },
     })
   })

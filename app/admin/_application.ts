@@ -101,7 +101,7 @@ const EXTRA_LABELS: Record<string, string> = {
   specializations: 'სპეციალიზაციები',
   certifications: 'სერტიფიკატები',
   industries: 'ინდუსტრიები',
-  requestedCategory: 'მოთხოვნილი სფერო',
+  requestedCategory: 'მოთხოვნილი კატეგორია',
   professions: 'პროფესიები',
 }
 

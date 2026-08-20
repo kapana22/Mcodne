@@ -82,7 +82,7 @@ type Insights = {
 }
 
 const APPLY_STEP_LABEL: Record<string, string> = {
-  opened: '/apply გახსნა',
+  opened: '/join გახსნა',
   profile: 'პროფილი შეავსო',
   pricing: 'ფასი დაადო',
   submitted: 'განაცხადი გააგზავნა',
@@ -108,7 +108,7 @@ const APPLY_BLOCK_LABEL: Record<string, string> = {
   NAME_REQUIRED: 'სახელი ვერ შეავსო',
   EMAIL_INVALID: 'ელფოსტა ვერ შეიყვანა',
   PHONE_INVALID: 'ტელეფონის ნომერზე შეჩერდა',
-  CATEGORY_REQUIRED: 'სფერო ვერ აირჩია',
+  CATEGORY_REQUIRED: 'კატეგორია ვერ აირჩია',
   HEADLINE_INVALID: 'ერთ წინადადებაზე შეჩერდა',
   PHOTO_REQUIRED: 'ფოტო ვერ ატვირთა',
   BIO_TOO_SHORT: 'აღწერა ვერ დაწერა',
@@ -158,7 +158,7 @@ const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
 const ExpertName = ({ slug, fullName }: { slug: string | null; fullName: string | null }) => {
   const name = fullName?.trim() || 'უსახელო'
   return slug
-    ? <a href={`/tutors/${slug}`} target="_blank" rel="noopener noreferrer" className="font-display text-small font-bold text-ink-900 hover:text-brand-700 transition-colors duration-fast truncate">{name}</a>
+    ? <a href={`/experts/${slug}`} target="_blank" rel="noopener noreferrer" className="font-display text-small font-bold text-ink-900 hover:text-brand-700 transition-colors duration-fast truncate">{name}</a>
     : <span className="font-display text-small font-bold text-ink-900 truncate">{name}</span>
 }
 
@@ -174,7 +174,7 @@ const ZeroRow = ({ q, n, lastAt }: { q: string; n: number; lastAt: string }) => 
       </div>
     </div>
     <div className="flex items-center gap-2 shrink-0">
-      <OpenBtn href={`/tutors?q=${encodeURIComponent(q)}`} label="ძებნის ნახვა" />
+      <OpenBtn href={`/experts?q=${encodeURIComponent(q)}`} label="ძებნის ნახვა" />
       <CopyBtn value={q} />
     </div>
   </div>
@@ -298,7 +298,7 @@ const PeoplePane = ({ d }: { d: Insights }) => {
                 </div>
                 <div className="text-meta text-ink-600 shrink-0">
                   გაჩერდა <span className="font-display font-semibold text-ink-900">{APPLY_LAST_STEP[u.lastStep] ?? `ნაბიჯი ${u.lastStep}`}</span>
-                  {typeof u.catCount === 'number' && u.catCount > 0 && <> · {u.catCount} სფერო</>}
+                  {typeof u.catCount === 'number' && u.catCount > 0 && <> · {u.catCount} კატეგორია</>}
                   {/* The reason, when there was one. Warning-toned because a
                       wall is ours to remove, while a quiet exit is a question
                       to think about. */}
@@ -344,7 +344,7 @@ const PeoplePane = ({ d }: { d: Insights }) => {
         <SectionCard
           eyebrow="პროფილები"
           title="ვის რა აკლია"
-          sub="იჯავშნება, მაგრამ ნაკლულია. ცარიელი პროფილი არც ძებნაში ჩნდება კარგად, არც სტუდენტს არწმუნებს."
+          sub="იჯავშნება, მაგრამ ნაკლულია. ცარიელი პროფილი არც ძებნაში ჩნდება კარგად, არც კლიენტს არწმუნებს."
         >
           <RowList>
             {thin.map(e => (
@@ -437,7 +437,7 @@ const DemandPane = ({ d }: { d: Insights }) => {
         <Stat
           n={share === null ? '—' : PCT(share)}
           label="უშედეგო ძებნის წილი"
-          sub={share === null ? 'ჯერ ძებნა არ ყოფილა' : 'რაც მაღალია, მით მეტი სტუდენტი მიდის ხელცარიელი'}
+          sub={share === null ? 'ჯერ ძებნა არ ყოფილა' : 'რაც მაღალია, მით მეტი კლიენტი მიდის ხელცარიელი'}
           bad={share !== null && share >= 0.25}
         />
       </div>
@@ -455,15 +455,15 @@ const DemandPane = ({ d }: { d: Insights }) => {
 
       {d.categories.length > 0 && (
         <SectionCard
-          eyebrow="სფეროები"
+          eyebrow="კატეგორიები"
           title="სად არის მოთხოვნა და სად — ექსპერტი"
-          sub="ძებნა — რამდენჯერ მოძებნეს ეს სფერო. ექსპერტი — რამდენის დაჯავშნა შეიძლება ახლა."
+          sub="ძებნა — რამდენჯერ მოძებნეს ეს კატეგორია. ექსპერტი — რამდენის დაჯავშნა შეიძლება ახლა."
         >
           <div className="overflow-x-auto">
             <table className="w-full min-w-[380px] text-small">
               <thead>
                 <tr className="text-left border-b border-ink-200">
-                  <th className="pb-2 font-display text-micro font-semibold uppercase text-ink-500">სფერო</th>
+                  <th className="pb-2 font-display text-micro font-semibold uppercase text-ink-500">კატეგორია</th>
                   <th className="pb-2 pl-3 text-right font-display text-micro font-semibold uppercase text-ink-500">ძებნა</th>
                   <th className="pb-2 pl-3 text-right font-display text-micro font-semibold uppercase text-ink-500">ექსპერტი</th>
                   <th className="pb-2 pl-3 text-right font-display text-micro font-semibold uppercase text-ink-500">ჯავშანი</th>
@@ -476,7 +476,7 @@ const DemandPane = ({ d }: { d: Insights }) => {
                   return (
                     <tr key={c.slug} className={gap ? 'bg-danger-50/40' : undefined}>
                       <td className="py-2.5 pr-3">
-                        <a href={`/categories/${c.slug}`} target="_blank" rel="noopener noreferrer" className="font-display font-semibold text-ink-900 hover:text-brand-700 transition-colors duration-fast">{c.name}</a>
+                        <a href={`/experts?category=${c.slug}`} target="_blank" rel="noopener noreferrer" className="font-display font-semibold text-ink-900 hover:text-brand-700 transition-colors duration-fast">{c.name}</a>
                       </td>
                       <td className="py-2.5 pl-3 text-right tabular-nums text-ink-700">{c.searches}</td>
                       <td className={`py-2.5 pl-3 text-right tabular-nums font-semibold ${gap ? 'text-danger-700' : 'text-ink-900'}`}>{c.experts}</td>
@@ -617,7 +617,7 @@ const FunnelPane = ({ d, days }: { d: Insights; days: number }) => {
               <div className="font-display text-micro font-semibold uppercase text-ink-900 mb-2">დაუსრულებელი მცდელობები</div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Stat n={String(f.outcomes.failed)} label="შეცდომით შეწყდა" sub="სერვერმა უარი თქვა — ეს ჩვენი ბუგია" bad={f.outcomes.failed > 0} />
-                <Stat n={String(f.outcomes.noSlots)} label="თავისუფალი დრო არ იყო" sub="ჩიხი, რომელიც სტუდენტს არ აურჩევია" bad={f.outcomes.noSlots > 0} />
+                <Stat n={String(f.outcomes.noSlots)} label="თავისუფალი დრო არ იყო" sub="ჩიხი, რომელიც კლიენტს არ აურჩევია" bad={f.outcomes.noSlots > 0} />
                 <Stat n={String(f.outcomes.abandoned)} label="თავად მიატოვა" sub="შეცდომის გარეშე გავიდა — ეს დიზაინის საკითხია" />
               </div>
             </div>
@@ -647,7 +647,7 @@ const FunnelPane = ({ d, days }: { d: Insights; days: number }) => {
         <SectionCard
           eyebrow="ექსპერტად რეგისტრაცია"
           title="სად წყდება განაცხადი"
-          sub="ვინც /apply გახსნა და რომელ ნაბიჯამდე მივიდა."
+          sub="ვინც /join გახსნა და რომელ ნაბიჯამდე მივიდა."
         >
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {d.apply.steps.map(st => (

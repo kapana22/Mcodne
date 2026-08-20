@@ -2,7 +2,7 @@
 // „ზემოთ" — a back-to-top control for long pages.
 //
 // WHY IT EXISTS: measured on a phone, the real pages here run 5.2–7.9 screens
-// (/ 7.9 · /blog 6.4 · profile 6 · /konsultacia 5.3 · /tutors 5.2). Getting back
+// (/ 7.9 · /blog 6.4 · profile 6 · /konsultacia 5.3 · /experts 5.2). Getting back
 // to the search field or the nav from the foot of one of those is 6–8 swipes,
 // and the header is `sticky`, so it is NOT reachable by scrolling up a little —
 // you have to travel the whole way.

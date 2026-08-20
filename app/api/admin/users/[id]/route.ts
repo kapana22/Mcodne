@@ -130,7 +130,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
 /* ── Admin safety actions: suspend / unsuspend ──
    Guarded identically to every other /api/admin route (requireRoleApi('ADMIN'))
-   and audit-logged, following app/api/admin/tutors/[id]/featured as the
+   and audit-logged, following app/api/admin/experts/[id]/featured as the
    pattern. The reason is optional and, when supplied, kept in the audit meta. */
 const PatchBody = z.object({
   action: z.enum(['suspend', 'unsuspend', 'makeAdmin', 'revokeAdmin']),
@@ -157,7 +157,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!target) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
   // An anonymized account's `suspendedAt` is not a pause — it is the entire
-  // mechanism that keeps the tombstone off the public web. app/tutors/[id]/page
+  // mechanism that keeps the tombstone off the public web. app/experts/[slug]/page
   // gates on `suspendedAt` and on NOTHING else (browse's `available` filter
   // doesn't cover the profile URL), so un-suspending would republish a
   // „წაშლილი პროფილი" page at its old address.
@@ -244,7 +244,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
    · `anonymize` — every row survives, the person does not. Email, name, phone,
      bio, photo and the public expert text are replaced, the account is
      suspended (which is what removes an expert from every public read — see
-     lib/tutorsQuery, /api/tutors/[id], app/tutors/[id]/page) and every way back
+     lib/tutorsQuery, /api/tutors/[id], app/experts/[slug]/page) and every way back
      in is revoked. The counterparty keeps a coherent history.
 
    A reason is mandatory in both, because the account it describes is about to
@@ -580,7 +580,7 @@ async function anonymize(
         await tx.tutorProfile.update({
           where: { id: tutorId },
           data: {
-            // The pretty URL dies with the person; /tutors/[id] resolves by id
+            // The pretty URL dies with the person; /experts/[slug] resolves by id
             // as well, and `suspendedAt` already 404s both.
             slug: null,
             headline: ANON_HEADLINE,

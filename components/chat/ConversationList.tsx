@@ -6,23 +6,16 @@ import { Icon } from '@/components/Icon'
 import { ConversationRow } from '@/components/ConversationRow'
 import { Skeleton } from '@/components/Skeleton'
 
-type Thread = {
-  // Stable row key across booking (`b-<id>`) and pre-booking pair (`u-<id>`)
-  // threads — the two thread kinds share this list.
-  key: string
-  bookingId?: string
-  pre?: boolean
-  name: string | null
-  avatarUrl?: string | null
-  topic: string
-  status: string
-  preview: string
-  lastFromMe: boolean
-  lastHasFile: boolean
-  at: string
-  unreadCount: number
-  href: string
-}
+// ONE LIST, EVERY KIND (2026-08-19). The rows arrive already built as
+// lib/inboxRows → InboxRow: booking threads, pre-booking pair threads and — on
+// the supply side — the offer conversations that used to be embedded one per
+// row on /work/offers. The list does not know how a row was made; in
+// particular it never masks anything, because an OFFER row's `peerName` was
+// masked where it was BUILT. Type-only import: the module's loader half touches
+// prisma and must never reach the browser bundle.
+import type { InboxRow } from '@/lib/inboxRows'
+
+type Thread = InboxRow
 
 type EmptyCopy = {
   title: string
@@ -37,7 +30,7 @@ type EmptyCopy = {
 // shows the previous list instantly while the fetch refreshes it in the
 // background. User-scoped API + single-session, so cross-user leakage isn't a
 // concern (a role swap self-corrects on the next fetch).
-// KEYED BY SPACE ('student' | 'tutor'): a dual-role user has a different inbox in
+// KEYED BY SPACE ('client' | 'expert'): a dual-role user has a different inbox in
 // each space, so a single shared cache would flash the other space's list when
 // switching. Per-space entries keep each side's stale-while-revalidate correct.
 const cachedThreads: Record<string, Thread[] | undefined> = {}
@@ -53,20 +46,24 @@ export function ConversationList({ empty }: { empty: EmptyCopy }) {
   // Which hat is this inbox showing? The student and tutor messages layouts each
   // render this list under their own route, so the path tells us the active
   // space — passed to the API so a dual-role user sees only that space's threads.
-  const space = path.startsWith('/student') ? 'student' : 'tutor'
+  const space = path.startsWith('/me') ? 'client' : 'expert'
   const [threads, setThreads] = useState<Thread[] | null>(cachedThreads[space] ?? null)
   const [err, setErr] = useState(false)
   const [query, setQuery] = useState('')
-  const params = useParams<{ bookingId?: string; id?: string; userId?: string }>()
-  // Active row: the open booking thread (`b-<id>`) OR the open pair thread
-  // (`u-<userId>`). The booking route param is `bookingId` on the tutor side
-  // and `id` on the student side — accept either.
+  const params = useParams<{ bookingId?: string; id?: string; userId?: string; offerId?: string }>()
+  // Active row: the open booking thread (`b-<id>`), the open pair thread
+  // (`u-<userId>`) or the open offer thread (`o-<offerId>`). The booking route
+  // param is `bookingId` on the tutor side and `id` on the student side —
+  // accept either. Same prefixes lib/inboxRows mints, so the highlight cannot
+  // drift from the row ids.
   const bookingParam = params?.bookingId ?? params?.id
-  const activeKey = params?.userId
-    ? `u-${params.userId}`
-    : bookingParam
-      ? `b-${bookingParam}`
-      : null
+  const activeKey = params?.offerId
+    ? `o-${params.offerId}`
+    : params?.userId
+      ? `u-${params.userId}`
+      : bookingParam
+        ? `b-${bookingParam}`
+        : null
 
   useEffect(() => {
     let cancelled = false
@@ -98,13 +95,16 @@ export function ConversationList({ empty }: { empty: EmptyCopy }) {
     if (!threads) return []
     const q = query.trim().toLowerCase()
     const filtered = q
-      ? threads.filter(t => (t.name ?? '').toLowerCase().includes(q) || t.topic.toLowerCase().includes(q))
+      ? threads.filter(t => (t.peerName ?? '').toLowerCase().includes(q) || t.topic.toLowerCase().includes(q))
       : threads
+    // ⚠️ `lastAt` is when somebody last SPOKE — never a booking's updatedAt,
+    // which messages do not bump and which therefore buries a live thread at
+    // the bottom of the inbox (the invariant tests/regression-invariants pins).
     return [...filtered].sort((a, z) => {
-      const ua = a.unreadCount > 0 ? 1 : 0
-      const uz = z.unreadCount > 0 ? 1 : 0
+      const ua = a.unread > 0 ? 1 : 0
+      const uz = z.unread > 0 ? 1 : 0
       if (ua !== uz) return uz - ua
-      return new Date(z.at).getTime() - new Date(a.at).getTime()
+      return new Date(z.lastAt).getTime() - new Date(a.lastAt).getTime()
     })
   }, [threads, query])
 
@@ -175,17 +175,17 @@ export function ConversationList({ empty }: { empty: EmptyCopy }) {
       )}
       <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-ink-100">
         {sorted.map(t => (
-          <div key={t.key} className={activeKey === t.key ? 'bg-brand-50/50' : ''}>
+          <div key={t.id} className={activeKey === t.id ? 'bg-brand-50/50' : ''}>
             <ConversationRow
               href={t.href}
-              name={t.name}
+              name={t.peerName}
               avatarUrl={t.avatarUrl}
               topic={t.topic}
-              lastBody={t.preview}
+              lastBody={t.lastPreview}
               lastHasFile={t.lastHasFile}
-              lastAt={t.at ? new Date(t.at) : null}
+              lastAt={t.lastAt ? new Date(t.lastAt) : null}
               lastFromMe={t.lastFromMe}
-              unread={t.unreadCount}
+              unread={t.unread}
               now={now}
             />
           </div>

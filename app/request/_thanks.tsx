@@ -51,14 +51,29 @@ export function ThanksCard({ sent, topic }: {
   return (
     <div className="space-y-4">
       <Card padding="section" className="border-brand-200 bg-brand-50">
-        <h1 className="font-display text-h2 font-bold text-ink-900 tracking-tight">მივიღეთ</h1>
-        {sent.rejected ? (
-          // Said plainly, because a call that will not come is worse than a „no".
-          // The row is kept either way — see the endpoint.
-          <p className="mt-2 text-body text-ink-700">ამ ბიუჯეტში ვერ დაგეხმარებით.</p>
-        ) : (
-          <p className="mt-2 text-body text-ink-700">დაგირეკავთ მითითებულ ნომერზე.</p>
-        )}
+        {/* ⚠️ TWO OUTCOMES, AND THE SCREEN USED TO NAME ONLY THE OTHER ONE
+            (2026-08-18). It said „დაგირეკავთ მითითებულ ნომერზე" to everybody.
+            That was true when an operator read every request — and it stopped
+            being true the day triage started releasing clean ones on arrival.
+            Most senders now have their request in front of providers within
+            seconds and nobody phones them, so the last sentence they read was
+            describing a step that had already been skipped.
+
+            Owner, 2026-08-18: „ნახოს … რომ აქტიურად მიმდინარეობს ძებნა." That
+            is exactly the state auto-verification puts them in, and it is worth
+            saying in the heading rather than leaving to the track below.
+
+            The `rejected` branch is gone with the budget floor — nothing sets
+            it any more (see the endpoint), and a branch that cannot run is a
+            sentence nobody maintains. */}
+        <h1 className="font-display text-h2 font-bold text-ink-900 tracking-tight">
+          {sent.autoVerified ? 'გაიგზავნა' : 'მივიღეთ'}
+        </h1>
+        <p className="mt-2 text-body text-ink-700">
+          {sent.autoVerified
+            ? 'ხელოსნებს და ექსპერტებს უკვე გადაეცა — შეთავაზებებს ელოდები.'
+            : 'ჯერ ჩვენ ვამოწმებთ, მერე გადავცემთ. დაგირეკავთ მითითებულ ნომერზე.'}
+        </p>
         {sent.publicRef && (
           <>
             <p className="mt-5 text-small text-ink-600">შენი კოდი</p>
@@ -94,10 +109,10 @@ export function ThanksCard({ sent, topic }: {
             they have to do something (sign in) to reach what they just sent, and
             saying nothing would leave the request looking lost. SIGNED_IN and
             NONE are silent — nothing changed. */}
-        {/* ⚠️ NEITHER LINE PROMISES A LIST. /student does not show requests and
-            must not start to — the subsystem is linked from nowhere on the site
-            by design. The reference above IS how this request is reached, so the
-            account copy says only what is true about the account itself. */}
+        {/* Neither line links anywhere but sign-in. The signed-in client's own
+            list of requests is its own screen (stage 6); this screen has the
+            reference above, which is how THIS request is reached, so the account
+            copy says only what is true about the account itself. */}
         {sent.account === 'CREATED' && (
           <p className="mt-5 pt-4 border-t border-brand-200 text-small text-ink-700">
             ამ ელფოსტაზე ანგარიში შეგიქმენით. პაროლს{' '}
@@ -147,21 +162,35 @@ export function ThanksCard({ sent, topic }: {
           costs nothing and brings offers to you; browsing costs a few minutes
           and you choose. Only drawn when the topic maps to a sphere — a link to
           „experts in ⌀" is a dead end dressed as a choice. */}
-      {categorySlug && !sent.rejected && (
+      {/* ⚠️ THE WHOLE CARD USED TO BE GATED ON `categorySlug`, WHICH IS NULL FOR
+          EVERY SERVICE TOPIC (2026-08-18). So on the trades side the „ჩემი
+          მოთხოვნა" button — the only real control back to your own request —
+          vanished with the browse half it happens to sit beside, and the only
+          route left was a raw path rendered as inline text („შეთავაზებებს აქ
+          ნახავ: /request/MC-UQGUD").
+
+          The gate belongs to the BROWSE button alone: „see experts in ⌀" is a
+          dead end dressed as a choice, and that is a real reason to hide one
+          button. It was never a reason to hide the other. */}
+      {sent.publicRef && (
         <Card>
           <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">
             სანამ პასუხს ელოდები
           </h2>
           <p className="mt-2 text-body text-ink-600">
-            შეთავაზებები თავისით მოგივა. თუ გირჩევნია, თავადაც ნახე — {topicLabel(topic)}.
+            {categorySlug
+              ? <>შეთავაზებები თავისით მოგივა. თუ გირჩევნია, თავადაც ნახე — {topicLabel(topic)}.</>
+              : <>შეთავაზებები თავისით მოგივა. მოთხოვნას აქ ნახავ ნებისმიერ დროს.</>}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Btn href={`/tutors?category=${encodeURIComponent(categorySlug)}`} size="sm">
-              ექსპერტების ნახვა
-            </Btn>
-            <Btn href={`/request/${sent.publicRef}`} variant="secondary" size="sm">
+            <Btn href={`/request/${sent.publicRef}`} size="sm">
               ჩემი მოთხოვნა
             </Btn>
+            {categorySlug && (
+              <Btn href={`/experts?category=${encodeURIComponent(categorySlug)}`} variant="secondary" size="sm">
+                ექსპერტების ნახვა
+              </Btn>
+            )}
           </div>
         </Card>
       )}

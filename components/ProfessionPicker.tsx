@@ -76,7 +76,7 @@ export function ProfessionPicker({
     <div className="grid gap-5">
       {/* ── ① the sphere ─────────────────────────────────────────────────── */}
       <div>
-        <StepLabel n={1} on={!!sphere}>სფერო</StepLabel>
+        <StepLabel n={1} on={!!sphere}>კატეგორია</StepLabel>
         {/* A GRID, NOT A <select>. Seventeen spheres in a native dropdown is a
             list you scroll blind: macOS paints it as an overlay across the
             page, a phone as a wheel, and either way you cannot see the options
@@ -90,7 +90,7 @@ export function ProfessionPicker({
             is the one convention that tells them apart without a word. */}
         <div
           role="radiogroup"
-          aria-label="სფერო"
+          aria-label="კატეგორია"
           className="grid sm:grid-cols-2 gap-1 rounded-card border border-ink-200 bg-ink-50/40 p-2"
         >
           {spheres.map(sp => {
@@ -134,13 +134,13 @@ export function ProfessionPicker({
 
         {!current ? (
           <p className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 px-4 py-6 text-center text-small text-ink-500">
-            ჯერ სფერო აირჩიე — მერე აქ მისი პროფესიები გამოჩნდება.
+            ჯერ კატეგორია აირჩიე — მერე აქ მისი პროფესიები გამოჩნდება.
           </p>
         ) : jobs.length === 0 ? (
           // A sphere the admin added that has no professions listed yet. Say so;
           // the applicant can still finish (the sphere alone is a valid answer).
           <p className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 px-4 py-6 text-center text-small text-ink-500">
-            ამ სფეროს პროფესიები ჯერ არ აქვს — სფერო საკმარისია.
+            ამ კატეგორიის პროფესიები ჯერ არ აქვს — კატეგორია საკმარისია.
           </p>
         ) : (
           /* ONE BLOCK. Loose rows on a bare background read as a scattered list;
@@ -184,7 +184,7 @@ export function ProfessionPicker({
 
         {elsewhere.length > 0 && (
           <div className="mt-3 pt-3 border-t border-ink-100">
-            <p className="mb-1.5 text-meta text-ink-500">სხვა სფეროდან არჩეული:</p>
+            <p className="mb-1.5 text-meta text-ink-500">სხვა კატეგორიიდან არჩეული:</p>
             <div className="flex flex-wrap gap-1.5">
               {elsewhere.map(job => (
                 <span key={job} className="inline-flex items-center gap-1.5 h-7 pl-3 pr-1 rounded-pill border border-ink-200 bg-ink-50 text-meta text-ink-700">

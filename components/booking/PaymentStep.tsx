@@ -1,5 +1,5 @@
 'use client'
-// Payment step — moved verbatim from app/tutors/[id]/client.tsx. Rendered ONLY
+// Payment step — moved verbatim from app/experts/[slug]/client.tsx. Rendered ONLY
 // when PAYMENTS_LIVE flips true (lib/flags); until then the flow ends at the
 // intake step and no charge is implied anywhere.
 import React from 'react'

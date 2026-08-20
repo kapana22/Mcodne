@@ -86,7 +86,7 @@ async function runMigrations() {
       ADD COLUMN IF NOT EXISTS "professions" TEXT[] NOT NULL DEFAULT '{}';
   `)
 
-  // Public profile slug — „/tutors/ana-gagoshidze" instead of a raw cuid.
+  // Public profile slug — „/experts/ana-gagoshidze" instead of a raw cuid.
   // Nullable + UNIQUE: uniqueness is what the generator relies on to resolve
   // collisions, and Postgres allows many NULLs under a unique index, so
   // un-backfilled rows coexist fine. The route accepts id OR slug, so this can
@@ -1041,7 +1041,47 @@ async function runMigrations() {
       );
     EXCEPTION WHEN others THEN NULL; END $$;
   `)
+  // The face and the sentence (2026-08-18). Added late, because /services
+  // shipped as name + tag list and read as a directory of nobody — see the
+  // schema comments for why the photo is a column and why it must never be
+  // selected into a list.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ServiceProfile" ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ServiceProfile" ADD COLUMN IF NOT EXISTS "about" TEXT;`)
+  // Added 2026-08-18 with the column: the application had been collecting these
+  // and approval had nowhere to put them. Default '{}' so every existing row is
+  // valid the moment the column appears.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ServiceProfile" ADD COLUMN IF NOT EXISTS "workPhotos" TEXT[] NOT NULL DEFAULT '{}';`)
+
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ServiceProfile_companyId_key" ON "ServiceProfile"("companyId");`)
+
+  // Stage 5 (2026-08-19): a public address and a switch for it. Its own slug
+  // namespace (per-table uniqueness — see the schema comment); published
+  // defaults TRUE so every already-approved master keeps their listing.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ServiceProfile" ADD COLUMN IF NOT EXISTS "slug" TEXT;`)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ServiceProfile_slug_key" ON "ServiceProfile"("slug");`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ServiceProfile" ADD COLUMN IF NOT EXISTS "published" BOOLEAN NOT NULL DEFAULT true;`)
+
+  // Stage 7 (2026-08-19): a job can be finished and reviewed without a Job
+  // table. RequestOffer grows kind/doneAt/doneBy/closedAt; Review learns to hang
+  // off an offer. ⚠️ THE ONE REAL MIGRATION of the restructuring: Review.bookingId
+  // and Review.tutorId drop NOT NULL. Both are ALTERs that only WIDEN what the
+  // column accepts, so a stale instance mid-deploy keeps writing exactly what it
+  // wrote before; the CHECK below is what keeps a review attached to something.
+  await prisma.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "RequestOfferKind" AS ENUM ('QUOTE', 'BOOKING'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "RequestOffer" ADD COLUMN IF NOT EXISTS "kind" "RequestOfferKind" NOT NULL DEFAULT 'QUOTE';`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "RequestOffer" ADD COLUMN IF NOT EXISTS "doneAt" TIMESTAMP(3);`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "RequestOffer" ADD COLUMN IF NOT EXISTS "doneBy" TEXT;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "RequestOffer" ADD COLUMN IF NOT EXISTS "closedAt" TIMESTAMP(3);`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Review" ALTER COLUMN "bookingId" DROP NOT NULL;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Review" ALTER COLUMN "tutorId" DROP NOT NULL;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Review" ADD COLUMN IF NOT EXISTS "offerId" TEXT;`)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "Review_offerId_key" ON "Review"("offerId");`)
+  await prisma.$executeRawUnsafe(`DO $$ BEGIN
+    ALTER TABLE "Review" ADD CONSTRAINT "Review_offerId_fkey" FOREIGN KEY ("offerId") REFERENCES "RequestOffer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  EXCEPTION WHEN duplicate_object THEN NULL; END $$;`)
+  await prisma.$executeRawUnsafe(`DO $$ BEGIN
+    ALTER TABLE "Review" ADD CONSTRAINT "Review_attached_to_something" CHECK ("bookingId" IS NOT NULL OR "offerId" IS NOT NULL);
+  EXCEPTION WHEN duplicate_object THEN NULL; END $$;`)
 
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ServiceProfile_userId_key" ON "ServiceProfile"("userId");`)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceProfile_available_idx" ON "ServiceProfile"("available");`)
@@ -1053,6 +1093,59 @@ async function runMigrations() {
   // schema alongside the others.
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceProfile_services_gin" ON "ServiceProfile" USING GIN ("services");`)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceProfile_areas_gin" ON "ServiceProfile" USING GIN ("areas");`)
+
+  // ── A tradesperson asking to be listed (2026-08-18) ─────────────────────
+  // The object that did not exist: until now a master could only be admitted
+  // by an admin typing their id into /admin → access. That is not a product,
+  // it is a favour — there was no way to APPLY, no queue, and nothing for the
+  // applicant to look at afterwards. See prisma/schema → MasterApplication.
+  //
+  // ⚠️ THE ENUM IS CREATED BEFORE THE TABLE, and defensively. `MasterKind` is
+  // new, so on a database that predates this deploy the CREATE TABLE below
+  // would fail on an unknown type — and `dbBoot` runs before the first request
+  // is served, so that failure is the whole site, not one screen.
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      CREATE TYPE "MasterKind" AS ENUM ('INDIVIDUAL', 'COMPANY');
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+  `)
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "MasterApplication" (
+      "id"            TEXT PRIMARY KEY,
+      "userId"        TEXT NOT NULL,
+      "kind"          "MasterKind" NOT NULL DEFAULT 'INDIVIDUAL',
+      "fullName"      TEXT NOT NULL,
+      "phone"         TEXT NOT NULL,
+      "companyName"   TEXT,
+      "taxId"         TEXT,
+      "services"      TEXT[] NOT NULL DEFAULT '{}',
+      "areas"         TEXT[] NOT NULL DEFAULT '{}',
+      "about"         TEXT NOT NULL,
+      "yearsExp"      INTEGER,
+      "calloutFee"    INTEGER,
+      "priceFrom"     INTEGER,
+      "photoUrl"      TEXT,
+      "workPhotos"    TEXT[] NOT NULL DEFAULT '{}',
+      "status"        "ApplicationStatus" NOT NULL DEFAULT 'SUBMITTED',
+      "moderatorNote" TEXT,
+      "reviewedAt"    TIMESTAMP(3),
+      "createdAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      -- The same bounds lib/masterApplication enforces, restated where a raw
+      -- INSERT cannot get past them. A price of zero is not „free", it is a
+      -- form that was submitted empty and read as a number.
+      CONSTRAINT "MasterApplication_prices_sane" CHECK (
+        ("calloutFee" IS NULL OR ("calloutFee" > 0 AND "calloutFee" <= 100000))
+        AND ("priceFrom" IS NULL OR ("priceFrom" > 0 AND "priceFrom" <= 1000000))
+        AND ("yearsExp" IS NULL OR ("yearsExp" >= 0 AND "yearsExp" <= 70))
+      )
+    );
+  `)
+  // One application per account, upserted — a re-submit after NEEDS_REVISION
+  // updates the row rather than queueing a second one, exactly as
+  // TutorApplication does.
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "MasterApplication_userId_key" ON "MasterApplication"("userId");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MasterApplication_status_createdAt_idx" ON "MasterApplication"("status", "createdAt");`)
 
   // ── What happened to an offer (2026-08-17) ──────────────────────────────
   // The append-only record a PRICE will be read from: the owner's decision is
@@ -1181,6 +1274,32 @@ async function runMigrations() {
     `ALTER TABLE "RequestOffer" ADD CONSTRAINT "RequestOffer_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
     `ALTER TABLE "RequestAccess" ADD CONSTRAINT "RequestAccess_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
     `ALTER TABLE "RequestAccess" ADD CONSTRAINT "RequestAccess_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    // MasterApplication → User, CASCADE (2026-08-18). Not a judgement call: the
+    // row IS the person — their name, phone, face photo and a paragraph about
+    // themselves — so it cannot outlive the account the way a ServiceRequest's
+    // anonymised history can. SET NULL is not even available (the column is NOT
+    // NULL, one application per account), and RESTRICT would make an account
+    // undeletable because somebody once applied to fix taps. Deliberately
+    // allowlisted in tests/userDeletion.test.ts rather than excused there.
+    `ALTER TABLE "MasterApplication" ADD CONSTRAINT "MasterApplication_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    // ⚠️ THESE TWO WERE MISSING, AND THE GAP WAS REAL (found 2026-08-18 by
+    // deleting three test accounts and watching their profiles survive).
+    //
+    // `ServiceProfile` declares `onDelete: Cascade` on both columns in
+    // prisma/schema — but this table is created by the raw DDL above, which
+    // never emitted the foreign keys, so PRODUCTION HAD NONE AT ALL. Deleting a
+    // master left a row whose `userId` pointed at nothing: still `available`,
+    // still matching in the routing query, and rendered on /services with the
+    // name read through a relation that now resolves to null.
+    //
+    // Nothing reported it. The Prisma client believes the relation exists, so
+    // it never complains; the page just draws „—" where a name should be. This
+    // is exactly the class of defect tests/userDeletion.test.ts exists to catch,
+    // and it caught the MasterApplication edge above the same day — it could not
+    // catch this one, because a foreign key that was never written is not a
+    // foreign key that changed.
+    `ALTER TABLE "ServiceProfile" ADD CONSTRAINT "ServiceProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    `ALTER TABLE "ServiceProfile" ADD CONSTRAINT "ServiceProfile_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
   ]) {
     await prisma.$executeRawUnsafe(
       `DO $$ BEGIN ${fk} EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,

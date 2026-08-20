@@ -113,12 +113,12 @@ export const DisputesSection = () => {
         eyebrow="მოდერაცია · დავები"
         // Cursor-paginated — while a next page remains this is the LOADED count.
         title={<>{items ? (nextCursor ? `ჩატვირთულია ${items.length} ` : `${items.length} `) : '— '}დავა</>}
-        sub="სტუდენტის ფორმალური საჩივრები — გახსენი, გადახედე, გადაწყვიტე (refund / redo / dismiss). გადაწყვეტა უცნობდება ორივე მხარეს."
+        sub="კლიენტის ფორმალური საჩივრები — გახსენი, გადახედე, გადაწყვიტე (refund / redo / dismiss). გადაწყვეტა უცნობდება ორივე მხარეს."
       />
       <section className="px-6 lg:px-8 py-4 bg-ink-50/40 border-b border-ink-100 sticky top-16 z-20">
         <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200 overflow-x-auto">
           {OUTCOME_TABS.map(t => (
-            <button key={t.id} type="button" onClick={() => setOutcome(t.id)} className={`shrink-0 h-8 px-3 rounded-pill font-display text-meta font-semibold tracking-wide transition-colors duration-fast ${outcome === t.id ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}>{t.label}</button>
+            <button key={t.id} type="button" onClick={() => setOutcome(t.id)} className={`shrink-0 h-10 sm:h-9 px-3.5 rounded-pill font-display text-small font-semibold tracking-wide transition-colors duration-fast ${outcome === t.id ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}>{t.label}</button>
           ))}
         </div>
       </section>

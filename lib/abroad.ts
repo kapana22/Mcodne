@@ -21,7 +21,7 @@ import { ABROAD_EUR_PER_GEL } from '@/lib/flags'
  * EXISTING mechanism for a hidden category and does all the hiding for us:
  * lib/categoryTree states the rule, lib/tutorsQuery and app/sitemap.ts both
  * apply it, and /categories lists spheres only. A profile in it still opens by
- * direct link — app/tutors/[id]/page.tsx never checks the category — which is
+ * direct link — app/experts/[slug]/page.tsx never checks the category — which is
  * exactly the „reachable only from /abroad" behaviour we want.
  *
  * It is HIDDEN and NOT redirected, deliberately: a redirect would fold it into
@@ -41,7 +41,7 @@ export function isAbroadCategory(slug?: string | null): boolean {
  *
  * `TutorProfile.categoryId` is single-valued, and `lib/tutorsQuery` excludes any
  * expert whose category is not browsable — from the category page, from the
- * general /tutors browse, from search, and from the sitemap. So assigning a
+ * general /experts browse, from search, and from the sitemap. So assigning a
  * lawyer to the hidden `diaspora` category does not ADD them to /abroad, it
  * DELETES them from the public catalog. The one action that looks like „turn
  * this expert on for the diaspora" is the one action that takes them off the

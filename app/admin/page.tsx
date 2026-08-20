@@ -25,6 +25,7 @@ import { HelpSection } from './_help'
 import { CompaniesSection } from './_companies'
 import { RequestsSection } from './_requests'
 import { AccessSection } from './_access'
+import { MastersSection } from './_masters'
 
 /* ───── Impersonation banner ─────
    Polls the /status endpoint (a cheap read of the impersonation cookie, no DB
@@ -34,11 +35,12 @@ import { AccessSection } from './_access'
 // so the banner appears on every page (student, tutor, public) — not only /admin.
 
 export default function AdminOverview() {
-  // MODERATION is the landing tab (2026-08-03, user's call): reviewing expert
-  // applications is the one job on this panel that someone is WAITING on — an
-  // unopened queue costs an applicant days. „მიმოხილვა“ is a dashboard you read
-  // when you choose to; it is one click away and still the first nav item.
-  const [active, setActive] = useState<AdminTab>('moderation')
+  // OVERVIEW is the landing tab (owner's call, 2026-08-19 — it was „განაცხადები"
+  // from 2026-08-03): the panel opens on the whole picture, and it is the first
+  // nav item, standing alone above the groups. The queues are still one click
+  // away, and every one of them that has somebody waiting carries a badge in
+  // the rail — the six counts below — so an unopened queue is not a silent one.
+  const [active, setActive] = useState<AdminTab>('overview')
   const [pendingCount, setPendingCount] = useState<number | null>(null)
   // People waiting for a reply from the help chat. It gets a nav badge for the
   // same reason the application queue does: it is a person, not a number, and
@@ -51,6 +53,10 @@ export default function AdminOverview() {
   // Unverified requests — a phone call waiting. Same treatment as the three
   // queue badges above it, from the same stats fetch.
   const [newRequests, setNewRequests] = useState<number | null>(null)
+  // Submitted tradesperson applications and unresolved disputes — the last two
+  // queues on the panel that had no badge, from the same stats fetch (2026-08-19).
+  const [pendingMasters, setPendingMasters] = useState<number | null>(null)
+  const [openDisputes, setOpenDisputes] = useState<number | null>(null)
   // Bump this to force <OverviewSection> KPI re-fetch after a moderation
   // decision (approve/reject changes counts).
   const [statsTick, setStatsTick] = useState(0)
@@ -78,6 +84,8 @@ export default function AdminOverview() {
       if (typeof d?.helpOpen === 'number') setHelpOpen(d.helpOpen)
       if (typeof d?.b2bLeads === 'number') setB2bLeads(d.b2bLeads)
       if (typeof d?.newRequests === 'number') setNewRequests(d.newRequests)
+      if (typeof d?.pendingMasters === 'number') setPendingMasters(d.pendingMasters)
+      if (typeof d?.openDisputes === 'number') setOpenDisputes(d.openDisputes)
     } catch {}
   }
   useEffect(() => { loadPending() }, [statsTick])
@@ -92,9 +100,9 @@ export default function AdminOverview() {
       {/* Renders nothing. Here rather than inside the requests tab because an
           operator reading any tab is still an operator — see _presence. */}
       <PresenceBeat />
-      <AdminSidebar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} />
+      <AdminSidebar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingMasters={pendingMasters} openDisputes={openDisputes} />
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-      <TopBar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} />
+      <TopBar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingMasters={pendingMasters} openDisputes={openDisputes} />
 
       {/* NB: the `key` used to be `active + ':' + statsTick` so that a moderation
           decision would remount the overview KPIs. But `statsTick` also
@@ -115,6 +123,7 @@ export default function AdminOverview() {
             `active` can never hold either value. Their APIs are gated
             independently — see app/api/admin/requests. */}
         {active === 'requests' && <RequestsSection onChanged={() => setStatsTick(t => t + 1)} />}
+        {active === 'masters' && <MastersSection onChanged={() => setStatsTick(t => t + 1)} />}
         {active === 'access' && <AccessSection />}
         {active === 'bookings' && <BookingsSection />}
         {active === 'reviews' && <ReviewsSection />}

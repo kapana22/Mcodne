@@ -58,7 +58,7 @@ const RequestedSpheres = () => {
   return (
     <div className="mb-4 rounded-card border border-ink-200 bg-white p-4">
       <Eyebrow tone="muted" className="mb-1">განმცხადებლებმა მოითხოვეს</Eyebrow>
-      <p className="text-meta text-ink-500 mb-3">სფეროები, რომლებიც სიაში არ იყო და ხელით ჩაწერეს. ბოლო 6 თვე.</p>
+      <p className="text-meta text-ink-500 mb-3">კატეგორიები, რომლებიც სიაში არ იყო და ხელით ჩაწერეს. ბოლო 6 თვე.</p>
       <div className="flex flex-wrap gap-1.5">
         {items.map(r => (
           <span
@@ -89,7 +89,7 @@ const VisibleBox = ({ row, onToggle }: { row: AdminCategory; onToggle: (r: Admin
       className="w-5 h-5 shrink-0 accent-brand-500"
     />
     <span className={`text-small ${row.status === 'HIDDEN' ? 'text-ink-400' : 'text-ink-800'}`}>
-      {row.status === 'HIDDEN' ? 'არ ჩანს' : row.parentId ? 'ჩანს სფეროში' : 'ჩანს საიტზე'}
+      {row.status === 'HIDDEN' ? 'არ ჩანს' : row.parentId ? 'ჩანს კატეგორიაში' : 'ჩანს საიტზე'}
     </span>
   </label>
 )
@@ -104,7 +104,7 @@ const DeleteBtn = ({ row, onAsk }: { row: AdminCategory; onAsk: (r: AdminCategor
     disabled={row.tutorCount > 0 || row.childCount > 0}
     title={row.tutorCount > 0 ? 'ჯერ ექსპერტები ჰყავს — მოხსენი პტიჩკა' : row.childCount > 0 ? TREE_ERROR.HAS_CHILDREN : 'წაშლა'}
     aria-label={`${row.name} — წაშლა`}
-    className="shrink-0 h-8 w-8 rounded-btn text-danger-600 hover:bg-danger-50 disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center justify-center transition-colors duration-fast"
+    className="shrink-0 h-10 w-10 sm:h-9 sm:w-9 rounded-btn text-danger-600 hover:bg-danger-50 disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center justify-center transition-colors duration-fast"
   >
     <Icon.x className="w-3.5 h-3.5" />
   </button>
@@ -199,7 +199,7 @@ export const CategoriesSection = () => {
       if (!res.ok || !j.ok) throw new Error(typeof j?.message === 'string' ? j.message : '')
       setRows(prev => [...(prev ?? []), j.category])
       setNewName('')
-      setFlash({ kind: 'success', msg: 'სფერო დაემატა.' })
+      setFlash({ kind: 'success', msg: 'კატეგორია დაემატა.' })
     } catch (e) {
       const why = e instanceof Error ? e.message : ''
       setFlash({ kind: 'error', msg: why || 'დამატება ვერ მოხერხდა.' })
@@ -347,9 +347,9 @@ export const CategoriesSection = () => {
   return (
     <>
       <TabHeader
-        eyebrow="კატეგორიები · სფეროების მართვა"
-        title={<>სფეროების მართვა</>}
-        sub="დაამატე, გადაარქვი, დამალე ან გადაამისამართე სფერო — /apply და ძებნა DB-დან კითხულობს, ასე რომ კოდის შეცვლა აღარ სჭირდება."
+        eyebrow="კონტენტი · კატეგორიები"
+        title={<>კატეგორიების მართვა</>}
+        sub="დაამატე, გადაარქვი, დამალე ან გადაამისამართე კატეგორია — /join და ძებნა DB-დან კითხულობს, ასე რომ კოდის შეცვლა აღარ სჭირდება."
         actions={undefined}
       />
       <section className="px-6 lg:px-8 py-6">
@@ -365,9 +365,9 @@ export const CategoriesSection = () => {
             and it was, in fact, the only way to create a sub-category. */}
         <dl className="mb-4 rounded-btn border border-ink-200 bg-ink-50/60 px-3.5 py-3 grid gap-1.5 sm:grid-cols-2 text-meta">
           <div><dt className="inline font-display font-semibold text-ink-800">ჩანს საიტზე</dt>
-            <dd className="inline text-ink-600"> — მენიუში, მთავარზე და ფილტრში. მოხსნისას გვერდი რჩება, სფერო კი სიებიდან ქრება.</dd></div>
+            <dd className="inline text-ink-600"> — მენიუში, მთავარზე და ფილტრში. მოხსნისას გვერდი რჩება, კატეგორია კი სიებიდან ქრება.</dd></div>
           <div><dt className="inline font-display font-semibold text-ink-800">ქვეკატეგორია</dt>
-            <dd className="inline text-ink-600"> — ექსპერტები სფეროში ჩანან და იქვე ითვლებიან, არჩევისას კი საკუთარი სახელით. სწორედ ეს გამოჩნდება /apply-ზე სფეროს ქვეშ.</dd></div>
+            <dd className="inline text-ink-600"> — ექსპერტები კატეგორიაში ჩანან და იქვე ითვლებიან, არჩევისას კი საკუთარი სახელით. სწორედ ეს გამოჩნდება /apply-ზე კატეგორიის ქვეშ.</dd></div>
         </dl>
         <RequestedSpheres />
         {err && <AdminError message={err} className="mb-4" />}
@@ -387,7 +387,7 @@ export const CategoriesSection = () => {
               value={newName}
               onChange={e => setNewName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') create() }}
-              placeholder="ახალი სფერო — მაგ. ჯანმრთელობა და კვება"
+              placeholder="ახალი კატეგორია — მაგ. ჯანმრთელობა და კვება"
               maxLength={60}
               className="flex-1 h-11 px-3 rounded-btn border border-ink-200 text-small focus:border-brand-500 focus:outline-none"
             />
@@ -414,7 +414,7 @@ export const CategoriesSection = () => {
         ) : rows.length === 0 ? (
           <div className="rounded-card border border-dashed border-ink-200 bg-white py-12 px-6 text-center">
             <div className="font-display text-body-lg font-bold text-ink-900 tracking-tight">კატეგორია არ არის</div>
-            <p className="text-small text-ink-500 mt-1.5">დაამატე პირველი სფერო ზემოთ ველიდან.</p>
+            <p className="text-small text-ink-500 mt-1.5">დაამატე პირველი კატეგორია ზემოთ ველიდან.</p>
           </div>
         ) : (
           /* ONE BLOCK PER SPHERE, with its sub-categories INSIDE it.
@@ -485,8 +485,8 @@ export const CategoriesSection = () => {
                         <select
                           value=""
                           onChange={e => { if (e.target.value) foldInto(s, e.target.value) }}
-                          aria-label={`${s.name} — სხვა სფეროს ქვეშ გადატანა`}
-                          title="სხვა სფეროს ქვეკატეგორიად გადატანა"
+                          aria-label={`${s.name} — სხვა კატეგორიის ქვეშ გადატანა`}
+                          title="სხვა კატეგორიის ქვეკატეგორიად გადატანა"
                           className="h-8 px-1.5 rounded-btn border border-ink-200 bg-white text-meta text-ink-600 focus:border-brand-500 focus:outline-none max-w-[7.5rem]"
                         >
                           <option value="">გადატანა…</option>
@@ -556,7 +556,7 @@ export const CategoriesSection = () => {
                         <select
                           value={k.parentId ?? ''}
                           onChange={e => foldInto(k, e.target.value || null)}
-                          aria-label={`${k.name} — რომელ სფეროშია`}
+                          aria-label={`${k.name} — რომელ კატეგორიაშია`}
                           className="shrink-0 h-8 px-1.5 rounded-btn border border-ink-200 bg-white text-meta text-ink-600 focus:border-brand-500 focus:outline-none max-w-[8rem]"
                         >
                           <option value="">დამოუკიდებელი</option>

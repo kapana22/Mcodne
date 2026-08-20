@@ -29,6 +29,7 @@ import { Icon } from '@/components/Icon'
 import { AutoRefresh } from '@/components/AutoRefresh'
 import { RequestChat } from '@/components/RequestChat'
 import { RequestShell } from '../_shell'
+import { LiveRefresh } from '../_liveRefresh'
 import { OfferList } from './OfferList'
 
 export const dynamic = 'force-dynamic'
@@ -55,6 +56,9 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
     select: {
       // `id` is for the platform thread's unread count below — never rendered.
       id: true,
+      // `userId` decides whether a review can be signed (lib/offerLifecycle →
+      // reviewGate): a request without an account has nobody to write as.
+      userId: true,
       publicRef: true, description: true, status: true,
       kind: true, topic: true, details: true,
       budgetMin: true, budgetMax: true, budgetUnit: true,
@@ -71,6 +75,10 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
         select: {
           id: true, priceGel: true, priceKind: true, daysEstimate: true, message: true,
           status: true, createdAt: true,
+          // After the choice (stage 7): finished? reviewed? — the accepted
+          // offer's „დასრულდა" button and the ★ picker read these.
+          kind: true, doneAt: true,
+          review: { select: { rating: true, body: true } },
           // Unread FOR THE CLIENT: provider messages this side has not opened.
           // A count, never the bodies — the pane fetches those when opened.
           _count: { select: { messages: { where: { fromClient: false, readByClientAt: null } } } },
@@ -78,7 +86,7 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
             select: {
               fullName: true, phone: true, email: true,
               // The PUBLIC profile facts for the offer card — slug, verified,
-              // rating. Public by definition (/tutors/[slug] shows them to
+              // rating. Public by definition (/experts/[slug] shows them to
               // anyone), so this widens nothing the seal protects.
               tutor: { select: { slug: true, verified: true, rating: true, reviewsCount: true } },
             },
@@ -96,6 +104,13 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
   // admin makes. Passing nulls is honest; inventing a member's number here
   // would hand out a person's details they never offered.
   const unreadByOffer = new Map(request.offers.map(o => [o.id, o._count.messages]))
+  // The lifecycle state beside each shaped offer — clientOfferView owns the
+  // CONTACT rule and is not widened; these three columns hide nothing.
+  const lifecycleByOffer = new Map(request.offers.map(o => [o.id, {
+    kind: o.kind,
+    doneAt: o.doneAt ? o.doneAt.toISOString() : null,
+    review: o.review ? { rating: o.review.rating, body: o.review.body } : null,
+  }]))
 
   // ── Conversations the client started ─────────────────────────────────────
   // A SECOND query rather than widening the one above, deliberately: that
@@ -201,27 +216,52 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
             there is something to wait FOR — a settled request has no next
             event, and a liveness promise on it would be furniture. */}
         {(request.status === 'NEW' || request.status === 'VERIFIED') && <AutoRefresh />}
+        {/* The stream (stage 10): the same page, re-asked the moment the
+            request moves rather than every half-minute. AutoRefresh above stays
+            as the fallback; both go through router.refresh(). Same condition —
+            a settled request has no next event. */}
+        {(request.status === 'NEW' || request.status === 'VERIFIED') && <LiveRefresh publicRef={request.publicRef} />}
       </div>
 
-      {offers.length === 0 ? (
-        <div className="mt-4">
+      {/* ⚠️ THE EMPTY STATE IS PASSED INTO OfferList, NOT SWAPPED FOR IT
+          (stage 10). The list has to stay MOUNTED across „nothing yet" → „one
+          offer", because that is the moment its entrance is for: a component
+          that mounts with the first offer already in it cannot tell that
+          offer from one that was always there. The words stay here, on the
+          server page, where the status is known. */}
+      <OfferList
+        publicRef={request.publicRef}
+        offers={offers.map(o => ({
+          ...o,
+          unread: unreadByOffer.get(o.id) ?? 0,
+          kind: lifecycleByOffer.get(o.id)?.kind ?? 'QUOTE',
+          doneAt: lifecycleByOffer.get(o.id)?.doneAt ?? null,
+          review: lifecycleByOffer.get(o.id)?.review ?? null,
+        }))}
+        matched={matched}
+        canReview={request.userId !== null}
+        empty={
           <EmptyState
             icon={<Icon.mail className="w-6 h-6" />}
             title="ჯერ არაფერია"
             description={
               request.status === 'VERIFIED'
-                ? 'ექსპერტები ხედავენ მოთხოვნას. შეთავაზება აქ გამოჩნდება.'
+                // ⚠️ NOT „ექსპერტები ხედავენ" (2026-08-18). Present tense
+                // claiming people are looking at it — and nobody is: a
+                // notification row was written and a mail was sent. That is the
+                // „3 people are viewing this room" pattern that both
+                // /api/requests/[ref]/status and app/request/_live refuse in
+                // writing, at length. The refusal held in the live component
+                // and leaked into this server page.
+                //
+                // „ექსპერტები" was wrong for a second reason on the trades
+                // side: a plumber is not an expert.
+                ? 'მოთხოვნა გადაცემულია. შეთავაზება აქ გამოჩნდება.'
                 : 'ჯერ გადავამოწმებთ და დაგირეკავთ.'
             }
           />
-        </div>
-      ) : (
-        <OfferList
-          publicRef={request.publicRef}
-          offers={offers.map(o => ({ ...o, unread: unreadByOffer.get(o.id) ?? 0 }))}
-          matched={matched}
-        />
-      )}
+        }
+      />
 
       {/* ── The experts the client wrote to first ───────────────────────────
           Threads opened from the waiting panel, before anybody had bid

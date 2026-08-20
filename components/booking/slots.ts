@@ -1,6 +1,6 @@
 // Shared booking-domain logic — the ONE source of truth for slot enumeration,
 // calendar grouping, price resolution and fallback defaults. Extracted from
-// app/tutors/[id]/client.tsx (the honest reference implementation) so the
+// app/experts/[slug]/client.tsx (the honest reference implementation) so the
 // listing and the profile can never drift again (DESIGN_FIX_PROMPT 1.1).
 //
 // WINDOWS, NOT TICKETS. An `AvailabilitySlot` row is a WINDOW of availability,
@@ -253,7 +253,7 @@ export function primaryService<T extends TierShape>(consultations: T[]): T | nul
  * profile price when the expert has published no tiers.
  *
  * WHY IT EXISTS: `primaryPriceLabel` answers „what does the card SAY", and for a
- * long time nothing answered „what should the card be FILTERED by". So /tutors
+ * long time nothing answered „what should the card be FILTERED by". So /experts
  * compared the raw flat rate while every card rendered the flagship, and the two
  * disagree for any expert who set one and then priced the other differently.
  * Measured live 2026-08-13: „₾50-მდე" returned ლიზა ზუბაშვილი (flat 20) whose
@@ -298,7 +298,7 @@ export const tierPriceLabel = (c: TierShape): string =>
  *
  * WHY THIS REPLACED THE TWO RULES THAT PRECEDED IT (2026-07-31). Measured on
  * production, ONE expert advertised three prices at once:
- *   • the /tutors card said „₾80 · 30 წთ" — it priced `consultationDurationMin`,
+ *   • the /experts card said „₾80 · 30 წთ" — it priced `consultationDurationMin`,
  *     the profile-level DEFAULT, which is not a service anybody can buy;
  *   • the profile rail said „₾25-დან" — `fromPriceLabel` anchors on the CHEAPEST
  *     paid tier, so a 15-minute add-on priced the whole profile;

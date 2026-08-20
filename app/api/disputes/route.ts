@@ -78,8 +78,8 @@ export async function POST(req: Request) {
     notify(booking.tutor.userId, {
       type: 'GENERIC',
       title: 'ჯავშანთან დაკავშირებული საჩივარი',
-      body: `სტუდენტმა დააფიქსირა: ${parsed.data.reason}`,
-      href: `/tutor/bookings/${booking.id}#chat`,
+      body: `კლიენტმა დააფიქსირა: ${parsed.data.reason}`,
+      href: `/work/bookings/${booking.id}#chat`,
     }),
     prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } }),
   ])

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { parseIntParam } from '@/lib/apiParams'
+import { ROLE } from '@/lib/roles'
 
 // Lessons in a date window, for the teacher's month grid.
 //
@@ -12,7 +13,7 @@ import { parseIntParam } from '@/lib/apiParams'
 // list route would have meant fetching detail nobody draws.
 
 export async function GET(req: Request) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
 
   const tutor = await prisma.tutorProfile.findUnique({

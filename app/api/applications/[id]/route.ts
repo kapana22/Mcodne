@@ -1,7 +1,8 @@
 import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { ASSIGNABLE_CATEGORY_WHERE, CATEGORY_READ_ORDER, resolveCategoryByName, sphereToReveal } from '@/lib/categoryTree'
+import { ASSIGNABLE_CATEGORY_WHERE, CATEGORY_READ_ORDER, resolveCategoryByName } from '@/lib/categoryTree'
+import { revealCategoryIfHidden } from '@/lib/categoryReveal'
 import { requireRoleApi } from '@/lib/auth'
 import { notify, normalizePrefs } from '@/lib/notify'
 import { audit } from '@/lib/audit'
@@ -14,6 +15,8 @@ import { materializeWeekly } from '@/lib/availabilityRules'
 import { MAX_PROFESSIONS } from '@/lib/professions'
 import { georgianNameError } from '@/lib/georgianText'
 import { normalizePhone, phoneFormatError } from '@/lib/phone'
+import type { Prisma } from '@prisma/client'
+import { ROLE } from '@/lib/roles'
 
 const Body = z.object({
   action: z.enum(['approve', 'reject', 'revise']),
@@ -21,7 +24,7 @@ const Body = z.object({
   // Optional admin override for the approved expert's category (approve only).
   // Lets a niche/custom applicant — whose free-text specialty matches no
   // Category name — be assigned one at approval time instead of being born
-  // category-less and invisible on /tutors.
+  // category-less and invisible on /experts.
   categoryId: z.string().min(1).max(64).optional(),
   // The moderator's deliberate „გადამოწმებული" decision (approve only).
   // STRICTLY a boolean and STRICTLY optional-defaulting-to-false: the badge is
@@ -38,6 +41,29 @@ function tierForMinutes(m: number): 'QUICK' | 'STANDARD' | 'DEEP' {
   if (m <= 20) return 'QUICK'
   if (m <= 45) return 'STANDARD'
   return 'DEEP'
+}
+
+
+/* SEED ONCE, EVEN WHEN APPROVED TWICE. Every post-approval step below is
+ * „count, and create only when zero" — idempotent on paper, and a duplicate
+ * factory in practice: a double-click or two moderators send two requests,
+ * both count zero, both create, and the live profile shows every tier and
+ * every diploma twice. The count and the create therefore run in ONE
+ * transaction that first takes the profile's row lock, so the second approver
+ * waits for the first and then counts its rows. `FOR UPDATE` on the profile
+ * row is the cheapest lock that serialises exactly the two callers who race.
+ * Still guarded by the caller's try/catch: a seed step never fails an
+ * approval that has already committed. */
+async function seedOnce(
+  userId: string,
+  fn: (tx: Prisma.TransactionClient, profile: { id: string }) => Promise<void>,
+): Promise<void> {
+  await prisma.$transaction(async tx => {
+    const rows = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "TutorProfile" WHERE "userId" = ${userId} FOR UPDATE`
+    const profile = rows[0]
+    if (!profile) return
+    await fn(tx, profile)
+  })
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -100,7 +126,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   if (action === 'approve') {
-    if (app.user.role !== 'STUDENT') {
+    if (app.user.role !== ROLE.CLIENT) {
       // Only a STUDENT applicant can be promoted. ADMIN → refuse outright;
       // an existing TUTOR is already an expert (nothing to promote).
       return NextResponse.json(
@@ -151,31 +177,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const chosenCat = overrideCat ?? matchedCat
     const resolvedCategoryId = chosenCat?.id
 
-    // A sphere is HIDDEN because it has no expert yet — that is the whole
-    // reason. Filing one into it makes the reason false, so the sphere comes
-    // back into view here rather than waiting for somebody to notice. Leaving
-    // it hidden would publish an expert nobody can find: the same activation
-    // lapse that killed 46% of booking attempts on 2026-08-03, arriving by a
-    // new door.
-    //
-    // `sphereToReveal` also covers the case that made sub-fields usable at all
-    // (2026-08-11): the applicant answered „დიეტოლოგია", whose SPHERE is the
-    // hidden one. The row to reveal is then the parent, not the answer — a
-    // sub-field is browsed through its sphere, so revealing the child alone
-    // would leave the expert reachable from nowhere.
-    // `isLive` is written alongside `status`, as everywhere.
-    const reveal = sphereToReveal(chosenCat, liveCats)
-    if (reveal) {
-      await prisma.category.update({
-        where: { id: reveal.id },
-        data: { status: 'VISIBLE', isLive: true },
-      })
-      await audit(admin.id, 'category.show', {
-        targetType: 'Category',
-        targetId: reveal.id,
-        meta: { name: reveal.name, reason: 'first approved expert', via: chosenCat?.slug ?? null },
-      })
-    }
+    // A sphere is HIDDEN because it has no expert yet; filing one into it
+    // makes that false, so it comes back into view here — for a sub-field
+    // („დიეტოლოგია") the row revealed is its SPHERE. The rule, the write and
+    // the audit row are ONE function shared with the admin re-file endpoint
+    // (lib/categoryReveal, stage 11) — the two used to inline the same calls.
+    await revealCategoryIfHidden(chosenCat, liveCats, {
+      adminId: admin.id,
+      reason: 'first approved expert',
+      via: chosenCat?.slug ?? null,
+    })
 
     // Carry the languages the applicant selected (stored in professionData as
     // free-text tags like „ქართული · მშობლიური") into the structured
@@ -207,7 +218,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     /* THE APPLICANT'S OWN ANSWERS, CARRIED ONTO THE ACCOUNT.
      *
      * Approval copied a dozen fields onto the TutorProfile and wrote exactly
-     * `{ role: 'TUTOR' }` to the User — so `fullName` and `phone`, the two
+     * `{ role: ROLE.EXPERT }` to the User — so `fullName` and `phone`, the two
      * things /apply validates hardest, were collected and then dropped.
      * Measured on production 2026-08-17: 15 of 25 approved experts gave a phone
      * on /apply and their account still had `phone: null`, and one gave
@@ -225,7 +236,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
      * overwrite a good account name with a worse one).
      * PHONE: FILLED, NEVER OVERWRITTEN — a number the person later set in
      * /settings is newer than the one on the application. */
-    const promoted: { role: 'TUTOR'; fullName?: string; phone?: string } = { role: 'TUTOR' }
+    const promoted: { role: typeof ROLE.EXPERT; fullName?: string; phone?: string } = { role: ROLE.EXPERT }
     {
       const appName = (app.fullName ?? '').trim()
       if (appName && !georgianNameError('სახელი', appName)) promoted.fullName = appName
@@ -296,10 +307,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       }),
     ])
 
-    // Public URL slug — „/tutors/ana-gagoshidze" instead of the raw cuid.
+    // Public URL slug — „/experts/ana-gagoshidze" instead of the raw cuid.
     // Deliberately OUTSIDE the promotion transaction and fully guarded: a slug
     // is cosmetic, and it must never be able to fail an approval. A profile
-    // without one stays reachable by id (app/tutors/[id] resolves both).
+    // without one stays reachable by id (app/experts/[slug] resolves both).
     try {
       const profile = await prisma.tutorProfile.findUnique({
         where: { userId: app.userId },
@@ -315,9 +326,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     try {
       const services = (app.professionData as any)?.services
       if (Array.isArray(services) && services.length) {
-        const profile = await prisma.tutorProfile.findUnique({ where: { userId: app.userId }, select: { id: true } })
-        if (profile) {
-          const existing = await prisma.consultation.count({ where: { tutorId: profile.id } })
+        await seedOnce(app.userId, async (tx, profile) => {
+          const existing = await tx.consultation.count({ where: { tutorId: profile.id } })
           if (existing === 0) {
             const rows = services
               .filter((s: any) => s && typeof s.name === 'string' && s.name.trim() && Number.isFinite(Number(s.dur)))
@@ -334,9 +344,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
                   price: Math.min(10000, Math.max(0, Math.round(Number(s.price) || 0))),
                 }
               })
-            if (rows.length) await prisma.consultation.createMany({ data: rows })
+            if (rows.length) await tx.consultation.createMany({ data: rows })
           }
-        }
+        })
       }
     } catch { /* consultations are a convenience — never fail the approval on them */ }
     // Same guarded pattern for the diploma/certificate scans uploaded during
@@ -350,9 +360,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     try {
       const certs = (app.certificates as any)
       if (Array.isArray(certs) && certs.length) {
-        const profile = await prisma.tutorProfile.findUnique({ where: { userId: app.userId }, select: { id: true } })
-        if (profile) {
-          const existing = await prisma.certificate.count({ where: { tutorId: profile.id } })
+        await seedOnce(app.userId, async (tx, profile) => {
+          const existing = await tx.certificate.count({ where: { tutorId: profile.id } })
           if (existing === 0) {
             const year = app.createdAt.getFullYear()
             const rows = certs
@@ -375,9 +384,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
                   fileUrl: url || null,
                 }
               })
-            if (rows.length) await prisma.certificate.createMany({ data: rows })
+            if (rows.length) await tx.certificate.createMany({ data: rows })
           }
-        }
+        })
       }
     } catch { /* certificates are a convenience — never fail the approval on them */ }
 
@@ -403,22 +412,21 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       const endHour = Number(av?.endHour)
       const weeks = Math.min(12, Math.max(1, Number(av?.weeks) || 8))
       if (days.length && Number.isInteger(startHour) && Number.isInteger(endHour) && endHour > startHour) {
-        const profile = await prisma.tutorProfile.findUnique({ where: { userId: app.userId }, select: { id: true } })
-        if (profile) {
-          const already = await prisma.availabilitySlot.count({
+        await seedOnce(app.userId, async (tx, profile) => {
+          const already = await tx.availabilitySlot.count({
             where: { tutorId: profile.id, endAt: { gt: new Date() } },
           })
           if (already === 0) {
             const windows = materializeWeekly(days.map(day => ({ day, startHour, endHour })), weeks)
             if (windows.length) {
-              const res = await prisma.availabilitySlot.createMany({
+              const res = await tx.availabilitySlot.createMany({
                 data: windows.map(w => ({ tutorId: profile.id, startAt: w.startAt, endAt: w.endAt })),
                 skipDuplicates: true,
               })
               openedWindows = res.count
             }
           }
-        }
+        })
       }
     } catch { /* availability is a convenience — never fail the approval on it */ }
 
@@ -433,7 +441,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         // word would be a client booking an hour the expert never agreed to.
         ? 'ახლა ხარ ექსპერტი. განაცხადში მითითებული განრიგი გამოქვეყნდა და დაჯავშნა შესაძლებელია — შეამოწმე და შეცვალე, თუ საჭიროა.'
         : 'ახლა ხარ ექსპერტი. სანამ თავისუფალ დროს არ გამოაქვეყნებ, ვერავინ დაგიჯავშნის.'),
-      href: '/tutor/schedule',
+      href: '/work/schedule',
     })
     // Same message by email — the in-app bell only lands if they come back on
     // their own. Runs off the response path (the admin shouldn't wait on a mail
@@ -489,7 +497,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       type: 'APPLICATION_STATUS',
       title: 'შეასწორე განაცხადი',
       body: note!.trim(),
-      href: '/apply',
+      href: '/join?can=CONSULT',
     })
     await audit(admin.id, 'application.revise', { targetType: 'TutorApplication', targetId: id, meta: { note, applicantUserId: app.userId } })
   } else {
@@ -501,7 +509,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       type: 'APPLICATION_STATUS',
       title: 'შენი განაცხადი უარყოფილია',
       body: note?.trim() || 'შემდგომი შეკითხვებისთვის მოგვწერე.',
-      href: '/apply',
+      href: '/join?can=CONSULT',
     })
     await audit(admin.id, 'application.reject', { targetType: 'TutorApplication', targetId: id, meta: { note, applicantUserId: app.userId } })
   }

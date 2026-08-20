@@ -5,7 +5,8 @@ import { BOOKING_REVENUE_ONLY } from '@/lib/packages'
 import { isBookingLive } from '@/lib/bookingLive'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { b2bFeatureExists } from '@/lib/b2b'
-import { requestsFeatureExists } from '@/lib/requests'
+import { requestsFeatureExists, providersFeatureExists } from '@/lib/requests'
+import { ROLE } from '@/lib/roles'
 
 export async function GET() {
   const auth = await requireRoleApi('ADMIN')
@@ -15,12 +16,12 @@ export async function GET() {
   const now = Date.now()
   const liveWindowStart = new Date(now - 240 * 60_000)
   await ensureDbReady().catch(() => {})
-  const [users, tutors, students, bookings, pendingApps, completed, revenue, pkgRevenue, liveCandidates, helpOpen, b2bLeads, newRequests] = await Promise.all([
+  const [users, tutors, students, bookings, pendingApps, completed, revenue, pkgRevenue, liveCandidates, helpOpen, b2bLeads, newRequests, pendingMasters, openDisputes] = await Promise.all([
     prisma.user.count(),
     // Profiles, not roles — see the note in /api/admin/analytics. An expert is
     // somebody with a TutorProfile; the role decides what else they may do.
     prisma.tutorProfile.count(),
-    prisma.user.count({ where: { role: 'STUDENT' } }),
+    prisma.user.count({ where: { role: ROLE.CLIENT } }),
     prisma.booking.count(),
     prisma.tutorApplication.count({ where: { status: 'SUBMITTED' } }),
     prisma.booking.count({ where: { status: 'COMPLETED' } }),
@@ -62,11 +63,22 @@ export async function GET() {
     requestsFeatureExists()
       ? prisma.serviceRequest.count({ where: { status: 'NEW' } }).catch(() => 0)
       : Promise.resolve(0),
+    // Submitted tradesperson applications — the „ხელოსნები" badge. Follows the
+    // SUPPLY-side switch exactly as the tab does (D6): with FEATURE_PROVIDERS
+    // off the tab is not drawn, so the count is 0 without touching the table.
+    // Same .catch(() => 0) contract as the three above.
+    providersFeatureExists()
+      ? prisma.masterApplication.count({ where: { status: 'SUBMITTED' } }).catch(() => 0)
+      : Promise.resolve(0),
+    // Unresolved disputes — the „დავები" badge. `resolvedAt` is the real
+    // resolution marker on the Dispute model (the PATCH route claims it
+    // atomically); `outcome` is what was decided, not whether.
+    prisma.dispute.count({ where: { resolvedAt: null } }).catch(() => 0),
   ])
   // Derived truth — the stored LIVE status is never written (see lib/bookingLive).
   const live = liveCandidates.filter(isBookingLive).length
   return NextResponse.json({
-    users, tutors, students, bookings, pendingApps, completed, live, helpOpen, b2bLeads, newRequests,
+    users, tutors, students, bookings, pendingApps, completed, live, helpOpen, b2bLeads, newRequests, pendingMasters, openDisputes,
     revenue: ((revenue as any)._sum?.price ?? 0) + ((pkgRevenue as any)._sum?.priceTotal ?? 0),
   })
 }

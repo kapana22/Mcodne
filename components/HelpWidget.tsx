@@ -8,7 +8,7 @@ import { searchAnswer, scoreTopics, smallTalk, redactQuery, MAX_QUERY_CHARS } fr
 import type { HelpProfession } from '@/lib/helpProfessions'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 import { useMe } from '@/lib/me'
-import { showApplyCta } from '@/lib/roleHome'
+import { showJoinInvite } from '@/lib/capabilities'
 
 /* THE HELP WIDGET — a shortcut to answers, not a chatbot.
  *
@@ -331,7 +331,7 @@ export function HelpWidget() {
   const actionOf = (t: HelpTopic) => {
     const a = t.action
     if (!a) return null
-    if (a.gate === 'apply' && !showApplyCta(me?.role)) return null
+    if (a.gate === 'apply' && !showJoinInvite(me?.role, me?.capabilities)) return null
     if (a.gate === 'auth' && !me) return null
     return a
   }
@@ -479,7 +479,7 @@ export function HelpWidget() {
                         დიახ — {b.prof.label} გვყავს. აი, სად ნახავ:
                       </p>
                       <a
-                        href={`/konsultacia/${b.prof.slug}`}
+                        href={`/experts/${b.prof.slug}`}
                         className="mt-2.5 h-9 px-3.5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-small inline-flex items-center justify-center transition-colors duration-fast"
                       >
                         {b.prof.label} →

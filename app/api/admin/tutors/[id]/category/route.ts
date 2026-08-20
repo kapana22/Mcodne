@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
-import { ASSIGNABLE_CATEGORY_WHERE, sphereToReveal } from '@/lib/categoryTree'
+import { ASSIGNABLE_CATEGORY_WHERE } from '@/lib/categoryTree'
+import { revealCategoryIfHidden } from '@/lib/categoryReveal'
 
 /* Re-file an EXISTING expert. 2026-08-11.
  *
@@ -64,23 +65,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     select: { id: true, categoryId: true, category: { select: { id: true, name: true, status: true } } },
   })
 
-  // Same rule as approval, from the same function: a sphere is HIDDEN because
-  // it has no expert yet, and putting one there makes that false. For a
-  // sub-field the row to reveal is its SPHERE — that is what it is browsed
-  // through, so revealing the child alone leaves the expert reachable from
-  // nowhere. `isLive` is written alongside `status`, as everywhere.
+  // Same rule as approval, from the SAME function (lib/categoryReveal, stage
+  // 11): a sphere is HIDDEN because it has no expert yet, and putting one
+  // there makes that false. For a sub-field the row revealed is its SPHERE.
   const spheres = cat
     ? await prisma.category.findMany({ select: { id: true, name: true, status: true, parentId: true } })
     : []
-  const reveal = sphereToReveal(cat ?? undefined, spheres)
-  if (reveal) {
-    await prisma.category.update({ where: { id: reveal.id }, data: { status: 'VISIBLE', isLive: true } })
-    await audit(admin.id, 'category.show', {
-      targetType: 'Category',
-      targetId: reveal.id,
-      meta: { name: reveal.name, reason: 'expert re-filed here', via: cat?.name ?? null },
-    })
-  }
+  await revealCategoryIfHidden(cat ?? undefined, spheres, {
+    adminId: admin.id,
+    reason: 'expert re-filed here',
+    via: cat?.name ?? null,
+  })
 
   // BOTH sides in the meta. „who moved this expert, and out of what" is the
   // question this row will be asked months later; the new value alone answers

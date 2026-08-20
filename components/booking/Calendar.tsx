@@ -1,6 +1,6 @@
 'use client'
 // Month calendar for the booking flow — moved verbatim from
-// app/tutors/[id]/client.tsx (DESIGN_FIX_PROMPT 1.1). Viewer-local dates.
+// app/experts/[slug]/client.tsx (DESIGN_FIX_PROMPT 1.1). Viewer-local dates.
 import React from 'react'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'

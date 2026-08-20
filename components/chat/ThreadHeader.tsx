@@ -44,7 +44,7 @@ export function ThreadHeader({
   booking,
   counterparty,
   peer,
-  backHref = '/tutor/messages',
+  backHref = '/work/messages',
   bookingHref,
   alwaysBack = false,
   showBookCta = false,
@@ -75,7 +75,7 @@ export function ThreadHeader({
   // price) AND the viewer is the student side (showBookCta). Never on the tutor
   // side or a non-expert peer.
   const bookHref = isPre && showBookCta && counterparty?.tutorProfileId
-    ? `/tutors/${counterparty.tutorProfileId}` : null
+    ? `/experts/${counterparty.tutorProfileId}` : null
   const bookPrice = bookHref && typeof counterparty?.price === 'number' ? counterparty.price : null
   return (
     <div className="px-3 sm:px-5 py-3 border-b border-ink-100 bg-white flex items-center gap-3">
@@ -111,7 +111,7 @@ export function ThreadHeader({
         )}
       </div>
       {booking && (
-        <Btn variant="ghost" size="sm" href={bookingHref ?? `/tutor/bookings/${booking.id}`} className="shrink-0">
+        <Btn variant="ghost" size="sm" href={bookingHref ?? `/work/bookings/${booking.id}`} className="shrink-0">
           <span className="hidden sm:inline">ჯავშნის ნახვა</span>
           <Icon.external className="w-4 h-4 sm:hidden" />
         </Btn>

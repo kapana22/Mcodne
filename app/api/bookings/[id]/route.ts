@@ -7,6 +7,7 @@ import { markRelatedRead } from '@/lib/notifClear'
 import { newMeetingUrl, isStaleMeetingUrl } from '@/lib/meeting'
 import { sendMail } from '@/lib/mailer'
 import { bookingConfirmedEmail, bookingChangedEmail, fmtWhenTz } from '@/lib/emailTemplates'
+import { releaseBookingCredit } from '@/lib/bookingCredit'
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
@@ -243,7 +244,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           type: 'BOOKING_CREATED',
           title: 'გადახდის ბმული მზადაა',
           body: 'ჯავშნის გვერდზე გამოჩნდა გადახდის ღილაკი.',
-          href: `/student/bookings/${id}`,
+          href: `/me/bookings/${id}`,
         })
       })
     }
@@ -299,13 +300,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         type: 'BOOKING_CANCELED',
         title: 'აღინიშნა: სესია არ შედგა',
         body: `${own.topic} · ${fmtWhenTz(own.startAt, { year: true })} — ექსპერტს ეცნობა. გადასახდელი არაფერია.`,
-        href: `/student/bookings/${own.id}`,
+        href: `/me/bookings/${own.id}`,
       }),
       notify(own.tutor.userId, {
         type: 'BOOKING_CANCELED',
         title: 'აღინიშნა: სესია არ შედგა',
-        body: `სტუდენტმა აღნიშნა, რომ სესია არ შედგა — ${own.topic} · ${fmtWhenTz(own.startAt, { year: true })}. თუ ეს შეცდომაა, უპასუხე მიმოწერაში — გუნდიც გადახედავს.`,
-        href: `/tutor/bookings/${own.id}#chat`,
+        body: `კლიენტმა აღნიშნა, რომ სესია არ შედგა — ${own.topic} · ${fmtWhenTz(own.startAt, { year: true })}. თუ ეს შეცდომაა, უპასუხე მიმოწერაში — გუნდიც გადახედავს.`,
+        href: `/work/bookings/${own.id}#chat`,
       }),
     ])
     // Email BOTH parties — same two recipients as the in-app pair above. The
@@ -328,18 +329,18 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
             whenText,
             actorLabel: 'შენი',
             note: 'გადასახდელი არაფერია — ექსპერტს ეცნობა.',
-            href: `/student/bookings/${own.id}`,
+            href: `/me/bookings/${own.id}`,
           })
           await sendMail({ to: student.email, subject, html })
         }
         if (tutorUser?.email && normalizePrefs(tutorUser.notificationPrefs).BOOKING_CREATED) {
           const { subject, html } = bookingChangedEmail('no_show', {
-            counterpartName: student?.fullName || 'სტუდენტი',
+            counterpartName: student?.fullName || 'კლიენტი',
             topic: own.topic,
             whenText,
-            actorLabel: 'სტუდენტის',
+            actorLabel: 'კლიენტის',
             note: 'თუ ეს შეცდომაა, უპასუხე მიმოწერაში — გუნდიც გადახედავს.',
-            href: `/tutor/bookings/${own.id}#chat`,
+            href: `/work/bookings/${own.id}#chat`,
           })
           await sendMail({ to: tutorUser.email, subject, html })
         }
@@ -355,7 +356,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         await notifyMany(admins.map(a => a.id), {
           type: 'GENERIC',
           title: 'სესია არ შედგა — ექსპერტი',
-          body: `#${own.ref.slice(0, 8)} · სტუდენტის განაცხადი`,
+          body: `#${own.ref.slice(0, 8)} · კლიენტის განაცხადი`,
           href: '/admin#bookings',
         })
       } catch { /* ops ping is best-effort */ }
@@ -405,11 +406,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       type: 'BOOKING_CREATED',
       title: 'ჯავშანი დადასტურდა',
       body: booking.topic,
-      href: `/student/bookings/${booking.id}`,
+      href: `/me/bookings/${booking.id}`,
     })
     // Tutor already acted — clear their "new request" bell entry so it doesn't
     // keep sitting as unread.
-    await markRelatedRead(user.id, `/tutor/bookings/${booking.id}`, 'BOOKING_CREATED')
+    // `contains` on the booking segment, not the full path: rows written
+    // before the /tutor → /work move (stage 6) still say /tutor/bookings/…,
+    // and the userId + type already scope the match to this person's own row.
+    await markRelatedRead(user.id, `bookings/${booking.id}`, 'BOOKING_CREATED')
     // Confirmation email to the student — fire-and-forget (extra lookups for the
     // names/email run off the response path).
     after(async () => {
@@ -444,9 +448,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (booking.status !== 'PREPARING') {
       return NextResponse.json({ ok: false, error: 'BAD_STATE' }, { status: 400 })
     }
-    // Free the EXACT slot this booking claimed (if any) so someone else can
-    // book it. Instant bookings hold no slot → heldSlotId is null.
-    const heldSlotId = booking.heldSlotId
+    // Nothing to free: a booking claims no window (heldSlotId is null since the
+    // windows model; the legacy `booked` flag is retired — stage 11).
     try {
       await prisma.$transaction(async tx => {
         // Status-guarded: bail if a concurrent write already moved this booking
@@ -463,10 +466,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           },
         })
         if (claim.count !== 1) throw new Error('BAD_STATE')
-        if (heldSlotId) {
-          await tx.availabilitySlot.updateMany({ where: { id: heldSlotId }, data: { booked: false } })
-        }
         await tx.$executeRawUnsafe(`UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`, id)
+        // A declined package lesson gives its credit back — the expert said
+        // no, so the client's month is also extended (lib/bookingCredit).
+        await releaseBookingCredit(tx, booking.enrollmentId, { cancelledBy: 'TUTOR', lessonMinutes: booking.durationMin })
       })
     } catch (e) {
       if (e instanceof Error && e.message === 'BAD_STATE') {
@@ -478,10 +481,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       type: 'BOOKING_CANCELED',
       title: 'ჯავშანი უარყოფილია',
       body: booking.topic,
-      href: `/student/bookings/${booking.id}`,
+      href: `/me/bookings/${booking.id}`,
     })
     // Clear the tutor's "new request" bell entry — they've already answered.
-    await markRelatedRead(user.id, `/tutor/bookings/${booking.id}`, 'BOOKING_CREATED')
+    // Same segment-only match as the accept path above (stage 6).
+    await markRelatedRead(user.id, `bookings/${booking.id}`, 'BOOKING_CREATED')
     // Email the client. A decline is TERMINAL: this booking will never produce
     // another signal (no confirmation, no reminder — the reminder sweep only
     // looks at CONFIRMED rows), so the in-app bell alone means a client who
@@ -501,7 +505,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
             topic: booking.topic,
             whenText: fmtWhenTz(booking.startAt, { year: true }),
             note: 'იმავე ექსპერტთან სხვა დროს ან სხვა ექსპერტს მარტივად აირჩევ.',
-            href: `/tutors/${booking.tutorId}`,
+            href: `/experts/${booking.tutorId}`,
           })
           await sendMail({ to: student.email, subject, html })
         }
@@ -544,7 +548,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       type: 'BOOKING_CANCELED',
       title: 'აღინიშნა: გამოუცხადებლობა',
       body: `ექსპერტმა აღნიშნა, რომ არ გამოცხადდი — ${booking.topic} · ${fmtWhenTz(booking.startAt, { year: true })}`,
-      href: `/student/bookings/${booking.id}`,
+      href: `/me/bookings/${booking.id}`,
     })
     // Email the client: being marked as a no-show is a consequential, contestable
     // claim about them, and the in-app notice reaches nobody who isn't already
@@ -563,7 +567,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
             whenText: fmtWhenTz(booking.startAt, { year: true }),
             actorLabel: 'ექსპერტის',
             note: 'თუ ეს შეცდომაა, მიწერე მიმოწერაში — გუნდიც გადახედავს.',
-            href: `/student/bookings/${booking.id}#chat`,
+            href: `/me/bookings/${booking.id}#chat`,
           })
           await sendMail({ to: student.email, subject, html })
         }
@@ -604,7 +608,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     type: 'BOOKING_COMPLETED',
     title: 'სესია დასრულდა',
     body: `${booking.topic} — დატოვე შეფასება`,
-    href: `/student/bookings/${booking.id}`,
+    href: `/me/bookings/${booking.id}`,
   })
   return NextResponse.json({ ok: true, status: 'COMPLETED' })
 }

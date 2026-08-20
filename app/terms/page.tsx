@@ -131,7 +131,7 @@ export default function TermsPage() {
 
         <p className="mt-6 text-body-lg text-ink-700 leading-relaxed">
           წინამდებარე პირობები არეგულირებს მცოდნე პლატფორმის გამოყენებას. გთხოვ, ყურადღებით წაიკითხე — ეს
-          დოკუმენტი ეხება როგორც სტუდენტებს, ისე ექსპერტებს.
+          დოკუმენტი ეხება როგორც კლიენტებს, ისე ექსპერტებს.
         </p>
 
         <nav className="mt-8 rounded-card border border-ink-200 bg-ink-50/50 p-5">

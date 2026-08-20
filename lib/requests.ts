@@ -22,15 +22,29 @@
 
 import { z } from 'zod'
 import { phoneFormatError, normalizePhone } from '@/lib/phone'
+import { UNSTATED } from '@/lib/requestTopics'
 
 /* ── the routes the subsystem lives on ──────────────────────────────────── */
 
 /** The client's form. */
 export const REQUEST_ROUTE = '/request'
-/** The provider's workspace — deliberately its own, beside /tutor and /student
- *  rather than inside either. The booking product and this one must not read as
- *  one screen with two moods. */
-export const PROVIDER_ROUTE = '/provider'
+/** The master's workspace lives under /work — ONE address with the expert's
+ *  (stage 6, 2026-08-19): /work/requests and /work/offers,
+ *  behind their own guard (app/work/(provider)/layout.tsx). The prefix is the
+ *  shared space; the three screens below are the subsystem's. */
+export const PROVIDER_ROUTE = '/work'
+/** The three master screens — the ONLY parts of /work the subsystem owns.
+ *  ⚠️ NEVER '/work' itself: that would 404 the expert workspace beside them
+ *  when the subsystem is off. */
+// ⚠️ TWO PATHS, NOT THREE (2026-08-19). „ჩემი სერვისები" moved to
+// /work/services, which BOTH capabilities open — an expert edits their
+// consultations there. Listing it here would 404 that page for every expert on
+// a deployment with FEATURE_PROVIDERS off, which is the opposite of what this
+// list is for. The page gates itself instead (app/work/services/page.tsx).
+export const PROVIDER_WORKSPACE_PATHS = [
+  `${PROVIDER_ROUTE}/requests`,
+  `${PROVIDER_ROUTE}/offers`,
+] as const
 
 /**
  * Every path the subsystem owns, as prefixes.
@@ -42,7 +56,7 @@ export const PROVIDER_ROUTE = '/provider'
  */
 export const REQUEST_PATH_PREFIXES = [
   '/request',
-  '/provider',
+  ...PROVIDER_WORKSPACE_PATHS,
   '/api/requests',
   // Its own prefix, not covered by the one above: „/api/request-chat" does not
   // start with „/api/requests/". The conversation endpoint was added after this
@@ -84,6 +98,38 @@ export function requestsOn(raw: string | undefined = process.env.FEATURE_REQUEST
   return (raw ?? '').trim().toLowerCase() === 'on'
 }
 
+/**
+ * Is the SUPPLY side on — becoming a master, the master's workspace, the
+ * admin queue that approves them?
+ *
+ * A second, NARROWER switch (2026-08-18). One variable used to kill both
+ * halves at once: turning FEATURE_REQUESTS off to stop the public form also
+ * took down /provider for the people already answering requests, /apply/master
+ * for the ones applying, and the admin tab that approves them. FEATURE_PROVIDERS
+ * lets the operator close the door to new masters — or park the whole supply
+ * side — while the client intake keeps running, and vice versa is impossible
+ * on purpose: the supply side lives INSIDE the subsystem, so requests off ⇒
+ * providers off, always.
+ *
+ * ⚠️ UNSET MEANS „NO SEPARATE OPINION", NOT OFF — the one place this file
+ * departs from requestsOn's rule, and deliberately. Every deployment before
+ * this variable existed ran the supply side on FEATURE_REQUESTS alone; if
+ * unset meant off, the deploy that introduced the variable would have taken
+ * the masters' workspace down until somebody remembered to add it to the
+ * dashboard. So: unset (or blank) follows FEATURE_REQUESTS; anything else must
+ * say exactly „on". The safety property is intact — a deployment that never
+ * heard of EITHER variable still ships dark.
+ */
+export function providersOn(
+  raw: string | undefined = process.env.FEATURE_PROVIDERS,
+  requests: boolean = requestsOn(),
+): boolean {
+  if (!requests) return false
+  const v = (raw ?? '').trim().toLowerCase()
+  if (v === '') return true
+  return v === 'on'
+}
+
 /** The viewer, as much of them as the gate needs. A plain string role rather
  *  than the Prisma `Role` enum, so this file stays importable from a client
  *  component without dragging @prisma/client into the browser bundle. */
@@ -122,7 +168,11 @@ export function requestsVisibleTo(on: boolean, viewer: RequestViewer): boolean {
  *  that side; call sites ask this and never read the variable themselves, so
  *  „is it on?" cannot develop two answers. */
 export function canSeeRequests(viewer: RequestViewer): boolean {
-  return requestsVisibleTo(requestsOn(), viewer)
+  // An ADMIN opens the queue on the subsystem's own switch; a PROVIDER opens
+  // their workspace on the supply-side switch — which is never on when the
+  // subsystem is off (providersOn folds requestsOn in), so the outer rule
+  // „off beats everything" still holds for both.
+  return requestsVisibleTo(viewer.role === 'ADMIN' ? requestsOn() : providersOn(), viewer)
 }
 
 /**
@@ -167,6 +217,13 @@ export function requestsFeatureExists(): boolean {
   return requestsOn()
 }
 
+/** Same split for the supply side: does the admin rail draw the „ხელოსნები"
+ *  tab, does the signup page offer the „ვარ ხელოსანი" tile. A hide, not a
+ *  guard — every /api/master-applications route checks providersOn() itself. */
+export function providersFeatureExists(): boolean {
+  return providersOn()
+}
+
 /**
  * Does this path belong to the subsystem?
  *
@@ -176,6 +233,39 @@ export function requestsFeatureExists(): boolean {
  */
 export function isRequestPath(pathname: string): boolean {
   return REQUEST_PATH_PREFIXES.some(p => pathname === p || pathname.startsWith(p + '/'))
+}
+
+/**
+ * The paths that belong to the SUPPLY side only — 404 when FEATURE_PROVIDERS
+ * says off, on top of the outer gate above. The three /work/… master screens
+ * and `/api/provider` are listed in BOTH arrays on purpose: they are inside the subsystem (so
+ * requests off kills them) and they are the master's workspace (so providers
+ * off kills them too).
+ *
+ * ⚠️ /join IS NOT HERE, and its predecessor (/apply/master) was (2026-08-19).
+ * The ხელოსანი application now shares one door with the expert application,
+ * and 404ing the door would take the expert half down with it. The WORK half
+ * is gated INSIDE app/join/page.tsx with the same providersOn() instead.
+ */
+export const PROVIDER_PATH_PREFIXES = [
+  ...PROVIDER_WORKSPACE_PATHS,
+  '/api/provider',
+  '/api/master-applications',
+  '/api/admin/master-applications',
+] as const
+
+export function isProviderPath(pathname: string): boolean {
+  return PROVIDER_PATH_PREFIXES.some(p => pathname === p || pathname.startsWith(p + '/'))
+}
+
+/**
+ * Is this pathname one of the master's three /work screens? The SPACE test the
+ * chrome reads (components/AppShell, BottomNav, UserMenu, the /work shell) —
+ * a presentation rule, never a guard: the pages gate themselves. Segment-
+ * bounded, so /work/requests-x is not inside and /work itself never is.
+ */
+export function isProviderWorkspacePath(pathname: string): boolean {
+  return PROVIDER_WORKSPACE_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
 }
 
 /* ── the public reference ───────────────────────────────────────────────── */
@@ -261,13 +351,16 @@ import {
 
 export {
   REQUEST_KINDS, KIND, kindOf, BUDGET_UNITS,
-  BUDGET_BANDS, bandOf, budgetIsBelowFloor, budgetLabel,
+  BUDGET_BANDS, bandOf, budgetIsBelowFloor, budgetLabel, UNSTATED, UNSTATED_BUDGET, isUnstated,
   TIMING, timingLabel, FORMATS, formatLabel, CITIES, cityLabel,
   TOPIC_GROUPS, OTHER_TOPIC, topicById, topicLabel, categorySlugOfTopic,
   SUGGESTED_TOPICS, SUGGESTED_TOPIC_IDS,
-  groupsForKind, isTopicOfKind, searchTopics,
+  groupsForKind, isTopicOfKind, searchTopics, BROWSABLE_GROUPS, groupIsLive,
+  SERVICE_BROWSE_GROUPS, EXPERT_BROWSE_GROUPS, groupIsService,
+  VERTICALS, isVertical, browseGroupsFor, verticalOfTopic, VERTICAL_COPY, suggestedFor,
+  type Vertical,
   extrasFor, normalizeExtras, extrasLabels, templateFor, offerTemplateFor,
-  kindsOfTopic, searchAllTopics,
+  kindsOfTopic, searchAllTopics, topicsForProvider,
 } from './requestTopics'
 export type {
   RequestKindName, BudgetUnitName, BudgetBand, TimingOption,
@@ -323,6 +416,43 @@ export const STATUS_LABEL: Record<RequestStatusName, string> = {
 // „everything except".
 export const OFFER_STATUSES = ['INVITED', 'SENT', 'WITHDRAWN', 'ACCEPTED', 'DECLINED'] as const
 export type OfferStatusName = (typeof OFFER_STATUSES)[number]
+
+/**
+ * WHAT A PERSON READS AS THE TITLE — their own words first, the category only
+ * as a floor.
+ *
+ * ⚠️ FIVE SCREENS TITLED EVERY ROW WITH `topicLabel` (2026-08-19), so a queue
+ * of four cleaning requests was four cards headed „ბინის დალაგება" and the
+ * only way to tell them apart was to read the paragraph under each. A list
+ * whose titles are all identical is not a list, it is a pile — and the person
+ * scanning it is a provider deciding which job to race for.
+ *
+ * The description is where the request actually differs, so the first sentence
+ * of it is the title. Rules, in order:
+ *   · cut at the first sentence end (Georgian text uses „." like everything
+ *     else) when that lands inside the budget;
+ *   · otherwise cut at the last word boundary under the cap, never mid-word;
+ *   · never return an empty string — a card with no title is worse than a
+ *     repeated one, so the topic is the floor and it always exists.
+ *
+ * The category does NOT disappear: the callers print it above the headline as
+ * `text-meta`, beside the city. It stops being the title and becomes what it
+ * always was — the shelf the request sits on.
+ */
+export function requestHeadline(description: string | null | undefined, topic: string, cap = 80): string {
+  const d = (description ?? '').replace(/\s+/g, ' ').trim()
+  if (d === '') return topic
+  // A sentence end only counts if there is a sentence before it — „. მეორე"
+  // at index 0 is punctuation, not a heading.
+  const stop = d.search(/[.!?]\s/)
+  if (stop > 0 && stop <= cap) return d.slice(0, stop)
+  if (d.length <= cap) return d
+  const cut = d.slice(0, cap)
+  const lastSpace = cut.lastIndexOf(' ')
+  // A cap that lands inside the first word leaves nothing to break on; the
+  // hard cut is right there, and it is still better than the topic.
+  return (lastSpace > 20 ? cut.slice(0, lastSpace) : cut).replace(/[·,;:]$/, '') + '…'
+}
 
 export const OFFER_STATUS_LABEL: Record<OfferStatusName, string> = {
   // Not „მოწვევა": nothing was offered and nothing was promised — the client
@@ -493,6 +623,11 @@ export function providerRequestView(r: ProviderRequestRow) {
     kindLabel: KIND[kind].label,
     topic: r.topic,
     topicLabel: topicLabel(r.topic),
+    // ⚠️ THE HEADLINE IS SHAPED HERE, not per page (2026-08-19). The queue, the
+    // detail page it opens and the client's own list must call the same request
+    // by the same name — a card headed one way and a page headed another is the
+    // provider wondering whether they clicked the right row.
+    headline: requestHeadline(r.description, topicLabel(r.topic)),
     description: r.description,
     // Rendered here rather than in three page components, so the same request
     // never reads „40–70₾" on one screen and „40–70₾ ერთ გაკვეთილზე" on
@@ -572,7 +707,7 @@ export function clientOfferView(o: {
     // so withholding its address from the one screen where the choice happens
     // protects nothing and only degrades the choice. The seal below is about
     // CONTACT, and only contact.
-    providerProfileHref: prof?.slug ? `/tutors/${prof.slug}` : null,
+    providerProfileHref: prof?.slug ? `/experts/${prof.slug}` : null,
     providerVerified: prof?.verified ?? false,
     // Null below the platform's own display floor: a rating computed from one
     // review is noise wearing a number, and the browse surfaces hide it too.
@@ -619,9 +754,22 @@ export function clientOfferView(o: {
 export const PICK_MODES = ['OFFERS', 'SELF'] as const
 export type PickMode = (typeof PICK_MODES)[number]
 
+/**
+ * ⚠️ THE WORDS DEPEND ON THE VERTICAL (2026-08-18), and until now they did not.
+ *
+ * Both options said „ექსპერტი" on a run about a leaking tap. Worse, the SELF
+ * hint promised „ნახავ ამ მიმართულების ექსპერტებს" — and on the trades side
+ * that list is EMPTY 100% of the time: it is built from `tutorProfile` filtered
+ * by `categoryId`, and no service request has ever carried one. Somebody tapped
+ * a mode whose whole promise was a list, and got a screen identical to the
+ * other mode. Measured on a real submission.
+ *
+ * The list itself is fixed in /api/requests/[ref]/status; this is the half that
+ * decides what we PROMISE, and the two have to agree.
+ */
 export const PICK_MODE_OPTION: Record<PickMode, { label: string; hint: string }> = {
-  OFFERS: { label: 'შეთავაზებები მომივიდეს', hint: 'ექსპერტები დაგიკავშირდებიან და ფასს შემოგთავაზებენ' },
-  SELF: { label: 'მე ავირჩევ ექსპერტს', hint: 'ნახავ ამ მიმართულების ექსპერტებს და თვითონ მისწერ' },
+  OFFERS: { label: 'შეთავაზებები მომივიდეს', hint: 'დაგიკავშირდებიან და ფასს შემოგთავაზებენ' },
+  SELF: { label: 'მე ავირჩევ', hint: 'ნახავ ვინ მუშაობს ამ მიმართულებით და თვითონ მისწერ' },
 }
 
 export const ServiceRequestInput = z.object({
@@ -642,16 +790,17 @@ export const ServiceRequestInput = z.object({
   // what the work costs cannot type one, and free text would produce
   // „договорная" in four spellings. The numbers are resolved server-side from
   // the band so a crafted body cannot invent a range.
-  // ⚠️ ONE OF THE TWO IS REQUIRED, NOT BOTH — see the refinement at the end of
-  // this object. A band is a tap for somebody who does not know what the work
-  // costs; an amount is what somebody who DOES know would rather type than
-  // hunt for in a ladder. Owner, 2026-08-18: „აქ ხელით უნდა იწერებოდეს."
+  // ⚠️ THE BAND IS THE ONLY WAY TO ANSWER IT AGAIN (2026-08-19). A second key,
+  // `budgetAmount`, briefly let the client send a typed figure (owner,
+  // 2026-08-18: „აქ ხელით უნდა იწერებოდეს"); it was removed the next day with
+  // the field that fed it — see app/request/RequestWizard, budget step, for the
+  // three reasons. A body still carrying that key is stripped by zod and then
+  // refused by the band rule below, which is the correct outcome: the ladder is
+  // the answer this row is built from.
   /** How they want to be helped. Defaults so a request written before this
    *  question existed still parses. */
   pickMode: z.enum(PICK_MODES).default('OFFERS'),
   budgetBand: z.string().trim().max(8).default(''),
-  /** Lari, whole. Ceiling matches every other money field on this site. */
-  budgetAmount: z.number().int().min(1).max(1_000_000).nullable().optional(),
   timing: z.string().trim().min(1).max(24),
   format: z.enum(['ONLINE', 'IN_PERSON', 'EITHER']),
   city: z.enum(['TBILISI', 'BATUMI', 'KUTAISI', 'RUSTAVI', 'OTHER']),
@@ -727,25 +876,27 @@ export const ServiceRequestInput = z.object({
   // so the error names the field that is actually wrong — a single „INVALID" on
   // a four-step form leaves the person hunting through steps they already
   // finished.
-  // ⚠️ A BUDGET IS REQUIRED AND MAY ARRIVE AS EITHER (2026-08-18). Checked here
-  // rather than by making both fields required: they are two ways to answer one
-  // question, and demanding both would make the typed box a second tax on
-  // somebody who already tapped a range.
-  .refine(v => (v.budgetAmount ?? 0) > 0 || bandOf(v.kind, v.budgetBand) !== undefined, {
+  // ⚠️ A BUDGET IS REQUIRED, AND IT IS A BAND (2026-08-19). This said „a band
+  // OR a typed amount" for one day; the typed half went with its field. The
+  // rule below („a band, IF given, must be real") stays a SEPARATE refinement
+  // so „you did not answer" and „that band does not exist" name themselves —
+  // one „INVALID" on a four-step form leaves somebody hunting through screens
+  // they already finished.
+  .refine(v => v.budgetBand !== '', {
     path: ['budgetBand'], message: 'ბიუჯეტი მიუთითე',
   })
   .refine(v => isTopicOfKind(v.kind, v.topic), {
     path: ['topic'], message: 'ეს თემა ამ ტიპს არ ეკუთვნის',
   })
-  // ⚠️ A BAND IS CHECKED ONLY WHEN THERE IS ONE (2026-08-18). This used to
-  // demand a valid band unconditionally, which is correct while a band is the
-  // only way to answer — and refuses every typed amount the moment a second way
-  // exists. The „one of the two is present" rule is the refinement above; this
-  // one now only says that a band, IF given, must be real.
+  // A band, IF given, must be one of this kind's own — see the note above for
+  // why presence and validity are two refinements and not one.
   .refine(v => v.budgetBand === '' || bandOf(v.kind, v.budgetBand) !== undefined, {
     path: ['budgetBand'], message: 'ბიუჯეტი არასწორია',
   })
-  .refine(v => TIMING[v.kind].some(t => t.id === v.timing), {
+  // UNSTATED passes both money and timing: a message to ONE named provider asks
+  // neither question, and a schema that refuses the answer it never asked for
+  // is a form that cannot be submitted. See UNSTATED_BUDGET in requestTopics.
+  .refine(v => v.timing === UNSTATED || TIMING[v.kind].some(t => t.id === v.timing), {
     path: ['timing'], message: 'ვადა არასწორია',
   })
 export type ServiceRequestInput = z.infer<typeof ServiceRequestInput>
@@ -775,21 +926,18 @@ export function serviceRequestRow(input: ServiceRequestInput) {
     const t = (v ?? '').trim()
     return t === '' ? null : t
   }
-  // ⚠️ A TYPED AMOUNT WINS OVER THE BAND, and it is stored as an exact figure
-  // rather than snapped to whichever range contains it. „ვიხდი 45₾-ს" is more
-  // information than „30–60₾", and rounding it into a band throws away the one
-  // thing the person actually told us. Both halves land in the same two
-  // columns, so every reader downstream is unaffected.
-  const typed = input.budgetAmount ?? null
-  const band = typed === null ? bandOf(input.kind, input.budgetBand)! : null
+  // The band is resolved against the ladder, never taken from the body — the
+  // `!` is safe because the refinements above already refused a request whose
+  // band is missing or not this kind's.
+  const band = bandOf(input.kind, input.budgetBand)!
   return {
     kind: input.kind,
     topic: input.topic,
     // '' rather than null: the column is NOT NULL, and an empty description is
     // an ordinary state now — the pages simply do not render the paragraph.
     description: (input.description ?? '').trim(),
-    budgetMin: band ? band.min : typed!,
-    budgetMax: band ? band.max : typed!,
+    budgetMin: band.min,
+    budgetMax: band.max,
     budgetUnit: KIND[input.kind].unit,
     pickMode: input.pickMode,
     timing: input.timing,
@@ -854,25 +1002,12 @@ export function offerPriceLabel(priceGel: number, kind: string): string {
   return money
 }
 
-/**
- * The lowest amount this kind can be served at, in lari — the FLOOR BAND'S TOP.
- *
- * ⚠️ IT EXISTS BECAUSE THE BUDGET CAN NOW BE TYPED (2026-08-18). The floor was
- * only ever a property of a band id, so a person who tapped „20₾-მდე" was
- * warned and a person who typed „18" was not — the same answer, two different
- * outcomes, decided by which control they happened to use. Derived from the
- * ladder rather than written down again, so re-pricing a band re-prices this.
- */
-export function budgetFloorFor(kind: RequestKindName): number {
-  const floor = BUDGET_BANDS[kind].find(b => b.floor)
-  return floor?.max ?? 0
-}
-
-/** Is this TYPED amount below what the platform can serve? The numeric twin of
- *  `budgetIsBelowFloor`, so a band and a number are judged by one rule. */
-export function amountIsBelowFloor(kind: RequestKindName, amount: number): boolean {
-  return amount > 0 && amount < budgetFloorFor(kind)
-}
+/* ⚠️ `budgetFloorFor` LIVED HERE AND IS GONE (2026-08-19). It existed only
+   because the budget could be TYPED — a floor is a property of a band id, so a
+   numeric answer needed the band's top read back out as a number to be judged
+   by the same rule. The typed field is gone (see app/request/RequestWizard,
+   budget step), so the floor is a band property again and
+   `budgetIsBelowFloor(kind, bandId)` in requestTopics is the whole of it. */
 
 export const RequestOfferInput = z.object({
   requestId: z.string().trim().min(1).max(40),

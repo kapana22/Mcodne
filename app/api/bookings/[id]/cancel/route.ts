@@ -7,6 +7,7 @@ import { audit } from '@/lib/audit'
 import { CANCEL_CUTOFF_HOURS } from '@/lib/flags'
 import { sendMail } from '@/lib/mailer'
 import { bookingChangedEmail, fmtWhenTz } from '@/lib/emailTemplates'
+import { releaseBookingCredit } from '@/lib/bookingCredit'
 
 // Cancel body is optional — legacy clients POST empty. When present we accept a
 // short reason chip label + optional freeform text (the "სხვა" case).
@@ -50,11 +51,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const hoursTilStart = (booking.startAt.getTime() - Date.now()) / 3600000
   const fullRefund = hoursTilStart >= CANCEL_CUTOFF_HOURS
 
-  // Un-flip the EXACT slot this booking claimed (recorded at booking time) so
-  // the tutor can offer that time to someone else. Instant bookings have
-  // no heldSlotId, so nothing is freed for them — previously a time-containment
-  // scan could wrongly free an unrelated slot.
-  const heldSlotId = booking.heldSlotId
+  // Nothing is un-flipped: the legacy `booked` flag on AvailabilitySlot is
+  // retired (stage 11) — a booking's own interval is the only "busy" there is.
 
   // Record cancellation source so tutor no-show / student flake rates can be
   // tracked in admin analytics.
@@ -70,12 +68,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   try {
     await prisma.$transaction(async tx => {
-      // Re-read INSIDE the tx: a concurrent reschedule-accept swaps heldSlotId
-      // (frees the old slot, claims a new one), and the cleanup cron / complete
-      // can move status. Using the pre-read snapshot would free a stale slot and
-      // leave the newly-claimed one booked forever, or overwrite a terminal
-      // status. Bail if it's no longer ours to cancel.
-      const fresh = await tx.booking.findUnique({ where: { id }, select: { status: true, heldSlotId: true, enrollmentId: true } })
+      // Re-read INSIDE the tx: the cleanup cron / complete / a reschedule-accept
+      // can move status between our first read and this write. Using the
+      // pre-read snapshot would overwrite a terminal status. Bail if it's no
+      // longer ours to cancel.
+      const fresh = await tx.booking.findUnique({ where: { id }, select: { status: true, enrollmentId: true } })
       if (!fresh || fresh.status === 'COMPLETED' || fresh.status === 'CANCELED' || fresh.status === 'NO_SHOW') {
         throw new Error('BAD_STATE')
       }
@@ -92,39 +89,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         },
       })
       if (claim.count !== 1) throw new Error('BAD_STATE')
-      // Free the slot this booking currently holds (as of the in-tx read).
-      if (fresh.heldSlotId) {
-        await tx.availabilitySlot.updateMany({ where: { id: fresh.heldSlotId }, data: { booked: false } })
-      }
+      // No slot to free: the legacy `booked` flag is retired (stage 11);
+      // heldSlotId is only nulled above.
       // Clear any pending reschedule proposal so an accept can't resurrect this
       // now-canceled booking (raw column — not in the Prisma model).
       await tx.$executeRawUnsafe(`UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`, id)
 
       // ── Package credit: give it back ────────────────────────────────────
-      // `Enrollment.lessonsUsed` counts lessons BOOKED, so a cancelled lesson
-      // must return its credit — otherwise cancelling once quietly costs the
-      // client a lesson they paid for, and the count stops meaning anything.
-      // Inside the same transaction as the cancel, so the two can never
-      // disagree. Guarded at 0: a double-cancel is refused above by BAD_STATE,
-      // but a negative balance is the kind of thing worth making impossible.
-      if (fresh.enrollmentId) {
-        await tx.enrollment.updateMany({
-          where: { id: fresh.enrollmentId, lessonsUsed: { gt: 0 } },
-          data: { lessonsUsed: { decrement: 1 } },
-        })
-        // When the EXPERT is at fault the client also loses a day of their
-        // month through no doing of their own, so the window is extended —
-        // see lib/packages → extendedExpiry for why a whole day, not a lesson.
-        if (cancelledBy === 'TUTOR') {
-          const e = await tx.enrollment.findUnique({ where: { id: fresh.enrollmentId }, select: { expiresAt: true } })
-          if (e?.expiresAt) {
-            await tx.enrollment.update({
-              where: { id: fresh.enrollmentId },
-              data: { expiresAt: new Date(e.expiresAt.getTime() + 24 * 60 * 60 * 1000) },
-            })
-          }
-        }
-      }
+      // Same transaction as the cancel — lib/bookingCredit says why, and the
+      // expert's decline and the cleanup cron call the same function.
+      await releaseBookingCredit(tx, fresh.enrollmentId, { cancelledBy })
     })
   } catch (e) {
     if (e instanceof Error && e.message === 'BAD_STATE') {
@@ -153,13 +127,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       type: 'BOOKING_CANCELED',
       title: 'ჯავშანი გაუქმდა · ადმინმა',
       body: cancelBody,
-      href: `/student/bookings/${booking.id}`,
+      href: `/me/bookings/${booking.id}`,
     })
     await notify(booking.tutor.userId, {
       type: 'BOOKING_CANCELED',
       title: 'ჯავშანი გაუქმდა · ადმინმა',
       body: cancelBody,
-      href: `/tutor/bookings/${booking.id}`,
+      href: `/work/bookings/${booking.id}`,
     })
   } else {
     const otherPartyId = cancelledBy === 'STUDENT' ? booking.tutor.userId : booking.studentId
@@ -168,8 +142,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       title: 'ჯავშანი გაუქმდა',
       body: cancelBody,
       href: cancelledBy === 'STUDENT'
-        ? `/tutor/bookings/${booking.id}`
-        : `/student/bookings/${booking.id}`,
+        ? `/work/bookings/${booking.id}`
+        : `/me/bookings/${booking.id}`,
     })
   }
 
@@ -188,7 +162,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       const whenText = fmtWhenTz(booking.startAt, { year: true })
       const actorLabel =
         cancelledBy === 'ADMIN' ? 'ადმინისტრატორმა'
-        : cancelledBy === 'STUDENT' ? 'სტუდენტმა'
+        : cancelledBy === 'STUDENT' ? 'კლიენტმა'
         : 'ექსპერტმა'
       // Same pref gate as the in-app notify(): BOOKING_CANCELED lives in the
       // BOOKING_CREATED group (lib/notify prefKeyForType).
@@ -202,19 +176,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           actorLabel,
           reason,
           note: 'სხვა დროს დაჯავშნა ნებისმიერ დროს შეგიძლია.',
-          href: `/student/bookings/${booking.id}`,
+          href: `/me/bookings/${booking.id}`,
         })
         await sendMail({ to: student.email, subject, html })
       }
       if (mailTutor && tutorUser?.email && normalizePrefs(tutorUser.notificationPrefs).BOOKING_CREATED) {
         const { subject, html } = bookingChangedEmail('canceled', {
-          counterpartName: student?.fullName || 'სტუდენტი',
+          counterpartName: student?.fullName || 'კლიენტი',
           topic: booking.topic,
           whenText,
           actorLabel,
           reason,
           note: 'ეს დრო შენს განრიგში ისევ თავისუფალია.',
-          href: `/tutor/bookings/${booking.id}`,
+          href: `/work/bookings/${booking.id}`,
         })
         await sendMail({ to: tutorUser.email, subject, html })
       }

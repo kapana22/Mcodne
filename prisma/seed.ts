@@ -471,7 +471,7 @@ async function main() {
       // skip Sundays for realism (getDay 0 = Sunday)
       if (start.getDay() === 0) start.setDate(start.getDate() + 1)
       const end = new Date(start.getTime() + 60 * 60 * 1000)
-      slots.push({ tutorId: t.id, startAt: start, endAt: end, booked: false })
+      slots.push({ tutorId: t.id, startAt: start, endAt: end })
     }
     await prisma.availabilitySlot.createMany({ data: slots })
     slotAdded += slots.length

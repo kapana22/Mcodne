@@ -43,16 +43,16 @@ export const FALLBACK_CATS: HomeCat[] = [
 ]
 
 /* ───── Top nav ─────
-   The home page renders the canonical <PublicTopBar /> (same as /tutors and
+   The home page renders the canonical <PublicTopBar /> (same as /experts and
    every other public surface) — no bespoke inline header. The old inline nav
-   with its category mega-menu was the one divergent public header; categories
-   stay reachable via the „კატეგორიები“ item PublicTopBar now carries. */
+   with its category mega-menu was the one divergent public header; the
+   categories are the /experts catalogue's own filter now (stage 8/9). */
 
 /* ───── Shared footer ───── */
 /* Local Footer removed — the home page now renders the shared
    components/Footer.tsx like every other public page, so the columns, honesty
    notes and bottom strip can never drift between surfaces again. (The old
-   local copy also pointed „კატეგორიები“ at /tutors instead of /categories.) */
+   local copy also pointed „კატეგორიები“ at /experts instead of /categories.) */
 
 /* ═══════════════════════════════════════════════════════════════════ */
 /* HOME VIEW                                                            */
@@ -80,7 +80,7 @@ export type Expert = {
   priceLabel: string
   durationMin: number
   // Real next open start (ISO) or null. Drives the SAME bookability gate the
-  // /tutors card and the profile's StickyBookingCard use — a card must never
+  // /experts card and the profile's StickyBookingCard use — a card must never
   // promise a booking the profile will immediately deny.
   nextSlotAt: string | null
   video: boolean
@@ -106,7 +106,7 @@ export function mapTutorToExpert(t: any): Expert {
     urlSlug: t?.slug ?? null,
     name: t?.user?.fullName ?? 'ექსპერტი',
     // The real category or nothing — never `specialty`, never the literal
-    // „სფერო". See app/tutors/_data.tsx for the full reasoning; this mapper
+    // „სფერო". See app/experts/_data.tsx for the full reasoning; this mapper
     // feeds the same card component.
     cat: t?.category?.name ?? '',
     headline: t?.headline ?? '',

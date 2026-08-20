@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
  *   /favicon.ico   261ms    22KB
  *   /              254ms    59KB
  *   /categories    259ms    75KB
- *   /tutors        460ms   556KB      ← ten base64 avatars, inline
+ *   /experts        460ms   556KB      ← ten base64 avatars, inline
  * A ~259ms floor applies to every request (network + edge→origin), and server
  * render time above it is effectively zero. So caching the RENDER — ISR,
  * revalidate, unstable_cache — buys nothing here; the only lever left is the
@@ -43,7 +43,7 @@ export const dynamic = 'force-dynamic'
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 
 // Cards render avatars into ≤128px boxes; 512px originals meant ~80% of the
-// bytes were discarded pixels (measured: 194KB of avatars on /tutors, 6 of 7
+// bytes were discarded pixels (measured: 194KB of avatars on /experts, 6 of 7
 // at 512²). 384 covers the worst real case (112px card × 3 DPR = 336). The
 // resize runs once per (user, version) and is then served from this LRU —
 // sharp never runs twice for the same bytes.
@@ -54,8 +54,8 @@ const SERVE_MAX = 384
  *
  * ⚠️ DO NOT JUST RAISE SERVE_MAX. The 384 above is a measured decision — cards
  * render into ≤128px boxes and 512px originals meant ~80% of the bytes on
- * /tutors were discarded pixels. But og:image and the Person JSON-LD now point
- * at this same route (app/tutors/[id]/page.tsx), and there a bigger image is
+ * /experts were discarded pixels. But og:image and the Person JSON-LD now point
+ * at this same route (app/experts/[slug]/page.tsx), and there a bigger image is
  * strictly better: Google will not show a thumbnail it considers too small.
  * Two callers, two needs — so the SIZE IS THE CALLER'S CHOICE, and the card
  * path keeps the weight it fought for.

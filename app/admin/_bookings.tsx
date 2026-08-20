@@ -106,7 +106,7 @@ export const BookingsSection = () => {
         // Cursor-paginated list — while a next page remains this is the LOADED
         // count, not the total match, and the CSV carries exactly these rows.
         title={<>{items ? (nextCursor ? `ჩატვირთულია ${items.length} ` : `${items.length} `) : '— '}ჯავშანი</>}
-        sub="ყველა ჯავშნის ნახვა · გაუქმება სტუდენტის/ექსპერტის სახელით · მიზეზი გამოჩნდება ორივე მხარისთვის."
+        sub="ყველა ჯავშნის ნახვა · გაუქმება კლიენტის/ექსპერტის სახელით · მიზეზი გამოჩნდება ორივე მხარისთვის."
         actions={items && items.length > 0 ? (
           <button
             type="button"
@@ -129,7 +129,7 @@ export const BookingsSection = () => {
           </div>
           <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200 overflow-x-auto">
             {BOOKING_STATUS_TABS.map(t => (
-              <button key={t.id} type="button" onClick={() => setStatus(t.id)} className={`shrink-0 h-8 px-3 rounded-pill font-display text-meta font-semibold tracking-wide transition-colors duration-fast ${status === t.id ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}>{t.label}</button>
+              <button key={t.id} type="button" onClick={() => setStatus(t.id)} className={`shrink-0 h-10 sm:h-9 px-3.5 rounded-pill font-display text-small font-semibold tracking-wide transition-colors duration-fast ${status === t.id ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}>{t.label}</button>
             ))}
           </div>
         </div>
@@ -147,7 +147,7 @@ export const BookingsSection = () => {
               <thead className="bg-ink-50/40 border-b border-ink-100">
                 <tr className="text-left">
                   <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">ჯავშანი</th>
-                  <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">სტუდენტი</th>
+                  <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">კლიენტი</th>
                   <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">ექსპერტი</th>
                   <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">დრო</th>
                   <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">სტატუსი</th>

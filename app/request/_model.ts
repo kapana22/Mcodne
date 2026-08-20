@@ -27,26 +27,58 @@
 
 import {
   ServiceRequestInput, bandOf, TIMING, isTopicOfKind, kindsOfTopic, extrasFor,
-  KIND, kindOf, REQUEST_KINDS, PICK_MODE_OPTION,
+  KIND, kindOf, REQUEST_KINDS, PICK_MODE_OPTION, UNSTATED,
   // The label vocabulary, for the transcript — see answerLabel. Imported rather
   // than re-derived so a renamed band or city renames in the conversation too.
   topicLabel, budgetLabel, timingLabel, formatLabel, cityLabel,
-  type RequestKindName,
+  VERTICAL_COPY, verticalOfTopic,
+  type RequestKindName, type Vertical,
 } from '@/lib/requests'
 
 /** Everything the steps collect. One flat object rather than a slice per
  *  step: the last step needs to submit all of it, and a nested shape would only
  *  be flattened again at that moment. */
 export type Draft = {
+  /** ⚠️ WHICH DOOR THEY CAME THROUGH — and it is NOT submitted (2026-08-18).
+   *
+   *  Owner, approving option „ა": the entry point picks the vertical and the
+   *  wizard never asks again. It lives on the draft because two screens need it
+   *  — the what-step's catalogue and this file's step titles — and threading it
+   *  as a second parameter through `stepsFor` would have put the same value in
+   *  two places for the same run.
+   *
+   *  It is deliberately absent from `ServiceRequestInput`. The intake is ONE
+   *  system (owner: „როცა გამოგზავნას ეხება, აუცილებლად ერთ სისტემაში
+   *  იგზავნება") — one row, one queue, one routing pass. The vertical is
+   *  already recoverable from the topic, so storing it would be a second copy
+   *  of a fact, and the copy that drifts is the one nobody reads. */
+  vertical: Vertical
+  /** ⚠️ THE TOPIC CAME FROM THE PERSON THEY CHOSE (2026-08-19), not from the
+   *  catalogue — so the „რა გჭირდება" screen has nothing left to ask and the
+   *  run starts on „დეტალები".
+   *
+   *  Set only when `?to=` named a provider whose own offering implies EXACTLY
+   *  ONE topic AND that topic carries exactly one kind (see `withTarget`). Two
+   *  topics, or one ambiguous topic, leave this false: the screen stays, it is
+   *  simply narrowed to that provider's own list.
+   *
+   *  It is a fact about the RUN, not about the request — deliberately absent
+   *  from `ServiceRequestInput`, like `vertical`, and cleared on every restored
+   *  draft so a saved run can never shorten a wizard that carries no `?to=`. */
+  topicPinned: boolean
+  /** ⚠️ A MESSAGE TO ONE PERSON, NOT AN OPEN REQUEST (2026-08-19). `?to=` named
+   *  somebody, so the structured questions stop earning their screens: budget,
+   *  timing, city and format exist so a provider can quote BLIND, and this one
+   *  can just ask in the thread. Owner: „მინდა რომ მარტივად, სწრაფად და
+   *  კომფორტულად იყოს." Measured before the change: six screens after the
+   *  visitor had already chosen the person. */
+  directTo: boolean
   kind: RequestKindName | ''
   topic: string
   description: string
   budgetBand: string
   /** 'OFFERS' | 'SELF' — see lib/requests → PICK_MODES. */
   pickMode: 'OFFERS' | 'SELF'
-  /** A typed amount, in whole lari. Wins over the band when set — see
-   *  lib/requests → serviceRequestRow. */
-  budgetAmount: number | null
   timing: string
   /** The clarifying answers ({ audience: 'pupil' }). Optional per key and as a
    *  whole — see the schema comment in lib/requests. */
@@ -103,12 +135,30 @@ export function withAccountContact(d: Draft, a: AccountContact | null): Draft {
 }
 
 export const EMPTY_DRAFT: Draft = {
+  // The default door. „EXPERT" and not „SERVICE" because a bare /request with
+  // no parameter is reached from the expert half of the site and from the home
+  // band's own field; the trades door always sets ?for=service explicitly.
+  vertical: 'EXPERT',
+  topicPinned: false,
+  directTo: false,
   kind: '',
   topic: '',
   description: '',
-  budgetBand: '',
+  // ⚠️ THE BUDGET QUESTION IS GONE (2026-08-19) — owner: „არ გვინდა ბიუჯეტი
+  // საერთოდ, 5 ეტაპამდე უნდა შემცირდეს." It asked the person who knows least
+  // what the work costs to name a number first, and that number then anchored
+  // every offer they received: guess low and the good providers skip you, guess
+  // high and you have bid against yourself. It is the same objection that took
+  // the price off the card („არ იცის კლიენტმა რამდენი ღირს სერვისი") — the
+  // provider quotes, the client does not.
+  //
+  // What went with it: `budgetIsBelowFloor` no longer fires, so requests under
+  // 30₾ are not refused on arrival any more. That guard was protecting
+  // providers from unservable leads and the owner chose the shorter form over
+  // it, knowingly. If junk arrives, the answer is a rule about the DESCRIPTION,
+  // not the money question coming back.
+  budgetBand: UNSTATED,
   pickMode: 'OFFERS',
-  budgetAmount: null,
   timing: '',
   details: {},
   // Pre-set, and only these two. „ონლაინ" is the honest default for most of
@@ -125,6 +175,84 @@ export const EMPTY_DRAFT: Draft = {
 }
 
 /* ═══════════ the run of screens ════════════════════════════════════════ */
+
+/* ═══════════ THE THREE STAGES ═══════════════════════════════════════════ */
+
+/**
+ * ⚠️ THREE STAGES OVER THE SAME SCREENS — NOT THREE SCREENS (2026-08-18).
+ *
+ * Owner, holding a screenshot of the budget question: „სამ ეტაპიანი გავაკეთოთ —
+ * პრობლემის კატეგორია, ვის უნდა მიუდეს … აღწერა … და ბოლოს ფორმა."
+ *
+ * The obvious reading — merge everything into three long screens — would undo
+ * the one-question-per-screen work this file's header records, which was
+ * adopted from the reference products after the owner called the previous
+ * revision „უფრო რთულად გაკეთებული". Six questions on one page is the exact
+ * shape that was removed.
+ *
+ * What the screenshot actually shows missing is not fewer screens; it is ANY
+ * SENSE OF WHERE YOU ARE. „ბიუჯეტი — ერთ გაკვეთილზე" arrives with a thin
+ * percentage bar and no name for the part of the journey it belongs to, so a
+ * run of seven taps feels unbounded — and an unbounded form is one you can quit
+ * without losing anything, which is how they get quit.
+ *
+ * So the screens stay one question each, and they are GROUPED. Three names,
+ * shown from the first screen, so the whole shape is legible before the first
+ * tap: what you need · the details · how to reach you.
+ *
+ * ⚠️ DERIVED FROM `stepsFor`, NEVER A SECOND LIST. Which screens exist depends
+ * on the draft (the kind screen folds away, the clarifiers come from the
+ * vocabulary), so a hand-kept mapping would go stale the first time a step is
+ * added — and its symptom would be a stage that never lights up, which nobody
+ * would notice. `stageOfStep` is the one rule and everything reads it.
+ */
+export const STAGES = [
+  { id: 'what', label: 'რა გჭირდება' },
+  { id: 'detail', label: 'დეტალები' },
+  { id: 'contact', label: 'კონტაქტი' },
+] as const
+
+export type StageId = (typeof STAGES)[number]['id']
+
+/**
+ * The stages THIS run actually has.
+ *
+ * ⚠️ THE FIRST ONE GOES WHEN THE PERSON IS ALREADY CHOSEN (2026-08-19). Somebody
+ * who arrived from a plumber's profile answered „რა გჭირდება" by tapping the
+ * plumber; a stage row still naming that question would be the wizard claiming
+ * a step it is not going to run, and the counter under it would never reach it.
+ * Same source as the screens themselves — `stepsFor` decides, this filters, and
+ * neither is a hand-kept second list.
+ */
+export function stagesFor(d: Draft): typeof STAGES[number][] {
+  const ids = new Set(stepsFor(d).map(s => stageOfStep(s.id)))
+  return STAGES.filter(s => ids.has(s.id))
+}
+
+/**
+ * Which stage a screen belongs to.
+ *
+ * The default is `detail` on purpose: every clarifier the vocabulary can invent
+ * (`extra:*`) and every question added later is a detail until somebody says
+ * otherwise, so a new screen lands somewhere sensible rather than nowhere.
+ */
+export function stageOfStep(stepId: string): StageId {
+  // The topic, and the „what kind of help" question that only exists because
+  // the topic was ambiguous — one decision in two taps, so one stage.
+  if (stepId === 'what' || stepId === 'kind') return 'what'
+  if (stepId === 'contact') return 'contact'
+  return 'detail'
+}
+
+/** How far along the run is, as three states per stage. `done` is what makes
+ *  the row worth showing at all — „two of three finished" is the answer to the
+ *  question a progress bar is asked. */
+export function stageState(stageId: StageId, currentStepId: string): 'done' | 'live' | 'todo' {
+  const order = STAGES.map(s => s.id)
+  const here = order.indexOf(stageOfStep(currentStepId))
+  const mine = order.indexOf(stageId)
+  return mine < here ? 'done' : mine === here ? 'live' : 'todo'
+}
 
 export type StepDef = {
   /** Stable within a draft; clarifier screens are `extra:<questionId>`. */
@@ -145,7 +273,28 @@ export type StepDef = {
  * („რამდენად ხშირად" over frequencies, „რა ვადაში" over deadlines).
  */
 export function stepsFor(d: Draft): StepDef[] {
-  const out: StepDef[] = [{ id: 'what', title: 'რა გჭირდება?' }]
+  // ⚠️ THE FIRST QUESTION IS THE DOOR'S, and it follows the ANSWER once the two
+  // disagree. Search crosses the vertical line on purpose (lib/requestTopics →
+  // VERTICALS: a separation that loses a request is worse than the confusion it
+  // fixed), so somebody who came in through the trades door and typed
+  // „ინგლისური" is now choosing a tutor — and a screen still headed „რა
+  // გაფუჭდა?" at that moment is telling them they are somewhere they are not.
+  const asked: Vertical = verticalOfTopic(d.topic) ?? d.vertical
+  // ⚠️ THE FIRST SCREEN IS NOT ASKED WHEN THE PERSON IS ALREADY CHOSEN
+  // (2026-08-19). `?to=` named a provider who does exactly one thing, so the
+  // topic is already known — see Draft.topicPinned. Dropping the SCREEN rather
+  // than pre-filling it is the point: a search box holding an answer somebody
+  // did not type invites them to change it, and the thing they would be
+  // changing is the person they just chose.
+  // ⚠️ ONE SCREEN WHEN THE PERSON IS ALREADY CHOSEN (2026-08-19). Everything
+  // between the door and the contact form exists so a stranger can quote
+  // without asking — a named provider asks in the thread instead. What is left
+  // is the only thing they cannot get any other way: what you need, and how to
+  // reach you. The contact screen carries both (see _stepContact: with
+  // `directTo` the description opens and is the first thing on it).
+  if (d.directTo) return [{ id: 'contact', title: 'რა გჭირდება?' }]
+  const pinned = d.topicPinned && d.topic !== ''
+  const out: StepDef[] = pinned ? [] : [{ id: 'what', title: VERTICAL_COPY[asked].title }]
   // ⚠️ „აირჩიე ტიპი" IS NO LONGER A SCREEN (2026-08-18). It asked one question
   // with two or three answers, on a page of its own, immediately after the
   // question it depends on — so a person who tapped „ხელშეკრულება" was made to
@@ -175,17 +324,24 @@ export function stepsFor(d: Draft): StepDef[] {
     // Still optional, still one tap each — what changed is the paper they are
     // printed on. The title comes from the kind rather than the question,
     // because a screen holding two questions cannot be named after one of them.
-    if (extrasFor(kind, d.topic).length > 0) {
-      out.push({
-        id: 'extras',
-        title: kind === 'SERVICE' ? 'ორიოდე დეტალი' : 'ვისთვის არის?',
-        skippable: true,
-      })
-    }
-    out.push({ id: 'budget', title: `ბიუჯეტი — ${KIND[kind].unitLabel}` })
-    out.push({ id: 'timing', title: KIND[kind].timingLabel })
+    // ⚠️ THE CLARIFIERS SHARE THE TIMING SCREEN (2026-08-19) — they no longer
+    // get one of their own. Owner: „5 ეტაპამდე უნდა შემცირდეს." Removing the
+    // budget question took the trades run to five and left 94 of 171 topics at
+    // six, all of them for this screen: one or two optional taps on a page by
+    // themselves, immediately before another one-tap question.
+    //
+    // Same move the „აირჩიე ტიპი" screen made a day earlier — the questions are
+    // not merged, the PAPER is. Every clarifier stays optional and answers in
+    // place; the timing tap is the one that advances, because it is the last
+    // question on the page and the only one that is asked of everybody.
+    const hasExtras = extrasFor(kind, d.topic).length > 0
+    out.push({
+      id: 'timing',
+      // The heading has to name the whole page. With clarifiers on it the page
+      // is „a couple of details", of which when-you-need-it is one.
+      title: hasExtras ? 'ორიოდე დეტალი' : KIND[kind].timingLabel,
+    })
   } else {
-    out.push({ id: 'budget', title: 'ბიუჯეტი' })
     out.push({ id: 'timing', title: 'როდის' })
   }
   // ⚠️ A SERVICE IS NEVER ASKED „ONLINE OR IN PERSON" — there is no online
@@ -248,24 +404,17 @@ export function answerLabel(id: string, d: Draft): string | null {
   // One screen, so one chip — every answer given on it, joined. „—" for the
   // unanswered halves would be a person who said nothing, which is not worth
   // printing (see the note above).
-  if (id === 'extras') {
+  // ONE SCREEN, ONE BUBBLE. The clarifiers and the timing are answered on the
+  // same page (see stepsFor), so the transcript shows them as one answer —
+  // „კვირაში ორჯერ · აბიტურიენტი" — rather than inventing a second exchange
+  // for a question that was never asked on its own.
+  if (id === 'timing') {
     if (!d.kind) return null
     const said = extrasFor(kindOf(d.kind), d.topic)
       .map(q => q.options.find(o => o.id === d.details[q.id])?.label)
       .filter((v): v is string => !!v)
-    return said.length ? said.join(' · ') : null
-  }
-  if (id === 'budget') {
-    if (!d.kind) return null
-    // A typed amount reads back as the exact figure, not as the range that
-    // happens to contain it — restating „45₾" as „30–60₾" would show somebody
-    // an answer they did not give.
-    if (d.budgetAmount) return budgetLabel(kindOf(d.kind), d.budgetAmount, d.budgetAmount)
-    const band = bandOf(kindOf(d.kind), d.budgetBand)
-    return band ? budgetLabel(kindOf(d.kind), band.min, band.max) : null
-  }
-  if (id === 'timing') {
-    return d.kind && d.timing ? timingLabel(kindOf(d.kind), d.timing) : null
+    const when = d.timing ? timingLabel(kindOf(d.kind), d.timing) : null
+    return [when, ...said].filter(Boolean).join(' · ') || null
   }
   // The service run's own place question. It reads back as just the city —
   // „ადგილზე · თბილისი" would restate a format nobody was offered a choice of.
@@ -295,10 +444,6 @@ export function answerLabel(id: string, d: Draft): string | null {
 export function stepComplete(id: string, d: Draft): boolean {
   if (id === 'what') return d.topic !== '' && kindsOfTopic(d.topic).length > 0
   if (id === 'kind') return d.kind !== '' && d.topic !== '' && isTopicOfKind(d.kind, d.topic)
-  if (id === 'budget') {
-    if (d.kind === '') return false
-    return (d.budgetAmount ?? 0) > 0 || bandOf(kindOf(d.kind), d.budgetBand) !== undefined
-  }
   if (id === 'timing') return d.kind !== '' && TIMING[kindOf(d.kind)].some(t => t.id === d.timing)
   // format and city both carry an honest default (ONLINE / თბილისი) that the
   // screen shows pre-selected; details and the clarifiers are optional.
@@ -342,7 +487,6 @@ export function resumeStepId(d: Draft): string {
       if (answered) continue
       const later = steps.slice(i + 1)
       const anyLaterAnswered = later.some(l =>
-        (l.id === 'budget' && (d.budgetBand !== '' || (d.budgetAmount ?? 0) > 0)) ||
         (l.id === 'timing' && d.timing !== '') ||
         (l.id === 'contact' && (d.contactName !== '' || d.phone !== '')))
       if (!anyLaterAnswered) return s.id
@@ -368,7 +512,7 @@ export function progressOf(id: string, d: Draft): number {
 export function withKind(d: Draft, kind: RequestKindName): Draft {
   if (d.kind === kind) return d
   return {
-    ...d, kind, budgetBand: '', timing: '', details: {},
+    ...d, kind, budgetBand: UNSTATED, timing: '', details: {},
     // ⚠️ THE FORMAT IS DECIDED BY THE KIND FOR A SERVICE, not asked. Somebody
     // has to be in the room, so the row must say IN_PERSON whatever the draft
     // was carrying — and the run never shows the format screen for this kind
@@ -390,9 +534,54 @@ export function withTopic(d: Draft, topicId: string): Draft {
   const next = { ...d, topic: topicId }
   if (kinds.length === 1) return withKind(next, kinds[0])
   if (next.kind !== '' && !kinds.includes(next.kind)) {
-    return { ...next, kind: '', budgetBand: '', budgetAmount: null, timing: '', details: {} }
+    return { ...next, kind: '', budgetBand: UNSTATED, timing: '', details: {} }
   }
   return next
+}
+
+/**
+ * Seed a draft from the provider `?to=` named — see lib/requestTarget.
+ *
+ * ⚠️ IT NEVER GUESSES. Three outcomes and only the first one shortens anything:
+ *   • ONE topic that carries ONE kind → the topic is set and the „რა გჭირდება"
+ *     screen is dropped (`topicPinned`). „მჭირდება სანტექნიკოსი" is not
+ *     ambiguous between a conversation and a job, so nothing is being decided
+ *     on somebody's behalf.
+ *   • ONE topic carrying SEVERAL kinds → the topic is set, the screen STAYS and
+ *     asks the one question that is still open („რა სახის დახმარება?").
+ *   • SEVERAL topics, or none → nothing is set. The screen behaves exactly as
+ *     it does for a visitor who arrived with no provider; what changes is that
+ *     the catalogue on it is narrowed to that provider's own list (_stepWhat).
+ *
+ * Never silently submitting a wrong topic is the whole rule: a request filed
+ * under the wrong thing is worse for the client AND for the person they chose.
+ */
+export function withTarget(d: Draft, topics: string[], chosen = false): Draft {
+  // ⚠️ `chosen` IS THE PERSON, NOT THE TOPIC. A provider was named, so this is a
+  // message to somebody rather than a request into the room — and that is true
+  // whether or not their topic could be inferred (see `directTo`).
+  // ⚠️ `directTo` IS EARNED, NOT ASSUMED (2026-08-19, the same day it shipped
+  // wrong). It collapses the whole run to one screen, so it may only be true
+  // when every question that screen skips already HAS an answer. The first
+  // version set it from `chosen` alone: a provider whose offering spans two
+  // topics, or one topic that could be a lesson or a consultation, left `kind`
+  // empty — and the wizard then showed one screen, took the person's name and
+  // number, and answered „INVALID" on send, every time, with nothing on the
+  // page pointing at what was wrong. Measured: 0 of the direct runs could
+  // submit. The rule now is the one the name always implied — the person is
+  // chosen AND there is nothing left to ask.
+  if (topics.length !== 1) return { ...d, directTo: false, topicPinned: false }
+  const only = topics[0]
+  // `withTopic` already owns „one possible kind → set it", so the pin is only
+  // asking whether that happened.
+  const next = withTopic({ ...d }, only)
+  const pinned = kindsOfTopic(only).length === 1
+  if (!(chosen && pinned)) return { ...next, directTo: false, topicPinned: pinned }
+  // The questions this run will never ask, answered as „not asked" rather than
+  // left empty. A named provider quotes after a conversation, not blind — see
+  // UNSTATED_BUDGET in lib/requestTopics for why this is a sentinel and not a
+  // band anybody can pick.
+  return { ...next, directTo: true, topicPinned: true, timing: UNSTATED }
 }
 
 /**
@@ -403,6 +592,21 @@ export function withTopic(d: Draft, topicId: string): Draft {
 export function reviveDraft(raw: unknown): Draft {
   if (!raw || typeof raw !== 'object') return EMPTY_DRAFT
   const d = { ...EMPTY_DRAFT, ...(raw as Partial<Draft>) }
+  // ⚠️ A RESTORED DRAFT NEVER CARRIES THE PIN. It is a fact about the URL that
+  // was open when the run started (`?to=`), and the URL open NOW is the one
+  // that decides — the same rule `vertical` follows in RequestWizard. Without
+  // this, one run started from a plumber's profile would silently shorten every
+  // later visit to a bare /request, hiding the topic question from somebody who
+  // has not chosen anybody.
+  d.topicPinned = false
+  // ⚠️ A DRAFT WRITTEN BEFORE THE TYPED BUDGET WENT (2026-08-19) still carries
+  // `budgetAmount`, and the spread above copies it straight back in. The wire
+  // schema no longer has that key, so it would be stripped at submit and the
+  // person would meet „INVALID" on the last screen for an answer they gave.
+  // Dropped here instead: `stepComplete('budget')` then reads false and the
+  // resume logic parks them on the budget question, which is the truth — the
+  // ladder is the only way to answer it now.
+  delete (d as Record<string, unknown>).budgetAmount
   if (typeof d.details !== 'object' || d.details === null || Array.isArray(d.details)) d.details = {}
   // ⚠️ READ FROM `REQUEST_KINDS`, NEVER RE-TYPED HERE (2026-08-17). This was a
   // literal `['LEARNING', 'CONSULTATION', 'PROJECT']`, so the day a fourth kind
@@ -415,10 +619,11 @@ export function reviveDraft(raw: unknown): Draft {
   }
   if (d.kind !== '') {
     if (d.topic && !isTopicOfKind(d.kind, d.topic)) d.topic = ''
-    if (d.budgetBand && bandOf(d.kind, d.budgetBand) === undefined) d.budgetBand = ''
-    if (typeof d.budgetAmount !== 'number' || !Number.isFinite(d.budgetAmount) || d.budgetAmount <= 0) {
-      d.budgetAmount = null
-    }
+    // A draft saved before the budget question went carries a real band id.
+    // It is harmless (the schema still accepts it), but anything the ladder no
+    // longer knows drops to UNSTATED rather than to '' — '' is the one value
+    // ServiceRequestInput refuses, and the screen that used to fix it is gone.
+    if (bandOf(d.kind, d.budgetBand) === undefined) d.budgetBand = UNSTATED
     if (d.timing && !TIMING[d.kind].some(t => t.id === d.timing)) d.timing = ''
   }
   for (const k of ['description', 'contactName', 'phone', 'email', 'website'] as const) {

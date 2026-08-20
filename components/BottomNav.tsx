@@ -14,6 +14,8 @@ import { usePathname } from 'next/navigation'
 import { useEffect, type ReactElement } from 'react'
 import { Icon } from './Icon'
 import { useNotifications } from '@/lib/notifications'
+import { isProviderWorkspacePath } from '@/lib/requests'
+import { HELP_PROFESSIONS } from '@/lib/helpProfessions'
 
 type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
 
@@ -22,7 +24,7 @@ type Tab = {
   label: string
   icon: (p: any) => ReactElement
   // A tab is "active" if the pathname matches exactly OR starts with
-  // the tab's href followed by "/" (so /student/bookings/123 highlights
+  // the tab's href followed by "/" (so /me/bookings/123 highlights
   // the ჯავშნები tab).
   match?: (path: string) => boolean
 }
@@ -31,33 +33,48 @@ const startsWith = (prefix: string) => (path: string) =>
   path === prefix || path.startsWith(prefix + '/')
 
 const STUDENT_TABS: Tab[] = [
-  { href: '/student',           label: 'მთავარი',      icon: Icon.home, match: p => p === '/student' },
-  { href: '/tutors',            label: 'ექსპერტები',     icon: Icon.search,   match: startsWith('/tutors') },
+  { href: '/me',           label: 'მთავარი',      icon: Icon.home, match: p => p === '/me' },
+  // /experts/<slug> is the profile (own address space since 2026-08-19); it is
+  // still the ექსპერტები section, so it lights the same tab.
+  { href: '/experts',            label: 'ექსპერტები',     icon: Icon.search,   match: startsWith('/experts') },
   // Bookings — the core object of the product — earns a tab.
-  { href: '/student/bookings',  label: 'ჯავშნები',     icon: Icon.calendar, match: startsWith('/student/bookings') },
+  { href: '/me/bookings',  label: 'ჯავშნები',     icon: Icon.calendar, match: startsWith('/me/bookings') },
   // Messages — a marketplace conversation surface earns its own tab (mirrors
   // the tutor nav).
-  { href: '/student/messages',  label: 'მიმოწერა',      icon: Icon.chat,     match: startsWith('/student/messages') },
+  { href: '/me/messages',  label: 'მიმოწერა',      icon: Icon.chat,     match: startsWith('/me/messages') },
   // „შენახული" TOOK THE PROFILE SLOT (2026-07-31). The old comment above claimed
   // saved-experts lived „in the StudentAppBar rail + profile" — but that rail is
   // `hidden lg:flex` and the public header's heart was `hidden sm:`, so on a
   // phone a student had NO route to their shortlist anywhere. It was reported to
   // us as „the save function was deleted", which is exactly how an unreachable
   // feature reads.
-  // Why PROFILE gave up the slot rather than „ექსპერტები": /tutors is the
+  // Why PROFILE gave up the slot rather than „ექსპერტები": /experts is the
   // catalog — the core action of a marketplace — and must stay one tap away.
   // The profile is a rare destination that ALREADY has a permanent entry point
   // in the always-visible avatar menu (UserMenu → „პროფილი"), so it loses
   // nothing by leaving the bar. A shortlist, by contrast, is used exactly while
   // the visitor is deciding, which is the whole job of this nav.
-  { href: '/student/favorites', label: 'შენახული',     icon: Icon.heart,    match: startsWith('/student/favorites') },
+  { href: '/me/favorites', label: 'შენახული',     icon: Icon.heart,    match: startsWith('/me/favorites') },
 ]
 
 const TUTOR_TABS: Tab[] = [
-  { href: '/tutor',             label: 'მთავარი',      icon: Icon.home, match: p => p === '/tutor' },
-  { href: '/tutor/bookings',    label: 'ჯავშნები',     icon: Icon.calendar, match: startsWith('/tutor/bookings') },
-  { href: '/tutor/messages',    label: 'მიმოწერა',      icon: Icon.chat,    match: startsWith('/tutor/messages') },
-  { href: '/tutor/profile',     label: 'პროფილი',      icon: Icon.user,     match: startsWith('/tutor/profile') },
+  { href: '/work',             label: 'მთავარი',      icon: Icon.home, match: p => p === '/work' },
+  { href: '/work/jobs',        label: 'სამუშაოები',   icon: Icon.calendar, match: startsWith('/work/jobs') },
+  { href: '/work/messages',    label: 'მიმოწერა',      icon: Icon.chat,    match: startsWith('/work/messages') },
+  { href: '/work/profile',     label: 'პროფილი',      icon: Icon.user,     match: startsWith('/work/profile') },
+]
+
+// The master's workspace (M1, 2026-08-18). Three screens, the same three the
+// /work rail lists (components/tutor/navConfig → PROVIDER_NAV), because on a
+// phone the rail is hidden. Shown by SPACE, not role — a master's `role` is
+// STUDENT or TUTOR (lib/hats says why), and anybody who can see these three
+// paths at all has already passed their 404 gate (app/work/(provider)/layout).
+// ⚠️ THE SPACE IS THE THREE PATHS, NEVER THE /work PREFIX (stage 6): the rest
+// of /work is the expert's, and gets TUTOR_TABS.
+const PROVIDER_TABS: Tab[] = [
+  { href: '/work/requests',        label: 'მოთხოვნები',        icon: Icon.list,      match: startsWith('/work/requests') },
+  { href: '/work/offers',          label: 'შეთავაზებები',      icon: Icon.send,      match: startsWith('/work/offers') },
+  { href: '/work/services',        label: 'ჩემი სერვისები',    icon: Icon.briefcase, match: startsWith('/work/services') },
 ]
 
 const TABS_BY_ROLE: Record<Role, Tab[]> = {
@@ -77,12 +94,15 @@ export function BottomNav({ role }: { role: Role | null }) {
   const { unreadCount: unread } = useNotifications(role !== null)
 
   // SPACE-aware, not just role-aware. A dual-role expert (or an admin) who
-  // switches into the client space at /student got TUTOR tabs whose every
+  // switches into the client space at /me got TUTOR tabs whose every
   // destination bounced them straight back out — on mobile the switch was a
   // trap. The path names the space the user is IN; the role only decides the
-  // default elsewhere.
-  const space = path.startsWith('/student') ? 'STUDENT' : path.startsWith('/tutor') ? 'TUTOR' : role
-  const tabs = role ? TABS_BY_ROLE[space === 'STUDENT' || space === 'TUTOR' ? space : role] ?? [] : []
+  // default elsewhere. The master's three paths are tested BEFORE the /work
+  // prefix they live under — the order is the whole distinction.
+  const space = path.startsWith('/me') ? 'STUDENT' : isProviderWorkspacePath(path) ? 'PROVIDER' : path.startsWith('/work') ? 'TUTOR' : role
+  const tabs = !role ? []
+    : space === 'PROVIDER' ? PROVIDER_TABS
+    : TABS_BY_ROLE[space === 'STUDENT' || space === 'TUTOR' ? space : role] ?? []
   // Focused screens own the full viewport including the bottom edge, so the
   // tab bar steps aside there:
   //  • conversation threads (student AND tutor) — the composer owns the
@@ -91,22 +111,24 @@ export function BottomNav({ role }: { role: Role | null }) {
   //    cancel) is the bottom surface; stacking the tab bar under it just
   //    hides the tabs behind an action bar.
   const isFocusedScreen =
-    /^\/(?:student|tutor)\/messages\/[^/]+$/.test(path) ||
+    /^\/(?:me|work)\/messages\/[^/]+$/.test(path) ||
     // Pre-booking pair threads (/…/messages/u/[userId]) — the composer owns
     // the bottom edge, same as booking threads.
-    /^\/(?:student|tutor)\/messages\/u\/[^/]+$/.test(path) ||
-    /^\/student\/bookings\/[^/]+$/.test(path) ||
+    /^\/(?:me|work)\/messages\/u\/[^/]+$/.test(path) ||
+    /^\/me\/bookings\/[^/]+$/.test(path) ||
     // Expert profile: the fixed MobileBookingBar is the bottom surface for
     // signed-in students — two stacked bottom layers just hide the tabs.
-    /^\/tutors\/[^/]+$/.test(path) ||
-    // The /apply expert-application wizard owns the bottom edge with its own
+    // NOT the profession landings that share the address space since stage 8
+    // (/experts/<profession>, lib/professionSeo) — those are marketing pages
+    // with no bottom bar of their own. The slug list is read from the help
+    // widget's client-safe copy of the table (tests/helpProfessions pins it to
+    // the real one), not from professionSeo, whose 450 lines of prose must not
+    // ship in this bundle.
+    (/^\/experts\/[^/]+$/.test(path) && !HELP_PROFESSIONS.some(p => path === `/experts/${p.slug}`)) ||
+    // The /join expert-application wizard owns the bottom edge with its own
     // back/next footer — the tab bar (+ cookie banner) stacked under it hid the
     // "next" button and read as a broken double bar.
-    /^\/apply(?:\/|$)/.test(path) ||
-    // /ask owns the bottom edge with its sticky follow-up submit bar; the fixed
-    // tab bar (z-40) stacked over it (z-30) covered the input and made it
-    // unusable on mobile.
-    /^\/ask(?:\/|$)/.test(path)
+    /^\/join(?:\/|$)/.test(path)
   const show = tabs.length > 0 && !isFocusedScreen
 
   // Signal to globals.css that the bar is present so pages can reserve
@@ -127,7 +149,7 @@ export function BottomNav({ role }: { role: Role | null }) {
       className="lg:hidden fixed inset-x-0 bottom-0 z-chrome bg-white border-t border-ink-200"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className={`grid h-16 ${tabs.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
+      <ul className={`grid h-16 ${tabs.length === 5 ? 'grid-cols-5' : tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
         {tabs.map(tab => {
           const active = tab.match ? tab.match(path) : path === tab.href
           const IconComp = tab.icon

@@ -118,9 +118,34 @@ export function redirectAfterSignin(role: string, home?: string | null) {
 // always minted a 30-day session. Only the NON-default is ever sent (both
 // params default correctly on the server), so a plain
 // <a href="/api/auth/google"> remains a working no-JS fallback.
-export function startGoogleSignin(e: React.MouseEvent<HTMLAnchorElement>, opts?: { remember?: boolean }) {
+/**
+ * ⚠️ `dest` EXISTS BECAUSE ITS ABSENCE LOST THE ROLE CHOICE (2026-08-18).
+ *
+ * The owner registered on the live site as a ხელოსანი and landed on /student,
+ * as an ordinary client, with no application and no trace that they had ever
+ * chosen anything. Traced: they picked „ვარ ხელოსანი" — which is LOCAL STATE,
+ * it never touches the URL — and then tapped „Google-ით გაგრძელება", the first
+ * and most prominent control on that form. This function read only
+ * `readRedirectParam()`, i.e. `window.location.search`; on a bare /signup there
+ * is no `?redirect=`, so `qs` came out empty, the early return fired, and the
+ * plain `<a href="/api/auth/google">` navigated with nothing attached. The
+ * callback then had no destination and fell through to `postAuthHome`.
+ *
+ * The password path was fine — it holds `dest` in the same closure and assigns
+ * `window.location.href` itself. So the bug was invisible to anyone testing
+ * with a password, and it silently discarded the single most important thing
+ * that screen collects.
+ *
+ * The URL parameter still WINS over `dest`: arriving at
+ * /signup?redirect=/apply/master is an explicit instruction from wherever they
+ * came from, and a form's default must never override it.
+ */
+export function startGoogleSignin(
+  e: React.MouseEvent<HTMLAnchorElement>,
+  opts?: { remember?: boolean; dest?: string },
+) {
   const qp = new URLSearchParams()
-  const next = readRedirectParam()
+  const next = readRedirectParam() ?? safeRedirect(opts?.dest ?? null)
   if (next) qp.set('redirect', next)
   if (opts?.remember === false) qp.set('remember', '0')
   const qs = qp.toString()

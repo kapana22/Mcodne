@@ -98,7 +98,7 @@ export async function POST(req: Request) {
     type: 'REVIEW_NEW',
     title: `ახალი შეფასება · ${parsed.data.rating}/5`,
     body: body.slice(0, 80),
-    href: `/tutor/bookings/${booking.id}`,
+    href: `/work/bookings/${booking.id}`,
   })
 
   return NextResponse.json({ ok: true, id: review.id })

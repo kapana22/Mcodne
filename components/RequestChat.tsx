@@ -15,7 +15,8 @@
 // Polling while OPEN only — a conversation is the one screen where a reply
 // arriving thirty seconds late is felt, and the one screen nobody leaves open
 // in a background tab by accident. Same visibility-aware contract as
-// AutoRefresh, and stopped the moment the pane is closed.
+// AutoRefresh, and stopped the moment the pane is closed. (Since stage 10 the
+// poll is the fallback — see „LIVE, NOT POLLED" below.)
 
 // ── TWO THREADS, ONE PANE (2026-08-17) ──────────────────────────────────────
 // A second conversation exists now — the client and US, from the moment they
@@ -27,10 +28,20 @@
 // So the pane takes a THREAD DESCRIPTOR and derives the URL from it, rather than
 // being copied. The alternative was a second component that would have drifted
 // on the first change to a bubble.
+//
+// ── LIVE, NOT POLLED, ON THE CLIENT'S SIDE (stage 10) ───────────────────────
+// A pane that holds the reference (`refCode`) joins the request's one stream
+// (lib/requestLiveClient ↔ /api/requests/[ref]/events) and refetches its thread
+// the moment the route says a message, a receipt or the desk moved — through
+// the SAME endpoint as before, so the masking and side rules stay where they
+// live. The 15-second poll is the FALLBACK, run only while the stream is down.
+// A pane without the reference (the provider's, the operator's) has no room
+// to join and polls exactly as it always did.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Btn } from '@/components/Btn'
 import { presenceLabel, presenceHint } from '@/lib/requestThread'
+import { subscribeRequestLive, type LiveState } from '@/lib/requestLiveClient'
 
 type Msg = { id: string; mine: boolean; body: string; createdAt: string; readByOther: boolean }
 
@@ -103,10 +114,14 @@ export function RequestChat({
   // and the operator's own view). Distinct from `false`, which is „nobody is at
   // the desk" and IS shown.
   const [online, setOnline] = useState<boolean | undefined>(undefined)
+  /** 'open' = the room's stream is delivering; 'down' = poll. Starts down, so a
+   *  pane with no room to join (no `refCode`) simply keeps polling. */
+  const [live, setLive] = useState<LiveState>('down')
   const endRef = useRef<HTMLDivElement | null>(null)
 
   const { url, keys } = endpointOf(thread)
   const qs = new URLSearchParams(keys).toString()
+  const refCode = thread.refCode
 
   const load = useCallback(async (scroll = false) => {
     try {
@@ -120,14 +135,30 @@ export function RequestChat({
     } catch { /* a failed poll is a poll that tries again */ }
   }, [url, qs])
 
+  // The stream, while the pane is open and holds the reference. The event is a
+  // nudge, never the messages — the pane reads them back through its own
+  // endpoint. Scrolls to the newest, the way a reply arriving in a chat does.
   useEffect(() => {
-    if (!open) return
+    if (!open || !refCode) return
+    return subscribeRequestLive(refCode, {
+      onMessages: () => { load(true) },
+      onState: setLive,
+    })
+  }, [open, refCode, load])
+
+  // The fallback: the first read and the poll, while the stream is down. Same
+  // visibility-aware contract as AutoRefresh, stopped the moment the pane is
+  // closed. The stream reports 'down' until its socket opens, so this is also
+  // what paints the pane first; once 'open', the route's first event is the
+  // catch-up and the timer never starts.
+  useEffect(() => {
+    if (!open || live === 'open') return
     load(true)
     const id = window.setInterval(() => {
       if (document.visibilityState === 'visible') load()
     }, POLL_MS)
     return () => window.clearInterval(id)
-  }, [open, load])
+  }, [open, live, load])
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault()

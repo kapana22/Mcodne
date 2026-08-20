@@ -201,7 +201,7 @@ export async function sendPostSessionNudges(): Promise<{ bookings: number; email
   // back and stays silent. Written with raw SQL rather than notify() because
   // notify() generates a random id — there would be no key to conflict on. The
   // pref gate notify() would have applied is already enforced above.
-  const hrefFor = (id: string) => `/student/bookings/${id}?review=1`
+  const hrefFor = (id: string) => `/me/bookings/${id}?review=1`
   const claimed = await prisma.$queryRawUnsafe<{ id: string }[]>(
     `INSERT INTO "Notification" (id, "userId", "type", title, body, href)
      SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[])
@@ -229,7 +229,7 @@ export async function sendPostSessionNudges(): Promise<{ bookings: number; email
       href: hrefFor(r.id),
       // Folded-in rebook invite — dropped when they already have time booked
       // with this expert. ?rebook=1 auto-opens the booking flow on the profile.
-      rebookHref: shouldPromptRebook(r) ? `/tutors/${r.tutorProfileId}?rebook=1` : undefined,
+      rebookHref: shouldPromptRebook(r) ? `/experts/${r.tutorProfileId}?rebook=1` : undefined,
     })
     // Count only what actually went out — sendMail RESOLVES with { ok: false }
     // on a provider error, so a bare .then() would report failures as sent.

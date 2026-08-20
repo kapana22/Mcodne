@@ -3,9 +3,10 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { avatarSrc } from '@/lib/avatarSrc'
 import { BOOKING_REVENUE_ONLY } from '@/lib/packages'
+import { ROLE } from '@/lib/roles'
 
 export async function GET() {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })

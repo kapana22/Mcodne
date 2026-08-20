@@ -10,6 +10,7 @@ import { ConfirmModal } from '@/components/ConfirmModal'
 import { signOut as doSignOut } from '@/lib/signout'
 import { homeForRole } from '@/lib/roleHome'
 import { Eyebrow } from '@/components/Eyebrow'
+import { PageHeader } from '@/components/PageHeader'
 import { georgianNameError } from '@/lib/georgianText'
 
 // Local mirror of lib/notify.ts PrefKey. Keeping this in-file so the Settings
@@ -437,11 +438,9 @@ export default function SettingsPage() {
 
       <Container as="main" size="content" className="py-10 space-y-8">
         {/* Page header — the sticky utility bar above is chrome, not a
-            heading; this h1 is the page's actual title. */}
-        <div>
-          <Eyebrow className="mb-2">ანგარიში</Eyebrow>
-          <h1 className="font-display text-display font-bold text-ink-900 tracking-tight">პარამეტრები</h1>
-        </div>
+            heading; this is the page's actual title, on the shared workspace
+            PageHeader (same scale as /student/bookings, /tutor/*). */}
+        <PageHeader eyebrow="ანგარიში" title="პარამეტრები" />
 
         <ProfileSection
           me={me}

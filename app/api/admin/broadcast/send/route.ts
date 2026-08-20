@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { normalizePrefs } from '@/lib/notify'
+import { ROLE } from '@/lib/roles'
 
 const Segment = z.enum(['all', 'students', 'tutors', 'recent'])
 const Body = z.object({
@@ -15,8 +16,8 @@ const Body = z.object({
 function whereForSegment(segment: z.infer<typeof Segment>) {
   switch (segment) {
     case 'all': return {}
-    case 'students': return { role: 'STUDENT' as const }
-    case 'tutors': return { role: 'TUTOR' as const }
+    case 'students': return { role: ROLE.CLIENT }
+    case 'tutors': return { role: ROLE.EXPERT }
     case 'recent': {
       const since = new Date(Date.now() - 7 * 24 * 3600 * 1000)
       return { createdAt: { gte: since } }

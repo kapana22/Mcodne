@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { buildProfileChecks, profilePercent } from '@/lib/profileScore'
 import { preThreadInitiators } from '@/lib/preThreadInitiators'
+import { requestAccessOf } from '@/lib/requestsServer'
+import { offerUnreadTotal } from '@/lib/inboxRows'
+import { ROLE } from '@/lib/roles'
 
 // Lightweight counts for the workspace sidebar badges. Polled every 60s by
 // useNavBadges — keep this to cheap count queries only (the heavier
@@ -10,7 +13,7 @@ import { preThreadInitiators } from '@/lib/preThreadInitiators'
 // nav-badge polling path).
 
 export async function GET() {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({
@@ -97,14 +100,27 @@ export async function GET() {
   // Count an unread pre-booking message toward the EXPERT badge only when the
   // partner OPENED the thread (they're the client, I'm the responder/expert).
   // Unread in threads I opened is client-side and belongs to the student badge.
-  // This is the SAME space rule /api/messages?space=tutor applies to pre threads
+  // This is the SAME space rule /api/messages?space=expert applies to pre threads
   // (initiator = client, checked before any booking dedup), so the badge total
   // and the inbox's summed `unreadCount` describe the same set of messages.
   let preUnread = 0
   for (const m of preUnreadRows) {
     if (preInitiators.get(m.fromId) === m.fromId) preUnread++
   }
-  const messages = bookingUnread + preUnread
+
+  // ── THE THIRD KIND, AND WHY IT IS COUNTED FROM THE ROWS (2026-08-19) ──────
+  // Offer conversations now live in the SAME inbox as bookings, so the pill
+  // over „მიმოწერა" has to cover them or it points at a list holding more than
+  // it admits. It is counted by summing the very rows /api/messages returns
+  // (lib/inboxRows → offerUnreadTotal = inboxUnreadTotal(offerInboxRows(…))),
+  // not by a count query of its own: two derivations of one number is the bug
+  // that once left a „მიმოწერა N" pill nothing could clear.
+  //
+  // Costs one indexed allowlist lookup plus one bounded offer query per poll,
+  // and returns 0 immediately for anybody who is not a provider.
+  const offerUnread = await offerUnreadTotal(await requestAccessOf(user.id))
+
+  const messages = bookingUnread + preUnread + offerUnread
 
   const percent = profilePercent(buildProfileChecks(
     profile,

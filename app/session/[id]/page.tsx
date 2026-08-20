@@ -159,8 +159,8 @@ export default function SessionRoom() {
           <h1 className="font-display text-h2 font-bold text-ink-900">სესია ვერ მოიძებნა</h1>
           <p className="text-body text-ink-500 mt-2">ჯავშანი წაიშალა ან შენ არ ხარ მონაწილე.</p>
           <div className="mt-6 flex justify-center gap-2">
-            <Btn variant="secondary" href="/student/bookings">ჩემი ჯავშნები</Btn>
-            <Btn variant="primary" href="/tutors">ექსპერტები</Btn>
+            <Btn variant="secondary" href="/me/bookings">ჩემი ჯავშნები</Btn>
+            <Btn variant="primary" href="/experts">ექსპერტები</Btn>
           </div>
         </div>
       </div>
@@ -184,7 +184,7 @@ export default function SessionRoom() {
             </Btn>
           </div>
           <div className="mt-3">
-            <Link href="/student/bookings" className="font-display text-meta font-semibold text-ink-500 hover:text-ink-900 transition-colors duration-fast">ჩემი ჯავშნები</Link>
+            <Link href="/me/bookings" className="font-display text-meta font-semibold text-ink-500 hover:text-ink-900 transition-colors duration-fast">ჩემი ჯავშნები</Link>
           </div>
         </div>
       </div>
@@ -217,7 +217,7 @@ export default function SessionRoom() {
   // instead of a dead countdown/join surface.
   const isPastCutoff = now > startMs + (booking.durationMin + 30) * 60_000
   const isTutor = me?.id === booking.tutor.user.id
-  const backHref = isTutor ? `/tutor/bookings/${booking.id}` : `/student/bookings/${booking.id}`
+  const backHref = isTutor ? `/work/bookings/${booking.id}` : `/me/bookings/${booking.id}`
 
   const humanCountdown = (ms: number) => {
     if (ms <= 0) return 'ახლა'
@@ -276,7 +276,7 @@ export default function SessionRoom() {
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar src={booking.student.avatarUrl ?? undefined} name={booking.student.fullName} size={44} />
                 <div className="min-w-0">
-                  <div className="text-meta text-ink-500 font-semibold uppercase">სტუდენტი</div>
+                  <div className="text-meta text-ink-500 font-semibold uppercase">კლიენტი</div>
                   <div className="font-display text-body font-bold text-ink-900 truncate">{booking.student.fullName}</div>
                 </div>
               </div>
@@ -302,7 +302,7 @@ export default function SessionRoom() {
                 {!isTutor && (
                   <div className="mt-3">
                     <Link
-                      href={`/student/bookings/${booking.id}?review=1`}
+                      href={`/me/bookings/${booking.id}?review=1`}
                       className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body transition-colors duration-fast"
                     >
                       შეაფასე
@@ -379,7 +379,7 @@ export default function SessionRoom() {
                     </p>
                     {isTutor && (
                       <div className="mt-6 pt-6 border-t border-ink-100">
-                        <div className="text-meta text-ink-500 mb-3">სესიის ბოლოს მონიშნე დასრულებულად — სტუდენტი შეგაფასებს.</div>
+                        <div className="text-meta text-ink-500 mb-3">სესიის ბოლოს მონიშნე დასრულებულად — კლიენტი შეგაფასებს.</div>
                         {completeErr && (
                           <div role="alert" className="mb-3 mx-auto max-w-[380px] rounded-btn bg-danger-50 border border-danger-200 text-danger-700 text-small px-3 py-2">
                             {completeErr}
@@ -405,7 +405,7 @@ export default function SessionRoom() {
       <ConfirmModal
         open={completeConfirmOpen}
         title="სესიის დასრულება?"
-        body="სესია დასრულდება და სტუდენტი შეგაფასებს."
+        body="სესია დასრულდება და კლიენტი შეგაფასებს."
         tone="brand"
         confirmLabel="დასრულება"
         cancelLabel="უკან"

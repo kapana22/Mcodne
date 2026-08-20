@@ -7,8 +7,8 @@ import { computeOpenStarts } from '@/lib/availability'
 import { BROWSABLE_CATEGORY, BROWSABLE_CATEGORY_SQL, categorySlugFilter } from '@/lib/categoryTree'
 
 // Single source of truth for the public expert-list query. Both the JSON API
-// (app/api/tutors/route.ts) and the server-rendered /tutors page
-// (app/tutors/page.tsx) call this so the initial SSR list and every subsequent
+// (app/api/tutors/route.ts) and the server-rendered /experts page
+// (app/experts/page.tsx) call this so the initial SSR list and every subsequent
 // client refetch share EXACTLY the same shape + ordering. Do not change the
 // returned object shape without updating both consumers + the client mapper.
 
@@ -182,9 +182,43 @@ function searchCandidateSql(terms: SearchTerm[], cap: number): Prisma.Sql {
 // the answer can change.
 let trigramAvailable = true
 
+/**
+ * WHO THE CATALOGUE SHOWS — the expert half's visibility rule, stated once.
+ *
+ * ⚠️ LIFTED OUT OF `queryTutors` 2026-08-19 and NOT re-typed anywhere: the
+ * intake's `?to=<slug>` (lib/requestTarget) has to resolve a provider by
+ * exactly the rule that put them on a card, or the recipient line would name
+ * somebody the catalogue hides — or refuse somebody it shows. One rule, two
+ * readers; the sphere/serviceType/featured narrowing below is per-query and
+ * stays where it is.
+ */
+export const PUBLIC_TUTOR = {
+  // Tutors can pause their public listing via the visibility toggle on
+  // /tutor/profile — hidden tutors don't appear in the browse list.
+  // Their /experts/[slug] page still resolves so existing bookings can link
+  // back; the detail page renders a "paused" banner instead of the
+  // booking flow.
+  available: true,
+  // Admin-suspended accounts (User.suspendedAt set from the admin panel)
+  // must vanish from every public surface — browse, home featured, and the
+  // category pages all flow through here. Unlike the self-pause `available`
+  // flag above, a suspension fully removes the expert (their /experts/[slug]
+  // detail 404s too — see app/experts/[slug]/page.tsx).
+  user: { is: { suspendedAt: null } },
+  // A profile with ZERO services cannot be booked by ANYONE: the flow has no
+  // tier to enumerate and the CTA has nothing to sell. Listing it spends a
+  // browse slot on a guaranteed dead end — the 2026-07-29 production audit
+  // found exactly such an expert holding the TOP position with 54 free
+  // windows and nothing to book. Their /experts/[slug] page still resolves, so
+  // deep links keep working, exactly like a self-paused expert; they are
+  // simply not advertised. They come back the moment they add a service —
+  // lib/expertActivation is what tells them to.
+  consultations: { some: {} },
+}
+
 export async function queryTutors(params: TutorsQueryParams = {}) {
   // A transient boot/DDL failure degrades to a plain query instead of
-  // 500ing /tutors — the query itself surfaces any real schema problem.
+  // 500ing /experts — the query itself surfaces any real schema problem.
   await ensureDbReady().catch(() => {})
 
   const q = params.q?.trim()
@@ -203,29 +237,7 @@ export async function queryTutors(params: TutorsQueryParams = {}) {
   const rawLimit = typeof params.limit === 'number' && Number.isFinite(params.limit) ? params.limit : 40
   const limit = Math.min(Math.max(1, rawLimit), 200)
 
-  const where: any = {
-    // Tutors can pause their public listing via the visibility toggle on
-    // /tutor/profile — hidden tutors don't appear in the browse list.
-    // Their /tutors/[id] page still resolves so existing bookings can link
-    // back; the detail page renders a "paused" banner instead of the
-    // booking flow.
-    available: true,
-    // Admin-suspended accounts (User.suspendedAt set from the admin panel)
-    // must vanish from every public surface — browse, home featured, and the
-    // category pages all flow through here. Unlike the self-pause `available`
-    // flag above, a suspension fully removes the expert (their /tutors/[id]
-    // detail 404s too — see app/tutors/[id]/page.tsx).
-    user: { is: { suspendedAt: null } },
-    // A profile with ZERO services cannot be booked by ANYONE: the flow has no
-    // tier to enumerate and the CTA has nothing to sell. Listing it spends a
-    // browse slot on a guaranteed dead end — the 2026-07-29 production audit
-    // found exactly such an expert holding the TOP position with 54 free
-    // windows and nothing to book. Their /tutors/[id] page still resolves, so
-    // deep links keep working, exactly like a self-paused expert; they are
-    // simply not advertised. They come back the moment they add a service —
-    // lib/expertActivation is what tells them to.
-    consultations: { some: {} },
-  }
+  const where: any = { ...PUBLIC_TUTOR }
   // Category is a LABEL, not a gate. Filtering by slug still restricts to that
   // sphere, but with no filter an expert whose category is unset stays
   // visible: a taxonomy field must never be able to hide a person (it did,
@@ -301,7 +313,7 @@ export async function queryTutors(params: TutorsQueryParams = {}) {
     include: {
       user: { select: { id: true, fullName: true, avatarUrl: true, bio: true } },
       // The parent travels with the category because the browse filter runs on
-      // the CLIENT (the /tutors list is fetched unfiltered), and it has to be
+      // the CLIENT (the /experts list is fetched unfiltered), and it has to be
       // able to answer „is this expert in this sphere?" the same way the count
       // does. Without it the sphere chip printed 7 and returned 5 — the same
       // shape as the 2026-07-31 „10 over a list of 9".

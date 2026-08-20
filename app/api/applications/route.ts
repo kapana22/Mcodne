@@ -22,6 +22,7 @@ import {
   videoError,
   yearsError,
 } from '@/lib/applyValidation'
+import { ROLE } from '@/lib/roles'
 
 // EVERY rule below is a function from lib/applyValidation, which the /apply
 // form calls too. That is the whole point: a rule stated in two places is a
@@ -115,13 +116,13 @@ export async function POST(req: Request) {
   // must never hold a pending application (approving it would demote them out
   // of the admin role and lock everyone out of /admin — the exact bug this
   // guards). Admins who want to inspect the flow can impersonate a student.
-  if (user.role !== 'STUDENT') {
+  if (user.role !== ROLE.CLIENT) {
     return NextResponse.json({
       ok: false,
       error: 'ONLY_STUDENTS_CAN_APPLY',
-      message: user.role === 'TUTOR'
+      message: user.role === ROLE.EXPERT
         ? 'შენ უკვე ექსპერტი ხარ — განაცხადი აღარ გჭირდება. პროფილს „ჩემი სივრციდან“ მართავ.'
-        : 'ამ ანგარიშიდან განაცხადს ვერ გააგზავნი. შედი როგორც სტუდენტი და სცადე თავიდან.',
+        : 'ამ ანგარიშიდან განაცხადს ვერ გააგზავნი. შედი როგორც კლიენტი და სცადე თავიდან.',
     }, { status: 403 })
   }
 

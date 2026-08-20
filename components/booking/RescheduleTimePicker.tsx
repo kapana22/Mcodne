@@ -140,10 +140,16 @@ export function RescheduleTimePicker({
           <Eyebrow as="span" tone="muted">დრო</Eyebrow>
           {durationLabel && <span className="text-meta text-ink-400">{durationLabel}</span>}
         </div>
+        {/* h-11 targets, three-and-a-half rows tall (M3, 2026-08-18): the old
+            h-9 buttons in a 148px box were 36px targets inside a scroll area —
+            a thumb picking 14:00 landed on 15:00. The half row at the bottom
+            is deliberate: a cut-off button is what tells a person the box
+            scrolls, and a box that ended exactly on a row looked complete
+            when it was not. */}
         {times.length === 0 ? (
           <p className="text-meta text-ink-400 py-3">ამ დღეს დრო აღარ დარჩა — აირჩიე სხვა.</p>
         ) : (
-          <div className="grid grid-cols-4 gap-2 max-h-[148px] overflow-y-auto pr-0.5">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[178px] overflow-y-auto pr-0.5">
             {times.map(t => {
               const hm = fmtHM(t.start)
               const sel = hm === timeStr
@@ -153,7 +159,7 @@ export function RescheduleTimePicker({
                   type="button"
                   onClick={() => onTime(hm)}
                   aria-pressed={sel}
-                  className={`h-9 rounded-field border text-small font-display font-semibold tabular-nums transition-colors duration-fast motion-safe:active:scale-[0.97] ${
+                  className={`h-11 rounded-field border text-body font-display font-semibold tabular-nums transition-colors duration-fast motion-safe:active:scale-[0.97] ${
                     sel ? 'bg-brand-600 border-brand-600 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300'
                   }`}
                 >

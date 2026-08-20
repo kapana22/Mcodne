@@ -9,7 +9,7 @@ import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { useMe } from '@/lib/me'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
-import { showApplyCta } from '@/lib/roleHome'
+import { showJoinInvite } from '@/lib/capabilities'
 // Resolve the help widget's topic IDS back into their questions — one source,
 // so a reworded question reads correctly here too.
 import { ALL_TOPICS } from '@/lib/helpTopics'
@@ -56,7 +56,7 @@ const CHANNELS = [
     icon: <Icon.user className="w-5 h-5" />,
     label: 'ექსპერტთა გაწევრიანება',
     value: 'განაცხადის ფორმა',
-    href: '/apply',
+    href: '/join',
     hint: 'პასუხი 24–48 საათში',
   },
 ]
@@ -268,7 +268,7 @@ export default function ContactPage({ initialUser }: { initialUser?: Me | null }
               პირდაპირი არხები
             </Eyebrow>
             <div className="space-y-3">
-              {CHANNELS.filter(c => c.href !== '/apply' || showApplyCta(me?.role)).map(c => (
+              {CHANNELS.filter(c => c.href !== '/join' || showJoinInvite(me?.role, me?.capabilities)).map(c => (
                 <a
                   key={c.label}
                   href={c.href}

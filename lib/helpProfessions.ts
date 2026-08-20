@@ -24,7 +24,7 @@
  */
 
 export type HelpProfession = {
-  /** /konsultacia/<slug> */
+  /** /experts/<slug> — the profession landing (was /konsultacia/<slug>) */
   slug: string
   /** Nominative label, for the button text. */
   label: string

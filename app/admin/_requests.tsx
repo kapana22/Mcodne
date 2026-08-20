@@ -79,6 +79,8 @@ function errText(code?: string): string {
     case 'NOTHING_TO_DO': return 'არაფერი შეცვლილა.'
     case 'INVALID': return 'შეავსე ველები სწორად.'
     case 'NOT_FOUND': return 'ვერ მოიძებნა.'
+    // Somebody else changed the row between reading it and this click (D4).
+    case 'CHANGED': return 'ეს მოთხოვნა ახლახან შეიცვალა — განაახლე გვერდი.'
     default: return 'ვერ შესრულდა — სცადე თავიდან.'
   }
 }
@@ -175,7 +177,7 @@ function RequestDetail({ r, candidates, notified, experts, onChanged }: {
         body: JSON.stringify(body),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) { setErr(errText(j?.error)); return }
+      if (!res.ok || !j.ok) { setErr(errText(j?.error)); if (j?.error === 'CHANGED') onChanged(); return }
       onChanged()
     } catch {
       setErr(errText())
@@ -382,8 +384,8 @@ function RequestDetail({ r, candidates, notified, experts, onChanged }: {
         {candidates.length === 0 ? (
           <p className="mt-3 text-small text-ink-600">
             {r.category
-              ? 'ამ სფეროში აქტიური ექსპერტი არ არის.'
-              : 'ეს თემა ჯერ არცერთ სფეროს არ უკავშირდება — ამაზე ექსპერტი არ გვყავს.'}
+              ? 'ამ კატეგორიაში აქტიური ექსპერტი არ არის.'
+              : 'ეს თემა ჯერ არცერთ კატეგორიას არ უკავშირდება — ამაზე ექსპერტი არ გვყავს.'}
           </p>
         ) : (
           <div className="mt-3 divide-y divide-ink-100">
@@ -396,7 +398,7 @@ function RequestDetail({ r, candidates, notified, experts, onChanged }: {
                   </div>
                   <div className="text-meta text-ink-500 truncate">{c.user.email}</div>
                 </div>
-                <OpenBtn href={`/tutors/${c.slug ?? c.id}`} label="ნახვა" />
+                <OpenBtn href={`/experts/${c.slug ?? c.id}`} label="ნახვა" />
               </div>
             ))}
           </div>

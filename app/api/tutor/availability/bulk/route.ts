@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { materializeWeekly } from '@/lib/availabilityRules'
+import { ROLE } from '@/lib/roles'
 
 // Recurring weekly-template availability. Tutor picks weekday+time blocks once,
 // we materialize each block as ONE concrete AvailabilitySlot WINDOW per week for
@@ -36,7 +37,7 @@ const Body = z.object({
 })
 
 export async function POST(req: Request) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
@@ -126,7 +127,7 @@ export async function POST(req: Request) {
  * Idempotent: a second call deletes 0 rows and still answers 200 { ok: true }.
  */
 export async function DELETE(req: Request) {
-  const auth = await requireRoleApi(['TUTOR', 'ADMIN'])
+  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })

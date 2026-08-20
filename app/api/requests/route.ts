@@ -18,10 +18,12 @@ import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import {
-  ServiceRequestInput, serviceRequestRow, budgetIsBelowFloor,
+  ServiceRequestInput, serviceRequestRow,
   budgetLabel, timingLabel, formatLabel, cityLabel, topicLabel, extrasLabels, KIND,
 } from '@/lib/requests'
 import { requestsViewer, createServiceRequest } from '@/lib/requestsServer'
+import { resolveRequestTarget } from '@/lib/requestTarget'
+import { inviteProviderToRequest } from '@/lib/requestInvite'
 import { accountForRequest } from '@/lib/requestAccount'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { sendMail } from '@/lib/mailer'
@@ -29,6 +31,8 @@ import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 import { triageFlags, triageNote } from '@/lib/requestTriage'
 import { requestReceivedClientEmail } from '@/lib/emailTemplates'
 import { mailVerifiedRequest } from '@/lib/requestJobs'
+import { notifyMany } from '@/lib/notify'
+import { ROLE } from '@/lib/roles'
 
 export async function POST(req: Request) {
   const viewer = await requestsViewer()
@@ -97,16 +101,35 @@ export async function POST(req: Request) {
       }).catch(() => null)
     : null
 
-  // ── The budget floor ─────────────────────────────────────────────────────
-  // Refused ON ARRIVAL — and the row is written anyway. „How many people arrive
-  // under the floor" is exactly what an early stage exists to find out, and it
-  // is unrecoverable if the endpoint drops it. Deleting the evidence to keep
-  // the queue tidy would be throwing away the measurement.
+  // ── THE BUDGET FLOOR IS GONE (2026-08-18) ────────────────────────────────
   //
-  // PER KIND: 20₾ is below the floor for a lesson and absurd as a floor for a
-  // project. The rule reads the band's own `floor` flag rather than comparing
-  // numbers here.
-  const rejected = budgetIsBelowFloor(parsed.data.kind, parsed.data.budgetBand)
+  // It refused a request outright when its budget band was the lowest one, and
+  // it was the single biggest hole in the funnel: 7 of 21 requests — ONE IN
+  // THREE — were rejected on arrival, four of them 20₾ lessons. Those are not
+  // bad requests. A 20₾ lesson is what a school pupil's budget looks like, and
+  // a Georgian tutor taking 20₾ is a normal transaction that this platform was
+  // refusing to carry.
+  //
+  // ⚠️ AND THE COMPETITION SETTLES IT. sheniani.ge — the closest local
+  // reference — has no budget field AT ALL; their intake asks for a priority
+  // („ეკონომიური / სწრაფი / პრემიუმი") and lets the tradesperson quote. We were
+  // losing a third of our demand to a question they do not even ask.
+  //
+  // Owner, 2026-08-18: „ზღვარი მოხსენი."
+  //
+  // WHAT SURVIVES, deliberately:
+  //   · the BANDS. A budget is still asked for and still stored — it is what an
+  //     expert needs in order to bid, and losing it would make every offer a
+  //     guess. It simply no longer disqualifies anybody.
+  //   · `budgetIsBelowFloor` itself, and the `floor: true` flag it reads. The
+  //     wizard still SHOWS a warning on that band (see RequestWizard) so
+  //     somebody choosing it knows what to expect. Telling a person what is
+  //     likely and refusing to take their money are different acts, and only
+  //     the second one was wrong.
+  //
+  // The constant stays so the shape of this handler and its response contract
+  // („rejected" is read by the form) do not change on the way through.
+  const rejected = false
 
   // ── Does a person have to look at this before any expert does? ───────────
   // Until 2026-08-18 the answer was always yes, and that made the operator's
@@ -164,6 +187,39 @@ export async function POST(req: Request) {
     // findable later without them retyping a reference.
     userId: viewer.user?.id ?? null,
   })
+
+  // ── The person they came from ────────────────────────────────────────────
+  //
+  // ⚠️ THE SAME CODE PATH THE ROOM'S „მიწერე" BUTTON USES, not a second one:
+  // lib/requestInvite writes the INVITED offer and everything it guarantees
+  // holds here too — no price, no place consumed against `offerLimit`, not
+  // acceptable, contact still masked, and the provider gets the notification
+  // they already get today. A visitor who tapped somebody's „გამოაგზავნე
+  // მოთხოვნა" now lands in a room that already has that person's thread in it,
+  // instead of one that is empty until somebody happens to bid.
+  //
+  // ⚠️ THE SLUG IS RE-RESOLVED HERE. The browser sent a public address, not a
+  // decision — this asks the database again, against the catalogue's own
+  // visibility rule, so a crafted body can only ever name somebody the site
+  // already lists in public.
+  //
+  // ⚠️ AND IT NEVER FAILS THE REQUEST. An unknown slug, a company-owned profile
+  // with nobody to write to, a provider not on the allowlist, a REJECTED row:
+  // every one of them is a thread that does not open, and none of them is a
+  // reason to lose the request that was just written. The endpoint answers the
+  // same either way — the invite is an extra, and the row is the deliverable.
+  const toRaw = typeof (json as { to?: unknown })?.to === 'string' ? (json as { to: string }).to : null
+  if (toRaw) {
+    try {
+      const target = await resolveRequestTarget(toRaw, row.kind === 'SERVICE' ? 'SERVICE' : 'EXPERT')
+      if (target?.userId) {
+        await inviteProviderToRequest(
+          { id: created.id, status: rejected ? 'REJECTED' : autoVerified ? 'VERIFIED' : 'NEW', topic: row.topic },
+          target.userId,
+        )
+      }
+    } catch { /* best-effort: the request is the deliverable */ }
+  }
 
   // ── The account, made in parallel ────────────────────────────────────────
   // AFTER the write, deliberately: the request is the deliverable and must
@@ -245,6 +301,23 @@ export async function POST(req: Request) {
   }
 
   if (!rejected) {
+    // ── The admins' bell (D10, 2026-08-19) ─────────────────────────────────
+    // The same ping app/api/applications sends as APPLICATION_NEW: the row is
+    // in the queue either way, but a queue nobody is told about is read when
+    // somebody happens to open /admin. REQUEST_NEW is not pref-gated (lib/
+    // notify) — an ops signal to staff, not marketing. Best-effort, after the
+    // response, like every notification here.
+    after(async () => {
+      try {
+        const admins = await prisma.user.findMany({ where: { role: ROLE.ADMIN }, select: { id: true } })
+        await notifyMany(admins.map(a => a.id), {
+          type: 'REQUEST_NEW',
+          title: 'ახალი მოთხოვნა',
+          body: `${created.publicRef} · ${topicLabel(row.topic)}`,
+          href: '/admin#requests',
+        })
+      } catch { /* best-effort */ }
+    })
     after(async () => {
       try {
         const esc = escapeHtml
@@ -255,7 +328,7 @@ export async function POST(req: Request) {
           // Named as „—" rather than omitted when the topic maps nowhere: an
           // absent line reads as „not asked", and this one WAS asked and came
           // back empty, which is the interesting answer.
-          ['სფერო', category?.name ?? '— (ამ სფეროში ექსპერტი არ გვყავს)'],
+          ['კატეგორია', category?.name ?? '— (ამ კატეგორიაში ექსპერტი არ გვყავს)'],
           ['ბიუჯეტი', budgetLabel(parsed.data.kind, row.budgetMin, row.budgetMax)],
           [KIND[parsed.data.kind].timingLabel, timingLabel(parsed.data.kind, row.timing)],
           ...extrasLabels(parsed.data.kind, row.topic, row.details).map(e => [e.label, e.value] as [string, string | null]),
@@ -303,6 +376,16 @@ export async function POST(req: Request) {
     ok: true,
     publicRef: created.publicRef,
     rejected,
+    // ⚠️ WHETHER A PERSON STILL HAS TO READ IT BEFORE ANYBODY ELSE DOES
+    // (2026-08-18). The thanks screen said „დაგირეკავთ მითითებულ ნომერზე" to
+    // everybody — which stopped being true the day triage started releasing
+    // clean requests automatically. Most senders are now told about their
+    // request within seconds and nobody phones them, so the one sentence they
+    // read on the way out was describing a step that had already been skipped.
+    //
+    // The screen needs the answer and cannot compute it: `triageFlags` runs
+    // here, against a repeat-count only the database knows.
+    autoVerified,
     // What the thanks screen says about the account. Never the userId — the
     // browser has no use for it and it is somebody's identifier.
     account: account.outcome,

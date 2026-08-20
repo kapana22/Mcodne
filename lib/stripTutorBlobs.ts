@@ -17,7 +17,7 @@ import { avatarSrc } from '@/lib/avatarSrc'
 // This function used to NULL any stored avatar above 128KB, which had two
 // costs: an expert with a detailed photo silently rendered as initials, and
 // every avatar UNDER the ceiling still travelled as base64 inside the payload,
-// repeated once per card. Measured: /tutors was 556KB of HTML against 59KB for
+// repeated once per card. Measured: /experts was 556KB of HTML against 59KB for
 // the home page, and a ~259ms network floor applies to every request, so bytes
 // were the only thing left worth cutting.
 //

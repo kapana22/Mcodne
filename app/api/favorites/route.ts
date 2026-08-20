@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { stripTutorBlobs } from '@/lib/stripTutorBlobs'
+import { ROLE } from '@/lib/roles'
 
 const Body = z.object({ tutorId: z.string() })
 
@@ -22,10 +23,10 @@ export async function GET() {
           category: { select: { id: true, slug: true, name: true, icon: true } },
           // Tier SHAPE only (minutes/price/tier) — the saved-experts cards are a
           // PRE-TIER surface, so they must advertise the FLAGSHIP service like
-          // /tutors does. Without this they printed the raw profile-level
+          // /experts does. Without this they printed the raw profile-level
           // `price`, which is not a service anyone can buy: measured 2026-07-31,
           // one expert read ₾60 on the surfaces that lacked these rows and ₾30
-          // on /tutors. Three small numbers per tier; never the title or body.
+          // on /experts. Three small numbers per tier; never the title or body.
           consultations: { select: { minutes: true, price: true, tier: true } },
         },
       },
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
   // Saved-experts is a CLIENT feature — a TUTOR/ADMIN has no surface for it.
-  if (user.role !== 'STUDENT') return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
+  if (user.role !== ROLE.CLIENT) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
-  if (user.role !== 'STUDENT') return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
+  if (user.role !== ROLE.CLIENT) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
 
   // Accept tutorId from either JSON body OR query string (?tutorId=…),
   // since some HTTP clients strip DELETE request bodies.

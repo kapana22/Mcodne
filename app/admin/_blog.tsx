@@ -207,10 +207,10 @@ export const BlogSection = () => {
                   {live && <a href={`/blog/${selected.slug}`} target="_blank" rel="noopener noreferrer" className="text-meta text-brand-700 hover:underline inline-flex items-center gap-1">ნახვა <Icon.external className="w-3 h-3" /></a>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button type="button" onClick={() => live ? setPendUnpublish(selected) : togglePublish(selected)} className={`h-8 px-3 rounded-btn font-display text-meta font-semibold transition-colors duration-fast ${live ? 'bg-ink-100 text-ink-700 hover:bg-ink-200' : 'bg-brand-600 text-white hover:bg-brand-600'}`}>
+                  <button type="button" onClick={() => live ? setPendUnpublish(selected) : togglePublish(selected)} className={`h-10 sm:h-9 px-3.5 rounded-btn font-display text-small font-semibold transition-colors duration-fast ${live ? 'bg-ink-100 text-ink-700 hover:bg-ink-200' : 'bg-brand-600 text-white hover:bg-brand-600'}`}>
                     {live ? 'დამალვა' : 'გამოქვეყნება'}
                   </button>
-                  <button type="button" onClick={() => setPendDelete(selected)} aria-label="წაშლა" className="h-8 w-8 grid place-items-center rounded-btn text-ink-400 hover:text-danger-600 hover:bg-danger-50 transition-colors duration-fast"><Icon.close className="w-4 h-4" /></button>
+                  <button type="button" onClick={() => setPendDelete(selected)} aria-label="წაშლა" className="h-10 w-10 sm:h-9 sm:w-9 grid place-items-center rounded-btn text-ink-400 hover:text-danger-600 hover:bg-danger-50 transition-colors duration-fast"><Icon.close className="w-4 h-4" /></button>
                 </div>
               </div>
 
@@ -300,8 +300,8 @@ export const BlogSection = () => {
                   <div className="flex items-center justify-between mb-1.5">
                     <Label>ტექსტი · Markdown</Label>
                     <div className="inline-flex rounded-btn border border-ink-200 overflow-hidden -mt-1">
-                      <button type="button" onClick={() => setShowPreview(false)} className={`h-7 px-3 text-meta font-semibold transition-colors duration-fast ${!showPreview ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-50'}`}>რედაქტირება</button>
-                      <button type="button" onClick={() => setShowPreview(true)} className={`h-7 px-3 text-meta font-semibold transition-colors duration-fast ${showPreview ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-50'}`}>გადახედვა</button>
+                      <button type="button" onClick={() => setShowPreview(false)} className={`h-10 sm:h-9 px-3 text-small font-semibold transition-colors duration-fast ${!showPreview ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-50'}`}>რედაქტირება</button>
+                      <button type="button" onClick={() => setShowPreview(true)} className={`h-10 sm:h-9 px-3 text-small font-semibold transition-colors duration-fast ${showPreview ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-50'}`}>გადახედვა</button>
                     </div>
                   </div>
                   {showPreview ? (

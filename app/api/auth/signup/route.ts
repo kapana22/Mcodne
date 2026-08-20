@@ -7,6 +7,7 @@ import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { sendMail } from '@/lib/mailer'
 import { welcomeEmail } from '@/lib/emailTemplates'
 import { normalizePhone, phoneFormatError } from '@/lib/phone'
+import { ROLE } from '@/lib/roles'
 
 // NB: `role` is intentionally NOT accepted from the client. Every self-signup
 // creates a STUDENT; promotion to TUTOR happens only through the moderated
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
         fullName: fullName.trim(),
         passwordHash: await hashPassword(password),
         phone: normalizePhone(phone),
-        role: 'STUDENT',
+        role: ROLE.CLIENT,
       },
     })
   } catch (e: unknown) {

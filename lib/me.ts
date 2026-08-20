@@ -1,8 +1,8 @@
 'use client'
 // Shared client-side identity source — ONE /api/me per page load.
 //
-// Before this, AppShell, PublicTopBar and the funnel pages (`/`, `/tutors`,
-// `/tutors/[id]`, plus the profile's VideoHero) each ran their own
+// Before this, AppShell, PublicTopBar and the funnel pages (`/`, `/experts`,
+// `/experts/[slug]`, plus the profile's VideoHero) each ran their own
 // `fetch('/api/me')` on mount — 3–4 identical round-trips against a ~300ms-RTT
 // remote DB on a single public page load.
 //
@@ -44,6 +44,14 @@ export type Me = {
   bio?: string | null
   emailVerified?: boolean
   createdAt?: string | null
+  /** ⚠️ WHAT THE PERSON CAN DO, which `role` cannot say (2026-08-18). A
+   *  tradesperson on the requests allowlist keeps role STUDENT — see lib/hats
+   *  for why — so any menu that branches on `role` alone calls them a student
+   *  and offers them the expert application. Carried on the identity so a
+   *  client component can draw the right doors. */
+  hats?: ('ADMIN' | 'EXPERT' | 'MASTER' | 'COMPANY' | 'CLIENT')[]
+  /** What the person already offers — see lib/capabilities. */
+  capabilities?: ('CONSULT' | 'WORK')[]
 } | null
 
 // The single in-flight probe. Null whenever no request is pending.
@@ -81,7 +89,9 @@ export function fetchMe(): Promise<Me> {
   if (inflight) return inflight
   const p = fetch('/api/me', { credentials: 'include', cache: 'no-store' })
     .then(r => (r.ok ? r.json() : { user: null }))
-    .then(d => (d?.user ?? null) as Me)
+    // `hats` rides beside `user` in the response rather than inside it — it is
+    // derived, not a column — so it is folded in here.
+    .then(d => (d?.user ? { ...d.user, hats: d.hats ?? [], capabilities: d.capabilities ?? [] } : null) as Me)
     .catch(() => null)
   inflight = p
   // Cache the resolved value so a later navigation renders it instantly while

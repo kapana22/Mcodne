@@ -132,7 +132,7 @@ const CATEGORIES: CatDef[] = [
 
 const GENERIC: Framing = {
   categorySlug: null,
-  categoryLabel: 'ყველა სფერო',
+  categoryLabel: 'ყველა კატეგორია',
   headline: 'შენი კონსულტაცია',
   intro: 'აი ის შემოწმებული ექსპერტები, რომლებიც შენს კითხვასთან ყველაზე ახლოს არიან. აირჩიე და დაჯავშნე ვიდეოსესია.',
   prepare: [
