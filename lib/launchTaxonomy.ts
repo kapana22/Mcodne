@@ -38,7 +38,18 @@ export const LAUNCH_CATEGORIES = [
   { slug: 'psychology', name: 'ფსიქოლოგია',                side: 'CONSULT' },
   { slug: 'business',   name: 'ბიზნესი',                    side: 'CONSULT' },
   { slug: 'remonti',    name: 'სახლის რემონტი',            side: 'WORK' },
-  { slug: 'dalageba',   name: 'დალაგება და გადაზიდვა',     side: 'WORK' },
+  // ⚠️ „დალაგება და გადაზიდვა" IS DELIBERATELY ABSENT — owner, 2026-08-20,
+  // asked for it by name and then removed it the same afternoon: „კი მაგრამ
+  // saqofacxovrebo არ გვინდა." It is the same bucket under a tidier label, so
+  // renaming it would have kept the thing that was refused.
+  //
+  // ⚠️ AND THE REQUESTS SIDE IS NOT TOUCHED BY THAT. `cleaning` and `moving`
+  // stay in LIVE_SERVICE_GROUP_IDS (lib/requestTopics), which was set the same
+  // morning with its own owner quote — „სერვისებსაც, რაც ყოველდღიურად
+  // სჭირდება — დალაგება და ხელოსანი, ესეც". A LAUNCH CATEGORY and an INTAKE
+  // VOCABULARY are two different surfaces: somebody may still describe a
+  // cleaning job through /request; nobody is invited to REGISTER as one yet.
+  // Switching those groups off is a separate decision and a separate file.
 ] as const
 
 export type LaunchSide = (typeof LAUNCH_CATEGORIES)[number]['side']

@@ -26,8 +26,13 @@ test('the shape of the list the owner supplied', () => {
   // owner's own launch categories and the first SERVICE spheres this file has
   // ever held — until today every one of its 93 names was a consultant, which
   // is what „the taxonomy is still the old site" meant in CLAUDE.md.
-  assert.equal(Object.keys(PROFESSIONS).length, 21, '21 spheres')
-  assert.equal(ALL_PROFESSIONS.length, 99, '99 professions')
+  // 20, not 21: the household sphere („დალაგება და გადაზიდვა") was written and
+  // removed the same afternoon — owner, 2026-08-20: „saqofacxovrebo არ გვინდა".
+  // lib/launchTaxonomy carries the reasoning, including why the REQUESTS
+  // vocabulary keeps `cleaning`/`moving`: a launch category and an intake
+  // vocabulary are two different surfaces.
+  assert.equal(Object.keys(PROFESSIONS).length, 20, '20 spheres')
+  assert.equal(ALL_PROFESSIONS.length, 97, '97 professions')
   // ⚠️ AND THE THREE DO NOT COME BACK. „მეწარმე" is an identity, not something
   // anybody can buy — the exact fault that retired „ხელოსანი".
   for (const banned of ['მეწარმე', 'სტრატეგი', 'ჟურნალისტი']) {

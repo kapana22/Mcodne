@@ -238,10 +238,6 @@ export const PROFESSIONS: Record<string, readonly string[]> = {
     'კონდიციონერის სპეციალისტი',
     'ტექნიკის სპეციალისტი',
   ],
-  'dalageba': [
-    'დამლაგებელი',
-    'ავეჯის ამწყობი',
-  ],
   'swavleba': [
     'ინგლისურის მასწავლებელი',
     'მათემატიკის მასწავლებელი',
@@ -306,8 +302,6 @@ const ALSO_WORKS: readonly string[] = [
   'ელექტრიკოსი',
   'კონდიციონერის სპეციალისტი',
   'ტექნიკის სპეციალისტი',
-  'დამლაგებელი',
-  'ავეჯის ამწყობი',
 ]
 
 /** job → what it can do. Every profession is present; default `['CONSULT']`. */
