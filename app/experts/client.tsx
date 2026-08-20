@@ -51,7 +51,7 @@ import {
  *  into. It was a `basePath` prop while /tutors and /masters were two entrances
  *  to this container; there is one entrance now. */
 const CATALOG_PATH = '/experts'
-import { TutorCard, VideoPreview } from './_card'
+import { TutorCard } from './_card'
 import { LiveCat, Tutor, catNameOf, mapRows } from './_data'
 import { FILTER_LANGS, FILTER_RATINGS, Facets, Filters, NO_CAP, TutorFilters, consultRefined, passesFilters, priceBandActive, priceBandLabel, workRefined } from './_filters'
 import { SearchHero } from './_hero'
@@ -351,17 +351,12 @@ function Catalog({ initialTutors, initialMasters, tradeCounts, initialUser, requ
     if (window.scrollY > top + 4) window.scrollTo({ top, behavior: 'smooth' })
   }
 
-  /* Click-to-open video preview — opens a centered modal (no anchoring) */
-  const [preview, setPreview] = useState<Tutor | null>(null)
-  const openPreview = (t: Tutor) => setPreview(t)
-  const closeNow = () => setPreview(null)
-
   /* Shared booking flow — opens without leaving the page */
   const [quickBook, setQuickBook] = useState<Tutor | null>(null)
   const openBook = (t: Tutor) => {
     // A signed-in non-student (TUTOR/ADMIN) can't book — the server 403s. Never
     // open the flow for them (the cards also hide/relabel the CTA); guard here so
-    // every entry point (card, video preview, compare) is safe.
+    // every entry point (card, compare) is safe.
     if (viewerCantBook) return
     if (!signedIn) {
       // Anonymous book-tap: previously this discarded the click, scrolled to
@@ -1006,9 +1001,23 @@ function Catalog({ initialTutors, initialMasters, tradeCounts, initialUser, requ
                       or a person who holds both halves. */}
                   {pagedItems.map((it, i) => (
                     it.consult ? (
-                      <TutorCard key={it.key} idx={i} t={it.consult} view={view} onPreviewEnter={openPreview} onBook={openBook} saved={favIds.has(it.consult.id)} onToggleFav={toggleFav} needsSignIn={authKnown && !signedIn} viewerCantBook={viewerCantBook} viewerCantFav={viewerCantFav} />
+                      // ⚠️ `kinds` REACHES THIS CARD TOO SINCE 2026-08-20, and it
+                      // never did before: the comment above has always said the
+                      // labels are drawn for „a person who holds both halves",
+                      // but only the master card was ever handed them. So a
+                      // master who also consults said so and an expert who also
+                      // sells services said nothing — the asymmetry hid exactly
+                      // the half the catalogue is supposed to lead with.
+                      // ONLY when they hold both: `EntityKinds`' own rule is that
+                      // a label earns its place by DISTINGUISHING, and one label
+                      // on every card in a single-kind list distinguishes nobody
+                      // (the same argument that removed „ახალი" on 2026-07-31).
+                      <TutorCard key={it.key} idx={i} t={it.consult} view={view} onBook={openBook} saved={favIds.has(it.consult.id)} onToggleFav={toggleFav} needsSignIn={authKnown && !signedIn} viewerCantBook={viewerCantBook} viewerCantFav={viewerCantFav} kinds={it.kinds.length > 1 ? it.kinds.map(k => KIND_LABEL[k]) : undefined} />
                     ) : it.work ? (
-                      <MasterCard key={it.key} m={it.work} view={view} />
+                      // `alsoConsults` is the benefit line, not a type badge —
+                      // see MasterCard. An item carries both halves only when
+                      // one PERSON does (lib/catalogItems keys by person).
+                      <MasterCard key={it.key} m={it.work} view={view} alsoConsults={it.kinds.includes('CONSULT')} />
                     ) : null
                   ))}
                 </div>
@@ -1048,8 +1057,6 @@ function Catalog({ initialTutors, initialMasters, tradeCounts, initialUser, requ
 
       <Footer />
 
-      {/* Tutor video preview — centered modal (16:9) */}
-      {preview && <VideoPreview tutor={preview} onClose={closeNow} onBook={openBook} />}
 
       {/* Shared booking flow (same component as the profile) — tier step,
           slot picker, mandatory intake; the flow fetches the expert by id. */}

@@ -32,7 +32,7 @@ export default function robots(): MetadataRoute.Robots {
           '/join',
           '/signin',
           // ⚠️ THE ONE /api PATH GOOGLE MUST REACH, and it has to out-rank the
-          // `/api/*` Disallow below. Expert photos live in the database as
+          // `/api/∗` Disallow below. Expert photos live in the database as
           // `data:` URIs (19 of 24 on 2026-08-13), so /api/avatars/[id] is the
           // ONLY form of them that exists as a fetchable image — it is what
           // `og:image` and the Person JSON-LD point at. Blocked, those tags
@@ -40,7 +40,7 @@ export default function robots(): MetadataRoute.Robots {
           // result or shared link can ever show a face.
           //
           // Google resolves Allow vs Disallow by LONGEST MATCH, so this beats
-          // '/api/*' for these URLs and nothing else under /api opens up.
+          // '/api/∗' for these URLs and nothing else under /api opens up.
           '/api/avatars/',
           // The same, for the trades side: a master's face and work photos are
           // base64 columns served only by /api/masters/[id]/photo, which is

@@ -24,7 +24,8 @@ type Item = {
    *  shared `primaryPriceLabel`, so this page can't disagree with /experts. */
   priceLabel: string
   /** The flagship tier's real length, so the price carries a unit. */
-  durationMin: number
+  /** „60 წთ" or „სერვისი" — a job has no clock. See slots → HeadlineOffer. */
+  priceSuffix: string
 }
 
 export function FavoritesClient({ items: initial }: { items: Item[] }) {
@@ -159,7 +160,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
               width={96}
               height={96}
               // Skip the optimizer for anything already optimized — base64 data
-              // URIs it cannot process at all, and /api/avatars/* is already a
+              // URIs it cannot process at all, and /api/avatars/∗ is already a
               // ≤384px immutable webp, so the extra hop is pure latency.
               unoptimized={(t.photo || DEFAULT_AVATAR).startsWith('data:') || (t.photo || DEFAULT_AVATAR).startsWith('/api/avatars/')}
               className="shrink-0 w-24 h-24 rounded-full object-cover object-center bg-ink-100 ring-1 ring-ink-100"
@@ -206,7 +207,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
                   wasn't) gives way to the actual minutes — same sentence /experts
                   prints for the same expert. */}
               <div className="font-display text-h3 font-bold text-ink-900 tabular-nums tracking-tight">
-                {t.priceLabel}<span className="text-meta font-medium text-ink-500 ml-1">· {t.durationMin} წთ</span>
+                {t.priceLabel}<span className="text-meta font-medium text-ink-500 ml-1">· {t.priceSuffix}</span>
               </div>
               {/* Booking path — ?rebook=1 auto-opens the booking modal on the
                   profile (this is a signed-in area, so no auth detour). */}

@@ -63,9 +63,31 @@ test('§A /me carries every client screen; /student is gone', () => {
 
 test('§B /work carries both groups under one shell; /tutor and /provider are gone', () => {
   assert.ok(has('app/work/layout.tsx'), 'the /work shell layout is missing')
-  assert.ok(!has('app/work/page.tsx'), 'app/work/page.tsx sits OUTSIDE the (expert) guard — the home must live inside the group')
+  // ⚠️ THIS LINE SAID THE OPPOSITE UNTIL 2026-08-20, and it was right at the
+  // time: /work was the EXPERT's session dashboard, so a file at app/work/page
+  // would have served it to anybody the shell let through. What changed is what
+  // the home IS — the four counts and the balance, which both capabilities need
+  // — so it moved out of the group and took the group's guard with it, the same
+  // move /work/services and /work/jobs already made. Outside is only safe with
+  // a gate of its own, so that gate is asserted here rather than assumed.
+  assert.ok(has('app/work/page.tsx'), 'the shared workspace home is missing')
+  {
+    const home = codeOf('app/work/page.tsx')
+    assert.match(home, /getCurrentUser\(\)/, '/work no longer checks who is asking')
+    assert.match(home, /capabilitiesOf\(user\.id\)/, '/work no longer checks a capability')
+    assert.match(home, /if \(!isProvider && !isExpert\) notFound\(\)/, '/work stopped 404ing a stranger')
+    assert.doesNotMatch(home, /status: 403|redirect\(/, '/work answers with something other than 404 — that confirms the page exists')
+  }
   for (const p of [
-    'app/work/(expert)/layout.tsx', 'app/work/(expert)/page.tsx',
+    'app/work/(expert)/layout.tsx',
+    // ⚠️ THE HOME LEFT THE (expert) GROUP TOO (2026-08-20). It was
+    // app/work/(expert)/page.tsx and it rendered a SESSION dashboard, so a
+    // WORK-only provider had no home at all — the group's layout dropped them
+    // straight into the queue. `/work` is now the one home for both, with the
+    // four counts and the balance on it, and the session dashboard is a
+    // component it renders only for a CONSULT holder.
+    'app/work/page.tsx', 'app/work/_components/SessionDashboard.tsx',
+    'app/work/_components/CreditStrip.tsx', 'app/work/_components/DayBoard.tsx',
     // ⚠️ THE LIST LEFT THE (expert) GROUP AND THE DETAIL PAGE DID NOT
     // (2026-08-19). A provider's committed work is one list — a Booking and an
     // ACCEPTED quote are both „work I agreed to do" — and a page inside either
@@ -91,8 +113,9 @@ test('§B /work carries both groups under one shell; /tutor and /provider are go
   assert.ok(!has('app/work/(provider)/service-profile'), 'the master has a second page for what they sell again')
   assert.ok(!has('app/tutor'), 'app/tutor is back — the expert workspace is /work/(expert)')
   assert.ok(!has('app/provider'), 'app/provider is back — the master workspace is /work/(provider)')
+  assert.ok(!has('app/work/(expert)/page.tsx'), 'the expert group claimed /work again — it is the shared home')
   assert.ok(!has('app/work/(provider)/_shell.tsx') && !has('app/work/(provider)/page.tsx'),
-    'the old provider bar / root redirect page came back — the shell is app/work/layout.tsx and the root is the expert home')
+    'the old provider bar / root redirect page came back — the shell is app/work/layout.tsx and the root is app/work/page.tsx, shared')
   // The route constants agree with the tree.
   assert.equal(PROVIDER_ROUTE, '/work')
   assert.deepEqual([...PROVIDER_WORKSPACE_PATHS], ['/work/requests', '/work/offers'])
@@ -107,7 +130,13 @@ test('§C the two guards: (expert) redirects to sign-in, (provider) answers 404 
   assert.match(expert, /requireRole\(\[ROLE\.EXPERT, ROLE\.ADMIN\]\)/, 'the expert guard is gone')
   // A WORK-only master is sent to their own screen, before the role guard would
   // bounce them to /me — keyed on the capability, never on a role.
-  assert.match(expert, /if \(caps\.includes\('WORK'\)\) redirect\(`\$\{PROVIDER_ROUTE\}\/requests`\)/)
+  //
+  // ⚠️ THE TARGET IS `/work` SINCE 2026-08-20, not the queue. It was the queue
+  // while /work was an expert-only session dashboard, which made the first
+  // screen of a provider's workspace a list with no context and no balance.
+  assert.match(expert, /if \(caps\.includes\('WORK'\)\) redirect\('\/work'\)/)
+  assert.doesNotMatch(expert, /redirect\(`\$\{PROVIDER_ROUTE\}\/requests`\)/,
+    'a provider is dropped into the queue again instead of their own home')
   assert.ok(expert.indexOf("caps.includes('WORK')") < expert.indexOf('requireRole('), 'the WORK redirect runs after requireRole — it can never fire')
 
   const provider = codeOf('app/work/(provider)/layout.tsx')

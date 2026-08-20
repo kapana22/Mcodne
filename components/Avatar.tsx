@@ -39,7 +39,7 @@ export function Avatar({
             height={size}
             // Skip Next's optimizer for anything ALREADY optimized:
             //  • base64 data URIs — it can't process them at all;
-            //  • /api/avatars/* — that route resizes to ≤384px webp and serves
+            //  • /api/avatars/∗ — that route resizes to ≤384px webp and serves
             //    it `immutable`, so routing it through /_next/image adds a
             //    second server hop and a re-encode for zero benefit. Measured
             //    on a throttled phone: the optimizer hop was pure added

@@ -40,7 +40,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { ensureMasterSlug } from '@/lib/masterSlug'
-import { LIVE_SERVICE_GROUPS, serviceLabels, areaLabels, priceHint } from '@/lib/serviceProfile'
+import { LIVE_SERVICE_GROUPS, serviceLabels, areaLabels, priceHint, lowestPrice } from '@/lib/serviceProfile'
 import { CITIES, type CityName } from '@/lib/requestTopics'
 
 /**
@@ -288,7 +288,9 @@ export async function queryMasters(f: MastersFilter): Promise<MastersResult> {
     orderBy: { createdAt: 'asc' },
     take: MAX_ROWS,
     select: {
-      id: true, slug: true, services: true, areas: true, calloutFee: true, priceFrom: true,
+      // `priceList` is a small JSON map (`{ topicId: lari }`), not a blob —
+      // safe in a list query, unlike the photo columns beside it.
+      id: true, slug: true, services: true, areas: true, calloutFee: true, priceFrom: true, priceList: true,
       about: true, updatedAt: true, createdAt: true, userId: true, companyId: true,
       user: { select: { fullName: true } },
       company: { select: { name: true } },
@@ -359,7 +361,12 @@ export async function queryMasters(f: MastersFilter): Promise<MastersResult> {
       areas: areaLabels(r.areas).join(', '),
       areaIds: r.areas,
       price: priceHint(r),
-      priceValue: r.priceFrom ?? r.calloutFee ?? null,
+      // ⚠️ THE LOWEST PRICED SERVICE WINS (2026-08-20). The card prints
+      // „X₾-დან", and the truest floor is the cheapest thing the provider
+      // actually sells — „ბინის დალაგება — 60₾" — not the blanket `priceFrom`
+      // they may have typed before the list existed. The two older numbers stay
+      // as the fallback, in the order they always had.
+      priceValue: lowestPrice(r) ?? r.priceFrom ?? r.calloutFee ?? null,
       createdAt: r.createdAt.toISOString(),
       about: r.about,
       services: serviceLabels(r.services),

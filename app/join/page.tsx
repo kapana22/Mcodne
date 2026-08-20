@@ -60,9 +60,15 @@ export default async function Page({ searchParams }: { searchParams: Search }) {
   const have = await capabilitiesOf(user.id)
 
   const offer: Capability[] = []
+  // ⚠️ SERVICE FIRST, ALWAYS (2026-08-20). This list is the ORDER the tiles are
+  // drawn in, and those tiles are the first thing anybody who wants to sell on
+  // this site reads. CONSULT was pushed first, so the door opened with the
+  // consultation — a statement about what this site is, made by a line of code
+  // nobody thought of as copy. CLAUDE.md → THE HIERARCHY, rule 4: wherever both
+  // appear, the service comes first.
   // The profile, not only the role: an approved expert always has both.
-  if (user.role !== ROLE.EXPERT && !have.includes('CONSULT')) offer.push('CONSULT')
   if (providersOn() && !have.includes('WORK')) offer.push('WORK')
+  if (user.role !== ROLE.EXPERT && !have.includes('CONSULT')) offer.push('CONSULT')
 
   // Nothing left to apply for → their real screen, as the two old pages did.
   // The constant, for the reason lib/hats.ts states: this file lives outside

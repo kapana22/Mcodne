@@ -383,7 +383,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // the same room. Room name is namespaced to reduce collision odds.
     const meetingUrl = booking.meetingUrl ?? (await newMeetingUrl())
     // Conditional claim (status-guarded), not a blind update: a concurrent
-    // /cancel or the */15 cleanup cron may have flipped this to CANCELED between
+    // /cancel or the ∗/15 cleanup cron may have flipped this to CANCELED between
     // our read and this write. updateMany + count===1 makes the transition
     // fail-safe instead of resurrecting a canceled booking.
     const claim = await prisma.booking.updateMany({

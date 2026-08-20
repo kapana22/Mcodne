@@ -67,7 +67,14 @@ const ExpertCta = () => (
         <Eyebrow className="mb-3"><SiteText k="home.expertCta.eyebrow" /></Eyebrow>
         <h2 className="font-display text-h2 sm:text-display font-bold leading-[1.08] tracking-[-0.02em] text-ink-900 text-balance">
           <SiteText k="home.expertCta.title" /><br />
-          <span className="text-brand-600">გასამრჯელო — სესიის შემდეგ.</span>
+          {/* ⚠️ WAS „გასამრჯელო — სესიის შემდეგ." (2026-08-20). A „session" is
+              what a CONSULTATION produces; a plumber finishes a job. The band
+              recruits both halves of one catalogue, so its promise has to hold
+              for both — and the one that does is the one the model is built on:
+              the provider names the price. Hardcoded rather than a SiteText
+              key on purpose — the first line beside it is editable, and two
+              editable halves of one sentence drift apart. */}
+          <span className="text-brand-600">ფასს შენ წერ.</span>
         </h2>
         <p className="text-body-lg text-ink-700 mt-5 max-w-[520px] leading-relaxed text-pretty">
           {/* The commission clause was removed 2026-08-05 (owner) — with it

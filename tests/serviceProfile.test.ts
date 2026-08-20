@@ -19,7 +19,7 @@ import {
   vocabularyIsConsistent,
 } from '../lib/serviceProfile'
 import {
-  CITIES, TOPIC_GROUPS, BROWSABLE_GROUPS, groupIsLive, SUGGESTED_TOPICS,
+  CITIES, TOPIC_GROUPS, BROWSABLE_GROUPS, DORMANT_GROUP_IDS, topicById, groupIsLive, SUGGESTED_TOPICS,
 } from '../lib/requestTopics'
 
 /* ═══════════ A. the vocabulary is derived, never re-typed ═══════════════ */
@@ -177,28 +177,33 @@ test('§F an unpriced master says nothing rather than „—"', () => {
 })
 
 /* ═══════════ §L the launch gate ═════════════════════════════════════════ */
-// The four open trades are a SUPPLY decision, and the whole design rests on it
-// narrowing what is OFFERED without narrowing what is UNDERSTOOD. Both halves
-// are asserted here, because losing either one is silent: a picker that draws
-// all eight promises work nobody can do, and a matcher that only knows four
-// files „კარი გაფუჭდა" under OTHER and loses the signal that would tell us
-// which group to open next.
+// ⚠️ ALL EIGHT TRADES ARE OPEN SINCE 2026-08-20 (owner: „მასშტაბურად უნდა
+// მივიდეთ… სერვისებსაც, რაც ყოველდღიურად სჭირდება"). The gate itself is not
+// retired and this test is not deleted: the mechanism is what matters, because
+// the design rests on being able to narrow what is OFFERED without narrowing
+// what is UNDERSTOOD. A matcher that only knows the open groups files „კარი
+// გაფუჭდა" under OTHER and loses the signal that says which group to open next.
+// If a trade is ever closed again, this number moves and the vocabulary does
+// not — that is the whole assertion.
 test('§L live groups gate the pickers but not the vocabulary', () => {
-  assert.equal(LIVE_SERVICE_GROUPS.length, 4, 'the launch set is four groups')
-  assert.ok(
-    LIVE_SERVICE_GROUPS.length < SERVICE_GROUPS.length,
-    'nothing is gated — the closed groups vanished from the catalogue instead',
-  )
+  const ALL_SERVICE = TOPIC_GROUPS.filter(g => g.kinds.includes('SERVICE'))
+  assert.equal(LIVE_SERVICE_GROUPS.length, ALL_SERVICE.length, 'a trade was closed — say why here')
   for (const g of LIVE_SERVICE_GROUPS) {
     assert.ok(g.kinds.includes('SERVICE'), `${g.id} is live but not a service group`)
   }
-  // The gate must not touch validation. A master seeded by hand into a closed
-  // group has to keep saving — see the comment on LIVE_SERVICE_GROUPS.
-  const closed = SERVICE_GROUPS.filter(g => !LIVE_SERVICE_GROUPS.includes(g))
-  assert.ok(closed.length > 0, 'no closed groups to check')
+  // ⚠️ THE MECHANISM IS PROVEN ON WHATEVER IS CLOSED TODAY. Every trade is open
+  // now, so the closed set is the DORMANT one (positioning, not staffing) — and
+  // the property under test is the same either way: a group that is not offered
+  // must still be UNDERSTOOD. Its topics keep their ids, so a stored request
+  // that names one still reads and the matcher still files it correctly instead
+  // of dropping it into OTHER, where the signal that says which group to open
+  // next is lost.
+  const closed = TOPIC_GROUPS.filter(g => !BROWSABLE_GROUPS.includes(g))
+  assert.ok(closed.length > 0, 'nothing is gated at all — the switch became decoration')
   for (const g of closed) {
+    assert.ok(g.topics.length > 0, `${g.id} is closed and empty — it was gutted, not switched off`)
     for (const t of g.topics) {
-      assert.ok(isServiceTopic(t.id), `${t.id} is closed AND unsavable — the gate leaked into the schema`)
+      assert.ok(topicById(t.id) !== undefined, `${t.id} is closed AND unreadable — the gate leaked into the vocabulary`)
     }
   }
 })
@@ -207,11 +212,22 @@ test('§L every browsable group is either non-service or live', () => {
   for (const g of BROWSABLE_GROUPS) {
     assert.ok(groupIsLive(g), `${g.id} is browsable but not live`)
   }
-  // Consultation and learning are never gated: the gate is about staffing a
-  // city with vans, and an online consultation needs none.
+  // ⚠️ THERE ARE NOW TWO GATES, AND THEY ASK DIFFERENT QUESTIONS (2026-08-20).
+  // LIVE_SERVICE_GROUP_IDS is about STAFFING — a trade needs somebody with a
+  // van in this city. DORMANT_GROUP_IDS is about POSITIONING — the site leads
+  // with professional services, so „მე-8 კლასის მათემატიკა" is written, kept,
+  // and not offered. A non-service group is browsable unless positioning
+  // closed it, which is why this can no longer assert „never gated".
   const nonService = TOPIC_GROUPS.filter(g => !g.kinds.includes('SERVICE'))
   for (const g of nonService) {
-    assert.ok(BROWSABLE_GROUPS.includes(g), `${g.id} was gated and it is not a trade`)
+    const shouldShow = !DORMANT_GROUP_IDS.includes(g.id)
+    assert.equal(BROWSABLE_GROUPS.includes(g), shouldShow,
+      `${g.id}: browsable=${BROWSABLE_GROUPS.includes(g)} but dormant=${DORMANT_GROUP_IDS.includes(g.id)}`)
+  }
+  // Nothing is deleted by going dormant — the topics stay readable so a stored
+  // request that names one still renders.
+  for (const id of DORMANT_GROUP_IDS) {
+    assert.ok(TOPIC_GROUPS.some(g => g.id === id), `${id} was DELETED rather than switched off`)
   }
 })
 

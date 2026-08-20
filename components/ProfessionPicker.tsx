@@ -42,6 +42,7 @@
  */
 
 import { Icon } from '@/components/Icon'
+import { useState } from 'react'
 import { MAX_PROFESSIONS, PROFESSIONS } from '@/lib/professions'
 
 export type PickerSphere = { slug: string; name: string }
@@ -58,6 +59,16 @@ export function ProfessionPicker({
   value: string[]
   onChange: (next: string[]) => void
 }) {
+  const [sphereQuery, setSphereQuery] = useState('')
+  /** ⚠️ THE CHOSEN SPHERE IS NEVER FILTERED OUT. A search that hides the row
+   *  you already ticked reads as „your answer was lost", and the tick is the
+   *  only thing on this step that carries state. */
+  const shownSpheres = (() => {
+    const q = sphereQuery.trim().toLowerCase()
+    if (q.length < 2) return spheres
+    return spheres.filter(sp => sp.name.toLowerCase().includes(q) || sp.name === sphere)
+  })()
+
   const current = spheres.find(s => s.name === sphere)
   const jobs = current ? (PROFESSIONS[current.slug] ?? []) : []
   const full = value.length >= MAX_PROFESSIONS
@@ -88,12 +99,34 @@ export function ProfessionPicker({
             should not look like two different mechanisms — the only difference
             is the tick's shape, round for „one of", square for „any of", which
             is the one convention that tells them apart without a word. */}
+        {/* ⚠️ A FIELD ABOVE THE GRID (2026-08-20), the same one the service
+            door already had. Nineteen spheres in a two-column grid is nine rows
+            of reading before the one that is yours, and half the labels wrap to
+            two lines („არქიტექტურა და მშენებლობა"). Somebody who already knows
+            they are an accountant should not have to scan a taxonomy.
+
+            The grid stays underneath for browsing — this narrows it, it does
+            not replace it. Two characters before it filters: one letter matches
+            half the list and reads as broken. Shown only when there is enough
+            to be worth searching. */}
+        {spheres.length > 8 && (
+          <input
+            type="search"
+            value={sphereQuery}
+            onChange={e => setSphereQuery(e.target.value)}
+            placeholder="მოძებნე — ბუღალტერია, სამართალი…"
+            className="mb-2 w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-500 outline-none transition-colors duration-fast"
+          />
+        )}
         <div
           role="radiogroup"
           aria-label="კატეგორია"
           className="grid sm:grid-cols-2 gap-1 rounded-card border border-ink-200 bg-ink-50/40 p-2"
         >
-          {spheres.map(sp => {
+          {shownSpheres.length === 0 && (
+            <p className="col-span-full px-2.5 py-3 text-small text-ink-500">ვერაფერი მოიძებნა — მოხსენი ძებნა და გადახედე სიას.</p>
+          )}
+          {shownSpheres.map(sp => {
             const on = sphere === sp.name
             return (
               <button

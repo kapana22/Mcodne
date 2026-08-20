@@ -325,7 +325,14 @@ export async function queryTutors(params: TutorsQueryParams = {}) {
       // profile-level default, so a card for an expert whose real offer is a
       // 60-minute consultation read „30-წუთიანი სესია". Three small numbers per
       // tier is a negligible payload next to being wrong on every card.
-      consultations: { select: { minutes: true, price: true, tier: true } },
+      // ⚠️ `bookable` IS PART OF THE CARD'S MEANING, NOT AN EXTRA (2026-08-20).
+      // Without it every row read as an HOUR, so an expert who publishes only
+      // services („დეკლარაციის შევსება — ₾100", `minutes: 0`) had them filtered
+      // out by every tier resolver and the card fell back to the profile-level
+      // duration — advertising „· 60 წთ" for something with no clock and no
+      // calendar. The profile already selects it (app/experts/[slug]/page.tsx);
+      // the catalogue is the surface that was still blind. One boolean per row.
+      consultations: { select: { minutes: true, price: true, tier: true, bookable: true } },
     },
   })
 

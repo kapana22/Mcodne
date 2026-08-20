@@ -4,7 +4,6 @@
 import { redirect } from 'next/navigation'
 import { requireRole, requireUser } from '@/lib/auth'
 import { capabilitiesOf } from '@/lib/capabilities'
-import { PROVIDER_ROUTE } from '@/lib/requests'
 import { ROLE } from '@/lib/roles'
 
 // Re-verify the session on every request for this segment (matching the /me
@@ -22,7 +21,15 @@ export default async function ExpertLayout({ children }: { children: React.React
   const user = await requireUser()
   if (user.role !== ROLE.EXPERT && user.role !== ROLE.ADMIN) {
     const caps = await capabilitiesOf(user.id)
-    if (caps.includes('WORK')) redirect(`${PROVIDER_ROUTE}/requests`)
+    // ⚠️ THE TARGET IS `/work` SINCE 2026-08-20, not the queue. This bounce
+    // exists because a WORK-only provider must not be handed to `requireRole`
+    // below, which would send them to /me — the one workspace that is not
+    // theirs. It used to drop them straight into the request list, which was
+    // the honest answer while `/work` was an expert-only session dashboard;
+    // `/work` now serves both capabilities and carries their balance, so it is
+    // their door too. Sending them to the queue instead would skip the only
+    // screen that tells them what they can spend.
+    if (caps.includes('WORK')) redirect('/work')
   }
   await requireRole([ROLE.EXPERT, ROLE.ADMIN])
   return <>{children}</>

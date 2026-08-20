@@ -68,7 +68,7 @@ test('archetypes 5/6 — workspace and form pages open with the shared PageHeade
   // The expert's booking LIST became the one list of work at /work/jobs (the
   // detail page under it did not move); the archetype it stood for is the same
   // one, so the assertion follows the page rather than being dropped.
-  for (const f of ['app/work/(expert)/page.tsx', 'app/work/jobs/page.tsx', 'app/me/bookings/page.tsx']) {
+  for (const f of ['app/work/page.tsx', 'app/work/jobs/page.tsx', 'app/me/bookings/page.tsx']) {
     assert.match(read(f), /from '@\/components\/PageHeader'/, `${f} imports PageHeader from somewhere else`)
   }
 })

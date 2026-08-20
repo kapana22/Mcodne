@@ -186,26 +186,45 @@ test('the type is in the URL, so a narrowed view is linkable and Back works', ()
 })
 
 test('one taxonomy, and every section is always drawn', () => {
-  // ⚠️ TWO SECTIONS ANSWERED THE SAME QUESTION. „კატეგორია" held the expert
-  // spheres and „სერვისი" held the trades, so a plumber and an accountant were
-  // filed under different headings with no way to know which. They are one list
-  // now, ordered by count, with the trades' narrower topics nested under a
-  // ticked row. The rail also never rearranges itself: sections do not appear
-  // and disappear with what is ticked.
+  // ⚠️ ONE RAIL, TWO NAMED BLOCKS, IN THE PRODUCT'S ORDER (2026-08-20).
+  //
+  // The history in three steps. It was „კატეგორია" (expert spheres) and
+  // „სერვისი" (trades) — two headings answering the SAME question, so a plumber
+  // and an accountant were filed apart with no way to know which. They became
+  // ONE list ordered by count. Count then turned out to be the wrong ordering
+  // for this site: the everyday trades fell to the bottom with zeros beside
+  // them while the professional rows sat above, and a visitor read that as a
+  // ranking of what mattered.
+  //
+  // Now the blocks are named and their ORDER is fixed by the product, not by
+  // the roster: „პროფესიული სერვისები" first because that is what the site
+  // leads with, „ყოველდღიური სერვისები" second because it is the other half of
+  // what it sells. Count still orders rows INSIDE a block, where it means „here
+  // is somebody to answer" rather than „this half matters more".
+  //
+  // Do not merge them back into one flat list, and do not sort the blocks
+  // themselves — both changes have been made once and both were wrong.
   const rail = read(RAIL)
   assert.match(rail, /const showConsult = true/, 'the consultation sections are conditional again')
   assert.match(rail, /const showWork = true/, 'the job sections are conditional again')
-  assert.doesNotMatch(rail, /FilterGroup title="სერვისი"/, 'the trades are a separate section again')
-  assert.match(rail, /FilterGroup title="კატეგორია"/)
-  // Both taxonomies live inside that one section…
-  const cat = rail.slice(rail.indexOf('FilterGroup title="კატეგორია"'), rail.indexOf('</FilterGroup>', rail.indexOf('FilterGroup title="კატეგორია"')))
-  assert.match(cat, /liveCats\.map/, 'the spheres left the one category list')
-  assert.match(cat, /LIVE_SERVICE_GROUPS\.map/, 'the trades left the one category list')
-  assert.match(cat, /\.sort\(\(a, b\) => b\.count - a\.count\)/, 'the one list is no longer ordered by what has people')
-  // …and each half still writes its own state field, because they filter
-  // different columns.
-  assert.match(cat, /cats: toggleIn\(filters\.cats/)
-  assert.match(cat, /trades: toggleIn\(filters\.trades/)
+  assert.doesNotMatch(rail, /FilterGroup title="სერვისი"/, 'the old split heading is back')
+  assert.doesNotMatch(rail, /FilterGroup title="კატეგორია"/, 'the rail went back to one unnamed category list')
+  const proIdx = rail.indexOf('FilterGroup title="პროფესიული სერვისები"')
+  const dayIdx = rail.indexOf('FilterGroup title="ყოველდღიური სერვისები"')
+  assert.ok(proIdx > -1, 'the professional block is gone')
+  assert.ok(dayIdx > -1, 'the everyday block is gone')
+  assert.ok(proIdx < dayIdx, 'the everyday services are drawn before the professional ones')
+  // Each block draws its own taxonomy…
+  const pro = rail.slice(proIdx, dayIdx)
+  const day = rail.slice(dayIdx)
+  assert.match(pro, /liveCats/, 'the professional block lost the admin categories')
+  assert.match(day, /LIVE_SERVICE_GROUPS/, 'the everyday block lost the trades')
+  assert.match(pro, /\.sort\(\(a, b\) => b\.count - a\.count\)/, 'rows inside a block are no longer ordered by what has people')
+  assert.match(day, /\.sort\(\(a, b\) => b\.count - a\.count\)/, 'rows inside a block are no longer ordered by what has people')
+  // …and each still writes its own state field, because they filter different
+  // columns; a reader cannot tell, and should not have to.
+  assert.match(pro, /cats: toggleIn\(filters\.cats/)
+  assert.match(day, /trades: toggleIn\(filters\.trades/)
   for (const section of ['title="ფასი"', 'title="ენა"', 'title="მინ. რეიტინგი"', 'title="ქალაქი"']) {
     assert.ok(rail.indexOf(section) > -1, `the section ${section} is gone`)
   }

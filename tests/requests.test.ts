@@ -30,6 +30,7 @@ import {
   makePublicRef, normalizePublicRef, PUBLIC_REF_RE, REF_ALPHABET, REF_LENGTH,
   budgetIsBelowFloor, BUDGET_BANDS, REQUEST_KINDS, KIND, TIMING,
   isTopicOfKind, searchTopics, budgetLabel, TOPIC_GROUPS, groupsForKind,
+  CITIES, ALL_CITIES, ONE_CITY, cityLabel,
   SUGGESTED_TOPICS, SUGGESTED_TOPIC_IDS,
   extrasFor, normalizeExtras, extrasLabels, templateFor, offerTemplateFor, timeAgoKa,
   offerProviderError, accessSubjectError,
@@ -1011,7 +1012,9 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   assert.doesNotMatch(workLayout, /work: [^\n]*ROLE\./, 'the master group became role-keyed — a role is not the allowlist')
   assert.doesNotMatch(workLayout, /redirect\(|notFound\(|requireRole\(/, 'the /work shell became a guard — the guards are the two route groups')
   const expertLayout = codeOf('app/work/(expert)/layout.tsx')
-  assert.match(expertLayout, /if \(caps\.includes\('WORK'\)\) redirect\(`\$\{PROVIDER_ROUTE\}\/requests`\)/,
+  // The TARGET moved to /work on 2026-08-20 (the shared home); what this pins
+  // is unchanged — the bounce is keyed on the CAPABILITY and not on a role.
+  assert.match(expertLayout, /if \(caps\.includes\('WORK'\)\) redirect\('\/work'\)/,
     'the WORK-only redirect is not keyed on the capability')
   assert.match(expertLayout, /requireRole\(\[ROLE\.EXPERT, ROLE\.ADMIN\]\)/, 'the expert guard is gone')
 
@@ -2586,4 +2589,40 @@ test('„მე ავირჩევ" is a preference about a button, not about
   const create = read('app/api/requests/route.ts')
   assert.doesNotMatch(create, /pickMode[\s\S]{0,120}mailVerifiedRequest/,
     'routing became conditional on pickMode — a button preference must not silence a request')
+})
+
+test('one city means the question is not asked, and the vocabulary still reads', () => {
+  // ⚠️ TWO LISTS, AND THE SPLIT IS THE POINT (2026-08-20). Owner: „მხოლოდ
+  // თბილისში იყოს ჯერ ჯობია." `CITIES` is what the site OFFERS; `ALL_CITIES`
+  // is every id the database has ever stored and may never shrink.
+  //
+  // The failure this guards is silent in both directions: narrowing the
+  // vocabulary makes an old row print „BATUMI" as a raw latin id, and NOT
+  // narrowing the offered list keeps a picker that collects requests into
+  // cities where nobody is listed — which the client only discovers after
+  // typing their name and phone.
+  assert.ok(ALL_CITIES.length >= CITIES.length, 'the vocabulary shrank below what is offered')
+  assert.ok(ALL_CITIES.some(c => c.id === 'BATUMI'), 'the vocabulary forgot a stored id')
+  assert.equal(cityLabel('BATUMI'), 'ბათუმი', 'a stored city reads as a raw id')
+  assert.equal(ONE_CITY, CITIES.length === 1)
+
+  // While there is one city, no run may ask for it.
+  const { withTopic, stepsFor, EMPTY_DRAFT } =
+    require('../app/request/_model') as typeof import('../app/request/_model')
+  if (ONE_CITY) {
+    for (const g of TOPIC_GROUPS) {
+      for (const t of g.topics) {
+        const ids = stepsFor(withTopic(EMPTY_DRAFT, t.id)).map(s => s.id)
+        assert.ok(!ids.includes('city'), `${t.id} still asks a question with one answer`)
+      }
+    }
+    // …and the draft still carries the value the screen would have collected,
+    // so the row is written exactly as before.
+    assert.equal(EMPTY_DRAFT.city, 'TBILISI')
+    assert.equal(ServiceRequestInput.safeParse({
+      kind: 'SERVICE', topic: 'clean-flat', description: 'ბინის დალაგება',
+      budgetBand: 'x', timing: 'flexible', format: 'IN_PERSON', city: 'TBILISI',
+      contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
+    }).success, true, 'a service request stopped parsing without the city screen')
+  }
 })

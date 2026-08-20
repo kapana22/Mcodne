@@ -126,7 +126,7 @@ export async function POST(req: Request) {
   await ensureDbReady()
 
   // Dual-role model (2026-07-23): a TUTOR may also act as a CLIENT and book
-  // another expert. The /student/* surfaces + space switcher are now wired for
+  // another expert. The /student/∗ surfaces + space switcher are now wired for
   // it, and the booking is reached via the client space. Booking is keyed off
   // User.id (studentId), independent of the tutor's TutorProfile, so a promoted
   // expert's client bookings never collide with their expert bookings. The only
@@ -191,7 +191,14 @@ export async function POST(req: Request) {
     }),
     consultationId
       ? prisma.consultation.findFirst({
-          where: { id: consultationId, tutorId },
+          // ⚠️ `bookable: true` IS PART OF THE OWNERSHIP TEST, NOT A FILTER
+          // (2026-08-20). Since the table holds both shapes, a row that is a
+          // SERVICE („დეკლარაციის შევსება — 100₾") has no duration and no slot,
+          // and booking one would write a session of 0 minutes onto a calendar.
+          // Refusing it here rather than downstream keeps the failure a 404 —
+          // the same answer a forged id from another tutor gets, which is the
+          // answer that tells an attacker nothing.
+          where: { id: consultationId, tutorId, bookable: true },
           select: { id: true, price: true, minutes: true },
         })
       : Promise.resolve(null),

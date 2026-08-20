@@ -8,7 +8,7 @@
 //      written to access logs, proxy logs, or Referer, and does not sit in a
 //      shell's history the way a URL does.
 //   2. `?secret=<CLEANUP_SECRET>` — LEGACY, still accepted because the live
-//      Railway */15 cron pings the URL form. Removing it before the cron
+//      Railway ∗/15 cron pings the URL form. Removing it before the cron
 //      command changes would silently stop cleanup + session reminders.
 //
 // Operator steps to finish the migration (then delete the fallback below):

@@ -25,7 +25,51 @@ Georgian expert-consultation marketplace (Next.js 15 + Tailwind + Prisma). UI is
 | `/work/profile` | `app/work/(expert)/profile/page.tsx` | `_types` `_parts` `_tabProfile` `_tabServices` `_tabCredentials` `_tabAccount` `_packages` `_students` |
 | `/work/schedule` | `app/work/(expert)/schedule/page.tsx` | `_shared` `_sheetSlot` `_sheetTemplate` `_sheetBlock` |
 
-## THE PRODUCT MODEL — READ THIS BEFORE ANYTHING ELSE (settled 2026-08-19)
+## THE PRODUCT MODEL — READ THIS BEFORE ANYTHING ELSE (settled 2026-08-19, hierarchy pinned 2026-08-20)
+
+### THE HIERARCHY, AND IT IS AN ORDER — NOT A LIST OF EQUALS
+
+Owner, 2026-08-20, after catching the same mistake five times in one afternoon:
+„მე ეჭვი მაქვს რომ ისევ კონსულტაციაზე გაამახვილე ყურადღება… მინდა რომ
+კონსულტაციამ უკანა პლანზე გადაიწიოს და სერვისი გავუყიდოთ ექსპერტებს."
+
+1. **The site sells SERVICES.** That is the product. Full stop.
+2. **A consultation is a PRE-STEP to buying one** — „გაიარე კონსულტაცია, სანამ
+   სერვისს აიღებ" — offered small, on the card, over the chat or the video call
+   that is already built. It is not a second product, not a headline, not a
+   button of its own.
+3. **The pitch to a provider is CLIENTS FOR THEIR SERVICE**, never „share your
+   knowledge". They set the price.
+4. **WHEREVER BOTH APPEAR, THE SERVICE COMES FIRST.** In a sentence, a filter, a
+   category rail, a list, an example, a meta description. Always. This is the
+   rule that is easiest to break by accident and the one that gives the whole
+   site away — on 2026-08-20 every new sentence written that day put the
+   consultation first („ბუღალტერი, იურისტი, სანტექნიკოსი…", „კონსულტანტები და
+   სერვისები"), and none of it was deliberate. When in doubt, read your own
+   sentence back and check which half arrives first.
+5. **One catalogue, one card, one namespace.** The type belongs to what is
+   OFFERED, never to what kind of person somebody is.
+6. **Retired words:** „ხელოსანი" · „მასწავლებელი" as a label · „სფერო" ·
+   „ტუტორი" · „მასტერი" · „სპეციალისტი" as a role word.
+7. **Tbilisi only, for now** — `CITIES` in lib/requestTopics, one line to widen.
+
+### THE LEFTOVER TO WATCH: THE TAXONOMY IS STILL THE OLD SITE
+
+Measured 2026-08-20: **4 service groups / 21 topics vs 23 consultation groups /
+132 topics.** No amount of copy makes a site read as a services marketplace
+while its own category list is 86% consulting — the rail sorts by count, so the
+services fall to the bottom with zeros beside them. Growing the SERVICE side of
+`lib/requestTopics` is the work; the copy alone cannot do it.
+
+### WHERE THE OLD IDEOLOGY HIDES: THE COPY IS IN THE DATABASE
+
+`SiteText` rows override `lib/siteTextDefs`, so the words that DEFINE the
+product are editable content, and no test can see them. `tests/lexicon` scans
+SOURCE only. On 2026-08-20 the live home page still read „ვიდეოსესია
+მცოდნესთან" and „შეარჩიე შენი სფეროს მცოდნე" — the retired word included —
+weeks after the source stopped saying either. **When you change a default, write
+the DB row too, and scan the live values, not the file.**
+
 
 **The site sells SERVICES.** A consultation is not a second product; it is one
 KIND of service — the one with a fixed price and a bookable time. An accountant

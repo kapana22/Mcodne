@@ -39,6 +39,13 @@ export type ConsultationItem = {
   description: string | null
   minutes: number
   price: number
+  /** ⚠️ FALSE = A JOB, NOT AN HOUR — see Consultation.bookable in schema.prisma.
+   *  Optional so every existing caller keeps compiling; absent reads as true,
+   *  which is what every row written before 2026-08-20 is. Anything that offers
+   *  a TIME must check it — `orderedTiers` already drops these because a
+   *  service carries `minutes: 0`, and that is not a coincidence to rely on
+   *  silently: filter on the flag where the meaning matters. */
+  bookable?: boolean
 }
 
 /**
@@ -249,20 +256,25 @@ export function primaryService<T extends TierShape>(consultations: T[]): T | nul
 }
 
 /**
- * The NUMBER behind `primaryPriceLabel` — the flagship tier's price, or the flat
- * profile price when the expert has published no tiers.
+ * The NUMBER behind `primaryPriceLabel` — the floor of the leading shape, and
+ * the only number a price FILTER or a price SORT may compare.
  *
- * WHY IT EXISTS: `primaryPriceLabel` answers „what does the card SAY", and for a
- * long time nothing answered „what should the card be FILTERED by". So /experts
- * compared the raw flat rate while every card rendered the flagship, and the two
- * disagree for any expert who set one and then priced the other differently.
+ * WHY IT EXISTS: `primaryPriceLabel` answers „what does the card SAY", and for
+ * a long time nothing answered „what should the card be FILTERED by". So
+ * /experts compared the raw flat rate while every card rendered a tier, and the
+ * two disagree for any expert who set one and then priced the other differently.
  * Measured live 2026-08-13: „₾50-მდე" returned ლიზა ზუბაშვილი (flat 20) whose
  * card reads ₾60, and „₾50–100" returned მარიამ ფოფხაძე (flat 60) whose card
  * reads ₾30 — a budget filter that answers with prices outside the budget.
- * A filter must compare the number the reader can see. This is that number.
+ *
+ * ⚠️ IT DELEGATES, IT DOES NOT RE-DERIVE (2026-08-20). It used to call
+ * `primaryService` directly, which is the BOOKING flow's rule (longest paid),
+ * not the card's — so the moment the card moved to the floor the filter would
+ * have gone back to comparing a number the reader cannot see. One function
+ * decides what the price of an expert IS; everything else reads it from here.
  */
-export function primaryPrice(consultations: TierShape[], flatPrice: number): number {
-  return primaryService(consultations ?? [])?.price ?? flatPrice
+export function primaryPrice(consultations: (TierShape & { bookable?: boolean })[], flatPrice: number): number {
+  return primaryPriceLabel(consultations ?? [], flatPrice, 0).price
 }
 
 /** Minutes of `primaryService`, or the profile-level duration when there are no tiers. */
@@ -292,37 +304,127 @@ export const tierPriceLabel = (c: TierShape): string =>
 /* ───── Tier pricing labels ───── */
 
 /**
- * THE price a pre-tier surface advertises: the FLAGSHIP tier's price and its
- * real length. One helper, so the browse card, the profile rail and the mobile
- * bar cannot quote three different numbers for one expert.
+ * WHAT A PRE-TIER SURFACE ADVERTISES — the browse card, the profile rail, the
+ * mobile bar, the home grid, the favourites list. One helper, so they cannot
+ * quote different numbers for one expert.
  *
- * WHY THIS REPLACED THE TWO RULES THAT PRECEDED IT (2026-07-31). Measured on
- * production, ONE expert advertised three prices at once:
- *   • the /experts card said „₾80 · 30 წთ" — it priced `consultationDurationMin`,
- *     the profile-level DEFAULT, which is not a service anybody can buy;
- *   • the profile rail said „₾25-დან" — `fromPriceLabel` anchors on the CHEAPEST
- *     paid tier, so a 15-minute add-on priced the whole profile;
- *   • the service list said 60წთ ₾80 · 30წთ ₾45 · 15წთ ₾25 — the truth.
- * A visitor who clicked ₾25 met ₾80. Anchoring on the flagship is the only rule
- * that agrees with `primaryService` — which is ALREADY what the „განრიგი" grid,
- * the tier step and every duration preview resolve from — so the price and the
- * times on screen now describe the same service.
+ * ⚠️ THE NUMBER IS THE FLOOR OF THE LEADING SHAPE, NOT THE FLAGSHIP (2026-08-20,
+ * second pass). Between 2026-07-31 and today this returned the FLAGSHIP tier's
+ * price — the longest paid one, the same tier `primaryService` pre-selects in
+ * the booking flow — and the argument for it was real: the rail printed
+ * „₾25-დან" while the card printed „₾80", and a visitor who clicked ₾25 met ₾80.
+ * Aligning both on the flagship removed the disagreement.
  *
- * `label` is the tier's own `tierPriceLabel` (so a free flagship reads „უფასო",
- * never „₾0"), and `minutes` is that tier's real length — never a synthetic
- * number, which is the bug primaryService's own docblock exists to prevent.
+ * Then „-დან" was appended to the flagship number on the card, and that put the
+ * SAME false claim back the other way round. MEASURED on the live database:
+ * 24 visible experts, 11 with two or more paid tiers, and 10 of those 11
+ * advertise a floor they do not have —
+ *   მათე ივანიაძე  card „₾100-დან"  really sells a ₾25 tier
+ *   ნინო გახოკია   card „₾80-დან"   really sells a ₾25 tier
+ *   გიორგი         card „₾80-დან"   really sells a ₾1 tier
+ * „-დან" is a promise about the CHEAPEST thing on offer. A number that is not
+ * the cheapest cannot carry it, and 10 of 24 cards is not an edge case.
+ *
+ * So the two claims are separated and each is made true:
+ *   `price` / `label`  the lowest PAID price in the leading shape — the floor,
+ *                      which is what a marketplace that shows one price shows
+ *                      (Fiverr „From $45" is the Basic package; Upwork prints
+ *                      an explicit range). Never a number nobody can pay.
+ *   `isFrom`           whether that shape actually holds two different prices.
+ *                      One tier is not a range and „-დან" is a range word, so
+ *                      the caller prints the bare number.
+ * The July alignment argument is answered by `minutes` coming off the SAME row
+ * as the price: „₾25-დან · 15 წთ" describes one real service, so a visitor who
+ * clicks it meets exactly it. What broke then was two surfaces describing two
+ * different tiers — not the floor itself.
+ *
+ * The free intro tier is excluded throughout (`isFreeTier`): a free door is not
+ * the product, and pricing a profile from it made an expert charging ₾80
+ * advertise „₾0-დან" — that is `fromPriceLabel`'s rule below, kept here.
+ *
+ * ⚠️ SERVICE FIRST WHEN THEY HOLD BOTH. Since `Consultation.bookable`
+ * (schema.prisma, 2026-08-20) one expert can publish a JOB („დეკლარაციის
+ * შევსება — ₾100", no clock) beside an HOUR („კონსულტაცია 60წთ — ₾80"). The site
+ * sells services and a consultation is the pre-step to buying one, so the line
+ * describes the SERVICE and its floor; the consultation keeps the profile and,
+ * where the expert has published time, the card's button. The floor is taken
+ * WITHIN the leading shape, never across both — a „-დან" that quietly jumps
+ * from a service to an hour would describe neither.
+ *
+ * `suffix` is the second half of the line and it names the shape instead of
+ * repeating a clock a service does not have: „60 წთ" for an hour, „სერვისი" for
+ * a job — the word the workspace editor already prints on a service row
+ * (app/work/services/_consultations). `minutes` is null there ON PURPOSE: every
+ * call site that wants to print a duration is forced to say what it does when
+ * there is none.
+ *
  * Falls back to the flat profile price + `fallbackMin` only when the expert has
- * published no tiers at all.
+ * published no tiers at all — the pre-tier behaviour, unchanged.
  */
+export type HeadlineOffer = {
+  /** „₾25", or „უფასო" when every paid row is gone. No „-დან" — see `isFrom`. */
+  label: string
+  /** The number behind `label`. What a price filter and a price sort compare. */
+  price: number
+  /** True only when the leading shape holds two DIFFERENT paid prices. */
+  isFrom: boolean
+  /** The priced row's own length, or null when the leading offer is a service. */
+  minutes: number | null
+  /** „60 წთ" or „სერვისი" — what the line says after the price. */
+  suffix: string
+  /** Whether the leading offer is a job rather than a bookable hour. */
+  isService: boolean
+}
+
+/** A row as this resolver needs it: `bookable` absent reads as true, which is
+ *  what every row written before 2026-08-20 is. See ConsultationItem. */
+type OfferShape = TierShape & { bookable?: boolean }
+
+/** The word a service row carries where an hour carries its length. */
+export const SERVICE_SUFFIX = 'სერვისი'
+
 export function primaryPriceLabel(
-  consultations: TierShape[],
+  consultations: OfferShape[],
   flatPrice: number,
   fallbackMin: number,
-): { label: string; minutes: number } {
-  const flagship = primaryService(consultations ?? [])
-  if (flagship) return { label: tierPriceLabel(flagship), minutes: flagship.minutes }
-  return { label: `₾${priceForDuration(flatPrice, 0)}`, minutes: fallbackMin }
+): HeadlineOffer {
+  const rows = consultations ?? []
+  // PAID only — the free door never prices the profile. A bookable row must also
+  // carry a real length: `minutes: 0` on a bookable row is a broken row, and
+  // pricing „· 0 წთ" off it would advertise a session of no duration.
+  const paid = rows.filter(c => !isFreeTier(c))
+  const services = paid.filter(c => c.bookable === false)
+  const sessions = paid.filter(c => c.bookable !== false && c.minutes > 0)
+  // ⚠️ AN ALL-FREE PROFILE FALLS BACK TO ITS FREE ROWS, NOT TO THE FLAT PRICE
+  // (2026-08-20). Somebody whose only published offering is the free intro has
+  // `paid` empty, and dropping to the flat branch printed „₾0" — which reads as
+  // a broken price, not as a gift. `tierPriceLabel` says „უფასო" for exactly
+  // this, and it is the reason that function exists.
+  // Only when there is NOTHING published at all does the flat rate answer.
+  const free = rows.filter(c => isFreeTier(c) && c.minutes > 0)
+  const pool = services.length ? services : sessions.length ? sessions : free
+
+  if (!pool.length) {
+    const flat = priceForDuration(flatPrice, 0)
+    return { label: `₾${flat}`, price: flat, isFrom: false, minutes: fallbackMin, suffix: `${fallbackMin} წთ`, isService: false }
+  }
+
+  const floor = pool.reduce((best, c) => (c.price < best.price ? c : best), pool[0])
+  const isFrom = pool.some(c => c.price !== floor.price)
+  const isService = services.length > 0
+  return {
+    label: tierPriceLabel(floor),
+    price: Math.max(0, Math.round(floor.price)),
+    isFrom,
+    minutes: isService ? null : floor.minutes,
+    suffix: isService ? SERVICE_SUFFIX : `${floor.minutes} წთ`,
+    isService,
+  }
 }
+
+/** The price line as one string — „₾25-დან" / „₾80". The „-დან" rule lives with
+ *  the number that earns it, so no surface can append the word on its own. */
+export const offerPriceLabel = (o: HeadlineOffer): string => (o.isFrom ? `${o.label}-დან` : o.label)
 
 // From-price label for rails/bars (DESIGN_FIX_PROMPT 1.2): with 2+ tiers whose
 // prices differ, the honest headline price is „₾{min}-დან"; otherwise the flat

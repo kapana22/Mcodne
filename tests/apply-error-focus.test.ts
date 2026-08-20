@@ -62,8 +62,12 @@ check('F5: focus does not fight the scroll',
   'scrollIntoView already owns the movement; a second one lands a frame later as a jerk')
 
 // Autofill: the reason this form was slow to fill in the first place.
+// ⚠️ THE FLOOR MOVED 5 → 4 (2026-08-20) because a FIELD was removed, not an
+// attribute: the video-intro URL input carried `autoComplete="url"` and left
+// with the question (0 of 27 profiles ever had one). Lower this only when a
+// field genuinely goes; raising it back means adding autofill, not a control.
 const autofill = (src.match(/autoComplete="/g) ?? []).length
-check('F6: the form is autofillable', autofill >= 5, `only ${autofill} autoComplete attributes`)
+check('F6: the form is autofillable', autofill >= 4, `only ${autofill} autoComplete attributes`)
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

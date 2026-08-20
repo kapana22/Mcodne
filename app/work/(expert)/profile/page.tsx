@@ -544,7 +544,7 @@ export default function TutorProfilePage() {
   }
 
   // Copy varies by entity — keep the mapping in one place so the modal below
-  // stays declarative. `path` is only set for the /api/me/tutor/* entities;
+  // stays declarative. `path` is only set for the /api/me/tutor/∗ entities;
   // cons/video have their own endpoints handled in confirmDelete.
   const DELETE_META: Record<PendingDelete['kind'], { path?: string; title: string; body: string }> = {
     cert:  { path: 'certificates', title: 'სერტიფიკატის წაშლა?', body: 'შეუქცევადია.' },

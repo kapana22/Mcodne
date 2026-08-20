@@ -3,7 +3,7 @@
 // ⚠️ THIS IS NOT `Category`, AND IT MUST NEVER BECOME IT. The sphere taxonomy
 // (prisma → Category, lib/professionSeo) describes what the EXPERTS ON THIS
 // PLATFORM DO: it drives browse (/experts?category=), the counts and the SEO
-// pages (/categories/* itself was retired in stage 8 — the catalogue filter is
+// pages (/categories/∗ itself was retired in stage 8 — the catalogue filter is
 // the sphere page now).
 // Measured 2026-08-14 it holds 16 professional spheres and 91 professions, and
 // not one school subject — so „ვეძებ ქიმიის მასწავლებელს" has nowhere to go in
@@ -558,17 +558,45 @@ export function formatLabel(id: string): string {
   return FORMATS.find(f => f.id === id)?.label ?? id
 }
 
-export const CITIES = [
+/**
+ * ⚠️ TWO LISTS, AND THE SPLIT IS THE WHOLE POINT (2026-08-20).
+ *
+ * `ALL_CITIES` is the VOCABULARY: every id this database has ever stored. It
+ * may never shrink. Rows written before today carry BATUMI and RUSTAVI, and a
+ * vocabulary that forgets them would render „BATUMI" as a raw latin id on an
+ * admin screen, or throw where a label is required.
+ *
+ * `CITIES` is what the site OFFERS TODAY. Owner, 2026-08-20: „მხოლოდ
+ * თბილისში იყოს ჯერ ჯობია." Every picker, filter and validator reads this one,
+ * so serving a second city again is one line here — the same contract the
+ * budget ladder and the feature flags already use.
+ *
+ * Why offering fewer cities than we accept is correct rather than sloppy: a
+ * marketplace with nobody in Batumi that still ASKS „which city?" collects
+ * requests it cannot route and tells the person, after they have typed their
+ * name and number, that nobody is coming. The narrower list is the honest one.
+ */
+export const ALL_CITIES = [
   { id: 'TBILISI', label: 'თბილისი' },
   { id: 'BATUMI',  label: 'ბათუმი' },
   { id: 'KUTAISI', label: 'ქუთაისი' },
   { id: 'RUSTAVI', label: 'რუსთავი' },
   { id: 'OTHER',   label: 'სხვა' },
 ] as const
-export type CityName = (typeof CITIES)[number]['id']
+export type CityName = (typeof ALL_CITIES)[number]['id']
+
+/** The cities served today. Add one back and every surface follows. */
+export const CITIES: readonly { id: CityName; label: string }[] = ALL_CITIES.filter(c => c.id === 'TBILISI')
+
+/** True while the question „which city?" has exactly one answer, and therefore
+ *  must not be asked — the same rule that stopped asking a plumber whether the
+ *  job is online. See stepsFor in app/request/_model. */
+export const ONE_CITY = CITIES.length === 1
 
 export function cityLabel(id: string): string {
-  return CITIES.find(c => c.id === id)?.label ?? id
+  // Reads the VOCABULARY, never the offered list: an old row must still say
+  // „ბათუმი" rather than „BATUMI".
+  return ALL_CITIES.find(c => c.id === id)?.label ?? id
 }
 
 /* ═══════════ WHAT YOU CAN ASK FOR ═══════════════════════════════════════
@@ -1114,15 +1142,18 @@ export function topicById(id: string | null | undefined): Topic | undefined {
  * teach that the fold headings cannot, because nobody unfolds a heading to find
  * out whether the product is for them.
  */
+// ⚠️ THE ORDER IS THE PRODUCT'S (2026-08-20). These eight chips are the first
+// thing a visitor reads on the what-step, so they are the fastest statement the
+// site makes about itself — and until today they opened with „მათემატიკა",
+// which said tutoring. Professional deliverables first, then the everyday
+// trades (which a household is most likely to TYPE, so recognising one teaches
+// that this half exists), then the learning that survived as an adult,
+// outcome-shaped service. `math` is gone with its group — see DORMANT_GROUP_IDS.
 export const SUGGESTED_TOPIC_IDS = [
-  'english', 'math',           // LEARN
-  'contract', 'accounting',    // CONSULT
-  'logo', 'renovation',        // JOB
-  // The two most-asked-for trades in any household. „დამლაგებელი" and
-  // „სანტექნიკოსი" are also the two words most likely to be TYPED, so a visitor
-  // who recognises one here learns in a single glance that this half of the
-  // product exists at all.
-  'clean-flat', 'plumb-leak',  // SERVICE
+  'contract', 'declaration',   // professional service — a thing delivered
+  'logo', 'renovation',        // project
+  'clean-flat', 'plumb-leak',  // everyday service
+  'english', 'nat-exams',      // learning, the outcome-shaped half
 ] as const
 
 /**
@@ -1187,8 +1218,39 @@ export function groupsForKind(kind: RequestKindName): TopicGroup[] {
  * line here and costs no re-classification of anything already stored.
  */
 export const LIVE_SERVICE_GROUP_IDS: readonly string[] = [
+  // ⚠️ ALL EIGHT, SINCE 2026-08-20. It was four. Owner: „პარალელურად დაემატება
+  // სერვისი როგორც არის, მასშტაბურად უნდა მივიდეთ… სერვისებსაც, რაც
+  // ყოველდღიურად სჭირდება — დალაგება და ხელოსანი, ესეც."
+  //
+  // The everyday layer is not the site's headline (see DORMANT_GROUP_IDS and
+  // the note below it for what the headline IS), but it is half of what the
+  // site sells and a half that arrives with real, daily demand. Four of these
+  // were written and switched off; nothing else was needed to double the
+  // service side.
   'plumbing', 'electrical', 'cleaning', 'appliances',
+  'repairs', 'moving', 'outdoor', 'systems',
 ]
+
+/**
+ * ⚠️ GROUPS THAT ARE WRITTEN, KEPT, AND NOT OFFERED (2026-08-20).
+ *
+ * The site sells SERVICES, and it leads with the PROFESSIONAL ones — a contract
+ * drafted, a declaration filed, a brand built, IELTS passed. Owner: „არ მინდა
+ * რომ სულ კანალიზაციაც და მსგავსი ხელოსანი სერვისებიც მქონდეს — უფრო მაღალი
+ * დონის სერვისები და ინტელექტუალურიც იყოს."
+ *
+ * These three are neither. „მე-8 კლასის მათემატიკა" is bought by a parent, is
+ * priced per lesson and repeats every week — a different market with a
+ * different buyer, and the one that makes a refined catalogue read as a
+ * classifieds board. The four LEARNING groups that survive (`exams`,
+ * `languages`, `higher`, `digital`) are the adult, outcome-shaped half: an
+ * exam has a date and a result, which is the same shape as a service.
+ *
+ * Nothing is deleted — the topics, their synonyms and their tests all stay, so
+ * a stored request that names one still reads. Removing an id from this list is
+ * the whole of turning it back on.
+ */
+export const DORMANT_GROUP_IDS: readonly string[] = ['school', 'arts', 'sport']
 
 /**
  * Is this group offered in a picker?
@@ -1197,6 +1259,7 @@ export const LIVE_SERVICE_GROUP_IDS: readonly string[] = [
  * staff, and a consultation group needs no van in the city to answer.
  */
 export function groupIsLive(g: TopicGroup): boolean {
+  if (DORMANT_GROUP_IDS.includes(g.id)) return false
   return !g.kinds.includes('SERVICE') || LIVE_SERVICE_GROUP_IDS.includes(g.id)
 }
 
@@ -1320,8 +1383,10 @@ export const VERTICAL_COPY: Record<Vertical, {
     label: 'ექსპერტები',
     title: 'რაში გჭირდება დახმარება?',
     hint: 'დაწერე შენი სიტყვებით — ექსპერტები შემოგთავაზებენ.',
-    placeholder: 'მათემატიკა, ბუღალტერია, იურისტი…',
-    suggested: ['math', 'nat-exams', 'english', 'accounting', 'contract', 'cv'],
+    placeholder: 'ხელშეკრულება, დეკლარაცია, ბრენდი…',
+    // Same reordering as SUGGESTED_TOPIC_IDS, and the same reason: what is
+    // DELIVERED first, and no dormant topic (`math` left with its group).
+    suggested: ['contract', 'declaration', 'logo', 'accounting', 'cv', 'english'],
   },
 }
 

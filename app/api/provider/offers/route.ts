@@ -21,6 +21,7 @@
 
 import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { chargeForOffer } from '@/lib/creditsServer'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { RequestOfferInput, offerProviderError, kindOf, KIND, gel, offerPriceLabel, topicLabel } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
@@ -131,6 +132,29 @@ export async function POST(req: Request) {
             request: { select: { publicRef: true, topic: true, kind: true, email: true, offerCount: true } },
           },
         })
+
+    // ── What it cost to answer ───────────────────────────────────────────
+    //
+    // ⚠️ CHARGED ON SENDING, NEVER ON SEEING (lib/credits → OFFER_COST_TETRI).
+    // The provider read the whole request, decided, and spent on their own
+    // decision — the model this industry is most criticised for is the other
+    // one, where you pay to look and most leads never answer.
+    //
+    // ⚠️ BEST-EFFORT, AND DELIBERATELY SO WHILE `CREDITS_ENFORCED` IS FALSE.
+    // The offer is the deliverable; a ledger write that fails must never lose
+    // an answer the client is waiting for. When enforcement lands, the check
+    // moves ABOVE the create and this becomes part of the same transaction —
+    // charging for an offer that does not exist is the one direction that
+    // cannot be allowed.
+    //
+    // ⚠️ ONLY AN INDIVIDUAL IS CHARGED. The ledger is keyed on a USER, and a
+    // company offer is sent by an organisation — debiting whichever member
+    // happened to press the button would take from a personal balance for a
+    // company's lead. A company ledger is the fix when companies matter; until
+    // then not charging is the honest half of the mistake, not the expensive one.
+    if (expertUserId) {
+      try { await chargeForOffer(prisma, expertUserId, offer.id) } catch { /* the offer is the deliverable */ }
+    }
 
     // ── The clock every later event is measured against ──────────────────
     // SENT is what „how long did the client take to open it" subtracts from,

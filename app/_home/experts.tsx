@@ -8,7 +8,7 @@ import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { Reveal } from '@/components/Reveal'
 import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
-import { primaryPriceLabel, primaryService } from '@/components/booking/slots'
+import { primaryPriceLabel, offerPriceLabel, SERVICE_SUFFIX } from '@/components/booking/slots'
 import { ExpertGrid, type GridExpert } from '@/components/home/ExpertGrid'
 import { categoryIcon } from '@/lib/categoryMarks'
 
@@ -75,7 +75,7 @@ export const FeaturedExperts = () => {
             // `price` stays a NUMBER because the hero animates it with <CountUp>;
             // it comes off the SAME tier as the label and the duration, so the
             // three can no longer describe different services.
-            return { price: primaryService(tiers)?.price ?? (t?.price ?? 80), priceLabel: f.label, durationMin: f.minutes }
+            return { price: f.price, priceLabel: offerPriceLabel(f), priceSuffix: f.isService ? SERVICE_SUFFIX : `${f.minutes}-წუთიანი სესია` }
           })(),
           photo: t?.user?.avatarUrl ?? DEFAULT_AVATAR,
           rate: typeof t?.rating === 'number' ? t.rating : 0,

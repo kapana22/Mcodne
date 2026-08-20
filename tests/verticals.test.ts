@@ -236,15 +236,22 @@ test('§G search still crosses the line, in both directions', () => {
   assert.ok(verticals.has('SERVICE') && verticals.has('EXPERT'),
     `one query set reached only ${[...verticals].join(', ')} — search is being filtered by vertical`)
 
-  // And the SAME distinction the launch gate makes: what is not OFFERED is
-  // still UNDERSTOOD. „კარი გაფუჭდა" belongs to a group no door draws, and it
-  // must still land on კარ-ფანჯარა rather than dissolve into „სხვა" — that row
-  // is the signal telling us which group to open next.
-  const closed = found('კარი გაფუჭდა')
-  assert.ok(closed.includes('rep-door'),
+  // And the SAME distinction the gate makes: what is not OFFERED is still
+  // UNDERSTOOD. „მათემატიკა" belongs to a group no door draws since 2026-08-20
+  // (DORMANT_GROUP_IDS — positioning, not staffing), and it must still land on
+  // its own topic rather than dissolve into „სხვა". That row is the signal that
+  // says what people are asking for that the site has decided not to sell yet;
+  // losing it means deciding blind next time.
+  //
+  // ⚠️ THE FIXTURE MOVED FROM `rep-door` TO `math` because the repairs group
+  // was OPENED that same day. Do not delete this assertion when its topic
+  // opens — point it at whatever is closed then; the property is the gate, not
+  // the example.
+  const closed = found('მათემატიკა')
+  assert.ok(closed.includes('math'),
     'a closed group stopped being matched — the gate leaked out of the picker and into the vocabulary')
-  assert.ok(!BROWSABLE_GROUPS.some(g => g.topics.some(t => t.id === 'rep-door')),
-    'rep-door became browsable — pick another closed topic for this assertion, do not delete it')
+  assert.ok(!BROWSABLE_GROUPS.some(g => g.topics.some(t => t.id === 'math')),
+    'math became browsable — pick another closed topic for this assertion, do not delete it')
   assert.ok(topicById('rep-door'), 'rep-door left the catalogue')
 })
 

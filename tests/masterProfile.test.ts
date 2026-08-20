@@ -60,7 +60,15 @@ test('the profile exists as a container plus parts, and is the Profile archetype
     'the BreadcrumbList no longer names the parent the URL actually has')
   // Reviews are the honest empty state until stage 7 — never a fabricated list.
   const blocks = read(`${DIR}/_providerBlocks.tsx`)
-  assert.match(blocks, /<EmptyState[\s\S]{0,200}?title="ჯერ არ არის შეფასება"/)
+  // ⚠️ THE EMPTY STATE WAS REMOVED (2026-08-20), not lost. Measured that day:
+  // 0 reviews on the whole site, so every provider profile drew a heading, a
+  // bordered box and an icon to announce an absence — three elements saying
+  // „unfinished" on the one page whose job is to make somebody trustworthy.
+  // An empty state earns its place when the reader can FILL it; nobody can
+  // review a provider they have not hired. What is pinned now is the ABSENCE
+  // of the section, plus the two properties that always mattered: reviews come
+  // through the offer, and no photo column is ever selected.
+  assert.match(blocks, /if \(p\.reviews\.length === 0\) return null/)
   // The model is a leaf.
   assert.doesNotMatch(read(DATA), /from '\.\//, '_data imports a sibling — the model must stay a leaf')
   // Metadata title and canonical.

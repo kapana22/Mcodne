@@ -9,7 +9,7 @@ import { primaryPrice } from '@/components/booking/slots'
 import { type Capability } from '@/lib/capabilities'
 import { tradeTopicIds, type CatalogItem } from '@/lib/catalogItems'
 import { LIVE_SERVICE_GROUPS } from '@/lib/serviceProfile'
-import { CITIES } from '@/lib/requestTopics'
+import { CITIES, ONE_CITY } from '@/lib/requestTopics'
 import { LiveCat } from './_data'
 
 // ⚠️ ONE STATE, ONE SURFACE (2026-08-19). Owner: „სერვისები და ექპერტები უნდა
@@ -381,46 +381,66 @@ export const TutorFilters = ({ filters, setFilters, liveCats, facets, activeCoun
       )}
 
       {showConsult && (
-        <FilterGroup title="კატეგორია">
-          {/* ⚠️ ONE LIST, BOTH TAXONOMIES (2026-08-19). The rail carried two
-              sections answering the SAME question — „კატეგორია" held the expert
-              spheres and „სერვისი" held the trades, so an accountant was found
-              in one and a plumber in the other, and nobody could know which.
-              Owner: „ფილტრაციები და კატეგორიები არეულად არის და ვფიქრობ ძალიან
-              ბევრი დაიბნევა." The product model says the same: one provider who
-              offers services, so one list of what they do.
+        <>
+          {/* ⚠️ TWO BLOCKS, IN THE SITE'S OWN ORDER (2026-08-20). It was one
+              list sorted by COUNT, and count is not what this site is about:
+              the everyday trades fell to the bottom with zeros beside them
+              while six professional rows sat above, and a visitor read the
+              ordering as a ranking of what mattered.
 
-              Ordered by COUNT, descending — what actually has people is at the
-              top, which is also the only ordering that stays true as the roster
-              grows. The two kinds keep their own state field (`cats` are
-              category slugs, `trades` are topic ids) because they filter
-              different columns; a reader cannot tell, and should not have to. */}
-          {liveCats.length === 0 && LIVE_SERVICE_GROUPS.length === 0
-            ? <p className="text-small text-ink-500">კატეგორიები იტვირთება…</p>
-            : [
-                ...liveCats.map(c => ({
-                  key: `c:${c.slug}`,
-                  label: c.name,
-                  count: c.expertCount ?? 0,
-                  on: filters.cats.includes(c.slug),
-                  toggle: () => setFilters({ ...filters, cats: toggleIn(filters.cats, c.slug) }),
-                  topics: null as null | typeof LIVE_SERVICE_GROUPS[number]['topics'],
-                })),
-                ...LIVE_SERVICE_GROUPS.map(g => ({
+              The order is now the PRODUCT's, and it does not move as the
+              roster does. Owner: „უფრო მაღალი დონის სერვისები და
+              ინტელექტუალურიც იყოს… პარალელურად სერვისებსაც, რაც ყოველდღიურად
+              სჭირდება — დალაგება და ხელოსანი, ესეც." Professional first,
+              because that is what the site leads with; everyday second,
+              because it is half of what it sells.
+
+              Still ONE question — the two blocks are labelled sections of the
+              same rail, not the two catalogues that were merged in stage 10.
+              They keep separate state fields (`cats` are category slugs,
+              `trades` are topic ids) because they filter different columns; a
+              reader cannot tell, and should not have to. */}
+          <FilterGroup title="პროფესიული სერვისები">
+            {liveCats.length === 0
+              ? <p className="text-small text-ink-500">იტვირთება…</p>
+              : liveCats
+                  .map(c => ({
+                    key: `c:${c.slug}`,
+                    label: c.name,
+                    count: c.expertCount ?? 0,
+                    on: filters.cats.includes(c.slug),
+                    toggle: () => setFilters({ ...filters, cats: toggleIn(filters.cats, c.slug) }),
+                  }))
+                  // Inside a block, count IS the right order — it says where
+                  // there is somebody to answer, without claiming the block
+                  // itself is more important than the one below.
+                  .sort((a, b) => b.count - a.count)
+                  .map(row => (
+                    <FilterRow key={row.key} on={row.on} onClick={row.toggle} label={row.label} count={row.count} />
+                  ))}
+          </FilterGroup>
+
+          {/* OPEN, like the block above it. Collapsing it made the ordering into
+              a hiding place: the professional block leads because it is drawn
+              FIRST, which is enough — a second tap to reach half of what the
+              site sells is a barrier, not a hierarchy. */}
+          {LIVE_SERVICE_GROUPS.length > 0 && (
+            <FilterGroup title="ყოველდღიური სერვისები">
+              {LIVE_SERVICE_GROUPS
+                .map(g => ({
                   key: `t:${g.id}`,
                   label: g.label,
                   count: facets.trades[g.id] ?? 0,
                   on: filters.trades.includes(g.id),
                   toggle: () => setFilters({ ...filters, trades: toggleIn(filters.trades, g.id) }),
                   topics: g.topics,
-                })),
-              ]
+                }))
                 .sort((a, b) => b.count - a.count)
                 .map(row => (
                   <div key={row.key} className="flex flex-col gap-1">
                     <FilterRow on={row.on} onClick={row.toggle} label={row.label} count={row.count} />
                     {/* The narrower topics unfold only under a ticked trade —
-                        all of them at once is twenty-one rows above the first
+                        all of them at once is thirty-nine rows above the first
                         card, and the rail would be the page. */}
                     {row.on && row.topics && (
                       <FilterNest>
@@ -437,7 +457,9 @@ export const TutorFilters = ({ filters, setFilters, liveCats, facets, activeCoun
                     )}
                   </div>
                 ))}
-        </FilterGroup>
+            </FilterGroup>
+          )}
+        </>
       )}
 
       {showConsult && (
@@ -488,7 +510,11 @@ export const TutorFilters = ({ filters, setFilters, liveCats, facets, activeCoun
           roster-wide counts. The only change is the mechanism: a row was an
           address there and is state here, because there is one list now. */}
       
-      {showWork && (
+      {/* ⚠️ NO CITY GROUP WHILE THERE IS ONE CITY (2026-08-20). A filter whose
+          every row matches everything narrows nothing; it is a control that
+          teaches the visitor the rail is full of things that do not work. It
+          returns by itself the day a second city is served — see CITIES. */}
+      {showWork && !ONE_CITY && (
         <FilterGroup title="ქალაქი" note={workNote} defaultOpen={false} active={filters.cities.length > 0}>
           {CITIES.map(c => (
             <FilterRow

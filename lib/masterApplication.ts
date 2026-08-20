@@ -84,11 +84,27 @@ export const MasterApplicationInput = z.object({
   calloutFee: z.number().int().positive().max(100_000).nullable(),
   priceFrom: z.number().int().positive().max(1_000_000).nullable(),
 
+  // ⚠️ `{ topicId: lari }`, AND THE KEYS ARE CHECKED AGAINST THE TICKS BELOW.
+  // A JSON column can hold anything a bad write ever put there, so the schema
+  // does the two things the reader cannot: every value is a positive integer
+  // (a blank input must never arrive as 0 and print „0₾" on a card), and every
+  // key names a real service topic. The stronger rule — the key is one THIS
+  // applicant ticked — is a cross-field refinement, so it lives with the
+  // others at the bottom of this object.
+  priceList: z.record(z.string(), z.number().int().positive().max(1_000_000)).default({}),
+
   photoUrl: dataUri.nullable(),
   workPhotos: z.array(dataUri).max(MASTER.MAX_WORK_PHOTOS),
 })
   .refine(v => v.kind !== 'COMPANY' || !!v.companyName, {
     message: 'დაწერე კომპანიის სახელი', path: ['companyName'],
+  })
+  // A price for something they do not offer is either a stale key left behind
+  // when a tick was removed, or a crafted body. Neither may be stored: the
+  // reader walks `services` and would ignore it, but a row that holds a price
+  // for a service the provider does not do is a row nobody can explain.
+  .refine(v => Object.keys(v.priceList).every(k => v.services.includes(k)), {
+    message: 'ფასი მითითებულია სერვისზე, რომელიც არჩეული არ არის', path: ['priceList'],
   })
 export type MasterApplicationInput = z.infer<typeof MasterApplicationInput>
 

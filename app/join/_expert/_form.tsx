@@ -44,7 +44,9 @@ export type StepId = 1 | 2
  * form is a second form to read. */
 export const STEPS: { id: StepId; l: string; icon: any }[] = [
   { id: 1, l: 'პროფილი', icon: Icon.user },
-  { id: 2, l: 'ფასი და დრო', icon: Icon.wallet },
+  // ⚠️ WAS „ფასი და დრო" (2026-08-20). „დრო" was the consultation assumption
+  // written into the rail itself — a service has a price and no time at all.
+  { id: 2, l: 'რას ყიდი', icon: Icon.wallet },
 ]
 
 /* ───── Where an error is SAID ─────
@@ -86,7 +88,17 @@ export type FormState = {
   headline: string; motivation: string; city: string; yearsExp: string; linkedin: string; website: string
   introVideoUrl: string
   languages: string[]
-  services: { name: string; dur: number; price: number; free: boolean; desc: string }[]
+  /** ⚠️ `bookable` DECIDES WHICH SHAPE THIS IS (2026-08-20) — the same column
+   *  the workspace editor writes (Consultation.bookable). `false` = a JOB:
+   *  a name and a price, no clock and no calendar. It is the DEFAULT, because
+   *  the site sells services and a consultation is what you can do before
+   *  committing to one.
+   *
+   *  Until today every offering on this form required `dur`, so a lawyer who
+   *  drafts contracts could not register without inventing a duration for the
+   *  work AND publishing a weekly schedule for it. The door asked the wrong
+   *  question and turned away everybody the product is now for. */
+  services: { name: string; dur: number; price: number; free: boolean; desc: string; bookable: boolean }[]
   /** Weekly availability, published on approval. Mon=0 … Sun=6. */
   avail: { days: boolean[]; startHour: number; endHour: number }
   professionData: Record<string, any>
@@ -107,6 +119,8 @@ export const FREE_INTRO: FormState['services'][number] = {
   dur: 15,
   price: 0,
   free: true,
+  // A free intro IS a booked slot — it is the one row that must stay bookable.
+  bookable: true,
   desc: 'გაესაუბრე ექსპერტს მოკლედ და დარწმუნდი, რომ სწორ ექსპერტს ირჩევ.',
 }
 
@@ -137,7 +151,14 @@ export const INITIAL_FORM: FormState = {
     // market out of existence before it could appear. Zero renders as an empty
     // input (see PriceField), so the expert has to make the decision the field
     // is asking for; validation already refuses anything under ₾10.
-    { name: 'კონსულტაცია', dur: 60, price: 0, free: false, desc: 'დასვი შენი კითხვა და ერთ საათში მიიღე კონკრეტული ნაბიჯები.' },
+    // ⚠️ THE SEEDED ROW IS A SERVICE, NOT AN HOUR (2026-08-20). It used to be
+    // „კონსულტაცია, 60 წუთი" — the form's own answer to „what do you sell?",
+    // handed to every applicant before they had thought about it. The site
+    // sells services, so the pre-filled row is one, and the name is left EMPTY
+    // rather than guessed: „დეკლარაციის შევსება" is not something we can write
+    // on a lawyer's behalf, and a wrong pre-fill is an anchor exactly the way
+    // the ₾80 price was.
+    { name: '', dur: 60, price: 0, free: false, bookable: false, desc: '' },
     { ...FREE_INTRO },
   ],
   avail: { ...DEFAULT_AVAIL, days: [...DEFAULT_AVAIL.days] },

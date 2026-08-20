@@ -56,7 +56,7 @@ import { releaseBookingCredit } from '@/lib/bookingCredit'
 // Railway cron setup:
 //   1. Set env CLEANUP_SECRET=<random 32+ char string> in Variables
 //   2. Dashboard → Service → Cron → add job:
-//        Schedule: */15 * * * *
+//        Schedule: ∗/15 * * * *
 //        Command:  curl -fsS -X POST -H "Authorization: Bearer $CLEANUP_SECRET" \
 //                    https://mcodne.ge/api/internal/cleanup
 
@@ -459,7 +459,7 @@ export async function POST(req: Request) {
     remindersSent += toSend.length
   }
 
-  // Email session reminders ride this same */15 cron (best-effort — a mail
+  // Email session reminders ride this same ∗/15 cron (best-effort — a mail
   // failure must never break the cleanup job). Separate from the in-app
   // `remindersSent` above; deduped by its own sessionReminderSentAt column.
   let emailReminders = { bookings: 0, emails: 0 }

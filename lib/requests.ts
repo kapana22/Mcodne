@@ -352,7 +352,7 @@ import {
 export {
   REQUEST_KINDS, KIND, kindOf, BUDGET_UNITS,
   BUDGET_BANDS, bandOf, budgetIsBelowFloor, budgetLabel, UNSTATED, UNSTATED_BUDGET, isUnstated,
-  TIMING, timingLabel, FORMATS, formatLabel, CITIES, cityLabel,
+  TIMING, timingLabel, FORMATS, formatLabel, CITIES, ALL_CITIES, ONE_CITY, cityLabel,
   TOPIC_GROUPS, OTHER_TOPIC, topicById, topicLabel, categorySlugOfTopic,
   SUGGESTED_TOPICS, SUGGESTED_TOPIC_IDS,
   groupsForKind, isTopicOfKind, searchTopics, BROWSABLE_GROUPS, groupIsLive,

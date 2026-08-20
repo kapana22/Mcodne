@@ -7,7 +7,7 @@ import { ensureDbReady } from '@/lib/dbBoot'
 // Emails BOTH parties ~1h before a CONFIRMED session and stamps
 // `sessionReminderSentAt` so a booking is reminded exactly once. Called by the
 // dedicated /api/internal/reminders endpoint AND piggybacked on the existing
-// */15 cleanup cron (so no separate cron has to be provisioned).
+// ∗/15 cleanup cron (so no separate cron has to be provisioned).
 //
 // `sessionReminderSentAt` is a dbBoot-added column Prisma can't select, so the
 // query/update go through raw SQL (same pattern as rescheduleRequest).
@@ -137,7 +137,7 @@ export async function sendSessionReminders(): Promise<{
   }
 
   // The second, imminent reminder rides this same call rather than a new cron
-  // entry: both scheduled callers (/api/internal/reminders and the */15 cleanup
+  // entry: both scheduled callers (/api/internal/reminders and the ∗/15 cleanup
   // job) already invoke this function, so nothing has to be provisioned. Run
   // after the 1h pass and independently guarded — a failure here must not lose
   // the counts above.

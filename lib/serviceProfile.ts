@@ -18,7 +18,7 @@
 
 import { z } from 'zod'
 import {
-  TOPIC_GROUPS, CITIES, topicLabel, cityLabel, isTopicOfKind, groupIsLive,
+  TOPIC_GROUPS, CITIES, ALL_CITIES, topicLabel, cityLabel, isTopicOfKind, groupIsLive,
   type Topic, type TopicGroup, type CityName,
 } from './requestTopics'
 
@@ -58,6 +58,9 @@ export const SERVICE_TOPICS: Topic[] = SERVICE_GROUPS.flatMap(g => g.topics)
 export const LIVE_SERVICE_GROUPS = SERVICE_GROUPS.filter(groupIsLive)
 export const LIVE_SERVICE_TOPICS: Topic[] = LIVE_SERVICE_GROUPS.flatMap(g => g.topics)
 
+// ⚠️ WHAT MAY BE SAVED reads the OFFERED list, not the vocabulary: a provider
+// cannot tick a city the site does not serve. Reading a stored value uses
+// ALL_CITIES instead — see areaLabels, and the note on CITIES.
 const AREA_IDS = new Set(CITIES.map(c => c.id))
 
 /* ═══════════ what may be saved ══════════════════════════════════════════ */
@@ -94,7 +97,7 @@ export const ServiceProfileInput = z.object({
       message: 'სერვისი ორჯერ არის არჩეული',
     }),
   areas: z.array(z.string().trim().min(1).max(20))
-    .max(CITIES.length)
+    .max(ALL_CITIES.length)
     .refine(ids => ids.every(id => AREA_IDS.has(id as CityName)), {
       message: 'არჩეულია ქალაქი, რომელიც სიაში არ არის',
     })
@@ -177,7 +180,11 @@ export function serviceLabels(ids: string[]): string[] {
 /** The same, for areas. */
 export function areaLabels(ids: string[]): string[] {
   const set = new Set(ids)
-  return CITIES.filter(c => set.has(c.id)).map(c => cityLabel(c.id))
+  // ⚠️ THE VOCABULARY, NOT THE OFFERED LIST. A row written when the site served
+  // Batumi still has to read „ბათუმი" — filtering by what we offer TODAY would
+  // silently drop it from the provider's own profile. Caught by
+  // tests/serviceProfile §F the hour the two lists were split.
+  return ALL_CITIES.filter(c => set.has(c.id)).map(c => cityLabel(c.id))
 }
 
 /**
@@ -187,6 +194,45 @@ export function areaLabels(ids: string[]): string[] {
  * than „ფასი: —". An absent price is a master who quotes per job, which is a
  * normal way to work and not a blank to apologise for.
  */
+/**
+ * THE PRICED SERVICES A PROVIDER PUBLISHES — „ბინის დალაგება — 60₾".
+ *
+ * ⚠️ THE MAP IS UNTRUSTED AND IS READ THROUGH THE TICKS, NEVER LISTED (2026-08-20).
+ * `priceList` is a JSON column, so it can hold anything a bad write ever put
+ * there: an unknown key, a string where a number belongs, a negative, a topic
+ * the provider has since unticked. So the ORDER of operations is the guard —
+ * walk `services` (validated ids, in catalogue order), and look each one up.
+ * A key the provider no longer offers can then never reach a screen, and a
+ * junk value is simply not a number and is skipped.
+ *
+ * Catalogue order, not map order: two providers offering the same two trades
+ * must list them the same way, or a client comparing cards is comparing click
+ * sequences. Same rule `serviceLabels` already applies.
+ */
+export function pricedServices(
+  p: { services: string[]; priceList?: unknown },
+): { id: string; label: string; price: number }[] {
+  const raw = p.priceList
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
+  const map = raw as Record<string, unknown>
+  const owned = new Set(p.services)
+  const out: { id: string; label: string; price: number }[] = []
+  for (const t of LIVE_SERVICE_TOPICS) {
+    if (!owned.has(t.id)) continue
+    const v = map[t.id]
+    const n = typeof v === 'number' ? v : Number(v)
+    if (!Number.isFinite(n) || n <= 0) continue
+    out.push({ id: t.id, label: t.label, price: Math.round(n) })
+  }
+  return out
+}
+
+/** The lowest published price, or null — what the card prints as „X₾-დან". */
+export function lowestPrice(p: { services: string[]; priceList?: unknown }): number | null {
+  const list = pricedServices(p)
+  return list.length ? Math.min(...list.map(s => s.price)) : null
+}
+
 export function priceHint(p: { calloutFee: number | null; priceFrom: number | null }): string | null {
   const parts: string[] = []
   if (p.calloutFee !== null) parts.push(`გამოძახება ${p.calloutFee}₾`)

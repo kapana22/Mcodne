@@ -3,7 +3,7 @@
 // the verified mark every section reuses.
 
 import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
-import { primaryPriceLabel, primaryService } from '@/components/booking/slots'
+import { primaryPriceLabel, offerPriceLabel, SERVICE_SUFFIX } from '@/components/booking/slots'
 
 export const VerifiedMark = ({ size = 16 }: { size?: number }) => (
   <span className="inline-flex items-center justify-center rounded-full bg-brand-600 text-white shrink-0" style={{ width: size, height: size }}>
@@ -78,7 +78,7 @@ export type Expert = {
   price: number
   /** The same tier, formatted („₾60", „უფასო") — for everything that shows text. */
   priceLabel: string
-  durationMin: number
+  priceSuffix: string
   // Real next open start (ISO) or null. Drives the SAME bookability gate the
   // /experts card and the profile's StickyBookingCard use — a card must never
   // promise a booking the profile will immediately deny.
@@ -128,7 +128,7 @@ export function mapTutorToExpert(t: any): Expert {
       // `price` stays a NUMBER because the hero animates it with <CountUp>;
       // it comes off the SAME tier as the label and the duration, so the
       // three can no longer describe different services.
-      return { price: primaryService(tiers)?.price ?? (t?.price ?? 80), priceLabel: f.label, durationMin: f.minutes }
+      return { price: f.price, priceLabel: offerPriceLabel(f), priceSuffix: f.isService ? SERVICE_SUFFIX : `${f.minutes}-წუთიანი სესია` }
     })(),
     nextSlotAt: t?.nextSlotAt ?? null,
     video: Boolean(t?.videoUrl),

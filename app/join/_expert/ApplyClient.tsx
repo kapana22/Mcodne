@@ -303,7 +303,10 @@ export default function TutorApply({ initialUser, seed, onContinueMaster }: {
   /** Which screen each anchor lives on — so a jump can change steps first. */
   const FIELD_STEP: Record<string, StepId> = {
     firstName: 1, lastName: 1, email: 1, phone: 1, cats: 1, otherCat: 1, headline: 1,
-    photo: 1, motivation: 1, yearsExp: 1, city: 1, introVideoUrl: 1,
+    // `introVideoUrl` left this map with the field itself (2026-08-20) — a
+    // name here with no `data-field` on the page is an error that jumps to a
+    // control that does not exist.
+    photo: 1, motivation: 1, yearsExp: 1, city: 1,
     // Moved onto step 1 with the third screen's removal (2026-08-07).
     linkedin: 1, website: 1, certificates: 1,
     services: 2, avail: 2,
@@ -386,17 +389,41 @@ export default function TutorApply({ initialUser, seed, onContinueMaster }: {
       // Optional fields, but a bad value in one still 400s the whole submit —
       // and it does so two screens later, where nothing points back here.
       { const e = yearsError(form.yearsExp); if (e) return fail('yearsExp', e) }
-      { const e = videoError(form.introVideoUrl); if (e) return fail('introVideoUrl', e) }
+      // ⚠️ THE VIDEO URL IS NO LONGER VALIDATED, BECAUSE IT IS NO LONGER ASKED
+      // (2026-08-20). The field left the form — see the note in ./_steps — so
+      // naming it in a validator would jump to a control that is not on the
+      // page: an error with nowhere to land, which is the exact failure
+      // tests/apply-error-focus F2 exists to catch.
+      //
+      // ⚠️ AND THE FIELD NAME IS NOT WRITTEN OUT ANYWHERE ABOVE, deliberately.
+      // That test scans this file as TEXT, comments included, so an example of
+      // the very call being described re-creates the failure it explains. Cost
+      // twenty minutes the day it was written.
+      //
+      // A value can still arrive from a draft saved before the removal; it is
+      // passed through untouched and the server's own bound is the backstop.
       return null
     }
     if (s === 2) {
       const paidService = form.services.find(sv => !sv.free && sv.price > 0)
       { const e = priceError(paidService?.price ?? 0); if (e) return fail('services', e) }
-      // An expert with no published day cannot be booked at all — the single
-      // biggest hole in the funnel. It is pre-filled, so this only fires when
-      // someone deliberately unticked everything.
-      if (!form.avail.days.some(Boolean)) return fail('avail', 'აირჩიე მინიმუმ ერთი დღე — ამის გარეშე შენთან ჯავშანი შეუძლებელია.')
-      if (form.avail.endHour <= form.avail.startHour) return fail('avail', 'დასრულების საათი დაწყებაზე გვიან უნდა იყოს.')
+      // Every offering needs a NAME. It was pre-filled with „კონსულტაცია" and
+      // therefore never empty, so nothing checked it; the seeded row is blank
+      // now (see FormState.services) because naming somebody's service for them
+      // is an anchor, and a blank one must be refused rather than published.
+      { const unnamed = form.services.find(sv => !sv.free && sv.name.trim().length < 2)
+        if (unnamed) return fail('services', 'დაასახელე შენი სერვისი — ეს არის ის, რასაც კლიენტი კატალოგში დაინახავს.') }
+      // ⚠️ THE SCHEDULE IS REQUIRED ONLY IF SOMETHING CAN BE BOOKED
+      // (2026-08-20). This used to fire unconditionally, so an expert selling
+      // a JOB — „ხელშეკრულების შედგენა" — was refused registration until they
+      // published a working week for an appointment that does not exist. The
+      // reason it exists at all is unchanged and still applies to the bookable
+      // half: an expert with no published day cannot be booked, which was the
+      // single biggest hole in the funnel.
+      if (form.services.some(sv => sv.bookable)) {
+        if (!form.avail.days.some(Boolean)) return fail('avail', 'აირჩიე მინიმუმ ერთი დღე — ამის გარეშე შენთან ჯავშანი შეუძლებელია.')
+        if (form.avail.endHour <= form.avail.startHour) return fail('avail', 'დასრულების საათი დაწყებაზე გვიან უნდა იყოს.')
+      }
       return null
     }
     return null

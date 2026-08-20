@@ -1,5 +1,5 @@
 /**
- * WHAT AN EXPERT CALLS THEMSELVES — 16 spheres, 91 professions.
+ * WHAT AN EXPERT CALLS THEMSELVES — 17 spheres, 96 professions.
  *
  * The owner's list (კატეგორიები.docx, 2026-08-11), transcribed. It is the
  * SECOND level of the taxonomy and it replaced a level made of FIELD nouns
@@ -162,6 +162,41 @@ export const PROFESSIONS: Record<string, readonly string[]> = {
   'medicine': [
     'ოჯახის ექიმი',
     'პედიატრი',
+  ],
+  // ⚠️ THE THIRD FORM OF THE SAME PROMISE (owner, 2026-08-20): „მცოდნე" is
+  // whoever KNOWS, and knowing has three shapes — სწავლება gives you a SKILL,
+  // კონსულტაცია gives you an UNDERSTANDING, სერვისი gives you a RESULT.
+  // „სამივე მცოდნეა."
+  //
+  // Teaching sits in THIS file, and not with the trades, because of how it is
+  // BOUGHT: you book an hour. That makes a teacher a TutorProfile with a
+  // calendar — mechanically the same purchase as a consultation — so the sphere
+  // belongs in the expert taxonomy. (`REQUEST_KINDS` has carried `LEARNING`
+  // since the requests vertical; lib/requestTopics already groups it into
+  // school · exams · languages · higher · digital · arts · sport. That is the
+  // INTAKE vocabulary for somebody describing a need; this is the list a
+  // teacher picks from when they register. The two are not duplicates.)
+  //
+  // ⚠️ WHY „X-ის მასწავლებელი" AND NOT „რეპეტიტორი". „რეპეტიტორი" is retired in
+  // UI copy (CLAUDE.md) and 2026-08-11-open-new-spheres refused this sphere
+  // partly on that ground. The word is what was banned, not the work: these are
+  // profession NAMES, which the same canon explicitly allows („a profession NAME
+  // like „IT სპეციალისტი" is fine"), while the ROLE word on every screen stays
+  // „ექსპერტი". Nothing here calls anybody a რეპეტიტორი.
+  //
+  // ⚠️ AND THE FIVE ARE PERSON-NOUNS, which is this file's founding rule — it
+  // exists because the level above it was made of FIELD nouns („ფინანსები") and
+  // was replaced with people („ბუღალტერი"). The owner's launch list writes two
+  // of them as subjects („ეროვნული გამოცდები", „ქართული ენა და ლიტერატურა");
+  // written that way they would reintroduce exactly the mixture this file was
+  // created to remove, so they are named for the person who does the work.
+  // The SUBJECT is not lost — it is the searchable half of each name.
+  'swavleba': [
+    'ინგლისურის მასწავლებელი',
+    'მათემატიკის მასწავლებელი',
+    'ეროვნული გამოცდების მასწავლებელი',
+    'ქართული ენისა და ლიტერატურის მასწავლებელი',
+    'პროგრამირების მასწავლებელი',
   ],
 }
 

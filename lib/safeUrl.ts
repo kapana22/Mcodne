@@ -13,7 +13,7 @@
 
 // Schemes we consider safe to navigate to from a clickable link. Note the
 // deliberate exclusion of `javascript:`, `vbscript:`, `file:`, and bare
-// `data:` (only `data:image/*` is allowed, for inline image previews we render
+// `data:` (only `data:image/∗` is allowed, for inline image previews we render
 // ourselves). Relative/app-internal paths (`/...`) are allowed.
 const SAFE_HREF = /^(https?:\/\/|mailto:|tel:|data:image\/|\/)/i
 

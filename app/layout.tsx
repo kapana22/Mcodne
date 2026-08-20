@@ -25,10 +25,14 @@ export const metadata: Metadata = {
   // Do NOT remove it, or Search Console will lose verification.
   verification: { google: 'd52ikKfhRDBsgsbzX-ZfC9lE-jPW4BGVpPeNLERiVpo' },
   title: {
-    default: 'მცოდნე — ონლაინ კონსულტაცია ქართველ ექსპერტებთან',
+    // ⚠️ NOT „ონლაინ კონსულტაცია" ANY MORE (2026-08-20). That named a FORMAT,
+    // and the format is now one of the things the site sells rather than what
+    // it is. A person searching for a plumber never matched a title that
+    // promised a video call — see CLAUDE.md → THE PRODUCT MODEL.
+    default: 'მცოდნე — აღწერე რა გჭირდება, მიიღე შეთავაზებები',
     template: '%s',
   },
-  description: 'ქართული ექსპერტ-კონსულტაციის პლატფორმა — დაჯავშნე ვიდეოსესია ბიზნესის, კარიერის, იურიდიულ და ფინანსურ საკითხებზე ხელით შერჩეულ ექსპერტებთან.',
+  description: 'აღწერე რა გჭირდება და მიიღე შეთავაზებები — ბუღალტერიდან სანტექნიკოსამდე. გადამოწმებული ექსპერტები თბილისში. მოთხოვნა უფასოა.',
   manifest: '/manifest.webmanifest',
   // ⚠️ WITHOUT THIS GOOGLE SHOWS NO THUMBNAIL, whatever images the page
   // carries. The default preview budget is small; `max-image-preview: large`
@@ -69,8 +73,8 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   openGraph: {
-    title: 'მცოდნე — ონლაინ კონსულტაცია ექსპერტებთან',
-    description: 'დაჯავშნე ვიდეოკონსულტაცია ხელით შერჩეულ ქართველ ექსპერტებთან.',
+    title: 'მცოდნე — აღწერე რა გჭირდება, მიიღე შეთავაზებები',
+    description: 'ბუღალტერიდან სანტექნიკოსამდე — გადამოწმებული ექსპერტები თბილისში.',
     images: [{ url: '/og.png', width: 1200, height: 630, alt: 'მცოდნე' }],
     locale: 'ka_GE',
     type: 'website',
@@ -78,8 +82,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'მცოდნე — ონლაინ კონსულტაცია ექსპერტებთან',
-    description: 'დაჯავშნე ვიდეოკონსულტაცია ხელით შერჩეულ ქართველ ექსპერტებთან.',
+    title: 'მცოდნე — აღწერე რა გჭირდება, მიიღე შეთავაზებები',
+    description: 'ბუღალტერიდან სანტექნიკოსამდე — გადამოწმებული ექსპერტები თბილისში.',
     images: [{ url: '/og.png', width: 1200, height: 630, alt: 'მცოდნე' }],
   },
 }

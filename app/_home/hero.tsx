@@ -321,8 +321,11 @@ export const HomeHero = () => {
                       duration={520}
                       className="block font-display text-display font-bold text-ink-900 tabular-nums tracking-[-0.02em] leading-none"
                     />
-                    <span className="mt-1 block text-meta font-medium text-ink-500">
-                      <CountUp value={featured.durationMin} duration={420} className="tabular-nums" />-წუთიანი სესია
+                    {/* The suffix is a STRING now — a service („სერვისი") has no
+                        minute count, and CountUp can only animate a number. The
+                        odometer stays where there IS one; see slots → HeadlineOffer. */}
+                    <span className="mt-1 block text-meta font-medium text-ink-500 tabular-nums">
+                      {featured.priceSuffix}
                     </span>
                   </div>
                   {/* ?rebook=1 opens the booking modal on arrival, so the CTA

@@ -40,7 +40,10 @@ export type GridExpert = {
   headline: string
   price: number
   priceLabel: string
-  durationMin: number
+  /** The half-line after the price — „60-წუთიანი სესია" or „სერვისი". A job has
+   *  no clock, so this is a STRING and not a number of minutes; see
+   *  components/booking/slots → HeadlineOffer. */
+  priceSuffix: string
   photo: string
   rate: number
   reviews: number
@@ -163,7 +166,7 @@ export function ExpertGrid({ experts, loading }: { experts: GridExpert[]; loadin
           <div className="px-5 pb-5 pt-4 border-t border-ink-200 flex items-end justify-between gap-3">
             <div>
               <span className="block font-display text-h2 font-bold text-ink-900 tabular-nums tracking-tight leading-none">{e.priceLabel}</span>
-              <span className="mt-1 block text-meta text-ink-500 tabular-nums">{e.durationMin}-წუთიანი სესია</span>
+              <span className="mt-1 block text-meta text-ink-500 tabular-nums">{e.priceSuffix}</span>
             </div>
             {/* ?rebook=1 opens the booking flow on arrival, so the label is
                 honest — it books, it does not merely view. */}

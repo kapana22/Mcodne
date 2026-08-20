@@ -257,7 +257,16 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
           shows so nobody spends their 60 characters repeating them.
           maxLength 80 → HEADLINE_MAX (60), matching the profile editor — the two
           forms write the SAME column and had different ceilings. */}
-      <FormSection title="ერთი წინადადება შენზე" required fields={['headline']} sub="ზუსტად ასე გამოჩნდება შენს ბარათზე. კატეგორია და წლები ცალკე ჩანს — აქ ნუ გაიმეორებ.">
+      {/* ⚠️ „პროფილზე", NOT „ბარათზე" (2026-08-20). The sub promised this
+          sentence would appear „ზუსტად ასე … შენს ბარათზე", and the browse card
+          has not printed `headline` since 2026-07-31 — it was dropped there
+          because it is the one-line version of the bio that renders directly
+          under it (see app/experts/_card, the CATEGORY CHIP ONLY note). The
+          field is not dead: it is the lead sentence under the name on the
+          PROFILE, which is where it has the room to be read. So the promise is
+          corrected rather than the card changed — reinstating the headline on
+          the card would print the same content twice at two lengths again. */}
+      <FormSection title="ერთი წინადადება შენზე" required fields={['headline']} sub="ზუსტად ასე გამოჩნდება შენს პროფილზე, სახელის ქვეშ. კატეგორია და წლები ცალკე ჩანს — აქ ნუ გაიმეორებ.">
         <Input data-field="headline" value={form.headline} onChange={(e: any) => set({ headline: e.target.value })} placeholder="მაგ. ბრენდის სტრატეგია მცირე ბიზნესისთვის" maxLength={HEADLINE_MAX} />
         <FieldError name="headline" />
       </FormSection>
@@ -303,15 +312,16 @@ export const Step1 = ({ form, set, media, setMedia }: StepProps) => {
         <FieldError name="photo" />
       </FormSection>
 
-      <Collapsible
-        title="ვიდეოგაცნობა"
-        sub="ყველაზე ძლიერი: სანამ შეფასებები არ გაქვს, ვიდეო ყველაზე მეტად აჩენს ნდობას."
-        fields={['introVideoUrl']}
-      >
-        <Field l="YouTube-ის ბმული" sub="60 წამი საკმარისია — ვინ ხარ და რაში ეხმარები." name="introVideoUrl">
-          <Input data-field="introVideoUrl" type="url" inputMode="url" autoCapitalize="none" spellCheck={false} autoComplete="url" value={form.introVideoUrl} onChange={(e: any) => set({ introVideoUrl: e.target.value })} placeholder="https://youtu.be/…" />
-        </Field>
-      </Collapsible>
+      {/* ⚠️ THE VIDEO INTRO IS GONE (2026-08-20). It asked every applicant for
+          a YouTube link and told them it was „ყველაზე ძლიერი" — the strongest
+          trust signal they could give. Measured on the day it was removed:
+          0 of 27 profiles had one. Not „few" — none. A field nobody fills is
+          not a weak feature, it is a question that costs every applicant a
+          block of the form and returns nothing, and it belongs to the
+          video-consultation site this one stopped being.
+          The COLUMN stays (`TutorProfile.videoUrl`) — no data is destroyed —
+          and the profile still renders one if a row ever holds it. Nothing
+          collects one any more. */}
 
       {/* MOVED HERE FROM THE DELETED THIRD STEP (2026-08-07). These are the only
           two things that step actually asked for; everything else on it was
@@ -353,7 +363,10 @@ export const Step2 = ({ form, set }: StepProps) => {
     set({ services: next })
   }
   const removeService = (i: number) => set({ services: form.services.filter((_, idx) => idx !== i) })
-  const addService = () => set({ services: [...form.services, { name: '', dur: 60, price: 40, free: false, desc: '' }] })
+  const addService = () => set({ services: [...form.services, { name: '', dur: 60, price: 40, free: false, bookable: false, desc: '' }] })
+  // The schedule question is only real if something on this form can be booked.
+  // See AvailabilityPicker's mount below and the step-2 validation.
+  const anyBookable = form.services.some(sv => sv.bookable)
 
   /* THE FREE INTRO IS A SWITCH, NOT A ROW (fixed 2026-08-06, reported from a
    * phone). It used to render inside the services loop, so unticking the box
@@ -381,9 +394,11 @@ export const Step2 = ({ form, set }: StepProps) => {
         inside <PriceField>, framed as our recommendation. */}
     {/* The old sub said the expert would add further services „მოგვიანებით,
         პროფილიდან" — while a „სერვისის დამატება" button sits right below it. */}
-    <StepHeader title="რა ღირს შენი კონსულტაცია და როდის ხარ თავისუფალი?" sub="ერთი ფასიანი კონსულტაცია საკმარისია. განრიგი უკვე შევსებულია სამუშაო კვირით — შეამოწმე და გააგზავნე." />
+    <StepHeader title="რას ყიდი?" sub={anyBookable
+      ? 'ერთი ფასიანი შეთავაზება საკმარისია. განრიგი უკვე შევსებულია სამუშაო კვირით — შეამოწმე და გააგზავნე.'
+      : 'ერთი ფასიანი სერვისი საკმარისია. დანარჩენს მოგვიანებით დაამატებ.'} />
 
-    <FormSection title="შენი კონსულტაცია" sub="სახელი და აღწერა უკვე შევსებულია — შეცვალე, თუ გინდა. მთავარი გადაწყვეტილება ფასია.">
+    <FormSection title="შენი შეთავაზება" sub="სერვისი არის სამუშაო, რომელსაც ასრულებ. კონსულტაცია არის დაჯავშნილი საათი. ორივე შეგიძლია.">
       <div data-field="services" className="space-y-3">
         {form.services.map((s, i) => (
           s.free ? null : (
@@ -395,15 +410,48 @@ export const Step2 = ({ form, set }: StepProps) => {
                 17-character uppercase label with 0.14em tracking and wrapped to
                 two lines at the narrower width, which left the field floating
                 under a broken heading. */}
-            <div className="grid sm:grid-cols-[1fr_152px_auto] gap-3 items-start">
+            {/* ⚠️ THE SHAPE IS THE FIRST QUESTION ON THE ROW (2026-08-20), and
+                it changes the row under it. Same two words, same order and the
+                same default as the workspace editor (app/work/services/
+                _consultations) — an applicant meets this choice at the door and
+                finds it unchanged the first time they edit. Service first,
+                because that is what the site sells. */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {([
+                { on: false, label: 'სერვისი', hint: 'ფასი, დროის გარეშე' },
+                { on: true, label: 'კონსულტაცია', hint: 'ჯავშნადი, დროით' },
+              ] as const).map(o => {
+                const active = s.bookable === o.on
+                return (
+                  <button
+                    key={String(o.on)}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => updateService(i, { bookable: o.on, dur: o.on && s.dur < 15 ? 60 : s.dur })}
+                    className={`text-left px-3 py-2 rounded-field border transition-colors duration-fast ${
+                      active ? 'border-brand-400 bg-brand-50/60' : 'border-ink-200 bg-white hover:bg-ink-50'
+                    }`}
+                  >
+                    <span className="block font-display text-small font-semibold text-ink-900">{o.label}</span>
+                    <span className="block text-meta text-ink-500">{o.hint}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className={`grid gap-3 items-start ${s.bookable ? 'sm:grid-cols-[1fr_152px_auto]' : 'sm:grid-cols-[1fr_auto]'}`}>
               <div className="min-w-0">
-                <Input value={s.name} onChange={(e: any) => updateService(i, { name: e.target.value })} placeholder="სერვისის სახელი" className="!h-9 !text-small font-display font-bold" />
+                <Input value={s.name} onChange={(e: any) => updateService(i, { name: e.target.value })} placeholder={s.bookable ? 'მაგ. ინდივიდუალური კონსულტაცია' : 'მაგ. დეკლარაციის შევსება'} className="!h-9 !text-small font-display font-bold" />
                 <textarea value={s.desc} onChange={e => updateService(i, { desc: e.target.value })} placeholder="მოკლე აღწერა" rows={2} className="mt-2 w-full p-2 rounded-field border border-ink-200 bg-white text-meta text-ink-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none resize-none" />
               </div>
-              <div>
-                <span className="font-display text-micro font-semibold uppercase text-ink-500 block mb-1">ხანგრძლივობა · წთ</span>
-                <Input type="number" min={15} max={240} value={s.dur} onChange={(e: any) => updateService(i, { dur: Number(e.target.value) || 0 })} className="!h-9 !text-small tabular-nums font-display font-bold" />
-              </div>
+              {/* A service has no clock — the column is ABSENT, not greyed out.
+                  A disabled box still asks a question, and the answer to this
+                  one does not exist. */}
+              {s.bookable && (
+                <div>
+                  <span className="font-display text-micro font-semibold uppercase text-ink-500 block mb-1">ხანგრძლივობა · წთ</span>
+                  <Input type="number" min={15} max={240} value={s.dur} onChange={(e: any) => updateService(i, { dur: Number(e.target.value) || 0 })} className="!h-9 !text-small tabular-nums font-display font-bold" />
+                </div>
+              )}
               {/* Removing the ONLY paid service leaves the form unsubmittable
                   („add at least one paid service") — so don't offer the action. */}
               {form.services.filter(x => !x.free).length > 1 ? (
@@ -452,7 +500,17 @@ export const Step2 = ({ form, set }: StepProps) => {
       <FieldError name="services" />
     </FormSection>
 
-    <AvailabilityPicker form={form} set={set} />
+    {/* ⚠️ THE CALENDAR IS NOT PART OF REGISTERING (2026-08-20) unless something
+        on this form can actually be booked. It used to be unconditional, and
+        step 2 refused to submit without a published day — so a lawyer selling
+        „ხელშეკრულების შედგენა" had to declare a working week for a job that has
+        no appointment. Owner: „აქამდე ექსპერტებზე მორგებული იყო, ვინც
+        კონსულტაციას ატარებს — შესაცვლელია."
+        It is not deferred to „after approval" either: that was the 46% hole
+        this picker was built to close. It appears the moment the applicant
+        chooses a bookable offering, on the screen where they are already
+        deciding when they work. */}
+    {anyBookable && <AvailabilityPicker form={form} set={set} />}
 
     {/* Was: „დამტკიცების შემდეგ პირველი საქმე თავისუფალი დროის გამოქვეყნებაა".
         That sentence described the failure it caused — 46% of booking attempts
@@ -461,7 +519,9 @@ export const Step2 = ({ form, set }: StepProps) => {
         where they are already deciding when they work. */}
     <div className="flex items-start gap-2.5 p-4 rounded-card bg-brand-50/50 border border-brand-200">
       <Icon.bolt className="w-4 h-4 text-brand-700 mt-0.5 shrink-0" />
-      <p className="text-meta text-ink-700 leading-[1.55]">დამტკიცებისთანავე ეს დრო გამოქვეყნდება და დაჯავშნა შესაძლებელი გახდება. განრიგს ნებისმიერ დროს შეცვლი — დღეს ან საათს ერთი შეხებით ამოიღებ.</p>
+      <p className="text-meta text-ink-700 leading-[1.55]">{anyBookable
+        ? 'დამტკიცებისთანავე ეს დრო გამოქვეყნდება და დაჯავშნა შესაძლებელი გახდება. განრიგს ნებისმიერ დროს შეცვლი — დღეს ან საათს ერთი შეხებით ამოიღებ.'
+        : 'დამტკიცებისთანავე შენი სერვისები გამოქვეყნდება და მოთხოვნები დაგიწყებს მოსვლას. ჯავშნადი კონსულტაციას ნებისმიერ დროს დაამატებ — განრიგს მაშინ შეავსებ.'}</p>
     </div>
   </>
   )
@@ -564,11 +624,25 @@ export const LivePreview = ({ step, form, media }: { step: StepId; form: FormSta
   // but it must render nothing rather than the placeholders „ქალაქი · გამოცდილება",
   // which promised a card detail the applicant never entered.
   const meta = [form.city.trim(), form.yearsExp ? `${form.yearsExp} წლის გამოცდილება` : ''].filter(Boolean).join(' · ')
-  const displayHeadline = form.headline.trim() || 'შენი პროფესია აქ გამოჩნდება'
   const primaryCat = form.cats[0] || 'კატეგორია'
   const bio = form.motivation.trim() || form.headline.trim() || 'აქ გამოჩნდება შენი მოკლე აღწერა.'
-  const paidService = form.services.find(s => !s.free && s.price > 0)
-  const price = paidService?.price ?? 0
+  /* WHAT THE CARD WILL ADVERTISE — the same rule the live card runs
+     (components/booking/slots → primaryPriceLabel): the FLOOR of whichever
+     shape leads, and a SERVICE leads when they publish one. Resolved here from
+     the form rather than imported, because these rows are not `Consultation`
+     rows yet — but the RULE has to match, or this preview goes back to being
+     the thing it was built to stop being.
+     ⚠️ IT USED TO PRINT „₾N / სესია" UNCONDITIONALLY, off the FIRST paid row,
+     and the form now defaults to a service (_form.tsx: `bookable: false`) — so
+     the preview called every applicant's job an hour, and with two rows it
+     quoted whichever they happened to type first. */
+  const paidRows = form.services.filter(s => !s.free && s.price > 0)
+  const jobs = paidRows.filter(s => !s.bookable)
+  const leading = jobs.length ? jobs : paidRows.filter(s => s.bookable)
+  const floor = leading.length ? leading.reduce((b, s) => (s.price < b.price ? s : b), leading[0]) : null
+  const price = floor?.price ?? 0
+  const priceIsFrom = leading.some(s => s.price !== price)
+  const priceSuffix = floor ? (floor.bookable ? `${floor.dur} წთ` : 'სერვისი') : ''
   return (
   <aside className="hidden xl:block w-[320px] shrink-0 p-6 border-l border-ink-200 bg-white sticky top-20 self-start xl:h-[836px] overflow-y-auto">
     {/* Was an eyebrow („წინასწარი ხედი") plus a heading („ასე დაინახავენ
@@ -610,7 +684,6 @@ export const LivePreview = ({ step, form, media }: { step: StepId; form: FormSta
                 canon besides). */}
             <span className="font-display text-body-lg font-bold text-ink-900 tracking-tight truncate">{displayName}</span>
           </div>
-          <div className="mt-0.5 text-meta text-ink-700 leading-[1.35] line-clamp-2">{displayHeadline}</div>
           {meta && <div className="mt-0.5 text-meta text-ink-400 truncate">{meta}</div>}
         </div>
 
@@ -628,7 +701,7 @@ export const LivePreview = ({ step, form, media }: { step: StepId; form: FormSta
               (the ₾80 pre-fill was an anchor half the roster accepted), and a
               preview advertising ₾0 would read as a free session. */}
           {price > 0
-            ? <span className="font-display text-body-lg font-bold text-ink-900 tabular-nums">₾{price}<span className="text-meta font-medium text-ink-500"> / სესია</span></span>
+            ? <span className="font-display text-body-lg font-bold text-ink-900 tabular-nums">₾{price}{priceIsFrom ? '-დან' : ''}<span className="text-meta font-medium text-ink-500"> · {priceSuffix}</span></span>
             : <span className="font-display text-body-lg font-bold text-ink-400">ფასი — შენ ადგენ</span>}
         </div>
         <div aria-hidden className="mt-3 w-full h-9 rounded-btn bg-brand-600 text-white font-display font-semibold text-meta tracking-wide inline-flex items-center justify-center gap-1.5 select-none cursor-default shadow-xs" title="ნიმუში — ასე გამოიყურება ჯავშნის ღილაკი"><Icon.cal className="w-3.5 h-3.5" /> დაჯავშნე (ნიმუში)</div>

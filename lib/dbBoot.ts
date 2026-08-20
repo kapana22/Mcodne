@@ -200,7 +200,7 @@ async function runMigrations() {
   `)
 
   // Message — stamp for the delayed "unread message" reminder email. Set once a
-  // thread's outstanding unread burst has been reminded, so the */15 cron emails
+  // thread's outstanding unread burst has been reminded, so the ∗/15 cron emails
   // a missed message at most once per unread streak (reset when the recipient
   // opens the thread and readAt is stamped). See lib/messageReminders.
   await prisma.$executeRawUnsafe(`
@@ -548,6 +548,45 @@ async function runMigrations() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Message_toId_createdAt_idx" ON "Message"("toId", "createdAt");`)
   // Every expert profile view loads that expert's consultation offerings.
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Consultation_tutorId_idx" ON "Consultation"("tutorId");`)
+
+  // ServiceProfile.priceList / MasterApplication.priceList — a price per
+  // service the provider already picked, `{ topicId: lari }` (2026-08-20).
+  // Additive and nullable: every existing row keeps meaning „ask", which is
+  // what it meant before the column existed.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ServiceProfile" ADD COLUMN IF NOT EXISTS "priceList" JSONB;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "MasterApplication" ADD COLUMN IF NOT EXISTS "priceList" JSONB;`)
+
+  // ── CreditEntry: the provider's balance, as a ledger (2026-08-20) ───────
+  //
+  // Created empty on every deployment. The balance is the SUM of these rows —
+  // there is no counter column anywhere, deliberately (see the model's note).
+  //
+  // ⚠️ THE UNIQUE INDEX IS THE IDEMPOTENCY. `(userId, grantKey)` refuses a
+  // second „photo is worth 15₾" row however many times the profile is saved,
+  // and — because Postgres treats NULLs as distinct — leaves spends, which
+  // repeat by nature, entirely unconstrained. That one line is the whole
+  // mechanism; do not add a second table to do it.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "CreditEntry" (
+      "id"          TEXT PRIMARY KEY,
+      "userId"      TEXT NOT NULL REFERENCES "User"("id") ON DELETE CASCADE,
+      "amountTetri" INTEGER NOT NULL,
+      "reason"      TEXT NOT NULL,
+      "grantKey"    TEXT,
+      "refId"       TEXT,
+      "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "CreditEntry_userId_grantKey_key" ON "CreditEntry"("userId", "grantKey");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "CreditEntry_userId_createdAt_idx" ON "CreditEntry"("userId", "createdAt");`)
+
+  // Consultation.bookable — the column that lets an expert sell a JOB and not
+  // only an hour (2026-08-20). Additive with a default, so every existing row
+  // keeps meaning exactly what it meant: a bookable consultation.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Consultation"
+      ADD COLUMN IF NOT EXISTS "bookable" BOOLEAN NOT NULL DEFAULT true;
+  `)
 
   // ── B2B: companies with a prepaid balance (2026-08-11) ─────────────────
   //

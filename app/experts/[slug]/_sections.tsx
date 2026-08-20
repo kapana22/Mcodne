@@ -3,6 +3,7 @@
 // certificates, education, experience.
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { safeHttpUrl } from '@/lib/safeUrl'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
@@ -72,10 +73,18 @@ export const AboutSection = ({ tutor }: { tutor: TutorDetail | null }) => {
    ConsultationItem type comes from components/booking/slots (shared with the
    booking flow's tier step). Each card's „აირჩიე“ opens the shared flow with
    that tier preselected (DESIGN_FIX_PROMPT 1.2). */
-export const ServicesSection = ({ consultations, onBook }: { consultations: ConsultationItem[]; onBook: (s: ConsultationItem) => void }) => {
+export const ServicesSection = ({ consultations, onBook, requestHref = null }: { consultations: ConsultationItem[]; onBook: (s: ConsultationItem) => void; requestHref?: string | null }) => {
   if (!consultations || consultations.length === 0) return null
-  // Shared ordering: flagship (longest PAID) first, free intro last. Raw payload
-  // order could lead with a free 15-min tier, which reads as the main offer.
+  // ⚠️ TWO LISTS, SERVICES FIRST (2026-08-20). `orderedTiers` keeps only rows
+  // with a real duration, so before today a SERVICE row („დეკლარაციის შევსება —
+  // 100₾", minutes 0) was silently dropped from the one page that exists to
+  // show what somebody sells. Both are drawn now, and the ORDER is the
+  // product's: the site sells services, and a consultation is what you can do
+  // before committing to one. See Consultation.bookable.
+  const jobs = consultations.filter(c => c.bookable === false)
+  // Shared ordering for the bookable half: flagship (longest PAID) first, free
+  // intro last. Raw payload order could lead with a free 15-min tier, which
+  // reads as the main offer.
   const tiers = orderedTiers(consultations)
   return (
     <section id="services" className="mt-14 lg:mt-16 pt-10 border-t border-ink-100 scroll-mt-24">
@@ -84,9 +93,39 @@ export const ServicesSection = ({ consultations, onBook }: { consultations: Cons
           <Eyebrow className="mb-3">სერვისები</Eyebrow>
           <h2 className="font-display text-h2 lg:text-h1 font-bold tracking-[-0.022em] text-ink-900 leading-tight">როგორ დაგეხმარები</h2>
         </div>
-        <span className="text-meta text-ink-500 font-display tabular-nums">{consultations.length} სერვისი · ფიქსირებული ფასი</span>
+        <span className="text-meta text-ink-500 font-display tabular-nums">
+          {jobs.length + tiers.length} სერვისი · ფიქსირებული ფასი
+        </span>
       </div>
 
+      {/* THE JOBS. No number badge, no „წუთი" — a service is not measured in
+          time, and printing „0 წუთი" is exactly the lie this list was added to
+          stop telling. The action opens the request thread rather than a
+          calendar; when the subsystem is off there is no button at all and the
+          hero's own CTA carries it. */}
+      {jobs.length > 0 && (
+        <div className="mt-7 grid sm:grid-cols-2 gap-3">
+          {jobs.map(s => (
+            <article key={s.id} className="rounded-card border border-ink-200 bg-white p-5 hover:border-ink-300 hover-lift flex flex-col">
+              <h3 className="font-display text-body-lg font-bold text-ink-900 tracking-tight leading-tight">{s.title}</h3>
+              {s.description && <p className="text-small text-ink-600 mt-2 leading-[1.55] flex-1">{s.description}</p>}
+              <div className="mt-4 pt-4 border-t border-ink-100 flex items-center justify-between gap-3">
+                <div className="font-display text-h3 font-bold text-ink-900 tabular-nums leading-none">₾{s.price}</div>
+                {requestHref && (
+                  <Link href={requestHref} className="h-11 px-4 rounded-btn bg-brand-50 hover:bg-brand-600 hover:text-white border border-brand-200 hover:border-brand-600 text-brand-700 font-display font-semibold text-meta tracking-wide inline-flex items-center gap-1 transition-colors duration-fast">
+                    დაკვეთა
+                  </Link>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {/* THE BOOKABLE HALF — an hour with a time on it. Second, deliberately. */}
+      {tiers.length > 0 && jobs.length > 0 && (
+        <p className="mt-8 text-meta text-ink-500">ან ჯერ ისაუბრეთ:</p>
+      )}
       <div className="mt-7 grid sm:grid-cols-2 gap-3">
         {tiers.map((s, i) => (
           <article key={s.id} className="rounded-card border border-ink-200 bg-white p-5 hover:border-ink-300 hover-lift flex flex-col">

@@ -98,6 +98,48 @@ export type CatalogItem = {
 }
 
 /**
+ * WHAT SOMEBODY OFFERS — read off the OFFERS, never off which table they sit in.
+ *
+ * ⚠️ THIS USED TO BE `consult !== null ? CONSULT : WORK` AND THAT IS NOW WRONG
+ * (2026-08-20). It was right for one day: on 2026-08-19 the two shapes lived in
+ * two tables, so holding a `TutorProfile` WAS holding CONSULT. Then
+ * `Consultation.bookable` landed (schema.prisma) and an expert could publish a
+ * JOB — „დეკლარაციის შევსება — ₾100", no clock, arranged in the thread — as a
+ * row on their own profile. Under the old rule that person was labelled
+ * CONSULT, the „სამუშაო" filter could not find them, and the type rail counted
+ * them on the wrong side: the ONE structural thing standing between the site's
+ * services half and the people who actually sell services.
+ *
+ * So: CONSULT means „at least one row you can book a time on"; WORK means „at
+ * least one row you buy without one" — a service row on the expert side, a
+ * `ServiceProfile` on the job side, or both. `bookable` absent reads as true,
+ * which is what every row written before 2026-08-20 is.
+ *
+ * The fallback exists because `kinds` is documented as never empty and a person
+ * with no rows at all would otherwise produce `[]`. It cannot be reached
+ * through the catalogue (`lib/tutorsQuery → PUBLIC_TUTOR` requires
+ * `consultations: { some: {} }`), only through a fixture, and answering with
+ * the table is exactly the old rule — correct precisely when there is nothing
+ * better to read.
+ */
+export function kindsOf(consult: Tutor | null, work: MasterRow | null): Capability[] {
+  const rows = consult?.consultations ?? []
+  // ⚠️ NO ROWS = NO SIGNAL, so that side falls back to its TABLE — the rule as
+  // it stood before this function existed, which is correct exactly when there
+  // is nothing better to read. It is reachable: `app/experts/_data → mapTutorRow`
+  // already defends against a cached payload that predates the tier select, and
+  // an expert whose tiers went missing must not be silently relabelled a
+  // service-seller. A tutor with genuinely zero rows cannot be listed at all
+  // (lib/tutorsQuery → PUBLIC_TUTOR requires `consultations: { some: {} }`).
+  const canConsult = consult !== null && (rows.length === 0 || rows.some(r => r.bookable !== false))
+  const canWork = work !== null || rows.some(r => r.bookable === false)
+  const kinds = CAPABILITIES.filter(c => (c === 'CONSULT' ? canConsult : canWork))
+  // `kinds` is documented as never empty; only a row with neither side could
+  // reach this, and `toCatalogItems` cannot build one.
+  return kinds.length ? kinds : CAPABILITIES.filter(c => (c === 'CONSULT' ? consult : work) !== null)
+}
+
+/**
  * THE PERSON, NOT THE ROW.
  *
  * A `TutorProfile` and a `ServiceProfile` for one human share nothing but
@@ -147,7 +189,7 @@ export function toCatalogItems(tutors: Tutor[], masters: MasterRow[]): CatalogIt
     const { consult, work } = byKey.get(key)!
     return {
       key,
-      kinds: CAPABILITIES.filter(c => (c === 'CONSULT' ? consult : work) !== null),
+      kinds: kindsOf(consult, work),
       name: consult?.name ?? work?.name ?? '',
       consult,
       work,

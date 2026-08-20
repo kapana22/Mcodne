@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Btn } from '@/components/Btn'
 import {
-  ServiceRequestInput, KIND, kindOf, TIMING, FORMATS, CITIES,
+  ServiceRequestInput, KIND, kindOf, TIMING, FORMATS, CITIES, ONE_CITY,
   extrasFor, topicLabel, kindsOfTopic, OTHER_TOPIC,
   PICK_MODES, PICK_MODE_OPTION, VERTICAL_COPY,
   type RequestKindName, type Vertical,
@@ -327,10 +327,14 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
     // „press 2" mean something different on 94 of 171 topics. The clarifiers
     // answer by tap, which names its own question.
     : step.id === 'timing' ? [...TIMING[kind]]
+    // ⚠️ THE CITY FOLLOW-UP IS SKIPPED WHILE THERE IS ONE CITY (2026-08-20).
+    // With a single row the reveal is a list that answers itself, and the
+    // number keys would point at it instead of at the format rows the person
+    // is actually reading. See CITIES in lib/requestTopics.
     : step.id === 'format'
-      ? (draft.format === 'IN_PERSON'
+      ? (draft.format === 'IN_PERSON' && !ONE_CITY
           ? [...CITIES]
-          : FORMATS.map(f => f.id === 'IN_PERSON' ? { ...f, hint: 'ქალაქს შემდეგ იკითხავს' } : f))
+          : FORMATS.map(f => f.id === 'IN_PERSON' ? (ONE_CITY ? f : { ...f, hint: 'ქალაქს შემდეგ იკითხავს' }) : f))
     // The service run's place screen. Same list the format screen reveals after
     // „ადგილზე", except here it is the whole question rather than a follow-up —
     // see _model → stepsFor.
@@ -691,14 +695,15 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
         )}
         {step.id === 'format' && (
           <StepPick
-            options={FORMATS.map(f => f.id === 'IN_PERSON'
+            options={FORMATS.map(f => f.id === 'IN_PERSON' && !ONE_CITY
               ? { id: f.id, label: f.label, hint: 'ქალაქს შემდეგ იკითხავს' }
               : f)}
             value={draft.format}
             onPick={pickOption}
             // Numbered only while it IS the live question — once „ადგილზე" is
-            // chosen the numbers belong to the city list below.
-            numbered={draft.format !== 'IN_PERSON'}
+            // chosen the numbers belong to the city list below. With one city
+            // there is no list below, so it stays the live question throughout.
+            numbered={ONE_CITY || draft.format !== 'IN_PERSON'}
           />
         )}
         {/* The service run asks the city on its own screen — one list, one
@@ -713,7 +718,7 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
         {step.id === 'mode' && (
           <StepPick options={options} value={draft.pickMode} onPick={pickOption} numbered />
         )}
-        {step.id === 'format' && draft.format === 'IN_PERSON' && (
+        {step.id === 'format' && draft.format === 'IN_PERSON' && !ONE_CITY && (
           <div className="mt-5">
             <p className="text-small font-display font-semibold text-ink-800 mb-2.5">რომელ ქალაქში?</p>
             <StepPick options={options} value={draft.city} onPick={pickOption} numbered />

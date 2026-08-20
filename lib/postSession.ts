@@ -11,7 +11,7 @@ import { tbilisiParts } from '@/lib/tz'
 
 // Post-session follow-up for the CLIENT: a few hours after a session the expert
 // closed as COMPLETED, nudge the client to review it — and, in the SAME message,
-// invite them to book that expert again. Rides the */15 cleanup cron like the
+// invite them to book that expert again. Rides the ∗/15 cleanup cron like the
 // other reminder sweeps.
 //
 // ONE message, not two. The review nudge and the rebook prompt share the exact

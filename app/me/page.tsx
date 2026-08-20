@@ -14,7 +14,7 @@ import { SavedStrip } from './_saved'
 import { MyRequestsSection } from './_requests'
 import { SessionsPanel } from './_sessions'
 import { OnboardingTour, Welcome } from './_welcome'
-import { primaryPriceLabel, TUTOR_DEFAULTS } from '@/components/booking/slots'
+import { primaryPriceLabel, offerPriceLabel, TUTOR_DEFAULTS } from '@/components/booking/slots'
 
 /* ───── Page ───── */
 /* ───── Dashboard "home" section — wraps the original main content ───── */
@@ -133,11 +133,11 @@ export default function Dashboard() {
         avatar: f.tutor?.user?.avatarUrl ?? null,
         // Real category or nothing — see app/experts/_data.tsx.
         cat: f.tutor?.category?.name ?? '',
-        priceLabel: primaryPriceLabel(
+        priceLabel: offerPriceLabel(primaryPriceLabel(
           Array.isArray(f.tutor?.consultations) ? f.tutor.consultations : [],
           f.tutor?.price ?? 0,
           f.tutor?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin,
-        ).label,
+        )),
         rating: f.tutor?.rating ?? 0,
       })))
       setFavState('ready')

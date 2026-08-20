@@ -27,7 +27,7 @@
 
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
-import { serviceLabels, areaLabels, priceHint, sanitizeStored, countCovering } from '@/lib/serviceProfile'
+import { serviceLabels, areaLabels, priceHint, pricedServices, sanitizeStored, countCovering } from '@/lib/serviceProfile'
 
 /**
  * THE DOOR, WRITTEN ONCE — the same address app/experts/_masterData states,
@@ -103,6 +103,12 @@ export type MasterProfile = {
   areas: string[]
   /** „გამოძახება 30₾ · სამუშაო 50₾-დან", or null when they quote per job. */
   price: string | null
+  /** ⚠️ THE CENTRE OF THIS PAGE (2026-08-20) — „ბინის დალაგება — 60₾", one row
+   *  per service the provider priced. A profile that lists what somebody sells,
+   *  with the price beside it, is the single thing this catalogue has that the
+   *  trades sites it competes with do not: theirs list services with no prices
+   *  at all. Empty is normal — „ask" is an honest answer. */
+  priced: { id: string; label: string; price: number }[]
   about: string | null
   /** The photo ROUTE, never the image. Null = no servable photo. */
   photoSrc: string | null
@@ -137,7 +143,7 @@ export const getMasterProfile = cache(async (id: string): Promise<MasterProfile 
     const row = await prisma.serviceProfile.findFirst({
       where: { id, ...VISIBLE },
       select: {
-        id: true, slug: true, services: true, areas: true, calloutFee: true, priceFrom: true,
+        id: true, slug: true, services: true, areas: true, calloutFee: true, priceFrom: true, priceList: true,
         about: true, updatedAt: true,
         // The provider identity the reviews join on — never rendered.
         userId: true, companyId: true,
@@ -200,6 +206,9 @@ export const getMasterProfile = cache(async (id: string): Promise<MasterProfile 
       services: serviceLabels(clean.services),
       areas: areaLabels(clean.areas),
       price: priceHint(row),
+      // Read through the TICKS, never listed from the map — see pricedServices
+      // for why the order of those two operations is the guard.
+      priced: pricedServices({ services: clean.services, priceList: row.priceList }),
       about: row.about?.trim() || null,
       photoSrc: hasPhoto ? `/api/masters/${row.id}/photo?v=${v}` : null,
       workPhotoSrcs: idx.map(n => `/api/masters/${row.id}/photo?n=${n}&v=${v}`),

@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { FavoritesClient } from './client'
 import { Container } from '@/components/Container'
 import { PageHeader } from '@/components/PageHeader'
-import { primaryPriceLabel, primaryService, TUTOR_DEFAULTS } from '@/components/booking/slots'
+import { primaryPriceLabel, offerPriceLabel, TUTOR_DEFAULTS } from '@/components/booking/slots'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,9 +63,9 @@ export default async function StudentFavoritesPage() {
       specialty: f.tutor.category?.name ?? f.tutor.specialty ?? '',
       rating: f.tutor.rating,
       reviews: f.tutor.reviewsCount,
-      price: primaryService(f.tutor.consultations ?? [])?.price ?? f.tutor.price,
-      priceLabel: flagship.label,
-      durationMin: flagship.minutes,
+      price: flagship.price,
+      priceLabel: offerPriceLabel(flagship),
+      priceSuffix: flagship.suffix,
     }
   })
 

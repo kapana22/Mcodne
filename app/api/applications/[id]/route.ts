@@ -330,17 +330,32 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           const existing = await tx.consultation.count({ where: { tutorId: profile.id } })
           if (existing === 0) {
             const rows = services
-              .filter((s: any) => s && typeof s.name === 'string' && s.name.trim() && Number.isFinite(Number(s.dur)))
+              // ⚠️ A SERVICE HAS NO `dur`, SO IT MAY NOT BE REQUIRED HERE
+              // (2026-08-20). This filter demanded a finite duration on every
+              // row, which was true while the form could only collect hours —
+              // and would have silently DROPPED every service an applicant
+              // registered with, publishing an approved expert with an empty
+              // profile and no error anywhere. A name is the only thing every
+              // shape must have.
+              .filter((s: any) => s && typeof s.name === 'string' && s.name.trim())
               .slice(0, 10)
               .map((s: any) => {
-                const minutes = Math.min(240, Math.max(5, Math.round(Number(s.dur))))
+                // Absent reads as bookable: an application written before the
+                // flag existed carries hours, and that is what they are.
+                const bookable = s.bookable !== false
+                const minutes = bookable
+                  ? Math.min(240, Math.max(5, Math.round(Number(s.dur) || 60)))
+                  : 0
                 const title = String(s.name).trim().slice(0, 80)
                 return {
                   tutorId: profile.id,
-                  tier: tierForMinutes(minutes),
+                  // The tier is derived from minutes and means nothing for a
+                  // service; it keeps its default rather than inventing one.
+                  tier: tierForMinutes(bookable ? minutes : 60),
                   title,
                   description: (String(s.desc ?? '').trim() || title).slice(0, 400),
                   minutes,
+                  bookable,
                   price: Math.min(10000, Math.max(0, Math.round(Number(s.price) || 0))),
                 }
               })

@@ -36,9 +36,15 @@ import type { TutorProfile } from '@/app/work/(expert)/profile/_types'
 // The QUICK/STANDARD/DEEP tier is a backend enum — never surfaced to the
 // expert. It is derived from the chosen minutes at submit time.
 type ConsultTier = 'QUICK' | 'STANDARD' | 'DEEP'
-type Consultation = { id: string; tier: ConsultTier; title: string; description: string; minutes: number; price: number }
-type ConsForm = { title: string; description: string; minutes: number; price: number }
-type ConsEdit = { id: string; title: string; description: string; minutes: number; price: number }
+// ⚠️ TWO SHAPES, ONE LIST (2026-08-20) — see Consultation.bookable in
+// schema.prisma. `bookable: false` is a JOB: a name, a price, and no clock. It
+// exists because until today the only thing an expert could publish was an
+// hour, so „დეკლარაციის შევსება — 100₾" had to be invented as a 60-minute
+// session on a calendar, and the whole expert half of the catalogue sold
+// nothing but time.
+type Consultation = { id: string; tier: ConsultTier; title: string; description: string; minutes: number; price: number; bookable: boolean }
+type ConsForm = { title: string; description: string; minutes: number; price: number; bookable: boolean }
+type ConsEdit = { id: string; title: string; description: string; minutes: number; price: number; bookable: boolean }
 
 const tierFromMinutes = (m: number): ConsultTier => (m <= 20 ? 'QUICK' : m <= 45 ? 'STANDARD' : 'DEEP')
 
@@ -46,7 +52,7 @@ export function ConsultationsSection() {
   const [profile, setProfile] = useState<TutorProfile>(null)
   const [loading, setLoading] = useState(true)
   const [consultations, setConsultations] = useState<Consultation[]>([])
-  const [consForm, setConsForm] = useState<ConsForm>({ title: '', description: '', minutes: 60, price: 80 })
+  const [consForm, setConsForm] = useState<ConsForm>({ title: '', description: '', minutes: 60, price: 80, bookable: true })
   const [consBusy, setConsBusy] = useState(false)
   const [consErr, setConsErr] = useState<string | null>(null)
   // Inline edit of a single existing service row. `consEdit` holds the id +
@@ -93,7 +99,7 @@ export function ConsultationsSection() {
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) { setConsErr(j?.message || 'ვერ დაემატა'); return }
       setConsultations(prev => [...prev, j.item])
-      setConsForm({ title: '', description: '', minutes: 60, price: 80 })
+      setConsForm({ title: '', description: '', minutes: 60, price: 80, bookable: true })
       toast('სერვისი დაემატა', 'success')
     } catch { setConsErr('ქსელის შეცდომა') }
     finally { setConsBusy(false) }
@@ -101,7 +107,7 @@ export function ConsultationsSection() {
 
   const startEditConsultation = (c: Consultation) => {
     setConsEditErr(null)
-    setConsEdit({ id: c.id, title: c.title, description: c.description, minutes: c.minutes, price: c.price })
+    setConsEdit({ id: c.id, title: c.title, description: c.description, minutes: c.minutes, price: c.price, bookable: c.bookable })
   }
   const cancelEditConsultation = () => { setConsEdit(null); setConsEditErr(null) }
 
@@ -185,14 +191,45 @@ export function ConsultationsSection() {
                   <Field label="აღწერა">
                     <textarea rows={2} required maxLength={400} value={consEdit.description}
                               onChange={e => setConsEdit({ ...consEdit, description: e.target.value })}
-                              placeholder="რას მოიცავს სესია"
+                              placeholder={consForm.bookable ? 'რას მოიცავს სესია' : 'რას მოიცავს სამუშაო'}
                               className="w-full px-3 py-2 rounded-field border border-ink-200 bg-white text-small focus:border-brand-400 focus:outline-none resize-y" />
                   </Field>
-                  <Field label="ხანგრძლივობა (წუთი)">
-                    <input type="number" inputMode="numeric" required min={5} max={240} value={consEdit.minutes}
-                           onChange={e => setConsEdit({ ...consEdit, minutes: Number(e.target.value) })}
-                           className="w-full sm:max-w-[200px] h-11 px-3 rounded-field border border-ink-200 bg-white text-body tabular-nums focus:border-brand-400 focus:outline-none" />
+                  {/* The shape can be changed after the fact — an expert who
+                      published „კონსულტაცია 60წთ" because it was the only thing
+                      the form offered can turn it into the service it always
+                      was. The API clears the leftover minutes; see the PATCH
+                      handler's pairing rule. */}
+                  <Field label="რა ტიპისაა?">
+                    <div className="grid grid-cols-2 gap-2">
+                      {([
+                        { on: false, label: 'სერვისი', hint: 'ფასი, დროის გარეშე' },
+                        { on: true, label: 'კონსულტაცია', hint: 'ჯავშნადი, დროით' },
+                      ] as const).map(o => {
+                        const active = consEdit.bookable === o.on
+                        return (
+                          <button
+                            key={String(o.on)}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => setConsEdit({ ...consEdit, bookable: o.on, minutes: o.on && consEdit.minutes < 5 ? 60 : consEdit.minutes })}
+                            className={`text-left px-3 py-2.5 rounded-field border transition-colors duration-fast ${
+                              active ? 'border-brand-400 bg-brand-50/60' : 'border-ink-200 bg-white hover:bg-ink-50'
+                            }`}
+                          >
+                            <span className="block font-display text-small font-semibold text-ink-900">{o.label}</span>
+                            <span className="block text-meta text-ink-500">{o.hint}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
                   </Field>
+                  {consEdit.bookable && (
+                    <Field label="ხანგრძლივობა (წუთი)">
+                      <input type="number" inputMode="numeric" required min={5} max={240} value={consEdit.minutes}
+                             onChange={e => setConsEdit({ ...consEdit, minutes: Number(e.target.value) })}
+                             className="w-full sm:max-w-[200px] h-11 px-3 rounded-field border border-ink-200 bg-white text-body tabular-nums focus:border-brand-400 focus:outline-none" />
+                    </Field>
+                  )}
                   {/* Same price control as /apply — this editor previously
                       had no guidance and no earnings preview at all. */}
                   <PriceField
@@ -212,7 +249,12 @@ export function ConsultationsSection() {
                 </form>
               ) : (
               <div key={c.id} className="flex items-start gap-3 p-3 rounded-card border border-ink-200 bg-ink-50/40">
-                <span className="shrink-0 inline-flex items-center h-6 px-2 rounded-pill border border-ink-200 bg-ink-75 text-ink-700 font-display text-micro font-bold uppercase tabular-nums">{c.minutes} წთ</span>
+                {/* The badge answers „what is this?" — for a bookable row the
+                    length IS the answer („60 წთ"), for a service there is no
+                    length and the word is. */}
+                <span className="shrink-0 inline-flex items-center h-6 px-2 rounded-pill border border-ink-200 bg-ink-75 text-ink-700 font-display text-micro font-bold uppercase tabular-nums">
+                  {c.bookable ? `${c.minutes} წთ` : 'სერვისი'}
+                </span>
                 <div className="flex-1 min-w-0">
                   <div className="font-display text-body font-bold text-ink-900 truncate">{c.title}</div>
                   <div className="text-meta text-ink-700 leading-snug mt-0.5">{c.description}</div>
@@ -229,23 +271,58 @@ export function ConsultationsSection() {
         </div>
 
         <form onSubmit={addConsultation} className="pt-3 border-t border-ink-100 space-y-3">
+          {/* ⚠️ THE SHAPE IS THE FIRST QUESTION, and it changes the form under
+              it. Everything an expert could publish before today was an hour on
+              a calendar; „რას ვყიდი?" now has two honest answers and this is
+              where they diverge. Two buttons rather than a checkbox, because a
+              checkbox has a default that reads as the normal case and neither
+              of these is more normal than the other. */}
+          <Field label="რა ტიპისაა?">
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { on: false, label: 'სერვისი', hint: 'ფასი, დროის გარეშე' },
+                { on: true, label: 'კონსულტაცია', hint: 'ჯავშნადი, დროით' },
+              ] as const).map(o => {
+                const active = consForm.bookable === o.on
+                return (
+                  <button
+                    key={String(o.on)}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setConsForm({ ...consForm, bookable: o.on })}
+                    className={`text-left px-3 py-2.5 rounded-field border transition-colors duration-fast ${
+                      active ? 'border-brand-400 bg-brand-50/60' : 'border-ink-200 bg-white hover:bg-ink-50'
+                    }`}
+                  >
+                    <span className="block font-display text-small font-semibold text-ink-900">{o.label}</span>
+                    <span className="block text-meta text-ink-500">{o.hint}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
           <Field label="სათაური">
             <input type="text" required maxLength={80} value={consForm.title}
                    onChange={e => setConsForm({ ...consForm, title: e.target.value })}
-                   placeholder="მაგ. ინდივიდუალური კონსულტაცია"
+                   placeholder={consForm.bookable ? 'მაგ. ინდივიდუალური კონსულტაცია' : 'მაგ. დეკლარაციის შევსება'}
                    className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body focus:border-brand-400 focus:outline-none" />
           </Field>
           <Field label="აღწერა">
             <textarea rows={2} required maxLength={400} value={consForm.description}
                       onChange={e => setConsForm({ ...consForm, description: e.target.value })}
-                      placeholder="რას მოიცავს სესია"
+                      placeholder={consForm.bookable ? 'რას მოიცავს სესია' : 'რას მოიცავს სამუშაო'}
                       className="w-full px-3 py-2 rounded-field border border-ink-200 bg-white text-small focus:border-brand-400 focus:outline-none resize-y" />
           </Field>
-          <Field label="ხანგრძლივობა (წუთი)">
-            <input type="number" inputMode="numeric" required min={5} max={240} value={consForm.minutes}
-                   onChange={e => setConsForm({ ...consForm, minutes: Number(e.target.value) })}
-                   className="w-full sm:max-w-[200px] h-11 px-3 rounded-field border border-ink-200 bg-white text-body tabular-nums focus:border-brand-400 focus:outline-none" />
-          </Field>
+          {/* A service has no clock — the field is not disabled, it is ABSENT.
+              A greyed-out box still asks a question, and the answer to this one
+              does not exist. See Consultation.bookable. */}
+          {consForm.bookable && (
+            <Field label="ხანგრძლივობა (წუთი)">
+              <input type="number" inputMode="numeric" required min={5} max={240} value={consForm.minutes}
+                     onChange={e => setConsForm({ ...consForm, minutes: Number(e.target.value) })}
+                     className="w-full sm:max-w-[200px] h-11 px-3 rounded-field border border-ink-200 bg-white text-body tabular-nums focus:border-brand-400 focus:outline-none" />
+            </Field>
+          )}
           <PriceField
             className="pt-3 border-t border-ink-100"
             value={consForm.price}

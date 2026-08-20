@@ -117,9 +117,14 @@ test('one booking, one set of words on both screens', () => {
   // so the word is pinned where the site still says it: the home section's
   // eyebrow (SiteText default) and the catalogue's filter loading line.
   assert.match(codeOf('lib/siteTextDefs.ts'), /key: 'home\.categories\.eyebrow'[^\n]*default: 'კატეგორიები'/)
-  // The catalogue's own line moved from the hero to the filter rail when the
-  // refinements did (2026-08-19) — the hero no longer filters.
-  assert.match(codeOf('app/experts/_filters.tsx'), /კატეგორიები/)
+  // ⚠️ THE RAIL STOPPED SAYING „კატეგორია" (2026-08-20), and that is the change
+  // rather than a regression: it names the two things the site sells —
+  // „პროფესიული სერვისები" and „ყოველდღიური სერვისები" — in the site's own
+  // order, professional first. „კატეგორია" was the word for a shelf when there
+  // were two catalogues to tell apart. What must never come back is „სფეროები",
+  // which the loop below still guards.
+  assert.match(codeOf('app/experts/_filters.tsx'), /პროფესიული სერვისები/)
+  assert.match(codeOf('app/experts/_filters.tsx'), /ყოველდღიური სერვისები/)
   for (const f of ['components/PublicTopBar.tsx', 'lib/siteTextDefs.ts', 'app/experts/_hero.tsx', 'app/experts/_filters.tsx']) {
     assert.doesNotMatch(codeOf(f), /სფეროები/, `${f} says „სფეროები"`)
   }

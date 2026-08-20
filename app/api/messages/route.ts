@@ -15,7 +15,7 @@ import { bookingInboxRow, inboxUnreadTotal, offerInboxRows, sortInboxRows } from
 
 // New-message email is NOT sent inline here anymore. Emailing the instant a
 // message arrives pings people who are actively reading in-app. Instead, the
-// */15 cleanup cron runs lib/messageReminders → a message that's still unread
+// ∗/15 cleanup cron runs lib/messageReminders → a message that's still unread
 // after ~30 min gets ONE reminder email. See lib/messageReminders.
 
 // POST accepts EITHER a booking-scoped message ({ bookingId }) OR a pre-booking
@@ -30,7 +30,7 @@ const Body = z.object({
   // NOTE: zod's `.url()` accepts `javascript:` and `data:text/html` — both are
   // valid URLs per WHATWG — so it does NOT stop a stored-XSS payload from being
   // saved and later rendered as a clickable <a href>. The scheme is re-checked
-  // with `safeStoredFileUrl` below (only http(s)/data:image/* and base64
+  // with `safeStoredFileUrl` below (only http(s)/data:image/∗ and base64
   // data:application/pdf pass — the exact forms /api/uploads emits); the render
   // side runs the same guard as defense in depth.
   // Attachments come from /api/uploads already downscaled (1600px jpeg) — a
@@ -586,7 +586,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
   // Reject attachment URLs whose scheme could execute on the recipient's click
-  // (javascript:, data:text/html, …). Only http(s) links, inline data:image/*
+  // (javascript:, data:text/html, …). Only http(s) links, inline data:image/∗
   // previews and base64 data:application/pdf files (both of which /api/uploads
   // accepts) are allowed. Absent fileUrl is fine (text-only msg).
   let safeFileUrl: string | undefined

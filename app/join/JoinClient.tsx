@@ -25,9 +25,19 @@ import { useSpheres } from './_expert/_steps'
 import { MasterApplyClient } from './_master/client'
 
 /** The signup tiles' own words (app/signin/_signup.tsx), one per capability. */
+/**
+ * ⚠️ BOTH TILES NAME AN OFFER, NEVER A PERSON (2026-08-20).
+ *
+ * It read „ვარ ექსპერტი" beside „ვთავაზობ სერვისს" — one tile answering „who
+ * am I", the other „what do I offer", side by side on the same screen. That is
+ * the framing the product model retired with „ხელოსანი": the type belongs to
+ * what somebody OFFERS, never to what kind of person they are (CLAUDE.md →
+ * THE HIERARCHY, rule 5). The second line under each is the capability's own
+ * label and is unchanged.
+ */
 const TILE: Record<Capability, { t: string; s: string }> = {
-  CONSULT: { t: 'ვარ ექსპერტი', s: CAPABILITY_LABEL.CONSULT },
-  WORK: { t: 'ვთავაზობ სერვისს', s: CAPABILITY_LABEL.WORK },
+  WORK: { t: 'ვასრულებ სერვისს', s: CAPABILITY_LABEL.WORK },
+  CONSULT: { t: 'ვატარებ კონსულტაციას', s: CAPABILITY_LABEL.CONSULT },
 }
 
 const JOIN_KEY = 'mcodne:join'

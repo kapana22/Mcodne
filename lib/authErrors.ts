@@ -12,7 +12,7 @@
 // It now emits `?error=suspended` like everything else, so the page has one
 // param to read and this file has one map to answer from.
 //
-// Pure data (no React, no next/*, no prisma) so it can be imported by both the
+// Pure data (no React, no next/∗, no prisma) so it can be imported by both the
 // client page and tests/authErrors.test.ts. That test greps the callback route
 // for the codes it can actually emit and asserts each one has copy here —
 // a MISSING entry is the exact bug this file fixes, so a missing entry is

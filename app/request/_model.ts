@@ -27,7 +27,7 @@
 
 import {
   ServiceRequestInput, bandOf, TIMING, isTopicOfKind, kindsOfTopic, extrasFor,
-  KIND, kindOf, REQUEST_KINDS, PICK_MODE_OPTION, UNSTATED,
+  KIND, kindOf, REQUEST_KINDS, PICK_MODE_OPTION, UNSTATED, ONE_CITY,
   // The label vocabulary, for the transcript — see answerLabel. Imported rather
   // than re-derived so a renamed band or city renames in the conversation too.
   topicLabel, budgetLabel, timingLabel, formatLabel, cityLabel,
@@ -353,7 +353,13 @@ export function stepsFor(d: Draft): StepDef[] {
   // (The finer-grained district this really wants is the address work, and it
   // is deliberately not here yet — see the services model. City is the honest
   // amount of place we can route on today.)
-  if (kind === 'SERVICE') out.push({ id: 'city', title: 'რომელ ქალაქში?' })
+  // ⚠️ NOT ASKED WHILE THERE IS ONE CITY (2026-08-20). Exactly the rule the
+  // line below already applies to „ონლაინ თუ ადგილზე" for a service: a screen
+  // whose list holds a single row is the wizard performing a choice nobody
+  // has. `city` keeps its honest default (TBILISI, set in EMPTY_DRAFT), so the
+  // row is written with the same value the screen would have collected. Serve
+  // a second city and the screen returns by itself — see CITIES.
+  if (kind === 'SERVICE' && !ONE_CITY) out.push({ id: 'city', title: 'რომელ ქალაქში?' })
   else out.push({ id: 'format', title: 'ონლაინ თუ ადგილზე?' })
   // Free text LAST among the questions and OPTIONAL — the reference decision.
   // The structured taps above already carry a quotable request, and the

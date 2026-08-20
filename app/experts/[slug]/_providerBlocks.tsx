@@ -22,6 +22,42 @@ const Section = ({ id, title, children }: { id: string; title: string; children:
   </section>
 )
 
+/**
+ * WHAT THEY SELL, WITH THE PRICE BESIDE IT.
+ *
+ * ⚠️ THIS IS THE PAGE'S CENTRE, AND UNTIL 2026-08-20 IT DID NOT EXIST. The
+ * provider profile drew a name, a chip, a city, a paragraph and two empty
+ * boxes — nothing on it said what the person actually does for money. The
+ * competing trades sites in this market list their services as a bulleted
+ * column with no prices at all; listing them WITH prices is the one thing this
+ * catalogue can do that they cannot, and it comes for free from the model:
+ * a provider prices the services they ticked (ServiceProfile.priceList).
+ *
+ * Drawn FIRST among the blocks, above „შესახებ", because a paragraph about
+ * somebody is context and this is the offer.
+ *
+ * Renders nothing when nothing is priced — „ask" is an honest way to work, and
+ * an empty „ფასები" heading over a blank box is worse than no section at all.
+ */
+export function PricedServicesBlock({ p }: { p: MasterProfile }) {
+  if (p.priced.length === 0) return null
+  return (
+    <Section id="services" title="სერვისები და ფასები">
+      <ul className="divide-y divide-ink-100 border-t border-ink-100 max-w-[640px]">
+        {p.priced.map(s => (
+          <li key={s.id} className="flex items-baseline justify-between gap-4 py-3">
+            <span className="min-w-0 text-body text-ink-900">{s.label}</span>
+            <span className="shrink-0 font-display text-h3 font-bold text-ink-900 tabular-nums leading-none">{s.price}₾</span>
+          </li>
+        ))}
+      </ul>
+      {/* Said once, under the list, rather than „-დან" beside every number:
+          a column of „60₾-დან · 40₾-დან" reads as hedging. */}
+      <p className="mt-3 text-meta text-ink-500 max-w-[640px]">საორიენტაციო ფასია — ზუსტს შენს მოთხოვნაზე შემოგთავაზებს.</p>
+    </Section>
+  )
+}
+
 export function AboutBlock({ p }: { p: MasterProfile }) {
   if (!p.about) return null
   const paragraphs = p.about.split(/\n\n+/).filter(t => t.trim())
@@ -76,11 +112,18 @@ export function ProviderStars({ n, className = 'w-3.5 h-3.5' }: { n: number; cla
 }
 
 export function ReviewsBlock({ p }: { p: MasterProfile }) {
+  // ⚠️ NOTHING RATHER THAN „ჯერ არ არის შეფასება" (2026-08-20). Measured that
+  // day: 0 reviews on the whole site. So every profile drew a heading, a
+  // bordered box and an icon to announce an absence — three elements saying
+  // „unfinished" on a page whose only job is to make somebody trustworthy. An
+  // empty state earns its place when the reader could FILL it (a filter that
+  // matched nobody, an inbox they can write in); nobody can review a provider
+  // they have not hired, so this one only apologises.
+  // The section returns the moment there is one, and the anchor below survives
+  // for the profile's own section nav.
+  if (p.reviews.length === 0) return null
   return (
     <Section id="reviews" title="შეფასებები">
-      {p.reviews.length === 0 ? (
-        <EmptyState icon={<Icon.quote className="w-6 h-6" />} title="ჯერ არ არის შეფასება" />
-      ) : (
         <ul className="divide-y divide-ink-100">
           {p.reviews.map(r => (
             <li key={r.id} className="py-4 first:pt-0">
@@ -97,7 +140,6 @@ export function ReviewsBlock({ p }: { p: MasterProfile }) {
             </li>
           ))}
         </ul>
-      )}
     </Section>
   )
 }

@@ -177,6 +177,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         areas: app.areas,
         calloutFee: app.calloutFee,
         priceFrom: app.priceFrom,
+        // ⚠️ CARRIED, for the same reason the photo is. The applicant priced
+        // their services on the form; a profile created without them is a card
+        // that says „ask" about work whose price was already given, and nobody
+        // would ever find out — the number simply would not be there.
+        priceList: app.priceList ?? {},
         // ⚠️ THE PHOTO AND THE SENTENCE ARE CARRIED, and forgetting this is the
         // whole reason /services read as a directory of nobody: the application
         // collected a face, approval created a profile without one, and the

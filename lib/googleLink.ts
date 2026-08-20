@@ -30,7 +30,7 @@
 // time they tried the Google button — which is why it is pinned by a test rather
 // than left as a condition someone can „simplify" later.
 //
-// Pure: no prisma, no next/*, no crypto. The callback route does the writing;
+// Pure: no prisma, no next/∗, no crypto. The callback route does the writing;
 // this only decides, where tests/googleLink.test.ts can pin it.
 
 export type ExistingAccount = {

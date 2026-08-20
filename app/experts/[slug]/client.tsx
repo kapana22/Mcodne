@@ -27,7 +27,7 @@ import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
 import { mapTutorPayload } from '@/components/booking/mapTutorPayload'
 import { InlineAvailability } from '@/components/booking/InlineAvailability'
-import { TUTOR_DEFAULTS, primaryPriceLabel, primaryServiceMin, type ConsultationItem } from '@/components/booking/slots'
+import { TUTOR_DEFAULTS, primaryPriceLabel, offerPriceLabel, primaryServiceMin, type ConsultationItem } from '@/components/booking/slots'
 import { AuthPromptSheet, MobileBookingBar, SlotsState, StickyBookingCard } from './_booking'
 import { Breadcrumb, VideoHero } from './_hero'
 import { Reviews } from './_reviews'
@@ -589,11 +589,16 @@ function ExpertProfile({ initialTutor, initialUser, masterHref, requestHref }: {
   // Starts are DERIVED from it (windows − bookings − length), never read off a
   // pre-sliced row's `booked` flag.
   const previewMin = primaryServiceMin(tutorData?.consultations ?? [], tutorData?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin)
-  // The headline price shared by the rail + mobile bar. It reads off the SAME
-  // flagship tier `previewMin` above is derived from, so the price and the times
-  // beside it now describe one service. It used to be `fromPriceLabel`, i.e. the
-  // CHEAPEST tier — the rail said „₾25-დან" while the browse card said „₾80" and
-  // the service list said both. See primaryPriceLabel in slots.ts.
+  // The headline price shared by the rail + mobile bar, and the SAME resolver
+  // the browse card reads — which is the whole point: the rail once said
+  // „₾25-დან" while the card said „₾80" and the service list said both.
+  // ⚠️ IT IS THE FLOOR AGAIN AS OF 2026-08-20, and this time so is the card, so
+  // the two still agree. The July fix aligned both on the flagship; „-დან" was
+  // then welded onto that number on the card, which made it a false claim on 10
+  // of 24 live profiles. See primaryPriceLabel in slots.ts for the measurements.
+  // `previewMin` stays the FLAGSHIP length on purpose — it drives the slot
+  // preview, i.e. what the booking flow will pre-select, which is a different
+  // question from what the profile advertises.
   const headlinePrice = primaryPriceLabel(
     tutorData?.consultations ?? [],
     tutorData?.price ?? TUTOR_DEFAULTS.price,
@@ -651,7 +656,7 @@ function ExpertProfile({ initialTutor, initialUser, masterHref, requestHref }: {
                 with that tier preselected — the flow enumerates by the tier's
                 minutes, restates ITS price and sends consultationId (the
                 server books the Consultation row's authoritative values). */}
-            <ServicesSection consultations={tutorData?.consultations ?? []} onBook={openServiceBooking} />
+            <ServicesSection consultations={tutorData?.consultations ?? []} onBook={openServiceBooking} requestHref={requestHref} />
             {/* Inline availability (1.6) — the shared flow's calendar/slot
                 view rendered in-page, viewer-local tz. Tapping a time opens
                 the booking Sheet with the slot preselected. Hidden while the
@@ -699,7 +704,7 @@ function ExpertProfile({ initialTutor, initialUser, masterHref, requestHref }: {
                       busySlots={tutorData?.busySlots ?? []}
                       sessionMin={previewMin}
                       bufferMin={bufferMin}
-                      priceLabel={headlinePrice.label}
+                      priceLabel={offerPriceLabel(headlinePrice)}
                       tutorName={tutorData?.user?.fullName ?? TUTOR_DEFAULTS.name}
                       tutorId={tutorData?.id}
                       consultations={tutorData?.consultations ?? []}
@@ -788,7 +793,7 @@ function ExpertProfile({ initialTutor, initialUser, masterHref, requestHref }: {
       <MobileBookingBar
               canProposeCategory={isAbroadProfile}
         onBook={openPaid}
-        priceLabel={headlinePrice.label}
+        priceLabel={offerPriceLabel(headlinePrice)}
         sessionMin={previewMin}
         bufferMin={bufferMin}
         signedIn={signedIn}

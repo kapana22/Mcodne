@@ -8,7 +8,7 @@ import { ROLE } from '@/lib/roles'
 // Re-verify the session on every request for this segment (matching the
 // force-dynamic child routes), so /me can never be served from a cached
 // render that outlived the session. The persistent workspace shell (sidebar +
-// top bar) wraps every /me/* page — pages render only their content.
+// top bar) wraps every /me/∗ page — pages render only their content.
 export const dynamic = 'force-dynamic'
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {

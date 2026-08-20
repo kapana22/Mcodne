@@ -9,13 +9,13 @@ import { isBookingLive } from '@/lib/bookingLive'
 import { subtractIntervals } from '@/lib/availability'
 import { fmtKaDate, KA_WEEKDAYS_LONG } from '@/lib/kaDate'
 import { PageHeader } from '@/components/PageHeader'
-import { AlertsStack } from '../_components/AlertsStack'
-import { PendingRequests } from '../_components/PendingRequests'
-import { ProfileSignal } from '../_components/ProfileSignal'
-import { SnapshotRow } from '../_components/SnapshotRow'
-import { TodayHero } from '../_components/TodayHero'
-import { MonthSchedule, type ScheduleLesson } from '../_components/MonthSchedule'
-import type { DashBooking } from '../_components/types'
+import { AlertsStack } from './AlertsStack'
+import { PendingRequests } from './PendingRequests'
+import { ProfileSignal } from './ProfileSignal'
+import { SnapshotRow } from './SnapshotRow'
+import { TodayHero } from './TodayHero'
+import { MonthSchedule, type ScheduleLesson } from './MonthSchedule'
+import type { DashBooking } from './types'
 
 // Auth redirect helper — preserves the return URL so the user lands back
 // on this page after signing in.
@@ -34,7 +34,22 @@ const fmtGreeting = () => {
   return 'საღამო მშვიდობისა'
 }
 
-export default function TutorHome() {
+/**
+ * THE SESSIONS HALF OF THE WORKSPACE HOME.
+ *
+ * ⚠️ THIS WAS `/work` ITSELF UNTIL 2026-08-20, and that is the change. Today's
+ * session, the month's calendar and „how many free minutes have you published"
+ * were the frame around every provider's day — on a site with 0 active
+ * bookings, 6050 published slots, and a request flow opened almost twice as
+ * often as the booking flow. It also meant a WORK-only provider had no home at
+ * all: the page sat inside the (expert) route group and redirected them into
+ * the queue.
+ *
+ * It is now a BLOCK, rendered under the day board and only for somebody who
+ * actually takes bookings. Nothing inside it changed — it is a move, not a
+ * rewrite; see app/work/page.tsx for what replaced it as the frame.
+ */
+export function SessionDashboard() {
   const { toast } = useToast()
   const [me, setMe] = useState<Me>(null)
   const [bookings, setBookings] = useState<DashBooking[] | null>(null)
@@ -188,19 +203,17 @@ export default function TutorHome() {
 
   return (
     <div>
-      {/* Greeting — sign-out lives in the UserMenu now. Canonical PageHeader
-          block; the date line rides the eyebrow slot (nbsp reserves the line
-          pre-mount so the header doesn't jump when the client clock lands). */}
-      <PageHeader
-        className="mb-6 motion-safe:animate-rise-in"
-        eyebrow={clientNow ? `${KA_WEEKDAYS_LONG[clientNow.getDay()]}, ${fmtKaDate(clientNow, { month: 'long' })}` : ' '}
-        title={`${clientNow ? fmtGreeting() : 'გამარჯობა'}${me?.fullName ? `, ${me.fullName.split(' ')[0]}` : ''}`}
-        sub={todaySessions.length > 0
-          ? `${todaySessions.length} სესია დღეს${pending.length > 0 ? ` · ${pending.length} მოთხოვნა ელოდება` : ''}`
-          : pending.length > 0
-          ? `${pending.length} მოთხოვნა ელოდება`
-          : 'დღეს სესია არ გაქვს'}
-      />
+      {/* ⚠️ NO PAGE HEADER HERE ANY MORE (2026-08-20). This block used to BE the
+          page, so it greeted the person and dated the day; it is one section
+          under the day board now, and a second „გამარჯობა, გიორგი" inside a
+          page that already greeted them reads as two pages stacked. The heading
+          below names the section instead. */}
+      <div className="flex items-baseline justify-between gap-4 flex-wrap mb-4">
+        <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight">სესიები</h2>
+        <span className="text-meta text-ink-500">
+          {clientNow ? `${KA_WEEKDAYS_LONG[clientNow.getDay()]}, ${fmtKaDate(clientNow, { month: 'long' })}` : ' '}
+        </span>
+      </div>
 
       <AlertsStack bookings={bookings ?? []} upcomingSlots={bookable} />
 

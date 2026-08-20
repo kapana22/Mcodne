@@ -72,7 +72,7 @@ import ExpertProfilePage from './client'
 import { ProfessionLanding, professionMetadata } from './_profession'
 import { resolveMaster, getMasterProfile, masterPath, countMastersCovering } from './_providerData'
 import { ProviderBreadcrumb, ProviderHero } from './_providerHero'
-import { AboutBlock, WorkBlock, ReviewsBlock } from './_providerBlocks'
+import { PricedServicesBlock, AboutBlock, WorkBlock, ReviewsBlock } from './_providerBlocks'
 import { ProviderCta } from './_providerCta'
 import { TradeLanding, tradeLabel } from './_tradeLanding'
 
@@ -178,7 +178,10 @@ const getTutorInitial = cache(async (id: string) => {
       }),
       prisma.consultation.findMany({
         where: { tutorId: id },
-        select: { id: true, tier: true, title: true, description: true, minutes: true, price: true },
+        // `bookable` decides which of the two lists a row lands in on the
+        // profile — without it every service renders as a bookable hour. See
+        // Consultation.bookable.
+        select: { id: true, tier: true, title: true, description: true, minutes: true, price: true, bookable: true },
       }),
       // Education / experience / reviews are seeded server-side too.
       //
@@ -647,6 +650,9 @@ async function providerProfile(provider: { id: string; slug: string | null }) {
             )}
 
             <div className="min-w-0 lg:col-start-1">
+              {/* The offer before the paragraph about the person — see
+                  PricedServicesBlock for why it leads. */}
+              <PricedServicesBlock p={p} />
               <AboutBlock p={p} />
               <WorkBlock p={p} />
               <ReviewsBlock p={p} />

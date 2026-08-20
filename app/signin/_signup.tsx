@@ -60,7 +60,9 @@ type SignupRole = 'learn' | 'teach' | 'serve'
 // the provider side and shows the trades pitch); it is simply no longer a tile.
 const SIGNUP_TILES = [
   { v: 'learn' as const, t: 'ვეძებ ექსპერტს', s: 'კლიენტი' },
-  { v: 'teach' as const, t: 'ვთავაზობ',       s: 'კონსულტაცია ან სერვისი' },
+  // ⚠️ SERVICE FIRST — CLAUDE.md → THE HIERARCHY, rule 4. Read the sentence
+  // back and check which half arrives first; this one had it backwards.
+  { v: 'teach' as const, t: 'ვთავაზობ',       s: 'სერვისი ან კონსულტაცია' },
 ]
 
 const RoleSwitch = ({ role, setRole }: { role: SignupRole; setRole: (r: SignupRole) => void }) => (

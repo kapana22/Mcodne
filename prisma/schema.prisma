@@ -145,6 +145,7 @@ model User {
   receivedMessages  Message[]            @relation("ReceivedMessages")
   reviewsGiven      Review[]             @relation("ReviewsGiven")
   favorites         Favorite[]
+  creditEntries     CreditEntry[]
   notifications     Notification[]
   sessions          Session[]
   otpCodes          OtpCode[]
@@ -274,6 +275,51 @@ model Post {
 // keys (with labels, defaults, grouping) lives in code at lib/siteTextDefs; a
 // row here overrides the code default. Missing row → the default is used, so
 // the site works with an empty table. Created via dbBoot inline DDL.
+/// THE PROVIDER'S BALANCE, AS A LEDGER (2026-08-20).
+///
+/// ⚠️ EVERY MOVEMENT IS A ROW; THE BALANCE IS THEIR SUM. There is deliberately
+/// no mutable counter to „fix" — „რატომ მაქვს 40₾?" must be answerable by
+/// reading rows, and a number that can be edited without a reason is a number
+/// nobody trusts. Owner: „ეს რეალურად 100₾ ტოლფასი მივცეთ… და არა რაღაც
+/// უაზრო ტოკენები."
+///
+/// ⚠️ TETRI, NEVER LARI, AND NEVER A FLOAT. `amountTetri` is a signed integer:
+/// positive is granted, negative is spent. Money in a float is how a balance
+/// ends up at 39.999999.
+///
+/// ⚠️ IT IS NOT CASH AND THE COPY MAY NEVER SAY IT IS. The balance buys ONE
+/// thing — sending an offer. It cannot be withdrawn, transferred or refunded,
+/// which is exactly why it is safe to denominate in lari at a stage where
+/// `PAYMENTS_LIVE` is false: nothing here is a payment, a purchase or a
+/// liability. See lib/credits.ts for the wording that must hold.
+model CreditEntry {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Signed. Grants are positive, spends negative.
+  amountTetri Int
+  /// Why this row exists — a `CreditReason` from lib/credits, stored as text so
+  /// adding one is an edit to an array and never a migration (the same choice
+  /// the budget bands and the request timings already made).
+  reason String
+
+  /// ⚠️ THE IDEMPOTENCY KEY FOR A ONE-OFF GRANT, and NULL for everything else.
+  /// „a photo is worth 15₾" must pay once however many times the profile is
+  /// saved, so a grant carries a key and the unique index refuses the second
+  /// row. Postgres treats NULLs as distinct in a unique index, so spends — which
+  /// repeat by nature — are unconstrained by the same index. That is the whole
+  /// mechanism; do not add a second table for it.
+  grantKey String?
+  /// What was bought, when something was: the RequestOffer id.
+  refId String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, grantKey])
+  @@index([userId, createdAt])
+}
+
 model SiteText {
   key       String   @id
   value     String
@@ -457,6 +503,25 @@ model Consultation {
   description String
   minutes     Int
   price       Int
+  /// ⚠️ THE TABLE HOLDS TWO SHAPES SINCE 2026-08-20, and this column is the
+  /// difference. Both are SERVICES — the product model has always said so —
+  /// but only one is bought by picking a time:
+  ///
+  ///   bookable = true   „კონსულტაცია 60წთ — 80₾"   a slot on a calendar
+  ///   bookable = false  „დეკლარაციის შევსება — 100₾" a job, arranged in the thread
+  ///
+  /// It exists because an accountant could not publish the second one at all.
+  /// Every row on this table required `minutes`, so selling „draft my contract"
+  /// meant inventing a duration for it and putting it on a booking calendar —
+  /// and the whole expert side of the catalogue therefore sold nothing but
+  /// hours. The site says it sells services; this is the column that lets the
+  /// expert half actually do it.
+  ///
+  /// `minutes` STAYS REQUIRED and is 0 on a service row. Forty-four call sites
+  /// read it; making it nullable would have touched every one of them for a
+  /// value none of them needs when `bookable` is false. Anything that offers a
+  /// TIME must filter on this column — see lib/bookableConsultations.
+  bookable    Boolean          @default(true)
   tutor       TutorProfile     @relation(fields: [tutorId], references: [id], onDelete: Cascade)
   bookings    Booking[]
 
@@ -1731,6 +1796,8 @@ model MasterApplication {
   /// the price depends on what is behind the wall.
   calloutFee Int?
   priceFrom  Int?
+  /// The same `{ topicId: lari }` map — see ServiceProfile.priceList.
+  priceList      Json?
 
   /// The face, or the logo when kind = COMPANY. One image, 512×512 webp data
   /// URI, produced by /api/uploads?kind=avatar.
@@ -1897,6 +1964,25 @@ model ServiceProfile {
   calloutFee Int?
   /// „50₾-დან" — the same, for the work itself.
   priceFrom  Int?
+  /// ⚠️ A PRICE PER SERVICE THEY ALREADY PICKED (2026-08-20) — `{ topicId: lari }`.
+  ///
+  /// The provider's price used to be two numbers for the whole person:
+  /// `calloutFee` („გამოძახება 30₾") and `priceFrom` („სამუშაო 50₾-დან"). Those
+  /// say what a VISIT costs and nothing about what a JOB costs, so a catalogue
+  /// built to sell services could not print „ბინის დალაგება — 60₾" — the one
+  /// sentence a client is actually shopping for.
+  ///
+  /// ⚠️ KEYED BY TOPIC ID, WHICH IS WHY IT IS A MAP AND NOT A TABLE. The names
+  /// are not free text: they are the very rows the provider ticked in
+  /// `services[]`, so there is nothing extra to type and nothing to keep in
+  /// sync. A key that is no longer in `services` is stale by construction and
+  /// is ignored on read (lib/serviceProfile → pricedServices); a separate table
+  /// would have to re-state the name and could then disagree with the tick.
+  ///
+  /// Lari, integer, like `priceFrom` beside it. Partial by design: pricing one
+  /// service and leaving the rest blank is a normal way to work, and the card
+  /// says „ფასს შემოგთავაზებს" for anything unpriced.
+  priceList  Json?
 
   /// THE FACE ON THE CARD — or the logo, when this profile belongs to a company.
   ///

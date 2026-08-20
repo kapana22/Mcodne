@@ -90,7 +90,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   // An SVG is a document: it can carry <script>, and this route serves it from
   // mcodne.ge's own origin. A provider who uploads one has stored executable
   // code that runs with our origin's cookies the moment anybody opens the URL.
-  // „image/*" is not a safety check — it is a MIME prefix, and SVG satisfies it.
+  // „image/∗" is not a safety check — it is a MIME prefix, and SVG satisfies it.
   //
   // /api/uploads already refuses SVG on the way in (it sniffs magic bytes and
   // re-encodes through sharp), so nothing legitimate reaches this branch. It is

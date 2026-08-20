@@ -38,7 +38,13 @@ const vocabulary = () => ({
   groups: LIVE_SERVICE_GROUPS.map(g => ({
     id: g.id,
     label: g.label,
-    topics: g.topics.map(t => ({ id: t.id, label: t.label })),
+    // ⚠️ `alt` TRAVELS TOO (2026-08-20). The application's service search
+    // matches on it, and those are the words people actually type —
+    // „დამლაგებელი" for „ბინის დალაგება", „სანტექნიკოსი" for the plumbing
+    // rows. A search that only knew our printed labels would fail exactly the
+    // applicant it is for: the one who names their trade in their own words.
+    // Small strings, already public in the client-side intake's own catalogue.
+    topics: g.topics.map(t => ({ id: t.id, label: t.label, alt: t.alt ?? [] })),
   })),
   cities: CITIES.map(c => ({ id: c.id, label: c.label })),
 })
@@ -128,6 +134,9 @@ export async function POST(req: Request) {
     yearsExp: d.yearsExp,
     calloutFee: d.calloutFee,
     priceFrom: d.priceFrom,
+    // Already validated to hold only ticked services and positive integers —
+    // see MasterApplicationInput's two rules for priceList.
+    priceList: d.priceList,
     photoUrl: d.photoUrl,
     workPhotos: d.workPhotos,
   }

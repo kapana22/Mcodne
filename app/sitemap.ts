@@ -64,8 +64,8 @@ const STATIC_ROUTES: Array<{
   //
   //   /signin, /signup   noindex (their layouts set it).
   //   /ask               retired 2026-08-19 — the middleware 308s it to /experts.
-  //   /categories/*      retired 2026-08-19 (stage 8) — 308 to /experts?category=.
-  //   /konsultacia/*     moved 2026-08-19 (stage 8) — 308 to /experts/<slug>.
+  //   /categories/∗      retired 2026-08-19 (stage 8) — 308 to /experts?category=.
+  //   /konsultacia/∗     moved 2026-08-19 (stage 8) — 308 to /experts/<slug>.
   //   /tutors /masters   the catalogue's two old addresses — 308 to /experts
   //   /services          (stage 10, 2026-08-19), and since stage 11 the whole
   //   /services/<x>      prefix with them: a provider profile and a trade
@@ -171,7 +171,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     postEntries = []
   }
 
-  // ⚠️ NO CATEGORY ENTRIES (stage 8, 2026-08-19). /categories/* was retired
+  // ⚠️ NO CATEGORY ENTRIES (stage 8, 2026-08-19). /categories/∗ was retired
   // and 308s to /experts?category=<slug>; a filtered catalogue view
   // canonicalises to /experts, which is already listed. Submitting the redirect
   // sources would be submitting URLs that answer 308.

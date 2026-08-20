@@ -4,11 +4,17 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { ROLE } from '@/lib/roles'
 
+// ⚠️ `minutes` FLOOR IS 0 HERE, NOT 5 — see Consultation.bookable. A service
+// row carries no clock, so an edit that keeps it a service must be allowed to
+// send 0. The pairing rule (bookable ⇒ a real duration) is enforced below,
+// against the row's CURRENT shape as well as the incoming one, because a PATCH
+// may flip the flag without resending the minutes.
 const UpdateBody = z.object({
   title: z.string().min(2).max(80).optional(),
   description: z.string().min(2).max(400).optional(),
-  minutes: z.number().int().min(5).max(240).optional(),
+  minutes: z.number().int().min(0).max(240).optional(),
   price: z.number().int().min(0).max(10000).optional(),
+  bookable: z.boolean().optional(),
 })
 
 // Ownership check helper — returns the consultation only if it belongs to the
@@ -35,7 +41,25 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const parsed = UpdateBody.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
-  const updated = await prisma.consultation.update({ where: { id }, data: parsed.data })
+  // ⚠️ THE PAIRING RULE, CHECKED AGAINST THE MERGED ROW. A PATCH may send the
+  // flag without the minutes („make this a service") or the minutes without the
+  // flag („make it 45 minutes"), so neither half of the body can be judged
+  // alone. Resolve what the row WILL be, then apply the one invariant:
+  // bookable ⇒ a real duration, service ⇒ no clock at all.
+  const willBook = parsed.data.bookable ?? c.bookable
+  const willMins = parsed.data.minutes ?? c.minutes
+  if (willBook && willMins < 5) {
+    return NextResponse.json(
+      { ok: false, error: 'INVALID', message: 'ჯავშნად სერვისს ხანგრძლივობა სჭირდება' },
+      { status: 400 },
+    )
+  }
+  // A service keeps no leftover duration from the shape it used to be — the
+  // profile prints „60 წთ" from this column and would announce a session that
+  // is not on offer.
+  const data = willBook ? parsed.data : { ...parsed.data, minutes: 0 }
+
+  const updated = await prisma.consultation.update({ where: { id }, data })
   return NextResponse.json({ ok: true, item: updated })
 }
 

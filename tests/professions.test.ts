@@ -17,8 +17,8 @@ import {
 } from '../lib/professions'
 
 test('the shape of the list the owner supplied', () => {
-  assert.equal(Object.keys(PROFESSIONS).length, 16, '16 spheres')
-  assert.equal(ALL_PROFESSIONS.length, 91, '91 professions')
+  assert.equal(Object.keys(PROFESSIONS).length, 17, '17 spheres')
+  assert.equal(ALL_PROFESSIONS.length, 96, '96 professions')
   // Every sphere has at least two — one profession is not a category, it is
   // the sphere under another name.
   for (const [slug, jobs] of Object.entries(PROFESSIONS)) {

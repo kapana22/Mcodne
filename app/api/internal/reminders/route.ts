@@ -5,7 +5,7 @@ import { cronAuth } from '@/lib/cronAuth'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Standalone session-reminder trigger. The reminder logic also rides the */15
+// Standalone session-reminder trigger. The reminder logic also rides the ∗/15
 // cleanup cron (see /api/internal/cleanup), so this endpoint is mainly for a
 // dedicated cron or manual runs. Gated by lib/cronAuth with CLEANUP_SECRET.
 //

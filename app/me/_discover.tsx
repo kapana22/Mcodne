@@ -9,7 +9,7 @@ import { Icon } from '@/components/Icon'
 import { EmptyState } from '@/components/EmptyState'
 import { VerifiedMark } from '@/components/Avatar'
 import { displayHeadline } from '@/lib/headline'
-import { primaryPriceLabel, TUTOR_DEFAULTS } from '@/components/booking/slots'
+import { primaryPriceLabel, offerPriceLabel, TUTOR_DEFAULTS } from '@/components/booking/slots'
 import { DiscoverTutor } from './_model'
 
 export const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
@@ -45,11 +45,11 @@ export const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => 
           // FLAGSHIP price, via the shared helper — the raw profile `price` is
           // not a service anyone can buy, and printing it here made one expert
           // read ₾60 on this dashboard and ₾30 on /experts (measured 2026-07-31).
-          priceLabel: primaryPriceLabel(
+          priceLabel: offerPriceLabel(primaryPriceLabel(
             Array.isArray(t.consultations) ? t.consultations : [],
             t.price ?? TUTOR_DEFAULTS.price,
             t.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin,
-          ).label,
+          )),
           verified: t.verified ?? false,
         })))
       } catch {

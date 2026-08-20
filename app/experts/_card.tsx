@@ -8,7 +8,7 @@ import { Icon } from '@/components/Icon'
 import { EntityCard, EntityKinds, EntityPrice, type EntityView } from '@/components/EntityCard'
 import { fmtRating } from '@/lib/fmt'
 import { displayHeadline } from '@/lib/headline'
-import { TUTOR_DEFAULTS, primaryPriceLabel } from '@/components/booking/slots'
+import { TUTOR_DEFAULTS, primaryPriceLabel, offerPriceLabel } from '@/components/booking/slots'
 import { Tutor, fmtLangs, hasExtraLanguage, initialsAvatarSvg, isTutorBookable, tutorYouTubeId } from './_data'
 
 const VerifiedMark = ({ size = 18 }: { size?: number }) => (
@@ -86,7 +86,7 @@ const ExpertPhoto = ({ src, name, eager = false }: { src: string; name: string; 
   )
 }
 
-export const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, needsSignIn, viewerCantBook = false, viewerCantFav = false, view = 'grid', kinds }:{ t: Tutor; idx: number; onPreviewEnter: (t: Tutor, anchor: HTMLElement) => void; onBook: (t: Tutor) => void; saved: boolean; onToggleFav: (tutorId: string) => void; needsSignIn?: boolean; viewerCantBook?: boolean; viewerCantFav?: boolean; view?: EntityView; /** What this person offers, when saying so distinguishes them — see components/EntityCard → EntityKinds. */ kinds?: string[] }) => {
+export const TutorCard = ({ t, idx, onBook, saved, onToggleFav, needsSignIn, viewerCantBook = false, viewerCantFav = false, view = 'grid', kinds }:{ t: Tutor; idx: number; onBook: (t: Tutor) => void; saved: boolean; onToggleFav: (tutorId: string) => void; needsSignIn?: boolean; viewerCantBook?: boolean; viewerCantFav?: boolean; view?: EntityView; /** What this person offers, when saying so distinguishes them — see components/EntityCard → EntityKinds. */ kinds?: string[] }) => {
   // The reader's layout choice, passed down by the catalogue shell. `grid` is
   // the card exactly as it has always shipped; `list` is the same card as a
   // full-width row from `sm` up (components/EntityCard). Everything below that
@@ -98,13 +98,16 @@ export const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, 
   // Inline video-on-hover (Preply-style). Only the hovered card mounts an
   // (muted, looping) iframe, so we never autoplay every video at once.
   const [vhover, setVhover] = useState(false)
-  // Advertise the FLAGSHIP service — the longest PAID tier — and nothing else.
-  // This used to price `consultationDurationMin`, the profile-level DEFAULT,
-  // which is not a service anyone can buy: the card read „₾80 · 30 წთ" for an
-  // expert whose real offer is a 60-minute consultation at ₾80, while their
-  // profile rail said „₾25-დან" (the cheapest tier). One expert, three prices.
-  // `primaryPriceLabel` is the shared source the rail now reads too.
-  const flagship = primaryPriceLabel(t.consultations, t.price, t.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin)
+  // WHAT THIS PERSON ADVERTISES — the floor of whichever shape leads (a service
+  // when they publish one, otherwise their cheapest paid session) plus the word
+  // that goes after it. One resolver, shared with the profile rail, the mobile
+  // bar, the home grid, the favourites list and the price FILTER, so no two
+  // surfaces can quote different numbers for one expert — the whole reason
+  // `primaryPriceLabel` exists; its docblock carries the measurements.
+  // The `consultationDurationMin` fallback is only reached by an expert with no
+  // published tier at all: pricing that DEFAULT is what once made a card read
+  // „₾80 · 30 წთ" for a 60-minute ₾80 consultation.
+  const offer = primaryPriceLabel(t.consultations, t.price, t.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin)
   // Gate the CTA on real availability — same rule the detail page's
   // StickyBookingCard uses — so the card never promises a booking the profile
   // will deny with "no published slots".
@@ -176,33 +179,11 @@ export const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, 
           title={`${t.name} — ვიდეო`}
         />
       )}
-      {/* Play badge — opens the full VideoPreview modal (stopPropagation
-          so the card-wide overlay link doesn't navigate instead). The
-          BUTTON is 40×40 (canon tap-target floor) but its visible circle
-          is 28px, so it sits in the shoulder corner instead of covering
-          the face. It is INSET (`bottom-2`/`sm:bottom-3`, badge centred in
-          the button) rather than pinned to `bottom-0 right-0` as it was on
-          the square: a corner of the bounding box is OUTSIDE a circular
-          photo, so the old offsets left the badge floating in the gap.
-          These land it tangent to the circle at the 4-o'clock edge —
-          r(56/72) ≈ centre-distance(39.6/56.6) + badge radius(14). Keep
-          the breakpoint on `lg`, matching the thumb's own.
-          Same arithmetic on the 80px list portrait, which is why it gets
-          its own inset: r=40, `bottom-1 right-1` puts the badge centre
-          22.6px from the middle, +14 = 36.6 — inside the circle. At
-          `bottom-2` it would sit over the face, at `bottom-0` outside it. */}
-      {t.video && (
-        <button
-          type="button"
-          aria-label="ვიდეო"
-          onClick={e => { e.stopPropagation(); onPreviewEnter(t, e.currentTarget) }}
-          className={`absolute z-20 w-10 h-10 inline-flex items-center justify-center ${row ? 'bottom-1 right-1' : 'bottom-2 right-2 lg:bottom-3 lg:right-3'}`}
-        >
-          <span className="w-7 h-7 rounded-full bg-white/95 backdrop-blur shadow-pop text-ink-900 inline-flex items-center justify-center group-hover/photo:scale-105 transition-transform duration-fast">
-            <Icon.play className="w-3 h-3 ml-0.5" />
-          </span>
-        </button>
-      )}
+      {/* ⚠️ THE PLAY BADGE IS GONE (2026-08-20) — with the field that fed it.
+          0 of 27 profiles ever had a video, so this badge was arithmetic that
+          could never run, and the tangent-to-the-circle geometry it carried was
+          the most carefully reasoned dead code on the card. See the note in
+          app/join/_expert/_steps for why the question stopped being asked. */}
     </div>
   )
 
@@ -367,15 +348,36 @@ export const TutorCard = ({ t, idx, onPreviewEnter, onBook, saved, onToggleFav, 
            equal buttons. Keeping the price above the buttons (instead of beside
            them) is what stopped „· N წთ სესია" from wrapping on a narrow card. */
         <>
-          {/* ⚠️ „-დან", NOT AN EXACT NUMBER (2026-08-20). An expert can publish
-              several tiers and the card prints the flagship, so a bare „50₾"
-              read as THE price of a thing that has more than one. The floor is
-              always true, and it is the form every marketplace uses on a browse
-              card — Fiverr „From $45", Airtasker „From $150". The exact number
-              belongs on the booking screen, where a tier has been chosen. */}
+          {/* ⚠️ „-დან" IS A CLAIM, AND THE NUMBER HAS TO EARN IT (2026-08-20,
+              second pass). This printed the FLAGSHIP tier's price with „-დან"
+              welded on. „-დან" says „the cheapest thing here costs this", and a
+              flagship is the most expensive thing an expert sells, so the line
+              was false wherever it mattered. MEASURED on the live database the
+              same day: 24 visible experts, 11 with two or more paid tiers, and
+              10 of those 11 overstating their own floor — მათე ივანიაძე's card
+              said „₾100-დან" while he sells a ₾25 tier, გიორგი's said „₾80-დან"
+              against a ₾1 one. Ten of twenty-four cards is the catalogue, not
+              an edge.
+              `primaryPriceLabel` now returns the floor and, separately, whether
+              a range exists at all; `offerPriceLabel` is the ONE place the word
+              is appended, so no surface can add it to a number that has not
+              earned it. A single-tier expert reads „₾80", which is what they
+              charge.
+              The reason the flagship was chosen in July still stands and is
+              still satisfied: the price and the length come off the SAME row,
+              so „₾25-დან · 15 წთ" describes one real service and a visitor who
+              clicks it meets exactly it. */}
+          {/* ⚠️ AND THE SECOND HALF NAMES THE SHAPE, NOT ALWAYS A CLOCK. Since
+              `Consultation.bookable` an expert can sell a JOB („დეკლარაციის
+              შევსება — ₾100") which has no duration at all; this line used to
+              print `flagship.minutes`, and with no bookable tier to read that
+              fell through to the profile-level default — so a service-only
+              expert advertised „· 60 წთ", a session length nothing on their
+              profile offers. `suffix` is „60 წთ" or „სერვისი" and is resolved
+              beside the price it belongs to. */}
           <div className="flex items-baseline gap-1.5 mb-2.5">
-            <EntityPrice>{flagship.label}-დან</EntityPrice>
-            <span className="text-meta font-medium text-ink-500">· {flagship.minutes} წთ</span>
+            <EntityPrice>{offerPriceLabel(offer)}</EntityPrice>
+            <span className="text-meta font-medium text-ink-500">· {offer.suffix}</span>
           </div>
           {/* Two-button CTA: booking is the primary niche, messaging the
               secondary. A non-student (tutor/admin) can't book OR message, so

@@ -8,7 +8,7 @@ import { ensureDbReady } from '@/lib/dbBoot'
 // message arrives (which pings people who are actively reading in-app), we wait
 // ~30 min and email ONLY if the message is still unread — a genuine miss.
 //
-// Rides the */15 cleanup cron. Deduped by the dbBoot column
+// Rides the ∗/15 cleanup cron. Deduped by the dbBoot column
 // `Message.reminderEmailSentAt`, which Prisma can't select, so the read/stamp
 // go through raw SQL (same pattern as sessionReminders).
 //
@@ -63,7 +63,7 @@ export async function sendMessageReminders(): Promise<{ threads: number; emails:
   // window now holds nothing but reminder candidates, and the newest ones are
   // the ones that fit, so a fresh thread can never be crowded out by an old one.
   // (A month-old „you missed a message" is meaningless anyway; the 30-day bound
-  // stays.) A thread truncated by the LIMIT simply waits for the next */15 tick.
+  // stays.) A thread truncated by the LIMIT simply waits for the next ∗/15 tick.
   const rows = await prisma.$queryRawUnsafe<Row[]>(`
     SELECT m.id, m."toId", m."fromId", m."bookingId", m.body,
            m."createdAt", m."reminderEmailSentAt"

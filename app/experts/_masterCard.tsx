@@ -61,7 +61,15 @@ export const masterHref = (m: Pick<MasterRow, 'slug'>) => (m.slug ? `/experts/${
 // slot. `view` is the reader's grid/list choice, passed down by the catalogue
 // shell; it defaults to `grid`, which is the card as it ships today.
 
-export function MasterCard({ m, view = 'grid', kinds }: { m: MasterRow; view?: EntityView; /** What this person offers, when saying so distinguishes them — see components/EntityCard → EntityKinds. */ kinds?: string[] }) {
+export function MasterCard({ m, view = 'grid', kinds, alsoConsults = false }: { m: MasterRow; view?: EntityView; /** What this person offers, when saying so distinguishes them — see components/EntityCard → EntityKinds. */ kinds?: string[];
+  /** ⚠️ THE CONSULTATION AS A BENEFIT, NOT A SECOND PRODUCT (2026-08-20).
+   *  True when this same person also takes consultations. Owner: „მცირედ უნდა
+   *  იყოს ქარდზე დამატებული, რომ გაიარე კონსულტაცია, სანამ სერვისს აიღებ…
+   *  უბრალოდ ბენეფიტია, რომ კონსულტაციაც გვაქვს."
+   *  So it is one muted line under the price — never a badge, never a second
+   *  button, never a filter. It says what the visitor can do BEFORE committing
+   *  to the job, which is the only thing that makes it worth a line at all. */
+  alsoConsults?: boolean }) {
   const href = masterHref(m)
   const row = view === 'list'
 
@@ -201,11 +209,19 @@ export function MasterCard({ m, view = 'grid', kinds }: { m: MasterRow; view?: E
               quote". Same position, same weight, different sentence: that is
               what makes the two halves of this catalogue read as one product,
               where a blank on one of them would not. */}
-          {m.priceValue !== null ? (
-            <EntityPrice>{m.priceValue}₾-დან</EntityPrice>
-          ) : (
-            <span className="text-small text-ink-500">ფასს შემოგთავაზებს</span>
-          )}
+          <span className="min-w-0">
+            {m.priceValue !== null ? (
+              <EntityPrice>{m.priceValue}₾-დან</EntityPrice>
+            ) : (
+              <span className="text-small text-ink-500">ფასს შემოგთავაზებს</span>
+            )}
+            {/* One line, `text-meta`, under the number — the smallest thing on
+                the card that still reads. See `alsoConsults` for why it is a
+                line and not a badge. */}
+            {alsoConsults && (
+              <span className="block mt-0.5 text-meta text-ink-500">კონსულტაციაც შეგიძლია</span>
+            )}
+          </span>
           {href && (
             /* ⚠️ A REAL LINK, NOT A DECORATED SPAN, and it is a SIBLING of the
                overlay rather than a child of it — EntityCard renders `overlay`

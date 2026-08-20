@@ -115,7 +115,21 @@ test('the master card is the expert card: portrait, chips, meta, clamp, footer s
   // and it is the form every comparable marketplace uses.
   assert.match(code(MASTER), /<EntityPrice>\{m\.priceValue\}₾-დან<\/EntityPrice>/, 'the floor price left the service card')
   assert.match(code(MASTER), /ფასს შემოგთავაზებს/, 'the no-floor sentence is gone — the slot would be blank')
-  assert.match(code(EXPERT), /\{flagship\.label\}-დან/, 'the consultation card went back to an exact price')
+  // ⚠️ AND ON THE EXPERT CARD THE WORD IS NO LONGER WELDED ON (2026-08-20,
+  // second pass). It used to read `{flagship.label}-დან`, i.e. „-დან" appended
+  // to the FLAGSHIP tier — the most expensive thing the expert sells — so the
+  // one claim the word makes was false wherever it mattered. Measured that
+  // morning: 24 visible experts, 11 with 2+ paid tiers, 10 of them overstating
+  // their own floor („₾100-დან" against a ₾25 tier). `offerPriceLabel` is the
+  // ONE place the suffix is added and it adds it only to a real floor with a
+  // real range behind it; the card may not re-implement that decision.
+  assert.match(code(EXPERT), /<EntityPrice>\{offerPriceLabel\(offer\)\}<\/EntityPrice>/, 'the consultation card stopped reading the shared price resolver')
+  assert.doesNotMatch(code(EXPERT), /\}-დან/, 'the expert card appended „-დან" itself — that word belongs to offerPriceLabel, which only gives it to a genuine floor')
+  // The second half of the line names the SHAPE. A service („დეკლარაციის
+  // შევსება") has no clock, and printing `.minutes` there fell through to the
+  // profile-level default — advertising „· 60 წთ" for something with neither a
+  // duration nor a calendar.
+  assert.match(code(EXPERT), /· \{offer\.suffix\}/, 'the expert card went back to printing a duration a service does not have')
   assert.doesNotMatch(code(MASTER), /გამოძახება/, 'the price wording belongs to lib/serviceProfile → priceHint, never to the card')
 })
 
@@ -206,4 +220,27 @@ test('the expert card keeps every behaviour the merge was not about', () => {
   // written down in both files precisely because nothing else ties them.
   assert.match(t, /sm:right-\[248px\]/, 'the favourite button must clear the list rail — in the card’s own corner it sits on the price')
   assert.match(read(SHELL), /sm:right-\[248px\]/, 'EntityCard must record that the rail width is measured from elsewhere')
+})
+
+test('the consultation is a benefit line, never a second product', () => {
+  // ⚠️ THE HIERARCHY, ENFORCED WHERE IT IS EASIEST TO BREAK (2026-08-20). The
+  // site sells SERVICES; a consultation is what you can do BEFORE committing to
+  // one. Owner: „უბრალოდ ბენეფიტია, რომ კონსულტაციაც გვაქვს."
+  //
+  // On a card that means exactly one muted line. The three shapes it must never
+  // take are the three that would make it a product again: a badge beside the
+  // name, a second button in the footer, or a heading. Each of those has been
+  // on this card at some point.
+  const m = code(MASTER)
+  assert.match(m, /alsoConsults && \(/, 'the benefit line is unconditional or gone')
+  assert.match(m, /კონსულტაციაც შეგიძლია/, 'the benefit line lost its words')
+  assert.match(m, /text-meta text-ink-500">კონსულტაციაც/, 'the benefit line grew past text-meta — it is a line, not a claim')
+  // It is drawn from the PERSON holding both halves, never from a type field.
+  assert.match(code('app/experts/client.tsx'), /alsoConsults=\{it\.kinds\.includes\('CONSULT'\)\}/,
+    'the benefit line stopped following who actually takes consultations')
+  // …and it never becomes an action: the line and the card's ONE button are
+  // siblings, so what must not exist is a control INSIDE the line's own span.
+  const start = m.indexOf('{alsoConsults && (')
+  const line = m.slice(start, m.indexOf('</span>', m.indexOf('კონსულტაციაც შეგიძლია')))
+  assert.doesNotMatch(line, /<Btn|<button|href=/, 'the benefit line grew a control')
 })

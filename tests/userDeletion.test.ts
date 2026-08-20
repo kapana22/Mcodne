@@ -232,6 +232,19 @@ test('§C the FK-less dbBoot tables are deleted BY HAND, not left to a cascade',
     //     trade listing, and it cannot outlive the account.
     [/ALTER TABLE "ServiceProfile" ADD CONSTRAINT "ServiceProfile_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
       'the ServiceProfile→User cascade is gone — deleting a master would orphan their listing, and the listing keeps being routed'],
+    // CreditEntry.userId  CASCADE — added 2026-08-20 with the balance ledger.
+    //     Written INLINE in the CREATE TABLE (`REFERENCES "User"("id") ON
+    //     DELETE CASCADE`) rather than as a separate ALTER, which is why the
+    //     pattern below differs in shape from its neighbours.
+    //     CASCADE is the only correct action. A credit row is not a record
+    //     ABOUT a person the way a ServiceRequest is — it is a bookkeeping line
+    //     for an account that no longer exists, worth nothing to anybody and
+    //     denominated in a balance that cannot be paid out (lib/credits: it buys
+    //     offers and nothing else, and PAYMENTS_LIVE is false). SET NULL would
+    //     leave a sum belonging to nobody; RESTRICT would make an account
+    //     undeletable because it once earned 15₾ for a photo.
+    [/"userId"\s+TEXT NOT NULL REFERENCES "User"\("id"\) ON DELETE CASCADE/,
+      'the CreditEntry→User cascade is gone — a deleted account leaves a balance behind'],
     [/ALTER TABLE "RequestOffer" ADD CONSTRAINT "RequestOffer_expertUserId_fkey" FOREIGN KEY \("expertUserId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
       'the RequestOffer→User cascade changed — SET NULL would break the one-provider CHECK and make the account undeletable'],
     [/ALTER TABLE "ServiceRequest" ADD CONSTRAINT "ServiceRequest_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE SET NULL[^;]*;/,
