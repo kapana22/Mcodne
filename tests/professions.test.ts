@@ -17,8 +17,18 @@ import {
 } from '../lib/professions'
 
 test('the shape of the list the owner supplied', () => {
-  assert.equal(Object.keys(PROFESSIONS).length, 17, '17 spheres')
-  assert.equal(ALL_PROFESSIONS.length, 96, '96 professions')
+  // ⚠️ 19 AND 93 SINCE 2026-08-20 (docs/TAXONOMY-AUDIT §P4, §P6). `design` and
+  // `career` became spheres of their own — both were topic GROUPS with no
+  // category, so a client could ask for them and the catalogue had nobody to
+  // show — and three names that sell nothing left the list („მეწარმე",
+  // „სტრატეგი", „ჟურნალისტი"). Net: +2 spheres, −3 professions.
+  assert.equal(Object.keys(PROFESSIONS).length, 19, '19 spheres')
+  assert.equal(ALL_PROFESSIONS.length, 93, '93 professions')
+  // ⚠️ AND THE THREE DO NOT COME BACK. „მეწარმე" is an identity, not something
+  // anybody can buy — the exact fault that retired „ხელოსანი".
+  for (const banned of ['მეწარმე', 'სტრატეგი', 'ჟურნალისტი']) {
+    assert.ok(!ALL_PROFESSIONS.some(p => p.job === banned), `„${banned}" is on offer again — it sells nothing`)
+  }
   // Every sphere has at least two — one profession is not a category, it is
   // the sphere under another name.
   for (const [slug, jobs] of Object.entries(PROFESSIONS)) {

@@ -117,6 +117,16 @@ export type MasterProfile = {
   workPhotoSrcs: string[]
   /** The same person's expert profile, when they have one with a slug. */
   expertHref: string | null
+  /** ⚠️ THE THIRD VERB — „მიწერე" (2026-08-20). Messaging is USER-to-user
+   *  (Message.fromId/toId), never tutor-to-client, so a provider has always
+   *  been messageable; nothing on their profile ever offered it. This page
+   *  carried exactly ONE action — the request wizard — which meant somebody who
+   *  had read the page and simply wanted to ask „ამას აკეთებ?" had to describe a
+   *  whole job in a multi-step form first.
+   *  Null for a COMPANY profile: `userId` and `companyId` are exclusive (see
+   *  the schema), so a firm has no person to write to — the request stays the
+   *  only door there, honestly. */
+  messageHref: string | null
   /** Reviews of this master's finished jobs (Review → RequestOffer whose
    *  provider is this profile's user or company), newest first. */
   reviews: MasterReview[]
@@ -213,6 +223,8 @@ export const getMasterProfile = cache(async (id: string): Promise<MasterProfile 
       photoSrc: hasPhoto ? `/api/masters/${row.id}/photo?v=${v}` : null,
       workPhotoSrcs: idx.map(n => `/api/masters/${row.id}/photo?n=${n}&v=${v}`),
       expertHref: expertSlug ? `/experts/${expertSlug}` : null,
+      // The pair thread that already exists for every user — app/me/messages/u/[userId].
+      messageHref: row.userId ? `/me/messages/u/${row.userId}` : null,
       reviews,
       ratingAvg,
       reviewCount,

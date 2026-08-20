@@ -17,6 +17,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { PROFESSIONS } from '../lib/professions'
 
 const ROOT = join(__dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -99,4 +100,43 @@ test('a hidden block does not leave a hole in the numbering', () => {
   const work = codeOf('app/join/_master/client.tsx')
   assert.doesNotMatch(work, /<Block n=\{\d+\}/, 'a block number was typed by hand again')
   assert.match(work, /n=\{\+\+blockNo\}/, 'the blocks stopped numbering themselves')
+})
+
+test('the one word an applicant is certain of finds them', () => {
+  /* ⚠️ THE WALL THE OWNER KEPT SENDING BACK. The picker asked two questions in
+   * order — ① კატეგორია, ② პროფესია — and step ② printed „ჯერ კატეგორია
+   * აირჩიე" until step ① was answered. The way past it was a search field
+   * whose own placeholder invited a profession („მოძებნე — ბუღალტერია…") and
+   * which searched SPHERE NAMES ONLY. So typing „ბუღალტერი" — the single word
+   * that person is sure of — answered „ვერაფერი მოიძებნა", with a dead step
+   * underneath. Owner, looking at exactly this screen: „ათასჯერ ვთქვი ამის
+   * გამოსწორება და ისევ იგივეა."
+   *
+   * A person knows their job title. The category is OUR taxonomy's need. */
+  const src = read('components/ProfessionPicker.tsx')
+  assert.match(src, /ALL_PROFESSIONS/, 'the search reads spheres only again')
+  assert.match(src, /jobHits/, 'the profession results are gone')
+  // One tap answers BOTH steps — the whole point of the hit list.
+  assert.match(src, /onClick=\{\(\) => \{\s*if \(cat\) onSphere\(cat\.name\)/,
+    'picking a profession no longer fills the category in')
+  assert.doesNotMatch(src, /ჯერ კატეგორია აირჩიე — მერე აქ მისი პროფესიები გამოჩნდება/,
+    'step ② is a dead end again')
+  // And the placeholder must not promise something the field cannot do.
+  const ph = src.match(/placeholder="([^"]+)"/)
+  assert.ok(ph && /პროფესია/.test(ph[1]), `the placeholder stopped saying it takes a profession: ${ph?.[1]}`)
+})
+
+test('every sphere the picker offers has professions behind it', () => {
+  // A category with no professions is step ① answered and step ② empty — the
+  // same dead end by another route. `design` and `career` were topic GROUPS
+  // with no category at all (docs/TAXONOMY-AUDIT §P4): a client could ask for
+  // „დიზაინი" and the catalogue had nobody to show.
+  for (const slug of ['design', 'career', 'swavleba']) {
+    assert.ok((PROFESSIONS[slug] ?? []).length >= 2, `${slug} is not a sphere with professions`)
+  }
+  // §P3 — one subject, one name. The category row and the topic group must not
+  // disagree, or somebody searching one cannot find the other.
+  const topics = read('lib/requestTopics.ts')
+  assert.match(topics, /id: 'property', label: 'უძრავი ქონება'/, 'construction is filed in two places again')
+  assert.doesNotMatch(topics, /categorySlug: 'hr'/, "'hr' is not a category — that group is `career`")
 })

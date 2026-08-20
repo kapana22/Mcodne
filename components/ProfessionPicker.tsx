@@ -43,7 +43,7 @@
 
 import { Icon } from '@/components/Icon'
 import { useState } from 'react'
-import { MAX_PROFESSIONS, PROFESSIONS } from '@/lib/professions'
+import { ALL_PROFESSIONS, MAX_PROFESSIONS, PROFESSIONS } from '@/lib/professions'
 
 export type PickerSphere = { slug: string; name: string }
 
@@ -60,14 +60,36 @@ export function ProfessionPicker({
   onChange: (next: string[]) => void
 }) {
   const [sphereQuery, setSphereQuery] = useState('')
+  const q = sphereQuery.trim().toLowerCase()
+  const searching = q.length >= 2
+
   /** ⚠️ THE CHOSEN SPHERE IS NEVER FILTERED OUT. A search that hides the row
    *  you already ticked reads as „your answer was lost", and the tick is the
    *  only thing on this step that carries state. */
-  const shownSpheres = (() => {
-    const q = sphereQuery.trim().toLowerCase()
-    if (q.length < 2) return spheres
-    return spheres.filter(sp => sp.name.toLowerCase().includes(q) || sp.name === sphere)
-  })()
+  const shownSpheres = !searching
+    ? spheres
+    : spheres.filter(sp => sp.name.toLowerCase().includes(q) || sp.name === sphere)
+
+  /**
+   * ⚠️ THE SEARCH READS PROFESSIONS TOO, AND THAT IS THE POINT (2026-08-20).
+   *
+   * The field searched SPHERE NAMES only, while its own placeholder invited a
+   * profession („მოძებნე — ბუღალტერია…"). So somebody who typed the one word
+   * they are certain of — „ბუღალტერი", „იურისტი", „დიზაინერი" — was told
+   * „ვერაფერი მოიძებნა", and step ② sat dead underneath saying „ჯერ კატეგორია
+   * აირჩიე". Two blocking steps, and the shortcut past them was a dead end.
+   *
+   * A person knows their JOB TITLE. The category is our taxonomy's need, not
+   * theirs — so picking a profession here answers BOTH steps in one tap and
+   * sets the sphere on their behalf. The grid below is untouched and is still
+   * how somebody who does not know the word browses; this only adds the way in
+   * for somebody who does.
+   */
+  const jobHits = searching
+    ? ALL_PROFESSIONS
+        .filter(p => p.job.toLowerCase().includes(q) && spheres.some(sp => sp.slug === p.slug))
+        .slice(0, 12)
+    : []
 
   const current = spheres.find(s => s.name === sphere)
   const jobs = current ? (PROFESSIONS[current.slug] ?? []) : []
@@ -114,17 +136,64 @@ export function ProfessionPicker({
             type="search"
             value={sphereQuery}
             onChange={e => setSphereQuery(e.target.value)}
-            placeholder="მოძებნე — ბუღალტერია, სამართალი…"
+            placeholder="მოძებნე პროფესია ან კატეგორია — ბუღალტერი, იურისტი…"
             className="mb-2 w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-500 outline-none transition-colors duration-fast"
           />
         )}
+        {/* THE HITS. Profession first, its category in grey underneath — the
+            answer they were looking for, with the answer we need attached to
+            it. One tap sets both, which is why this block sits above the grid
+            rather than inside step ②. */}
+        {jobHits.length > 0 && (
+          <div className="mb-2 rounded-card border border-brand-200 bg-brand-50/40 p-2">
+            <p className="px-1 pb-1.5 text-meta text-ink-500">პროფესიები — აირჩიე და კატეგორია თავად შეივსება</p>
+            <div className="grid sm:grid-cols-2 gap-1">
+              {jobHits.map(p => {
+                const on = value.includes(p.job)
+                const cat = spheres.find(sp => sp.slug === p.slug)
+                return (
+                  <button
+                    key={`${p.slug}:${p.job}`}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={on}
+                    disabled={!on && full}
+                    onClick={() => {
+                      if (cat) onSphere(cat.name)
+                      if (on) onChange(value.filter(v => v !== p.job))
+                      else if (!full) onChange([...value, p.job])
+                    }}
+                    className={`min-w-0 min-h-11 px-2.5 py-2 flex items-center gap-2.5 text-left rounded-btn border transition-colors duration-fast disabled:opacity-45 disabled:cursor-not-allowed ${
+                      on ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-transparent bg-white text-ink-900 hover:border-ink-200'
+                    }`}
+                  >
+                    <span className={`w-[18px] h-[18px] shrink-0 rounded border-[1.5px] inline-flex items-center justify-center ${
+                      on ? 'bg-brand-600 border-brand-600 text-white' : 'border-ink-300 bg-white'
+                    }`}>
+                      {on && <Icon.check className="w-3 h-3" />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className={`block text-body leading-snug ${on ? 'font-display font-semibold' : ''}`}>{p.job}</span>
+                      <span className="block text-meta text-ink-500 leading-snug">{cat?.name}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         <div
           role="radiogroup"
           aria-label="კატეგორია"
           className="grid sm:grid-cols-2 gap-1 rounded-card border border-ink-200 bg-ink-50/40 p-2"
         >
           {shownSpheres.length === 0 && (
-            <p className="col-span-full px-2.5 py-3 text-small text-ink-500">ვერაფერი მოიძებნა — მოხსენი ძებნა და გადახედე სიას.</p>
+            <p className="col-span-full px-2.5 py-3 text-small text-ink-500">
+              {jobHits.length > 0
+                ? 'კატეგორია ამ სიტყვით არ მოიძებნა — აირჩიე პროფესია ზემოთ.'
+                : 'ვერაფერი მოიძებნა — მოხსენი ძებნა და გადახედე სიას.'}
+            </p>
           )}
           {shownSpheres.map(sp => {
             const on = sphere === sp.name
@@ -167,7 +236,7 @@ export function ProfessionPicker({
 
         {!current ? (
           <p className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 px-4 py-6 text-center text-small text-ink-500">
-            ჯერ კატეგორია აირჩიე — მერე აქ მისი პროფესიები გამოჩნდება.
+            მოძებნე შენი პროფესია ზემოთ, ან ჯერ კატეგორია აირჩიე.
           </p>
         ) : jobs.length === 0 ? (
           // A sphere the admin added that has no professions listed yet. Say so;

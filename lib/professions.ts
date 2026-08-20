@@ -40,12 +40,24 @@
 
 /** slug → the professions that belong to that sphere, in the owner's order. */
 export const PROFESSIONS: Record<string, readonly string[]> = {
+  // ⚠️ THREE NAMES LEFT THIS FILE ON 2026-08-20 (docs/TAXONOMY-AUDIT §P6) and
+  // they must not come back: „მეწარმე" and „სტრატეგი" here, „ჟურნალისტი" in
+  // media. „მეწარმე" is an IDENTITY, not something anybody can buy — the exact
+  // fault that retired „ხელოსანი"; „სტრატეგი" is covered twice over by
+  // „ბიზნეს-კონსულტანტი" and „ბრენდ-სტრატეგი"; „ჟურნალისტი" by „კოპირაითერი"
+  // and „კონტენტ-მარკეტოლოგი". Experts who already picked one KEEP it — the
+  // column is a string array and routing matches the whole label — they simply
+  // are not offered to anybody new.
   'business': [
     'ბიზნეს-კონსულტანტი',
-    'სტრატეგი',
-    'მეწარმე',
     'ოპერაციების მენეჯერი',
     'პროექტის მენეჯერი',
+  ],
+  // ⚠️ ITS OWN SPHERE SINCE 2026-08-20 (§P4). „კარიერა და HR" is a topic group
+  // in lib/requestTopics and was not a category, so a client could ask for it
+  // and the catalogue had nobody to show; the three names sat under „ბიზნესი",
+  // where nobody looking for a career consultant would think to open.
+  'career': [
     'კარიერული კონსულტანტი',
     'HR-მენეჯერი',
     'ბიზნეს-ტრენერი',
@@ -78,14 +90,20 @@ export const PROFESSIONS: Record<string, readonly string[]> = {
     'კონტენტ-მარკეტოლოგი',
     'გაყიდვების მენეჯერი',
     'PR სპეციალისტი',
+  ],
+  // ⚠️ ITS OWN SPHERE SINCE 2026-08-20 (§P4), for the same reason as `career`:
+  // `design` is a topic group with five topics and had no category, while its
+  // two professions were filed one under „მარკეტინგი" and one under „IT" — so
+  // „დიზაინერი" was a search that returned a marketer or a developer.
+  'design': [
     'გრაფიკული დიზაინერი',
+    'UX/UI დიზაინერი',
   ],
   'it': [
     'დეველოპერი',
     'AI ინჟინერი',
     'მონაცემთა ანალიტიკოსი',
     'პროდაქტ-მენეჯერი',
-    'UX/UI დიზაინერი',
     'DevOps ინჟინერი',
     'QA ინჟინერი',
     'კიბერუსაფრთხოების სპეციალისტი',
@@ -136,7 +154,6 @@ export const PROFESSIONS: Record<string, readonly string[]> = {
     'მონტაჟის სპეციალისტი',
     'თარჯიმანი',
     'კოპირაითერი',
-    'ჟურნალისტი',
     'პოდკასტის პროდიუსერი',
   ],
   'tourism': [

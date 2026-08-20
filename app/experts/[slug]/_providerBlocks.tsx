@@ -13,7 +13,9 @@ import type { ReactNode } from 'react'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { fmtDateTime, TBILISI } from '@/lib/tz'
+import Link from 'next/link'
 import type { MasterProfile } from './_providerData'
+import { requestHrefFor } from './_providerData'
 
 const Section = ({ id, title, children }: { id: string; title: string; children: ReactNode }) => (
   <section id={id} className="mt-10 lg:mt-12 pt-8 border-t border-ink-100 scroll-mt-24">
@@ -39,15 +41,46 @@ const Section = ({ id, title, children }: { id: string; title: string; children:
  * Renders nothing when nothing is priced — „ask" is an honest way to work, and
  * an empty „ფასები" heading over a blank box is worse than no section at all.
  */
+/**
+ * ⚠️ EVERY ROW IS BUYABLE SINCE 2026-08-20, and until today none of them was.
+ *
+ * This list is documented above as „the centre of this page" — the named
+ * service with its price beside it, the one thing this catalogue has that the
+ * trades sites do not. It was also completely inert: six services, six prices,
+ * and nothing to press. The only action on the page sat in the rail and said
+ * „describe your job", which is the opposite of what a priced list invites —
+ * the client has already found the thing they want and read what it costs.
+ *
+ * The EXPERT profile has never had this problem: `_sections.tsx` puts a
+ * „დაკვეთა" button on every job row. Identical content — a named service at a
+ * fixed price — was orderable on one profile and dead on the other, purely
+ * because the two are stored in different tables. That is exactly the split
+ * THE PRODUCT MODEL says must not be visible to anybody.
+ *
+ * The button carries the SAME href the rail does (`requestHrefFor`, `?to=<slug>`)
+ * — one door, aimed at this person. It does not pre-fill the service, because
+ * the wizard has no parameter for it; the row's job here is to say „this one",
+ * and the client repeats it in the description. If that ever feels like a
+ * retype, the fix is a `?service=` the wizard reads, not a second door.
+ */
 export function PricedServicesBlock({ p }: { p: MasterProfile }) {
   if (p.priced.length === 0) return null
   return (
     <Section id="services" title="სერვისები და ფასები">
       <ul className="divide-y divide-ink-100 border-t border-ink-100 max-w-[640px]">
         {p.priced.map(s => (
-          <li key={s.id} className="flex items-baseline justify-between gap-4 py-3">
+          <li key={s.id} className="flex items-center justify-between gap-4 py-3">
             <span className="min-w-0 text-body text-ink-900">{s.label}</span>
-            <span className="shrink-0 font-display text-h3 font-bold text-ink-900 tabular-nums leading-none">{s.price}₾</span>
+            <span className="shrink-0 flex items-center gap-3">
+              <span className="font-display text-h3 font-bold text-ink-900 tabular-nums leading-none">{s.price}₾</span>
+              <Link
+                href={requestHrefFor(p)}
+                aria-label={`${s.label} — დაკვეთა`}
+                className="h-11 px-4 rounded-btn bg-brand-50 hover:bg-brand-600 hover:text-white border border-brand-200 hover:border-brand-600 text-brand-700 font-display font-semibold text-meta tracking-wide inline-flex items-center transition-colors duration-fast"
+              >
+                დაკვეთა
+              </Link>
+            </span>
           </li>
         ))}
       </ul>

@@ -751,7 +751,7 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     template: 'რა მაქვს: … (მოქმედი ბიზნესი / იდეა)\nსფერო: …\nკონკრეტულად რაში მჭირდება დახმარება: …',
     topics: [
       { id: 'business-plan', label: 'ბიზნესგეგმა', categorySlug: 'business', professions: ['ბიზნეს-კონსულტანტი', 'ბიზნესგეგმის სპეციალისტი'] },
-      { id: 'strategy',      label: 'სტრატეგია', categorySlug: 'business', professions: ['სტრატეგი', 'ბიზნეს-კონსულტანტი'] },
+      { id: 'strategy',      label: 'სტრატეგია', categorySlug: 'business', professions: ['ბიზნეს-კონსულტანტი', 'ბრენდ-სტრატეგი'] },
       { id: 'startup',       label: 'სტარტაპი', categorySlug: 'business' },
       { id: 'operations',    label: 'ოპერაციები და პროცესები', categorySlug: 'business', professions: ['ოპერაციების მენეჯერი'] },
       { id: 'project-mgmt',  label: 'პროექტის მართვა', categorySlug: 'business', professions: ['პროექტის მენეჯერი'] },
@@ -838,8 +838,8 @@ export const TOPIC_GROUPS: TopicGroup[] = [
       { id: 'cv',        label: 'რეზიუმე და CV', categorySlug: 'career' },
       { id: 'interview', label: 'გასაუბრებისთვის მომზადება', categorySlug: 'career' },
       { id: 'career-adv',label: 'კარიერული კონსულტაცია', categorySlug: 'career', professions: ['კარიერული კონსულტანტი'] },
-      { id: 'hiring',    label: 'დაქირავება', categorySlug: 'hr', professions: ['HR-მენეჯერი'] },
-      { id: 'training',  label: 'ტრენინგი გუნდისთვის', categorySlug: 'hr', professions: ['ბიზნეს-ტრენერი'] },
+      { id: 'hiring',    label: 'დაქირავება', categorySlug: 'career', professions: ['HR-მენეჯერი'] },
+      { id: 'training',  label: 'ტრენინგი გუნდისთვის', categorySlug: 'career', professions: ['ბიზნეს-ტრენერი'] },
     ],
   },
   {
@@ -854,7 +854,12 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     ],
   },
   {
-    id: 'property', label: 'უძრავი ქონება და მშენებლობა', kinds: CP,
+    // ⚠️ „და მშენებლობა" LEFT THIS LABEL ON 2026-08-20 (docs/TAXONOMY-AUDIT §P3).
+    // Construction was in two places at once — here and in the `architecture`
+    // category — and a subject filed twice is a subject nobody can filter on.
+    // `architecture` („არქიტექტურა და მშენებლობა") keeps it; this group is the
+    // property itself, and the name now matches its category row exactly.
+    id: 'property', label: 'უძრავი ქონება', kinds: CP,
     template: 'ობიექტი: … (ბინა / სახლი / კომერციული)\nსად მდებარეობს: …\nრა მჭირდება: …',
     topics: [
       { id: 'architecture', label: 'არქიტექტურა', categorySlug: 'architecture', professions: ['არქიტექტორი'] },

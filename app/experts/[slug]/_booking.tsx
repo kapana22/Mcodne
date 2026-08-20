@@ -30,17 +30,32 @@ export type SlotsState = 'pending' | 'ready' | 'failed'
    today required posting a request into the void and inviting them from the
    room afterwards.
 
-   ⚠️ IT TAKES THE SLOT „მიწერე ექსპერტს" HAS, IT DOES NOT ADD A THIRD BUTTON.
-   The rail already carries exactly two actions and a third would make the page
-   an argument with itself. The two are also the same intent — „write to this
-   person before committing" — except this one needs no account, which is the
-   whole design of the intake („no registration, anywhere"). When the subsystem
-   is off (`requestHref` null, gated once in page.tsx) the button is the message
-   button it has always been, unchanged.
+   ⚠️ IT NO LONGER TAKES „მიწერე ექსპერტს"'s SLOT — BOTH ARE DRAWN (2026-08-20).
+   This note used to argue that a message and a request are „the same intent",
+   and on that ground the request button REPLACED the message button. They are
+   not the same intent, and the replacement quietly removed the cheapest action
+   on the page:
 
-   ⚠️ AND NEVER WHEN MESSAGING HAS BEEN PROMOTED TO PRIMARY. With no published
-   time the message button IS the primary action; replacing the secondary then
-   would leave the rail showing the same action twice. */
+     მიწერე    one question, one line, answered in a thread — „ამას აკეთებ?",
+               „ხუთშაბათს თავისუფალი ხარ?". Costs a sentence.
+     მოთხოვნა  a multi-step brief — topic, city, budget band, description —
+               which opens offers. Costs a form.
+
+   Somebody with a question was handed the form. That is interaction cost in the
+   NN/g sense: the effort exceeds the value of the act, so the act does not
+   happen — and the question that would have preceded a ₾100 booking goes
+   unasked. Owner, 2026-08-20: „რამდენიმე ვარიანტი უნდა ქონდეს — მესიჯის
+   გაგზავნა, გაგზავნე მოთხოვნა."
+
+   THE THIRD BUTTON OBJECTION, ANSWERED RATHER THAN IGNORED. The old note was
+   right that three equal buttons make a page argue with itself. These are not
+   equal and are not drawn as such: ONE primary („დაჯავშნე"), one secondary
+   („გამოაგზავნე მოთხოვნა"), and the question as a quiet TEXT link under both.
+   Hierarchy is what stops a rail from arguing, not arithmetic.
+
+   ⚠️ AND STILL NEVER WHEN MESSAGING HAS BEEN PROMOTED TO PRIMARY. With no
+   published time the message button IS the primary action, so the quiet link
+   below would be the same action twice. */
 
 /* ───── Mobile sticky booking bar ───── */
 export const MobileBookingBar = ({ onBook, priceLabel, sessionMin, bufferMin = 0, signedIn, paused, availability = [], busySlots = [], slotsState = 'ready', onRetrySlots, canMessage = false, onMessage, requestHref = null, isOwnProfile = false, viewerCantBook = false, canProposeCategory = false }: { onBook: () => void; priceLabel: string; sessionMin: number; bufferMin?: number; signedIn?: boolean | null; paused?: boolean; availability?: ApiSlot[]; busySlots?: BusySlot[]; slotsState?: SlotsState; onRetrySlots?: () => void; canMessage?: boolean; onMessage?: () => void; /** `/request?to=<slug>` when the requests subsystem exists — see the note above. */ requestHref?: string | null; isOwnProfile?: boolean; viewerCantBook?: boolean; canProposeCategory?: boolean }) => {
@@ -125,16 +140,26 @@ export const MobileBookingBar = ({ onBook, priceLabel, sessionMin, bufferMin = 0
             the same action twice, once as an icon and once as a button. */}
         {canMessage && !messagePromoted && (
           requestHref ? (
-            // The same swap the desktop rail makes — one secondary action, the
-            // same destination on both, so the page does not offer two different
-            // second steps depending on the width of the screen.
+            /* ⚠️ ONE ICON HERE, NOT TWO — AND IT IS NOT THE CHAT GLYPH (2026-08-20).
+               The desktop rail now draws both second steps (a secondary button
+               for the request, a quiet text link for the question); this bar
+               cannot. Its width is MEASURED in this file — a price, an icon
+               button and „შესვლა და დაჯავშნა" already fill 360px, and a second
+               48px control is what pushed that label onto two lines before.
+               So the bar keeps the action that gets the job DONE, and the
+               question stays a tap away inside the page (the service rows carry
+               „დაკვეთა", the sections carry the thread).
+               The glyph changed with the reasoning: `chat` is a speech bubble
+               and this opens a FORM. It said „conversation" on the one control
+               that is not one — the same lie the desktop button carried until
+               today. `doc` is what a brief looks like. */
             <Link
               href={requestHref}
               aria-label="გამოაგზავნე მოთხოვნა"
               title="გამოაგზავნე მოთხოვნა"
               className="h-12 w-12 shrink-0 rounded-btn border border-ink-200 bg-white text-ink-700 hover:border-brand-300 hover:text-brand-700 inline-flex items-center justify-center transition-colors duration-fast"
             >
-              <Icon.chat className="w-5 h-5" />
+              <Icon.doc className="w-5 h-5" />
             </Link>
           ) : onMessage ? (
             <button
@@ -478,15 +503,34 @@ export const StickyBookingCard = ({
               See the note at the top of this file for why `requestHref` takes
               this slot rather than earning a third button. */}
           {canMessage && !messagePromoted && (
-            requestHref ? (
-              <Btn href={requestHref} variant="secondary" size="lg" className="w-full mt-2.5">
-                <Icon.chat className="w-4 h-4" /> გამოაგზავნე მოთხოვნა
-              </Btn>
-            ) : onMessage ? (
-              <Btn variant="secondary" size="lg" onClick={onMessage} className="w-full mt-2.5">
-                <Icon.chat className="w-4 h-4" /> მიწერე ექსპერტს
-              </Btn>
-            ) : null
+            <>
+              {requestHref && (
+                /* No chat glyph on this one any more: a speech bubble on a
+                   multi-step form told the reader it opens a conversation, and
+                   it is the one control on the rail that does not. */
+                <Btn href={requestHref} variant="secondary" size="lg" className="w-full mt-2.5">
+                  გამოაგზავნე მოთხოვნა
+                </Btn>
+              )}
+              {onMessage && (
+                requestHref ? (
+                  /* THE QUIET THIRD. A text link, not a button — it is the
+                     cheapest act on the page and must not compete with the two
+                     that commit to something. */
+                  <button
+                    type="button"
+                    onClick={onMessage}
+                    className="mt-2.5 w-full inline-flex items-center justify-center gap-1.5 text-small font-display font-semibold text-ink-600 hover:text-brand-700 transition-colors duration-fast tap-area"
+                  >
+                    <Icon.chat className="w-3.5 h-3.5" /> ან დაუსვი კითხვა
+                  </button>
+                ) : (
+                  <Btn variant="secondary" size="lg" onClick={onMessage} className="w-full mt-2.5">
+                    <Icon.chat className="w-4 h-4" /> მიწერე ექსპერტს
+                  </Btn>
+                )
+              )}
+            </>
           )}
           {/* Decision-point reassurance: what happens NEXT, one line. With no
               slots to pick there is no „next you choose a time", so an honest

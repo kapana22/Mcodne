@@ -22,17 +22,45 @@
 // გჭირდება" question their trades already answer, and the endpoint opens the
 // INVITED thread with them the moment the request is written.
 
+// ⚠️ TWO ACTIONS SINCE 2026-08-20, AND THE SECOND IS NOT A DUPLICATE. Owner:
+// „მინდა რომ … გავუგზავნო სერვისი, მივწერო ან დავუკავშირდე — რამდენიმე ვარიანტი
+// უნდა ქონდეს." Until today this card carried ONE button, and the expert rail
+// argued (app/experts/[slug]/_booking, „THE SECOND VERB") that a message and a
+// request are „the same intent". They are not, and the difference is the whole
+// reason somebody bounces:
+//
+//   მიწერე            one question, one line, answered in a thread —
+//                     „ამას აკეთებ?", „ხუთშაბათს თავისუფალი ხარ?"
+//   გამოაგზავნე       a multi-step brief — topic, city, budget band, description
+//   მოთხოვნა          — which opens offers and is how the job is actually let
+//
+// Making the brief the only door prices a one-line question at a whole wizard.
+// That is interaction cost in the NN/g sense: the effort exceeds the value of
+// the act, and the act does not happen. The request stays PRIMARY — it is what
+// gets the work done and it needs no account, which is the intake's own design
+// („no registration, anywhere") — and the question sits quietly beneath it.
+//
+// ⚠️ THE MESSAGE LINK IS OMITTED, NEVER DISABLED, when there is nobody to write
+// to (a company profile — `messageHref` null). A greyed control still asks a
+// question whose answer does not exist.
+
 import { Btn } from '@/components/Btn'
 import { Card } from '@/components/Card'
+import { Icon } from '@/components/Icon'
 import { requestHrefFor } from './_providerData'
 
 export function ProviderCta({ master }: {
-  /** The profile this button belongs to — only its address is used. */
-  master: { slug: string | null; id: string }
+  /** The profile these buttons belong to — its address, and whoever to write to. */
+  master: { slug: string | null; id: string; messageHref: string | null }
 }) {
   return (
     <Card>
       <Btn href={requestHrefFor(master)} variant="hero" size="lg" className="w-full">გამოაგზავნე მოთხოვნა</Btn>
+      {master.messageHref && (
+        <Btn href={master.messageHref} variant="secondary" size="lg" className="w-full mt-2.5">
+          <Icon.chat className="w-4 h-4" /> მიწერე
+        </Btn>
+      )}
       {/* The terms at the decision point, in the owner's own words from the
           deleted trades door — the same action, so the same sentence. */}
       <p className="mt-3 text-small text-ink-500">

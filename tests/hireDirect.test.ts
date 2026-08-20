@@ -300,8 +300,24 @@ test('§E both profile CTAs carry the recipient and stay behind requestsOn()', (
     'the expert CTA is not gated on the flag, or no longer carries the slug')
   const booking = read('app/experts/[slug]/_booking.tsx')
   assert.match(booking, /დაჯავშნე/, 'booking stopped being the profile’s primary action')
-  // It takes the slot the message button has — never a third button.
-  assert.match(booking, /requestHref \? \([\s\S]{0,400}variant="secondary"/)
+  // ⚠️ IT NO LONGER TAKES THE MESSAGE BUTTON'S SLOT (2026-08-20). This used to
+  // assert `requestHref ? (…variant="secondary"` — a TERNARY, i.e. the request
+  // button REPLACING the message button. That was argued from „the two are the
+  // same intent"; they are not. A message is one question in a thread, a
+  // request is a multi-step brief that opens offers, and handing the form to
+  // somebody who wanted to ask „ამას აკეთებ?" is how the question stops being
+  // asked at all. Owner, 2026-08-20: „რამდენიმე ვარიანტი უნდა ქონდეს."
+  //
+  // What replaces the old pin is the property that actually matters: BOTH are
+  // reachable, and they are NOT peers. The request is the secondary BUTTON; the
+  // question is a quiet text link under it. Hierarchy is what keeps a rail from
+  // arguing with itself — not the number of controls.
+  assert.match(booking, /requestHref && \([\s\S]{0,400}variant="secondary"[\s\S]{0,200}გამოაგზავნე მოთხოვნა/,
+    'the request path is no longer the rail’s secondary button')
+  assert.match(booking, /requestHref \?[\s\S]{0,600}ან დაუსვი კითხვა/,
+    'the question link vanished — the request button is swallowing the message path again')
+  assert.doesNotMatch(booking, /ან დაუსვი კითხვა[\s\S]{0,200}variant="hero"/,
+    'the question was promoted to a primary CTA — it is the cheapest act on the page, not the loudest')
   assert.doesNotMatch(booking, /requestHref[\s\S]{0,200}variant="hero"/,
     'the request path was promoted to a primary CTA on the expert profile')
   // Never while messaging has already been promoted TO primary — the rail must
