@@ -1,4 +1,4 @@
-/* Validation errors must POINT somewhere (app/apply/ApplyClient).
+/* Validation errors must POINT somewhere (app/join/_expert/ApplyClient).
  *
  * The failure this guards against is silent and total: a validator names a
  * field (`fail('headline', …)`) that has no matching `data-field` anchor in the
@@ -14,13 +14,13 @@ const check = (name: string, ok: boolean, why = '') => {
   else { failed++; console.log(`✗ ${name}${why ? ` — ${why}` : ''}`) }
 }
 
-/* /apply is split across `app/apply/_*.tsx` — ApplyClient.tsx is only the
+/* /join's expert wizard is split across `app/join/_expert/_*.tsx` — ApplyClient.tsx is only the
    container now. These assertions are about the FORM as a whole, so read the
    directory rather than a filename the next split would invalidate. */
-const src = readdirSync(new URL('../app/apply/', import.meta.url))
+const src = readdirSync(new URL('../app/join/_expert/', import.meta.url))
   .filter(f => f.endsWith('.tsx'))
   .sort()
-  .map(f => readFileSync(new URL(`../app/apply/${f}`, import.meta.url), 'utf8'))
+  .map(f => readFileSync(new URL(`../app/join/_expert/${f}`, import.meta.url), 'utf8'))
   .join('\n')
 const uniq = (re: RegExp) => [...new Set([...src.matchAll(re)].map(m => m[1]))].sort()
 

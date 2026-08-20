@@ -42,14 +42,14 @@ test('§B the order is the priority, and CLIENT is the floor', () => {
 test('§C the first hat wins — a tradesperson never lands on the student dashboard', () => {
   // THE REGRESSION, stated directly.
   assert.equal(homeForHats(['MASTER', 'CLIENT']), HAT_HOME.MASTER)
-  assert.notEqual(homeForHats(['MASTER', 'CLIENT']), '/student')
+  assert.notEqual(homeForHats(['MASTER', 'CLIENT']), '/me')
 
-  assert.equal(homeForHats(['CLIENT']), '/student')
-  assert.equal(homeForHats(['EXPERT', 'CLIENT']), '/tutor')
+  assert.equal(homeForHats(['CLIENT']), '/me')
+  assert.equal(homeForHats(['EXPERT', 'CLIENT']), '/work')
   // The owner's own shape: admin AND on the allowlist. The panel wins.
   assert.equal(homeForHats(['ADMIN', 'MASTER', 'CLIENT']), '/admin')
   // A tutor who also does home repairs — the case a fourth Role could not hold.
-  assert.equal(homeForHats(['EXPERT', 'MASTER', 'CLIENT']), '/tutor')
+  assert.equal(homeForHats(['EXPERT', 'MASTER', 'CLIENT']), '/work')
 
   // An empty list cannot happen while hatsOf always returns CLIENT, but the
   // fallback must still be a real path rather than undefined.

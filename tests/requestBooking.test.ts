@@ -28,7 +28,7 @@ const respond = readFileSync(join(ROOT, 'app/api/bookings/[id]/reschedule/respon
  *  so leaving it in would let a comment satisfy an assertion about code.
  *
  *  ORDER MATTERS, and getting it wrong is silent. Line 77 of the route contains
- *  `/student/*` inside a `//` comment. Stripping block comments FIRST makes
+ *  `/me/*` inside a `//` comment. Stripping block comments FIRST makes
  *  that the opening of a block, which then runs to the next `*​/` three hundred
  *  lines later and deletes most of the file — every assertion below failed
  *  against an empty-ish string that looked like a real mismatch. Line comments
@@ -58,10 +58,10 @@ test('every surface that offers a proposal is category-scoped', () => {
   // Read the whole page directory: the profile is split across `_*.tsx` files
   // (the two CTAs live in _booking.tsx, the predicate is derived in client.tsx),
   // and this assertion is about the page as a whole, not about one file.
-  const profile = readdirSync(join(ROOT, 'app/tutors/[id]'))
+  const profile = readdirSync(join(ROOT, 'app/experts/[slug]'))
     .filter(f => f.endsWith('.tsx'))
     .sort()
-    .map(f => readFileSync(join(ROOT, 'app/tutors/[id]', f), 'utf8'))
+    .map(f => readFileSync(join(ROOT, 'app/experts/[slug]', f), 'utf8'))
     .join('\n')
   assert.match(profile, /const isAbroadProfile = isAbroadCategory\(/)
   assert.equal((profile.match(/FEATURE_REQUEST_BOOKING && canProposeCategory/g) ?? []).length, 2)

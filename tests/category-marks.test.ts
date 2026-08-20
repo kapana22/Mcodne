@@ -13,7 +13,7 @@
 // SOURCE-LEVEL on purpose: importing lib/categoryMarks would pull in
 // components/Icon (JSX + the `@/` alias), which this bare-node runner cannot
 // resolve. The invariants here are all about the TEXT of the map anyway.
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
 
 let passed = 0, failed = 0
 const check = (name: string, ok: boolean, why = '') => {
@@ -64,10 +64,14 @@ const home = [
     .sort()
     .map(f => readFileSync(new URL(`../app/_home/${f}`, import.meta.url), 'utf8')),
 ].join('\n')
-const cats = readFileSync(new URL('../app/categories/page.tsx', import.meta.url), 'utf8')
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 check('C6: the home page no longer keeps its own map', !/CAT_META\s*:/.test(strip(home)))
-check('C7: /categories no longer keeps its own map', !/ICON_MAP\s*:/.test(strip(cats)))
+// C7 used to read app/categories/page.tsx for a private ICON_MAP. That page was
+// RETIRED in stage 8 (2026-08-19; /categories/* 308s to /tutors?category=), so
+// the assertion is now that the directory stays gone — a resurrected page would
+// have to be argued for, and would have to draw from lib/categoryMarks like
+// everybody else (tests/taxonomy.test.ts pins the redirect).
+check('C7: app/categories stays retired', !existsSync(new URL('../app/categories', import.meta.url)))
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

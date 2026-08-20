@@ -46,8 +46,8 @@ test('the route map is not empty — the context feature is the whole point', ()
 })
 
 test('every route returns a full, non-empty, duplicate-free list', () => {
-  const routes = ['/', '/tutors', '/tutors/some-expert', '/apply', '/signup', '/signin',
-                  '/student/bookings/abc', '/tutor/schedule', '/blog/x', '', null, undefined]
+  const routes = ['/', '/tutors', '/experts/some-expert', '/join', '/signup', '/signin',
+                  '/me/bookings/abc', '/work/schedule', '/blog/x', '', null, undefined]
   for (const r of routes) {
     const got = topicsForRoute(r as string)
     assert.equal(got.length, ALL_TOPICS.length, `route ${r} dropped or duplicated topics`)
@@ -57,16 +57,16 @@ test('every route returns a full, non-empty, duplicate-free list', () => {
 
 test('context ordering actually differs by route — otherwise it is just /help', () => {
   const first = (r: string) => topicsForRoute(r).slice(0, HELP_VISIBLE).map(t => t.q).join('|')
-  assert.notEqual(first('/apply'), first('/tutors/x'))
-  assert.notEqual(first('/apply'), first('/'))
+  assert.notEqual(first('/join'), first('/experts/x'))
+  assert.notEqual(first('/join'), first('/'))
   // The most specific prefix wins: a profile is not the browse page.
-  assert.notEqual(first('/tutors/x'), first('/tutors'))
+  assert.notEqual(first('/experts/x'), first('/tutors'))
 })
 
 test('the expert-side routes lead with the money questions', () => {
   // Someone stops mid-application over commission and payout timing, not over
   // „what is mcodne".
-  const top = topicsForRoute('/apply').slice(0, 3).map(t => t.q).join(' ')
+  const top = topicsForRoute('/join').slice(0, 3).map(t => t.q).join(' ')
   assert.match(top, /ექსპერტი/)
   assert.match(top, /კომისი|თანხას/)
 })
@@ -128,8 +128,8 @@ test('the widget events are ACCEPTED by the /api/events validator', () => {
   // the code you expected to write.
   // ─────────────────────────────────────────────────────────────────────────
   const cases: { label: string; body: unknown }[] = [
-    { label: 'opened', body: { name: HELP_EVENTS.opened, props: { route: normalizeRoute('/apply') } } },
-    { label: 'question', body: { name: HELP_EVENTS.question, props: { route: normalizeRoute('/tutors/nino-x'), q: ALL_TOPICS[0].id } } },
+    { label: 'opened', body: { name: HELP_EVENTS.opened, props: { route: normalizeRoute('/join') } } },
+    { label: 'question', body: { name: HELP_EVENTS.question, props: { route: normalizeRoute('/experts/nino-x'), q: ALL_TOPICS[0].id } } },
     { label: 'unresolved', body: { name: HELP_EVENTS.unresolved, props: { route: normalizeRoute('/'), seen: HELP_VISIBLE } } },
   ]
   for (const c of cases) {
@@ -148,9 +148,9 @@ test('the widget events are ACCEPTED by the /api/events validator', () => {
   // Every route the app can produce must normalise into something acceptable —
   // including the ones with ids, Georgian slugs and query strings, since a
   // rejected beacon is silent.
-  const routes = ['/', '/tutors', '/tutors/nino-kapanadze-a1b2', '/apply', '/signin',
-                  '/student/bookings/clx0000000000000000000000', '/blog/რატომ-მცოდნე',
-                  '/konsultacia/biznes-konsultacia?utm_source=x', '/' + 'a'.repeat(200)]
+  const routes = ['/', '/tutors', '/experts/nino-kapanadze-a1b2', '/join', '/signin',
+                  '/me/bookings/clx0000000000000000000000', '/blog/რატომ-მცოდნე',
+                  '/experts/biznes-konsultanti?utm_source=x', '/' + 'a'.repeat(200)]
   for (const r of routes) {
     const got = parseEventBody({ name: HELP_EVENTS.opened, props: { route: normalizeRoute(r) } })
     assert.equal(got.ok, true, `route ${r} normalises to something the API rejects`)
@@ -280,9 +280,9 @@ test('every answer action is internal and role-honest', () => {
       `topic '${t.id}' action leaves the site: ${a.href}`)
     assert.ok(a.label.trim().length > 2, `topic '${t.id}' has an empty action label`)
     // The role-correctness rule: an apply CTA may never be shown to someone who
-    // is already an expert, so /apply actions must be gated.
-    if (a.href.startsWith('/apply')) {
-      assert.equal(a.gate, 'apply', `topic '${t.id}' points at /apply without gate: 'apply'`)
+    // is already an expert, so /join actions must be gated.
+    if (a.href.startsWith('/join')) {
+      assert.equal(a.gate, 'apply', `topic '${t.id}' points at /join without gate: 'apply'`)
     }
     // /settings bounces an anonymous visitor to /signin — a dead end dressed
     // as an answer.
@@ -292,7 +292,9 @@ test('every answer action is internal and role-honest', () => {
   }
   // And the widget must actually apply both gates rather than just carrying them.
   const widget = readFileSync(join(ROOT, 'components/HelpWidget.tsx'), 'utf8')
-  assert.match(widget, /showApplyCta/, 'the widget renders apply actions without the role gate')
+  // Capabilities since 2026-08-19 (a master keeps role CLIENT — the role gate
+  // invited providers to become providers). Same contract: the gate is applied.
+  assert.match(widget, /showJoinInvite/, 'the widget renders apply actions without the join gate')
   assert.match(widget, /gate === 'auth'/, 'the widget renders auth-only actions to anonymous visitors')
 })
 

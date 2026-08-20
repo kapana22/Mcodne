@@ -136,7 +136,7 @@ const baseRow = {
   const both = imminentTargets([{ ...baseRow }])
   check('prefs: default (no prefs row) reminds both parties', both.length === 2, String(both.length))
   check('prefs: each side is deep-linked to its own space',
-    both.some(t => t.href.startsWith('/student/bookings/')) && both.some(t => t.href.startsWith('/tutor/bookings/')))
+    both.some(t => t.href.startsWith('/me/bookings/')) && both.some(t => t.href.startsWith('/work/bookings/')))
   check('prefs: counterpart is the OTHER person for each recipient',
     both.find(t => t.userId === 'u_student')?.counterpartName === 'გიორგი' &&
     both.find(t => t.userId === 'u_tutor')?.counterpartName === 'ნინო')
@@ -169,10 +169,10 @@ const WHEN = fmtWhenTz(T0, { year: true })
   check('tz: fmtWhenTz appends the Tbilisi label', WHEN.includes(TZ_LABEL), WHEN)
   check('tz: label is Georgian, not an abbreviation', TZ_LABEL === 'თბილისის დროით', TZ_LABEL)
 
-  const imminent = sessionImminentEmail({ counterpartName: 'გიორგი', topic: 'თემა', whenText: WHEN, href: '/student/bookings/bk_1' })
+  const imminent = sessionImminentEmail({ counterpartName: 'გიორგი', topic: 'თემა', whenText: WHEN, href: '/me/bookings/bk_1' })
   check('tz: imminent email prints the labelled time', imminent.html.includes(TZ_LABEL))
 
-  const reminder = sessionReminderEmail({ name: 'ნინო', counterpartName: 'გიორგი', topic: 'თემა', whenText: WHEN, durationText: '60 წუთი', href: '/student/bookings/bk_1' })
+  const reminder = sessionReminderEmail({ name: 'ნინო', counterpartName: 'გიორგი', topic: 'თემა', whenText: WHEN, durationText: '60 წუთი', href: '/me/bookings/bk_1' })
   check('tz: ~1h reminder prints the labelled time', reminder.html.includes(TZ_LABEL))
   // The detail table gained the counterpart + the length (they were missing).
   check('reminder: detail table names the counterpart', reminder.html.includes('ვისთან') && reminder.html.includes('გიორგი'))
@@ -184,7 +184,7 @@ const WHEN = fmtWhenTz(T0, { year: true })
   ]
   const missingTz = kinds.filter(k => !bookingChangedEmail(k, {
     counterpartName: 'გიორგი', topic: 'თემა', whenText: WHEN, newWhenText: WHEN,
-    href: '/student/bookings/bk_1',
+    href: '/me/bookings/bk_1',
   }).html.includes(TZ_LABEL))
   check('tz: every bookingChangedEmail kind prints the labelled time', missingTz.length === 0, missingTz.join(', '))
 }
@@ -218,7 +218,7 @@ const XSS = '<script>alert(1)</script>'
     actorLabel: XSS,
     reason: XSS,
     note: XSS,
-    href: '/student/bookings/bk_1',
+    href: '/me/bookings/bk_1',
   })
   check('esc: no raw <script> survives into the html', !evil.html.includes('<script'), evil.html.slice(0, 200))
   check('esc: hostile input is entity-encoded', evil.html.includes('&lt;script&gt;'))
@@ -229,17 +229,17 @@ const XSS = '<script>alert(1)</script>'
     'reschedule_proposed', 'reschedule_accepted', 'reschedule_rejected',
   ]
   const built = all.map(k => bookingChangedEmail(k, {
-    counterpartName: 'გიორგი', topic: 'თემა', whenText: WHEN, newWhenText: WHEN, href: '/student/bookings/bk_1',
+    counterpartName: 'გიორგი', topic: 'თემა', whenText: WHEN, newWhenText: WHEN, href: '/me/bookings/bk_1',
   }))
   check('cta: every link is absolute (BASE + href)',
-    built.every(b => b.html.includes('https://mcodne.ge/student/bookings/bk_1')))
+    built.every(b => b.html.includes('https://mcodne.ge/me/bookings/bk_1')))
   check('subject: no CR/LF in any subject', built.every(b => !/[\r\n]/.test(b.subject)))
   check('subject: every kind has its own subject', new Set(built.map(b => b.subject)).size === all.length)
 }
 
 {
-  const imminent = sessionImminentEmail({ counterpartName: 'გიორგი', topic: 'თემა', whenText: WHEN, href: '/student/bookings/bk_1' })
-  const hour = sessionReminderEmail({ name: 'ნინო', counterpartName: 'გიორგი', topic: 'თემა', whenText: WHEN, href: '/student/bookings/bk_1' })
+  const imminent = sessionImminentEmail({ counterpartName: 'გიორგი', topic: 'თემა', whenText: WHEN, href: '/me/bookings/bk_1' })
+  const hour = sessionReminderEmail({ name: 'ნინო', counterpartName: 'გიორგი', topic: 'თემა', whenText: WHEN, href: '/me/bookings/bk_1' })
   check('subject: the imminent mail is not mistakable for the ~1h one', imminent.subject !== hour.subject, imminent.subject)
   check('subject: the imminent subject shares no leading words with the ~1h one',
     imminent.subject.split(' ')[0] !== hour.subject.split(' ')[0])

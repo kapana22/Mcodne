@@ -39,7 +39,7 @@ function check(name: string, ok: boolean, hint: string) {
 }
 
 const ROUTE = 'app/api/bookings/[id]/route.ts'
-const PAGE = 'app/student/bookings/[id]'
+const PAGE = 'app/me/bookings/[id]'
 const route = read(ROUTE)
 /* The screen is split across `_*.tsx` files beside page.tsx — these assertions
    are about the SCREEN, so read the directory rather than one filename. */
@@ -204,7 +204,7 @@ check(
 
 check(
   '5c: the expert is pointed at a real contest surface',
-  /\/tutor\/bookings\/\$\{own\.id\}#chat/.test(expertBranch) && /notifyMany/.test(expertBranch),
+  /\/work\/bookings\/\$\{own\.id\}#chat/.test(expertBranch) && /notifyMany/.test(expertBranch),
   'POST /api/disputes is student-only, so the expert contests via the thread + an admin — the admin ping must fire.',
 )
 

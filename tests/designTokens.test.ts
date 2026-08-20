@@ -258,6 +258,38 @@ const AA = 4.5
   )
 }
 
+// ── G. anything TAPPABLE in the admin is ≥40px (stage 11, 2026-08-19) ───────
+// CLAUDE.md „Control heights": the h-5/6/7/8 chip tiers are for INERT badges;
+// a chip that gains onClick/href moves to the compact interactive tier
+// (`h-10 sm:h-9`, <Btn size="sm">) or keeps its look and gains a `tap-area`
+// ::before hit area. ~50 legacy interactive h-7/h-8 chips predated the rule;
+// the admin's were swept in stage 11 (five filter rails, blog/moderation/
+// categories buttons, the three user micro-toggles → tap-area). This scan is
+// TAG-scoped, not line-scoped: the toggles carry onClick and className on
+// different lines, which is exactly the shape a `grep h-8 | grep onClick`
+// would miss.
+{
+  const { readdirSync } = require('fs') as typeof import('fs')
+  const offenders: string[] = []
+  const tag = /<(?:button|a|Link)\b[^>]*>/gs
+  for (const f of readdirSync(join(root, 'app/admin')).filter(f => f.endsWith('.tsx'))) {
+    const src = read(join('app/admin', f))
+    for (const m of src.matchAll(tag)) {
+      // Comment lines inside a tag (`// h-8 is 32px…`) are prose, not classes.
+      const t = m[0].replace(/^\s*\/\/.*$/gm, '')
+      if (!/\bonClick=|\bhref=/.test(t)) continue
+      if (!/(?<![\w:-])h-[78](?![\w.])/.test(t)) continue
+      if (/\btap-area\b/.test(t)) continue
+      offenders.push(`app/admin/${f}:${src.slice(0, m.index).split('\n').length}`)
+    }
+  }
+  check(
+    'G: no h-7/h-8 element with onClick/href in app/admin',
+    offenders.length === 0,
+    `${offenders.length} tappable chip(s) under the 40px floor: ${offenders.slice(0, 5).join(', ')}. Use h-10 sm:h-9 (Btn size="sm") or add tap-area.`,
+  )
+}
+
 if (failures > 0) {
   console.error(`\n${failures} design-token guard(s) FAILED`)
   process.exit(1)

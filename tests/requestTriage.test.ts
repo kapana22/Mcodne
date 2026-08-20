@@ -33,12 +33,23 @@ test('§A an ordinary request routes without waiting for anybody', () => {
   assert.equal(triageNote([]), null)
 })
 
-test('§B a below-floor budget is still held', () => {
-  // The floor exists because nobody here can serve it. Routing it would spend
-  // every expert's attention on work that will be refused.
+test('§B a below-floor budget is NOT held any more', () => {
+  // ⚠️ THIS TEST WAS INVERTED ON 2026-08-18, and the inversion is the point.
+  //
+  // It used to assert that the lowest budget band was held back from routing,
+  // because the endpoint refused such a request outright. That floor rejected
+  // ONE IN THREE requests this platform ever received — 7 of 21, four of them
+  // 20₾ lessons, which is simply what a pupil's budget looks like. The closest
+  // local competitor asks for no budget at all.
+  //
+  // Owner, 2026-08-18: „ზღვარი მოხსენი." So a low budget must now route like
+  // any other, and this test exists so that reinstating the floor by accident
+  // fails loudly rather than quietly re-closing the funnel.
   const flags = triageFlags({ ...ok, budgetBand: 's0' })
-  assert.ok(flags.includes('BELOW_FLOOR'))
-  assert.equal(mayAutoVerify({ ...ok, budgetBand: 's0' }), false)
+  assert.ok(!flags.includes('BELOW_FLOOR'),
+    'the budget floor is back — one in three requests will stop reaching anybody')
+  assert.equal(mayAutoVerify({ ...ok, budgetBand: 's0' }), true,
+    'a low budget is holding a request back from auto-verification again')
 })
 
 test('§C „სხვა" is held, because there is nothing to route it on', () => {
@@ -79,19 +90,31 @@ test('§F an obviously fake number is held; a foreign one is too, not refused', 
 })
 
 test('§G every flag has words the operator can read', () => {
-  const flags = triageFlags({ ...ok, budgetBand: 's0', topic: 'other', recentFromPhone: 9 })
-  assert.ok(flags.length >= 3)
+  // `budgetBand: 's0'` used to be one of the three flags this raised; since the
+  // floor was removed it raises none, so the case now leans on a description
+  // that carries both a phone number and a link.
+  const flags = triageFlags({
+    ...ok, topic: 'other', recentFromPhone: 9,
+    description: 'დამირეკე 599 12 34 56 ან ნახე https://example.com',
+  })
+  assert.ok(flags.length >= 3, `expected three or more flags, got ${flags.join(', ')}`)
   const note = triageNote(flags)
   assert.ok(note && note.length > 0)
   // Never a raw code in the operator's note.
   for (const f of flags) assert.ok(note!.includes(TRIAGE_LABEL[f]), `${f} rendered as a code`)
 })
 
-test('§H the endpoint still refuses to route a below-floor request', () => {
-  // ⚠️ THE ORDER MATTERS AND IS EASY TO BREAK. `rejected` must beat
-  // auto-verification: a request under the floor is answered, never broadcast.
-  // Asserted against the source because the alternative is a live database.
+test('§H the status ladder still has REJECTED above auto-verification', () => {
+  // ⚠️ NOTHING SETS `rejected` TODAY — the budget floor was the only thing that
+  // ever did, and it is gone (see §B). The ladder is asserted anyway, and
+  // deliberately: `rejected` is the shape any future refusal will arrive in,
+  // and if the ordering rots while the branch is dead, the first real rejection
+  // will be broadcast to every expert instead of answered. A dead branch that
+  // is still correct is cheap; a dead branch that is quietly wrong is a bug
+  // waiting for its first caller.
   const src = readFileSync('app/api/requests/route.ts', 'utf8')
+  assert.match(src, /const rejected = false/,
+    'something rejects requests on arrival again — check it is not the budget floor coming back')
   assert.match(src, /const autoVerified = !rejected && flags\.length === 0/,
     'auto-verification stopped deferring to the budget floor')
   assert.match(src, /status: rejected \? 'REJECTED' : autoVerified \? 'VERIFIED' : 'NEW'/,

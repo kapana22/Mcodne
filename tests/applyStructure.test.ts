@@ -22,13 +22,13 @@ import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import { materializeWeekly } from '../lib/availabilityRules'
 
-/* /apply is split across `app/apply/_*.tsx` — ApplyClient.tsx is only the
+/* /join's expert wizard is split across `app/join/_expert/_*.tsx` — ApplyClient.tsx is only the
    container now. These assertions are about the FORM as a whole, so read the
    directory rather than a filename the next split would invalidate. */
-const src = readdirSync(new URL('../app/apply/', import.meta.url))
+const src = readdirSync(new URL('../app/join/_expert/', import.meta.url))
   .filter(f => f.endsWith('.tsx'))
   .sort()
-  .map(f => readFileSync(new URL(`../app/apply/${f}`, import.meta.url), 'utf8'))
+  .map(f => readFileSync(new URL(`../app/join/_expert/${f}`, import.meta.url), 'utf8'))
   .join('\n')
 const approve = readFileSync(new URL('../app/api/applications/[id]/route.ts', import.meta.url), 'utf8')
 

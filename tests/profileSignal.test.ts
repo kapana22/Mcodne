@@ -39,7 +39,7 @@ import {
   MIN_SIGNAL_VIEWS,
   RATE_MIN_VIEWS,
   LOW_CONVERSION,
-} from '../app/tutor/_components/ProfileSignal'
+} from '../app/work/_components/ProfileSignal'
 
 /* ───── tiny assert harness (matches tests/ vibe) ───── */
 
@@ -181,12 +181,12 @@ check('diagnosis: 0 views + 0 free time → the TIME is the problem',
 check('diagnosis: views but 0 free time → still the TIME, not the profile',
   d(40, 0, 0).key === 'no-time')
 check('diagnosis: the no-time verdicts point at the schedule, not the profile',
-  d(0, 0, 0).cta?.href === '/tutor/schedule' && d(40, 0, 0).cta?.href === '/tutor/schedule')
+  d(0, 0, 0).cta?.href === '/work/schedule' && d(40, 0, 0).cta?.href === '/work/schedule')
 
 check('diagnosis: 0 views (with free time) → a VISIBILITY problem',
   d(0, 0).key === 'no-views')
 check('diagnosis: the 0-view verdict points at the profile screen that fixes it',
-  d(0, 0).cta?.href === '/tutor/profile')
+  d(0, 0).cta?.href === '/work/profile')
 check('diagnosis: the 0-view verdict states the zero plainly and invents no demand',
   (() => {
     const t = d(0, 0).text
@@ -198,10 +198,10 @@ check('diagnosis: a handful of views is NOT dressed up as a verdict',
 check('diagnosis: at MIN_SIGNAL_VIEWS the persuasion reading turns on',
   d(MIN_SIGNAL_VIEWS, 0).key === 'no-bookings')
 check('diagnosis: many views + no bookings → a PERSUASION problem, aimed at the profile',
-  d(120, 0).key === 'no-bookings' && d(120, 0).cta?.href === '/tutor/profile')
+  d(120, 0).key === 'no-bookings' && d(120, 0).cta?.href === '/work/profile')
 
 check('diagnosis: a low rate on enough views → persuasion, aimed at the profile',
-  d(RATE_MIN_VIEWS * 5, 1).key === 'low-rate' && d(RATE_MIN_VIEWS * 5, 1).cta?.href === '/tutor/profile')
+  d(RATE_MIN_VIEWS * 5, 1).key === 'low-rate' && d(RATE_MIN_VIEWS * 5, 1).cta?.href === '/work/profile')
 check('diagnosis: the same low rate on too few views is NOT called low',
   d(RATE_MIN_VIEWS - 1, 1).key === 'working')
 check('diagnosis: LOW_CONVERSION is the boundary — exactly at it is not "low"',

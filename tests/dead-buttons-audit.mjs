@@ -97,10 +97,10 @@ const bookingsRes = await fetch(`${BASE}/api/student/bookings`, {
 const bookings = await bookingsRes.json()
 
 const studentPages = [
-  { url: '/student', name: 'StudentDash' },
+  { url: '/me', name: 'StudentDash' },
   { url: `/tutors/${tutors[0].id}`, name: 'ExpertProfile' },
   ...(bookings[0] ? [
-    { url: `/student/bookings/${bookings[0].id}`, name: 'BookingDetail' },
+    { url: `/me/bookings/${bookings[0].id}`, name: 'BookingDetail' },
     { url: `/session/${bookings[0].id}`, name: 'VideoSession' },
   ] : []),
 ]
@@ -129,7 +129,7 @@ if (adminAudit.deadButtons.length) {
 console.log('\n\n=== SIGNED IN (tutor) ===')
 await ctx.clearCookies()
 await signIn('giorgi.meladze@mcodne.ge', 'tutor1234')
-const tutorAudit = await auditPage('/tutor', 'TutorDash')
+const tutorAudit = await auditPage('/work', 'TutorDash')
 console.log(`\nTutor (${tutorAudit.url}): total=${tutorAudit.totalButtons} wired=${tutorAudit.wired} dead=${tutorAudit.dead}`)
 if (tutorAudit.deadButtons.length) {
   console.log('  DEAD:')

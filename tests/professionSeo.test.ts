@@ -2,7 +2,8 @@
 //
 // Run: npx tsx tests/professionSeo.test.ts
 //
-// This data drives 15 indexable URLs, and every way it breaks is silent:
+// This data drives 15 indexable URLs (/experts/<slug> since stage 8, 2026-08-19;
+// was /konsultacia/<slug>), and every way it breaks is silent:
 // a categorySlug that doesn't exist renders a page listing nobody, a duplicate
 // slug shadows a whole page, and a missing labelWith/labelPlural produces
 // Georgian non-words in an H1 („ბუღალტერითან") because the language declines by
@@ -101,7 +102,7 @@ const LIVE_CATEGORIES = [
   const uncovered = LIVE_CATEGORIES.filter(c => professionsForCategory(c).length === 0)
   check('EVERY live category has at least one profession page',
     uncovered.length === 0,
-    `no cross-links on /categories/${uncovered.join(', /categories/')}`)
+    `no profession page points at: ${uncovered.join(', ')}`)
 
   check('professionsForCategory returns only that category',
     professionsForCategory('tax').every(p => p.categorySlug === 'tax'))

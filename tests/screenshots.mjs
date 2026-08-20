@@ -24,7 +24,7 @@ await page.fill('input[type=email]', 'student@mcodne.ge')
 await page.fill('input[type=password]', 'student1234')
 await page.click('button[type=submit]:has-text("შესვლა")')
 await page.waitForURL(/\/student/, { timeout: 8000 })
-await shot('/student', 'student')
+await shot('/me', 'student')
 
 // Get tutor & booking IDs
 const tutorsRes = await fetch(`${BASE}/api/tutors`)
@@ -36,7 +36,7 @@ const bookingsRes = await fetch(`${BASE}/api/student/bookings`, {
 })
 const bookings = await bookingsRes.json()
 if (bookings[0]) {
-  await shot(`/student/bookings/${bookings[0].id}`, 'booking-detail')
+  await shot(`/me/bookings/${bookings[0].id}`, 'booking-detail')
   await shot(`/session/${bookings[0].id}`, 'session')
 }
 
@@ -56,7 +56,7 @@ await page.fill('input[type=email]', 'giorgi.meladze@mcodne.ge')
 await page.fill('input[type=password]', 'tutor1234')
 await page.click('button[type=submit]:has-text("შესვლა")')
 await page.waitForURL(/\/tutor/, { timeout: 8000 })
-await shot('/tutor', 'tutor')
+await shot('/work', 'tutor')
 
 await browser.close()
 console.log('done')

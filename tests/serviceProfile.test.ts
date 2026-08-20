@@ -13,11 +13,14 @@ import assert from 'node:assert/strict'
 
 import {
   SERVICE_GROUPS, SERVICE_TOPICS, isServiceTopic, MAX_SERVICES,
+  LIVE_SERVICE_GROUPS, LIVE_SERVICE_TOPICS,
   ServiceProfileInput, profileIsRoutable, profileGaps,
   serviceLabels, areaLabels, priceHint, covers, sanitizeStored,
   vocabularyIsConsistent,
 } from '../lib/serviceProfile'
-import { CITIES } from '../lib/requestTopics'
+import {
+  CITIES, TOPIC_GROUPS, BROWSABLE_GROUPS, groupIsLive, SUGGESTED_TOPICS,
+} from '../lib/requestTopics'
 
 /* ═══════════ A. the vocabulary is derived, never re-typed ═══════════════ */
 
@@ -171,4 +174,55 @@ test('§F an unpriced master says nothing rather than „—"', () => {
   assert.equal(priceHint({ calloutFee: 30, priceFrom: null }), 'გამოძახება 30₾')
   assert.equal(priceHint({ calloutFee: null, priceFrom: 50 }), 'სამუშაო 50₾-დან')
   assert.equal(priceHint({ calloutFee: 30, priceFrom: 50 }), 'გამოძახება 30₾ · სამუშაო 50₾-დან')
+})
+
+/* ═══════════ §L the launch gate ═════════════════════════════════════════ */
+// The four open trades are a SUPPLY decision, and the whole design rests on it
+// narrowing what is OFFERED without narrowing what is UNDERSTOOD. Both halves
+// are asserted here, because losing either one is silent: a picker that draws
+// all eight promises work nobody can do, and a matcher that only knows four
+// files „კარი გაფუჭდა" under OTHER and loses the signal that would tell us
+// which group to open next.
+test('§L live groups gate the pickers but not the vocabulary', () => {
+  assert.equal(LIVE_SERVICE_GROUPS.length, 4, 'the launch set is four groups')
+  assert.ok(
+    LIVE_SERVICE_GROUPS.length < SERVICE_GROUPS.length,
+    'nothing is gated — the closed groups vanished from the catalogue instead',
+  )
+  for (const g of LIVE_SERVICE_GROUPS) {
+    assert.ok(g.kinds.includes('SERVICE'), `${g.id} is live but not a service group`)
+  }
+  // The gate must not touch validation. A master seeded by hand into a closed
+  // group has to keep saving — see the comment on LIVE_SERVICE_GROUPS.
+  const closed = SERVICE_GROUPS.filter(g => !LIVE_SERVICE_GROUPS.includes(g))
+  assert.ok(closed.length > 0, 'no closed groups to check')
+  for (const g of closed) {
+    for (const t of g.topics) {
+      assert.ok(isServiceTopic(t.id), `${t.id} is closed AND unsavable — the gate leaked into the schema`)
+    }
+  }
+})
+
+test('§L every browsable group is either non-service or live', () => {
+  for (const g of BROWSABLE_GROUPS) {
+    assert.ok(groupIsLive(g), `${g.id} is browsable but not live`)
+  }
+  // Consultation and learning are never gated: the gate is about staffing a
+  // city with vans, and an online consultation needs none.
+  const nonService = TOPIC_GROUPS.filter(g => !g.kinds.includes('SERVICE'))
+  for (const g of nonService) {
+    assert.ok(BROWSABLE_GROUPS.includes(g), `${g.id} was gated and it is not a trade`)
+  }
+})
+
+test('§L the suggested chips only point at open groups', () => {
+  // Six chips are the first thing on the wizard's what-step. One pointing into
+  // a closed trade is the exact promise the gate exists to stop making, and it
+  // would be made in the most prominent place on the screen.
+  const live = new Set(LIVE_SERVICE_TOPICS.map(t => t.id))
+  for (const t of SUGGESTED_TOPICS) {
+    if (isServiceTopic(t.id)) {
+      assert.ok(live.has(t.id), `suggested chip „${t.label}" points at a closed trade`)
+    }
+  }
 })

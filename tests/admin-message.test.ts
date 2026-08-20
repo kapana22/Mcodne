@@ -91,11 +91,11 @@ test('every link in the mail is absolute (an inbox has no site-relative base)', 
       `relative or foreign link in an email: ${h}`,
     )
   }
-  assert.ok(hrefs.includes('https://mcodne.ge/apply'), 'the expert starter must link straight to /apply')
+  assert.ok(hrefs.includes('https://mcodne.ge/join'), 'the expert starter must link straight to /join')
 })
 
 test('destination is chosen from a fixed map, unknown input falls back to blank', () => {
-  assert.equal(adminMessageDestination('expert').href, '/apply')
+  assert.equal(adminMessageDestination('expert').href, '/join')
   assert.equal(adminMessageDestination('info').href, '/settings')
   assert.equal(adminMessageDestination('blank').href, '/notifications')
   // Anything unexpected (or absent) must land on the safe default, never on a

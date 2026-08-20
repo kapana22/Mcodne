@@ -7,8 +7,8 @@
 // "search card vs tutor-detail mismatch" bug (B) and the "booking CTA lies" bug
 // (C):
 //
-//   1. The search card (app/tutors/page.tsx) and the expert detail page
-//      (app/tutors/[id]/page.tsx) must resolve the SAME price / duration / name
+//   1. The search card (app/experts/page.tsx) and the expert detail page
+//      (app/experts/[slug]/page.tsx) must resolve the SAME price / duration / name
 //      for the same API row — especially when fields are missing. They used to
 //      drift (duration 30 vs 60, price 60 vs 80, name "ექსპერტი" vs "—").
 //   2. `priceForDuration` is FLAT — the duration argument is a display label
@@ -28,7 +28,7 @@ function priceForDuration(base: number, _minutes: number): number {
   return Math.max(0, Math.round(base || 0))
 }
 
-// Availability → CTA-enabled predicate (isTutorBookable in app/tutors/page.tsx;
+// Availability → CTA-enabled predicate (isTutorBookable in app/experts/page.tsx;
 // mirrors StickyBookingCard's `uniqueDays.length === 0` gate on the detail page).
 function isTutorBookable(nextSlotAt?: string | null): boolean {
   return nextSlotAt != null
@@ -41,7 +41,7 @@ type ApiRow = {
 }
 type Resolved = { name: string; price: number; durationMin: number }
 
-// Card resolution — app/tutors/page.tsx fetchTutors mapper.
+// Card resolution — app/experts/page.tsx fetchTutors mapper.
 function resolveCard(t: ApiRow): Resolved {
   return {
     name: t.user?.fullName ?? TUTOR_DEFAULTS.name,
@@ -50,7 +50,7 @@ function resolveCard(t: ApiRow): Resolved {
   }
 }
 
-// Detail resolution — app/tutors/[id]/page.tsx booking call sites.
+// Detail resolution — app/experts/[slug]/page.tsx booking call sites.
 function resolveDetail(t: ApiRow): Resolved {
   return {
     name: t.user?.fullName ?? TUTOR_DEFAULTS.name,

@@ -115,13 +115,13 @@ test('refine() forwards the rule verbatim into zod', () => {
 
 /* ── the contract, read off the two files that have to honour it ── */
 const api = readFileSync(new URL('../app/api/applications/route.ts', import.meta.url), 'utf8')
-/* /apply is split across `app/apply/_*.tsx` — ApplyClient.tsx is only the
+/* /join's expert wizard is split across `app/join/_expert/_*.tsx` — ApplyClient.tsx is only the
    container now. These assertions are about the FORM as a whole, so read the
    directory rather than a filename the next split would invalidate. */
-const form = readdirSync(new URL('../app/apply/', import.meta.url))
+const form = readdirSync(new URL('../app/join/_expert/', import.meta.url))
   .filter(f => f.endsWith('.tsx'))
   .sort()
-  .map(f => readFileSync(new URL(`../app/apply/${f}`, import.meta.url), 'utf8'))
+  .map(f => readFileSync(new URL(`../app/join/_expert/${f}`, import.meta.url), 'utf8'))
   .join('\n')
 
 test('the API states no bound of its own for a shared field', () => {

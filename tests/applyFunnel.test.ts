@@ -16,7 +16,7 @@
 //      flowId / code / tutorId may be strings — the free-text firewall — so it
 //      too was silently refused. It now reuses `code`.
 import { parseEventBody, BOOKING_FUNNEL_EVENTS, FLOW_ID_RE } from '../components/booking/funnelEvents'
-import { APPLY_FUNNEL_EVENTS, APPLY_FUNNEL_PROP_KEYS, newApplyFlowId } from '../app/apply/applyFunnelEvents'
+import { APPLY_FUNNEL_EVENTS, APPLY_FUNNEL_PROP_KEYS, newApplyFlowId } from '../app/join/_expert/applyFunnelEvents'
 
 let passed = 0
 let failed = 0

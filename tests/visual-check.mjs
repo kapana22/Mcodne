@@ -37,7 +37,7 @@ await page.click('button[type=submit]:has-text("შესვლა")')
 await page.waitForURL(/\/student/, { timeout: 8000 })
 
 const pages = [
-  '/', '/tutors', '/apply', '/signin', '/student',
+  '/', '/tutors', '/apply', '/signin', '/me',
 ]
 
 // Real IDs
@@ -50,7 +50,7 @@ const bookingsRes = await fetch(`${BASE}/api/student/bookings`, {
 })
 const bookings = await bookingsRes.json()
 if (bookings[0]) {
-  pages.push(`/student/bookings/${bookings[0].id}`)
+  pages.push(`/me/bookings/${bookings[0].id}`)
   pages.push(`/session/${bookings[0].id}`)
 }
 
@@ -92,7 +92,7 @@ await page.fill('input[type=password]', 'tutor1234')
 await page.click('button[type=submit]:has-text("შესვლა")')
 await page.waitForURL(/\/tutor/, { timeout: 8000 })
 
-for (const p of ['/tutor']) {
+for (const p of ['/work']) {
   const r = await checkPage(p)
   const flags = []
   if (r.errorBanner) flags.push('ERROR-BANNER')

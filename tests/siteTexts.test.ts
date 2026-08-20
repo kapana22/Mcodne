@@ -34,14 +34,18 @@ import { PAGE_SEO } from '../lib/pageSeoDefs'
 /** Which file owns each page's metadata. */
 const FILE_BY_PAGE: Record<string, string> = {
   home: 'app/page.tsx',
-  tutors: 'app/tutors/page.tsx',
-  apply: 'app/apply/page.tsx',
+  // The KEY is historical: the catalogue was /tutors until stage 10 (2026-08-19).
+  tutors: 'app/experts/page.tsx',
+  apply: 'app/join/page.tsx',
   help: 'app/help/page.tsx',
   about: 'app/about/page.tsx',
   blog: 'app/blog/page.tsx',
-  categories: 'app/categories/page.tsx',
-  services: 'app/services/page.tsx',
-  konsultacia: 'app/konsultacia/page.tsx',
+  // `categories` is RETIRED (stage 8), and `services`, `masters` and
+  // `konsultacia` are RETIRED (stage 10): those pages are gone, their rows stay.
+  // Skipped in the loop below by `retired`, so none of them has a file here.
+  // Both provider pitches are served by the one door since 2026-08-19; the
+  // page picks the registry row from `?can=`. The ids are DB keys — never renamed.
+  'apply-master': 'app/join/page.tsx',
   contact: 'app/contact/page.tsx',
 }
 
@@ -136,9 +140,14 @@ test('every public page takes its SEO text from the registry', () => {
   // them, and a page that goes back to a static `metadata` object silently
   // stops being editable.
   for (const p of PAGE_SEO) {
+    // A retired page has no file — its rows are kept only for the DB (stage 8).
+    if (p.retired) { assert.equal(FILE_BY_PAGE[p.page], undefined); continue }
     const file = FILE_BY_PAGE[p.page]
+    assert.ok(file, `${p.page}: no file owns this page's metadata`)
     const src = readFileSync(join(ROOT, file), 'utf8')
-    assert.match(src, /export const generateMetadata = \(\) => pageMetadata\(/, `${file}: metadata is not built from the registry`)
+    // `/join` picks its registry row from `?can=` (a ternary between two
+    // pageMetadata calls); every other page is the bare arrow.
+    assert.match(src, /export const generateMetadata = (?:async )?\([^)]*\) =>[\s\S]{0,160}?pageMetadata\(/, `${file}: metadata is not built from the registry`)
     assert.doesNotMatch(src, /export const metadata: Metadata = \{/, `${file}: went back to a hardcoded metadata object`)
     // …and it must render per request, or the built HTML freezes whatever the
     // defaults were at BUILD time — when Railway's builder cannot reach the DB.

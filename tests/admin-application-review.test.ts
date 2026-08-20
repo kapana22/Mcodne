@@ -135,5 +135,34 @@ check(
   'A refusal the moderator cannot read is a refusal they will retry.',
 )
 
+/* ═════ D3 + D4 — a moderator's second click cannot duplicate or clobber ════ */
+{
+  const root = join(__dirname, '..')
+  const approve = readFileSync(join(root, 'app/api/applications/[id]/route.ts'), 'utf8')
+  // Every „count, then createMany" seed runs under seedOnce, which takes the
+  // profile's row lock so two approvals in flight serialise instead of both
+  // counting zero.
+  check(
+    'D3: seedOnce locks the profile row (FOR UPDATE) before counting',
+    /async function seedOnce\(/.test(approve) && /FOR UPDATE/.test(approve),
+    'Two concurrent approvals both count zero and both create — the live profile shows every tier and diploma twice.',
+  )
+  for (const table of ['consultation', 'certificate', 'availabilitySlot']) {
+    const usesTx = new RegExp(`tx\\.${table}\\.count\\(`).test(approve) && new RegExp(`tx\\.${table}\\.createMany\\(`).test(approve)
+    const usesBare = new RegExp(`prisma\\.${table}\\.count\\(`).test(approve) || new RegExp(`prisma\\.${table}\\.createMany\\(`).test(approve)
+    check(
+      `D3: the ${table} seed counts and creates through the locked transaction`,
+      usesTx && !usesBare,
+      'A seed step outside seedOnce is the duplicate factory again.',
+    )
+  }
+  const patch = readFileSync(join(root, 'app/api/admin/requests/[id]/route.ts'), 'utf8')
+  check(
+    'D4: the admin request PATCH claims the row on the status it was read at',
+    /updateMany\(\{\s*where: \{ id, status: before\.status \}/.test(patch) && /claim\.count !== 1/.test(patch) && /status: 409/.test(patch),
+    'A plain update() lets two admins overwrite each other silently — the second one’s status wins and nobody is told.',
+  )
+}
+
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

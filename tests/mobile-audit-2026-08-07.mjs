@@ -27,10 +27,10 @@ fs.mkdirSync(OUT, { recursive: true })
 const ROUTES = process.env.ROUTES
   ? process.env.ROUTES.split(',')
   : [
-      '/', '/tutors', '/categories', '/about', '/help', '/contact', '/blog', '/apply',
-      '/konsultacia', '/signin', '/signup', '/terms', '/privacy',
-      '/categories/business', '/categories/it', '/categories/law',
-      '/konsultacia/biznes-konsultanti', '/konsultacia/iuristi', '/konsultacia/fsikologi',
+      '/', '/tutors', '/about', '/help', '/contact', '/blog', '/join',
+      '/experts', '/signin', '/signup', '/terms', '/privacy',
+      '/tutors?category=business', '/tutors?category=it', '/tutors?category=law',
+      '/experts/biznes-konsultanti', '/experts/iuristi', '/experts/fsikologi',
       '/blog/ra-aris-biznes-konsultacia', '/blog/shps-dafudzneba-saqartveloshi',
       '/tutors/luka-lortkipanidze', '/tutors/ana-gagoshidze', '/tutors/nino-gakhokia',
     ]

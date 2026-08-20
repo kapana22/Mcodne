@@ -56,13 +56,13 @@ test('every code the API can answer with has a Georgian sentence', () => {
 
 const item = readFileSync(new URL('../app/api/tutor/availability/[id]/route.ts', import.meta.url), 'utf8')
 const coll = readFileSync(new URL('../app/api/tutor/availability/route.ts', import.meta.url), 'utf8')
-/* The schedule screen is split across `app/tutor/schedule/_*.tsx` — the slot
+/* The schedule screen is split across `app/work/(expert)/schedule/_*.tsx` — the slot
    and template sheets are their own files now. These assertions are about the
    SCREEN, so read the directory rather than one filename. */
-const page = readdirSync(new URL('../app/tutor/schedule/', import.meta.url))
+const page = readdirSync(new URL('../app/work/(expert)/schedule/', import.meta.url))
   .filter(f => /\.tsx?$/.test(f))
   .sort()
-  .map(f => readFileSync(new URL(`../app/tutor/schedule/${f}`, import.meta.url), 'utf8'))
+  .map(f => readFileSync(new URL(`../app/work/(expert)/schedule/${f}`, import.meta.url), 'utf8'))
   .join('\n')
 
 test('editing a window is possible at all', () => {
@@ -78,7 +78,7 @@ test('an edit does not conflict with itself', () => {
 
 test('an edit is authorised like a delete', () => {
   const patch = item.slice(item.indexOf('export async function PATCH'), item.indexOf('export async function DELETE'))
-  assert.match(patch, /requireRoleApi\(\['TUTOR', 'ADMIN'\]\)/)
+  assert.match(patch, /requireRoleApi\(\[ROLE\.EXPERT, ROLE\.ADMIN\]\)/)
   assert.match(patch, /userId !== user\.id && user\.role !== 'ADMIN'/, 'a window must not be editable by its non-owner')
 })
 

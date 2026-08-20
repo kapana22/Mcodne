@@ -29,7 +29,7 @@ navItems.slice(0, 30).forEach(n => console.log(`  [${n.tag}] "${n.text}" href="$
 // Try clicking each nav item and see where it goes
 console.log('\n=== CLICK EACH NAV ITEM ===')
 const testPaths = [
-  { selector: 'a[href="/student"], button:has-text("მთავარი")', name: 'მთავარი' },
+  { selector: 'a[href="/me"], button:has-text("მთავარი")', name: 'მთავარი' },
   { selector: 'a:has-text("ჩემი ჯავშნები"), button:has-text("ჩემი ჯავშნები")', name: 'ჩემი ჯავშნები' },
   { selector: 'a:has-text("პროფილი"), button:has-text("პროფილი")', name: 'პროფილი' },
   { selector: 'a:has-text("სეთინგები"), a:has-text("პარამეტრები"), button:has-text("სეთინგები"), button:has-text("პარამეტრები")', name: 'პარამეტრები' },
@@ -54,7 +54,7 @@ for (const t of testPaths) {
 
 // Check what /profile, /settings, /messages routes actually resolve to
 console.log('\n=== EXPECTED USER ROUTES ===')
-for (const r of ['/student/profile', '/student/settings', '/student/messages', '/student/favorites', '/student/bookings']) {
+for (const r of ['/me/profile', '/me/settings', '/me/messages', '/me/favorites', '/me/bookings']) {
   const resp = await page.goto(`${BASE}${r}`, { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(1000)
   const status = resp?.status()

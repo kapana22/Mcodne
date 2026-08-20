@@ -5,7 +5,7 @@
  *
  * WHY THIS FILE EXISTS. A filter that cannot change the result set is worse
  * than a missing one: the reader spends attention on it, taps it, and either
- * nothing happens or the page empties with no explanation. app/tutors/_filters
+ * nothing happens or the page empties with no explanation. app/experts/_filters
  * already carries a long note about this — three facets shipped as
  * guaranteed-zero on 2026-08-02 — and it was still true on 2026-08-12, measured
  * against the live roster:
@@ -39,7 +39,7 @@ import { join } from 'node:path'
 type Facets = { rating: Record<string, number>; langs: Record<string, number>; pool: number; superOnly: number }
 const {
   FILTER_LANGS, FILTER_RATINGS, ratingUseless, usefulLangs,
-} = require('../app/tutors/_filters') as {
+} = require('../app/experts/_filters') as {
   FILTER_LANGS: { l: string }[]
   FILTER_RATINGS: number[]
   ratingUseless: (f: Facets) => boolean
@@ -105,26 +105,37 @@ test('the availability filter is gone from every surface', () => {
   // Read as source across the whole route directory rather than a file list:
   // CLAUDE.md warns that a negative assertion aimed at one filename passes
   // vacuously the moment the code moves to a sibling.
-  const dir = join(ROOT, 'app/tutors')
+  const dir = join(ROOT, 'app/experts')
   const src = readdirSync(dir)
     .filter(f => f.endsWith('.tsx'))
     .map(f => readFileSync(join(dir, f), 'utf8'))
     .join('\n')
   for (const ghost of ['FILTER_AVAIL', 'availMatches', 'ხელმისაწვდომობა', 'ნებისმიერ დროს']) {
-    assert.ok(!src.includes(ghost), `app/tutors still references ${ghost}`)
+    assert.ok(!src.includes(ghost), `app/experts still references ${ghost}`)
   }
   // …and the Filters type no longer carries the field, so a stale `?avail=`
   // bookmark is simply ignored instead of half-applying.
-  assert.doesNotMatch(read('app/tutors/_filters.tsx'), /^\s*available: string\[\]/m)
+  assert.doesNotMatch(read('app/experts/_filters.tsx'), /^\s*available: string\[\]/m)
 })
 
 test('every offered option still carries its own count', () => {
-  // The honesty this file inherits: a chip that says „(3)" and hands back two
+  // The honesty this file inherits: a row that says „(3)" and hands back two
   // cards is the failure the shared `passesFilters` predicate exists to stop.
-  // Both surfaces — the desktop dropdowns and the phone drawer — must pass one.
-  for (const f of ['app/tutors/_hero.tsx', 'app/tutors/_filters.tsx']) {
-    assert.match(read(f), /count=\{facets\.langs\[l\.l\] \?\? 0\}/, `${f}: language options lost their counts`)
-  }
+  //
+  // It used to be asserted on TWO files, because there were two filter surfaces
+  // — the hero's desktop dropdowns and the phone drawer. Since 2026-08-19 there
+  // is one: the shared rail (components/catalog/FilterPanel), the same
+  // component at both breakpoints. So the count is pinned where the options are
+  // drawn, and the two-surface risk is pinned out of existence instead of
+  // being checked twice.
+  assert.match(read('app/experts/_filters.tsx'), /count=\{facets\.langs\[l\.l\] \?\? 0\}/,
+    'app/experts/_filters.tsx: language options lost their counts')
+  assert.match(read('app/experts/_filters.tsx'), /facets\.rating\[String\(r\)\] \?\? 0/,
+    'app/experts/_filters.tsx: rating options lost their counts')
+  const client = read('app/experts/client.tsx')
+  assert.match(client, /<TutorFilters/, 'the rail is not the filter surface')
+  assert.doesNotMatch(client, /FiltersPanel|<Sheet/, 'a second copy of the refinements is back')
+  assert.doesNotMatch(read('app/experts/_hero.tsx'), /facets/, 'the hero filters again')
   assert.ok(FILTER_LANGS.length >= 2 && FILTER_RATINGS.length >= 2)
 })
 
@@ -135,7 +146,7 @@ test('the default sort is newest-first, and the URL says so by staying silent', 
   // MUST agree — when they disagreed once before, the default was written into
   // every URL as if the visitor had chosen it, so every shared link carried a
   // `?sort=` the sender never picked.
-  const src = read('app/tutors/client.tsx')
+  const src = read('app/experts/client.tsx')
   assert.match(src, /params\?\.get\('sort'\) \?\? 'new'/, 'the default sort is not newest-first')
   assert.match(src, /if \(sort !== 'new'\) url\.set\('sort', sort\)/,
     'the URL-sync default disagrees with the useState default')
@@ -148,7 +159,7 @@ test('a free-text search still ranks by relevance, not by date', () => {
   // Re-sorting it by createdAt would push the best match onto page 3.
   // An EXPLICIT ?sort=new still wins; only the default defers.
   assert.match(
-    read('app/tutors/client.tsx'),
+    read('app/experts/client.tsx'),
     /case 'new':\s*if \(!rankedByRelevance\)/,
     'newest-first no longer defers to search relevance',
   )
@@ -161,7 +172,7 @@ test('a typed query is never the page heading', () => {
   // page handed to an arbitrary string the visitor had just typed — and the one
   // string on screen guaranteed not to be designed. It also said nothing, since
   // the words were still in the field directly below it.
-  const hero = read('app/tutors/_hero.tsx')
+  const hero = read('app/experts/_hero.tsx')
   const label = hero.slice(hero.indexOf('const headingLabel'), hero.indexOf('const catVal'))
   assert.doesNotMatch(label, /search\.trim\(\)/, 'the h1 prints the raw query again')
   // A CATEGORY may still title the page: it is a name we own, from a fixed
@@ -172,7 +183,7 @@ test('a typed query is never the page heading', () => {
 test('the query is a removable chip instead', () => {
   // It has to live somewhere: a refinement the visitor cannot see is one they
   // cannot undo. The chip row is where every other refinement already is.
-  const client = read('app/tutors/client.tsx')
+  const client = read('app/experts/client.tsx')
   assert.match(client, /\{ k: 'q', v: `„\$\{search\.trim\(\)\}“` \}/, 'the query has no chip')
   assert.match(client, /if \(k === 'q'\)\s+setSearch\(''\)/, 'the query chip cannot be removed')
 })
@@ -182,5 +193,5 @@ test('no keyboard-shortcut furniture in the search field', () => {
   // and on focus) and read as an artifact to everyone else — the owner saw it
   // as a stray slash. A consumer marketplace in Georgian is not where a
   // power-user affordance earns its space.
-  assert.doesNotMatch(read('app/tutors/_hero.tsx'), /<kbd/, 'the / shortcut badge is back')
+  assert.doesNotMatch(read('app/experts/_hero.tsx'), /<kbd/, 'the / shortcut badge is back')
 })

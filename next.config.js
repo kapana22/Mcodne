@@ -30,7 +30,7 @@ const nextConfig = {
   // be two variables to keep in agreement — the exact failure lib/flags.ts
   // warns about. `env:` inlines the SAME name at build time, which matches how
   // the middleware already consumes it (per-request reads stay server-only).
-  env: { FEATURE_REQUESTS: process.env.FEATURE_REQUESTS },
+  env: { FEATURE_REQUESTS: process.env.FEATURE_REQUESTS, FEATURE_PROVIDERS: process.env.FEATURE_PROVIDERS },
 }
 // Everything under public/ shipped `max-age=0`, and the four preloaded fonts
 // therefore cost a blocking 304 round-trip (~220–270ms, measured) on every

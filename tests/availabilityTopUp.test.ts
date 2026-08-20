@@ -89,7 +89,7 @@ test('it only ever uses the expert’s own stored pattern', () => {
 
 test('suspended accounts are skipped and the cron cannot be broken by it', () => {
   assert.match(src, /suspendedAt: null/)
-  assert.match(src, /role: 'TUTOR'/)
+  assert.match(src, /role: ROLE\.EXPERT/)
   assert.match(src, /catch \(e\) \{[\s\S]{0,200}\[server-error\] availability top-up/)
 })
 

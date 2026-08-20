@@ -83,9 +83,9 @@ test('the route 404s while the flag is off — actually, not just in principle',
 test('noindex, nofollow — and no OG card', () => {
   const page = read('app/abroad/page.tsx')
   assert.match(page, /robots: \{ index: false, follow: false \}/)
-  // nofollow is deliberate and differs from /ask (which is index:false,
-  // follow:true). /ask links out to profiles we DO want crawled; /abroad links
-  // to diaspora profiles that are equally not ready. If someone „fixes" this to
+  // nofollow is deliberate and differs from the retired /ask (which was
+  // index:false, follow:true — it linked out to profiles we DO want crawled);
+  // /abroad links to diaspora profiles that are equally not ready. If someone „fixes" this to
   // follow:true, the hidden category starts leaking through its own experts.
   // No OG card either — that is for a page you want shared. (Matched on the
   // import, not the word: the file's own comment explains the decision.)

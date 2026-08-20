@@ -103,11 +103,11 @@ const student = await ctxFor('student')
 const tutor = await ctxFor('tutor')
 
 const tutorId = await firstId(guest, '/tutors', '/tutors/')
-const sBooking = await firstId(student, '/student/bookings', '/student/bookings/')
+const sBooking = await firstId(student, '/me/bookings', '/me/bookings/')
 
 const GUEST = [['/', 'home'], ['/tutors', 'tutors'], tutorId && [`/tutors/${tutorId}`, 'profile'], ['/categories', 'categories'], ['/about', 'about'], ['/help', 'help'], ['/contact', 'contact'], ['/signin', 'signin'], ['/apply', 'apply']].filter(Boolean)
-const STUDENT = [['/student', 'dashboard'], ['/student/bookings', 'bookings'], sBooking && [`/student/bookings/${sBooking}`, 'booking-detail'], ['/student/messages', 'messages'], ['/student/favorites', 'favorites'], ['/settings', 'settings']].filter(Boolean)
-const TUTOR = [['/tutor', 'dashboard'], ['/tutor/bookings', 'bookings'], ['/tutor/schedule', 'schedule'], ['/tutor/earnings', 'earnings'], ['/tutor/profile', 'profile']].filter(Boolean)
+const STUDENT = [['/me', 'dashboard'], ['/me/bookings', 'bookings'], sBooking && [`/me/bookings/${sBooking}`, 'booking-detail'], ['/me/messages', 'messages'], ['/me/favorites', 'favorites'], ['/settings', 'settings']].filter(Boolean)
+const TUTOR = [['/work', 'dashboard'], ['/work/bookings', 'bookings'], ['/work/schedule', 'schedule'], ['/work/earnings', 'earnings'], ['/work/profile', 'profile']].filter(Boolean)
 
 for (const w of [360, 390]) {
   for (const [r, n] of GUEST) await audit(guest, 'guest', r, n, w)

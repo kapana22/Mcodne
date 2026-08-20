@@ -16,11 +16,11 @@ const routes = [
 
 // Also test authed pages
 const authedRoutes = [
-  '/student',
-  '/tutor',
+  '/me',
+  '/work',
   '/admin',
   '/tutors/notfound-id',
-  '/student/bookings/notfound-id',
+  '/me/bookings/notfound-id',
   '/session/notfound-id',
 ]
 

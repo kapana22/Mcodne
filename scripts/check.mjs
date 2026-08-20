@@ -37,12 +37,23 @@ import { dirname, join } from 'node:path'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const FAST = process.argv.includes('fast')
 
+// Every stage gets a deadline. On 2026-08-19 one test file waited on something
+// that never arrived and, because the runner had no timeout, the gate sat there
+// for four and a half hours: no failure, no deploy, no signal. A hang must
+// report as a failure, never as silence.
 const run = (cmd, args, opts = {}) =>
   new Promise(resolve => {
     const p = spawn(cmd, args, { cwd: ROOT, stdio: opts.quiet ? ['ignore', 'pipe', 'pipe'] : 'inherit', shell: false })
     let out = ''
+    let timer = null
     if (opts.quiet) { p.stdout.on('data', d => (out += d)); p.stderr.on('data', d => (out += d)) }
-    p.on('close', code => resolve({ code, out }))
+    if (opts.timeout) {
+      timer = setTimeout(() => {
+        p.kill('SIGKILL')
+        out += `\n  TIMEOUT after ${opts.timeout / 1000}s — killed`
+      }, opts.timeout)
+    }
+    p.on('close', code => { if (timer) clearTimeout(timer); resolve({ code, out, timedOut: !!timer && code === null }) })
   })
 
 const started = process.hrtime.bigint()
@@ -52,7 +63,7 @@ let failed = 0
 console.log('\n\x1b[1m▸ types\x1b[0m')
 {
   const t = process.hrtime.bigint()
-  const { code, out } = await run('npx', ['tsc', '--noEmit', '-p', 'tsconfig.json'], { quiet: true })
+  const { code, out } = await run('npx', ['tsc', '--noEmit', '-p', 'tsconfig.json'], { quiet: true, timeout: 180000 })
   if (code === 0) console.log(`  \x1b[32m✓\x1b[0m clean (${secs(t)})`)
   else { failed++; console.log(`  \x1b[31m✗\x1b[0m\n${out.split('\n').slice(0, 20).join('\n')}`) }
 }
@@ -63,9 +74,32 @@ console.log('\n\x1b[1m▸ tests\x1b[0m')
   // there is no runner, by design (they predate one and need no fixtures).
   const files = readdirSync(join(ROOT, 'tests')).filter(f => f.endsWith('.test.ts')).sort()
   const t = process.hrtime.bigint()
-  const results = await Promise.all(
-    files.map(async f => ({ f, ...(await run('npx', ['tsx', join('tests', f)], { quiet: true })) })),
-  )
+  // ⚠️ SIX AT A TIME, NOT NINETY-ONE (2026-08-19). This was `Promise.all` over
+  // every file, and about a dozen of them open a Prisma client against the real
+  // Postgres. Ninety-one processes racing for connections exhausted the pool:
+  // the ones that lost hung on connect, the gate had no timeout, and it sat
+  // there for FOUR AND A HALF HOURS with „▸ tests" on screen and nothing else.
+  // The next run failed differently — the build's own prerender could not get a
+  // connection either, so `/privacy` failed to export and a green change looked
+  // like a broken one.
+  //
+  // The cap is small deliberately. These tests are seconds each; the wall-clock
+  // cost of six lanes is a rounding error next to one bad afternoon, and a
+  // number the database can always serve is worth more than a faster gate.
+  const LANES = 6
+  const results = []
+  {
+    const queue = [...files]
+    const lane = async () => {
+      for (;;) {
+        const f = queue.shift()
+        if (!f) return
+        results.push({ f, ...(await run('npx', ['tsx', join('tests', f)], { quiet: true, timeout: 120000 })) })
+      }
+    }
+    await Promise.all(Array.from({ length: LANES }, lane))
+    results.sort((a, b) => a.f.localeCompare(b.f))
+  }
   const bad = results.filter(r => r.code !== 0)
   console.log(`  ${bad.length ? '\x1b[31m✗\x1b[0m' : '\x1b[32m✓\x1b[0m'} ${files.length - bad.length}/${files.length} passed (${secs(t)})`)
   for (const r of bad) {
@@ -81,7 +115,7 @@ if (!FAST) {
   // `next build` and a running `next dev` share .next and fight over the
   // manifests — a build that fails with PageNotFoundError on an API route is
   // almost always this, not the change under test.
-  const { code, out } = await run('npx', ['next', 'build'], { quiet: true })
+  const { code, out } = await run('npx', ['next', 'build'], { quiet: true, timeout: 600000 })
   if (code === 0) console.log(`  \x1b[32m✓\x1b[0m compiled (${secs(t)})`)
   else {
     failed++

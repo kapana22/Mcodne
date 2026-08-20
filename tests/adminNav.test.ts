@@ -94,6 +94,62 @@ test('every tab in the nav has a section rendered for it', () => {
   assert.deepEqual(unrendered, [], `these tabs render nothing: ${unrendered.join(', ')}`)
 })
 
+/* ═══════════ the 2026-08-19 tidy-up (owner's brief) ═════════════════════ */
+
+const navFile = readFileSync(join(ROOT, 'app/admin/_nav.tsx'), 'utf8')
+const pageFile = readFileSync(join(ROOT, 'app/admin/page.tsx'), 'utf8')
+const statsFile = readFileSync(join(ROOT, 'app/api/admin/stats/route.ts'), 'utf8')
+
+test('the panel opens on the overview, and the overview is the first nav row', () => {
+  // The default tab is „მიმოხილვა" (owner's call): the panel opens on the whole
+  // picture; the queues announce themselves through the badges instead.
+  assert.match(pageFile, /useState<AdminTab>\('overview'\)/, 'the landing tab is no longer the overview')
+  assert.equal(navIds[0], 'overview', `the first nav row is '${navIds[0]}', not the overview`)
+  // It stands alone above the groups: its own caption-less group, rendered
+  // before every other one, and a header is only drawn when a caption exists.
+  assert.match(navFile, /const NAV_GROUPS: NavGroup\[\] = \['home', 'queue'/, 'the overview group is not the first rendered group')
+  assert.match(navFile, /home: '',/, 'the overview group grew a caption')
+  assert.equal((navFile.match(/GROUP_LABEL\[g\] && /g) ?? []).length, 2,
+    'a caption-less group must draw no header on BOTH surfaces')
+  // The retired hash still lands: #analytics → overview.
+  assert.match(navFile, /analytics: 'overview',/)
+})
+
+test('the group captions and the three renamed tabs read as the owner wrote them', () => {
+  for (const line of ["queue: 'რიგი'", "people: 'ხალხი'", "content: 'ტექსტები'", "signals: 'რიცხვები'", "system: 'სისტემა'"]) {
+    assert.ok(navFile.includes(line), `GROUP_LABEL lost \`${line}\``)
+  }
+  // Only the label changed — the id is a deep link and a state value.
+  assert.match(navFile, /\{ id: 'insights',\s+l: 'ქცევა'/)
+  assert.match(navFile, /\{ id: 'integrations',\s+l: 'კოდი'/)
+  assert.match(navFile, /\{ id: 'broadcast',\s+l: 'შეტყობინების გაგზავნა'/)
+})
+
+test('the masters and disputes badges ride on the ONE stats fetch', () => {
+  // Same Promise.all as every other badge — a badge is never a second request
+  // from the shell, and never worth 500-ing the shell over (.catch(() => 0)).
+  const all = statsFile.slice(statsFile.indexOf('await Promise.all(['), statsFile.indexOf('])', statsFile.indexOf('await Promise.all([')))
+  assert.match(all, /providersFeatureExists\(\)\s*\?\s*prisma\.masterApplication\.count\(\{ where: \{ status: 'SUBMITTED' \} \}\)\.catch\(\(\) => 0\)\s*:\s*Promise\.resolve\(0\)/,
+    'the masters count is not inside Promise.all, or does not follow providersFeatureExists() with .catch(() => 0)')
+  // `resolvedAt` is the Dispute model's real resolution marker (prisma/schema.prisma).
+  assert.match(all, /prisma\.dispute\.count\(\{ where: \{ resolvedAt: null \} \}\)\.catch\(\(\) => 0\)/,
+    'the disputes count is not inside Promise.all with .catch(() => 0)')
+  assert.match(statsFile, /\[users, tutors, [^\]]*pendingMasters, openDisputes\] = await Promise\.all/)
+  assert.match(statsFile, /newRequests, pendingMasters, openDisputes,\s*\n/, 'the two counts are not in the JSON response')
+  // …and the shell reads them the same way it reads the other four.
+  for (const k of ['pendingMasters', 'openDisputes']) {
+    assert.match(pageFile, new RegExp(`if \\(typeof d\\?\\.${k} === 'number'\\)`), `page.tsx does not read ${k} from the stats response`)
+    assert.equal((pageFile.match(new RegExp(`${k}=\\{${k}\\}`, 'g')) ?? []).length, 2, `${k} is not passed to both AdminSidebar and TopBar`)
+  }
+  // The badge helper is the ONE place both surfaces read, so a badge means the
+  // same thing on desktop and mobile.
+  assert.match(navFile, /if \(id === 'masters'\) return pendingMasters \?\? 0/)
+  assert.match(navFile, /if \(id === 'disputes'\) return openDisputes \?\? 0/)
+  assert.doesNotMatch(navFile, /if \(id === 'bookings'\)/, '„ჯავშნები" is a ledger, not a queue — no badge')
+  assert.equal((navFile.match(/navBadge\(it\.id, pendingCount, helpOpen, b2bLeads, newRequests, pendingMasters, openDisputes\)/g) ?? []).length, 2,
+    'both surfaces must call navBadge with the same six counts')
+})
+
 /* ═══════════ consistency: one idea, written once ════════════════════════ */
 
 /* `_parts.tsx` is the primitives module itself — it DEFINES <PeriodSwitch> and

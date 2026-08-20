@@ -6,7 +6,7 @@
 // sessions list (SessionsPanel / NextSession) now share, so their numbers can
 // never diverge again. A Next.js `page.tsx` may only export `default`, so the
 // pure helpers below are kept byte-for-byte in sync with the module-local copy
-// in app/student/page.tsx (a shared lib/ module is out of scope for this fix).
+// in app/me/page.tsx (a shared lib/ module is out of scope for this fix).
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'

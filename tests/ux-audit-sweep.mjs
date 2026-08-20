@@ -98,10 +98,10 @@ const student = await makeContext('student')
 const tutor = await makeContext('tutor')
 
 const { tutorId } = await discover(guest)
-const sBookingId = await firstLink(student, '/student/bookings', '/student/bookings/')
-const sMsgId = await firstLink(student, '/student/messages', '/student/messages/')
-const tBookingId = await firstLink(tutor, '/tutor/bookings', '/tutor/bookings/')
-const tMsgId = await firstLink(tutor, '/tutor/messages', '/tutor/messages/')
+const sBookingId = await firstLink(student, '/me/bookings', '/me/bookings/')
+const sMsgId = await firstLink(student, '/me/messages', '/me/messages/')
+const tBookingId = await firstLink(tutor, '/work/bookings', '/work/bookings/')
+const tMsgId = await firstLink(tutor, '/work/messages', '/work/messages/')
 console.log('discovered ids:', { tutorId, sBookingId, sMsgId, tBookingId, tMsgId })
 
 const PUBLIC = [
@@ -109,25 +109,25 @@ const PUBLIC = [
   tutorId && [`/tutors/${tutorId}`, 'tutor-detail'],
   ['/categories', 'categories'], ['/discover', 'discover'], ['/about', 'about'],
   ['/blog', 'blog'], ['/contact', 'contact'], ['/help', 'help'], ['/apply', 'apply'],
-  ['/ask', 'ask'], ['/privacy', 'privacy'], ['/terms', 'terms'],
+  ['/privacy', 'privacy'], ['/terms', 'terms'],
   ['/signin', 'signin'], ['/signup', 'signup'], ['/nonexistent-xyz', '404'],
 ].filter(Boolean)
 const STUDENT = [
-  ['/student', 'dashboard'], ['/student/bookings', 'bookings'],
-  sBookingId && [`/student/bookings/${sBookingId}`, 'booking-detail'],
-  ['/student/messages', 'messages'],
-  sMsgId && [`/student/messages/${sMsgId}`, 'message-detail'],
-  ['/student/favorites', 'favorites'], ['/student/profile', 'profile'],
+  ['/me', 'dashboard'], ['/me/bookings', 'bookings'],
+  sBookingId && [`/me/bookings/${sBookingId}`, 'booking-detail'],
+  ['/me/messages', 'messages'],
+  sMsgId && [`/me/messages/${sMsgId}`, 'message-detail'],
+  ['/me/favorites', 'favorites'], ['/me/profile', 'profile'],
   ['/settings', 'settings'], ['/notifications', 'notifications'],
-  ['/signin', 'signin-when-authed'], ['/tutor', 'role-mismatch-tutor'],
+  ['/signin', 'signin-when-authed'], ['/work', 'role-mismatch-tutor'],
 ].filter(Boolean)
 const TUTOR = [
-  ['/tutor', 'dashboard'], ['/tutor/bookings', 'bookings'],
-  tBookingId && [`/tutor/bookings/${tBookingId}`, 'booking-detail'],
-  ['/tutor/messages', 'messages'],
-  tMsgId && [`/tutor/messages/${tMsgId}`, 'message-detail'],
-  ['/tutor/profile', 'profile'], ['/tutor/schedule', 'schedule'], ['/tutor/earnings', 'earnings'],
-  ['/settings', 'settings'], ['/signin', 'signin-when-authed'], ['/student', 'role-mismatch-student'],
+  ['/work', 'dashboard'], ['/work/bookings', 'bookings'],
+  tBookingId && [`/work/bookings/${tBookingId}`, 'booking-detail'],
+  ['/work/messages', 'messages'],
+  tMsgId && [`/work/messages/${tMsgId}`, 'message-detail'],
+  ['/work/profile', 'profile'], ['/work/schedule', 'schedule'], ['/work/earnings', 'earnings'],
+  ['/settings', 'settings'], ['/signin', 'signin-when-authed'], ['/me', 'role-mismatch-student'],
 ].filter(Boolean)
 
 const VPS = [{ width: 1440, height: 900 }, { width: 390, height: 844 }]

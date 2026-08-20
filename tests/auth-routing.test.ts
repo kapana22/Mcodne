@@ -16,7 +16,7 @@
 //      shell to anonymous visitors.
 //   D. The auth APIs that mint a session (signin, otp/verify, reset/confirm)
 //      return the server-decided `home` via postAuthHome, so pending expert
-//      applicants land on /apply instead of vanishing into /student.
+//      applicants land on /join instead of vanishing into /student.
 //   E. The Google OAuth callback uses postAuthHome + the g_oauth_next cookie
 //      (validated via safeInternalPath) instead of an inline role map.
 //   F. signOut clears the non-user-scoped localStorage drafts so they can't
@@ -47,15 +47,15 @@ function check(name: string, ok: boolean, hint: string) {
   const roleHome = read('lib/roleHome.ts')
   check(
     'A1: lib/roleHome.ts defines the canonical map',
-    /'\/admin'/.test(roleHome) && /'\/tutor'/.test(roleHome) && /'\/student'/.test(roleHome),
-    'homeForRole must map ADMIN→/admin, TUTOR→/tutor, else /student in lib/roleHome.ts',
+    /'\/admin'/.test(roleHome) && /'\/work'/.test(roleHome) && /'\/me'/.test(roleHome),
+    'homeForRole must map ADMIN→/admin, TUTOR→/work, else /me in lib/roleHome.ts',
   )
-  // Any inline `'/admin' : … '/tutor' : … '/student'` ternary outside
+  // Any inline `'/admin' : … '/work' : … '/me'` ternary outside
   // lib/roleHome.ts is a re-forked copy of the map.
   let hits = ''
   try {
     hits = execSync(
-      `grep -rn "'/admin'.*'/tutor'.*'/student'" app lib --include='*.ts' --include='*.tsx' | grep -v 'lib/roleHome.ts' || true`,
+      `grep -rn "'/admin'.*'/work'.*'/me'" app lib --include='*.ts' --include='*.tsx' | grep -v 'lib/roleHome.ts' || true`,
       { cwd: root, encoding: 'utf8' },
     ).trim()
   } catch { /* grep unavailable → skip, A1 still covers the canon */ }
@@ -86,9 +86,9 @@ function check(name: string, ok: boolean, hint: string) {
   const cases: Array<[string, RegExp]> = [
     // TUTOR is deliberate, not a leak: a dual-role user (expert who is also a
     // client) reaches their OWN client-side bookings/messages here. Data is
-    // scoped by ?space=student|tutor, not by the layout guard.
-    ['app/student/layout.tsx', /requireRole\(\['STUDENT', 'TUTOR', 'ADMIN'\]\)/],
-    ['app/tutor/layout.tsx', /requireRole\(\['TUTOR', 'ADMIN'\]\)/],
+    // scoped by ?space=client|expert, not by the layout guard.
+    ['app/me/layout.tsx', /requireRole\(\[ROLE\.CLIENT, ROLE\.EXPERT, ROLE\.ADMIN\]\)/],
+    ['app/work/(expert)/layout.tsx', /requireRole\(\[ROLE\.EXPERT, ROLE\.ADMIN\]\)/],
     ['app/admin/layout.tsx', /requireRole\('ADMIN'\)/],
     ['app/settings/layout.tsx', /requireUser\(\)/],
     ['app/notifications/layout.tsx', /requireUser\(\)/],
@@ -114,7 +114,7 @@ function check(name: string, ok: boolean, hint: string) {
     check(
       `D: ${p} returns home via postAuthHome`,
       /postAuthHome/.test(src) && /home:/.test(src),
-      'clients route by the returned `home` (pending applicants → /apply); without it they fall back to the bare role map.',
+      'clients route by the returned `home` (pending applicants → /join); without it they fall back to the bare role map.',
     )
   }
 }

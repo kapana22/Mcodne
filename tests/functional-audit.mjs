@@ -41,7 +41,7 @@ const login = async (page, email, pw, expectedPath) => {
 
 // 1. Full booking flow — student signs in, opens tutor profile, books
 await runTest('BOOK: full flow via /api/bookings', async (page, ctx) => {
-  await login(page, 'student@mcodne.ge', 'student1234', '/student')
+  await login(page, 'student@mcodne.ge', 'student1234', '/me')
   const tutors = await (await fetch(`${BASE}/api/tutors`)).json()
   await page.goto(`${BASE}/tutors/${tutors[0].id}`)
   await page.waitForTimeout(2000)
@@ -67,7 +67,7 @@ await runTest('BOOK: full flow via /api/bookings', async (page, ctx) => {
 
 // 2. Apply flow — sign in, go to apply, submit
 await runTest('APPLY: full flow → /api/applications', async (page) => {
-  await login(page, 'student@mcodne.ge', 'student1234', '/student')
+  await login(page, 'student@mcodne.ge', 'student1234', '/me')
   await page.goto(`${BASE}/apply`)
   await page.waitForTimeout(2000)
 
@@ -87,7 +87,7 @@ await runTest('APPLY: full flow → /api/applications', async (page) => {
 
 // 3. Message send — student on booking detail
 await runTest('MSG: send message on booking detail', async (page, ctx) => {
-  await login(page, 'student@mcodne.ge', 'student1234', '/student')
+  await login(page, 'student@mcodne.ge', 'student1234', '/me')
   const jar = (await ctx.cookies()).map(c => `${c.name}=${c.value}`).join('; ')
   const bookings = await (await fetch(`${BASE}/api/student/bookings`, { headers: { cookie: jar } })).json()
   if (!bookings.length) return { skip: 'no bookings' }
@@ -109,7 +109,7 @@ await runTest('MSG: send message on booking detail', async (page, ctx) => {
 
 // 4. Session enter from booking detail
 await runTest('SESSION: enter via booking detail', async (page, ctx) => {
-  await login(page, 'student@mcodne.ge', 'student1234', '/student')
+  await login(page, 'student@mcodne.ge', 'student1234', '/me')
   const jar = (await ctx.cookies()).map(c => `${c.name}=${c.value}`).join('; ')
   const bookings = await (await fetch(`${BASE}/api/student/bookings`, { headers: { cookie: jar } })).json()
   if (!bookings.length) return { skip: 'no bookings' }
@@ -138,7 +138,7 @@ await runTest('ADMIN: approve application', async (page) => {
 
 // 6. Tutor dashboard sections all render
 await runTest('TUTOR: all 10 hash sections load', async (page) => {
-  await login(page, 'giorgi.meladze@mcodne.ge', 'tutor1234', '/tutor')
+  await login(page, 'giorgi.meladze@mcodne.ge', 'tutor1234', '/work')
   const sections = ['today', 'calendar', 'requests', 'earnings', 'messages', 'reviews', 'consultations', 'profile', 'settings', 'help']
   const results = {}
   for (const s of sections) {
@@ -184,7 +184,7 @@ await runTest('TUTORS: search query', async (page) => {
 
 // 10. Sign out with real redirect
 await runTest('SIGNOUT: /api/auth/signout redirects to origin', async (page) => {
-  await login(page, 'student@mcodne.ge', 'student1234', '/student')
+  await login(page, 'student@mcodne.ge', 'student1234', '/me')
   await page.goto(`${BASE}/api/auth/signout`)
   await page.waitForTimeout(1500)
   return { url: page.url() }

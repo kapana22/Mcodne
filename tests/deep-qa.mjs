@@ -21,7 +21,7 @@ const signIn = async (page, email, pw, expected) => {
 
 // 1. Session cookie security
 await test('SECURITY: session cookie flags', async (p, c) => {
-  await signIn(p, 'student@mcodne.ge', 'student1234', '/student')
+  await signIn(p, 'student@mcodne.ge', 'student1234', '/me')
   const cookies = await c.cookies()
   const session = cookies.find(c => c.name === 'mcodne_session')
   return {
@@ -75,7 +75,7 @@ await test('SECURITY: XSS in message body', async () => {
 
 // 4. Cross-role access — student tries to open /admin
 await test('AUTH: student cannot access admin', async (p) => {
-  await signIn(p, 'student@mcodne.ge', 'student1234', '/student')
+  await signIn(p, 'student@mcodne.ge', 'student1234', '/me')
   const r = await p.goto(`${BASE}/admin`)
   const finalUrl = p.url()
   return { finalUrl, status: r?.status(), ok: !finalUrl.includes('/admin') }

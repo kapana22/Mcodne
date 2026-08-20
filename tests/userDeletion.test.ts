@@ -209,6 +209,29 @@ test('§C the FK-less dbBoot tables are deleted BY HAND, not left to a cascade',
       'the CompanyMember→User cascade is gone — a deleted account now leaves its membership behind'],
     [/ALTER TABLE "RequestAccess" ADD CONSTRAINT "RequestAccess_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
       'the RequestAccess→User cascade is gone — a deleted account keeps its requests allowlist row'],
+    // MasterApplication.userId  CASCADE — the only referential action available
+    //     and the only correct one. The row is not a record ABOUT the person
+    //     the way a ServiceRequest is (that one survives anonymised, because
+    //     what somebody needed fixing is market data with the name scrubbed);
+    //     this row IS the person — name, phone, a photo of their face and a
+    //     paragraph they wrote about themselves. Keeping it after a deletion
+    //     request would be keeping exactly what was asked to be deleted. SET
+    //     NULL is not on the table (NOT NULL column, one row per account) and
+    //     RESTRICT would make an account undeletable because somebody once
+    //     applied to fix taps.
+    [/ALTER TABLE "MasterApplication" ADD CONSTRAINT "MasterApplication_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
+      'the MasterApplication→User cascade is gone — a deleted account keeps its photo, phone and application'],
+    // ServiceProfile.userId  CASCADE — added 2026-08-18, and it was MISSING
+    //     ENTIRELY until then. prisma/schema declared the cascade; the raw DDL
+    //     that actually creates this table never emitted a foreign key, so
+    //     production had none. Deleting three test masters left three rows with
+    //     a `userId` pointing at nothing — still `available`, still matched by
+    //     the routing query, still drawn on /services with a null name. Nothing
+    //     errored, and nothing would have. CASCADE is the only correct action
+    //     here for the same reason as MasterApplication: the row is a person's
+    //     trade listing, and it cannot outlive the account.
+    [/ALTER TABLE "ServiceProfile" ADD CONSTRAINT "ServiceProfile_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
+      'the ServiceProfile→User cascade is gone — deleting a master would orphan their listing, and the listing keeps being routed'],
     [/ALTER TABLE "RequestOffer" ADD CONSTRAINT "RequestOffer_expertUserId_fkey" FOREIGN KEY \("expertUserId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
       'the RequestOffer→User cascade changed — SET NULL would break the one-provider CHECK and make the account undeletable'],
     [/ALTER TABLE "ServiceRequest" ADD CONSTRAINT "ServiceRequest_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE SET NULL[^;]*;/,
@@ -337,7 +360,7 @@ test('Serializable was rejected on purpose, and the reason is written down', () 
 })
 
 test('an anonymized account can never be un-suspended', () => {
-  // app/tutors/[id]/page gates the public profile on suspendedAt and NOTHING
+  // app/experts/[slug]/page gates the public profile on suspendedAt and NOTHING
   // else — browse's `available` filter does not cover the profile URL. Clearing
   // it would republish a „წაშლილი პროფილი" tombstone at its old address.
   assert.match(ROUTE, /action === 'unsuspend' && isAnonymized\(target\.email\)/)
@@ -409,7 +432,7 @@ test('anonymize removes the expert documents that carry a name and a face', () =
 })
 
 test('anonymize suspends — which is what removes an expert from every public read', () => {
-  // lib/tutorsQuery, /api/tutors/[id] and app/tutors/[id]/page all gate on
+  // lib/tutorsQuery, /api/tutors/[id] and app/experts/[slug]/page all gate on
   // User.suspendedAt. Setting it is the whole public-invisibility mechanism;
   // `available:false` alone would leave the profile page reachable.
   assert.match(ROUTE, /suspendedAt:\s*new Date\(\)/)

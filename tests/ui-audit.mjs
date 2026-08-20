@@ -41,7 +41,7 @@
 import { chromium } from 'playwright'
 
 const SITE = (process.argv[2] || 'https://mcodne.ge').replace(/\/$/, '')
-const PAGES = ['/', '/tutors', '/categories', '/konsultacia', '/about', '/contact', '/help', '/apply']
+const PAGES = ['/', '/tutors', '/experts', '/experts/iuristi', '/about', '/contact', '/help', '/join']
 const WIDTHS = [1280, 390]
 
 const found = []

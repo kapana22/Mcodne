@@ -1,4 +1,4 @@
-// Unit tests for the OPTIONAL credential attachment on /apply — it lives in
+// Unit tests for the OPTIONAL credential attachment on /join — it lives in
 // step 1's collapsed „ბმულები და დოკუმენტი" block since the 2026-08-07 3→2 cut.
 //
 // Run: npx tsx tests/apply-certificates.test.ts
@@ -8,7 +8,7 @@
 //
 //   1. The pure helpers (`certSlotsLeft`, `takeCertFiles`, `certificatesPayload`)
 //      that bound the file count and build the submit payload.
-//   2. Source-level invariants on app/apply/ApplyClient.tsx — the guards that
+//   2. Source-level invariants on app/join/_expert/ApplyClient.tsx — the guards that
 //      keep the attachment OPTIONAL and the review promise HONEST.
 //
 // Why the helpers are mirrored instead of imported: ApplyClient.tsx is a JSX
@@ -35,7 +35,7 @@ function check(name: string, cond: boolean, detail = '') {
   else { failed++; console.log(`✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 
-/* ═════ 1. Mirror of the helpers in app/apply/ApplyClient.tsx — keep in sync ═════ */
+/* ═════ 1. Mirror of the helpers in app/join/_expert/ApplyClient.tsx — keep in sync ═════ */
 
 const MAX_CERTS = 3
 
@@ -145,16 +145,16 @@ check('a non-array (corrupt restored state) → omitted, not thrown',
   check('the url is passed through untouched', certificatesPayload([{ title: 'a.pdf', url }])?.[0].url === url)
 }
 
-/* ═════ 2. Source-level invariants — app/apply/ApplyClient.tsx ═════ */
+/* ═════ 2. Source-level invariants — app/join/_expert/ApplyClient.tsx ═════ */
 
 const root = join(__dirname, '..')
-/* /apply is split across `app/apply/_*.tsx` — ApplyClient.tsx is only the
+/* /join's expert wizard is split across `app/join/_expert/_*.tsx` — ApplyClient.tsx is only the
    container now. These assertions are about the FORM as a whole, so read the
    directory rather than a filename the next split would invalidate. */
-const src = readdirSync(join(root, 'app/apply'))
+const src = readdirSync(join(root, 'app/join/_expert'))
   .filter(f => f.endsWith('.tsx'))
   .sort()
-  .map(f => readFileSync(join(root, 'app/apply', f), 'utf8'))
+  .map(f => readFileSync(join(root, 'app/join/_expert', f), 'utf8'))
   .join('\n')
 
 // ── the mirror above must match the real source ──

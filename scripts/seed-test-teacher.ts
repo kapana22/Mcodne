@@ -14,9 +14,9 @@
  *
  *   1. It has ZERO Consultation rows, and lib/tutorsQuery filters public browse
  *      on `consultations: { some: {} }`. An expert with nothing bookable is
- *      already excluded from /tutors, the category pages, the SEO landings, the
+ *      already excluded from /experts, the category pages, the SEO landings, the
  *      home grid and the sitemap — every one of them flows through that query.
- *      This is also why /tutors needed no new filter for the teaching vertical:
+ *      This is also why /experts needed no new filter for the teaching vertical:
  *      a teacher who sells only packages is invisible there by construction.
  *   2. /swavleba, the only page that does list it, is ADMIN-only while
  *      PACKAGES_VISIBILITY is 'admin' (lib/packages → canSeePackages).
@@ -168,7 +168,7 @@ async function create() {
   const existing = await prisma.user.findUnique({ where: { email: EMAIL }, select: { id: true } })
   console.log(existing ? `უკვე არსებობს — განახლდება: ${EMAIL}` : `შეიქმნება: ${EMAIL} (${FULL_NAME})`)
   console.log(`  პაკეტი: ${PACKAGES.map(p => `${p.lessonsCount}×${p.minutesPerLesson}წთ = ₾${p.price}`).join('  ·  ')}`)
-  console.log('  კონსულტაცია: 0 — ამიტომ /tutors-ზე არ გამოჩნდება')
+  console.log('  კონსულტაცია: 0 — ამიტომ /experts-ზე არ გამოჩნდება')
   if (!APPLY) return console.log('\nგასაშვებად: --apply')
 
   // A real password only when explicitly asked for; otherwise random bytes.
@@ -200,7 +200,7 @@ async function create() {
   const slug = await ensureExpertSlug(tutor.id)
   console.log(`  განრიგი: ${windows} სამუშაო ფანჯარა (ორშ–პარ 15:00–19:00)`)
 
-  console.log(`\n✅ მზადაა — /swavleba (ადმინით) ან /tutors/${slug ?? tutor.id}`)
+  console.log(`\n✅ მზადაა — /swavleba (ადმინით) ან /experts/${slug ?? tutor.id}`)
   if (PASSWORD) {
     console.log(`\n   მასწავლებელი: ${EMAIL}`)
     console.log(`   მოსწავლე:     ${STUDENT_EMAIL}`)

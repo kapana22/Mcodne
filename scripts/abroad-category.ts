@@ -19,7 +19,7 @@
  * the platform already treats a hidden category as invisible in exactly the
  * places that matter — lib/categoryTree states the rule, lib/tutorsQuery and
  * app/sitemap.ts both apply it, /categories lists spheres only — while
- * app/tutors/[id]/page.tsx never checks it, so a profile in it opens fine by
+ * app/experts/[id]/page.tsx never checks it, so a profile in it opens fine by
  * direct link. „Invisible in the catalog, reachable from /abroad" is therefore
  * a data state, not a feature.
  *

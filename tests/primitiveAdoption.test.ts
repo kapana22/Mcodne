@@ -63,13 +63,13 @@ const handButtons = count(
 ratchet(
   'hand-built card shells',
   cardShells,
-  201,
+  189, // 2026-08-19 (catalogue merge): measured 189 — the /tutors dropdown bar and its duplicate drawer went when both catalogues moved to the one shared rail.
   'Use <Card> (components/Card.tsx). If the padding is not one of its tiers, that is a design decision — raise it rather than hand-rolling a shell.',
 )
 ratchet(
   'hand-built primary buttons',
   handButtons,
-  101,
+  98, // 2026-08-19 (catalogue merge): the /tutors filter drawer's own apply button went with the drawer.
   'Use <Btn variant="primary">. A hand-built copy opts out of the shared focus ring, press state and disabled handling.',
 )
 
@@ -90,6 +90,44 @@ ratchet(
   1, // components/Eyebrow.tsx's explanatory comment mentions both words.
   'globals.css `[class*="uppercase"] { letter-spacing: .14em }` wins over any tracking-* utility. Retune that ONE rule instead.',
 )
+
+// The same rule, TAG-scoped (stage 11, 2026-08-19): a className that wraps
+// onto several lines hides `uppercase` and `tracking-*` from the line grep
+// above. Every JSX opening tag in app/components/lib is checked as one string;
+// the only allowed pair is the `normal-case` opt-out. Measured 0 tonight — a
+// hard zero, no comment allowance needed because comments are not tags.
+{
+  const { readdirSync, statSync, readFileSync } = require('fs') as typeof import('fs')
+  const walk = (d: string, out: string[] = []): string[] => {
+    for (const f of readdirSync(d)) {
+      const p = join(d, f)
+      if (statSync(p).isDirectory()) walk(p, out)
+      else if (/\.tsx?$/.test(f)) out.push(p)
+    }
+    return out
+  }
+  let tagScoped = 0
+  const where: string[] = []
+  for (const dir of ['app', 'components', 'lib']) {
+    for (const p of walk(join(root, dir))) {
+      const src = readFileSync(p, 'utf8')
+      if (!src.includes('tracking-')) continue
+      for (const m of src.matchAll(/<[A-Za-z][^<>]*>/gs)) {
+        const t = m[0]
+        if (t.includes('uppercase') && /tracking-/.test(t) && !t.includes('normal-case')) {
+          tagScoped++
+          where.push(`${p.slice(root.length + 1)}:${src.slice(0, m.index).split('\n').length}`)
+        }
+      }
+    }
+  }
+  ratchet(
+    'dead tracking-* on uppercase elements (tag-scoped, multi-line)',
+    tagScoped,
+    0,
+    `${where.slice(0, 5).join(', ')} — delete the tracking-* utility; the uppercase rule owns letter-spacing.`,
+  )
+}
 
 if (failures > 0) {
   console.error(`\n${failures} adoption ratchet(s) FAILED — the pile grew.`)

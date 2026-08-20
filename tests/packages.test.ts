@@ -21,6 +21,7 @@
 
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
+import { releaseBookingCredit } from '../lib/bookingCredit'
 
 const root = join(__dirname, '..')
 const read = (p: string) => readFileSync(join(root, p), 'utf8')
@@ -199,7 +200,7 @@ const flags = read('lib/flags.ts')
 // becomes an INPUT, the two numbers can disagree and we reprint the „₾80 · 30
 // წთ" vs „₾25-დან" bug at package scale.
 {
-  const editor = read('app/tutor/profile/_packages.tsx')
+  const editor = read('app/work/(expert)/profile/_packages.tsx')
   const api = read('app/api/tutor/packages/route.ts')
   check(
     'F: the editor derives the per-lesson price and never stores it',
@@ -232,7 +233,7 @@ const flags = read('lib/flags.ts')
     const src = read(p)
     check(
       `G: ${p.replace('app/api/tutor/', '')} is TUTOR/ADMIN-guarded and feature-gated`,
-      src.includes("requireRoleApi(['TUTOR', 'ADMIN'])") && src.includes('packagesFeatureExists'),
+      src.includes("requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])") && src.includes('packagesFeatureExists'),
       'Every packages endpoint must 404 while the vertical is off and must never trust the caller for identity.',
     )
   }
@@ -323,20 +324,23 @@ const flags = read('lib/flags.ts')
     'Otherwise the validity window the client paid for means nothing.',
   )
 
+  // I5–I7 moved to lib/bookingCredit (D1, 2026-08-18) so the expert's decline
+  // and the cleanup cron refund the same way; §Q below pins all three callers.
   const cancel = read('app/api/bookings/[id]/cancel/route.ts')
+  const credit = read('lib/bookingCredit.ts')
   check(
     'I5: cancelling a package lesson refunds the credit',
-    /enrollment\.updateMany/.test(cancel) && /decrement: 1/.test(cancel),
+    /releaseBookingCredit\(tx, fresh\.enrollmentId/.test(cancel) && /decrement: 1/.test(credit),
     'lessonsUsed counts lessons BOOKED. Without the refund, cancelling once silently costs the client a lesson they paid for.',
   )
   check(
     'I6: the refund is guarded against going negative',
-    /lessonsUsed: \{ gt: 0 \}/.test(cancel),
+    /lessonsUsed: \{ gt: 0 \}/.test(credit),
     'A negative balance is the kind of state worth making impossible rather than merely unlikely.',
   )
   check(
     'I7: an expert-side cancel extends the client’s expiry',
-    /cancelledBy === 'TUTOR'/.test(cancel) && /expiresAt/.test(cancel),
+    /\{ cancelledBy \}/.test(cancel) && /extendedExpiry\(/.test(credit) && /cancelledBy === 'TUTOR'/.test(read('lib/packages.ts')),
     'The client lost a day through no doing of their own; the month they paid for has to grow back.',
   )
 }
@@ -344,7 +348,7 @@ const flags = read('lib/flags.ts')
 // ── J. the month grid tells the truth about the month ────────────────────────
 {
   const api = read('app/api/tutor/schedule/route.ts')
-  const ui = read('app/tutor/_components/MonthSchedule.tsx')
+  const ui = read('app/work/_components/MonthSchedule.tsx')
   check(
     'J: cancelled lessons are not drawn on the calendar',
     !/'CANCELED'/.test(api) && /status: \{ in: \[/.test(api),
@@ -375,7 +379,7 @@ const flags = read('lib/flags.ts')
 // ── K. the weekly pattern is all-or-nothing and server-expanded ──────────────
 {
   const sch = read('app/api/enrollments/[id]/schedule/route.ts')
-  const ui = read('app/student/_pattern.tsx')
+  const ui = read('app/me/_pattern.tsx')
   check(
     'K: the whole pattern is booked in ONE Serializable transaction',
     /isolationLevel:\s*'Serializable'/.test(sch) && /for \(const start of picks\)/.test(sch),
@@ -524,7 +528,7 @@ const flags = read('lib/flags.ts')
   check(
     'P2: the picker offers and previews Tbilisi wall clock, captioned',
     (() => {
-      const ui = read('app/student/_pattern.tsx')
+      const ui = read('app/me/_pattern.tsx')
       return ui.includes('sessionTime(') && ui.includes('<TzNote') && !/getHours\(\)/.test(ui)
     })(),
     'The hour the client taps is compared in Tbilisi. Rendering it in the browser zone lets someone abroad mean 16:00 Berlin and be answered about 16:00 Tbilisi.',
@@ -660,7 +664,7 @@ const flags = read('lib/flags.ts')
 // picked „8 გაკვეთილი", saved, and only then discovered the calendar held
 // three. Every input to the answer is in the draft form.
 {
-  const editor = read('app/tutor/profile/_packages.tsx')
+  const editor = read('app/work/(expert)/profile/_packages.tsx')
   check(
     'T: the draft form asks the capacity question',
     /draftMinutes=/.test(editor) && /capacity !== null && capacity < d\.lessonsCount/.test(editor),
@@ -694,8 +698,86 @@ const flags = read('lib/flags.ts')
   )
 }
 
-if (failures > 0) {
-  console.error(`\n${failures} packages guard(s) FAILED`)
-  process.exit(1)
-}
-console.log('\nAll packages guards passed.')
+// ═══════════ U. the credit comes back by every exit (async: the file is CJS, so
+// the executed checks live in an IIFE that also prints the summary) (D1, 2026-08-18) ═══════
+// `Enrollment.lessonsUsed` counts lessons BOOKED. Until this section only the
+// client's own cancel decremented it; the expert's decline and the cleanup
+// cron's auto-cancel silently kept the credit — a paid lesson lost with no
+// screen saying so. One function, three callers, all inside the transaction
+// that flips the booking.
+void (async () => {
+  const lib = read('lib/bookingCredit.ts')
+  check(
+    'U1: releaseBookingCredit decrements, floors at zero, and defers the expiry rule to lib/packages',
+    /lessonsUsed: \{ gt: 0 \}/.test(lib) && /lessonsUsed: \{ decrement: 1 \}/.test(lib) && /extendedExpiry\(/.test(lib),
+    'The credit function stopped guarding at zero, or grew its own copy of the expiry rule.',
+  )
+  const EXITS: [string, RegExp][] = [
+    ['app/api/bookings/[id]/cancel/route.ts', /await releaseBookingCredit\(tx, fresh\.enrollmentId, \{ cancelledBy \}\)/],
+    ['app/api/bookings/[id]/route.ts', /await releaseBookingCredit\(tx, booking\.enrollmentId, \{ cancelledBy: 'TUTOR'/],
+    ['app/api/internal/cleanup/route.ts', /await releaseBookingCredit\(tx, b\.enrollmentId\)/],
+  ]
+  for (const [f, re] of EXITS) {
+    const src = read(f)
+    check(
+      `U2: ${f} gives the credit back inside its transaction`,
+      re.test(src),
+      'A booking exit that does not call releaseBookingCredit(tx, …) is a paid lesson silently lost.',
+    )
+    check(
+      `U3: ${f} has no private decrement beside the shared one`,
+      (src.match(/lessonsUsed: \{ decrement: 1 \}/g) ?? []).length === 0,
+      'The decrement moved to lib/bookingCredit so the three exits cannot drift; a local copy is the drift.',
+    )
+  }
+  // Q5–Q7 EXECUTE the function against a recording fake of the transaction
+  // client, so the rule is proven and not just grepped for.
+  const calls: { op: string; args: any }[] = []
+  const expiresAt = new Date('2026-09-01T00:00:00Z')
+  const fakeTx = {
+    enrollment: {
+      updateMany: async (args: any) => { calls.push({ op: 'updateMany', args }); return { count: 1 } },
+      findUnique: async (args: any) => { calls.push({ op: 'findUnique', args }); return { expiresAt } },
+      update: async (args: any) => { calls.push({ op: 'update', args }); return {} },
+    },
+  } as any
+  await releaseBookingCredit(fakeTx, 'enr_1', { cancelledBy: 'STUDENT' })
+  check(
+    'U5: a client-side exit decrements once and does not move the expiry',
+    calls.filter(c => c.op === 'updateMany').length === 1
+      && calls[0].args.where.lessonsUsed.gt === 0
+      && calls[0].args.data.lessonsUsed.decrement === 1
+      && calls.filter(c => c.op === 'update').length === 0,
+    'The client cancelled; the credit comes back, the month they paid for does not grow.',
+  )
+  calls.length = 0
+  await releaseBookingCredit(fakeTx, 'enr_1', { cancelledBy: 'TUTOR' })
+  const upd = calls.find(c => c.op === 'update')
+  check(
+    'U6: an expert-side exit decrements AND extends the expiry by one day',
+    calls.filter(c => c.op === 'updateMany').length === 1
+      && !!upd && upd.args.data.expiresAt.getTime() === expiresAt.getTime() + 24 * 60 * 60 * 1000,
+    'The expert declined; the client lost a day through no doing of their own.',
+  )
+  calls.length = 0
+  await releaseBookingCredit(fakeTx, null)
+  await releaseBookingCredit(fakeTx, undefined)
+  check(
+    'U7: a booking without an enrollment touches nothing',
+    calls.length === 0,
+    'Ordinary (non-package) bookings must not reach the enrollment table at all.',
+  )
+  check(
+    'U4: the cleanup sweep selects enrollmentId on the stale-PREPARING rows',
+    // (Anchored on studentId since stage 11 — heldSlotId left that select when
+    // the legacy `booked` release went; the assertion is about enrollmentId.)
+    /studentId: true,\s*enrollmentId: true,/.test(read('app/api/internal/cleanup/route.ts')),
+    'Without enrollmentId in the select, releaseBookingCredit is called with undefined and returns early — the bug comes back invisibly.',
+  )
+
+  if (failures > 0) {
+    console.error(`\n${failures} packages guard(s) FAILED`)
+    process.exit(1)
+  }
+  console.log('\nAll packages guards passed.')
+})()

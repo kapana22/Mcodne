@@ -24,6 +24,8 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import {
   requestsOn, requestsVisibleTo, canSeeRequests, requestsFeatureExists,
+  providersOn, providersFeatureExists, isProviderPath, PROVIDER_PATH_PREFIXES,
+  isProviderWorkspacePath, PROVIDER_WORKSPACE_PATHS,
   isRequestPath, REQUEST_PATH_PREFIXES,
   makePublicRef, normalizePublicRef, PUBLIC_REF_RE, REF_ALPHABET, REF_LENGTH,
   budgetIsBelowFloor, BUDGET_BANDS, REQUEST_KINDS, KIND, TIMING,
@@ -138,10 +140,61 @@ test('the gate answers correctly in BOTH states, not just this one', () => {
   // the environment, with nothing extra in between. Without this, the table
   // above could be describing a function nobody uses.
   for (const viewer of VIEWERS) {
-    assert.equal(canSeeRequests(viewer.v), requestsVisibleTo(requestsOn(), viewer.v),
+    // An admin's surfaces follow the subsystem's switch; a provider's follow the
+    // supply-side switch (D6, 2026-08-18) — which folds the first one in.
+    const on = viewer.v.role === 'ADMIN' ? requestsOn() : providersOn()
+    assert.equal(canSeeRequests(viewer.v), requestsVisibleTo(on, viewer.v),
       'canSeeRequests has drifted from requestsVisibleTo — there are two gates now')
   }
   assert.equal(requestsFeatureExists(), requestsOn())
+  assert.equal(providersFeatureExists(), providersOn())
+})
+
+test('FEATURE_PROVIDERS narrows, never widens (D6)', () => {
+  // Off subsystem ⇒ off supply side, whatever the second variable says. This
+  // is what keeps „off beats everything" true after the split.
+  for (const v of [undefined, '', 'on', 'ON', 'off', 'true']) {
+    assert.equal(providersOn(v, false), false, `providers came on with the subsystem off („${String(v)}")`)
+  }
+  // Inside an ON subsystem: unset/blank means „no separate opinion" — the
+  // supply side follows FEATURE_REQUESTS, so a deployment that predates the
+  // variable keeps its masters' workspace. Anything typed must say „on".
+  for (const v of [undefined, '', '  ', 'on', 'ON', ' On ']) {
+    assert.equal(providersOn(v, true), true, `„${String(v)}" was read as off inside an on subsystem`)
+  }
+  for (const v of ['off', 'OFF', 'false', '0', 'no', 'true', '1', 'yes', 'onn']) {
+    assert.equal(providersOn(v, true), false, `„${v}" was read as on`)
+  }
+  // The supply-side paths, on a segment boundary, and NOT the client ones.
+  for (const p of PROVIDER_PATH_PREFIXES) {
+    assert.equal(isProviderPath(p), true, `${p} is not gated`)
+    assert.equal(isProviderPath(p + '/x'), true, `${p}/… is not gated`)
+  }
+  // ⚠️ /join stays OUTSIDE the gate (2026-08-19): it is the expert door too,
+  // and 404ing it would take the expert half down. Its WORK half is gated in
+  // the page — asserted just below.
+  for (const p of ['/', '/request', '/api/requests', '/services', '/masters', '/api/masters/x/photo', '/providers', '/apply', '/join', '/work', '/work/bookings', '/work/schedule', '/me/requests']) {
+    assert.equal(isProviderPath(p), false, `${p} was swallowed by the providers gate`)
+  }
+  // The middleware walks the second list too, with the same 404.
+  const mw = codeOf('middleware.ts')
+  assert.match(mw, /if \(!providersOn\(\) && isProviderPath\(req\.nextUrl\.pathname\)\)/,
+    'the middleware does not gate the supply-side paths on FEATURE_PROVIDERS')
+  // Every supply-side route reads providersOn(), not requestsOn().
+  for (const f of ['app/join/page.tsx', 'app/api/master-applications/route.ts',
+    'app/api/master-applications/[id]/route.ts', 'app/api/admin/master-applications/route.ts']) {
+    assert.match(codeOf(f), /providersOn\(\)/, `${f} does not check the supply-side switch`)
+    assert.doesNotMatch(codeOf(f), /requestsOn\(\)/, `${f} still checks the subsystem switch directly`)
+  }
+  // The signup tile that hands off to /join?can=WORK is drawn only when that
+  // half exists (D5) — an ungated tile was a registration ending on a 404.
+  const signup = codeOf('app/signin/_signup.tsx')
+  // The signup page no longer forks by provider TYPE (2026-08-19) — there is no
+  // „ვარ ხელოსანი" tile to gate. The WORK half is offered, and gated, on the
+  // door itself: app/join/page.tsx builds `offer` behind providersOn().
+  assert.doesNotMatch(signup, /ვარ ხელოსანი/, 'the signup page forks by provider type again')
+  assert.match(codeOf('app/join/page.tsx'), /providersOn\(\) && !have\.includes\('WORK'\)/,
+    'the WORK half is offered without checking the supply-side switch')
 })
 
 test('an allowlist row is the ONLY way in that is not being an admin', () => {
@@ -204,7 +257,10 @@ test('the middleware 404s every path the subsystem owns', () => {
     assert.equal(isRequestPath(p), true, `${p} is not gated`)
     assert.equal(isRequestPath(p + '/MC-7A4K2'), true, `${p}/… is not gated`)
   }
-  for (const p of ['/', '/tutors', '/services', '/student', '/tutor', '/admin', '/business', '/api/bookings', '/requests-archive', '/providers']) {
+  // ⚠️ /work AND /work/bookings: the expert's workspace shares the prefix with
+  // the master's three screens (stage 6) and must survive the subsystem being
+  // off. /me/requests too — it is a /me page that gates itself.
+  for (const p of ['/', '/tutors', '/services', '/me', '/me/requests', '/work', '/work/bookings', '/work/requests-x', '/admin', '/business', '/api/bookings', '/requests-archive', '/providers']) {
     assert.equal(isRequestPath(p), false, `${p} was swallowed by the requests gate`)
   }
 })
@@ -277,9 +333,9 @@ test('the client’s reference is never shown to a provider', () => {
 
   // …and no provider-facing surface may print it directly either.
   for (const f of [
-    'app/provider/requests/page.tsx',
-    'app/provider/requests/[id]/page.tsx',
-    'app/provider/offers/page.tsx',
+    'app/work/(provider)/requests/page.tsx',
+    'app/work/(provider)/requests/[id]/page.tsx',
+    'app/work/(provider)/offers/page.tsx',
   ]) {
     const body = codeOf(f)
     assert.doesNotMatch(body, /\{[^}]*\.publicRef[^}]*\}/,
@@ -378,7 +434,13 @@ test('the waiting screen animates FACTS — no invented audience', () => {
   // pattern, and it is worse here: the person is asked to WAIT on it, and what
   // they are waiting for is a phone call we would have misrepresented.
   const live = codeOf('app/request/_live.tsx')
-  const api = codeOf('app/api/requests/[ref]/status/route.ts')
+  // Since stage 10 the counting lives in lib/requestLive, which BOTH the poll
+  // route (./status) and the stream (./events) answer from — one source, so a
+  // number cannot be true on one and stale on the other. Both routes must
+  // still go through it (tests/liveRoom.test.ts pins the stream side).
+  const api = codeOf('lib/requestLive.ts')
+  assert.match(codeOf('app/api/requests/[ref]/status/route.ts'), /requestLiveStatus\(ref\)/,
+    'the status route stopped answering from lib/requestLive')
 
   // Every number on that screen must come from the endpoint, and every number
   // in the endpoint must come from a count.
@@ -439,7 +501,10 @@ test('an emailed provider link survives not being signed in', () => {
   // visitor who turns out to have a session straight through to `redirect`.
   const t = read('lib/emailTemplates.ts')
 
-  // ⚠️ /provider ONLY, and the exemption is the whole distinction. /admin is
+  // ⚠️ THE MASTER'S /work SCREENS ONLY, and the exemption is the whole
+  // distinction (they were /provider until stage 6; the /work prefix is also
+  // the expert's, whose /work/bookings links are guarded by requireRole and
+  // redirect to sign-in on their own — see PROVIDER_WORKSPACE_PATHS). /admin is
   // guarded by requireRole, which REDIRECTS a signed-out visitor to sign-in —
   // so an emailed /admin link has always worked and was never the bug. The
   // requests subsystem is the one that answers notFound(), deliberately, and
@@ -447,10 +512,13 @@ test('an emailed provider link survives not being signed in', () => {
   // this file go through the helper too, which saves a redirect hop, but
   // asserting it would fail this test on an unrelated moderation email that
   // is not broken.)
-  const bare = [...t.matchAll(/href: `\$\{BASE\}(\/provider[^`]*)`/g)].map(m => m[1])
+  const bare = [...t.matchAll(/href: `\$\{BASE\}(\/work\/(?:requests|offers|service-profile)[^`]*)`/g)].map(m => m[1])
   assert.deepEqual(bare, [],
     `these email links go straight to a 404-on-signed-out page: ${bare.join(', ')}`)
-  const bareTernary = [...t.matchAll(/\?\s*`\$\{BASE\}(\/provider[^`]*)`/g)].map(m => m[1])
+  const bareTernary = [...t.matchAll(/\?\s*`\$\{BASE\}(\/work\/(?:requests|offers|service-profile)[^`]*)`/g)].map(m => m[1])
+  // …and every one of the master's links in this file goes through the helper.
+  const gated = [...t.matchAll(/gatedLink\((?:'|`)(\/work\/[^'`$]*)/g)].map(m => m[1])
+  assert.ok(gated.length >= 3, `the master's emailed links stopped going through gatedLink: ${gated.join(', ')}`)
   assert.deepEqual(bareTernary, [], `same, in a ternary: ${bareTernary.join(', ')}`)
 
   // …and the helper must keep doing the one thing it is for.
@@ -472,13 +540,13 @@ test('an emailed provider link survives not being signed in', () => {
 
 test('a settled request stays open to the people who bid on it', () => {
   // ⚠️ THE LINK IN THE NOTIFICATION POINTS HERE. A provider is told about a
-  // request by an email and a bell that both link to /provider/requests/<id>;
+  // request by an email and a bell that both link to /work/requests/<id>;
   // accepting an offer moves the request to MATCHED. The page used to answer
   // `status !== 'VERIFIED' → notFound()`, so the WINNER's own link went dead at
   // the exact moment it started to matter, and every provider who bid and lost
   // got a 404 where the answer should have been (owner, 2026-08-17, holding the
   // dead link).
-  const page = codeOf('app/provider/requests/[id]/page.tsx')
+  const page = codeOf('app/work/(provider)/requests/[id]/page.tsx')
   assert.doesNotMatch(page, /row\.status !== 'VERIFIED'\s*\)\s*notFound/,
     'the page 404s on every non-VERIFIED status again — that kills the winner’s own link')
   // The replacement rule, asserted as a rule rather than as prose: a settled
@@ -551,7 +619,7 @@ test('every page and every route ALSO gates itself — the middleware is not the
   const PAGES: [string, 'clientAllowed' | 'providerAllowed'][] = [
     ['app/request/page.tsx', 'clientAllowed'],
     ['app/request/[ref]/page.tsx', 'clientAllowed'],
-    ['app/provider/layout.tsx', 'providerAllowed'],
+    ['app/work/(provider)/layout.tsx', 'providerAllowed'],
   ]
   for (const [f, gate] of PAGES) {
     const body = codeOf(f)
@@ -663,7 +731,10 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   // deleted in frustration, taking the half that still matters with it.
   //
   // So the halves are separated:
-  //   /provider — STILL linked from nowhere. It is the bidder's side; nobody
+  //   the master's three /work screens (/work/requests, /work/offers,
+  //   /work/service-profile — were /provider until stage 6, 2026-08-19; the
+  //   rest of /work is the EXPERT's workspace and is not the subsystem's) —
+  //               STILL linked from nowhere. It is the bidder's side; nobody
   //               arrives there by browsing, only by an admin's invitation.
   //               This is the guarantee that has to survive.
   //   /request  — allowed, from a SHORT NAMED LIST, and every entry must check
@@ -685,19 +756,62 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     // ხდებოდეს." It gates itself (this file is not the home page) and it
     // carries the typed search through as ?q=, so the bridge costs nobody
     // their sentence.
-    ['app/tutors/client.tsx', 'app/tutors/client.tsx'],
-    // ⚠️ THE TRADES VERTICAL'S FRONT DOOR (2026-08-18). Unlike the three above
-    // it is a SECTION rather than a link — an indexable page whose whole job is
-    // to lead into the intake. It gates itself and, deliberately, only the CTAs
-    // are gated: the page must survive FEATURE_REQUESTS being off, because it
-    // is in the sitemap and a submitted URL that 404s teaches the crawler to
-    // distrust the file.
-    ['app/services/page.tsx', 'app/services/page.tsx'],
+    ['app/experts/client.tsx', 'app/experts/client.tsx'],
+    // ⚠️ THE CATALOGUE'S ONE INTAKE URL, AND IT IS A CONSTANT (2026-08-18; the
+    // /services DOOR that used to sit beside it was deleted in stage 10,
+    // 2026-08-19, and the catalogue moved to /experts). Two surfaces reach the
+    // subsystem — the header CTA and the „nobody is listed yet" empty state —
+    // and BOTH import `REQUEST_HREF` from this model file, so the address is
+    // written once with `for=service` baked in: the parameter the wizard needs
+    // to open on the trades side instead of offering a plumbing visitor 23
+    // groups of experts. Gated in the PAGE rather than here on purpose:
+    // `_masterData` is a pure model with no react and no environment, and the
+    // page reads the flag once and hands it to both surfaces, so the two cannot
+    // disagree. Only the CTAs are gated — the page itself must survive
+    // FEATURE_REQUESTS being off, because it is in the sitemap and a submitted
+    // URL that 404s teaches the crawler to distrust the file.
+    ['app/experts/_masterData.ts', 'app/experts/page.tsx'],
+    // ⚠️ THE SERVICE PROFILE (stage 5, 2026-08-19; moved into the ONE namespace
+    // in stage 11, the same day — it answers at /experts/<slug> now and its
+    // parts are the `_provider*` siblings of the expert profile's). It is the
+    // one page behind a catalogue card, and its one action is the intake. The
+    // same shape as /masters: the address is a constant in the model
+    // (`REQUEST_HREF`, `for=service` baked in), the CTA part imports it, and the
+    // PAGE reads `requestsOn()` once and mounts the CTA only when the subsystem
+    // exists — the profile itself must survive FEATURE_REQUESTS being off,
+    // because it is an indexable page. The page it is gated in is the SAME file
+    // the expert profile is gated in: one resolver, one flag read.
+    ['app/experts/[slug]/_providerData.ts', 'app/experts/[slug]/page.tsx'],
+    ['app/experts/[slug]/_providerCta.tsx', 'app/experts/[slug]/page.tsx'],
+    // ⚠️ THE TRADE LANDING (stage 8; /experts/<trade> since stage 11). Its CTA
+    // is `REQUEST_HREF` from the same model, mounted only when the page hands
+    // it `requestsEnabled` — never read from the environment by the part.
+    ['app/experts/[slug]/_tradeLanding.tsx', 'app/experts/[slug]/page.tsx'],
+    // ⚠️ THE CLIENT'S OWN LIST (D7, stage 6, 2026-08-19). /me/requests shows
+    // the signed-in owner their requests and links each to /request/<ref> — a
+    // page they already hold the key to. It gates itself (requestsOn() →
+    // notFound) and reads `userId = me` and nothing wider; the mechanism is
+    // asserted under the tree scan below.
+    ['app/me/requests/page.tsx', 'app/me/requests/page.tsx'],
+    // ⚠️ THE EXPERT'S PROFILE (2026-08-19) — the counterpart of the master's
+    // above, and the same shape: the href is BUILT in the page („/request?to="
+    // + the expert's slug), the page reads `requestsOn()` ONCE and hands the
+    // result down as `requestHref`, and null means the rail draws the message
+    // button it always drew. The two parts below carry the value, never the
+    // flag — a component that read the environment itself is how two surfaces
+    // on one page start disagreeing about whether a subsystem exists.
+    //
+    // ⚠️ IT IS THE SECONDARY ACTION AND MUST STAY ONE. „დაჯავშნე" is this
+    // page's primary; the request path takes the slot „მიწერე ექსპერტს" has,
+    // never a third button — asserted under the scan below.
+    ['app/experts/[slug]/page.tsx', 'app/experts/[slug]/page.tsx'],
+    ['app/experts/[slug]/_booking.tsx', 'app/experts/[slug]/page.tsx'],
+    ['app/experts/[slug]/client.tsx', 'app/experts/[slug]/page.tsx'],
   ]
   for (const [f, gate] of CLIENT_ENTRY_POINTS) {
     assert.match(read(gate), /requestsOn\(\)/,
       `${f} reaches /request but ${gate} does not check the flag — it would show on a deployment where the subsystem does not exist`)
-    assert.doesNotMatch(read(f), /["'`]\/provider/,
+    assert.doesNotMatch(read(f), /["'`]\/work\/(requests|offers|service-profile)/,
       `${f} links to the PROVIDER side — that surface is reached by invitation only`)
   }
   // ⚠️ ONE FILE REACHES THE PROVIDER SIDE ON PURPOSE, AND IT IS NOT A LINK.
@@ -717,7 +831,7 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     const hats = read('lib/hats.ts')
     assert.match(hats, /PROVIDER_ROUTE/,
       'lib/hats.ts stopped using the subsystem’s own route constant')
-    assert.doesNotMatch(hats, /["'`]\/provider/,
+    assert.doesNotMatch(hats, /["'`]\/work\/(requests|offers|service-profile)|["'`]\/provider/,
       'lib/hats.ts hard-codes the provider path instead of importing it')
     // …and it must never become a browsable entry point: no link, no nav item.
     assert.doesNotMatch(hats, /<Link|href=/,
@@ -734,7 +848,19 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     // so a NEW file linking to /request still lands in `offenders`.
     if (ENTRY_FILES.includes(rel)) continue
     // The subsystem's own files are allowed to know their own URLs.
-    if (rel.startsWith('app/request/') || rel.startsWith('app/provider/')) continue
+    if (rel.startsWith('app/request/') || rel.startsWith('app/work/(provider)/')) continue
+    // ⚠️ THE /work SHELL AND ITS RAIL (stage 6, 2026-08-19). The master's three
+    // items live in components/tutor/navConfig beside the expert's, and the
+    // shell (app/work/layout.tsx) draws them only for a viewer the (provider)
+    // gate itself admits — capabilitiesOf → WORK, or requestsViewer().
+    // providerAllowed — never for a role. The (expert) layout's redirect sends
+    // a WORK-only account to the queue for the same reason lib/hats does: that
+    // is somebody the allowlist already names going home, not a door. All
+    // three mechanisms are asserted just under this scan.
+    if (rel === 'components/tutor/navConfig.ts' || rel === 'app/work/layout.tsx' || rel === 'app/work/(expert)/layout.tsx') continue
+    // The client's OWN request list (D7): /me/requests reads `userId = me` and
+    // links each row to /request/<ref> — a page its owner already holds the
+    // key to. Named here, gated below (requestsOn() + the signed-in owner).
     if (rel.startsWith('app/api/requests/') || rel.startsWith('app/api/provider/')) continue
     // The conversation endpoint is the subsystem's own — its hrefs are „reply"
     // targets inside threads that already belong to it.
@@ -745,6 +871,13 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     // its hrefs go INTO the subsystem's mails, they are not a way in from
     // outside it.
     if (rel === 'lib/requests.ts' || rel === 'lib/requestJobs.ts') continue
+    // …and so are the two files the subsystem's own „write to this provider
+    // first" is made of: lib/requestInvite is where the INVITED offer is
+    // DEFINED (one definition, two callers — the room's button and the intake's
+    // `?to=`), lib/requestTarget is what resolves that parameter. Neither
+    // renders anything; the only /request they contain is prose about their own
+    // URL. Pinned separately by tests/hireDirect.test.ts.
+    if (rel === 'lib/requestInvite.ts' || rel === 'lib/requestTarget.ts') continue
     // lib/requestThread.ts is the platform thread's rules, and
     // lib/emailTemplates.ts is where those mails are BUILT — its /provider
     // paths are the destinations inside the subsystem's own letters, reached
@@ -764,6 +897,40 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     // target inside a conversation that already belongs to the subsystem, not
     // a door into it from the site.
     if (rel === 'components/RequestChat.tsx') continue
+    // ⚠️ THE ONE LIST OF WORK (2026-08-19). /work/jobs holds a provider's
+    // committed work of BOTH kinds, so an accepted QUOTE row has to open where
+    // an offer is viewable (lib/jobRows → href '/work/offers'), and the empty
+    // state offers the open queue to somebody who has no work yet.
+    //
+    // This is not a door into the subsystem, by the same mechanism UserMenu is
+    // excused below: the row only EXISTS for a provider whose offer was
+    // accepted, and the CTA renders only when `hasProvider` — which the page
+    // derives from `requestsViewer()` behind `providersOn()`, i.e. the same
+    // allowlist the subsystem's own 404 gate reads. A stranger browsing the
+    // site is never shown either string. The mechanism is asserted just under
+    // this scan rather than trusted to this line.
+    if (rel === 'lib/jobRows.ts' || rel === 'app/work/jobs/_client.tsx') continue
+    // ⚠️ components/UserMenu IS THE WAY BACK, AND IT IS GATED ON THE HAT
+    // (2026-08-18). An approved tradesperson keeps role STUDENT (lib/hats), so
+    // this menu called them „სტუდენტი" and offered them the EXPERT application
+    // — and there was no route to /provider from anywhere on the site. Their
+    // own workspace was reachable only by typing the URL or signing in again.
+    //
+    // This is NOT a door anybody can find by browsing, which is the guarantee
+    // the scan protects: the item renders only when `hats.includes('MASTER')`,
+    // and that hat requires BOTH a ServiceProfile and an active RequestAccess
+    // row — the same allowlist the subsystem itself checks. Identical reasoning
+    // to lib/hats.ts's own exemption below, and the mechanism is asserted just
+    // under this scan rather than trusted to this line.
+    if (rel === 'components/UserMenu.tsx') continue
+    // ⚠️ THE MOBILE TAB BAR, INSIDE THE WORKSPACE ONLY (M1, 2026-08-18). Its
+    // three tabs are drawn only when the pathname is ALREADY one of the
+    // master's three /work screens — a place nobody reaches without passing
+    // the workspace's own 404 gate. So it is not a door into the subsystem; it
+    // is furniture inside it, the same way the /work rail's own items are.
+    // AppShell's line is the path test that lets the bar render there at all.
+    // Both mechanisms are asserted just under this scan.
+    if (rel === 'components/BottomNav.tsx' || rel === 'components/AppShell.tsx') continue
     // The public header's „მოთხოვნა" item — the ONE link outside the subsystem,
     // added at the owner's request (2026-08-14: „მხოლოდ ადმინებს რომ
     // გამოუჩნდეს") and verified admin-gated by the assertions below this scan.
@@ -771,13 +938,94 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     if (rel === 'components/PublicTopBar.tsx') continue
 
     readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
-      // A quoted "/request" or "/provider" — a link target, not the word.
-      if (!/["'`]\/(request|provider)(["'`/?#])/.test(line)) return
+      // A quoted "/request" or one of the master's three "/work/…" screens —
+      // a link target, not the word. Never a bare "/work": that prefix is the
+      // expert's workspace, linked from everywhere it should be.
+      if (!/["'`]\/(request(["'`/?#])|work\/(requests|offers|service-profile)(["'`/?#])|provider(["'`/?#]))/.test(line)) return
       offenders.push(`      ${rel}:${i + 1}  ${line.trim()}`)
     })
   }
   assert.equal(offenders.length, 0,
     `something links to the requests subsystem from outside it:\n${offenders.join('\n')}`)
+
+  // The allowlist entry above only says WHERE to look. This is the part that
+  // matters: the menu's provider item must be gated on the MASTER hat, never on
+  // a role — a `role === 'TUTOR'`-style test would show the door to somebody
+  // the requests allowlist has never admitted.
+  const menu = read('components/UserMenu.tsx')
+  assert.match(menu, /const isMaster = hats\.includes\('MASTER'\)/,
+    'the user menu stopped deriving the master door from the hat')
+  assert.match(menu, /if \(isMaster && !inProviderSpace\) switchItems\.push\(\{ href: `\$\{PROVIDER_ROUTE\}\/requests`/,
+    'the provider link in the user menu is no longer behind the MASTER hat')
+
+  // Same shape for /work/jobs: the allowlist entry above says WHERE to look,
+  // this says the two strings are unreachable without the allowlist. The page
+  // asks `requestsViewer()` behind `providersOn()` and hands the answer down as
+  // `hasProvider`; the CTA is behind that flag, and a QUOTE row cannot exist at
+  // all unless the query found an ACCEPTED offer belonging to that provider.
+  const jobsPage = read('app/work/jobs/page.tsx')
+  assert.match(jobsPage, /const viewer = providersOn\(\) \? await requestsViewer\(\) : null/,
+    'the jobs page derives the provider from something other than the viewer + the switch')
+  assert.match(jobsPage, /hasProvider=\{!!provider\}/, 'the jobs screen no longer learns whether it has a provider')
+  assert.match(read('app/work/jobs/_client.tsx'), /hasProvider \? \{ label: '[^']+', href: '\/work\/requests' \}/,
+    'the queue CTA on /work/jobs is no longer behind the allowlist')
+
+  // The tab bar's provider tabs are keyed on the SPACE the pathname is in —
+  // never on a role, never on a hat, never anywhere but the master's three
+  // paths (lib/requests → isProviderWorkspacePath — and that helper is bound
+  // to PROVIDER_WORKSPACE_PATHS, asserted executed below).
+  const nav = read('components/BottomNav.tsx')
+  assert.match(nav, /isProviderWorkspacePath\(path\) \? 'PROVIDER'/,
+    'BottomNav no longer derives the provider space from the pathname')
+  for (const p of PROVIDER_WORKSPACE_PATHS) {
+    assert.equal(isProviderWorkspacePath(p), true, `${p} is not the master's space`)
+    assert.equal(isProviderWorkspacePath(p + '/x'), true, `${p}/… is not the master's space`)
+  }
+  for (const p of ['/work', '/work/bookings', '/work/requests-x', '/me', '/provider/requests', '/request']) {
+    assert.equal(isProviderWorkspacePath(p), false, `${p} was read as the master's space`)
+  }
+  assert.match(nav, /space === 'PROVIDER' \? PROVIDER_TABS/,
+    'PROVIDER_TABS are shown by something other than being inside /provider')
+  assert.doesNotMatch(nav, /PROVIDER_TABS[\s\S]{0,200}role === /,
+    'PROVIDER_TABS became role-keyed — a role is not the allowlist')
+  const shell = read('components/AppShell.tsx')
+  assert.match(shell, /const inProviderSpace = isProviderWorkspacePath\(path \?\? ''\)/,
+    'AppShell no longer recognises the provider workspace')
+
+  // The /work rail: the master's items are their own group, drawn only for
+  // the capability (or the allowlist), never for a role — and the shell draws
+  // nothing at all for a viewer with no session, so the (provider) 404 stays a
+  // bare 404.
+  const navCfg = read('components/tutor/navConfig.ts')
+  // ⚠️ THE GROUP IS GONE, THE GATE IS NOT (2026-08-19). The rail became ONE list
+  // of functions rather than two lists of person-kinds; what this test protects
+  // is unchanged — the subsystem's two screens are drawn only for a viewer the
+  // allowlist admits (`groups.work`), never for a role, and never by default.
+  assert.match(navCfg, /export const WORK_ONLY_NAV: NavItem\[\] = \[/, 'the subsystem\'s items left navConfig')
+  assert.doesNotMatch(navCfg, /export const PROVIDER_NAV/, 'the per-person group came back')
+  assert.match(navCfg, /\.\.\.\(groups\.work \? WORK_ONLY_NAV : \[\]\)/, 'the subsystem items are no longer drawn by capability')
+  const workLayout = codeOf('app/work/layout.tsx')
+  assert.match(workLayout, /if \(!user\) return <>\{children\}<\/>/, 'the /work shell draws chrome for a signed-out visitor')
+  assert.match(workLayout, /work: viewer !== null && \(caps\.includes\('WORK'\) \|\| viewer\.providerAllowed\)/,
+    'the master group is no longer keyed on the WORK capability / the allowlist')
+  assert.doesNotMatch(workLayout, /work: [^\n]*ROLE\./, 'the master group became role-keyed — a role is not the allowlist')
+  assert.doesNotMatch(workLayout, /redirect\(|notFound\(|requireRole\(/, 'the /work shell became a guard — the guards are the two route groups')
+  const expertLayout = codeOf('app/work/(expert)/layout.tsx')
+  assert.match(expertLayout, /if \(caps\.includes\('WORK'\)\) redirect\(`\$\{PROVIDER_ROUTE\}\/requests`\)/,
+    'the WORK-only redirect is not keyed on the capability')
+  assert.match(expertLayout, /requireRole\(\[ROLE\.EXPERT, ROLE\.ADMIN\]\)/, 'the expert guard is gone')
+
+  // /me/requests (D7): the owner's list, and only the owner's — gated on the
+  // flag and on the session, scoped by userId.
+  const mine = codeOf('app/me/requests/page.tsx')
+  assert.match(mine, /if \(!requestsOn\(\)\) notFound\(\)/, '/me/requests does not 404 with the subsystem off')
+  assert.match(mine, /const user = await requireUser\(\)/, '/me/requests does not require a session')
+  assert.match(mine, /myRequests\(user\.id\)/, '/me/requests lists something other than the signed-in owner’s requests')
+  assert.match(codeOf('lib/myRequests.ts'), /where: \{ userId \}/, 'lib/myRequests widened the owner match')
+  assert.match(codeOf('app/api/me/requests/route.ts'), /if \(!requestsOn\(\)\) return requestsNotFound\(\)/, '/api/me/requests is not gated on the flag')
+  assert.match(codeOf('app/api/me/requests/route.ts'), /myRequests\(user\.id/, '/api/me/requests reads somebody else’s list')
+  assert.match(shell, /\(!inRequests \|\| inProviderSpace\) && \(/,
+    'the provider workspace lost its bottom nav again (M1)')
 
   // …and the ONE allowed link is actually gated on the flag, which is the
   // assertion that matters — the allowlist entry above only says where to look.
@@ -805,17 +1053,20 @@ test('it is not in the sitemap, not in the feed, and not named in robots.txt', (
   // STATIC_ROUTES is an allowlist, so absence is the default — pinned anyway,
   // because „add every page to the sitemap" is a plausible future tidy-up.
   assert.doesNotMatch(sitemap, /path: '\/request'/)
-  assert.doesNotMatch(sitemap, /path: '\/provider'/)
-  assert.doesNotMatch(read('app/rss.xml/route.ts'), /\/request|\/provider/)
+  assert.doesNotMatch(sitemap, /path: '\/provider'|path: '\/work/)
+  assert.doesNotMatch(read('app/rss.xml/route.ts'), /\/request|\/provider|\/work/)
   // The instinct is to add these to Disallow. That is backwards: robots.txt is
   // PUBLIC, so a Disallow line publishes the exact URLs the subsystem exists to
   // keep unlisted — to anyone who reads it, including every scraper that treats
   // Disallow as a list of interesting places. /business and /abroad are absent
   // from that file for the same reason.
   assert.doesNotMatch(read('app/robots.ts'), /request|provider/)
+  // /work is Disallowed as a workspace (like /me), never NAMED as the
+  // subsystem's — the line reads „/work$" and „/work/", nothing longer.
+  assert.doesNotMatch(read('app/robots.ts'), /\/work\/[a-z]/)
   // Every page carries noindex AND nofollow — nofollow deliberately: a crawler
   // that reached one must not walk out of it either.
-  for (const f of ['app/request/page.tsx', 'app/request/[ref]/page.tsx', 'app/provider/layout.tsx']) {
+  for (const f of ['app/request/page.tsx', 'app/request/[ref]/page.tsx', 'app/work/(provider)/layout.tsx']) {
     assert.match(read(f), /robots: \{ index: false, follow: false \}/, `${f} is indexable`)
   }
 })
@@ -826,14 +1077,22 @@ test('FEATURE_REQUESTS reaches the browser bundle', () => {
   // filtered out on every deployment while the server half worked perfectly.
   // Invisible when broken (nothing errors; the rail is simply two rows shorter),
   // which is exactly the class of defect this file exists to pin.
-  assert.match(read('next.config.js'), /env: \{ FEATURE_REQUESTS: process\.env\.FEATURE_REQUESTS \}/,
-    'next.config.js no longer inlines FEATURE_REQUESTS — client components read undefined and the admin tabs vanish')
+  assert.match(read('next.config.js'), /env: \{ FEATURE_REQUESTS: process\.env\.FEATURE_REQUESTS, FEATURE_PROVIDERS: process\.env\.FEATURE_PROVIDERS \}/,
+    'next.config.js no longer inlines FEATURE_REQUESTS + FEATURE_PROVIDERS — client components read undefined, the admin tabs and the signup tile vanish')
 })
 
 test('the admin tabs disappear with the subsystem', () => {
   const nav = codeOf('app/admin/_nav.tsx')
+  // Three tabs now, not two — „ხელოსნები" joined them 2026-08-18. It belongs to
+  // the same subsystem for the same reason the other two do: it approves people
+  // INTO /provider, so leaving it visible with the flag off would offer an admin
+  // a button that admits somebody to a workspace that 404s.
   assert.match(nav, /\.filter\(it => \(it\.id !== 'requests' && it\.id !== 'access'\) \|\| requestsFeatureExists\(\)\)/,
     'the requests tabs are no longer filtered out of ADMIN_NAV')
+  // …and the masters queue follows the SUPPLY-side switch (D6): it approves
+  // people into /provider, which is what FEATURE_PROVIDERS turns off.
+  assert.match(nav, /\.filter\(it => it\.id !== 'masters' \|\| providersFeatureExists\(\)\)/,
+    'the masters tab is not filtered on providersFeatureExists()')
   // VALID_TABS is DERIVED from that array, so filtering there means
   // /admin#requests does nothing at all with the subsystem off — exactly like
   // any other unknown hash — rather than opening a tab that is not drawn.
@@ -883,7 +1142,7 @@ test('a provider payload cannot carry the client‘s name, phone or email', () =
 
   // The provider-facing SURFACES go through it rather than picking their own
   // columns — the assertion that makes the one above worth anything.
-  for (const f of ['app/provider/requests/page.tsx', 'app/provider/requests/[id]/page.tsx']) {
+  for (const f of ['app/work/(provider)/requests/page.tsx', 'app/work/(provider)/requests/[id]/page.tsx']) {
     const body = codeOf(f)
     assert.match(body, /providerRequestView/, `${f} shapes the row itself`)
     for (const col of ['contactName', 'phone: true', 'adminNote']) {
@@ -906,7 +1165,7 @@ test('a provider gets the client‘s contact only once their offer is ACCEPTED',
   assert.equal(clientContactFor({ status: 'SENT' }, contact), null)
 
   // The screen where a chosen provider reads it does go through the function.
-  const offers = codeOf('app/provider/offers/page.tsx')
+  const offers = codeOf('app/work/(provider)/offers/page.tsx')
   assert.match(offers, /clientContactFor\(/, 'the offers page picks its own contact columns')
   assert.ok(!offers.includes('adminNote'), 'the offers page selects the admin‘s private note')
 })
@@ -1032,11 +1291,12 @@ test('the place arithmetic is the same on both sides of the wire', () => {
 
 /* ═══════════ 6. the budget floor ═══════════════════════════════════════ */
 
-test('a below-floor request is STORED, with status REJECTED — per kind', () => {
-  // Both halves matter and they pull in opposite directions. The request is
-  // refused because nobody here can deliver against it — and the row is kept
-  // because „how many people arrive with 300₾" is exactly what an early stage
-  // exists to find out, and it is unrecoverable if the endpoint drops it.
+test('the budget ladder is per kind — and no band is refused any more', () => {
+  // The ladder's SHAPE is still load-bearing even though nothing is refused by
+  // it: `bandOf` maps a typed amount onto it, the expert reads the band on the
+  // request, and `floor: true` still drives the wizard's „fewer offers" note.
+  // What changed on 2026-08-18 is only the consequence — see the endpoint half
+  // of this test.
   //
   // PER KIND, and this loop is why the rule is data rather than a comparison:
   // 20₾ is below the floor for a LESSON and absurd as a floor for a PROJECT.
@@ -1055,24 +1315,30 @@ test('a below-floor request is STORED, with status REJECTED — per kind', () =>
     assert.equal(budgetIsBelowFloor(kind, 'nope'), false)
   }
 
+  // ⚠️ THE ENDPOINT NO LONGER REFUSES ANYTHING FOR ITS BUDGET (2026-08-18).
+  //
+  // The ladder above is still real and still asserted — a budget is collected,
+  // stored, and shown to the expert who bids. What is gone is the REFUSAL. It
+  // turned away 7 of 21 requests, four of them 20₾ lessons; the closest local
+  // competitor asks for no budget at all. Owner: „ზღვარი მოხსენი."
+  //
+  // Pinned as an EQUALITY, not an absence: `const rejected = false` is a claim
+  // this test can check, where „the floor call is missing" would also pass on a
+  // file somebody half-refactored.
   const route = codeOf('app/api/requests/route.ts')
-  assert.match(route, /const rejected = budgetIsBelowFloor\(parsed\.data\.kind, parsed\.data\.budgetBand\)/,
-    'the endpoint no longer applies the per-kind floor')
-  // ⚠️ THE LADDER GREW A RUNG (2026-08-18) AND `rejected` MUST KEEP THE TOP.
-  // It used to read `rejected ? 'REJECTED' : 'NEW'`, because every accepted
-  // request waited for an operator's call. Now an unflagged one verifies itself
-  // (lib/requestTriage) — and the ONLY thing that matters here is that a
-  // below-floor request cannot reach that branch: it is answered, never
-  // broadcast to a sphere full of experts who will refuse it.
+  assert.match(route, /const rejected = false/,
+    'something rejects a request on arrival again — if it is the budget floor, it closes a third of the funnel')
+  // The ladder itself must keep its shape. Nothing sets `rejected` today, and a
+  // dead branch that is quietly wrong is a bug waiting for its first caller.
   assert.match(route, /status: rejected \? 'REJECTED' :/,
-    'a below-floor request no longer lands as REJECTED first')
+    'the status ladder changed — REJECTED must still outrank auto-verification')
   assert.match(route, /const autoVerified = !rejected &&/,
-    'auto-verification stopped deferring to the budget floor')
-  // THE ROW IS STILL WRITTEN. If this ever becomes an early return, the
-  // measurement is gone and nothing says so.
+    'auto-verification stopped deferring to `rejected`')
+  // THE ROW IS STILL WRITTEN, whatever the budget. If this ever becomes an
+  // early return, the measurement is gone and nothing says so.
   const beforeCreate = route.slice(0, route.indexOf('createServiceRequest'))
   assert.doesNotMatch(beforeCreate, /if \(rejected\)[\s\S]{0,80}return/,
-    'a below-floor request is dropped instead of stored — that is the measurement')
+    'a request is dropped instead of stored — that is the measurement')
   // …and it is not mailed: nobody is going to phone it, so a mail about it only
   // trains the reader to ignore the subject line.
   assert.match(route, /if \(!rejected\) \{\s*after\(/,
@@ -1172,49 +1438,75 @@ test('the run is one question per screen, derived from the draft', () => {
   // them — offers coming to you, or a list of experts to write to. The owner
   // chose to ask before sending rather than after: at that point they are still
   // deciding how they want to be helped; afterwards they are waiting.
-  assert.deepEqual(chemRun, ['what', 'extras', 'budget', 'timing', 'format', 'mode', 'contact'])
-  assert.ok(stepsFor(chem).find(st => st.id === 'extras')!.skippable, 'the clarifiers became required')
+  // ⚠️ FIVE SCREENS, FOR EVERY TOPIC ON THE SITE (2026-08-19). Owner: „არ
+  // გვინდა ბიუჯეტი საერთოდ, 5 ეტაპამდე უნდა შემცირდეს."
+  //
+  // Two screens went in one pass and the reasons differ. The BUDGET question
+  // asked the person who cannot know what the work costs to name a figure
+  // first, and that figure then capped every offer they got — the same
+  // objection that took the price off the catalogue card, one screen earlier.
+  // The CLARIFIERS did not go anywhere; they lost their own page and sit on the
+  // timing screen, which is the move „აირჩიე ტიპი" made a day before.
+  //
+  // The distribution is the pin, not one example: measured across all 171
+  // topics, every single run is five screens. If a step returns, this is the
+  // test that says so.
+  assert.deepEqual(chemRun, ['what', 'timing', 'format', 'mode', 'contact'])
+  assert.ok(!chemRun.includes('budget'), 'the budget question came back')
   assert.ok(!chemRun.includes('details'), 'the free-text screen came back')
 
   // An ambiguous topic no longer earns a screen — it is answered on screen one.
   const con = withTopic(EMPTY_DRAFT, 'contract')
   assert.deepEqual(stepsFor(con).map(st => st.id),
-    ['what', 'budget', 'timing', 'format', 'mode', 'contact'])
+    ['what', 'timing', 'format', 'mode', 'contact'])
   // …but an EMPTY draft still lists it, so the counter can count before the
   // first tap.
   assert.ok(stepsFor(EMPTY_DRAFT).map(st => st.id).includes('kind'),
     'the empty run lost its provisional kind step — the counter would jump')
 
-  // The shortest honest run is six screens. It was five until „mode" arrived —
-  // and that is the bar a future step has to clear: not „is this useful" but
-  // „does one tap here change what happens next".
-  assert.equal(stepsFor(con).length, 6)
+  // EVERY topic, not the two above.
+  for (const g of TOPIC_GROUPS) {
+    for (const t of g.topics) {
+      const run = stepsFor(withTopic(EMPTY_DRAFT, t.id))
+      assert.equal(run.length, 5, `${t.id} runs in ${run.length} screens, not 5`)
+    }
+  }
 
-  // Titles speak the kind's own words once it is known.
-  assert.ok(stepsFor(chem).find(st => st.id === 'budget')!.title.includes('ერთ გაკვეთილზე'))
+  // The clarifiers share the timing screen, and the heading says so.
+  assert.equal(stepsFor(chem).find(st => st.id === 'timing')!.title, 'ორიოდე დეტალი')
+  // …while a topic with no clarifiers keeps the kind's own timing wording.
+  const plain = withTopic(EMPTY_DRAFT, 'contract')
+  assert.ok(!stepsFor(plain).find(st => st.id === 'timing')!.title.includes('დეტალი'))
 
-  // Resume: a draft with budget answered but no timing lands on timing —
-  // never dragged back to a skipped clarifier, never overshot to contact.
-  const mid = { ...chem, budgetBand: 'l2', details: { audience: 'pupil' } }
-  assert.equal(resumeStepId(mid), 'timing')
-  // …and a virgin restored draft with only the topic resumes at the clarifiers
-  // (the frontier), which are now one screen rather than one per question.
-  assert.equal(resumeStepId(chem), 'extras')
+  // Resume lands on the frontier: a draft holding only its topic resumes at the
+  // first unanswered question, which is now the shared details screen.
+  assert.equal(resumeStepId(chem), 'timing')
 
   // The description is OPTIONAL — the schema accepts an empty one, because the
-  // structured answers carry the request and the admin phones anyway. It no
-  // longer has a screen at all; the contact step carries it as a folded field.
-  assert.equal(stepComplete('extras', chem), true)
+  // structured answers carry the request. It has no screen at all; the contact
+  // step carries it as a folded field.
   assert.equal(ServiceRequestInput.safeParse({
     kind: 'LEARNING', topic: 'chemistry', description: '',
-    budgetBand: 'l2', timing: 'twice_week', format: 'ONLINE', city: 'TBILISI',
+    budgetBand: 'x', timing: 'twice_week', format: 'ONLINE', city: 'TBILISI',
     contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
   }).success, true, 'an empty description is rejected — the essay wall is back')
 
-  // Cross-kind topic switch still clears the kind-scoped answers.
-  const cross = withTopic({ ...chem, budgetBand: 'l2', timing: 'twice_week' }, 'contract')
+  // ⚠️ AND THE SCHEMA MUST ACCEPT „NOT ASKED" MONEY. The wizard no longer
+  // collects a band, so every request that reaches the endpoint carries the
+  // sentinel. A refinement that demands a real band here would refuse every
+  // request on the site — and would do it at the last screen, after the person
+  // typed their name and number.
+  assert.equal(ServiceRequestInput.safeParse({
+    kind: 'LEARNING', topic: 'chemistry', description: 'ალგებრა',
+    budgetBand: 'x', timing: 'twice_week', format: 'ONLINE', city: 'TBILISI',
+    contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
+  }).success, true, 'the UNSTATED budget is refused — no request can be sent')
+
+  // Cross-kind topic switch still clears the kind-scoped answers, and the money
+  // stays at „not asked" rather than dropping to '' (which the schema refuses).
+  const cross = withTopic({ ...chem, timing: 'twice_week' }, 'contract')
   assert.equal(cross.kind, '')
-  assert.equal(cross.budgetBand, '')
+  assert.equal(cross.budgetBand, 'x')
 })
 
 test('the conversation opens before the choice and never leaks the contact', () => {
@@ -1406,12 +1698,12 @@ test('the live layer and the budget-fit line hold', () => {
   assert.match(codeOf('app/request/[ref]/page.tsx'),
     /\(request\.status === 'NEW' \|\| request\.status === 'VERIFIED'\) && <AutoRefresh/,
     'the client page promises liveness on settled requests too')
-  assert.match(codeOf('app/provider/requests/page.tsx'), /<AutoRefresh/,
+  assert.match(codeOf('app/work/(provider)/requests/page.tsx'), /<AutoRefresh/,
     'the provider queue lost its live refresh')
 
   // The budget-fit line: warning above the band, never a BLOCK — an expert
   // worth more than the band must still be able to say so.
-  const form = codeOf('app/provider/requests/[id]/OfferForm.tsx')
+  const form = codeOf('app/work/(provider)/requests/[id]/OfferForm.tsx')
   assert.match(form, /კლიენტის ბიუჯეტშია/, 'the in-budget confirmation is gone')
   assert.match(form, /text-warning-700/, 'above-budget lost its caution tone')
   assert.doesNotMatch(form, /disabled=\{[^}]*fit/, 'the fit line became a block')
@@ -1530,7 +1822,7 @@ test('the form and the API judge a request by the SAME schema', () => {
   for (const f of ['app/request/_model.ts', 'app/request/RequestWizard.tsx', 'app/api/requests/route.ts']) {
     assert.match(read(f), /ServiceRequestInput/, `${f} does not use the shared schema`)
   }
-  for (const f of ['app/provider/requests/[id]/OfferForm.tsx', 'app/api/provider/offers/route.ts']) {
+  for (const f of ['app/work/(provider)/requests/[id]/OfferForm.tsx', 'app/api/provider/offers/route.ts']) {
     assert.match(read(f), /RequestOfferInput/, `${f} does not use the shared schema`)
   }
 })
@@ -1795,8 +2087,8 @@ test('the subsystem shares nothing with bookings, packages or B2B', () => {
     'app/request/_stepDetails.tsx',
     'app/request/[ref]/page.tsx',
     'lib/requestTopics.ts',
-    'app/provider/requests/page.tsx',
-    'app/provider/offers/page.tsx',
+    'app/work/(provider)/requests/page.tsx',
+    'app/work/(provider)/offers/page.tsx',
   ]
   for (const f of OWN) {
     // Comments stripped: every one of these files explains at length what it is
@@ -1918,10 +2210,11 @@ test('the request is written before the account, and the account cannot lose it'
 
 test('the thanks screen promises only what exists', () => {
   const thanks = codeOf('app/request/_thanks.tsx')
-  // /student does not list service requests and must not be pointed at as if
-  // it did — the subsystem is linked from nowhere on the site by design.
-  assert.ok(!thanks.includes('/student'),
-    'the thanks screen links to /student, which does not show requests')
+  // The /me HOME does not list service requests and must not be pointed at as
+  // if it did — /me/requests (D7) is the page that does, and only for a signed-
+  // in owner; a client who has just sent a request usually has no session yet.
+  assert.ok(!/["'`]\/me(["'`?#])/.test(thanks),
+    'the thanks screen links to /me, which does not show requests')
   assert.match(thanks, /sent\.account === 'CREATED'/, 'the created-account line is gone')
   assert.match(thanks, /sent\.account === 'EXISTS'/, 'the existing-account line is gone')
 })
@@ -1940,27 +2233,26 @@ test('the honeypot stays invisible and stays dumb', () => {
     'the honeypot branch stopped answering ok:true — it now tells bots they were caught')
 })
 
-test('a below-floor budget is said at the tap, not after the submit', () => {
-  // ⚠️ SEVEN SCREENS OF WORK TO BE TOLD SOMETHING TRUE AT THE FIRST OF THEM.
-  // `budgetIsBelowFloor` has existed since the band ladder was written, and the
-  // wizard never asked it. So somebody who tapped „20₾-მდე" answered four more
-  // questions, typed their name, phone and email, pressed send — and read „ამ
-  // ბიუჯეტში ვერ დაგეხმარებით" on the thanks card. The floor was known the
-  // instant they tapped (owner, 2026-08-17, holding that exact screenshot).
+test('the money question is gone from the wizard, warning and all', () => {
+  // ⚠️ THIS TEST USED TO PIN THE OPPOSITE. It guarded a warning under the
+  // budget ladder („ამ ბიუჯეტში შეთავაზება ნაკლები იქნება") and the rule that
+  // the low band must not block the run. Both were right about the screen they
+  // were on; the screen itself is what the owner removed on 2026-08-19, and a
+  // pin that outlives its subject fails the next honest change instead of the
+  // dishonest one.
+  //
+  // What is worth pinning now is the absence, because a money question is the
+  // easiest thing in the world to add back „just optionally".
   const w = codeOf('app/request/RequestWizard.tsx')
-  assert.match(w, /budgetIsBelowFloor\(kind, id\)\) \{ patch\(\{ budgetBand: id \}\); return \}/,
-    'a floor band advances again — the person learns after the submit')
-  assert.match(w, /budgetIsBelowFloor\(kind, draft\.budgetBand\)/,
-    'the floor notice is no longer rendered on the budget screen')
+  assert.doesNotMatch(w, /budgetIsBelowFloor/, 'the floor warning is back on a screen that no longer exists')
+  assert.doesNotMatch(w, /BUDGET_BANDS/, 'the wizard offers a budget ladder again')
+  assert.doesNotMatch(w, /step\.id === 'budget'/, 'the budget screen came back')
+  const m = codeOf('app/request/_model.ts')
+  assert.doesNotMatch(m, /id: 'budget'/, 'stepsFor lists a budget screen again')
 
-  // ⚠️ IT WARNS, IT DOES NOT BLOCK. „How many arrive under the floor" is the
-  // measurement this stage exists for, and the endpoint still writes the row —
-  // so the screen must offer a way past it.
-  assert.match(w, /მაინც გავაგრძელებ/, 'the continue-anyway control is gone; the floor now blocks')
-  assert.doesNotMatch(w, /disabled=\{[^}]*budgetIsBelowFloor/,
-    'the floor disables a control — it is a warning, not a gate')
-
-  // …and the rule itself still lives in one place.
+  // …and the RULE still lives in one place, unused but intact: it is the thing
+  // to reach for if unservable requests ever become the problem the owner
+  // traded it away against.
   assert.equal(budgetIsBelowFloor('LEARNING', 'l0'), true)
   assert.equal(budgetIsBelowFloor('LEARNING', 'l1'), false)
 })
@@ -2037,9 +2329,10 @@ test('the transcript restates ANSWERS, in words, and only answered ones', () => 
     budgetBand: 'c2', timing: 'this_week',
     format: 'IN_PERSON', city: 'BATUMI',
   }
-  const budget = answerLabel('budget', d)
-  assert.ok(budget && !budget.includes('c2'), `the budget bubble shows the raw band id: ${budget}`)
-  assert.equal(budget, budgetLabel('CONSULTATION', 100, 250))
+  // No money bubble: the question is not asked, so there is no exchange to
+  // restate. `budgetLabel` is still the one owner of that vocabulary for the
+  // rows already in the database — see the label test below.
+  assert.equal(answerLabel('budget', d), null, 'a budget bubble appeared for a question nobody was asked')
   const timing = answerLabel('timing', d)
   assert.ok(timing && !timing.includes('this_week'), `the timing bubble shows the raw id: ${timing}`)
   assert.equal(answerLabel('what', d), topicLabel('contract'))
@@ -2053,7 +2346,7 @@ test('the transcript restates ANSWERS, in words, and only answered ones', () => 
   // An unanswered or skipped screen leaves NO pair. „—" in a conversation is a
   // person who said nothing, which is not worth a line.
   assert.equal(answerLabel('details', d), null, 'an empty description produced a bubble')
-  assert.equal(answerLabel('budget', EMPTY_DRAFT), null, 'an unanswered screen produced a bubble')
+  assert.equal(answerLabel('timing', EMPTY_DRAFT), null, 'an unanswered screen produced a bubble')
   // The contact screen is never behind the reader — it is where send lives.
   assert.equal(answerLabel('contact', d), null)
 })
@@ -2166,46 +2459,65 @@ test('the database allows exactly the three zeroes it should', () => {
     'the old constraint is no longer replaced — CREATE TABLE IF NOT EXISTS cannot repair a live table')
 })
 
-test('a budget can be typed, and the floor judges both the same way', () => {
+test('the budget is a band, and the ladder is the only way to answer it', () => {
   const {
-    serviceRequestRow, ServiceRequestInput, budgetFloorFor, amountIsBelowFloor,
+    serviceRequestRow, ServiceRequestInput, budgetIsBelowFloor,
   } = require('../lib/requests') as typeof import('../lib/requests')
 
-  // ⚠️ THE FLOOR USED TO BE A PROPERTY OF A BAND ID ONLY. Somebody who tapped
-  // „30₾-მდე" was warned and somebody who typed „18" was not — one answer, two
-  // outcomes, decided by which control they happened to use.
-  assert.equal(budgetFloorFor('SERVICE'), 30)
-  assert.equal(amountIsBelowFloor('SERVICE', 18), true)
-  assert.equal(amountIsBelowFloor('SERVICE', 45), false)
-  // Zero is „not answered", not „below the floor" — the schema refuses it
-  // separately and a warning there would be about a field nobody filled in.
-  assert.equal(amountIsBelowFloor('SERVICE', 0), false)
-
+  // ⚠️ THE TYPED AMOUNT LIVED HERE FOR ONE DAY (2026-08-18 → 2026-08-19). The
+  // field, `budgetAmount`, `amountIsBelowFloor` and `budgetFloorFor` all went
+  // together — see app/request/RequestWizard's budget step for the reasons.
+  // What this test now holds is that they went TOGETHER: a schema that still
+  // accepted the key while the screen no longer sent it would be a silent
+  // second way to write a request.
   const base = {
     kind: 'SERVICE' as const, topic: 'clean-flat', description: '',
     timing: 'tomorrow', format: 'IN_PERSON' as const, city: 'TBILISI' as const,
     details: {}, contactName: 'ნინო', phone: '599112233', email: 'n@example.ge',
   }
 
-  // A typed amount is stored EXACTLY, not snapped to the range containing it:
-  // „45₾" is more information than „30–60₾".
-  const typed = ServiceRequestInput.safeParse({ ...base, budgetBand: '', budgetAmount: 45 })
-  assert.equal(typed.success, true, typed.success ? '' : JSON.stringify(typed.error.issues))
-  if (typed.success) {
-    const row = serviceRequestRow(typed.data)
-    assert.equal(row.budgetMin, 45)
-    assert.equal(row.budgetMax, 45)
+  // A band is the answer, and the row's numbers come from the ladder.
+  const banded = ServiceRequestInput.safeParse({ ...base, budgetBand: 's2' })
+  assert.equal(banded.success, true, banded.success ? '' : JSON.stringify(banded.error.issues))
+  if (banded.success) {
+    const row = serviceRequestRow(banded.data)
+    assert.equal(row.budgetMin, 60)
+    assert.ok(row.budgetMax !== null && row.budgetMax >= row.budgetMin)
   }
 
-  // A band still works untouched.
-  const banded = ServiceRequestInput.safeParse({ ...base, budgetBand: 's2', budgetAmount: null })
-  assert.equal(banded.success, true)
-  if (banded.success) assert.equal(serviceRequestRow(banded.data).budgetMin, 60)
+  // No band = no budget, whatever else the body carries. A crafted POST holding
+  // the retired key is stripped by zod and then refused here — it cannot write
+  // a range the ladder does not have.
+  assert.equal(ServiceRequestInput.safeParse({ ...base, budgetBand: '' }).success, false,
+    'a request with no budget band was accepted')
+  const crafted = ServiceRequestInput.safeParse({ ...base, budgetBand: '', budgetAmount: 45 })
+  assert.equal(crafted.success, false, 'the retired budgetAmount still answers the budget question')
+  const smuggled = ServiceRequestInput.safeParse({ ...base, budgetBand: 's2', budgetAmount: 45 })
+  assert.equal(smuggled.success, true)
+  if (smuggled.success) {
+    assert.equal((smuggled.data as Record<string, unknown>).budgetAmount, undefined,
+      'budgetAmount survived the parse')
+    assert.equal(serviceRequestRow(smuggled.data).budgetMin, 60, 'a crafted amount moved the row')
+  }
 
-  // …but neither is refused: a budget is required, and which of the two it
-  // arrives as is the person's business.
-  assert.equal(ServiceRequestInput.safeParse({ ...base, budgetBand: '', budgetAmount: null }).success,
-    false, 'a request with no budget at all was accepted')
+  // The floor is a property of a band id again — one rule, one control.
+  assert.equal(budgetIsBelowFloor('SERVICE', 's0'), true)
+  assert.equal(budgetIsBelowFloor('SERVICE', 's2'), false)
+
+  // …and the screen it belonged to draws no number field any more.
+  const fs = require('node:fs') as typeof import('node:fs')
+  const path = require('node:path') as typeof import('node:path')
+  const dir = path.join(__dirname, '..', 'app', 'request')
+  const src = fs.readdirSync(dir)
+    .filter((f: string) => f.endsWith('.tsx') || f.endsWith('.ts'))
+    .map((f: string) => fs.readFileSync(path.join(dir, f), 'utf8'))
+    .join('\n')
+  // The two shapes the field had: the control, and the draft key it patched.
+  // (The word „budgetAmount" itself still appears once, in _model's revive
+  // step, which DELETES it off a draft written before the removal — that is the
+  // migration, not the field, so the assertion is on the patch form.)
+  assert.ok(!/type="number"/.test(src), 'the intake grew a number input again')
+  assert.ok(!/budgetAmount:/.test(src), 'something writes a typed budget onto the draft again')
 })
 
 test('the client is told their request exists, at the moment they send it', () => {
