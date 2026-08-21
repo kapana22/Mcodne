@@ -92,18 +92,16 @@ export default async function Page() {
       <div className="space-y-10">
         {/* ⚠️ TWO HEADINGS, NEVER TWO TABS. A tab bar here would read as two
             products — exactly the consultation-vs-service primary axis the
-            product model forbids. These are two shapes of one answer, stacked,
-            in the order the platform grew them. */}
-        {showConsultations && (
-          <section>
-            <h2 className="font-display text-h3 font-bold text-ink-900">კონსულტაციები</h2>
-            <p className="mt-1 mb-4 text-small text-ink-500 leading-snug">
-              რას სთავაზობ — ფასი, ხანგრძლივობა და თავისუფალი დრო.
-            </p>
-            <ConsultationsSection />
-          </section>
-        )}
+            product model forbids. These are two shapes of one answer, stacked.
 
+            ⚠️ AND SERVICES COME FIRST (2026-08-21). They were stacked „in the
+            order the platform grew them", which put კონსულტაციები at the top of
+            the page an expert opens to answer „რას ვყიდი?" — the consultation
+            arriving before the service, on the provider's own screen. CLAUDE.md
+            rule 4 is not about marketing copy: „WHEREVER BOTH APPEAR, THE
+            SERVICE COMES FIRST — sentence, filter, rail, list, example." This is
+            a list, and it is the one the owner reads most. The order the
+            platform grew them is history, not a hierarchy. */}
         {showTrades && (
           <section>
             <h2 className="font-display text-h3 font-bold text-ink-900">სამუშაოები</h2>
@@ -111,6 +109,16 @@ export default async function Page() {
               აირჩიე, რას აკეთებ და რომელ ქალაქებში. მოთხოვნები მხოლოდ ამის მიხედვით მოგდის.
             </p>
             <ServiceProfileForm />
+          </section>
+        )}
+
+        {showConsultations && (
+          <section>
+            <h2 className="font-display text-h3 font-bold text-ink-900">კონსულტაციები</h2>
+            <p className="mt-1 mb-4 text-small text-ink-500 leading-snug">
+              წინა ნაბიჯი სერვისის ყიდვამდე — ფასი, ხანგრძლივობა და თავისუფალი დრო.
+            </p>
+            <ConsultationsSection />
           </section>
         )}
 

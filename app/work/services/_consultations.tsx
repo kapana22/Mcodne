@@ -181,9 +181,19 @@ export function ConsultationsSection() {
       {/* Consultations */}
       <section id="section-consultations" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
         <div className="flex items-start justify-between gap-3 flex-wrap">
+          {/* ⚠️ NO SECOND HEADING HERE (2026-08-21). The screen said the same
+              thing four times on the way down: „ჩემი სერვისები" (page title) →
+              „კონსულტაციები" (section h2) → „კონსულტაციის ტიპები" (this
+              eyebrow) → and then each row offers to be a „სერვისი". Owner:
+              „ბევრია, უფრო მარტივი და კომფორტული უნდა იყოს." The h2 above is
+              the heading; this was a label for the thing already labelled.
+
+              The old line also promised „ჩაანაცვლებს ნაგულისხმევს" — pointing
+              at the default-length card, which is no longer on screen once a
+              type exists. Copy that names something invisible is worse than no
+              copy. */}
           <div>
-            <Eyebrow tone="muted" className="mb-1">კონსულტაციის ტიპები</Eyebrow>
-            <p className="text-meta text-ink-500 leading-snug max-w-[520px]">თითოეულს თავისი ხანგრძლივობა და ფასი — ჩაანაცვლებს ნაგულისხმევს.</p>
+            <p className="text-meta text-ink-500 leading-snug max-w-[520px]">თითოეულს თავისი ხანგრძლივობა და ფასი.</p>
           </div>
         </div>
 
