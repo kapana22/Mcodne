@@ -24,6 +24,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { PhotoUploader } from '@/app/join/_expert/_upload'
 import { Btn } from '@/components/Btn'
 import { Card } from '@/components/Card'
+import { Icon } from '@/components/Icon'
 import { MAX_SERVICES } from '@/lib/serviceProfile'
 
 type Group = { id: string; label: string; topics: { id: string; label: string }[] }
@@ -105,6 +106,19 @@ export function ServiceProfileForm() {
 
   const atCap = draft.services.length >= MAX_SERVICES
 
+  // ⚠️ 39 CHIPS IN 8 GROUPS, ALL EXPANDED, WAS THE WHOLE SCREEN (2026-08-21).
+  // Measured: eight `h-11` rows deep, roughly 1 400px of scrolling before the
+  // cities card came into view — and the cap is 12, so a plumber ticks four of
+  // the five under სანტექნიკა and scrolls past the other thirty-four. Owner:
+  // „ამდენი სივრცე სჭირდება? … მარტო ტექსტები და ღილაკებია დაყრილი და
+  // არაპროფესიონალურია."
+  //
+  // One group open at a time. Nothing is hidden — every chip is one click away,
+  // and the header carries its own count, so what you already chose is legible
+  // while it is closed. That is the whole trade: eight words to scan instead of
+  // thirty-nine buttons to wade through.
+  const [openGroup, setOpenGroup] = useState<string | null>(null)
+
   const toggleService = (id: string) => {
     const on = draft.services.includes(id)
     if (!on && atCap) return
@@ -147,12 +161,17 @@ export function ServiceProfileForm() {
           The first thing on the screen, because a master whose list is empty is
           waiting for work that is never routed to them and nothing else on the
           page would say so. */}
+      {/* ⚠️ ONE LINE, NOT A BULLETED BOX (2026-08-21). It listed „აირჩიე ერთი
+          სერვისი მაინც" and „აირჩიე ქალაქი" as bullets directly above the two
+          cards that ASK for exactly those two things — the warning restated the
+          form it was sitting on top of. The state („ჯერ არ ხარ სიაში") is worth
+          saying because nothing else on the page would; the instructions are
+          not, because the next two headings are the instructions. */}
       {data.gaps.length > 0 ? (
         <div className="rounded-card border border-warning-200 bg-warning-50 px-4 py-3">
-          <p className="text-body text-ink-900">ჯერ არ ხარ სიაში.</p>
-          <ul className="mt-1 text-small text-ink-700 list-disc list-inside">
-            {data.gaps.map(g => <li key={g}>{g}</li>)}
-          </ul>
+          <p className="text-body text-ink-900">
+            ჯერ არ ხარ სიაში — {data.gaps.join(', ')}.
+          </p>
         </div>
       ) : (
         <div className="rounded-card border border-ink-200 bg-ink-50 px-4 py-3">
@@ -177,11 +196,33 @@ export function ServiceProfileForm() {
             მაქსიმუმია. ერთი მოხსენი, თუ სხვის დამატება გინდა.
           </p>
         )}
-        <div className="mt-4 flex flex-col gap-5">
-          {data.groups.map(g => (
-            <div key={g.id}>
-              <p className="text-small font-display font-semibold text-ink-800 mb-2">{g.label}</p>
-              <div className="flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-col gap-1">
+          {data.groups.map(g => {
+            const chosen = g.topics.filter(t => draft.services.includes(t.id)).length
+            // A group that already holds a choice opens on its own the first
+            // time the list is drawn — otherwise a returning provider has to
+            // hunt for their own answers.
+            const open = openGroup === null ? chosen > 0 : openGroup === g.id
+            return (
+            <div key={g.id} className="border-b border-ink-100 last:border-b-0">
+              <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpenGroup(open ? '' : g.id)}
+                className="w-full min-h-11 py-2 flex items-center justify-between gap-3 text-left rounded-btn hover:bg-ink-50 transition-colors duration-fast"
+              >
+                <span className="font-display text-body font-semibold text-ink-900">{g.label}</span>
+                <span className="flex items-center gap-2 shrink-0">
+                  {chosen > 0 && (
+                    <span className="h-6 min-w-6 px-2 inline-flex items-center justify-center rounded-pill bg-brand-600 text-white text-meta font-display font-semibold tabular-nums">
+                      {chosen}
+                    </span>
+                  )}
+                  <Icon.chevD className={`w-4 h-4 text-ink-500 transition-transform duration-fast ${open ? 'rotate-180' : ''}`} />
+                </span>
+              </button>
+              {open && (
+              <div className="pb-3 flex flex-wrap gap-2">
                 {g.topics.map(t => {
                   const on = draft.services.includes(t.id)
                   // Disabled only when it would be a no-op — a ticked chip at the
@@ -207,8 +248,10 @@ export function ServiceProfileForm() {
                   )
                 })}
               </div>
+              )}
             </div>
-          ))}
+            )
+          })}
         </div>
       </Card>
 
