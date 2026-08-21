@@ -1,4 +1,4 @@
-import { ensureDbReady } from './lib/dbBoot'
+import { ensureDbReady } from '../lib/dbBoot'
 async function main() {
   try { await ensureDbReady(); console.log('dbBoot: OK') }
   catch (e: any) {

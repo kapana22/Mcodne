@@ -104,19 +104,41 @@ export function useSpheres(): Sphere[] {
   // while no such category has ever existed in the database — an applicant who
   // picked it during an API blip was guaranteed to be filed nowhere.
   //
-  // Eight, not six: the two spheres hidden from browse are offered here on
-  // purpose. „კარიერა" is hidden because it has no expert yet, and if this
-  // screen cannot offer it, nobody can ever be its first. Sub-fields arrive
-  // with the fetch; the fallback only has to keep the form usable.
+  // ⚠️ IT WENT STALE AGAIN, AND THIS TIME IT WAS ON THE FIRST SCREEN A GUEST
+  // SEES (2026-08-20). Three of the eight names below no longer existed —
+  // „ბიზნესი და სტრატეგია", „ფინანსები და გადასახადები", „ტექნოლოგია და
+  // პროდუქტი" were renamed — and ტალღა 1's two service-side spheres
+  // („სწავლება", „სახლის რემონტი") were not in the list at all. Since the
+  // public door renders this control BEFORE the fetch resolves, every visitor
+  // saw a consulting-only list with three dead names flash and then swap.
+  // Verified against all 20 production rows the same day.
+  //
+  // ტალღა 1 first, in `lib/launchTaxonomy`'s order — the picker sorts anyway
+  // (`launchFirst`), but a fallback that opens on the launch set is one less
+  // thing that can disagree. The rest follow; nothing is hidden from this
+  // screen on purpose, because a sphere that cannot be picked here can never
+  // get its first expert.
   const SPHERES: Sphere[] = dbCats.length ? dbCats : [
-    { name: 'ბიზნესი და სტრატეგია', slug: 'business', children: [] },
-    { name: 'ფინანსები და გადასახადები', slug: 'tax', children: [] },
+    { name: 'სწავლება', slug: 'swavleba', children: [] },
+    { name: 'ბუღალტერია და გადასახადები', slug: 'tax', children: [] },
     { name: 'სამართალი', slug: 'law', children: [] },
-    { name: 'მარკეტინგი და გაყიდვები', slug: 'marketing', children: [] },
-    { name: 'ტექნოლოგია და პროდუქტი', slug: 'it', children: [] },
     { name: 'ფსიქოლოგია', slug: 'psychology', children: [] },
-    { name: 'კარიერა', slug: 'career', children: [] },
+    { name: 'ბიზნესი', slug: 'business', children: [] },
+    { name: 'სახლის რემონტი', slug: 'remonti', children: [] },
+    { name: 'დიზაინი', slug: 'design', children: [] },
+    { name: 'კარიერა და HR', slug: 'career', children: [] },
+    { name: 'მარკეტინგი და გაყიდვები', slug: 'marketing', children: [] },
+    { name: 'IT და ტექნოლოგიები', slug: 'it', children: [] },
     { name: 'უძრავი ქონება', slug: 'real-estate', children: [] },
+    { name: 'ჯანმრთელობა და კვება', slug: 'health', children: [] },
+    { name: 'მედიცინა', slug: 'medicine', children: [] },
+    { name: 'არქიტექტურა და მშენებლობა', slug: 'architecture', children: [] },
+    { name: 'ტურიზმი და ღონისძიებები', slug: 'tourism', children: [] },
+    { name: 'ლოგისტიკა და საბაჟო', slug: 'logistics', children: [] },
+    { name: 'მედია და კონტენტი', slug: 'media', children: [] },
+    { name: 'გრანტები და ტენდერები', slug: 'grants', children: [] },
+    { name: 'ვიზა, მიგრაცია და რელოკაცია', slug: 'relocation', children: [] },
+    { name: 'სოფლის მეურნეობა', slug: 'agriculture', children: [] },
   ]
 
   return SPHERES
@@ -419,7 +441,7 @@ export const Step2 = ({ form, set }: StepProps) => {
             <div className="grid grid-cols-2 gap-2 mb-3">
               {([
                 { on: false, label: 'სერვისი', hint: 'ფასი, დროის გარეშე' },
-                { on: true, label: 'კონსულტაცია', hint: 'ჯავშნადი, დროით' },
+                { on: true, label: 'სერვისი დროით', hint: 'ჯავშნადი — კლიენტი დროს ირჩევს' },
               ] as const).map(o => {
                 const active = s.bookable === o.on
                 return (

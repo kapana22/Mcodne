@@ -22,6 +22,7 @@ import { Card } from '@/components/Card'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
+import { DIRECT_WINDOW_MS } from '@/lib/requestLive'
 
 export const dynamic = 'force-dynamic'
 
@@ -102,6 +103,33 @@ export default async function Page({ searchParams }: {
    *  otherwise „nothing here" reads as „the site is broken". */
   const filtered = Object.keys(mine).length > 0
 
+  const me = viewer.provider
+  /**
+   * WHICH REQUESTS WERE ADDRESSED TO *ME* — asked BEFORE the feed, because the
+   * answer is both a filter and a label.
+   *
+   * A client standing on somebody's profile aims their request with `?to=<slug>`
+   * (app/experts/[slug]/_providerCta), which opens an INVITED offer through
+   * lib/requestInvite the moment the request is written, and — since 2026-08-20
+   * — drops that request's `offerLimit` to 1. Owner: „თუ მცოდნესთან აგზავნის,
+   * მხოლოდ მცოდნესთან უნდა მივიდეს."
+   *
+   * So an addressed request must be invisible to everybody EXCEPT the person it
+   * names, and unmistakable TO them. Both come from this one list.
+   */
+  const mineInvited = me
+    ? await prisma.requestOffer.findMany({
+        where: {
+          status: 'INVITED',
+          ...(me.kind === 'EXPERT' ? { expertUserId: me.userId } : { companyId: me.companyId }),
+        },
+        select: { requestId: true, createdAt: true },
+      })
+    : []
+  // requestId → when the client addressed it. The card turns this into the one
+  // thing that makes exclusivity fair: a clock the PROVIDER carries.
+  const invited = new Map(mineInvited.map(o => [o.requestId, o.createdAt]))
+
   const rows = await prisma.serviceRequest.findMany({
     // Verified and not yet full. The place filter is a field comparison rather
     // than a fetch-then-filter so a full request never reaches the page at all
@@ -109,6 +137,18 @@ export default async function Page({ searchParams }: {
     where: {
       status: 'VERIFIED',
       offerCount: { lt: prisma.serviceRequest.fields.offerLimit },
+      // ⚠️ AN ADDRESSED REQUEST BELONGS TO ONE PERSON (2026-08-20). `offerLimit`
+      // is 1 only on a request that named somebody (app/api/requests), so this
+      // is the whole rule: the open queue shows requests with room for anybody,
+      // plus the ones addressed to ME. It cannot leak — a request addressed to
+      // somebody else has offerLimit 1 and is not in my invited set, so neither
+      // arm matches. And when the client presses „გავხსნა სხვებისთვის?" the
+      // limit goes back to 3 and it appears here for everyone, with nothing
+      // else to update.
+      OR: [
+        { offerLimit: { gt: 1 } },
+        ...(invited.size ? [{ id: { in: [...invited.keys()] } }] : []),
+      ],
       ...(kindFilter ? { kind: kindFilter } : {}),
       ...mine,
     },
@@ -227,6 +267,20 @@ export default async function Page({ searchParams }: {
             // was. When there is no description the category is the title
             // again, because a card with no title is worse than a repeated one.
             const titled = (r.description ?? '').trim() !== ''
+            /* ⚠️ THE CLOCK THAT MAKES EXCLUSIVITY FAIR (2026-08-20). This
+               request is not in anybody else's queue — the client chose this
+               provider and the request was closed to everyone else
+               (app/api/requests → `offerLimit: 1`). Exclusivity that costs
+               nothing invites sitting on it, and the client is the one who
+               waits. So the card says how long is left of the window after
+               which THEY are offered a way out (lib/requestLive →
+               DIRECT_WINDOW_MS). Nothing expires here: past zero the provider
+               can still answer, and the request is still theirs until the
+               client presses a button. */
+            const since = invited.get(r.id)
+            const hoursLeft = since
+              ? Math.max(0, Math.ceil((since.getTime() + DIRECT_WINDOW_MS - Date.now()) / 3_600_000))
+              : null
             // The money, split so the NUMBER carries the weight and the unit
             // does not. `budgetLabel` is „60–120₾ ერთ გამოძახებაზე" — one
             // string by design, so the two screens that print it cannot
@@ -247,7 +301,26 @@ export default async function Page({ searchParams }: {
                     context — it is „თბილისი" on almost every row — so it sits
                     here rather than competing in the facts line. */}
                 <p className="text-meta text-ink-500 min-w-0">
+                  {/* ⚠️ THE ONE FACT THAT CHANGES HOW THIS CARD IS READ. When
+                      the client aimed the request at this provider, the row
+                      above the title says so — before the budget, before the
+                      places-left count, because it reframes both: this is not a
+                      three-way race, somebody read your profile and picked you.
+                      Brand-tinted and tiny, in the caption row rather than as a
+                      pill beside the title: it is a PROPERTY of the request,
+                      like the city, not a badge on the provider. Drawn only
+                      when true, which by definition is a minority of the feed —
+                      the same rule that keeps EntityKinds off a single-kind
+                      list. */}
+                  {invited.has(r.id) && (
+                    <span className="text-brand-700 font-display font-bold">შენ აგირჩია · </span>
+                  )}
                   {titled ? <>{r.topicLabel} · {r.cityLabel}</> : r.cityLabel}
+                  {hoursLeft !== null && (
+                    <span className="block mt-0.5 text-ink-600">
+                      {hoursLeft > 0 ? <>უპასუხე <span className="font-display font-bold tabular-nums">{hoursLeft} საათში</span></> : 'ვადა გავიდა — ჯერ კიდევ შენია'}
+                    </span>
+                  )}
                 </p>
                 {/* ⚠️ THE ONE NUMBER A PROVIDER DECIDES ON, and until 2026-08-19
                     it was the weakest thing on the card — small grey text in a

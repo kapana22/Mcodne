@@ -133,6 +133,12 @@ export default function TutorApply({ initialUser, seed, onContinueMaster }: {
           // where the answer actually goes, so a restored draft (or an older
           // typed value) must never win over it.
           email: d.user.email ?? f.email,
+          // ⚠️ AND THE PHONE (2026-08-20). Signup asks for it and REQUIRES it,
+          // /api/me has always returned it, and this form asks for it again as
+          // a required field — so an applicant typed the same number twice,
+          // about a minute apart. Only when the box is empty: a number typed
+          // here is a deliberate second number and outranks the account's.
+          phone: f.phone.trim() ? f.phone : (d.user.phone ?? ''),
         }))
         // The photo is REQUIRED, and an avatar the person UPLOADED already
         // satisfies it — nobody should have to re-upload a photo they gave us.
@@ -353,7 +359,7 @@ export default function TutorApply({ initialUser, seed, onContinueMaster }: {
    * someone editing one bound and not the other. The step gates below are the
    * same rules, applied as soon as the field is on screen — the last thing an
    * applicant should meet is a wall on the final screen. */
-  const validateStep = (s: StepId, _p: StepPart = 1): string | null => {
+  const validateStep = (s: StepId, _p: StepPart = 1, final = false): string | null => {
     if (s === 1) {
       // EACH FIELD ON ITS OWN. This used to join them and validate the pair,
       // so „ნინო" + „Beridze" put the red line under სახელი — the one field
@@ -384,7 +390,20 @@ export default function TutorApply({ initialUser, seed, onContinueMaster }: {
       { const e = georgianError('ერთი წინადადება შენზე', checkGeorgian(form.headline)); if (e) return fail('headline', e) }
       // A profile with no face is the single weakest thing on the marketplace —
       // it converts badly and it reads as unfinished. Required from 2026-07-29.
-      if (!media?.photoUrl) return fail('photo', 'ატვირთე პროფილის ფოტო — ის ყველგან გამოჩნდება, სადაც კლიენტი შენ გხედავს.')
+      //
+      // ⚠️ REQUIRED TO SUBMIT, NOT TO CONTINUE (2026-08-20). This ran on the
+      // STEP gate, so the most expensive control on the whole form — a file
+      // upload, which on a phone means leaving the browser — stood between
+      // screen one and screen two, before the applicant had seen what they
+      // were being asked to price. The service door already had this right and
+      // says so in its own header: „cheap and identifying first… and only then
+      // the things that cost effort — photo, work photos, prices." Two doors,
+      // two opposite doctrines, both written down.
+      //
+      // The bar is unchanged: `validate()` runs every step with `final`, so no
+      // application is submitted without a photo, and `FIELD_STEP` carries the
+      // jump back to this control. Same rule, asked at the end.
+      if (final && !media?.photoUrl) return fail('photo', 'ატვირთე პროფილის ფოტო — ის ყველგან გამოჩნდება, სადაც კლიენტი შენ გხედავს.')
       { const e = bioError(form.motivation); if (e) return fail('motivation', e) }
       // Optional fields, but a bad value in one still 400s the whole submit —
       // and it does so two screens later, where nothing points back here.
@@ -435,7 +454,7 @@ export default function TutorApply({ initialUser, seed, onContinueMaster }: {
    * value behind the applicant. `fail()` carries the step, so the jump lands on
    * the right screen instead of pointing at a field that isn't rendered. */
   const validate = (): string | null =>
-    validateStep(1) ?? validateStep(2) ?? (() => {
+    validateStep(1, 1, true) ?? validateStep(2, 1, true) ?? (() => {
       // `specialty` is derived at submit (cats[0], else the headline) — so it is
       // the one value no single input owns and no step gate covers.
       const specialty = form.cats[0] || form.otherCat.trim() || form.headline.trim().slice(0, 60)

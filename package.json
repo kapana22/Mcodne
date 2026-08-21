@@ -12,7 +12,8 @@
     "test": "node scripts/check.mjs fast",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "map": "node scripts/build-map.mjs"
   },
   "engines": {
     "node": ">=20 <24"

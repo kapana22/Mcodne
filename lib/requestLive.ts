@@ -53,7 +53,26 @@ export type RequestLiveStatus = {
   notified: number
   expertsInField: number
   experts: LiveExpert[]
+  /** Set only while this request belongs to ONE named provider — see
+   *  DIRECT_WINDOW_MS and app/api/requests → `offerLimit: 1`. */
+  addressedTo: { name: string; waitingSince: string; overdue: boolean } | null
 }
+
+/**
+ * HOW LONG THE CHOSEN PROVIDER HAS BEFORE THE CLIENT IS OFFERED A WAY OUT.
+ *
+ * 24 hours, and it is a fairness clock, not a deadline that does anything by
+ * itself: nothing expires, nothing opens, no offer is cancelled. All it changes
+ * is whether the client's own page shows the „გავხსნა სხვებისთვის?" button.
+ *
+ * ⚠️ NOTHING HERE IS AUTOMATIC, ON PURPOSE. Auto-opening would publish a
+ * private choice to strangers without the client pressing anything — and this
+ * platform has no SMS (see the note on `email` in lib/requests), so every
+ * automated message is an email that arrives while nobody is looking. The
+ * client would discover the change by receiving quotes they never asked for.
+ * Owner, 2026-08-20: „თუ მცოდნესთან აგზავნის, მხოლოდ მცოდნესთან უნდა მივიდეს."
+ */
+export const DIRECT_WINDOW_MS = 24 * 60 * 60 * 1000
 
 /**
  * The full panel payload. Four reads — the row, „who did we tell", „how many
@@ -68,6 +87,22 @@ export async function requestLiveStatus(ref: string): Promise<RequestLiveStatus 
     select: {
       id: true, status: true, pickMode: true, offerCount: true, offerLimit: true,
       categoryId: true, kind: true, topic: true, city: true,
+      // ⚠️ WHO THIS WAS ADDRESSED TO, AND WHEN (2026-08-20). A request that
+      // named somebody carries `offerLimit: 1` and one INVITED offer (see
+      // app/api/requests). The client's own page has to be able to say
+      // „გაგზავნილია X-სთან · პასუხს ელოდება" rather than the tender copy —
+      // and, once the provider's window has passed, to offer opening it up.
+      // ONE row at most: the invite is written once and leaves INVITED the
+      // moment a price is sent, so this is empty on every ordinary request.
+      offers: {
+        where: { status: 'INVITED' },
+        select: {
+          createdAt: true,
+          expertUser: { select: { fullName: true } },
+          company: { select: { name: true } },
+        },
+        take: 1,
+      },
     },
   })
   if (!r) return null
@@ -137,11 +172,28 @@ export async function requestLiveStatus(ref: string): Promise<RequestLiveStatus 
       : Promise.resolve([]),
   ])
 
+  // The addressed state, resolved once here so no screen has to reconstruct it
+  // from `offerLimit` and an offer array. `waitingSince` is what the countdown
+  // and the „open it up" line are both measured from.
+  const invitedTo = r.offers[0] ?? null
+  const addressedTo = invitedTo
+    ? {
+        name: invitedTo.expertUser?.fullName ?? invitedTo.company?.name ?? 'ექსპერტი',
+        waitingSince: invitedTo.createdAt.toISOString(),
+        /** True once the provider's window has passed with no answer — the only
+         *  moment the client is offered the open queue. Never automatic: the
+         *  request stays theirs until the client presses the button. */
+        overdue: Date.now() - invitedTo.createdAt.getTime() > DIRECT_WINDOW_MS,
+      }
+    : null
+
   return {
     status: r.status,
     offerCount: r.offerCount,
     offerLimit: r.offerLimit,
     pickMode: r.pickMode,
+    /** Set only while this request belongs to ONE named provider. */
+    addressedTo,
     notified,
     expertsInField,
     experts: experts.map(e => ({

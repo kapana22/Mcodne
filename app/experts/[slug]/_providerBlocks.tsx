@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { fmtDateTime, TBILISI } from '@/lib/tz'
 import Link from 'next/link'
+import { Card } from '@/components/Card'
 import type { MasterProfile } from './_providerData'
 import { requestHrefFor } from './_providerData'
 
@@ -63,31 +64,63 @@ const Section = ({ id, title, children }: { id: string; title: string; children:
  * and the client repeats it in the description. If that ever feels like a
  * retype, the fix is a `?service=` the wizard reads, not a second door.
  */
-export function PricedServicesBlock({ p }: { p: MasterProfile }) {
+/** How many rows the rail shows before folding. FOUR is the measured line: the
+ *  provider with the longest list has six, and at six the block is taller than
+ *  the CTA it sits under — which is the „იკარგება" the owner named. */
+const RAIL_ROWS = 4
+
+/** One priced service. Extracted because the block draws the list twice (open
+ *  and folded) and two copies of a row is how the two halves drift apart. */
+const PricedRow = ({ s, p, ordering }: { s: { id: string; label: string; price: number }; p: MasterProfile; ordering: boolean }) => (
+  <li className="flex items-center justify-between gap-3 py-2.5">
+    <span className="min-w-0 text-small text-ink-900">{s.label}</span>
+    <span className="shrink-0 flex items-center gap-2.5">
+      <span className="font-display text-body-lg font-bold text-ink-900 tabular-nums leading-none">{s.price}₾</span>
+      {/* The row's own label rides along as `?q=` — the wizard's „რა გჭირდება"
+          is then already answered. See requestHrefFor. Absent when the intake
+          does not exist on this deployment: the PRICE is still the answer to
+          „what does this cost", and a button to a 404 is not. */}
+      {ordering && (
+        <Link
+          href={requestHrefFor(p, s.label)}
+          aria-label={`${s.label} — დაკვეთა`}
+          className="h-9 px-3 rounded-btn bg-brand-50 hover:bg-brand-600 hover:text-white border border-brand-200 hover:border-brand-600 text-brand-700 font-display font-semibold text-meta tracking-wide inline-flex items-center transition-colors duration-fast"
+        >
+          დაკვეთა
+        </Link>
+      )}
+    </span>
+  </li>
+)
+
+export function PricedServicesBlock({ p, ordering = true }: { p: MasterProfile; ordering?: boolean }) {
   if (p.priced.length === 0) return null
+  const shown = p.priced.slice(0, RAIL_ROWS)
+  const rest = p.priced.slice(RAIL_ROWS)
   return (
-    <Section id="services" title="სერვისები და ფასები">
-      <ul className="divide-y divide-ink-100 border-t border-ink-100 max-w-[640px]">
-        {p.priced.map(s => (
-          <li key={s.id} className="flex items-center justify-between gap-4 py-3">
-            <span className="min-w-0 text-body text-ink-900">{s.label}</span>
-            <span className="shrink-0 flex items-center gap-3">
-              <span className="font-display text-h3 font-bold text-ink-900 tabular-nums leading-none">{s.price}₾</span>
-              <Link
-                href={requestHrefFor(p)}
-                aria-label={`${s.label} — დაკვეთა`}
-                className="h-11 px-4 rounded-btn bg-brand-50 hover:bg-brand-600 hover:text-white border border-brand-200 hover:border-brand-600 text-brand-700 font-display font-semibold text-meta tracking-wide inline-flex items-center transition-colors duration-fast"
-              >
-                დაკვეთა
-              </Link>
-            </span>
-          </li>
-        ))}
+    <Card as="section" id="services" className="mt-3 scroll-mt-24">
+      <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">სერვისები და ფასები</h2>
+      <ul className="mt-3 divide-y divide-ink-100 border-t border-ink-100">
+        {shown.map(s => <PricedRow key={s.id} s={s} p={p} ordering={ordering} />)}
       </ul>
-      {/* Said once, under the list, rather than „-დან" beside every number:
-          a column of „60₾-დან · 40₾-დან" reads as hedging. */}
-      <p className="mt-3 text-meta text-ink-500 max-w-[640px]">საორიენტაციო ფასია — ზუსტს შენს მოთხოვნაზე შემოგთავაზებს.</p>
-    </Section>
+      {/* ⚠️ A PLAIN <details>, NOT A TOGGLE COMPONENT. This block is server-
+          rendered and the rest of the profile has no client bundle; a „show all"
+          that needed `useState` would pull one in for a disclosure the browser
+          has done natively for years — and it keeps working with JS off, which
+          a rail full of prices should. */}
+      {rest.length > 0 && (
+        <details className="group">
+          <summary className="mt-3 list-none cursor-pointer text-small font-display font-semibold text-brand-700 hover:text-brand-800 tap-area">
+            <span className="group-open:hidden">ყველა სერვისი (<span className="tabular-nums">{p.priced.length}</span>)</span>
+            <span className="hidden group-open:inline">დამალვა</span>
+          </summary>
+          <ul className="divide-y divide-ink-100 border-t border-ink-100">
+            {rest.map(s => <PricedRow key={s.id} s={s} p={p} ordering={ordering} />)}
+          </ul>
+        </details>
+      )}
+      <p className="mt-3 text-meta text-ink-500">საორიენტაციო ფასია — ზუსტს შენს მოთხოვნაზე შემოგთავაზებს.</p>
+    </Card>
   )
 }
 

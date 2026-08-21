@@ -5,7 +5,7 @@
 // drop this in without duplicating the menu logic.
 
 import Link from 'next/link'
-import { missingCapability, enableCapabilityHref, CAPABILITY_ENABLE_LABEL, showJoinInvite } from '@/lib/capabilities'
+import { missingCapability, enableCapabilityHref, CAPABILITY_ENABLE_LABEL, showJoinInvite, JOIN_DOOR_HREF, JOIN_DOOR_LABEL } from '@/lib/capabilities'
 import { usePathname } from 'next/navigation'
 import { Fragment, useEffect, useRef, useState, type ReactElement } from 'react'
 import { Avatar } from './Avatar'
@@ -44,7 +44,7 @@ const STUDENT_ITEMS = (onSignout: () => void): MenuItem[] => [
   // in exactly ONE place: below the sign-out button on a page she had to seek out.
   // The account menu is where someone hunting for „how do I…" actually looks.
   // Only for a plain STUDENT — an expert/admin has no use for it.
-  { href: '/join',              label: 'შემოგვიერთდი', icon: Icon.briefcase },
+  { href: JOIN_DOOR_HREF,       label: JOIN_DOOR_LABEL, icon: Icon.briefcase },
   { href: '/settings',          label: 'პარამეტრები',   icon: Icon.settings },
   { href: '/notifications',     label: 'შეტყობინებები', icon: Icon.bell },
   { href: '/help',              label: 'დახმარება',     icon: Icon.info },

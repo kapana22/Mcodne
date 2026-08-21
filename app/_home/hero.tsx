@@ -85,13 +85,19 @@ export const HomeHero = () => {
   // „+N“ must mean N more REAL experts — never a decorative plus.
   const moreCount = Math.max(0, (stats?.total ?? experts.length) - (featured ? 1 : 0) - sidekicks.length)
 
+  /* ⚠️ DEPTH, ADDED 2026-08-20. The hero was flat white with ONE drifting glow,
+     and the owner's verdict on it was „ძალიან მოძველებული". What a modern hero
+     has and this did not is LAYERED light plus material: two glows on different
+     periods drifting in opposite directions, over a warm ink-75 ground, with
+     grain on top.
+     None of it is the „decorative wash" the colour canon forbids — a wash is a
+     saturated fill competing with the content. These are 13–15% radial stops
+     you register only as depth, and the grain is 3.5% and adds no colour at
+     all. `.grain` needs the section to be `relative`, which it already is. */
   return (
-    <section className="relative bg-white overflow-hidden border-b border-ink-200">
-      {/* Restrained backdrop — barely-there brand tint, premium/clean.
-          Radial glow washes (NOT blur filters — Safari renders those as a
-          hard-edged square) drifting on a very slow aurora cycle. */}
-      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-brand-50/12 via-white to-white pointer-events-none" />
+    <section className="relative bg-gradient-to-b from-ink-75/70 via-white to-white grain overflow-hidden border-b border-ink-200">
       <div aria-hidden className="glow-brand aurora-a absolute -top-64 -right-48 w-[620px] h-[620px] opacity-60 pointer-events-none" />
+      <div aria-hidden className="glow-brand-soft aurora-b absolute -top-32 -left-56 w-[560px] h-[560px] opacity-70 pointer-events-none" />
       {/* The page's one piece of ownable graphic material: a mkhedruli „მ",
           outlined, bleeding off the right edge. See GlyphBackdrop — the layout,
           cards and icons here could belong to any marketplace in any country;
@@ -101,7 +107,7 @@ export const HomeHero = () => {
       <Container className="relative pt-8 sm:pt-12 lg:pt-16 pb-12 sm:pb-16 lg:pb-20">
         {/* Trust strip — one quiet line. The expert count rides here (real
             aggregate, only once it has loaded) so mobile gets it too. */}
-        <div className="relative z-10 flex items-center gap-3 mb-5 sm:mb-8 lg:mb-10 text-meta text-ink-500">
+        <div className="relative z-10 flex items-center justify-center gap-3 mb-5 sm:mb-8 lg:mb-10 text-meta text-ink-500">
           <span className="inline-flex items-center gap-1.5">
             <Icon.shieldCheck className="w-3.5 h-3.5 text-ink-400" />
             <span><SiteText k="home.hero.trustChip" /></span>
@@ -121,9 +127,18 @@ export const HomeHero = () => {
             and at 1fr against a 1.3fr headline plus a 64px gutter it rendered
             small enough to read as a thumbnail. The headline still leads; the
             card is now close enough in weight to be looked AT. */}
-        <div className="relative z-10 grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-12 xl:gap-14 items-start">
-          {/* Left — headline, promise, the two doors */}
-          <div className="min-w-0">
+        {/* ⚠️ CENTRED, NOT SPLIT (2026-08-21). This was a 1.15fr/1fr two-column
+            hero — headline left, product card right. The approved design is a
+            centred composition with the product BELOW the sentence, and the
+            reason is not taste: a split hero makes the reader choose where to
+            look first, and on this page the two halves are the same message
+            said twice („here is what we do" / „here is one of them"). Centred,
+            the sentence lands, then the proof does.
+            The card itself is untouched — it carries a real photo, a real price
+            and a booking button, which is more product than the mock had. */}
+        <div className="relative z-10 flex flex-col items-center gap-10 lg:gap-12">
+          {/* The sentence, then the doors */}
+          <div className="min-w-0 w-full max-w-[720px] text-center flex flex-col items-center">
             {/* STEPPED DOWN ONE NOTCH, 2026-08-04 (44/52 → 36/44). The headline
                 is authored as TWO lines and the size is what keeps it there. It
                 had drifted back to four cramped lines: the copy is edited from
@@ -161,7 +176,7 @@ export const HomeHero = () => {
                 then the promise, then the two doors. Each step is
                 the next thing you would read, so the motion follows the eye
                 instead of decorating the box. */}
-            <p className="mt-5 sm:mt-6 text-body-lg sm:text-h3 text-ink-700 max-w-[520px] leading-[1.62] motion-safe:animate-rise-in" style={{ animationDelay: '180ms' }}>
+            <p className="mt-5 sm:mt-6 text-body-lg sm:text-h3 text-ink-700 max-w-[540px] mx-auto leading-[1.62] motion-safe:animate-rise-in" style={{ animationDelay: '180ms' }}>
               <SiteText k="home.hero.subtitle" /> <span className="font-display font-semibold text-ink-900"><SiteText k="home.hero.subtitleEmphasis" /></span>
             </p>
 
@@ -177,7 +192,7 @@ export const HomeHero = () => {
 
                 No search field either (stage 9): the headline is the question,
                 and a box here would pre-answer it. */}
-            <div className="mt-7 sm:mt-8 flex flex-col sm:flex-row gap-3 motion-safe:animate-rise-in" style={{ animationDelay: '270ms' }}>
+            <div className="mt-7 sm:mt-8 flex flex-col sm:flex-row gap-3 sm:justify-center motion-safe:animate-rise-in" style={{ animationDelay: '270ms' }}>
               <Btn href="/experts" variant="hero" size="lg" className="sm:min-w-[220px]">
                 ექსპერტები
               </Btn>
@@ -203,7 +218,7 @@ export const HomeHero = () => {
             // pointer: they spread apart on hover, which reads as depth rather
             // than as a static drop shadow. Named group — the card inside has
             // its own hover states.
-            className="group/stack relative motion-safe:animate-scale-in hidden lg:block"
+            className="group/stack relative motion-safe:animate-scale-in hidden lg:block w-full max-w-[560px]"
             style={{ animationDelay: '330ms' }}
             onMouseEnter={() => setHeld(true)}
             onMouseLeave={() => setHeld(false)}
@@ -340,7 +355,7 @@ export const HomeHero = () => {
                     is the mismatch that made the page's lines read as strays. */}
                 <div className="border-t border-ink-200 px-5 sm:px-6 py-3 flex items-center gap-4 text-meta text-ink-600">
                   <span className="inline-flex items-center gap-1.5">
-                    <Icon.shieldCheck className="w-3.5 h-3.5 text-brand-600" /> {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'უფასო დაჯავშნა'}
+                    <Icon.shieldCheck className="w-3.5 h-3.5 text-brand-600" /> {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'ბარათი არ გჭირდება'}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     {/* Honest: only claim ID-verification when this expert

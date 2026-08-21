@@ -16,8 +16,11 @@ export type Capability = (typeof CAPABILITIES)[number]
 
 /** The tile wording from app/signin/_signup.tsx, reused verbatim. */
 export const CAPABILITY_LABEL: Record<Capability, string> = {
-  CONSULT: 'ვაკონსულტირებ',
-  WORK: 'სერვისს ვასრულებ',
+  // ⚠️ HOW IT IS BOUGHT, NOT WHAT IT IS (2026-08-20). „ვაკონსულტირებ" named a
+  // second product; there is one — a service — and this half is the one with a
+  // clock on it. See lib/catalogItems → KIND_LABEL for the full reasoning.
+  CONSULT: 'ჯავშნადი სერვისი',
+  WORK: 'სერვისი შეთანხმებით',
 }
 
 /** Parses `?can=CONSULT|WORK|CONSULT,WORK` (case-insensitive); unknown → []. */
@@ -68,6 +71,46 @@ export function missingCapability(caps: readonly Capability[] | undefined | null
   if (!caps || caps.length !== 1) return null
   return caps[0] === 'CONSULT' ? 'WORK' : 'CONSULT'
 }
+
+/* ═══════════ THE DOOR: ONE ADDRESS, ONE WORD ═══════════════════════════
+ *
+ * ⚠️ EVERY HUMAN-FACING INVITATION USES THESE TWO CONSTANTS (2026-08-20), and
+ * the reason is measured, not stylistic. The same action carried SIX labels
+ * across the site — „გახდი ექსპერტი" (header, footer), „გახდი მცოდნე" (home,
+ * from the DB), „დაარეგისტრირე სერვისი" (footer), „შემოგვიერთდი" (user menu
+ * and the door's own h1), „ვთავაზობ" (signup), „დაიწყე განაცხადი" (the pitch)
+ * — and three different destinations. A label that does not reappear as the
+ * destination's heading reads as „wrong page" and costs the click (NN/g,
+ * information scent).
+ *
+ * ⚠️ AND THE HREF CARRIES NO `?can=`. That parameter SEEDS the door; it is not
+ * a navigation choice. Until today the header and the footer both pointed at
+ * `/join?can=CONSULT`, and the door honoured a preset over the profession the
+ * applicant had just picked — so a სანტექნიკოსი arriving from the site's own
+ * navigation was told „შენს პროფესიაზე კონსულტაციებს ჩაატარებ" and dropped
+ * into the consultation wizard, with the service half unreachable. The
+ * hierarchy (CLAUDE.md rule 4) was being broken by a query string.
+ *
+ * `?can=` remains legitimate in exactly two places, both of which NAME a half
+ * on purpose: the two crawlable pitches (`/join?can=WORK` is the trades
+ * landing), and system links that resume or enable one half —
+ * `enableCapabilityHref`, `lib/auth`'s pending-application resume, the
+ * application mails and notifications.
+ */
+export const JOIN_DOOR_HREF = '/join'
+
+/**
+ * The one label for it — in the header, the user menu, the footer's action and
+ * the door's own h1, so the click is confirmed by the heading it lands on.
+ *
+ * ⚠️ PLAIN, AND A SENTENCE THE SITE ALREADY WROTE. Owner, 2026-08-20, looking
+ * at „შემოგვიერთდი" and „დანარჩენს ჩვენ მოვაწყობთ": „ძალიან ცუდად წერ
+ * ტექსტებს, არავინ იყენებს ესეთს… მარტივი ტექსტი უნდა იყოს, არ უნდა ეწეროს
+ * გაურკვეველი, გამოგონილი ინფორმაციები." This is the footer's own wording and
+ * the trades pitch's own h1, and it is service-first — which the model already
+ * makes correct for both halves: a consultation IS a kind of service.
+ */
+export const JOIN_DOOR_LABEL = 'დაარეგისტრირე სერვისი'
 
 /** The word for turning the other half on. Plain: what it does, nothing more. */
 export const CAPABILITY_ENABLE_LABEL: Record<Capability, string> = {

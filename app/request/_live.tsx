@@ -105,12 +105,58 @@ type Live = {
   notified: number
   expertsInField: number
   experts: Expert[]
+  /** Set only while this request belongs to ONE named provider — see
+   *  lib/requestLive → DIRECT_WINDOW_MS. */
+  addressedTo: { name: string; waitingSince: string; overdue: boolean } | null
 }
 
 /** The FALLBACK cadence, when there is no stream. Slow on purpose: a poll is
  *  a request every N seconds to watch a number that moves twice an hour, and
  *  ./status is rate-limited per IP. With the stream up this timer never runs. */
 const POLL_MS = 20_000
+
+/**
+ * „გავხსნა სხვებისთვის?" — the one control that widens an addressed request.
+ *
+ * ⚠️ IT EXISTS SO THAT NOTHING AUTOMATIC HAS TO. The alternative was a timer
+ * that opens the request itself after 24 hours, and that publishes a private
+ * choice to strangers without the client pressing anything — they would find
+ * out by receiving quotes they never asked for, most likely by email, which is
+ * the only channel this platform has (see the `email` note in lib/requests: no
+ * SMS exists anywhere in the codebase). A delay is a smaller harm than a
+ * surprise.
+ *
+ * The wording asks rather than warns, and the confirmation says what actually
+ * changes — two more places, not „we gave up on them". The chosen provider
+ * keeps their thread and their place through all of it.
+ */
+function OpenToOthers({ publicRef }: { publicRef: string }) {
+  const [state, setState] = useState<'idle' | 'sending' | 'done' | 'failed'>('idle')
+  if (state === 'done') {
+    return <p className="mt-3 text-small text-ink-600">გახსნილია — სხვებსაც შეუძლიათ შემოგთავაზონ.</p>
+  }
+  return (
+    <div className="mt-3">
+      <Btn
+        size="sm"
+        variant="secondary"
+        disabled={state === 'sending'}
+        onClick={async () => {
+          setState('sending')
+          try {
+            const r = await fetch(`/api/requests/${publicRef}/open`, { method: 'POST' })
+            setState(r.ok ? 'done' : 'failed')
+          } catch { setState('failed') }
+        }}
+      >
+        {state === 'sending' ? 'იხსნება…' : 'გავხსნა სხვებისთვის?'}
+      </Btn>
+      {state === 'failed' && (
+        <p className="mt-2 text-small text-danger-700">ვერ მოხერხდა — სცადე ხელახლა.</p>
+      )}
+    </div>
+  )
+}
 
 export function LiveStatus({ publicRef }: { publicRef: string }) {
   const [d, setD] = useState<Live | null>(null)
@@ -276,6 +322,30 @@ export function LiveStatus({ publicRef }: { publicRef: string }) {
               <Btn href={`/request/${publicRef}`} size="sm">შეთავაზებების ნახვა</Btn>
             </div>
           </div>
+        ) : d.addressedTo ? (
+          /* ⚠️ THIS REQUEST BELONGS TO ONE PERSON (2026-08-20), so it may not
+             wear the tender's copy. „დაელოდე შეთავაზებებს" and „N ექსპერტს
+             ვაცნობეთ" describe a room of bidders; this client read one
+             profile, saw one price and pressed „დაკვეთა". Owner: „თუ
+             მცოდნესთან აგზავნის, მხოლოდ მცოდნესთან უნდა მივიდეს."
+             The state is said plainly, and NOTHING here happens on its own —
+             see OpenToOthers below. */
+          <>
+            <p className="text-body text-ink-900">
+              გაგზავნილია <span className="font-display font-bold">{d.addressedTo.name}</span>-სთან.
+            </p>
+            <p className="mt-1.5 text-small text-ink-600">
+              {d.addressedTo.overdue
+                ? 'ჯერ არ გიპასუხა.'
+                : 'პასუხს ელოდება. მხოლოდ ის ხედავს ამ მოთხოვნას.'}
+            </p>
+            {/* The way out, offered only after the provider has had their day —
+                and it is an OFFER: the request stays theirs until this is
+                pressed. Nothing expires, nothing opens by itself, and the
+                person who was chosen keeps their thread and their place either
+                way; this adds two places, it does not take one away. */}
+            {d.addressedTo.overdue && <OpenToOthers publicRef={publicRef} />}
+          </>
         ) : (
           <>
             {/* NOBODY TOLD YET → the search is the state, and it is drawn as

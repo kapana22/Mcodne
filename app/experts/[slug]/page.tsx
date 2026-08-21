@@ -641,18 +641,39 @@ async function providerProfile(provider: { id: string; slug: string | null }) {
               <ProviderHero p={p} />
             </div>
 
-            {on && (
-              <aside className="min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2">
-                <div className="lg:sticky lg:top-[80px]">
-                  <ProviderCta master={p} />
-                </div>
-              </aside>
-            )}
+            {/* ⚠️ THE PRICES MOVED INTO THE RAIL (2026-08-20), UNDER THE ACTIONS.
+                They were the FIRST block of the left column, and that was a
+                deliberate choice — „the offer before the paragraph about the
+                person". Two things beat it.
+                ONE, the owner's: „ფასები მარჯვნივ უნდა გადავიტანოთ მიწერის
+                ქვევით… თორე იკარგება ვისაც ბევრი სერვისი აქვს." A provider with
+                six priced rows pushed „შესახებ" and the work photos off the
+                first screen, so the page about a person opened as a price list.
+                TWO, and it is why the rail is the right home rather than merely
+                a smaller one: PRICE BELONGS BESIDE THE ACTION. What it costs and
+                what to press were in two different columns; the consultation
+                rail on the expert profile has always put them together.
+                The aside keeps `row-span-2` so it starts level with the hero on
+                desktop. On a PHONE there is no rail — the aside is in DOM order,
+                so the reading becomes hero → actions + prices → about → work,
+                which is the same decision in the same order. The list folds past
+                four rows there (PricedServicesBlock → RAIL_ROWS), which is what
+                actually answers „იკარგება". */}
+            {/* ⚠️ THE PRICES ARE NOT GATED ON THE FLAG, THE BUTTONS ARE. The
+                aside used to exist only when `requestsOn()`; moving the price
+                list inside it would have deleted the page's whole offer on a
+                deployment where the intake is off — and a price is CONTENT, not
+                a feature of the requests subsystem. So the rail is drawn either
+                way and `ordering` decides whether a row carries „დაკვეთა". */}
+            <aside className="min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+              <div className="lg:sticky lg:top-[80px]">
+                {on && <ProviderCta master={p} />}
+                <PricedServicesBlock p={p} ordering={on} />
+              </div>
+            </aside>
 
             <div className="min-w-0 lg:col-start-1">
-              {/* The offer before the paragraph about the person — see
-                  PricedServicesBlock for why it leads. */}
-              <PricedServicesBlock p={p} />
+              {/* The person, then the proof, then what others said. */}
               <AboutBlock p={p} />
               <WorkBlock p={p} />
               <ReviewsBlock p={p} />

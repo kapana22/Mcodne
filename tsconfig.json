@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": false,
     "skipLibCheck": true,
     "strict": true,
@@ -13,9 +17,28 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "plugins": [{ "name": "next" }],
-    "paths": { "@/*": ["./*"] }
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "scratch"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "/private/tmp/claude-501/-Users-kapana-Desktop-------/e1dea262-0fa4-4ff3-8da2-290455efcc40/scratchpad/next-dev/types/**/*.ts",
+    "/private/tmp/claude-501/mcodne-build/types/**/*.ts",
+    "next-env.d.ts",
+    "/private/tmp/claude-501/-Users-kapana-Desktop-------/e1dea262-0fa4-4ff3-8da2-290455efcc40/scratchpad/next-build/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "scratch"
+  ]
 }

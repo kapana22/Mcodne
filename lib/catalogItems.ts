@@ -42,14 +42,39 @@ import { primaryPrice } from '@/components/booking/slots'
 import type { Tutor } from '@/app/experts/_data'
 import type { MasterRow } from '@/app/experts/_masterData'
 
-/** The two things a provider can offer. The owner's own words. */
+/**
+ * HOW A SERVICE IS BOUGHT — not what KIND of thing it is.
+ *
+ * ⚠️ „კონსულტაცია" LEFT THE PLATFORM'S VOCABULARY (2026-08-20). It was one of
+ * these two labels, sitting opposite „სერვისი" as though they were two products.
+ * They are not, and the owner's own example is what settles it: a psychologist
+ * selling „ბავშვთა სეანსი — 100₾, 60 წთ" is selling a SERVICE; the schema called
+ * it a consultation only because it has a price and a clock. „ერთ რამეს ორი
+ * სახელი არ გვჭირდება."
+ *
+ * So there is ONE product — a service — and two ways to buy it:
+ *   WORK      a price, and the details are agreed (a repair, a declaration)
+ *   CONSULT   a price and a CLOCK: the client picks a time and it is booked
+ *
+ * ⚠️ THE MECHANISM IS UNTOUCHED. The calendar, the free slots, „დაჯავშნე", the
+ * video room and `Consultation.bookable` all stay exactly as they are — a
+ * session and a lesson genuinely need a time. What went is the WORD as a
+ * product type: no category, no filter option, no registration step called
+ * „კონსულტაცია". A provider may still TYPE it as the name of their own service
+ * („გაცნობითი კონსულტაცია — 15 წთ"); that is their copy, not our structure.
+ *
+ * ⚠️ AND THE IDENTIFIERS DO NOT MOVE. `CONSULT` / `WORK` / `bookable` are code,
+ * and CLAUDE.md's lexicon rule is explicit that retired words are a UI matter —
+ * renaming a column to chase a word is how two vocabularies drift apart.
+ */
 export const KIND_LABEL: Record<Capability, string> = {
-  CONSULT: 'კონსულტაცია',
-  WORK: 'სერვისი',
+  CONSULT: 'დროით',
+  WORK: 'შეთანხმებით',
 }
 
-/** The rail's own heading. What the visitor needs, not who the provider is. */
-export const KIND_SECTION_TITLE = 'რა გჭირდება'
+/** The rail's own heading. It asks how the visitor wants to buy, which is a
+ *  property of the OFFER — never „what kind of person is this". */
+export const KIND_SECTION_TITLE = 'როგორ ყიდულობ'
 
 /**
  * ONE PERSON AND EVERYTHING THEY OFFER.

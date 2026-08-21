@@ -245,12 +245,39 @@ export function mapRows(rows: any[]): Tutor[] {
    from (the old "MUST stay identical" twin blocks are gone).
    Covered by tests/tutor-mapping.test.ts. */
 
-// A card is bookable only when the expert has an upcoming free slot
-// (`nextSlotAt`). Mirrors the detail page's StickyBookingCard gate
-// (`uniqueDays.length === 0` → CTA disabled) so search never implies a
-// bookability the profile will immediately deny. Covered by the test file.
-export function isTutorBookable(nextSlotAt?: string | null): boolean {
-  return nextSlotAt != null
+/**
+ * Is „დაჯავშნე" an honest thing to show — is there a free slot AND something to
+ * book INTO it?
+ *
+ * ⚠️ THE SECOND HALF IS NEW (2026-08-20) AND IT USED TO BE ASSUMED. This asked
+ * only „does the expert have an upcoming free slot", which was complete while
+ * every `Consultation` row was an hour on a calendar. Since
+ * `Consultation.bookable` a row can be a JOB — „დეკლარაციის შევსება — ₾100",
+ * no clock — and since the capability base was inverted (lib/professions: every
+ * profession sells SERVICES, consulting is a switch) a provider whose rows are
+ * ALL jobs is an ordinary case rather than a broken one.
+ *
+ * For that person the old rule said „bookable": they have a calendar, so the
+ * card and the rail offered „დაჯავშნე" — and the booking flow then opened with
+ * no tier to choose, because every tier resolver drops `minutes: 0`. A button
+ * that leads to an empty picker is worse than no button.
+ *
+ * Owner's rule, 2026-08-20: „ვისაც არ აქვს, იმას არ ექნება ღილაკი პროფილზე და
+ * ვისაც სჭირდება, იმას ექნება."
+ *
+ * `consultations` is optional so the older two-arg-less call sites (and any
+ * cached payload that predates the tier select) keep their previous meaning:
+ * absent means „do not know", and not knowing must not remove a button that
+ * used to work. A row with `bookable` absent reads as bookable — that is what
+ * every row written before 2026-08-20 is.
+ */
+export function isTutorBookable(
+  nextSlotAt?: string | null,
+  consultations?: readonly { minutes: number; bookable?: boolean }[],
+): boolean {
+  if (nextSlotAt == null) return false
+  if (!consultations) return true
+  return consultations.some(c => c.bookable !== false && c.minutes > 0)
 }
 
 /*/* ───── "Available now" pill — instant-booking indicator ───── */

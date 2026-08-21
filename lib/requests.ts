@@ -321,6 +321,17 @@ export const PUBLIC_REF_RE = new RegExp(`^${REF_PREFIX}[${REF_ALPHABET}]{${REF_L
  * off a phone call actually does, and neither is a different request. Returns
  * null when it is not a reference at all, so the caller 404s without a query.
  */
+/**
+ * HOW MANY PROVIDERS MAY ANSWER AN OPEN REQUEST — the schema's own default
+ * (`ServiceRequest.offerLimit @default(3)`), named so the two places that
+ * CHANGE it are readable.
+ *
+ * A request addressed to one person is written down to 1 (app/api/requests),
+ * and the client's „გავხსნა სხვებისთვის?" raises it back to this
+ * (app/api/requests/[ref]/open). Nothing else moves it.
+ */
+export const DEFAULT_OFFER_LIMIT = 3
+
 export function normalizePublicRef(raw: string | null | undefined): string | null {
   const v = (raw ?? '').trim().toUpperCase().replace(/\s+/g, '')
   const withPrefix = v.startsWith(REF_PREFIX) ? v : REF_PREFIX + v

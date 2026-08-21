@@ -217,6 +217,34 @@ export async function POST(req: Request) {
           { id: created.id, status: rejected ? 'REJECTED' : autoVerified ? 'VERIFIED' : 'NEW', topic: row.topic },
           target.userId,
         )
+        // ⚠️ ADDRESSED, NOT BROADCAST (2026-08-20). Owner: „თუ მცოდნესთან
+        // აგზავნის, მხოლოდ მცოდნესთან უნდა მივიდეს."
+        //
+        // Until today a request that named somebody still went out to everybody:
+        // `offerLimit` stayed at its default 3 and the provider queue had no
+        // exclusion, so a client who had read this person's page, seen „ბინის
+        // დალაგება — 90₾" and pressed „დაკვეთა" got two cold quotes from
+        // strangers — and learned that the price they read was not a price. The
+        // „შენ აგირჩია" badge the provider now sees was true and useless: chosen,
+        // and still in a race.
+        //
+        // `offerLimit: 1` IS the exclusion, and deliberately so: it is one
+        // existing column, every surface already reads it (`placesLeft`,
+        // `requestIsOpen`, the queue's own `offerCount < offerLimit` filter), and
+        // it is the single value the client's „გავხსნა სხვებისთვის?" button
+        // raises back to 3. No new column, no new state machine, nothing to keep
+        // in step. The INVITED row still consumes no place (lib/requestInvite),
+        // so the one place stays open for the person it was addressed to.
+        //
+        // Written as an UPDATE rather than a field on `create` because the
+        // target is re-resolved against the database AFTER the row exists — the
+        // rule this whole block is built on: the request is the deliverable and
+        // must survive a failed invite. If the invite throws, the request stays
+        // a normal open one, which is the honest fallback.
+        await prisma.serviceRequest.update({
+          where: { id: created.id },
+          data: { offerLimit: 1 },
+        }).catch(() => {})
       }
     } catch { /* best-effort: the request is the deliverable */ }
   }

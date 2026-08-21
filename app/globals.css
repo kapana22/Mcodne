@@ -274,12 +274,55 @@ label:has(> input.sr-only:focus-visible) {
   50%      { transform: translate3d(-44px, 32px, 0) scale(1.12); }
 }
 
+@keyframes auroraB {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50%      { transform: translate3d(38px, -24px, 0) scale(1); }
+}
+
+/* ⚠️ THE MARQUEE AND THE SCROLL REVEAL ARE NEW, AND THE LIBRARY WAS CLOSED
+ * (2026-08-20). CLAUDE.md's motion section says "Do not add new animation —
+ * the library is closed at 8 tokens", and that is a 📌 CURRENT rule, not a
+ * 🔒 absolute: the owner reopened it deliberately after the flat, entrance-only
+ * home page. His words: „ძალიან მოძველებული დიზაინი … ანიმაციებით გაძეძგე, რაც
+ * მოგვცემს პროფესიონალიზმს."
+ *
+ * What was added is ONE thing, and it is the OPPOSITE of the carousel the
+ * research warns about — nothing here hides content on a timer:
+ *   MARQUEE  one slow rail, off the reading path, 38s per pass. It makes the
+ *            page alive without competing with the sentence you are on.
+ * A scroll-driven `animation-timeline: view()` reveal was drafted beside it and
+ * then deleted: `components/Reveal` already does exactly that with an
+ * IntersectionObserver, and two mechanisms for one effect is how a design
+ * system grows a second vocabulary.
+ *   REVEAL   scroll-driven (animation-timeline: view()), so a block animates
+ *            when the READER reaches it rather than being performed at them.
+ *            Wrapped in @supports: a browser without it simply shows the
+ *            content, which is the only acceptable fallback — content must
+ *            never be hidden behind an effect.
+ * Both stay inside the prefers-reduced-motion guard, which is 🔒 and is not
+ * a preference. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
 /* ─────────── Motion & depth utilities (motion-safe) ───────────
  * Short, calm transitions. Never bouncy — playful motion reads as loud on
  * long browse sessions. Every animation is guarded by `prefers-reduced-motion`
  * (below) so opt-out users get instant state changes.
  */
 @media (prefers-reduced-motion: no-preference) {
+
+  /* The category rail under the hero. The track holds the list TWICE and
+     translates -50%, which is what makes the seam invisible; `width: max-content`
+     is what stops it wrapping. Layer-promoted so a 38s transform never repaints
+     the section under it. */
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee 38s linear infinite;
+    will-change: transform;
+  }
 
   /* Card / tile hover lift — subtle raise + shadow ramp. Applied to any
      element with `.hover-lift`; used on cards, category tiles, KPI blocks. */
@@ -468,6 +511,11 @@ label:has(> input.sr-only:focus-visible) {
      symmetric breathing cycle, where an exit-to-rest curve has nothing to
      rest at. `.aurora-b` deleted 2026-07-29: zero usages. */
   .aurora-a { animation: auroraA 26s ease-in-out infinite; }
+  /* The SECOND light. One drifting glow reads as a gradient; two, on different
+     periods and drifting in opposite directions, read as depth — the thing the
+     entrance-only home page was missing. 22s against 26s never re-syncs into a
+     visible pulse. */
+  .aurora-b { animation: auroraB 22s ease-in-out infinite; }
 
 }
 
@@ -479,6 +527,12 @@ label:has(> input.sr-only:focus-visible) {
  * aurora drift classes above add movement only when motion is allowed. */
 .glow-brand {
   background: radial-gradient(closest-side, rgba(47, 156, 134, 0.13), rgba(47, 156, 134, 0));
+}
+/* The cooler companion — brand-300, so the two lights are the same hue family
+   at different lightness rather than two colours. Two hues here would be the
+   „rainbow gradient" the design canon calls slop. */
+.glow-brand-soft {
+  background: radial-gradient(closest-side, rgba(127, 199, 180, 0.15), rgba(127, 199, 180, 0));
 }
 
 

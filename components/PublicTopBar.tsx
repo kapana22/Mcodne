@@ -10,6 +10,7 @@ import { Container } from '@/components/Container'
 import { useMe, type Me } from '@/lib/me'
 import { useMessagesUnread, type MessagesSpace } from '@/lib/messagesUnread'
 import { JOIN_HREF } from '@/lib/roleHome'
+import { JOIN_DOOR_HREF, JOIN_DOOR_LABEL } from '@/lib/capabilities'
 import { showJoinInvite } from '@/lib/capabilities'
 import { requestsOn } from '@/lib/requests'
 import { ROLE } from '@/lib/roles'
@@ -281,13 +282,17 @@ export function PublicTopBar({
           {/* SUPPLY, as a quiet word (2026-08-19). Text, not a button: the bar
               already carries one outlined action and one filled one, and a
               third would make the row a shelf of buttons. Gated — an existing
-              expert must never be invited to become one. */}
+              provider must never be invited to become one.
+              ⚠️ THE ADDRESS AND THE WORD COME FROM lib/capabilities (2026-08-20).
+              This was a hard-coded „გახდი ექსპერტი" → `/join?can=CONSULT`: the
+              site's most visible supply link, pre-answering the door's one
+              question with the half the hierarchy says comes second. */}
           {showJoinInvite(me?.role, me?.capabilities) && (
             <Link
-              href="/join?can=CONSULT"
+              href={JOIN_DOOR_HREF}
               className="hidden lg:inline-flex h-11 px-3 rounded-btn font-display font-semibold text-meta uppercase text-ink-600 hover:text-ink-900 hover:bg-ink-100 items-center whitespace-nowrap transition-colors duration-fast"
             >
-              გახდი ექსპერტი
+              {JOIN_DOOR_LABEL}
             </Link>
           )}
           {/* THE ACTION (stage 9). Desktop only — at 390px a signed-in client's
@@ -507,11 +512,11 @@ export function PublicTopBar({
                 {showJoinInvite(me?.role, me?.capabilities) && (
                   <li>
                     <Link
-                      href="/join?can=CONSULT"
+                      href={JOIN_DOOR_HREF}
                       onClick={() => setMobOpen(false)}
                       className="flex items-center h-12 px-3 rounded-btn text-small font-display font-semibold uppercase text-ink-800 hover:bg-ink-100 transition-colors duration-fast"
                     >
-                      გახდი ექსპერტი
+                      {JOIN_DOOR_LABEL}
                     </Link>
                   </li>
                 )}

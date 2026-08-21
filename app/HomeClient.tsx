@@ -14,11 +14,15 @@ import { FeaturedExperts } from './_home/experts'
 import { HomeHero } from './_home/hero'
 import { HowItWorks } from './_home/how'
 import { RequestBand } from './_home/request'
+import { ServiceRail } from './_home/rail'
 import { requestsOn } from '@/lib/requests'
 
 const HomeView = ({ initialCategories = [] }: { initialCategories?: HomeCat[] }) => (
   <>
     <HomeHero />
+    {/* The service rail — one slow pass of what is on sale, directly under the
+        hero. See _home/rail for why it is a rail and not a carousel. */}
+    <ServiceRail />
     {/* ── The second way in ───────────────────────────────────────────────
         Directly under the hero, because the hero answers „I know who I want"
         and this answers „I don't". Both paths visible at once is the Angi

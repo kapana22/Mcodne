@@ -46,7 +46,10 @@ import { Reveal } from '@/components/Reveal'
  *  questions: what do I get, what does it cost me, who sees it. */
 const POINTS = [
   { label: 'მაქსიმუმ 3 შეთავაზება', hint: 'ერთი მოთხოვნა ათს არ ეგზავნება.' },
-  { label: 'უფასოა', hint: 'გადაწყვეტილებამდე არაფერს იხდი.' },
+  // ⚠️ „უფასოა" LEFT THIS ROW (2026-08-21). Owner: the discount word costs the
+  // site more trust than it buys — and the hint under it already said the same
+  // thing in a way that reads as a POLICY rather than a promotion.
+  { label: 'ვალდებულების გარეშე', hint: 'გადაწყვეტილებამდე არაფერს იხდი.' },
   // ⚠️ WAS „ჯერ დაგირეკავთ" (2026-08-19). Auto-verification made the call the
   // exception, not the step — and a promise on the home page has to hold for
   // the ordinary case. The check itself is still real and still gates who sees

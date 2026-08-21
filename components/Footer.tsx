@@ -6,6 +6,7 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { ApplyCtaGate } from './ApplyCtaGate'
 import { SiteText } from '@/components/SiteTextProvider'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
+import { JOIN_DOOR_HREF, JOIN_DOOR_LABEL } from '@/lib/capabilities'
 const COLS: { titleKey: string; links: { label: string; href: string }[] }[] = [
   { titleKey: 'footer.col1.title', links: [
     { label: 'ექსპერტების ძებნა', href: '/experts' },
@@ -22,13 +23,16 @@ const COLS: { titleKey: string; links: { label: string; href: string }[] }[] = [
     // at the SAME page with a filter pre-ticked, which in a footer reads as a
     // second section and is not one. Owner: „იყოს ამ ეტაპზე ექსპერტები
     // მხოლოდ." One list, one word, one link.
-    { label: 'გახდი ექსპერტი', href: '/join?can=CONSULT' },
-    // ⚠️ TWO ENTRIES, NOT ONE „შემოგვიერთდი" (2026-08-18). A single join link
-    // has to land somewhere, and either destination is the wrong form for half
-    // the people who tap it — a plumber reading „become an expert" concludes
-    // the site is not for him and does not look for a second door. Owner:
-    // „კარგად უნდა გამინჯნო ექსპერტი და სტუდენტი." Same rule, one level up.
-    { label: 'დაარეგისტრირე სერვისი', href: '/join?can=WORK' },
+    // ⚠️ ONE JOIN ENTRY AGAIN (2026-08-20), and the reason the pair existed is
+    // now answered by the DOOR rather than by the footer. It was split in two
+    // on 2026-08-18 — „a single join link has to land somewhere, and either
+    // destination is the wrong form for half the people who tap it; a plumber
+    // reading „become an expert" concludes the site is not for him" — which was
+    // true of a link that landed on a PITCH for one half. It no longer lands on
+    // one: /join asks „რას აკეთებ", and the answer picks the form. Two labels
+    // for one address is the „one action, six names" problem this file was
+    // paying its share of.
+    { label: JOIN_DOOR_LABEL, href: JOIN_DOOR_HREF },
     { label: 'როგორ მუშაობს', href: '/#how' },
   ]},
   { titleKey: 'footer.col2.title', links: [
@@ -100,8 +104,10 @@ export function Footer() {
                       </Link>
                     </li>
                   )
-                  // "გახდი ექსპერტი" is meaningless for an existing expert.
-                  return l.href === '/join?can=CONSULT' ? <ApplyCtaGate key={l.href}>{li}</ApplyCtaGate> : li
+                  // The invitation is meaningless for somebody who already
+                  // offers something — the gate asks the CAPABILITIES, not the
+                  // role (lib/capabilities → showJoinInvite).
+                  return l.href === JOIN_DOOR_HREF ? <ApplyCtaGate key={l.href}>{li}</ApplyCtaGate> : li
                 })}
               </ul>
             </div>

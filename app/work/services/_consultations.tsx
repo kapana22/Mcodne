@@ -203,7 +203,7 @@ export function ConsultationsSection() {
                     <div className="grid grid-cols-2 gap-2">
                       {([
                         { on: false, label: 'სერვისი', hint: 'ფასი, დროის გარეშე' },
-                        { on: true, label: 'კონსულტაცია', hint: 'ჯავშნადი, დროით' },
+                        { on: true, label: 'სერვისი დროით', hint: 'ჯავშნადი — კლიენტი დროს ირჩევს' },
                       ] as const).map(o => {
                         const active = consEdit.bookable === o.on
                         return (
@@ -281,7 +281,7 @@ export function ConsultationsSection() {
             <div className="grid grid-cols-2 gap-2">
               {([
                 { on: false, label: 'სერვისი', hint: 'ფასი, დროის გარეშე' },
-                { on: true, label: 'კონსულტაცია', hint: 'ჯავშნადი, დროით' },
+                { on: true, label: 'სერვისი დროით', hint: 'ჯავშნადი — კლიენტი დროს ირჩევს' },
               ] as const).map(o => {
                 const active = consForm.bookable === o.on
                 return (

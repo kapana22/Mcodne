@@ -16,3 +16,6 @@ scratch/
 # whatever the schema looked like that afternoon, so a stale one breaks the
 # gate’s type stage for a file nothing imports.
 scripts/_qa*.ts
+
+# Build output written by a stray distDir override — never commit it.
+private/

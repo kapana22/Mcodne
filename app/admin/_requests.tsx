@@ -120,6 +120,14 @@ function RequestDetail({ r, candidates, notified, experts, onChanged }: {
   const [picked, setPicked] = useState<string[]>([])
   const [sendMsg, setSendMsg] = useState<string | null>(null)
   const [note, setNote] = useState(r.adminNote ?? '')
+  /** Set only while this request belongs to ONE named provider: the invite
+   *  writes an INVITED offer and drops the limit to 1 in the same breath
+   *  (app/api/requests), so the pair is the state — neither half alone is. */
+  const addressedTo = r.offerLimit === 1
+    ? r.offers.find(o => o.status === 'INVITED')?.expertUser?.fullName
+      ?? r.offers.find(o => o.status === 'INVITED')?.company?.name
+      ?? null
+    : null
   const [limit, setLimit] = useState(String(r.offerLimit))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -272,6 +280,29 @@ function RequestDetail({ r, candidates, notified, experts, onChanged }: {
 
           {err && <AdminError message={err} className="mt-3" />}
         </div>
+
+        {/* ⚠️ ADDRESSED TO ONE PERSON — THE OPERATOR HAS TO KNOW (2026-08-20).
+            A client who ordered from somebody's profile gets a request that is
+            CLOSED to everybody else (`offerLimit: 1`, app/api/requests). This
+            panel showed that state as „0/1" in the offers header — a number an
+            operator reads as „nobody has bid yet", not as „this person chose
+            somebody". And the operator PHONES every request: they would promise
+            three offers on a request that is deliberately private, and the
+            field below lets them raise the limit and silently undo the client's
+            choice without ever seeing it.
+            Owner's rule, 2026-08-20: „თუ მცოდნესთან აგზავნის, მხოლოდ
+            მცოდნესთან უნდა მივიდეს." So it is said in words, above the fold,
+            before the note field and the limit field it explains. */}
+        {addressedTo && (
+          <div className="mx-5 mb-5 -mt-1 px-3 py-2 rounded-field border border-brand-200 bg-brand-50/60">
+            <p className="text-small text-ink-900">
+              მისამართულია <span className="font-display font-bold">{addressedTo}</span>-სთან — სხვა ვერავინ ხედავს.
+            </p>
+            <p className="mt-0.5 text-meta text-ink-600">
+              კლიენტმა ეს ადამიანი თვითონ აირჩია. ლიმიტის აწევა მოთხოვნას სხვებისთვისაც გახსნის.
+            </p>
+          </div>
+        )}
 
         {/* ── the offers, when there are any ── */}
         {r.offers.length > 0 && (

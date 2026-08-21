@@ -90,8 +90,34 @@ function PickChip({ on, onClick, children, disabled }: {
   )
 }
 
-export function MasterApplyClient({ email, name, phone: accountPhone = '', me }: {
+export function MasterApplyClient({ email, name, phone: accountPhone = '', me, seed, onContinueExpert }: {
   email: string; name: string; phone?: string; me: any
+  /**
+   * ⚠️ THE DOOR'S ANSWER, CARRIED IN (2026-08-20). The applicant has already
+   * named their job — „სანტექნიკოსი" — and this form then asked them to find
+   * it again in a 31-row catalogue of SERVICE topics, in our words. The two
+   * vocabularies do not map (a SERVICE topic deliberately carries no
+   * `professions`; see lib/requestTopics), so nothing can be TICKED for them.
+   * What can be done is the search: the topics carry `alt`, the words people
+   * actually type, and „სანტექნიკოსი" is one of them. So their own word is
+   * typed into the search box for them — and only when it actually finds
+   * something, because a pre-filled query that answers „ვერაფერი მოიძებნა" is
+   * worse than an empty one.
+   */
+  seed?: { cats?: string[]; professions?: string[] }
+  /**
+   * ⚠️ THE OTHER HALF, WHEN THEIR PROFESSION HAS ONE (2026-08-20).
+   *
+   * The mirror of `onContinueMaster` on the expert wizard, and it exists
+   * because the order was reversed the same day: /join used to open the
+   * consultation wizard first and offer the service from ITS success screen,
+   * which is the hierarchy upside down (CLAUDE.md rule 4). Now a ბუღალტერი —
+   * CONSULT and WORK both — lands here first, and without this the
+   * consultation half would simply have no door.
+   *
+   * Undefined when they only sell a job, which is most of this form's traffic.
+   */
+  onContinueExpert?: () => void
 }) {
   const router = useRouter()
 
@@ -211,6 +237,15 @@ export function MasterApplyClient({ email, name, phone: accountPhone = '', me }:
         if (!live) return
         if (!d?.ok) { setLoaded(true); return }
         setGroups(d.groups ?? [])
+        // Their own word into the search — see `seed` above. Only if it hits,
+        // and never over something they have already typed.
+        const job = (seed?.professions ?? [])[0]?.trim()
+        if (job) {
+          const q = job.toLowerCase()
+          const hit = (d.groups ?? []).some((g: Group) => g.topics.some(t =>
+            t.label.toLowerCase().includes(q) || (t.alt ?? []).some((a: string) => a.toLowerCase().includes(q))))
+          if (hit) setQuery(cur => (cur.trim() ? cur : job))
+        }
         const cs = d.cities ?? []
         setCities(cs)
         // ⚠️ ONE CITY IS ANSWERED FOR THEM, not left blank. The block above is
@@ -363,9 +398,29 @@ export function MasterApplyClient({ email, name, phone: accountPhone = '', me }:
               The photo button is FIRST and primary when it is missing, because
               it is the only blocker left; when the photo is there it is not
               drawn at all and „სერვისები" is the whole footer. */}
+          {/* ⚠️ THE CONSULTATION IS OFFERED, NEVER ASKED — and it is offered
+              HERE, after the service is filed, because that is what it is in
+              this product: a pre-step to buying the service, not a second
+              product (CLAUDE.md → THE HIERARCHY, rule 2). It appears only when
+              their own profession can do it (lib/professions → PROFESSION_CAN),
+              so nobody is invited to sell something their trade does not. */}
+          {onContinueExpert && (
+            <p className="mt-4 pt-4 border-t border-ink-100 text-body text-ink-700 leading-relaxed">
+              შენს პროფესიაზე ზოგი სერვისი დროზე იყიდება — კლიენტი ირჩევს საათს და ჯავშნის.
+              გინდა, ასეთიც დაამატო?
+            </p>
+          )}
           <div className="mt-5 flex flex-wrap gap-3">
             {!photoUrl && (
               <Btn href="/join?can=WORK">ფოტოს დამატება</Btn>
+            )}
+            {/* Secondary next to the photo blocker, primary when nothing is
+                blocking: the photo is the only thing standing between this
+                person and approval, and an optional extra must not outrank it. */}
+            {onContinueExpert && (
+              <Btn onClick={onContinueExpert} variant={photoUrl ? 'primary' : 'secondary'}>
+                ჯავშნადი სერვისის დამატება
+              </Btn>
             )}
             <Btn href="/experts" variant="secondary">ექსპერტები</Btn>
           </div>

@@ -88,7 +88,7 @@ export const HowItWorks = () => (
             // PAYMENTS_LIVE flips.
             PAYMENTS_LIVE
               ? { n: '03', t: 'დაცული გადახდა', d: 'თანხა დაცულია — ექსპერტს სესიის შემდეგ გადაერიცხება.' }
-              : { n: '03', t: 'შეხვდი ვიდეოზე', d: 'დანიშნულ დროს ბმულით შეხვალ — დაჯავშნა ახლა უფასოა.', tk: 'home.how.step3.title', dk: 'home.how.step3.desc', art: 'videoSessionOnDark' },
+              : { n: '03', t: 'შეხვდი ვიდეოზე', d: 'დანიშნულ დროს ბმულით შეხვალ — გადახდა ჯერ საიტზე არ ხდება.', tk: 'home.how.step3.title', dk: 'home.how.step3.desc', art: 'videoSessionOnDark' },
           ] as { n: string; t: string; d: string; tk?: string; dk?: string; art?: IllustrationName }[]).map((s, i) => (
             /* No card. On a dark ground a white panel is a hole, not a card —
                the steps are ruled rows instead, and the numeral does the work a

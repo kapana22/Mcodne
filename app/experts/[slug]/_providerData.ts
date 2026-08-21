@@ -47,6 +47,22 @@ export const REQUEST_HREF = '/request?for=service'
  * to bid; the client's two verbs are „დაჯავშნე" and „აღწერე", and „აღწერე"
  * could not be aimed at anybody.
  *
+ * ⚠️ AND IT MAY CARRY THE SERVICE THEY TAPPED (2026-08-20) — as `?q=`, which is
+ * the search box's OWN parameter and has been read by app/request/page since
+ * the wizard was built. No new key was invented: `q` seeds „რა გჭირდება",
+ * which is the exact question the client already answered by pressing
+ * „დაკვეთა" on a named row.
+ *
+ * WHY IT MATTERS. The priced list is this page's centre — „ბინის დალაგება 90₾"
+ * — and its button opened a form that asked, as its first question, what the
+ * client needs. They had just said. Re-asking a question somebody answered one
+ * tap ago is the plainest form of interaction cost, and on a wizard the first
+ * screen is where people leave.
+ *
+ * `q` is a SEED, not a decision: the wizard still shows the panel and the
+ * client can change it. Capped at 60 to match what app/request/page accepts —
+ * bounded on both sides, since either can be reached with a crafted URL.
+ *
  * Built here rather than at the CTA for the reason `REQUEST_HREF` is: the
  * address of the intake is this model's to state, so `for=service` and the
  * recipient stay in one place and cannot drift apart.
@@ -55,8 +71,9 @@ export const REQUEST_HREF = '/request?for=service'
  * this file uses (lib/requestTarget) and IGNORES anything that does not
  * resolve — so a stale link is a plain intake form, never a 404.
  */
-export const requestHrefFor = (p: { slug: string | null; id: string }) =>
-  `${REQUEST_HREF}&to=${encodeURIComponent(p.slug || p.id)}`
+export const requestHrefFor = (p: { slug: string | null; id: string }, service?: string) =>
+  `${REQUEST_HREF}&to=${encodeURIComponent(p.slug || p.id)}` +
+  (service ? `&q=${encodeURIComponent(service.slice(0, 60))}` : '')
 
 /** The visibility rule — see the header. */
 const VISIBLE = {

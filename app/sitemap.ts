@@ -50,11 +50,20 @@ const STATIC_ROUTES: Array<{
   // submitting them would be submitting duplicates of a page we already list.
   // Its children are the professionEntries below and the expert profiles.
   { path: '/experts', changeFrequency: 'daily', priority: 0.9 },
-  // Public again as of 2026-07-29: guests get a crawlable „გახდი ექსპერტი"
-  // landing page (app/join/_expert/ApplyMarketing.tsx) and only the FORM needs
-  // a session. It was removed from this list while it 307'd every guest away.
-  // /apply → /join since 2026-08-19 (the middleware 308s the old address).
+  // Public again as of 2026-07-29: a guest gets a crawlable page and only the
+  // FORM needs a session. It was removed from this list while it 307'd every
+  // guest away. /apply → /join since 2026-08-19 (the middleware 308s it), and
+  // since 2026-08-20 the bare address is the DOOR (app/join/_door/PublicDoor):
+  // the pitch AND the one question, asked before the account is required.
   { path: '/join', changeFrequency: 'monthly', priority: 0.7 },
+  // ⚠️ THE TRADES LANDING IS A SEPARATE URL AND A SEPARATE PAGE (2026-08-20).
+  // /join is the DOOR now — it asks the profession and names no half — while
+  // `?can=WORK` is „დაარეგისტრირე შენი სერვისი", with its own copy and its own
+  // canonical (`pageMetadata('apply-master', '/join?can=WORK')`), so it is a
+  // real second entry rather than a duplicate of the one above.
+  // ⚠️ `?can=CONSULT` IS NOT LISTED, and must not be: it canonicalises to
+  // /join, so submitting it would submit a duplicate of an address already here.
+  { path: '/join?can=WORK', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/blog', changeFrequency: 'weekly', priority: 0.6 },
   { path: '/contact', changeFrequency: 'monthly', priority: 0.5 },

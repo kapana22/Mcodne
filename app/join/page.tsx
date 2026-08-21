@@ -26,6 +26,7 @@ import { providersOn, PROVIDER_ROUTE } from '@/lib/requests'
 import { capabilitiesOf, parseCapabilities, type Capability } from '@/lib/capabilities'
 import { ApplyMarketing } from './_expert/ApplyMarketing'
 import { MasterApplyMarketing } from './_master/_marketing'
+import { PublicDoor } from './_door/PublicDoor'
 import { JoinClient } from './JoinClient'
 
 // Session-dependent: never statically render or cache this shell, or a guest
@@ -39,6 +40,11 @@ function wantsWorkOnly(can: Capability[]): boolean {
   return providersOn() && can.includes('WORK') && !can.includes('CONSULT')
 }
 
+/** `?can=CONSULT` on its own means the „გახდი ექსპერტი" pitch. */
+function wantsConsultOnly(can: Capability[]): boolean {
+  return can.includes('CONSULT') && !can.includes('WORK')
+}
+
 // Editable in ადმინი → ტექსტები (group „SEO — …"). See lib/pageSeo. The two
 // registry rows keep their old ids — they are DB keys, never renamed.
 export const generateMetadata = async ({ searchParams }: { searchParams: Search }) =>
@@ -50,9 +56,23 @@ export default async function Page({ searchParams }: { searchParams: Search }) {
   const can = parseCapabilities((await searchParams).can)
   const user = await getCurrentUser()
 
-  // Guest → the public pitch. This is the crawlable view and the whole reason
-  // the auth gate lives here and not in the layout.
-  if (!user) return wantsWorkOnly(can) ? <MasterApplyMarketing /> : <ApplyMarketing />
+  // ⚠️ THREE GUEST VIEWS, AND THE BARE ADDRESS IS THE DOOR (2026-08-20).
+  //
+  // It used to be two — the consultation pitch by default, the trades pitch on
+  // `?can=WORK` — so the ONE question this whole subsystem is built on (the
+  // profession, from which the capabilities are derived) sat behind the
+  // sign-up wall, and the default pitch named the consultation in its first
+  // sentence, which is the hierarchy upside down (CLAUDE.md rule 4).
+  //
+  // Now: a link that NAMES a half gets that half's pitch — both are real
+  // landing pages for real search intent and both stay crawlable — and the
+  // bare address, which is what every navigation link and every button on the
+  // site now points at, asks the question instead of the wall.
+  if (!user) {
+    if (wantsWorkOnly(can)) return <MasterApplyMarketing />
+    if (wantsConsultOnly(can)) return <ApplyMarketing />
+    return <PublicDoor preset={can} />
+  }
 
   if (user.role === ROLE.ADMIN) redirect('/admin')
 

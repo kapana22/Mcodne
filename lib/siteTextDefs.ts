@@ -62,10 +62,27 @@ const SEO_TEXTS: SiteTextDef[] = PAGE_SEO.flatMap(p => {
 
 export const SITE_TEXTS: SiteTextDef[] = [
   // ── Landing hero ──
-  { key: 'home.hero.line1', group: 'მთავარი — Hero', label: 'სათაური, 1-ლი ხაზი', default: 'რა გჭირდება? —' },
-  { key: 'home.hero.line2', group: 'მთავარი — Hero', label: 'სათაური, აქცენტი (მწვანე)', default: 'აღწერე, და შემოგთავაზებენ.' },
-  { key: 'home.hero.subtitle', group: 'მთავარი — Hero', label: 'ქვესათაური', multiline: true, default: 'ხელშეკრულება, დეკლარაცია, ბრენდი, საიტი, დალაგება — გადამოწმებული ექსპერტები თბილისში.' },
-  { key: 'home.hero.subtitleEmphasis', group: 'მთავარი — Hero', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'მოთხოვნა უფასოა.' },
+  // ⚠️ THE HEADLINE MOVED FROM A QUESTION TO A VERB (2026-08-20). It read
+  // „რა გჭირდება? — აღწერე, და შემოგთავაზებენ", which is the TENDER framing:
+  // it puts the work on the visitor before the site has said what it is, and
+  // it describes the half of the product the hierarchy says comes second.
+  // Every marketplace that reads as professional opens the same way — Fiverr
+  // „Find the right freelance service", Thumbtack „Find local pros for any
+  // project", Malt „Find the freelancer who fits your project": a verb, and the
+  // name of WHO you will meet.
+  // ⚠️ THESE ARE DEFAULTS AND THE LIVE SITE READS THE `SiteText` TABLE. Change
+  // one here and the page does not move until the row changes too — that is
+  // documented in CLAUDE.md and it is the reason the live title still said
+  // „ონლაინ კონსულტაცია" weeks after the source stopped saying it.
+  { key: 'home.hero.line1', group: 'მთავარი — Hero', label: 'სათაური, 1-ლი ხაზი', default: 'იპოვე ექსპერტი,' },
+  { key: 'home.hero.line2', group: 'მთავარი — Hero', label: 'სათაური, აქცენტი (მწვანე)', default: 'რომელიც გააკეთებს' },
+  { key: 'home.hero.subtitle', group: 'მთავარი — Hero', label: 'ქვესათაური', multiline: true, default: 'ბუღალტერი, იურისტი, ფსიქოლოგი, სანტექნიკოსი — თბილისში. ყველა პროფილი ხელით მოწმდება,' },
+  // ⚠️ „მოთხოვნა უფასოა" LEFT (2026-08-20). Owner: „უფასო და ესეთი რამები, რაც
+  // არაპროფესიონალურია და საიტს ნდობას უკარგავს, არ გამოიყენო." He is right and
+  // so is the market: Fiverr, Upwork and Thumbtack put counts and verification
+  // in this slot, never the price of asking — which only invites the question
+  // „so what DOES cost?".
+  { key: 'home.hero.subtitleEmphasis', group: 'მთავარი — Hero', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'ფასი პროფილზევე წერია.' },
   { key: 'home.hero.trustChip', group: 'მთავარი — Hero', label: 'ნდობის ხაზი (პატარა, ზემოთ)', default: 'ხელით შერჩეული ბაზა' },
   // Shown ONLY while the catalog has no ratings yet — once real reviews exist
   // the same slot prints „4.8★ საშუალო შეფასება", which is computed.
@@ -191,6 +208,27 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'about.cta.title', group: 'ჩვენ შესახებ', label: 'ექსპერტის CTA — სათაური', default: 'ხარ ექსპერტი? გვინდა შენი ცოდნა' },
   { key: 'about.cta.body', group: 'ჩვენ შესახებ', label: 'ექსპერტის CTA — ტექსტი', multiline: true, default: 'გაქვს გამოცდილება? შემოგვიერთდი — განაცხადს 24–48 საათში განვიხილავთ.' },
 
+  // ── /join — THE BARE DOOR, what a signed-out visitor meets ─────────────
+  //
+  // ⚠️ NO NEW SENTENCES, AND NOTHING VAGUE (2026-08-20). Owner, on the first
+  // draft of this block: „ძალიან ცუდად წერ ტექსტებს… მარტივი ტექსტი უნდა
+  // იყოს, არ უნდა ეწეროს გაურკვეველი, გამოგონილი ინფორმაციები." „შემოგვიერთდი"
+  // and „დანარჩენს ჩვენ მოვაწყობთ" both went out on that sentence: one is a
+  // word nobody uses, the other promises something unnamed.
+  //
+  // What is left is concrete and already written on this site: the eyebrow is
+  // the home band's, the two body sentences are the home band's headline and
+  // the SEO row's own line, and the note is the half of `apply.hero.note` that
+  // is true for BOTH halves („24–48 საათი" is the consultation queue's promise;
+  // the trades queue calls instead, so the shared door may not print it).
+  //
+  // The HEADING is not a row — it is `JOIN_DOOR_LABEL` in lib/capabilities,
+  // because it must be the same word as the header link that leads here.
+  { key: 'join.hero.eyebrow', group: 'რეგისტრაცია — კარი', label: 'პატარა იარლიყი', default: 'ექსპერტებისთვის' },
+  { key: 'join.hero.body', group: 'რეგისტრაცია — კარი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'მიიღე კლიენტები. ფასს, დროსა და მოცულობას შენ ადგენ.' },
+  { key: 'join.hero.ask', group: 'რეგისტრაცია — კარი', label: 'ხაზი ამომრჩევის ზემოთ', default: 'აირჩიე, რას აკეთებ.' },
+  { key: 'join.hero.note', group: 'რეგისტრაცია — კარი', label: 'პატარა ხაზი ღილაკის ქვეშ', default: 'რეგისტრაცია 2 წუთია' },
+
   // ── /apply — the public „გახდი ექსპერტი" page ──────────────────────────
   // The whole page was hardcoded. It is the recruiting funnel — the copy most
   // likely to be rewritten after the first few applications come in — and it
@@ -206,7 +244,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'apply.hero.body', group: 'გახდი ექსპერტი — შესავალი', label: 'შესავალი ტექსტი', multiline: true, default: 'შენი გამოცდილება ვიღაცის პასუხგაუცემელი კითხვაა. მცოდნე ქართველ სპეციალისტებს აკავშირებს იმ ადამიანებთან, რომლებსაც კონკრეტულ საკითხზე პასუხი სჭირდებათ — ერთსაათიან ონლაინ კონსულტაციაზე, შენს მიერ დადგენილ დროსა და ფასად.' },
   { key: 'apply.hero.ctaPrimary', group: 'გახდი ექსპერტი — შესავალი', label: 'მთავარი ღილაკი', default: 'დაიწყე განაცხადი' },
   { key: 'apply.hero.ctaSecondary', group: 'გახდი ექსპერტი — შესავალი', label: 'მეორე ღილაკი', default: 'უკვე გაქვს ანგარიში?' },
-  { key: 'apply.hero.note', group: 'გახდი ექსპერტი — შესავალი', label: 'პატარა ხაზი ღილაკების ქვეშ', multiline: true, default: 'რეგისტრაცია უფასოა · განაცხადს ინდივიდუალურად განვიხილავთ 24–48 საათში' },
+  { key: 'apply.hero.note', group: 'გახდი ექსპერტი — შესავალი', label: 'პატარა ხაზი ღილაკების ქვეშ', multiline: true, default: 'რეგისტრაცია 2 წუთია · განაცხადს ინდივიდუალურად განვიხილავთ 24–48 საათში' },
 
   { key: 'apply.how.eyebrow', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'პატარა იარლიყი', default: 'როგორ მუშაობს' },
   { key: 'apply.how.step1.title', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 1 — სათაური', default: 'შეავსე განაცხადი' },

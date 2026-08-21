@@ -111,7 +111,10 @@ export const TutorCard = ({ t, idx, onBook, saved, onToggleFav, needsSignIn, vie
   // Gate the CTA on real availability — same rule the detail page's
   // StickyBookingCard uses — so the card never promises a booking the profile
   // will deny with "no published slots".
-  const bookable = isTutorBookable(t.nextSlotAt)
+  // Both halves: a free slot, and a tier that can go in it. An expert whose
+  // rows are all SERVICES has a calendar and nothing to put on it — see
+  // ./_data → isTutorBookable.
+  const bookable = isTutorBookable(t.nextSlotAt, t.consultations)
   // Video plays INLINE inside the photo on hover (Preply-style) — no permanent
   // panel cluttering the list. Play button opens the full VideoPreview modal.
   const ytId = tutorYouTubeId(t)
