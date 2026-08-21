@@ -16,6 +16,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { normalizePublicRef, topicLabel, PROVIDER_ROUTE } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
+import { refBudgetSpent, noteRefMiss } from '@/lib/refGuard'
 import { notifyMany } from '@/lib/notify'
 import { sendMail } from '@/lib/mailer'
 import { offerAcceptedProviderEmail } from '@/lib/emailTemplates'
@@ -27,11 +28,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
   const viewer = await requestsViewer()
   if (!viewer.clientAllowed) return notFound()
 
+  // ⚠️ THE REFERENCE IS THE WHOLE AUTHORISATION — this route spends the client's
+  // one choice and hands a stranger's phone number to the winner. Wrong guesses
+  // are counted and a spent address is refused with the same 404 as an empty
+  // code (lib/refGuard); a client holding a real reference spends nothing.
+  if (refBudgetSpent(req)) return notFound()
+
   const { ref: raw } = await params
   // A garbage segment is answered without a query at all — the shape check is
   // free and the database round-trip is not.
   const ref = normalizePublicRef(raw)
-  if (!ref) return notFound()
+  if (!ref) { noteRefMiss(req); return notFound() }
 
   const body = await req.json().catch(() => ({})) as { offerId?: unknown }
   const offerId = typeof body.offerId === 'string' ? body.offerId.trim() : ''
@@ -56,7 +63,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
       request: { select: { topic: true } },
     },
   })
-  if (!offer) return notFound()
+  // An offer that is not on THIS request is the same signal as a wrong code:
+  // somebody is trying ids against a reference they do not hold.
+  if (!offer) { noteRefMiss(req); return notFound() }
 
   // ── THE CLAIM ────────────────────────────────────────────────────────────
   // VERIFIED → MATCHED, conditionally. The `where` carries the state we believe

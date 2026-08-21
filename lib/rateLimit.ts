@@ -41,7 +41,11 @@ export function rateLimit(key: string, max: number, windowSec: number): RateResu
 // internal hops.
 const TRUSTED_PROXY_HOPS = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS) || 1)
 
-export function clientIp(req: Request): string {
+/** Anything carrying request headers — a `Request`, or `headers()` in a server
+ *  component, which has the same `.get` and is how a PAGE keys a limiter. */
+type HasHeaders = { headers: { get(name: string): string | null } }
+
+export function clientIp(req: HasHeaders): string {
   const xff = req.headers.get('x-forwarded-for')
   if (xff) {
     const parts = xff.split(',').map(s => s.trim()).filter(Boolean)

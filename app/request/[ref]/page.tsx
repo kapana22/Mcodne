@@ -13,6 +13,7 @@
 // stated, and the second place is where it stops matching.
 
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
@@ -22,6 +23,7 @@ import {
   REQUEST_STATIONS, stationsReached,
 } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
+import { refBudgetSpent, noteRefMiss } from '@/lib/refGuard'
 import { Card } from '@/components/Card'
 import { Eyebrow } from '@/components/Eyebrow'
 import { EmptyState } from '@/components/EmptyState'
@@ -43,11 +45,18 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
   const viewer = await requestsViewer()
   if (!viewer.clientAllowed) notFound()
 
+  // ⚠️ THE REFERENCE IS THE ONLY CREDENTIAL ON THIS PAGE, and after an offer is
+  // accepted the page carries a phone number — so wrong guesses are counted and
+  // an address that has spent its budget gets the same 404 as an empty code
+  // (lib/refGuard). A client holding a real reference never spends any of it.
+  const req = { headers: await headers() }
+  if (refBudgetSpent(req)) notFound()
+
   const { ref: raw } = await params
   // A garbage segment is answered without a query at all — the shape check is
   // free and the database round-trip is not.
   const ref = normalizePublicRef(raw)
-  if (!ref) notFound()
+  if (!ref) { noteRefMiss(req); notFound() }
 
   await ensureDbReady()
 
@@ -96,7 +105,7 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
       },
     },
   })
-  if (!request) notFound()
+  if (!request) { noteRefMiss(req); notFound() }
 
   // Shaped through the ONE function that decides who sees whose contact. Note
   // that the company branch has no phone or email at all — a Company row holds
