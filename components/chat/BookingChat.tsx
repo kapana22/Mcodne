@@ -12,7 +12,7 @@ import { sanitizeMsgBody, MSG_MAX_LEN } from '@/lib/msgText'
 import { useBookingThread, type ChatMessage, type ChatUser, type ThreadBooking, type ThreadPair, type ThreadPre } from './useBookingThread'
 import { CallInviteCard } from './CallInviteCard'
 
-export type BookingChatProps = {
+type BookingChatProps = {
   /** Booking-scoped thread. Provide EITHER bookingId or withUser (not both). */
   bookingId?: string
   /** Pre-booking pair thread — the other user's id. Drives ?withUser / toUserId. */

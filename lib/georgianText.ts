@@ -34,7 +34,7 @@ const MIN_LETTERS = 8
 /** Georgian must be at least this share of the letters. */
 const MIN_GEORGIAN_SHARE = 0.5
 
-export type ScriptCheck = { ok: true } | { ok: false; reason: 'no-georgian' | 'mostly-foreign' }
+type ScriptCheck = { ok: true } | { ok: false; reason: 'no-georgian' | 'mostly-foreign' }
 
 /**
  * Is this user-written text acceptably Georgian?

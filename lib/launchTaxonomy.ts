@@ -52,10 +52,10 @@ export const LAUNCH_CATEGORIES = [
   // Switching those groups off is a separate decision and a separate file.
 ] as const
 
-export type LaunchSide = (typeof LAUNCH_CATEGORIES)[number]['side']
+type LaunchSide = (typeof LAUNCH_CATEGORIES)[number]['side']
 
 /** Just the slugs — the shape most callers want. */
-export const LAUNCH_SLUGS: readonly string[] = LAUNCH_CATEGORIES.map(c => c.slug)
+const LAUNCH_SLUGS: readonly string[] = LAUNCH_CATEGORIES.map(c => c.slug)
 
 /** Is this sphere part of ტალღა 1? Everything else is „სხვა კატეგორიები". */
 export function isLaunchCategory(slug: string | null | undefined): boolean {

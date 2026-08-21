@@ -15,7 +15,7 @@
 //
 // Pure and react-free on purpose: the component renders, this decides.
 
-export type ReadableMsg = { id: string; fromId: string; createdAt: string }
+type ReadableMsg = { id: string; fromId: string; createdAt: string }
 
 /**
  * The last message of MINE the other side has read, or null.

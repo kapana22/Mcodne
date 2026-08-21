@@ -25,7 +25,7 @@
 import { type RequestKindName } from './requestTopics'
 
 /** Why a request is being held for a person. Empty means „let it go". */
-export type TriageFlag =
+type TriageFlag =
   | 'BELOW_FLOOR'
   | 'NO_TOPIC'
   | 'CONTACT_IN_TEXT'
@@ -67,7 +67,7 @@ function phoneLooksOdd(phone: string): boolean {
   return false
 }
 
-export type TriageInput = {
+type TriageInput = {
   kind: RequestKindName
   budgetBand: string
   topic: string

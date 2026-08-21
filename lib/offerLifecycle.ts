@@ -106,7 +106,7 @@ export function withdrawWhere(offerId: string, provider: ProviderIdentity) {
   }
 }
 
-export type ReviewGate = 'OK' | 'NOT_DONE' | 'ALREADY_REVIEWED' | 'NO_ACCOUNT'
+type ReviewGate = 'OK' | 'NOT_DONE' | 'ALREADY_REVIEWED' | 'NO_ACCOUNT'
 
 /** May a review be written on this offer? Done, unreviewed, by somebody with
  *  an account to sign it. */
@@ -160,7 +160,7 @@ export function closeDue(o: ClockRow, now: number): boolean {
 
 /* ═══════════ the prisma helpers ═════════════════════════════════════════ */
 
-export type ClaimResult = { ok: true } | { ok: false; error: string }
+type ClaimResult = { ok: true } | { ok: false; error: string }
 
 /**
  * Mark an offer done, once. The `where` IS the guard — no read-then-write.
@@ -216,7 +216,7 @@ export async function providerUserIdsOf(o: { expertUserId: string | null; compan
 
 /* ═══════════ the cron ═══════════════════════════════════════════════════ */
 
-export type OfferLifecycleJobsResult = { reminded: number; closed: number }
+type OfferLifecycleJobsResult = { reminded: number; closed: number }
 
 /**
  * One tick: the reminder, then the close. Both idempotent and claim-style —

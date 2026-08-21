@@ -33,7 +33,7 @@ import { PROVIDER_ROUTE } from '@/lib/requests'
 import { PRESENCE_TTL_MS } from '@/lib/requestThread'
 import { avatarSrc } from '@/lib/avatarSrc'
 
-export type LiveExpert = {
+type LiveExpert = {
   id: string
   href: string
   name: string
@@ -44,7 +44,7 @@ export type LiveExpert = {
 }
 
 /** What `/status` returns and what the `status` stream event carries. */
-export type RequestLiveStatus = {
+type RequestLiveStatus = {
   status: string
   /** 'OFFERS' | 'SELF' — what this person asked for in the wizard. */
   pickMode: string

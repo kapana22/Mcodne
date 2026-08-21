@@ -12,7 +12,7 @@ if (typeof setInterval !== 'undefined') {
   }, 5 * 60 * 1000).unref?.()
 }
 
-export type RateResult = { ok: true } | { ok: false; retryInSec: number }
+type RateResult = { ok: true } | { ok: false; retryInSec: number }
 
 export function rateLimit(key: string, max: number, windowSec: number): RateResult {
   const now = Date.now()

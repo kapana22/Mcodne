@@ -45,7 +45,7 @@ import { professionsOfTopic } from './requestTopics'
  *              request nobody is told about is a request that dies. Silence
  *              would be us pretending to a precision we do not have.
  */
-export type RoutingAudience = 'TARGETED' | 'EVERYONE'
+type RoutingAudience = 'TARGETED' | 'EVERYONE'
 
 export type RoutableProvider = {
   userId: string
@@ -81,7 +81,7 @@ export type RoutableProvider = {
 
 const norm = (s: string) => s.trim().toLowerCase()
 
-export type RoutingResult = {
+type RoutingResult = {
   audience: RoutingAudience
   /** The user ids to mail. Never empty when there is anybody on the allowlist —
    *  see the EVERYONE fallback. */

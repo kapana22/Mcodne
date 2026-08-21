@@ -53,7 +53,7 @@ type Msg = { id: string; mine: boolean; body: string; createdAt: string; readByO
  * `PLATFORM` — the client and us. The client proves themselves with `refCode`;
  *           an operator passes `requestId` and is their ADMIN session.
  */
-export type ThreadRef =
+type ThreadRef =
   | { kind: 'OFFER'; offerId: string; refCode?: string }
   | { kind: 'PLATFORM'; refCode?: string; requestId?: string }
 

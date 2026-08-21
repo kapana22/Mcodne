@@ -63,7 +63,7 @@ export type CatalogueCardItem = {
 }
 
 /** Six is the grid: 3×2 on desktop, 2×3 on tablet, a single column on a phone. */
-export const CATALOGUE_GRID_SIZE = 6
+const CATALOGUE_GRID_SIZE = 6
 
 const GRID = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5'
 

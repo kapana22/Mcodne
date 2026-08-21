@@ -24,9 +24,9 @@ import { notify } from './notify'
 /** As much of the request as the invite needs — the caller already holds it,
  *  and re-reading the row here would be a second round trip for facts that
  *  cannot have changed inside one handler. */
-export type InvitableRequest = { id: string; status: string; topic: string }
+type InvitableRequest = { id: string; status: string; topic: string }
 
-export type InviteOutcome =
+type InviteOutcome =
   | { ok: true; offerId: string; created: boolean }
   /** The provider is not somebody this platform routes work to (or does not
    *  exist). Answered as NOT_FOUND, never as „no access": a request reference

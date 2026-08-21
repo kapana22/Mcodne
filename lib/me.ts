@@ -52,6 +52,11 @@ export type Me = {
   hats?: ('ADMIN' | 'EXPERT' | 'MASTER' | 'COMPANY' | 'CLIENT')[]
   /** What the person already offers — see lib/capabilities. */
   capabilities?: ('CONSULT' | 'WORK')[]
+  /** The provider's balance in tetri, or null for somebody who sells nothing.
+   *  Drives the pill in the top bar's signed-in cluster (components/CreditPill).
+   *  ⚠️ NULL AND ZERO ARE DIFFERENT: null = „no balance to show", 0 = „spent it
+   *  all". The pill renders nothing for the first and „0₾" for the second. */
+  balanceTetri?: number | null
   /** Has this person ever bought, saved or asked for anything — i.e. is there a
    *  client room worth a door? A provider's menu should be about selling, and
    *  27 of 29 providers had nothing at all on the client side (2026-08-21). */
@@ -95,7 +100,18 @@ export function fetchMe(): Promise<Me> {
     .then(r => (r.ok ? r.json() : { user: null }))
     // `hats` rides beside `user` in the response rather than inside it — it is
     // derived, not a column — so it is folded in here.
-    .then(d => (d?.user ? { ...d.user, hats: d.hats ?? [], capabilities: d.capabilities ?? [], clientRoom: d.clientRoom ?? false } : null) as Me)
+    // ⚠️ EVERY DERIVED FIELD HAS TO BE NAMED HERE. The spread only covers
+    // `d.user`; anything riding BESIDE it is dropped unless it is folded in, and
+    // a dropped field fails silently — the component renders nothing and looks
+    // like a styling problem. `balanceTetri` was added on 2026-08-21 and caught
+    // exactly that way, in the browser, after the types were already clean.
+    .then(d => (d?.user ? {
+      ...d.user,
+      hats: d.hats ?? [],
+      capabilities: d.capabilities ?? [],
+      clientRoom: d.clientRoom ?? false,
+      balanceTetri: d.balanceTetri ?? null,
+    } : null) as Me)
     .catch(() => null)
   inflight = p
   // Cache the resolved value so a later navigation renders it instantly while

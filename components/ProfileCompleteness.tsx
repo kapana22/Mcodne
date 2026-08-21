@@ -21,7 +21,7 @@ import {
 
 export type { ProfileForCompleteness }
 
-export type ProfileCompletenessProps = {
+type ProfileCompletenessProps = {
   profile: ProfileForCompleteness
   certificates: number
   education: number

@@ -81,7 +81,7 @@ export function packagesFeatureExists(): boolean {
  * comparing against.
  */
 export const PACKAGE_LESSON_COUNTS = [4, 8, 12] as const
-export type PackageLessonCount = (typeof PACKAGE_LESSON_COUNTS)[number]
+type PackageLessonCount = (typeof PACKAGE_LESSON_COUNTS)[number]
 export const DEFAULT_LESSON_COUNT: PackageLessonCount = 8
 
 /* ── Teacher-specific profile fields ────────────────────────────────────────
@@ -167,7 +167,7 @@ export function perLessonPrice(priceTotal: number, lessonsCount: number): number
  * one computed against a reference price that does not exist, is a lie in a
  * loud font; render nothing instead.
  */
-export function savingPct(priceTotal: number, lessonsCount: number, singleLessonPrice: number | null | undefined): number | null {
+function savingPct(priceTotal: number, lessonsCount: number, singleLessonPrice: number | null | undefined): number | null {
   if (!singleLessonPrice || singleLessonPrice <= 0 || lessonsCount <= 0) return null
   const full = singleLessonPrice * lessonsCount
   if (full <= priceTotal) return null

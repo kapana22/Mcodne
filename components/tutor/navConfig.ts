@@ -73,7 +73,7 @@ export type NavGroups = { expert: boolean; work: boolean }
 
 /** A block of the rail. One today; the shape survives so a divider can return
  *  without changing every caller. */
-export type NavSection = { caption: string | null; items: NavItem[] }
+type NavSection = { caption: string | null; items: NavItem[] }
 
 /**
  * The rail, in order. ONE list — see the note above WORKSPACE_NAV for why the

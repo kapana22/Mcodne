@@ -274,7 +274,7 @@ export function sphereOfProfessions(jobs: readonly string[]): string | undefined
 
 /** Mirrors lib/capabilities → Capability, restated here so this file stays a
  *  leaf a client component can import (capabilities.ts pulls in prisma). */
-export type ProfessionCapability = 'CONSULT' | 'WORK'
+type ProfessionCapability = 'CONSULT' | 'WORK'
 
 /**
  * The professions that plausibly DELIVER something as well as advise. Kept

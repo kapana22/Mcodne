@@ -18,7 +18,7 @@ import { requestsViewer } from '@/lib/requestsServer'
 import { ROLE, asRole } from '@/lib/roles'
 import { routingWhere } from '@/lib/serviceProfile'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { grantEarnedTasks } from '@/lib/creditsServer'
+import { balanceOf, grantEarnedTasks } from '@/lib/creditsServer'
 import { WorkspaceShell } from '@/components/tutor/WorkspaceShell'
 
 // Re-verify on every request for this segment: the shell must never be served
@@ -63,9 +63,13 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
   //
   // ⚠️ CAPABILITY-GATED, because an ADMIN passes `groups.work` by role alone and
   // has no supply-side profile to score.
+  // The balance is read AFTER the grant on purpose: a provider who has just
+  // finished a field must not be shown yesterday's number for one navigation.
+  let balanceTetri: number | null = null
   if (caps.length > 0) {
     await ensureDbReady()
     await grantEarnedTasks(user.id)
+    balanceTetri = await balanceOf(user.id)
   }
 
   // The queue badge — how many verified requests still have a place. Same
@@ -111,6 +115,7 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
       // with no identity to attach). The shell says so instead of showing a
       // control that cannot work.
       isProvider={viewer === null || viewer.provider !== null}
+      balanceTetri={balanceTetri}
     >
       {children}
     </WorkspaceShell>

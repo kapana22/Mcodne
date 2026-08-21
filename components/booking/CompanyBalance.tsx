@@ -19,7 +19,7 @@ import { useEffect, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { b2bFeatureExists, canSpendBalance } from '@/lib/b2b'
 
-export type MyCompany = {
+type MyCompany = {
   id: string
   name: string
   balance: number

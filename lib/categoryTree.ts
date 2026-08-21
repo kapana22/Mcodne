@@ -34,7 +34,7 @@ export type TreeNode = {
 export type TreeTarget = TreeNode & { childCount: number }
 
 /** What the PATCH is asking for. Absent = unchanged. */
-export type TreeChange = {
+type TreeChange = {
   status?: CategoryStatus
   /** `null` clears the parent; `undefined` leaves it alone. */
   parentId?: string | null
@@ -55,7 +55,7 @@ export const TREE_ERROR = {
   REDIRECT_NEEDS_PARENT: 'გადამისამართებას მშობელი კატეგორია სჭირდება.',
 } as const
 
-export type TreeErrorCode = keyof typeof TREE_ERROR
+type TreeErrorCode = keyof typeof TREE_ERROR
 
 /**
  * The one check. Returns a code, or null when the change is allowed.
@@ -236,7 +236,7 @@ export function foldCounts(
  *  restated — a second copy of that slug is exactly how the marker would get
  *  protected in one place and left open in another. (No cycle: lib/abroad
  *  imports only lib/flags.) */
-export const NEVER_ASSIGNABLE_SLUGS = [ABROAD_CATEGORY_SLUG] as const
+const NEVER_ASSIGNABLE_SLUGS = [ABROAD_CATEGORY_SLUG] as const
 
 /** Prisma: every category an EXPERT may be filed into. Pair with
  *  `slug: { notIn: [...NEVER_ASSIGNABLE_SLUGS] }` — expressed separately so the

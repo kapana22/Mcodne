@@ -26,7 +26,7 @@ export function sanitizeMsgBody(s?: string | null): string {
 // clean label instead of echoing the raw filename pattern.
 const ATTACHMENT_MARKER = /^📎\s*/
 
-export type MsgPreview = {
+type MsgPreview = {
   /** Single-line, invisible-free text ready for a truncating container. */
   text: string
   /** True when the message is an attachment send (with or without caption). */

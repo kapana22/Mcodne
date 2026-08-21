@@ -14,7 +14,7 @@ export type ProfileForCompleteness = {
   languages?: string[] | null
 } | null
 
-export type ProfileCheck = {
+type ProfileCheck = {
   id: string
   label: string
   done: boolean

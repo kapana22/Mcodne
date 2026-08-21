@@ -138,7 +138,7 @@ export type ActivationCandidate = {
   suspended: boolean
 }
 
-export type PlannedNudge = {
+type PlannedNudge = {
   row: ActivationCandidate
   blocker: Blocker
   /** Stage (days) for `service`; fortnight bucket for `slots`. See the id builder. */

@@ -23,7 +23,7 @@ export const TOPIC_OPTIONS = [
   'სხვა თემა',
 ]
 
-export const MAX_INTAKE_CHARS = 500
+const MAX_INTAKE_CHARS = 500
 
 export type DetailsState = { topic: string; goal: string }
 

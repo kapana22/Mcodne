@@ -32,7 +32,7 @@ function secretEquals(a: string, b: string): boolean {
   return timingSafeEqual(ba, bb)
 }
 
-export type CronGate =
+type CronGate =
   | { ok: true }
   | { ok: false; status: 401 | 503; body: { ok: false; error: string; hint?: string } }
 

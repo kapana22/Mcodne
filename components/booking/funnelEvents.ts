@@ -44,7 +44,7 @@ export const BOOKING_FUNNEL_EVENTS = {
   noSlots: 'booking_no_slots',
 } as const
 
-export type BookingFunnelEvent = typeof BOOKING_FUNNEL_EVENTS[keyof typeof BOOKING_FUNNEL_EVENTS]
+type BookingFunnelEvent = typeof BOOKING_FUNNEL_EVENTS[keyof typeof BOOKING_FUNNEL_EVENTS]
 
 /** Flat list — what the route turns into its allow-list Set. */
 export const BOOKING_FUNNEL_EVENT_NAMES: readonly BookingFunnelEvent[] =
@@ -74,13 +74,13 @@ export const BOOKING_FUNNEL_PROP_KEYS = [
   'code',          // server error code on the failure terminal
 ] as const
 
-export type BookingFunnelPropKey = typeof BOOKING_FUNNEL_PROP_KEYS[number]
+type BookingFunnelPropKey = typeof BOOKING_FUNNEL_PROP_KEYS[number]
 
 /** Public TutorProfile id (cuid). Constrained so this key can't smuggle text. */
-export const TUTOR_ID_RE = /^[a-z0-9]{20,32}$/
+const TUTOR_ID_RE = /^[a-z0-9]{20,32}$/
 
 /** Scalars only — no nesting, no arrays. Keeps the JSONB row small and boring. */
-export type BookingFunnelProps = Partial<Record<BookingFunnelPropKey, string | number | boolean>>
+type BookingFunnelProps = Partial<Record<BookingFunnelPropKey, string | number | boolean>>
 
 /** Hard caps the route enforces; exported so the test asserts the same numbers. */
 export const MAX_PROP_KEYS = 16
@@ -144,7 +144,7 @@ export function leadDays(start: Date, now: number = Date.now()): number {
  *     no server, no DB and no dev server — see tests/bookingFunnelEvents.test.ts.
  * ────────────────────────────────────────────────────────────────────────── */
 
-export type ParsedEvent =
+type ParsedEvent =
   | { ok: true; name: BookingFunnelEvent; props: Record<string, string | number | boolean> }
   | { ok: false; reason: string }
 
@@ -212,7 +212,7 @@ const KEY_SET: ReadonlySet<string> = new Set<string>([
  */
 const TEXT_EVENT: string = HELP_EVENTS.unanswered
 /** Matches the browser-side cap in lib/helpSearch#MAX_QUERY_CHARS. */
-export const MAX_TEXT_PROP = 120
+const MAX_TEXT_PROP = 120
 
 /**
  * Turn an untrusted request body into a row we are willing to write, or a

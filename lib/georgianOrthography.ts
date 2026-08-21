@@ -95,7 +95,7 @@ export const COPY_RULES: CopyRule[] = [
     why: 'CLAUDE.md — ქართული ბრჭყალები' },
 ]
 
-export type CopyViolation = { id: string; found: string; fix: string; why: string }
+type CopyViolation = { id: string; found: string; fix: string; why: string }
 
 /** Every rule this text breaks. Empty array = clean. */
 export function checkGeorgianCopy(text: string): CopyViolation[] {

@@ -56,7 +56,7 @@ export const OFFER_EVENTS = [
   'CLOSED',
 ] as const
 
-export type OfferEventName = (typeof OFFER_EVENTS)[number]
+type OfferEventName = (typeof OFFER_EVENTS)[number]
 
 /**
  * The events a price could ever be attached to.
@@ -88,7 +88,7 @@ export const OFFER_EVENT_LABEL: Record<OfferEventName, string> = {
 
 /* ═══════════ writing one ════════════════════════════════════════════════ */
 
-export type RecordResult =
+type RecordResult =
   /** Written now — this is the first time it happened. A billing rule acts on
    *  exactly this answer and on no other. */
   | { ok: true; first: true }
@@ -132,7 +132,7 @@ export async function recordOfferEvent(
 
 /* ═══════════ reading them back ══════════════════════════════════════════ */
 
-export type OfferEventRow = { type: string; at: Date | string }
+type OfferEventRow = { type: string; at: Date | string }
 
 /**
  * The lifecycle of one offer, oldest first, as a timeline reads.

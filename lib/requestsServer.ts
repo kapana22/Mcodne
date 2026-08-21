@@ -117,7 +117,7 @@ export async function requestAccessOf(userId: string | null | undefined): Promis
 
 /* ── the gate, resolved ─────────────────────────────────────────────────── */
 
-export type RequestsViewerState = {
+type RequestsViewerState = {
   user: Awaited<ReturnType<typeof getCurrentUser>>
   provider: ProviderIdentity | null
   /**

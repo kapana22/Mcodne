@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { kickSweep } from '@/lib/sweepRunner'
 import { z } from 'zod'
 import { identityOf } from '@/lib/identity'
+import { balanceOf } from '@/lib/creditsServer'
 import { getCurrentUser, hashPassword, verifyPassword, revokeOtherSessions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeAvatar } from '@/lib/normalizeAvatar'
@@ -56,7 +57,18 @@ export async function GET() {
   // overlapped almost completely and whose supply-side conditions were letter
   // for letter the same — on the endpoint its own comment calls „the cheapest
   // reliable heartbeat in the app", i.e. nearly every page load. See lib/identity.
-  const identity = await identityOf(user.id)
+  // ⚠️ THE BALANCE RIDES ALONG, IN PARALLEL (2026-08-21). The provider's credit
+  // pill lives in the signed-in cluster of the top bar (components/CreditPill),
+  // which is a client component on every public page — so the number has to
+  // arrive with the identity or not at all. Run beside `identityOf` rather than
+  // after it: the aggregate is one indexed read on `(userId, createdAt)` and
+  // costs no latency when it does not extend the chain. It is only EXPOSED for
+  // somebody who holds a capability, so a plain client is never handed a number
+  // they cannot earn or spend.
+  const [identity, balanceTetri] = await Promise.all([
+    identityOf(user.id),
+    balanceOf(user.id),
+  ])
   return NextResponse.json({
     user: {
       id: user.id,
@@ -92,6 +104,10 @@ export async function GET() {
     // TutorProfile, WORK = a ServiceProfile plus active RequestAccess. The
     // /join door reads it to stop offering a half somebody already has.
     capabilities: identity.capabilities,
+    // The provider's balance in tetri, or null for somebody who sells nothing.
+    // Null and not 0: the pill renders nothing for null and „0₾" for zero, and
+    // a client must get the first.
+    balanceTetri: identity.capabilities.length > 0 ? balanceTetri : null,
     // ⚠️ WHETHER THE CLIENT ROOM HOLDS ANYTHING (2026-08-21). Owner: „ირევა
     // ჩვეულებრივ იუზერსა და ეს უნდა გავმიჯნოთ სწორად." The user menu offered
     // „ჩემი სივრცე" beside „სამუშაო სივრცე" to every provider — and measured

@@ -19,7 +19,7 @@
  */
 import type { CategoryStatus } from './categoryTree'
 
-export type RoutedCategory = {
+type RoutedCategory = {
   slug: string
   status: CategoryStatus
   parent?: { slug: string } | null

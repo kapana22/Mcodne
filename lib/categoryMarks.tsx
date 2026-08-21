@@ -46,7 +46,7 @@ const MARKS: Record<string, CategoryMark> = {
 const FALLBACK: CategoryMark = { icon: CatIcon.business, description: 'ექსპერტული კონსულტაცია' }
 
 /** The mark + blurb for a slug. Unknown slugs get a neutral default. */
-export function categoryMark(slug: string | null | undefined): CategoryMark {
+function categoryMark(slug: string | null | undefined): CategoryMark {
   return (slug && MARKS[slug]) || FALLBACK
 }
 

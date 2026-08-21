@@ -22,7 +22,7 @@ import type { TreeNode } from '@/lib/categoryTree'
  * and with at least one service — a serviceless expert is hidden from browse,
  * so counting them promises a person the destination then withholds.
  */
-export const COUNTABLE_EXPERT = {
+const COUNTABLE_EXPERT = {
   available: true,
   user: { is: { suspendedAt: null } },
   consultations: { some: {} },

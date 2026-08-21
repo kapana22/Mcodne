@@ -22,7 +22,7 @@ import type { MasterRow } from '@/app/experts/_masterData'
 
 /** Six cards: 3×2 on desktop. Kept here because the ORDER rule below is
  *  meaningless without the size it is dividing up. */
-export const HOME_ITEMS = 6
+const HOME_ITEMS = 6
 /**
  * How many of the six the SERVICE half leads with when it has that many.
  *
@@ -38,7 +38,7 @@ const SERVICE_LEAD = 3
 
 /** The tutor rows this needs — a structural subset of `TutorListRow`, written
  *  out so this file never imports the query (which imports prisma). */
-export type HomeTutorRow = {
+type HomeTutorRow = {
   id: string
   slug?: string | null
   headline?: string | null

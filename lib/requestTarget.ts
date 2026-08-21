@@ -27,7 +27,7 @@ import { PUBLIC_TUTOR } from './tutorsQuery'
 import { avatarSrc } from './avatarSrc'
 import { PUBLIC as PUBLIC_MASTER } from '@/app/experts/_masterData'
 
-export type RequestTarget = {
+type RequestTarget = {
   /** MASTER = a ServiceProfile; EXPERT = a TutorProfile. Both answer at
    *  /experts/<slug> since stage 11 — ONE namespace, so this no longer says
    *  which prefix the slug came from, only which TABLE it was found in. The

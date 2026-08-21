@@ -46,7 +46,7 @@ import { useState } from 'react'
 import { ALL_PROFESSIONS, MAX_PROFESSIONS, PROFESSIONS } from '@/lib/professions'
 import { isLaunchCategory, launchFirst } from '@/lib/launchTaxonomy'
 
-export type PickerSphere = { slug: string; name: string }
+type PickerSphere = { slug: string; name: string }
 
 export function ProfessionPicker({
   spheres, sphere, onSphere, value, onChange,

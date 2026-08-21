@@ -33,12 +33,12 @@
 // Pure: no prisma, no next/∗, no crypto. The callback route does the writing;
 // this only decides, where tests/googleLink.test.ts can pin it.
 
-export type ExistingAccount = {
+type ExistingAccount = {
   /** `User.emailVerified` as stored — see the strictness note below. */
   emailVerified?: boolean | null
 }
 
-export type GoogleLinkDecision = {
+type GoogleLinkDecision = {
   /** Replace the stored password hash with an unusable random one. */
   revokePassword: boolean
   /** Delete every session on the account before minting the new one. */

@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Logo } from './Logo'
 import { Icon } from './Icon'
+import { CreditPill } from './CreditPill'
 import { NotifBell } from './NotifBell'
 import { UserMenu } from './UserMenu'
 import { Container } from '@/components/Container'
@@ -381,6 +382,20 @@ export function PublicTopBar({
                   Still STUDENT-only on purpose: the favourites API 403s every
                   other role (saved-experts is a client feature), so showing the
                   heart to a TUTOR/ADMIN would open a page that cannot load. */}
+              {/* THE BALANCE — first in the cluster, and only for somebody who
+                  sells (2026-08-21). Owner, pointing at this exact row: „აქ უნდა
+                  ჩანდეს ლამაზად." It had lived on /work alone, which is one
+                  screen out of forty; a provider browsing the catalogue or their
+                  own public page never saw the number the whole bonus exists to
+                  motivate. Status first, then actions, then identity — the pill
+                  is read, the icons beside it are pressed.
+                  ⚠️ THE 390px BUDGET STILL HOLDS. `balanceTetri` is null for
+                  everybody who sells nothing, and the heart below is USER-only —
+                  so the two never appear together and the worst case on a phone
+                  is still four 40px controls (pill + bell + avatar + burger),
+                  which is the row measured in the note above. The word „ბალანსი"
+                  inside the pill only appears from xl. */}
+              <CreditPill tetri={me.balanceTetri} />
               {me.role === ROLE.USER && (
                 <Link
                   href="/me/favorites"

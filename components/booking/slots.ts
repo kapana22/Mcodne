@@ -62,7 +62,7 @@ export type ConsultationItem = {
  * either widen to `any` or invent the missing fields; both hide real mistakes.
  * Resolvers take this instead, and `ConsultationItem` still satisfies it.
  */
-export type TierShape = { minutes: number; price: number }
+type TierShape = { minutes: number; price: number }
 
 /* ───── Shared fallback defaults ─────
  * Single source for the card/profile/booking fallbacks. Duration is aligned to
@@ -108,7 +108,7 @@ export const fmtHM = (d: Date) =>
 
 /** Start-time grid the UI offers inside a window. Anchored to each window's own
  *  start, so a 10:00–11:00 legacy row still leads with 10:00. */
-export const SLOT_GRANULARITY_MIN = 15
+const SLOT_GRANULARITY_MIN = 15
 
 /** Expert-level rules that shape the derivation. `bufferMin` comes from the
  *  tutor profile (0 until the payload carries it — never break on its absence);
@@ -156,7 +156,7 @@ const openStarts = (
 /** Calendar grouping: bucket derived starts into viewer-local days. Replaces
  *  the old `groupSlotsByDay` — the calendar must count what is BOOKABLE for the
  *  chosen service, not how many rows the expert happened to publish. */
-export const groupStartsByDay = (starts: Date[]): StartsByDay => {
+const groupStartsByDay = (starts: Date[]): StartsByDay => {
   const map: StartsByDay = new Map()
   for (const s of starts) {
     const key = dayKey(s)
@@ -195,7 +195,7 @@ export const toTimeChoices = (starts: Date[], serviceMin: number): TimeChoice[] 
 
 // Bookable start times on one viewer-local day. Kept as the per-day entry point
 // for surfaces that don't already hold a grouped map.
-export const enumerateTimes = (
+const enumerateTimes = (
   date: Date,
   avail: ApiSlot[],
   busy: BusySlot[],

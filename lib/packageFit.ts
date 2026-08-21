@@ -60,7 +60,7 @@ export async function tutorScheduleCapacity(
 }
 
 /** Per-package verdict, in the shape both the editor and /swavleba render. */
-export type PackageFit = { capacity: number; fits: boolean }
+type PackageFit = { capacity: number; fits: boolean }
 
 /** Capacity for several packages at once, keyed by package id. */
 export async function packageFits(

@@ -41,7 +41,7 @@ import { ROLE } from '@/lib/roles'
 
 export type AccountOutcome = 'SIGNED_IN' | 'NONE' | 'CREATED' | 'EXISTS'
 
-export type AccountResult = { outcome: AccountOutcome; userId: string | null }
+type AccountResult = { outcome: AccountOutcome; userId: string | null }
 
 /**
  * Decide, and do it.

@@ -57,7 +57,7 @@ export const EVENTS = {
   PROFILE_VIEW: 'profile_view',
 } as const
 
-export type EventName = (typeof EVENTS)[keyof typeof EVENTS]
+type EventName = (typeof EVENTS)[keyof typeof EVENTS]
 
 /* ───── bounds (exported so tests and readers pin the same numbers) ───── */
 
@@ -198,7 +198,7 @@ export function isBotUserAgent(ua: unknown): boolean {
   return BOT_UA_MARKERS.some(m => s.includes(m))
 }
 
-export type ProfileViewer = {
+type ProfileViewer = {
   userAgent?: string | null
   /** Signed-in viewer's User.id, or null when anonymous. */
   viewerUserId?: string | null

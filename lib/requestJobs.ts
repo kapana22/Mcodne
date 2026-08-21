@@ -171,7 +171,7 @@ export async function mailVerifiedRequest(
 
 /* ═══════════ the four jobs ══════════════════════════════════════════════ */
 
-export type RequestJobsResult = {
+type RequestJobsResult = {
   providerNudges: number
   clientNudges: number
   autoClosed: number

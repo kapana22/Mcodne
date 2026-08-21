@@ -21,7 +21,7 @@
 
 export type LiveState = 'open' | 'down'
 
-export type LiveListener = {
+type LiveListener = {
   /** The full ./status payload — every number counted, see lib/requestLive. */
   onStatus?: (payload: unknown) => void
   /** Something in the threads moved: a message, a receipt, the desk. */

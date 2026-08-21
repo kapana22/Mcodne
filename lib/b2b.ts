@@ -126,7 +126,7 @@ export function b2bFeatureExists(): boolean {
  * Returns the string form rather than the Prisma enum so this file stays
  * client-safe; the two are the same values.
  */
-export type PaymentSourceName = 'CARD' | 'COMPANY_BALANCE'
+type PaymentSourceName = 'CARD' | 'COMPANY_BALANCE'
 export function paymentSourceOf(paidBy: string | null | undefined): PaymentSourceName {
   return paidBy === 'COMPANY_BALANCE' ? 'COMPANY_BALANCE' : 'CARD'
 }
@@ -247,7 +247,7 @@ export function businessLeadRow(input: BusinessLeadInput) {
  * first, and shows the area beside each row.
  */
 export const B2B_KINDS = ['CONSULTATION', 'TRAINING'] as const
-export type B2BKind = (typeof B2B_KINDS)[number]
+type B2BKind = (typeof B2B_KINDS)[number]
 
 /** Its Georgian name. One place, so the page and the admin never disagree. */
 export function kindLabel(kind: string): string {
@@ -256,7 +256,7 @@ export function kindLabel(kind: string): string {
 
 /** Anything unrecognised reads as a consultation — the safe default, and the
  *  same one the column carries, so a row can never fall out of the page. */
-export function normalizeKind(kind: string | null | undefined): B2BKind {
+function normalizeKind(kind: string | null | undefined): B2BKind {
   return kind === 'TRAINING' ? 'TRAINING' : 'CONSULTATION'
 }
 

@@ -369,7 +369,7 @@ export function smallTalk(query: string): string | null {
 
 /* ═══════════ scoring ═════════════════════════════════════════════════════ */
 
-export type Scored = {
+type Scored = {
   topic: HelpTopic
   score: number
   /**
@@ -394,7 +394,7 @@ const W_QUESTION = 3 // a content word shared with the question text
 const W_ANSWER = 1   // a content word shared with the answer body
 
 /** Everything above this is worth showing as an answer at all. */
-export const MIN_SCORE = 4
+const MIN_SCORE = 4
 /** At or above this the FAQ match is specific enough to outrank a named
  *  profession — one keyword alone never reaches it. */
 const PROFESSION_YIELDS_AT = 7
@@ -433,7 +433,7 @@ export function scoreTopics(query: string, topics: HelpTopic[]): Scored[] {
     .sort((a, b) => b.score - a.score || a.topic.id.localeCompare(b.topic.id))
 }
 
-export type SearchResult =
+type SearchResult =
   /** One clear winner. */
   | { kind: 'answer'; topic: HelpTopic }
   /**

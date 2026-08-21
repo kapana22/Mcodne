@@ -97,7 +97,7 @@ export type EscalationCandidate = {
   sentStages: StageKey[]
 }
 
-export type Escalation = {
+type Escalation = {
   row: EscalationCandidate
   stage: StageKey
   /** Milliseconds left before the auto-cancel deadline, at send time. */

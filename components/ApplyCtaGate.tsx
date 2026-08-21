@@ -19,7 +19,7 @@ export function ApplyCtaGate({ children }: { children: ReactNode }) {
 // Renders its children only for anonymous (signed-out) viewers. Use for
 // "create account / დაწყება → /signup" CTAs, which are meaningless for anyone
 // already signed in (student, tutor, or admin).
-export function AnonOnly({ children }: { children: ReactNode }) {
+function AnonOnly({ children }: { children: ReactNode }) {
   const { me } = useMe()
   if (me) return null
   return <>{children}</>

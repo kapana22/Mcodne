@@ -31,10 +31,10 @@ import { Icon } from '@/components/Icon'
 // 2× desktop retina 256px. 512 covers both with headroom. Raising this means
 // re-checking `AVATAR_MAX` in lib/stripTutorBlobs.ts — that guard nulls any
 // stored avatar whose base64 exceeds it.
-export const AVATAR_OUTPUT_PX = 512
+const AVATAR_OUTPUT_PX = 512
 // Half the output. Below this we'd be upscaling more than 2×, which reads as
 // mush at 128px. Refuse instead.
-export const AVATAR_MIN_SOURCE_PX = 256
+const AVATAR_MIN_SOURCE_PX = 256
 // Mirrors MAX_IMAGE_BYTES in app/api/uploads/route.ts so the „მაქს. 8MB" copy
 // on the profile editors stays literally true.
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024

@@ -55,7 +55,7 @@ export const APPLY = {
 } as const
 
 /** Server field name → the words the applicant sees on the form. */
-export const APPLY_FIELD_LABEL: Record<string, string> = {
+const APPLY_FIELD_LABEL: Record<string, string> = {
   fullName: 'სახელი და გვარი',
   specialty: 'კატეგორია',
   motivation: 'მოკლე აღწერა',
@@ -183,7 +183,7 @@ export function phoneRequiredError(raw: string | null | undefined): string | nul
 }
 
 /** The lenient sibling: empty is fine, anything typed must still be real. */
-export function phoneError(raw: string | null | undefined): string | null {
+function phoneError(raw: string | null | undefined): string | null {
   const v = (raw ?? '').trim()
   if (!v) return null
   if (v.length > APPLY.PHONE_MAX) return `ტელეფონი ძალიან გრძელია — მაქსიმუმ ${APPLY.PHONE_MAX} სიმბოლო.`
@@ -205,15 +205,15 @@ export function refine<T>(rule: (v: T) => string | null) {
 }
 
 /** The last-resort sentence for a zod issue none of our rules produced. */
-export function applyIssueMessage(field: string): string {
+function applyIssueMessage(field: string): string {
   const label = APPLY_FIELD_LABEL[field]
   return label
     ? `„${label}“ არასწორად არის შევსებული — შეამოწმე და სცადე თავიდან.`
     : 'ერთი ველი არასწორად არის შევსებული — შეამოწმე ფორმა და სცადე თავიდან.'
 }
 
-export type ApplyErrorCode = 'INVALID' | 'INVALID_TEXT' | 'INVALID_VIDEO_URL'
-export type ApplyFailure = { code: ApplyErrorCode; field?: string; message: string }
+type ApplyErrorCode = 'INVALID' | 'INVALID_TEXT' | 'INVALID_VIDEO_URL'
+type ApplyFailure = { code: ApplyErrorCode; field?: string; message: string }
 
 /** Fields whose refusal already had its own code before this file existed. */
 const FIELD_CODE: Record<string, ApplyErrorCode> = { introVideoUrl: 'INVALID_VIDEO_URL' }

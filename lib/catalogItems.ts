@@ -147,7 +147,7 @@ export type CatalogItem = {
  * the table is exactly the old rule — correct precisely when there is nothing
  * better to read.
  */
-export function kindsOf(consult: Tutor | null, work: MasterRow | null): Capability[] {
+function kindsOf(consult: Tutor | null, work: MasterRow | null): Capability[] {
   const rows = consult?.consultations ?? []
   // ⚠️ NO ROWS = NO SIGNAL, so that side falls back to its TABLE — the rule as
   // it stood before this function existed, which is correct exactly when there
@@ -176,7 +176,7 @@ export function kindsOf(consult: Tutor | null, work: MasterRow | null): Capabili
 export const personKeyOfConsult = (t: Pick<Tutor, 'id' | 'userId'>) =>
   t.userId ? `u:${t.userId}` : `t:${t.id}`
 
-export const personKeyOfWork = (m: Pick<MasterRow, 'id' | 'userId' | 'companyId'>) =>
+const personKeyOfWork = (m: Pick<MasterRow, 'id' | 'userId' | 'companyId'>) =>
   m.userId ? `u:${m.userId}` : m.companyId ? `c:${m.companyId}` : `s:${m.id}`
 
 /**

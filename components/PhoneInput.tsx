@@ -15,7 +15,7 @@
 import { normalizePhone } from '@/lib/phone'
 
 /** Digits, one leading +, and the separators people type. Nothing else. */
-export function sanitizePhoneInput(raw: string): string {
+function sanitizePhoneInput(raw: string): string {
   const plus = raw.trimStart().startsWith('+')
   const rest = raw.replace(/[^\d]/g, '')
   return (plus ? '+' : '') + rest
@@ -65,4 +65,4 @@ export function PhoneInput({
 }
 
 /** What gets sent to the API — the stored shape, not what was typed. */
-export const phoneForSubmit = normalizePhone
+const phoneForSubmit = normalizePhone

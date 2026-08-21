@@ -21,7 +21,7 @@
 import React from 'react'
 import { Icon } from '@/components/Icon'
 
-export type StepState = 'done' | 'active' | 'todo'
+type StepState = 'done' | 'active' | 'todo'
 
 export type Step<Id extends string | number> = { id: Id; label: string }
 

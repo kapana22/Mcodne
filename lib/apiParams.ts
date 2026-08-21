@@ -18,7 +18,7 @@
 // added copies the broken line again.
 
 /** How a route describes its own page size. */
-export type LimitSpec = {
+type LimitSpec = {
   /** Used when `?limit=` is absent, empty, or unparseable. */
   fallback: number
   /** Hard ceiling; a larger request is clamped down to it. */

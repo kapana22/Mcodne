@@ -9,7 +9,7 @@ import { ensureDbReady } from '@/lib/dbBoot'
 // them — the two systems share a table but never collide. React `cache()` →
 // one query per request. DB-down → all empty (no injection), never crashes.
 
-export type Integrations = { gaId: string; headerHtml: string; footerHtml: string }
+type Integrations = { gaId: string; headerHtml: string; footerHtml: string }
 
 const KEYS = { ga: 'integration.gaId', header: 'integration.headerHtml', footer: 'integration.footerHtml' } as const
 

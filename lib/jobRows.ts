@@ -23,7 +23,7 @@ import { topicLabel } from './requestTopics'
 
 /* ═══════════ the row ════════════════════════════════════════════════════ */
 
-export type JobKind = 'BOOKING' | 'QUOTE'
+type JobKind = 'BOOKING' | 'QUOTE'
 
 /** Which part of the list a row belongs to. Three, not two, because
  *  „somebody is waiting on MY answer" was already a bucket on the bookings
@@ -102,18 +102,18 @@ const ms = (d: string | number | Date): number =>
  *  expert owes a complete / no-show decision. Mirrors `awaitsClosure` in
  *  app/work/_components/types (which is a .tsx-side helper over the same two
  *  fields); kept here because bucketing must stay importable by a pure test. */
-export function bookingAwaitsClosure(b: BookingJobInput, now: number): boolean {
+function bookingAwaitsClosure(b: BookingJobInput, now: number): boolean {
   return (b.status === 'CONFIRMED' || b.status === 'LIVE') &&
     ms(b.startAt) + b.durationMin * 60_000 < now
 }
 
 /** The client proposed a new time and the expert has not answered. */
-export function bookingAwaitsReschedule(b: BookingJobInput): boolean {
+function bookingAwaitsReschedule(b: BookingJobInput): boolean {
   return (b.status === 'PREPARING' || b.status === 'CONFIRMED') &&
     b.rescheduleRequest?.proposedBy === 'USER'
 }
 
-export function bookingJobBucket(b: BookingJobInput, now: number): JobBucket {
+function bookingJobBucket(b: BookingJobInput, now: number): JobBucket {
   if (b.status === 'COMPLETED' || b.status === 'CANCELED' || b.status === 'NO_SHOW') return 'history'
   if (b.status === 'PREPARING' || bookingAwaitsReschedule(b) || bookingAwaitsClosure(b, now)) return 'attention'
   // Live counts as active even once its start is behind us — that is the whole
@@ -159,7 +159,7 @@ export const QUOTE_JOB_STATUS_LABEL = {
   DONE: 'დასრულებული',
   CLOSED: 'დაიხურა',
 } as const
-export type QuoteJobStatus = keyof typeof QUOTE_JOB_STATUS_LABEL
+type QuoteJobStatus = keyof typeof QUOTE_JOB_STATUS_LABEL
 
 export type QuoteJobInput = {
   id: string

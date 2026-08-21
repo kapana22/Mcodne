@@ -115,7 +115,7 @@ const HANDLE_RE = /(?:^|\s)@[A-Za-z0-9._]{3,}/g
 
 export const MASK = '•••'
 
-export type MaskResult = { body: string; masked: boolean }
+type MaskResult = { body: string; masked: boolean }
 
 /**
  * Strip contact details from a message, unless the contact is already open.
@@ -134,7 +134,7 @@ export function maskContacts(body: string, contactIsOpen: boolean): MaskResult {
 
 /* ═══════════ what each side may see ═════════════════════════════════════ */
 
-export type ChatMessageRow = {
+type ChatMessageRow = {
   id: string
   fromClient: boolean
   body: string

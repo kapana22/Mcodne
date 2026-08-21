@@ -113,7 +113,7 @@ export const CREDIT_TASKS = [
  * one tick can never pay twice: `services[]` earns PROFESSIONS, a PRICE on one
  * of them earns SERVICE.
  */
-export type CreditKind = 'CONSULT' | 'WORK'
+type CreditKind = 'CONSULT' | 'WORK'
 
 /** The task list in one half's words. Copy only — same keys, same amounts. */
 export function creditTasks(kind: CreditKind): { key: CreditTaskKey; tetri: number; label: string; why: string }[] {

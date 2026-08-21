@@ -20,7 +20,7 @@ export type NotifItem = {
   createdAt: string
 }
 
-export type NotifSnapshot = { items: NotifItem[]; unreadCount: number; ready: boolean }
+type NotifSnapshot = { items: NotifItem[]; unreadCount: number; ready: boolean }
 
 const listeners = new Set<() => void>()
 // Snapshot is a STABLE reference that only changes when data changes, satisfying

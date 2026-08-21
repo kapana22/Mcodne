@@ -32,7 +32,7 @@ export type CatalogView = 'grid' | 'list'
 export const CATALOG_VIEW_KEY = 'mcodne:catalog-view'
 
 /** What a first-time visitor gets, and what the server always renders. */
-export const DEFAULT_CATALOG_VIEW: CatalogView = 'grid'
+const DEFAULT_CATALOG_VIEW: CatalogView = 'grid'
 
 /**
  * The container the cards sit in, per view. THE CONTRACT with both card files:
@@ -69,7 +69,7 @@ function subscribe(cb: () => void): () => void {
   return () => { subscribers.delete(cb) }
 }
 
-export function setCatalogView(v: CatalogView): void {
+function setCatalogView(v: CatalogView): void {
   if (current === v) return
   current = v
   try { window.localStorage.setItem(CATALOG_VIEW_KEY, v) } catch {}

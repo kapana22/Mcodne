@@ -39,7 +39,7 @@ export type FaqAction = { label: string; href: string; gate?: 'apply' | 'auth' }
  *     slightly longer Georgian question would quietly exceed.
  * Ids are permanent: reword `q` freely, never renumber an `id`.
  */
-export type FaqItem = { id: string; q: string; a: string; action?: FaqAction }
+type FaqItem = { id: string; q: string; a: string; action?: FaqAction }
 
 export type FaqGroup = {
   title: string
@@ -294,7 +294,7 @@ export function resolveGroups(map: Record<string, string>): FaqGroup[] {
 }
 
 /** Flattened equivalent of resolveGroups — what the widget renders. */
-export function resolveTopics(map: Record<string, string>): HelpTopic[] {
+function resolveTopics(map: Record<string, string>): HelpTopic[] {
   return resolveGroups(map).flatMap(g => g.items.map(it => ({ ...it, group: g.title })))
 }
 
@@ -425,7 +425,7 @@ export const HELP_EVENTS = {
   unanswered: 'help_unanswered',
 } as const
 
-export type HelpEvent = (typeof HELP_EVENTS)[keyof typeof HELP_EVENTS]
+type HelpEvent = (typeof HELP_EVENTS)[keyof typeof HELP_EVENTS]
 
 /** Flat list — what /api/events turns into its allow-list. */
 export const HELP_EVENT_NAMES: readonly HelpEvent[] = Object.values(HELP_EVENTS)
@@ -464,7 +464,7 @@ export function normalizeRoute(pathname: string | null | undefined): string {
  * Never awaited, never throws, never blocks a click — an analytics row is not
  * worth a degraded interaction, and a blocked one would be worse than no data.
  */
-export type HelpProps = {
+type HelpProps = {
   /** Raw pathname — normalised here, so no call site can forget. */
   route?: string | null
   /** A topic ID from ALL_TOPICS. Never the question text. */

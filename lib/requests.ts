@@ -320,7 +320,7 @@ export function isProviderWorkspacePath(pathname: string): boolean {
  * failure this code can have.
  */
 export const REF_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
-export const REF_PREFIX = 'MC-'
+const REF_PREFIX = 'MC-'
 /** Five characters out of 32 = 33.5M codes. At the scale this feature will ever
  *  reach, a collision is a retried insert (the column is UNIQUE), not a risk. */
 export const REF_LENGTH = 5
@@ -465,7 +465,7 @@ export const STATUS_LABEL: Record<RequestStatusName, string> = {
 // not its absence from this array — it is the queries, which name the statuses
 // they mean (the client's list asks for SENT/ACCEPTED/DECLINED) and never say
 // „everything except".
-export const OFFER_STATUSES = ['INVITED', 'SENT', 'WITHDRAWN', 'ACCEPTED', 'DECLINED'] as const
+const OFFER_STATUSES = ['INVITED', 'SENT', 'WITHDRAWN', 'ACCEPTED', 'DECLINED'] as const
 export type OfferStatusName = (typeof OFFER_STATUSES)[number]
 
 /**
@@ -548,7 +548,7 @@ export function timeAgoKa(iso: string | Date, now: number = Date.now()): string 
 export const PROVIDER_KINDS = ['EXPERT', 'COMPANY'] as const
 export type ProviderKindName = (typeof PROVIDER_KINDS)[number]
 
-export type OfferProvider = {
+type OfferProvider = {
   providerKind: string
   expertUserId?: string | null
   companyId?: string | null
@@ -731,7 +731,7 @@ export function clientIdentityOpen(offer: { status: string }): boolean {
   return offer.status === 'ACCEPTED'
 }
 
-export type ProviderContact = {
+type ProviderContact = {
   name: string
   /* ⚠️ NO `phone`, NO `email` (2026-08-21). The client used to be handed the
      chosen provider's number and address here, the mirror of what the provider
@@ -813,7 +813,7 @@ export function clientOfferView(o: {
  * routing. Both modes reach experts; only one of them offers a list to write to.
  */
 export const PICK_MODES = ['OFFERS', 'SELF'] as const
-export type PickMode = (typeof PICK_MODES)[number]
+type PickMode = (typeof PICK_MODES)[number]
 
 /**
  * ⚠️ THE WORDS DEPEND ON THE VERTICAL (2026-08-18), and until now they did not.

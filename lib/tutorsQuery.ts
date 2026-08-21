@@ -12,7 +12,7 @@ import { BROWSABLE_CATEGORY, BROWSABLE_CATEGORY_SQL, categorySlugFilter } from '
 // client refetch share EXACTLY the same shape + ordering. Do not change the
 // returned object shape without updating both consumers + the client mapper.
 
-export type TutorsQueryParams = {
+type TutorsQueryParams = {
   q?: string | null
   category?: string | null
   serviceType?: 'CONSULTATION' | 'RECURRING' | null
@@ -71,7 +71,7 @@ export type SearchField = keyof typeof SEARCH_FIELD_WEIGHTS
  */
 export const MAX_SEARCH_TERMS = 8
 
-export type SearchTerm = { term: string; weight: number }
+type SearchTerm = { term: string; weight: number }
 
 /**
  * Normalise a raw user query into the weighted term list both the trigram

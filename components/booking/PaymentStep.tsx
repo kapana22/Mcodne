@@ -6,7 +6,7 @@ import React from 'react'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 
-export type PaymentMethod = 'tbc' | 'bog' | 'solo' | 'card'
+type PaymentMethod = 'tbc' | 'bog' | 'solo' | 'card'
 
 const METHODS: { id: PaymentMethod; l: string; sub: string; tone: 'ink' | 'brand' | 'accent' }[] = [
   { id: 'tbc',  l: 'TBC Pay',     sub: 'Open Banking',   tone: 'accent' },

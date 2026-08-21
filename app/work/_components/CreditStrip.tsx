@@ -1,9 +1,18 @@
 // THE BALANCE, WHERE IT IS SPENT.
 //
-// ⚠️ IT LIVES ON THE WORKSPACE HOME AND NOWHERE ELSE (2026-08-20), because
-// this is the screen where the decision to spend is made — the queue is one tap
-// away and every offer costs. A balance on a settings page is a number nobody
-// reads; a balance beside the work is a reason to finish the profile.
+// ⚠️ IT LIVES ON THE WORKSPACE HOME, AND SINCE 2026-08-21 IT IS NO LONGER THE
+// ONLY PLACE THE NUMBER APPEARS. The original argument — „a balance beside the
+// work is a reason to finish the profile" — is still why the STRIP is here:
+// this is the screen where the decision to spend is made, the queue is one tap
+// away, and the strip is the only thing that carries the next task and what it
+// pays. What the argument got wrong was reach: /work is one screen out of
+// forty, so the number itself now also rides in the top bar's signed-in cluster
+// (components/CreditPill), where a provider passes it on every page.
+//
+// The division is deliberate and worth keeping: the PILL is a readout — four
+// characters, no task, no verb — and the STRIP is the explanation. Never grow
+// the pill into a second strip, and never let the strip's number and the pill's
+// disagree: both read `balanceOf`, which sums the one ledger.
 //
 // ⚠️ THE UNIT ON SCREEN IS AN OFFER, NOT A NUMBER. „85₾" is the currency and it
 // is deliberately lari (lib/credits: a token is an abstraction, „85₾" is one a

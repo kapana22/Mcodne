@@ -23,7 +23,7 @@ import { useSiteText } from '@/components/SiteTextProvider'
  *
  * Reduced motion: `motion-safe:` only — the text is simply there.
  */
-export function WordReveal({
+function WordReveal({
   k,
   delay = 0,
   step = 70,

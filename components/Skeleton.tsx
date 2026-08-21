@@ -84,7 +84,7 @@ Skeleton.Avatar = SkeletonAvatar
 Skeleton.Line = SkeletonLinePreset
 
 // Legacy named-export helpers used by existing dashboards. Keep intact.
-export function SkeletonLine({ className = '' }: { className?: string }) {
+function SkeletonLine({ className = '' }: { className?: string }) {
   return <SkeletonBase className={`h-3.5 w-full ${className}`} />
 }
 

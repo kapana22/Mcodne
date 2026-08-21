@@ -12,7 +12,7 @@
  * so only canonical codes ever reach the DB.
  */
 
-export type LanguageOption = { code: string; label: string }
+type LanguageOption = { code: string; label: string }
 
 /**
  * The canonical set. `label` is the Georgian name shown in the editor chips.

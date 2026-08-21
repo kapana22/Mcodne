@@ -122,7 +122,7 @@ export async function lastSweepRunAt(): Promise<string | null> {
  *  not jitter. */
 export const SWEEP_STALE_MIN = 35
 
-export type SweepStatus = {
+type SweepStatus = {
   ranAt: string | null
   minutesAgo: number | null
   /** true when the sweep has not run recently enough to be trusted. */

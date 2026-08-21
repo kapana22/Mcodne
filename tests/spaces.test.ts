@@ -187,7 +187,7 @@ test('§D the /work shell is chrome only: nothing without a session, groups by c
   const ws = read('components/tutor/WorkspaceShell.tsx')
   assert.match(ws, /ხედავ როგორც ადმინი — შეთავაზების დაწერა არ შეგიძლია\./)
   assert.match(ws, /onMasterScreen && !isProvider/)
-  assert.match(ws, /<WorkspaceTopBar\s+user=\{user\}\s+role=\{role\}\s+\/>/)
+  assert.match(ws, /<WorkspaceTopBar\s+user=\{user\}\s+role=\{role\}/)
   assert.doesNotMatch(read('components/tutor/WorkspaceTopBar.tsx'), /role="TUTOR"/, 'the top bar hard-codes TUTOR again — a master gets the wrong menu')
 })
 

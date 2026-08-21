@@ -22,7 +22,7 @@ export const ANON_HEADLINE = 'წაშლილი პროფილი'
 
 /** `.invalid` is reserved by RFC 2606 — it can never resolve to a real
  *  mailbox, and keying it on the user id keeps User.email unique. */
-export const ANON_EMAIL_DOMAIN = '@deleted.invalid'
+const ANON_EMAIL_DOMAIN = '@deleted.invalid'
 export const anonEmail = (userId: string) => `deleted-${userId}${ANON_EMAIL_DOMAIN}`
 
 /* The address IS the marker — there is no `anonymizedAt` column, and adding one

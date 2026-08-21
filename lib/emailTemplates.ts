@@ -532,7 +532,7 @@ export type BookingChangeKind =
   | 'reschedule_accepted'
   | 'reschedule_rejected'
 
-export type BookingChangeOpts = {
+type BookingChangeOpts = {
   /** The other human on the booking, from the RECIPIENT's point of view. */
   counterpartName: string
   topic: string
@@ -641,7 +641,7 @@ export function sessionImminentEmail(o: { counterpartName: string; topic: string
 //     typed body can ever produce is <p> and <br>, both emitted by us.
 // The caller sets replyTo to SUPPORT_EMAIL — the point of this message is that
 // the recipient can hit Reply and reach a human, not a noreply void.
-export type AdminMessageTemplate = 'expert' | 'info' | 'blank'
+type AdminMessageTemplate = 'expert' | 'info' | 'blank'
 
 export const ADMIN_MESSAGE_SUBJECT_MAX = 120
 export const ADMIN_MESSAGE_BODY_MAX = 4000

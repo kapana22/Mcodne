@@ -2,14 +2,20 @@
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Logo } from '@/components/Logo'
+import { CreditPill } from '@/components/CreditPill'
 import { NotifBell } from '@/components/NotifBell'
 import { UserMenu } from '@/components/UserMenu'
 
 /* Compact workspace header: page title (from nav config) + bell + user menu.
    The old TutorAppBar's 7-link nav lives in WorkspaceSidebar on desktop;
    mobile navigation = global BottomNav + UserMenu items. */
-export function WorkspaceTopBar({ user, role = 'PROVIDER' }: {
+export function WorkspaceTopBar({ user, role = 'PROVIDER', balanceTetri = null }: {
   user?: { name: string; avatar?: string | null }
+  /** ⚠️ THE SAME PILL AS THE PUBLIC BAR (2026-08-21), and that is the point: a
+   *  number that disappears the moment you walk into the room where it is spent
+   *  reads as a bug. The public bar gets it from /api/me; here it is a prop,
+   *  because app/work/layout.tsx already holds it. */
+  balanceTetri?: number | null
   /** The viewer's REAL role. A master keeps role STUDENT (lib/hats) and shares
    *  this bar since stage 6 — a hardcoded TUTOR would hand them the expert's
    *  menu, whose every link bounces them out. */
@@ -39,6 +45,7 @@ export function WorkspaceTopBar({ user, role = 'PROVIDER' }: {
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <CreditPill tetri={balanceTetri} />
           <NotifBell />
           <UserMenu user={user} role={role} />
         </div>

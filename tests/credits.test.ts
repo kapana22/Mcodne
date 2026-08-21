@@ -205,3 +205,33 @@ test('the grant runs on the SHELL, and every supply-side hat is routed to it', (
   assert.match(read('app/join/page.tsx'), /if \(offer\.length === 0\) redirect\('\/work'\)/,
     'the join door sends one half somewhere without a balance again')
 })
+
+test('the balance is readable from the chrome, in the sanctioned wording', () => {
+  // ⚠️ OWNER, 2026-08-21, pointing at the signed-in cluster: „აქ უნდა ჩანდეს
+  // ლამაზად." The number had lived on /work alone — one screen out of forty —
+  // so a provider browsing the catalogue or their own public page never saw the
+  // thing the whole bonus exists to motivate.
+  const pill = read('components/CreditPill.tsx')
+  for (const bar of ['components/PublicTopBar.tsx', 'components/tutor/WorkspaceTopBar.tsx']) {
+    assert.match(read(bar), /<CreditPill\s/, `${bar} no longer shows the balance`)
+  }
+
+  // It must render NOTHING when there is no balance to show — a plain client
+  // has no capability and must never be handed „0₾" for something they cannot
+  // earn or spend. Null and zero are different states on purpose.
+  assert.match(pill, /tetri == null.*return null/s, 'the pill draws a number for somebody who sells nothing')
+  assert.match(read('app/api/me/route.ts'), /capabilities\.length > 0 \? balanceTetri : null/,
+    '/api/me hands the balance to people with no capability')
+
+  // The wording rules from lib/credits — they exist because naming this
+  // „ანაზღაურება" or „შენი ფული" once turns a discount into a liability.
+  // ⚠️ COMMENTS STRIPPED FIRST: the component QUOTES the banned list in its own
+  // header, and a scan over raw source would read the warning as the offence.
+  const shown = pill
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')
+  assert.match(shown, /ბალანსი/, 'the pill lost the only word that names it')
+  for (const banned of ['ანაზღაურება', 'შენი ფული', 'გამომუშავებ', 'გატანა', 'ქეშბექ']) {
+    assert.ok(!shown.includes(banned), `the pill calls the balance „${banned}" — it reads as cash`)
+  }
+})

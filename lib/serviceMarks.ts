@@ -22,10 +22,10 @@ import { SERVICE_TOPICS, LIVE_SERVICE_TOPICS } from './serviceProfile'
 
 /** The `CatIcon` keys this row may use. Typed as a union rather than `string`
  *  so a typo is a compile error and not a blank tile. */
-export type TradeIconKey =
+type TradeIconKey =
   | 'plumbing' | 'electrical' | 'cleaning' | 'appliances' | 'drain' | 'climate'
 
-export type TradeMark = {
+type TradeMark = {
   /** A service topic id from lib/requestTopics — the same id a request carries. */
   topic: string
   icon: TradeIconKey

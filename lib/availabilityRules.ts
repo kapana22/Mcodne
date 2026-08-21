@@ -16,7 +16,7 @@
  *  date, not a real shift. */
 export const MAX_WINDOW_MS = 12 * 60 * 60 * 1000
 
-export type WindowErrorCode = 'BAD_RANGE' | 'PAST_DATE' | 'TOO_LONG'
+type WindowErrorCode = 'BAD_RANGE' | 'PAST_DATE' | 'TOO_LONG'
 
 /**
  * Is this range publishable? Returns the CODE (the wire contract) or null.

@@ -26,7 +26,7 @@ import { sphereToReveal, type TreeNode } from './categoryTree'
 
 export type RevealableCategory = TreeNode & { name: string }
 
-export type RevealContext = {
+type RevealContext = {
   /** Who caused it — the admin approving / re-filing. */
   adminId: string
   /** Free text for the audit row: 'first approved expert' / 'expert re-filed here'. */

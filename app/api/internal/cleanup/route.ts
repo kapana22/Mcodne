@@ -82,7 +82,7 @@ export async function POST(req: Request) {
 
   // ── Auth-artifact deletes ─────────────────────────────────────────────
   const notifCutoff = new Date(now.getTime() - 120 * 24 * 3600_000) // 120 days
-  const [sessions, otps, resets, notifs] = await Promise.all([
+  const [sessions, otps, resets, notifs, staleSlots] = await Promise.all([
     prisma.session.deleteMany({ where: { expiresAt: { lt: now } } }),
     prisma.otpCode.deleteMany({
       where: { OR: [{ consumed: true }, { expiresAt: { lt: now } }] },
@@ -93,6 +93,22 @@ export async function POST(req: Request) {
     // Prune old READ notifications so the table (one row per booking event /
     // message / broadcast) doesn't grow unbounded and slow the dedupe scans.
     prisma.notification.deleteMany({ where: { readAt: { not: null }, createdAt: { lt: notifCutoff } } }),
+    // ── Availability windows that have already happened ──────────────────
+    //
+    // ⚠️ NOTHING PRUNED THESE UNTIL 2026-08-21, and an audit found 412 of 6 475
+    // rows sitting in the past. A window whose end has passed can never be
+    // booked again — lib/availability derives bookable starts from FUTURE slots
+    // — so every one of them is dead weight in the table every availability
+    // query scans.
+    //
+    // A WEEK OF GRACE, and the reason is support rather than correctness: „what
+    // did I have open last Tuesday" is a question somebody actually asks, and
+    // for seven days it can still be answered. Nothing references a slot by id
+    // — a Booking carries its own `startAt` and `tutorId` — so this loses no
+    // history that another row is not already keeping.
+    prisma.availabilitySlot.deleteMany({
+      where: { endAt: { lt: new Date(now.getTime() - 7 * 24 * 3600_000) } },
+    }),
   ])
 
   // ── Booking auto-transitions ──────────────────────────────────────────
@@ -608,6 +624,7 @@ export async function POST(req: Request) {
       otpCodes: otps.count,
       passwordResetTokens: resets.count,
       notifications: notifs.count,
+      staleSlots: staleSlots.count,
     },
     bookings: {
       preparingCanceled,

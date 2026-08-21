@@ -35,7 +35,7 @@ import { ROLE } from '@/lib/roles'
 export const HORIZON_WEEKS = 8
 
 /** The shape /apply stores (day indexes, Mon=0). */
-export type StoredPattern = { days: number[]; startHour: number; endHour: number }
+type StoredPattern = { days: number[]; startHour: number; endHour: number }
 
 /** Read a usable pattern out of a profile's professionData, or null. */
 export function readPattern(professionData: unknown): StoredPattern | null {
@@ -83,7 +83,7 @@ export function missingWindows(
   return out
 }
 
-export type TopUpResult = { experts: number; created: number }
+type TopUpResult = { experts: number; created: number }
 
 /** Runs inside the cleanup cron. Contractually non-throwing. */
 export async function topUpAvailability(now: Date = new Date()): Promise<TopUpResult> {

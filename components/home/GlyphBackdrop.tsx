@@ -16,7 +16,7 @@ import React from 'react'
  * Desktop only. At 390px there is no margin to bleed into; the same glyph would
  * sit under the headline and fight it.
  */
-export function GlyphBackdrop({
+function GlyphBackdrop({
   char = 'მ',
   className = '',
 }: {

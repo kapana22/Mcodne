@@ -32,7 +32,7 @@ import type { ProviderIdentity } from './requestsServer'
 
 /* ═══════════ the shape ══════════════════════════════════════════════════ */
 
-export type InboxKind = 'BOOKING' | 'OFFER'
+type InboxKind = 'BOOKING' | 'OFFER'
 
 export type InboxRow = {
   kind: InboxKind

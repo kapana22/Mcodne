@@ -133,7 +133,7 @@ const BAND_ART = {
   consultationJourney: { file: 'band-consultation-journey-1915.webp', w: 1915, h: 821 },
 } as const
 
-export type IllustrationBandName = keyof typeof BAND_ART
+type IllustrationBandName = keyof typeof BAND_ART
 
 /**
  * Height is fixed and the art is RIGHT-ALIGNED at its natural aspect — never

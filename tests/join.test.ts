@@ -99,7 +99,9 @@ test('§C /api/me carries capabilities beside hats, and lib/me types it', () => 
   const me = codeOf('app/api/me/route.ts')
   // One read, both vocabularies off it (lib/identity) — this route is hit on
   // nearly every page load and used to make two overlapping queries.
-  assert.match(me, /const identity = await identityOf\(user\.id\)/, '/api/me reads the identity twice again')
+  // Once, however it is awaited — it now runs beside the balance in a
+  // Promise.all, which is the same single read and one less link in the chain.
+  assert.equal((me.match(/identityOf\(user\.id\)/g) ?? []).length, 1, '/api/me reads the identity twice again')
   assert.match(me, /hats: identity\.hats/)
   assert.match(me, /capabilities: identity\.capabilities/, '/api/me stopped exposing capabilities')
   const lib = read('lib/me.ts')

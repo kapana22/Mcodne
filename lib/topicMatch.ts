@@ -119,7 +119,7 @@ export function wordScore(q: string, h: string): number {
 
 /* ═══════════ scoring a candidate ════════════════════════════════════════ */
 
-export type MatchCandidate = {
+type MatchCandidate = {
   /** Everything this topic can be called: its label, its synonyms. */
   phrases: string[]
   /** The heading it lives under. Matched too, so „ენები" surfaces every

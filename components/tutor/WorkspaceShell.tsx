@@ -26,6 +26,7 @@ export function WorkspaceShell({
   groups,
   openRequests = 0,
   isProvider = true,
+  balanceTetri = null,
   children,
 }: {
   user?: { name: string; avatar?: string | null }
@@ -37,6 +38,10 @@ export function WorkspaceShell({
    *  with no allowlist row): the master's screens then say so once, at the
    *  top, instead of showing an offer form that cannot work. */
   isProvider?: boolean
+  /** The credit balance in tetri, or null for somebody with no capability.
+   *  Server-supplied here rather than fetched: app/work/layout.tsx already
+   *  knows the capabilities and pays for the grant, so the number is free. */
+  balanceTetri?: number | null
   children: React.ReactNode
 }) {
   const path = usePathname() ?? ''
@@ -46,7 +51,7 @@ export function WorkspaceShell({
     <div className="min-h-screen bg-ink-50 lg:flex lg:items-start">
       <WorkspaceSidebar badges={badges} groups={groups} />
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-        <WorkspaceTopBar user={user} role={role} />
+        <WorkspaceTopBar user={user} role={role} balanceTetri={balanceTetri} />
         {/* An admin reading the master's screens is told once, at the top,
             rather than discovering it on a button that does nothing. Neutral
             ink and not a warning tint: nothing is wrong, this is simply not
