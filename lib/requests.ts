@@ -21,6 +21,9 @@
 // escrow, no automatic matching, no scoring, no ranking and no messaging.
 
 import { z } from 'zod'
+// TYPE ONLY — lib/capabilities imports prisma and this file must not; see
+// `showRequestCta` below.
+import type { Capability } from '@/lib/capabilities'
 import { phoneFormatError, normalizePhone } from '@/lib/phone'
 import { UNSTATED } from '@/lib/requestTopics'
 
@@ -201,6 +204,43 @@ export function canSeeRequests(viewer: RequestViewer): boolean {
  */
 export function canOpenRequestForm(): boolean {
   return requestsOn()
+}
+
+/**
+ * Who is still INVITED by the header's one action („მოთხოვნის გაგზავნა") —
+ * which is a different question from `canOpenRequestForm` above, and the two
+ * must never be collapsed again.
+ *
+ * ⚠️ THE BAR'S ONE ACTION BELONGS TO THE DEMAND SIDE (2026-08-21). Owner,
+ * holding the header signed in as a provider: „როცა სერვისი მაქვს დამატებული
+ * არ უნდა მიჩანდეს მოთხოვნის გაგზავნა. მხოლოდ მაშინ როცა user კლიენტი შემოდის
+ * უბრალოდ." PublicTopBar carries exactly ONE permanent action on every public
+ * page, and for somebody who has registered a service that action was the
+ * opposite side of their own marketplace — an invitation to buy, printed above
+ * the page where they sell.
+ *
+ * CAPABILITIES, NOT THE ROLE, for the same reason `showJoinInvite` reads them:
+ * an admitted provider keeps role CLIENT (lib/hats says why), so a role test
+ * would hide the CTA from approved experts and keep showing it to exactly the
+ * person who asked for this. „A service added" IS a capability — a TutorProfile
+ * (CONSULT) or an admitted ServiceProfile (WORK). The type is imported
+ * `import type` and nothing else: lib/capabilities imports prisma, and this
+ * file's whole contract is that it does not.
+ *
+ * ⚠️ A HIDDEN INVITATION IS NOT A CLOSED DOOR. `canOpenRequestForm` is
+ * untouched, so /request still answers everyone the flag admits — a provider
+ * who needs a plumber is a client like anybody else („CLIENT is the floor",
+ * lib/hats), and the home band, the catalogue's empty state and the address
+ * itself all still reach it. What is removed is the standing invitation, not
+ * the permission.
+ *
+ * A GUEST KEEPS IT — settled, owner 2026-08-17: „აქ ხო უნდა ჩანდეს რეალურად
+ * როცა არაა დარეგისტრირებული მაშინაც." Somebody who offers nothing yet reads
+ * as demand, so an empty (or not-yet-resolved) list answers `true`; the one
+ * audience this removes is people who already sell.
+ */
+export function showRequestCta(caps: readonly Capability[] | undefined | null): boolean {
+  return (caps?.length ?? 0) === 0
 }
 
 /**

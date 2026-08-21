@@ -168,7 +168,12 @@ test('§E no live /tutors or /masters URL remains in app, components or lib', ()
 
 test('§F the cards, sitemap, nav and JSON-LD name /experts/', () => {
   // The catalogue card, the home grid and the hero: slug first, under /experts/.
-  for (const f of ['app/experts/_card.tsx', 'components/home/ExpertGrid.tsx', 'app/_home/hero.tsx']) {
+  // ⚠️ THE LIST FOLLOWS THE CARDS, NOT THE OTHER WAY ROUND. `ExpertGrid` was
+  // replaced by `CatalogueGrid` on 2026-08-21 (it could only render the
+  // consulting half of a merged catalogue), and the hero stopped carrying cards
+  // at all in the same redesign — its entrance is a search field now. Both
+  // edits move where the href is WRITTEN; neither weakens the rule.
+  for (const f of ['app/experts/_card.tsx', 'components/home/CatalogueGrid.tsx']) {
     const src = codeOf(f)
     assert.match(src, /`\/experts\/\$\{[a-z]+\.(?:slug|urlSlug)\s+\|\|\s+[a-z]+\.id\}/, `${f}: the card href must be the SLUG when present, under /experts/`)
   }

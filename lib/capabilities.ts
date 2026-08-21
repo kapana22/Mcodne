@@ -141,3 +141,14 @@ export function showJoinInvite(
   if (role === 'ADMIN') return false
   return (caps?.length ?? 0) === 0
 }
+
+/* ⚠️ THE HEADER'S INTAKE CTA IS NOT HERE — it is `showRequestCta` in
+ * lib/requests.ts (2026-08-21). It reads capabilities, so this file is where it
+ * wanted to live, and it cannot: this module imports prisma, and prisma loads
+ * `.env` the moment it is imported. Pulling that into tests/requests.test.ts
+ * switched FEATURE_REQUESTS on inside the process that pins „the flag defaults
+ * to off", i.e. importing a two-line pure function broke the safety property it
+ * had nothing to do with. The subsystem's own leaf is prisma-free by contract
+ * and states so at the top of the file — the rule lives there, beside
+ * `canOpenRequestForm`, which is the permission it is deliberately NOT.
+ */

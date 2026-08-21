@@ -1,126 +1,73 @@
 'use client'
-// Home — „როგორ მუშაობს“: the page's one dark band, three steps.
+// Home — „როგორ მუშაობს": three steps on one rule.
+//
+// ⚠️ IT IS NO LONGER THE PAGE'S DARK BAND (2026-08-21). It was `bg-ink-900`
+// from 2026-07-31, on a good argument: the page was one uninterrupted white
+// sheet and needed a chapter break. The design canvas splits the page a
+// different way — the hero and this band are the warm ink-75 grounds, the
+// roster and the tiles are white — so the alternation is still there and no
+// section has to shout to make it. What went with the dark ground: the on-dark
+// step illustrations (they were drawn for #0F0E0A and are invisible on paper)
+// and the brand-400 eyebrow that only existed to clear contrast on it.
+//
+// ⚠️ THE STEPS DESCRIBE BROWSING, NOT THE INTAKE, and that is the substantive
+// change rather than a restyle. They used to read „აღწერე რა გჭირდება →
+// მიიღე შეთავაზებები → აირჩიე და შეთანხმდი", which is the request funnel; the
+// page around them now opens with a search field and six priced cards, so the
+// steps that follow have to be the ones that reader is actually taking.
+// The old keys are RETIRED rather than reused (lib/siteTextDefs): a production
+// SiteText row still holds the request wording, and reusing the key would print
+// „აღწერე რა გჭირდება" under a heading about choosing from a list.
+//
+// ⚠️ THE CONNECTOR IS ONE ABSOLUTE RULE BEHIND THREE NUMERALS, and each numeral
+// carries a 5px ring in the band's own colour so the line appears to pass
+// BEHIND it rather than through it. It is `hidden lg:block`: at one and two
+// columns the steps stack, and a horizontal rule across a vertical list points
+// at nothing.
 
-import Link from 'next/link'
 import { SiteText } from '@/components/SiteTextProvider'
-import { PAYMENTS_LIVE } from '@/lib/flags'
 import { Reveal } from '@/components/Reveal'
 import { Container } from '@/components/Container'
-import { Eyebrow } from '@/components/Eyebrow'
-import { Illustration, hasIllustration, type IllustrationName } from '@/components/Illustration'
 
-/* ───── How it works (+ the „why" row, merged in 2026-07-27) ─────
-   This used to be TWO full-height sections. „რატომ მცოდნე" restated, one
-   section later, exactly what the hero's three quality anchors and step 03
-   already said: hand-picked / transparent price / video session, plus a second
-   copy of the payments note verbatim. Read end to end the page said the same
-   three things three times and then asked you to become an expert.
-   The four „why" cells first became a compact strip at the FOOT of this section
-   — the detail under the steps rather than a competing heading — and were then
-   removed outright 2026-08-08 (owner). The section is now the three steps and
-   nothing else; see the note where the strip used to be for why its SiteText
-   keys stay in the registry. */
-/**
- * Do the three step drawings exist yet — ALL of them?
- *
- * All three or none, deliberately: two illustrated steps and one bare one reads
- * as a loading failure, not as a design. Module scope because the registry is a
- * build-time constant; nothing here changes at runtime.
- *
- * ⚠️ These are the ON-DARK variants. This band is `bg-ink-900` (#0F0E0A) and the
- * light-ground drawings were verified by screenshot to be nearly invisible on
- * it — thin dark-teal strokes on near-black. Do not point these at the light
- * files; they need their own art (see components/Illustration).
- */
-const stepArt =
-  hasIllustration('expertSearchOnDark') &&
-  hasIllustration('bookingsOnDark') &&
-  hasIllustration('videoSessionOnDark')
+const STEPS = [
+  { n: 1, tk: 'home.steps.s1.title', dk: 'home.steps.s1.desc' },
+  { n: 2, tk: 'home.steps.s2.title', dk: 'home.steps.s2.desc' },
+  { n: 3, tk: 'home.steps.s3.title', dk: 'home.steps.s3.desc' },
+]
 
 export const HowItWorks = () => (
-  /* THE PAGE'S ONE DARK BAND (2026-07-31).
-     Everything above and below this is white or a warm off-white — hero, cards,
-     questions, the „why" strip. Read end to end the page was one uninterrupted
-     sheet, which is the real reason it felt flat: no contrast, no chapters, no
-     place for the eye to rest. Motion cannot fix a static picture.
-     One full-bleed dark section, in the middle, does three things at once: it
-     splits the page into a before and an after, it lets the brand green finally
-     read as a colour instead of an accent on white, and it costs no data. */
-  <section id="how" className="relative overflow-hidden bg-ink-900 deep grain grain-dark text-white scroll-mt-24">
-    {/* z-10: `.grain` paints through ::after ON TOP of the section, so anything
-        that must stay crisp — all of it — has to sit above that layer. */}
-    <Container className="relative z-10 py-10 sm:py-12 lg:py-16">
-      <div className="grid lg:grid-cols-[1fr_1.6fr] gap-10 lg:gap-12 items-start">
-        <Reveal>
-          {/* brand-400, not the default brand-700: on ink-900 the dark green
-              measures 2.84:1 — a label nobody can read. The light step is
-              7.56:1 and is the same hue. Any Eyebrow that lands on the dark
-              band needs this. */}
-          <Eyebrow className="mb-3 !text-brand-400"><SiteText k="home.how.eyebrow" /></Eyebrow>
-          {/* `whitespace-pre-line` replaces the hardcoded <br>: the line break
-              is now whatever the admin types in the textarea, and the default
-              carries the exact same two lines it always had. */}
-          <h2 className="font-display text-h2 sm:text-display font-bold text-white tracking-[-0.02em] leading-[1.08] whitespace-pre-line">
-            <SiteText k="home.how.title" />
-          </h2>
-          <p className="text-body-lg text-white/70 mt-5 max-w-[400px] leading-relaxed"><SiteText k="home.how.subtitle" /></p>
-          {/* The CTA now points at the primary path. „დაწყება" → /signup asked a
-              first-time visitor to open an account before they had seen a single
-              expert, and it was the one place on the page where the secondary
-              path outranked „find an expert". Signing up still happens — it is
-              the first thing the booking flow asks for, in context. */}
-          <Link href="/experts" className="mt-7 h-12 px-6 rounded-btn bg-white hover:bg-white/90 text-ink-900 font-display font-semibold text-small tracking-wide inline-flex items-center gap-2 transition-colors duration-fast">
-            <SiteText k="home.how.cta" />
-          </Link>
-        </Reveal>
-        <Reveal stagger className="space-y-3">
-          {([
-            { n: '01', t: 'აირჩიე ექსპერტი', d: 'გადახედე პროფილებს, შეფასებებს და ვიდეოგაცნობას.', tk: 'home.how.step1.title', dk: 'home.how.step1.desc', art: 'expertSearchOnDark' },
-            { n: '02', t: 'აირჩიე სერვისი და დრო', d: 'აირჩიე სერვისი და დრო კალენდრიდან — ექსპერტი ადასტურებს.', tk: 'home.how.step2.title', dk: 'home.how.step2.desc', art: 'bookingsOnDark' },
-            // Step 03 must describe something the visitor DOES. „უსაფრთხო
-            // გადახდები · მალე" described a feature that doesn't exist yet — a
-            // step you cannot take. Until payments are live the third step is
-            // the session itself, which is the actual next thing that happens.
-            //
-            // Only the LIVE branch carries SiteText keys. The payments version
-            // is unreachable copy today, and an admin field that edits a string
-            // nobody can see is a dead control — it gets keys the day
-            // PAYMENTS_LIVE flips.
-            PAYMENTS_LIVE
-              ? { n: '03', t: 'დაცული გადახდა', d: 'თანხა დაცულია — ექსპერტს სესიის შემდეგ გადაერიცხება.' }
-              : { n: '03', t: 'შეხვდი ვიდეოზე', d: 'დანიშნულ დროს ბმულით შეხვალ — გადახდა ჯერ საიტზე არ ხდება.', tk: 'home.how.step3.title', dk: 'home.how.step3.desc', art: 'videoSessionOnDark' },
-          ] as { n: string; t: string; d: string; tk?: string; dk?: string; art?: IllustrationName }[]).map((s, i) => (
-            /* No card. On a dark ground a white panel is a hole, not a card —
-               the steps are ruled rows instead, and the numeral does the work a
-               border used to. */
-            <div key={i} className="border-t border-white/15 py-5 sm:py-6 grid grid-cols-[64px_1fr] sm:grid-cols-[110px_1fr] gap-4 sm:gap-6 items-baseline">
-              <div className="font-display text-display sm:text-display-xl font-bold text-brand-400 tabular-nums tracking-[-0.03em] leading-[0.85]">{s.n}</div>
-              <div className={stepArt ? 'flex items-center gap-4 sm:gap-6' : undefined}>
-                <div className="min-w-0">
-                  <h3 className="font-display text-h3 sm:text-h2 font-bold text-white mb-1.5 tracking-tight leading-tight">{s.tk ? <SiteText k={s.tk} /> : s.t}</h3>
-                  <p className="text-body text-white/65 leading-relaxed">{s.dk ? <SiteText k={s.dk} /> : s.d}</p>
-                </div>
-                {/* ALL THREE or none — see `stepArt` above. Below sm the row is
-                    already tight against a 64px numeral, so the art is desktop
-                    only rather than squeezing a phone to three columns. */}
-                {stepArt && s.art && (
-                  <div className="hidden sm:block shrink-0 ml-auto">
-                    <Illustration name={s.art} size="step" alt="" />
-                  </div>
-                )}
-              </div>
+  <section id="how" className="scroll-mt-24 border-y border-ink-100 bg-gradient-to-b from-ink-75/60 to-ink-75">
+    <Container className="py-11 sm:py-12 lg:py-14">
+      <Reveal>
+        <h2 className="mb-8 text-center font-display text-h2 font-bold tracking-[-0.022em] text-ink-900 sm:mb-9 sm:text-h1">
+          <SiteText k="home.steps.title" />
+        </h2>
+      </Reveal>
+
+      <div className="relative">
+        <span
+          aria-hidden
+          className="absolute left-[16%] right-[16%] top-4 hidden h-px bg-gradient-to-r from-transparent via-ink-300 to-transparent lg:block"
+        />
+        <Reveal stagger className="relative grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6 lg:gap-8">
+          {STEPS.map(s => (
+            <div key={s.n} className="text-center">
+              {/* `ring-[5px] ring-ink-75` is the mask that lets the rule pass
+                  behind the numeral. It has to be the BAND's colour, not white —
+                  a white ring on a warm ground is a visible white dot. */}
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 font-display text-body font-bold tabular-nums text-white shadow-brand-glow ring-[5px] ring-ink-75">
+                {s.n}
+              </span>
+              <h3 className="mt-3.5 font-display text-h3 font-bold tracking-tight text-ink-900">
+                <SiteText k={s.tk} />
+              </h3>
+              <p className="mx-auto mt-2 max-w-[280px] text-body leading-[1.55] text-ink-500 text-pretty">
+                <SiteText k={s.dk} />
+              </p>
             </div>
           ))}
         </Reveal>
       </div>
-
-      {/* The three-cell „რას გთავაზობთ?" strip that used to close this section
-          was REMOVED 2026-08-08 (owner). Its seven SiteText keys —
-          `home.includes.eyebrow` and `home.why.card1–3.title/body` — are marked
-          `retired: true` in lib/siteTextDefs rather than deleted: the keys must
-          survive (production rows hold the owner's hand-written copy under those
-          exact strings) but the admin fields must not, or they would edit a
-          void. Render this strip again and the stored text comes back with it. */}
     </Container>
   </section>
 )

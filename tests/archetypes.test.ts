@@ -77,11 +77,23 @@ test('archetypes 5/6 — workspace and form pages open with the shared PageHeade
   }
 })
 
-test('archetype 1 — the home page is six sections and one closing band', () => {
+test('archetype 1 — the home page is a marketing landing that closes on the supply band', () => {
   const home = read('app/HomeClient.tsx')
   assert.match(home, /<ClosingBand/)
   assert.doesNotMatch(home, /<JourneyBand|<ExpertCta/, 'the two closing CTAs are separate sections again')
-  assert.match(home, /<RequestBand/, 'the request band is the owner’s own call (2026-08-17) — it stays')
+  // ⚠️ `<RequestBand` WAS PINNED HERE UNTIL 2026-08-21 („the request band is the
+  // owner’s own call (2026-08-17) — it stays"). It was, and it was superseded by
+  // the owner’s own design canvas („მცოდნე — მთავარი გვერდი"), which composes
+  // the page as hero → roster → spheres → steps → supply and carries the intake
+  // in the header instead. Re-pinning the band would be a test out-voting the
+  // person it was written for.
+  //
+  // WHAT IS ACTUALLY WORTH PINNING is what the removal could have broken: the
+  // intake must still be reachable from the home page. It is — the header’s one
+  // filled action — so assert THAT, at the level a reader would notice.
+  assert.match(home, /<PublicTopBar/, 'the home page must render the shared header, which carries /request')
+  const bar = read('components/PublicTopBar.tsx')
+  assert.match(bar, /href: '\/request'/, 'the intake lost its last door on the home page')
 })
 
 test('/ask is gone and redirects, permanently, to the catalogue search', () => {

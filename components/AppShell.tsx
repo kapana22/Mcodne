@@ -48,6 +48,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // reload. The previous role stays on screen while the re-check is in
   // flight, so there's no flicker on ordinary navigations.
   const [role, setRole] = useState<Role | null>(null)
+  // ⚠️ AND THE CAPABILITY, not only the role (2026-08-21). /work is the supply
+  // side's home for BOTH halves, but the tab bar guessed the space from the
+  // path alone — so a person who sells a SERVICE and nothing else stood on
+  // /work and was handed the expert's tabs, one of which (/work/profile) sits
+  // in the (expert) group and bounces them straight back. `/api/me` has
+  // returned `capabilities` since the switch shipped; the bar simply never
+  // read them. Same probe, no extra request.
+  const [caps, setCaps] = useState<string[]>([])
   // True for exactly one path change: the one caused by back/forward.
   //
   // Seeded from the NAVIGATION TYPE, not only from the `popstate` listener.
@@ -78,8 +86,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         const r = m?.role as Role | undefined
         if (r === 'STUDENT' || r === 'TUTOR' || r === 'ADMIN') setRole(r)
         else setRole(null)
+        setCaps(Array.isArray((m as any)?.capabilities) ? (m as any).capabilities : [])
       })
-      .catch(() => { if (!cancelled) setRole(null) })
+      .catch(() => { if (!cancelled) { setRole(null); setCaps([]) } })
     return () => { cancelled = true }
   }, [path])
 
@@ -231,7 +240,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               never overlap; hides itself entirely while a mobile booking CTA
               owns the bottom edge — see HelpWidget. */}
           {!inProviderSpace && <HelpWidget />}
-          <BottomNav role={role} />
+          <BottomNav role={role} caps={caps} />
         </>
       )}
     </ToastProvider>

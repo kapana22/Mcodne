@@ -43,6 +43,12 @@ test('§C the first hat wins — a tradesperson never lands on the student dashb
   // THE REGRESSION, stated directly.
   assert.equal(homeForHats(['MASTER', 'CLIENT']), HAT_HOME.MASTER)
   assert.notEqual(homeForHats(['MASTER', 'CLIENT']), '/me')
+  // ⚠️ AND THE ADDRESS ITSELF (2026-08-21). Against `HAT_HOME.MASTER` this was
+  // a tautology: it could not fail whatever that constant said, and what it
+  // said for a year was the QUEUE. /work is the only screen that runs the
+  // profile grant and draws the balance, so the service half — the one hat
+  // pointed elsewhere — earned a bonus it was never shown. Name the path.
+  assert.equal(homeForHats(['MASTER', 'CLIENT']), '/work')
 
   assert.equal(homeForHats(['CLIENT']), '/me')
   assert.equal(homeForHats(['EXPERT', 'CLIENT']), '/work')

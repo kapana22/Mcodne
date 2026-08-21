@@ -37,12 +37,6 @@ enum PayoutStatus {
   REFUNDED
 }
 
-enum ConsultationTier {
-  QUICK
-  STANDARD
-  DEEP
-}
-
 // Product pivot: two service shapes coexist on the platform.
 // CONSULTATION = one-off, "available now" experience (default going forward).
 // RECURRING    = weekly-schedule tutoring (existing behavior, default for legacy rows).
@@ -498,7 +492,6 @@ model Experience {
 model Consultation {
   id          String           @id @default(cuid())
   tutorId     String
-  tier        ConsultationTier
   title       String
   description String
   minutes     Int

@@ -38,6 +38,7 @@ import {
   providerRequestView, clientOfferView, clientContactFor,
   ServiceRequestInput, RequestOfferInput, AdminRequestPatch,
   serviceRequestRow, topicLabel, REQUEST_STATIONS, stationsReached,
+  canOpenRequestForm, showRequestCta,
 } from '../lib/requests'
 import {
   threadIsOpen, threadClosedReason, staffIsOnline, PRESENCE_TTL_MS,
@@ -810,8 +811,24 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     ['app/experts/[slug]/client.tsx', 'app/experts/[slug]/page.tsx'],
   ]
   for (const [f, gate] of CLIENT_ENTRY_POINTS) {
-    assert.match(read(gate), /requestsOn\(\)/,
-      `${f} reaches /request but ${gate} does not check the flag — it would show on a deployment where the subsystem does not exist`)
+    // ⚠️ A SECTION NOTHING COMPOSES IS NOT AN ENTRY POINT (2026-08-21). The home
+    // band left the composition with the redesign (see app/HomeClient), so
+    // HomeClient no longer reads the flag — and it should not: a page does not
+    // gate a section it does not render. The FILE stays, one `<RequestBand />`
+    // away from returning, which is exactly why the pair stays listed here: it
+    // keeps both files known to the scan below, so the band's /request link is
+    // not mistaken for a new, unargued door. The flag check simply FOLLOWS THE
+    // RENDER — compose the band again and this fires again, unchanged.
+    // `.replace(//…)` strips line comments first: HomeClient EXPLAINS the
+    // removal in prose and names the component while doing so, so a bare match
+    // would read the explanation as the render.
+    const composed =
+      f !== 'app/_home/request.tsx' ||
+      /<RequestBand/.test(read('app/HomeClient.tsx').replace(/\/\/[^\n]*/g, ''))
+    if (composed) {
+      assert.match(read(gate), /requestsOn\(\)/,
+        `${f} reaches /request but ${gate} does not check the flag — it would show on a deployment where the subsystem does not exist`)
+    }
     assert.doesNotMatch(read(f), /["'`]\/work\/(requests|offers|service-profile)/,
       `${f} links to the PROVIDER side — that surface is reached by invitation only`)
   }
@@ -1047,12 +1064,47 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   const bar = read('components/PublicTopBar.tsx')
   assert.match(bar, /if\s+\(i\.href\s+===\s+'\/request'\)\s+return\s+requestsOn\(\)/,
     'the header „მოთხოვნა" item no longer checks the flag — it would show on a deployment where the subsystem does not exist')
-  assert.doesNotMatch(bar, /i\.href\s+===\s+'\/request'\)\s+return\s+requestsOn\(\)\s+&&/,
-    'the requests item narrowed its audience again — the client form is open to everyone the flag admits')
   // The FLAG check is the whole gate now, so it must be the real thing and not
   // a literal somebody inlined while removing the role test.
   assert.doesNotMatch(bar, /i\.href === '\/request'\) return true/,
     'the requests item is shown unconditionally — FEATURE_REQUESTS=off must still hide it')
+})
+
+// ⚠️ THE AUDIENCE, WHICH IS A SEPARATE QUESTION FROM THE FLAG (2026-08-21).
+// A third assertion used to sit in the test above — `doesNotMatch(… requestsOn()
+// &&)`, „the requests item narrowed its audience again" — and it was written
+// against ONE narrowing: the admin-only filter that had hidden a working page
+// from anonymous visitors. It has been replaced rather than deleted, because
+// the half of it that still matters (a GUEST must keep the CTA) is now stated
+// as behaviour instead of as a regex over one statement, per CLAUDE.md §6.
+//
+// What changed. Owner, 2026-08-21, holding the header signed in as a provider:
+// „როცა სერვისი მაქვს დამატებული არ უნდა მიჩანდეს მოთხოვნის გაგზავნა. მხოლოდ
+// მაშინ როცა user კლიენტი შემოდის უბრალოდ." The bar carries ONE permanent
+// action on every public page, and for somebody who has registered a service
+// that action was an invitation to buy, printed above the page where they sell.
+//
+// The two halves this pins, and they pull in opposite directions on purpose:
+//   · a guest and a plain client still get it — the 2026-08-17 ruling, intact;
+//   · anybody with a capability does not — the 2026-08-21 one.
+// And the PERMISSION is untouched either way: canOpenRequestForm() still admits
+// everyone the flag admits, because a provider who needs a plumber is a client
+// like anybody else. A hidden invitation is not a closed door.
+test('the header CTA invites the demand side only — and never mistakes that for a gate', () => {
+  assert.equal(showRequestCta([]), true, 'a guest or a plain client lost the intake CTA')
+  assert.equal(showRequestCta(undefined), true, 'an unresolved identity must read as demand, not as supply')
+  assert.equal(showRequestCta(null), true)
+  assert.equal(showRequestCta(['CONSULT']), false, 'an expert is still invited to send a request from the bar')
+  assert.equal(showRequestCta(['WORK']), false, 'a provider with a registered service is still invited to buy one')
+  assert.equal(showRequestCta(['CONSULT', 'WORK']), false)
+  // The invitation and the door are not the same question — the form stays open
+  // to everyone the flag admits, whatever the bar shows.
+  assert.equal(canOpenRequestForm(), requestsOn(), 'the CTA’s audience leaked into the form’s gate')
+  // One const feeds both renders (desktop button + mobile drawer), so the two
+  // cannot drift apart; and the rule itself is not re-implemented in the bar.
+  const bar = codeOf('components/PublicTopBar.tsx')
+  assert.match(bar, /showRequestCta\(/, 'the bar stopped asking the shared rule who the CTA is for')
+  assert.doesNotMatch(bar, /capabilities\?\.length/, 'the bar re-implements showRequestCta instead of calling it')
 })
 
 test('it is not in the sitemap, not in the feed, and not named in robots.txt', () => {

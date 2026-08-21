@@ -64,14 +64,22 @@ const TUTOR_TABS: Tab[] = [
   { href: '/work/profile',     label: 'პროფილი',      icon: Icon.user,     match: startsWith('/work/profile') },
 ]
 
-// The master's workspace (M1, 2026-08-18). Three screens, the same three the
-// /work rail lists (components/tutor/navConfig → PROVIDER_NAV), because on a
-// phone the rail is hidden. Shown by SPACE, not role — a master's `role` is
+// The master's workspace (M1, 2026-08-18). The screens the /work rail lists
+// for this capability (components/tutor/navConfig), because on a phone the
+// rail is hidden. Shown by SPACE, not role — a master's `role` is
 // STUDENT or TUTOR (lib/hats says why), and anybody who can see these three
 // paths at all has already passed their 404 gate (app/work/(provider)/layout).
 // ⚠️ THE SPACE IS THE THREE PATHS, NEVER THE /work PREFIX (stage 6): the rest
 // of /work is the expert's, and gets TUTOR_TABS.
+// ⚠️ FOUR SINCE 2026-08-21, AND THE HOME IS THE ONE THAT WAS MISSING. /work is
+// the only screen that draws the balance and the only one that runs the grant,
+// and this bar — the whole of a provider's navigation on a phone — had no route
+// to it. The desktop rail has carried „მთავარი" for both capabilities since
+// stage 6 (components/tutor/navConfig → WORKSPACE_NAV); the phone did not, so
+// the feature was desktop-only by accident. It leads the list for the same
+// reason it does there: it is the screen the other three are reached from.
 const PROVIDER_TABS: Tab[] = [
+  { href: '/work',                 label: 'მთავარი',           icon: Icon.home,      match: p => p === '/work' },
   { href: '/work/requests',        label: 'მოთხოვნები',        icon: Icon.list,      match: startsWith('/work/requests') },
   { href: '/work/offers',          label: 'შეთავაზებები',      icon: Icon.send,      match: startsWith('/work/offers') },
   { href: '/work/services',        label: 'ჩემი სერვისები',    icon: Icon.briefcase, match: startsWith('/work/services') },
@@ -83,7 +91,7 @@ const TABS_BY_ROLE: Record<Role, Tab[]> = {
   ADMIN:   [],
 }
 
-export function BottomNav({ role }: { role: Role | null }) {
+export function BottomNav({ role, caps = [] }: { role: Role | null; caps?: string[] }) {
   const path = usePathname() ?? ''
   // Shared store (one poll app-wide, visibility-gated + cross-tab). Reads the
   // unread count for the profile/messages dot.
@@ -99,7 +107,18 @@ export function BottomNav({ role }: { role: Role | null }) {
   // trap. The path names the space the user is IN; the role only decides the
   // default elsewhere. The master's three paths are tested BEFORE the /work
   // prefix they live under — the order is the whole distinction.
-  const space = path.startsWith('/me') ? 'STUDENT' : isProviderWorkspacePath(path) ? 'PROVIDER' : path.startsWith('/work') ? 'TUTOR' : role
+  // ⚠️ /work BELONGS TO WHOEVER IS STANDING ON IT (2026-08-21). The path alone
+  // cannot answer which space that screen is: it is the home of BOTH halves,
+  // and a person who only sells a service got the expert's tabs there — with a
+  // პროფილი tab that redirects them off the page they just opened. The
+  // capability decides, exactly as the desktop rail's groups do
+  // (app/work/layout → NAV_GROUPS). Someone holding both stays on the expert's
+  // tabs: that profile is the one with more in it.
+  const workOnly = caps.includes('WORK') && !caps.includes('CONSULT')
+  const space = path.startsWith('/me') ? 'STUDENT'
+    : isProviderWorkspacePath(path) ? 'PROVIDER'
+    : path.startsWith('/work') ? (workOnly ? 'PROVIDER' : 'TUTOR')
+    : role
   const tabs = !role ? []
     : space === 'PROVIDER' ? PROVIDER_TABS
     : TABS_BY_ROLE[space === 'STUDENT' || space === 'TUTOR' ? space : role] ?? []

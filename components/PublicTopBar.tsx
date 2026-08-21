@@ -10,9 +10,8 @@ import { Container } from '@/components/Container'
 import { useMe, type Me } from '@/lib/me'
 import { useMessagesUnread, type MessagesSpace } from '@/lib/messagesUnread'
 import { JOIN_HREF } from '@/lib/roleHome'
-import { JOIN_DOOR_HREF, JOIN_DOOR_LABEL } from '@/lib/capabilities'
-import { showJoinInvite } from '@/lib/capabilities'
-import { requestsOn } from '@/lib/requests'
+import { JOIN_DOOR_HREF, JOIN_DOOR_LABEL, showJoinInvite } from '@/lib/capabilities'
+import { requestsOn, showRequestCta } from '@/lib/requests'
 import { ROLE } from '@/lib/roles'
 
 // The single public header. Rendered on every guest/browse/marketing page.
@@ -225,7 +224,22 @@ export function PublicTopBar({
   // ever again needs to light on an address it does not name, bring it back
   // WITH the address that needs it — not before.
   const links = nav.filter(i => !i.cta)
-  const cta = nav.find(i => i.cta)
+  // THE ACTION IS THE DEMAND SIDE'S (2026-08-21). The flag decides whether the
+  // item exists at all (the filter above, untouched); this decides who is still
+  // invited by it — a person who has registered a service is not, because the
+  // bar's one permanent action would otherwise ask them to buy on top of every
+  // page where they sell. The rule and the whole argument live in
+  // lib/requests → showRequestCta; both renders below read this one const,
+  // so the desktop button and the drawer button cannot disagree.
+  //
+  // ⚠️ THE FLASH IS DELIBERATE ON THIS SIDE OF IT. Visibility now waits on
+  // /api/me, so on a client-only page a provider sees the button for one beat
+  // before it goes. Shown-then-hidden is the right way round: `initialUser`
+  // resolves it in the FIRST paint on every server-rendered page (home, browse,
+  // the profiles — where a provider actually browses), and the alternative,
+  // rendering nothing until `ready`, would pop the button in late for the
+  // guests and clients it is for, which is everyone else.
+  const cta = showRequestCta(me?.capabilities) ? nav.find(i => i.cta) : undefined
   const isActive = (href: string) => activePath === href || activePath.startsWith(href + '/')
 
   return (

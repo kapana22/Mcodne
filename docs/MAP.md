@@ -2,10 +2,13 @@
 
 # Where every export lives
 
-1515 symbols across 550 files. `grep` the name you need.
+1528 symbols across 555 files. `grep` the name you need.
 
 | symbol | file |
 | --- | --- |
+| `__migrationsFingerprint` | `lib/dbBoot.ts` |
+| `__resetRefGuard` | `lib/refGuard.ts` |
+| `__runMigrationsSource` | `lib/dbBoot.ts` |
 | `AboutBlock` | `app/experts/[slug]/_providerBlocks.tsx` |
 | `AboutSection` | `app/experts/[slug]/_sections.tsx` |
 | `ABROAD_CATEGORY_SLUG` | `lib/abroad.ts` |
@@ -204,6 +207,9 @@
 | `CatalogClient` | `app/experts/client.tsx` |
 | `CatalogItem` | `lib/catalogItems.ts` |
 | `CatalogProps` | `app/experts/client.tsx` |
+| `CATALOGUE_GRID_SIZE` | `components/home/CatalogueGrid.tsx` |
+| `CatalogueCardItem` | `components/home/CatalogueGrid.tsx` |
+| `CatalogueGrid` | `components/home/CatalogueGrid.tsx` |
 | `CatalogView` | `components/catalog/useCatalogView.ts` |
 | `Categories` | `app/_home/categories.tsx` |
 | `CategoriesSection` | `app/admin/_categories.tsx` |
@@ -281,6 +287,7 @@
 | `ConsultationDuration` | `lib/consultation.ts` |
 | `ConsultationItem` | `components/booking/slots.ts` |
 | `ConsultationsSection` | `app/work/services/_consultations.tsx` |
+| `ConsultationTier` | `lib/consultationTier.ts` |
 | `consultRefined` | `app/experts/_filters.tsx` |
 | `contactIsOpen` | `lib/jobRows.ts` |
 | `Container` | `components/Container.tsx` |
@@ -384,11 +391,9 @@
 | `expandQuery` | `lib/searchSynonyms.ts` |
 | `Experience` | `app/work/(expert)/profile/_types.ts` |
 | `ExperienceSection` | `app/experts/[slug]/_sections.tsx` |
-| `Expert` | `app/_home/data.tsx` |
 | `EXPERT_BROWSE_GROUPS` | `lib/requestTopics.ts` |
 | `expertActivationEmail` | `lib/emailTemplates.ts` |
 | `expertCountsBySphere` | `lib/categoryCounts.ts` |
-| `ExpertGrid` | `components/home/ExpertGrid.tsx` |
 | `expertRequestEscalationEmail` | `lib/emailTemplates.ts` |
 | `ExpertsAttentionSection` | `app/admin/_expertsAttention.tsx` |
 | `ExpForm` | `app/work/(expert)/profile/_types.ts` |
@@ -399,7 +404,6 @@
 | `extrasLabels` | `lib/requestTopics.ts` |
 | `Eyebrow` | `components/Eyebrow.tsx` |
 | `Facets` | `app/experts/_filters.tsx` |
-| `FALLBACK_CATS` | `app/_home/data.tsx` |
 | `fallbackSeo` | `lib/categorySeo.ts` |
 | `FaqAction` | `lib/helpTopics.ts` |
 | `FaqGroup` | `lib/helpTopics.ts` |
@@ -481,7 +485,6 @@
 | `googleLinkedEmail` | `lib/emailTemplates.ts` |
 | `GoogleMark` | `app/signin/_fields.tsx` |
 | `grantEarnedTasks` | `lib/creditsServer.ts` |
-| `GridExpert` | `components/home/ExpertGrid.tsx` |
 | `groupByDirection` | `lib/b2b.ts` |
 | `groupByKind` | `lib/b2b.ts` |
 | `groupIsLive` | `lib/requestTopics.ts` |
@@ -521,12 +524,15 @@
 | `HelpWidget` | `components/HelpWidget.tsx` |
 | `Hero` | `app/me/bookings/[id]/_hero.tsx` |
 | `hierarchyError` | `lib/categoryTree.ts` |
+| `HOME_ITEMS` | `lib/homeCatalogue.ts` |
 | `HOME_TRADE_IDS` | `lib/serviceMarks.ts` |
 | `HOME_TRADES` | `lib/serviceMarks.ts` |
 | `HomeCat` | `app/_home/data.tsx` |
 | `homeForHats` | `lib/hats.ts` |
 | `homeForRole` | `lib/roleHome.ts` |
 | `HomeHero` | `app/_home/hero.tsx` |
+| `homeItems` | `lib/homeCatalogue.ts` |
+| `HomeTutorRow` | `lib/homeCatalogue.ts` |
 | `HORIZON_WEEKS` | `lib/availabilityTopUp.ts` |
 | `HOURS_DEFAULT` | `app/work/(expert)/schedule/_shared.ts` |
 | `HOURS_FULL` | `app/work/(expert)/schedule/_shared.ts` |
@@ -556,6 +562,7 @@
 | `IntakeStep` | `components/booking/IntakeStep.tsx` |
 | `INTEGRATION_KEYS` | `lib/integrations.ts` |
 | `Integrations` | `lib/integrations.ts` |
+| `INTEGRATIONS_TAG` | `lib/integrations.ts` |
 | `IntegrationsSection` | `app/admin/_integrations.tsx` |
 | `Interval` | `lib/availability.ts` |
 | `InvitableRequest` | `lib/requestInvite.ts` |
@@ -585,6 +592,7 @@
 | `isQuietHour` | `lib/postSession.ts` |
 | `isRequestPath` | `lib/requests.ts` |
 | `isRetiredSiteTextKey` | `lib/siteTextDefs.ts` |
+| `isServerOnlySiteTextKey` | `lib/siteTextDefs.ts` |
 | `isServiceTopic` | `lib/serviceProfile.ts` |
 | `isStaleMeetingUrl` | `lib/meeting.ts` |
 | `isStartOpen` | `lib/availability.ts` |
@@ -626,6 +634,7 @@
 | `kindOf` | `lib/requestTopics.ts` |
 | `kindsOf` | `lib/catalogItems.ts` |
 | `kindsOfTopic` | `lib/requestTopics.ts` |
+| `LandingProps` | `app/HomeClient.tsx` |
 | `LANG_LABELS` | `lib/languages.ts` |
 | `langLabel` | `lib/languages.ts` |
 | `LanguageOption` | `lib/languages.ts` |
@@ -665,7 +674,6 @@
 | `makePublicRef` | `lib/requests.ts` |
 | `mapRows` | `app/experts/_data.tsx` |
 | `mapTutorPayload` | `components/booking/mapTutorPayload.ts` |
-| `mapTutorToExpert` | `app/_home/data.tsx` |
 | `markAllNotificationsRead` | `lib/notifications.ts` |
 | `markDoneWhere` | `lib/offerLifecycle.ts` |
 | `MARKED_SLUGS` | `lib/categoryMarks.tsx` |
@@ -729,6 +737,7 @@
 | `MIN_SIGNAL_VIEWS` | `app/work/_components/ProfileSignal.tsx` |
 | `MiniChart` | `app/admin/_charts.tsx` |
 | `minutesToView` | `lib/offerEvents.ts` |
+| `MISS_BUDGET` | `lib/refGuard.ts` |
 | `missingApplicationParts` | `app/admin/_application.ts` |
 | `missingCapability` | `lib/capabilities.ts` |
 | `MissingPart` | `app/admin/_application.ts` |
@@ -785,6 +794,7 @@
 | `normalizeRoute` | `lib/helpTopics.ts` |
 | `normalizeSearchTerms` | `lib/tutorsQuery.ts` |
 | `normExternalUrl` | `app/experts/[slug]/_data.tsx` |
+| `noteRefMiss` | `lib/refGuard.ts` |
 | `NotFoundClient` | `app/NotFoundClient.tsx` |
 | `NotifBell` | `components/NotifBell.tsx` |
 | `NotifItem` | `lib/notifications.ts` |
@@ -1032,6 +1042,7 @@
 | `REF_ALPHABET` | `lib/requests.ts` |
 | `REF_LENGTH` | `lib/requests.ts` |
 | `REF_PREFIX` | `lib/requests.ts` |
+| `refBudgetSpent` | `lib/refGuard.ts` |
 | `refine` | `lib/applyValidation.ts` |
 | `refreshNavBadges` | `components/tutor/useNavBadges.ts` |
 | `registerSearchInput` | `lib/searchFocus.ts` |
@@ -1135,7 +1146,6 @@
 | `ROLE` | `lib/roles.ts` |
 | `RoleCode` | `lib/roles.ts` |
 | `roleLabel` | `lib/roles.ts` |
-| `ROTATE_MS` | `app/_home/data.tsx` |
 | `RoutableProvider` | `lib/requestRouting.ts` |
 | `routableProviders` | `lib/requestJobs.ts` |
 | `RoutedCategory` | `lib/categoryRoutes.ts` |
@@ -1197,6 +1207,7 @@
 | `servicePriceLabel` | `lib/b2b.ts` |
 | `ServiceProfileForm` | `app/work/services/_trades.tsx` |
 | `ServiceProfileInput` | `lib/serviceProfile.ts` · `lib/serviceProfile.ts` |
+| `ServiceRail` | `app/_home/rail.tsx` |
 | `ServiceRequestInput` | `lib/requests.ts` · `lib/requests.ts` |
 | `serviceRequestRow` | `lib/requests.ts` |
 | `ServicesSection` | `app/experts/[slug]/_sections.tsx` |
@@ -1219,13 +1230,14 @@
 | `shouldPromptRebook` | `lib/postSession.ts` |
 | `showApplyCta` | `lib/roleHome.ts` |
 | `showJoinInvite` | `lib/capabilities.ts` |
-| `shuffled` | `app/_home/data.tsx` |
+| `showRequestCta` | `lib/requests.ts` |
 | `SignInView` | `app/signin/_signin.tsx` |
 | `signOut` | `lib/signout.ts` |
 | `SignUpView` | `app/signin/_signup.tsx` |
 | `SimilarExperts` | `app/experts/[slug]/_similar.tsx` |
 | `SITE_TEXT_DEFAULTS` | `lib/siteTextDefs.ts` |
 | `SITE_TEXT_PUBLIC_DEFAULTS` | `lib/siteTextDefs.ts` |
+| `SITE_TEXT_TAG` | `lib/siteText.ts` |
 | `SITE_TEXTS` | `lib/siteTextDefs.ts` |
 | `SiteText` | `components/SiteTextProvider.tsx` |
 | `SiteTextDef` | `lib/siteTextDefs.ts` |
@@ -1363,6 +1375,7 @@
 | `ThreadPre` | `components/chat/useBookingThread.ts` |
 | `ThreadRef` | `components/RequestChat.tsx` |
 | `ThreadSide` | `lib/requestThread.ts` |
+| `tierOf` | `lib/consultationTier.ts` |
 | `tierPriceLabel` | `components/booking/slots.ts` |
 | `TierShape` | `components/booking/slots.ts` |
 | `TIME_BANDS` | `components/booking/slots.ts` |
@@ -1473,7 +1486,7 @@
 | `VALID_TABS` | `app/admin/_nav.tsx` |
 | `Verdict` | `app/work/_components/ProfileSignal.tsx` |
 | `VerifiedGrant` | `app/admin/_application.ts` |
-| `VerifiedMark` | `components/Avatar.tsx` · `app/_home/data.tsx` · `app/experts/[slug]/_bits.tsx` |
+| `VerifiedMark` | `components/Avatar.tsx` · `app/experts/[slug]/_bits.tsx` |
 | `verifyPassword` | `lib/auth.ts` |
 | `VerifyView` | `app/signin/_verify.tsx` |
 | `Vertical` | `lib/requestTopics.ts` |
@@ -1526,7 +1539,7 @@
 
 # Prisma models and their fields
 
-37 models. The UI word is not the column name — check here before writing a query.
+40 models. The UI word is not the column name — check here before writing a query.
 
 **AuditLog** — id:String · actorId:String · action:String · targetType:String? · targetId:String? · meta:Json? · createdAt:DateTime
 
@@ -1558,9 +1571,15 @@
 
 **Enrollment** — id:String · packageId:String? · studentId:String · tutorId:String · status:EnrollmentStatus · lessonsTotal:Int · lessonsUsed:Int · priceTotal:Int · perLessonPrice:Int · minutesPerLesson:Int? · paidAt:DateTime? · startsAt:DateTime? · expiresAt:DateTime? · createdAt:DateTime · updatedAt:DateTime · student:User · tutor:TutorProfile · package:Package? · bookings:Booking[]
 
+**Event** — id:String · name:String · at:DateTime · userId:String? · props:Json?
+
 **Experience** — id:String · tutorId:String · company:String · role:String · startYear:Int · endYear:Int? · description:String? · createdAt:DateTime · tutor:TutorProfile
 
 **Favorite** — id:String · userId:String · tutorId:String · createdAt:DateTime · user:User · tutor:TutorProfile
+
+**HelpMessage** — id:String · at:DateTime · route:String? · question:String? · message:String · email:String? · name:String? · userId:String? · status:String · handledAt:DateTime?
+
+**JobRun** — key:String · ranAt:DateTime · ok:Boolean? · result:Json?
 
 **LegacyRescheduleRequest** — id:String · bookingId:String · proposedBy:String · newStartAt:DateTime · newDurationMin:Int · reason:String? · status:RescheduleStatus · decidedAt:DateTime? · createdAt:DateTime · booking:Booking
 

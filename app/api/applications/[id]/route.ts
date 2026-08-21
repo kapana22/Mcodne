@@ -1,6 +1,5 @@
 import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
-import { tierOf } from '@/lib/consultationTier'
 import { prisma } from '@/lib/prisma'
 import { ASSIGNABLE_CATEGORY_WHERE, CATEGORY_READ_ORDER, resolveCategoryByName } from '@/lib/categoryTree'
 import { revealCategoryIfHidden } from '@/lib/categoryReveal'
@@ -347,7 +346,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
                   tutorId: profile.id,
                   // The tier is derived from minutes and means nothing for a
                   // service; it keeps its default rather than inventing one.
-                  tier: tierOf(bookable ? minutes : 60),
                   title,
                   description: (String(s.desc ?? '').trim() || title).slice(0, 400),
                   minutes,

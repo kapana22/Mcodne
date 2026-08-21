@@ -17,6 +17,8 @@ import { providersOn } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
 import { ROLE } from '@/lib/roles'
 import { routingWhere } from '@/lib/serviceProfile'
+import { ensureDbReady } from '@/lib/dbBoot'
+import { grantEarnedTasks } from '@/lib/creditsServer'
 import { WorkspaceShell } from '@/components/tutor/WorkspaceShell'
 
 // Re-verify on every request for this segment: the shell must never be served
@@ -39,6 +41,31 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
   const groups = {
     expert: isAdmin || user.role === ROLE.EXPERT || caps.includes('CONSULT'),
     work: viewer !== null && (caps.includes('WORK') || viewer.providerAllowed),
+  }
+
+  // ⚠️ THE GRANT RUNS ON THE SHELL, NOT ON ONE PAGE (2026-08-21). It used to sit
+  // in app/work/page.tsx alone, and that is the whole reason the balance „did
+  // not exist": /work was the one screen a service provider was never sent to
+  // (lib/hats → HAT_HOME.MASTER pointed at the queue, and the phone's tab bar
+  // had no route to the home at all). Measured on live data that day: BOTH
+  // service providers had zero grants, one of them holding 85₾ of completed
+  // tasks and a −5₾ balance from the single offer they had sent; 24 of 27
+  // experts likewise, having never opened the home screen since the feature
+  // shipped. A bonus that pays only the people who happen to walk past one door
+  // is not a bonus.
+  //
+  // Here it pays on ANY workspace screen — the services editor, the queue, the
+  // offers list — which is also where the profile is actually filled in, so the
+  // credit is waiting by the time they look. Idempotent by a unique index and
+  // not by a check (lib/creditsServer), so running it on every render is
+  // correct rather than merely tolerable; it costs one `findMany` on an indexed
+  // pair once every task is paid.
+  //
+  // ⚠️ CAPABILITY-GATED, because an ADMIN passes `groups.work` by role alone and
+  // has no supply-side profile to score.
+  if (caps.length > 0) {
+    await ensureDbReady()
+    await grantEarnedTasks(user.id)
   }
 
   // The queue badge — how many verified requests still have a place. Same

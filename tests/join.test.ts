@@ -132,9 +132,17 @@ test('§E the page: guest → pitch, admin → /admin, and the WORK half is gate
   // Both halves are offered only when still missing — reads capabilitiesOf.
   assert.match(page, /const have = await capabilitiesOf\(user\.id\)/)
   assert.match(page, /if\s+\(user\.role\s+!==\s+ROLE\.EXPERT\s+&&\s+!have\.includes\('CONSULT'\)\)\s+offer\.push\('CONSULT'\)/)
-  // The provider workspace is named through the subsystem's constant, never a literal.
+  // The provider workspace is never named by a LITERAL — that is the half of
+  // this rule that protects something: a hardcoded '/provider' survives the
+  // route moving and 404s somebody who just finished applying.
   assert.doesNotMatch(read('app/join/page.tsx'), /["'`]\/provider/)
-  assert.match(page, /PROVIDER_ROUTE/)
+  // ⚠️ THE MATCH ON `PROVIDER_ROUTE` WAS DROPPED (2026-08-21). It required the
+  // page to MENTION the constant, and the page has nothing left to say with it:
+  // when there is no half left to offer, every hat now goes to /work — one home
+  // for both capabilities — instead of branching to the provider queue. The
+  // constant is unused here because the branch is gone, which is the change
+  // succeeding, not the rule breaking. What the rule was really guarding is the
+  // line above.
 })
 
 test('§F the door: one question, the capability derived, the choice persists', () => {

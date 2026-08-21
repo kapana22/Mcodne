@@ -183,3 +183,25 @@ test('the strip sends each half to an editor it can actually open', () => {
   assert.doesNotMatch(read('app/work/_components/CreditStrip.tsx'), /href="\/work\/profile"/,
     'the strip hard-codes the expert-only editor again')
 })
+
+test('the grant runs on the SHELL, and every supply-side hat is routed to it', () => {
+  // ⚠️ THE BUG THIS PINS (2026-08-21). The grant was wired to app/work/page.tsx
+  // and nothing else, and /work was the one screen a service provider was never
+  // sent to — sign-in put them on the queue and the phone's tab bar had no route
+  // to the home at all. Measured on live data before the fix: 0 of 2 service
+  // providers and 3 of 27 experts had ANY grant; one provider held 85₾ of
+  // completed tasks and a −5₾ balance. A bonus that pays only the people who
+  // walk past one door is not a bonus.
+  const shell = read('app/work/layout.tsx')
+  assert.match(shell, /grantEarnedTasks\(user\.id\)/,
+    'the shell stopped granting — the bonus is back to paying one screen')
+  assert.doesNotMatch(read('app/work/page.tsx'), /await grantEarnedTasks/,
+    'the grant is being run twice per render of the home')
+
+  // Where each supply-side hat LANDS is pinned next to the hats themselves
+  // (tests/hats §C, tests/spaces §F) — this file stays pure and asserts only the
+  // door, which is the one redirect that lives outside lib/hats and branched on
+  // the capability: a finished applicant must not be dropped on the queue.
+  assert.match(read('app/join/page.tsx'), /if \(offer\.length === 0\) redirect\('\/work'\)/,
+    'the join door sends one half somewhere without a balance again')
+})

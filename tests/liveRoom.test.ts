@@ -325,6 +325,21 @@ test('the home page opens ONE door', () => {
   for (const f of ['app/_home/hero.tsx', 'app/_home/request.tsx', 'components/Footer.tsx']) {
     assert.doesNotMatch(codeOf(f), /type=WORK/, `${f} reopened the second door`)
   }
+  // ⚠️ THIS USED TO COUNT `<Btn href="/experts">` AND EXPECT EXACTLY ONE.
+  // The rule it enforces („one entrance, and it is the catalogue") is unchanged;
+  // the control is not. Since the 2026-08-21 redesign the hero’s entrance is a
+  // search FORM whose submit pushes /experts — so counting a button spelling
+  // would now pass or fail on markup rather than on the rule. Assert the rule:
+  // every destination the hero can send somebody to is the catalogue.
   const hero = codeOf('app/_home/hero.tsx')
-  assert.equal((hero.match(/<Btn href="\/experts"/g) || []).length, 1, 'the hero must offer exactly one catalogue button')
+  // Every ROUTE-shaped string literal the hero contains (comments and imports
+  // are already stripped by codeOf). The search field builds its destination in
+  // a template literal, so matching on `href=` alone would see nothing.
+  const dests = [...hero.matchAll(/[`'"](\/[a-zA-Z0-9\-_/?=&$.{}]*)/g)].map(m => m[1])
+  assert.ok(dests.length > 0, 'the hero must offer a way in')
+  assert.deepEqual(
+    [...new Set(dests.filter(d => !d.startsWith('/experts')))],
+    [],
+    'the hero opens ONE door and it is the catalogue',
+  )
 })

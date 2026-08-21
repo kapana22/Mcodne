@@ -1,125 +1,107 @@
 'use client'
-// Home — the closing band: „გააზიარე შენი ცოდნა“ (gated for existing experts)
-// with the illustration that ends the page beneath it. One section, one
-// component (`ClosingBand`) — 2026-08-19 the two were merged so the home page
-// carries six sections instead of seven; the copy, links and gate are unchanged.
+// Home — the closing band: the invitation to the SUPPLY side.
+//
+// ⚠️ THE PITCH IS THE SERVICE AND THE PRICE (CLAUDE.md rule 3): „the pitch to a
+// provider is CLIENTS FOR THEIR SERVICE, never „share your knowledge". They set
+// the price." The heading says exactly that in four words and the paragraph
+// says what the client then sees. Nothing here mentions a commission, a
+// consultation or a session — the first is in the help centre where somebody
+// looks for it, and the second two are not what this band is selling.
+//
+// ⚠️ THE WORD AND THE ADDRESS COME FROM lib/capabilities, not from here. The
+// header, the footer and this band are the site's three supply links and they
+// must be the same string pointing at the same door; a hand-typed fourth
+// wording is how „გახდი ექსპერტი" survived in one place after being retired in
+// the others.
+//
+// ⚠️ IT IS GATED. An existing provider must never read an invitation to become
+// one — <ApplyCtaGate> is the one place that rule is expressed, so a new supply
+// surface inherits it instead of re-deriving it.
+//
+// ⚠️ THE CLOSING ILLUSTRATION BAND LEFT WITH THE REDESIGN (2026-08-21). It was
+// a full-bleed drawing under this block, on `bg-ink-75` matched to the art's own
+// paper. The design canvas ends the page on this band instead, and the drawing
+// it replaces was doing the same job as the six real cards near the top —
+// showing what the product is — a screen and a half later. The asset and
+// <IllustrationBand> are untouched; nothing on the home page renders it.
 
-import Link from 'next/link'
 import { SiteText } from '@/components/SiteTextProvider'
 import { Reveal } from '@/components/Reveal'
 import { Container } from '@/components/Container'
-import { Eyebrow } from '@/components/Eyebrow'
-import { IllustrationBand } from '@/components/Illustration'
+import { Btn } from '@/components/Btn'
 import { ApplyCtaGate } from '@/components/ApplyCtaGate'
+import { JOIN_DOOR_HREF, JOIN_DOOR_LABEL } from '@/lib/capabilities'
 
-/* Testimonials removed (Phase 0.2): the previous section showed invented
-   people with i.pravatar.cc stock faces and fabricated outcomes. It returns
-   only when real outcome-story reviews accumulate (role-attributed, quantified
-   quotes pulled from the Reviews system) — never seeded. */
-
-/* ───── „გახდი ექსპერტი" ─────
-   The page's SECONDARY path, and it now looks like one. It used to close the
-   home with a lg:py-24 band, a bespoke pill-in-a-pill badge, three big cards
-   with 40px numerals, and two buttons that both went to /apply — more visual
-   weight than the expert row it follows, for the smaller audience. Same copy,
-   same honesty branches, a third of the height. */
-/* `border-b`, NOT `border-y`. The section immediately above (#how) already ends
-   in `border-b border-ink-200`, so a top border here landed a second 1px rule on
-   the exact same y — two hairlines stacked, in slightly different tints because
-   the backgrounds differ (bg-ink-50 vs bg-ink-50/50). It read as one thick,
-   smudged, misaligned divider.
-   Rule for this page: a section owns its BOTTOM edge only — EXCEPT this one,
-   the last before the footer, which now owns neither: the footer draws its own
-   full-bleed hairline, so the two sat 80px apart with nothing between them.
-   That pair is the „two lines above the footer" you can see from across the
-   room. The footer's rule is canonical — it is on every page, including those
-   that do not end in a bordered section.
-   (A `{/* … *\/}` here is a SYNTAX error — a JSX comment cannot be the first
-   thing inside an arrow function's parenthesised return. Keep it a /* *\/ block
-   above the arrow.) */
-const ExpertCta = () => (
-  <div className="relative grain">
-    <Container className="relative z-10 pt-12 sm:pt-16 pb-8 sm:pb-10">
-      {/* ⚠️ ONE CENTRED COLUMN — THE STATS LATTICE IS GONE (2026-08-19).
-          Owner, holding a screenshot of this band: „მარჯვენა მხარე მოვაშოროთ,
-          15 საკომისიო და ეგ ქარდი სრულად, და მარცხნივ რაც წარწერაა, ის ლამაზად
-          ცენტრში იქნება ფოტოსი."
-
-          The lattice printed „15% საკომისიო / 85% შენი ნაწილი / 60 წუთი სესია"
-          beside the invitation — so the first hard number an expert met on the
-          home page was what we take, stated in the same stat type as what they
-          keep, in the block whose job is to make them want to apply. The
-          commission is not hidden by removing it: it is in the help centre
-          (`COMMISSION_PCT`, pinned by tests/helpTopics) and in the terms, which
-          is where somebody looks for it, and it is stated before anybody is
-          asked to price anything.
-
-          What the removal leaves is the actual invitation, and a two-column
-          grid with one column left in it is not a layout — so the copy is now
-          one centred column over the full width, reading straight down into the
-          drawing that closes the page. `max-w` is the measure, not the grid: a
-          centred `text-display` line that runs the full 1280 is a banner, not a
-          sentence. */}
-      <Reveal className="mx-auto max-w-[680px] flex flex-col items-center text-center">
-        {/* Canon section-header pattern (eyebrow + heading), replacing the
-            bespoke badge — whose „ხელით მოდერაცია" tail also repeated the
-            „ყოველი ჯავშანი მოიცავს" cell directly above this section. */}
-        <Eyebrow className="mb-3"><SiteText k="home.expertCta.eyebrow" /></Eyebrow>
-        <h2 className="font-display text-h2 sm:text-display font-bold leading-[1.08] tracking-[-0.02em] text-ink-900 text-balance">
-          <SiteText k="home.expertCta.title" /><br />
-          {/* ⚠️ WAS „გასამრჯელო — სესიის შემდეგ." (2026-08-20). A „session" is
-              what a CONSULTATION produces; a plumber finishes a job. The band
-              recruits both halves of one catalogue, so its promise has to hold
-              for both — and the one that does is the one the model is built on:
-              the provider names the price. Hardcoded rather than a SiteText
-              key on purpose — the first line beside it is editable, and two
-              editable halves of one sentence drift apart. */}
-          <span className="text-brand-600">ფასს შენ წერ.</span>
-        </h2>
-        <p className="text-body-lg text-ink-700 mt-5 max-w-[520px] leading-relaxed text-pretty">
-          {/* The commission clause was removed 2026-08-05 (owner) — with it
-              went the PAYMENTS_LIVE branch and the COMMISSION_PCT template,
-              which is exactly why this paragraph is editable now. */}
-          <SiteText k="home.expertCta.body" />
-        </p>
-        {/* One CTA. The „როგორ მუშაობს" button next to it pointed at /apply
-            too — the same destination twice reads as a choice and isn't one. */}
-        <Link href="/join" className="tap-shrink mt-7 h-12 px-6 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center gap-2 transition-colors duration-fast">
-          <SiteText k="home.expertCta.cta" />
-        </Link>
-      </Reveal>
-    </Container>
-  </div>
+/* The band's own drawing: a profile card, a dashed run, and the „add" node it
+   arrives at — the whole act of listing something, in one figure. Every stop is
+   a palette value (brand-600/500/300/100, ink-50/75/100/200), so it carries no
+   hue the rest of the page does not already have. Inline rather than a file: it
+   is ~1 KB of geometry, it must recolour with the palette, and a request for it
+   would land after the band it belongs to. */
+const SupplyMark = () => (
+  <svg
+    width="230"
+    height="150"
+    viewBox="0 0 230 150"
+    fill="none"
+    aria-hidden
+    className="h-auto w-[200px] shrink-0 lg:w-[230px]"
+  >
+    <defs>
+      <linearGradient id="home-supply-plate" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#FFFFFF" />
+        <stop offset="100%" stopColor="#F8F6F2" />
+      </linearGradient>
+    </defs>
+    <rect x="12" y="28" width="126" height="94" rx="14" fill="url(#home-supply-plate)" stroke="#DFD8CB" strokeWidth="1.5" />
+    <circle cx="44" cy="58" r="15" fill="#D3ECE4" />
+    <rect x="68" y="49" width="54" height="6" rx="3" fill="#DFD8CB" />
+    <rect x="68" y="62" width="34" height="5" rx="2.5" fill="#EFECE5" />
+    <rect x="26" y="88" width="52" height="18" rx="9" fill="#26806E" />
+    <rect x="86" y="90" width="40" height="14" rx="7" fill="#EFECE5" />
+    <path d="M152 75h40" stroke="#7FC7B4" strokeWidth="2" strokeLinecap="round" strokeDasharray="4 7" />
+    <circle cx="204" cy="75" r="19" fill="#2F9C86" />
+    <path d="M196 75h16M204 67v16" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
+  </svg>
 )
 
-/* ───── The page's closing image ─────
-   Full-bleed, no copy, no CTA: the drawing's own left→right story — questions
-   and half-written notes resolving into a booked video consultation — is the
-   whole product in one picture, which is why it closes the page rather than
-   explaining any one section.
-
-   Placement is the owner's call (2026-08-08): it shipped above „როგორ მუშაობს"
-   first and was moved here, under „გააზიარე შენი ცოდნა". Note the one hard
-   constraint if it ever moves again — it CANNOT go inside `#how`; that band is
-   bg-ink-900 and this art is thin dark-teal line work, verified by screenshot
-   to be nearly invisible there.
-
-   `bg-ink-75` is not a guess: the artwork was colour-shifted at export so its
-   paper measures #F8F6F2 exactly, which is why the empty left half reads as the
-   drawing's own paper continuing rather than as a background behind an image.
-   Change this class and the band grows a vertical seam — see the PAPER note in
-   components/Illustration. No border either side: the footer below draws its
-   own full-bleed hairline, and the tone step above IS the divider.
-
-   The illustration sits OUTSIDE `<ApplyCtaGate>` deliberately — an existing
-   expert doesn't see the „გახდი ექსპერტი" block, but the page still needs
-   something between the dark band and the footer. Both live in ONE section
-   (`bg-ink-75` — the paper tone the art was exported to, see above), so the
-   expert copy and the drawing read as one closing band, not two. */
 export const ClosingBand = () => (
-  <section className="bg-ink-75">
-    {/* „გახდი ექსპერტი“ is meaningless for an existing expert/admin. */}
-    <ApplyCtaGate><ExpertCta /></ApplyCtaGate>
-    <IllustrationBand name="consultationJourney" />
-  </section>
+  <ApplyCtaGate>
+    <section className="bg-white">
+      <Container className="py-12 sm:py-14">
+        <Reveal className="flex flex-col items-start gap-8 sm:flex-row sm:items-center sm:gap-10 lg:gap-14">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-display text-h2 font-bold tracking-[-0.022em] text-ink-900 sm:text-h1">
+              <SiteText k="home.supply.title" />
+            </h2>
+            <p className="mt-3 max-w-[430px] text-body leading-[1.6] text-ink-500 text-pretty">
+              <SiteText k="home.supply.body" />
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              {/* Same treatment as the hero's search button — see there: `hero`
+                  is the canvas's `.cta` (rests on the glow, deepens it), and the
+                  1px lift is the other half of that rule. The two filled
+                  actions on this page must not read as two different controls. */}
+              <Btn
+                href={JOIN_DOOR_HREF}
+                size="md"
+                variant="hero"
+                className="motion-safe:hover:-translate-y-px"
+              >
+                {JOIN_DOOR_LABEL}
+              </Btn>
+              {/* How long it takes, beside the button that starts it — the one
+                  fact that answers „not now" before it is thought. */}
+              <span className="text-body text-ink-500"><SiteText k="home.supply.note" /></span>
+            </div>
+          </div>
+          {/* Hidden below sm: at 390px the drawing would take a third of the
+              screen to repeat what the sentence beside it already says. */}
+          <div className="hidden shrink-0 sm:block">
+            <SupplyMark />
+          </div>
+        </Reveal>
+      </Container>
+    </section>
+  </ApplyCtaGate>
 )

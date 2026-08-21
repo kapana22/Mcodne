@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { tierOf } from '@/lib/consultationTier'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { ROLE } from '@/lib/roles'
@@ -58,13 +57,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // A service keeps no leftover duration from the shape it used to be — the
   // profile prints „60 წთ" from this column and would announce a session that
   // is not on offer.
-  // The tier follows the minutes it is derived from — a row edited from 60 to 15
-  // used to keep DEEP for ever, because the client sent the tier on CREATE and
-  // never again. Nothing reads the value (see the POST route's note), so this
-  // corrected nothing visible; it is here so the column cannot drift from the
-  // one number that defines it.
-  const base = willBook ? parsed.data : { ...parsed.data, minutes: 0 }
-  const data = { ...base, tier: tierOf(willBook ? willMins : 0) }
+  const data = willBook ? parsed.data : { ...parsed.data, minutes: 0 }
 
   const updated = await prisma.consultation.update({ where: { id }, data })
   return NextResponse.json({ ok: true, item: updated })

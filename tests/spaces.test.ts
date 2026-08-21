@@ -17,6 +17,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { PROVIDER_ROUTE, PROVIDER_WORKSPACE_PATHS, isProviderWorkspacePath, isRequestPath, isProviderPath } from '../lib/requests'
 import { homeForRole } from '../lib/roleHome'
+import { homeForHats } from '../lib/hats'
 
 const ROOT = join(import.meta.dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -243,11 +244,28 @@ test('§F the subsystem owns three /work screens, never /work — and the chrome
   }
   // BottomNav: /me → client tabs, the master's three → PROVIDER_TABS, other /work → expert tabs; order matters.
   const nav = read('components/BottomNav.tsx')
-  assert.match(nav, /const\s+space\s+=\s+path\.startsWith\('\/me'\)\s+\?\s+'STUDENT'\s+:\s+isProviderWorkspacePath\(path\)\s+\?\s+'PROVIDER'\s+:\s+path\.startsWith\('\/work'\)\s+\?\s+'TUTOR'\s+:\s+role/,
-    'BottomNav space detection changed — the master test must run BEFORE the /work prefix test')
+  // ⚠️ THE ORDER IS THE RULE, not the spelling of the expression (2026-08-21).
+  // This pinned the whole ternary verbatim, so adding the capability branch that
+  // /work needed — the home is BOTH halves', and the path alone cannot say whose
+  // it is — failed a test about something else entirely. What must hold is that
+  // the master's three exact paths are tested BEFORE the /work prefix they live
+  // under; that is the distinction, and it is what is asserted.
+  const spaceExpr = nav.slice(nav.indexOf('const space ='), nav.indexOf('const tabs ='))
+  assert.ok(spaceExpr.includes("path.startsWith('/me')"), 'BottomNav no longer reads the client space off the path')
+  assert.ok(
+    spaceExpr.indexOf('isProviderWorkspacePath(path)') < spaceExpr.indexOf("path.startsWith('/work')"),
+    'BottomNav space detection changed — the master test must run BEFORE the /work prefix test',
+  )
   for (const href of ['/me', '/me/bookings', '/me/messages', '/me/favorites']) assert.ok(nav.includes(`href: '${href}'`), `STUDENT_TABS lost ${href}`)
   for (const href of ['/work', '/work/jobs', '/work/messages', '/work/profile']) assert.ok(nav.includes(`href: '${href}'`), `TUTOR_TABS lost ${href}`)
   for (const href of ['/work/requests', '/work/offers', '/work/services']) assert.ok(nav.includes(`href: '${href}'`), `PROVIDER_TABS lost ${href}`)
+  // ⚠️ AND THE HOME (2026-08-21). /work is the only screen that draws the
+  // balance and runs the grant; a phone with no tab for it made the feature
+  // desktop-only, which is how „the credits do not exist" was reported.
+  assert.ok(
+    /PROVIDER_TABS[\s\S]*?href: '\/work'[\s\S]*?\]/.test(nav),
+    'PROVIDER_TABS lost its /work home — a provider on a phone cannot reach their balance',
+  )
   assert.match(nav, /\/\^\\\/\(\?:me\|work\)\\\/messages\\\/\[\^\/\]\+\$\//, 'the focused-screen regex still names the old spaces')
   assert.match(read('components/AppShell.tsx'), /const inProviderSpace = isProviderWorkspacePath\(path \?\? ''\)/)
   // The switcher and the homes.
@@ -263,9 +281,17 @@ test('§F the subsystem owns three /work screens, never /work — and the chrome
   // screen carrying their balance. /work serves both capabilities now.
   assert.match(menu, /if\s+\(\(isDualRole\s+\|\|\s+isMaster\)\s+&&\s+!inExpertSpace\s+&&\s+!inProviderSpace\)/)
   assert.doesNotMatch(menu, /label: SPACE_LABEL\.MASTER/, 'the second door came back')
-  const hats = read('lib/hats.ts')
-  assert.match(hats, /EXPERT: '\/work'/); assert.match(hats, /CLIENT: '\/me'/)
-  assert.match(hats, /MASTER: `\$\{PROVIDER_ROUTE\}\/requests`/)
+  // ⚠️ BEHAVIOUR, NOT THE SOURCE LINE (2026-08-21). This used to pin
+  // „MASTER: ${PROVIDER_ROUTE}/requests" as text — and by doing so it pinned the
+  // bug: /work is the only screen that grants the profile bonus and draws the
+  // balance, and the service half was the one hat sign-in never sent there. The
+  // rule is where each hat LANDS, so ask the function.
+  assert.equal(homeForHats(['EXPERT', 'CLIENT']), '/work')
+  assert.equal(homeForHats(['MASTER', 'CLIENT']), '/work', 'a service provider lands somewhere without a balance on it')
+  assert.equal(homeForHats(['CLIENT']), '/me')
+  // A company member holds RequestAccess and NO ServiceProfile, so
+  // `capabilitiesOf` gives them no WORK capability and /work would 404 them.
+  assert.equal(homeForHats(['COMPANY', 'CLIENT']), `${PROVIDER_ROUTE}/offers`)
   // ?space= renamed in lock-step, old values still accepted.
   assert.match(read('lib/messagesUnread.ts'), /export type MessagesSpace = 'client' \| 'expert'/)
   const api = codeOf('app/api/messages/route.ts')

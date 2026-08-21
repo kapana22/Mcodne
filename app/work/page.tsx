@@ -29,7 +29,7 @@ import { ensureDbReady } from '@/lib/dbBoot'
 import { routingWhere } from '@/lib/serviceProfile'
 import { PROVIDER_ROUTE, requestsOn } from '@/lib/requests'
 import { creditTasks, completeness, type CreditTaskKey } from '@/lib/credits'
-import { balanceOf, profileFacts, grantEarnedTasks } from '@/lib/creditsServer'
+import { balanceOf, profileFacts } from '@/lib/creditsServer'
 import { earnedTasks } from '@/lib/credits'
 import { PageHeader } from '@/components/PageHeader'
 import { CreditStrip } from './_components/CreditStrip'
@@ -53,12 +53,12 @@ export default async function WorkHome() {
   const isExpert = caps.includes('CONSULT')
   if (!isProvider && !isExpert) notFound()
 
-  // ⚠️ THE GRANT RUNS ON THE HOME SCREEN, and it is idempotent by a unique
-  // index rather than by a check (lib/creditsServer). A provider who filled a
-  // field in the profile editor should find the credit waiting the next time
-  // they look at their balance — not have to press something to claim it.
-  await grantEarnedTasks(user.id)
-
+  // ⚠️ THE GRANT MOVED UP TO THE SHELL (2026-08-21) — app/work/layout.tsx runs it
+  // for every workspace screen, so a provider who fills a field in the services
+  // editor is paid without first walking to this page. It used to run HERE and
+  // only here, which is why nobody had a balance: this was the one screen the
+  // service half was never routed to. The layout renders before this page, so
+  // the numbers below are already current.
   const facts = await profileFacts(user.id)
   const earned = new Set<CreditTaskKey>(earnedTasks(facts))
   const [balance, svc] = await Promise.all([

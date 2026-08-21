@@ -22,7 +22,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { pageMetadata } from '@/lib/pageSeo'
 import { ROLE } from '@/lib/roles'
-import { providersOn, PROVIDER_ROUTE } from '@/lib/requests'
+import { providersOn } from '@/lib/requests'
 import { capabilitiesOf, parseCapabilities, type Capability } from '@/lib/capabilities'
 import { ApplyMarketing } from './_expert/ApplyMarketing'
 import { MasterApplyMarketing } from './_master/_marketing'
@@ -90,12 +90,17 @@ export default async function Page({ searchParams }: { searchParams: Search }) {
   if (providersOn() && !have.includes('WORK')) offer.push('WORK')
   if (user.role !== ROLE.EXPERT && !have.includes('CONSULT')) offer.push('CONSULT')
 
-  // Nothing left to apply for → their real screen, as the two old pages did.
-  // The constant, for the reason lib/hats.ts states: this file lives outside
-  // the subsystem and must not hold its own copy of the subsystem's paths.
-  if (offer.length === 0) {
-    redirect(user.role === ROLE.EXPERT || have.includes('CONSULT') ? '/work' : `${PROVIDER_ROUTE}/requests`)
-  }
+  // Nothing left to apply for → their real screen.
+  //
+  // ⚠️ ONE DESTINATION FOR BOTH HALVES (2026-08-21). This branched, and the
+  // service half landed on the provider queue (/work/requests) — a screen
+  // with no balance on it, on a deployment where /work is the only screen
+  // that grants the profile bonus at all. Somebody who finishes the door and
+  // is shown a list of other people's jobs never learns the 100₾ exists.
+  // /work opens for either capability (it carries its own gate) and shows the
+  // queue as a cell, so nothing is lost by arriving one screen earlier. Same
+  // change as lib/hats → HAT_HOME.MASTER; the two doors have to agree.
+  if (offer.length === 0) redirect('/work')
 
   return (
     <JoinClient
