@@ -67,28 +67,41 @@ test('§A two capabilities, and their words are the signup tiles’ words', () =
   assert.deepEqual(parseCapabilities(undefined), [])
 })
 
-test('§B capabilitiesOf reads BOTH tables, the way hatsOf does', () => {
-  const src = codeOf('lib/capabilities.ts')
-  // One round trip, three selects on the User row.
-  assert.equal((src.match(/prisma\.user\.findUnique/g) ?? []).length, 1, 'capabilitiesOf is not one query')
+test('§B the supply side is decided in ONE place, from both tables', () => {
+  // ⚠️ THE READ MOVED TO lib/identity ON 2026-08-21, and the reason is what this
+  // test's last two lines used to check by hand: `capabilitiesOf` and `hatsOf`
+  // were deciding the SAME two facts — CONSULT/EXPERT from a TutorProfile,
+  // WORK/MASTER from a ServiceProfile plus an active allowlist row — in two
+  // separate queries, on the same request. „So the two answers cannot drift" is
+  // a guarantee better kept by there being one answer.
+  const src = codeOf('lib/identity.ts')
+  assert.equal((src.match(/prisma\.user\.findUnique/g) ?? []).length, 1, 'the identity is no longer one query')
   assert.match(src, /tutor: \{ select: \{ id: true \} \}/, 'CONSULT no longer reads TutorProfile')
   assert.match(src, /serviceProfile: \{ select: \{ id: true \} \}/, 'WORK no longer reads ServiceProfile')
-  assert.match(src, /requestAccess:\s+\{\s+select:\s+\{\s+active:\s+true\s+\}\s+\}/, 'WORK no longer reads the allowlist')
-  // …and the two rules: the profile for CONSULT; profile AND active access for WORK.
-  assert.match(src, /if \(u\.tutor\) out\.push\('CONSULT'\)/)
-  assert.match(src, /if\s+\(u\.serviceProfile\s+&&\s+u\.requestAccess\?\.active\s+===\s+true\)\s+out\.push\('WORK'\)/,
-    'a ServiceProfile without an active RequestAccess must NOT count as WORK — that is somebody never let in')
-  // The same reads lib/hats makes, so the two answers cannot drift.
-  const hats = codeOf('lib/hats.ts')
-  for (const sel of ['tutor: { select: { id: true } }', 'serviceProfile: { select: { id: true } }']) {
-    assert.ok(hats.includes(sel), `lib/hats no longer selects ${sel} — capabilitiesOf mirrors it`)
-  }
+  assert.match(src, /requestAccess:\s*\{\s*select:\s*\{\s*active:\s*true\s*\}\s*\}/, 'WORK no longer reads the allowlist')
+  // The two rules: the profile for CONSULT; profile AND active access for WORK.
+  assert.match(src, /const sellsConsultation = !!u\.tutor/)
+  assert.match(
+    src, /const sellsWork = !!u\.serviceProfile && u\.requestAccess\?\.active === true/,
+    'a ServiceProfile without an active RequestAccess must NOT count as WORK — that is somebody never let in',
+  )
+  // …and both vocabularies come off that one answer.
+  assert.match(src, /if \(sellsConsultation\) capabilities\.push\('CONSULT'\)/)
+  assert.match(src, /if \(sellsWork\) capabilities\.push\('WORK'\)/)
+  assert.match(src, /if \(sellsConsultation\) hats\.push\('EXPERT'\)/)
+  assert.match(src, /if \(sellsWork\) hats\.push\('MASTER'\)/)
+  // The old entry points survive for their callers, delegating rather than deciding.
+  assert.match(codeOf('lib/capabilities.ts'), /identityOf\(userId\)\)\.capabilities/, 'capabilitiesOf decides for itself again')
+  assert.match(codeOf('lib/hats.ts'), /identityOf\(userId\)\)\.hats/, 'hatsOf decides for itself again')
 })
 
 test('§C /api/me carries capabilities beside hats, and lib/me types it', () => {
   const me = codeOf('app/api/me/route.ts')
-  assert.match(me, /hats: await hatsOf\(user\.id\)/)
-  assert.match(me, /capabilities:\s+await\s+capabilitiesOf\(user\.id\)/, '/api/me stopped exposing capabilities')
+  // One read, both vocabularies off it (lib/identity) — this route is hit on
+  // nearly every page load and used to make two overlapping queries.
+  assert.match(me, /const identity = await identityOf\(user\.id\)/, '/api/me reads the identity twice again')
+  assert.match(me, /hats: identity\.hats/)
+  assert.match(me, /capabilities: identity\.capabilities/, '/api/me stopped exposing capabilities')
   const lib = read('lib/me.ts')
   assert.match(lib, /capabilities\?: \('CONSULT' \| 'WORK'\)\[\]/, 'the Me type lost `capabilities`')
   assert.match(lib, /capabilities: d\.capabilities \?\? \[\]/, 'fetchMe drops `capabilities` on the floor')

@@ -22,7 +22,7 @@
 // უნდა გავაერთიანო." This is the separating half: each hat has its own
 // workspace and nobody is shown the wrong one.
 
-import { prisma } from './prisma'
+import { identityOf } from './identity'
 import { PROVIDER_ROUTE } from './requests'
 import { homeForRole } from './roleHome'
 
@@ -80,32 +80,13 @@ export const HAT_HOME: Record<Hat, string> = {
  * empty list to reason about, and a switcher always has somewhere to go back to.
  */
 export async function hatsOf(userId: string): Promise<Hat[]> {
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      role: true,
-      tutor: { select: { id: true } },
-      serviceProfile: { select: { id: true } },
-      requestAccess: { select: { active: true, kind: true } },
-      companyMemberships: { select: { companyId: true }, take: 1 },
-    },
-  })
-  if (!u) return ['CLIENT']
-
-  const out: Hat[] = []
-  if (u.role === 'ADMIN') out.push('ADMIN')
-  // The profile, not the role: a TUTOR row without one has nothing to show on a
-  // calendar, and an approved expert always has both.
-  if (u.tutor) out.push('EXPERT')
-  // ⚠️ THE ALLOWLIST IS REQUIRED, NOT JUST THE PROFILE. A ServiceProfile with no
-  // active RequestAccess is somebody who filled in a form and was never let in —
-  // sending them to a workspace listing requests they cannot answer would be the
-  // emptiest room on the site.
-  const allowed = u.requestAccess?.active === true
-  if (u.serviceProfile && allowed) out.push('MASTER')
-  if (u.companyMemberships.length > 0) out.push('COMPANY')
-  out.push('CLIENT')
-  return out
+  // ⚠️ ONE READER SINCE 2026-08-21 (lib/identity). This used to run its own
+  // `user.findUnique` deciding EXPERT from a TutorProfile and MASTER from a
+  // ServiceProfile plus the allowlist — the identical pair of conditions
+  // lib/capabilities was deciding CONSULT and WORK from, in a second query, on
+  // the same request. They now agree by construction instead of by both being
+  // kept correct.
+  return (await identityOf(userId)).hats
 }
 
 /**

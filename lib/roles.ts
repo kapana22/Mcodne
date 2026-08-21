@@ -69,11 +69,19 @@ export const HAT_LABEL: Record<Hat, string> = {
   CLIENT: 'კლიენტი',
 }
 
-/** The screen word for a `Role` value. Unknown or missing → the client word,
- *  because that is what everybody without a special role is. */
+/**
+ * The screen word for a `Role` value.
+ *
+ * ⚠️ IT NORMALISES FIRST (2026-08-21). It used to compare the raw string, so a
+ * row still holding the legacy `TUTOR` fell past every branch and came out as
+ * „კლიენტი" — a seller labelled a buyer, on their own screen, which is the exact
+ * confusion the two-role model was written to end. `asRole` is not optional
+ * anywhere a database value is read.
+ */
 export function roleLabel(role: string | null | undefined): string {
-  if (role === ROLE.ADMIN) return HAT_LABEL.ADMIN
-  if (role === ROLE.PROVIDER) return HAT_LABEL.EXPERT
+  const r = asRole(role)
+  if (r === ROLE.ADMIN) return HAT_LABEL.ADMIN
+  if (r === ROLE.PROVIDER) return HAT_LABEL.EXPERT
   return HAT_LABEL.CLIENT
 }
 

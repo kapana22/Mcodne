@@ -9,7 +9,7 @@
 // side, and the labels are the words the signup tiles already use, so the
 // door at /join and the tile at /signup say the same thing.
 
-import { prisma } from './prisma'
+import { identityOf } from './identity'
 
 export const CAPABILITIES = ['CONSULT', 'WORK'] as const
 export type Capability = (typeof CAPABILITIES)[number]
@@ -39,19 +39,8 @@ export function parseCapabilities(raw: string | string[] | null | undefined): Ca
  * without access is somebody who filled in a form and was never let in.
  */
 export async function capabilitiesOf(userId: string): Promise<Capability[]> {
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      tutor: { select: { id: true } },
-      serviceProfile: { select: { id: true } },
-      requestAccess: { select: { active: true } },
-    },
-  })
-  if (!u) return []
-  const out: Capability[] = []
-  if (u.tutor) out.push('CONSULT')
-  if (u.serviceProfile && u.requestAccess?.active === true) out.push('WORK')
-  return out
+  // One reader for the whole identity — see lib/identity for why there were two.
+  return (await identityOf(userId)).capabilities
 }
 
 /**

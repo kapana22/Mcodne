@@ -3,8 +3,7 @@ import { normalizePhone, phoneFormatError } from '@/lib/phone'
 import { cookies } from 'next/headers'
 import { kickSweep } from '@/lib/sweepRunner'
 import { z } from 'zod'
-import { hatsOf } from '@/lib/hats'
-import { capabilitiesOf } from '@/lib/capabilities'
+import { identityOf } from '@/lib/identity'
 import { getCurrentUser, hashPassword, verifyPassword, revokeOtherSessions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeAvatar } from '@/lib/normalizeAvatar'
@@ -52,6 +51,12 @@ export async function GET() {
 
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ user: null }, { headers: NO_STORE })
+  // ⚠️ ONE READ FOR THE WHOLE IDENTITY (2026-08-21). This route called `hatsOf`
+  // AND `capabilitiesOf`, two `user.findUnique` round trips whose SELECTs
+  // overlapped almost completely and whose supply-side conditions were letter
+  // for letter the same — on the endpoint its own comment calls „the cheapest
+  // reliable heartbeat in the app", i.e. nearly every page load. See lib/identity.
+  const identity = await identityOf(user.id)
   return NextResponse.json({
     user: {
       id: user.id,
@@ -82,11 +87,11 @@ export async function GET() {
     //
     // `hatsOf` is one indexed read and this endpoint is already per-request and
     // no-store, so nothing is being paid for twice.
-    hats: await hatsOf(user.id),
+    hats: identity.hats,
     // What the person already OFFERS (lib/capabilities): CONSULT = a
     // TutorProfile, WORK = a ServiceProfile plus active RequestAccess. The
     // /join door reads it to stop offering a half somebody already has.
-    capabilities: await capabilitiesOf(user.id),
+    capabilities: identity.capabilities,
     // ⚠️ WHETHER THE CLIENT ROOM HOLDS ANYTHING (2026-08-21). Owner: „ირევა
     // ჩვეულებრივ იუზერსა და ეს უნდა გავმიჯნოთ სწორად." The user menu offered
     // „ჩემი სივრცე" beside „სამუშაო სივრცე" to every provider — and measured

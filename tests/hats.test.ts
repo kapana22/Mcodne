@@ -71,15 +71,25 @@ test('§E the allowlist is required for MASTER, not just the profile', () => {
   // ⚠️ A ServiceProfile WITHOUT an active RequestAccess is somebody who filled
   // in a form and was never let in. Sending them to a workspace listing
   // requests they cannot answer would be the emptiest room on the site.
-  const src = readFileSync('lib/hats.ts', 'utf8')
+  // The decision moved to lib/identity on 2026-08-21 — hatsOf and capabilitiesOf
+  // were computing the same two facts in two queries, so there is one reader now
+  // and both vocabularies come off it. The RULE is unchanged and is asserted at
+  // its new home.
+  const src = readFileSync('lib/identity.ts', 'utf8')
   assert.match(src, /requestAccess\?\.active === true/,
     'MASTER stopped requiring an active allowlist row')
-  assert.match(src, /u\.serviceProfile && allowed/,
+  assert.match(src, /if \(sellsWork\) hats\.push\('MASTER'\)/,
+    'MASTER is no longer derived from the same fact as WORK — the two answers can drift again')
+  // The local `allowed` variable went with the merge; the conjunction it stood
+  // for is the line asserted above, in full.
+  assert.match(src, /!!u\.serviceProfile && u\.requestAccess\?\.active === true/,
     'MASTER is granted on the profile alone')
-  // EXPERT keys on the PROFILE, not the role: a TUTOR row with no profile has
-  // nothing to put on a calendar.
-  assert.match(src, /if \(u\.tutor\) out\.push\('EXPERT'\)/,
+  // EXPERT keys on the PROFILE, not the role: a seller-role row with no profile
+  // has nothing to put on a calendar.
+  assert.match(src, /const sellsConsultation = !!u\.tutor/,
     'EXPERT went back to keying on the role')
+  assert.match(src, /if \(sellsConsultation\) hats\.push\('EXPERT'\)/,
+    'EXPERT is no longer derived from the same fact as CONSULT')
 })
 
 test('§F sign-in asks the model, not four separate tables', () => {
