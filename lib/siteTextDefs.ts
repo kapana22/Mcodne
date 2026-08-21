@@ -563,6 +563,30 @@ export function isRetiredSiteTextKey(key: string): boolean {
   return RETIRED_KEYS.has(key)
 }
 
+/**
+ * Keys that are RESOLVED ON THE SERVER AND NEVER READ IN THE BROWSER.
+ *
+ * ⚠️ THE WHOLE PUBLIC MAP TRAVELS ON EVERY PAGE. app/layout hands it to
+ * <SiteTextProvider>, a client component, so it is serialized into the RSC
+ * payload of every request — measured on production 2026-08-21: 252 keys,
+ * 37.8 KB, and on /privacy that payload was 69% of the document. A visitor
+ * reading the privacy policy was downloading the copy of /join and the home
+ * page along with it.
+ *
+ * `seo.*` (6.4 KB, 30 keys) is the clearest case: it exists to fill
+ * `generateMetadata`, which runs on the server and emits <title> and
+ * <meta> — no client component has ever read one. Shipping it is pure waste.
+ *
+ * This is NOT the retired list and must not be merged with it. A retired key
+ * describes a page that no longer exists; a server-only key describes a page
+ * that very much does, in a place the browser cannot see. Both stay readable
+ * through `getSiteTextMap` on the server and through the admin panel.
+ */
+const SERVER_ONLY_PREFIXES = ['seo.']
+export function isServerOnlySiteTextKey(key: string): boolean {
+  return SERVER_ONLY_PREFIXES.some(p => key.startsWith(p))
+}
+
 // Guard: only known keys can be written from the admin API.
 export function isKnownSiteTextKey(key: string): boolean {
   return key in SITE_TEXT_DEFAULTS

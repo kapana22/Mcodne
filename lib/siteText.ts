@@ -1,7 +1,7 @@
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { SITE_TEXT_DEFAULTS, isRetiredSiteTextKey } from '@/lib/siteTextDefs'
+import { SITE_TEXT_DEFAULTS, isRetiredSiteTextKey, isServerOnlySiteTextKey } from '@/lib/siteTextDefs'
 
 // Resolve every editable text = code default overridden by any SiteText DB row.
 // Wrapped in React `cache()` so the layout + any server component share ONE
@@ -29,6 +29,14 @@ export const getSiteTextMap = cache(async (): Promise<Record<string, string>> =>
 export const getPublicSiteTextMap = cache(async (): Promise<Record<string, string>> => {
   const full = await getSiteTextMap()
   const out: Record<string, string> = {}
-  for (const [k, v] of Object.entries(full)) if (!isRetiredSiteTextKey(k)) out[k] = v
+  // Two independent reasons a key does not travel: it describes a page that no
+  // longer exists (retired), or it is only ever read on the server (`seo.*`,
+  // which fills generateMetadata). Neither is a secret — both stay available to
+  // `getSiteTextMap` and to the admin panel; they simply are not the browser's
+  // business, and the map is serialized into EVERY page's RSC payload.
+  for (const [k, v] of Object.entries(full)) {
+    if (isRetiredSiteTextKey(k) || isServerOnlySiteTextKey(k)) continue
+    out[k] = v
+  }
   return out
 })
