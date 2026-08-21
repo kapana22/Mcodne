@@ -1,250 +1,177 @@
-# mcodne.ge — the canon
+# mcodne.ge
 
-Georgian expert marketplace (Next.js 15 + Tailwind + Prisma). UI is Georgian.
-**Every surface follows this file — public, auth, client, provider, admin alike.**
+Georgian services marketplace. Next.js 15 · React 19 · Tailwind · Prisma · Postgres.
+UI is Georgian. Rewritten 2026-08-21.
 
-> ## How to read this file
+> ### Why this file was rewritten
 >
-> **Two kinds of statement live here and they do NOT carry the same weight.**
-> Before 2026-08-20 they were written in one voice, and the effect was that a
-> decision taken on a Tuesday read like a law — which is how a canon stops
-> informing and starts caging. Owner: „არ შემზღუდოს რამეში, როგორც დიზაინში
-> ასევე ყველაფერში."
+> Owner: „რატომ უნდა იყოს ისეთი წესები, რაც მიშლის მუშაობაში" — and before that,
+> „წესები წაშალე და ახლიდან დაწერე, მასშტაბურად იცვლება საიტი."
 >
-> **🔒 ABSOLUTE** — do not re-litigate. Accessibility contracts, contrast
-> arithmetic, correctness patterns, privacy, „never invent a number". These are
-> not taste and a new idea does not get to override them.
+> The previous version had grown into a body of law. It was accurate and it was
+> in the way: in a single session it was quoted back at the owner as the reason
+> NOT to do something they had asked for — most plainly „Additive DDL only" as
+> grounds for keeping a dead column they wanted gone.
 >
-> **📌 CURRENT** — true today, decided for a reason, and **open**. Bring a better
-> idea and the owner decides. If you change one, change the line here too.
-> Everything not marked 🔒 is 📌.
+> **A rule that blocks the owner's work is a bug in the rule.** So this file no
+> longer legislates. Nearly all of it is DESCRIPTION — how the thing works today,
+> written down so nobody has to rediscover it. Change any of it; change the line
+> too.
 >
-> ⚠️ **A MEASUREMENT IS A DATE, NOT A FACT.** Every number below was true when it
-> was written. Three were stale within a fortnight („4 service groups" had become
-> 8; „6 masters" 2; „84 tests" 97). **Re-measure before you reason from one** —
-> `npm run map`, a `count()`, `ls`. Never quote a number from this file into new
-> work without checking it.
+> The list under **Things that protect a person** is different, and it is short
+> on purpose: each one exists because breaking it hurts somebody — a reader who
+> cannot see the text, a client whose phone number leaks, two providers promised
+> the same job. Those are not taste. Everything else is.
 >
-> ⚠️ **THIS FILE IS LOADED INTO EVERY TURN.** On 2026-08-20 it was 65 KB ≈ 20 800
-> tokens spent before reading a single line of the actual task. Nothing was
-> deleted — the RULES stayed here and the REASONING moved next to them:
-> **`docs/product-model.md`** (the model's history, owner quotes, the full screen
-> map) and **`docs/design-system.md`** (the full design canon).
-> Keep it that way: a rule that is broken by accident belongs here; the story of
-> why it exists belongs in `docs/`. The pre-split backup was deleted on
-> 2026-08-21 — a third copy of the same text can only drift.
->
-> ⚠️ **NOTHING IN `docs/archive/` IS CURRENT.** Finished audits, kept for their
-> reasoning. Never quote a number out of one.
+> Numbers here were measured on 2026-08-21 and they rot. `npm run map`, a
+> `count()`, an `ls` — re-measure before reasoning from one.
 
 ---
 
-## 1. THE PRODUCT MODEL — READ BEFORE ANYTHING ELSE
+## The product
 
-Owner, 2026-08-20, after catching the same mistake five times in one afternoon:
-„მინდა რომ კონსულტაციამ უკანა პლანზე გადაიწიოს და სერვისი გავუყიდოთ ექსპერტებს."
+**The site sells SERVICES.** A consultation is one KIND of service — the one with
+a fixed price and a bookable time. It is a step somebody takes before buying the
+bigger thing, offered small: on the card, in the thread, over the video room that
+already exists. Not a second product, not a headline, not its own button.
 
-1. **The site sells SERVICES.** That is the product. Full stop.
-2. **A consultation is a PRE-STEP to buying one** — offered small, on the card,
-   over the chat or the video call that already exists. Not a second product,
-   not a headline, not a button of its own.
-3. **The pitch to a provider is CLIENTS FOR THEIR SERVICE**, never „share your
-   knowledge". They set the price.
-4. **WHEREVER BOTH APPEAR, THE SERVICE COMES FIRST** — sentence, filter, rail,
-   list, example, meta description. This is the rule broken by accident, not by
-   decision: read your own sentence back and check which half arrives first.
-5. **One catalogue, one card, one namespace.** The type belongs to what is
-   OFFERED, never to what kind of person somebody is.
-6. **Retired words:** „ხელოსანი" · „მასწავლებელი" as a label · „სფერო" ·
-   „ტუტორი" · „მასტერი" · „სპეციალისტი" as a role word · „რეპეტიტორი" ·
-   „სტუდენტი" (→ კლიენტი) · „ვერიფიცირებული" (→ გადამოწმებული) ·
-   „ღირებულება" (→ ფასი) · „დამკვეთი" (→ კლიენტი). A profession NAME
-   („IT სპეციალისტი", „ინგლისურის მასწავლებელი") is fine — the ban is on the
-   ROLE word. Pinned by `tests/lexicon.test.ts`.
-7. **Tbilisi only, for now** — `CITIES` in `lib/requestTopics`.
+**Where both appear, the service comes first** — sentence, list, filter, rail,
+example. This gets broken by writing naturally rather than by deciding wrongly,
+so read your own sentence back and check which half arrives first.
 
-**Three things that must not come back:** a „კონსულტაცია/სერვისი" primary axis
-(switcher, nav item, first filter, badge on a name); two catalogues; the word
-„ხელოსანი".
+**One provider, one catalogue, one card, one namespace.** `lib/capabilities`
+holds CONSULT and WORK; a person switches the second on from the same account.
+The type belongs to what is OFFERED, never to what kind of person somebody is.
 
-**An addressed request goes to ONE person (2026-08-20).** `?to=<slug>` writes an
-INVITED offer AND `offerLimit: 1`; the queue shows „anything with room, plus what
-was addressed to me"; only the client's own button raises it back to 3. Nothing
-automatic ever widens it.
+**Words that were retired**, pinned by `tests/lexicon.test.ts`: ხელოსანი ·
+მასწავლებელი *as a label* · სფერო · ტუტორი · მასტერი · სპეციალისტი *as a role
+word* · რეპეტიტორი · სტუდენტი (→ კლიენტი) · ვერიფიცირებული (→ გადამოწმებული) ·
+ღირებულება (→ ფასი) · დამკვეთი (→ კლიენტი). A profession NAME („IT
+სპეციალისტი") is fine — the ban is on the role word.
 
-**Two leftovers to watch:**
-- 📌 **The taxonomy still leans consulting** — re-measured 2026-08-20:
-  **8 service groups / 40 topics** against **16 consultation / 77** (it was
-  4/21 vs 23/132 a fortnight ago, so this is moving). The rail sorts by count.
-  Copy cannot fix it; growing `lib/requestTopics` can.
-- **The product-defining copy lives in the `SiteText` DB table** and overrides
-  `lib/siteTextDefs`, so no test can see it. Change the default AND the row, and
-  scan the live values.
+**Tbilisi only, for now** — `CITIES` in `lib/requestTopics`.
 
-→ Full model, every owner quote, the schema reality: **`docs/product-model.md`**
+**The copy is the owner's.** Don't author or reword site text. Much of it lives
+in the `SiteText` table and overrides `lib/siteTextDefs`, so no test can see it:
+change the default AND the row.
+
+→ history, owner quotes, the full screen map: **`docs/product-model.md`**
 
 ---
 
-## 2. WHERE THINGS LIVE
+## Things that protect a person
 
-**Every big screen is a container plus `_*.tsx` siblings in its own folder.
-Open the part, not the page** — the container holds only state, fetch and layout.
+Six. Each breaks something for somebody real; none is a preference.
 
-| screen | where |
+1. **`motion-safe:` on every `animate-*`.** Vestibular disorders. The browser
+   already knows the answer and we only have to ask.
+2. **A filled brand surface is `brand-600`, never `brand-500`.** White on 500
+   measures 3.38 and fails AA. `tests/designTokens.test.ts` computes that rather
+   than trusting this sentence.
+3. **Anything tappable is ≥40px** — however it is spelled: `w-10 h-10`,
+   `size-10`, padding around a glyph.
+4. **Claim the row, don't check it.**
+   `updateMany({ where: { id, status: <expected> } })` then `count !== 1 → 409`.
+   A status read before the write is not a guard: two tabs both read VERIFIED and
+   the client promises one job to two people, each of whom now has their phone
+   number.
+5. **The public reference is a credential.** `MC-` + 5 characters is 25 bits and
+   it opens a page carrying a phone number. Never print it into a provider's mail
+   or notification; `lib/refGuard` counts wrong guesses.
+6. **Never invent a number.** No made-up ratings, counts, response times, no
+   „500+ experts". If it was not measured it does not go on the page.
+
+Dates need `lib/kaDate` (runtime ICU falls back to English) and server-side time
+needs `lib/tz → tbilisiParts()`. Not moral — just wrong otherwise.
+
+---
+
+## Where things live
+
+585 files, ~105 000 lines across `app/`, `components/`, `lib/`. Big screens are a
+container plus `_*.tsx` siblings in their own folder — **open the part, not the
+page**.
+
+| | |
 | --- | --- |
-| `/` home | `app/HomeClient.tsx` + `app/_home/` |
-| public header / footer | `components/PublicTopBar.tsx`, `components/Footer.tsx` |
-| **the catalogue** — ONE list, ONE address | `app/experts/client.tsx` + `_card` `_masterCard` `_data` `_masterData` `_filters` `_results` + `lib/catalogItems.ts` |
-| **`/experts/[slug]`** — the ONE namespace, 4 pages share it | `app/experts/[slug]/page.tsx` resolves: profession landing → trade landing → expert profile → provider profile → 404 |
-| `/join` — one door, one question | `app/join/page.tsx` + `JoinClient` + `_door/` + `_expert/` + `_master/` |
-| `/signin` + `/signup` | `app/signin/auth-client.tsx` + `_*` |
-| the two spaces | `app/me/` = the client's · `app/work/` = the supply side's |
-| `/work` — the shared home | `app/work/page.tsx` (outside both route groups, own gate) |
-| the intake | `app/request/` (`_model` is the leaf) |
-| the provider workspace | `app/work/(provider)/` — requests · offers · service-profile |
-| `/admin` | `app/admin/page.tsx` + one `_<tab>.tsx` per tab + `_parts.tsx` |
-| retired URLs | `/tutors` `/masters` `/services` `/categories` `/apply` `/konsultacia` `/student` `/tutor` `/provider` → 308, all pinned in `tests/redirects.test.ts` |
+| home | `app/HomeClient.tsx` + `app/_home/` |
+| the catalogue — one list, one address | `app/experts/` + `lib/catalogItems.ts` |
+| `/experts/[slug]` — one namespace, four pages resolve through it | `app/experts/[slug]/page.tsx` |
+| the door | `app/join/` — `_door/` `_expert/` `_master/` |
+| the two spaces | `app/me/` (client) · `app/work/` (supply) |
+| what a provider sells | `app/work/services/` |
+| the intake | `app/request/` |
+| admin | `app/admin/` — one `_<tab>.tsx` per tab |
+| retired URLs → 308 | `middleware.ts`, executed by `tests/redirects.test.ts` |
 
-**Three rules this shape depends on:**
-- **The model is a leaf.** Each folder's `_model`/`_data`/`_form` imports no
-  sibling. A cycle means model code was left in a UI file — move it, don't add
-  an import.
-- **Never split a component to shrink a file.** `BookingFlow` (1 172L) and the
-  big workspace pages are ONE component each; splitting needs ~40 props.
-- **Tests read screens as SOURCE TEXT** (~10 of them) — they must read the whole
-  route DIRECTORY, never one filename, or a negative assertion passes vacuously.
-
-**Seven page archetypes, and an eighth is forbidden:** marketing landing ·
-catalogue · profile · intake wizard · workspace · form/detail · admin tab.
-Pinned by `tests/archetypes.test.ts`.
-
-→ Per-screen notes and why each folder looks that way: **`docs/product-model.md`**
-
----
-
-## 3. DESIGN
-
-🔒 marks the four that are arithmetic or an accessibility contract — those are
-closed. The rest are 📌: they are the system as it stands, and a better idea is
-welcome; change the token, not the call site, and say so here.
-
-Each line is the rule. The measurements and the history are in
-**`docs/design-system.md`**; `lib/design/README.md` maps every "change it once"
-lever with file:line pointers.
-
-- **Two colours only.** Brand green `#2F9C86` used with restraint + the neutral
-  `ink` ramp. **No blue.** Semantic warning/danger only at the point of meaning.
-  No status dots, no decorative arrows, no ad-hoc hex.
-- 🔒 **A filled brand surface is `brand-600`**, never `brand-500` (white on 500 =
-  3.38, fails AA). **Never translucent white text on a coloured fill.**
-- **Never hand-write `text-[Npx]`** — write the token from the ramp in
-  `tailwind.config.js`. Reading text never below `text-meta` (12px); `text-micro`
-  (11px) only on uppercase+tracked labels. Between steps, round UP.
-- **Never hand-write `duration-[Nms]` or a raw `cubic-bezier()`.** Three
-  durations: `duration-fast` 140 (default) · `duration-mid` 220 ·
-  `duration-slow` 360. Two curves; `ease-out-expo` is entrances only.
-  🔒 **`motion-safe:` is MANDATORY on every `animate-*`** — an accessibility
-  contract, not a preference. The animation library is CLOSED at 8 tokens.
-- **Never hand-write `z-[N]` above 40** — the scale is in `tailwind.config.js`.
-- **A control's label size follows its height:** `h-9→text-small` ·
-  `h-11→text-body` · `h-12→text-body-lg`. Fix at the source, never via
-  `className` (two fontSize utilities resolve by emit order).
-- **Control heights are `h-9` / `h-11` / `h-12`.** Nothing between or above.
-  Anything TAPPABLE is ≥40px. Icon buttons 40×40 or 36×36.
-- **Prefer the primitives**: `Btn` `Card` `Eyebrow` `PageHeader` `Container`
-  `EmptyState` `Sheet` `Icon`. Never a page-local icon set.
-- **Glass is for surfaces you look PAST, never READ** — `.glass` / `.glass-bar`
-  in globals.css are the only translucent surfaces; never re-invent
-  `bg-white/xx backdrop-blur-*`.
-- Empty/error states are compact — icon + one line + one action.
-- 🔒 **Dates: never `toLocaleDateString('ka-GE', …)`** (runtime ICU falls back to
-  English) — use `lib/kaDate`. **Server-side never `getHours()`/`getDay()`** —
-  use `lib/tz → tbilisiParts()`.
-- **Copy is the owner's and it is PLAIN.** Never author or reword site text.
-  A borrowed indeclinable prefix takes NO hyphen (ვიდეოოთახი, ვებგვერდი);
-  only a truncated stem does (ბიზნეს-გეგმა). Pinned by
-  `tests/georgianOrthography.test.ts`.
-- 🔒 **A status check you read before the write is not a guard.** Claim the row:
-  `updateMany({ where: { id, status: <expected> } })` + `count !== 1 → 409`.
-
----
-
-## 4. FINDING THINGS — LOOK HERE FIRST
-
-**`docs/MAP.md` is a generated index. One grep answers both questions that
-otherwise cost a round trip of guessing:**
+**`docs/MAP.md` is generated — grep it, never read it whole.** 1 528 exported
+symbols → their file; 40 Prisma models → their real columns. `lib/` is 129 files
+flat and the request family alone is 13 whose names differ by a suffix —
+`requestsViewer` lives in `requestsServer.ts`, which is not guessable. The UI word
+is rarely the column: a Booking's price is `price`, a RequestOffer's is
+`priceGel`. Regenerate with `npm run map` after adding or moving an export.
 
 ```
-grep '| `primaryPriceLabel` |' docs/MAP.md     → components/booking/slots.ts
-grep '^\*\*RequestOffer\*\*'   docs/MAP.md     → its real column names
+grep '| `primaryPriceLabel` |' docs/MAP.md
+grep '^\*\*RequestOffer\*\*'   docs/MAP.md
 ```
-
-- **1 515 exported symbols → their file.** `lib/` is 126 files flat and the
-  request family alone is 13 whose names differ by a suffix — `requestsViewer`
-  is in `requestsServer.ts`, not `requests.ts`, and that is not guessable.
-- **37 Prisma models → their real fields.** The UI word is not the column: a
-  Booking's price is `price`, a RequestOffer's is `priceGel`; `ServiceProfile`
-  has no `visible` and `Category` has no `hidden`. Four queries failed on
-  guesses in one session before this existed.
-
-**Regenerate after adding or moving an export: `npm run map`.** It is DERIVED —
-never hand-edit it. A stale hand-written map is worse than none, because it is
-believed.
 
 ---
 
-## 5. HOW TO WORK HERE
+## How to work here
 
-- **Node 22.** `export PATH="/opt/homebrew/opt/node@22/bin:$PATH"` — Next 15.5
-  fails on Node 26 in ways that read as code errors. `npm rebuild sharp bcryptjs`
-  after any Node switch.
-- **`npx tsc --noEmit` must stay clean.** During work run that, or one test file
-  (`npx tsx tests/<file>.test.ts`) — not the whole gate after every edit.
-- ⚠️ **`npm run check` and `npm run dev` share `.next`.** Running the gate while
-  a dev server is up corrupts that server: pages render unstyled, manifests go
-  missing, routes 500. It reads as a product bug and is not one. Stop dev first.
-- ⚠️ **Keep the project OFF an iCloud-synced folder.** It lived in `~/Desktop`
-  until 2026-08-20; iCloud raced the build over `.next`'s thousands of files and
-  produced `ENOENT: rename '.next/export/500.html'` after a clean compile, plus a
-  day of phantom 500s.
-- **Verify visually with Playwright at 1440 and 390** before deploying. The
-  admin panel selects its tab from the **hash** (`/admin#requests`), never `?tab=`.
-- **Pre-deploy gate: `npm run check` before every `railway up`** — types → all
-  `tests/*.test.ts` → `next build`. There is no CI, and although a remote exists
-  (`origin` → github.com/kapana22/Mcodne — the line here said otherwise until
-  2026-08-21) **nothing deploys from it**: `railway up` uploads the WORKING
-  TREE, so this script is the only thing that ever runs the tests, and a commit
-  is a record rather than a release.
-- **Deploy:** `railway up --detach` (project Tutor → service mcodne →
-  https://mcodne.ge). Verify live after.
-- **DB changes are hand-written SQL** in `prisma/manual-migrations/<date>-<name>/`
-  with an `up.sql`, a `down.sql` and guards that fail loudly. Additive DDL only;
-  an enum is never renamed.
+**Node 22.** `export PATH="/opt/homebrew/opt/node@22/bin:$PATH"`. Next 15.5 fails
+on Node 26 in ways that read as code errors.
 
-## 6. WHAT A TEST MAY PIN — 📌 (added 2026-08-21)
+**While working:** `npx tsc --noEmit` (~2s), or one test file
+(`npx tsx tests/<file>.test.ts`). Not the whole gate after every edit.
 
-**Measured that day: 1 506 of 3 169 assertions were a regex over SOURCE TEXT,
-not over behaviour.** They are why an ordinary refactor fails the gate while
-nothing a user can see has changed, and owner: „ძალიან მკაცრად არის კოდი
-დაწერილი."
+**Before deploying:** `npm run check` — types → schema → 101 tests → `next build`.
+There is no CI, and `railway up` uploads the WORKING TREE, so this script is the
+only thing that ever runs the tests and a commit is a record rather than a
+release.
 
-**The test:** *if this assertion fails, has a person been harmed?* If a rename,
-a reformat or a restyle can break it while the screen is identical, it is
-pinning the wrong thing.
+**Deploy:** `railway up --detach` (project Tutor → service mcodne → mcodne.ge),
+then verify live.
 
-- **Pin behaviour.** Call the function, render the tree, execute the redirect
-  table. `tests/redirects.test.ts` and `tests/designTokens.test.ts` are the
-  models: one runs the table, the other computes the contrast.
-- **Pin an architectural fact** — that a screen imports the shared shell, that a
-  dark feature is still dark, that a leaf imports no sibling. These are real and
-  invisible to types.
-- **NEVER pin a Tailwind VALUE.** `w-10 h-10` vs `size-10` are the same 40px
-  floor; write the contract (`/(w-10 h-10|size-10)/`), never one spelling. The
-  colour, type, motion and z rules are already arithmetic in `designTokens`.
-- **NEVER pin a whole source statement verbatim.** 233 of them exist and are now
-  whitespace-tolerant (`\s+`), which survives a reformat and NOT a rename —
-  they are debt, not a pattern to copy. Replacing one with a behavioural
-  assertion is always an improvement; adding another is not.
-- **Georgian copy:** pin it only where the WORD is the rule (`lexicon`,
-  `georgianOrthography`). Everywhere else the owner edits copy in `SiteText` and
-  a pinned string makes the test wrong, not the page.
+**Two things that cost an afternoon if you don't know them:**
+- `npm run check` and `npm run dev` share `.next`, and two `next build`s fight
+  over it. The symptoms read as product bugs — unstyled pages, missing
+  manifests, `PageNotFoundError` on an API route. Stop the other one,
+  `rm -rf .next`, retry.
+- Keep the project off an iCloud-synced folder.
+
+**The database.** Schema deltas are hand-written SQL in
+`prisma/manual-migrations/<date>-<name>/` with an `up.sql`, a `down.sql` and
+guards that fail loudly. `lib/dbBoot` applies them at first request and stamps
+the set with a hash of its own source, so a warm boot costs two round trips
+instead of 166 — edit that file and the next boot legitimately re-runs once.
+
+Prefer additive DDL, and **that is advice, not a prohibition.** Dropping a
+`NOT NULL` column just has an order: drop the constraint, deploy the code that
+stops writing it, then drop the column. The hazard is the sequence and it has a
+known answer — it was never a reason to keep dead columns.
+
+**Testing.** 101 files, no runner, each exits non-zero on failure. Pin
+BEHAVIOUR: call the function, render the tree, execute the redirect table. A
+regex over source text is a last resort, and ~1 500 of them exist — debt, not a
+pattern to copy. If an assertion can break on a rename, a reformat or a restyle
+while the screen is identical, it is pinning the wrong thing. Deleting one that
+outlived its reason is fine; say so in the commit.
+
+**Design.** Two colours — brand green `#2F9C86` and the neutral `ink` ramp, no
+blue. Tokens live in `tailwind.config.js`: the type ramp, three durations, two
+curves, the z-scale, control heights `h-9`/`h-11`/`h-12`. Reach for the
+primitives (`Btn` `Card` `Eyebrow` `PageHeader` `Container` `EmptyState` `Sheet`
+`Icon`) before writing a new one, and change the token rather than the call site.
+When the owner ships a design canvas, that is the newer decision — port it and
+update whatever test pinned the older one.
+→ the full canon and its measurements: **`docs/design-system.md`**
+
+**Dark features.** `FEATURE_PAYMENTS_V2` · `PAYMENTS_LIVE` ·
+`FEATURE_REQUEST_BOOKING` · `FEATURE_ABROAD` · `PACKAGES_VISIBILITY` ·
+`B2B_VISIBILITY` are off in `lib/flags.ts`. Their code and copy stay reachable so
+the flag can simply be turned on. A dark feature is not a deleted one.
+
+**`docs/archive/` is history.** Nothing in it is current; never quote a number
+out of it.
