@@ -83,26 +83,57 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // in this slot, never the price of asking — which only invites the question
   // „so what DOES cost?".
   { key: 'home.hero.subtitleEmphasis', group: 'მთავარი — Hero', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'ფასი პროფილზევე წერია.' },
-  { key: 'home.hero.trustChip', group: 'მთავარი — Hero', label: 'ნდობის ხაზი (პატარა, ზემოთ)', default: 'ხელით შერჩეული ბაზა' },
-  // Shown ONLY while the catalog has no ratings yet — once real reviews exist
-  // the same slot prints „4.8★ საშუალო შეფასება", which is computed.
-  { key: 'home.hero.browseAll', group: 'მთავარი — Hero', label: 'ტექსტი სანამ შეფასებები არაა', default: 'გადახედე მთელ ბაზას' },
+  // ⚠️ RETIRED 2026-08-21 (the redesign — see app/_home/hero). The trust strip
+  // and the ratings-fallback line belonged to the hero's stats lattice, and the
+  // design canvas replaces the whole lattice with six real priced cards
+  // directly underneath. The keys stay: a production row may hold copy typed
+  // under these exact strings.
+  { key: 'home.hero.trustChip', group: 'მთავარი — Hero', label: 'ნდობის ხაზი (პატარა, ზემოთ)', default: 'ხელით შერჩეული ბაზა', retired: true },
+  { key: 'home.hero.browseAll', group: 'მთავარი — Hero', label: 'ტექსტი სანამ შეფასებები არაა', default: 'გადახედე მთელ ბაზას', retired: true },
+  // ── THE ONE FIELD (2026-08-21) ──
+  // The placeholder is a worked EXAMPLE, not an instruction („მაგ. …"): a
+  // marketplace box that says „ძებნა" teaches nothing, and the chip rail under
+  // it is the same lesson in eight more words. Keep it a real, bookable thing.
+  { key: 'home.hero.searchPlaceholder', group: 'მთავარი — Hero', label: 'საძიებო ველი — მინიშნება', default: 'მაგ. ბინის დალაგება' },
+  { key: 'home.hero.searchCta', group: 'მთავარი — Hero', label: 'საძიებო ველი — ღილაკი', default: 'ვეძებოთ' },
+  // Read aloud, never seen — the label a screen reader announces for the field.
+  // A placeholder is not a label: it vanishes the moment somebody types.
+  { key: 'home.hero.searchLabel', group: 'მთავარი — Hero', label: 'საძიებო ველი — ხმოვანი წარწერა', default: 'რას ეძებ?' },
 
   // ── Home · Categories section ──
-  { key: 'home.categories.eyebrow', group: 'მთავარი — კატეგორიები', label: 'პატარა იარლიყი (ზემოთ)', default: 'კატეგორიები' },
-  { key: 'home.categories.title', group: 'მთავარი — კატეგორიები', label: 'სათაური', default: 'აირჩიე შენი კატეგორია' },
-  { key: 'home.categories.subtitle', group: 'მთავარი — კატეგორიები', label: 'ქვესათაური', default: 'აირჩიე მიმართულება და ნახე, ვინ მუშაობს ამაზე.' },
-  { key: 'home.categories.allEyebrow', group: 'მთავარი — კატეგორიები', label: 'იარლიყი კატეგორიების სიის ზემოთ', default: 'ყველა კატეგორია' },
+  // ⚠️ ONE HEADING NOW (2026-08-21). The section was an eyebrow + a heading + a
+  // subtitle + a second label over a text list of every sphere; the design
+  // canvas is a heading over six tiles that each carry their own expert count,
+  // which says everything the three removed lines were saying in prose.
+  // The four old keys are RETIRED, not reused: a production row still holds the
+  // sentence „აირჩიე მიმართულება და ნახე, ვინ მუშაობს ამაზე." and printing it
+  // under a grid that already answers it would be the CMS contradicting itself.
+  { key: 'home.categories.eyebrow', group: 'მთავარი — კატეგორიები', label: 'პატარა იარლიყი (ზემოთ)', default: 'კატეგორიები', retired: true },
+  { key: 'home.categories.title', group: 'მთავარი — კატეგორიები', label: 'სათაური', default: 'აირჩიე შენი კატეგორია', retired: true },
+  { key: 'home.categories.subtitle', group: 'მთავარი — კატეგორიები', label: 'ქვესათაური', default: 'აირჩიე მიმართულება და ნახე, ვინ მუშაობს ამაზე.', retired: true },
+  { key: 'home.categories.allEyebrow', group: 'მთავარი — კატეგორიები', label: 'იარლიყი კატეგორიების სიის ზემოთ', default: 'ყველა კატეგორია', retired: true },
+  { key: 'home.spheres.title', group: 'მთავარი — კატეგორიები', label: 'სათაური', default: 'კატეგორიები' },
 
   // ── Home · Experts section ──
   // `home.experts.title` is the section h2 — but ONLY while no sphere is
   // selected. Tap a sphere and the heading becomes „{სფერო} — N ექსპერტი",
   // which is generated and cannot be edited. Worth knowing before someone
   // concludes the field is broken because their text „disappeared".
-  { key: 'home.experts.eyebrow', group: 'მთავარი — ექსპერტები', label: 'პატარა იარლიყი (ზემოთ)', default: 'ექსპერტები' },
-  { key: 'home.experts.empty', group: 'მთავარი — ექსპერტები', label: 'როცა კატეგორიაში ექსპერტი არაა', default: 'ამ კატეგორიაში ჯერ არ არის ექსპერტი' },
-  { key: 'home.experts.allCta', group: 'მთავარი — ექსპერტები', label: 'ღილაკი სიის ბოლოს', default: 'ნახე ყველა ექსპერტი' },
-  { key: 'home.experts.title', group: 'მთავარი — ექსპერტები', label: 'სათაური (როცა კატეგორია არჩეული არაა)', default: 'ხელით შერჩეული ექსპერტები.' },
+  // ⚠️ ALL FOUR RETIRED 2026-08-21. The sphere chips went with the redesign, so
+  // the „selected sphere" heading, its eyebrow and the per-sphere empty state
+  // describe an interaction that no longer exists on this page. The section is
+  // one heading and one link now — new keys below, because a production row
+  // still holds „ხელით შერჩეული ექსპერტები." under the old string and the
+  // section it titles is a merged catalogue, not a roster of experts.
+  { key: 'home.experts.eyebrow', group: 'მთავარი — ექსპერტები', label: 'პატარა იარლიყი (ზემოთ)', default: 'ექსპერტები', retired: true },
+  { key: 'home.experts.empty', group: 'მთავარი — ექსპერტები', label: 'როცა კატეგორიაში ექსპერტი არაა', default: 'ამ კატეგორიაში ჯერ არ არის ექსპერტი', retired: true },
+  { key: 'home.experts.allCta', group: 'მთავარი — ექსპერტები', label: 'ღილაკი სიის ბოლოს', default: 'ნახე ყველა ექსპერტი', retired: true },
+  { key: 'home.experts.title', group: 'მთავარი — ექსპერტები', label: 'სათაური (როცა კატეგორია არჩეული არაა)', default: 'ხელით შერჩეული ექსპერტები.', retired: true },
+  // „ახლა ხელმისაწვდომია" is a claim the grid under it has to keep: every card
+  // is a live, listed, priced offer. If that ever stops being true, change the
+  // query, not this line.
+  { key: 'home.now.title', group: 'მთავარი — ახლა ხელმისაწვდომია', label: 'სათაური', default: 'ახლა ხელმისაწვდომია' },
+  { key: 'home.now.allCta', group: 'მთავარი — ახლა ხელმისაწვდომია', label: 'ბმული სათაურის გვერდით', default: 'ყველა' },
 
   // ── Home · How it works ──
   // The WHOLE section is editable, top to bottom (2026-08-04). Before that, the
@@ -110,23 +141,39 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // were not — so the admin could edit two thirds of one section and had no way
   // to tell which third was which. Half an editable section is worse than none:
   // it teaches you the panel is unreliable.
-  { key: 'home.how.eyebrow', group: 'მთავარი — როგორ მუშაობს', label: 'პატარა იარლიყი (ზემოთ)', default: 'როგორ მუშაობს' },
+  { key: 'home.how.eyebrow', group: 'მთავარი — როგორ მუშაობს', label: 'პატარა იარლიყი (ზემოთ)', default: 'როგორ მუშაობს', retired: true },
   // Two lines on purpose — the line break is authored, not automatic. Rendered
   // with `whitespace-pre-line`, so a plain Enter in the admin textarea is the
   // line break. Keep it two lines: one long line re-wraps badly at 390px.
-  { key: 'home.how.title', group: 'მთავარი — როგორ მუშაობს', label: 'სათაური (ორ ხაზად)', multiline: true, default: 'სამი ნაბიჯი —\nდა შეთავაზებები მოდის.' },
-  { key: 'home.how.subtitle', group: 'მთავარი — როგორ მუშაობს', label: 'ქვესათაური', default: 'აღწერე, მიიღე, აირჩიე.' },
-  { key: 'home.how.cta', group: 'მთავარი — როგორ მუშაობს', label: 'ღილაკი', default: 'მოთხოვნის დატოვება' },
-  { key: 'home.how.step1.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — სათაური', default: 'აღწერე რა გჭირდება' },
-  { key: 'home.how.step1.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'ორიოდე კითხვა. ანგარიში არ სჭირდება.' },
-  { key: 'home.how.step2.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — სათაური', default: 'მიიღე შეთავაზებები' },
-  { key: 'home.how.step2.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'ექსპერტები თავად წერენ ფასს და ვადას — მაქსიმუმ სამი შეთავაზება.' },
+  { key: 'home.how.title', group: 'მთავარი — როგორ მუშაობს', label: 'სათაური (ორ ხაზად)', multiline: true, default: 'სამი ნაბიჯი —\nდა შეთავაზებები მოდის.', retired: true },
+  { key: 'home.how.subtitle', group: 'მთავარი — როგორ მუშაობს', label: 'ქვესათაური', default: 'აღწერე, მიიღე, აირჩიე.', retired: true },
+  { key: 'home.how.cta', group: 'მთავარი — როგორ მუშაობს', label: 'ღილაკი', default: 'მოთხოვნის დატოვება', retired: true },
+  { key: 'home.how.step1.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — სათაური', default: 'აღწერე რა გჭირდება', retired: true },
+  { key: 'home.how.step1.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'ორიოდე კითხვა. ანგარიში არ სჭირდება.', retired: true },
+  { key: 'home.how.step2.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — სათაური', default: 'მიიღე შეთავაზებები', retired: true },
+  { key: 'home.how.step2.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'ექსპერტები თავად წერენ ფასს და ვადას — მაქსიმუმ სამი შეთავაზება.', retired: true },
   // Step 3 has TWO versions and only one of them is on screen. These keys are
   // the PAYMENTS_LIVE=false version, which is what the site shows today. The
   // „დაცული გადახდა" version stays in code until payments actually ship —
   // an editable field for a string nobody can see is a dead control.
-  { key: 'home.how.step3.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'აირჩიე და შეთანხმდი' },
-  { key: 'home.how.step3.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'ნომერს მხოლოდ ის ექსპერტი ნახავს, ვისაც აირჩევ.' },
+  { key: 'home.how.step3.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'აირჩიე და შეთანხმდი', retired: true },
+  { key: 'home.how.step3.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'ნომერს მხოლოდ ის ექსპერტი ნახავს, ვისაც აირჩევ.', retired: true },
+
+  // ── Home · How it works, THE BROWSE FLOW (2026-08-21) ──
+  // ⚠️ NEW KEYS, NOT THE `home.how.*` ONES ABOVE, and that is the whole point.
+  // Those nine describe the REQUEST funnel („აღწერე რა გჭირდება → მიიღე
+  // შეთავაზებები"), a production row holds the owner's own wording under each,
+  // and the section they titled is now three steps about choosing from a priced
+  // list. Reusing the key would print the request wording under a heading about
+  // browsing — the CMS lying, quietly, on the busiest page on the site. The old
+  // rows survive untouched and come back with the section if it ever returns.
+  { key: 'home.steps.title', group: 'მთავარი — როგორ მუშაობს', label: 'სათაური', default: 'როგორ მუშაობს' },
+  { key: 'home.steps.s1.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — სათაური', default: 'აირჩიე' },
+  { key: 'home.steps.s1.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'ფასი პროფილზე წერია — ხედავ და ირჩევ, არაფერს ელოდები.' },
+  { key: 'home.steps.s2.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — სათაური', default: 'შეთანხმდი' },
+  { key: 'home.steps.s2.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'დეტალებს პირდაპირ ექსპერტთან აზუსტებ. თუ დრო სჭირდება — საათსაც ირჩევ.' },
+  { key: 'home.steps.s3.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'შესრულდა' },
+  { key: 'home.steps.s3.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'სამუშაო სრულდება შეთანხმებულ ფასში. კონტაქტს მხოლოდ არჩეული იღებს.' },
 
   // ── Home · What every booking includes — RETIRED 2026-08-08 (owner) ──
   // The three-cell strip at the foot of „როგორ მუშაობს" was deleted from
@@ -155,10 +202,25 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // broken). The heading's second, green line is still branched, so it stays.
   // ⚠ The paragraph no longer follows PAYMENTS_LIVE — re-type it here the day
   // paid bookings ship.
-  { key: 'home.expertCta.eyebrow', group: 'მთავარი — გახდი ექსპერტი', label: 'პატარა იარლიყი (ზემოთ)', default: 'ექსპერტებისთვის' },
-  { key: 'home.expertCta.title', group: 'მთავარი — გახდი ექსპერტი', label: 'სათაური (1-ლი ხაზი)', default: 'მიიღე კლიენტები.' },
-  { key: 'home.expertCta.body', group: 'მთავარი — გახდი ექსპერტი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'შენ ადგენ ფასს, დროსა და მოცულობას. დანარჩენს ჩვენ ვუვლით.' },
-  { key: 'home.expertCta.cta', group: 'მთავარი — გახდი ექსპერტი', label: 'ღილაკი', default: 'შემოგვიერთდი' },
+  { key: 'home.expertCta.eyebrow', group: 'მთავარი — გახდი ექსპერტი', label: 'პატარა იარლიყი (ზემოთ)', default: 'ექსპერტებისთვის', retired: true },
+  { key: 'home.expertCta.title', group: 'მთავარი — გახდი ექსპერტი', label: 'სათაური (1-ლი ხაზი)', default: 'მიიღე კლიენტები.', retired: true },
+  { key: 'home.expertCta.body', group: 'მთავარი — გახდი ექსპერტი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'შენ ადგენ ფასს, დროსა და მოცულობას. დანარჩენს ჩვენ ვუვლით.', retired: true },
+  { key: 'home.expertCta.cta', group: 'მთავარი — გახდი ექსპერტი', label: 'ღილაკი', default: 'შემოგვიერთდი', retired: true },
+
+  // ── Home · the supply band (2026-08-21) ──
+  // ⚠️ THE BUTTON'S LABEL IS NOT HERE, and must not be added. „დაარეგისტრირე
+  // სერვისი" is `JOIN_DOOR_LABEL` in lib/capabilities, shared with the header
+  // and the footer: the site's three supply links say one thing and point at
+  // one door. An editable fourth copy is exactly how „გახდი ექსპერტი" outlived
+  // its own retirement in one corner of the site.
+  // The four `home.expertCta.*` keys above are retired for the usual reason —
+  // their rows hold the old pitch („მიიღე კლიენტები." / „შენ ადგენ ფასს…"),
+  // which is about a consultation practice; this band sells listing a SERVICE.
+  { key: 'home.supply.title', group: 'მთავარი — დაარეგისტრირე სერვისი', label: 'სათაური', default: 'შენი სერვისი — შენი ფასი' },
+  { key: 'home.supply.body', group: 'მთავარი — დაარეგისტრირე სერვისი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'დაარეგისტრირე რასაც აკეთებ და დაწერე ფასი. კლიენტი ბარათიდანვე ხედავს, რას ყიდი და რა ღირს.' },
+  // How long it takes, beside the button. Two words, and they answer the one
+  // objection („not now") before it is formed.
+  { key: 'home.supply.note', group: 'მთავარი — დაარეგისტრირე სერვისი', label: 'ღილაკის გვერდით — რამდენი დრო', default: '2 წუთი' },
 
   // ── Categories page — RETIRED 2026-08-19 (stage 8) ──
   // app/categories/∗ was deleted; the URLs 308 to /experts?category=. The keys
@@ -582,6 +644,14 @@ export function isRetiredSiteTextKey(key: string): boolean {
  * that very much does, in a place the browser cannot see. Both stay readable
  * through `getSiteTextMap` on the server and through the admin panel.
  */
+// ⚠️ `abroad.*` WAS ADDED HERE ON 2026-08-21 AND TAKEN STRAIGHT BACK OUT.
+// 29 keys and 4 KB, for a vertical whose flag is off — it looked free. It is
+// not: three tests failed on it, and they were right to. The diaspora landing
+// renders through the SAME provider as everything else, `siteTexts.test.ts`
+// requires every registered key to be rendered by some component, and both
+// depend on the copy being reachable from the browser whether or not the flag
+// is on today. Withholding it would mean the vertical could not simply be
+// switched on. A dark feature is not the same thing as a deleted one.
 const SERVER_ONLY_PREFIXES = ['seo.']
 export function isServerOnlySiteTextKey(key: string): boolean {
   return SERVER_ONLY_PREFIXES.some(p => key.startsWith(p))

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { INTEGRATION_KEYS } from '@/lib/integrations'
+import { INTEGRATION_KEYS, INTEGRATIONS_TAG } from '@/lib/integrations'
 
 const FIELD_KEY = {
   gaId: INTEGRATION_KEYS.ga,
@@ -66,6 +67,11 @@ export async function PATCH(req: Request) {
       targetId: key,
       meta: { field, codeInjection: isCodeInjection },
     })
+    // ⚠️ WITHOUT THIS THE SAVE APPEARS TO DO NOTHING for up to an hour. The
+    // root layout reads these through a tagged data cache (lib/integrations),
+    // which is what stopped every page in the site being dynamic; the tag is
+    // the half that keeps an admin's change instant.
+    revalidateTag(INTEGRATIONS_TAG)
     return NextResponse.json({ ok: true, cleared: true })
   }
 
@@ -85,5 +91,6 @@ export async function PATCH(req: Request) {
       value: isCodeInjection ? `${value.slice(0, 200)}${value.length > 200 ? '…' : ''}` : value,
     },
   })
+  revalidateTag(INTEGRATIONS_TAG)
   return NextResponse.json({ ok: true })
 }

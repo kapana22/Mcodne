@@ -76,3 +76,33 @@ test('the payload stays within sight of what was measured', () => {
     `the map every page ships is now ${bytes.toLocaleString()} bytes. Either trim it, or mark the new prefix server-only, or raise this ceiling on purpose.`,
   )
 })
+
+test('the data cache is an optimisation, never a dependency', () => {
+  // `unstable_cache` reaches for a store Next installs PER REQUEST. Called from
+  // anywhere else — a test, a seed script, a cron entry point — it does not
+  // degrade, it throws „Invariant: incrementalCache missing". Both readers were
+  // wrapped in it on 2026-08-21 and tests/abroad.test.ts caught it within the
+  // hour by rendering a landing page in plain Node.
+  //
+  // So both must fall back to the plain query. A caller that used to work and
+  // now crashes is a worse trade than any number of round trips.
+  for (const f of ['lib/siteText.ts', 'lib/integrations.ts']) {
+    const src = readFileSync(join(ROOT, f), 'utf8')
+    assert.match(src, /unstable_cache/, `${f} no longer caches — every page view pays a round trip again`)
+    assert.match(
+      src, /try\s*\{[\s\S]{0,200}Cached\(\)[\s\S]{0,120}\}\s*catch\s*\{[\s\S]{0,200}\}/,
+      `${f} calls the cached reader without a fallback — it will throw outside a request`,
+    )
+  }
+})
+
+test('an admin save drops the tag, or the edit is invisible for an hour', () => {
+  for (const [route, tag] of [
+    ['app/api/admin/site-texts/route.ts', 'SITE_TEXT_TAG'],
+    ['app/api/admin/integrations/route.ts', 'INTEGRATIONS_TAG'],
+  ]) {
+    const src = readFileSync(join(ROOT, route), 'utf8')
+    assert.match(src, /revalidateTag/, `${route} writes copy but never busts the cache — the save would look like it did nothing`)
+    assert.match(src, new RegExp(`revalidateTag\\(${tag}\\)`), `${route} busts some other tag`)
+  }
+})

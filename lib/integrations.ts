@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { unstable_noStore as noStore } from 'next/cache'
+import { unstable_cache } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 
@@ -13,12 +13,30 @@ export type Integrations = { gaId: string; headerHtml: string; footerHtml: strin
 
 const KEYS = { ga: 'integration.gaId', header: 'integration.headerHtml', footer: 'integration.footerHtml' } as const
 
-export const getIntegrations = cache(async (): Promise<Integrations> => {
-  // Read at REQUEST time, never baked into the static build — otherwise the GA
-  // id set in the admin panel is lost if the DB is unreachable during `next
-  // build` (root layout is otherwise static), and admin changes wouldn't apply
-  // until the next deploy.
-  noStore()
+/** The tag app/api/admin/integrations busts the moment an admin saves. */
+export const INTEGRATIONS_TAG = 'integrations'
+
+/**
+ * ⚠️ THIS FUNCTION USED TO CALL `noStore()`, AND THAT MADE THE WHOLE SITE
+ * DYNAMIC (fixed 2026-08-21).
+ *
+ * The reasoning behind it was sound and the cost was invisible. It is read by
+ * the ROOT LAYOUT, so opting it out of the data cache opted out every page
+ * underneath: `next build` marked all but /robots.txt as „server-rendered on
+ * demand", and /privacy — a page with no data on it at all — paid a database
+ * round trip and a full render on every visit. Measured on production the same
+ * day: TTFB 0.585s on /privacy against 0.564s on the home page, which is the
+ * shape of a site where nothing is cached and every page costs the same.
+ *
+ * What noStore() was protecting is real: the GA id must survive a build that
+ * cannot reach the database, and an admin's change must apply without waiting
+ * for a deploy. A CACHE WITH A TAG keeps both, and gives up nothing —
+ * app/api/admin/integrations calls `revalidateTag` the instant it writes, so a
+ * saved change is live on the next request rather than in an hour.
+ *
+ * The hour is only the backstop for a tag that somehow never fires.
+ */
+const readIntegrations = async (): Promise<Integrations> => {
   const out: Integrations = { gaId: '', headerHtml: '', footerHtml: '' }
   try {
     await ensureDbReady()
@@ -33,6 +51,26 @@ export const getIntegrations = cache(async (): Promise<Integrations> => {
     }
   } catch { /* keep empties */ }
   return out
+}
+
+const readIntegrationsCached = unstable_cache(
+  readIntegrations,
+  ['integrations-v1'],
+  { tags: [INTEGRATIONS_TAG], revalidate: 3600 },
+)
+
+/** React `cache()` on top: one call per request even before the data cache.
+ *
+ *  ⚠️ The data cache is an OPTIMISATION, not a dependency — `unstable_cache`
+ *  throws („Invariant: incrementalCache missing") anywhere that is not a server
+ *  render, so a script or a test calling this must still get an answer. Same
+ *  shape as lib/siteText, and for the same reason. */
+export const getIntegrations = cache(async (): Promise<Integrations> => {
+  try {
+    return await readIntegrationsCached()
+  } catch {
+    return readIntegrations()
+  }
 })
 
 export const INTEGRATION_KEYS = KEYS

@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { SITE_TEXTS, isKnownSiteTextKey } from '@/lib/siteTextDefs'
+import { SITE_TEXT_TAG } from '@/lib/siteText'
 import { INTEGRATION_KEYS } from '@/lib/integrations'
 import { checkGeorgianCopy, describeViolations } from '@/lib/georgianOrthography'
 import { FEATURE_ABROAD } from '@/lib/flags'
@@ -101,6 +103,11 @@ export async function PATCH(req: Request) {
       targetId: key,
       meta: { key, prevValue: before?.value?.slice(0, 300) ?? null },
     })
+    // ⚠️ THE RESET IS ONLY VISIBLE ONCE THE TAG IS DROPPED. The site's copy is
+    // read through a tagged data cache (lib/siteText) — that is what stopped
+    // every page paying a database round trip — so a row deleted without this
+    // line would keep showing for up to an hour.
+    revalidateTag(SITE_TEXT_TAG)
     return NextResponse.json({ ok: true, reset: true })
   }
   if (value === undefined) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
@@ -135,6 +142,8 @@ export async function PATCH(req: Request) {
     targetId: key,
     meta: { key, value: value.slice(0, 300), prevValue: before?.value?.slice(0, 300) ?? null },
   })
+  // Same as the reset branch: the write is not live until the tag is dropped.
+  revalidateTag(SITE_TEXT_TAG)
   // `ok: true` regardless — the row is written. `warnings` is advice about the
   // text that was just SAVED, never a reason it wasn't.
   return NextResponse.json({
