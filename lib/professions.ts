@@ -40,7 +40,7 @@
 
 /** slug → the professions that belong to that sphere, in the owner's order. */
 export const PROFESSIONS: Record<string, readonly string[]> = {
-  // ⚠️ THREE NAMES LEFT THIS FILE ON 2026-08-20 (docs/TAXONOMY-AUDIT §P6) and
+  // ⚠️ THREE NAMES LEFT THIS FILE ON 2026-08-20 (docs/archive/TAXONOMY-AUDIT §P6) and
   // they must not come back: „მეწარმე" and „სტრატეგი" here, „ჟურნალისტი" in
   // media. „მეწარმე" is an IDENTITY, not something anybody can buy — the exact
   // fault that retired „ხელოსანი"; „სტრატეგი" is covered twice over by
@@ -281,37 +281,60 @@ export type ProfessionCapability = 'CONSULT' | 'WORK'
  * short and obvious on purpose — a claim that everybody does jobs is no claim.
  * ⚠️ Not routed anywhere yet (see the header): stage 9+ / join data.
  */
-const ALSO_WORKS: readonly string[] = [
-  'ბუღალტერი',
-  'გრაფიკული დიზაინერი',
-  'UX/UI დიზაინერი',
-  'დეველოპერი',
-  'ფოტოგრაფი',
-  'ვიდეოგრაფი',
-  'მონტაჟის სპეციალისტი',
-  'თარჯიმანი',
-  'კოპირაითერი',
-  'ინტერიერის დიზაინერი',
-  'არქიტექტორი',
-  'SMM სპეციალისტი',
-  // ტალღა 1 — the six that sell a JOB and nothing else. They are listed here
-  // rather than given a flag of their own because `PROFESSION_CAN` is the one
-  // answer to „what can this person sell", and a second mechanism for the same
-  // question is how the two halves drifted apart the last time.
+/**
+ * THE PROFESSIONS THAT DO NOT CONSULT.
+ *
+ * ⚠️ THIS LIST IS THE INVERSE OF WHAT IT USED TO BE, AND THE INVERSION IS THE
+ * PRODUCT MODEL (2026-08-20). It was `ALSO_WORKS`: every profession consulted by
+ * default and a short list ALSO delivered. That is the old site — a consultation
+ * platform where a job was the exception. Owner, restating the model in one
+ * sentence: „ყველამ სერვისი უნდა დაამატოს, ვისაც რა აქვს… და კონსულტაცია
+ * ცალკე ფუნქცია ექნება."
+ *
+ * So the base is inverted to match rule 1 (THE SITE SELLS SERVICES):
+ *
+ *   WORK      EVERY profession. It is not a list because it is not an
+ *             exception — a service is what this site sells, and a psychologist
+ *             selling „ბავშვთა სეანსი — 100₾" is selling one exactly as a
+ *             plumber selling a repair is.
+ *   CONSULT   an OFFER, not a default — the switch a provider turns on when a
+ *             conversation is itself a product they sell. Suggested for every
+ *             profession EXCEPT the ones below.
+ *
+ * ⚠️ WHAT THIS FIXES, MEASURED THE DAY IT CHANGED. `PROFESSION_CAN` could not
+ * express „I only do jobs": `სანტექნიკოსი` resolved to `['CONSULT','WORK']`, so
+ * a plumber was told they would take consultations and met the whole
+ * consultation apparatus — a calendar, tiers, session lengths — none of which
+ * they sell. The comment on the old list already said these four „sell a JOB and
+ * nothing else"; the code just did not agree with it.
+ *
+ * KEEP IT SHORT. A profession belongs here only when a paid conversation about
+ * the work is genuinely not a thing anyone buys. When in doubt leave it out —
+ * CONSULT is only ever an offer, and an offer nobody takes costs nothing, while
+ * a missing one closes a door.
+ */
+const WORK_ONLY: readonly string[] = [
   'სანტექნიკოსი',
   'ელექტრიკოსი',
   'კონდიციონერის სპეციალისტი',
   'ტექნიკის სპეციალისტი',
 ]
 
-/** job → what it can do. Every profession is present; default `['CONSULT']`. */
+/**
+ * job → what it can sell. WORK for everybody; CONSULT unless the job is one of
+ * the four above. „Can" here means „may be OFFERED", never „already has" — what
+ * a provider actually turned on is `lib/capabilities → capabilitiesOf`, which
+ * reads their real rows.
+ */
 export const PROFESSION_CAN: Record<string, readonly ProfessionCapability[]> = Object.fromEntries(
-  ALL_PROFESSIONS.map(p => [p.job, ALSO_WORKS.includes(p.job) ? ['CONSULT', 'WORK'] : ['CONSULT']]),
+  ALL_PROFESSIONS.map(p => [p.job, WORK_ONLY.includes(p.job) ? ['WORK'] : ['CONSULT', 'WORK']]),
 )
 
-/** What one profession can do; an unknown job can only consult. */
+/** What one profession may be offered. An UNKNOWN job sells services — that is
+ *  the base, and guessing „consultant" for a word we do not recognise is the
+ *  old default that this file just stopped having. */
 export function professionCan(job: string): readonly ProfessionCapability[] {
-  return PROFESSION_CAN[job] ?? ['CONSULT']
+  return PROFESSION_CAN[job] ?? ['WORK']
 }
 
 /** Every profession that can do `cap`, in the owner's order. */

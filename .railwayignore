@@ -14,3 +14,15 @@ mcodne-ge
 2
 .workstation
 .planflow
+
+# Nothing below is needed to BUILD or RUN the app, and production deploys from
+# the WORKING TREE (`railway up`), not from git — so anything sitting in the
+# folder is uploaded whether or not it is committed. Measured 2026-08-21:
+# 23 MB of it, on every deploy.
+scratch
+design
+docs
+_audit_tmp*
+*.md
+.h.png
+.hero.png

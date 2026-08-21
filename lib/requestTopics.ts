@@ -854,7 +854,7 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     ],
   },
   {
-    // ⚠️ „და მშენებლობა" LEFT THIS LABEL ON 2026-08-20 (docs/TAXONOMY-AUDIT §P3).
+    // ⚠️ „და მშენებლობა" LEFT THIS LABEL ON 2026-08-20 (docs/archive/TAXONOMY-AUDIT §P3).
     // Construction was in two places at once — here and in the `architecture`
     // category — and a subject filed twice is a subject nobody can filter on.
     // `architecture` („არქიტექტურა და მშენებლობა") keeps it; this group is the

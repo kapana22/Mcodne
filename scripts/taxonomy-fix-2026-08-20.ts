@@ -1,4 +1,4 @@
-// docs/TAXONOMY-AUDIT items 3, 4 and 5 — the ones the audit put in „ერთ დღეში"
+// docs/archive/TAXONOMY-AUDIT items 3, 4 and 5 — the ones the audit put in „ერთ დღეში"
 // and that never reached the registration screen. Owner, looking at /join:
 // „ათასჯერ ვთქვი ამის გამოსწორება და ისევ იგივეა."
 //

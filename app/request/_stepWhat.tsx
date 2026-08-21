@@ -447,7 +447,11 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block font-display text-body font-semibold text-ink-900 break-words no-caps">
-                      „{q.trim()}"
+                      {/* The closer is a plain ASCII quote, as everywhere else on the
+                          site — wrapped in an expression only because a bare one in
+                          JSX TEXT trips react/no-unescaped-entities. Same glyph,
+                          same copy; nothing the owner wrote has changed. */}
+                      „{q.trim()}{'"'}
                     </span>
                     <span className="block text-small text-ink-600 mt-0.5">გავაგრძელოთ ამით</span>
                   </span>
