@@ -7,7 +7,7 @@ import { prisma } from './prisma'
 import { homeForRole } from './roleHome'
 import { hatsOf, homeForHats } from './hats'
 import type { Role } from '@prisma/client'
-import { ROLE } from '@/lib/roles'
+import { ROLE, asRole } from '@/lib/roles'
 
 // Re-exported so existing `import { homeForRole } from '@/lib/auth'` server
 // call sites keep working; the implementation lives in the client-safe
@@ -125,7 +125,20 @@ export async function getCurrentUser() {
   // it, suspend only sets a flag while the live session cookie keeps working
   // (and password-reset/OTP/Google re-auth would mint fresh working sessions).
   if (session.user.suspendedAt) return null
-  return session.user
+  // ⚠️ THE ROLE IS NORMALISED HERE, AT THE ONE PLACE THE ROW IS READ
+  // (2026-08-21). `requireRole` and `requireRoleApi` compare `user.role`
+  // against a list with `includes` — a raw string match — so a row still
+  // holding the legacy `TUTOR` would fail `[ROLE.PROVIDER, ROLE.ADMIN]` and the
+  // provider would be redirected out of their own workspace. Locked out of the
+  // room they were given, by a word.
+  //
+  // The backfill has since moved every row, so nothing hits that path today.
+  // That is exactly why it is worth closing: the failure would arrive with a
+  // restored backup or a single row written by an older build, long after
+  // anybody remembers the rename — and it would read as „the guard is broken"
+  // rather than „the word is old". Normalising at the source means every
+  // consumer downstream is right without having to know.
+  return { ...session.user, role: asRole(session.user.role) }
 }
 
 // Returns the original-admin id if the CURRENT session was minted via admin
