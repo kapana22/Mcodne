@@ -148,7 +148,7 @@ test('the default sort is newest-first, and the URL says so by staying silent', 
   // `?sort=` the sender never picked.
   const src = read('app/experts/client.tsx')
   assert.match(src, /params\?\.get\('sort'\) \?\? 'new'/, 'the default sort is not newest-first')
-  assert.match(src, /if \(sort !== 'new'\) url\.set\('sort', sort\)/,
+  assert.match(src, /if\s+\(sort\s+!==\s+'new'\)\s+url\.set\('sort',\s+sort\)/,
     'the URL-sync default disagrees with the useState default')
 })
 

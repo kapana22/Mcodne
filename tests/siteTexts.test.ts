@@ -147,7 +147,7 @@ test('every public page takes its SEO text from the registry', () => {
     const src = readFileSync(join(ROOT, file), 'utf8')
     // `/join` picks its registry row from `?can=` (a ternary between two
     // pageMetadata calls); every other page is the bare arrow.
-    assert.match(src, /export const generateMetadata = (?:async )?\([^)]*\) =>[\s\S]{0,160}?pageMetadata\(/, `${file}: metadata is not built from the registry`)
+    assert.match(src, /export\s+const\s+generateMetadata\s+=\s+(?:async\s+)?\([^)]*\)\s+=>[\s\S]{0,160}?pageMetadata\(/, `${file}: metadata is not built from the registry`)
     assert.doesNotMatch(src, /export const metadata: Metadata = \{/, `${file}: went back to a hardcoded metadata object`)
     // …and it must render per request, or the built HTML freezes whatever the
     // defaults were at BUILD time — when Railway's builder cannot reach the DB.
@@ -236,7 +236,7 @@ test('the CMS saves what was typed — it never refuses it', () => {
   )
   assert.match(route, /const warnings = checkGeorgianCopy\(value\)/)
   // The warning must still reach the editor, or the rule silently disappears.
-  assert.match(route, /warnings: warnings\.length \? describeViolations\(warnings\) : null/)
+  assert.match(route, /warnings:\s+warnings\.length\s+\?\s+describeViolations\(warnings\)\s+:\s+null/)
   // …and it has to land next to the field, not only in the page-level banner
   // that is off screen by the twentieth row.
   const ui = readFileSync(join(ROOT, 'app/admin/_texts.tsx'), 'utf8')

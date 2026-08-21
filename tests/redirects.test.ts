@@ -150,7 +150,7 @@ test('the sitemap names no retired prefix and lists one catalogue', () => {
   // prose is allowed to remember where a page used to live).
   assert.doesNotMatch(src, new RegExp("['\"`]/services"), 'sitemap still names /services')
   // The profile URL is built under /experts/ (id fallback kept)
-  assert.match(src, /url: `\$\{SITE_URL\}\/experts\/\$\{t\.slug \|\| t\.id\}`/)
+  assert.match(src, /url:\s+`\$\{SITE_URL\}\/experts\/\$\{t\.slug\s+\|\|\s+t\.id\}`/)
   // The static list is exactly the final public doors — ONE catalogue entry.
   for (const p of ['/', '/experts', '/join', '/about', '/blog', '/contact', '/help']) {
     assert.match(src, new RegExp(`path: '${p.replace(/[/]/g, '\\/')}'`), `sitemap does not list ${p}`)

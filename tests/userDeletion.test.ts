@@ -376,14 +376,14 @@ test('an anonymized account can never be un-suspended', () => {
   // app/experts/[slug]/page gates the public profile on suspendedAt and NOTHING
   // else — browse's `available` filter does not cover the profile URL. Clearing
   // it would republish a „წაშლილი პროფილი" tombstone at its old address.
-  assert.match(ROUTE, /action === 'unsuspend' && isAnonymized\(target\.email\)/)
+  assert.match(ROUTE, /action\s+===\s+'unsuspend'\s+&&\s+isAnonymized\(target\.email\)/)
   assert.match(ROUTE, /'ANONYMIZED'/)
   assert.ok(isAnonymized('deleted-abc@deleted.invalid'))
   assert.ok(!isAnonymized('nino@gmail.com'))
   assert.ok(!isAnonymized(null))
   // …and the panel must not offer the control the server refuses.
   const page = adminPanelSrc()
-  assert.match(page, /u\.role !== 'ADMIN' && !isAnonymized\(u\.email\)/)
+  assert.match(page, /u\.role\s+!==\s+'ADMIN'\s+&&\s+!isAnonymized\(u\.email\)/)
 })
 
 test('upcoming and live sessions block BOTH modes', () => {

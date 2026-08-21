@@ -179,7 +179,7 @@ test('FEATURE_PROVIDERS narrows, never widens (D6)', () => {
   }
   // The middleware walks the second list too, with the same 404.
   const mw = codeOf('middleware.ts')
-  assert.match(mw, /if \(!providersOn\(\) && isProviderPath\(req\.nextUrl\.pathname\)\)/,
+  assert.match(mw, /if\s+\(!providersOn\(\)\s+&&\s+isProviderPath\(req\.nextUrl\.pathname\)\)/,
     'the middleware does not gate the supply-side paths on FEATURE_PROVIDERS')
   // Every supply-side route reads providersOn(), not requestsOn().
   for (const f of ['app/join/page.tsx', 'app/api/master-applications/route.ts',
@@ -218,7 +218,7 @@ test('SEEING the subsystem and BEING a provider are two questions', () => {
   const gate = codeOf('lib/requestsServer.ts')
   assert.doesNotMatch(gate, /user\.role !== 'ADMIN' \? await requestAccessOf/,
     'the gate skips the allowlist for an admin again — a row for them does nothing')
-  assert.match(gate, /const provider = user \? await requestAccessOf\(user\.id\) : null/,
+  assert.match(gate, /const\s+provider\s+=\s+user\s+\?\s+await\s+requestAccessOf\(user\.id\)\s+:\s+null/,
     'the provider identity no longer comes from the allowlist for every viewer')
   // …and the endpoint that maintains the list accepts an admin, for the same
   // reason. The refusal that used to sit there is what made the row pointless.
@@ -239,7 +239,7 @@ test('the middleware 404s every path the subsystem owns', () => {
   // later is covered by this test the day it appears rather than the day
   // somebody remembers. A hand-typed copy here would rot.
   const mw = codeOf('middleware.ts')
-  assert.match(mw, /if \(!requestsOn\(\) && isRequestPath\(req\.nextUrl\.pathname\)\)/,
+  assert.match(mw, /if\s+\(!requestsOn\(\)\s+&&\s+isRequestPath\(req\.nextUrl\.pathname\)\)/,
     'the middleware no longer gates the requests paths')
   assert.match(mw, /status: 404/, 'the middleware gate must answer 404')
   // Before the headers are built and before anything else touches the request.
@@ -348,7 +348,7 @@ test('the client’s reference is never shown to a provider', () => {
   assert.doesNotMatch(codeOf('app/api/request-chat/route.ts'), /body: r\.offer\.request\.publicRef/,
     'the provider bell body is the client’s reference again')
   const mail = read('lib/emailTemplates.ts')
-  assert.match(mail, /o\.toProvider\s*\n?\s*\?\s*`ახალი შეტყობინება — \$\{topicLabel\(o\.topic\)\}`/,
+  assert.match(mail, /o\.toProvider\s*\n?\s*\?\s*`ახალი\s+შეტყობინება\s+—\s+\$\{topicLabel\(o\.topic\)\}`/,
     'the provider chat mail subject carries the client’s reference again')
   // codeOf, not read: the comment explaining the removal names `publicRef`, and
   // a negative assertion that trips on its own documentation is a test nobody
@@ -406,9 +406,9 @@ test('NOBODY outside the allowlist can be mailed about a request', () => {
   const jobs = codeOf('lib/requestJobs.ts')
 
   // The audience is built from RequestAccess, and only from rows that are ON.
-  assert.match(jobs, /prisma\.requestAccess\.findMany\(\{\s*where: \{ active: true/,
+  assert.match(jobs, /prisma\.requestAccess\.findMany\(\{\s*where:\s+\{\s+active:\s+true/,
     'the routable audience is no longer restricted to ACTIVE allowlist rows')
-  assert.match(jobs, /company: \{ requestAccess: \{ active: true \} \}/,
+  assert.match(jobs, /company:\s+\{\s+requestAccess:\s+\{\s+active:\s+true\s+\}\s+\}/,
     'company members are no longer restricted to companies with an active allowlist row')
 
   // …and it is NEVER built from the expert catalogue. This is the assertion
@@ -960,7 +960,7 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   // this pins is unchanged: a provider reaches the supply side through the
   // MASTER HAT, never through a role, and the hat requires the same allowlist
   // row the workspace itself checks.
-  assert.match(menu, /if \(\(isDualRole \|\| isMaster\) && !inExpertSpace && !inProviderSpace\) \{\s*\n\s*switchItems\.push\(\{ href: '\/work'/,
+  assert.match(menu, /if\s+\(\(isDualRole\s+\|\|\s+isMaster\)\s+&&\s+!inExpertSpace\s+&&\s+!inProviderSpace\)\s+\{\s*\n\s*switchItems\.push\(\{\s+href:\s+'\/work'/,
     'the provider link in the user menu is no longer behind the MASTER hat')
 
   // Same shape for /work/jobs: the allowlist entry above says WHERE to look,
@@ -969,7 +969,7 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   // `hasProvider`; the CTA is behind that flag, and a QUOTE row cannot exist at
   // all unless the query found an ACCEPTED offer belonging to that provider.
   const jobsPage = read('app/work/jobs/page.tsx')
-  assert.match(jobsPage, /const viewer = providersOn\(\) \? await requestsViewer\(\) : null/,
+  assert.match(jobsPage, /const\s+viewer\s+=\s+providersOn\(\)\s+\?\s+await\s+requestsViewer\(\)\s+:\s+null/,
     'the jobs page derives the provider from something other than the viewer + the switch')
   assert.match(jobsPage, /hasProvider=\{!!provider\}/, 'the jobs screen no longer learns whether it has a provider')
   assert.match(read('app/work/jobs/_client.tsx'), /hasProvider \? \{ label: '[^']+', href: '\/work\/requests' \}/,
@@ -994,7 +994,7 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   assert.doesNotMatch(nav, /PROVIDER_TABS[\s\S]{0,200}role === /,
     'PROVIDER_TABS became role-keyed — a role is not the allowlist')
   const shell = read('components/AppShell.tsx')
-  assert.match(shell, /const inProviderSpace = isProviderWorkspacePath\(path \?\? ''\)/,
+  assert.match(shell, /const\s+inProviderSpace\s+=\s+isProviderWorkspacePath\(path\s+\?\?\s+''\)/,
     'AppShell no longer recognises the provider workspace')
 
   // The /work rail: the master's items are their own group, drawn only for
@@ -1008,17 +1008,17 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   // allowlist admits (`groups.work`), never for a role, and never by default.
   assert.match(navCfg, /export const WORK_ONLY_NAV: NavItem\[\] = \[/, 'the subsystem\'s items left navConfig')
   assert.doesNotMatch(navCfg, /export const PROVIDER_NAV/, 'the per-person group came back')
-  assert.match(navCfg, /\.\.\.\(groups\.work \? WORK_ONLY_NAV : \[\]\)/, 'the subsystem items are no longer drawn by capability')
+  assert.match(navCfg, /\.\.\.\(groups\.work\s+\?\s+WORK_ONLY_NAV\s+:\s+\[\]\)/, 'the subsystem items are no longer drawn by capability')
   const workLayout = codeOf('app/work/layout.tsx')
   assert.match(workLayout, /if \(!user\) return <>\{children\}<\/>/, 'the /work shell draws chrome for a signed-out visitor')
-  assert.match(workLayout, /work: viewer !== null && \(caps\.includes\('WORK'\) \|\| viewer\.providerAllowed\)/,
+  assert.match(workLayout, /work:\s+viewer\s+!==\s+null\s+&&\s+\(caps\.includes\('WORK'\)\s+\|\|\s+viewer\.providerAllowed\)/,
     'the master group is no longer keyed on the WORK capability / the allowlist')
   assert.doesNotMatch(workLayout, /work: [^\n]*ROLE\./, 'the master group became role-keyed — a role is not the allowlist')
   assert.doesNotMatch(workLayout, /redirect\(|notFound\(|requireRole\(/, 'the /work shell became a guard — the guards are the two route groups')
   const expertLayout = codeOf('app/work/(expert)/layout.tsx')
   // The TARGET moved to /work on 2026-08-20 (the shared home); what this pins
   // is unchanged — the bounce is keyed on the CAPABILITY and not on a role.
-  assert.match(expertLayout, /if \(caps\.includes\('WORK'\)\) redirect\('\/work'\)/,
+  assert.match(expertLayout, /if\s+\(caps\.includes\('WORK'\)\)\s+redirect\('\/work'\)/,
     'the WORK-only redirect is not keyed on the capability')
   assert.match(expertLayout, /requireRole\(\[ROLE\.EXPERT, ROLE\.ADMIN\]\)/, 'the expert guard is gone')
 
@@ -1045,9 +1045,9 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   // the people it is for. What survives is the part that never depended on the
   // audience: the item must not appear when the FLAG is off.
   const bar = read('components/PublicTopBar.tsx')
-  assert.match(bar, /if \(i\.href === '\/request'\) return requestsOn\(\)/,
+  assert.match(bar, /if\s+\(i\.href\s+===\s+'\/request'\)\s+return\s+requestsOn\(\)/,
     'the header „მოთხოვნა" item no longer checks the flag — it would show on a deployment where the subsystem does not exist')
-  assert.doesNotMatch(bar, /i\.href === '\/request'\) return requestsOn\(\) &&/,
+  assert.doesNotMatch(bar, /i\.href\s+===\s+'\/request'\)\s+return\s+requestsOn\(\)\s+&&/,
     'the requests item narrowed its audience again — the client form is open to everyone the flag admits')
   // The FLAG check is the whole gate now, so it must be the real thing and not
   // a literal somebody inlined while removing the role test.
@@ -1084,7 +1084,7 @@ test('FEATURE_REQUESTS reaches the browser bundle', () => {
   // filtered out on every deployment while the server half worked perfectly.
   // Invisible when broken (nothing errors; the rail is simply two rows shorter),
   // which is exactly the class of defect this file exists to pin.
-  assert.match(read('next.config.js'), /env: \{ FEATURE_REQUESTS: process\.env\.FEATURE_REQUESTS, FEATURE_PROVIDERS: process\.env\.FEATURE_PROVIDERS \}/,
+  assert.match(read('next.config.js'), /env:\s+\{\s+FEATURE_REQUESTS:\s+process\.env\.FEATURE_REQUESTS,\s+FEATURE_PROVIDERS:\s+process\.env\.FEATURE_PROVIDERS\s+\}/,
     'next.config.js no longer inlines FEATURE_REQUESTS + FEATURE_PROVIDERS — client components read undefined, the admin tabs and the signup tile vanish')
 })
 
@@ -1094,11 +1094,11 @@ test('the admin tabs disappear with the subsystem', () => {
   // the same subsystem for the same reason the other two do: it approves people
   // INTO /provider, so leaving it visible with the flag off would offer an admin
   // a button that admits somebody to a workspace that 404s.
-  assert.match(nav, /\.filter\(it => \(it\.id !== 'requests' && it\.id !== 'access'\) \|\| requestsFeatureExists\(\)\)/,
+  assert.match(nav, /\.filter\(it\s+=>\s+\(it\.id\s+!==\s+'requests'\s+&&\s+it\.id\s+!==\s+'access'\)\s+\|\|\s+requestsFeatureExists\(\)\)/,
     'the requests tabs are no longer filtered out of ADMIN_NAV')
   // …and the masters queue follows the SUPPLY-side switch (D6): it approves
   // people into /provider, which is what FEATURE_PROVIDERS turns off.
-  assert.match(nav, /\.filter\(it => it\.id !== 'masters' \|\| providersFeatureExists\(\)\)/,
+  assert.match(nav, /\.filter\(it\s+=>\s+it\.id\s+!==\s+'masters'\s+\|\|\s+providersFeatureExists\(\)\)/,
     'the masters tab is not filtered on providersFeatureExists()')
   // VALID_TABS is DERIVED from that array, so filtering there means
   // /admin#requests does nothing at all with the subsystem off — exactly like
@@ -1216,7 +1216,7 @@ test('the place is CLAIMED conditionally, never counted then written', () => {
 
   const claim = route.slice(route.indexOf('prisma.serviceRequest.updateMany'))
   assert.match(claim, /status: 'VERIFIED'/, 'the claim does not carry the expected status')
-  assert.match(claim, /offerCount: \{ lt: prisma\.serviceRequest\.fields\.offerLimit \}/,
+  assert.match(claim, /offerCount:\s+\{\s+lt:\s+prisma\.serviceRequest\.fields\.offerLimit\s+\}/,
     'the claim no longer compares the counter to the limit in the database')
   assert.match(claim, /offerCount: \{ increment: 1 \}/, 'the claim does not take the place')
   assert.match(route, /claimed\.count !== 1/, 'the claim result is not checked')
@@ -1252,7 +1252,7 @@ test('the database refuses a fourth offer even if the endpoint is bypassed', () 
   // the reviewable migration carry it, and they must stay identical.
   for (const f of ['lib/dbBoot.ts', 'prisma/manual-migrations/2026-08-14-requests/up.sql']) {
     const src = read(f)
-    assert.match(src, /CHECK \("offerCount" >= 0 AND "offerCount" <= "offerLimit"\)/,
+    assert.match(src, /CHECK\s+\("offerCount"\s+>=\s+0\s+AND\s+"offerCount"\s+<=\s+"offerLimit"\)/,
       `${f} has lost the offerCount CHECK`)
     assert.match(src, /"RequestOffer_exactly_one_provider" CHECK/,
       `${f} has lost the one-provider CHECK`)
@@ -1599,7 +1599,7 @@ test('the conversation opens before the choice and never leaks the contact', () 
   // nulls it for the client.
   assert.match(route, /fromClient:\s*r\.side === 'CLIENT'/,
     'the stored side is no longer derived from the resolved side')
-  assert.match(route, /fromUserId:\s*r\.side === 'CLIENT' \? null : \(viewer\.user\?\.id/,
+  assert.match(route, /fromUserId:\s*r\.side\s+===\s+'CLIENT'\s+\?\s+null\s+:\s+\(viewer\.user\?\.id/,
     'a provider message no longer takes its author from the session — nothing checks this in the database')
 })
 
@@ -1911,7 +1911,7 @@ test('the honeypot answers ok and writes nothing', () => {
   // Telling a bot it was caught teaches whoever wrote it which field to skip
   // next time, and there is nobody on the other end to inform.
   const route = codeOf('app/api/requests/route.ts')
-  assert.match(route, /if \(\(parsed\.data\.website \?\? ''\) !== ''\)/,
+  assert.match(route, /if\s+\(\(parsed\.data\.website\s+\?\?\s+''\)\s+!==\s+''\)/,
     'the honeypot is no longer checked')
   const trap = route.slice(route.indexOf("parsed.data.website"))
   assert.ok(
@@ -2025,7 +2025,7 @@ test('every admin decision writes an audit row', () => {
   // „Verified" is a claim that a human phoned somebody, and the audit row is
   // the only evidence that happened. Same for handing somebody access.
   const patch = codeOf('app/api/admin/requests/[id]/route.ts')
-  assert.match(patch, /await audit\(admin\.id, status \? `request\.\$\{status\.toLowerCase\(\)\}` : 'request\.update'/)
+  assert.match(patch, /await\s+audit\(admin\.id,\s+status\s+\?\s+`request\.\$\{status\.toLowerCase\(\)\}`\s+:\s+'request\.update'/)
   // The PREVIOUS status is recorded because that is the half you cannot
   // reconstruct: the row now says what it became, only the log says what it was.
   assert.match(patch, /from: before\.status/)
@@ -2064,7 +2064,7 @@ test('verifying does not notify anybody — sending is its own action', () => {
   // The support address is READ, never typed — an unrouted literal drops mail
   // silently (lib/supportEmails says so at length).
   const create = read('app/api/requests/route.ts')
-  assert.match(create, /import \{ SUPPORT_EMAIL \} from '@\/lib\/supportEmails'/)
+  assert.match(create, /import\s+\{\s+SUPPORT_EMAIL\s+\}\s+from\s+'@\/lib\/supportEmails'/)
   assert.doesNotMatch(create, /@mcodne\.ge|@gmail\.com/, 'an email address was typed as a literal')
 })
 
@@ -2091,7 +2091,6 @@ test('the subsystem shares nothing with bookings, packages or B2B', () => {
     'app/request/page.tsx',
     'app/request/RequestWizard.tsx',
     'app/request/_model.ts',
-    'app/request/_stepDetails.tsx',
     'app/request/[ref]/page.tsx',
     'lib/requestTopics.ts',
     'app/work/(provider)/requests/page.tsx',
@@ -2236,7 +2235,7 @@ test('the honeypot stays invisible and stays dumb', () => {
   // The route answers ok:true with no row — never a 400 that teaches a bot
   // which field to skip.
   const route = codeOf('app/api/requests/route.ts')
-  assert.match(route, /website \?\? ''\) !== ''\) \{[\s\S]{0,400}?ok: true/,
+  assert.match(route, /website\s+\?\?\s+''\)\s+!==\s+''\)\s+\{[\s\S]{0,400}?ok:\s+true/,
     'the honeypot branch stopped answering ok:true — it now tells bots they were caught')
 })
 

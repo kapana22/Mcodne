@@ -149,7 +149,7 @@ test('the masking happens where the row is BUILT, through the one function that 
   // the client". A second `status === 'ACCEPTED'` written here would be a
   // second answer, and the two would drift.
   assert.match(lib, /clientContactFor\(/, 'the row builder stopped going through clientContactFor')
-  assert.match(lib, /peerName: offerPeerName\(o, o\.request\.contactName\)/,
+  assert.match(lib, /peerName:\s+offerPeerName\(o,\s+o\.request\.contactName\)/,
     'an offer row no longer masks its peer name at build time')
   const build = lib.slice(lib.indexOf('export function offerInboxRow'))
   assert.doesNotMatch(build, /status === 'ACCEPTED'/, 'the builder re-implements the acceptance rule')
@@ -168,7 +168,7 @@ test('the masking happens where the row is BUILT, through the one function that 
   assert.match(pane, /clientContactFor\(/, 'the offer pane picks its own contact columns')
   assert.match(pane, /const contact = clientContactFor\(offer, \{/, 'the pane’s contact is no longer gated')
   assert.match(pane, /\{contact && \(/, 'the pane renders the contact block outside the gate')
-  assert.match(pane, /offerPeerName\(offer, offer\.request\.contactName\)/, 'the pane prints an unmasked peer name')
+  assert.match(pane, /offerPeerName\(offer,\s+offer\.request\.contactName\)/, 'the pane prints an unmasked peer name')
   assert.doesNotMatch(pane, /contactName\}/, 'the pane prints the client’s name straight from the column')
 })
 
@@ -188,7 +188,7 @@ test('the unread number is one number over both kinds, from one source', () => {
   // conversation older than the returned window must still be counted.
   const api = codeOf(MESSAGES_API)
   assert.match(api, /from '@\/lib\/inboxRows'/, 'the inbox endpoint stopped building rows through lib/inboxRows')
-  assert.match(api, /const unreadCount = inboxUnreadTotal\(allRows\)/, 'the inbox counts unread its own way again')
+  assert.match(api, /const\s+unreadCount\s+=\s+inboxUnreadTotal\(allRows\)/, 'the inbox counts unread its own way again')
   assert.match(api, /const threads = allRows\.slice\(0, 20\)/, 'the payload cap moved off the merged rows')
   assert.doesNotMatch(api, /reduce\(\(n, t\) => n \+ t\.unreadCount, 0\)/, 'the old hand-rolled sum is back beside the shared one')
 
@@ -196,8 +196,8 @@ test('the unread number is one number over both kinds, from one source', () => {
   // derivations of one number is the bug that once left a „მიმოწერა N" pill
   // nothing could clear.
   const badges = codeOf(NAV_BADGES)
-  assert.match(badges, /import \{ offerUnreadTotal \} from '@\/lib\/inboxRows'/, 'the nav badge no longer reads the shared total')
-  assert.match(badges, /const offerUnread = await offerUnreadTotal\(await requestAccessOf\(user\.id\)\)/,
+  assert.match(badges, /import\s+\{\s+offerUnreadTotal\s+\}\s+from\s+'@\/lib\/inboxRows'/, 'the nav badge no longer reads the shared total')
+  assert.match(badges, /const\s+offerUnread\s+=\s+await\s+offerUnreadTotal\(await\s+requestAccessOf\(user\.id\)\)/,
     'the nav badge counts offer unread with a query of its own')
   assert.match(badges, /const messages = bookingUnread \+ preUnread \+ offerUnread/,
     'the „მიმოწერა" pill does not cover offer conversations')
@@ -206,7 +206,7 @@ test('the unread number is one number over both kinds, from one source', () => {
 
   // …and the shared total IS the shared rows, not a parallel count.
   const lib = codeOf('lib/inboxRows.ts')
-  assert.match(lib, /return inboxUnreadTotal\(await offerInboxRows\(provider\)\)/,
+  assert.match(lib, /return\s+inboxUnreadTotal\(await\s+offerInboxRows\(provider\)\)/,
     'offerUnreadTotal stopped being „the rows, summed"')
 })
 
@@ -222,7 +222,7 @@ test('/work/offers is the list of OFFERS again — it no longer mounts RequestCh
   // block through the one function. Nothing about this change touches them.
   assert.match(code, /offerPriceLabel\(o\.priceGel, o\.priceKind\)/, 'the price left the offers page')
   assert.match(code, /OFFER_STATUS_LABEL\[o\.status as OfferStatusName\]/, 'the status label left the offers page')
-  assert.match(code, /<OfferActions offerId=\{o\.id\} status=\{o\.status\} kind=\{o\.kind\} doneAt=/,
+  assert.match(code, /<OfferActions\s+offerId=\{o\.id\}\s+status=\{o\.status\}\s+kind=\{o\.kind\}\s+doneAt=/,
     'the „გატანა" / „დასრულდა" actions changed — _actions.tsx behaviour was to stay untouched')
   assert.match(code, /clientContactFor\(/, 'the offers page picks its own contact columns')
 
@@ -256,9 +256,9 @@ test('the one list carries both kinds, newest activity first, and every row open
   // client's request conversations live in their own request room, keyed by a
   // reference rather than by an account.
   const api = codeOf(MESSAGES_API)
-  assert.match(api, /const offerRows = space === 'client'\s*\n?\s*\? \[\]\s*\n?\s*: await offerInboxRows\(await requestAccessOf\(user\.id\)\)/,
+  assert.match(api, /const\s+offerRows\s+=\s+space\s+===\s+'client'\s*\n?\s*\?\s+\[\]\s*\n?\s*:\s+await\s+offerInboxRows\(await\s+requestAccessOf\(user\.id\)\)/,
     'offer conversations are no longer merged in on the supply side only')
-  assert.match(api, /sortInboxRows\(\[\.\.\.allThreads\.map\(bookingInboxRow\), \.\.\.offerRows\]\)/,
+  assert.match(api, /sortInboxRows\(\[\.\.\.allThreads\.map\(bookingInboxRow\),\s+\.\.\.offerRows\]\)/,
     'the two kinds are no longer merged into one ordered list')
 
   // The list component renders whatever it is given and masks nothing itself —
@@ -270,14 +270,14 @@ test('the one list carries both kinds, newest activity first, and every row open
   assert.doesNotMatch(list, /კლიენტი|clientContactFor|ACCEPTED/, 'the list is masking (or unmasking) on its own')
   // The open row highlights for all three thread kinds, from the same prefixes
   // lib/inboxRows mints.
-  assert.match(list, /params\?\.offerId\s*\n?\s*\? `o-\$\{params\.offerId\}`/, 'an open offer thread no longer highlights its row')
+  assert.match(list, /params\?\.offerId\s*\n?\s*\?\s+`o-\$\{params\.offerId\}`/, 'an open offer thread no longer highlights its row')
 
   // Two mounts, one pane — the expert reads it inside the messages centre, and
   // a WORK-only provider (whom the (expert) guard never admits) in their own
   // space. Same component, so the two can never drift.
   for (const p of [INBOX_THREAD, PROVIDER_THREAD]) {
     assert.ok(has(p), `${p} is missing — a row in the list points nowhere`)
-    assert.match(codeOf(p), /<OfferThreadPane offerId=\{offerId\} backHref="/, `${p} does not render the shared pane`)
+    assert.match(codeOf(p), /<OfferThreadPane\s+offerId=\{offerId\}\s+backHref="/, `${p} does not render the shared pane`)
   }
   assert.match(codeOf(INBOX_THREAD), /backHref="\/work\/messages"/)
   assert.match(codeOf(PROVIDER_THREAD), /backHref="\/work\/offers"/)
@@ -285,11 +285,11 @@ test('the one list carries both kinds, newest activity first, and every row open
   // The pane is the pane that already existed: components/RequestChat, no ref
   // (the session is the identity and the endpoint derives the side from it).
   const pane = codeOf(PANE)
-  assert.match(pane, /<RequestChat\s+thread=\{\{ kind: 'OFFER', offerId: offer\.id \}\}/, 'the offer pane stopped using RequestChat')
+  assert.match(pane, /<RequestChat\s+thread=\{\{\s+kind:\s+'OFFER',\s+offerId:\s+offer\.id\s+\}\}/, 'the offer pane stopped using RequestChat')
   assert.doesNotMatch(pane, /refCode/, 'the provider’s pane carries a client reference')
   // Ownership is in the `where`, never in a branch after the read.
-  assert.match(pane, /prisma\.requestOffer\.findFirst\(\{\s*\n\s*where: \{\s*\n\s*id: offerId,/, 'the pane reads an offer before checking whose it is')
-  assert.match(pane, /p\.kind === 'EXPERT'\s*\n?\s*\? \{ expertUserId: p\.userId \}\s*\n?\s*: \{ companyId: p\.companyId \}/,
+  assert.match(pane, /prisma\.requestOffer\.findFirst\(\{\s*\n\s*where:\s+\{\s*\n\s*id:\s+offerId,/, 'the pane reads an offer before checking whose it is')
+  assert.match(pane, /p\.kind\s+===\s+'EXPERT'\s*\n?\s*\?\s+\{\s+expertUserId:\s+p\.userId\s+\}\s*\n?\s*:\s+\{\s+companyId:\s+p\.companyId\s+\}/,
     'the pane no longer scopes the offer to the viewer')
 })
 
@@ -298,7 +298,7 @@ test('the one list carries both kinds, newest activity first, and every row open
 test('lib/inboxRows is safe on both sides: no top-level prisma, and the list imports the TYPE only', () => {
   const lib = read('lib/inboxRows.ts')
   assert.doesNotMatch(lib, /^import \{ prisma \}/m, 'a database client is imported at module scope — the browser list imports this module')
-  assert.match(lib, /const \{ prisma \} = await import\('\.\/prisma'\)/, 'the loader stopped importing prisma lazily')
-  assert.match(read(LIST), /import type \{ InboxRow \} from '@\/lib\/inboxRows'/,
+  assert.match(lib, /const\s+\{\s+prisma\s+\}\s+=\s+await\s+import\('\.\/prisma'\)/, 'the loader stopped importing prisma lazily')
+  assert.match(read(LIST), /import\s+type\s+\{\s+InboxRow\s+\}\s+from\s+'@\/lib\/inboxRows'/,
     'the list imports lib/inboxRows for VALUES — that pulls the loader into the bundle')
 })

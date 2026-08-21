@@ -122,17 +122,17 @@ test('the group captions and the three renamed tabs read as the owner wrote them
   // Only the label changed — the id is a deep link and a state value.
   assert.match(navFile, /\{ id: 'insights',\s+l: 'ქცევა'/)
   assert.match(navFile, /\{ id: 'integrations',\s+l: 'კოდი'/)
-  assert.match(navFile, /\{ id: 'broadcast',\s+l: 'შეტყობინების გაგზავნა'/)
+  assert.match(navFile, /\{\s+id:\s+'broadcast',\s+l:\s+'შეტყობინების\s+გაგზავნა'/)
 })
 
 test('the masters and disputes badges ride on the ONE stats fetch', () => {
   // Same Promise.all as every other badge — a badge is never a second request
   // from the shell, and never worth 500-ing the shell over (.catch(() => 0)).
   const all = statsFile.slice(statsFile.indexOf('await Promise.all(['), statsFile.indexOf('])', statsFile.indexOf('await Promise.all([')))
-  assert.match(all, /providersFeatureExists\(\)\s*\?\s*prisma\.masterApplication\.count\(\{ where: \{ status: 'SUBMITTED' \} \}\)\.catch\(\(\) => 0\)\s*:\s*Promise\.resolve\(0\)/,
+  assert.match(all, /providersFeatureExists\(\)\s*\?\s*prisma\.masterApplication\.count\(\{\s+where:\s+\{\s+status:\s+'SUBMITTED'\s+\}\s+\}\)\.catch\(\(\)\s+=>\s+0\)\s*:\s*Promise\.resolve\(0\)/,
     'the masters count is not inside Promise.all, or does not follow providersFeatureExists() with .catch(() => 0)')
   // `resolvedAt` is the Dispute model's real resolution marker (prisma/schema.prisma).
-  assert.match(all, /prisma\.dispute\.count\(\{ where: \{ resolvedAt: null \} \}\)\.catch\(\(\) => 0\)/,
+  assert.match(all, /prisma\.dispute\.count\(\{\s+where:\s+\{\s+resolvedAt:\s+null\s+\}\s+\}\)\.catch\(\(\)\s+=>\s+0\)/,
     'the disputes count is not inside Promise.all with .catch(() => 0)')
   assert.match(statsFile, /\[users, tutors, [^\]]*pendingMasters, openDisputes\] = await Promise\.all/)
   assert.match(statsFile, /newRequests, pendingMasters, openDisputes,\s*\n/, 'the two counts are not in the JSON response')
@@ -143,8 +143,8 @@ test('the masters and disputes badges ride on the ONE stats fetch', () => {
   }
   // The badge helper is the ONE place both surfaces read, so a badge means the
   // same thing on desktop and mobile.
-  assert.match(navFile, /if \(id === 'masters'\) return pendingMasters \?\? 0/)
-  assert.match(navFile, /if \(id === 'disputes'\) return openDisputes \?\? 0/)
+  assert.match(navFile, /if\s+\(id\s+===\s+'masters'\)\s+return\s+pendingMasters\s+\?\?\s+0/)
+  assert.match(navFile, /if\s+\(id\s+===\s+'disputes'\)\s+return\s+openDisputes\s+\?\?\s+0/)
   assert.doesNotMatch(navFile, /if \(id === 'bookings'\)/, '„ჯავშნები" is a ledger, not a queue — no badge')
   assert.equal((navFile.match(/navBadge\(it\.id, pendingCount, helpOpen, b2bLeads, newRequests, pendingMasters, openDisputes\)/g) ?? []).length, 2,
     'both surfaces must call navBadge with the same six counts')

@@ -43,35 +43,44 @@ const codeOf = (p: string) => strip(read(p))
 
 /* ═══════════ A. what a profession can do ═══════════════════════════════ */
 
-test('A. every profession carries `can`, defaulting to CONSULT, and the WORK list is short', () => {
+test('A. every profession sells SERVICES; consulting is the offer, not the base', () => {
+  // ⚠️ THIS TEST ASSERTED THE OPPOSITE UNTIL 2026-08-20, and the assertion was
+  // the old site written down: „every profession on an expert platform can
+  // consult". Under THE PRODUCT MODEL rule 1 the base is the service, and
+  // consulting is a switch a provider turns on where a paid conversation is
+  // itself a product. Owner: „ყველამ სერვისი უნდა დაამატოს… და კონსულტაცია
+  // ცალკე ფუნქცია ექნება."
+  //
+  // What that fixed: `სანტექნიკოსი` resolved to ['CONSULT','WORK'], so a plumber
+  // was routed through a consultation wizard — calendar, tiers, session lengths
+  // — for a product they do not sell. The old list's own comment said these
+  // „sell a JOB and nothing else"; the code disagreed with the comment.
   for (const { job } of ALL_PROFESSIONS) {
     const can = PROFESSION_CAN[job]
     assert.ok(Array.isArray(can) && can.length > 0, `„${job}" has no capabilities`)
-    assert.ok(can.includes('CONSULT'), `„${job}" cannot consult — every profession on an expert platform can`)
+    assert.ok(can.includes('WORK'), `„${job}" cannot sell a service — that is the base, not an exception`)
     for (const c of can) assert.ok(c === 'CONSULT' || c === 'WORK', `„${job}": unknown capability ${c}`)
   }
   assert.equal(Object.keys(PROFESSION_CAN).length, ALL_PROFESSIONS.length, 'a profession is missing from PROFESSION_CAN')
-  // Short and obvious: designers, developers, photographers — not everybody.
-  //
-  // ⚠️ THE CEILING WENT 16 → 20 WITH ტალღა 1 (2026-08-20). The owner's launch
-  // list added six professions that sell a JOB and nothing else — სანტექნიკოსი,
-  // ელექტრიკოსი, კონდიციონერის სპეციალისტი, ტექნიკის სპეციალისტი,
-  // დამლაგებელი, ავეჯის ამწყობი — and they are the first entries in this file
-  // that exist for the WORK half rather than being consultants who also
-  // deliver. „Short" still means „nameable in one breath", not „a dozen".
-  //
-  // They keep CONSULT as well, and that is the owner's own reasoning rather
-  // than a default: „სანტექნიკოსი, რომელმაც იცის რატომ ჟონავს მილი, ისეთივე
-  // მცოდნეა, როგორც იურისტი." A ten-minute call about whether the pipe needs
-  // replacing is a real thing to sell.
-  const workers = professionsThatCan('WORK')
-  assert.ok(workers.length >= 8 && workers.length <= 20, `${workers.length} professions do WORK — the list was meant to be short`)
-  assert.ok(workers.includes('გრაფიკული დიზაინერი') && workers.includes('ფოტოგრაფი') && workers.includes('დეველოპერი'))
-  assert.ok(!workers.includes('ფსიქოლოგი') && !workers.includes('ადვოკატი'), 'a conversation-only profession was marked WORK')
-  assert.equal(professionsThatCan('CONSULT').length, ALL_PROFESSIONS.length)
-  assert.deepEqual(professionCan('no-such-job'), ['CONSULT'], 'an unknown job can only consult')
-  // ⚠️ WORK for an expert profession is DATA today — nothing routes on it. The
-  // moment something does, this pin should be replaced by a test of that thing.
+  assert.equal(professionsThatCan('WORK').length, ALL_PROFESSIONS.length,
+    'a profession lost WORK — every profession sells services')
+
+  // The trades, and it stays SHORT. A profession is here only when a paid
+  // conversation about the work is genuinely not something anyone buys; when in
+  // doubt leave it out, because CONSULT is only ever an OFFER — one nobody takes
+  // costs nothing, a missing one closes a door.
+  const consultants = professionsThatCan('CONSULT')
+  const workOnly = ALL_PROFESSIONS.map(p => p.job).filter(j => !consultants.includes(j))
+  assert.ok(workOnly.length >= 1 && workOnly.length <= 8,
+    `${workOnly.length} professions are WORK-only — the list was meant to be nameable in one breath`)
+  assert.ok(workOnly.includes('სანტექნიკოსი') && workOnly.includes('ელექტრიკოსი'),
+    'the trades can consult again — a plumber does not sell conversations')
+  assert.ok(consultants.includes('ფსიქოლოგი') && consultants.includes('ადვოკატი') && consultants.includes('ბუღალტერი'),
+    'a conversation profession lost its consultation offer')
+  // An unknown word sells a service. Guessing „consultant" for anything we do
+  // not recognise is precisely the default this file stopped having.
+  assert.deepEqual(professionCan('no-such-job'), ['WORK'], 'an unknown job fell back to consulting again')
+
   const routing = codeOf('lib/requestRouting.ts') + codeOf('lib/requestJobs.ts')
   assert.doesNotMatch(routing, /PROFESSION_CAN|professionsThatCan/, 'routing started reading `can` — stage 9 work; document and test it there')
 })
@@ -177,9 +186,9 @@ test('C5. the trades match still comes first, and a company member is never targ
 
 test('C6. the caller hands the professions over — the query selects them', () => {
   const jobs = read('lib/requestJobs.ts')
-  assert.match(jobs, /tutor: \{ select: \{ categoryId: true, professions: true \} \}/, 'routableProviders no longer selects TutorProfile.professions')
+  assert.match(jobs, /tutor:\s+\{\s+select:\s+\{\s+categoryId:\s+true,\s+professions:\s+true\s+\}\s+\}/, 'routableProviders no longer selects TutorProfile.professions')
   assert.match(jobs, /professions: p\.user\.tutor\?\.professions \?\? \[\]/)
-  assert.match(jobs, /routeRequest\(r\.categoryId, providers, \{ topic: r\.topic, city: r\.city \}\)/, 'the topic is no longer passed — the profession match needs it')
+  assert.match(jobs, /routeRequest\(r\.categoryId,\s+providers,\s+\{\s+topic:\s+r\.topic,\s+city:\s+r\.city\s+\}\)/, 'the topic is no longer passed — the profession match needs it')
 })
 
 /* ═══════════ D. /experts/<slug>: the profession wins ═══════════════════ */
@@ -195,7 +204,7 @@ test('D. /experts resolves a profession slug BEFORE an expert, and no expert can
     assert.ok(prof >= 0 && expert >= 0, `${name}: one of the two resolvers is missing`)
     assert.ok(prof < expert, `${name}: the expert is resolved before the profession — a DB row could shadow a code-owned page`)
   }
-  assert.match(render, /if \(prof\) return <ProfessionLanding p=\{prof\} \/>/)
+  assert.match(render, /if\s+\(prof\)\s+return\s+<ProfessionLanding\s+p=\{prof\}\s+\/>/)
   assert.match(meta, /if \(prof\) return professionMetadata\(prof\)/)
   // BOTH generators reserve every profession slug — that is what makes the
   // precedence safe rather than merely documented. Stated once since stage 11
@@ -209,7 +218,7 @@ test('D. /experts resolves a profession slug BEFORE an expert, and no expert can
   // The landing keeps its content and its structured data, at the new address.
   const part = read('app/experts/[slug]/_profession.tsx')
   for (const ld of ["'@type': 'Service'", "'@type': 'FAQPage'", "'@type': 'BreadcrumbList'"]) assert.match(part, new RegExp(ld.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-  assert.match(part, /export const professionPath = .*`\/experts\/\$\{p\.slug\}`/)
+  assert.match(part, /export\s+const\s+professionPath\s+=\s+.*`\/experts\/\$\{p\.slug\}`/)
   assert.doesNotMatch(strip(part), /['"`]\/konsultacia/, 'the profession landing still links to /konsultacia')
   // ⚠️ THE HUB PAGE IS GONE (stage 10, 2026-08-19): the CATALOGUE took /experts,
   // because a hub of professions is a pre-filtered catalogue. What must survive
@@ -278,12 +287,12 @@ test('E2. the ≥3 rule is three, counted once per master, and the page reads it
     assert.ok(trade < master, `${name}: the provider profile is resolved before the trade`)
   }
   // At the bar → the catalogue's own query; below it → NO list query, the door.
-  assert.match(render, /count >= TRADE_LANDING_MIN\s*\?\s*await queryMasters\(/)
+  assert.match(render, /count\s+>=\s+TRADE_LANDING_MIN\s*\?\s*await\s+queryMasters\(/)
   assert.match(render, /: null/)
   const part = read('app/experts/[slug]/_tradeLanding.tsx')
   assert.match(part, /result: MastersResult \| null/)
   assert.match(part, /\{result && \(/, 'the list is not gated on the result — an empty grid would render below the bar')
-  assert.match(part, /import \{ MasterCard \} from '@\/app\/experts\/_masterCard'/, 'the trade landing draws its own card instead of the catalogue’s')
+  assert.match(part, /import\s+\{\s+MasterCard\s+\}\s+from\s+'@\/app\/experts\/_masterCard'/, 'the trade landing draws its own card instead of the catalogue’s')
   assert.match(part, /REQUEST_HREF/)
   assert.doesNotMatch(strip(part), /["'`]\/request/, 'the CTA address is written by hand instead of REQUEST_HREF')
   // The count itself is the same VISIBLE rule as the profile.
@@ -292,7 +301,7 @@ test('E2. the ≥3 rule is three, counted once per master, and the page reads it
   assert.match(data, /return countCovering\(rows, topicIds\)/)
   // …and the sitemap submits only trades at the bar, counted the same way.
   const sitemap = read('app/sitemap.ts')
-  assert.match(sitemap, /countCovering\(rows, g\.topics\.map\(t => t\.id\)\) >= TRADE_LANDING_MIN/)
+  assert.match(sitemap, /countCovering\(rows,\s+g\.topics\.map\(t\s+=>\s+t\.id\)\)\s+>=\s+TRADE_LANDING_MIN/)
   assert.match(sitemap, /url: `\$\{SITE_URL\}\/experts\/\$\{g\.id\}`/)
   assert.doesNotMatch(strip(sitemap), /\/services\//, 'the sitemap still submits the retired namespace')
   // BOTH slug generators reserve every trade id — the same safety as D, and

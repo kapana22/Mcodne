@@ -17,7 +17,7 @@ import {
 } from '../lib/professions'
 
 test('the shape of the list the owner supplied', () => {
-  // ⚠️ 19 AND 93 SINCE 2026-08-20 (docs/TAXONOMY-AUDIT §P4, §P6). `design` and
+  // ⚠️ 19 AND 93 SINCE 2026-08-20 (docs/archive/TAXONOMY-AUDIT §P4, §P6). `design` and
   // `career` became spheres of their own — both were topic GROUPS with no
   // category, so a client could ask for them and the catalogue had nobody to
   // show — and three names that sell nothing left the list („მეწარმე",

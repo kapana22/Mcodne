@@ -56,7 +56,7 @@ test('the profile exists as a container plus parts, and is the Profile archetype
   for (const href of ['"/"', '"/experts"']) assert.match(hero, new RegExp(`href=${href}`))
   assert.doesNotMatch(hero, /href="\/services/, 'the trail still links into the retired /services prefix')
   // …and since stage 11 the two steps are the REAL path: /experts → this page.
-  assert.match(page, /name: 'ექსპერტები', item: `\$\{SITE_URL\}\/experts`/,
+  assert.match(page, /name:\s+'ექსპერტები',\s+item:\s+`\$\{SITE_URL\}\/experts`/,
     'the BreadcrumbList no longer names the parent the URL actually has')
   // Reviews are the honest empty state until stage 7 — never a fabricated list.
   const blocks = read(`${DIR}/_providerBlocks.tsx`)
@@ -80,7 +80,7 @@ test('it resolves by slug AND by id, and the id form redirects to the slug', () 
   const data = read(DATA)
   assert.match(data, /OR: \[\{ slug: param \}, \{ id: param \}\]/, 'the resolver must accept both forms')
   const page = read(PAGE)
-  assert.match(page, /permanentRedirect\(`\$\{masterPath\(provider\)\}\$\{queryOf\(await searchParams\)\}`\)/,
+  assert.match(page, /permanentRedirect\(`\$\{masterPath\(provider\)\}\$\{queryOf\(await\s+searchParams\)\}`\)/,
     'an id URL must 308 to the slug URL — carrying the query string, like the expert branch')
   // Nothing found in EITHER table is the one 404 this route has.
   assert.match(page, /if \(tutor === null\) notFound\(\)/)
@@ -156,18 +156,18 @@ test('lib/masterSlug checks BOTH namespaces, and approval calls it guarded', () 
   // now (/experts/<slug>), so a slug is an identity: minting the same one on
   // the other table would hand one URL to two people. The question is asked
   // once, in lib/slugSpace, and BOTH generators ask it.
-  assert.match(lib, /import \{ slugReserved, slugTaken \} from '\.\/slugSpace'/)
+  assert.match(lib, /import\s+\{\s+slugReserved,\s+slugTaken\s+\}\s+from\s+'\.\/slugSpace'/)
   assert.match(lib, /if \(await slugTaken\(candidate\)\) continue/)
   const space = read('lib/slugSpace.ts')
-  assert.match(space, /prisma\.tutorProfile\.findFirst\(\{ where: \{ slug \}/)
-  assert.match(space, /prisma\.serviceProfile\.findFirst\(\{ where: \{ slug \}/)
-  assert.match(lib, /export async function ensureMasterSlug\(serviceProfileId: string\)/)
+  assert.match(space, /prisma\.tutorProfile\.findFirst\(\{\s+where:\s+\{\s+slug\s+\}/)
+  assert.match(space, /prisma\.serviceProfile\.findFirst\(\{\s+where:\s+\{\s+slug\s+\}/)
+  assert.match(lib, /export\s+async\s+function\s+ensureMasterSlug\(serviceProfileId:\s+string\)/)
   assert.match(lib, /company\?\.name \?\? profile\.user\?\.fullName/, 'the name is the firm’s or the person’s, in that order')
   // Never overwrites: an existing slug is returned, not regenerated.
   assert.match(lib, /if \(profile\.slug\) return profile\.slug/)
   // Approval: after the grant transaction, in a try/catch, non-fatal.
   const approve = read('app/api/master-applications/[id]/route.ts')
-  assert.match(approve, /import \{ ensureMasterSlug \} from '@\/lib\/masterSlug'/)
+  assert.match(approve, /import\s+\{\s+ensureMasterSlug\s+\}\s+from\s+'@\/lib\/masterSlug'/)
   const i = approve.indexOf('await ensureMasterSlug(profile.id)')
   assert.ok(i > approve.indexOf('await prisma.$transaction('), 'the slug is assigned AFTER the grant transaction')
   assert.match(approve.slice(i - 400, i), /try \{/, 'the slug call must be guarded — it must never fail an approval')
@@ -176,17 +176,25 @@ test('lib/masterSlug checks BOTH namespaces, and approval calls it guarded', () 
 test('the CTA is the intake, gated by the page, and the dual link goes to /experts/<slug>', () => {
   const page = read(PAGE)
   assert.match(page, /requestsOn\(\)/)
-  assert.match(page, /\{on && \(/, 'the CTA mounts only when the subsystem exists')
+  // ⚠️ THE GATE MOVED INWARD (2026-08-20) and it is narrower now, on purpose.
+  // The whole aside used to be `{on && (…)}`. When the price list moved into
+  // that aside — under the actions, where price belongs beside what you press —
+  // the flag would have deleted the page's entire OFFER on a deployment with
+  // the intake off. A price is CONTENT; only the button that opens the intake
+  // is a feature of it.
+  assert.match(page, /\{on && <ProviderCta/, 'the CTA no longer mounts on the subsystem flag')
+  assert.match(page, /<PricedServicesBlock\s+p=\{p\}\s+ordering=\{on\}\s+\/>/,
+    'the price list is gated on the flag again — prices must survive the intake being off')
   const cta = read(`${DIR}/_providerCta.tsx`)
   // ⚠️ THE ADDRESS NOW CARRIES THIS MASTER (2026-08-19) — `?to=<slug>`, so the
   // person reading the profile can hire the person on it instead of describing
   // the job to nobody. It is still ONE address, still stated in the model: the
   // CTA imports the builder rather than assembling a query string of its own.
-  assert.match(cta, /import \{ requestHrefFor \} from '\.\/_providerData'/)
+  assert.match(cta, /import\s+\{\s+requestHrefFor\s+\}\s+from\s+'\.\/_providerData'/)
   assert.match(cta, /href=\{requestHrefFor\(master\)\}/)
   assert.match(cta, /გამოაგზავნე მოთხოვნა/)
   assert.match(read(DATA), /REQUEST_HREF = '\/request\?for=service'/)
-  assert.match(read(DATA), /requestHrefFor[\s\S]{0,200}&to=\$\{encodeURIComponent\(p\.slug \|\| p\.id\)\}/,
+  assert.match(read(DATA), /requestHrefFor[\s\S]{0,200}&to=\$\{encodeURIComponent\(p\.slug\s+\|\|\s+p\.id\)\}/,
     'the recipient is no longer carried, or is carried unencoded')
   // The other profile of the same person.
   assert.match(read(DATA), /tutor: \{ select: \{ slug: true \} \}/)

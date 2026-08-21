@@ -121,9 +121,9 @@ test('§H the status ladder still has REJECTED above auto-verification', () => {
     'the status ladder changed — check that REJECTED still wins')
   // An auto-verified row without `verifiedAt` would never be nudged and never
   // close: every timer in lib/requestRouting measures from that column.
-  assert.match(src, /autoVerified \? \{ verifiedAt: new Date\(\) \}/,
+  assert.match(src, /autoVerified\s+\?\s+\{\s+verifiedAt:\s+new\s+Date\(\)\s+\}/,
     'an auto-verified request no longer stamps verifiedAt — the lifecycle clock would never start')
   // …and it must actually be told to somebody.
-  assert.match(src, /if \(autoVerified\)[\s\S]{0,200}mailVerifiedRequest/,
+  assert.match(src, /if\s+\(autoVerified\)[\s\S]{0,200}mailVerifiedRequest/,
     'an auto-verified request is no longer routed to the experts')
 })

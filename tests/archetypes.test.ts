@@ -57,8 +57,12 @@ test('archetype 4 — intake wizard: one StepIndicator, Container sizes, no hand
   assert.match(read('app/join/_master/client.tsx'), /<Container size="(narrow|content)"/)
   // The door itself is the wizard archetype too: the narrow column, and it
   // hands the profession question to the shared picker rather than a copy.
+  // ⚠️ THE PICKER LIVES IN THE LEAF SINCE 2026-08-20 (`_door/DoorQuestion`),
+  // because the PUBLIC door asks the same question before the sign-up wall and
+  // two copies of it would answer differently within a week.
   assert.match(read('app/join/JoinClient.tsx'), /<Container as="main" size="narrow"/)
-  assert.match(read('app/join/JoinClient.tsx'), /<ProfessionPicker/)
+  assert.match(read('app/join/_door/DoorQuestion.tsx'), /<ProfessionPicker/)
+  assert.doesNotMatch(read('app/join/JoinClient.tsx'), /<ProfessionPicker/, 'the door grew a second copy of the question')
 })
 
 test('archetypes 5/6 — workspace and form pages open with the shared PageHeader', () => {

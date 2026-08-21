@@ -204,7 +204,7 @@ test('the ONLY links to /business are admin-gated, and there are exactly two', (
     'the /business entry is no longer behind b2bFeatureExists — it would show with the vertical off')
   // ADMIN_ITEMS must stay reachable only for an admin. If that ternary is ever
   // loosened, every item in the array leaks, this one included.
-  assert.match(menu, /role === 'ADMIN'\s*\?\s*ADMIN_ITEMS\(signOut\)/)
+  assert.match(menu, /role\s+===\s+'ADMIN'\s*\?\s*ADMIN_ITEMS\(signOut\)/)
 })
 
 test('it is not in the sitemap, and not in the feed', () => {
@@ -237,7 +237,7 @@ test('the page 404s behind the gate — actually, not just in principle', () => 
   // that it runs BEFORE the page is built.
   const page = read('app/business/page.tsx')
   const body = page.slice(page.indexOf('export default async function Page()'))
-  assert.match(body, /^\s*if \(!canSeeB2B\(me\?\.role\)\) notFound\(\)/m)
+  assert.match(body, /^\s*if\s+\(!canSeeB2B\(me\?\.role\)\)\s+notFound\(\)/m)
   assert.ok(
     body.indexOf('notFound()') < body.indexOf('<BusinessLanding'),
     'the guard runs after the page has already been built',
@@ -427,7 +427,7 @@ test('the hand movement claims the row instead of checking it', () => {
   // balanceAfter is read back INSIDE the transaction — not computed from a
   // value read before the write, which would record a number the balance never
   // actually held.
-  assert.match(src, /findUniqueOrThrow\(\{\s*where: \{ id \},\s*select: \{ balance: true \}/)
+  assert.match(src, /findUniqueOrThrow\(\{\s*where:\s+\{\s+id\s+\},\s*select:\s+\{\s+balance:\s+true\s+\}/)
 })
 
 test('the admin tab disappears with the vertical, from the SOURCE array', () => {
@@ -436,7 +436,7 @@ test('the admin tab disappears with the vertical, from the SOURCE array', () => 
   // so this is what makes /admin#companies a dead hash with the flag off
   // rather than a tab that opens but is not drawn in the rail.
   const nav = read('app/admin/_nav.tsx')
-  assert.match(nav, /\.filter\(it => it\.id !== 'companies' \|\| b2bFeatureExists\(\)\)/)
+  assert.match(nav, /\.filter\(it\s+=>\s+it\.id\s+!==\s+'companies'\s+\|\|\s+b2bFeatureExists\(\)\)/)
   assert.match(nav, /VALID_TABS: AdminTab\[\] = ADMIN_NAV\.map/,
     'VALID_TABS stopped being derived — the filter no longer reaches deep links')
   // The tab id must be lowercase letters only: tests/adminNav.test.ts parses
@@ -477,7 +477,7 @@ test('the charge uses the SERVER price and re-reads membership', () => {
   // gating the CHARGE on the rollout stage left no account able to use it —
   // an employee is a STUDENT (refused by the stage) and an ADMIN cannot book
   // (refused by this route). Found by driving the real flow, not by reading.
-  assert.match(src, /const wantsBalance = canSpendAsMember\(\) && parsed\.data\.paidBy === 'COMPANY_BALANCE'/)
+  assert.match(src, /const\s+wantsBalance\s+=\s+canSpendAsMember\(\)\s+&&\s+parsed\.data\.paidBy\s+===\s+'COMPANY_BALANCE'/)
   assert.doesNotMatch(src, /canSeeB2B\(user\.role\)/,
     'the charge is gated on the viewer role again — no account can complete the flow')
   assert.match(src, /amount: price/, 'the ledger records a client-supplied amount')
@@ -491,7 +491,7 @@ test('an ordinary booking is untouched by any of it', () => {
   // was actually charged, so every other booking still stores null — which
   // paymentSourceOf reads as CARD, the same value the entire history has.
   const src = read('app/api/bookings/route.ts')
-  assert.match(src, /\.\.\.\(chargedCompanyId \? \{ paidBy: 'COMPANY_BALANCE' as const \} : \{\}\)/,
+  assert.match(src, /\.\.\.\(chargedCompanyId\s+\?\s+\{\s+paidBy:\s+'COMPANY_BALANCE'\s+as\s+const\s+\}\s+:\s+\{\}\)/,
     'paidBy is written unconditionally — ordinary bookings would stop reading as history')
   // …and on the client, the key is absent rather than false: JSON.stringify
   // drops undefined, so a non-member's payload is byte-for-byte the old one.
@@ -504,7 +504,7 @@ test('the booking sheet makes no request at all while the vertical is off', () =
   // site gains a network call for a feature nobody can use, which is a change
   // to the booking path however harmless it looks.
   const src = read('components/booking/CompanyBalance.tsx')
-  assert.match(src, /if \(!open \|\| !b2bFeatureExists\(\)\) return/)
+  assert.match(src, /if\s+\(!open\s+\|\|\s+!b2bFeatureExists\(\)\)\s+return/)
   // The fetch failing must never break the flow: this is an OPTIONAL payment
   // method and its absence is exactly what every booking already does.
   assert.match(src, /catch \{/)
@@ -601,8 +601,8 @@ test('the database refuses an overdraw and a negative movement', () => {
   // document with the rollback next to it.
   for (const f of ['lib/dbBoot.ts', 'prisma/manual-migrations/2026-08-11-b2b/up.sql']) {
     const src = read(f)
-    assert.match(src, /CONSTRAINT "Company_balance_nonnegative" CHECK \("balance" >= 0\)/, `${f}: balance CHECK`)
-    assert.match(src, /CONSTRAINT "CompanyTransaction_amount_positive" CHECK \("amount" > 0\)/, `${f}: amount CHECK`)
+    assert.match(src, /CONSTRAINT\s+"Company_balance_nonnegative"\s+CHECK\s+\("balance"\s+>=\s+0\)/, `${f}: balance CHECK`)
+    assert.match(src, /CONSTRAINT\s+"CompanyTransaction_amount_positive"\s+CHECK\s+\("amount"\s+>\s+0\)/, `${f}: amount CHECK`)
   }
 })
 
@@ -660,7 +660,7 @@ test('the company detail endpoint returns every field the panel reads', () => {
     )
   }
   // The two that actually broke, pinned by name so the reason survives.
-  assert.match(route, /_count: \{ select: \{ members: true, transactions: true \} \}/)
+  assert.match(route, /_count:\s+\{\s+select:\s+\{\s+members:\s+true,\s+transactions:\s+true\s+\}\s+\}/)
 })
 
 /* ═══════════ 6. the service catalogue ══════════════════════════════════ */
@@ -677,7 +677,7 @@ test('a retired service never deletes the requests it produced', () => {
   // erase that history the first time somebody tidied the price list — so the
   // FK is SET NULL, in BOTH places the DDL lives.
   for (const f of ['lib/dbBoot.ts', 'prisma/manual-migrations/2026-08-11-b2b-services/up.sql']) {
-    assert.match(read(f), /"BusinessLead_serviceId_fkey"\s+FOREIGN KEY \("serviceId"\) REFERENCES "B2BService"\("id"\) ON DELETE SET NULL/, f)
+    assert.match(read(f), /"BusinessLead_serviceId_fkey"\s+FOREIGN\s+KEY\s+\("serviceId"\)\s+REFERENCES\s+"B2BService"\("id"\)\s+ON\s+DELETE\s+SET\s+NULL/, f)
   }
   assert.match(read('prisma/schema.prisma'), /service\s+B2BService\? @relation\(fields: \[serviceId\], references: \[id\], onDelete: SetNull\)/)
 })
@@ -686,7 +686,7 @@ test('the requested service is verified against the catalogue, never trusted', (
   // A crafted POST must not be able to attach an enquiry to a hidden service —
   // or to a string that is not a service at all.
   const src = codeOf('app/api/business/lead/route.ts')
-  assert.match(src, /b2BService\.findFirst\(\{[\s\S]*?where: \{ id: wantedId, visible: true \}/)
+  assert.match(src, /b2BService\.findFirst\(\{[\s\S]*?where:\s+\{\s+id:\s+wantedId,\s+visible:\s+true\s+\}/)
   // …and an unknown id is DROPPED, not rejected: a stale bookmark must not cost
   // us the enquiry.
   assert.match(src, /serviceId: service\?\.id \?\? null/)

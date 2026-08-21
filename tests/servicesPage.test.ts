@@ -61,9 +61,9 @@ test('§A the page exists, sits outside both guards, and the two old surfaces ar
 
 test('§B the gate: signed in, at least one capability, else notFound() — never a redirect', () => {
   const src = codeOf(PAGE)
-  assert.match(src, /const user = await getCurrentUser\(\)\s*\n\s*if \(!user\) notFound\(\)/,
+  assert.match(src, /const\s+user\s+=\s+await\s+getCurrentUser\(\)\s*\n\s*if\s+\(!user\)\s+notFound\(\)/,
     'a signed-out visitor no longer gets the 404')
-  assert.match(src, /if \(!showConsultations && !showTrades\) notFound\(\)/,
+  assert.match(src, /if\s+\(!showConsultations\s+&&\s+!showTrades\)\s+notFound\(\)/,
     'somebody with neither capability is admitted to an empty page')
   // ⚠️ 404 AND NEVER 403 OR /signin. A redirect tells a stranger the page is
   // real and worth coming back to with an account — the one thing the 404
@@ -75,7 +75,7 @@ test('§B the gate: signed in, at least one capability, else notFound() — neve
 test('§C each half is drawn by its own capability, and the trades half keeps the provider gate', () => {
   const src = codeOf(PAGE)
   // CONSULT — the TutorProfile row the old tab needed to render at all.
-  assert.match(src, /const showConsultations = caps\.includes\('CONSULT'\)/,
+  assert.match(src, /const\s+showConsultations\s+=\s+caps\.includes\('CONSULT'\)/,
     'the consultation half is no longer keyed on the CONSULT capability')
   assert.match(src, /const caps = await capabilitiesOf\(user\.id\)/,
     'the page stopped reading capabilities — the halves cannot be keyed on them')
@@ -129,7 +129,7 @@ test('§D /work/service-profile 308s to /work/services, in one hop, and lands on
 test('§E /work/profile lost the services tab and nothing else', () => {
   const src = codeOf('app/work/(expert)/profile/page.tsx')
   assert.doesNotMatch(src, /ServicesTab|_tabServices/, 'the services tab is still mounted on the profile page')
-  assert.match(src, /\{\['პროფილი', 'კვალიფიკაცია', 'ანგარიში'\]\.map/,
+  assert.match(src, /\{\['პროფილი',\s+'კვალიფიკაცია',\s+'ანგარიში'\]\.map/,
     'the profile tab bar is not the three remaining tabs')
   // The three panels that stay, still imported and still mounted.
   for (const tab of ['ProfileTab', 'CredentialsTab', 'AccountTab']) {
@@ -156,9 +156,9 @@ test('§E /work/profile lost the services tab and nothing else', () => {
 test('§F the behaviour moved with it: same endpoints, same switch, same uploader', () => {
   const cons = codeOf('app/work/services/_consultations.tsx')
   // Create / edit / delete, exactly the three the tab had.
-  assert.match(cons, /fetch\('\/api\/tutor\/consultations', \{\s*\n?\s*method: 'POST'/)
-  assert.match(cons, /fetch\(`\/api\/tutor\/consultations\/\$\{id\}`, \{\s*\n?\s*method: 'PATCH'/)
-  assert.match(cons, /fetch\(`\/api\/tutor\/consultations\/\$\{pendingDelete\}`, \{ method: 'DELETE' \}\)/)
+  assert.match(cons, /fetch\('\/api\/tutor\/consultations',\s+\{\s*\n?\s*method:\s+'POST'/)
+  assert.match(cons, /fetch\(`\/api\/tutor\/consultations\/\$\{id\}`,\s+\{\s*\n?\s*method:\s+'PATCH'/)
+  assert.match(cons, /fetch\(`\/api\/tutor\/consultations\/\$\{pendingDelete\}`,\s+\{\s+method:\s+'DELETE'\s+\}\)/)
   // A booked type cannot be deleted, and the reason is still named.
   assert.match(cons, /j\.error === 'IN_USE'/)
   assert.match(cons, /<ServiceTypeAndAvailability/)
@@ -166,7 +166,7 @@ test('§F the behaviour moved with it: same endpoints, same switch, same uploade
   assert.match(cons, /<StudentsSection \/>/)
 
   const trades = codeOf('app/work/services/_trades.tsx')
-  assert.match(trades, /fetch\('\/api\/provider\/service-profile', \{ cache: 'no-store' \}\)/)
+  assert.match(trades, /fetch\('\/api\/provider\/service-profile',\s+\{\s+cache:\s+'no-store'\s+\}\)/)
   assert.match(trades, /method: 'PUT'/)
   // The master's own switch, the gaps line, the photo and the sentence.
   assert.match(trades, /ახალი მოთხოვნები მომდის/, 'the paused/available switch is gone')

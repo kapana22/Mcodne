@@ -120,19 +120,19 @@ test('§A3 a provider profile is REACHABLE at /experts/<slug> — the branch is 
   const page = codeOf(PAGE)
   // Entered only when the expert table answered nothing (a slug is unique
   // across both tables, so at most one of the two can be here) …
-  assert.match(page, /if \(!resolved\) \{\s*\n\s*const provider = await resolveMaster\(param\)/,
+  assert.match(page, /if\s+\(!resolved\)\s+\{\s*\n\s*const\s+provider\s+=\s+await\s+resolveMaster\(param\)/,
     'the provider branch is no longer reached from the resolver')
   // … and it RETURNS the profile rather than falling through to the 404.
   assert.match(page, /return providerProfile\(provider\)/, 'the provider branch resolves and then drops the row')
   // The id form 308s to the slug, carrying the query string.
-  assert.match(page, /permanentRedirect\(`\$\{masterPath\(provider\)\}\$\{queryOf\(await searchParams\)\}`\)/)
+  assert.match(page, /permanentRedirect\(`\$\{masterPath\(provider\)\}\$\{queryOf\(await\s+searchParams\)\}`\)/)
   // …and every address this profile prints for itself is under /experts.
   const data = read('app/experts/[slug]/_providerData.ts')
-  assert.match(data, /export const masterPath = \(p: \{ slug: string \| null; id: string \}\) => `\/experts\/\$\{p\.slug \|\| p\.id\}`/)
+  assert.match(data, /export\s+const\s+masterPath\s+=\s+\(p:\s+\{\s+slug:\s+string\s+\|\s+null;\s+id:\s+string\s+\}\)\s+=>\s+`\/experts\/\$\{p\.slug\s+\|\|\s+p\.id\}`/)
   assert.match(data, /`\/experts\/\$\{expertSlug\}`/, 'the cross-link to the same person’s expert profile is gone')
   // The metadata half canonicalises to the same address, never the old one.
-  assert.match(codeOf(PAGE), /alternates: \{ canonical: providerCanonical \}/)
-  assert.match(codeOf(PAGE), /const providerCanonical = `\$\{SITE_URL\}\$\{masterPath\(pp\)\}`/)
+  assert.match(codeOf(PAGE), /alternates:\s+\{\s+canonical:\s+providerCanonical\s+\}/)
+  assert.match(codeOf(PAGE), /const\s+providerCanonical\s+=\s+`\$\{SITE_URL\}\$\{masterPath\(pp\)\}`/)
 })
 
 /* ═══════════ B. a slug is unique across BOTH tables ═════════════════════ */
@@ -140,9 +140,9 @@ test('§A3 a provider profile is REACHABLE at /experts/<slug> — the branch is 
 test('§B one shared helper answers „is this slug taken?" for both generators', () => {
   const space = read('lib/slugSpace.ts')
   // BOTH tables, in one function. Either half missing is a duplicate waiting.
-  assert.match(space, /export async function slugTaken\(slug: string\): Promise<boolean>/)
-  assert.match(space, /prisma\.tutorProfile\.findFirst\(\{ where: \{ slug \}/, 'slugTaken does not look at TutorProfile')
-  assert.match(space, /prisma\.serviceProfile\.findFirst\(\{ where: \{ slug \}/, 'slugTaken does not look at ServiceProfile')
+  assert.match(space, /export\s+async\s+function\s+slugTaken\(slug:\s+string\):\s+Promise<boolean>/)
+  assert.match(space, /prisma\.tutorProfile\.findFirst\(\{\s+where:\s+\{\s+slug\s+\}/, 'slugTaken does not look at TutorProfile')
+  assert.match(space, /prisma\.serviceProfile\.findFirst\(\{\s+where:\s+\{\s+slug\s+\}/, 'slugTaken does not look at ServiceProfile')
   // A DB outage answers „taken" — the safe direction (the caller suffixes and
   // at worst a profile keeps its id URL). „free" would mint a duplicate.
   assert.match(space, /catch \{\n\s*return true\n\s*\}/, 'slugTaken fails open — an outage would mint duplicates')
@@ -150,7 +150,7 @@ test('§B one shared helper answers „is this slug taken?" for both generators'
   // BOTH generators ask it, and neither keeps a private list any more.
   for (const f of ['lib/expertSlug.ts', 'lib/masterSlug.ts']) {
     const src = read(f)
-    assert.match(src, /import \{ slugReserved, slugTaken \} from '\.\/slugSpace'/, `${f} does not use the shared helper`)
+    assert.match(src, /import\s+\{\s+slugReserved,\s+slugTaken\s+\}\s+from\s+'\.\/slugSpace'/, `${f} does not use the shared helper`)
     assert.match(src, /if \(await slugTaken\(candidate\)\) continue/, `${f} writes a candidate without asking both tables`)
     assert.doesNotMatch(codeOf(f), /const RESERVED = new Set/, `${f} kept a private reserved list — there is one`)
     // …and a slug is still PERMANENT: an existing one is returned, never redone.
@@ -225,7 +225,7 @@ test('§C3 the sitemap and robots know one namespace', () => {
   const sitemap = codeOf('app/sitemap.ts')
   // Every dynamic block under /experts/: expert profiles, provider profiles,
   // trade landings, profession landings.
-  assert.match(sitemap, /url: `\$\{SITE_URL\}\/experts\/\$\{t\.slug \|\| t\.id\}`/, 'expert profiles left the sitemap')
+  assert.match(sitemap, /url:\s+`\$\{SITE_URL\}\/experts\/\$\{t\.slug\s+\|\|\s+t\.id\}`/, 'expert profiles left the sitemap')
   assert.match(sitemap, /url: `\$\{SITE_URL\}\/experts\/\$\{m\.slug\}`/, 'provider profiles left the sitemap')
   assert.match(sitemap, /url: `\$\{SITE_URL\}\/experts\/\$\{g\.id\}`/, 'trade landings left the sitemap')
   assert.match(sitemap, /url: `\$\{SITE_URL\}\/experts\/\$\{p\.slug\}`/, 'profession landings left the sitemap')

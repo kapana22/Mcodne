@@ -178,7 +178,7 @@ test('the strip sends each half to an editor it can actually open', () => {
   // /work/profile lives inside the (expert) route group and bounces a WORK-only
   // provider straight back out — the „შევსება" button would have been a wall.
   const page = read('app/work/page.tsx')
-  assert.match(page, /editHref=\{isExpert \? '\/work\/profile' : '\/work\/services'\}/,
+  assert.match(page, /editHref=\{isExpert\s+\?\s+'\/work\/profile'\s+:\s+'\/work\/services'\}/,
     'the completion button no longer branches on the capability')
   assert.doesNotMatch(read('app/work/_components/CreditStrip.tsx'), /href="\/work\/profile"/,
     'the strip hard-codes the expert-only editor again')

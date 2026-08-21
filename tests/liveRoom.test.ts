@@ -74,7 +74,7 @@ test('the stream is gated EXACTLY like ./status — publicRef, requestsViewer, 4
     assert.doesNotMatch(src, /403|redirect\(|\/signin/, `${name}: the gate answers something other than 404`)
   }
   // The stream's refusals go through the subsystem's ONE 404.
-  assert.match(ev, /if \(!viewer\.clientAllowed\) return requestsNotFound\(\)/)
+  assert.match(ev, /if\s+\(!viewer\.clientAllowed\)\s+return\s+requestsNotFound\(\)/)
   assert.match(ev, /if \(!ref\) return requestsNotFound\(\)/)
   // Existence is decided with a real 404 BEFORE the stream opens — a 200 that
   // then closes would make EventSource retry a dead reference forever.
@@ -90,7 +90,7 @@ test('the stream is gated EXACTLY like ./status — publicRef, requestsViewer, 4
 
 test('the stream respects the client going away, and does not live forever', () => {
   const src = codeOf(EVENTS)
-  assert.match(src, /req\.signal\.addEventListener\('abort', stop\)/, 'the stream ignores the client disconnecting')
+  assert.match(src, /req\.signal\.addEventListener\('abort',\s+stop\)/, 'the stream ignores the client disconnecting')
   assert.match(src, /cancel\(\)\s*\{[\s\S]*?closed = true/, 'the stream does not stop when the consumer cancels')
   assert.match(src, /controller\.close\(\)/, 'stop() does not close the stream')
   // The tuning: a tick every 3–5 s (an offer appears „within ~5 s"), a
@@ -100,12 +100,12 @@ test('the stream respects the client going away, and does not live forever', () 
   assert.ok(tick >= 3000 && tick <= 5000, `tick is ${tick} ms, not 3–5 s`)
   assert.ok(beat > 0 && beat <= 30_000, `heartbeat is ${beat} ms — proxies drop idle sockets around 30 s`)
   assert.match(src, /const MAX_AGE_MS = 30 \* 60_000/, 'the 30-minute life moved')
-  assert.match(src, /Date\.now\(\) - openedAt > MAX_AGE_MS\) \{ stop\(\)/, 'the stream does not close at its max age')
+  assert.match(src, /Date\.now\(\)\s+-\s+openedAt\s+>\s+MAX_AGE_MS\)\s+\{\s+stop\(\)/, 'the stream does not close at its max age')
   // Cheap ticks: the fingerprint every tick, the full payload only on change.
   assert.match(src, /const mark = await requestLiveMark\(ref\)/)
-  assert.match(src, /if \(mark\.status !== last\.status\) \{\s*const live = await requestLiveStatus\(ref\)/,
+  assert.match(src, /if\s+\(mark\.status\s+!==\s+last\.status\)\s+\{\s*const\s+live\s+=\s+await\s+requestLiveStatus\(ref\)/,
     'the full payload is recomputed every tick, or not on change')
-  assert.match(src, /if \(mark\.messages !== last\.messages\) send\('messages'/)
+  assert.match(src, /if\s+\(mark\.messages\s+!==\s+last\.messages\)\s+send\('messages'/)
   // A route file may export only what Next allows.
   const exportsOf = [...read(EVENTS).matchAll(/^export (?:const|async function|function) (\w+)/gm)].map(m => m[1]).sort()
   assert.deepEqual(exportsOf, ['GET', 'dynamic', 'runtime'], `route.ts exports something Next will refuse: ${exportsOf}`)
@@ -131,13 +131,13 @@ test('the browser half opens ONE EventSource per room and reports when it is dow
   const c = codeOf(CLIENT)
   assert.match(c, /new EventSource\(url\)/, 'no EventSource')
   assert.match(c, /typeof window\.EventSource === 'function'/, 'availability is assumed rather than checked')
-  assert.match(c, /listener\.onState\?\.\('down'\)\s*return \(\) => \{\}/, 'a browser without EventSource is not told to poll')
+  assert.match(c, /listener\.onState\?\.\('down'\)\s*return\s+\(\)\s+=>\s+\{\}/, 'a browser without EventSource is not told to poll')
   assert.match(c, /es\.onerror = \(\) => setState\('down'\)/, 'a stream error does not send panes back to polling')
   assert.match(c, /es\.onopen = \(\) => setState\('open'\)/)
   assert.match(c, /addEventListener\('status'/, 'the client does not listen for status events')
   assert.match(c, /addEventListener\('messages'/, 'the client does not listen for messages events')
   // Refcounted: the last pane out closes the socket.
-  assert.match(c, /if \(room\.listeners\.size === 0\) \{\s*room\.es\.close\(\)/, 'the socket outlives its last listener')
+  assert.match(c, /if\s+\(room\.listeners\.size\s+===\s+0\)\s+\{\s*room\.es\.close\(\)/, 'the socket outlives its last listener')
   assert.match(c, /rooms\.get\(ref\) \?\? open\(ref\)/, 'every pane opens its own connection')
 })
 
@@ -148,7 +148,7 @@ test('_live uses the stream and keeps the poll as the fallback', () => {
   assert.match(live, /onState: setLive/, 'the panel does not track whether the stream is up')
   // The poll survives — and runs ONLY while the stream is down.
   assert.match(live, /const POLL_MS = 20_000/, 'the fallback cadence moved')
-  assert.match(live, /if \(live === 'open'\) return\s*load\(\)\s*const id = window\.setInterval/,
+  assert.match(live, /if\s+\(live\s+===\s+'open'\)\s+return\s*load\(\)\s*const\s+id\s+=\s+window\.setInterval/,
     'the poll no longer yields to the stream, or is gone')
   assert.match(live, /document\.visibilityState === 'visible'/, 'the fallback polls hidden tabs')
   assert.match(live, /\/api\/requests\/\$\{encodeURIComponent\(publicRef\)\}\/status/, 'the fallback stopped reading ./status')
@@ -156,11 +156,11 @@ test('_live uses the stream and keeps the poll as the fallback', () => {
 
 test('RequestChat joins the room when it holds the reference, polls otherwise', () => {
   const chat = codeOf('components/RequestChat.tsx')
-  assert.match(chat, /if \(!open \|\| !refCode\) return\s*return subscribeRequestLive\(refCode, \{/,
+  assert.match(chat, /if\s+\(!open\s+\|\|\s+!refCode\)\s+return\s*return\s+subscribeRequestLive\(refCode,\s+\{/,
     'the pane subscribes without the reference, or not at all')
   assert.match(chat, /onMessages: \(\) => \{ load\(true\) \}/, 'a messages event does not refetch the thread')
   // The fallback: first read + poll while down; never while the stream is up.
-  assert.match(chat, /if \(!open \|\| live === 'open'\) return\s*load\(true\)\s*const id = window\.setInterval/,
+  assert.match(chat, /if\s+\(!open\s+\|\|\s+live\s+===\s+'open'\)\s+return\s*load\(true\)\s*const\s+id\s+=\s+window\.setInterval/,
     'the chat poll no longer yields to the stream, or is gone')
   assert.match(chat, /const POLL_MS = 15_000/, 'the chat fallback cadence moved')
   // The nudge is a nudge: messages still come through the thread's own
@@ -174,9 +174,9 @@ test('the offers page re-asks the server on events, through the one render path'
   assert.match(lr, /router\.refresh\(\)/, 'LiveRefresh grew its own data channel')
   assert.doesNotMatch(lr, /fetch\(/, 'LiveRefresh fetches data itself')
   const page = codeOf('app/request/[ref]/page.tsx')
-  assert.match(page, /\(request\.status === 'NEW' \|\| request\.status === 'VERIFIED'\) && <LiveRefresh publicRef=\{request\.publicRef\} \/>/,
+  assert.match(page, /\(request\.status\s+===\s+'NEW'\s+\|\|\s+request\.status\s+===\s+'VERIFIED'\)\s+&&\s+<LiveRefresh\s+publicRef=\{request\.publicRef\}\s+\/>/,
     'LiveRefresh is not mounted under AutoRefresh’s condition')
-  assert.match(page, /\(request\.status === 'NEW' \|\| request\.status === 'VERIFIED'\) && <AutoRefresh/,
+  assert.match(page, /\(request\.status\s+===\s+'NEW'\s+\|\|\s+request\.status\s+===\s+'VERIFIED'\)\s+&&\s+<AutoRefresh/,
     'AutoRefresh — the fallback — is gone from the offers page')
 })
 
@@ -190,26 +190,26 @@ test('the wizard becomes the room in place: no navigation on submit, replaceStat
   assert.doesNotMatch(submit, /router\.(push|replace)|window\.location|redirect\(/, 'submit navigates — that is the flash the room exists to remove')
   assert.match(submit, /setSent\(\{/, 'submit no longer renders the room in place')
   // The room renders in the SAME component, from `sent`.
-  assert.match(w, /if \(sent\) \{\s*return \(\s*<RequestShell>[\s\S]*?<ThanksCard sent=\{sent\}/, 'the room is no longer rendered in place')
+  assert.match(w, /if\s+\(sent\)\s+\{\s*return\s+\(\s*<RequestShell>[\s\S]*?<ThanksCard\s+sent=\{sent\}/, 'the room is no longer rendered in place')
   // The address bar becomes the room's, without a navigation.
-  assert.match(w, /window\.history\.replaceState\(window\.history\.state, '', target\)/, 'the URL is not replaced with /request/<ref>')
-  assert.match(w, /const target = `\/request\/\$\{sent\.publicRef\}`/)
+  assert.match(w, /window\.history\.replaceState\(window\.history\.state,\s+'',\s+target\)/, 'the URL is not replaced with /request/<ref>')
+  assert.match(w, /const\s+target\s+=\s+`\/request\/\$\{sent\.publicRef\}`/)
   // The one legitimate navigation: mounting UNDER a room's address (Back).
-  assert.match(w, /if \(\/\^\\\/request\\\/\[\^\/\]\+\$\/\.test\(here\)\) router\.replace\(here\)/, 'a stale wizard under a room’s address no longer hands over')
+  assert.match(w, /if\s+\(\/\^\\\/request\\\/\[\^\/\]\+\$\/\.test\(here\)\)\s+router\.replace\(here\)/, 'a stale wizard under a room’s address no longer hands over')
   // The room enters with the same token every step uses.
   assert.match(w, /<div className="motion-safe:animate-slide-in-b">\s*<ThanksCard/, 'the room lost its entrance, or its guard')
 })
 
 test('AppShell treats the intake as one room, so replaceState cannot remount it', () => {
   const shell = codeOf('components/AppShell.tsx')
-  assert.match(shell, /<div key=\{inRequests && !inProviderSpace \? '\/request' : \(path \?\? '\/'\)\} className="motion-safe:animate-fade-in">/,
+  assert.match(shell, /<div\s+key=\{inRequests\s+&&\s+!inProviderSpace\s+\?\s+'\/request'\s+:\s+\(path\s+\?\?\s+'\/'\)\}\s+className="motion-safe:animate-fade-in">/,
     'the page wrapper is keyed on the pathname inside the intake — replaceState would remount the room')
 })
 
 test('ThanksCard is the room: stations + thread, no link-only terminus', () => {
   const t = codeOf('app/request/_thanks.tsx')
   assert.match(t, /<LiveStatus publicRef=\{sent\.publicRef\} \/>/, 'the stations left the room')
-  assert.match(t, /<RequestChat[\s\S]*?thread=\{\{ kind: 'PLATFORM', refCode: sent\.publicRef \}\}[\s\S]*?defaultOpen/, 'the thread is not open in the room')
+  assert.match(t, /<RequestChat[\s\S]*?thread=\{\{\s+kind:\s+'PLATFORM',\s+refCode:\s+sent\.publicRef\s+\}\}[\s\S]*?defaultOpen/, 'the thread is not open in the room')
 })
 
 /* ═══════════ D. motion — the closed library, gated ═══════════════════════ */
@@ -233,28 +233,40 @@ test('every animate-* in the touched files is a library token and carries motion
 
 test('the stations: the live one pulses, a station that lights enters once, the label carries the state', () => {
   const live = codeOf('app/request/_live.tsx')
-  assert.match(live, /\{current && \([\s\S]*?motion-safe:animate-pulse-soft/, 'the pulse left the current station')
-  assert.match(live, /key=\{done \? 'done' : current \? 'current' : 'next'\}/, 'the dot no longer re-enters when its state changes')
-  assert.match(live, /aria-current=\{current \? 'step' : undefined\}/, 'the current station is not announced')
+  assert.match(live, /\{current\s+&&\s+\([\s\S]*?motion-safe:animate-pulse-soft/, 'the pulse left the current station')
+  assert.match(live, /key=\{done\s+\?\s+'done'\s+:\s+current\s+\?\s+'current'\s+:\s+'next'\}/, 'the dot no longer re-enters when its state changes')
+  assert.match(live, /aria-current=\{current\s+\?\s+'step'\s+:\s+undefined\}/, 'the current station is not announced')
   // The word: with motion removed the label still says which one is live.
   assert.match(live, /current \? 'text-ink-900 font-semibold' : 'text-ink-500'/, 'the current label lost its weight')
   // The count re-enters when it changes — the one place a number appearing IS news.
-  assert.match(live, /<div key=\{d\.offerCount\} className="motion-safe:animate-fade-in-fast">/)
+  assert.match(live, /<div\s+key=\{d\.offerCount\}\s+className="motion-safe:animate-fade-in-fast">/)
 })
 
 test('a NEW offer enters with slide-in-b; the ones already on screen do not', () => {
   const ol = codeOf('app/request/[ref]/OfferList.tsx')
-  assert.match(ol, /const seenAtMount = useRef<Set<string> \| null>\(null\)/, 'the list forgot which offers were there at mount')
-  assert.match(ol, /arrived\(o\.id\) \? 'motion-safe:animate-slide-in-b' : ''/, 'a new offer has no entrance, or an ungated one')
+  assert.match(ol, /const\s+seenAtMount\s+=\s+useRef<Set<string>\s+\|\s+null>\(null\)/, 'the list forgot which offers were there at mount')
+  assert.match(ol, /arrived\(o\.id\)\s+\?\s+'motion-safe:animate-slide-in-b'\s+:\s+''/, 'a new offer has no entrance, or an ungated one')
   // …and the list stays mounted across „nothing" → „one", or the first offer
   // could never be told from one that was always there.
-  assert.match(ol, /if \(offers\.length === 0\) return <div className="mt-4">\{empty\}<\/div>/, 'the empty state is not inside the list')
+  assert.match(ol, /offers\.length === 0[\s\S]{0,120}\{empty\}/, 'the empty state is not inside the list')
   const page = codeOf('app/request/[ref]/page.tsx')
   assert.doesNotMatch(page, /offers\.length === 0 \?\s*\(\s*<div/, 'the page swaps EmptyState for OfferList again')
   assert.match(page, /empty=\{\s*<EmptyState/, 'the page no longer passes the empty state in')
 })
 
-test('no new keyframes — the library is closed', () => {
+test('the keyframe library is a SHORT, deliberate list', () => {
+  // ⚠️ THIS TEST WAS „no new keyframes — the library is closed" AND THE LIBRARY
+  // REOPENED (2026-08-20). Closing it was a 📌 CURRENT decision, not a 🔒
+  // absolute, and the owner reopened it deliberately after the entrance-only
+  // home page: „ძალიან მოძველებული დიზაინი … ანიმაციებით გაძეძგე, რაც
+  // მოგვცემს პროფესიონალიზმს."
+  //
+  // So the ratchet changed shape rather than being deleted, because what it
+  // was really protecting is still worth protecting: a list SHORT enough that
+  // every entrance is picked BY NAME instead of by number. Two were added and
+  // both are named here — `auroraB` (the hero's second drifting light) and
+  // `marquee` (the service rail). Adding a third is a decision, not a detail:
+  // add it to this list with a line saying what it is for.
   const tw = read('tailwind.config.js')
   const start = tw.indexOf('keyframes: {')
   const end = tw.indexOf('\n      },', start)
@@ -267,8 +279,9 @@ test('no new keyframes — the library is closed', () => {
   const css = read('app/globals.css')
   const cssNames = [...css.matchAll(/^@keyframes (\w+)/gm)].map(m => m[1]).sort()
   assert.deepEqual(cssNames, [
-    'auroraA', 'drawerInR', 'fadeIn', 'pulseSoft', 'riseIn', 'scaleIn', 'shimmer', 'slideInB', 'slideInR',
-  ], 'globals.css grew or lost a keyframe')
+    'auroraA', 'auroraB', 'drawerInR', 'fadeIn', 'marquee', 'pulseSoft', 'riseIn', 'scaleIn', 'shimmer',
+    'slideInB', 'slideInR',
+  ], 'globals.css grew or lost a keyframe — add it to this list with a line saying what it is for')
 })
 
 /* ── THE FIRST SECONDS, AND THE ONE DOOR ────────────────────────────────────

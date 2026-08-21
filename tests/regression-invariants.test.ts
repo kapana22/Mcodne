@@ -323,7 +323,11 @@ function check(name: string, ok: boolean, hint: string) {
   const menu = read('components/UserMenu.tsx')
   check(
     'K5: the account menu keeps its own gated /join item',
-    menu.includes("href: '/join'") && menu.includes('showJoinInvite(role, me?.capabilities)'),
+    // ⚠️ THE ADDRESS IS THE CONSTANT SINCE 2026-08-20 (lib/capabilities →
+    // JOIN_DOOR_HREF). Six surfaces typed their own label and three typed their
+    // own `?can=`, which is how the header ended up pre-answering the door's
+    // question. What K5 protects is unchanged: the item is HERE, and it is gated.
+    menu.includes('href: JOIN_DOOR_HREF') && menu.includes('showJoinInvite(role, me?.capabilities)'),
     'On mobile the avatar menu is the ONLY path — the sidebar is desktop-only (hidden lg:flex).',
   )
 }

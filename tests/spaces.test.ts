@@ -134,7 +134,7 @@ test('§C the two guards: (expert) redirects to sign-in, (provider) answers 404 
   // ⚠️ THE TARGET IS `/work` SINCE 2026-08-20, not the queue. It was the queue
   // while /work was an expert-only session dashboard, which made the first
   // screen of a provider's workspace a list with no context and no balance.
-  assert.match(expert, /if \(caps\.includes\('WORK'\)\) redirect\('\/work'\)/)
+  assert.match(expert, /if\s+\(caps\.includes\('WORK'\)\)\s+redirect\('\/work'\)/)
   assert.doesNotMatch(expert, /redirect\(`\$\{PROVIDER_ROUTE\}\/requests`\)/,
     'a provider is dropped into the queue again instead of their own home')
   assert.ok(expert.indexOf("caps.includes('WORK')") < expert.indexOf('requireRole('), 'the WORK redirect runs after requireRole — it can never fire')
@@ -153,13 +153,13 @@ test('§C the two guards: (expert) redirects to sign-in, (provider) answers 404 
 
 test('§D the /work shell is chrome only: nothing without a session, groups by capability', () => {
   const shell = codeOf('app/work/layout.tsx')
-  assert.match(shell, /const user = await getCurrentUser\(\)\s*\n\s*if \(!user\) return <>\{children\}<\/>/,
+  assert.match(shell, /const\s+user\s+=\s+await\s+getCurrentUser\(\)\s*\n\s*if\s+\(!user\)\s+return\s+<>\{children\}<\/>/,
     'a signed-out visitor gets chrome — the (provider) 404 is no longer a bare 404')
   assert.doesNotMatch(shell, /redirect\(|notFound\(|requireRole\(|requireUser\(/, 'the shell became a guard')
   assert.match(shell, /const caps = await capabilitiesOf\(user\.id\)/, 'the shell stopped reading capabilities')
-  assert.match(shell, /expert: isAdmin \|\| user\.role === ROLE\.EXPERT \|\| caps\.includes\('CONSULT'\)/, 'the expert group is not keyed on CONSULT')
-  assert.match(shell, /work: viewer !== null && \(caps\.includes\('WORK'\) \|\| viewer\.providerAllowed\)/, 'the master group is not keyed on WORK / the allowlist')
-  assert.match(shell, /const viewer = providersOn\(\) \? await requestsViewer\(\) : null/, 'the master group ignores the supply-side switch')
+  assert.match(shell, /expert:\s+isAdmin\s+\|\|\s+user\.role\s+===\s+ROLE\.EXPERT\s+\|\|\s+caps\.includes\('CONSULT'\)/, 'the expert group is not keyed on CONSULT')
+  assert.match(shell, /work:\s+viewer\s+!==\s+null\s+&&\s+\(caps\.includes\('WORK'\)\s+\|\|\s+viewer\.providerAllowed\)/, 'the master group is not keyed on WORK / the allowlist')
+  assert.match(shell, /const\s+viewer\s+=\s+providersOn\(\)\s+\?\s+await\s+requestsViewer\(\)\s+:\s+null/, 'the master group ignores the supply-side switch')
   // ⚠️ ONE LIST, ITEMS BY FUNCTION (2026-08-19). The rail used to draw the
   // expert's group and the master's group with a caption over each — nine rows
   // saying „you are in two products". Owner: „ხელოსნის სივრცე ზედმეტია."
@@ -168,7 +168,7 @@ test('§D the /work shell is chrome only: nothing without a session, groups by c
   const nav = read('components/tutor/navConfig.ts')
   assert.match(nav, /export const WORKSPACE_NAV: NavItem\[\] = \[/)
   assert.doesNotMatch(nav, /export const PROVIDER_NAV/, 'the rail has a per-person group again')
-  assert.match(nav, /\.\.\.WORKSPACE_NAV,\s*\n\s*\.\.\.\(groups\.work \? WORK_ONLY_NAV : \[\]\),\s*\n\s*\.\.\.\(groups\.expert \? CONSULT_ONLY_NAV : \[\]\),/,
+  assert.match(nav, /\.\.\.WORKSPACE_NAV,\s*\n\s*\.\.\.\(groups\.work\s+\?\s+WORK_ONLY_NAV\s+:\s+\[\]\),\s*\n\s*\.\.\.\(groups\.expert\s+\?\s+CONSULT_ONLY_NAV\s+:\s+\[\]\),/,
     'navFor stopped composing one list from the shared items plus the two conditional tools')
   for (const href of ['/work', '/work/jobs', '/work/messages', '/work/services']) {
     assert.ok(nav.includes(`href: '${href}'`), `the shared rail lost ${href}`)
@@ -181,12 +181,12 @@ test('§D the /work shell is chrome only: nothing without a session, groups by c
   }
   const sidebar = read('components/tutor/WorkspaceSidebar.tsx')
   assert.match(sidebar, /const sections = navFor\(groups\)/)
-  assert.match(sidebar, /i > 0 \? 'mt-4 pt-4 border-t border-ink-100/, 'the two groups are no longer visually separated')
+  assert.match(sidebar, /i > 0 \? '[^']*border-t/, 'the two groups are no longer visually separated')
   // The shell carries the retired provider bar's note and the real role.
   const ws = read('components/tutor/WorkspaceShell.tsx')
   assert.match(ws, /ხედავ როგორც ადმინი — შეთავაზების დაწერა არ შეგიძლია\./)
   assert.match(ws, /onMasterScreen && !isProvider/)
-  assert.match(ws, /<WorkspaceTopBar user=\{user\} role=\{role\} \/>/)
+  assert.match(ws, /<WorkspaceTopBar\s+user=\{user\}\s+role=\{role\}\s+\/>/)
   assert.doesNotMatch(read('components/tutor/WorkspaceTopBar.tsx'), /role="TUTOR"/, 'the top bar hard-codes TUTOR again — a master gets the wrong menu')
 })
 
@@ -222,8 +222,8 @@ test('§E the old addresses 308 segment-for-segment, and only on a segment bound
   // Guard the middleware source against drift from this executable copy.
   const mw = codeOf('middleware.ts')
   assert.match(mw, /\['\/student', '\/me'\],\s*\n\s*\['\/tutor', '\/work'\],\s*\n\s*\['\/provider', '\/work'\],/)
-  assert.match(mw, /if \(p === from \|\| p\.startsWith\(from \+ '\/'\)\)/, 'the segment-boundary test changed')
-  assert.match(mw, /url\.pathname = from === '\/provider' && rest === '' \? `\$\{to\}\/requests` : to \+ rest/)
+  assert.match(mw, /if\s+\(p\s+===\s+from\s+\|\|\s+p\.startsWith\(from\s+\+\s+'\/'\)\)/, 'the segment-boundary test changed')
+  assert.match(mw, /url\.pathname\s+=\s+from\s+===\s+'\/provider'\s+&&\s+rest\s+===\s+''\s+\?\s+`\$\{to\}\/requests`\s+:\s+to\s+\+\s+rest/)
   const start = mw.indexOf('SPACE_MOVES')
   const block = mw.slice(start, mw.indexOf('isRequestPath('))
   assert.match(block, /NextResponse\.redirect\(url, 308\)/, 'must be permanent AND method-preserving, like the other blocks')
@@ -243,7 +243,7 @@ test('§F the subsystem owns three /work screens, never /work — and the chrome
   }
   // BottomNav: /me → client tabs, the master's three → PROVIDER_TABS, other /work → expert tabs; order matters.
   const nav = read('components/BottomNav.tsx')
-  assert.match(nav, /const space = path\.startsWith\('\/me'\) \? 'STUDENT' : isProviderWorkspacePath\(path\) \? 'PROVIDER' : path\.startsWith\('\/work'\) \? 'TUTOR' : role/,
+  assert.match(nav, /const\s+space\s+=\s+path\.startsWith\('\/me'\)\s+\?\s+'STUDENT'\s+:\s+isProviderWorkspacePath\(path\)\s+\?\s+'PROVIDER'\s+:\s+path\.startsWith\('\/work'\)\s+\?\s+'TUTOR'\s+:\s+role/,
     'BottomNav space detection changed — the master test must run BEFORE the /work prefix test')
   for (const href of ['/me', '/me/bookings', '/me/messages', '/me/favorites']) assert.ok(nav.includes(`href: '${href}'`), `STUDENT_TABS lost ${href}`)
   for (const href of ['/work', '/work/jobs', '/work/messages', '/work/profile']) assert.ok(nav.includes(`href: '${href}'`), `TUTOR_TABS lost ${href}`)
@@ -252,16 +252,16 @@ test('§F the subsystem owns three /work screens, never /work — and the chrome
   assert.match(read('components/AppShell.tsx'), /const inProviderSpace = isProviderWorkspacePath\(path \?\? ''\)/)
   // The switcher and the homes.
   const menu = read('components/UserMenu.tsx')
-  assert.match(menu, /const inClientSpace = pathname\.startsWith\('\/me'\)/)
-  assert.match(menu, /const inProviderSpace = isProviderWorkspacePath\(pathname\)/)
-  assert.match(menu, /const inExpertSpace = pathname\.startsWith\('\/work'\) && !inProviderSpace/)
+  assert.match(menu, /const\s+inClientSpace\s+=\s+pathname\.startsWith\('\/me'\)/)
+  assert.match(menu, /const\s+inProviderSpace\s+=\s+isProviderWorkspacePath\(pathname\)/)
+  assert.match(menu, /const\s+inExpertSpace\s+=\s+pathname\.startsWith\('\/work'\)\s+&&\s+!inProviderSpace/)
   assert.match(menu, /\{ href: '\/work', label: SPACE_LABEL\.EXPERT/)
   assert.match(menu, /\{ href: '\/me', label: SPACE_LABEL\.CLIENT/)
   // ⚠️ ONE DOOR SINCE 2026-08-20. The menu used to push two items — /work for
   // an expert and /work/requests for a provider — so somebody holding both
   // hats read two entries for one room, and the provider's skipped the home
   // screen carrying their balance. /work serves both capabilities now.
-  assert.match(menu, /if \(\(isDualRole \|\| isMaster\) && !inExpertSpace && !inProviderSpace\)/)
+  assert.match(menu, /if\s+\(\(isDualRole\s+\|\|\s+isMaster\)\s+&&\s+!inExpertSpace\s+&&\s+!inProviderSpace\)/)
   assert.doesNotMatch(menu, /label: SPACE_LABEL\.MASTER/, 'the second door came back')
   const hats = read('lib/hats.ts')
   assert.match(hats, /EXPERT: '\/work'/); assert.match(hats, /CLIENT: '\/me'/)

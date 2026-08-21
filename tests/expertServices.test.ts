@@ -54,7 +54,7 @@ test('the booking route refuses a service by NOT FINDING it', () => {
   // for the wrong reason. The needle below is a code expression with braces —
   // it cannot occur in prose.
   const route = read('app/api/bookings/route.ts')
-  assert.match(route, /where: \{ id: consultationId, tutorId, bookable: true \}/,
+  assert.match(route, /where:\s+\{\s+id:\s+consultationId,\s+tutorId,\s+bookable:\s+true\s+\}/,
     'a service row can be booked — it has no duration and no slot')
   // 404, not 403: the same answer a forged id from another tutor gets. A
   // different answer here would tell an attacker which ids are real.
@@ -75,7 +75,7 @@ test('the API keeps the two shapes from blurring', () => {
     'the pairing rule judges the body alone — a flip without minutes slips through')
   assert.match(patch, /const willMins = parsed\.data\.minutes \?\? c\.minutes/)
   assert.match(patch, /willBook && willMins < 5/, 'a bookable row can be left with no duration')
-  assert.match(patch, /willBook \? parsed\.data : \{ \.\.\.parsed\.data, minutes: 0 \}/,
+  assert.match(patch, /willBook\s+\?\s+parsed\.data\s+:\s+\{\s+\.\.\.parsed\.data,\s+minutes:\s+0\s+\}/,
     'a row turned into a service keeps its old minutes and announces a session that is not on offer')
 })
 
@@ -83,7 +83,7 @@ test('the API keeps the two shapes from blurring', () => {
 
 test('the profile draws both shapes, services first', () => {
   const sec = codeOf('app/experts/[slug]/_sections.tsx')
-  assert.match(sec, /const jobs = consultations\.filter\(c => c\.bookable === false\)/,
+  assert.match(sec, /const\s+jobs\s+=\s+consultations\.filter\(c\s+=>\s+c\.bookable\s+===\s+false\)/,
     'the profile lost its service list — orderedTiers drops them silently')
   const jobsAt = sec.indexOf('jobs.map(')
   const tiersAt = sec.indexOf('tiers.map(')
@@ -107,7 +107,7 @@ test('the editor asks the shape first and hides the clock for a service', () => 
   // ABSENT, not disabled: a greyed-out box still asks a question, and the
   // answer to this one does not exist.
   assert.doesNotMatch(ed, /disabled=\{[^}]*bookable/, 'the clock is disabled rather than removed')
-  assert.match(ed, /c\.bookable \? `\$\{c\.minutes\} წთ` : 'სერვისი'/, 'a saved service is labelled by a duration it has not got')
+  assert.match(ed, /c\.bookable\s+\?\s+`\$\{c\.minutes\}\s+წთ`\s+:\s+'სერვისი'/, 'a saved service is labelled by a duration it has not got')
 })
 
 /* ── D. The door asks the same question as the editor ─────────────────────── */
@@ -126,7 +126,7 @@ test('registration collects a SERVICE, and the calendar is conditional', () => {
   assert.match(form, /l: 'რას ყიდი'/, 'step 2 is named after time again')
 
   const steps = codeOf('app/join/_expert/_steps.tsx')
-  assert.match(steps, /const anyBookable = form\.services\.some\(sv => sv\.bookable\)/)
+  assert.match(steps, /const\s+anyBookable\s+=\s+form\.services\.some\(sv\s+=>\s+sv\.bookable\)/)
   assert.match(steps, /\{anyBookable && <AvailabilityPicker/,
     'the calendar is unconditional — a service seller is asked to publish a working week')
   assert.match(steps, /\{s\.bookable && \(/, 'the duration column shows on a service')
@@ -134,7 +134,7 @@ test('registration collects a SERVICE, and the calendar is conditional', () => {
   // The rule, at the gate: a schedule is demanded only when something on the
   // form can actually be booked.
   const client = codeOf('app/join/_expert/ApplyClient.tsx')
-  assert.match(client, /if \(form\.services\.some\(sv => sv\.bookable\)\) \{/,
+  assert.match(client, /if\s+\(form\.services\.some\(sv\s+=>\s+sv\.bookable\)\)\s+\{/,
     'step 2 requires a working week from everybody again')
   assert.match(client, /დაასახელე შენი სერვისი/, 'an unnamed offering can be submitted — it publishes a blank row')
 })

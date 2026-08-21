@@ -73,10 +73,10 @@ test('§B capabilitiesOf reads BOTH tables, the way hatsOf does', () => {
   assert.equal((src.match(/prisma\.user\.findUnique/g) ?? []).length, 1, 'capabilitiesOf is not one query')
   assert.match(src, /tutor: \{ select: \{ id: true \} \}/, 'CONSULT no longer reads TutorProfile')
   assert.match(src, /serviceProfile: \{ select: \{ id: true \} \}/, 'WORK no longer reads ServiceProfile')
-  assert.match(src, /requestAccess: \{ select: \{ active: true \} \}/, 'WORK no longer reads the allowlist')
+  assert.match(src, /requestAccess:\s+\{\s+select:\s+\{\s+active:\s+true\s+\}\s+\}/, 'WORK no longer reads the allowlist')
   // …and the two rules: the profile for CONSULT; profile AND active access for WORK.
   assert.match(src, /if \(u\.tutor\) out\.push\('CONSULT'\)/)
-  assert.match(src, /if \(u\.serviceProfile && u\.requestAccess\?\.active === true\) out\.push\('WORK'\)/,
+  assert.match(src, /if\s+\(u\.serviceProfile\s+&&\s+u\.requestAccess\?\.active\s+===\s+true\)\s+out\.push\('WORK'\)/,
     'a ServiceProfile without an active RequestAccess must NOT count as WORK — that is somebody never let in')
   // The same reads lib/hats makes, so the two answers cannot drift.
   const hats = codeOf('lib/hats.ts')
@@ -88,7 +88,7 @@ test('§B capabilitiesOf reads BOTH tables, the way hatsOf does', () => {
 test('§C /api/me carries capabilities beside hats, and lib/me types it', () => {
   const me = codeOf('app/api/me/route.ts')
   assert.match(me, /hats: await hatsOf\(user\.id\)/)
-  assert.match(me, /capabilities: await capabilitiesOf\(user\.id\)/, '/api/me stopped exposing capabilities')
+  assert.match(me, /capabilities:\s+await\s+capabilitiesOf\(user\.id\)/, '/api/me stopped exposing capabilities')
   const lib = read('lib/me.ts')
   assert.match(lib, /capabilities\?: \('CONSULT' \| 'WORK'\)\[\]/, 'the Me type lost `capabilities`')
   assert.match(lib, /capabilities: d\.capabilities \?\? \[\]/, 'fetchMe drops `capabilities` on the floor')
@@ -112,12 +112,18 @@ test('§D /join exists and /apply does not', () => {
 
 test('§E the page: guest → pitch, admin → /admin, and the WORK half is gated INSIDE it', () => {
   const page = codeOf('app/join/page.tsx')
-  assert.match(page, /if \(!user\) return wantsWorkOnly\(can\) \? <MasterApplyMarketing \/> : <ApplyMarketing \/>/,
-    'a guest no longer gets the crawlable pitch')
-  assert.match(page, /if \(user\.role === ROLE\.ADMIN\) redirect\('\/admin'\)/)
+  // ⚠️ THREE GUEST VIEWS SINCE 2026-08-20, and the BARE one is the door. The
+  // two pitches each speak to one half and stay crawlable on `?can=`; the
+  // address every link on the site points at asks the question instead of
+  // putting the sign-up wall in front of it.
+  assert.match(page, /if\s+\(wantsWorkOnly\(can\)\)\s+return\s+<MasterApplyMarketing\s+\/>/, 'the trades pitch is gone')
+  assert.match(page, /if\s+\(wantsConsultOnly\(can\)\)\s+return\s+<ApplyMarketing\s+\/>/, 'the consultation pitch is gone')
+  assert.match(page, /return <PublicDoor preset=\{can\} \/>/,
+    'the bare address stopped being the door — a guest is behind the wall again')
+  assert.match(page, /if\s+\(user\.role\s+===\s+ROLE\.ADMIN\)\s+redirect\('\/admin'\)/)
   // The supply switch gates the WORK half here — the page itself must never 404
   // with it, because the expert half lives behind the same URL.
-  assert.match(page, /if \(providersOn\(\) && !have\.includes\('WORK'\)\) offer\.push\('WORK'\)/,
+  assert.match(page, /if\s+\(providersOn\(\)\s+&&\s+!have\.includes\('WORK'\)\)\s+offer\.push\('WORK'\)/,
     'the WORK half is no longer gated on providersOn()')
   assert.doesNotMatch(page, /notFound\(\)/, '/join 404s — that takes the expert half down with the trades half')
   assert.equal(isProviderPath('/join'), false, '/join is inside PROVIDER_PATH_PREFIXES — the middleware would 404 the expert door')
@@ -125,14 +131,19 @@ test('§E the page: guest → pitch, admin → /admin, and the WORK half is gate
   assert.ok(!(PROVIDER_PATH_PREFIXES as readonly string[]).some(p => p.startsWith('/apply') || p.startsWith('/join')))
   // Both halves are offered only when still missing — reads capabilitiesOf.
   assert.match(page, /const have = await capabilitiesOf\(user\.id\)/)
-  assert.match(page, /if \(user\.role !== ROLE\.EXPERT && !have\.includes\('CONSULT'\)\) offer\.push\('CONSULT'\)/)
+  assert.match(page, /if\s+\(user\.role\s+!==\s+ROLE\.EXPERT\s+&&\s+!have\.includes\('CONSULT'\)\)\s+offer\.push\('CONSULT'\)/)
   // The provider workspace is named through the subsystem's constant, never a literal.
   assert.doesNotMatch(read('app/join/page.tsx'), /["'`]\/provider/)
   assert.match(page, /PROVIDER_ROUTE/)
 })
 
 test('§F the door: one question, the capability derived, the choice persists', () => {
-  const door = codeOf('app/join/JoinClient.tsx')
+  // ⚠️ TWO FILES SINCE 2026-08-20. The question moved into the leaf both doors
+  // import (`_door/DoorQuestion`) so that a GUEST can answer it before the
+  // wall; `JoinClient` kept what only a signed-in door can do — which wizard
+  // opens, and the hand-off. The rules below are the door's, wherever the door
+  // now keeps them.
+  const door = codeOf('app/join/JoinClient.tsx') + codeOf('app/join/_door/DoorQuestion.tsx')
   assert.match(door, /<ProfessionPicker/, 'the door grew its own profession control instead of the shared one')
   assert.match(door, /useSpheres\(\)/, 'the door fetches spheres its own way — one fetch shape, one fallback')
   // ⚠️ THE TWO CAPABILITY TILES WERE REMOVED ON 2026-08-20 and the checkbox
@@ -148,14 +159,38 @@ test('§F the door: one question, the capability derived, the choice persists', 
   assert.match(door, /setStage\(work \? 'master' : 'expert'\)/)
   // The expert wizard is seeded from the door and offered the master hand-off.
   assert.match(door, /seed=\{seed\}/)
-  assert.match(door, /onContinueMaster=\{work \? \(\) => setStage\('master'\) : undefined\}/)
+  // ⚠️ PINNED AS A PROPERTY, NOT AS AN EXPRESSION (2026-08-20). This asserted
+  // the literal `work ? () => setStage('master') : undefined` and broke the
+  // moment the hand-off got smarter — it now also remembers which half has
+  // already been FILED, so somebody who finished the expert form is not offered
+  // it again. The rule that must hold is the rule, not the ternary that
+  // happened to express it: the second form is offered when, and only when,
+  // this applicant picked WORK.
+  assert.match(door, /onContinueMaster=\{work/,
+    'the expert wizard is no longer handed the WORK follow-up')
+  assert.match(door, /setStage\('master'\)/,
+    'the hand-off no longer moves the door to the master form')
+  assert.match(door, /: undefined/,
+    'the hand-off must be undefined when it does not apply — never a no-op function, which still draws the button')
   const expert = codeOf('app/join/_expert/ApplyClient.tsx')
   assert.match(expert, /გააგრძელე სერვისის ნაწილით/, 'the expert success screen lost the hand-off to the master form')
   assert.match(expert, /onContinueMaster \? \(/)
-  // `?can=` still wins over the derivation — somebody followed that link on
-  // purpose — and is still narrowed to what is actually offered.
+  /* ⚠️ `?can=` SEEDS THE DERIVATION, IT DOES NOT OVERRIDE IT (2026-08-20), and
+   * the version this replaced was a shipped bug rather than a preference. The
+   * header (desktop AND drawer) and the footer all pointed at
+   * `/join?can=CONSULT`, and `picked` short-circuited on a preset — so a
+   * სანტექნიკოსი who arrived by clicking the site's own navigation picked
+   * „სანტექნიკოსი" in the control directly above the button, was told „შენს
+   * პროფესიაზე კონსულტაციებს ჩაატარებ", and was dropped into the consultation
+   * wizard with the service half unreachable. The derivation — the reason the
+   * door exists — was dead for everybody who did not type the address by hand.
+   *
+   * A preset is now the answer only while there is no answer of their own. */
   assert.match(codeOf('app/join/page.tsx'), /preset=\{can\.filter\(c => offer\.includes\(c\)\)\}/)
-  assert.match(door, /if \(preset\.length > 0\) return preset/)
+  assert.doesNotMatch(door, /if \(preset\.length > 0\) return preset/,
+    'a link that names a half beats the profession the applicant just picked')
+  assert.match(door, /if\s+\(derived\.size\s+===\s+0\)\s+for\s+\(const\s+c\s+of\s+preset\)\s+derived\.add\(c\)/,
+    'the preset stopped seeding — a `?can=` link now says nothing at all')
 })
 /* ═══════════ 3. the redirects ══════════════════════════════════════════ */
 
@@ -163,10 +198,10 @@ test('§G the middleware 308s /apply, /apply/master and /apply/* onto /join, que
   const mw = codeOf('middleware.ts')
   const block = mw.slice(mw.indexOf("req.nextUrl.pathname === '/apply'"), mw.indexOf('isRequestPath('))
   assert.ok(block.length > 0, 'the /apply block is gone from the middleware')
-  assert.match(block, /req\.nextUrl\.pathname === '\/apply' \|\| req\.nextUrl\.pathname\.startsWith\('\/apply\/'\)/)
+  assert.match(block, /req\.nextUrl\.pathname\s+===\s+'\/apply'\s+\|\|\s+req\.nextUrl\.pathname\.startsWith\('\/apply\/'\)/)
   assert.match(block, /url\.pathname = '\/join'/)
-  assert.match(block, /wasMaster = req\.nextUrl\.pathname === '\/apply\/master' \|\| req\.nextUrl\.pathname\.startsWith\('\/apply\/master\/'\)/)
-  assert.match(block, /if \(wasMaster && !url\.searchParams\.has\('can'\)\) url\.searchParams\.set\('can', 'WORK'\)/)
+  assert.match(block, /wasMaster\s+=\s+req\.nextUrl\.pathname\s+===\s+'\/apply\/master'\s+\|\|\s+req\.nextUrl\.pathname\.startsWith\('\/apply\/master\/'\)/)
+  assert.match(block, /if\s+\(wasMaster\s+&&\s+!url\.searchParams\.has\('can'\)\)\s+url\.searchParams\.set\('can',\s+'WORK'\)/)
   assert.match(block, /NextResponse\.redirect\(url, 308\)/, 'must be permanent AND method-preserving, like the /ask block')
   // The query string is preserved: the block clones the URL and never blanks `search`.
   assert.doesNotMatch(block, /url\.search = ''/)
@@ -202,8 +237,8 @@ test('§I signup hands off to /join, and reads the half back from `?can=`', () =
   // („serve" survives only for somebody arriving on an existing ?can=WORK link.)
   assert.match(signup, /const dest = kind === 'serve' \? '\/join\?can=WORK' : '\/join'/,
     'the two signup tiles no longer hand off to the door with their half pre-ticked')
-  assert.match(signup, /const joinIntent = !bookingIntent && redirect\.startsWith\('\/join'\)/)
-  assert.match(signup, /const masterIntent = joinIntent && \/\[\?&\]can=WORK\\b\/\.test\(redirect\)/,
+  assert.match(signup, /const\s+joinIntent\s+=\s+!bookingIntent\s+&&\s+redirect\.startsWith\('\/join'\)/)
+  assert.match(signup, /const\s+masterIntent\s+=\s+joinIntent\s+&&\s+\/\[\?&\]can=WORK\\b\/\.test\(redirect\)/,
     'a plumber arriving from the trades pitch is read as an EXPERT again')
   assert.match(signup, /const applyIntent = joinIntent && !masterIntent/)
   // ⚠️ TWO TILES. „ვარ ექსპერტი" + „ვარ ხელოსანი" split one person into two

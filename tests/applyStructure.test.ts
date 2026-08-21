@@ -52,12 +52,12 @@ test('optional and heavy is folded away', () => {
   assert.match(src, /const Collapsible = /)
   assert.match(src, /<Collapsible[\s\S]{0,900}CertificateUploader/, 'the diploma uploader must start closed')
   // …but a closed lid must never hide an error.
-  assert.match(src, /const forced = !!err && !!fields\?\.includes\(err\.field\)/)
+  assert.match(src, /const\s+forced\s+=\s+!!err\s+&&\s+!!fields\?\.includes\(err\.field\)/)
   assert.match(src, /const shown = open \|\| forced/)
 })
 
 test('the calendar is full by default and travels with the application', () => {
-  assert.match(src, /const DEFAULT_AVAIL = \{ days: \[true, true, true, true, true, false, false\], startHour: 10, endHour: 18 \}/)
+  assert.match(src, /const\s+DEFAULT_AVAIL\s+=\s+\{\s+days:\s+\[true,\s+true,\s+true,\s+true,\s+true,\s+false,\s+false\],\s+startHour:\s+10,\s+endHour:\s+18\s+\}/)
   assert.match(src, /pd\.availability = \{/, 'the pattern must reach the server')
   // An expert with no day cannot be booked at all — that stays gated.
   assert.match(src, /!form\.avail\.days\.some\(Boolean\)/)

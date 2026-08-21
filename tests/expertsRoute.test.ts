@@ -75,11 +75,11 @@ test('§B the page reads `slug`, resolves id OR slug, and 308s a cuid to /expert
   assert.match(page, /const \{ slug: param \} = await params/)
   assert.doesNotMatch(page, /const \{ id: param \}/, 'the param is still read as `id`')
   // /experts/<cuid> keeps working forever (bookings, messages, admin link by id).
-  assert.match(page, /where: \{ OR: \[\{ id: param \}, \{ slug: param \}\] \}/)
+  assert.match(page, /where:\s+\{\s+OR:\s+\[\{\s+id:\s+param\s+\},\s+\{\s+slug:\s+param\s+\}\]\s+\}/)
   assert.match(page, /permanentRedirect\(`\/experts\/\$\{resolved\.slug\}/)
   // Canonical + JSON-LD name the new address, never the old one.
-  assert.match(page, /const canonical = `\$\{SITE_URL\}\/experts\/\$\{resolved\?\.slug \|\| id\}`/)
-  assert.match(page, /url: `\$\{SITE_URL\}\/experts\/\$\{resolved\?\.slug \|\| id\}`/)
+  assert.match(page, /const\s+canonical\s+=\s+`\$\{SITE_URL\}\/experts\/\$\{resolved\?\.slug\s+\|\|\s+id\}`/)
+  assert.match(page, /url:\s+`\$\{SITE_URL\}\/experts\/\$\{resolved\?\.slug\s+\|\|\s+id\}`/)
   assert.doesNotMatch(page, /\/tutors\/\$\{/, 'the page still builds a /tutors/ profile URL')
   const client = codeOf('app/experts/[slug]/client.tsx')
   assert.match(client, /useParams<\{ slug: string \}>\(\)/)
@@ -88,11 +88,11 @@ test('§B the page reads `slug`, resolves id OR slug, and 308s a cuid to /expert
 
 test('§C dual providers: the profile links „სერვისის პროფილი" → /experts/<slug>, photos never selected', () => {
   const page = read('app/experts/[slug]/page.tsx')
-  assert.match(page, /serviceProfile: \{ select: \{ slug: true, published: true \} \}/,
+  assert.match(page, /serviceProfile:\s+\{\s+select:\s+\{\s+slug:\s+true,\s+published:\s+true\s+\}\s+\}/,
     'the select must be exactly slug + published — ServiceProfile photo columns are base64')
   assert.doesNotMatch(codeOf('app/experts/[slug]/page.tsx'), /photoUrl|workPhotos/, 'a ServiceProfile photo column is selected into the profile page')
   // ONE namespace since stage 11: the other profile is /experts/<slug> too.
-  assert.match(page, /serviceProfile\?\.published && serviceProfile\.slug \? `\/experts\/\$\{serviceProfile\.slug\}` : null/)
+  assert.match(page, /serviceProfile\?\.published\s+&&\s+serviceProfile\.slug\s+\?\s+`\/experts\/\$\{serviceProfile\.slug\}`\s+:\s+null/)
   assert.match(page, /masterHref=\{masterHref\}/)
   const hero = read('app/experts/[slug]/_hero.tsx')
   assert.match(hero, /<Link href=\{masterHref\}/)
@@ -111,7 +111,7 @@ test('§D the middleware 308s /tutors AND /tutors/<segment> into /experts', () =
   const block = mw.slice(start, mw.indexOf('isRequestPath('))
   // Both forms, one hop, one block — the bare address is the catalogue's old
   // one and must not fall through to a 404.
-  assert.match(block, /req\.nextUrl\.pathname === '\/tutors' \|\| req\.nextUrl\.pathname\.startsWith\('\/tutors\/'\)/)
+  assert.match(block, /req\.nextUrl\.pathname\s+===\s+'\/tutors'\s+\|\|\s+req\.nextUrl\.pathname\.startsWith\('\/tutors\/'\)/)
   assert.match(block, /'\/experts' \+ rest/)
   assert.match(block, /NextResponse\.redirect\(url, 308\)/, 'must be permanent AND method-preserving, like the other blocks')
   // The query string survives (?q=, ?category=, ?intent=message, ?rebook=1).
@@ -170,11 +170,11 @@ test('§F the cards, sitemap, nav and JSON-LD name /experts/', () => {
   // The catalogue card, the home grid and the hero: slug first, under /experts/.
   for (const f of ['app/experts/_card.tsx', 'components/home/ExpertGrid.tsx', 'app/_home/hero.tsx']) {
     const src = codeOf(f)
-    assert.match(src, /`\/experts\/\$\{[a-z]+\.(?:slug|urlSlug) \|\| [a-z]+\.id\}/, `${f}: the card href must be the SLUG when present, under /experts/`)
+    assert.match(src, /`\/experts\/\$\{[a-z]+\.(?:slug|urlSlug)\s+\|\|\s+[a-z]+\.id\}/, `${f}: the card href must be the SLUG when present, under /experts/`)
   }
   // The sitemap emits only the new address.
   const sitemap = codeOf('app/sitemap.ts')
-  assert.match(sitemap, /url: `\$\{SITE_URL\}\/experts\/\$\{t\.slug \|\| t\.id\}`/)
+  assert.match(sitemap, /url:\s+`\$\{SITE_URL\}\/experts\/\$\{t\.slug\s+\|\|\s+t\.id\}`/)
   assert.doesNotMatch(sitemap, /\/tutors\/\$\{/)
   // robots allows the catalogue and everything under it; a redirecting URL does
   // not belong in an Allow, so the three retired doors are absent.
@@ -195,7 +195,7 @@ test('§F the cards, sitemap, nav and JSON-LD name /experts/', () => {
   // stage 11 that is all four (/experts/<profession|trade|expert|provider>).
   // The SECTION_ALIAS that used to add '/services' is gone with the prefix.
   const bar = read('components/PublicTopBar.tsx')
-  assert.match(bar, /activePath === href \|\| activePath\.startsWith\(href \+ '\/'\)/)
+  assert.match(bar, /activePath\s+===\s+href\s+\|\|\s+activePath\.startsWith\(href\s+\+\s+'\/'\)/)
   assert.doesNotMatch(codeOf('components/PublicTopBar.tsx'), /'\/services/,
     'the header still aliases the retired /services prefix')
   // Contextual help keys the profile on the deeper prefix and the catalogue on

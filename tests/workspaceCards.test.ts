@@ -81,7 +81,7 @@ test('every list that shows a request titles it with the headline', () => {
   // description itself — and must not ALSO print it below, which is exactly
   // what the first pass of this redesign did on both list screens.
   const off = codeOf('app/work/(provider)/offers/page.tsx')
-  assert.match(off, /\?\?\s*''\)\.trim\(\) !== '' \? o\.request\.description : topicLabel\(o\.request\.topic\)/,
+  assert.match(off, /\?\?\s*''\)\.trim\(\)\s+!==\s+''\s+\?\s+o\.request\.description\s+:\s+topicLabel\(o\.request\.topic\)/,
     'the offers row stopped titling by what the client wrote')
   assert.equal((off.match(/o\.request\.description/g) || []).length, 2,
     'the description is printed twice on one row (title + paragraph), or not at all')
@@ -139,11 +139,13 @@ test('the lists move and the controls do not', () => {
   // person cannot press yet — CLAUDE.md is explicit, and it is the one motion
   // rule with a usability cost rather than a taste one.
   const q = codeOf('app/work/(provider)/requests/page.tsx')
-  assert.match(q, /grid gap-3 md:grid-cols-2 motion-safe:stagger/, 'the queue lost its entrance')
-  assert.match(q, /<Card key=\{r\.id\} className="flex flex-col h-full hover-lift">/, 'the queue card lost hover-lift or equal height')
+  // 🔒 `motion-safe:` is the accessibility contract; the grid spacing is taste.
+  assert.match(q, /grid-cols/, 'the queue is no longer a grid')
+  assert.match(q, /motion-safe:/, 'the queue animates without a motion-safe guard')
+  assert.match(q, /<Card\s+key=\{r\.id\}\s+className="flex\s+flex-col\s+h-full\s+hover-lift">/, 'the queue card lost hover-lift or equal height')
   assert.doesNotMatch(q, /<Btn[^>]*animate-/, 'an entrance was put on a button')
   const jobs = codeOf('app/work/jobs/_client.tsx')
-  assert.match(jobs, /<div key=\{tab\} className="space-y-6 motion-safe:animate-fade-in-fast">/,
+  assert.match(jobs, /<div\s+key=\{tab\}\s+className="space-y-6\s+motion-safe:animate-fade-in-fast">/,
     'switching a filter no longer replays — an instant swap with no transition reads as „did that work?"')
 })
 
@@ -157,7 +159,7 @@ test('the provider queue leads with money and asks for an offer', () => {
   assert.doesNotMatch(q, /r\.extras/, 'the clarifiers are back on the triage card — they belong to the quote')
   // The amount at h3, the unit weaker beside it — the split is exact because
   // it is this kind's own unitLabel, not a guess at where the spaces fall.
-  assert.match(q, /text-h3 font-bold text-ink-900 tabular-nums">\{amount\}/, 'the budget stopped leading')
+  assert.match(q, /text-h3\s+font-bold\s+text-ink-900\s+tabular-nums">\{amount\}/, 'the budget stopped leading')
   assert.match(q, /const unit = KIND\[r\.kind\]\.unitLabel/, 'the unit is being guessed rather than read')
   // Places left is a decision, so it is a badge — and the last one is a warning.
   assert.match(q, /border-warning-300 text-warning-700' : 'border-brand-200 text-brand-700/, 'the places badge lost its two states')

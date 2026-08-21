@@ -47,7 +47,7 @@ test('the door does not ask which half they are', () => {
    * never be primary — and it asked a question the site could already answer:
    * `PROFESSION_CAN` has known what each job sells since stage 8, and it is
    * the same table the request router reads. */
-  const door = codeOf('app/join/JoinClient.tsx')
+  const door = codeOf('app/join/JoinClient.tsx') + codeOf('app/join/_door/DoorQuestion.tsx')
   assert.doesNotMatch(door, /'ვასრულებ სერვისს'|'ვატარებ კონსულტაციას'|'ვარ ექსპერტი'/,
     'the capability tiles are back — the profession decides, CLAUDE.md rule 1')
   assert.doesNotMatch(door, /role="checkbox"[\s\S]{0,400}CAPABILITY_LABEL/,
@@ -62,7 +62,7 @@ test('when they can do both, the SERVICE form opens first', () => {
   // consultation wizard and offer the service afterwards, which is the
   // hierarchy upside down — CLAUDE.md rule 4: wherever both appear, the
   // service comes first.
-  const door = codeOf('app/join/JoinClient.tsx')
+  const door = codeOf('app/join/JoinClient.tsx') + codeOf('app/join/_door/DoorQuestion.tsx')
   assert.match(door, /setStage\(work \? 'master' : 'expert'\)/,
     'the consultation wizard opens first again for somebody who can do both')
 })
@@ -101,7 +101,7 @@ test('„დარჩა" takes you there instead of naming it', () => {
       `„${f}" is listed as missing but nothing on the page answers to it`)
   }
   // …and the Block prop really does become the attribute jumpTo queries.
-  assert.match(work, /<Card className="mt-4" data-field=\{field\}>/, 'Block stopped forwarding its jump target')
+  assert.match(work, /data-field=\{field\}/, 'Block stopped forwarding its jump target — the error summary cannot scroll to it')
 })
 
 test('no question is asked that has one answer', () => {
@@ -136,7 +136,7 @@ test('the one word an applicant is certain of finds them', () => {
   assert.match(src, /ALL_PROFESSIONS/, 'the search reads spheres only again')
   assert.match(src, /jobHits/, 'the profession results are gone')
   // One tap answers BOTH steps — the whole point of the hit list.
-  assert.match(src, /onClick=\{\(\) => \{\s*if \(cat\) onSphere\(cat\.name\)/,
+  assert.match(src, /onClick=\{\(\)\s+=>\s+\{\s*if\s+\(cat\)\s+onSphere\(cat\.name\)/,
     'picking a profession no longer fills the category in')
   assert.doesNotMatch(src, /ჯერ კატეგორია აირჩიე — მერე აქ მისი პროფესიები გამოჩნდება/,
     'step ② is a dead end again')
@@ -148,7 +148,7 @@ test('the one word an applicant is certain of finds them', () => {
 test('every sphere the picker offers has professions behind it', () => {
   // A category with no professions is step ① answered and step ② empty — the
   // same dead end by another route. `design` and `career` were topic GROUPS
-  // with no category at all (docs/TAXONOMY-AUDIT §P4): a client could ask for
+  // with no category at all (docs/archive/TAXONOMY-AUDIT §P4): a client could ask for
   // „დიზაინი" and the catalogue had nobody to show.
   for (const slug of ['design', 'career', 'swavleba']) {
     assert.ok((PROFESSIONS[slug] ?? []).length >= 2, `${slug} is not a sphere with professions`)
@@ -158,4 +158,97 @@ test('every sphere the picker offers has professions behind it', () => {
   const topics = read('lib/requestTopics.ts')
   assert.match(topics, /id: 'property', label: 'უძრავი ქონება'/, 'construction is filed in two places again')
   assert.doesNotMatch(topics, /categorySlug: 'hr'/, "'hr' is not a category — that group is `career`")
+})
+
+
+test('whichever form opens first, the other half still has a door', () => {
+  /* ⚠️ THE CHAIN BROKE THE DAY IT WAS REVERSED (2026-08-20, caught by the
+   * owner: „კონსულტაციის საკითხი სად წაიღე?"). The hand-off existed in ONE
+   * direction — the expert wizard's success screen offered the service form —
+   * so the moment the service form started opening first, a ბუღალტერი
+   * (CONSULT + WORK) filed their service and the consultation half had no
+   * door at all. Two forms, two hand-offs, and neither may point back at a
+   * half that is already filed. */
+  const door = codeOf('app/join/JoinClient.tsx') + codeOf('app/join/_door/DoorQuestion.tsx')
+  assert.match(door, /onContinueMaster=\{work\s+&&\s+!filed\.includes\('WORK'\)/,
+    'the expert wizard stopped offering the service half')
+  assert.match(door, /onContinueExpert=\{consult\s+&&\s+!filed\.includes\('CONSULT'\)/,
+    'the service form does not offer the consultation half — it is unreachable for anybody who can do both')
+  const master = codeOf('app/join/_master/client.tsx')
+  assert.match(master, /onContinueExpert \&\& \(/, 'the service success screen has no control for it')
+  // …and it is OFFERED, never asked: no tick, no radio, no second axis.
+  assert.doesNotMatch(master, /role="(checkbox|radio)"[\s\S]{0,200}კონსულტაცი/,
+    'the consultation became a choice on the service form')
+})
+
+
+/* ═══════════ THE ORDER: THE QUESTION, THEN THE WALL (2026-08-20) ══════════ */
+
+test('a guest is asked what they do BEFORE being asked to register', () => {
+  /* ⚠️ THE WALL WAS THE FUNNEL'S BIGGEST LEAK AND IT WAS INVISIBLE. /join
+   * showed a signed-out visitor a pitch whose only action was „create an
+   * account", and the door's one question — the profession, from which every
+   * capability, every route and every seeded field is derived — sat behind it.
+   * Two costs: forced registration before any commitment is one of the
+   * best-measured causes of abandonment there is, and somebody who leaves at
+   * the wall leaves NOTHING behind, while somebody who leaves just after it
+   * leaves an address that routes to nobody.
+   *
+   * The order is now: answer → account → form. */
+  const pub = codeOf('app/join/_door/PublicDoor.tsx')
+  assert.match(pub, /<GuestDoor/, 'the public door lost its question — it is a pitch behind a wall again')
+  const guest = codeOf('app/join/_door/GuestDoor.tsx')
+  assert.match(guest, /<DoorQuestion/, 'the guest half grew its own copy of the question')
+  assert.match(guest, /\/signup\?redirect=%2Fjoin/, 'the answer no longer carries the visitor into signup')
+
+  // …and the answer SURVIVES the round trip, or the first ask was a trick.
+  const leaf = codeOf('app/join/_door/DoorQuestion.tsx')
+  assert.match(leaf, /asked: true/, 'pressing continue no longer records that the question was answered')
+  const signed = codeOf('app/join/JoinClient.tsx')
+  assert.match(signed, /if \(!d\?\.asked\) return/, 'the signed-in door stopped reading the guest answer')
+  assert.match(signed, /clearAsked\(\)/, 'the flag is never cleared — the door can no longer be reopened')
+})
+
+test('the site invites people to ONE address, in ONE word', () => {
+  /* ⚠️ SIX LABELS AND THREE DESTINATIONS FOR ONE ACTION (measured 2026-08-20).
+   * A label that does not reappear as the destination's heading reads as
+   * „wrong page" and costs the click. Worse, two of the three destinations
+   * carried `?can=CONSULT`, which pre-answered the door's question with the
+   * half the hierarchy says comes second. */
+  for (const f of ['components/PublicTopBar.tsx', 'components/Footer.tsx', 'components/UserMenu.tsx']) {
+    const src = codeOf(f)
+    assert.doesNotMatch(src, /["'`]\/join\?can=/, `${f} still pre-answers the door with ?can=`)
+    assert.match(src, /JOIN_DOOR_HREF/, `${f} types the door's address instead of importing it`)
+    assert.match(src, /JOIN_DOOR_LABEL/, `${f} types its own word for the door`)
+  }
+  // The heading confirms the click: the door prints the same constant.
+  assert.match(codeOf('app/join/JoinClient.tsx'), /\{JOIN_DOOR_LABEL\}/, 'the door heading drifted from the link that leads to it')
+  assert.match(codeOf('app/join/_door/PublicDoor.tsx'), /\{JOIN_DOOR_LABEL\}/)
+})
+
+test('the expensive answers are asked last, on both doors', () => {
+  /* ⚠️ TWO DOORS, TWO OPPOSITE DOCTRINES, BOTH WRITTEN DOWN (fixed 2026-08-20).
+   * The service form's own header says „cheap and identifying first… and only
+   * then the things that cost effort — photo, work photos, prices", and it is
+   * right. The consultation wizard required a PHOTO UPLOAD to leave step one —
+   * on a phone, leaving the browser — before the applicant had seen what they
+   * were being asked to price.
+   *
+   * The BAR is unchanged: no application is submitted without a photo. */
+  const expert = codeOf('app/join/_expert/ApplyClient.tsx')
+  assert.match(expert, /if \(final && !media\?\.photoUrl\)/, 'the photo is a wall in the middle of the form again')
+  assert.match(expert, /validateStep\(1,\s+1,\s+true\)\s+\?\?\s+validateStep\(2,\s+1,\s+true\)/,
+    'the final gate stopped running in `final` mode — an application can be submitted without a photo')
+})
+
+test('nothing is asked twice that the account already answered', () => {
+  // Signup REQUIRES a phone; /api/me has always returned it; the form asked for
+  // it again as a required field, about a minute later.
+  const expert = codeOf('app/join/_expert/ApplyClient.tsx')
+  assert.match(expert, /phone:\s+f\.phone\.trim\(\)\s+\?\s+f\.phone\s+:\s+\(d\.user\.phone\s+\?\?\s+''\)/,
+    'the applicant retypes the phone number they gave at signup')
+  // The service form gets the door's answer typed into its search, so the
+  // person's own word („სანტექნიკოსი") finds their service rows.
+  assert.match(codeOf('app/join/_master/client.tsx'), /setQuery\(cur => \(cur\.trim\(\) \? cur : job\)\)/,
+    'the service catalogue no longer starts from the profession they just named')
 })

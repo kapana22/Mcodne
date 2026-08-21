@@ -1,283 +1,250 @@
-# mcodne.ge — Design System Canon
+# mcodne.ge — the canon
 
-Georgian expert-consultation marketplace (Next.js 15 + Tailwind + Prisma). UI is Georgian.
-**Every new/edited surface must follow this canon — public, auth, student, tutor, admin alike.**
+Georgian expert marketplace (Next.js 15 + Tailwind + Prisma). UI is Georgian.
+**Every surface follows this file — public, auth, client, provider, admin alike.**
 
-## Where things live (map added 2026-08-08)
-**Every big screen is a container plus `_*.tsx` siblings in its own folder. Open the part, not the page** — the container holds only state, fetch and layout.
+> ## How to read this file
+>
+> **Two kinds of statement live here and they do NOT carry the same weight.**
+> Before 2026-08-20 they were written in one voice, and the effect was that a
+> decision taken on a Tuesday read like a law — which is how a canon stops
+> informing and starts caging. Owner: „არ შემზღუდოს რამეში, როგორც დიზაინში
+> ასევე ყველაფერში."
+>
+> **🔒 ABSOLUTE** — do not re-litigate. Accessibility contracts, contrast
+> arithmetic, correctness patterns, privacy, „never invent a number". These are
+> not taste and a new idea does not get to override them.
+>
+> **📌 CURRENT** — true today, decided for a reason, and **open**. Bring a better
+> idea and the owner decides. If you change one, change the line here too.
+> Everything not marked 🔒 is 📌.
+>
+> ⚠️ **A MEASUREMENT IS A DATE, NOT A FACT.** Every number below was true when it
+> was written. Three were stale within a fortnight („4 service groups" had become
+> 8; „6 masters" 2; „84 tests" 97). **Re-measure before you reason from one** —
+> `npm run map`, a `count()`, `ls`. Never quote a number from this file into new
+> work without checking it.
+>
+> ⚠️ **THIS FILE IS LOADED INTO EVERY TURN.** On 2026-08-20 it was 65 KB ≈ 20 800
+> tokens spent before reading a single line of the actual task. Nothing was
+> deleted — the RULES stayed here and the REASONING moved next to them:
+> **`docs/product-model.md`** (the model's history, owner quotes, the full screen
+> map) and **`docs/design-system.md`** (the full design canon).
+> Keep it that way: a rule that is broken by accident belongs here; the story of
+> why it exists belongs in `docs/`. The pre-split backup was deleted on
+> 2026-08-21 — a third copy of the same text can only drift.
+>
+> ⚠️ **NOTHING IN `docs/archive/` IS CURRENT.** Finished audits, kept for their
+> reasoning. Never quote a number out of one.
 
-| screen | container | its parts |
-| --- | --- | --- |
-| `/` home | `app/HomeClient.tsx` (68L) | `app/_home/` — `data` `hero` `categories` `experts` `how` `cta`. **Stage 9 (2026-08-19): the hero has NO search field** — the one question (SiteText `home.hero.*`) and two doors, `Btn` „ექსპერტები" → `/experts` and „სერვისები" → `/experts?type=WORK` (**stage 10**: both doors open the ONE catalogue, the second pre-filtered to the job half); the rest of the six sections + `RequestBand` unchanged. |
-| **public header + footer** (stage 10, 2026-08-19) | `components/PublicTopBar.tsx`, `components/Footer.tsx` | The bar is exactly ONE section, `ექსპერტები` → `/experts` (owner: „სათაურში ჩემი აზრით ექსპერტები უნდა დარჩეს მარტო"), plus the button „მოთხოვნის გაგზავნა" → `/request` (`cta: true` in `NAV`, gated by the same `if (i.href === '/request') return requestsOn()` line `tests/requests.test.ts` pins; desktop right of the nav, phone inside the drawer) + guest „შესვლა/დაწყება" (→ `JOIN_HREF`) or the avatar/`UserMenu`. „კატეგორიები/სერვისები/მოთხოვნა/შემოგვიერთდი/დახმარება" all left the bar: „სერვისები" because its page was deleted in stage 10 and the remaining item already opens it; join + help live in `UserMenu` (gated there) and the footer. **The lit item is derived by PREFIX and nothing else** (`activePath === href || activePath.startsWith(href + '/')`) — since stage 11 all four pages that answer under `/experts/` are covered by it, so the `SECTION_ALIAS = { '/experts': ['/services'] }` that used to reach the trades side was deleted with the prefix it aliased. Footer col 1 is two words: „ექსპერტების ძებნა" → `/experts`, „სერვისები" → `/experts?type=WORK`, plus the two join links and „როგორ მუშაობს". **Every retired URL is executed against the real middleware in `tests/redirects.test.ts`** (one table: `/apply*`, `/ask`, `/tutors[/…]`, `/masters[/…]`, `/services` EXACTLY **and `/services/<x>` segment-for-segment (stage 11)**, `/student*`, `/tutor*`, `/provider*`, `/konsultacia*`, `/categories*` → 308 exact target; live neighbours untouched; sitemap names no retired prefix). |
-| **the catalogue** — `/experts`, ONE list, ONE address (stage 10, 2026-08-19) | `app/experts/client.tsx` (`CatalogClient`) | `_data` `_filters` `_hero` `_card` `_results` `_masterCard` `_masterData` + `lib/catalogItems.ts`. **Three pages became one.** Owner, four times in one day: „სერვისები და ექსპერტები უნდა გაერთიანდეს", „მოვიფიქროთ რომ იდენტურია უბრალოდ და ფილტრაციასავით უნდა იყოს", „ექსპერტები და სერვისები ხო ერთია — ექსპერტს აქვს სერვისი რეალურად და პარალელურად აკეთებს კონსულტაციასაც", then „სერვისები საერთოდ ხო ამოსაგდებია … ექსპერტებზე გადაიტანე" („ტუტორები რატო უნდა იყოს სახელად" — the word is banned, so it may not sit in a URL). `/tutors[/…]`, `/masters[/…]` and `/services` EXACTLY now 308 here. The kind is a property of what somebody OFFERS, and `lib/catalogItems → toCatalogItems` groups BOTH rosters **by user id**: one person is ONE `CatalogItem` carrying `kinds: ('CONSULT'\|'WORK')[]`, `consult` (the Tutor row) and `work` (the MasterRow) — the day somebody enables their second capability they are one card with both labels, never two. The one server page loads both halves (`queryTutors` + `queryMasters` UNFILTERED — its VISIBLE rule untouched) plus `filterCounts()`, reads `requestsOn()` ONCE for the CTA, and hands them to the client, which filters/sorts/paginates in the browser. **There is no `preset` and no `basePath`**: the page opens on EVERYBODY, `?type=CONSULT\|WORK` narrows it (silent when both are on — that is what the bare address means), and `?trade=` / `?city=` keep their /masters meanings. `CATALOG_PATH = '/experts'` is the one address every filter change is written back into. **The pill switch (`components/VerticalSwitch`) was deleted** with the /services door — with one catalogue there is nowhere to navigate BETWEEN; the type is a rail `FilterGroup` („რა გჭირდება" → კონსულტაცია / სამუშაო, LAST section, unticking the last one turns BOTH on). Pinned by `tests/catalog.test.ts` (19). |
-| **`/experts/[slug]` — THE ONE NAMESPACE** (stage 11, 2026-08-19; was `/tutors/[id]`, 308 since the same day) | `app/experts/[slug]/page.tsx` (the resolver) | **FOUR pages share this segment and `page.tsx` decides which, in ONE documented order:** **1.** profession landing (`lib/professionSeo` → `_profession.tsx`, was `app/konsultacia/[slug]`) → **2.** trade landing (`lib/serviceProfile → resolveTrade` → `_tradeLanding.tsx`, was `app/services/[slug]/_trade`) → **3.** expert profile (`TutorProfile` → `client.tsx` + `_bits` `_data` `_hero` `_reviews` `_booking` `_similar` `_sections`) → **4.** provider profile (`ServiceProfile` → `_providerData` `_providerHero` `_providerBlocks` `_providerCta`, was `app/services/[slug]/{_data,_hero,_blocks,_cta}`) → **5.** `notFound()`. **The two CODE-OWNED lists win** because they are fixed lists in source while both profile slugs are generated from names — and `lib/slugSpace → RESERVED_SLUGS` reserves every id in both, which is what makes the precedence safe rather than merely documented. **The two profiles are ordered by nothing but history, and that is safe since stage 11:** `lib/slugSpace → slugTaken` checks BOTH tables, so at most one can answer (measured before the move: 26 expert slugs, 7 provider slugs, 0 collisions — nothing was renamed). `export const dynamic = 'force-dynamic'`; both id→slug 308s carry the query string (`queryOf`). Provider photos via `/api/masters/[id]/photo?n=` — the model COUNTS and PROBES the base64 columns, never selects them. **The HUB is gone (stage 10):** `app/experts/page.tsx` is the CATALOGUE — a hub of professions is a pre-filtered catalogue. `seo.konsultacia.*` + `konsultacia.*` SiteText are `retired` (never deleted). `/konsultacia*` and `/services*` 308 → `/experts*` in `middleware.ts`. Pinned by `tests/oneNamespace.test.ts` (8), `tests/masterProfile.test.ts`, `tests/expertsRoute.test.ts`, `tests/taxonomy.test.ts`. |
-| `/services/*` — RETIRED (stage 11, 2026-08-19) | — | **`app/services/` is deleted; `/services` is not a route prefix at all.** `/services` EXACTLY → `/experts` (stage 10, the door); `/services/<anything>` → `/experts/<same>`, segment-for-segment, 308, query preserved (`middleware.ts`, the block under `/masters`). Two profile spaces and two landing spaces contradict THE PRODUCT MODEL — one provider, and a consultation is one KIND of service — so the master profile and the trade landing moved into `app/experts/[slug]` (row above) rather than being deleted. Nothing in `app/`, `components/` or `lib/` quotes the prefix any more (`tests/oneNamespace.test.ts` §C2 scans the tree with comments stripped); the sitemap and `robots.ts` name only `/experts`. `seo.services.*` stays a `retired` registry row — never delete a key. |
-| `/categories/*` — RETIRED (stage 8, 2026-08-19, §8.7) | — | 308 in `middleware.ts`: `/categories` → `/experts`, `/categories/<a>/<b>` → `/experts?category=<last segment>`. `lib/categoryRoutes → categoryPath()` now returns `/experts?category=<slug>` for every status; `lib/categorySeo.ts` stays as DATA (the profession landing prints the sphere keyword). `seo.categories.*` and `categories.*` SiteText keys are `retired` (never deleted). The header „კატეგორიები" item went in stage 9 (see the header row below). |
-| `/join` (one door, 2026-08-19) | `app/join/page.tsx` + `JoinClient.tsx` | the door: two capability tiles + `ProfessionPicker`; then `_expert/ApplyClient.tsx` (`_form` `_fields` `_chrome` `_upload` `_steps` `_draft`, the ex-`/apply` wizard) or `_master/client.tsx` (`_marketing` `_workPhotos`, the ex-`/apply/master` form). `lib/capabilities.ts` = `CONSULT`/`WORK`, `capabilitiesOf()`; `/api/me` exposes `capabilities`. `/apply*` 308 → `/join` in `middleware.ts` |
-| `/signin` + `/signup` | `app/signin/auth-client.tsx` (78L) | `_model` `_fields` `_signin` `_signup` `_verify` `_reset` `_onboarding` |
-| **The two spaces** (stage 6, 2026-08-19) | `app/me/` = the client's (was `/student`), `app/work/` = the supply side's (was `/tutor` + `/provider`) | `app/work/layout.tsx` is the SHELL ONLY (`components/tutor/WorkspaceShell`, groups from `capabilitiesOf`, renders bare children with no session); the GUARDS are the route groups: `app/work/(expert)/layout.tsx` (`requireRole` → /signin; sends a WORK-only account to **`/work`** — the shared home since 2026-08-20, not the queue) and `app/work/(provider)/layout.tsx` (`requestsViewer().providerAllowed` → `notFound()`, NEVER a redirect). Old addresses 308 in `middleware.ts` (`SPACE_MOVES`, segment-bounded — `/api/tutor/*` untouched; `/tutors` has its own 308 block above them since stage 10). Pinned by `tests/spaces.test.ts`. |
-| `/me` | `app/me/page.tsx` | `_model` `_welcome` `_next` `_saved` `_discover` `_sessions` `_packages` `_pattern` `_requests` (D7: the client's own service requests; full list at `/me/requests`, helper `lib/myRequests.ts`, `/api/me/requests`) |
-| `/me/bookings/[id]` | `.../page.tsx` | `_model` `_hero` `_modals` `_review` `_body` `_mobile` |
-| `/work/bookings/[id]` | `app/work/(expert)/bookings/[id]/page.tsx` | `_model` `_review` `_timeline` |
-| `/admin` | `app/admin/page.tsx` (145L) | one `_<tab>.tsx` per tab + shared `_parts.tsx` (27 `_*.tsx` siblings tonight) |
-| `/settings` | `app/settings/page.tsx` | `_types` `_profile` `_password` `_account` `_prefs` |
-| **`/work` — THE SHARED HOME** (2026-08-20) | `app/work/page.tsx` | `_components/CreditStrip` `_components/DayBoard` `_components/SessionDashboard`. **Outside BOTH route groups with its own gate** (signed in + at least one capability, else `notFound()`) — the `/work/services` precedent. It was `app/work/(expert)/page.tsx`, an expert-only SESSION dashboard, so a WORK-only provider had no home at all and was dropped into the queue; it also measured the half that is not happening (0 active bookings against 6050 published slots). Now: `CreditStrip` (balance → „N შეთავაზება", the ONE most valuable unearned task, „შევსება" → `/work/profile` for CONSULT and `/work/services` for WORK — the expert editor sits inside the group and would bounce a provider straight back out), `DayBoard` (ახალი მოთხოვნები · პასუხს ველოდები · ხელში მაქვს · წაუკითხავი, narrowed by the SAME `routingWhere(svc)` the queue page uses, so the number here and the list there cannot disagree), then `SessionDashboard` for a CONSULT holder only. `grantEarnedTasks(user.id)` runs here — idempotent by the unique index, so a credit is waiting rather than claimed. Pinned by `tests/spaces.test.ts` §B/§C, `tests/credits.test.ts` §F. |
-| `/work/profile` | `app/work/(expert)/profile/page.tsx` | `_types` `_parts` `_tabProfile` `_tabServices` `_tabCredentials` `_tabAccount` `_packages` `_students` |
-| `/work/schedule` | `app/work/(expert)/schedule/page.tsx` | `_shared` `_sheetSlot` `_sheetTemplate` `_sheetBlock` |
+---
 
-## THE PRODUCT MODEL — READ THIS BEFORE ANYTHING ELSE (settled 2026-08-19, hierarchy pinned 2026-08-20)
-
-### THE HIERARCHY, AND IT IS AN ORDER — NOT A LIST OF EQUALS
+## 1. THE PRODUCT MODEL — READ BEFORE ANYTHING ELSE
 
 Owner, 2026-08-20, after catching the same mistake five times in one afternoon:
-„მე ეჭვი მაქვს რომ ისევ კონსულტაციაზე გაამახვილე ყურადღება… მინდა რომ
-კონსულტაციამ უკანა პლანზე გადაიწიოს და სერვისი გავუყიდოთ ექსპერტებს."
+„მინდა რომ კონსულტაციამ უკანა პლანზე გადაიწიოს და სერვისი გავუყიდოთ ექსპერტებს."
 
 1. **The site sells SERVICES.** That is the product. Full stop.
-2. **A consultation is a PRE-STEP to buying one** — „გაიარე კონსულტაცია, სანამ
-   სერვისს აიღებ" — offered small, on the card, over the chat or the video call
-   that is already built. It is not a second product, not a headline, not a
-   button of its own.
+2. **A consultation is a PRE-STEP to buying one** — offered small, on the card,
+   over the chat or the video call that already exists. Not a second product,
+   not a headline, not a button of its own.
 3. **The pitch to a provider is CLIENTS FOR THEIR SERVICE**, never „share your
    knowledge". They set the price.
-4. **WHEREVER BOTH APPEAR, THE SERVICE COMES FIRST.** In a sentence, a filter, a
-   category rail, a list, an example, a meta description. Always. This is the
-   rule that is easiest to break by accident and the one that gives the whole
-   site away — on 2026-08-20 every new sentence written that day put the
-   consultation first („ბუღალტერი, იურისტი, სანტექნიკოსი…", „კონსულტანტები და
-   სერვისები"), and none of it was deliberate. When in doubt, read your own
-   sentence back and check which half arrives first.
+4. **WHEREVER BOTH APPEAR, THE SERVICE COMES FIRST** — sentence, filter, rail,
+   list, example, meta description. This is the rule broken by accident, not by
+   decision: read your own sentence back and check which half arrives first.
 5. **One catalogue, one card, one namespace.** The type belongs to what is
    OFFERED, never to what kind of person somebody is.
 6. **Retired words:** „ხელოსანი" · „მასწავლებელი" as a label · „სფერო" ·
-   „ტუტორი" · „მასტერი" · „სპეციალისტი" as a role word.
-7. **Tbilisi only, for now** — `CITIES` in lib/requestTopics, one line to widen.
+   „ტუტორი" · „მასტერი" · „სპეციალისტი" as a role word · „რეპეტიტორი" ·
+   „სტუდენტი" (→ კლიენტი) · „ვერიფიცირებული" (→ გადამოწმებული) ·
+   „ღირებულება" (→ ფასი) · „დამკვეთი" (→ კლიენტი). A profession NAME
+   („IT სპეციალისტი", „ინგლისურის მასწავლებელი") is fine — the ban is on the
+   ROLE word. Pinned by `tests/lexicon.test.ts`.
+7. **Tbilisi only, for now** — `CITIES` in `lib/requestTopics`.
 
-### THE LEFTOVER TO WATCH: THE TAXONOMY IS STILL THE OLD SITE
+**Three things that must not come back:** a „კონსულტაცია/სერვისი" primary axis
+(switcher, nav item, first filter, badge on a name); two catalogues; the word
+„ხელოსანი".
 
-Measured 2026-08-20: **4 service groups / 21 topics vs 23 consultation groups /
-132 topics.** No amount of copy makes a site read as a services marketplace
-while its own category list is 86% consulting — the rail sorts by count, so the
-services fall to the bottom with zeros beside them. Growing the SERVICE side of
-`lib/requestTopics` is the work; the copy alone cannot do it.
+**An addressed request goes to ONE person (2026-08-20).** `?to=<slug>` writes an
+INVITED offer AND `offerLimit: 1`; the queue shows „anything with room, plus what
+was addressed to me"; only the client's own button raises it back to 3. Nothing
+automatic ever widens it.
 
-### WHERE THE OLD IDEOLOGY HIDES: THE COPY IS IN THE DATABASE
+**Two leftovers to watch:**
+- 📌 **The taxonomy still leans consulting** — re-measured 2026-08-20:
+  **8 service groups / 40 topics** against **16 consultation / 77** (it was
+  4/21 vs 23/132 a fortnight ago, so this is moving). The rail sorts by count.
+  Copy cannot fix it; growing `lib/requestTopics` can.
+- **The product-defining copy lives in the `SiteText` DB table** and overrides
+  `lib/siteTextDefs`, so no test can see it. Change the default AND the row, and
+  scan the live values.
 
-`SiteText` rows override `lib/siteTextDefs`, so the words that DEFINE the
-product are editable content, and no test can see them. `tests/lexicon` scans
-SOURCE only. On 2026-08-20 the live home page still read „ვიდეოსესია
-მცოდნესთან" and „შეარჩიე შენი სფეროს მცოდნე" — the retired word included —
-weeks after the source stopped saying either. **When you change a default, write
-the DB row too, and scan the live values, not the file.**
+→ Full model, every owner quote, the schema reality: **`docs/product-model.md`**
 
+---
 
-**The site sells SERVICES.** A consultation is not a second product; it is one
-KIND of service — the one with a fixed price and a bookable time. An accountant
-sells „დეკლარაციის შევსება" (a price is agreed) and „კონსულტაცია 60წთ — 80₾"
-(booked outright). Both are services.
+## 2. WHERE THINGS LIVE
 
-**One provider, not two kinds of people.** What somebody offers is a set of
-CAPABILITIES they switch on (`lib/capabilities.ts` — `CONSULT`, `WORK`), not an
-identity they pick at the door. Two application forms still exist; the second is
-turned on later from the same account (`/join` serves exactly the missing half,
-and `missingCapability` puts that switch in the user menu).
+**Every big screen is a container plus `_*.tsx` siblings in its own folder.
+Open the part, not the page** — the container holds only state, fetch and layout.
 
-⚠️ **THREE THINGS THAT MUST NOT COME BACK.** Each was built, shipped and removed
-in one day because it contradicts the model:
-1. **A „კონსულტაცია / სერვისი" primary axis** — a switcher, a nav item, the
-   first filter section, or a badge next to somebody's name. If a distinction is
-   ever needed it is about HOW YOU BUY (a known price and a time, versus a
-   quote), never about what kind of person somebody is.
-2. **Two catalogues.** There is ONE list at `/experts`, and one card; a person
-   who holds both capabilities is ONE row carrying both.
-3. **The word „ხელოსანი"** (and „ტუტორი", „მასტერი", „სპეციალისტი" as a role).
-   „სერვისი" is what is sold; „ექსპერტი" is who sells it.
+| screen | where |
+| --- | --- |
+| `/` home | `app/HomeClient.tsx` + `app/_home/` |
+| public header / footer | `components/PublicTopBar.tsx`, `components/Footer.tsx` |
+| **the catalogue** — ONE list, ONE address | `app/experts/client.tsx` + `_card` `_masterCard` `_data` `_masterData` `_filters` `_results` + `lib/catalogItems.ts` |
+| **`/experts/[slug]`** — the ONE namespace, 4 pages share it | `app/experts/[slug]/page.tsx` resolves: profession landing → trade landing → expert profile → provider profile → 404 |
+| `/join` — one door, one question | `app/join/page.tsx` + `JoinClient` + `_door/` + `_expert/` + `_master/` |
+| `/signin` + `/signup` | `app/signin/auth-client.tsx` + `_*` |
+| the two spaces | `app/me/` = the client's · `app/work/` = the supply side's |
+| `/work` — the shared home | `app/work/page.tsx` (outside both route groups, own gate) |
+| the intake | `app/request/` (`_model` is the leaf) |
+| the provider workspace | `app/work/(provider)/` — requests · offers · service-profile |
+| `/admin` | `app/admin/page.tsx` + one `_<tab>.tsx` per tab + `_parts.tsx` |
+| retired URLs | `/tutors` `/masters` `/services` `/categories` `/apply` `/konsultacia` `/student` `/tutor` `/provider` → 308, all pinned in `tests/redirects.test.ts` |
 
-Owner, verbatim: „ექსპერტს აქვს სერვისი რეალურად და პარალელურად აკეთებს
-კონსულტაციასაც — მთელი პრინციპი ეს იყო", and „კონსულტაციამ მეორე პლანზე
-გადაინაცვლა, მთელი იდეა სერვისებზე წამოვიდა."
+**Three rules this shape depends on:**
+- **The model is a leaf.** Each folder's `_model`/`_data`/`_form` imports no
+  sibling. A cycle means model code was left in a UI file — move it, don't add
+  an import.
+- **Never split a component to shrink a file.** `BookingFlow` (1 172L) and the
+  big workspace pages are ONE component each; splitting needs ~40 props.
+- **Tests read screens as SOURCE TEXT** (~10 of them) — they must read the whole
+  route DIRECTORY, never one filename, or a negative assertion passes vacuously.
 
-**Still true in the schema, and deliberately:** a consultation is a
-`Consultation` row on `TutorProfile`; a service is an id in
-`ServiceProfile.services[]`. Two tables. Merging them into one list of offerings
-is the eventual migration — the trigger is the first provider who turns their
-second capability on, because until then it buys nothing (measured 2026-08-19:
-26 experts, 6 masters, 0 people holding both).
+**Seven page archetypes, and an eighth is forbidden:** marketing landing ·
+catalogue · profile · intake wizard · workspace · form/detail · admin tab.
+Pinned by `tests/archetypes.test.ts`.
 
-### Where the two halves live today (added 2026-08-18, rewritten 2026-08-19)
+→ Per-screen notes and why each folder looks that way: **`docs/product-model.md`**
 
-| what | where | the one thing to know |
-| --- | --- | --- |
-| **the two switches** | `lib/requests.ts` | `requestsOn()` = `FEATURE_REQUESTS` (the whole subsystem, exact „on"). `providersOn()` = `FEATURE_PROVIDERS` (supply side only: the master's three `/work/…` screens, the WORK half of `/join` — gated INSIDE `app/join/page.tsx`, not via the prefix list — master-applications API, admin „ხელოსნები" tab, the signup tile). **Unset follows the first; it can only narrow, never widen.** Both inlined in `next.config.js → env` for client components. Middleware walks `REQUEST_PATH_PREFIXES` AND `PROVIDER_PATH_PREFIXES`. |
-| **the vocabulary** | `lib/requestTopics.ts` | `LIVE_SERVICE_GROUP_IDS` = the 4 open trades. `VERTICALS` / `browseGroupsFor` / `VERTICAL_COPY` = the two doors. `groupIsService` splits them. **Everything derives from `kinds`; never hand-list groups.** Stage 8: CONSULTATION/PROJECT topics may carry `professions?: string[]` (job labels from `lib/professions`; `professionsOfTopic()`), NEVER a LEARNING/SERVICE topic — the second and last place the two vocabularies touch (`categorySlug` is the first). |
-| **the taxonomy's capabilities** | `lib/professions.ts` | `PROFESSION_CAN[job]` = `['CONSULT']` (default) or `['CONSULT','WORK']` (12 obvious job-doers); `professionCan()`, `professionsThatCan()`. ⚠️ WORK on an expert profession is DATA only — nothing routes on it yet (stage 9+/join). |
-| **routing** | `lib/requestRouting.ts → routeRequest` | trades match first (topic + city); then the EXPERT audience = sphere match ∪ profession match (`TutorProfile.professions` ∩ `Topic.professions`, case-insensitive trim, whole label — never substring); neither → EVERYONE (unchanged fallback). Caller `lib/requestJobs → routableProviders` selects `tutor.professions`. Pinned by `tests/taxonomy.test.ts`. |
-| **the rules** | `lib/serviceProfile.ts` | `LIVE_SERVICE_GROUPS`, `covers()`, and `routingWhere()` — the ONE narrowing the queue page and the nav badge both read. |
-| **the intake rules** | `lib/masterApplication.ts` | `MasterApplicationInput`, `approvalBlockers()`. The photo is a SOFT gate: apply without, cannot be approved without. |
-| **the trades row** | `lib/serviceMarks.ts` | Pure `.ts` (icon KEYS, not elements) so the test can import it. Marks live in `components/Icon → CatIcon`. |
-| **who somebody is** | `lib/hats.ts` | `Role` has no value for „master". `hatsOf()` is the answer; `/api/me` exposes `hats`. |
-| **client landing** — DELETED (stage 10, 2026-08-19) | — | `app/services/page.tsx` was the vertical's door (`LIVE_SERVICE_GROUPS` + a 6-master strip). Owner: „სერვისები საერთოდ ხო ამოსაგდებია." `/services` EXACTLY 308s to `/experts`; `components/VerticalSwitch.tsx` and `app/services/_masters.tsx` went with it. ⚠️ `/services/<slug>` and `/services/<trade>` survived the door for ONE DAY and then moved too — stage 11 collapsed the whole prefix into `/experts` (see the `/services/*` row above). `seo.services.*` is a `retired` registry row. |
-| **the job half's model + card** (stage 10, 2026-08-19) | `app/experts/_masterData.ts`, `app/experts/_masterCard.tsx` | They were `app/masters/_data.ts` / `_card.tsx`; `app/masters/` is GONE (its `page` folded into `app/experts/page.tsx`, its `_hero` `_filters` `_results` into the shared container back in the evening merge). `_masterData` keeps the query, the VISIBLE rule, `MastersFilter`, `mastersHref`, `filterCounts` and `REQUEST_HREF`; its THREE readers are the catalogue, `/experts/<trade>` and `/experts/<slug>` (all one namespace since stage 11); `_masterCard → masterHref` builds `/experts/<slug>`, the same prefix the expert card builds. It LOST `parseFilters` / `toggleHref` / `filterIsActive` with the server-resolved rail — the same vocabulary is validated in `lib/catalogItems → parseTrades/parseCities` and applied in the browser. `MasterRow` carries `userId` / `companyId` (the merge key), `serviceIds` / `areaIds` (ids, never labels, are what a filter may match), `priceValue` and `createdAt` (the two sort keys). `_masterCard` is the PORTRAIT card — one card, two pages. |
-| **the intake** | `app/request/` | `_model` holds `STAGES` + `Draft.vertical` + `Draft.topicPinned`. The DOOR decides the catalogue (`?for=service`); the wizard never asks again. **`?to=<slug>` DECIDES WHO IT GOES TO (2026-08-19)** — the client's two verbs are „დაჯავშნე" and „აღწერე", and until this the second could not be aimed: a visitor standing on somebody's profile had to post a request into the void and invite from the room. Carried by `app/experts/[slug]/_providerCta` (`requestHrefFor` in `_providerData` — `for=service` + the slug) and by the expert rail's SECONDARY action (`app/experts/[slug]/page.tsx` builds the href behind ONE `requestsOn()` and hands it down as `requestHref`; booking stays PRIMARY and there is no third button). `lib/requestTarget → resolveRequestTarget` resolves it server-side against the catalogue's OWN rules — `app/experts/_masterData → PUBLIC` and `lib/tutorsQuery → PUBLIC_TUTOR`, both IMPORTED, never re-typed — and an unknown/hidden/malformed value is IGNORED, never a 404. On submit the endpoint re-resolves the SLUG (the browser carries an address, not a decision) and opens the INVITED thread through **`lib/requestInvite → inviteProviderToRequest`: ONE definition, two callers** (this and `POST /api/requests/[ref]/invite`) — no price, no place against `offerLimit`, not acceptable, **contact still masked**. `lib/requestTopics → topicsForProvider` (pure) turns the master's `services` / the expert's professions ∪ sphere into topic ids: exactly ONE unambiguous topic drops the „რა გჭირდება" SCREEN and its STAGE (`stagesFor`); one ambiguous topic sets the topic and keeps the screen for the kind question; several only pre-filter that screen's catalogue; none behaves exactly as before. `topicPinned` is cleared on every revived draft — the URL open NOW decides. Pinned by `tests/hireDirect.test.ts` (12). **Step one is ONE FIELD (2026-08-19):** `_stepWhat` no longer prints the 31-row accordion under the search box — the catalogue lives in a panel (`#what-panel`) that opens on the TAP (never on focus: the `pointer: fine` autofocus would otherwise re-print it for every desktop visitor), on the first character typed, on ArrowDown, or from the one quiet line „ან აირჩიე კატეგორიებიდან". Open with <2 chars = the folded groups; typing = the hits; no match = their sentence. The panel is capped (`PANEL_SCROLL`) and scrolls INSIDE itself, so the field never moves under the thumb. **The budget is a BAND and nothing else (2026-08-19):** the „ან ჩაწერე ზუსტი თანხა" number field, `Draft.budgetAmount`, the `budgetAmount` wire key, `amountIsBelowFloor` and `budgetFloorFor` were removed together — a typed figure wrote `budgetMin = budgetMax`, i.e. a ceiling that costs the client offers, and it was a second answering gesture on a one-tap screen. If an exact high budget ever needs saying, the move is to let the TOP band ask for a number. Pinned by `tests/requests.test.ts` („the budget is a band…"), which also scans `app/request` for a number input. |
-| **become a master** | `app/join/_master/` (via `/join?can=WORK`) | `client` `_marketing` `_workPhotos`. One screen, 7 blocks, 4 optional. The page is `app/join/page.tsx`. |
-| **the master's workspace** | `app/work/(provider)/` (`/work/requests`, `/work/offers`, `/work/service-profile` — was `/provider`, 308 since stage 6) | The chrome is the shared `/work` shell; its rail draws `components/tutor/navConfig → PROVIDER_NAV` for WORK holders / the allowlist. `lib/requests → PROVIDER_WORKSPACE_PATHS` names the THREE paths (never `/work` — that would 404 the expert workspace when the subsystem is off); `isProviderWorkspacePath` is the space test `BottomNav → PROVIDER_TABS`, `AppShell` and `UserMenu` read (never a role) — the only requests paths that keep site furniture. |
-| **the queue** | `app/admin/_masters.tsx` | Tab „ხელოსნები". Blockers are shown BEFORE the button. |
-| **approval** | `app/api/master-applications/[id]` | One transaction: `RequestAccess` + `ServiceProfile`. Grants both or neither. |
-| **photos** | `app/api/masters/[id]/photo` | ⚠️ Images are base64 COLUMNS (no object storage). **Never select one into a list** — count it, and point the card at this route. SVG is refused here. |
+---
 
-**Bookings, not this vertical, but found the same day:** a package lesson's credit is returned by `lib/bookingCredit → releaseBookingCredit(tx, enrollmentId, …)` from EVERY exit (client cancel, expert decline, cleanup auto-cancel) — never write a local `lessonsUsed: { decrement }`. Approval seed steps in `app/api/applications/[id]` run under `seedOnce()` (profile row lock) — a bare `count()`+`createMany` is the duplicate factory again.
+## 3. DESIGN
 
-**Four traps this vertical sets, all of which caught somebody already:**
-1. **A base64 column in a list query** = megabytes in one page. Count it instead.
-2. **`available: true` in a `where`** makes a paused master look like somebody with NO profile — which widens the queue instead of emptying it. Select it, branch on it.
-3. **A trades request has no `categoryId`** (that table is the expert taxonomy). Anything matching on it falls through to „everyone" — the SELF-mode count, `/experts` links. (Routing itself no longer does: since stage 8 it also matches on the topic's professions — but a topic with neither sphere nor professions still reaches everyone, by design.)
-4. **`tests/requests.test.ts` scans the whole tree** for links to `/request` and the master's three `/work/…` screens. A new entry point needs an allowlist entry AND a mechanism assertion, not just the entry.
+🔒 marks the four that are arithmetic or an accessibility contract — those are
+closed. The rest are 📌: they are the system as it stands, and a better idea is
+welcome; change the token, not the call site, and say so here.
 
-⚠️ **The last four differ: state stayed in the page, only JSX moved.** Those
-sections take explicit props (ProfileSection 16, CredentialsTab 24) because the
-coupling was already there — the prop list makes it visible, it did not create
-it. Do not "tidy" that by moving the useState calls into the children: the page
-seeds them from its fetch, so moving them turns seeding into an effect.
+Each line is the rule. The measurements and the history are in
+**`docs/design-system.md`**; `lib/design/README.md` maps every "change it once"
+lever with file:line pointers.
 
-**`components/booking/BookingFlow.tsx` (1,136L when measured 2026-08-08; 1,172L tonight) is deliberately NOT split.**
-Measured, not assumed: every block worth extracting needs ~40 props (the time
-step 45, the day/time grid 40). At that ratio the interface is as much to hold
-in your head as the code, and this is the booking path — it is also a lazy
-chunk, so it cannot be checked by grep. If it is ever restructured, the move is
-a `useSlotSelection` hook, not a prop-threaded child, and it needs a browser.
+- **Two colours only.** Brand green `#2F9C86` used with restraint + the neutral
+  `ink` ramp. **No blue.** Semantic warning/danger only at the point of meaning.
+  No status dots, no decorative arrows, no ad-hoc hex.
+- 🔒 **A filled brand surface is `brand-600`**, never `brand-500` (white on 500 =
+  3.38, fails AA). **Never translucent white text on a coloured fill.**
+- **Never hand-write `text-[Npx]`** — write the token from the ramp in
+  `tailwind.config.js`. Reading text never below `text-meta` (12px); `text-micro`
+  (11px) only on uppercase+tracked labels. Between steps, round UP.
+- **Never hand-write `duration-[Nms]` or a raw `cubic-bezier()`.** Three
+  durations: `duration-fast` 140 (default) · `duration-mid` 220 ·
+  `duration-slow` 360. Two curves; `ease-out-expo` is entrances only.
+  🔒 **`motion-safe:` is MANDATORY on every `animate-*`** — an accessibility
+  contract, not a preference. The animation library is CLOSED at 8 tokens.
+- **Never hand-write `z-[N]` above 40** — the scale is in `tailwind.config.js`.
+- **A control's label size follows its height:** `h-9→text-small` ·
+  `h-11→text-body` · `h-12→text-body-lg`. Fix at the source, never via
+  `className` (two fontSize utilities resolve by emit order).
+- **Control heights are `h-9` / `h-11` / `h-12`.** Nothing between or above.
+  Anything TAPPABLE is ≥40px. Icon buttons 40×40 or 36×36.
+- **Prefer the primitives**: `Btn` `Card` `Eyebrow` `PageHeader` `Container`
+  `EmptyState` `Sheet` `Icon`. Never a page-local icon set.
+- **Glass is for surfaces you look PAST, never READ** — `.glass` / `.glass-bar`
+  in globals.css are the only translucent surfaces; never re-invent
+  `bg-white/xx backdrop-blur-*`.
+- Empty/error states are compact — icon + one line + one action.
+- 🔒 **Dates: never `toLocaleDateString('ka-GE', …)`** (runtime ICU falls back to
+  English) — use `lib/kaDate`. **Server-side never `getHours()`/`getDay()`** —
+  use `lib/tz → tbilisiParts()`.
+- **Copy is the owner's and it is PLAIN.** Never author or reword site text.
+  A borrowed indeclinable prefix takes NO hyphen (ვიდეოოთახი, ვებგვერდი);
+  only a truncated stem does (ბიზნეს-გეგმა). Pinned by
+  `tests/georgianOrthography.test.ts`.
+- 🔒 **A status check you read before the write is not a guard.** Claim the row:
+  `updateMany({ where: { id, status: <expected> } })` + `count !== 1 → 409`.
 
-Three rules this shape depends on:
-- **The model is a leaf.** Each folder's `_model` / `_data` / `_form` imports no sibling; everything else imports it. A cycle always means a piece of the model was left in a UI file — move it to the leaf, don't add an import.
-- **Never split a component to shrink a file.** These were pure MOVES, verified line-for-line. `work/(expert)/profile` (was `tutor/profile`; 1695L then, the folder is 2620L tonight), `work/(expert)/schedule` (was `tutor/schedule`; 1505L → 1651L), `BookingFlow` (1136L → 1172L) and `settings` (916L → 1096L) are still big because each is ONE component — shrinking them is a rewrite and needs its own decision.
-- **Tests read these screens as SOURCE TEXT.** ~10 of them. They must read the whole route DIRECTORY, never one filename. Watch for the reverse failure too: a negative assertion („X no longer appears here") pointed at a container passes vacuously — `category-marks` C6 was defanged exactly this way and is now directory-wide.
+---
 
-## THE PAGE ARCHETYPES (established 2026-08-18, restructuring v2 §8)
-**Every screen is one of seven. Inventing an eighth is forbidden.** Pinned by `tests/archetypes.test.ts`.
-1. **Marketing landing** — `Container` wide (1280); section rhythm `py-12 sm:py-16`.
-2. **Catalogue** — wide; **breadcrumb mandatory**; ONE screen, ONE LIST and — since stage 10, 2026-08-19 — ONE ADDRESS, `/experts` (owner: „ესეიგი ხო მოვიფიქროთ რომ იდენტურია უბრალოდ და ფილტრაციასავით უნდა იყოს", then „სერვისები საერთოდ ხო ამოსაგდებია … ექსპერტებზე გადაიტანე"). `/tutors`, `/masters` and `/services` 308 there — and since stage 11 so does every `/services/<x>`, onto `/experts/<x>`. Pinned by `tests/catalog.test.ts`: breadcrumb → h1 + one line → `lg:grid-cols-[240px_1fr]` with **`min-w-0` on BOTH tracks** → rail | (results header + cards). The rail is `components/catalog/FilterPanel`, 240px and `lg:sticky lg:top-24`, folded below `lg` by `components/catalog/MobileCollapse`; **the TYPE is a section of it** („რა გჭირდება" → კონსულტაცია / სამუშაო, both tickable, roster-wide counts, never zero selected), drawn LAST because it is the nuance and not the axis. **`components/VerticalSwitch` was DELETED** — a control over a result list reads as „narrow these", so the thing that narrows is the filter, and with one catalogue there is no second page to navigate to. `FilterRow` still takes EITHER an `href` OR an `onClick`; the merged rail uses `onClick` throughout and the container writes the whole selection back into the URL (`?type=` `?cats=` `?trade=` `?city=` …), so every view is still an address and Back still walks through them. **A drawer or a dropdown bar is no longer a second form**; search and sort are not filters and live in the results header, with the count („ნაჩვენებია N", no noun — the list may hold either half). The reader picks the layout there too: `components/catalog/ViewToggle` + `useCatalogView` (one `localStorage` key, `mcodne:catalog-view`; `VIEW_CLASS` writes the two containers once and the same `view` goes to the card). TWO cards in one list, one per PERSON: `app/experts/_card` for anybody offering consultations, `app/experts/_masterCard` otherwise, both through `components/EntityCard`, each keeping its own footer and CTA, plus `EntityKinds` labels when the list is mixed. Three empty states (nothing listed / this filter matched nobody / the cross-half contradiction, „ამ ფილტრით არავინ არის — მოხსენი ფილტრი").
-3. **Profile** — breadcrumb, hero, blocks, reviews, CTA.
-4. **Intake wizard** — `Container size="narrow"` (560); **never a hand-written `max-w-[Npx]`**; one `components/StepIndicator`. Chrome: choosing → full `PublicTopBar`+`Footer`; mid-transaction → the minimal bar.
-5. **Workspace** — ≥4 items → sidebar, fewer → link bar; **always a bottom nav on mobile**; every page opens with `<PageHeader>`; rhythm `py-8 lg:py-10`.
-6. **Form / detail** — `<PageHeader>` + `Card` blocks.
-7. **Admin tab** — 19/19 use `app/admin/_parts.tsx`; the model to copy.
+## 4. FINDING THINGS — LOOK HERE FIRST
 
-## Design levers (2026-08-01)
-**The full map of "change it once, it changes everywhere" lives in `lib/design/README.md` (Georgian, with file:line pointers) — read it before touching any visual value.** Short version: colors = `BRAND_SCALE`/`INK_SCALE` consts at the top of `tailwind.config.js` (brand/success/flame share ONE object, accent aliases ink); type = the `fontSize` ramp; motion = `DUR_*`/`EASE_*` consts mirrored as `--dur-*`/`--ease-*` in globals.css (utility name `ease-out-quart` ↔ CSS var `--ease-out` — `var(--ease-out-quart)` does not exist); shadows/radii/gradients = named tokens only (CTA hover glow = `shadow-brand-glow-lg`, never the rgba literal); glass = `.glass`/`.glass-bar`; uppercase tracking = the ONE globals.css rule (see Type below); section rhythm + primitive components (`Btn`/`Card`/`Eyebrow`/`PageHeader`/`Container`/`EmptyState`/`Sheet`) = README §5–6. New surface checklist = README §7; the backlog of call-site duplication still to sweep = README §8.
+**`docs/MAP.md` is a generated index. One grep answers both questions that
+otherwise cost a round trip of guessing:**
 
-## Color (strict 2-color system — blue removed 2026-07-19)
-- **PRIMARY green `brand` (#2F9C86)** — the logo teal (aligned to the wordmark 2026-07-19; was #159A82). Used with restraint: primary CTAs, verified, live, escrow, key accents. Never decorative washes on cards/forms.
-- **NO BLUE.** The `info` token still exists for backwards-compat but must NOT be used as an accent — pedigree/credential/notification chips are neutral `bg-ink-75 text-ink-700 border-ink-200`.
-- **NEUTRAL `ink` ramp** — dominant: text, borders (`border-ink-200`), hairlines (`border-ink-100`), backgrounds.
-- Semantic `success`(=brand green)/`warning`(gold — ratings + genuine cautions ONLY, not decorative)/`danger` only at the point of meaning. No other hues, no ad-hoc hex in pages.
-- **No status dots and no decorative button arrows** anywhere (2026-07-19). Badges = hairline border + colored text, no pastel fill (SUPER = `bg-ink-900 text-white`).
-- Gradients: ONLY the four named tokens in tailwind config (`gradient-wash/dark/cta/signature`); `gradient-dark` is warm charcoal (not teal); never ad-hoc `from-/to-` in page code.
-- Buttons: `rounded-btn` = 10px (crisp/geometric, echoes logo). Date/time picking: booking flow uses `components/booking/Calendar.tsx` + `DayTimeline.tsx` (real slots via `slots.ts`); reschedule uses `components/booking/RescheduleTimePicker.tsx` (real availability only).
+```
+grep '| `primaryPriceLabel` |' docs/MAP.md     → components/booking/slots.ts
+grep '^\*\*RequestOffer\*\*'   docs/MAP.md     → its real column names
+```
 
-## Type
-- FiraGO self-hosted (`public/fonts/firago-*.woff2`); never add font CDNs.
-- Georgian TT (mtavruli) on h1–h3 + buttons comes from `font-feature-settings:"case"` in globals.css (NOT text-transform). Opt out with `.no-caps`.
-- Section header pattern: `<Eyebrow>` (= `text-micro uppercase text-brand-700`) + heading + optional one-line muted sub (`text-ink-500`). Eyebrow/label tracking has ONE source: globals.css `[class*="uppercase"] { letter-spacing: 0.14em }` — that rule out-cascades every `tracking-*` utility on an uppercase element, so any per-site `tracking-[…]` next to `uppercase` is dead code (174 counted 2026-08-01, 182 by the 2026-08-06 sweep that removed them all with the rendered letter-spacing byte-identical before/after; **zero remain tonight** — `tests/primitiveAdoption.test.ts` holds it at zero both line-scoped and tag-scoped/multi-line since stage 11, 2026-08-19; never add new ones). Retune tracking in that one rule only.
+- **1 515 exported symbols → their file.** `lib/` is 126 files flat and the
+  request family alone is 13 whose names differ by a suffix — `requestsViewer`
+  is in `requestsServer.ts`, not `requests.ts`, and that is not guessable.
+- **37 Prisma models → their real fields.** The UI word is not the column: a
+  Booking's price is `price`, a RequestOffer's is `priceGel`; `ServiceProfile`
+  has no `visible` and `Category` has no `hidden`. Four queries failed on
+  guesses in one session before this existed.
 
-## THE TYPE SCALE (established 2026-07-27 — this section's absence is why 41 ad-hoc sizes accumulated)
-**NEVER hand-write `text-[Npx]`.** The ramp lives in `tailwind.config.js → theme.extend.fontSize`; write the token. Same for `leading-*`: every step ships a line-height, so `text-body` is already correctly leaded — only add `leading-*` when you deliberately want something other than the step default.
+**Regenerate after adding or moving an export: `npm run map`.** It is DERIVED —
+never hand-edit it. A stale hand-written map is worse than none, because it is
+believed.
 
-| token | px / line-height | use it for |
-| --- | --- | --- |
-| `text-micro` | 11 / 1.3 | uppercase+tracked micro labels (eyebrows, pill & badge captions) and numeric counters — **nothing else** |
-| `text-meta` | 12 / 1.45 | dense metadata, timestamps, table + audit cells, helper/hint text, counter badges |
-| `text-small` | 13 / 1.5 | secondary copy, chip and small-button labels, captions |
-| `text-body` | 14 / 1.55 | **default** body & UI text, inputs, standard button labels |
-| `text-body-lg` | 16 / 1.6 | lead paragraphs, hero sub-copy, prominent body |
-| `text-h3` | 18 / 1.4 | card titles, sub-section headings |
-| `text-h2` | 22 / 1.3 | section headings, in-card h2, big inline numerals |
-| `text-h1` | 28 / 1.2 | page titles (`<PageHeader>`), mobile hero h1 |
-| `text-display` | 36 / 1.12 | marketing section h2, tablet hero |
-| `text-display-lg` | 44 / 1.08 | desktop hero h1, countdown digits |
-| `text-display-xl` | 52 / 1.04 | wide-desktop hero h1 |
-| `text-hero` | 64 / 1 | the single biggest moment on a page |
+---
 
-- **FLOOR (two parts, both hard):** reading text — anything sentence-case that carries information — **never below `text-meta` (12px)**. `text-micro` (11px) is the absolute floor of the system and is allowed **only** on uppercase + tracked + semibold/bold labels and numeric counters, where cap-height and letter-spacing buy the legibility back. Georgian mkhedruli's rounded connected letterforms turn to mush under ~12px; mtavruli (what every `uppercase` label renders in, via the `case` feature) sits on a flat cap-height and survives 11px. **Nothing goes below 11px, ever.**
-- **Rounding rule when you're between steps: round UP.** The scale was derived by rounding every legacy size up; a change that makes existing text smaller is a regression, not a refinement. The one exception is a heading that would otherwise land ≥ its own page's h1 (see next bullet).
-- **Check the hierarchy before you pick a step.** Two nearby legacy sizes often collapse onto one token — verify a card title still outranks its meta line, and that **no `h2` ends up ≥ its page's `h1`** (that bug existed on the home page: hero 27px vs section h2 24px, one step apart). Deliberate demotions already applied: home + expert-profile + student section h2s sit at `text-h2`, and `about` section h2s at `text-h1`, precisely to keep clear of their pages' h1.
-- Tokens carry **size + line-height only** — no `fontWeight`, no `letterSpacing`, on purpose. globals.css gives h1–h3/buttons `letter-spacing: .02em` for mtavruli; a letterSpacing baked into a token is a utility class and would silently out-rank that element rule and un-track every heading. Explicit `font-*` / `leading-*` / `tracking-*` at the call site always wins (Tailwind emits fontSize utilities before those three).
-- **Off-ramps** exist and are legitimate, but each one carries a one-line comment saying why. The only four today: the 404/500 numerals (`text-[120px] sm:text-[160px]`, decorative not type), the student next-session countdown (`text-[56px]`, geometry-locked to the card at 390px), the home hero's mobile step (`text-[25px]` — was 27px until the 2026-08-01 cross-browser pass; `text-h1`/28px re-wraps the authored two-line headline, and FF/WebKit render real mtavruli casing ~4–6% wider than Chrome, so 27 wrapped to four lines there too), and globals.css's `font-size: 16px !important` iOS input-zoom guard.
+## 5. HOW TO WORK HERE
 
-## THE MOTION SCALE (established 2026-07-29 — this section's absence is why 42 animations shipped unguarded and 443 transitions ran on an undocumented 150ms)
-**Three durations, two curves, one mandatory guard.** Tokens live in `tailwind.config.js → theme.transitionDuration / theme.transitionTimingFunction` — **outside `extend`, deliberately**, so Tailwind's stock ramp is REPLACED and `duration-300` / `ease-out` are no longer valid class names at all (unlike the type ramp, which can safely extend). They are mirrored as `--dur-*` / `--ease-*` custom properties in globals.css so the CSS layer and the utility layer cannot drift. **Never hand-write `duration-[Nms]`, `duration-300`, or a raw `cubic-bezier()`** — write the intent.
+- **Node 22.** `export PATH="/opt/homebrew/opt/node@22/bin:$PATH"` — Next 15.5
+  fails on Node 26 in ways that read as code errors. `npm rebuild sharp bcryptjs`
+  after any Node switch.
+- **`npx tsc --noEmit` must stay clean.** During work run that, or one test file
+  (`npx tsx tests/<file>.test.ts`) — not the whole gate after every edit.
+- ⚠️ **`npm run check` and `npm run dev` share `.next`.** Running the gate while
+  a dev server is up corrupts that server: pages render unstyled, manifests go
+  missing, routes 500. It reads as a product bug and is not one. Stop dev first.
+- ⚠️ **Keep the project OFF an iCloud-synced folder.** It lived in `~/Desktop`
+  until 2026-08-20; iCloud raced the build over `.next`'s thousands of files and
+  produced `ENOENT: rename '.next/export/500.html'` after a clean compile, plus a
+  day of phantom 500s.
+- **Verify visually with Playwright at 1440 and 390** before deploying. The
+  admin panel selects its tab from the **hash** (`/admin#requests`), never `?tab=`.
+- **Pre-deploy gate: `npm run check` before every `railway up`** — types → all
+  `tests/*.test.ts` → `next build`. There is no CI, and although a remote exists
+  (`origin` → github.com/kapana22/Mcodne — the line here said otherwise until
+  2026-08-21) **nothing deploys from it**: `railway up` uploads the WORKING
+  TREE, so this script is the only thing that ever runs the tests, and a commit
+  is a record rather than a release.
+- **Deploy:** `railway up --detach` (project Tutor → service mcodne →
+  https://mcodne.ge). Verify live after.
+- **DB changes are hand-written SQL** in `prisma/manual-migrations/<date>-<name>/`
+  with an `up.sql`, a `down.sql` and guards that fail loudly. Additive DDL only;
+  an enum is never renamed.
 
-| token | ms | use it for |
-| --- | --- | --- |
-| `duration-fast` | 140 | **default.** Instant feedback: hover colour, border warm-up, focus ring, press, icon swap, opacity toggle. ~97% of transitions. |
-| `duration-mid` | 220 | Visible state change: transform reveals, elevation/shadow ramps, progress width, accordions — something moves and the user watches it arrive. |
-| `duration-slow` | 360 | Deliberate entrance: scroll reveals (`.reveal`), drawers, `.stagger`, a whole surface committing. |
+## 6. WHAT A TEST MAY PIN — 📌 (added 2026-08-21)
 
-- **Every `transition-*` must carry a duration token.** `transition-colors` alone is not a decision — it silently inherited Tailwind's 150ms, which is how two parallel systems formed. `transitionDuration.DEFAULT` is now pinned to 140ms as a *net* so a missed site can't regress, but a bare `transition-*` still reads as "nobody chose"; state the token.
-- **Curves: `ease-out-quart` is THE default and is wired to `transitionTimingFunction.DEFAULT`**, so even a bare `transition-*` decelerates like everything else (Tailwind's stock default is an ease-*in*-out and was quietly in use on 443 sites). `ease-out-expo` is the ONE alternative and belongs to **entrances only** — the `animate-*` keyframes and `.reveal`. Reason, so nobody "simplifies" it away: an entrance starts from a state the user has never seen, so expo's front-load makes it legible in the first third and the tail is a settle; a transition starts from a state the user is already looking at, where the same front-load reads as a snap. There is no third curve — the checkbox tick's overshoot `cubic-bezier(0.34, 1.56, …)` was removed 2026-07-29 (canon: never bouncy).
-- **`motion-safe:` is MANDATORY on every `animate-*`. No exceptions, and it is not noise.** For users with vestibular disorders or migraine, unrequested movement causes nausea and pain — this is an accessibility contract, not a preference. The blanket `prefers-reduced-motion: reduce` rule at the bottom of globals.css is a **net, not the fix**: it can only crush a duration to 0.001ms, which leaves a spinner frozen mid-arc and a fill-mode entrance stuck at its FROM state. The variant removes the animation outright, which is the correct outcome.
-- **Functional motion still has to work with the motion removed.** A skeleton is fine frozen — a grey block is still a placeholder. A **spinner is not**: a frozen arc is a lie about "working". Every spinner therefore pairs the ring (`aria-hidden`) with something non-moving that carries the state — a visible „იტვირთება…"/„ვამოწმებთ…" label, or `aria-busy` + the disabled control on icon-only buttons.
-- **Ambient infinite loops are off-scale by nature** and exempt: `shimmer` 1.6s, `pulse-soft` 2.4s, the hero `aurora-a` 26s drift. They have no start and no end, so "how long until it's done" is meaningless — and the curve rule is exempt too (`aurora` uses `ease-in-out`: a symmetric breathing cycle has nothing to rest at). They are still `motion-safe:`-gated.
-- **The `animate-*` tokens run on the same three durations** (`fade-in-fast` 140 · `fade-in`/`slide-in-r`/`slide-in-b`/`scale-in` 220 · `rise-in` 360) — they had drifted to six values. You pick an entrance **by name**, never by number, exactly as you pick a type step.
-- **2026-08-01 animation pass (user-approved) — what was added and the NEW ceiling.** Three additions, each reusing existing tokens rather than minting keyframes: (1) **View Transitions** — next-view-transitions wires document.startViewTransition around navigations; the expert photo carries `vt-photo-<id>` on cards AND the profile, so it morphs between pages. Card hrefs MUST use the expert's `slug` when present — a cuid href 308s to the slug and the redirect downgrades to a full load, silently killing the morph. CSS + reduced-motion guard at the bottom of globals.css. (2) **WordReveal** (home hero) — word-level LineReveal, same `line-rise` keyframe; the gradient line stays a single mask (background-clip:text does not survive word-splitting). (3) **Booking step entrances** — each step panel's root mounts with `slide-in-b`; the footer „არჩეული" line remounts with `fade-in-fast` keyed on the selection.
-- **Do not add new animation.** The library is closed at 8 tokens (`fade-in`, `fade-in-fast`, `rise-in`, `slide-in-r`, `slide-in-b`, `scale-in`, `pulse-soft`, `shimmer`) plus Tailwind's `pulse`/`spin`; 28 `rise-in` + 26 `scale-in` entrances are already plenty. Prefer removing motion to adding it. **Never** animate a layout property (`margin`/`gap`/`width` on a live element), never move content out from under the cursor, and never let an entrance delay a control becoming usable.
-- **`fade-in` keeps NO fill-mode — permanently.** Documented past bug: AppShell applies it to the wrapper around every route, and a filling opacity animation keeps that wrapper a stacking context forever, trapping every fixed modal below the BottomNav. End state == natural state, so no fill is needed. Same reason `fadeIn` stays opacity-only (no transform) — pinned by `tests/regression-invariants.test.ts`.
-- Removed 2026-07-29 as dead or decorative-hostile, don't reintroduce: `.btn-sheen` (a 640ms light sweep across primary CTAs — 1.8× the slowest tier, pure decoration on a control), the home avatar-stack hover fan-out (animated `margin`, moved content under the cursor), the category-icon `-rotate-3` wiggle, `.link-slide` / `.card-interactive` / `.page-in` / `.aurora-b` (zero usages; `.hover-lift` and `animate-fade-in` are the live equivalents), and the `in-out-quart` token.
+**Measured that day: 1 506 of 3 169 assertions were a regex over SOURCE TEXT,
+not over behaviour.** They are why an ordinary refactor fails the gate while
+nothing a user can see has changed, and owner: „ძალიან მკაცრად არის კოდი
+დაწერილი."
 
-## THE STACKING ORDER (established 2026-08-06 — this section's absence is why 14 arbitrary z-values accumulated)
-**Never hand-write `z-[N]` above 40.** The scale lives in `tailwind.config.js → theme.extend.zIndex` and is the single source for what covers what: `z-chrome` 40 (sticky headers, workspace bars, BottomNav) · `z-to-top` 45 · `z-help` 46 · `z-consent` 50 · `z-pill` 55 · `z-impersonate` 60 · `z-overlay` 65 · `z-drawer-scrim` 69 · `z-drawer` 70 · `z-sheet` 80 · `z-confirm` 90 · `z-toast` 95 · `z-skip` 100. Additive, not a replacement — ordinary in-flow elevation (`z-10`/`z-20`: a badge over a photo) is not part of this conversation and stays as it is. Before the token the ordering rationale lived only in prose across six components, each explaining itself in terms of its neighbours, and the admin drawer had quietly invented a private 50/51 pair that put its scrim level with the cookie banner. Pinned by `tests/designTokens.test.ts` §D/§E, which asserts the relationships (a scrim is exactly one below its drawer; the skip link is above everything) rather than the numbers.
+**The test:** *if this assertion fails, has a person been harmed?* If a rename,
+a reformat or a restyle can break it while the screen is identical, it is
+pinning the wrong thing.
 
-## A control's LABEL SIZE follows its HEIGHT (2026-08-06)
-`h-9 → text-small` · `h-11 → text-body` · `h-12 → text-body-lg` — the pairing `<Btn>`'s size tiers already ship, because height is how a control announces its importance and the label has to agree. 78 hand-built primary buttons had drifted off it; 55 sat at `h-11` with a 13px label, i.e. the page's main action set at filter-chip size. **This cannot be patched through `className`** — two fontSize utilities on one element resolve by Tailwind's emit order, not by the order you wrote them, so the pairing has to be right at the source. Pinned by `tests/designTokens.test.ts` §F.
-
-## Contrast is arithmetic, not judgement (2026-08-06)
-- **A FILLED brand surface is `brand-600`** (white on brand-500 = 3.38, fails AA; brand-600 = 4.78). Same for semantic fills: `warning-600` (5.51), never `warning-500` (3.67). `danger-500` is fine (7.62).
-- **Never translucent white text on a coloured fill.** On `brand-600` even `text-white/90` measures 4.19 — every opacity step fails, so the fill cannot carry a second white tier at all; hierarchy there comes from size and weight. Opacity IS legitimate on dark neutral grounds (`ink-800/900`, `gradient-dark`), where `text-white/50` still measures 5.2+.
-- Both rules are enforced arithmetically by `tests/designTokens.test.ts` — the ratios are computed from the palette, so re-tuning a step re-runs the real check instead of trusting a pasted number.
-
-## Control heights (clarified 2026-07-27)
-- **Canon tiers: `h-9` (small) · `h-11` (default) · `h-12` (large/hero).** Nothing between or above. `h-10` and `h-14` are **off-canon for controls** — `h-10` interactive elements become `h-11`, `h-14` ones become `h-12` (both stay ≥40px). The one blessed `h-10` is the **40×40 icon-button** (`w-10 h-10`); 36×36 (`w-9 h-9`) is the compact icon tier.
-- `h-14` is still fine as pure **layout** (workspace top bars `h-14 lg:h-16`) and as an **avatar/icon plate** (`w-14 h-14`) — it's only banned as a control height.
-- **Chips/badges keep h-5/6/7/8** — that tier is canon and must stay for non-interactive pills. But **anything TAPPABLE must be ≥40px**: if a chip gains an `onClick`/`href`, it moves to `h-11` (or keeps its visual size and gains padding/`::before` hit area). ~50 legacy interactive `h-7`/`h-8` chips predate this rule and were deliberately NOT swept in the 2026-07-27 pass — fix them opportunistically, in the file you're already touching, never in bulk. **The admin's were swept in stage 11 (2026-08-19):** the five filter rails and the blog/moderation/categories buttons moved to `h-10 sm:h-9` + `text-small` (the `<Btn size="sm">` tier), the three `_users` micro-toggles kept their badge look and gained `tap-area`; `tests/designTokens.test.ts` §G pins app/admin at zero (tag-scoped — onClick and className on different lines still count).
-
-## Sizing canon (normalized 2026-07)
-- **Containers**: page shell `max-w-[1280px] mx-auto px-6 sm:px-8`. Narrow content (forms/prose): 520–820px contextual.
-- **Buttons**: see "Control heights" above (h-9 / h-11 / h-12; icon-buttons 40×40 or 36×36). Radius `rounded-btn`. Prefer `<Btn>` (components/Btn.tsx) — variants primary/hero/secondary/ghost/danger, default `type="button"`, tactile press built in.
-- **Inputs/selects**: **h-11** standard; hero-search and auth fields may use **h-12** (the deliberate "prominent" tier — nothing between or above). Radius `rounded-field`, textarea `py-3`. Global focus glow exists in globals.css — don't add per-field rings.
-- **Cards**: radius `rounded-card`, border `border-ink-200`, padding `p-5 sm:p-6` (compact lists `p-4`; hero/section cards may use `p-8+`). Elevation: hairline border + `shadow-xs/card`; hover = `.hover-lift` or border warm-up — never shadow bloom.
-- **Chips/pills**: h-6/7/8 `rounded-pill`; plus an **h-5 micro-chip tier** for inline badges (SUPER, unread counts, "შეფასება ელოდება"). Badges: verified = green circle+check; SUPER = warning-50 gold; pedigree = neutral `bg-ink-75 text-ink-700 border-ink-200` (the older `bg-info-50 text-info-700` note is retired — zero usages tonight; see Color).
-- **Icons**: inline 16–18px, standalone 20–24px, plus a **12px (`w-3 h-3`) meta/inline-dense tier** for metadata rows and micro-chips (floor: 12px — never `w-2.5`). One stroke family (1.6–2.2), line-only. Single source: `components/Icon.tsx` — never define page-local icon sets.
-
-## Layout & states
-- Sticky rails: `position: sticky` works because `html,body` use `overflow-x: clip` (NOT `hidden` — hidden kills sticky site-wide). Don't reintroduce `overflow-x: hidden` on body.
-- Mobile bottom CTAs set `data-mobile-cta` on body so the cookie banner lifts above (globals.css).
-- ⚠️ **Glass is for surfaces you look PAST, never for surfaces you must READ (2026-08-02).** Dropdown menus (UserMenu, NotifBell) and toasts were briefly made `.glass` and went straight back to solid `bg-white border-ink-200`: they land over dense body copy and carry text the user gets one chance to read. Opacities were also raised — `.glass` 0.55 → **0.86**, `.glass-bar` 0.72 → **0.9**, `.glass-bar-quiet` 0.55 → **0.8** — because the cross-engine audit found the section-nav pill's labels colliding with the copy behind it, and because the `@supports not (backdrop-filter)` fallback can never fire on engines that *claim* support but don't paint the blur (GPU blocklist, low-power mode, macOS „Reduce transparency"). What may stay glass: the public header bar, the profile section-nav pill, BackToTop.
-- **Glass surfaces: `.glass` / `.glass-bar` (+ their `-quiet` states) in globals.css are the ONLY translucent surfaces.** Two edges of one material, each owning background + blur + hairline + shadow in a single class — the host adds only geometry. **`.glass` = floating surfaces inside the page** (pills, popovers, floating toolbars — the profile section-nav pill): white 55% + `blur(16px) saturate(180%)`, border all round, host supplies `rounded-*`. **`.glass-bar` = full-width bars pinned to a viewport edge** (the public header): white 72% + a hotter `blur(20px) saturate(190%)` because a bar covers far more content, **no radius, no box border — a bottom hairline only** (drawn as `inset 0 -1px 0`, so a host `border-*` can't fight it); `.glass-bar-quiet` = the scroll-top state (55% white, faint hairline, no lift), `.glass-quiet` drops the pill's shadow. Never for in-flow cards (`bg-white` + `border-ink-200`), never re-invent `bg-white/xx backdrop-blur-*` in page code, and don't stack `bg-*`/`border-*`/`shadow-*` on them — the rules are unlayered CSS and outrank Tailwind utilities. Blur is layer-promoted (`translateZ(0)` + `will-change` + `backface-visibility`), which is what supersedes the 2026-07-22 "no backdrop-blur on mobile bars" ban **for promoted glass only** — the ban still stands for any un-promoted sticky/fixed bar (BottomNav, workspace top bars stay solid). One-line revert if a device strobes: delete the two `backdrop-filter` lines in `.glass` / `.glass-bar`; the shared `@supports` fallback (0.95 white) takes over. Note both make their element a containing block for `position: fixed` descendants (NotifBell's <640px dropdown anchors to the bar, which is why `top-16` lands flush under it).
-- Public header = a **full-bleed glass bar** (2026-07-27, replacing the short-lived floating island): `<header sticky top-0>` → a full-width `glass-bar` div → `<Container className="h-16 sm:h-20 …">` for the nav content. The glass spans edge to edge from y=0; only the content sits in the 1280px column. Height is **exactly 64 / 80** — every sticky offset elsewhere (`top-16`, `sm:top-20`, `lg:top-[80px]`, `scroll-mt-24`) measures off it, so if it drifts, fix the header, not the consumers. The mobile drawer + scrim must stay siblings OUTSIDE the glass div (else the glass becomes their containing block and `h-[100dvh]`/`inset-0` collapse to the bar).
-- Empty/error states: compact — icon + one line + one action; never hero-sized. Use components/EmptyState where possible.
-- Dates: NEVER `toLocaleDateString('ka-GE', {month/weekday})` — runtime ICU falls back to English. Use `lib/kaDate.ts` (`fmtKaDate/fmtKaTime/fmtKaDateTime`).
-- **Server-side, NEVER `getHours()` / `getDay()` / `getMinutes()`** — they read whichever zone the process was started with. Production sets `TZ=Asia/Tbilisi` and local dev sets nothing, so the two disagree and neither throws. Compare wall-clock with `lib/tz → tbilisiParts()`; format with `fmtDateTime(iso, opts, TBILISI)` or `components/workspace/sessionTime`. `lib/kaDate` is machine-zone by design and is for CLIENT rendering only. Shipped bug (2026-08-06): the weekly-package scheduler matched „ორშ 18:00" against the server clock, so on any host without the env var it answered „თავისუფალი დრო არ არის" for a free calendar — and answered a diaspora client about a different hour than the one they tapped. Pinned by `tests/packages.test.ts` §P.
-- **A status check you read before the write is not a guard.** Claim the row instead: `updateMany({ where: { id, status: <expected> } })` + `count !== 1 → 409`, the pattern in `app/api/bookings/[id]/cancel`. A read-then-write loses to a second tab, and on `enrollment.markPaid` that meant a re-stamped expiry plus two audit rows for one payment (2026-08-06).
-
-## Product rules
-- **Copy is the owner's, and it is PLAIN.** Never author or reword existing site text. When a new surface genuinely needs a string, write the plainest one that works — what any other site would say: „ნომერი არასწორია", not a sentence teaching the format; „ტელეფონის ნომერი", not a headline. No eyebrows on dialogs, no reassurance paragraphs, no explaining the product inside a control. Owner, 2026-08-09: „რთულად და გამოგონილი არ დაწერო."
-- **Roles are words in ONE place (2026-08-18, restructuring v2 stage 2).** `lib/roles.ts` is a pure leaf: `ROLE.CLIENT/EXPERT/ADMIN` map onto the database's `STUDENT/TUTOR/ADMIN` (the enum is NEVER renamed — no migrations, additive DDL only, see the file header); code compares against `ROLE.*`, never the raw string; screens read `roleLabel()` / `HAT_LABEL` / `SPACE_LABEL`, never a hand-typed „სტუდენტი". Pinned by `tests/lexicon.test.ts`, which also forbids the retired words below.
-- **Retired data stays in the table; only the client forgets it (stage 11, 2026-08-19).** `AvailabilitySlot.booked` is `@ignore` in `prisma/schema.prisma` — no code reads or writes it, the column stays (DEFAULT false) until it is dropped by hand once no old instance runs; `/api/tutors/[id]` still emits `booked: false` on the wire for old clients. The unused relational `RescheduleRequest` model is `LegacyRescheduleRequest` in the client with `@@map("RescheduleRequest")` — the live reschedule state is the `Booking.rescheduleRequest` JSONB column (raw SQL). Neither change is DDL. Category auto-reveal on approve / re-file is ONE function, `lib/categoryReveal → revealCategoryIfHidden` (`lib/categoryTree` stays prisma-free because client components import it); pinned by `tests/categoryReveal.test.ts`.
-- Terminology: always „ექსპერტი" (never ტუტორი/რეპეტიტორი/სპეციალისტი/მასწავლებელი as the role word in UI — a profession NAME like „IT სპეციალისტი" is fine); „კლიენტი" (never სტუდენტი — one of 16 categories is learning); „კატეგორია" (never სფერო for the UI concept — the home section eyebrow says კატეგორიები); „ფასი" (never ღირებულება); „გადამოწმებული" (never ვერიფიცირებული); „ხელოსანი" (never მასტერი/შემსრულებელი); „კლიენტი" (never დამკვეთი). The LEARNING vocabulary in `lib/requestTopics.ts` keeps its own words (a topic called „სტუდენტი" is who is taught). Support email: read `SUPPORT_EMAIL` from `lib/supportEmails.ts` — never type a literal. Temporarily `mcodne.ge@gmail.com` (2026-07-27): the domain still has no MX, so every @mcodne.ge address dropped incoming mail silently. Revert to hi@/privacy@/legal@ once receiving works.
-- Lexicon (Georgian-first, UI copy only — never rename code identifiers/API fields): „ჩემი სივრცე" (not „dashboard/დაშბორდი"), „დრო/თავისუფალი დრო" (not „სლოტი"), „დაცული გადახდა/დაცული თანხა" (not „escrow"), „ვიდეოგაცნობა" (not „ვიდეოშესავალი/ვიდეო-ინტრო"), „და" (not „&") inside Georgian strings.
-- **Georgian compounds: a borrowed indeclinable prefix takes NO hyphen.** ვიდეოოთახი / ვიდეოკონსულტაცია / ვებგვერდი / ონლაინკურსი — never ვიდეო-ოთახი. There is **no double-vowel-clash exception**: the სასკოლო ორთოგრაფიული ლექსიკონი (nplg.gov.ge/saskolo) carries **ფოტოობიექტივი** solid — ო+ო, the exact shape of ვიდეოოთახი — alongside ვიდეოთამაში/ვიდეორგოლი/ვიდეოკლიპი, ფოტოასლი, მიკროავტობუსი. 18 call sites were hyphenated on a rule that does not exist. The hyphen belongs only to compounds whose first member is a **truncated stem** — ბიზნეს-გეგმა, ბიზნეს-სტრატეგია, ექსპერტ-კონსულტაცია, ქუქი-ფაილი, პროდაქტ-მენეჯერი (the სახლ-მუზეუმი pattern); leave those alone. Enforced by `tests/georgianOrthography.test.ts`, which also pins the terminology above and the `„…“` closer — it lints our own copy, while `tests/georgianText.test.ts` guards what users type in.
-- Paid-only model: NO free-trial promises in copy (removed 2026-07). Free things that exist: registration, cancellation ≥24h before, no-show replacement.
-- Escrow/payments not yet live — bookings currently free; keep the honest "payments coming soon" notes until integration.
-- Trust signals live at decision points: verified/escrow/ID row on profiles, escrow line at checkout, reassurance under booking CTAs.
-
-## Verification habit
-- Typecheck: `npx tsc --noEmit -p tsconfig.json` must stay clean.
-- Dev server `.next` cache corrupts under heavy editing: if pages render empty with working APIs → `pkill -f "next dev"; rm -rf .next; npm run dev`.
-- ⚠️ **Node 26 is not supported by Next 15.5** — `next dev` fails outright and `next build` fails intermittently at "Collecting page data", after types and compilation pass, so it reads as a code error and isn't. **RESOLVED locally 2026-08-01:** node@22 is installed and `export PATH="/opt/homebrew/opt/node@22/bin:$PATH"` is in `~/.zshrc`; `node -v` must read v22.x before `npm run dev`. `npm rebuild sharp bcryptjs` after any Node switch — the native builds are per-version. Railway builds on Node 22 too (`.nvmrc`), so local and prod now match.
-- Verify visually with Playwright (`node_modules/.bin/playwright`, chromium installed) at 1440px and 390px before deploying.
-- Deploy: `railway up --detach` (project Tutor → service mcodne → https://mcodne.ge); verify live after.
-
-## Pre-deploy gate (added 2026-07-31)
-- **`npm run check` before every `railway up`.** Runs `tsc --noEmit` → every `tests/*.test.ts` (31 when the gate was written; 84 tonight, 2026-08-19) → `next build`, in ascending cost. `npm test` = the same without the build (~2 min).
-- There is **no CI and no git remote** — production deploys from the WORKING TREE. This script is the only thing that runs the tests; without it they are comments. Two shipped features were already silently broken by a zod ceiling sized for a URL (certificates `max(500)`, blog covers `max(2000)`), both now pinned by tests that only matter if something runs them.
-- The `.mjs` files in `tests/` (37 then, 39 tonight) are live-site Playwright harnesses — deliberately NOT in the gate; they need a deployment and a browser.
-- Node is pinned in `.nvmrc` (22) and `package.json` `engines` (`>=20 <24`): Next 15.5 fails on Node 26.
+- **Pin behaviour.** Call the function, render the tree, execute the redirect
+  table. `tests/redirects.test.ts` and `tests/designTokens.test.ts` are the
+  models: one runs the table, the other computes the contrast.
+- **Pin an architectural fact** — that a screen imports the shared shell, that a
+  dark feature is still dark, that a leaf imports no sibling. These are real and
+  invisible to types.
+- **NEVER pin a Tailwind VALUE.** `w-10 h-10` vs `size-10` are the same 40px
+  floor; write the contract (`/(w-10 h-10|size-10)/`), never one spelling. The
+  colour, type, motion and z rules are already arithmetic in `designTokens`.
+- **NEVER pin a whole source statement verbatim.** 233 of them exist and are now
+  whitespace-tolerant (`\s+`), which survives a reformat and NOT a rename —
+  they are debt, not a pattern to copy. Replacing one with a behavioural
+  assertion is always an improvement; adding another is not.
+- **Georgian copy:** pin it only where the WORD is the rule (`lexicon`,
+  `georgianOrthography`). Everywhere else the owner edits copy in `SiteText` and
+  a pinned string makes the test wrong, not the page.

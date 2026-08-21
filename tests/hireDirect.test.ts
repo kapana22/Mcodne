@@ -111,8 +111,8 @@ test('§B `?to=` is resolved server-side, against the catalogue’s own rules', 
   // ⚠️ THE RULES ARE IMPORTED, NEVER RE-TYPED. A fourth hand-written copy of
   // „who is public" is a copy that drifts, and the drift is invisible: the
   // recipient line would name somebody the catalogue hides.
-  assert.match(t, /import \{ PUBLIC_TUTOR \} from '\.\/tutorsQuery'/)
-  assert.match(t, /import \{ PUBLIC as PUBLIC_MASTER \} from '@\/app\/experts\/_masterData'/)
+  assert.match(t, /import\s+\{\s+PUBLIC_TUTOR\s+\}\s+from\s+'\.\/tutorsQuery'/)
+  assert.match(t, /import\s+\{\s+PUBLIC\s+as\s+PUBLIC_MASTER\s+\}\s+from\s+'@\/app\/experts\/_masterData'/)
   assert.match(t, /PUBLIC_MASTER/, 'the master lookup does not apply the catalogue’s rule')
   assert.match(t, /PUBLIC_TUTOR/, 'the expert lookup does not apply the catalogue’s rule')
   // Both exports still exist and still say what they said.
@@ -155,7 +155,18 @@ test('§B the SLUG is what crosses the wire, and the server resolves it again', 
   assert.match(create, /resolveRequestTarget\(toRaw/,
     'the endpoint trusts the body instead of resolving the slug again')
   // The invite is best-effort: it can never cost somebody their request.
-  assert.match(create, /try \{[\s\S]{0,600}inviteProviderToRequest[\s\S]{0,200}\} catch/)
+  // The window widened when the invite gained its second job — dropping
+  // `offerLimit` to 1 so an addressed request is not also broadcast. What is
+  // pinned is unchanged: the whole thing sits inside a try/catch, because the
+  // REQUEST is the deliverable and a failed invite may never cost it.
+  assert.match(create, /try\s+\{[\s\S]{0,2000}inviteProviderToRequest[\s\S]{0,2000}\}\s+catch/)
+  // ⚠️ ADDRESSED, NOT BROADCAST (2026-08-20) — owner: „თუ მცოდნესთან აგზავნის,
+  // მხოლოდ მცოდნესთან უნდა მივიდეს." Before this, a request that named somebody
+  // kept the default three places and went to every matching provider, so the
+  // client who pressed „დაკვეთა" on a priced row got two cold quotes from
+  // strangers. One existing column carries it; nothing else needed a new state.
+  assert.match(create, /offerLimit: 1/,
+    'a targeted request no longer closes its own places — it is broadcast again')
   // …and `to` is not a column: the row records what was asked for, not the aim.
   assert.doesNotMatch(read('lib/requests.ts'), /^\s*to:\s*z\./m,
     'the wire schema grew a `to` field — the aim is the INVITED offer, not the request row')
@@ -251,7 +262,7 @@ test('§D a restored draft can never shorten a wizard that carries no `?to=`', (
   assert.equal(reviveDraft(saved).topicPinned, false)
   // …and the wizard re-applies it from the URL, not from storage.
   const wiz = read('app/request/RequestWizard.tsx')
-  assert.match(wiz, /withTarget\(withAccountContact\(\{ \.\.\.d, vertical \}, account\), to\?\.topics \?\? \[\], !!to\)/,
+  assert.match(wiz, /withTarget\(withAccountContact\(\{\s+\.\.\.d,\s+vertical\s+\},\s+account\),\s+to\?\.topics\s+\?\?\s+\[\],\s+!!to\)/,
     'the restore path no longer re-applies the recipient from the URL')
 })
 
@@ -288,7 +299,19 @@ test('§E both profile CTAs carry the recipient and stay behind requestsOn()', (
   // are ./_providerData and ./_providerCta inside app/experts/[slug].
   const data = read('app/experts/[slug]/_providerData.ts')
   assert.match(data, /export const requestHrefFor/)
-  assert.match(data, /&to=\$\{encodeURIComponent\(p\.slug \|\| p\.id\)\}/)
+  assert.match(data, /&to=\$\{encodeURIComponent\(p\.slug\s+\|\|\s+p\.id\)\}/)
+  // ⚠️ AND THE SERVICE THEY TAPPED, AS `?q=` (2026-08-20). The priced list is
+  // the provider page's centre, and its button opened a form whose FIRST
+  // question was „რა გჭირდება" — which the client had just answered by pressing
+  // „დაკვეთა" on a named row. `q` is the search box's own parameter, read by
+  // app/request/page since the wizard was built, so nothing new was invented;
+  // it is a SEED, not a decision, and it is capped on both sides.
+  assert.match(data, /&q=\$\{encodeURIComponent\(service\.slice\(0,\s+60\)\)\}/,
+    'the order button stopped carrying the service into the wizard')
+  assert.match(read('app/experts/[slug]/_providerBlocks.tsx'), /requestHrefFor\(p, s\.label\)/,
+    'the priced row no longer passes its own label')
+  assert.match(read('app/request/page.tsx'), /sp\.q === 'string'/,
+    'the wizard stopped reading ?q — the seed would land nowhere')
   assert.match(read('app/experts/[slug]/_providerCta.tsx'), /requestHrefFor\(master\)/)
   // …gated in the PAGE, exactly as before (the profile must survive the flag
   // being off — it is an indexable page).
@@ -296,7 +319,7 @@ test('§E both profile CTAs carry the recipient and stay behind requestsOn()', (
 
   // The expert's: BOOKING STAYS PRIMARY, the request path is the secondary.
   const page = read('app/experts/[slug]/page.tsx')
-  assert.match(page, /requestsOn\(\) \? `\/request\?to=\$\{encodeURIComponent\(resolved\?\.slug \|\| id\)\}` : null/,
+  assert.match(page, /requestsOn\(\)\s+\?\s+`\/request\?to=\$\{encodeURIComponent\(resolved\?\.slug\s+\|\|\s+id\)\}`\s+:\s+null/,
     'the expert CTA is not gated on the flag, or no longer carries the slug')
   const booking = read('app/experts/[slug]/_booking.tsx')
   assert.match(booking, /დაჯავშნე/, 'booking stopped being the profile’s primary action')
@@ -312,7 +335,7 @@ test('§E both profile CTAs carry the recipient and stay behind requestsOn()', (
   // reachable, and they are NOT peers. The request is the secondary BUTTON; the
   // question is a quiet text link under it. Hierarchy is what keeps a rail from
   // arguing with itself — not the number of controls.
-  assert.match(booking, /requestHref && \([\s\S]{0,400}variant="secondary"[\s\S]{0,200}გამოაგზავნე მოთხოვნა/,
+  assert.match(booking, /requestHref\s+&&\s+\([\s\S]{0,400}variant="secondary"[\s\S]{0,200}გამოაგზავნე\s+მოთხოვნა/,
     'the request path is no longer the rail’s secondary button')
   assert.match(booking, /requestHref \?[\s\S]{0,600}ან დაუსვი კითხვა/,
     'the question link vanished — the request button is swallowing the message path again')
@@ -388,4 +411,94 @@ test('directTo is never true while a question is still unanswered', async () => 
   // Nobody chosen at all.
   const none = withTarget(EMPTY_DRAFT, ['math'], false)
   assert.equal(none.directTo, false, 'no recipient, no shortening')
+})
+
+/* ═══════════ §H the provider is TOLD they were chosen ════════════════════ */
+
+test('§H an INVITED request is marked in the provider feed', () => {
+  // ⚠️ THE MECHANISM WAS COMPLETE AND THE OUTCOME WAS NOT (2026-08-20). Every
+  // step of `?to=` was already built and pinned above: the profile carries the
+  // slug, the wizard names the recipient, the endpoint re-resolves it and opens
+  // an INVITED offer. Then the request landed in the provider's queue looking
+  // exactly like a broadcast one — so the person who had ALREADY been chosen
+  // read it as a three-way race and priced it like one. The choice was made,
+  // recorded, and thrown away one screen before it mattered.
+  //
+  // What is pinned: the feed asks WHICH rows are invited, and it asks in ONE
+  // query over the ids it already has (a per-card lookup on a 100-row page is
+  // 100 round trips), and the answer reaches the card.
+  const feed = read('app/work/(provider)/requests/page.tsx')
+  assert.match(feed, /status: 'INVITED'/, 'the feed no longer asks which requests named this provider')
+  // The lookup runs BEFORE the feed query now, because its answer is both the
+  // label and the FILTER — see the OR below.
+  assert.match(feed, /const\s+invited\s+=\s+new\s+Map\(mineInvited\.map\(o\s+=>\s+\[o\.requestId,\s+o\.createdAt\]\)\)/,
+    'the invited map is gone — the feed can no longer tell an addressed request from an open one, nor time it')
+  // ⚠️ AND IT IS THE EXCLUSION. `offerLimit` is 1 only on a request that named
+  // somebody, so the queue is „anything with room for anybody, plus what was
+  // addressed to me". A request addressed to somebody else matches neither arm.
+  assert.match(feed, /\{ offerLimit: \{ gt: 1 \} \}/,
+    'the open queue stopped excluding addressed requests — they are broadcast again')
+  assert.match(feed, /id: \{ in: \[\.\.\.invited\.keys\(\)\] \}/,
+    'the recipient lost their own addressed request from the queue')
+  assert.match(feed, /expertUserId: me\.userId.*companyId: me\.companyId/s,
+    'the lookup must be scoped to THIS provider — both identities, as everywhere else')
+  assert.match(feed, /invited\.has\(r\.id\)/, 'the card stopped reading the invited set')
+  assert.match(feed, /შენ აგირჩია/, 'the words that tell the provider they were chosen are gone')
+})
+
+/* ═══════════ §I an addressed request goes to ONE person ═════════════════ */
+
+test('§I only the named provider can see or answer an addressed request', () => {
+  // ⚠️ THE RULE, IN THE OWNER'S WORDS (2026-08-20): „თუ მცოდნესთან აგზავნის,
+  // მხოლოდ მცოდნესთან უნდა მივიდეს." Until this, `?to=` opened the invited
+  // thread and changed nothing else: `offerLimit` kept its default 3 and the
+  // provider queue had no exclusion, so a client who had read one profile, seen
+  // one price and pressed „დაკვეთა" was answered by strangers. The „შენ
+  // აგირჩია" badge was true and useless — chosen, and still in a race.
+  //
+  // ONE COLUMN CARRIES IT. `offerLimit: 1` is written by the invite and read by
+  // everything that already asks „is there room" — no new column, no second
+  // state machine, and one value for the client's button to raise.
+  const create = read('app/api/requests/route.ts')
+  assert.match(create, /offerLimit: 1/, 'a targeted request is broadcast again')
+
+  const feed = read('app/work/(provider)/requests/page.tsx')
+  assert.match(feed, /\{ offerLimit: \{ gt: 1 \} \}/, 'the open queue stopped excluding addressed requests')
+  assert.match(feed, /id: \{ in: \[\.\.\.invited\.keys\(\)\] \}/, 'the recipient lost their own request from the queue')
+
+  // The clock is the PROVIDER's, because the asymmetry is that a client can
+  // always act and a provider can always stall.
+  assert.match(feed, /უპასუხე/, 'the exclusivity window is no longer shown to the provider')
+  assert.match(read('lib/requestLive.ts'), /export const DIRECT_WINDOW_MS/, 'the window constant is gone')
+
+  // ⚠️ AND NOTHING OPENS BY ITSELF. The endpoint is the ONLY writer that raises
+  // the limit, it is a POST, and it claims conditionally so a second tab cannot
+  // double-apply it. An automatic timer would publish a private choice to
+  // strangers with nobody pressing anything — and every automated message this
+  // platform sends is an email (there is no SMS), so the client would learn of
+  // it by receiving quotes they never asked for.
+  const open = read('app/api/requests/[ref]/open/route.ts')
+  assert.match(open, /where: \{ publicRef: ref, offerLimit: 1 \}/, 'the opener stopped guarding on the addressed state')
+  assert.match(open, /DEFAULT_OFFER_LIMIT/, 'the opener invents its own number instead of reading the one default')
+  // Comments stripped: the prose above explains at length why nothing expires,
+  // and a pin that reads its own explanation as a violation is a pin that can
+  // only be satisfied by deleting the reasoning.
+  assert.doesNotMatch(codeOf('app/api/requests/[ref]/open/route.ts'), /setTimeout|setInterval/,
+    'the opener grew an automatic path — it must be a person pressing a button')
+
+  // ⚠️ AND SO IS THE OPERATOR. This subsystem's safety net is that a human
+  // phones every request; „0/1" in an offers header reads as „nobody has bid",
+  // not as „this client chose somebody". The same panel lets an admin raise the
+  // limit, i.e. undo the client's choice, so the state must be legible ABOVE
+  // that field, in words.
+  const admin = read('app/admin/_requests.tsx')
+  assert.match(admin, /r\.offerLimit === 1/, 'the admin panel stopped detecting an addressed request')
+  assert.match(admin, /status === 'INVITED'/, 'the addressed state must be the PAIR — a limit of 1 alone is not it')
+  assert.match(admin, /სხვა ვერავინ ხედავს/, 'the operator is no longer told the request is private')
+
+  // The client is told which state they are in, in words that match it.
+  const live = read('app/request/_live.tsx')
+  assert.match(live, /addressedTo/, 'the client page cannot tell an addressed request from a tender')
+  assert.match(live, /მხოლოდ ის ხედავს ამ მოთხოვნას/, 'the client is no longer told the request is private')
+  assert.match(live, /გავხსნა სხვებისთვის/, 'the way out is gone — an unanswered request is a dead end again')
 })

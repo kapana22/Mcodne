@@ -28,11 +28,14 @@ function priceForDuration(base: number, _minutes: number): number {
   return Math.max(0, Math.round(base || 0))
 }
 
-// Availability → CTA-enabled predicate (isTutorBookable in app/experts/page.tsx;
-// mirrors StickyBookingCard's `uniqueDays.length === 0` gate on the detail page).
-function isTutorBookable(nextSlotAt?: string | null): boolean {
-  return nextSlotAt != null
-}
+// ⚠️ IMPORTED, NOT RE-IMPLEMENTED (2026-08-20). This file used to carry its own
+// two-line copy of `isTutorBookable`, so it tested the copy: when the real rule
+// grew a second half — a slot AND a tier to put in it — every assertion here
+// still passed against the old one. A test that cannot fail when the code
+// changes is a comment.
+// `app/experts/_data` is `'use client'` but imports only libs, no JSX, so it
+// loads under tsx exactly as any other module.
+import { isTutorBookable } from '../app/experts/_data'
 
 type ApiRow = {
   user?: { fullName?: string | null } | null
@@ -116,3 +119,29 @@ check('has slot → CTA enabled', isTutorBookable(new Date().toISOString()) === 
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
+
+/* ───── „დაჯავშნე" needs a slot AND something to put in it ───── */
+{
+  const SESSION = { minutes: 60 }
+  const JOB = { minutes: 0, bookable: false }
+  const T = '2026-09-01T10:00:00.000Z'
+  check('no slot → never bookable, whatever the rows are',
+    isTutorBookable(null, [SESSION]) === false)
+  check('slot + a bookable tier → bookable',
+    isTutorBookable(T, [SESSION]) === true)
+  // ⚠️ THE CASE THAT USED TO LIE. Every profession sells services now
+  // (lib/professions), so an expert whose rows are ALL jobs is ordinary — and
+  // they still have a calendar. „დაჯავშნე" opened a picker with nothing in it,
+  // because every tier resolver drops `minutes: 0`.
+  check('slot but ONLY services → NOT bookable',
+    isTutorBookable(T, [JOB]) === false)
+  check('a job beside a session is still bookable',
+    isTutorBookable(T, [JOB, SESSION]) === true)
+  // A row written before `bookable` existed reads as bookable.
+  check('a legacy row with no flag counts',
+    isTutorBookable(T, [{ minutes: 30 }]) === true)
+  // Unknown rows must not REMOVE a button that worked — absent means „do not
+  // know", and a cached payload that predates the tier select is not evidence.
+  check('rows absent → unchanged meaning',
+    isTutorBookable(T) === true)
+}

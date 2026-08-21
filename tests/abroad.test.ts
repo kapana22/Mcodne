@@ -138,7 +138,7 @@ test('the admin CMS hides the dark vertical\'s keys', () => {
   // Matched loosely on the abroad clause alone: the filter also drops `retired`
   // keys now, and pinning the whole expression made an unrelated change to that
   // second condition fail HERE, pointing at the wrong feature.
-  assert.match(route, /SITE_TEXTS\.filter\([^)]*t\.vertical !== 'abroad' \|\| FEATURE_ABROAD/)
+  assert.match(route, /SITE_TEXTS\.filter\([^)]*t\.vertical\s+!==\s+'abroad'\s+\|\|\s+FEATURE_ABROAD/)
   // The DEFAULTS map must NOT filter — the page has to resolve its copy the
   // instant the flag flips, with no DB rows and no deploy.
   assert.ok(SITE_TEXT_DEFAULTS['abroad.hero.title'], 'abroad defaults must stay resolvable')

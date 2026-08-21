@@ -141,9 +141,9 @@ test('§B every route sits behind the subsystem gate and answers 404, never 403'
     assert.doesNotMatch(src, /redirect\(/, `${f} redirects — same leak`)
   }
   // Client-side routes gate on the client flag; the provider's on the provider flag.
-  assert.match(codeOf(DONE), /if \(!viewer\.clientAllowed\) return requestsNotFound\(\)/)
-  assert.match(codeOf(REVIEW), /if \(!viewer\.clientAllowed\) return requestsNotFound\(\)/)
-  assert.match(codeOf(WITHDRAW), /if \(!viewer\.providerAllowed\) return requestsNotFound\(\)/)
+  assert.match(codeOf(DONE), /if\s+\(!viewer\.clientAllowed\)\s+return\s+requestsNotFound\(\)/)
+  assert.match(codeOf(REVIEW), /if\s+\(!viewer\.clientAllowed\)\s+return\s+requestsNotFound\(\)/)
+  assert.match(codeOf(WITHDRAW), /if\s+\(!viewer\.providerAllowed\)\s+return\s+requestsNotFound\(\)/)
   assert.match(codeOf(WITHDRAW), /if \(!provider\) return requestsNotFound\(\)/,
     'an admin with no allowlist row has no identity to withdraw as')
 })
@@ -151,19 +151,19 @@ test('§B every route sits behind the subsystem gate and answers 404, never 403'
 test('§B every state change is CLAIMED — updateMany + count !== 1 → 409, in the lib', () => {
   const lib = codeOf(LIB)
   // done
-  assert.match(lib, /prisma\.requestOffer\.updateMany\(\{\s*where: markDoneWhere\(offerId\)/)
-  assert.match(lib, /if \(claimed\.count !== 1\) return \{ ok: false, error: 'ALREADY_DONE' \}/)
+  assert.match(lib, /prisma\.requestOffer\.updateMany\(\{\s*where:\s+markDoneWhere\(offerId\)/)
+  assert.match(lib, /if\s+\(claimed\.count\s+!==\s+1\)\s+return\s+\{\s+ok:\s+false,\s+error:\s+'ALREADY_DONE'\s+\}/)
   // withdraw — the provider is IN the where, and the place is given back guarded
-  assert.match(lib, /where: withdrawWhere\(offerId, provider\),\s*data: \{ status: 'WITHDRAWN' \}/)
-  assert.match(lib, /if \(claimed\.count !== 1\) return \{ ok: false, error: 'NOT_OPEN' \}/)
-  assert.match(lib, /offerCount: \{ gt: 0 \} \},\s*data: \{ offerCount: \{ decrement: 1 \} \}/,
+  assert.match(lib, /where:\s+withdrawWhere\(offerId,\s+provider\),\s*data:\s+\{\s+status:\s+'WITHDRAWN'\s+\}/)
+  assert.match(lib, /if\s+\(claimed\.count\s+!==\s+1\)\s+return\s+\{\s+ok:\s+false,\s+error:\s+'NOT_OPEN'\s+\}/)
+  assert.match(lib, /offerCount:\s+\{\s+gt:\s+0\s+\}\s+\},\s*data:\s+\{\s+offerCount:\s+\{\s+decrement:\s+1\s+\}\s+\}/,
     'withdraw does not give the place back with the guarded decrement')
   // …and the routes turn a failed claim into 409, nothing else.
-  assert.match(codeOf(DONE), /if \(!r\.ok\) return NextResponse\.json\(\{ ok: false, error: r\.error \}, \{ status: 409 \}\)/)
-  assert.match(codeOf(WITHDRAW), /if \(!r\.ok\) return NextResponse\.json\(\{ ok: false, error: r\.error \}, \{ status: 409 \}\)/)
+  assert.match(codeOf(DONE), /if\s+\(!r\.ok\)\s+return\s+NextResponse\.json\(\{\s+ok:\s+false,\s+error:\s+r\.error\s+\},\s+\{\s+status:\s+409\s+\}\)/)
+  assert.match(codeOf(WITHDRAW), /if\s+\(!r\.ok\)\s+return\s+NextResponse\.json\(\{\s+ok:\s+false,\s+error:\s+r\.error\s+\},\s+\{\s+status:\s+409\s+\}\)/)
   // review: the gate is the honest answer, P2002 is the guard — both 409
   const review = codeOf(REVIEW)
-  assert.match(review, /if \(gate !== 'OK'\) return NextResponse\.json\(\{ ok: false, error: gate \}, \{ status: 409 \}\)/)
+  assert.match(review, /if\s+\(gate\s+!==\s+'OK'\)\s+return\s+NextResponse\.json\(\{\s+ok:\s+false,\s+error:\s+gate\s+\},\s+\{\s+status:\s+409\s+\}\)/)
   assert.match(review, /P2002[\s\S]{0,120}ALREADY_REVIEWED[\s\S]{0,40}status: 409/)
   // no read-then-write in any of the three: nothing decides on a status it read
   for (const f of [DONE, WITHDRAW]) {
@@ -175,13 +175,13 @@ test('§B who may call what: client by reference, provider by session, never a r
   const done = codeOf(DONE)
   // The client: the reference must be THIS offer's request.
   assert.match(done, /normalizePublicRef\(raw\)/)
-  assert.match(done, /ref === offer\.request\.publicRef\) by = 'CLIENT'/)
+  assert.match(done, /ref\s+===\s+offer\.request\.publicRef\)\s+by\s+=\s+'CLIENT'/)
   // The provider: the session owns the offer — same ownership test as request-chat.
   assert.match(done, /offer\.expertUserId === p\.userId : offer\.companyId === p\.companyId/)
   assert.match(done, /if \(owns\) by = 'PROVIDER'/)
   // The review is CLIENT ONLY: the ref is in the where, and the author is the request's user.
   const review = codeOf(REVIEW)
-  assert.match(review, /where: \{ id: offerId, request: \{ publicRef: ref \} \}/)
+  assert.match(review, /where:\s+\{\s+id:\s+offerId,\s+request:\s+\{\s+publicRef:\s+ref\s+\}\s+\}/)
   assert.match(review, /studentId: offer\.request\.userId!/)
   assert.match(review, /tutorId: null/)
   // The withdraw route never reads the ref — a provider must never need it.
@@ -204,29 +204,29 @@ test('§C two phases, both claim-style: the REMINDED row is the reminder\'s clai
   // Phase 1: the marker row is written FIRST and `first === false` sends nothing.
   const remind = jobs.indexOf("recordOfferEvent(r.id, 'REMINDED')")
   assert.ok(remind > 0, 'the reminder is not marked by an OfferEvent row')
-  assert.match(jobs, /const rec = await recordOfferEvent\(r\.id, 'REMINDED'\)\s*if \(!rec\.ok \|\| !rec\.first\) continue/)
+  assert.match(jobs, /const\s+rec\s+=\s+await\s+recordOfferEvent\(r\.id,\s+'REMINDED'\)\s*if\s+\(!rec\.ok\s+\|\|\s+!rec\.first\)\s+continue/)
   const send = jobs.indexOf('send.remindClient')
   assert.ok(send > remind, 'the client is mailed before the reminder is claimed — a crash mid-send mails every tick')
   assert.ok(jobs.indexOf('send.remindProvider') > remind)
   // The candidate query excludes already-reminded rows at the database, too.
   assert.match(jobs, /events: \{ none: \{ type: 'REMINDED' \} \}/)
   // Phase 2: the close is a conditional write on the columns that make it once.
-  assert.match(jobs, /where: \{ id: r\.id, status: 'ACCEPTED', doneAt: null, closedAt: null \},\s*data: \{ closedAt: new Date\(now\) \}/)
+  assert.match(jobs, /where:\s+\{\s+id:\s+r\.id,\s+status:\s+'ACCEPTED',\s+doneAt:\s+null,\s+closedAt:\s+null\s+\},\s*data:\s+\{\s+closedAt:\s+new\s+Date\(now\)\s+\}/)
   assert.match(jobs, /if \(claimed\.count !== 1\) continue/)
   // Neither phase touches status — closing is a stamp, not a transition.
   assert.doesNotMatch(jobs, /data: \{ status:/, 'the cron changes an offer\'s status')
   // Both phases re-check the pure predicate against the loaded row.
-  assert.match(jobs, /if \(!reminderDue\(rowOf\(r\), now\)\) continue/)
+  assert.match(jobs, /if\s+\(!reminderDue\(rowOf\(r\),\s+now\)\)\s+continue/)
   assert.match(jobs, /if \(!closeDue\(rowOf\(r\), now\)\) continue/)
 })
 
 test('§C the cleanup route runs it under the flag and reports it', () => {
   const cron = codeOf(CRON)
-  assert.match(cron, /requestsOn\(\)\s*\? await runOfferLifecycleJobs\(now\.getTime\(\)/)
+  assert.match(cron, /requestsOn\(\)\s*\?\s+await\s+runOfferLifecycleJobs\(now\.getTime\(\)/)
   assert.match(cron, /offers: offerJobs,/)
   // The client is mailed the reminder template; the provider gets a typed bell
   // with the topic and PROVIDER_ROUTE — never the reference.
-  assert.match(cron, /offerDoneReminderClientEmail\(\{ publicRef: o\.publicRef, topicLabel: topicLabel\(o\.topic\) \}\)/)
+  assert.match(cron, /offerDoneReminderClientEmail\(\{\s+publicRef:\s+o\.publicRef,\s+topicLabel:\s+topicLabel\(o\.topic\)\s+\}\)/)
   const bell = cron.slice(cron.indexOf('remindProvider'), cron.indexOf('remindProvider') + 600)
   assert.match(bell, /type: 'REQUEST_DONE'/)
   assert.match(bell, /href: `\$\{PROVIDER_ROUTE\}\/offers`/)
@@ -267,20 +267,20 @@ test('§D the requests subsystem has typed notifications, always delivered', () 
 test('§E the client\'s page: „დასრულდა" on the accepted offer, then ★, then read-only', () => {
   const dir = dirOf('app/request/[ref]')
   // The page feeds the lifecycle state without widening clientOfferView.
-  assert.match(dir, /kind: true, doneAt: true,\s*review: \{ select: \{ rating: true, body: true \} \}/)
+  assert.match(dir, /kind:\s+true,\s+doneAt:\s+true,\s*review:\s+\{\s+select:\s+\{\s+rating:\s+true,\s+body:\s+true\s+\}\s+\}/)
   assert.match(dir, /clientOfferView\(\{/, 'the contact rule still comes from lib/requests → clientOfferView')
   assert.match(dir, /canReview=\{request\.userId !== null\}/)
   // The button, secondary, on the ACCEPTED QUOTE offer that is not done.
-  assert.match(dir, /accepted && o\.kind === 'QUOTE' && !o\.doneAt && \([\s\S]{0,200}variant="secondary"[\s\S]{0,300}'დასრულდა'/)
+  assert.match(dir, /accepted\s+&&\s+o\.kind\s+===\s+'QUOTE'\s+&&\s+!o\.doneAt\s+&&\s+\([\s\S]{0,200}variant="secondary"[\s\S]{0,300}'დასრულდა'/)
   assert.match(dir, /\/api\/requests\/\$\{publicRef\}\/offers\/\$\{id\}\/done/)
   // The picker after done, only with an account; the stars after the review.
-  assert.match(dir, /accepted && o\.doneAt && !o\.review && canReview && \(\s*<ReviewForm/)
-  assert.match(dir, /accepted && o\.review && \([\s\S]{0,200}<Stars n=\{o\.review\.rating\}/)
+  assert.match(dir, /accepted\s+&&\s+o\.doneAt\s+&&\s+!o\.review\s+&&\s+canReview\s+&&\s+\(\s*<ReviewForm/)
+  assert.match(dir, /accepted\s+&&\s+o\.review\s+&&\s+\([\s\S]{0,200}<Stars\s+n=\{o\.review\.rating\}/)
   assert.match(dir, /\/api\/requests\/\$\{publicRef\}\/offers\/\$\{offerId\}\/review/)
   // The picker: five 40×40 star buttons (the lesson review's row), one textarea
   // capped at the lib's ceiling.
   assert.match(dir, /\[1, 2, 3, 4, 5\]\.map\(n => \(\s*<button/)
-  assert.match(dir, /className=\{`w-10 h-10 rounded-btn/)
+  assert.match(dir, /(w-10 h-10|size-10)/, 'the control fell below the 40px tap floor')
   assert.match(dir, /maxLength=\{REVIEW_BODY_MAX\}/)
   // The done/review 409s read as „out of date", like accept's.
   assert.match(dir, /case 'ALREADY_DONE':\s*case 'ALREADY_REVIEWED':/)
@@ -296,13 +296,13 @@ test('§E the master profile lists real reviews through the offer, and never a p
   const data = read('app/experts/[slug]/_providerData.ts')
   const code = codeOf('app/experts/[slug]/_providerData.ts')
   // Review → RequestOffer → the profile's user or company.
-  assert.match(code, /prisma\.review\.findMany\(\{\s*where: \{ offer: providerWhere \}/)
+  assert.match(code, /prisma\.review\.findMany\(\{\s*where:\s+\{\s+offer:\s+providerWhere\s+\}/)
   assert.match(code, /\{ companyId: row\.companyId \}/)
   assert.match(code, /\{ expertUserId: row\.userId \}/)
   assert.match(code, /orderBy: \{ createdAt: 'desc' \}/)
-  assert.match(code, /select: \{ id: true, rating: true, body: true, createdAt: true \}/)
+  assert.match(code, /select:\s+\{\s+id:\s+true,\s+rating:\s+true,\s+body:\s+true,\s+createdAt:\s+true\s+\}/)
   // Nothing about the reviewer, and no blob anywhere in the file.
-  assert.doesNotMatch(code, /student:|studentId: true|fullName: true, tutor: \{ select: \{ slug: true \} \} \},\s*company: \{ select: \{ name: true \} \},\s*photo/)
+  assert.doesNotMatch(code, /student:|studentId:\s+true|fullName:\s+true,\s+tutor:\s+\{\s+select:\s+\{\s+slug:\s+true\s+\}\s+\}\s+\},\s*company:\s+\{\s+select:\s+\{\s+name:\s+true\s+\}\s+\},\s*photo/)
   assert.doesNotMatch(data, /photoUrl:\s*true|workPhotos:\s*true|avatarUrl/, 'a base64 column in the profile query')
   // The model stays a leaf.
   assert.doesNotMatch(data, /from '\.\//)
@@ -320,11 +320,11 @@ test('§E the master profile lists real reviews through the offer, and never a p
   // through the offer, and no photo column is ever selected.
   assert.match(blocks, /if \(p\.reviews\.length === 0\) return null/)
   assert.match(blocks, /p\.reviews\.map\(r => \(/)
-  assert.match(blocks, /fmtDateTime\(r\.at, \{ day: 'numeric', month: 'long', year: 'numeric' \}, TBILISI\)\.local/)
+  assert.match(blocks, /fmtDateTime\(r\.at,\s+\{\s+day:\s+'numeric',\s+month:\s+'long',\s+year:\s+'numeric'\s+\},\s+TBILISI\)\.local/)
   assert.doesNotMatch(blocks, /toLocaleDateString|fmtKaDate/)
   // The hero: ★ beside the name only when count > 0.
   const hero = read('app/experts/[slug]/_providerHero.tsx')
-  assert.match(hero, /p\.reviewCount > 0 && p\.ratingAvg !== null && \(/)
+  assert.match(hero, /p\.reviewCount\s+>\s+0\s+&&\s+p\.ratingAvg\s+!==\s+null\s+&&\s+\(/)
   assert.match(hero, /p\.ratingAvg\.toFixed\(1\)/)
   assert.match(read('app/experts/[slug]/page.tsx'), /<ReviewsBlock p=\{p\} \/>/)
 })

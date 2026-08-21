@@ -139,13 +139,13 @@ test('the alternates are normalised, never trusted', () => {
   // A 2nd/3rd choice is client input like any other. It must not be able to
   // become an Invalid Date on the expert's screen, a time in the past they are
   // asked to accept, or an unbounded list.
-  assert.match(code, /proposedAlternates: z\.array\(z\.string\(\)\.datetime\(\)\)\.max\(2\)/)
+  assert.match(code, /proposedAlternates:\s+z\.array\(z\.string\(\)\.datetime\(\)\)\.max\(2\)/)
   assert.match(code, /if \(isNaN\(d\.getTime\(\)\)\) continue/)
-  assert.match(code, /if \(d\.getTime\(\) < Date\.now\(\) - CLOCK_SKEW_MS\) continue/)
+  assert.match(code, /if\s+\(d\.getTime\(\)\s+<\s+Date\.now\(\)\s+-\s+CLOCK_SKEW_MS\)\s+continue/)
   assert.match(code, /if \(alternates\.length === 2\) break/)
   // …and they only exist for a real request. Outside one there is no such thing
   // as an alternative time, so the array is never even built.
-  assert.match(code, /const alternates: string\[\] = \[\]\s*\n\s*if \(isRequest\) \{/)
+  assert.match(code, /const\s+alternates:\s+string\[\]\s+=\s+\[\]\s*\n\s*if\s+\(isRequest\)\s+\{/)
 })
 
 test('a proposal still cannot collide with a real session', () => {
