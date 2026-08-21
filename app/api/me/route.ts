@@ -21,6 +21,26 @@ export const dynamic = 'force-dynamic'
 // Applied to every response so no browser/proxy layer caches an identity.
 const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' }
 
+/**
+ * Has this person ever acted as a CLIENT — bought, saved or asked for anything?
+ *
+ * The question the space switcher needs, and it is deliberately generous: one
+ * favourite is enough. Somebody who has done any of the three has a room worth
+ * a door; somebody who has done none of them has an empty one, and a provider's
+ * menu should be about selling.
+ *
+ * It flips ON the moment they do any of it — nothing here is cached — so a
+ * provider who books their first consultation finds the door already there.
+ */
+async function hasClientActivity(userId: string): Promise<boolean> {
+  const [bought, saved, asked] = await Promise.all([
+    prisma.booking.count({ where: { studentId: userId }, take: 1 }),
+    prisma.favorite.count({ where: { userId }, take: 1 }),
+    prisma.serviceRequest.count({ where: { userId }, take: 1 }),
+  ])
+  return bought > 0 || saved > 0 || asked > 0
+}
+
 export async function GET() {
   // Maintenance sweep, kicked off ordinary traffic. This route is hit on nearly
   // every page load (AppShell reads the role from it), which makes it the
@@ -67,6 +87,16 @@ export async function GET() {
     // TutorProfile, WORK = a ServiceProfile plus active RequestAccess. The
     // /join door reads it to stop offering a half somebody already has.
     capabilities: await capabilitiesOf(user.id),
+    // ⚠️ WHETHER THE CLIENT ROOM HOLDS ANYTHING (2026-08-21). Owner: „ირევა
+    // ჩვეულებრივ იუზერსა და ეს უნდა გავმიჯნოთ სწორად." The user menu offered
+    // „ჩემი სივრცე" beside „სამუშაო სივრცე" to every provider — and measured
+    // that day, 27 OF 29 PROVIDERS HAD AN ENTIRELY EMPTY CLIENT ROOM: nothing
+    // bought, nothing saved, nothing asked for. A door into an empty room, next
+    // to their actual workspace, is what mixed the two identities.
+    //
+    // Three counts, one indexed read each, on a route that is already per-request
+    // and no-store. Cheaper than the alternative — a menu that guesses.
+    clientRoom: await hasClientActivity(user.id),
   }, { headers: NO_STORE })
 }
 

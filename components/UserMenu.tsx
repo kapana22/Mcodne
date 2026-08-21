@@ -182,7 +182,23 @@ export function UserMenu({
   if ((isDualRole || isMaster) && !inExpertSpace && !inProviderSpace) {
     switchItems.push({ href: '/work', label: SPACE_LABEL.EXPERT, icon: Icon.briefcase })
   }
-  if ((isDualRole || isMaster) && !inClientSpace) switchItems.push({ href: '/me', label: SPACE_LABEL.CLIENT, icon: Icon.home })
+  // ⚠️ ONLY WHEN THERE IS SOMETHING IN IT (2026-08-21). Owner: „ირევა
+  // ჩვეულებრივ იუზერსა და ეს უნდა გავმიჯნოთ სწორად." „ჩემი სივრცე" sat directly
+  // beneath „სამუშაო სივრცე" for every provider, and the two words read as one
+  // idea twice — both rooms are „mine", and nothing said which one held what.
+  //
+  // The separation is not a better label, it is a truer condition: measured that
+  // day, 27 OF 29 PROVIDERS HAD AN ENTIRELY EMPTY CLIENT ROOM — nothing bought,
+  // nothing saved, nothing asked for. The door was furniture. A provider's menu
+  // is about selling; the client room appears when they have actually been a
+  // client, and `clientRoom` flips the moment they do any of the three, so
+  // nobody is ever locked out of their own bookings or messages.
+  //
+  // Somebody ALREADY IN the client space keeps the way back regardless — that is
+  // the switcher doing its job, not an invitation.
+  if ((isDualRole || isMaster) && !inClientSpace && me?.clientRoom) {
+    switchItems.push({ href: '/me', label: SPACE_LABEL.CLIENT, icon: Icon.home })
+  }
   // ADMIN manages all three worlds — give the menu direct doors into both
   // spaces (user request 2026-08-01: „ადმინადაც და სტუდენტადაც… იკარგება").
   const adminSpaceItems: MenuItem[] = role === 'ADMIN'

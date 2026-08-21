@@ -51,6 +51,47 @@ word* · რეპეტიტორი · სტუდენტი (→ კლ�
 
 **Tbilisi only, for now** — `CITIES` in `lib/requestTopics`.
 
+### Who is who — two registrations, and they must not blur
+
+Owner, 2026-08-21: „ორი რეგისტრაცია მაგიტომ არსებობს, რომ ერთი არის ვინც სერვისს
+ამატებს, ერთი არის კლიენტი, უბრალო მომხმარებელი, და არ უნდა აირიოს. და მკაცრად
+უნდა იყოს გაწერილი ვინ ვინ არის."
+
+**A PROVIDER sells.** They registered through `/join`, they have a
+`TutorProfile` (CONSULT) or a `ServiceProfile` + an active `RequestAccess`
+(WORK), and `/work` is their room. One provider may hold both capabilities;
+that is one person with two offers, not two people.
+
+**A CLIENT buys.** They registered through `/signup`, they sell nothing, and
+`/me` is their room.
+
+**Ask `capabilitiesOf`, never `role`.** This is the part that actually blurs, and
+it blurs in the DATABASE rather than on a screen. Measured 2026-08-21:
+
+| who | `User.role` |
+| --- | --- |
+| 26 selling consultations | `TUTOR` |
+| **2 selling services** | **`STUDENT`** |
+| 30 plain buyers | `STUDENT` |
+
+`Role` has three values — `STUDENT`, `TUTOR`, `ADMIN` — and **no provider
+value**, so a tradesperson who sells services is stored under the same word as
+somebody who has only ever bought. `lib/hats` explains the history; the effect is
+that `role` cannot answer „who is this" for the supply side, and any guard that
+branches on it alone is wrong for exactly the people the requests subsystem was
+built for.
+
+Until a `PROVIDER` role exists, the reliable answers are
+`capabilitiesOf(userId)` (what they sell) and `hatsOf(userId)` (which rooms they
+may open). A menu, a guard or a label that reads `role === ROLE.CLIENT` and
+concludes „ordinary user" is making the mistake this section exists to name.
+
+**A provider's menu is about selling.** The client room is offered only when they
+have actually been a client — bought, saved or asked for something (`clientRoom`
+on `/api/me`). 27 of 29 providers had an entirely empty one, and a door into an
+empty room beside a real workspace is what mixed the two identities on screen.
+Pinned by `tests/spaceSeparation.test.ts`.
+
 **The copy is the owner's.** Don't author or reword site text. Much of it lives
 in the `SiteText` table and overrides `lib/siteTextDefs`, so no test can see it:
 change the default AND the row.

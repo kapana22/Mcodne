@@ -52,6 +52,10 @@ export type Me = {
   hats?: ('ADMIN' | 'EXPERT' | 'MASTER' | 'COMPANY' | 'CLIENT')[]
   /** What the person already offers — see lib/capabilities. */
   capabilities?: ('CONSULT' | 'WORK')[]
+  /** Has this person ever bought, saved or asked for anything — i.e. is there a
+   *  client room worth a door? A provider's menu should be about selling, and
+   *  27 of 29 providers had nothing at all on the client side (2026-08-21). */
+  clientRoom?: boolean
 } | null
 
 // The single in-flight probe. Null whenever no request is pending.
@@ -91,7 +95,7 @@ export function fetchMe(): Promise<Me> {
     .then(r => (r.ok ? r.json() : { user: null }))
     // `hats` rides beside `user` in the response rather than inside it — it is
     // derived, not a column — so it is folded in here.
-    .then(d => (d?.user ? { ...d.user, hats: d.hats ?? [], capabilities: d.capabilities ?? [] } : null) as Me)
+    .then(d => (d?.user ? { ...d.user, hats: d.hats ?? [], capabilities: d.capabilities ?? [], clientRoom: d.clientRoom ?? false } : null) as Me)
     .catch(() => null)
   inflight = p
   // Cache the resolved value so a later navigation renders it instantly while
