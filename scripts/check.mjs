@@ -16,14 +16,21 @@
  * Both are now pinned by tests. Pins only work if something checks them.
  *
  * WHAT IT RUNS, in ascending cost so the cheapest failure surfaces first:
- *   1. tsc --noEmit          (~20s)  — types across the whole tree
- *   2. tests/*.test.ts       (~30s)  — the 31 pure tests, each its own process
+ *   1. tsc --noEmit          (~9s)   — types across the whole tree
+ *   2. tests/*.test.ts       (~10s)  — the 98 pure tests, each its own process
  *   3. next build            (~60s)  — the thing Railway will run anyway
  *
- * WHAT IT DOES NOT RUN: the 37 .mjs files in tests/ are live-site Playwright
- * scripts and one-off measurement harnesses. They need a running deployment and
- * a browser, so they are a manual tool, not a gate — mixing them in would make
- * the gate fail for reasons that have nothing to do with the change.
+ * WHAT IT DOES NOT RUN: `tests/blogLinks.check.ts`, which reads the live DB to
+ * find posts linking at a draft or a redirect. It is `.check.ts` precisely so
+ * this glob misses it — it needs production data, so it is a manual tool.
+ *
+ * The 39 one-off .mjs harnesses that used to sit beside it were DELETED on
+ * 2026-08-21. Every one of them navigated a retired URL (`/tutors`, `/student`,
+ * `/apply`) and swallowed the failure with `.catch(() => {})`, so they reported
+ * success while measuring nothing — `ux-audit-sweep` waited for a selector,
+ * `a[href^="/tutors/"]`, that the catalogue stopped emitting in stage 10. They
+ * are in the history if a sweep is ever wanted again; what is NOT wanted is a
+ * green audit that looked at a redirect.
  *
  * Usage:
  *   npm run check          full gate, run this before `railway up`
@@ -74,18 +81,25 @@ console.log('\n\x1b[1m▸ tests\x1b[0m')
   // there is no runner, by design (they predate one and need no fixtures).
   const files = readdirSync(join(ROOT, 'tests')).filter(f => f.endsWith('.test.ts')).sort()
   const t = process.hrtime.bigint()
-  // ⚠️ SIX AT A TIME, NOT NINETY-ONE (2026-08-19). This was `Promise.all` over
-  // every file, and about a dozen of them open a Prisma client against the real
-  // Postgres. Ninety-one processes racing for connections exhausted the pool:
-  // the ones that lost hung on connect, the gate had no timeout, and it sat
-  // there for FOUR AND A HALF HOURS with „▸ tests" on screen and nothing else.
-  // The next run failed differently — the build's own prerender could not get a
-  // connection either, so `/privacy` failed to export and a green change looked
-  // like a broken one.
+  // ⚠️ SIX AT A TIME, NOT NINETY-EIGHT (2026-08-19). This was `Promise.all` over
+  // every file, and a handful of them reach the real Postgres. Ninety-one
+  // processes racing for connections exhausted the pool: the ones that lost
+  // hung on connect, the gate had no timeout, and it sat there for FOUR AND A
+  // HALF HOURS with „▸ tests" on screen and nothing else. The next run failed
+  // differently — the build's own prerender could not get a connection either,
+  // so `/privacy` failed to export and a green change looked like a broken one.
   //
-  // The cap is small deliberately. These tests are seconds each; the wall-clock
-  // cost of six lanes is a rounding error next to one bad afternoon, and a
-  // number the database can always serve is worth more than a faster gate.
+  // The cap is small deliberately. A number the database can always serve is
+  // worth more than a faster gate.
+  //
+  // ⚠️ AND SIX LANES WAS NEVER WHY THE GATE WAS SLOW (measured 2026-08-21).
+  // The tests stage took 110s and 96 of the 98 files accounted for under a
+  // second of it: `abroad` and `b2b` each cold-booted the schema, and
+  // lib/dbBoot was re-running all 166 idempotent statements every time —
+  // ~600ms per round trip against the Railway proxy, so 102 SECONDS per
+  // process. dbBoot now stamps the set with a hash of its own source and skips
+  // it in two round-trips, and this stage runs in 10s. If it ever creeps back
+  // up, time the files before touching this number — the lanes were innocent.
   const LANES = 6
   const results = []
   {

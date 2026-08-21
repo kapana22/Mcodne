@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { prisma } from './prisma'
 
 // Idempotent boot-time migration. Runs the schema deltas that `prisma db push`
@@ -1386,9 +1387,104 @@ async function runMigrations() {
   }
 }
 
+/* ── the stamp: why the second boot costs two round-trips, not 166 ─────────── */
+//
+// Every statement above is idempotent, so re-running the set is SAFE — it was
+// just never CHEAP. Measured 2026-08-21 against the Railway proxy: 166
+// statements × ~600ms = 102 SECONDS, paid in full by every cold process. In
+// production that is the first request after each deploy; in the test suite it
+// was the entire gate — `npm run check` spent 110s, of which 100s was two test
+// files (abroad, b2b) each booting the schema once, while the other 96 files
+// finished in under a second between them.
+//
+// So the set records that it ran. THE STAMP IS A HASH OF ITS OWN SOURCE, not a
+// version number somebody has to remember to raise: add a statement, change a
+// statement, delete one — the text of `runMigrations` changes, the hash changes
+// and the whole set runs again on the next boot. There is no bookkeeping step
+// to forget, which is the failure mode every hand-maintained migration counter
+// eventually has.
+//
+// The hash is taken over the TRANSPILED body, so esbuild has already dropped the
+// comments and normalised the spacing inside `runMigrations` — rewording the
+// prose above a statement does not cost a 102-second boot, while any real
+// statement survives into the text and moves the hash. Pinned by
+// tests/dbBootStamp.test.ts.
+//
+// ⚠️ IT ERRS TOWARDS RUNNING, NOT SKIPPING, and that is the whole point. The
+// emitted body also carries the names esbuild gave this module's imports, so an
+// edit ELSEWHERE in this file can shift it and re-run the set once (observed
+// 2026-08-21 when the test seams below were added: one 108-second boot, then a
+// fresh stamp and 10 seconds thereafter). A spurious re-run costs a minute of a
+// gate; a spurious SKIP would cost a missing column in production. If the two
+// ever have to trade, they trade this way round.
+//
+// ⚠️ WHAT THE STAMP DOES NOT PROMISE. It says „this exact DDL has been applied
+// to this database", not „the schema matches". Someone dropping a column by
+// hand is invisible to it — as it is to any migration system that trusts its
+// own ledger. Everything here is additive, so the repair is the same as it ever
+// was: `DELETE FROM "_DbBootStamp"` and restart, and all 166 run again.
+const STAMP_TABLE = '_DbBootStamp'
+
+/** sha256 of the migration body — changes exactly when the DDL changes. */
+function migrationsFingerprint(): string {
+  return createHash('sha256').update(runMigrations.toString()).digest('hex').slice(0, 32)
+}
+
+/** Test seams. The stamp's whole safety rests on the fingerprint tracking the
+ *  DDL, so tests/dbBootStamp.test.ts checks that rather than trusting the
+ *  comment above — exported here because neither is otherwise reachable. */
+export const __migrationsFingerprint = migrationsFingerprint
+export const __runMigrationsSource = () => runMigrations.toString()
+
+async function alreadyApplied(fp: string): Promise<boolean> {
+  // One statement to be sure the ledger exists, one to read it. Both are cheap
+  // and both must survive a database that has never seen this app before.
+  //
+  // ⚠️ `CREATE TABLE IF NOT EXISTS` IS NOT RACE-FREE. Two processes issuing it
+  // at the same instant can both pass the existence check and one then fails on
+  // a duplicate pg_type row — Postgres documents this, and the test gate
+  // reproduces it: six lanes, and `abroad` and `b2b` both boot the schema. The
+  // loser's throw would propagate as „not applied" and cost that process a full
+  // 102-second run of DDL it did not need. A concurrent create means the table
+  // is there, which is all this line wanted.
+  try {
+    await prisma.$executeRawUnsafe(
+      `CREATE TABLE IF NOT EXISTS "${STAMP_TABLE}" ("id" INTEGER PRIMARY KEY, "fingerprint" TEXT NOT NULL, "appliedAt" TIMESTAMPTZ NOT NULL DEFAULT now());`,
+    )
+  } catch { /* another process created it in the same instant */ }
+  // The SELECT is NOT wrapped: an unreachable database must reach ensureDbReady
+  // as a throw, not be mistaken for „nothing applied yet".
+  const rows = await prisma.$queryRawUnsafe<{ fingerprint: string }[]>(
+    `SELECT "fingerprint" FROM "${STAMP_TABLE}" WHERE "id" = 1;`,
+  )
+  return rows.length > 0 && rows[0].fingerprint === fp
+}
+
+async function recordApplied(fp: string): Promise<void> {
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "${STAMP_TABLE}" ("id", "fingerprint") VALUES (1, '${fp}')
+     ON CONFLICT ("id") DO UPDATE SET "fingerprint" = EXCLUDED."fingerprint", "appliedAt" = now();`,
+  )
+}
+
+/**
+ * The migration set, run at most once per database per version of the DDL.
+ *
+ * A stamp read that FAILS is not a reason to skip the migrations — it is a
+ * reason to run them: an unreachable database throws here and is handled by
+ * ensureDbReady exactly as before, and a ledger that cannot be read is treated
+ * as „not applied", which costs one slow boot and never a wrong schema.
+ */
+async function runMigrationsOnce(): Promise<void> {
+  const fp = migrationsFingerprint()
+  if (await alreadyApplied(fp)) return
+  await runMigrations()
+  await recordApplied(fp)
+}
+
 export function ensureDbReady(): Promise<void> {
   if (!bootPromise) {
-    bootPromise = runMigrations().catch(err => {
+    bootPromise = runMigrationsOnce().catch(err => {
       // Transient failures (DB unreachable at cold boot) shouldn't permanently
       // block requests — reset so the NEXT call retries a clean boot…
       console.error('[dbBoot] migration error:', err)
