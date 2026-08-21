@@ -13,7 +13,7 @@ import { ROLE } from '@/lib/roles'
 // list route would have meant fetching detail nobody draws.
 
 export async function GET(req: Request) {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
 
   const tutor = await prisma.tutorProfile.findUnique({

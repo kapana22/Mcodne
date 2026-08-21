@@ -8,10 +8,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Two roles and an admin. USER buys, PROVIDER sells, and a consultation is a
+/// KIND of service — so whoever sells one is a PROVIDER too, which is why there
+/// is no „consultant" here (2026-08-21).
+///
+/// STUDENT and TUTOR are the words the column used to hold and are kept ONLY
+/// until the backfill has run — lib/roles → `asRole` maps them on read so the
+/// deploy and the data move stay independent. Delete them once
+/// `SELECT DISTINCT role FROM "User"` shows three values.
 enum Role {
+  USER
+  PROVIDER
+  ADMIN
   STUDENT
   TUTOR
-  ADMIN
 }
 
 enum ApplicationStatus {
@@ -103,7 +113,7 @@ model User {
   phone         String?
   avatarUrl     String?
   bio           String?
-  role          Role     @default(STUDENT)
+  role          Role     @default(USER)
   locale        String   @default("ka")
   emailVerified Boolean  @default(false)
   // Per-type opt-outs for in-app Notification writes. Keyed by NotifType string

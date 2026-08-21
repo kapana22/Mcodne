@@ -35,6 +35,35 @@ import { Btn } from '@/components/Btn'
 import { CITIES } from '@/lib/requestTopics'
 import { ServiceRail } from './rail'
 
+/**
+ * THE TWO LIGHTS' OWN GRADIENTS — hero-only, and not `.glow-brand`.
+ *
+ * ⚠️ WHY NOT THE SHARED TOKEN. `.glow-brand` peaks at 0.13 alpha and
+ * `.glow-brand-soft` at 0.15, with a LINEAR `closest-side` falloff. Measured
+ * A/B in Chrome at 1440: re-centring those two over the band moved the mean
+ * pixel by 5.4 and the peak by 21 — i.e. the owner looked at the result and
+ * correctly said the background was unchanged („ფონი იგივეა"). 0.13 stretched
+ * across an 890px circle on a near-white ground is not a light, it is a rumour
+ * of one. The token stays exactly as it is: app/NotFoundClient and app/error
+ * use it behind a short message, where that weight is right.
+ *
+ * ⚠️ WHAT CHANGED IS THE CURVE, NOT JUST THE NUMBER. Three explicit stops give
+ * a DENSE core that still reaches zero well inside the rim, so the band gets a
+ * light with a middle instead of a uniform tint. Same two palette hues —
+ * brand-500 (47,156,134) and brand-300 (127,199,180) — so no new colour enters
+ * the page; only its concentration changed.
+ */
+const LIGHT_A =
+  'radial-gradient(circle at center,' +
+  ' rgba(47,156,134,0.30) 0%,' +
+  ' rgba(47,156,134,0.13) 42%,' +
+  ' rgba(47,156,134,0) 72%)'
+const LIGHT_B =
+  'radial-gradient(circle at center,' +
+  ' rgba(127,199,180,0.32) 0%,' +
+  ' rgba(127,199,180,0.14) 44%,' +
+  ' rgba(127,199,180,0) 74%)'
+
 /** Where we actually work, read off the taxonomy rather than typed here — the
  *  day a second city opens, the badge says so without an edit. */
 const WHERE = CITIES.map(c => c.label).join(' · ')
@@ -76,10 +105,16 @@ export const HomeHero = () => {
           numbers below, and they are why the light now reads as light. */}
       <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
         <div className="absolute left-[22%] top-[100px] -translate-x-1/2 -translate-y-1/2">
-          <span className="glow-brand aurora-a block h-[560px] w-[560px] rounded-full sm:h-[760px] sm:w-[760px] lg:h-[880px] lg:w-[880px]" />
+          <span
+            style={{ backgroundImage: LIGHT_A }}
+            className="aurora-a block h-[560px] w-[560px] rounded-full sm:h-[760px] sm:w-[760px] lg:h-[880px] lg:w-[880px]"
+          />
         </div>
         <div className="absolute left-[81%] top-[40px] -translate-x-1/2 -translate-y-1/2">
-          <span className="glow-brand-soft aurora-b block h-[500px] w-[500px] rounded-full sm:h-[680px] sm:w-[680px] lg:h-[780px] lg:w-[780px]" />
+          <span
+            style={{ backgroundImage: LIGHT_B }}
+            className="aurora-b block h-[500px] w-[500px] rounded-full sm:h-[680px] sm:w-[680px] lg:h-[780px] lg:w-[780px]"
+          />
         </div>
       </div>
 

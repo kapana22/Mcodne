@@ -131,7 +131,7 @@ test('§E the page: guest → pitch, admin → /admin, and the WORK half is gate
   assert.ok(!(PROVIDER_PATH_PREFIXES as readonly string[]).some(p => p.startsWith('/apply') || p.startsWith('/join')))
   // Both halves are offered only when still missing — reads capabilitiesOf.
   assert.match(page, /const have = await capabilitiesOf\(user\.id\)/)
-  assert.match(page, /if\s+\(user\.role\s+!==\s+ROLE\.EXPERT\s+&&\s+!have\.includes\('CONSULT'\)\)\s+offer\.push\('CONSULT'\)/)
+  assert.match(page, /if\s+\(user\.role\s+!==\s+ROLE\.PROVIDER\s+&&\s+!have\.includes\('CONSULT'\)\)\s+offer\.push\('CONSULT'\)/)
   // The provider workspace is never named by a LITERAL — that is the half of
   // this rule that protects something: a hardcoded '/provider' survives the
   // route moving and 404s somebody who just finished applying.
@@ -315,14 +315,14 @@ test('§K the invitation is for people who offer nothing; a provider gets the sw
   // approved master keeps role CLIENT — so a provider was invited to become
   // one, in the wrong words, right next to the switch that says the right ones.
   assert.equal(showJoinInvite(null, []), true, 'a guest is the audience for the invitation')
-  assert.equal(showJoinInvite('STUDENT', []), true, 'a plain client too')
-  assert.equal(showJoinInvite('STUDENT', ['WORK']), false, 'a master must not be told to become an expert')
-  assert.equal(showJoinInvite('TUTOR', ['CONSULT']), false)
-  assert.equal(showJoinInvite('STUDENT', ['CONSULT', 'WORK']), false)
+  assert.equal(showJoinInvite('USER', []), true, 'a plain client too')
+  assert.equal(showJoinInvite('USER', ['WORK']), false, 'a master must not be told to become an expert')
+  assert.equal(showJoinInvite('PROVIDER', ['CONSULT']), false)
+  assert.equal(showJoinInvite('USER', ['CONSULT', 'WORK']), false)
   assert.equal(showJoinInvite('ADMIN', []), false, 'an admin is nobody’s applicant')
   // The two answers never overlap: nobody may see the invitation AND the switch.
   for (const caps of [[], ['CONSULT'], ['WORK'], ['CONSULT', 'WORK']] as const) {
-    const invite = showJoinInvite('STUDENT', caps as any)
+    const invite = showJoinInvite('USER', caps as any)
     const swtch = missingCapability(caps as any) !== null
     assert.ok(!(invite && swtch), `both doors shown at once for ${JSON.stringify(caps)}`)
   }

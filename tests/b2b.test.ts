@@ -100,7 +100,7 @@ test('the gate answers correctly at ALL THREE stages, not just this one', () => 
   //
   // The shape is the point: nobody but an admin gets in before 'public', and an
   // anonymous visitor never gets in before it either.
-  const VIEWERS = ['ADMIN', 'TUTOR', 'STUDENT', null, undefined, ''] as const
+  const VIEWERS = ['ADMIN', 'PROVIDER', 'USER', null, undefined, ''] as const
   const EXPECTED: Record<B2BVisibility, boolean[]> = {
     //          ADMIN  TUTOR  STUDENT  null   undef  ''
     off:    [   false, false, false,   false, false, false],

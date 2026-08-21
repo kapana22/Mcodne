@@ -103,7 +103,7 @@ export async function GET(req: Request) {
           // OAuth accounts have no usable password — store a random unusable hash
           // (schema requires the column). They sign in only via Google.
           passwordHash: await hashPassword(crypto.randomBytes(24).toString('hex')),
-          role: ROLE.CLIENT,
+          role: ROLE.USER,
           emailVerified: true, // Google-verified email → skip our OTP step.
         },
       })

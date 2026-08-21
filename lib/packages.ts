@@ -289,7 +289,7 @@ export function extendedExpiry(
   opts: { cancelledBy?: string | null; noShowBy?: string | null; lessonMinutes: number },
 ): Date | null {
   if (!currentExpiry) return currentExpiry ?? null
-  const expertAtFault = opts.cancelledBy === 'TUTOR' || opts.noShowBy === 'TUTOR'
+  const expertAtFault = opts.cancelledBy === 'PROVIDER' || opts.noShowBy === 'PROVIDER'
   if (!expertAtFault) return currentExpiry
   // Give back a whole day per lost lesson rather than the lesson's own length:
   // the client has to find a new slot in someone else's calendar, and 50

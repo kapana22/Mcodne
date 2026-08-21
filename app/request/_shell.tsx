@@ -190,8 +190,13 @@ export function RequestShell({
               fixed is not choosing an expert. The half that IS true — and is
               the only promise on this page worth making — is what happens to
               the phone number, so that is what it now says. */}
+          {/* ⚠️ REWRITTEN 2026-08-21, same day and same reason as the hint in
+              _stepContact: „ნომერს მხოლოდ იმას ვაძლევთ, ვისაც შენ აირჩევ" was
+              a promise the code stopped keeping when the number stopped being
+              handed to anybody at all. One sentence, in both places, saying the
+              same true thing. */}
           <p className="text-meta text-ink-500">
-            ნომერს მხოლოდ იმას ვაძლევთ, ვისაც შენ აირჩევ.
+            ნომერს არავის ვაძლევთ — მიმოწერა პლატფორმაზეა.
           </p>
         </Container>
       </footer>

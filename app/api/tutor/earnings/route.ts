@@ -47,7 +47,7 @@ const PAYOUT_KA: Record<string, string> = PAYMENTS_LIVE
   : { PENDING: 'მოლოდინში', RELEASED: 'დასრულდა', REFUNDED: 'ანულირდა' }
 
 export async function GET(req: Request) {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const wantsCsv = new URL(req.url).searchParams.get('format') === 'csv'

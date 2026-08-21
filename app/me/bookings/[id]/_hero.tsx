@@ -256,9 +256,9 @@ export const Hero = ({ booking, onEnterRoom, onCopyRef }: { booking: Booking; on
                        day for is worse than being told nothing. STUDENT is now
                        named explicitly and the unknown case says what is
                        actually known: it was cancelled, not by whom. */
-                    : booking.cancelledBy === 'TUTOR' ? 'ექსპერტმა გააუქმა ჯავშანი.'
+                    : booking.cancelledBy === 'PROVIDER' ? 'ექსპერტმა გააუქმა ჯავშანი.'
                     : booking.cancelledBy === 'ADMIN' ? 'ადმინმა გააუქმა ჯავშანი.'
-                    : booking.cancelledBy === 'STUDENT' ? 'შენ გააუქმე ჯავშანი.'
+                    : booking.cancelledBy === 'USER' ? 'შენ გააუქმე ჯავშანი.'
                     : 'ჯავშანი ავტომატურად გაუქმდა.'}
                   {/* The reason, when the row carries one. All three exits write
                       it and none of them was showing it here — a cancellation

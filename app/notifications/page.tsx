@@ -15,7 +15,7 @@ import { UserMenu } from '@/components/UserMenu'
 import { homeForRole } from '@/lib/roleHome'
 import { ROLE } from '@/lib/roles'
 
-type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
+type Role = 'USER' | 'PROVIDER' | 'ADMIN'
 
 type Item = {
   id: string
@@ -202,7 +202,7 @@ export default function NotificationsPage() {
             <Logo size="sm" href="/" />
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {me?.role === ROLE.CLIENT && (
+            {me?.role === ROLE.USER && (
             <Link
               href="/me/favorites"
               aria-label="შენახული ექსპერტები"

@@ -19,7 +19,7 @@ export const DEFAULT_PREFS: PrefsMap = {
    EXPERT replies to their review (see app/api/reviews/[bookingId] vs
    app/api/reviews). Keys never change; only the wording does. */
 export const prefRows = (role: Me['role'] | null | undefined): Array<{ key: PrefKey; label: string; hint: string }> => {
-  const expert = role === ROLE.EXPERT || role === 'ADMIN'
+  const expert = role === ROLE.PROVIDER || role === 'ADMIN'
   return [
     { key: 'BOOKING_CREATED',    label: 'ჯავშნის ცვლილება',      hint: 'ახალი, გაუქმებული, დადასტურებული' },
     { key: 'MESSAGE_NEW',        label: 'ახალი შეტყობინება',     hint: 'ახალი ტექსტი მიმოწერაში' },
@@ -37,7 +37,7 @@ export type Me = {
   id: string
   email: string
   fullName: string
-  role: 'STUDENT' | 'TUTOR' | 'ADMIN'
+  role: 'USER' | 'PROVIDER' | 'ADMIN'
   avatarUrl?: string | null
   bio?: string | null
   phone?: string | null

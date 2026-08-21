@@ -26,7 +26,7 @@ const Body = z.object({
 const WINDOW_LOOKAROUND_MS = 7 * 24 * 60 * 60 * 1000
 
 type ReschedulePayload = {
-  proposedBy: 'STUDENT' | 'TUTOR'
+  proposedBy: 'USER' | 'PROVIDER'
   newStartAt: string
   reason: string | null
   proposedAt: string
@@ -67,7 +67,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const isStudent = booking.studentId === user.id
-  const responderRole: 'STUDENT' | 'TUTOR' = isStudent ? 'STUDENT' : 'TUTOR'
+  const responderRole: 'USER' | 'PROVIDER' = isStudent ? 'USER' : 'PROVIDER'
   if (pending.proposedBy === responderRole) {
     // The proposer cannot self-approve — only the other side responds.
     return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
@@ -193,10 +193,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       }
       throw e
     }
-    const otherPartyUserId = pending.proposedBy === 'STUDENT'
+    const otherPartyUserId = pending.proposedBy === 'USER'
       ? booking.studentId
       : booking.tutor.userId
-    const proposerHref = pending.proposedBy === 'STUDENT'
+    const proposerHref = pending.proposedBy === 'USER'
       ? `/me/bookings/${booking.id}`
       : `/work/bookings/${booking.id}`
     await notify(otherPartyUserId, {
@@ -217,7 +217,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         ])
         if (proposer?.email && normalizePrefs(proposer.notificationPrefs).BOOKING_CREATED) {
           const { subject, html } = bookingChangedEmail('reschedule_accepted', {
-            counterpartName: responder?.fullName || (pending.proposedBy === 'STUDENT' ? 'ექსპერტი' : 'კლიენტი'),
+            counterpartName: responder?.fullName || (pending.proposedBy === 'USER' ? 'ექსპერტი' : 'კლიენტი'),
             topic: booking.topic,
             whenText: fmtWhenTz(booking.startAt, { year: true }),
             newWhenText: fmtWhenTz(newStart, { year: true }),
@@ -262,13 +262,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // Reflect the real resulting status: an already-CONFIRMED booking stays
   // CONFIRMED; a still-PREPARING one takes the restored (prev) status.
   const resultingStatus = booking.status === 'CONFIRMED' ? 'CONFIRMED' : restoredStatus
-  const otherPartyUserId = pending.proposedBy === 'STUDENT'
+  const otherPartyUserId = pending.proposedBy === 'USER'
     ? booking.studentId
     : booking.tutor.userId
   // RESCHEDULE_REQUEST, not BOOKING_CANCELED — the booking is alive at its
   // original time, and the canceled type renders as a red „გაუქმება" chip,
   // which read as „the session was killed". Same pref group either way.
-  const proposerHrefRej = pending.proposedBy === 'STUDENT'
+  const proposerHrefRej = pending.proposedBy === 'USER'
     ? `/me/bookings/${booking.id}`
     : `/work/bookings/${booking.id}`
   await notify(otherPartyUserId, {
@@ -289,7 +289,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ])
       if (proposer?.email && normalizePrefs(proposer.notificationPrefs).BOOKING_CREATED) {
         const { subject, html } = bookingChangedEmail('reschedule_rejected', {
-          counterpartName: responder?.fullName || (pending.proposedBy === 'STUDENT' ? 'ექსპერტი' : 'კლიენტი'),
+          counterpartName: responder?.fullName || (pending.proposedBy === 'USER' ? 'ექსპერტი' : 'კლიენტი'),
           topic: booking.topic,
           whenText: fmtWhenTz(booking.startAt, { year: true }),
           note: 'სესია ძველ დროზე რჩება ძალაში.',

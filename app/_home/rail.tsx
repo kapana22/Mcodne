@@ -51,7 +51,17 @@ export function ServiceRail() {
   const track = [...chips, ...chips]
 
   return (
-    <div className="relative mt-8 sm:mt-9 overflow-hidden border-t border-ink-200/60 py-4 group">
+    /* ⚠️ `motion-reduce:overflow-x-auto` — A REDUCED-MOTION READER MUST STILL
+       REACH EVERY CHIP. `.marquee-track` lives entirely inside globals.css's
+       `prefers-reduced-motion: no-preference` block, so for that reader the
+       ANIMATION is not the only thing that disappears: `display:flex` and
+       `width:max-content` go with it. Measured at 390px — the eight chips
+       stopped being a rail and wrapped into five ragged rows. The layout is
+       restored below (`flex w-max` on the track, unconditionally); this turns
+       the seamless clip into a scrollable one for the same reader, because a
+       static `overflow-hidden` row would simply cut the last chips off with no
+       way to get at them. */
+    <div className="relative mt-8 sm:mt-9 overflow-hidden motion-reduce:overflow-x-auto border-t border-ink-200/60 py-4 group">
       {/* The edges fade into the hero's own ground rather than cutting the
           chips off at a hard line — the seam is the one thing that gives a
           rail away. */}
@@ -64,7 +74,10 @@ export function ServiceRail() {
         className="absolute inset-y-0 right-0 z-10 w-16 pointer-events-none bg-gradient-to-l from-ink-75 to-transparent sm:w-24"
       />
 
-      <div className="marquee-track gap-2.5 group-hover:[animation-play-state:paused]">
+      {/* `flex w-max` is NOT a duplicate of `.marquee-track` — it is the half of
+          it that must survive `prefers-reduced-motion: reduce`. The class keeps
+          owning the animation; these two own the shape. */}
+      <div className="marquee-track flex w-max gap-2.5 group-hover:[animation-play-state:paused]">
         {track.map((t, i) => (
           /* → the CATALOGUE's own search, not the intake. A chip is a browse
              gesture („show me who does this"), and /experts?q= is the one

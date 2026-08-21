@@ -102,7 +102,7 @@ async function runMigrations() {
   // Booking — snapshot column + reschedule proposal blob.
   // `rescheduleRequest` holds the pending "party X proposes new time" state
   // until the other side accepts or rejects it. Shape:
-  //   { proposedBy: 'STUDENT'|'TUTOR', newStartAt: ISO string, reason?: string, proposedAt: ISO string }
+  //   { proposedBy: 'USER' | 'PROVIDER', newStartAt: ISO string, reason?: string, proposedAt: ISO string }
   await prisma.$executeRawUnsafe(`
     ALTER TABLE "Booking"
       ADD COLUMN IF NOT EXISTS "serviceType" "ServiceType" NOT NULL DEFAULT 'CONSULTATION',
@@ -1365,6 +1365,79 @@ async function runMigrations() {
   // Also declared in prisma/schema.prisma (@@index(..., type: Gin)), so no
   // `prisma db push` is required either way — whichever runs first wins and
   // the other is a no-op.
+  // ── two roles, not three, and neither of them is „student" (2026-08-21) ────
+  //
+  // Owner: „კონსულტანტი საერთოდ უნდა ამოვიღოთ. ორი უნდა დავტოვოთ — ჩვეულებრივი
+  // მყიდველი და სერვისის გამყიდველი. და სტუდენტი არ უნდა იყოს მყიდველი,
+  // მომხმარებელია ეს."
+  //
+  // WHY IT MATTERED. `Role` was STUDENT / TUTOR / ADMIN, with no provider value,
+  // so somebody selling SERVICES had to be stored as STUDENT — the same word as
+  // somebody who has only ever bought. Measured that day: 26 sellers were TUTOR,
+  // 2 sellers were STUDENT, and 30 plain buyers were STUDENT too. The column
+  // could not answer „who is this", which is exactly what a role is for.
+  //
+  // A consultation is a KIND of service, so its seller is a PROVIDER as well —
+  // there is no third identity to keep.
+  //
+  // ⚠️ ADDITIVE, AND IN THIS ORDER ON PURPOSE. `ADD VALUE` is idempotent and
+  // leaves every existing row untouched, so the build that is live right now
+  // keeps writing STUDENT/TUTOR and keeps working. The rows move only once the
+  // code that understands both is deployed — lib/roles normalises the legacy
+  // words on read, so there is no window in which anybody is locked out.
+  //
+  // `ALTER TYPE … ADD VALUE` cannot run inside a transaction block on PG < 12,
+  // so each is its own statement and guarded in JS, exactly like
+  // ApplicationStatus.NEEDS_REVISION at the top of this file.
+  for (const value of ['USER', 'PROVIDER']) {
+    try {
+      await prisma.$executeRawUnsafe(`ALTER TYPE "Role" ADD VALUE IF NOT EXISTS '${value}';`)
+    } catch (err) {
+      console.error(`[dbBoot] Role ${value} add failed:`, err)
+    }
+  }
+
+  // ── and now move the rows onto the new words ───────────────────────────────
+  //
+  // Runs after the ADD VALUE above, and safely at any time: lib/roles → `asRole`
+  // maps STUDENT/TUTOR on read, so the code that is live understands both
+  // vocabularies and nobody is locked out of their own account in between.
+  //
+  // ⚠️ A SELLER IS DECIDED BY WHAT THEY SELL, NOT BY THEIR OLD WORD. Both a
+  // TutorProfile (a consultation) and a ServiceProfile (a job) make somebody a
+  // PROVIDER, because a consultation is a KIND of service. That is why the first
+  // statement is not simply „TUTOR → PROVIDER": on 2026-08-21 two people were
+  // selling services while stored as STUDENT, and a plain rename would have left
+  // them filed with the buyers for ever.
+  //
+  // ADMIN is never touched. Idempotent — the WHERE clauses match only the legacy
+  // words, so every later boot changes nothing.
+  await prisma.$executeRawUnsafe(`
+    UPDATE "User" SET "role" = 'PROVIDER'
+    WHERE "role" IN ('STUDENT', 'TUTOR')
+      AND (
+        EXISTS (SELECT 1 FROM "TutorProfile" t WHERE t."userId" = "User"."id")
+        OR EXISTS (SELECT 1 FROM "ServiceProfile" s WHERE s."userId" = "User"."id")
+      );
+  `)
+  await prisma.$executeRawUnsafe(`
+    UPDATE "User" SET "role" = 'USER' WHERE "role" = 'STUDENT';
+  `)
+  // Whatever still says TUTOR after that holds the SELLER role without a profile
+  // to show for it — a granted role and an unfinished registration, which is a
+  // provider mid-setup and not a buyer. Demoting them to USER would take away a
+  // room somebody was deliberately given; the profile is what they still owe.
+  await prisma.$executeRawUnsafe(`
+    UPDATE "User" SET "role" = 'PROVIDER' WHERE "role" = 'TUTOR';
+  `)
+  // The other column that holds a Role: who cancelled a booking.
+  await prisma.$executeRawUnsafe(`
+    UPDATE "Booking" SET "cancelledBy" = 'USER' WHERE "cancelledBy" = 'STUDENT';
+  `)
+  await prisma.$executeRawUnsafe(`
+    UPDATE "Booking" SET "cancelledBy" = 'PROVIDER' WHERE "cancelledBy" = 'TUTOR';
+  `)
+
   // ── the two foreign keys Postgres was never asked to index (2026-08-21) ────
   // A FK gets no index for free. Both of these are ON DELETE SET NULL, so every
   // account deletion had to seq-scan the child table to find the rows to null —

@@ -56,15 +56,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   // Record cancellation source so tutor no-show / student flake rates can be
   // tracked in admin analytics.
-  const cancelledBy: 'STUDENT' | 'TUTOR' | 'ADMIN' =
+  const cancelledBy: 'USER' | 'PROVIDER' | 'ADMIN' =
     user.role === 'ADMIN' ? 'ADMIN'
-    : booking.studentId === user.id ? 'STUDENT'
-    : 'TUTOR'
+    : booking.studentId === user.id ? 'USER'
+    : 'PROVIDER'
 
   // A tutor- or admin-initiated cancel is NOT the client's fault → the client is
   // refunded in full regardless of how close to start time it is. Only a
   // student's own cancel is bound by the time-based cutoff.
-  const refundClient = cancelledBy !== 'STUDENT' || fullRefund
+  const refundClient = cancelledBy !== 'USER' || fullRefund
 
   try {
     await prisma.$transaction(async tx => {
@@ -136,12 +136,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       href: `/work/bookings/${booking.id}`,
     })
   } else {
-    const otherPartyId = cancelledBy === 'STUDENT' ? booking.tutor.userId : booking.studentId
+    const otherPartyId = cancelledBy === 'USER' ? booking.tutor.userId : booking.studentId
     await notify(otherPartyId, {
       type: 'BOOKING_CANCELED',
       title: 'ჯავშანი გაუქმდა',
       body: cancelBody,
-      href: cancelledBy === 'STUDENT'
+      href: cancelledBy === 'USER'
         ? `/work/bookings/${booking.id}`
         : `/me/bookings/${booking.id}`,
     })
@@ -162,12 +162,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       const whenText = fmtWhenTz(booking.startAt, { year: true })
       const actorLabel =
         cancelledBy === 'ADMIN' ? 'ადმინისტრატორმა'
-        : cancelledBy === 'STUDENT' ? 'კლიენტმა'
+        : cancelledBy === 'USER' ? 'კლიენტმა'
         : 'ექსპერტმა'
       // Same pref gate as the in-app notify(): BOOKING_CANCELED lives in the
       // BOOKING_CREATED group (lib/notify prefKeyForType).
-      const mailStudent = cancelledBy !== 'STUDENT'
-      const mailTutor = cancelledBy !== 'TUTOR'
+      const mailStudent = cancelledBy !== 'USER'
+      const mailTutor = cancelledBy !== 'PROVIDER'
       if (mailStudent && student?.email && normalizePrefs(student.notificationPrefs).BOOKING_CREATED) {
         const { subject, html } = bookingChangedEmail('canceled', {
           counterpartName: tutorUser?.fullName || 'ექსპერტი',

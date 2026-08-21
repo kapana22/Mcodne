@@ -3,14 +3,16 @@
 //
 // REACHED BY REFERENCE, and the reference is the key. It is minted from crypto
 // randomness (lib/requests → makePublicRef) rather than being a sequence,
-// because it is the only thing between a stranger and this page — and once an
-// offer is accepted this page carries a phone number.
+// because it is the only thing between a stranger and this page — which carries
+// what the client wrote (a description, a budget, a city) and every
+// conversation they are having about it.
 //
-// ⚠️ THE CONTACT RULE LIVES IN lib/requests → clientOfferView, not here. This
-// page renders whatever that function returns and cannot widen it: the
-// provider's phone and email are null on every offer except the accepted one.
-// A page that picked its own columns would be a second place the rule is
-// stated, and the second place is where it stops matching.
+// ⚠️ NO PHONE NUMBER ON THIS PAGE ANY MORE (2026-08-21). The accepted offer
+// used to print the provider's phone and email. Owner: „მოდი ამ ეტაპზე იყოს
+// მიწერა და ჩათში გარკვნენ, ნომერიც თუ საჭიროა იქ გაცვალონ." The rule still
+// lives in lib/requests → clientOfferView, not here: this page renders whatever
+// that function returns and cannot widen it, and the columns are no longer
+// fetched at all.
 
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
@@ -45,8 +47,8 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
   const viewer = await requestsViewer()
   if (!viewer.clientAllowed) notFound()
 
-  // ⚠️ THE REFERENCE IS THE ONLY CREDENTIAL ON THIS PAGE, and after an offer is
-  // accepted the page carries a phone number — so wrong guesses are counted and
+  // ⚠️ THE REFERENCE IS THE ONLY CREDENTIAL ON THIS PAGE, and the page carries
+  // what somebody wrote about their home and their money — so wrong guesses are counted and
   // an address that has spent its budget gets the same 404 as an empty code
   // (lib/refGuard). A client holding a real reference never spends any of it.
   const req = { headers: await headers() }
@@ -93,7 +95,11 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
           _count: { select: { messages: { where: { fromClient: false, readByClientAt: null } } } },
           expertUser: {
             select: {
-              fullName: true, phone: true, email: true,
+              // NAME + the public profile facts. `phone`/`email` left this
+              // select on 2026-08-21 with the block that printed them — the
+              // client reaches their provider in the thread, and a column that
+              // is never fetched cannot be rendered by a later edit.
+              fullName: true,
               // The PUBLIC profile facts for the offer card — slug, verified,
               // rating. Public by definition (/experts/[slug] shows them to
               // anyone), so this widens nothing the seal protects.
@@ -107,11 +113,9 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
   })
   if (!request) { noteRefMiss(req); notFound() }
 
-  // Shaped through the ONE function that decides who sees whose contact. Note
-  // that the company branch has no phone or email at all — a Company row holds
-  // neither, and the contact for a company request is arranged on the call the
-  // admin makes. Passing nulls is honest; inventing a member's number here
-  // would hand out a person's details they never offered.
+  // Shaped through the ONE function that decides what a client may read about
+  // an offer. Since 2026-08-21 that no longer includes a phone or an email from
+  // either side — the conversation is the channel (lib/requests).
   const unreadByOffer = new Map(request.offers.map(o => [o.id, o._count.messages]))
   // The lifecycle state beside each shaped offer — clientOfferView owns the
   // CONTACT rule and is not widened; these three columns hide nothing.
@@ -153,7 +157,7 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
       ...o,
       provider: o.expertUser
         ? {
-            name: o.expertUser.fullName, phone: o.expertUser.phone, email: o.expertUser.email,
+            name: o.expertUser.fullName,
             profile: o.expertUser.tutor
               ? {
                   slug: o.expertUser.tutor.slug,
@@ -163,7 +167,7 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
                 }
               : null,
           }
-        : { name: o.company?.name ?? '—', phone: null, email: null, profile: null },
+        : { name: o.company?.name ?? '—', profile: null },
     }),
   )
 

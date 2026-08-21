@@ -162,7 +162,7 @@ function Catalog({ initialTutors, initialMasters, tradeCounts, initialUser, requ
   // SSR doesn't flash the wrong control for a known role.
   const viewerRoleForBook = (me ?? initialUser)?.role
   const viewerCantBook = viewerRoleForBook === 'ADMIN'
-  const viewerCantFav = !!(viewerRoleForBook && viewerRoleForBook !== ROLE.CLIENT)
+  const viewerCantFav = !!(viewerRoleForBook && viewerRoleForBook !== ROLE.USER)
   // Feedback that reaches the user wherever they are on the page — see the note
   // in toggleFav for why the old scroll-to-top + top-of-page banner were not
   // feedback at all.

@@ -233,7 +233,7 @@ const flags = read('lib/flags.ts')
     const src = read(p)
     check(
       `G: ${p.replace('app/api/tutor/', '')} is TUTOR/ADMIN-guarded and feature-gated`,
-      src.includes("requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])") && src.includes('packagesFeatureExists'),
+      src.includes("requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])") && src.includes('packagesFeatureExists'),
       'Every packages endpoint must 404 while the vertical is off and must never trust the caller for identity.',
     )
   }
@@ -340,7 +340,7 @@ const flags = read('lib/flags.ts')
   )
   check(
     'I7: an expert-side cancel extends the client’s expiry',
-    /\{ cancelledBy \}/.test(cancel) && /extendedExpiry\(/.test(credit) && /cancelledBy === 'TUTOR'/.test(read('lib/packages.ts')),
+    /\{ cancelledBy \}/.test(cancel) && /extendedExpiry\(/.test(credit) && /cancelledBy === 'PROVIDER'/.test(read('lib/packages.ts')),
     'The client lost a day through no doing of their own; the month they paid for has to grow back.',
   )
 }
@@ -714,7 +714,7 @@ void (async () => {
   )
   const EXITS: [string, RegExp][] = [
     ['app/api/bookings/[id]/cancel/route.ts', /await releaseBookingCredit\(tx, fresh\.enrollmentId, \{ cancelledBy \}\)/],
-    ['app/api/bookings/[id]/route.ts', /await releaseBookingCredit\(tx, booking\.enrollmentId, \{ cancelledBy: 'TUTOR'/],
+    ['app/api/bookings/[id]/route.ts', /await releaseBookingCredit\(tx, booking\.enrollmentId, \{ cancelledBy: 'PROVIDER'/],
     ['app/api/internal/cleanup/route.ts', /await releaseBookingCredit\(tx, b\.enrollmentId\)/],
   ]
   for (const [f, re] of EXITS) {
@@ -741,7 +741,7 @@ void (async () => {
       update: async (args: any) => { calls.push({ op: 'update', args }); return {} },
     },
   } as any
-  await releaseBookingCredit(fakeTx, 'enr_1', { cancelledBy: 'STUDENT' })
+  await releaseBookingCredit(fakeTx, 'enr_1', { cancelledBy: 'USER' })
   check(
     'U5: a client-side exit decrements once and does not move the expiry',
     calls.filter(c => c.op === 'updateMany').length === 1
@@ -751,7 +751,7 @@ void (async () => {
     'The client cancelled; the credit comes back, the month they paid for does not grow.',
   )
   calls.length = 0
-  await releaseBookingCredit(fakeTx, 'enr_1', { cancelledBy: 'TUTOR' })
+  await releaseBookingCredit(fakeTx, 'enr_1', { cancelledBy: 'PROVIDER' })
   const upd = calls.find(c => c.op === 'update')
   check(
     'U6: an expert-side exit decrements AND extends the expiry by one day',

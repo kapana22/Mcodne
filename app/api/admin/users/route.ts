@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q')?.trim()
   const rawRole = searchParams.get('role')
-  const role = rawRole === 'STUDENT' || rawRole === 'TUTOR' || rawRole === 'ADMIN' ? rawRole : null
+  const role = rawRole === 'USER' || rawRole === 'PROVIDER' || rawRole === 'ADMIN' ? rawRole : null
   const limit = parseLimit(searchParams.get('limit'), { fallback: 50, max: 200 })
   const cursor = searchParams.get('cursor')?.trim() || undefined
 

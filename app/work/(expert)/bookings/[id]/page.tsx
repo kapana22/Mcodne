@@ -447,7 +447,7 @@ export default function TutorBookingDetailPage() {
         {booking.rescheduleRequest && (() => {
           const req = booking.rescheduleRequest
           // On the tutor page, "iProposed" means we (the tutor) sent it.
-          const iProposed = req.proposedBy === 'TUTOR'
+          const iProposed = req.proposedBy === 'PROVIDER'
           return (
             <div className="mb-4 rounded-card border border-warning-200 bg-warning-50 p-5 flex items-start gap-4 flex-wrap">
               <div className="min-w-0 flex-1">

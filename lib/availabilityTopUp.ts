@@ -91,7 +91,7 @@ export async function topUpAvailability(now: Date = new Date()): Promise<TopUpRe
   try {
     const horizonEnd = new Date(now.getTime() + HORIZON_WEEKS * 7 * 86_400_000)
     const profiles = await prisma.tutorProfile.findMany({
-      where: { user: { role: ROLE.EXPERT, suspendedAt: null } },
+      where: { user: { role: ROLE.PROVIDER, suspendedAt: null } },
       select: { id: true, professionData: true },
     })
 

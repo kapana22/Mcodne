@@ -59,7 +59,7 @@ test('§C the first hat wins — a tradesperson never lands on the student dashb
 
   // An empty list cannot happen while hatsOf always returns CLIENT, but the
   // fallback must still be a real path rather than undefined.
-  assert.ok(homeForHats([] as Hat[], 'STUDENT').startsWith('/'))
+  assert.ok(homeForHats([] as Hat[], 'USER').startsWith('/'))
 })
 
 test('§D a switcher is drawn only for somebody who has one', () => {

@@ -16,7 +16,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
   // their client-side bookings + message threads here. Without this a tutor who
   // had student messages got bounced out of their own chats. The UserMenu offers
   // a switch back to the expert workspace.
-  const user = await requireRole([ROLE.CLIENT, ROLE.EXPERT, ROLE.ADMIN])
+  const user = await requireRole([ROLE.USER, ROLE.PROVIDER, ROLE.ADMIN])
   return (
     <StudentWorkspaceShell user={{ name: user.fullName, avatar: user.avatarUrl ?? undefined }}>
       {children}

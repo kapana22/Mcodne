@@ -116,11 +116,11 @@ export async function POST(req: Request) {
   // must never hold a pending application (approving it would demote them out
   // of the admin role and lock everyone out of /admin — the exact bug this
   // guards). Admins who want to inspect the flow can impersonate a student.
-  if (user.role !== ROLE.CLIENT) {
+  if (user.role !== ROLE.USER) {
     return NextResponse.json({
       ok: false,
       error: 'ONLY_STUDENTS_CAN_APPLY',
-      message: user.role === ROLE.EXPERT
+      message: user.role === ROLE.PROVIDER
         ? 'შენ უკვე ექსპერტი ხარ — განაცხადი აღარ გჭირდება. პროფილს „ჩემი სივრციდან“ მართავ.'
         : 'ამ ანგარიშიდან განაცხადს ვერ გააგზავნი. შედი როგორც კლიენტი და სცადე თავიდან.',
     }, { status: 403 })

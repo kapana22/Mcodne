@@ -5,7 +5,7 @@ import { Icon } from '@/components/Icon'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 import { ROLE } from '@/lib/roles'
 
-type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
+type Role = 'USER' | 'PROVIDER' | 'ADMIN'
 type Me = { role: Role; fullName?: string } | null
 
 // Smart 404: recovers non-authenticated users with generic paths, and
@@ -23,12 +23,12 @@ export function NotFoundClient() {
     return () => { cancelled = true }
   }, [])
 
-  const homeHref = me?.role === ROLE.EXPERT ? '/work'
+  const homeHref = me?.role === ROLE.PROVIDER ? '/work'
     : me?.role === 'ADMIN' ? '/admin'
-    : me?.role === ROLE.CLIENT ? '/me'
+    : me?.role === ROLE.USER ? '/me'
     : '/'
   const homeLabel = me
-    ? (me.role === ROLE.EXPERT ? 'ჩემი სივრცე' : me.role === 'ADMIN' ? 'ადმინი' : 'ჩემი სივრცე')
+    ? (me.role === ROLE.PROVIDER ? 'ჩემი სივრცე' : me.role === 'ADMIN' ? 'ადმინი' : 'ჩემი სივრცე')
     : 'მთავარი'
 
   return (

@@ -1,7 +1,7 @@
 export type BookingStatus = 'PREPARING' | 'CONFIRMED' | 'LIVE' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW'
 
 export type ReschedulePayload = {
-  proposedBy: 'STUDENT' | 'TUTOR'
+  proposedBy: 'USER' | 'PROVIDER'
   newStartAt: string
   reason: string | null
   proposedAt: string
@@ -40,4 +40,4 @@ export const awaitsClosure = (b: DashBooking, now: number) =>
 /** Reschedule proposal from the client, waiting on the expert's answer. */
 export const awaitsRescheduleAnswer = (b: DashBooking) =>
   (b.status === 'PREPARING' || b.status === 'CONFIRMED') &&
-  b.rescheduleRequest?.proposedBy === 'STUDENT'
+  b.rescheduleRequest?.proposedBy === 'USER'

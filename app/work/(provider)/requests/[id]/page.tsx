@@ -173,16 +173,17 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         />
 
         {/* ── What happened, and the one place to go next ──────────────────
-            Four states, one card. WON links to /provider/offers because that is
-            where the client's phone number is — `clientContactFor` is the only
-            thing allowed to reveal it, and it lives there. Repeating the number
-            here would be a second place that rule has to hold. */}
+            Four states, one card. WON links to /work/offers because that is
+            where the conversation with the client is. It used to say „the
+            client's phone number is there"; on 2026-08-21 the number stopped
+            being shown anywhere (owner: „არ უჩანდეს ეგრევე ტელეფონი"), so both
+            the sentence and the button label say the thread instead. */}
         {outcome === 'WON' ? (
           <Card className="border-brand-300">
             <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">კლიენტმა შენ აგირჩია</h2>
-            <p className="mt-2 text-body text-ink-600">კონტაქტი გახსნილია — შეთავაზებებში ნახავ.</p>
+            <p className="mt-2 text-body text-ink-600">მიმოწერა შეთავაზებებშია — იქ შეათანხმეთ დანარჩენი.</p>
             <div className="mt-4">
-              <Btn href="/work/offers" size="sm">კონტაქტი და მიმოწერა</Btn>
+              <Btn href="/work/offers" size="sm">მიმოწერა</Btn>
             </div>
           </Card>
         ) : outcome === 'LOST' ? (

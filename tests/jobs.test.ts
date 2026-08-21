@@ -124,8 +124,8 @@ test('bookings keep their existing status vocabulary and bucket by it', () => {
   // Past its own end while still confirmed = the expert owes a decision.
   assert.equal(at({ status: 'CONFIRMED', startAt: new Date(NOW - 4 * HOUR).toISOString() }), 'attention')
   // A client-proposed reschedule is an unanswered question, whatever the status.
-  assert.equal(at({ status: 'CONFIRMED', rescheduleRequest: { proposedBy: 'STUDENT' } }), 'attention')
-  assert.equal(at({ status: 'CONFIRMED', rescheduleRequest: { proposedBy: 'TUTOR' } }), 'active')
+  assert.equal(at({ status: 'CONFIRMED', rescheduleRequest: { proposedBy: 'USER' } }), 'attention')
+  assert.equal(at({ status: 'CONFIRMED', rescheduleRequest: { proposedBy: 'PROVIDER' } }), 'active')
 
   // The active set is the SHARED one, not a second copy.
   assert.deepEqual([...UPCOMING_STATUSES].sort(), ['CONFIRMED', 'LIVE', 'PREPARING'])
@@ -155,8 +155,10 @@ test('quote statuses map ACCEPTED → მიმდინარე, doneAt → �
 /* ═══════════ 3. masking ═════════════════════════════════════════════════ */
 
 test('the peer name obeys the contact seal — open on ACCEPTED, „კლიენტი" otherwise', () => {
-  // An ACCEPTED offer is exactly the case lib/requestChat opens the contact
-  // for, and lib/requests → clientContactFor is the function that decides it.
+  // An ACCEPTED offer is exactly the case lib/requestChat stops masking for,
+  // and lib/requests → clientIdentityOpen is the function that decides it.
+  // (It was `clientContactFor` until 2026-08-21; the phone and the email left
+  // the product that day and the seal now releases the NAME alone.)
   assert.equal(contactIsOpen({ status: 'ACCEPTED' }), true)
   for (const s of ['SENT', 'INVITED', 'DECLINED', 'WITHDRAWN']) {
     assert.equal(contactIsOpen({ status: s }), false, `${s} opened the contact`)
@@ -169,7 +171,7 @@ test('the peer name obeys the contact seal — open on ACCEPTED, „კლიე
   // The rule is asked, never copied: jobRows holds no second `=== 'ACCEPTED'`
   // seal of its own.
   const src = codeOf('lib/jobRows.ts')
-  assert.match(src, /clientContactFor\(/, 'lib/jobRows stopped asking clientContactFor')
+  assert.match(src, /clientIdentityOpen\(/, 'lib/jobRows stopped asking the one seal')
 })
 
 test('the list query selects no phone, no e-mail and no base64 column', () => {

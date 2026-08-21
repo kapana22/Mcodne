@@ -13,7 +13,7 @@ import { ROLE } from '@/lib/roles'
 // nav-badge polling path).
 
 export async function GET() {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({
@@ -78,7 +78,7 @@ export async function GET() {
        WHERE "tutorId" = $1
          AND status IN ('PREPARING', 'CONFIRMED')
          AND "rescheduleRequest" IS NOT NULL
-         AND "rescheduleRequest"->>'proposedBy' = 'STUDENT'`,
+         AND "rescheduleRequest"->>'proposedBy' = 'USER'`,
       profile.id,
     ).catch(() => [{ count: 0 }]),
     // Future availability slots — the profile-completeness „თავისუფალი დრო"

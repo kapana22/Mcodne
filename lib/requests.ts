@@ -699,27 +699,44 @@ export function providerRequestView(r: ProviderRequestRow) {
   }
 }
 
-export type ClientContact = { contactName: string; phone: string; email: string | null }
-
 /**
- * The client's contact, for the provider whose offer was ACCEPTED — and for
- * nobody else.
+ * Is the CLIENT'S IDENTITY open to this provider — i.e. was this offer chosen?
  *
- * Returns null rather than a redacted object: an object with empty strings in
- * it is a shape a UI will happily render as a blank „ტელეფონი:" row, and a
- * shape a careless `??` will fill from somewhere else. Absent is unambiguous.
+ * ⚠️ THIS USED TO HAND OVER A PHONE NUMBER AND AN EMAIL, and on 2026-08-21 it
+ * stopped. Owner: „მოდი ამ ეტაპზე იყოს მიწერა და ჩათში გარკვნენ, ნომერიც თუ
+ * საჭიროა იქ გაცვალონ… არ უჩანდეს ეგრევე ტელეფონი." Everything the two sides
+ * have to arrange, they arrange in the thread; if a number is genuinely needed
+ * they type it to each other there, which after acceptance the masking already
+ * allows (lib/requestChat → maskContacts, unchanged).
+ *
+ * WHAT THAT LEAVES THIS FUNCTION IS THE NAME, and the name alone. „კლიენტი"
+ * until they choose you, the person's own name afterwards — one rule, still in
+ * one place, still consumed by `offerPeerName` (lib/inboxRows) and by
+ * `contactIsOpen` (lib/jobRows) rather than copied into either.
+ *
+ * ⚠️ AND THE COLUMNS DO NOT LEAVE THE SERVER ANY MORE. The three surfaces that
+ * printed them (the provider's offers list, the offer thread pane, the client's
+ * own page) no longer SELECT `phone`/`email` at all — a rule enforced by what
+ * is fetched is a rule a future render cannot forget. The request still stores
+ * them: the admin phones the client to verify the request, which is the one
+ * reader that legitimately needs them.
+ *
+ * ⚠️ THE SECOND REASON, which is the owner's business and not privacy: the
+ * contact IS the lead. Handing it over automatically the moment a client
+ * chooses means the platform gives away, for free, the only thing it has to
+ * sell. Whatever it eventually costs, it has to be opened by a deliberate act
+ * that can carry a price — never printed on arrival.
  */
-export function clientContactFor(
-  offer: { status: string },
-  contact: ClientContact,
-): ClientContact | null {
-  return offer.status === 'ACCEPTED' ? contact : null
+export function clientIdentityOpen(offer: { status: string }): boolean {
+  return offer.status === 'ACCEPTED'
 }
 
 export type ProviderContact = {
   name: string
-  phone: string | null
-  email: string | null
+  /* ⚠️ NO `phone`, NO `email` (2026-08-21). The client used to be handed the
+     chosen provider's number and address here, the mirror of what the provider
+     was handed about them; both halves went the same day and for the same
+     reason (see clientIdentityOpen above). The conversation is the channel. */
   /** The PUBLIC profile facts — what the client is entitled to see BEFORE
    *  choosing, because the profile page itself is public. The research point
    *  this carries: on every reference marketplace the client chooses by
@@ -728,9 +745,8 @@ export type ProviderContact = {
   profile?: { slug: string | null; verified: boolean; rating: number; reviewsCount: number } | null
 }
 
-/** One offer, as the CLIENT is allowed to see it. The provider's phone and
- *  email appear only once this offer is the accepted one — the mirror of
- *  `clientContactFor`, and the same reason for returning null. */
+/** One offer, as the CLIENT is allowed to see it. PUBLIC profile facts and the
+ *  offer's own terms — no contact of any kind; see clientIdentityOpen. */
 export function clientOfferView(o: {
   id: string
   priceGel: number
@@ -743,7 +759,6 @@ export function clientOfferView(o: {
   createdAt: Date | string
   provider: ProviderContact
 }) {
-  const accepted = o.status === 'ACCEPTED'
   const prof = o.provider.profile ?? null
   return {
     id: o.id,
@@ -756,18 +771,13 @@ export function clientOfferView(o: {
     providerName: o.provider.name,
     // PUBLIC profile facts, shown before choosing — the profile page is public,
     // so withholding its address from the one screen where the choice happens
-    // protects nothing and only degrades the choice. The seal below is about
-    // CONTACT, and only contact.
+    // protects nothing and only degrades the choice.
     providerProfileHref: prof?.slug ? `/experts/${prof.slug}` : null,
     providerVerified: prof?.verified ?? false,
     // Null below the platform's own display floor: a rating computed from one
     // review is noise wearing a number, and the browse surfaces hide it too.
     providerRating: prof && prof.reviewsCount >= 1 && prof.rating > 0 ? prof.rating : null,
     providerReviews: prof?.reviewsCount ?? 0,
-    // Null until they are chosen. See the block comment above — this line is
-    // the feature.
-    providerPhone: accepted ? o.provider.phone : null,
-    providerEmail: accepted ? o.provider.email : null,
   }
 }
 

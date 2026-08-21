@@ -12,7 +12,7 @@
 // client who has none and a contact that stays sealed until acceptance).
 //
 // ⚠️ THE MASKING HAPPENS HERE, ONCE. `peerName` on an OFFER row is „კლიენტი"
-// until that offer is ACCEPTED, decided by lib/requests → clientContactFor, the
+// until that offer is ACCEPTED, decided by lib/requests → clientIdentityOpen, the
 // same function the offers page renders the contact block through. The row
 // builder is never handed a phone or an email AT ALL (see OfferInboxSource) —
 // a shared row type is exactly the place where „it is only a label" turns into
@@ -27,7 +27,7 @@
 // it with `import type`) and its builders are what the tests execute — a
 // top-level `import { prisma }` would drag a database client into both.
 
-import { clientContactFor, requestsOn, topicLabel } from './requests'
+import { clientIdentityOpen, requestsOn, topicLabel } from './requests'
 import type { ProviderIdentity } from './requestsServer'
 
 /* ═══════════ the shape ══════════════════════════════════════════════════ */
@@ -68,14 +68,14 @@ export const MASKED_CLIENT_NAME = 'კლიენტი'
 /**
  * The name an offer thread may print for the client.
  *
- * ⚠️ THE SAME RULE THE CONTACT BLOCK RUNS ON, and deliberately the same
- * FUNCTION: `clientContactFor` returns null for every status except ACCEPTED,
- * so „when does the name appear" has one answer on this platform and not two.
- * A peer label is not a loophole — the name is part of the contact.
+ * ⚠️ ONE FUNCTION DECIDES IT, and since 2026-08-21 the name is ALL it decides:
+ * `clientIdentityOpen` is false for every status except ACCEPTED, so „when does
+ * the client stop being „კლიენტი"" has one answer on this platform and not two.
+ * The phone and the email it used to release beside the name are gone from the
+ * product entirely — see lib/requests.
  */
 export function offerPeerName(offer: { status: string }, contactName: string | null): string {
-  const contact = clientContactFor(offer, { contactName: contactName ?? '', phone: '', email: null })
-  const name = contact?.contactName.trim()
+  const name = clientIdentityOpen(offer) ? (contactName ?? '').trim() : ''
   return name ? name : MASKED_CLIENT_NAME
 }
 

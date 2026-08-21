@@ -460,7 +460,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           data: {
             status: 'CANCELED',
             payoutStatus: 'REFUNDED',
-            cancelledBy: 'TUTOR',
+            cancelledBy: 'PROVIDER',
             tutorNotes: tutorNotes ?? booking.tutorNotes,
             heldSlotId: null,
           },
@@ -469,7 +469,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         await tx.$executeRawUnsafe(`UPDATE "Booking" SET "rescheduleRequest" = NULL WHERE id = $1`, id)
         // A declined package lesson gives its credit back — the expert said
         // no, so the client's month is also extended (lib/bookingCredit).
-        await releaseBookingCredit(tx, booking.enrollmentId, { cancelledBy: 'TUTOR', lessonMinutes: booking.durationMin })
+        await releaseBookingCredit(tx, booking.enrollmentId, { cancelledBy: 'PROVIDER', lessonMinutes: booking.durationMin })
       })
     } catch (e) {
       if (e instanceof Error && e.message === 'BAD_STATE') {

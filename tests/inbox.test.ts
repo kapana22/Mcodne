@@ -145,10 +145,12 @@ test('an offer row says „კლიენტი" until that offer is ACCEPTED �
 
 test('the masking happens where the row is BUILT, through the one function that decides it', () => {
   const lib = codeOf('lib/inboxRows.ts')
-  // clientContactFor is the platform's single answer to „may this reader see
-  // the client". A second `status === 'ACCEPTED'` written here would be a
-  // second answer, and the two would drift.
-  assert.match(lib, /clientContactFor\(/, 'the row builder stopped going through clientContactFor')
+  // clientIdentityOpen is the platform's single answer to „may this reader see
+  // who the client is". A second `status === 'ACCEPTED'` written here would be a
+  // second answer, and the two would drift. (It was `clientContactFor` until
+  // 2026-08-21, when the phone and the email left the product and the seal was
+  // left holding the NAME alone — same function, one thing less to release.)
+  assert.match(lib, /clientIdentityOpen\(/, 'the row builder stopped going through the seal')
   assert.match(lib, /peerName:\s+offerPeerName\(o,\s+o\.request\.contactName\)/,
     'an offer row no longer masks its peer name at build time')
   const build = lib.slice(lib.indexOf('export function offerInboxRow'))
@@ -162,12 +164,12 @@ test('the masking happens where the row is BUILT, through the one function that 
   assert.doesNotMatch(query, /phone: true|email: true/, 'the inbox query selects the client’s contact columns')
   assert.doesNotMatch(query, /adminNote/, 'the inbox query selects the admin’s private note')
 
-  // The pane behind the row prints the number ONLY through the same function,
-  // and only where a chosen provider has somebody to call.
+  // The pane behind the row prints NO contact at all (2026-08-21) — owner:
+  // „არ უჩანდეს ეგრევე ტელეფონი". It never fetches the two columns, so the
+  // block cannot come back without the query coming back first.
   const pane = codeOf(PANE)
-  assert.match(pane, /clientContactFor\(/, 'the offer pane picks its own contact columns')
-  assert.match(pane, /const contact = clientContactFor\(offer, \{/, 'the pane’s contact is no longer gated')
-  assert.match(pane, /\{contact && \(/, 'the pane renders the contact block outside the gate')
+  assert.doesNotMatch(pane, /phone: true|email: true/, 'the offer pane fetches the client’s contact again')
+  assert.doesNotMatch(pane, /tel:|mailto:/, 'the offer pane prints a contact link again')
   assert.match(pane, /offerPeerName\(offer,\s+offer\.request\.contactName\)/, 'the pane prints an unmasked peer name')
   assert.doesNotMatch(pane, /contactName\}/, 'the pane prints the client’s name straight from the column')
 })
@@ -218,13 +220,15 @@ test('/work/offers is the list of OFFERS again — it no longer mounts RequestCh
   assert.ok(!code.includes('<RequestChat'), '/work/offers still embeds the conversation — that is the second inbox')
   assert.ok(!raw.includes("from '@/components/RequestChat'"), '/work/offers still imports the chat pane')
 
-  // What it keeps: the price, the status, the two actions, and the contact
-  // block through the one function. Nothing about this change touches them.
+  // What it keeps: the price, the status, the two actions, and — since
+  // 2026-08-21, in place of the contact block — the client's NAME once they
+  // have chosen you, through the same seal.
   assert.match(code, /offerPriceLabel\(o\.priceGel, o\.priceKind\)/, 'the price left the offers page')
   assert.match(code, /OFFER_STATUS_LABEL\[o\.status as OfferStatusName\]/, 'the status label left the offers page')
   assert.match(code, /<OfferActions\s+offerId=\{o\.id\}\s+status=\{o\.status\}\s+kind=\{o\.kind\}\s+doneAt=/,
     'the „გატანა" / „დასრულდა" actions changed — _actions.tsx behaviour was to stay untouched')
-  assert.match(code, /clientContactFor\(/, 'the offers page picks its own contact columns')
+  assert.match(code, /clientIdentityOpen\(/, 'the offers page decides the seal itself')
+  assert.doesNotMatch(code, /phone: true|email: true|tel:|mailto:/, 'the offers page shows a contact again')
 
   // And the row now points AT the thread, carrying the same unread number the
   // collapsed pane used to show. No name on the link: the label says

@@ -78,7 +78,7 @@ test('an edit does not conflict with itself', () => {
 
 test('an edit is authorised like a delete', () => {
   const patch = item.slice(item.indexOf('export async function PATCH'), item.indexOf('export async function DELETE'))
-  assert.match(patch, /requireRoleApi\(\[ROLE\.EXPERT,\s+ROLE\.ADMIN\]\)/)
+  assert.match(patch, /requireRoleApi\(\[ROLE\.PROVIDER,\s+ROLE\.ADMIN\]\)/)
   assert.match(patch, /userId !== user\.id && user\.role !== 'ADMIN'/, 'a window must not be editable by its non-owner')
 })
 

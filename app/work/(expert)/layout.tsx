@@ -19,7 +19,7 @@ export default async function ExpertLayout({ children }: { children: React.React
   // instead. Read once, before the role guard, and only for somebody the guard
   // would otherwise refuse, so an expert pays no extra query.
   const user = await requireUser()
-  if (user.role !== ROLE.EXPERT && user.role !== ROLE.ADMIN) {
+  if (user.role !== ROLE.PROVIDER && user.role !== ROLE.ADMIN) {
     const caps = await capabilitiesOf(user.id)
     // ⚠️ THE TARGET IS `/work` SINCE 2026-08-20, not the queue. This bounce
     // exists because a WORK-only provider must not be handed to `requireRole`
@@ -31,6 +31,6 @@ export default async function ExpertLayout({ children }: { children: React.React
     // screen that tells them what they can spend.
     if (caps.includes('WORK')) redirect('/work')
   }
-  await requireRole([ROLE.EXPERT, ROLE.ADMIN])
+  await requireRole([ROLE.PROVIDER, ROLE.ADMIN])
   return <>{children}</>
 }

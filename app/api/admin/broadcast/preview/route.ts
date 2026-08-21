@@ -10,8 +10,8 @@ const Body = z.object({ segment: Segment })
 function whereForSegment(segment: z.infer<typeof Segment>) {
   switch (segment) {
     case 'all': return {}
-    case 'students': return { role: ROLE.CLIENT }
-    case 'tutors': return { role: ROLE.EXPERT }
+    case 'students': return { role: ROLE.USER }
+    case 'tutors': return { role: ROLE.PROVIDER }
     case 'recent': {
       const since = new Date(Date.now() - 7 * 24 * 3600 * 1000)
       return { createdAt: { gte: since } }

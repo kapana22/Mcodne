@@ -11,7 +11,7 @@ const Body = z.object({
 })
 
 export async function GET(req: Request) {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })

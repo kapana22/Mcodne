@@ -88,7 +88,7 @@ export default async function Page({ searchParams }: { searchParams: Search }) {
   // appear, the service comes first.
   // The profile, not only the role: an approved expert always has both.
   if (providersOn() && !have.includes('WORK')) offer.push('WORK')
-  if (user.role !== ROLE.EXPERT && !have.includes('CONSULT')) offer.push('CONSULT')
+  if (user.role !== ROLE.PROVIDER && !have.includes('CONSULT')) offer.push('CONSULT')
 
   // Nothing left to apply for → their real screen.
   //

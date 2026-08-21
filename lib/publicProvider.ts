@@ -4,7 +4,7 @@
 // app/api/messages asked the same question the same wrong way:
 //
 //     const roles = new Set([me.role, other.role])
-//     if (!roles.has(ROLE.EXPERT) || roles.has('ADMIN')) → 403
+//     if (!roles.has(ROLE.PROVIDER) || roles.has('ADMIN')) → 403
 //
 // „At least one party must be a TUTOR." That was true when the only provider on
 // the site was an expert with a calendar. It stopped being true the day the job

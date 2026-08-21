@@ -65,7 +65,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
-  if (user.role !== ROLE.EXPERT && user.role !== 'ADMIN') {
+  if (user.role !== ROLE.PROVIDER && user.role !== 'ADMIN') {
     return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
   }
   const profile = await tutorProfileForUser(user.id)

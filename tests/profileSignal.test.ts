@@ -115,16 +115,16 @@ const HUMAN = REAL_BROWSERS[0]
 check('counts: an anonymous human viewer counts',
   countsAsProfileView({ userAgent: HUMAN, viewerUserId: null, viewerRole: null, tutorUserId: 'u_expert' }) === true)
 check('counts: a signed-in STUDENT counts',
-  countsAsProfileView({ userAgent: HUMAN, viewerUserId: 'u_student', viewerRole: 'STUDENT', tutorUserId: 'u_expert' }) === true)
+  countsAsProfileView({ userAgent: HUMAN, viewerUserId: 'u_student', viewerRole: 'USER', tutorUserId: 'u_expert' }) === true)
 check('counts: ANOTHER expert looking at this profile counts (it is still a real view)',
-  countsAsProfileView({ userAgent: HUMAN, viewerUserId: 'u_other', viewerRole: 'TUTOR', tutorUserId: 'u_expert' }) === true)
+  countsAsProfileView({ userAgent: HUMAN, viewerUserId: 'u_other', viewerRole: 'PROVIDER', tutorUserId: 'u_expert' }) === true)
 
 check('counts: the expert viewing their OWN profile does NOT count',
-  countsAsProfileView({ userAgent: HUMAN, viewerUserId: 'u_expert', viewerRole: 'TUTOR', tutorUserId: 'u_expert' }) === false)
+  countsAsProfileView({ userAgent: HUMAN, viewerUserId: 'u_expert', viewerRole: 'PROVIDER', tutorUserId: 'u_expert' }) === false)
 check('counts: ADMIN does NOT count (moderation traffic is not demand)',
   countsAsProfileView({ userAgent: HUMAN, viewerUserId: 'u_admin', viewerRole: 'ADMIN', tutorUserId: 'u_expert' }) === false)
 check('counts: a bot does NOT count even when signed in',
-  countsAsProfileView({ userAgent: 'Googlebot/2.1', viewerUserId: 'u_student', viewerRole: 'STUDENT', tutorUserId: 'u_expert' }) === false)
+  countsAsProfileView({ userAgent: 'Googlebot/2.1', viewerUserId: 'u_student', viewerRole: 'USER', tutorUserId: 'u_expert' }) === false)
 check('counts: a missing user-agent does NOT count',
   countsAsProfileView({ userAgent: null, viewerUserId: null, viewerRole: null, tutorUserId: 'u_expert' }) === false)
 check('counts: self-view exclusion needs BOTH ids — a null tutorUserId cannot silently match a null viewer',

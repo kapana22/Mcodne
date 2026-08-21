@@ -19,7 +19,7 @@ import { ROLE } from '@/lib/roles'
 const Body = z.object({ action: z.enum(['accept', 'decline']) })
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
   if (!packagesFeatureExists()) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 

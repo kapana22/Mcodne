@@ -18,7 +18,7 @@
 // differently. Executed by tests/jobs.test.ts.
 
 import { UPCOMING_STATUSES, dayKeyInTz } from './bookings'
-import { clientContactFor, gel, offerPriceLabel, type ClientContact } from './requests'
+import { clientIdentityOpen, gel, offerPriceLabel } from './requests'
 import { topicLabel } from './requestTopics'
 
 /* ═══════════ the row ════════════════════════════════════════════════════ */
@@ -110,7 +110,7 @@ export function bookingAwaitsClosure(b: BookingJobInput, now: number): boolean {
 /** The client proposed a new time and the expert has not answered. */
 export function bookingAwaitsReschedule(b: BookingJobInput): boolean {
   return (b.status === 'PREPARING' || b.status === 'CONFIRMED') &&
-    b.rescheduleRequest?.proposedBy === 'STUDENT'
+    b.rescheduleRequest?.proposedBy === 'USER'
 }
 
 export function bookingJobBucket(b: BookingJobInput, now: number): JobBucket {
@@ -184,19 +184,16 @@ export function quoteJobStatus(q: Pick<QuoteJobInput, 'doneAt' | 'closedAt'>): Q
 }
 
 /**
- * The contact seal, ASKED rather than re-implemented.
+ * The seal, ASKED rather than re-implemented.
  *
- * lib/requestChat's rule is „masked before acceptance, open after" and
- * lib/requests → `clientContactFor` is the one function that decides it: it
- * returns null for every status but ACCEPTED. An accepted offer is precisely
- * the case where the contact IS open, so the client's NAME is the provider's
- * to read here. Calling the real function with a probe contact keeps that
- * decision in one place instead of copying `status === 'ACCEPTED'` into a
- * second file.
+ * lib/requests → `clientIdentityOpen` is the one function that decides when a
+ * client stops being „კლიენტი" to the provider they hired, and this file asks
+ * it rather than copying `status === 'ACCEPTED'` into a second place. The probe
+ * contact this used to build is gone with the columns themselves (2026-08-21):
+ * there is no phone or email left to seal, only the name.
  */
-const PROBE_CONTACT: ClientContact = { contactName: '', phone: '', email: null }
 export function contactIsOpen(offer: { status: string }): boolean {
-  return clientContactFor(offer, PROBE_CONTACT) !== null
+  return clientIdentityOpen(offer)
 }
 
 /** „კლიენტი" whenever the seal is shut or the name is blank — never a guess,

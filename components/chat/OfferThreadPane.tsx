@@ -9,12 +9,14 @@
 // in one workspace was the disorientation this pane exists to end; rewriting
 // the conversation would have been a second, unrelated risk.
 //
-// ⚠️ THE NAME AND THE NUMBER OBEY THE SAME ONE RULE. `offerPeerName`
-// (lib/inboxRows) and `clientContactFor` (lib/requests) are the same decision
-// read twice: „კლიენტი" and no contact until this offer is the ACCEPTED one.
-// This screen is the one place a chosen provider is now talking to the person
-// they have to call, so the contact belongs here — but it is rendered ONLY
-// through the function, exactly as on the offers page.
+// ⚠️ NO CONTACT BLOCK ANY MORE (2026-08-21). This pane used to print the
+// client's phone and email above the transcript once the offer was accepted.
+// Owner: „მოდი ამ ეტაპზე იყოს მიწერა და ჩათში გარკვნენ, ნომერიც თუ საჭიროა იქ
+// გაცვალონ." So the screen is the conversation and nothing else: the columns
+// are no longer even SELECTED below, and after acceptance the endpoint stops
+// masking, so a number the two actually need is typed to each other in the
+// thread. `offerPeerName` still decides the NAME the header prints — one rule,
+// in lib/requests, asked rather than copied.
 //
 // TWO MOUNTS, ONE IMPLEMENTATION: the expert reads it inside the messages
 // centre, and a WORK-only provider — whom the (expert) guard never lets into
@@ -25,7 +27,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { requestsViewer } from '@/lib/requestsServer'
 import {
-  clientContactFor, timeAgoKa, topicLabel,
+  timeAgoKa, topicLabel,
   OFFER_STATUS_LABEL, type OfferStatusName,
 } from '@/lib/requests'
 import { offerPeerName } from '@/lib/inboxRows'
@@ -75,20 +77,15 @@ export async function OfferThreadPane({
       request: {
         select: {
           topic: true, status: true,
-          // The contact. Rendered ONLY through clientContactFor below — the
-          // same shape and the same single gate as the offers page.
-          contactName: true, phone: true, email: true,
+          // THE NAME, and nothing else. `phone`/`email` left this select on
+          // 2026-08-21 with the block that printed them — a column that is
+          // never fetched cannot be rendered by a later edit that forgets why.
+          contactName: true,
         },
       },
     },
   })
   if (!offer) return <NotFoundPane backHref={backHref} />
-
-  const contact = clientContactFor(offer, {
-    contactName: offer.request.contactName,
-    phone: offer.request.phone,
-    email: offer.request.email,
-  })
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -96,8 +93,8 @@ export async function OfferThreadPane({
         <div className="flex items-center gap-3">
           <Btn variant="ghost" size="sm" href={backHref} className="lg:hidden -ml-2">უკან</Btn>
           <div className="min-w-0">
-            {/* ⚠️ „კლიენტი" until the choice is made. One function decides it,
-                and it is the function the contact block below runs on. */}
+            {/* ⚠️ „კლიენტი" until the choice is made — lib/requests decides it,
+                and the name is now the ONLY thing that decision releases. */}
             <div className="font-display text-body font-semibold text-ink-900 truncate">
               {offerPeerName(offer, offer.request.contactName)}
             </div>
@@ -108,20 +105,6 @@ export async function OfferThreadPane({
             </p>
           </div>
         </div>
-        {contact && (
-          <div className="mt-3 pt-3 border-t border-ink-100">
-            <p className="text-body text-ink-900">
-              <span className="text-ink-500">ტელეფონის ნომერი: </span>
-              <a href={`tel:${contact.phone}`} className="font-semibold underline underline-offset-2">{contact.phone}</a>
-            </p>
-            {contact.email && (
-              <p className="mt-1 text-body text-ink-900">
-                <span className="text-ink-500">ელფოსტა: </span>
-                <a href={`mailto:${contact.email}`} className="font-semibold underline underline-offset-2">{contact.email}</a>
-              </p>
-            )}
-          </div>
-        )}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 pb-4">

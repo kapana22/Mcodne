@@ -15,7 +15,7 @@ import { capabilitiesOf } from '@/lib/capabilities'
 import { prisma } from '@/lib/prisma'
 import { providersOn } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
-import { ROLE } from '@/lib/roles'
+import { ROLE, asRole } from '@/lib/roles'
 import { routingWhere } from '@/lib/serviceProfile'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { grantEarnedTasks } from '@/lib/creditsServer'
@@ -39,7 +39,7 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
   // lead to the middleware's 404.
   const viewer = providersOn() ? await requestsViewer() : null
   const groups = {
-    expert: isAdmin || user.role === ROLE.EXPERT || caps.includes('CONSULT'),
+    expert: isAdmin || user.role === ROLE.PROVIDER || caps.includes('CONSULT'),
     work: viewer !== null && (caps.includes('WORK') || viewer.providerAllowed),
   }
 
@@ -102,7 +102,7 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
       // ⚠️ THE FIELDS THE CHROME NEEDS AND NOTHING MORE. Passing the whole
       // row would put a password hash into a client component's props.
       user={{ name: user.fullName, avatar: user.avatarUrl ?? undefined }}
-      role={user.role}
+      role={asRole(user.role)}
       groups={groups}
       openRequests={openRequests}
       // An ADMIN passes the requests gate by role and has no provider identity

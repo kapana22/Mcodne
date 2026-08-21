@@ -9,7 +9,7 @@ import { ROLE } from '@/lib/roles'
 // auth-client.tsx) — adding a role or changing a home meant editing all of
 // them, and they had already started to drift.
 export function homeForRole(role: string | null | undefined): string {
-  return role === 'ADMIN' ? '/admin' : role === ROLE.EXPERT ? '/work' : '/me'
+  return role === 'ADMIN' ? '/admin' : role === ROLE.PROVIDER ? '/work' : '/me'
 }
 
 // Single gate for every "become an expert" / apply CTA (nav, footer, marketing
@@ -50,7 +50,7 @@ export const JOIN_HREF = '/signup'
  * this, and do not resurrect the role as the question.
  */
 export function showApplyCta(role: string | null | undefined): boolean {
-  return !role || role === ROLE.CLIENT
+  return !role || role === ROLE.USER
 }
 
 // Shared guard for client-supplied post-auth destinations: app-internal

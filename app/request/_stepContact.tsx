@@ -85,14 +85,15 @@ export function StepContact({ draft, patch, signedIn }: {
       <label className="block">
         <Label>ტელეფონის ნომერი</Label>
         <PhoneInput value={draft.phone} onChange={v => patch({ phone: v })} className={INPUT} required />
-        {/* ⚠️ NOT „დაგირეკავთ" ANY MORE (2026-08-19). A clean request is
-            auto-verified and routed the second it is written — nobody phones
-            first — so that hint promised a call most people never get, and it
-            answered a question nobody asked. What people actually want to know
-            about a phone field is WHO WILL SEE IT, and the firewall gives a
-            good answer: lib/requestChat → clientContactFor releases the number
-            at exactly one moment, when an offer is accepted. */}
-        <Hint>ნომერს მხოლოდ ის ექსპერტი ნახავს, ვისაც შენ აირჩევ.</Hint>
+        {/* ⚠️ THE ANSWER TO „WHO WILL SEE IT" CHANGED ON 2026-08-21, so this
+            line had to. It said „ნომერს მხოლოდ ის ექსპერტი ნახავს, ვისაც შენ
+            აირჩევ" — true until that day, and false the moment the number
+            stopped being released to anybody (owner: „არ უჩანდეს ეგრევე
+            ტელეფონი"; see lib/requests → clientIdentityOpen). A promise about
+            somebody's phone number is the last sentence on a site allowed to
+            drift out of date, so it now says the one thing that is still true:
+            we are the only ones who use it, to check the request is real. */}
+        <Hint>ნომერს მხოლოდ ჩვენ ვიყენებთ — მოთხოვნის გადასამოწმებლად.</Hint>
       </label>
 
       <label className="block">

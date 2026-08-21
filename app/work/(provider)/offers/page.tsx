@@ -1,21 +1,24 @@
 // /provider/offers — what I sent, and what happened to it.
 //
-// ⚠️ THE CLIENT'S CONTACT APPEARS ON EXACTLY ONE KIND OF ROW: an offer with
-// status ACCEPTED. That is decided by `clientContactFor` (lib/requests), which
-// takes the offer and the contact and returns null unless it was chosen — the
+// ⚠️ NO PHONE NUMBER LIVES ON THIS PAGE ANY MORE (2026-08-21). It used to print
+// the client's phone and email on every ACCEPTED row. Owner: „მოდი ამ ეტაპზე
+// იყოს მიწერა და ჩათში გარკვნენ, ნომერიც თუ საჭიროა იქ გაცვალონ… არ უჩანდეს
+// ეგრევე ტელეფონი." An accepted row now shows WHO chose you and points at the
+// thread; the two columns are not even selected below, so a later edit cannot
+// render what was never fetched.
+//
+// What survives unchanged is the SEAL ITSELF — `clientIdentityOpen`
+// (lib/requests) still decides „კლიენტი" vs the person's name, and it is the
 // mirror of the rule the client's page runs on, written once so the two sides
 // cannot come apart.
-//
-// The query DOES select contactName/phone/email, and it has to: this is the
-// screen where a chosen provider finds out who to call. What stops it leaking
-// is that nothing renders those fields except through the function.
 
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import {
-  clientContactFor, gel, offerPriceLabel, budgetLabel, topicLabel, kindOf, timeAgoKa,
+  clientIdentityOpen, gel, offerPriceLabel, budgetLabel, topicLabel, kindOf, timeAgoKa,
   OFFER_STATUS_LABEL, type OfferStatusName,
 } from '@/lib/requests'
+import { offerPeerName } from '@/lib/inboxRows'
 import { OfferStatusPill } from '@/components/requests/StatusPills'
 import { requestsViewer } from '@/lib/requestsServer'
 import Link from 'next/link'
@@ -63,10 +66,12 @@ export default async function Page() {
         select: {
           publicRef: true, description: true, status: true,
           kind: true, topic: true, budgetMin: true, budgetMax: true,
-          // The contact. Rendered only through clientContactFor below — see the
-          // header. `adminNote` is deliberately absent: it is the operator's
-          // note about the client and belongs to no other reader.
-          contactName: true, phone: true, email: true,
+          // THE NAME, and nothing else. `phone`/`email` left this select on
+          // 2026-08-21 (owner: „არ უჩანდეს ეგრევე ტელეფონი") together with the
+          // block that printed them — everything is arranged in the thread now.
+          // `adminNote` is deliberately absent for the older reason: it is the
+          // operator's note about the client and belongs to no other reader.
+          contactName: true,
         },
       },
     },
@@ -86,7 +91,7 @@ export default async function Page() {
       <PageHeader
         eyebrow="შეთავაზებები"
         title="ჩემი შეთავაზებები"
-        sub="კლიენტის კონტაქტი მაშინ ჩნდება, როცა შენს შეთავაზებას აირჩევენ."
+        sub="კლიენტთან კავშირი მიმოწერაშია."
       />
 
       {offers.length === 0 ? (
@@ -103,15 +108,12 @@ export default async function Page() {
         // motion lands every row on its end state.
         <div className="mt-6 space-y-3 motion-safe:stagger">
           {offers.map(o => {
-            // THE one call that decides. Null for everything except an accepted
-            // offer — see lib/requests.
-            const contact = clientContactFor(o, {
-              contactName: o.request.contactName,
-              phone: o.request.phone,
-              email: o.request.email,
-            })
+            // THE one call that decides — „კლიენტი" until this offer is the
+            // chosen one, the person's own name afterwards. Since 2026-08-21
+            // that is ALL it releases; see lib/requests → clientIdentityOpen.
+            const chosen = clientIdentityOpen(o)
             return (
-              <Card key={o.id} className={`hover-lift ${contact ? 'border-brand-300' : ''}`}>
+              <Card key={o.id} className={`hover-lift ${chosen ? 'border-brand-300' : ''}`}>
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   {/* ⚠️ THE TITLE STEPPED DOWN A SIZE (2026-08-19). It was
                       `text-h3 font-bold` — exactly the price beside it — so the
@@ -192,19 +194,12 @@ export default async function Page() {
 
                 <OfferActions offerId={o.id} status={o.status} kind={o.kind} doneAt={o.doneAt ? o.doneAt.toISOString() : null} />
 
-                {contact && (
+                {/* WHO CHOSE YOU — the name, and the way to reach them, which
+                    is the thread. What used to sit here was a phone number and
+                    an email; both left the product on 2026-08-21. */}
+                {chosen && (
                   <div className="mt-4 pt-4 border-t border-ink-100">
-                    <p className="text-body text-ink-900">{contact.contactName}</p>
-                    <p className="mt-1 text-body text-ink-900">
-                      <span className="text-ink-500">ტელეფონის ნომერი: </span>
-                      <a href={`tel:${contact.phone}`} className="font-semibold underline underline-offset-2">{contact.phone}</a>
-                    </p>
-                    {contact.email && (
-                      <p className="mt-1 text-body text-ink-900">
-                        <span className="text-ink-500">ელფოსტა: </span>
-                        <a href={`mailto:${contact.email}`} className="font-semibold underline underline-offset-2">{contact.email}</a>
-                      </p>
-                    )}
+                    <p className="text-body text-ink-900">{offerPeerName(o, o.request.contactName)}</p>
                   </div>
                 )}
               </Card>

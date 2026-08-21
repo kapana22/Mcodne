@@ -19,7 +19,7 @@ import { b2bFeatureExists } from '@/lib/b2b'
 import { ROLE, HAT_LABEL, roleLabel, SPACE_LABEL } from '@/lib/roles'
 import { PROVIDER_ROUTE, isProviderWorkspacePath } from '@/lib/requests'
 
-type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
+type Role = 'USER' | 'PROVIDER' | 'ADMIN'
 
 type MenuItem = {
   href?: string
@@ -112,7 +112,7 @@ export function UserMenu({
   // STUDENT first, so they can hold both an expert workspace AND client-side
   // bookings/messages — give them a switch between the two spaces.
   const { me } = useMe()
-  const isDualRole = me?.role === ROLE.EXPERT
+  const isDualRole = me?.role === ROLE.PROVIDER
   // The two spaces (stage 6, 2026-08-19): /me is the client's, /work the supply
   // side's — and inside /work the master's three screens are their own room.
   const inClientSpace = pathname.startsWith('/me')
@@ -120,7 +120,7 @@ export function UserMenu({
   // allowlisted tradesperson keeps role STUDENT by design (lib/hats), so this
   // menu was labelling them „სტუდენტი", offering them „შემოგვიერთდი" pointing
   // at the EXPERT application, and gating its space switcher on
-  // `role === ROLE.EXPERT` — with the result that there was NO route back to
+  // `role === ROLE.PROVIDER` — with the result that there was NO route back to
   // the master's screens from anywhere on the site. Their own workspace was
   // reachable only by typing the URL or signing in again.
   const hats = me?.hats ?? []
@@ -160,7 +160,7 @@ export function UserMenu({
 
   const baseItems =
     role === 'ADMIN'   ? ADMIN_ITEMS(signOut) :
-    role === ROLE.CLIENT ? STUDENT_ITEMS(signOut) :
+    role === ROLE.USER ? STUDENT_ITEMS(signOut) :
                          TUTOR_ITEMS(signOut)
 
   // Space switcher for somebody with more than one room. Sits at the top of

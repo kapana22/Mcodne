@@ -51,7 +51,7 @@ export type InsightsDays = (typeof ALLOWED_DAYS)[number]
 const ID_RE = /^[A-Za-z0-9_-]{6,64}$/
 
 export async function GET(req: Request) {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
 

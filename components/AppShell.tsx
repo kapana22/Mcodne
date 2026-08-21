@@ -16,7 +16,7 @@ import { NavProgress } from './NavProgress'
 import { ClientErrorReporter } from './ClientErrorReporter'
 import { fetchMe } from '@/lib/me'
 
-type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
+type Role = 'USER' | 'PROVIDER' | 'ADMIN'
 
 // sessionStorage, not localStorage: a remembered scroll position is meaningful
 // only inside the tab (and the history stack) that produced it.
@@ -84,7 +84,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       .then(m => {
         if (cancelled) return
         const r = m?.role as Role | undefined
-        if (r === 'STUDENT' || r === 'TUTOR' || r === 'ADMIN') setRole(r)
+        if (r === 'USER' || r === 'PROVIDER' || r === 'ADMIN') setRole(r)
         else setRole(null)
         setCaps(Array.isArray((m as any)?.capabilities) ? (m as any).capabilities : [])
       })

@@ -186,6 +186,11 @@ export function RequestChat({
     }
   }
 
+  // The newest message of MINE the other side has read. Derived here rather
+  // than stored: the endpoint already answers `readByOther` per message, so the
+  // last one carrying it IS the read mark, and nothing has to be kept in sync.
+  const lastReadMineId = msgs?.filter(m => m.mine && m.readByOther).at(-1)?.id ?? null
+
   if (!open) {
     return (
       <button
@@ -236,6 +241,10 @@ export function RequestChat({
         )}
       </div>
 
+      {/* The newest message of MINE the other side has read — the one row that
+          carries the receipt. Null when they are behind, which is the state
+          that must show nothing at all rather than „unread": this platform
+          never claims to know what somebody has not done. */}
       <div className="mt-3 max-h-72 overflow-y-auto space-y-2 pr-1">
         {msgs === null && <p className="text-small text-ink-500">იტვირთება…</p>}
         {msgs?.length === 0 && (
@@ -244,20 +253,27 @@ export function RequestChat({
           </p>
         )}
         {msgs?.map(m => (
-          <div key={m.id} className={`flex ${m.mine ? 'justify-end' : 'justify-start'}`}>
+          <div key={m.id} className={`flex flex-col ${m.mine ? 'items-end' : 'items-start'}`}>
             <div
               className={`max-w-[85%] rounded-card px-3.5 py-2 text-body leading-relaxed whitespace-pre-wrap ${
                 m.mine ? 'bg-brand-600 text-white' : 'bg-ink-75 text-ink-900'
               }`}
             >
               {m.body}
-              {m.mine && m.readByOther && (
-                // On brand-600 a second white tier fails contrast at every
-                // opacity (the canon states the measurement), so the receipt
-                // is carried by SIZE, at full white.
-                <span className="block text-micro text-white mt-0.5">წაკითხულია</span>
-              )}
             </div>
+            {/* ⚠️ ONCE, UNDER THE LAST ONE — not on every bubble (2026-08-21).
+                The receipt used to be rendered inside each of my read bubbles,
+                so a ten-message morning printed „წაკითხულია" ten times and the
+                word stopped being read. „Read up to here" is what the reader
+                actually wants, and one line at the bottom says it; it is also
+                what every messenger they already use does.
+                OUTSIDE the bubble in ink-500 rather than white-on-brand: the
+                canon measures a second white tier on brand-600 as failing
+                contrast at every opacity, which is why the old one had to be
+                full white and could not be quiet. */}
+            {m.mine && m.readByOther && m.id === lastReadMineId && (
+              <span className="mt-0.5 text-micro text-ink-500">წაკითხულია</span>
+            )}
           </div>
         ))}
         <div ref={endRef} />

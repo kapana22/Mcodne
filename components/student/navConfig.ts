@@ -46,7 +46,7 @@ export const CATALOG_LINK: NavItem = {
    into their own workspace — it survived only one click deep, inside the avatar
    menu. Same door, same words, in both chromes.
    ⚠️ MUST be rendered inside <ApplyCtaGate>: the student shell hardcodes
-   role="STUDENT" on its chrome, but /student also admits a TUTOR using their
+   role="USER" on its chrome, but /student also admits a TUTOR using their
    client side, and telling an approved expert to become one is the exact
    2026-07-22 bug. The gate reads the real role from useMe. */
 export const APPLY_LINK: NavItem = {

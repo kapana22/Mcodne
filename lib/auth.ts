@@ -151,7 +151,7 @@ export async function getImpersonatorId(): Promise<string | null> {
 // already TUTOR; REJECTED applicants get the normal student home (the /apply
 // status step still shows the outcome if they visit it themselves).
 export async function postAuthHome(user: { id: string; role: Role }): Promise<string> {
-  if (user.role === ROLE.CLIENT) {
+  if (user.role === ROLE.USER) {
     // ⚠️ BOTH APPLICATIONS, AND THE SECOND ONE WAS MISSING (2026-08-18).
     //
     // The tutor half of this check has been here since the expert flow shipped,
@@ -256,7 +256,7 @@ export async function requireRole(role: Role | Role[]) {
 // getCurrentUser (a suspended account reads as logged-out → 401).
 //
 // Usage:
-//   const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+//   const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
 //   if (auth.response) return auth.response
 //   const user = auth.user
 export async function requireRoleApi(role: Role | Role[]): Promise<

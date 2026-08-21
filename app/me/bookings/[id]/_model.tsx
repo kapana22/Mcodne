@@ -14,7 +14,7 @@ type MsgUser = { id: string; fullName: string; avatarUrl?: string | null }
 type BookingMsg = { id: string; body: string; fromId: string; createdAt: string; from: MsgUser; fileUrl?: string | null; fileName?: string | null }
 export type ExistingReview = { id: string; rating: number; body: string; createdAt: string; studentId: string; anonymous?: boolean }
 type ReschedulePayload = {
-  proposedBy: 'STUDENT' | 'TUTOR'
+  proposedBy: 'USER' | 'PROVIDER'
   newStartAt: string
   reason: string | null
   proposedAt: string
@@ -42,7 +42,7 @@ export type Booking = {
   // Money state. On a NO_SHOW booking this is also the only field that carries
   // WHICH side failed to appear — see `isExpertNoShow` below.
   payoutStatus?: 'PENDING' | 'RELEASED' | 'REFUNDED' | null
-  cancelledBy?: 'STUDENT' | 'TUTOR' | 'ADMIN' | null
+  cancelledBy?: 'USER' | 'PROVIDER' | 'ADMIN' | null
   cancelReason?: string | null
   student: { id: string; fullName: string; avatarUrl?: string | null }
   tutor: {

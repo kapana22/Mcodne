@@ -289,7 +289,7 @@ export async function GET(req: Request) {
       LEFT JOIN "TutorApplication" a ON a."userId" = f."userId"
           WHERE f.sent = 0
             AND a."id" IS NULL
-            AND u."role" = 'STUDENT'
+            AND u."role" = 'USER'
           ORDER BY f.last_at DESC
           LIMIT 40`,
         APPLY_FUNNEL_EVENTS.opened,

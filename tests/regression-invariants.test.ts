@@ -226,13 +226,13 @@ function check(name: string, ok: boolean, hint: string) {
   const submit = read('app/api/applications/route.ts')
   check(
     'I2: application submit rejects non-students',
-    submit.includes("role !== ROLE.CLIENT") && submit.includes('ONLY_STUDENTS_CAN_APPLY'),
+    submit.includes("role !== ROLE.USER") && submit.includes('ONLY_STUDENTS_CAN_APPLY'),
     'Only a STUDENT may apply — an ADMIN/TUTOR submission is a role-integrity hazard.',
   )
   const approve = read('app/api/applications/[id]/route.ts')
   check(
     'I3: application approve never promotes a non-student (no admin demotion)',
-    approve.includes("app.user.role !== ROLE.CLIENT") && approve.includes('CANNOT_PROMOTE_ADMIN'),
+    approve.includes("app.user.role !== ROLE.USER") && approve.includes('CANNOT_PROMOTE_ADMIN'),
     'Approve sets role=TUTOR; without a STUDENT-only guard it demotes an admin who applied.',
   )
 }
@@ -422,7 +422,7 @@ function check(name: string, ok: boolean, hint: string) {
     check(`${f} does not blame the client by fallback`,
       !/=== 'ADMIN' \? 'ადმინმა' : 'შენ'/.test(src),
       'an unrecognised cancelledBy reads as „შენ" again — including every automatic cancellation')
-    check(`${f} names the client explicitly`, /cancelledBy === 'STUDENT'/.test(src),
+    check(`${f} names the client explicitly`, /cancelledBy === 'USER'/.test(src),
       'the client must be named by their own value, never by being the last branch')
     check(`${f} has wording for a cancellation nobody performed`, /ავტომატურად გაუქმ/.test(src),
       'the sweep\'s cancellations have no sentence of their own')

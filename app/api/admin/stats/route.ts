@@ -21,7 +21,7 @@ export async function GET() {
     // Profiles, not roles — see the note in /api/admin/analytics. An expert is
     // somebody with a TutorProfile; the role decides what else they may do.
     prisma.tutorProfile.count(),
-    prisma.user.count({ where: { role: ROLE.CLIENT } }),
+    prisma.user.count({ where: { role: ROLE.USER } }),
     prisma.booking.count(),
     prisma.tutorApplication.count({ where: { status: 'SUBMITTED' } }),
     prisma.booking.count({ where: { status: 'COMPLETED' } }),

@@ -199,7 +199,7 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
           the student workspace, and it sat below „გამოსვლა", where nobody scrolls.
           Do not move it back down. */
       }
-      {role !== ROLE.EXPERT && role !== 'ADMIN' && (
+      {role !== ROLE.PROVIDER && role !== 'ADMIN' && (
         <div className="rounded-card border border-brand-200 bg-brand-50/40 p-6 flex items-center justify-between">
           <div>
             <div className="font-display text-small font-bold text-ink-900">შემოგვიერთდი</div>

@@ -106,11 +106,11 @@ test('the role words come from lib/roles, never a hand-typed ternary', () => {
     if (f.startsWith('lib/roles')) continue
     const src = codeOf(f)
     if (/ROLE\.(EXPERT|CLIENT|ADMIN)\s*\?\s*'(ექსპერტი|კლიენტი|ადმინი|სტუდენტი)'/.test(src)) bad.push(`${f}: role ternary spells the label by hand`)
-    if (/\brole\s*(===|!==)\s*'(STUDENT|TUTOR)'/.test(src)) bad.push(`${f}: compares role to a raw 'STUDENT'/'TUTOR' string — use ROLE.CLIENT / ROLE.EXPERT`)
+    if (/\brole\s*(===|!==)\s*'(STUDENT|TUTOR)'/.test(src)) bad.push(`${f}: compares role to a raw 'USER'/'PROVIDER' string — use ROLE.USER / ROLE.PROVIDER`)
   }
   assert.deepEqual(bad, [])
   const roles = readFileSync(join(ROOT, 'lib/roles.ts'), 'utf8')
-  assert.match(roles, /CLIENT: 'STUDENT'/); assert.match(roles, /EXPERT: 'TUTOR'/)
+  assert.match(roles, /USER: 'USER'/); assert.match(roles, /PROVIDER: 'PROVIDER'/)
   assert.match(roles, /CLIENT: 'კლიენტი'/); assert.match(roles, /EXPERT: 'ექსპერტი'/); assert.match(roles, /MASTER: 'ექსპერტი'/)
   // …and it stays a pure leaf: a client component imports the words from it.
   assert.doesNotMatch(roles, /from '\.\/prisma'|@prisma\/client|from 'react'/)

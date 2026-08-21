@@ -11,7 +11,7 @@ import { ROLE } from '@/lib/roles'
 // relationship, not a list of discrete bookings.
 
 export async function GET() {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
   if (!packagesFeatureExists()) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 

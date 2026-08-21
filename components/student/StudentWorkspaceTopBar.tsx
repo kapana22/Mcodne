@@ -50,7 +50,7 @@ export function StudentWorkspaceTopBar({ user }: { user?: { name: string; avatar
             <Icon.heart className="w-[18px] h-[18px]" />
           </Link>
           <NotifBell />
-          <UserMenu user={user} role="STUDENT" />
+          <UserMenu user={user} role="USER" />
         </div>
       </div>
     </header>

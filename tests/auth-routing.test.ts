@@ -87,8 +87,8 @@ function check(name: string, ok: boolean, hint: string) {
     // TUTOR is deliberate, not a leak: a dual-role user (expert who is also a
     // client) reaches their OWN client-side bookings/messages here. Data is
     // scoped by ?space=client|expert, not by the layout guard.
-    ['app/me/layout.tsx', /requireRole\(\[ROLE\.CLIENT, ROLE\.EXPERT, ROLE\.ADMIN\]\)/],
-    ['app/work/(expert)/layout.tsx', /requireRole\(\[ROLE\.EXPERT, ROLE\.ADMIN\]\)/],
+    ['app/me/layout.tsx', /requireRole\(\[ROLE\.USER, ROLE\.PROVIDER, ROLE\.ADMIN\]\)/],
+    ['app/work/(expert)/layout.tsx', /requireRole\(\[ROLE\.PROVIDER, ROLE\.ADMIN\]\)/],
     ['app/admin/layout.tsx', /requireRole\('ADMIN'\)/],
     ['app/settings/layout.tsx', /requireUser\(\)/],
     ['app/notifications/layout.tsx', /requireUser\(\)/],

@@ -83,6 +83,12 @@ export function useBookingThread({
   const [booking, setBooking] = useState<ThreadBooking | null>(null)
   const [pair, setPair] = useState<ThreadPair | null>(null)
   const [preThread, setPreThread] = useState<ThreadPre | null>(null)
+  /** ⚠️ HOW FAR THE OTHER SIDE HAS READ (2026-08-21) — an ISO stamp, not a flag
+   *  per message, because the incremental `?since` poll only ever carries NEW
+   *  rows: „they read what you sent an hour ago" is a change to an old row and
+   *  can only arrive as its own value. `/api/messages` answers it on every
+   *  response; anything of mine created at or before it has been read. */
+  const [peerReadAt, setPeerReadAt] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -149,6 +155,10 @@ export function useBookingThread({
         // Header (booking/pair) only arrives on the initial full fetch.
         if (j.booking) setBooking(j.booking)
         if (j.pair) setPair(j.pair)
+        // Present on every response, incremental included — and `null` is a
+        // real answer („they have read nothing yet"), so the key is tested
+        // rather than the value.
+        if ('peerReadAt' in (j ?? {})) setPeerReadAt(j.peerReadAt ?? null)
         // Booking mode, initial load only. `null` is a meaningful answer (no
         // earlier pre-booking thread), so only overwrite when the key is present.
         if ('preThread' in (j ?? {})) setPreThread(j.preThread ?? null)
@@ -293,7 +303,7 @@ export function useBookingThread({
   }
 
   return {
-    msgs, booking, pair, preThread, loaded,
+    msgs, booking, pair, preThread, loaded, peerReadAt,
     draft, setDraft,
     attachment, setAttachment, attach, uploading,
     send, sending,

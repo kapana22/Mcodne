@@ -17,7 +17,7 @@ import { useNotifications } from '@/lib/notifications'
 import { isProviderWorkspacePath } from '@/lib/requests'
 import { HELP_PROFESSIONS } from '@/lib/helpProfessions'
 
-type Role = 'STUDENT' | 'TUTOR' | 'ADMIN'
+type Role = 'USER' | 'PROVIDER' | 'ADMIN'
 
 type Tab = {
   href: string
@@ -85,10 +85,14 @@ const PROVIDER_TABS: Tab[] = [
   { href: '/work/services',        label: 'ჩემი სერვისები',    icon: Icon.briefcase, match: startsWith('/work/services') },
 ]
 
+// Keyed by the two roles the product has plus the admin — USER buys, PROVIDER
+// sells, and a consultation is a KIND of service so its seller is a PROVIDER
+// too (2026-08-21). The legacy words never reach here: every caller passes a
+// role through lib/roles → `asRole`.
 const TABS_BY_ROLE: Record<Role, Tab[]> = {
-  STUDENT: STUDENT_TABS,
-  TUTOR:   TUTOR_TABS,
-  ADMIN:   [],
+  USER:     STUDENT_TABS,
+  PROVIDER: TUTOR_TABS,
+  ADMIN:    [],
 }
 
 export function BottomNav({ role, caps = [] }: { role: Role | null; caps?: string[] }) {
@@ -114,14 +118,18 @@ export function BottomNav({ role, caps = [] }: { role: Role | null; caps?: strin
   // capability decides, exactly as the desktop rail's groups do
   // (app/work/layout → NAV_GROUPS). Someone holding both stays on the expert's
   // tabs: that profile is the one with more in it.
+  // ⚠️ THE TAB SET IS CHOSEN BY CAPABILITY, NOT BY ROLE (restated 2026-08-21,
+  // when USER/PROVIDER replaced STUDENT/TUTOR). Both a trades provider and a
+  // consulting one are now the same ROLE, so the role can no longer tell their
+  // tabs apart — and it never should have: what differs is what they SELL.
+  // A provider holding both stays on the expert tabs, which have more in them.
   const workOnly = caps.includes('WORK') && !caps.includes('CONSULT')
-  const space = path.startsWith('/me') ? 'STUDENT'
-    : isProviderWorkspacePath(path) ? 'PROVIDER'
-    : path.startsWith('/work') ? (workOnly ? 'PROVIDER' : 'TUTOR')
-    : role
-  const tabs = !role ? []
-    : space === 'PROVIDER' ? PROVIDER_TABS
-    : TABS_BY_ROLE[space === 'STUDENT' || space === 'TUTOR' ? space : role] ?? []
+  const tabs =
+      path.startsWith('/me') ? STUDENT_TABS
+    : isProviderWorkspacePath(path) ? PROVIDER_TABS
+    : path.startsWith('/work') ? (workOnly ? PROVIDER_TABS : TUTOR_TABS)
+    : !role ? []
+    : TABS_BY_ROLE[role] ?? []
   // Focused screens own the full viewport including the bottom edge, so the
   // tab bar steps aside there:
   //  • conversation threads (student AND tutor) — the composer owns the

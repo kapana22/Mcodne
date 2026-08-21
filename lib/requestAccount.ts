@@ -78,7 +78,7 @@ export async function accountForRequest(input: {
         // 32 random bytes, hashed and discarded. See the header.
         passwordHash: await hashPassword(randomBytes(32).toString('hex')),
         phone: normalizePhone(input.phone),
-        role: ROLE.CLIENT,
+        role: ROLE.USER,
       },
       select: { id: true },
     })

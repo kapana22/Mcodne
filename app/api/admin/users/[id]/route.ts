@@ -188,7 +188,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         return NextResponse.json({ ok: false, error: 'LAST_ADMIN', message: 'ბოლო ადმინს ვერ მოხსნი — ჯერ სხვა ადმინი დანიშნე' }, { status: 400 })
       }
     }
-    const newRole = action === 'makeAdmin' ? 'ADMIN' : 'STUDENT'
+    const newRole = action === 'makeAdmin' ? 'ADMIN' : 'USER'
     const u = await prisma.user.update({ where: { id }, data: { role: newRole }, select: { id: true, role: true } })
     // Demotion: wipe sessions so the ex-admin's shell drops its admin access now.
     if (action === 'revokeAdmin') await prisma.session.deleteMany({ where: { userId: id } }).catch(() => {})

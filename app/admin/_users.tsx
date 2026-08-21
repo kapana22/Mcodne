@@ -18,7 +18,7 @@ import { ROLE, roleLabel as roleLabelOf } from '@/lib/roles'
 type UserDetail = {
   user: {
     id: string; email: string; fullName: string;
-    role: 'STUDENT' | 'TUTOR' | 'ADMIN';
+    role: 'USER' | 'PROVIDER' | 'ADMIN';
     emailVerified: boolean; createdAt: string; avatarUrl: string | null;
     phone?: string | null; bio?: string | null;
     suspendedAt?: string | null;
@@ -169,7 +169,7 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
                   <div className="font-display text-h3 font-bold text-ink-900 truncate">{u.fullName}</div>
                   <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border font-display text-micro font-bold uppercase ${
                     u.role === 'ADMIN' ? 'bg-iris-50 border-iris-200 text-iris-700'
-                    : u.role === ROLE.EXPERT ? 'bg-brand-50 border-brand-200 text-brand-700'
+                    : u.role === ROLE.PROVIDER ? 'bg-brand-50 border-brand-200 text-brand-700'
                     : 'bg-ink-50 border-ink-200 text-ink-600'
                   }`}>{roleLabelOf(u.role)}</span>
                   {u.emailVerified && <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-pill bg-success-50 border border-success-200 text-success-700 font-display text-micro font-bold uppercase"><Icon.check className="w-3 h-3" /> ვერიფ.</span>}
@@ -743,14 +743,14 @@ const ReviewList = ({ items, authorKey }: { items: any[]; authorKey: 'student' |
 /* ───── Section: Users (real data via /api/admin/users) ───── */
 type ApiUser = {
   id: string; email: string; fullName: string;
-  role: 'STUDENT' | 'TUTOR' | 'ADMIN';
+  role: 'USER' | 'PROVIDER' | 'ADMIN';
   emailVerified: boolean; createdAt: string; avatarUrl: string | null;
   _count: { bookingsAsStudent: number; sentMessages: number };
 }
 
 export const UsersSection = () => {
   const [q, setQ] = useState('')
-  const [role, setRole] = useState<'all'|'STUDENT'|'TUTOR'|'ADMIN'>('all')
+  const [role, setRole] = useState<'all'|'USER' | 'PROVIDER' | 'ADMIN'>('all')
   const [users, setUsers] = useState<ApiUser[] | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -858,7 +858,7 @@ export const UsersSection = () => {
             <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="სახელი ან ელფოსტა…" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-small focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
           </div>
           <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200">
-            {(['all','STUDENT','TUTOR','ADMIN'] as const).map(r => (
+            {(['all','USER','PROVIDER','ADMIN'] as const).map(r => (
               <button key={r} type="button" onClick={() => setRole(r)} className={`h-10 sm:h-9 px-3.5 rounded-pill font-display text-small font-semibold tracking-wide transition-colors duration-fast ${role === r ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}>{r === 'all' ? 'ყველა' : roleLabel(r)}</button>
             ))}
           </div>
@@ -923,7 +923,7 @@ export const UsersSection = () => {
                   <td className="px-3 py-3">
                     <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border font-display text-micro font-bold uppercase ${
                       u.role === 'ADMIN' ? 'bg-iris-50 border-iris-200 text-iris-700'
-                      : u.role === ROLE.EXPERT ? 'bg-brand-50 border-brand-200 text-brand-700'
+                      : u.role === ROLE.PROVIDER ? 'bg-brand-50 border-brand-200 text-brand-700'
                       : 'bg-ink-50 border-ink-200 text-ink-600'
                     }`}>{roleLabel(u.role)}</span>
                   </td>
@@ -965,7 +965,7 @@ export const UsersSection = () => {
                       <span className="font-display text-small font-bold text-ink-900 truncate">{u.fullName}</span>
                       <span className={`inline-flex items-center h-5 px-1.5 rounded-pill border font-display text-micro font-bold uppercase ${
                         u.role === 'ADMIN' ? 'bg-iris-50 border-iris-200 text-iris-700'
-                        : u.role === ROLE.EXPERT ? 'bg-brand-50 border-brand-200 text-brand-700'
+                        : u.role === ROLE.PROVIDER ? 'bg-brand-50 border-brand-200 text-brand-700'
                         : 'bg-ink-50 border-ink-200 text-ink-600'
                       }`}>{roleLabel(u.role)}</span>
                       {u.emailVerified && <span className="text-success-700"><Icon.check className="w-3.5 h-3.5 inline" /></span>}

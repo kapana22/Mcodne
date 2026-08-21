@@ -266,7 +266,7 @@ export default function BookingDetail() {
       {booking.rescheduleRequest && (
         <RescheduleBanner
           booking={booking}
-          meRole="STUDENT"
+          meRole="USER"
           onResolved={reload}
         />
       )}

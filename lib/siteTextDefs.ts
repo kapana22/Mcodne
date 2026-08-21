@@ -173,7 +173,13 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'home.steps.s2.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — სათაური', default: 'შეთანხმდი' },
   { key: 'home.steps.s2.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'დეტალებს პირდაპირ ექსპერტთან აზუსტებ. თუ დრო სჭირდება — საათსაც ირჩევ.' },
   { key: 'home.steps.s3.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'შესრულდა' },
-  { key: 'home.steps.s3.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'სამუშაო სრულდება შეთანხმებულ ფასში. კონტაქტს მხოლოდ არჩეული იღებს.' },
+  // ⚠️ THE SECOND SENTENCE WAS A PROMISE ABOUT CONTACT (2026-08-21). „კონტაქტს
+  // მხოლოდ არჩეული იღებს" was true until the phone number stopped being
+  // released to anybody (lib/requests → clientIdentityOpen). THE LIVE PAGE MAY
+  // STILL SAY THE OLD SENTENCE: this is only the default, and a `SiteText` row
+  // overrides it — that row has to be edited in /admin the day this ships, not
+  // before, because until then the deployed code still shows the number.
+  { key: 'home.steps.s3.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'სამუშაო სრულდება შეთანხმებულ ფასში. ყველაფერს მიმოწერაში თანხმდებით.' },
 
   // ── Home · What every booking includes — RETIRED 2026-08-08 (owner) ──
   // The three-cell strip at the foot of „როგორ მუშაობს" was deleted from

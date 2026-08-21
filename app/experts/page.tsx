@@ -29,6 +29,7 @@ import { requestsOn } from '@/lib/requests'
 import { getCurrentUser } from '@/lib/auth'
 import { REQUEST_HREF, filterCounts, queryMasters } from './_masterData'
 import { CatalogClient } from './client'
+import { asRole } from '@/lib/roles'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -64,7 +65,7 @@ export default async function ExpertsCatalogue() {
     getCurrentUser(),
   ])
   const initialUser = user
-    ? { id: user.id, fullName: user.fullName, avatarUrl: user.avatarUrl, role: user.role }
+    ? { id: user.id, fullName: user.fullName, avatarUrl: user.avatarUrl, role: asRole(user.role) }
     : null
 
   // ⚠️ THE FLAG IS READ ONCE, HERE, AND HANDED DOWN. The header's CTA and the

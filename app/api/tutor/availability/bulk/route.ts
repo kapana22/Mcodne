@@ -37,7 +37,7 @@ const Body = z.object({
 })
 
 export async function POST(req: Request) {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })
@@ -127,7 +127,7 @@ export async function POST(req: Request) {
  * Idempotent: a second call deletes 0 rows and still answers 200 { ok: true }.
  */
 export async function DELETE(req: Request) {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const profile = await prisma.tutorProfile.findUnique({ where: { userId: user.id } })

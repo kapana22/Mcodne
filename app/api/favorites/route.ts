@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
   // Saved-experts is a CLIENT feature — a TUTOR/ADMIN has no surface for it.
-  if (user.role !== ROLE.CLIENT) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
+  if (user.role !== ROLE.USER) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
-  if (user.role !== ROLE.CLIENT) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
+  if (user.role !== ROLE.USER) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 })
 
   // Accept tutorId from either JSON body OR query string (?tutorId=…),
   // since some HTTP clients strip DELETE request bodies.

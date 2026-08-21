@@ -53,6 +53,7 @@
 export const dynamic = 'force-dynamic'
 
 import type { Metadata } from 'next'
+import { asRole } from '@/lib/roles'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
@@ -397,7 +398,7 @@ export default async function TutorProfileRoute(
       ? await queryMasters(trade.topic ? { groups: [], topics: [trade.topic.id], cities: [] } : { groups: [trade.group.id], topics: [], cities: [] })
       : null
     const initialUser = user
-      ? { id: user.id, fullName: user.fullName, avatarUrl: user.avatarUrl, role: user.role }
+      ? { id: user.id, fullName: user.fullName, avatarUrl: user.avatarUrl, role: asRole(user.role) }
       : null
     const breadcrumbLd = {
       '@context': 'https://schema.org',
@@ -464,7 +465,7 @@ export default async function TutorProfileRoute(
   // /experts/<slug> too, resolved by this very file's step 4.
   const masterHref = initial?.masterHref ?? null
   const initialUser = viewer
-    ? { id: viewer.id, fullName: viewer.fullName, avatarUrl: viewer.avatarUrl, role: viewer.role }
+    ? { id: viewer.id, fullName: viewer.fullName, avatarUrl: viewer.avatarUrl, role: asRole(viewer.role) }
     : null
 
   // ⚠️ THE SECOND VERB, AND IT IS THE SECONDARY ONE (2026-08-19). „დაჯავშნე"
@@ -587,7 +588,7 @@ async function providerProfile(provider: { id: string; slug: string | null }) {
   const [p, user] = await Promise.all([getMasterProfile(provider.id), getCurrentUser()])
   if (!p) notFound()
   const initialUser = user
-    ? { id: user.id, fullName: user.fullName, avatarUrl: user.avatarUrl, role: user.role }
+    ? { id: user.id, fullName: user.fullName, avatarUrl: user.avatarUrl, role: asRole(user.role) }
     : null
 
   // ⚠️ THE FLAG IS READ ONCE, HERE, AND HANDED DOWN — see app/experts/page.tsx.

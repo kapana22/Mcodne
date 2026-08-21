@@ -35,7 +35,7 @@ const CreateBody = Offering
 // Public read is fine (tutor detail already exposes services), but write requires
 // tutor owner (or admin). Currently only listing the caller's own consultations.
 export async function GET() {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const tutor = await prisma.tutorProfile.findUnique({ where: { userId: user.id }, select: { id: true } })
@@ -48,7 +48,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireRoleApi([ROLE.EXPERT, ROLE.ADMIN])
+  const auth = await requireRoleApi([ROLE.PROVIDER, ROLE.ADMIN])
   if (auth.response) return auth.response
   const user = auth.user
   const tutor = await prisma.tutorProfile.findUnique({ where: { userId: user.id }, select: { id: true } })

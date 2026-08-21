@@ -10,7 +10,7 @@ export type BookingStatus = 'PREPARING' | 'CONFIRMED' | 'LIVE' | 'COMPLETED' | '
 
 
 type ReschedulePayload = {
-  proposedBy: 'STUDENT' | 'TUTOR'
+  proposedBy: 'USER' | 'PROVIDER'
   newStartAt: string
   reason: string | null
   proposedAt: string

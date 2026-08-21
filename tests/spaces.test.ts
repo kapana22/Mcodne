@@ -58,7 +58,7 @@ test('§A /me carries every client screen; /student is gone', () => {
   ]) assert.ok(has(p), `${p} is missing`)
   assert.ok(!has('app/student'), 'app/student is back — the client space is /me')
   // The guard is the old one: a TUTOR is admitted to their own client side.
-  assert.match(codeOf('app/me/layout.tsx'), /requireRole\(\[ROLE\.CLIENT, ROLE\.EXPERT, ROLE\.ADMIN\]\)/)
+  assert.match(codeOf('app/me/layout.tsx'), /requireRole\(\[ROLE\.USER, ROLE\.PROVIDER, ROLE\.ADMIN\]\)/)
   assert.match(codeOf('app/me/layout.tsx'), /StudentWorkspaceShell/)
 })
 
@@ -120,15 +120,15 @@ test('§B /work carries both groups under one shell; /tutor and /provider are go
   // The route constants agree with the tree.
   assert.equal(PROVIDER_ROUTE, '/work')
   assert.deepEqual([...PROVIDER_WORKSPACE_PATHS], ['/work/requests', '/work/offers'])
-  assert.equal(homeForRole('TUTOR'), '/work')
-  assert.equal(homeForRole('STUDENT'), '/me')
+  assert.equal(homeForRole('PROVIDER'), '/work')
+  assert.equal(homeForRole('USER'), '/me')
 })
 
 /* ═══════════ 2. the guards ═══════════════════════════════════════════════ */
 
 test('§C the two guards: (expert) redirects to sign-in, (provider) answers 404 and NEVER redirects', () => {
   const expert = codeOf('app/work/(expert)/layout.tsx')
-  assert.match(expert, /requireRole\(\[ROLE\.EXPERT, ROLE\.ADMIN\]\)/, 'the expert guard is gone')
+  assert.match(expert, /requireRole\(\[ROLE\.PROVIDER, ROLE\.ADMIN\]\)/, 'the expert guard is gone')
   // A WORK-only master is sent to their own screen, before the role guard would
   // bounce them to /me — keyed on the capability, never on a role.
   //
@@ -158,7 +158,7 @@ test('§D the /work shell is chrome only: nothing without a session, groups by c
     'a signed-out visitor gets chrome — the (provider) 404 is no longer a bare 404')
   assert.doesNotMatch(shell, /redirect\(|notFound\(|requireRole\(|requireUser\(/, 'the shell became a guard')
   assert.match(shell, /const caps = await capabilitiesOf\(user\.id\)/, 'the shell stopped reading capabilities')
-  assert.match(shell, /expert:\s+isAdmin\s+\|\|\s+user\.role\s+===\s+ROLE\.EXPERT\s+\|\|\s+caps\.includes\('CONSULT'\)/, 'the expert group is not keyed on CONSULT')
+  assert.match(shell, /expert:\s+isAdmin\s+\|\|\s+user\.role\s+===\s+ROLE\.PROVIDER\s+\|\|\s+caps\.includes\('CONSULT'\)/, 'the expert group is not keyed on CONSULT')
   assert.match(shell, /work:\s+viewer\s+!==\s+null\s+&&\s+\(caps\.includes\('WORK'\)\s+\|\|\s+viewer\.providerAllowed\)/, 'the master group is not keyed on WORK / the allowlist')
   assert.match(shell, /const\s+viewer\s+=\s+providersOn\(\)\s+\?\s+await\s+requestsViewer\(\)\s+:\s+null/, 'the master group ignores the supply-side switch')
   // ⚠️ ONE LIST, ITEMS BY FUNCTION (2026-08-19). The rail used to draw the
@@ -250,10 +250,17 @@ test('§F the subsystem owns three /work screens, never /work — and the chrome
   // it is — failed a test about something else entirely. What must hold is that
   // the master's three exact paths are tested BEFORE the /work prefix they live
   // under; that is the distinction, and it is what is asserted.
-  const spaceExpr = nav.slice(nav.indexOf('const space ='), nav.indexOf('const tabs ='))
-  assert.ok(spaceExpr.includes("path.startsWith('/me')"), 'BottomNav no longer reads the client space off the path')
+  //
+  // ⚠️ THE INTERMEDIATE `space` VARIABLE IS GONE (2026-08-21). Once USER and
+  // PROVIDER replaced STUDENT and TUTOR, both kinds of seller became one ROLE —
+  // so the role could no longer choose between the trades tabs and the expert
+  // tabs, and the choice moved to the CAPABILITY, where it always belonged. The
+  // ternary now selects the tab set directly. The ORDER is still the rule, and
+  // it is still read off the same expression.
+  const tabExpr = nav.slice(nav.indexOf('const tabs ='), nav.indexOf('// Focused screens'))
+  assert.ok(tabExpr.includes("path.startsWith('/me')"), 'BottomNav no longer reads the client space off the path')
   assert.ok(
-    spaceExpr.indexOf('isProviderWorkspacePath(path)') < spaceExpr.indexOf("path.startsWith('/work')"),
+    tabExpr.indexOf('isProviderWorkspacePath(path)') < tabExpr.indexOf("path.startsWith('/work')"),
     'BottomNav space detection changed — the master test must run BEFORE the /work prefix test',
   )
   for (const href of ['/me', '/me/bookings', '/me/messages', '/me/favorites']) assert.ok(nav.includes(`href: '${href}'`), `STUDENT_TABS lost ${href}`)

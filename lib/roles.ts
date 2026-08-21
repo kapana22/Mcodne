@@ -1,17 +1,29 @@
 // The words for who somebody is — ONE place, and a pure leaf.
 //
-// ⚠️ THE DATABASE STILL SAYS STUDENT / TUTOR / ADMIN, AND IT WILL KEEP SAYING
-// SO. `Role` is a Postgres enum managed by lib/dbBoot's boot-time DDL — there
-// are no migrations — and every enum change there is additive. Renaming a value
-// is a hard cut-over: during a rolling deploy the new instance would rename
-// while the old one keeps writing `role: 'STUDENT'`, and every one of those
-// writes fails. `prisma db push` is worse: Prisma cannot express a rename, so
-// it drops and recreates the enum and the column data with it.
+// ⚠️ TWO ROLES, NOT THREE (2026-08-21). Owner: „კონსულტანტი საერთოდ უნდა
+// ამოვიღოთ. ორი უნდა დავტოვოთ — ჩვეულებრივი მყიდველი და სერვისის გამყიდველი.
+// და სტუდენტი არ უნდა იყოს მყიდველი, მომხმარებელია ეს."
 //
-// So the rename happens HERE and on the screen, nowhere else. Code compares
-// against `ROLE.CLIENT`, never against the string; screens read `roleLabel()`
-// or `HAT_LABEL`, never a hand-typed „სტუდენტი" — that word was written by
-// hand in 39 files, and one person was three different nouns on three screens.
+//   USER      buys. Registered at /signup, sells nothing, /me is their room.
+//   PROVIDER  sells. Registered at /join, /work is their room.
+//   ADMIN     runs the place.
+//
+// A CONSULTATION IS A KIND OF SERVICE, so whoever sells one is a PROVIDER too —
+// „consultant" was never a third identity, it was the first product wearing a
+// role. That is why TUTOR is gone rather than renamed alongside a new value.
+//
+// WHAT WAS WRONG. `Role` was STUDENT / TUTOR / ADMIN and had no provider value,
+// so somebody selling services had to be stored as STUDENT — the same word as
+// somebody who has only ever bought. Measured that day: 26 sellers TUTOR, 2
+// sellers STUDENT, 30 plain buyers STUDENT. A column that cannot tell a seller
+// from a buyer is not answering the question a role exists to answer.
+//
+// ⚠️ THE LEGACY WORDS ARE STILL UNDERSTOOD, AND THAT IS LOAD-BEARING. The enum
+// gained USER and PROVIDER additively (lib/dbBoot), so at the moment this code
+// ships every row still says STUDENT or TUTOR. `asRole` maps them on READ, so
+// the deploy and the data move are independent and nobody is locked out of
+// their own account in between. The legacy branch can go once the backfill has
+// run and `SELECT DISTINCT role FROM "User"` shows only the three words above.
 //
 // Pure on purpose: no prisma, no react, no environment. lib/hats (which needs
 // prisma) re-exports the hat vocabulary from here so a client component can
@@ -19,11 +31,29 @@
 
 /** The enum values as the product names them. Compare against these. */
 export const ROLE = {
-  CLIENT: 'STUDENT',
-  EXPERT: 'TUTOR',
+  USER: 'USER',
+  PROVIDER: 'PROVIDER',
   ADMIN: 'ADMIN',
 } as const
 export type RoleCode = (typeof ROLE)[keyof typeof ROLE]
+
+/** What the database may still be holding while the backfill catches up. */
+const LEGACY_ROLE: Record<string, RoleCode> = {
+  STUDENT: ROLE.USER,
+  TUTOR: ROLE.PROVIDER,
+}
+
+/**
+ * Whatever the database said → what the product means.
+ *
+ * EVERY read of `User.role` goes through this. An unknown value reads as USER,
+ * which is the least privilege in the system: a word nobody recognises must
+ * never open a workspace.
+ */
+export function asRole(role: string | null | undefined): RoleCode {
+  if (role === ROLE.USER || role === ROLE.PROVIDER || role === ROLE.ADMIN) return role
+  return LEGACY_ROLE[role ?? ''] ?? ROLE.USER
+}
 
 /** What a person can do here. Ordered by how much of the site each one owns —
  *  `homeForHats` (lib/hats) walks this order and the first match wins. */
@@ -43,7 +73,7 @@ export const HAT_LABEL: Record<Hat, string> = {
  *  because that is what everybody without a special role is. */
 export function roleLabel(role: string | null | undefined): string {
   if (role === ROLE.ADMIN) return HAT_LABEL.ADMIN
-  if (role === ROLE.EXPERT) return HAT_LABEL.EXPERT
+  if (role === ROLE.PROVIDER) return HAT_LABEL.EXPERT
   return HAT_LABEL.CLIENT
 }
 

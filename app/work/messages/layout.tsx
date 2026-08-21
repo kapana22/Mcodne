@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function MessagesLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser()
-  const privileged = user.role === ROLE.EXPERT || user.role === ROLE.ADMIN
+  const privileged = user.role === ROLE.PROVIDER || user.role === ROLE.ADMIN
   if (!privileged) {
     const caps = await capabilitiesOf(user.id)
     if (caps.length === 0) notFound()

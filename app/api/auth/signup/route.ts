@@ -68,7 +68,7 @@ export async function POST(req: Request) {
         fullName: fullName.trim(),
         passwordHash: await hashPassword(password),
         phone: normalizePhone(phone),
-        role: ROLE.CLIENT,
+        role: ROLE.USER,
       },
     })
   } catch (e: unknown) {

@@ -39,7 +39,7 @@ export type Me = {
   email?: string
   fullName: string
   avatarUrl?: string | null
-  role: 'STUDENT' | 'TUTOR' | 'ADMIN'
+  role: 'USER' | 'PROVIDER' | 'ADMIN'
   phone?: string | null
   bio?: string | null
   emailVerified?: boolean

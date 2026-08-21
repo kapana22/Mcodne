@@ -11,7 +11,7 @@ import { PitchFaqLd, PitchSections } from '../_sections'
 // Public „გახდი ექსპერტი" page — what a SIGNED-OUT visitor (and Googlebot)
 // sees at /join.
 //
-// WHY IT EXISTS: /apply used to call requireRole([ROLE.CLIENT]) in its layout, so
+// WHY IT EXISTS: /apply used to call requireRole([ROLE.USER]) in its layout, so
 // a guest was bounced to /signin. That meant the page could never be crawled,
 // its metadata was dead, and „გახდი ექსპერტი / კონსულტანტი ვაკანსია" — real
 // search intent, and the exact intent this marketplace most needs to capture —

@@ -44,7 +44,7 @@ export default async function Page() {
 
   // The consultation half: an expert profile (or an admin looking).
   const caps = await capabilitiesOf(user.id)
-  const showBookings = user.role === ROLE.EXPERT || user.role === ROLE.ADMIN || caps.includes('CONSULT')
+  const showBookings = user.role === ROLE.PROVIDER || user.role === ROLE.ADMIN || caps.includes('CONSULT')
 
   // The job half. `providersOn()` first, so the supply switch being off costs
   // no query — and the viewer, never a role, decides who has an identity to

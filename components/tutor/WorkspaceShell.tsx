@@ -29,7 +29,7 @@ export function WorkspaceShell({
   children,
 }: {
   user?: { name: string; avatar?: string | null }
-  role: 'STUDENT' | 'TUTOR' | 'ADMIN'
+  role: 'USER' | 'PROVIDER' | 'ADMIN'
   groups: NavGroups
   /** Verified requests with a place left — the master's queue badge. */
   openRequests?: number

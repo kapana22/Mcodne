@@ -4,8 +4,10 @@
 // A client component only because accepting is a mutation — the page itself is
 // server-rendered and hands this the ALREADY SHAPED offers. It receives no row
 // and does no query, so there is nothing here that could widen what a client
-// sees; `providerPhone` and `providerEmail` arrive null unless that offer is
-// the accepted one, decided by clientOfferView in lib/requests.
+// sees — and since 2026-08-21 what it is handed carries no contact at all: the
+// chosen provider's phone and email left `clientOfferView` (lib/requests) with
+// the block that printed them here. Everything is arranged in the thread below,
+// where after the choice the two sides may type a number to each other.
 
 import { useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -28,8 +30,6 @@ type Offer = {
   providerVerified: boolean
   providerRating: number | null
   providerReviews: number
-  providerPhone: string | null
-  providerEmail: string | null
   unread: number
   /** After the choice (stage 7): QUOTE offers can be marked done and reviewed. */
   kind: string
@@ -177,25 +177,6 @@ export function OfferList({ publicRef, offers, matched, canReview, empty }: {
             </p>
 
             <p className="mt-3 text-body text-ink-800 whitespace-pre-wrap leading-relaxed">{o.message}</p>
-
-            {/* ⚠️ THE CONTACT. Present on exactly one offer, and only after the
-                client chose it. This is the product — see lib/requests. */}
-            {accepted && (o.providerPhone || o.providerEmail) && (
-              <div className="mt-4 pt-4 border-t border-ink-100">
-                {o.providerPhone && (
-                  <p className="text-body text-ink-900">
-                    <span className="text-ink-500">ტელეფონის ნომერი: </span>
-                    <a href={`tel:${o.providerPhone}`} className="font-semibold underline underline-offset-2">{o.providerPhone}</a>
-                  </p>
-                )}
-                {o.providerEmail && (
-                  <p className="mt-1 text-body text-ink-900">
-                    <span className="text-ink-500">ელფოსტა: </span>
-                    <a href={`mailto:${o.providerEmail}`} className="font-semibold underline underline-offset-2">{o.providerEmail}</a>
-                  </p>
-                )}
-              </div>
-            )}
 
             {/* ── Ask before choosing ──────────────────────────────────
                 Open from the moment the offer exists, which is the whole point:

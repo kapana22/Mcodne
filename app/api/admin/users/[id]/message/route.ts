@@ -19,7 +19,7 @@ import {
    everyone; it could not simply WRITE to one of them. This is that channel.
 
    Deliberately NOT the chat/messages system: app/api/messages/route.ts refuses
-   any thread involving an ADMIN (`!roles.has('TUTOR') || roles.has('ADMIN')`),
+   any thread involving an ADMIN (`!roles.has('PROVIDER') || roles.has('ADMIN')`),
    because threads carry client PII between the two people on a booking and an
    admin is not one of them. That trust boundary stays exactly where it is —
    the pair below (in-app notification + a REPLYABLE email) is the channel, and

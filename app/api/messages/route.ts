@@ -118,7 +118,7 @@ export async function GET(req: Request) {
     })
     if (!other) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
     // ⚠️ „IS EITHER PARTY LISTED", NOT „IS EITHER PARTY A TUTOR" (2026-08-20).
-    // This asked for `ROLE.EXPERT` on one side, which excluded every SERVICE
+    // This asked for `ROLE.PROVIDER` on one side, which excluded every SERVICE
     // PROVIDER: they are admitted through `RequestAccess`, not by being granted
     // the role — all seven live ones are STUDENT. See lib/publicProvider for the
     // measurement and why the role was the wrong question to ask.
@@ -167,7 +167,25 @@ export async function GET(req: Request) {
     // long thread's full base64 attachment history isn't re-downloaded on every
     // open; the incremental ?since poll fetches only the (small) delta ascending.
     const initialLoad = !sinceValid
-    const rowsPair = await prisma.message.findMany({
+    // ⚠️ THE PEER'S READ MARK, AS ONE TIMESTAMP (2026-08-21) — „მინდა…
+    // დამატე ნახვის ფუნქცია, რომ მომხმარებელმა ნახა მესიჯი".
+    //
+    // It cannot be read off `messages` and that is the whole reason it exists:
+    // the poll is INCREMENTAL (`?since=`), so it returns only messages created
+    // since the last one — and „they read what you sent an hour ago" is a change
+    // to an OLD row, which such a poll can never carry. Re-sending the thread on
+    // every poll to catch it would undo the payload cap two lines below.
+    //
+    // So: the newest `readAt` among the messages I SENT them. One aggregate on
+    // an indexed pair, fired CONCURRENTLY with the thread read (Promise.all,
+    // never a second round trip), and the client compares it against its own
+    // messages' createdAt — the same „read up to here" mark every messenger
+    // shows, and one value instead of a per-message field.
+    const peerReadPromise = prisma.message.aggregate({
+      _max: { readAt: true },
+      where: { bookingId: null, fromId: user.id, toId: withUser },
+    }).catch(() => null)
+    const rowsPairPromise = prisma.message.findMany({
       where: {
         bookingId: null,
         ...sinceFilter,
@@ -185,6 +203,7 @@ export async function GET(req: Request) {
       // repeated avatar from multiplying the payload per message.
       include: { from: { select: { id: true, fullName: true } } },
     })
+    const [rowsPair, peerRead] = await Promise.all([rowsPairPromise, peerReadPromise])
     const messages = initialLoad ? rowsPair.reverse() : rowsPair
     // Read receipts + notif cleanup are UX side-effects the payload doesn't need
     // — defer them past the response so these WRITES never sit in the request's
@@ -204,6 +223,9 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       messages,
+      // On EVERY response, incremental ones included — see the note above: this
+      // is the one fact a `?since` poll could not otherwise deliver.
+      peerReadAt: peerRead?._max.readAt ? peerRead._max.readAt.toISOString() : null,
       // Header only on the initial (non-incremental) load; the client keeps it.
       ...(sinceValid ? {} : {
         pair: {
@@ -279,7 +301,14 @@ export async function GET(req: Request) {
           select: { fromId: true },
         }).catch(() => null)
       : Promise.resolve(null)
-    const [messagesRaw, preFirst] = await Promise.all([messagesPromise, preFirstPromise])
+    // The same read mark as the pair branch above, for the same reason, scoped
+    // to this booking's thread — fanned out with the two reads already in
+    // flight, so it costs no extra round trip.
+    const peerReadPromise = prisma.message.aggregate({
+      _max: { readAt: true },
+      where: { bookingId, fromId: user.id },
+    }).catch(() => null)
+    const [messagesRaw, preFirst, peerRead] = await Promise.all([messagesPromise, preFirstPromise, peerReadPromise])
     const messages = initialLoadB ? messagesRaw.reverse() : messagesRaw
     const tMsgs = performance.now()
     const preThread = preFirst && (preFirst.fromId === user.id) === iAmStudent
@@ -332,6 +361,7 @@ export async function GET(req: Request) {
     const res = NextResponse.json({
       ok: true,
       messages,
+      peerReadAt: peerRead?._max.readAt ? peerRead._max.readAt.toISOString() : null,
       // Header only on the initial (non-incremental) load; the client keeps it.
       ...(sinceValid ? {} : {
         booking: {
@@ -699,7 +729,7 @@ export async function POST(req: Request) {
       // throws, no-ops without a TutorProfile, self-throttled to once per
       // 10 min per process (lib/responseTimeStore). Only for a TUTOR sender —
       // the role is already loaded on `user`, so the guard is free.
-      if ((user as any).role === ROLE.EXPERT) await recomputeResponseTime(user.id)
+      if ((user as any).role === ROLE.PROVIDER) await recomputeResponseTime(user.id)
     })
 
     return NextResponse.json({ ok: true, message: msg })

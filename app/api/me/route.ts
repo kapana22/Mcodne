@@ -76,7 +76,7 @@ export async function GET() {
     // „somebody who bids on requests" — an allowlisted tradesperson keeps role
     // STUDENT (lib/hats states why). So `UserMenu` was labelling a master
     // „სტუდენტი", offering them „შემოგვიერთდი → /apply" (the EXPERT form), and
-    // gating its space switcher on `role === ROLE.EXPERT` — which meant there was
+    // gating its space switcher on `role === ROLE.PROVIDER` — which meant there was
     // no route back to /provider from anywhere on the site. Their own workspace
     // was reachable only by typing the URL or signing in again.
     //

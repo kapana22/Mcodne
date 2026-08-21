@@ -415,7 +415,7 @@ function ExpertProfile({ initialTutor, initialUser, masterHref, requestHref }: {
   const viewerCantBook = viewer?.role === 'ADMIN'
   // Favorites remain STUDENT-only (the favorites API still 403s a TUTOR), so the
   // save button uses a separate flag from booking (which a dual-role TUTOR can do).
-  const viewerCantFav = !!(viewer?.role && viewer.role !== ROLE.CLIENT)
+  const viewerCantFav = !!(viewer?.role && viewer.role !== ROLE.USER)
   const onMessageExpert = () => {
     if (requireAuth('message')) return
     if (!expertUserId) return

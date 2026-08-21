@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { lastReadMessageId } from '@/lib/chatRead'
 import { Avatar } from '@/components/Avatar'
 import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
@@ -128,8 +129,29 @@ export function BookingChat({
 }: BookingChatProps) {
   const {
     msgs, booking, pair, preThread, loaded, draft, setDraft, attachment, setAttachment, attach,
-    uploading, send, sending, requestCall, calling, error,
+    uploading, send, sending, requestCall, calling, error, peerReadAt,
   } = useBookingThread({ bookingId, withUser, me, initialMessages, onActivity })
+
+  /* ⚠️ „წაკითხულია", WHICH THIS CHAT NEVER HAD (2026-08-21). Owner: „დამატე
+     ნახვის ფუნქცია, რომ მომხმარებელმა ნახა მესიჯი." The column has been written
+     all along — `Message.readAt`, stamped when the recipient opens the thread,
+     and already spent on the inbox's unread badges — so nothing new is stored;
+     what was missing was the SENDER ever being told.
+
+     ONE LINE, UNDER THE LAST MESSAGE OF MINE THEY HAVE READ. Not a tick on
+     every bubble: the receipt that matters is „read up to here", and repeating
+     it down the thread turns a fact into wallpaper. Same shape as the offer
+     chat's (components/RequestChat), so the two conversations on this platform
+     say it the same way.
+
+     The mark is a TIMESTAMP rather than a flag per row, because the poll is
+     incremental — see the note in useBookingThread. An optimistic `tmp-` bubble
+     has a client clock in `createdAt`; it can only ever be NEWER than the
+     server's stamp, so it never shows a receipt it has not earned. */
+  const lastReadMineId = useMemo(
+    () => lastReadMessageId(msgs, me?.id, peerReadAt),
+    [msgs, peerReadAt, me?.id],
+  )
 
   // Sender avatars, resolved once from the thread's two participants — the API
   // no longer embeds an avatar on every message (that repetition made payloads
@@ -245,6 +267,9 @@ export function BookingChat({
                   </div>
                 )}
                 <MessageBubble m={m} mine={mine} tz={tz} groupedWithPrev={groupedWithPrev} groupedWithNext={groupedWithNext} avatarSrc={avatarOf.get(m.fromId)} />
+                {m.id === lastReadMineId && (
+                  <div className="mt-0.5 text-right text-micro text-ink-500">წაკითხულია</div>
+                )}
               </div>
             )
           })

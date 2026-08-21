@@ -121,7 +121,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   if (action === 'approve') {
-    if (app.user.role !== ROLE.CLIENT) {
+    if (app.user.role !== ROLE.USER) {
       // Only a STUDENT applicant can be promoted. ADMIN → refuse outright;
       // an existing TUTOR is already an expert (nothing to promote).
       return NextResponse.json(
@@ -213,7 +213,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     /* THE APPLICANT'S OWN ANSWERS, CARRIED ONTO THE ACCOUNT.
      *
      * Approval copied a dozen fields onto the TutorProfile and wrote exactly
-     * `{ role: ROLE.EXPERT }` to the User — so `fullName` and `phone`, the two
+     * `{ role: ROLE.PROVIDER }` to the User — so `fullName` and `phone`, the two
      * things /apply validates hardest, were collected and then dropped.
      * Measured on production 2026-08-17: 15 of 25 approved experts gave a phone
      * on /apply and their account still had `phone: null`, and one gave
@@ -231,7 +231,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
      * overwrite a good account name with a worse one).
      * PHONE: FILLED, NEVER OVERWRITTEN — a number the person later set in
      * /settings is newer than the one on the application. */
-    const promoted: { role: typeof ROLE.EXPERT; fullName?: string; phone?: string } = { role: ROLE.EXPERT }
+    const promoted: { role: typeof ROLE.PROVIDER; fullName?: string; phone?: string } = { role: ROLE.PROVIDER }
     {
       const appName = (app.fullName ?? '').trim()
       if (appName && !georgianNameError('სახელი', appName)) promoted.fullName = appName

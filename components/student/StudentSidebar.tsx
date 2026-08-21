@@ -57,7 +57,7 @@ export function StudentSidebar({ badges }: { badges: StudentBadges }) {
           in the group above because it leaves the client space — same reason
           „ექსპერტები" does — but it is now ALWAYS on screen, not one click deep
           in the avatar menu. Gated on the real role, never on the shell's
-          hardcoded "STUDENT" (see APPLY_LINK). */}
+          hardcoded "USER" (see APPLY_LINK). */}
       <div className="mt-4 pt-4 border-t border-ink-100 flex flex-col gap-0.5">
         <NavRow item={CATALOG_LINK} badges={badges} />
         <ApplyCtaGate>

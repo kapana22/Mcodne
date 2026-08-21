@@ -21,7 +21,7 @@ export const RescheduleBanner = ({
   onResolved,
 }: {
   booking: Booking
-  meRole: 'STUDENT' | 'TUTOR'
+  meRole: 'USER' | 'PROVIDER'
   onResolved: () => void
 }) => {
   const { toast } = useToast()
@@ -372,9 +372,9 @@ const StatusTimeline = ({ booking }: { booking: Booking }) => {
     if (s === 'CANCELED') {
       // Same fallback correction as _hero: an unrecognised actor is the
       // platform's own sweep, never the client. See the note there.
-      const who = booking.cancelledBy === 'TUTOR' ? 'ექსპერტმა გააუქმა'
+      const who = booking.cancelledBy === 'PROVIDER' ? 'ექსპერტმა გააუქმა'
         : booking.cancelledBy === 'ADMIN' ? 'ადმინმა გააუქმა'
-        : booking.cancelledBy === 'STUDENT' ? 'შენ გააუქმე'
+        : booking.cancelledBy === 'USER' ? 'შენ გააუქმე'
         : 'ავტომატურად გაუქმდა'
       list.push({ at: null, l: who, done: true, sub: booking.cancelReason || (PAYMENTS_LIVE ? 'დაცული თანხა დაბრუნდა' : undefined) })
     }

@@ -97,7 +97,7 @@ export function PublicTopBar({
   // the client-side one they also own. null → guest or ADMIN: no inbox, and
   // useMessagesUnread then subscribes to nothing at all.
   const msgSpace: MessagesSpace | null =
-    me?.role === ROLE.EXPERT ? 'expert' : me?.role === ROLE.CLIENT ? 'client' : null
+    me?.role === ROLE.PROVIDER ? 'expert' : me?.role === ROLE.USER ? 'client' : null
   const msgUnread = useMessagesUnread(msgSpace)
   const [mobOpen, setMobOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -381,7 +381,7 @@ export function PublicTopBar({
                   Still STUDENT-only on purpose: the favourites API 403s every
                   other role (saved-experts is a client feature), so showing the
                   heart to a TUTOR/ADMIN would open a page that cannot load. */}
-              {me.role === ROLE.CLIENT && (
+              {me.role === ROLE.USER && (
                 <Link
                   href="/me/favorites"
                   aria-label="შენახული"

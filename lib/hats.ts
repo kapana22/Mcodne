@@ -12,7 +12,7 @@
 // here is not. The same human is a CLIENT when they need a lawyer and a MASTER
 // when somebody needs a plumber; the owner is an ADMIN and on the allowlist; a
 // tutor may also do home repairs. `Role` cannot hold two of those at once, and
-// adding a value would force every `role === ROLE.CLIENT` check on the site —
+// adding a value would force every `role === ROLE.USER` check on the site —
 // homeForRole, showApplyCta, requireRole, the nav, the shells, the booking flow
 // — to be re-examined to express something only one subsystem cares about.
 //

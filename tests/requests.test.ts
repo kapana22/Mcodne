@@ -35,7 +35,7 @@ import {
   extrasFor, normalizeExtras, extrasLabels, templateFor, offerTemplateFor, timeAgoKa,
   offerProviderError, accessSubjectError,
   placesLeft, requestIsOpen,
-  providerRequestView, clientOfferView, clientContactFor,
+  providerRequestView, clientOfferView, clientIdentityOpen,
   ServiceRequestInput, RequestOfferInput, AdminRequestPatch,
   serviceRequestRow, topicLabel, REQUEST_STATIONS, stationsReached,
   canOpenRequestForm, showRequestCta,
@@ -43,6 +43,7 @@ import {
 import {
   threadIsOpen, threadClosedReason, staffIsOnline, PRESENCE_TTL_MS,
 } from '../lib/requestThread'
+import { offerPeerName } from '../lib/inboxRows'
 import { answerLabel, EMPTY_DRAFT, type Draft } from '../app/request/_model'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -116,10 +117,10 @@ test('the gate answers correctly in BOTH states, not just this one', () => {
   const VIEWERS = [
     { label: 'admin',              v: { role: 'ADMIN' } },
     { label: 'admin + access',     v: { role: 'ADMIN', hasAccess: true } },
-    { label: 'allowlisted tutor',  v: { role: 'TUTOR', hasAccess: true } },
-    { label: 'plain tutor',        v: { role: 'TUTOR' } },
-    { label: 'allowlisted client', v: { role: 'STUDENT', hasAccess: true } },
-    { label: 'plain client',       v: { role: 'STUDENT' } },
+    { label: 'allowlisted tutor',  v: { role: 'PROVIDER', hasAccess: true } },
+    { label: 'plain tutor',        v: { role: 'PROVIDER' } },
+    { label: 'allowlisted client', v: { role: 'USER', hasAccess: true } },
+    { label: 'plain client',       v: { role: 'USER' } },
     { label: 'signed out',         v: { role: null } },
     { label: 'nothing at all',     v: {} },
     // Case matters. Guards against a future `canSeeRequests(user.someField)`
@@ -204,9 +205,9 @@ test('an allowlist row is the ONLY way in that is not being an admin', () => {
   // „simplified" later: the obvious shortcut is „every approved expert can
   // bid". Those experts applied to be BOOKED. An empty allowlist can only ever
   // produce an empty audience, which is the only safe state for a stage-1 test.
-  assert.equal(requestsVisibleTo(true, { role: 'TUTOR' }), false,
+  assert.equal(requestsVisibleTo(true, { role: 'PROVIDER' }), false,
     'being an expert now grants access — the allowlist has been bypassed')
-  assert.equal(requestsVisibleTo(true, { role: 'TUTOR', hasAccess: true }), true)
+  assert.equal(requestsVisibleTo(true, { role: 'PROVIDER', hasAccess: true }), true)
 })
 
 test('SEEING the subsystem and BEING a provider are two questions', () => {
@@ -274,8 +275,8 @@ test('the two gates are different answers, and each is the right one', () => {
   // could ask a question) passed every other test in this file.
   const GUESTS = [
     {},
-    { role: 'STUDENT' },
-    { role: 'TUTOR' },
+    { role: 'USER' },
+    { role: 'PROVIDER' },
     { role: 'ADMIN' },
   ] as const
 
@@ -288,9 +289,9 @@ test('the two gates are different answers, and each is the right one', () => {
   }
 
   // ON: the provider side still asks who you are…
-  assert.equal(requestsVisibleTo(true, { role: 'STUDENT' }), false)
-  assert.equal(requestsVisibleTo(true, { role: 'TUTOR' }), false)
-  assert.equal(requestsVisibleTo(true, { role: 'TUTOR', hasAccess: true }), true)
+  assert.equal(requestsVisibleTo(true, { role: 'USER' }), false)
+  assert.equal(requestsVisibleTo(true, { role: 'PROVIDER' }), false)
+  assert.equal(requestsVisibleTo(true, { role: 'PROVIDER', hasAccess: true }), true)
   assert.equal(requestsVisibleTo(true, { role: 'ADMIN' }), true)
 
   // …and the client side does not ask at all. Asserted through the source of
@@ -997,7 +998,11 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   // paths (lib/requests → isProviderWorkspacePath — and that helper is bound
   // to PROVIDER_WORKSPACE_PATHS, asserted executed below).
   const nav = read('components/BottomNav.tsx')
-  assert.match(nav, /isProviderWorkspacePath\(path\) \? 'PROVIDER'/,
+  // The tab set is chosen straight from the path now — the `space` variable that
+  // sat in between went with STUDENT/TUTOR (2026-08-21), because one ROLE can no
+  // longer distinguish a trades provider from a consulting one. What must hold
+  // is unchanged: the provider's own paths are recognised from the pathname.
+  assert.match(nav, /isProviderWorkspacePath\(path\) \? PROVIDER_TABS/,
     'BottomNav no longer derives the provider space from the pathname')
   for (const p of PROVIDER_WORKSPACE_PATHS) {
     assert.equal(isProviderWorkspacePath(p), true, `${p} is not the master's space`)
@@ -1006,8 +1011,18 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   for (const p of ['/work', '/work/bookings', '/work/requests-x', '/me', '/provider/requests', '/request']) {
     assert.equal(isProviderWorkspacePath(p), false, `${p} was read as the master's space`)
   }
-  assert.match(nav, /space === 'PROVIDER' \? PROVIDER_TABS/,
-    'PROVIDER_TABS are shown by something other than being inside /provider')
+  // ⚠️ THIS PINNED `space === 'PROVIDER' ? PROVIDER_TABS`, AND THE SENTENCE IT
+  // CLAIMED WAS ALREADY FALSE. A WORK-only provider standing on /work got
+  // PROVIDER_TABS too — the old ternary said so — so „shown by nothing but being
+  // inside /provider" was never the rule. The real one has two arms and both are
+  // asserted below: the provider's own paths, and a provider whose only
+  // capability is WORK. Anyone else gets the tabs of the room they are in.
+  assert.match(nav, /isProviderWorkspacePath\(path\) \? PROVIDER_TABS/,
+    'PROVIDER_TABS no longer follow the provider paths')
+  assert.match(nav, /workOnly \? PROVIDER_TABS/,
+    'a WORK-only provider lost their tabs on /work — the trades half would show the expert rail')
+  assert.match(nav, /const workOnly = caps\.includes\('WORK'\) && !caps\.includes\('CONSULT'\)/,
+    'the tab set stopped being chosen by CAPABILITY — one role cannot tell a trades provider from a consulting one')
   assert.doesNotMatch(nav, /PROVIDER_TABS[\s\S]{0,200}role === /,
     'PROVIDER_TABS became role-keyed — a role is not the allowlist')
   const shell = read('components/AppShell.tsx')
@@ -1037,7 +1052,7 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   // is unchanged — the bounce is keyed on the CAPABILITY and not on a role.
   assert.match(expertLayout, /if\s+\(caps\.includes\('WORK'\)\)\s+redirect\('\/work'\)/,
     'the WORK-only redirect is not keyed on the capability')
-  assert.match(expertLayout, /requireRole\(\[ROLE\.EXPERT, ROLE\.ADMIN\]\)/, 'the expert guard is gone')
+  assert.match(expertLayout, /requireRole\(\[ROLE\.PROVIDER, ROLE\.ADMIN\]\)/, 'the expert guard is gone')
 
   // /me/requests (D7): the owner's list, and only the owner's — gated on the
   // flag and on the session, scoped by userId.
@@ -1210,47 +1225,64 @@ test('a provider payload cannot carry the client‘s name, phone or email', () =
   }
 })
 
-test('a provider gets the client‘s contact only once their offer is ACCEPTED', () => {
-  const contact = { contactName: 'ნინო მაგალიძე', phone: '+995555123456', email: 'nino@example.ge' }
-  // Every status the column can hold, so a value added later fails loudly here
-  // rather than defaulting into the revealing branch.
-  for (const status of ['SENT', 'WITHDRAWN', 'DECLINED']) {
-    assert.equal(clientContactFor({ status }, contact), null, `contact revealed on a ${status} offer`)
+// ⚠️ THIS TEST USED TO PIN THE OPPOSITE (2026-08-14 → 2026-08-21): „a provider
+// gets the client's contact once their offer is ACCEPTED". The reveal was the
+// product — „WE open the contact" — and the test guarded its one gate.
+//
+// Owner, 2026-08-21, holding the provider's thread screen: „მოდი ამ ეტაპზე იყოს
+// მიწერა და ჩათში გარკვნენ, ნომერიც თუ საჭიროა იქ გაცვალონ… არ უჩანდეს ეგრევე
+// ტელეფონი." Two reasons, and the second is the business one: an automatic
+// reveal gives away, for free and at the moment of acceptance, the only thing
+// the platform has to sell („ჩემი მიზანი ხომ ისაა, რომ ლიდი გავყიდო").
+//
+// So what is pinned now is the ABSENCE, on both sides, at BOTH layers: the
+// function releases a name and nothing else, and the three screens that used to
+// print a number do not even fetch the columns. The name rule is unchanged.
+test('the client‘s phone and email never reach a provider — only the name, and only once chosen', () => {
+  for (const status of ['SENT', 'WITHDRAWN', 'DECLINED', 'INVITED']) {
+    assert.equal(clientIdentityOpen({ status }), false, `${status} unsealed the client‘s identity`)
   }
-  assert.deepEqual(clientContactFor({ status: 'ACCEPTED' }, contact), contact)
-  // Null and NOT a redacted object: an object of empty strings is a shape a UI
-  // renders as a blank „ტელეფონი:" row and a careless `??` fills from
-  // somewhere else. Absent is unambiguous.
-  assert.equal(clientContactFor({ status: 'SENT' }, contact), null)
+  assert.equal(clientIdentityOpen({ status: 'ACCEPTED' }), true)
+  // The seal releases a NAME. „კლიენტი" before, the person after — one rule,
+  // asked by both the inbox row and the jobs list rather than copied.
+  assert.equal(offerPeerName({ status: 'SENT' }, 'ნინო მაგალიძე'), 'კლიენტი')
+  assert.equal(offerPeerName({ status: 'ACCEPTED' }, 'ნინო მაგალიძე'), 'ნინო მაგალიძე')
 
-  // The screen where a chosen provider reads it does go through the function.
-  const offers = codeOf('app/work/(provider)/offers/page.tsx')
-  assert.match(offers, /clientContactFor\(/, 'the offers page picks its own contact columns')
-  assert.ok(!offers.includes('adminNote'), 'the offers page selects the admin‘s private note')
+  // …AND THE COLUMNS ARE NOT FETCHED. A rule enforced by the query is one a
+  // later render cannot forget — this is the assertion that would fail if
+  // somebody re-added the block, because the block needs the data first.
+  for (const f of ['app/work/(provider)/offers/page.tsx', 'components/chat/OfferThreadPane.tsx']) {
+    const body = codeOf(f)
+    assert.ok(!/\bphone: true\b/.test(body), `${f} selects the client‘s phone again`)
+    assert.ok(!/\bemail: true\b/.test(body), `${f} selects the client‘s email again`)
+    assert.ok(!body.includes('adminNote'), `${f} selects the admin‘s private note`)
+    assert.ok(!/tel:|mailto:/.test(body), `${f} prints a contact link`)
+  }
 })
 
-test('a client gets the provider‘s contact only on the offer they accepted', () => {
-  // The mirror of the rule above, written once so the two sides cannot drift.
+test('the provider‘s phone and email never reach the client either — the mirror, same day', () => {
   const base = {
     id: 'o1', priceGel: 1200, priceKind: 'FIXED', daysEstimate: 10, message: 'გავაკეთებ',
     createdAt: new Date('2026-08-14T10:00:00Z'),
-    provider: { name: 'ბესიკ მაგალიძე', phone: '+995599111222', email: 'besik@example.ge' },
+    provider: { name: 'ბესიკ მაგალიძე' },
   }
-  for (const status of ['SENT', 'WITHDRAWN', 'DECLINED']) {
+  // ACCEPTED included on purpose: that WAS the revealing branch, and it is the
+  // one a future „just for the chosen one" edit would reopen.
+  for (const status of ['SENT', 'WITHDRAWN', 'DECLINED', 'ACCEPTED']) {
     const v = clientOfferView({ ...base, status })
-    assert.equal(v.providerPhone, null, `provider phone shown on a ${status} offer`)
-    assert.equal(v.providerEmail, null, `provider email shown on a ${status} offer`)
+    const json = JSON.stringify(v)
+    assert.ok(!/phone|email/i.test(json), `clientOfferView emitted a contact field on a ${status} offer`)
     // The NAME is always shown — it is what the client is choosing between.
     assert.equal(v.providerName, 'ბესიკ მაგალიძე')
-    assert.ok(!JSON.stringify(v).includes('+995599111222'))
   }
-  const accepted = clientOfferView({ ...base, status: 'ACCEPTED' })
-  assert.equal(accepted.providerPhone, '+995599111222')
-  assert.equal(accepted.providerEmail, 'besik@example.ge')
-
+  // …and the page stopped fetching them, so the shape above cannot be widened
+  // from the query side either.
   const page = codeOf('app/request/[ref]/page.tsx')
   assert.match(page, /clientOfferView\(/, 'the client page shapes offers itself')
+  assert.ok(!/phone: true|email: true/.test(page), 'the client page selects the provider‘s contact again')
   assert.ok(!page.includes('adminNote'), 'the client page selects the admin‘s private note about them')
+  const list = codeOf('app/request/[ref]/OfferList.tsx')
+  assert.ok(!/tel:|mailto:/.test(list), 'the offer list prints a contact link again')
 })
 
 /* ═══════════ 5. the place limit holds under concurrency ════════════════ */
