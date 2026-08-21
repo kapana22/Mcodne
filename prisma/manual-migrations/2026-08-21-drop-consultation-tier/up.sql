@@ -32,15 +32,20 @@ DO $$ BEGIN
 END $$;
 
 -- ── PART 2 — AFTER THE DEPLOY ───────────────────────────────────────────────
--- ALTER TABLE "Consultation" DROP COLUMN "tier";
--- DROP TYPE "ConsultationTier";
---
--- DO $$ BEGIN
---   IF EXISTS (SELECT 1 FROM information_schema.columns
---              WHERE table_schema='public' AND table_name='Consultation' AND column_name='tier') THEN
---     RAISE EXCEPTION 'Consultation.tier survived the drop';
---   END IF;
---   IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ConsultationTier') THEN
---     RAISE EXCEPTION 'ConsultationTier survived the drop';
---   END IF;
--- END $$;
+-- Both parts were applied to production on 2026-08-21, in this order, with the
+-- deploy of commit „Drop the tier column…" between them. Verified after each:
+-- part 1 → an insert omitting `tier` succeeded while the old build was live;
+-- part 2 → 58 rows intact, create/update/delete all fine, and the profile pages
+-- still render their consultations.
+ALTER TABLE "Consultation" DROP COLUMN "tier";
+DROP TYPE "ConsultationTier";
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema='public' AND table_name='Consultation' AND column_name='tier') THEN
+    RAISE EXCEPTION 'Consultation.tier survived the drop';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ConsultationTier') THEN
+    RAISE EXCEPTION 'ConsultationTier survived the drop';
+  END IF;
+END $$;
