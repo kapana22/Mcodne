@@ -1365,6 +1365,20 @@ async function runMigrations() {
   // Also declared in prisma/schema.prisma (@@index(..., type: Gin)), so no
   // `prisma db push` is required either way — whichever runs first wins and
   // the other is a no-op.
+  // ── the two foreign keys Postgres was never asked to index (2026-08-21) ────
+  // A FK gets no index for free. Both of these are ON DELETE SET NULL, so every
+  // account deletion had to seq-scan the child table to find the rows to null —
+  // and account deletion is a real, tested flow (app/api/admin/users/[id],
+  // tests/userDeletion.test.ts). Cheap now while the tables are small; the point
+  // is that it stops being cheap silently.
+  // Reviewable as prisma/manual-migrations/2026-08-21-fk-indexes/.
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "ServiceRequest_userId_idx" ON "ServiceRequest" ("userId");`,
+  )
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "RequestMessage_fromUserId_idx" ON "RequestMessage" ("fromUserId");`,
+  )
+
   try {
     await prisma.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`)
     await prisma.$executeRawUnsafe(

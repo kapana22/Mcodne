@@ -75,6 +75,25 @@ console.log('\n\x1b[1m▸ types\x1b[0m')
   else { failed++; console.log(`  \x1b[31m✗\x1b[0m\n${out.split('\n').slice(0, 20).join('\n')}`) }
 }
 
+// ⚠️ WARM THE SCHEMA BEFORE THE LANES START (2026-08-21).
+//
+// Two test files reach the database, and the FIRST process to do so pays the
+// migration set if the stamp does not match — which is exactly what happens the
+// run after anyone edits lib/dbBoot. That is a ~102-second bill landing inside a
+// file with a 120-second timeout, so a correct change to the schema failed the
+// gate on `abroad.test.ts` with no output, which reads as a broken test and is
+// not one. Paying it here once, with a deadline of its own, turns a confusing
+// red into a slow green.
+//
+// Failure is NOT fatal: a developer with no database reachable should still get
+// types and the ninety-odd tests that never open a connection.
+{
+  const t = process.hrtime.bigint()
+  const { code, out } = await run('npx', ['tsx', '-e', "require('./lib/dbBoot').ensureDbReady().then(()=>process.exit(0),e=>{console.error(e.message);process.exit(1)})"], { quiet: true, timeout: 240000 })
+  if (code === 0) console.log(`\n\x1b[1m▸ schema\x1b[0m\n  \x1b[32m✓\x1b[0m ready (${secs(t)})`)
+  else console.log(`\n\x1b[1m▸ schema\x1b[0m\n  \x1b[33m!\x1b[0m not reachable — DB-touching tests may fail (${secs(t)})\n${out.split('\n').slice(0, 3).map(l => '    ' + l).join('\n')}`)
+}
+
 console.log('\n\x1b[1m▸ tests\x1b[0m')
 {
   // Each test file is a standalone script that exits non-zero on failure —

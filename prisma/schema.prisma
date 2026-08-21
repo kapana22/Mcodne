@@ -1548,6 +1548,11 @@ model ServiceRequest {
   @@index([topic, status])
   // The provider queue filtered to one shape of work.
   @@index([kind, status])
+  // ⚠️ THE FK ITSELF (added 2026-08-21). `userId` is ON DELETE SET NULL, and
+  // Postgres does NOT index a foreign key for you — so deleting an account had
+  // to seq-scan this table to find the rows to null out. app/api/admin/users
+  // does exactly that, and tests/userDeletion.test.ts is 524 lines about it.
+  @@index([userId])
 }
 
 model RequestOffer {
@@ -1714,6 +1719,9 @@ model RequestMessage {
   // Postgres from a btree lookup on a NULL, which is why the platform thread
   // reads through the requestId index below instead.
   @@index([offerId, createdAt])
+  // The FK Postgres would not index for us — same reason as ServiceRequest.userId
+  // above: `fromUserId` is ON DELETE SET NULL and account deletion had to scan.
+  @@index([fromUserId])
   // „every thread of my request", for the client's page.
   @@index([requestId, createdAt])
 }
@@ -2035,4 +2043,59 @@ model ServiceProfile {
   /// without a sequential scan; it is created in lib/dbBoot, because Prisma
   /// cannot express a GIN index on a scalar list.
   @@index([available])
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE THREE TABLES PRISMA DID NOT KNOW ABOUT (declared 2026-08-21)
+//
+// Event, HelpMessage and JobRun are created by lib/dbBoot and read only through
+// `$queryRawUnsafe`, so they were never written down here. That is not merely
+// untidy: `prisma db push` reconciles the database TO this file, and a table it
+// cannot see is a table it offers to DROP — 2 468 Event rows, every help message
+// and the whole sweep history. It prompts first, so it was a trap rather than a
+// bug, but `npm run db:push` sits in package.json and the prompt is the only
+// thing between it and the data.
+//
+// Declared from `prisma db pull --print` against production, so these match the
+// live columns exactly rather than what someone remembered. The app still reads
+// them through raw SQL; nothing needs to change at the call sites. Keep them in
+// step with the CREATE TABLE statements in lib/dbBoot — that file is still the
+// thing that builds them.
+
+/// Funnel and analytics events. Written by lib/events, read by the admin
+/// insights tab. No FK to User on purpose: an event outlives the account.
+model Event {
+  id     String   @id
+  name   String
+  at     DateTime @default(now()) @db.Timestamptz(6)
+  userId String?
+  props  Json?
+
+  @@index([name, at(sort: Desc)])
+}
+
+/// „Ask us" messages from the help widget, answered from the admin panel.
+model HelpMessage {
+  id        String    @id
+  at        DateTime  @default(now()) @db.Timestamptz(6)
+  route     String?
+  question  String?
+  message   String
+  email     String?
+  name      String?
+  userId    String?
+  status    String    @default("new")
+  handledAt DateTime? @db.Timestamptz(6)
+
+  @@index([status, at(sort: Desc)])
+}
+
+/// One row per scheduled sweep, keyed by job name — lib/sweepRunner reads it to
+/// decide whether a job already ran today.
+model JobRun {
+  key    String   @id
+  ranAt  DateTime @default(now()) @db.Timestamptz(6)
+  ok     Boolean?
+  result Json?
 }
