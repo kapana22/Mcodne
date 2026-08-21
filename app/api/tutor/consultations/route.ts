@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { tierOf } from '@/lib/consultationTier'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
@@ -12,8 +13,20 @@ import { ROLE } from '@/lib/roles'
 // at all. The zod schema below refuses to let the two blur: `minutes` is
 // required and bounded when bookable, and forced to 0 when it is not, so a
 // service can never reach a calendar and a booking can never lose its length.
+// ⚠️ `tier` IS NOT AN INPUT (2026-08-21). It was required here, and the browser
+// duly computed it — `tierFromMinutes` in the editor, `tierForMinutes` in the
+// application approver, the same three-branch ladder written twice. Meanwhile
+// NOTHING READS THE VALUE: components/booking/slots says so in as many words
+// („the only two columns tier RESOLUTION actually reads" → minutes and price),
+// and a grep for 'QUICK' / 'STANDARD' / 'DEEP' outside those two derivations and
+// this enum returns nothing. A column derived from another column, sent over the
+// wire by the client, validated, stored on all 58 rows, and never consulted.
+//
+// The COLUMN stays — it is NOT NULL and CLAUDE.md's DB rule is additive-only, an
+// enum is never dropped — but it is derived once, on the server, from the
+// minutes that were going to decide it anyway. A client can no longer disagree
+// with it, because a client can no longer state it.
 const Offering = z.object({
-  tier: z.enum(['QUICK', 'STANDARD', 'DEEP']),
   title: z.string().min(2).max(80).superRefine(georgianRefine('სერვისის სახელი')),
   description: z.string().min(2).max(400).superRefine(georgianRefine('აღწერა')),
   minutes: z.number().int().min(0).max(240),
@@ -59,7 +72,8 @@ export async function POST(req: Request) {
   }
 
   const c = await prisma.consultation.create({
-    data: { ...parsed.data, tutorId: tutor.id },
+    // The tier is derived here and nowhere else — see tierOf above.
+    data: { ...parsed.data, tier: tierOf(parsed.data.minutes), tutorId: tutor.id },
   })
   return NextResponse.json({ ok: true, item: c })
 }

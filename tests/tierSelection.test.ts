@@ -18,8 +18,12 @@ function check(name: string, cond: boolean, detail = '') {
   else { failed++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 
+// ⚠️ NO `tier` FIELD SINCE 2026-08-21 — the enum left ConsultationItem because
+// resolution never read it. These helpers are still named `tier` because that is
+// what the SELECTION they exercise is called (flagship, intro, the ordered
+// list); the column is gone, the concept is not.
 const tier = (id: string, minutes: number, price: number): ConsultationItem =>
-  ({ id, tier: id, title: id, description: null, minutes, price })
+  ({ id, title: id, description: null, minutes, price })
 
 // The exact shape that caused the bug.
 const INTRO = tier('intro', 15, 0)

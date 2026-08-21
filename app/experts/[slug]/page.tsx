@@ -181,7 +181,7 @@ const getTutorInitial = cache(async (id: string) => {
         // `bookable` decides which of the two lists a row lands in on the
         // profile — without it every service renders as a bookable hour. See
         // Consultation.bookable.
-        select: { id: true, tier: true, title: true, description: true, minutes: true, price: true, bookable: true },
+        select: { id: true, title: true, description: true, minutes: true, price: true, bookable: true },
       }),
       // Education / experience / reviews are seeded server-side too.
       //

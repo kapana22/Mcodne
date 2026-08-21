@@ -25,7 +25,7 @@ export default async function StudentFavoritesPage() {
           // Tier shape only — needed to resolve the FLAGSHIP price, exactly as
           // /experts does. Must stay in step with the API sibling
           // (app/api/favorites/route.ts), which selects the same three columns.
-          consultations: { select: { minutes: true, price: true, tier: true } },
+          consultations: { select: { minutes: true, price: true } },
         },
       },
     },

@@ -332,7 +332,7 @@ export async function queryTutors(params: TutorsQueryParams = {}) {
       // duration — advertising „· 60 წთ" for something with no clock and no
       // calendar. The profile already selects it (app/experts/[slug]/page.tsx);
       // the catalogue is the surface that was still blind. One boolean per row.
-      consultations: { select: { minutes: true, price: true, tier: true, bookable: true } },
+      consultations: { select: { minutes: true, price: true, bookable: true } },
     },
   })
 

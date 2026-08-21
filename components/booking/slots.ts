@@ -31,10 +31,14 @@ export type TimeChoice = { start: Date; end: Date }
 /** dayKey → the bookable starts falling on that viewer-local day, ascending. */
 export type StartsByDay = Map<string, Date[]>
 
-// Consultation tier row exactly as /api/tutors/[id] ships it.
+// Consultation row exactly as /api/tutors/[id] ships it.
+//
+// ⚠️ `tier` LEFT THIS TYPE ON 2026-08-21, and the comment below is why it could:
+// resolution reads minutes and price, never the enum. Five queries were
+// selecting it — including the browse list, which loads 200 experts — to ship a
+// value no surface renders and no branch tests.
 export type ConsultationItem = {
   id: string
-  tier: string
   title: string
   description: string | null
   minutes: number

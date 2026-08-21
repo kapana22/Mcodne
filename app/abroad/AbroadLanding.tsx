@@ -91,7 +91,7 @@ async function loadExperts(): Promise<AbroadExpert[]> {
         // /slots → primaryPrice). Without it this page would ship the „one
         // expert, two prices" bug the moment FEATURE_ABROAD is switched on.
         consultationDurationMin: true,
-        consultations: { select: { minutes: true, price: true, tier: true } },
+        consultations: { select: { minutes: true, price: true } },
         rating: true,
         reviewsCount: true,
         verified: true,

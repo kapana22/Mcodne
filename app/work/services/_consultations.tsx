@@ -33,20 +33,23 @@ import { PackagesSection } from '@/app/work/(expert)/profile/_packages'
 import { StudentsSection } from '@/app/work/(expert)/profile/_students'
 import type { TutorProfile } from '@/app/work/(expert)/profile/_types'
 
+// ⚠️ THE TIER LEFT THIS FILE ON 2026-08-21. It was computed here from the
+// minutes and posted with every save, and the identical ladder lived in
+// app/api/applications/[id] — two copies of a derivation whose result nothing
+// reads. It is derived once on the server now (app/api/tutor/consultations).
+// The old note read:
 // The QUICK/STANDARD/DEEP tier is a backend enum — never surfaced to the
 // expert. It is derived from the chosen minutes at submit time.
-type ConsultTier = 'QUICK' | 'STANDARD' | 'DEEP'
 // ⚠️ TWO SHAPES, ONE LIST (2026-08-20) — see Consultation.bookable in
 // schema.prisma. `bookable: false` is a JOB: a name, a price, and no clock. It
 // exists because until today the only thing an expert could publish was an
 // hour, so „დეკლარაციის შევსება — 100₾" had to be invented as a 60-minute
 // session on a calendar, and the whole expert half of the catalogue sold
 // nothing but time.
-type Consultation = { id: string; tier: ConsultTier; title: string; description: string; minutes: number; price: number; bookable: boolean }
+type Consultation = { id: string; title: string; description: string; minutes: number; price: number; bookable: boolean }
 type ConsForm = { title: string; description: string; minutes: number; price: number; bookable: boolean }
 type ConsEdit = { id: string; title: string; description: string; minutes: number; price: number; bookable: boolean }
 
-const tierFromMinutes = (m: number): ConsultTier => (m <= 20 ? 'QUICK' : m <= 45 ? 'STANDARD' : 'DEEP')
 
 export function ConsultationsSection() {
   const [profile, setProfile] = useState<TutorProfile>(null)
@@ -94,7 +97,7 @@ export function ConsultationsSection() {
       const res = await fetch('/api/tutor/consultations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...consForm, tier: tierFromMinutes(consForm.minutes) }),
+        body: JSON.stringify(consForm),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) { setConsErr(j?.message || 'ვერ დაემატა'); return }

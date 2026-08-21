@@ -27,7 +27,7 @@ export async function GET() {
           // `price`, which is not a service anyone can buy: measured 2026-07-31,
           // one expert read ₾60 on the surfaces that lacked these rows and ₾30
           // on /experts. Three small numbers per tier; never the title or body.
-          consultations: { select: { minutes: true, price: true, tier: true } },
+          consultations: { select: { minutes: true, price: true } },
         },
       },
     },
