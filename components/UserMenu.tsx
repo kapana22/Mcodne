@@ -62,7 +62,8 @@ const TUTOR_ITEMS = (onSignout: () => void): MenuItem[] => [
   { href: '/work/schedule',    label: 'გრაფიკი',       icon: Icon.clock,  mobileOnly: true },
   { href: '/work/earnings',    label: 'შემოსავალი',    icon: Icon.wallet, mobileOnly: true },
   { href: '/experts',            label: 'ექსპერტები', icon: Icon.search, mobileOnly: true },
-  { href: '/work/profile',     label: 'პროფილი',       icon: Icon.user },
+  // Also mobileOnly: /work/profile is a rail row on desktop (navConfig).
+  { href: '/work/profile',     label: 'პროფილი',       icon: Icon.user, mobileOnly: true },
   { href: '/settings',          label: 'პარამეტრები',   icon: Icon.settings },
   { href: '/help',              label: 'დახმარება',     icon: Icon.info },
   { label: 'გამოსვლა',          icon: Icon.logout, danger: true, onClick: onSignout },
@@ -217,8 +218,11 @@ export function UserMenu({
   // („ფუნქციებში ექნებოდა ეს გასააქტიურებელი") kept its meaning and lost its
   // nag.
   const caps = me?.capabilities
+  // `mobileOnly`, because the workspace rail already carries this exact row on
+  // desktop — the convention the გრაფიკი/შემოსავალი/ექსპერტები rows above
+  // already follow. Without it the menu repeated the rail two items running.
   const servicesItem: MenuItem[] = (caps?.length ?? 0) > 0
-    ? [{ href: '/work/services', label: 'ჩემი სერვისები', icon: Icon.briefcase }]
+    ? [{ href: '/work/services', label: 'ჩემი სერვისები', icon: Icon.briefcase, mobileOnly: true }]
     : []
   const items = [...switchItems, ...adminSpaceItems, ...servicesItem, ...gated]
 

@@ -157,14 +157,26 @@ export function ConsultationsSection() {
   return (
     <div className="space-y-6">
 
-      {/* Service type + Available now (Type A) */}
-      <div id="section-availability" className="scroll-mt-24">
-        <ServiceTypeAndAvailability
-          profile={profile}
-          servicesCount={consultations.length}
-          onSaved={(next) => setProfile(next as any)}
-        />
-      </div>
+      {/* ⚠️ THE DEFAULT LENGTH IS ONLY SHOWN WHILE IT CAN DO SOMETHING (2026-08-21).
+          Its own copy admitted the rest: „ტიპები თავად განსაზღვრავს
+          ხანგრძლივობასა და ფასს. ეს ნაგულისხმევი მხოლოდ მათ გარეშე მოქმედებს."
+          A card with a heading, three buttons and two paragraphs of explanation,
+          standing at the TOP of the page, whose entire message is that it does
+          not apply to you — every expert with a single type read that before
+          reaching the types they actually edit. Owner: „უფრო მარტივი და
+          კომფორტული უნდა იყოს."
+
+          It is not deleted: with no types at all the default IS the session
+          length, and that is exactly when it appears. */}
+      {consultations.length === 0 && (
+        <div id="section-availability" className="scroll-mt-24">
+          <ServiceTypeAndAvailability
+            profile={profile}
+            servicesCount={consultations.length}
+            onSaved={(next) => setProfile(next as any)}
+          />
+        </div>
+      )}
 
       {/* Consultations */}
       <section id="section-consultations" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white space-y-4">
