@@ -29,14 +29,25 @@
 //     page is real and worth coming back to, which is the one thing the 404
 //     exists to deny (lib/requestsServer says it at length).
 //
-// A person with one capability therefore sees ONE half and no empty scaffolding
-// for the other — nothing here offers to sell them the capability they do not
-// have; that invitation is /join's job (lib/capabilities → missingCapability).
+// A person with one capability sees ONE half and no empty scaffolding for the
+// other. The INVITATION to the other half lives at the bottom of this page
+// (2026-08-21) — it used to be a row in the user menu saying „ჩართე სერვისები",
+// which every one of the 29 providers saw, including the ones who had been
+// selling a consultation for weeks. A consultation IS a service (CLAUDE.md
+// rule 2), so a permanent menu item telling them otherwise argued with the
+// product model. Owner: „როცა უკვე სერვისი მაქვს არ გვინდა."
+//
+// Here it is not a nag: it arrives AFTER what you already sell, which is the
+// only place „and this other kind too?" is a sensible question.
 
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
-import { capabilitiesOf } from '@/lib/capabilities'
+import {
+  capabilitiesOf, missingCapability, enableCapabilityHref, CAPABILITY_ENABLE_LABEL,
+} from '@/lib/capabilities'
+import { Btn } from '@/components/Btn'
+import { Card } from '@/components/Card'
 import { requestsViewer } from '@/lib/requestsServer'
 import { PageHeader } from '@/components/PageHeader'
 import { ConsultationsSection } from './_consultations'
@@ -69,6 +80,11 @@ export default async function Page() {
 
   if (!showConsultations && !showTrades) notFound()
 
+  // The half they do not hold — null when they hold both, or when the capability
+  // list disagrees with the gates above (an admin, say). Same helper the user
+  // menu used until this invitation moved here.
+  const missing = missingCapability(caps)
+
   return (
     <div>
       <PageHeader className="mb-6" title="ჩემი სერვისები" />
@@ -96,6 +112,26 @@ export default async function Page() {
             </p>
             <ServiceProfileForm />
           </section>
+        )}
+
+        {/* The other half — offered once, quietly, after what they already sell.
+            Not a section heading: it is not a third thing they own, it is a door. */}
+        {missing && (
+          <Card className="p-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
+            <div className="min-w-0">
+              <p className="font-display text-body font-semibold text-ink-900">
+                {CAPABILITY_ENABLE_LABEL[missing]}
+              </p>
+              <p className="mt-1 text-small text-ink-500 leading-snug">
+                {missing === 'WORK'
+                  ? 'გარდა კონსულტაციისა, შეგიძლია სამუშაოებიც შესთავაზო — მოთხოვნები პირდაპირ მოგდის.'
+                  : 'გარდა სამუშაოებისა, შეგიძლია კონსულტაციაც შესთავაზო — ფიქსირებული ფასით და დროით.'}
+              </p>
+            </div>
+            <Btn href={enableCapabilityHref(missing)} variant="secondary" className="mt-4 sm:mt-0 shrink-0">
+              ჩართვა
+            </Btn>
+          </Card>
         )}
       </div>
     </div>

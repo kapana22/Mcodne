@@ -276,13 +276,29 @@ test('§J a provider who holds one capability is offered the other one', () => {
   assert.equal(enableCapabilityHref('WORK'), '/join?can=WORK')
   assert.equal(enableCapabilityHref('CONSULT'), '/join?can=CONSULT')
 
-  // …and it is rendered where every space and every screen size can see it.
+  // ⚠️ IT MOVED OUT OF THE USER MENU ON 2026-08-21, and the reason is the
+  // product model rather than a layout preference. The menu carried a permanent
+  // „ჩართე სერვისები" row, and all 29 providers hold exactly ONE capability —
+  // so every one of them was invited to switch on something they had already
+  // been selling, when a consultation IS a service (CLAUDE.md rule 2). Owner:
+  // „როცა უკვე სერვისი მაქვს არ გვინდა… პროფილში უნდა იყოს რედაქტირება."
+  //
+  // The switch is not gone; it is asked at the only moment it makes sense —
+  // after what you already sell, at the bottom of /work/services. What the menu
+  // owes a provider now is the way IN to that page.
+  const services = codeOf('app/work/services/page.tsx')
+  assert.match(services, /missingCapability\(caps\)/,
+    'the services page stopped deriving the other half from the capabilities it already fetched')
+  assert.match(services, /enableCapabilityHref\(missing\)/,
+    'the invitation no longer links anywhere')
+
   const menu = codeOf('components/UserMenu.tsx')
-  assert.match(menu, /missingCapability\(me\?\.capabilities\)/,
-    'the user menu stopped deriving the switch from the capabilities it already fetches')
-  assert.match(menu, /enableCapabilityHref\(missing\)/)
+  assert.doesNotMatch(menu, /CAPABILITY_ENABLE_LABEL/,
+    'the „ჩართე…" row is back in the menu — it nags every provider who already sells something')
+  assert.match(menu, /'\/work\/services'/,
+    'the menu must still carry a provider to what they sell — that is what replaced the switch')
   assert.doesNotMatch(menu, /showApplyCta\(role\) *\|\| *missing/,
-    'the switch must NOT be behind showApplyCta — that gate is exactly what hid it')
+    'the old gate is back — it is exactly what hid the door in the first place')
 })
 
 /* ═════ §K who sees which door ════════════════════════════════════════════ */

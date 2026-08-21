@@ -5,7 +5,7 @@
 // drop this in without duplicating the menu logic.
 
 import Link from 'next/link'
-import { missingCapability, enableCapabilityHref, CAPABILITY_ENABLE_LABEL, showJoinInvite, JOIN_DOOR_HREF, JOIN_DOOR_LABEL } from '@/lib/capabilities'
+import { showJoinInvite, JOIN_DOOR_HREF, JOIN_DOOR_LABEL } from '@/lib/capabilities'
 import { usePathname } from 'next/navigation'
 import { Fragment, useEffect, useRef, useState, type ReactElement } from 'react'
 import { Avatar } from './Avatar'
@@ -199,11 +199,28 @@ export function UserMenu({
   // ვიღაცას არა") could only be reached by typing /join. This row is that
   // switch, and it is here rather than in the workspace rail because the menu
   // is the one surface present in every space and on a phone.
-  const missing = missingCapability(me?.capabilities)
-  const enableItem: MenuItem[] = missing
-    ? [{ href: enableCapabilityHref(missing), label: CAPABILITY_ENABLE_LABEL[missing], icon: Icon.spark }]
+  // ⚠️ IT SAID „ჩართე სერვისები" TO PEOPLE WHO ALREADY SELL ONE (2026-08-21).
+  // Owner: „როცა უკვე სერვისი მაქვს არ გვინდა… პროფილში უნდა იყოს რედაქტირება
+  // და მუშაობა და შეცვლა." Measured the same day: all 29 providers hold exactly
+  // one capability, so every single one of them was being invited to switch on
+  // something they had already been selling for weeks — a consultation IS a
+  // service (CLAUDE.md rule 2), so the row was arguing with the product model.
+  //
+  // The menu now points at the page that answers „რას ვყიდი?" — /work/services,
+  // the same „ჩემი სერვისები" the workspace rail and the bottom nav already
+  // name. Adding, editing and changing all live there.
+  //
+  // THE SWITCH ITSELF IS NOT LOST, it moved to where it belongs: /work/services
+  // offers the other half at the bottom of what you already sell, which is the
+  // moment it makes sense to ask. That page used to say the invitation was
+  // „/join's job" and this is that comment being paid off — the 2026-08-19 fix
+  // („ფუნქციებში ექნებოდა ეს გასააქტიურებელი") kept its meaning and lost its
+  // nag.
+  const caps = me?.capabilities
+  const servicesItem: MenuItem[] = (caps?.length ?? 0) > 0
+    ? [{ href: '/work/services', label: 'ჩემი სერვისები', icon: Icon.briefcase }]
     : []
-  const items = [...switchItems, ...adminSpaceItems, ...enableItem, ...gated]
+  const items = [...switchItems, ...adminSpaceItems, ...servicesItem, ...gated]
 
   const initialName = user?.name ?? ''
 
