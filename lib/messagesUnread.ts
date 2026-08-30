@@ -6,21 +6,21 @@
 // notification does not read the message, and a thread opened in another tab
 // clears here while the bell may still hold a booking notice.
 //
-// SPACE-SCOPED, never merged. A dual-role user (a STUDENT promoted to TUTOR)
-// holds two inboxes — client-side inquiries they started, and expert-side
-// threads on their profile. `/api/messages?space=…` is what separates them, and
-// the count has to inherit that separation or an expert would see their client
-// unread on the expert badge. One store per space, so the two never share a
-// snapshot.
+// ⚠️ ONE SPACE SINCE 2026-08-24, AND IT WAS TWO. A dual-role user used to hold
+// two inboxes — client-side inquiries they had started, and expert-side threads
+// on their own profile — so the store was keyed by space and
+// `/api/messages?space=…` separated them. A client has no inbox now: they
+// describe a job at /request and the conversation that follows is addressed by
+// its public reference, which needs no account. The 'client' space is kept as a
+// VALUE the caller may pass, and it subscribes to nothing — see `zero` below.
 //
-// THE SOURCE IS THE ENDPOINT THAT ALREADY OWNS THE NUMBER. It would be cheaper
-// to count unread Message rows directly, but the inbox's own `unreadCount` is
-// computed AFTER pre-booking threads are folded into their booking hosts
-// (app/api/messages/route.ts) — a hand-rolled count would drift from the
-// sidebar's, and two different numbers for one thing is worse than one
-// expensive one. What this file buys back instead is duplication: refcounted
-// subscribe + single-flight fetch, so the sidebar pill and the header badge on
-// the same screen are ONE request, not two.
+// THE SOURCE IS THE ENDPOINT THAT ALREADY OWNS THE NUMBER — `/api/work/threads`,
+// which builds its rows with lib/inboxRows → offerInboxRows and totals them with
+// the same `inboxUnreadTotal` the list pane sorts by. A hand-rolled count over
+// RequestMessage would drift from the list, and two different numbers for one
+// thing is worse than one expensive one. What this file buys back is
+// duplication: refcounted subscribe + single-flight fetch, so the sidebar pill
+// and the header badge on the same screen are ONE request, not two.
 import { useSyncExternalStore } from 'react'
 
 // The two spaces by their addresses — /me is the client's, /work the expert's.
@@ -50,7 +50,11 @@ function makeStore(space: MessagesSpace): Store {
       return Promise.resolve()
     }
     if (inflight) return inflight
-    const p = fetch(`/api/messages?space=${space}`)
+    // ⚠️ THE ADDRESS WAS `/api/messages?space=…` UNTIL 2026-08-24 and 404'd from
+    // the day that route was deleted — silently, because `.catch(() => {})`
+    // below is there so a failed poll never breaks a page. The badge simply read
+    // 0 for every provider with unread offers.
+    const p = fetch('/api/work/threads')
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (!d?.ok || typeof d.unreadCount !== 'number') return
@@ -98,6 +102,9 @@ function makeStore(space: MessagesSpace): Store {
 }
 
 function storeFor(space: MessagesSpace): Store {
+  // Nothing to poll for a client: /api/work/threads answers for the supply side
+  // and would return [] anyway, so this saves the request rather than the render.
+  if (space === 'client') return { subscribe: noopSubscribe, get: zero }
   let s = stores.get(space)
   if (!s) { s = makeStore(space); stores.set(space, s) }
   return s

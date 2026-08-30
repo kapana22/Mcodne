@@ -11,8 +11,8 @@
 //
 // ⚠️ THE ≥3 RULE (lib/serviceProfile → TRADE_LANDING_MIN). At or above the bar
 // the page is the trades catalogue filtered to this trade — the same rows,
-// query and card /experts draws (app/experts/_masterData → queryMasters, _card →
-// MasterCard), under a heading, with the intake CTA. Below it the page is THE
+// query and card /experts draws (app/experts/_providers → queryProviders, _card →
+// ProviderCard), under a heading, with the intake CTA. Below it the page is THE
 // DOOR ONLY: heading, one sentence, the CTA — and NEVER an empty list. A grid
 // with nobody in it under „ელექტრიკოსები" tells a stranger the site is empty;
 // a door tells them what to do.
@@ -27,8 +27,8 @@ import { Btn } from '@/components/Btn'
 import { Container } from '@/components/Container'
 import { Icon } from '@/components/Icon'
 import type { Topic, TopicGroup } from '@/lib/requestTopics'
-import { MasterCard } from '@/app/experts/_masterCard'
-import { mastersHref, type MastersResult } from '@/app/experts/_masterData'
+import { ProviderCard } from '@/app/experts/_providerCard'
+import { providersHref, type ProvidersResult } from '@/app/experts/_providers'
 import { REQUEST_HREF } from './_providerData'
 
 export type Trade = { group: TopicGroup; topic: Topic | null }
@@ -45,7 +45,7 @@ export function TradeLanding({
   /** The filtered catalogue — null below the bar (the door renders no list;
    *  the count that decided it is printed nowhere there on purpose — „2
    *  ხელოსანი" over no list is a tease). */
-  result: MastersResult | null
+  result: ProvidersResult | null
   requestsEnabled: boolean
 }) {
   const label = tradeLabel(trade)
@@ -90,12 +90,12 @@ export function TradeLanding({
         <Container className="py-8 sm:py-10 pb-14 sm:pb-20">
           {/* The catalogue's grid, two columns like /experts. */}
           <div className="grid gap-4 sm:grid-cols-2">
-            {result.rows.map(m => <MasterCard key={m.id} m={m} />)}
+            {result.rows.map(m => <ProviderCard key={m.id} m={m} />)}
           </div>
           {/* Every filter, in the catalogue proper — this page is one trade. */}
           <div className="mt-8">
             <Link
-              href={mastersHref({ trades: [trade.topic?.id ?? trade.group.id] })}
+              href={providersHref({ trades: [trade.topic?.id ?? trade.group.id] })}
               className="inline-flex items-center gap-1.5 min-h-[40px] text-body font-semibold text-brand-700 hover:underline"
             >
               ყველა ფილტრი <Icon.arrow className="w-3.5 h-3.5" />

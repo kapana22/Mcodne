@@ -12,10 +12,11 @@ import { Btn } from '@/components/Btn'
 import {
   ServiceRequestInput, KIND, kindOf, TIMING, FORMATS, CITIES, ONE_CITY,
   extrasFor, topicLabel, kindsOfTopic, OTHER_TOPIC,
-  PICK_MODES, PICK_MODE_OPTION, VERTICAL_COPY,
+  MAX_REQUEST_PHOTOS, VERTICAL_COPY,
   type RequestKindName, type Vertical,
 } from '@/lib/requests'
-import { newFlowId } from '@/components/booking/funnelEvents'
+import { newFlowId } from '@/lib/funnelEvents'
+import { WorkPhotos } from '@/app/join/_master/_workPhotos'
 import { REQUEST_FUNNEL_EVENTS, trackRequestFunnel } from './requestFunnelEvents'
 import { RequestShell } from './_shell'
 import {
@@ -65,7 +66,7 @@ function loadDraft(): Draft {
   }
 }
 
-export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT', to = null }: {
+export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT', to = null, covered = [] }: {
   /** ⚠️ THE DOOR, FROM THE URL (`?for=service`). Owner, 2026-08-18, approving
    *  option „ა": the entry point picks the vertical and the wizard never asks
    *  again — the ss.ge shape, where you choose the world at the entrance and
@@ -79,6 +80,10 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
   /** What they typed on the home band, handed to the first screen's search so
    *  nobody retypes the answer they just gave. See app/request/page. */
   initialQuery?: string
+  /** Topic ids at least one live provider offers — see lib/requestsServer →
+   *  coveredTopicIds. Empty is „do not narrow", which is what a database with
+   *  no providers at all should do rather than offering nothing. */
+  covered?: string[]
   /** The signed-in person's contact details, or null for a guest. Passed from
    *  the server page rather than fetched: /api/me would arrive after the first
    *  paint, so the last screen would render its fields empty and then fill
@@ -338,8 +343,6 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
     // The service run's place screen. Same list the format screen reveals after
     // „ადგილზე", except here it is the whole question rather than a follow-up —
     // see _model → stepsFor.
-    : step.id === 'mode'
-      ? PICK_MODES.map(m => ({ id: m, label: PICK_MODE_OPTION[m].label, hint: PICK_MODE_OPTION[m].hint }))
     : step.id === 'city' ? [...CITIES]
     : []
 
@@ -352,6 +355,37 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
    * cannot collide (ONLINE/IN_PERSON/EITHER vs TBILISI/…), so one function
    * serves both and there is no „which list did this come from" to get wrong.
    */
+  /**
+   * A tap on a CLARIFIER chip — and it is deliberately NOT `pickOption`.
+   *
+   * ⚠️ THE QUESTION IS PASSED IN, NEVER LOOKED UP BY OPTION ID. The clarifiers
+   * share the timing screen (see _model → stepsFor), and the two vocabularies
+   * COLLIDE: „unsure" is a `level` option on 177 learning topics AND the
+   * LEARNING timing id. Any handler that resolves „which question was this?"
+   * from the id alone therefore has 177 topics on which it is guessing.
+   *
+   * That is exactly how this broke: the routing lived in `pickOption` under
+   * `step.id === 'extras'`, an id `stepsFor` stopped producing when the
+   * clarifiers moved onto the timing screen — so a clarifier tap fell through
+   * to the timing branch, wrote the chip's id into `draft.timing`, and
+   * ADVANCED. `stepComplete('contact')` then parsed the draft, found a timing
+   * that is on no ladder, and kept „გაგზავნა" disabled for the rest of the
+   * run: a request that could never be sent, on the 94 of 171 topics that
+   * carry clarifiers.
+   *
+   * ⚠️ AND IT DOES NOT ADVANCE. The screen holds every clarifier, so a tap
+   * records an answer and leaves the reader on the page to give the other one.
+   * The timing tap below is the one that leaves, because it is the question
+   * asked of everybody.
+   */
+  const answerExtra = (questionId: string, optionId: string) => {
+    // Functional, not `patch({ details: { ...draft.details, … } })`: two chips
+    // tapped in the same tick would otherwise both spread the SAME stale
+    // `draft.details` and the first answer would be dropped.
+    setDraft(d => ({ ...d, details: { ...d.details, [questionId]: optionId } }))
+    if (status === 'error') { setStatus('idle'); setErrorText(null) }
+  }
+
   const pickOption = (id: string) => {
     if (step.id === 'kind') {
       const k = id as Exclude<Draft['kind'], ''>
@@ -361,18 +395,8 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
       advance(d, 'kind')
       return
     }
-    if (step.id === 'extras') {
-      // ⚠️ ANSWERING ONE OF TWO DOES NOT ADVANCE. The screen holds every
-      // clarifier, so a tap records an answer and leaves the reader on the page
-      // to give the other one; „შემდეგი" is what leaves. The single-question
-      // screens still advance on the tap, exactly as before.
-      const q = extras.find(x => x.options.some(o => o.id === id))
-      if (q) patch({ details: { ...draft.details, [q.id]: id } })
-      return
-    }
     if (step.id === 'timing') { pickAndGo({ timing: id }); return }
     if (step.id === 'city') { pickAndGo({ city: id as Draft['city'] }); return }
-    if (step.id === 'mode') { pickAndGo({ pickMode: id as Draft['pickMode'] }); return }
     if (step.id === 'format') {
       if (CITIES.some(c => c.id === id)) { pickAndGo({ city: id as Draft['city'] }); return }
       // In-person needs the city; online does not — the sub-question appears
@@ -586,7 +610,12 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
             // drops this screen entirely — _model → withTarget), and then the
             // honest question is „which of THEIRS", not „which of the 132".
             // Empty = every topic, i.e. exactly the screen as it was.
-            onlyTopics={to?.topics ?? []}
+            /* ⚠️ THE DIRECT TARGET WINS, AND IT IS ALREADY THE NARROWER ONE.
+               `?to=` means „this provider" and their own list is the only
+               honest offer; `covered` is the whole roster's. Both narrow the
+               browse list AND the search hits (see _stepWhat → `only`), and
+               empty means „no narrowing", never „nothing". */
+            onlyTopics={to?.topics ?? covered}
             // ⚠️ THE CATALOGUE COULD NOT NAME IT, SO THE SENTENCE BECOMES THE
             // REQUEST (2026-08-17). „მჭირდება სახლის დალაგება" matched nothing
             // — there is no cleaning topic — and the screen used to answer
@@ -658,7 +687,11 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
                 <StepPick
                   options={[...q.options]}
                   value={draft.details[q.id] ?? ''}
-                  onPick={pickOption}
+                  // ⚠️ ITS OWN QUESTION, BOUND HERE. Never `pickOption` — see
+                  // `answerExtra`: the option ids collide with the timing
+                  // ladder's, so the row that was tapped is the only thing that
+                  // knows which question it answers.
+                  onPick={optionId => answerExtra(q.id, optionId)}
                   // Numbered on the first UNANSWERED one only — the keys index
                   // that list (see `options`), and a badge on a row the digits
                   // do not reach is a lie about the shortcut.
@@ -711,17 +744,39 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
         {step.id === 'city' && (
           <StepPick options={options} value={draft.city} onPick={pickOption} numbered />
         )}
-        {/* One tap, and the default is already highlighted — „შეთავაზებები
-            მომივიდეს" is what happens if somebody taps straight past, and it is
-            the honest default: waiting for offers is the product, choosing
-            yourself is the option. */}
-        {step.id === 'mode' && (
-          <StepPick options={options} value={draft.pickMode} onPick={pickOption} numbered />
-        )}
+        {/* ⚠️ THE „როგორ გირჩევნია?" SCREEN STOOD HERE (removed 2026-08-29) —
+            see app/request/_model.ts for why, and for what happened to the list
+            it used to gate. */}
         {step.id === 'format' && draft.format === 'IN_PERSON' && !ONE_CITY && (
           <div className="mt-5">
             <p className="text-small font-display font-semibold text-ink-800 mb-2.5">რომელ ქალაქში?</p>
             <StepPick options={options} value={draft.city} onPick={pickOption} numbered />
+          </div>
+        )}
+        {/* ⚠️ OPTIONAL, AND THE WAY PAST IT IS ON THE SCREEN. „გამოტოვება" is a
+            real control rather than a small link, because the person who has
+            nothing to photograph is the one in a hurry — see _model → stepsFor. */}
+        {step.id === 'photos' && (
+          <div className="mt-5">
+            <WorkPhotos
+              value={draft.photos}
+              onChange={next => patch({ photos: next })}
+              max={MAX_REQUEST_PHOTOS}
+            />
+            <div className="mt-5 flex items-center gap-3">
+              <Btn
+                variant={draft.photos.length > 0 ? 'primary' : 'secondary'}
+                size="md"
+                onClick={() => advance(draft, 'photos')}
+              >
+                {draft.photos.length > 0 ? 'გავაგრძელოთ' : 'გამოტოვება'}
+              </Btn>
+              {draft.photos.length > 0 && (
+                <span className="text-small text-ink-500 tabular-nums">
+                  {draft.photos.length} / {MAX_REQUEST_PHOTOS}
+                </span>
+              )}
+            </div>
           </div>
         )}
         {step.id === 'contact' && <StepContact draft={draft} patch={patch} signedIn={account !== null} />}

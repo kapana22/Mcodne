@@ -12,7 +12,7 @@
  *    is the entire feature gone with no symptom.
  *
  * 2. The ANSWERS must never hardcode a number that lives in lib/flags. „24
- *    საათი" typed into an answer becomes a lie the day CANCEL_CUTOFF_HOURS
+ *    %" typed into an answer becomes a lie the day COMMISSION_PCT
  *    changes, and this is one of the two answers (with the payment tense) that
  *    costs real money when wrong.
  */
@@ -21,8 +21,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ALL_TOPICS, topicsForRoute, HELP_VISIBLE, HELP_EVENTS, normalizeRoute } from '../lib/helpTopics'
-import { parseEventBody } from '../components/booking/funnelEvents'
-import { CANCEL_CUTOFF_HOURS, COMMISSION_PCT } from '../lib/flags'
+import { parseEventBody } from '../lib/funnelEvents'
+import { COMMISSION_PCT } from '../lib/flags'
 
 const ROOT = join(import.meta.dirname, '..')
 const source = readFileSync(join(ROOT, 'lib/helpTopics.ts'), 'utf8')
@@ -72,8 +72,16 @@ test('the expert-side routes lead with the money questions', () => {
 })
 
 test('answers read the flags — they never hardcode the numbers', () => {
-  // A typed „24 საათი" or „15%" survives a constant change and starts lying.
-  assert.match(source, /CANCEL_CUTOFF_HOURS/)
+  // A typed „15%" survives a constant change and starts lying.
+  //
+  // ⚠️ CANCEL_CUTOFF_HOURS WAS ASSERTED HERE AND THE CONSTANT IS GONE
+  // (2026-08-26). It was a free-cancellation window counted back from a
+  // session's `startAt`; nothing has a start time since the booking product
+  // was removed on 2026-08-24, and its own doc pointed at
+  // `app/api/bookings/[id]/cancel`, a route that no longer exists. This
+  // assertion was therefore requiring the FAQ to keep quoting a refund
+  // deadline the site does not enforce. What replaces it is the negative: no
+  // answer may invent one.
   assert.match(source, /COMMISSION_PCT/)
   assert.match(source, /PAYMENTS_LIVE/)
   // Checked on the SOURCE, not on the rendered answer — this is the trap that
@@ -92,12 +100,11 @@ test('answers read the flags — they never hardcode the numbers', () => {
   // which together prove the interpolation is present AND lands in the right
   // answer — without caring how the literal is written.
   const code = source.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
-  assert.match(code, /\$\{CANCEL_CUTOFF_HOURS\}/, 'nothing reads CANCEL_CUTOFF_HOURS')
   const cancelAnswer = ALL_TOPICS.find(t => /აუქმ/.test(t.q) || /აუქმ/.test(t.a))?.a
   assert.ok(cancelAnswer, 'the cancellation answer disappeared')
-  assert.ok(
-    cancelAnswer!.includes(String(CANCEL_CUTOFF_HOURS)),
-    `the cancellation answer does not mention the current window (${CANCEL_CUTOFF_HOURS}h)`,
+  assert.doesNotMatch(
+    cancelAnswer!, /\d+\s*საათ/,
+    'the cancellation answer names an hour window — there is no start time to count back from',
   )
   const commissionAnswer = ALL_TOPICS.find(t => /კომისი/.test(t.q) || /კომისი/.test(t.a))?.a
   if (commissionAnswer) {

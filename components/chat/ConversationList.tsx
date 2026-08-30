@@ -30,50 +30,47 @@ type EmptyCopy = {
 // shows the previous list instantly while the fetch refreshes it in the
 // background. User-scoped API + single-session, so cross-user leakage isn't a
 // concern (a role swap self-corrects on the next fetch).
-// KEYED BY SPACE ('client' | 'expert'): a dual-role user has a different inbox in
-// each space, so a single shared cache would flash the other space's list when
-// switching. Per-space entries keep each side's stale-while-revalidate correct.
-const cachedThreads: Record<string, Thread[] | undefined> = {}
+// ⚠️ IT WAS KEYED BY SPACE UNTIL 2026-08-24 — a dual-role user held one inbox
+// on their own profile and another as somebody else's client, and a shared cache
+// would flash the wrong one when they switched. A client has no inbox now (they
+// talk to us through /request/<ref>, by reference, with no account), so there is
+// one list and one cache.
+let cachedThreads: Thread[] | undefined
 
-/* Left pane of the messages center — shared by the tutor and student sides.
-   Fetches the threads-mode messages API on mount, every 20s while visible, on
-   route change (returning from a thread clears its unread — the thread GET
-   stamped readAt), and on the `mcodne:threads-refresh` window event that the
-   thread pane fires after sends/receives. The API returns role-appropriate
-   hrefs, so the only per-side difference is the empty-state copy. */
+/* Left pane of the messages center. Fetches /api/work/threads on mount, every
+   20s while visible, on route change (returning from a thread clears its unread
+   — the thread GET stamped readByProviderAt), and on the
+   `mcodne:threads-refresh` window event the thread pane fires after
+   sends/receives. The empty-state copy is the caller's. */
 export function ConversationList({ empty }: { empty: EmptyCopy }) {
   const path = usePathname()
-  // Which hat is this inbox showing? The student and tutor messages layouts each
-  // render this list under their own route, so the path tells us the active
-  // space — passed to the API so a dual-role user sees only that space's threads.
-  const space = path.startsWith('/me') ? 'client' : 'expert'
-  const [threads, setThreads] = useState<Thread[] | null>(cachedThreads[space] ?? null)
+  const [threads, setThreads] = useState<Thread[] | null>(cachedThreads ?? null)
   const [err, setErr] = useState(false)
   const [query, setQuery] = useState('')
-  const params = useParams<{ bookingId?: string; id?: string; userId?: string; offerId?: string }>()
-  // Active row: the open booking thread (`b-<id>`), the open pair thread
-  // (`u-<userId>`) or the open offer thread (`o-<offerId>`). The booking route
-  // param is `bookingId` on the tutor side and `id` on the student side —
-  // accept either. Same prefixes lib/inboxRows mints, so the highlight cannot
-  // drift from the row ids.
-  const bookingParam = params?.bookingId ?? params?.id
-  const activeKey = params?.offerId
-    ? `o-${params.offerId}`
-    : params?.userId
-      ? `u-${params.userId}`
-      : bookingParam
-        ? `b-${bookingParam}`
-        : null
+  const params = useParams<{ offerId?: string }>()
+  // Active row: the open offer thread, `o-<offerId>` — the same prefix
+  // lib/inboxRows mints, so the highlight cannot drift from the row ids.
+  //
+  // ⚠️ IT MATCHED THREE SHAPES UNTIL 2026-08-24 — `b-<id>` for a booking thread
+  // (whose route param was `bookingId` on the provider side and `id` on the
+  // client side, so both were accepted) and `u-<userId>` for a PRE-booking pair
+  // thread, two people talking before anything was booked. Neither kind of row
+  // can be built any more; one address, one prefix.
+  const activeKey = params?.offerId ? `o-${params.offerId}` : null
 
   useEffect(() => {
     let cancelled = false
     const load = () => {
       if (document.visibilityState === 'hidden') return
-      fetch(`/api/messages?space=${space}`)
+      // ⚠️ `/api/work/threads`, and it was `/api/messages?space=…` until
+      // 2026-08-24. That route went with the booking inbox and nothing replaced
+      // it for four days: every poll 404'd, so this pane showed its error state
+      // for good while the thread pane beside it worked perfectly.
+      fetch('/api/work/threads')
         .then(r => (r.ok ? r.json() : null))
         .then(j => {
           if (cancelled) return
-          if (j?.ok && Array.isArray(j.threads)) { cachedThreads[space] = j.threads; setThreads(j.threads); setErr(false) }
+          if (j?.ok && Array.isArray(j.threads)) { cachedThreads = j.threads; setThreads(j.threads); setErr(false) }
           else if (!j) setErr(true)
         })
         .catch(() => { if (!cancelled && threads === null) setErr(true) })

@@ -160,6 +160,27 @@ export async function POST(req: Request) {
 
   if (kind === 'avatar') {
     await prisma.user.update({ where: { id: user.id }, data: { avatarUrl: dataUrl } })
+    // ⚠️ A NEW FACE RETIRES THE OLD SECOND ONE (2026-08-29). There were two
+    // portrait columns for one person — `User.avatarUrl` and
+    // `ServiceProfile.photoUrl` — and /work/profile drew an uploader for each,
+    // both saying they were the picture a client sees. Only one of them was:
+    // app/experts/_providers.ts prefers `photoUrl` and falls back to the
+    // avatar, so somebody could upload a new photo, be told „100%" by the
+    // completeness checklist (which scores the AVATAR), and go on showing a
+    // years-old face in the catalogue with nothing on screen saying why.
+    //
+    // One uploader survives — the avatar — and picking a new one drops the
+    // other column, which puts the fallback in charge and makes the face they
+    // just chose the face everywhere. Nothing is lost that they did not
+    // deliberately replace, and a provider who never touches their photo keeps
+    // exactly the one they have.
+    //
+    // `updateMany` and not `update`: most accounts have no ServiceProfile at
+    // all, and `update` on a missing row throws. Zero rows is the normal case.
+    await prisma.serviceProfile.updateMany({
+      where: { userId: user.id, NOT: { photoUrl: null } },
+      data: { photoUrl: null },
+    })
     return NextResponse.json({ ok: true, url: dataUrl })
   }
   return NextResponse.json({ ok: true, url: dataUrl, fileName: file.name, size: outBuf.length, type: outType })

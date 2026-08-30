@@ -6,64 +6,46 @@ import { useState, useEffect, useCallback } from 'react'
 import { Icon } from '@/components/Icon'
 import { Skeleton } from '@/components/Skeleton'
 import { Container } from '@/components/Container'
-import { StudentPackages } from './_packages'
 import { Discover } from './_discover'
 import { FavState, MeData, SavedExpert } from './_model'
-import { NextSession } from './_next'
 import { SavedStrip } from './_saved'
 import { MyRequestsSection } from './_requests'
-import { SessionsPanel } from './_sessions'
 import { OnboardingTour, Welcome } from './_welcome'
-import { primaryPriceLabel, offerPriceLabel, TUTOR_DEFAULTS } from '@/components/booking/slots'
 
 /* ───── Page ───── */
 /* ───── Dashboard "home" section — wraps the original main content ───── */
-const HomeSection = ({ me, bookings, bookingsLoading, bookingsError, reload, onOpenDetail, favs, favState, reloadFavs }: { me: MeData | null; bookings: any[]; bookingsLoading: boolean; bookingsError: string | null; reload: () => Promise<void> | void; onOpenDetail: (id?: string) => void; favs: SavedExpert[]; favState: FavState; reloadFavs: () => void }) => {
+const HomeSection = ({ me, favs, favState, reloadFavs }: {
+  me: MeData | null
+  favs: SavedExpert[]
+  favState: FavState
+  reloadFavs: () => void
+}) => {
   /* BLANK SLATE. A brand-new account has nothing in every one of these panels,
      and each empty panel used to render its own „find an expert" card — four
      identical CTAs in four shells, pushing the only real content (Discover)
-     ~1300px down. With zero bookings AND zero saved experts there is exactly
-     one thing to do, so we show exactly one place to do it: the Welcome search
-     + the expert grid. A load ERROR is never treated as „empty" — SessionsPanel
-     has to stay mounted to show its retry banner. */
-  const blankSlate =
-    !bookingsLoading && !bookingsError && bookings.length === 0 &&
-    favState === 'ready' && favs.length === 0
+     ~1300px down. With nothing saved there is exactly one thing to do, so we
+     show exactly one place to do it: the Welcome search + the expert grid.
+
+     ⚠️ IT USED TO COUNT BOOKINGS TOO (2026-08-24), and three of the four panels
+     it was protecting the reader from were the booking product: the next
+     session, the session list and the package credits. What is left is what a
+     client actually has here — their requests, what they saved, and who is
+     new. */
+  const blankSlate = favState === 'ready' && favs.length === 0
 
   return (
     <>
-      <Welcome me={me} bookings={bookings} />
-      <OnboardingTour userId={me?.id} hasBookings={bookings.length > 0} joinedAt={(me as any)?.createdAt} />
+      <Welcome me={me} />
+      <OnboardingTour userId={me?.id} joinedAt={(me as { createdAt?: string } | null)?.createdAt} />
       <Container as="main" className="py-8 lg:py-10">
-        {/* Primary: the user's own sessions come FIRST, full-width — the old
-            quick-book sidebar duplicated the hero search and is gone.
-            Discovery (recommendations, saved strip) follows below. */}
-        {/* Packages ABOVE the session list, and above the blankSlate branch:
-            a client with credits but no bookings yet is exactly the person this
-            card exists for, and they would otherwise land on an empty
-            dashboard holding lessons they paid for. Renders nothing when there
-            are no packages. */}
-        <div className="mb-6 empty:mb-0">
-          <StudentPackages />
-        </div>
-        {/* The client's own service requests (D7) — renders nothing without
-            any, and nothing on a deployment without the subsystem, so the
-            blank-slate rule below is untouched. */}
+        {/* The client's own service requests — renders nothing without any, and
+            nothing on a deployment without the subsystem, so the blank-slate
+            rule above is untouched. */}
         <div className="mb-6 empty:mb-0">
           <MyRequestsSection />
         </div>
-        {!blankSlate && (
-          <>
-            <div className="mb-6">
-              <NextSession bookings={bookings} loading={bookingsLoading} onOpenDetail={onOpenDetail} onOpenExpert={() => {}} />
-            </div>
-            <div className="mb-8">
-              <SessionsPanel bookings={bookings} loading={bookingsLoading} loadError={bookingsError} reload={reload} onOpenSession={s => onOpenDetail(s.id)} />
-            </div>
-          </>
-        )}
         <div className={blankSlate ? '' : 'mb-8'}>
-          <Discover onOpen={(t) => { window.location.href = `/experts/${t.id}` }} />
+          <Discover onOpen={t => { window.location.href = `/experts/${t.id}` }} />
         </div>
         {!blankSlate && (
           <div>
@@ -85,9 +67,6 @@ export default function Dashboard() {
   // land on a visible retry card — NEVER an eternal spinner, and NEVER a bogus
   // bounce of a still-authed user to /signin.
   const [authState, setAuthState] = useState<'checking' | 'authed' | 'error'>('checking')
-  const [bookings, setBookings] = useState<any[]>([])
-  const [bookingsLoading, setBookingsLoading] = useState(true)
-  const [bookingsError, setBookingsError] = useState<string | null>(null)
   // Favorites live here (not inside SavedStrip) because the blank-slate rule in
   // <HomeSection> needs the count. 'error' stays distinct from an empty list.
   const [favs, setFavs] = useState<SavedExpert[]>([])
@@ -99,25 +78,6 @@ export default function Dashboard() {
     window.location.replace(`/signin?redirect=${encodeURIComponent('/me')}`)
   }, [])
 
-  const loadBookings = useCallback(async () => {
-    setBookingsLoading(true)
-    setBookingsError(null)
-    try {
-      const res = await fetch('/api/student/bookings')
-      // Session died between page load and this call — the API now 401s
-      // (JSON) instead of 307-ing to /signin HTML; route to signin ourselves.
-      if (res.status === 401) { goSignin(); return }
-      if (!res.ok) throw new Error('load failed')
-      const d = await res.json()
-      if (!Array.isArray(d)) throw new Error('bad shape')
-      setBookings(d)
-    } catch {
-      setBookingsError('სესიების ჩატვირთვა ვერ მოხერხდა.')
-    } finally {
-      setBookingsLoading(false)
-    }
-  }, [goSignin])
-
   const loadFavs = useCallback(async () => {
     setFavState('loading')
     try {
@@ -127,18 +87,16 @@ export default function Dashboard() {
       if (!Array.isArray(data)) throw new Error('bad shape')
       // Real API fields only — the old strip decorated favorites with stock
       // pravatar photos and a hardcoded "90% match" badge, which lied.
+      // Real API fields only — the old strip decorated favourites with stock
+      // photos and a hardcoded „90% match" badge, which lied.
       setFavs(data.map((f: any, i: number) => ({
-        id: f.tutor?.id ?? String(i),
-        name: f.tutor?.user?.fullName ?? 'ექსპერტი',
-        avatar: f.tutor?.user?.avatarUrl ?? null,
-        // Real category or nothing — see app/experts/_data.tsx.
-        cat: f.tutor?.category?.name ?? '',
-        priceLabel: offerPriceLabel(primaryPriceLabel(
-          Array.isArray(f.tutor?.consultations) ? f.tutor.consultations : [],
-          f.tutor?.price ?? 0,
-          f.tutor?.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin,
-        )),
-        rating: f.tutor?.rating ?? 0,
+        id: f.provider?.slug ?? f.provider?.id ?? String(i),
+        name: f.provider?.company?.name ?? f.provider?.user?.fullName ?? 'ექსპერტი',
+        avatar: f.provider?.id ? `/api/masters/${f.provider.id}/photo` : (f.provider?.user?.avatarUrl ?? null),
+        cat: f.provider?.category?.name ?? '',
+        // 🔒 NEVER INVENT A NUMBER — null means „they quote per job".
+        priceLabel: typeof f.provider?.priceFrom === 'number' ? `${f.provider.priceFrom}₾-დან` : 'ფასს შემოგთავაზებს',
+        rating: f.provider?.rating ?? 0,
       })))
       setFavState('ready')
     } catch {
@@ -173,12 +131,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     checkAuth()
-    // Bookings load in PARALLEL with the session check — no waterfall behind
+    // Favourites load in PARALLEL with the session check — no waterfall behind
     // /api/me. If the session is actually gone this call 401s and redirects
     // exactly like checkAuth would.
-    loadBookings()
     loadFavs()
-  }, [checkAuth, loadBookings, loadFavs])
+  }, [checkAuth, loadFavs])
 
   // Neutral gate while we confirm the session — no authed chrome, no redirect
   // flash. On failure this becomes a visible dead-end-free error card with a
@@ -224,7 +181,7 @@ export default function Dashboard() {
             <p className="text-small text-ink-500 mt-1.5 leading-relaxed">შეამოწმე ინტერნეტი და სცადე თავიდან.</p>
             <button
               type="button"
-              onClick={() => { checkAuth(); if (bookingsError) loadBookings() }}
+              onClick={() => { checkAuth(); loadFavs() }}
               className="mt-4 h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast"
             >
               <Icon.refresh className="w-3.5 h-3.5" />
@@ -237,16 +194,6 @@ export default function Dashboard() {
   }
 
   return (
-    <HomeSection
-      me={me}
-      bookings={bookings}
-      bookingsLoading={bookingsLoading}
-      bookingsError={bookingsError}
-      reload={loadBookings}
-      onOpenDetail={(id) => { if (id) window.location.href = `/me/bookings/${id}` }}
-      favs={favs}
-      favState={favState}
-      reloadFavs={loadFavs}
-    />
+    <HomeSection me={me} favs={favs} favState={favState} reloadFavs={loadFavs} />
   )
 }

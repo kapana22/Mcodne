@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 // The terminal state — replaces the wizard entirely, because a live form under
 // a thank-you card is an invitation to send it twice.
 //
@@ -116,9 +117,9 @@ export function ThanksCard({ sent, topic }: {
         {sent.account === 'CREATED' && (
           <p className="mt-5 pt-4 border-t border-brand-200 text-small text-ink-700">
             ამ ელფოსტაზე ანგარიში შეგიქმენით. პაროლს{' '}
-            <a href="/signin" className="font-semibold text-brand-700 underline underline-offset-2">
+            <Link href="/signin" className="font-semibold text-brand-700 underline underline-offset-2">
               პაროლის აღდგენით
-            </a>{' '}
+            </Link>{' '}
             დააყენებ.
           </p>
         )}

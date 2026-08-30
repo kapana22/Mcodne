@@ -44,7 +44,13 @@ const iconBody = iconSrc.slice(iconSrc.indexOf('export const Icon'))
 const defined = new Set([...iconBody.matchAll(/^\s{2}([a-zA-Z]+):/gm)].map(m => m[1]))
 
 test('every nav icon exists — a missing one blanks the entire admin', () => {
-  assert.ok(navIcons.length >= 15, `only ${navIcons.length} nav icons found — did the nav move?`)
+  // ⚠️ THE FLOOR WAS 15 UNTIL 2026-08-24. Six rows went with the consultation
+  // product — „განაცხადები" (the consultation form), „ჯავშნები", „დავები",
+  // „შეფასებები", „ქცევა" and „ფინანსები" — and the surviving master queue
+  // took the first of those names. The number is a „did the nav move" floor,
+  // not a target: lower it when rows genuinely leave, never to make a red test
+  // green.
+  assert.ok(navIcons.length >= 14, `only ${navIcons.length} nav icons found — did the nav move?`)
   const missing = navIcons.filter(n => !defined.has(n))
   assert.deepEqual(missing, [], `Icon.${missing.join(', Icon.')} does not exist — the admin would crash on render`)
 })
@@ -88,6 +94,26 @@ test('the nav is rendered from ONE array, not re-typed per surface', () => {
   assert.equal(renders.length, 2, `expected the sidebar and the drawer to render the same array, found ${renders.length}`)
 })
 
+test('no group carries a caption with no rows under it', () => {
+  // Replaces a by-name ban on „რიცხვები" (2026-08-30), which hard-coded the one
+  // group that had gone wrong and failed when it legitimately came back. A
+  // caption is a promise that rows follow it. `home` is the exception the other
+  // way — a row with no caption — so the check is on the caption, not the group.
+  // Scoped to the GROUP_LABEL body on purpose: a bare object-line regex also
+  // matches TAB_ALIASES („analytics: 'overview'"), which is a hash redirect and
+  // not a group at all — the first version of this test failed on exactly that.
+  const body = navFile.slice(
+    navFile.indexOf('const GROUP_LABEL'),
+    navFile.indexOf('const GROUP_LABEL') + navFile.slice(navFile.indexOf('const GROUP_LABEL')).indexOf('\n}'),
+  )
+  const labels = [...body.matchAll(/^  (\w+): '([^']*)',$/gm)]
+    .filter(m => m[2] !== '')
+    .map(m => m[1])
+  const groupsInUse = new Set([...navFile.matchAll(/g: '(\w+)' \}/g)].map(m => m[1]))
+  const empty = labels.filter(g => !groupsInUse.has(g))
+  assert.deepEqual(empty, [], `these groups draw a caption over no rows: ${empty.join(', ')}`)
+})
+
 test('every tab in the nav has a section rendered for it', () => {
   // A tab you can click that renders nothing is worse than no tab.
   const unrendered = navIds.filter(id => !new RegExp(`active === '${id}'`).test(page))
@@ -115,39 +141,43 @@ test('the panel opens on the overview, and the overview is the first nav row', (
   assert.match(navFile, /analytics: 'overview',/)
 })
 
-test('the group captions and the three renamed tabs read as the owner wrote them', () => {
+test('the group captions and the renamed tabs read as the owner wrote them', () => {
+  // „რიცხვები" left this list 2026-08-24 (its two tabs counted bookings) and is
+  // back 2026-08-30 holding „ძაბრი", built on the request wizard's own events.
   for (const line of ["queue: 'რიგი'", "people: 'ხალხი'", "content: 'ტექსტები'", "signals: 'რიცხვები'", "system: 'სისტემა'"]) {
     assert.ok(navFile.includes(line), `GROUP_LABEL lost \`${line}\``)
   }
   // Only the label changed — the id is a deep link and a state value.
-  assert.match(navFile, /\{ id: 'insights',\s+l: 'ქცევა'/)
   assert.match(navFile, /\{ id: 'integrations',\s+l: 'კოდი'/)
   assert.match(navFile, /\{\s+id:\s+'broadcast',\s+l:\s+'შეტყობინების\s+გაგზავნა'/)
+  // The one application queue left says „განაცხადები" flat, because there is no
+  // longer a second kind of application to tell it apart from.
+  assert.match(navFile, /\{ id: 'masters',\s+l: 'განაცხადები'/)
 })
 
-test('the masters and disputes badges ride on the ONE stats fetch', () => {
+test('the masters badge rides on the ONE stats fetch', () => {
+  // ⚠️ IT WAS „the masters AND DISPUTES badges" UNTIL 2026-08-24. A dispute was
+  // a booking that went wrong, and there is no booking; the Dispute table is
+  // dropped, so the count, the badge and the tab all went together. The rule the
+  // remaining badge is held to is unchanged.
+  //
   // Same Promise.all as every other badge — a badge is never a second request
   // from the shell, and never worth 500-ing the shell over (.catch(() => 0)).
   const all = statsFile.slice(statsFile.indexOf('await Promise.all(['), statsFile.indexOf('])', statsFile.indexOf('await Promise.all([')))
-  assert.match(all, /providersFeatureExists\(\)\s*\?\s*prisma\.masterApplication\.count\(\{\s+where:\s+\{\s+status:\s+'SUBMITTED'\s+\}\s+\}\)\.catch\(\(\)\s+=>\s+0\)\s*:\s*Promise\.resolve\(0\)/,
-    'the masters count is not inside Promise.all, or does not follow providersFeatureExists() with .catch(() => 0)')
-  // `resolvedAt` is the Dispute model's real resolution marker (prisma/schema.prisma).
-  assert.match(all, /prisma\.dispute\.count\(\{\s+where:\s+\{\s+resolvedAt:\s+null\s+\}\s+\}\)\.catch\(\(\)\s+=>\s+0\)/,
-    'the disputes count is not inside Promise.all with .catch(() => 0)')
-  assert.match(statsFile, /\[users, tutors, [^\]]*pendingMasters, openDisputes\] = await Promise\.all/)
-  assert.match(statsFile, /newRequests, pendingMasters, openDisputes,\s*\n/, 'the two counts are not in the JSON response')
-  // …and the shell reads them the same way it reads the other four.
-  for (const k of ['pendingMasters', 'openDisputes']) {
-    assert.match(pageFile, new RegExp(`if \\(typeof d\\?\\.${k} === 'number'\\)`), `page.tsx does not read ${k} from the stats response`)
-    assert.equal((pageFile.match(new RegExp(`${k}=\\{${k}\\}`, 'g')) ?? []).length, 2, `${k} is not passed to both AdminSidebar and TopBar`)
-  }
+  assert.match(all, /prisma\.masterApplication\.count\(\{\s+where:\s+\{\s+status:\s+'SUBMITTED'\s+\}\s+\}\)\.catch\(\(\)\s+=>\s+0\)/,
+    'the application count is not inside Promise.all with .catch(() => 0)')
+  assert.match(statsFile, /pendingMasters: pendingApps,/, 'the count is not in the JSON response')
+  assert.doesNotMatch(statsFile, /prisma\.dispute\b/, 'the stats route counts disputes again — the table is gone')
+  // …and the shell reads it the same way it reads the other three.
+  assert.match(pageFile, /if \(typeof d\?\.pendingMasters === 'number'\)/, 'page.tsx does not read pendingMasters from the stats response')
+  assert.equal((pageFile.match(/pendingMasters=\{pendingMasters\}/g) ?? []).length, 2, 'pendingMasters is not passed to both AdminSidebar and TopBar')
   // The badge helper is the ONE place both surfaces read, so a badge means the
   // same thing on desktop and mobile.
   assert.match(navFile, /if\s+\(id\s+===\s+'masters'\)\s+return\s+pendingMasters\s+\?\?\s+0/)
-  assert.match(navFile, /if\s+\(id\s+===\s+'disputes'\)\s+return\s+openDisputes\s+\?\?\s+0/)
-  assert.doesNotMatch(navFile, /if \(id === 'bookings'\)/, '„ჯავშნები" is a ledger, not a queue — no badge')
-  assert.equal((navFile.match(/navBadge\(it\.id, pendingCount, helpOpen, b2bLeads, newRequests, pendingMasters, openDisputes\)/g) ?? []).length, 2,
-    'both surfaces must call navBadge with the same six counts')
+  assert.doesNotMatch(navFile, /if \(id === 'bookings'\)/, 'a bookings badge came back — there are no bookings')
+  assert.doesNotMatch(navFile, /if \(id === 'disputes'\)/, 'a disputes badge came back — there are no disputes')
+  assert.equal((navFile.match(/navBadge\(it\.id, helpOpen, b2bLeads, newRequests, pendingMasters\)/g) ?? []).length, 2,
+    'both surfaces must call navBadge with the same four counts')
 })
 
 /* ═══════════ consistency: one idea, written once ════════════════════════ */

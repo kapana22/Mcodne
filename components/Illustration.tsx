@@ -32,13 +32,27 @@ const ART: Record<string, string | null> = {
   // ── For LIGHT grounds (white / ink-50 / ink-75) ────────────────────────────
   expertSearch:      null, // compact-expert-search-512.png — NOT SUPPLIED
   categoryComingSoon: null, // compact-category-coming-soon-512.png — NOT SUPPLIED
+  // ⚠️ THE NAME IS LEGACY AND THE USE IS LIVE. „bookings" was the retired
+  // product's word; the drawing it points at is the empty state of
+  // /work/jobs — „ხელში მაქვს" — which is a provider's accepted work and not a
+  // booking. Renaming the key is a rename of the only call site plus this
+  // line; it has not been done because the file name would still be the old
+  // word and a half-rename reads worse than a legacy one.
   bookings:          'compact-bookings-512.png',
-  videoSession:      'compact-video-session-512.png',
-  askExpert:         'compact-ask-expert-512.png',
+  bookingsOnDark:      null, // compact-bookings-ondark-512.png
+  // ⚠️ `videoSession` AND `askExpert` WERE HERE (removed 2026-08-29). No call
+  // site named either, and none could: the video room went with the
+  // consultation product on 2026-08-24 and /ask has been a 308 to the
+  // catalogue since 2026-08-19. Their two PNGs — 112KB — were uploaded on
+  // every deploy to draw screens that cannot be reached. `videoSessionOnDark`
+  // went with them.
   messages:          'compact-messages-512.png',
   favourites:        'compact-favourites-512.png',
   registration:      'compact-registration-512.png',
-  expertApplication: 'compact-expert-application-512.png',
+  // ⚠️ `expertApplication` WAS HERE (removed 2026-08-30), for the same reason
+  // `videoSession` and `askExpert` went above it: no call site named it and
+  // none could — the application screen it drew became `/join`, which uses no
+  // illustration. Its 36KB PNG was uploaded on every deploy to draw nothing.
   support:           'compact-support-512.png',
   contactSent:       'compact-contact-sent-512.png',
 
@@ -53,15 +67,13 @@ const ART: Record<string, string | null> = {
   // the CURRENT art reads as a smudge there — it was verified by screenshot —
   // so aim for the lighter end of that range.
   expertSearchOnDark:  null, // compact-expert-search-ondark-512.png
-  bookingsOnDark:      null, // compact-bookings-ondark-512.png
-  videoSessionOnDark:  null, // compact-video-session-ondark-512.png
 }
 
 export type IllustrationName =
-  | 'expertSearch' | 'categoryComingSoon' | 'bookings' | 'videoSession' | 'askExpert'
-  | 'messages' | 'favourites' | 'registration' | 'expertApplication' | 'support'
+  | 'expertSearch' | 'categoryComingSoon' | 'bookings'
+  | 'messages' | 'favourites' | 'registration' | 'support'
   | 'contactSent'
-  | 'expertSearchOnDark' | 'bookingsOnDark' | 'videoSessionOnDark'
+  | 'expertSearchOnDark' | 'bookingsOnDark'
 
 /**
  * Is the art for this name actually shipped?
@@ -102,77 +114,24 @@ const SIZES_ATTR: Record<keyof typeof SIZE, string> = {
 /* BANDS — a different animal, deliberately not a fourth SIZE tier             */
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
-/**
- * A BAND is a wide (~2.3:1) drawing that spans the viewport and acts as the
- * transition between two sections. Everything the square system asserts is
- * wrong here, which is why it gets its own registry and its own component
- * rather than another entry in SIZE:
- *
- *   · not square, so „width only, height follows" cannot hold it
- *   · not transparent — the art carries its own painted paper ground, so unlike
- *     the compact PNGs it cannot ignore what is behind it (see PAPER below)
- *   · far outside the 128–220px band the brief set for the compact art
- *
- * The rules that DO carry over: no frame, no shadow, no crop, decorative only.
- *
- * ⚠️ PAPER: a band's ground and its host section's background must be the SAME
- * colour, or the art's left edge draws a vertical line down the page. The
- * shipped file was colour-shifted at export (`sharp().linear([1,1,1],[-4,-4,-2])`
- * on the original) so its paper measures 248/246/242 — `ink-75` exactly. A new
- * band, or a re-export of this one, has to repeat that step against whatever
- * background its call site uses; the mask below only feathers the seam, it
- * cannot hide a mismatched tone across 700px of paper.
- *
- * Intrinsic size travels with the file — a band's aspect is the one number the
- * layout depends on, and reading it off the registry beats retyping it at a
- * call site that has no way to check.
- */
-const BAND_ART = {
-  /** Left→right: questions and half-written notes resolving into a booked
-   *  video consultation. Sits directly above the home page's „როგორ მუშაობს". */
-  consultationJourney: { file: 'band-consultation-journey-1915.webp', w: 1915, h: 821 },
-} as const
+/* ⚠️ `IllustrationBand`, `BAND_ART` AND THE 84KB BAND ITSELF WERE HERE AND WENT
+   (2026-08-29). The drawing was „questions and half-written notes resolving
+   into a booked video consultation", sat above the home page's „როგორ მუშაობს",
+   and its subject is a product this site removed on 2026-08-24. It had already
+   lost its call site earlier than that — app/_home/cta.tsx says so in its own
+   words („nothing on the home page renders it") — when the owner's design
+   canvas replaced the home page on 2026-08-21.
 
-type IllustrationBandName = keyof typeof BAND_ART
+   So what stood here was ~70 lines of component and 84KB of webp uploaded on
+   every deploy, drawing a booking flow, reachable from nothing.
 
-/**
- * Height is fixed and the art is RIGHT-ALIGNED at its natural aspect — never
- * `object-cover`. A 2.3:1 drawing inside a 4.8:1 full-bleed box would lose half
- * its vertical extent to the crop (the speech bubble at the top, the desk at the
- * bottom), and those are the two ends of the picture's story.
- *
- * Right-aligned because the drawing's own left third is empty paper: on a wide
- * screen the section's background simply continues that emptiness leftward, so
- * the band reads as one uninterrupted sheet rather than a placed image. The mask
- * feathers the art's left edge into the host background, so the small tonal step
- * between the paper and `bg-ink-75` can never draw a vertical line down the
- * band. Below ~640px the art is wider than the viewport and the overflow clips
- * off that same empty left edge — nothing of the subject is ever lost.
- */
-export function IllustrationBand({
-  name,
-  className = '',
-}: {
-  name: IllustrationBandName
-  className?: string
-}) {
-  const art = BAND_ART[name]
+   ⚠️ IF A BAND EVER RETURNS, THE ONE FACT WORTH KEEPING IS THE PAPER RULE: a
+   band's ground and its host section's background must be the SAME colour, or
+   the art's left edge draws a vertical line down the page. The deleted file had
+   been colour-shifted at export (`sharp().linear([1,1,1],[-4,-4,-2])`) so its
+   paper measured 248/246/242 — `ink-75` exactly. A mask feathers a seam; it
+   cannot hide a mismatched tone across 700px of paper. */
 
-  return (
-    <div className={`relative flex justify-end overflow-hidden h-[168px] sm:h-[240px] lg:h-[300px] 2xl:h-[360px] ${className}`}>
-      <Image
-        src={`/illustrations/${art.file}`}
-        alt=""
-        aria-hidden
-        width={art.w}
-        height={art.h}
-        /* Mirrors the four heights above × the 2.33 aspect. */
-        sizes="(min-width: 1536px) 840px, (min-width: 1024px) 700px, (min-width: 640px) 560px, 400px"
-        className="h-full w-auto max-w-none select-none pointer-events-none [mask-image:linear-gradient(to_right,transparent,#000_8%)] [-webkit-mask-image:linear-gradient(to_right,transparent,#000_8%)]"
-      />
-    </div>
-  )
-}
 
 export function Illustration({
   name,

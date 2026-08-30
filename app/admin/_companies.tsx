@@ -73,7 +73,7 @@ function errText(code?: string): string {
   switch (code) {
     case 'TAX_ID_TAKEN': return 'ეს საიდენტიფიკაციო კოდი უკვე გამოყენებულია.'
     case 'USER_NOT_FOUND': return 'ამ ელფოსტაზე ანგარიში არ არსებობს — ჯერ დარეგისტრირდეს.'
-    case 'ADMIN_CANNOT_BE_MEMBER': return 'ადმინი ვერ იქნება კომპანიის წევრი — ჯავშნა ადმინს არ შეუძლია.'
+    case 'ADMIN_CANNOT_BE_MEMBER': return 'ადმინი ვერ იქნება კომპანიის წევრი — მოთხოვნის დატოვება ადმინს არ შეუძლია.'
     case 'USER_SUSPENDED': return 'ეს ანგარიში შეჩერებულია.'
     case 'ALREADY_MEMBER': return 'უკვე ამ კომპანიის წევრია.'
     case 'MEMBER_OF_ANOTHER': return 'უკვე სხვა კომპანიის წევრია.'
@@ -243,7 +243,7 @@ function CompanyDetail({ id, onChanged }: { id: string; onChanged: () => void })
                     <div className="text-meta text-ink-500 truncate">
                       {fmtKaDateTime(new Date(t.createdAt))}
                       {t.note && ` · ${t.note}`}
-                      {t.bookingId && ' · ჯავშანი'}
+                      {t.bookingId && ' · სამუშაო'}
                     </div>
                   </div>
                   {t.bookingId && <CopyBtn value={t.bookingId} label="ID" />}
@@ -708,7 +708,7 @@ export function CompaniesSection({ onLeadsChanged }: { onLeadsChanged?: () => vo
       <TabHeader
         eyebrow="B2B"
         title="კომპანიები"
-        sub="ორი რამ: სერვისები, რომლებსაც კომპანიას ვყიდით, და ბალანსები, რომლითაც კომპანია ჩვეულებრივ ექსპერტს უჯავშნის."
+        sub="ორი რამ: სერვისები, რომლებსაც კომპანიას ვყიდით, და ბალანსები, რომლითაც კომპანია ჩვეულებრივ ექსპერტს უკვეთავს."
         actions={<OpenBtn href="/business" label="გვერდის ნახვა" />}
       />
 
@@ -724,8 +724,8 @@ export function CompaniesSection({ onLeadsChanged }: { onLeadsChanged?: () => vo
         <div className="font-display text-small font-semibold text-ink-900">როგორ შევამოწმო</div>
         <ol className="mt-2 space-y-1 text-small text-ink-700 list-decimal pl-4">
           <li>ამ ტაბზე დაამატე კომპანია და ჩარიცხე ბალანსი.</li>
-          <li>წევრად დაამატე ჩვეულებრივი ანგარიში — ადმინი არ გამოდგება, ჯავშნა ადმინს არ შეუძლია.</li>
-          <li>იმ ანგარიშით შედი და დაჯავშნე კონსულტაცია — „დეტალების“ ბოლოს გამოჩნდება ბალანსით გადახდა.</li>
+          <li>წევრად დაამატე ჩვეულებრივი ანგარიში — ადმინი არ გამოდგება, მოთხოვნის დატოვება ადმინს არ შეუძლია.</li>
+          <li>იმ ანგარიშით შედი და დატოვე მოთხოვნა — შეთავაზების მიღებისას გამოჩნდება ბალანსით გადახდა.</li>
           <li>დაბრუნდი აქ: ბალანსი შემცირებული უნდა იყოს და ტრანზაქციებში ახალი ჩანაწერი გაჩნდეს.</li>
         </ol>
         <p className="mt-2.5 text-meta text-ink-500">

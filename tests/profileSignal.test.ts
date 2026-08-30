@@ -14,13 +14,10 @@
 //      feature exists to avoid. Real browser UAs must survive it.
 //   2. THE SELF-VIEW / ADMIN EXCLUSION — an expert reloading their own profile
 //      must never move their own counter, and moderation traffic is not demand.
-//   3. THE DEDUPE WINDOW — one human visit hits /api/tutors/[id] more than once
-//      (profile fetch + booking-sheet self-fetch + reschedule picker), so the
-//      first hit counts and repeats inside the window don't.
-//   4. THE DIAGNOSIS — the card's whole value is the sentence, so the SELECTION
-//      is asserted (by stable key, never by Georgian copy): a blocker the expert
-//      can clear outranks any reading of the numbers, „too few views" is never
-//      dressed up as a verdict, and zero is never spun as encouragement.
+//   3. THE DEDUPE WINDOW — one human visit can hit the profile route more than
+//      once, so the first hit counts and repeats inside the window don't.
+//   (A fourth section pinned the card's DIAGNOSIS sentence; the card was
+//   removed on 2026-08-26 — see the note at the bottom.)
 //
 // No Math.random(), no Date.now() in an assertion — every case is deterministic
 // (firstViewInWindow takes an injectable `now`).
@@ -34,12 +31,6 @@ import {
   profileViewKey,
   firstViewInWindow,
 } from '../lib/events'
-import {
-  diagnose,
-  MIN_SIGNAL_VIEWS,
-  RATE_MIN_VIEWS,
-  LOW_CONVERSION,
-} from '../app/work/_components/ProfileSignal'
 
 /* ───── tiny assert harness (matches tests/ vibe) ───── */
 
@@ -168,76 +159,18 @@ check('key: the key is a hash — no raw ip or user-agent survives in it',
     String(PROFILE_VIEW_DEDUPE_MS))
 }
 
-/* ───── 4. the diagnosis sentence ───── */
+/* ───── 4. the diagnosis sentence — REMOVED 2026-08-26 ───── */
 
-const d = (views: number, bookings: number, freeMinutes: number | null = 600, days = 7) =>
-  diagnose({ days, views, bookings, freeMinutes })
-
-// A blocker the expert can clear outranks every reading of the numbers: with no
-// bookable time, a perfect profile still converts nobody, so „fix your bio" would
-// be actively wrong advice.
-check('diagnosis: 0 views + 0 free time → the TIME is the problem',
-  d(0, 0, 0).key === 'no-time-no-views')
-check('diagnosis: views but 0 free time → still the TIME, not the profile',
-  d(40, 0, 0).key === 'no-time')
-check('diagnosis: the no-time verdicts point at the schedule, not the profile',
-  d(0, 0, 0).cta?.href === '/work/schedule' && d(40, 0, 0).cta?.href === '/work/schedule')
-
-check('diagnosis: 0 views (with free time) → a VISIBILITY problem',
-  d(0, 0).key === 'no-views')
-check('diagnosis: the 0-view verdict points at the profile screen that fixes it',
-  d(0, 0).cta?.href === '/work/profile')
-check('diagnosis: the 0-view verdict states the zero plainly and invents no demand',
-  (() => {
-    const t = d(0, 0).text
-    return t.includes('არავის უნახავს') && !/ბევრ|მალე|დაელოდ/.test(t)
-  })(), d(0, 0).text)
-
-check('diagnosis: a handful of views is NOT dressed up as a verdict',
-  d(MIN_SIGNAL_VIEWS - 1, 0).key === 'too-few')
-check('diagnosis: at MIN_SIGNAL_VIEWS the persuasion reading turns on',
-  d(MIN_SIGNAL_VIEWS, 0).key === 'no-bookings')
-check('diagnosis: many views + no bookings → a PERSUASION problem, aimed at the profile',
-  d(120, 0).key === 'no-bookings' && d(120, 0).cta?.href === '/work/profile')
-
-check('diagnosis: a low rate on enough views → persuasion, aimed at the profile',
-  d(RATE_MIN_VIEWS * 5, 1).key === 'low-rate' && d(RATE_MIN_VIEWS * 5, 1).cta?.href === '/work/profile')
-check('diagnosis: the same low rate on too few views is NOT called low',
-  d(RATE_MIN_VIEWS - 1, 1).key === 'working')
-check('diagnosis: LOW_CONVERSION is the boundary — exactly at it is not "low"',
-  (() => {
-    const views = 100, bookings = Math.round(views * LOW_CONVERSION) // 5% of 100
-    return bookings / views >= LOW_CONVERSION && d(views, bookings).key === 'working'
-  })())
-
-check('diagnosis: a healthy rate reads as working',
-  d(50, 6).key === 'working')
-check('diagnosis: more bookings than views is reported as repeat clients, never as >100%',
-  (() => {
-    const v = d(3, 9)
-    return v.key === 'repeat' && !v.text.includes('%')
-  })(), d(3, 9).text)
-check('diagnosis: equal bookings and views is also the repeat case (100% would be a coincidence, not a rate)',
-  d(4, 4).key === 'repeat')
-
-check('diagnosis: unknown free time (null) never fires a no-time verdict',
-  d(0, 0, null).key === 'no-views' && d(40, 0, null).key === 'no-bookings')
-check('diagnosis: the window length is spoken in the sentence, not just in the toggle',
-  diagnose({ days: 30, views: 0, bookings: 0, freeMinutes: 600 }).text.includes('30 დღეში'))
-check('diagnosis: every verdict has non-empty text',
-  ([d(0, 0, 0), d(9, 0, 0), d(0, 0), d(2, 0), d(60, 0), d(200, 1), d(3, 9), d(50, 6)] as const)
-    .every(v => v.text.trim().length > 20))
-check('diagnosis: every percentage printed is a real one (0 < pct < 100)',
-  (() => {
-    for (const [v, b] of [[50, 6], [200, 1], [100, 5]] as const) {
-      const m = d(v, b).text.match(/(\d+)%/)
-      if (!m) return false
-      const p = Number(m[1])
-      if (!(p > 0 && p < 100)) return false
-      if (p !== Math.round((b / v) * 100)) return false
-    }
-    return true
-  })())
+// `diagnose()` and the ProfileSignal card it belonged to are gone. The card
+// read views against BOOKINGS and against „free time", and ranked a blocker
+// („no bookable time") above every other verdict — three numbers the product
+// stopped having on 2026-08-24. It had also been unimported since that day, so
+// nothing rendered it; this block was the only thing keeping it alive, and a
+// test that keeps dead code breathing is how the dead code survives a cleanup.
+//
+// The three sections ABOVE are not about the card: they decide whether a
+// profile VIEW is real (bot filter, self-view exclusion, dedupe window), and
+// /experts/<slug> still counts views. They stay.
 
 /* ───── summary ───── */
 

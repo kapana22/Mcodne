@@ -18,6 +18,7 @@ import { join, relative } from 'node:path'
 import { PROVIDER_ROUTE, PROVIDER_WORKSPACE_PATHS, isProviderWorkspacePath, isRequestPath, isProviderPath } from '../lib/requests'
 import { homeForRole } from '../lib/roleHome'
 import { homeForHats } from '../lib/hats'
+import { navFor, WORKSPACE_NAV } from '../components/tutor/navConfig'
 
 const ROOT = join(import.meta.dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -50,10 +51,11 @@ function sourceFiles(dirs = ['app', 'components', 'lib']): string[] {
 
 test('§A /me carries every client screen; /student is gone', () => {
   for (const p of [
-    'app/me/layout.tsx', 'app/me/page.tsx', 'app/me/bookings/page.tsx', 'app/me/bookings/[id]/page.tsx',
-    'app/me/messages/page.tsx', 'app/me/messages/[id]/page.tsx', 'app/me/messages/u/[userId]/page.tsx',
+    'app/me/layout.tsx', 'app/me/page.tsx',
     'app/me/favorites/page.tsx', 'app/me/profile/page.tsx',
-    // D7 — the client's own service requests, and the home section for it.
+    // The client's own service requests, and the home section for it. ⚠️ THE
+    // BOOKINGS AND THE PAIR INBOX WERE HERE UNTIL 2026-08-24 and went with the
+    // product: a client's conversation is the request's own thread.
     'app/me/requests/page.tsx', 'app/me/_requests.tsx',
   ]) assert.ok(has(p), `${p} is missing`)
   assert.ok(!has('app/student'), 'app/student is back — the client space is /me')
@@ -75,33 +77,43 @@ test('§B /work carries both groups under one shell; /tutor and /provider are go
   {
     const home = codeOf('app/work/page.tsx')
     assert.match(home, /getCurrentUser\(\)/, '/work no longer checks who is asking')
-    assert.match(home, /capabilitiesOf\(user\.id\)/, '/work no longer checks a capability')
-    assert.match(home, /if \(!isProvider && !isExpert\) notFound\(\)/, '/work stopped 404ing a stranger')
+    assert.match(home, /sellsHere\(user\.id\)/, '/work no longer checks whether they sell anything')
+    assert.match(home, /notFound\(\)/, '/work stopped 404ing a stranger')
     assert.doesNotMatch(home, /status: 403|redirect\(/, '/work answers with something other than 404 — that confirms the page exists')
   }
   for (const p of [
-    'app/work/(expert)/layout.tsx',
     // ⚠️ THE HOME LEFT THE (expert) GROUP TOO (2026-08-20). It was
     // app/work/(expert)/page.tsx and it rendered a SESSION dashboard, so a
     // WORK-only provider had no home at all — the group's layout dropped them
     // straight into the queue. `/work` is now the one home for both, with the
     // four counts and the balance on it, and the session dashboard is a
     // component it renders only for a CONSULT holder.
-    'app/work/page.tsx', 'app/work/_components/SessionDashboard.tsx',
-    'app/work/_components/CreditStrip.tsx', 'app/work/_components/DayBoard.tsx',
+    'app/work/page.tsx',
+    /* ⚠️ `DayBoard.tsx` WAS PINNED HERE AND IS GONE (2026-08-29). Its four
+       cells — ახალი მოთხოვნები · პასუხს ველოდები · ხელში მაქვს · წაუკითხავი —
+       are the same four numbers the flow's stage bar and the rail's badge now
+       print beside the work they belong to, so the home was a second place to
+       learn them. What a home is for is the ONE thing to do next, and that band
+       is asserted below. */
+    'app/work/_components/CreditStrip.tsx',
     // ⚠️ THE LIST LEFT THE (expert) GROUP AND THE DETAIL PAGE DID NOT
     // (2026-08-19). A provider's committed work is one list — a Booking and an
     // ACCEPTED quote are both „work I agreed to do" — and a page inside either
     // route group would hide half of it behind the other group's guard, so
     // /work/jobs sits under the shared shell with a guard of its own.
-    'app/work/jobs/page.tsx', 'app/work/(expert)/bookings/[id]/page.tsx',
-    'app/work/(expert)/schedule/page.tsx',
+    'app/work/jobs/page.tsx',
     // ⚠️ THE INBOX IS OUTSIDE BOTH GROUPS (2026-08-19). It was in (expert),
     // whose layout sends a WORK-only master to /work/requests — so the one
     // person with offer threads could never open the list carrying them.
-    'app/work/messages/page.tsx',
-    'app/work/messages/[bookingId]/page.tsx', 'app/work/messages/u/[userId]/page.tsx',
-    'app/work/(expert)/earnings/page.tsx', 'app/work/(expert)/profile/page.tsx',
+    'app/work/messages/page.tsx', 'app/work/messages/o/[offerId]/page.tsx',
+    // ⚠️ „ვინ ვარ?" LEFT THE (expert) GROUP TOO (2026-08-21) — the same move
+    // /work/services made, for the same reason and one day later. `(expert)`
+    // requires the EXPERT role and redirects a WORK-only provider out, so the
+    // master had NO profile page: their photo and their sentence were edited
+    // inside „ჩემი სერვისები", which then answered two questions while the rail
+    // carried a „პროფილი" row that opened for one half of the supply side.
+    // Owner: „ეს სივრცე ძველებურად არის მოწყობილი — კონსულტაციაზეა აგებული."
+    'app/work/profile/page.tsx',
     'app/work/(provider)/layout.tsx', 'app/work/(provider)/requests/page.tsx',
     'app/work/(provider)/requests/[id]/page.tsx', 'app/work/(provider)/offers/page.tsx',
     // ⚠️ „რას ვყიდი?" IS ONE PAGE NOW (2026-08-19) and it is in NEITHER group:
@@ -109,12 +121,18 @@ test('§B /work carries both groups under one shell; /tutor and /provider are go
     // /work/profile was the expert's, and /work/services is both halves behind
     // its own gate. Pinned in full by tests/servicesPage.test.ts.
     'app/work/services/page.tsx',
-    'app/work/_components/ProfileSignal.tsx',
   ]) assert.ok(has(p), `${p} is missing`)
+  // ⚠️ `app/work/_components/ProfileSignal.tsx` WAS IN THAT LIST AND IS DELETED
+  // (2026-08-26). It diagnosed a profile by views-against-BOOKINGS and „free
+  // time", linked at /work/schedule, and nothing had imported it since
+  // 2026-08-24 — this assertion was the only thing requiring it to exist.
   assert.ok(!has('app/work/(provider)/service-profile'), 'the master has a second page for what they sell again')
-  assert.ok(!has('app/tutor'), 'app/tutor is back — the expert workspace is /work/(expert)')
+  // ⚠️ THE (expert) GROUP ITSELF IS GONE (2026-08-24) — with the calendar, the
+  // earnings report, the booking detail page and the guard that redirected a
+  // service provider out of all three.
+  assert.ok(!has('app/work/(expert)'), 'the consultation route group came back')
+  assert.ok(!has('app/tutor'), 'app/tutor is back — the workspace is /work')
   assert.ok(!has('app/provider'), 'app/provider is back — the master workspace is /work/(provider)')
-  assert.ok(!has('app/work/(expert)/page.tsx'), 'the expert group claimed /work again — it is the shared home')
   assert.ok(!has('app/work/(provider)/_shell.tsx') && !has('app/work/(provider)/page.tsx'),
     'the old provider bar / root redirect page came back — the shell is app/work/layout.tsx and the root is app/work/page.tsx, shared')
   // The route constants agree with the tree.
@@ -126,20 +144,13 @@ test('§B /work carries both groups under one shell; /tutor and /provider are go
 
 /* ═══════════ 2. the guards ═══════════════════════════════════════════════ */
 
-test('§C the two guards: (expert) redirects to sign-in, (provider) answers 404 and NEVER redirects', () => {
-  const expert = codeOf('app/work/(expert)/layout.tsx')
-  assert.match(expert, /requireRole\(\[ROLE\.PROVIDER, ROLE\.ADMIN\]\)/, 'the expert guard is gone')
-  // A WORK-only master is sent to their own screen, before the role guard would
-  // bounce them to /me — keyed on the capability, never on a role.
-  //
-  // ⚠️ THE TARGET IS `/work` SINCE 2026-08-20, not the queue. It was the queue
-  // while /work was an expert-only session dashboard, which made the first
-  // screen of a provider's workspace a list with no context and no balance.
-  assert.match(expert, /if\s+\(caps\.includes\('WORK'\)\)\s+redirect\('\/work'\)/)
-  assert.doesNotMatch(expert, /redirect\(`\$\{PROVIDER_ROUTE\}\/requests`\)/,
-    'a provider is dropped into the queue again instead of their own home')
-  assert.ok(expert.indexOf("caps.includes('WORK')") < expert.indexOf('requireRole('), 'the WORK redirect runs after requireRole — it can never fire')
-
+test('§C the one guard: (provider) answers 404 and NEVER redirects', () => {
+  // ⚠️ THERE WERE TWO (2026-08-24). `app/work/(expert)/layout.tsx` ran
+  // `requireRole` and then bounced a WORK-only provider to /work with
+  // `consultRoomVerdict` — a rule that existed because a service provider kept
+  // meeting a booking calendar. Both the group and the rule went with the
+  // consultation product; what is left is the queue's own gate, which was
+  // always the stricter and stranger one.
   const provider = codeOf('app/work/(provider)/layout.tsx')
   assert.match(provider, /const viewer = await requestsViewer\(\)/)
   assert.match(provider, /if \(!viewer\.providerAllowed\) notFound\(\)/, 'the master guard no longer 404s')
@@ -147,7 +158,7 @@ test('§C the two guards: (expert) redirects to sign-in, (provider) answers 404 
   assert.match(read('app/work/(provider)/layout.tsx'), /notFound\(\) and NEVER requireRole\(\)/, 'the comment explaining the 404 is gone')
   assert.match(read('app/work/(provider)/layout.tsx'), /robots: \{ index: false, follow: false \}/)
   // Both re-verify per request.
-  for (const f of ['app/work/layout.tsx', 'app/work/(expert)/layout.tsx', 'app/work/(provider)/layout.tsx', 'app/me/layout.tsx']) {
+  for (const f of ['app/work/layout.tsx', 'app/work/(provider)/layout.tsx', 'app/me/layout.tsx']) {
     assert.match(codeOf(f), /export const dynamic = 'force-dynamic'/, `${f} is not force-dynamic`)
   }
 })
@@ -157,29 +168,86 @@ test('§D the /work shell is chrome only: nothing without a session, groups by c
   assert.match(shell, /const\s+user\s+=\s+await\s+getCurrentUser\(\)\s*\n\s*if\s+\(!user\)\s+return\s+<>\{children\}<\/>/,
     'a signed-out visitor gets chrome — the (provider) 404 is no longer a bare 404')
   assert.doesNotMatch(shell, /redirect\(|notFound\(|requireRole\(|requireUser\(/, 'the shell became a guard')
-  assert.match(shell, /const caps = await capabilitiesOf\(user\.id\)/, 'the shell stopped reading capabilities')
-  assert.match(shell, /expert:\s+isAdmin\s+\|\|\s+user\.role\s+===\s+ROLE\.PROVIDER\s+\|\|\s+caps\.includes\('CONSULT'\)/, 'the expert group is not keyed on CONSULT')
-  assert.match(shell, /work:\s+viewer\s+!==\s+null\s+&&\s+\(caps\.includes\('WORK'\)\s+\|\|\s+viewer\.providerAllowed\)/, 'the master group is not keyed on WORK / the allowlist')
+  assert.match(shell, /const provider = await isProvider\(user\.id\)/, 'the shell stopped reading whether they sell anything')
+  // ⚠️ ONE GROUP SINCE 2026-08-24. There were two — the consultation tools and
+  // the request queue — and the first was keyed on a verdict that existed to
+  // keep a service provider off a booking calendar. The queue's row still
+  // follows the ALLOWLIST rather than the profile, because an admin and a
+  // company member reach it by another door.
+  assert.match(shell, /work:\s+viewer\s+!==\s+null\s+&&\s+\(provider\s+\|\|\s+viewer\.providerAllowed\)/,
+    'the queue row is not keyed on the allowlist')
   assert.match(shell, /const\s+viewer\s+=\s+providersOn\(\)\s+\?\s+await\s+requestsViewer\(\)\s+:\s+null/, 'the master group ignores the supply-side switch')
-  // ⚠️ ONE LIST, ITEMS BY FUNCTION (2026-08-19). The rail used to draw the
-  // expert's group and the master's group with a caption over each — nine rows
-  // saying „you are in two products". Owner: „ხელოსნის სივრცე ზედმეტია."
-  // What is shared is unconditional; exactly two TOOLS are conditional, each
-  // owned by one capability. Nobody may reintroduce a group per kind of person.
+  // ⚠️ ONE LIST, AND IT IS THE PIPELINE (2026-08-21). The rail drew four shared
+  // rows, then the master's two, then the expert's three — ten rows that read as
+  // two products stacked, with the expert's old workspace on the end. Owner:
+  // „ეს სივრცე ძველებურად არის მოწყობილი — კონსულტაციაზეა აგებული და ამიტომ
+  // არაკომფორტულია." Nobody may reintroduce a group per kind of person, and
+  // this is asserted by CALLING navFor rather than by matching how it is spelt.
   const nav = read('components/tutor/navConfig.ts')
-  assert.match(nav, /export const WORKSPACE_NAV: NavItem\[\] = \[/)
   assert.doesNotMatch(nav, /export const PROVIDER_NAV/, 'the rail has a per-person group again')
-  assert.match(nav, /\.\.\.WORKSPACE_NAV,\s*\n\s*\.\.\.\(groups\.work\s+\?\s+WORK_ONLY_NAV\s+:\s+\[\]\),\s*\n\s*\.\.\.\(groups\.expert\s+\?\s+CONSULT_ONLY_NAV\s+:\s+\[\]\),/,
-    'navFor stopped composing one list from the shared items plus the two conditional tools')
-  for (const href of ['/work', '/work/jobs', '/work/messages', '/work/services']) {
-    assert.ok(nav.includes(`href: '${href}'`), `the shared rail lost ${href}`)
+
+  /* The home is one action, not a board of counts. */
+  const home = read('app/work/page.tsx')
+  assert.ok(!existsSync(join(ROOT, 'app/work/_components/DayBoard.tsx')),
+    'the four-cell board is back — those counts live on the flow and the rail now')
+  assert.match(home, /const nextUp =/, 'the home lost the one-thing-to-do band')
+
+  const railOf = (g: { work: boolean }) =>
+    navFor(g).flatMap(s => s.items).map(i => i.href)
+
+  /* Demand enters after the home, then the work, then what you sell, then who
+     you are. „გრაფიკი" and „შემოსავალი" were the tail of this list until
+     2026-08-24 and went with the calendar they described.
+
+     ⚠️ AND „/work/requests" LEFT THE RAIL ON 2026-08-29 — five rows, not six.
+     It was never a destination of its own: an open request is the FIRST STAGE
+     of a job, and the two rows named three stages of one thing, so a provider
+     had to remember which page a piece of work was sitting on. Owner: „ერთი
+     ნაკადი გახდეს." The address is untouched and its guard is untouched; it is
+     reached from the stage bar (app/work/_components/WorkTabs), and the row
+     that replaced it MATCHES it — asserted below — so the rail still lights up
+     while somebody is on the queue.
+
+     ⚠️ THE RAIL IS THE SAME FOR BOTH GROUPS NOW, and that is the real change
+     this pins: nothing in it depends on the allowlist any more. */
+  assert.deepEqual(railOf({ work: true }), [
+    '/work', '/work/jobs', '/work/messages', '/work/services', '/work/profile',
+  ], 'the rail is no longer the service pipeline in order')
+  assert.deepEqual(railOf({ work: false }), railOf({ work: true }),
+    'a rail row depends on the allowlist again — every destination in it opens for both')
+
+  // The one row that replaced two must still own all three addresses, or a
+  // provider standing on the queue sees nothing lit in the rail.
+  const flowRow = WORKSPACE_NAV.find(i => i.href === '/work/jobs')!
+  for (const p of ['/work/jobs', '/work/offers', '/work/requests']) {
+    assert.ok(flowRow.match(p), `the flow row stopped matching ${p}`)
   }
-  for (const href of ['/work/schedule', '/work/earnings', '/work/profile']) {
-    assert.ok(nav.includes(`href: '${href}'`), `CONSULT_ONLY_NAV lost ${href}`)
+  assert.equal(flowRow.badgeKey, 'openRequests',
+    'the queue badge is not on the row that now leads to the queue')
+
+  // ⚠️ THE TWO PAGES BOTH HALVES OPEN ARE IN EVERY RAIL. „რას ვყიდი"
+  // (/work/services) and „ვინ ვარ" (/work/profile) — /work/profile was inside
+  // the (expert) group until 2026-08-21, so a master had no profile page at all
+  // and their photo lived inside „ჩემი სერვისები", which is why the rail read
+  // as two products with one question answered twice.
+  for (const g of [{ work: false }, { work: true }]) {
+    const rail = railOf(g)
+    for (const href of ['/work', '/work/jobs', '/work/messages', '/work/services', '/work/profile']) {
+      assert.ok(rail.includes(href), `${JSON.stringify(g)} lost the shared destination ${href}`)
+    }
   }
-  for (const seg of ['requests', 'offers']) {
-    assert.ok(nav.includes('href: `${PROVIDER_ROUTE}/' + seg + '`'), `WORK_ONLY_NAV lost ${seg}`)
-  }
+  // The consultation tools are gone, not hidden.
+  assert.deepEqual(railOf({ work: true }).filter(h => h === '/work/schedule' || h === '/work/earnings'), [],
+    'the calendar and the earnings report came back')
+  assert.ok(!railOf({ work: false }).includes('/work/requests'),
+    'somebody who cannot bid is shown the requests feed')
+  // …and „შეთავაზებები" is a STAGE of a job now, not a rail row of its own —
+  // /work/offers is reached from the jobs tab bar and the jobs row stays lit.
+  assert.ok(!railOf({ work: true }).includes('/work/offers'),
+    'the offers page is a rail row again — a sent offer is the first stage of a job')
+  const jobs = navFor({ work: true }).flatMap(s => s.items).find(i => i.href === '/work/jobs')!
+  assert.ok(jobs.match('/work/offers'), 'the jobs row stops lighting up on the offers page it now owns')
+
   const sidebar = read('components/tutor/WorkspaceSidebar.tsx')
   assert.match(sidebar, /const sections = navFor\(groups\)/)
   assert.match(sidebar, /i > 0 \? '[^']*border-t/, 'the two groups are no longer visually separated')
@@ -207,11 +275,9 @@ const moved = (p: string): string | null => {
 
 test('§E the old addresses 308 segment-for-segment, and only on a segment boundary', () => {
   assert.equal(moved('/student'), '/me')
-  assert.equal(moved('/student/bookings/abc'), '/me/bookings/abc')
-  assert.equal(moved('/student/messages/u/x'), '/me/messages/u/x')
+  assert.equal(moved('/student/favorites'), '/me/favorites')
   assert.equal(moved('/tutor'), '/work')
   assert.equal(moved('/tutor/profile'), '/work/profile')
-  assert.equal(moved('/tutor/bookings/abc'), '/work/bookings/abc')
   assert.equal(moved('/provider'), '/work/requests')
   assert.equal(moved('/provider/requests/abc'), '/work/requests/abc')
   assert.equal(moved('/provider/offers'), '/work/offers')
@@ -263,9 +329,20 @@ test('§F the subsystem owns three /work screens, never /work — and the chrome
     tabExpr.indexOf('isProviderWorkspacePath(path)') < tabExpr.indexOf("path.startsWith('/work')"),
     'BottomNav space detection changed — the master test must run BEFORE the /work prefix test',
   )
-  for (const href of ['/me', '/me/bookings', '/me/messages', '/me/favorites']) assert.ok(nav.includes(`href: '${href}'`), `STUDENT_TABS lost ${href}`)
+  for (const href of ['/me', '/me/requests', '/me/favorites']) assert.ok(nav.includes(`href: '${href}'`), `STUDENT_TABS lost ${href}`)
   for (const href of ['/work', '/work/jobs', '/work/messages', '/work/profile']) assert.ok(nav.includes(`href: '${href}'`), `TUTOR_TABS lost ${href}`)
-  for (const href of ['/work/requests', '/work/offers', '/work/services']) assert.ok(nav.includes(`href: '${href}'`), `PROVIDER_TABS lost ${href}`)
+  // ⚠️ „შეთავაზებები" IS NOT A TAB ANY MORE (2026-08-21) — a sent offer is the
+  // first stage of a job, so /work/jobs owns the offers page and lights up on
+  // it, on the phone exactly as on the rail. What the master's bar must carry
+  // is the pipeline plus the two pages both halves open.
+  for (const href of ['/work/requests', '/work/jobs', '/work/services', '/work/profile']) {
+    assert.ok(nav.includes(`href: '${href}'`), `PROVIDER_TABS lost ${href}`)
+  }
+  const providerTabs = nav.slice(nav.indexOf('const PROVIDER_TABS'), nav.indexOf('// Keyed by the two roles'))
+  assert.doesNotMatch(providerTabs, /href: '\/work\/offers'/,
+    'the offers page is a phone tab of its own again')
+  assert.match(providerTabs, /startsWith\('\/work\/offers'\)/,
+    'nothing on the master\'s phone bar lights up on the offers page')
   // ⚠️ AND THE HOME (2026-08-21). /work is the only screen that draws the
   // balance and runs the grant; a phone with no tab for it made the feature
   // desktop-only, which is how „the credits do not exist" was reported.
@@ -280,31 +357,26 @@ test('§F the subsystem owns three /work screens, never /work — and the chrome
   assert.match(menu, /const\s+inClientSpace\s+=\s+pathname\.startsWith\('\/me'\)/)
   assert.match(menu, /const\s+inProviderSpace\s+=\s+isProviderWorkspacePath\(pathname\)/)
   assert.match(menu, /const\s+inExpertSpace\s+=\s+pathname\.startsWith\('\/work'\)\s+&&\s+!inProviderSpace/)
-  assert.match(menu, /\{ href: '\/work', label: SPACE_LABEL\.EXPERT/)
+  assert.match(menu, /\{ href: '\/work', label: SPACE_LABEL\.PROVIDER/)
   assert.match(menu, /\{ href: '\/me', label: SPACE_LABEL\.CLIENT/)
   // ⚠️ ONE DOOR SINCE 2026-08-20. The menu used to push two items — /work for
   // an expert and /work/requests for a provider — so somebody holding both
   // hats read two entries for one room, and the provider's skipped the home
   // screen carrying their balance. /work serves both capabilities now.
-  assert.match(menu, /if\s+\(\(isDualRole\s+\|\|\s+isMaster\)\s+&&\s+!inExpertSpace\s+&&\s+!inProviderSpace\)/)
-  assert.doesNotMatch(menu, /label: SPACE_LABEL\.MASTER/, 'the second door came back')
+  assert.match(menu, /if\s+\(\(isDualRole\s+\|\|\s+sellsHere\)\s+&&\s+!inExpertSpace\s+&&\s+!inProviderSpace\)/)
   // ⚠️ BEHAVIOUR, NOT THE SOURCE LINE (2026-08-21). This used to pin
   // „MASTER: ${PROVIDER_ROUTE}/requests" as text — and by doing so it pinned the
   // bug: /work is the only screen that grants the profile bonus and draws the
   // balance, and the service half was the one hat sign-in never sent there. The
   // rule is where each hat LANDS, so ask the function.
-  assert.equal(homeForHats(['EXPERT', 'CLIENT']), '/work')
-  assert.equal(homeForHats(['MASTER', 'CLIENT']), '/work', 'a service provider lands somewhere without a balance on it')
+  assert.equal(homeForHats(['PROVIDER', 'CLIENT']), '/work', 'a provider lands somewhere without a balance on it')
   assert.equal(homeForHats(['CLIENT']), '/me')
-  // A company member holds RequestAccess and NO ServiceProfile, so
-  // `capabilitiesOf` gives them no WORK capability and /work would 404 them.
+  // A company member holds RequestAccess and NO ServiceProfile, so they are not
+  // a `provider` and /work would 404 them.
   assert.equal(homeForHats(['COMPANY', 'CLIENT']), `${PROVIDER_ROUTE}/offers`)
-  // ?space= renamed in lock-step, old values still accepted.
-  assert.match(read('lib/messagesUnread.ts'), /export type MessagesSpace = 'client' \| 'expert'/)
-  const api = codeOf('app/api/messages/route.ts')
-  assert.match(api, /spaceParam === 'client' \|\| spaceParam === 'student' \? 'client'/)
-  assert.match(api, /spaceParam === 'expert' \|\| spaceParam === 'tutor' \? 'expert'/)
-  assert.doesNotMatch(api, /space === 'student'|space === 'tutor'/, 'the endpoint still branches on the old space names')
+  // ⚠️ THE `?space=` PARAMETER WENT WITH THE PAIR INBOX (2026-08-24). It told
+  // /api/messages which side of a booking's conversation to list; there is one
+  // inbox now (offer threads) and no endpoint to ask.
 })
 
 /* ═══════════ 5. no live link to an old address ═══════════════════════════ */

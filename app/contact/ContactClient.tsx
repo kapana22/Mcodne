@@ -268,7 +268,7 @@ export default function ContactPage({ initialUser }: { initialUser?: Me | null }
               პირდაპირი არხები
             </Eyebrow>
             <div className="space-y-3">
-              {CHANNELS.filter(c => c.href !== '/join' || showJoinInvite(me?.role, me?.capabilities)).map(c => (
+              {CHANNELS.filter(c => c.href !== '/join' || showJoinInvite(me?.role, me?.provider)).map(c => (
                 <a
                   key={c.label}
                   href={c.href}

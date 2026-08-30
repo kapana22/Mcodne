@@ -1,192 +1,237 @@
 'use client'
-// Admin tab: შეფასებები — moderation list + delete.
+// ადმინი → „შეფასებები" — the one moderation surface for text the PUBLIC reads.
+//
+// ⚠️ WHY IT CAME BACK (2026-08-26). This tab existed and went on 2026-08-24,
+// with the booking a review used to hang off. The review did not go with it: it
+// hangs off a RequestOffer the client marked done, it is printed on the
+// provider's catalogue card, on their profile hero and in the profile body, and
+// it feeds the rating average beside their name. So for two days the site
+// published free text written by strangers about named people, and the only way
+// to take one down was to delete the account that wrote it.
+//
+// WHAT AN OPERATOR ACTUALLY DOES HERE, and why the screen is shaped like this:
+// they arrive because somebody complained, so the first thing on screen is the
+// filter that finds the complaint — „1–2 ★". Everything else is one list,
+// newest first, because a review has no state to work through: you read it and
+// you either leave it or you remove it.
+//
+// ⚠️ NO REPLY BUTTON, DELIBERATELY. `Review.tutorResponse` is the PROVIDER's
+// answer and it is shown here as context; an admin writing into that column
+// would put words in a provider's mouth on their own public profile. If a
+// review needs an answer rather than a removal, the message tool on the user
+// row is the honest way to ask its author for one.
 
-import { useState, useEffect } from 'react'
-import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
+import { useCallback, useEffect, useState } from 'react'
 import { Icon } from '@/components/Icon'
-import { EmptyState } from '@/components/EmptyState'
-import { AdminConfirmDialog, TabHeader, AdminLoading, AdminError, downloadCsv, fmtDT, LoadMoreBar } from './_parts'
+import {
+  TabHeader, SectionCard, RowList, AdminEmpty, AdminError, AdminLoading,
+  AdminConfirmDialog, SubTabs, CopyBtn, OpenBtn, adminResult, fmtDT,
+} from './_parts'
+import { topicLabel } from '@/lib/requests'
 
-/* ───── Section: Reviews (moderation — list + delete) ───── */
-type AdminReview = {
+type Row = {
   id: string
   rating: number
   body: string
+  anonymous: boolean
+  authorName: string | null
+  authorEmail: string | null
+  providerName: string | null
+  providerUserId: string | null
+  topic: string | null
+  publicRef: string | null
+  priceGel: number | null
+  response: string | null
+  respondedAt: string | null
   createdAt: string
-  student: { id: string; fullName: string; avatarUrl: string | null }
-  tutor: { id: string; user: { id: string; fullName: string; avatarUrl: string | null } }
-  booking: { id: string; topic: string; ref: string } | null
 }
+type Counts = { total: number; low: number; unanswered: number }
+type Filter = 'all' | 'low'
+
+/** Five glyphs, and the number beside them for anybody who counts rather than
+ *  looks. A rating is the one field here an operator scans rather than reads. */
+const Stars = ({ n }: { n: number }) => (
+  <span className="inline-flex items-center gap-1" aria-label={`${n} ვარსკვლავი`}>
+    <span className="inline-flex" aria-hidden>
+      {[1, 2, 3, 4, 5].map(i => (
+        <Icon.star
+          key={i}
+          className={`w-3.5 h-3.5 ${i <= n ? 'text-warning-500' : 'text-ink-200'}`}
+        />
+      ))}
+    </span>
+    <span className="font-display text-small font-bold text-ink-900 tabular-nums">{n}</span>
+  </span>
+)
 
 export const ReviewsSection = () => {
-  const [items, setItems] = useState<AdminReview[] | null>(null)
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [maxRating, setMaxRating] = useState<number>(5)
-  const [q, setQ] = useState('')
-  const [busy, setBusy] = useState<string | null>(null)
+  const [filter, setFilter] = useState<Filter>('all')
+  const [rows, setRows] = useState<Row[] | null>(null)
+  const [counts, setCounts] = useState<Counts | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const [flash, setFlash] = useState<{ kind: 'success' | 'error'; msg: string } | null>(null)
-  const [pendDelete, setPendDelete] = useState<AdminReview | null>(null)
+  const [pending, setPending] = useState<Row | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [flash, setFlash] = useState<string | null>(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setErr(null)
     try {
-      const params = new URLSearchParams({ maxRating: String(maxRating), limit: '50' })
-      if (q.trim()) params.set('q', q.trim())
-      const res = await fetch(`/api/admin/reviews?${params}`, { cache: 'no-store' })
-      if (!res.ok) { setErr('ჩატვირთვა ვერ მოხერხდა'); return }
+      const res = await fetch(`/api/admin/reviews${filter === 'low' ? '?low=1' : ''}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error('http ' + res.status)
       const j = await res.json()
-      setItems(Array.isArray(j.items) ? j.items : [])
-      setNextCursor(j.nextCursor ?? null)
-    } catch { setErr('ქსელის შეცდომა') }
-  }
+      setRows(Array.isArray(j?.items) ? j.items : [])
+      if (j?.counts) setCounts(j.counts)
+    } catch {
+      setRows(null)
+      setErr('შეფასებების ჩატვირთვა ვერ მოხერხდა.')
+    }
+  }, [filter])
 
-  const loadMore = async () => {
-    if (!nextCursor || loadingMore) return
-    setLoadingMore(true)
+  useEffect(() => { load() }, [load])
+
+  const remove = async (reason: string) => {
+    if (!pending) return
+    setBusy(true)
     try {
-      const params = new URLSearchParams({ maxRating: String(maxRating), limit: '50', cursor: nextCursor })
-      if (q.trim()) params.set('q', q.trim())
-      const res = await fetch(`/api/admin/reviews?${params}`, { cache: 'no-store' })
-      if (!res.ok) return
-      const j = await res.json()
-      setItems(prev => [...(prev ?? []), ...(Array.isArray(j.items) ? j.items : [])])
-      setNextCursor(j.nextCursor ?? null)
-    } catch { /* keep current page */ } finally { setLoadingMore(false) }
-  }
-
-  useEffect(() => {
-    const t = setTimeout(load, 300)
-    return () => clearTimeout(t)
-  }, [maxRating, q])
-
-  const remove = async (r: AdminReview, reason: string) => {
-    setBusy(r.id)
-    setFlash(null)
-    try {
-      const res = await fetch(`/api/admin/reviews?id=${r.id}`, {
+      const res = await fetch(`/api/admin/reviews/${pending.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason }),
       })
-      const j = await res.json().catch(() => ({} as any))
-      if (!res.ok || !j.ok) { setFlash({ kind: 'error', msg: 'წაშლა ვერ მოხერხდა' }); return }
-      await load()
-      setFlash({ kind: 'success', msg: 'შეფასება წაიშალა — ექსპერტის რეიტინგი გადაითვალა.' })
-    } catch { setFlash({ kind: 'error', msg: 'ქსელის შეცდომა' }) }
-    finally { setBusy(null) }
+      const r = await adminResult(res)
+      if (!r.ok) { setErr(r.message ?? 'წაშლა ვერ მოხერხდა.'); return }
+      setRows(prev => (prev ?? []).filter(x => x.id !== pending.id))
+      setCounts(c => (c ? { ...c, total: Math.max(0, c.total - 1), low: pending.rating <= 2 ? Math.max(0, c.low - 1) : c.low } : c))
+      setFlash('შეფასება წაიშალა. ჩანაწერი აუდიტშია.')
+    } catch {
+      setErr('წაშლა ვერ მოხერხდა.')
+    } finally {
+      setBusy(false)
+      setPending(null)
+    }
   }
 
   return (
     <>
       <TabHeader
-        eyebrow="მოდერაცია · შეფასებები"
-        // Cursor-paginated list — while a next page remains this is the LOADED
-        // count, not the total match, and the CSV carries exactly these rows.
-        title={<>{items ? (nextCursor ? `ჩატვირთულია ${items.length} ` : `${items.length} `) : '— '}შეფასება</>}
-        sub="ცუდი/სპამი/შეურაცხმყოფელი შეფასების წაშლა · წაშლისას ექსპერტის რეიტინგი გადაითვლება ავტომატურად."
-        actions={items && items.length > 0 ? (
-          <button
-            type="button"
-            title="ექსპორტდება მხოლოდ ჩატვირთული ჩანაწერები"
-            onClick={() => downloadCsv(`reviews-${new Date().toISOString().slice(0, 10)}.csv`, [
-              ['id', 'rating', 'student', 'tutor', 'topic', 'body', 'createdAt'],
-              ...items.map(r => [r.id, r.rating, r.student.fullName, r.tutor.user.fullName, r.booking?.topic ?? '', r.body, r.createdAt]),
-            ])}
-            className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-meta inline-flex items-center gap-1.5 transition-colors duration-fast"
-          >
-            <Icon.download className="w-3.5 h-3.5" /> CSV · {items.length}
-          </button>
-        ) : undefined}
+        eyebrow="შეფასებები"
+        title="რას წერენ"
+        sub="ყველა შეფასება, ახლიდან ძველისკენ. წაშლა შეუქცევადია და აუდიტში ჩაიწერება მიზეზთან და ტექსტთან ერთად."
       />
-      <section className="px-6 lg:px-8 py-4 bg-ink-50/40 border-b border-ink-100 sticky top-16 z-20">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[240px] max-w-[420px]">
-            <Icon.search className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="ტექსტი ან სახელი…" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-small focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
-          </div>
-          <div className="inline-flex items-center p-0.5 rounded-pill bg-white border border-ink-200">
-            {[
-              { v: 5, label: 'ყველა' },
-              { v: 3, label: '≤ 3 ★' },
-              { v: 2, label: '≤ 2 ★' },
-              { v: 1, label: '1 ★ (ცუდი)' },
-            ].map(o => (
-              <button key={o.v} type="button" onClick={() => setMaxRating(o.v)} className={`h-10 sm:h-9 px-3.5 rounded-pill font-display text-small font-semibold tracking-wide transition-colors duration-fast ${maxRating === o.v ? 'bg-ink-900 text-white hover:bg-ink-800' : 'text-ink-600 hover:bg-ink-100'}`}>{o.label}</button>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="px-6 lg:px-8 py-6 space-y-3">
-        {err && <AdminError message={err} />}
+
+      <SubTabs<Filter>
+        value={filter}
+        onChange={setFilter}
+        tabs={[
+          { id: 'all', label: 'ყველა', count: counts?.total },
+          // The reason an operator opens this tab at all.
+          { id: 'low', label: '1–2 ★', count: counts?.low },
+        ]}
+      />
+
+      <div className="px-6 lg:px-8 py-6 space-y-5">
         {flash && (
-          <div role="alert" className={`rounded-btn border px-3 py-2 text-small font-medium ${flash.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
-            {flash.msg}
+          <div role="status" className="rounded-btn border border-brand-200 bg-brand-50 px-3 py-2.5 text-small text-brand-800">
+            {flash}
           </div>
         )}
-        {items === null ? (
-          <AdminLoading inset />
-        ) : items.length === 0 ? (
-          <EmptyState
-            variant="inline"
-            icon={<Icon.star className="w-6 h-6" />}
-            title="ამ ფილტრით შეფასება არ არის"
-            description="სცადე სხვა ძებნა ან რეიტინგის ზღვარი."
-            cta={q.trim() || maxRating !== 5 ? { label: 'ფილტრის გასუფთავება', onClick: () => { setQ(''); setMaxRating(5) } } : undefined}
+        {err && <AdminError message={err} onRetry={load} />}
+
+        {rows === null && !err && <AdminLoading label="შეფასებები იტვირთება…" />}
+
+        {rows !== null && rows.length === 0 && (
+          <AdminEmpty
+            ok
+            text={filter === 'low' ? 'დაბალი შეფასება არ არის.' : 'შეფასება ჯერ არავის დაუწერია.'}
           />
-        ) : items.map(r => (
-          <article key={r.id} className="rounded-card border border-ink-200 bg-white p-4">
-            <div className="flex items-start gap-3 flex-wrap">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <img src={r.student.avatarUrl || DEFAULT_AVATAR} alt="" className="w-9 h-9 rounded-full object-cover ring-1 ring-ink-200" />
-                <div className="min-w-0">
-                  <div className="font-display text-small font-bold text-ink-900 truncate">{r.student.fullName}</div>
-                  <div className="text-meta text-ink-500 truncate">→ {r.tutor.user.fullName}{r.booking ? ` · #${r.booking.ref.slice(0, 8)}` : ''}</div>
+        )}
+
+        {rows !== null && rows.length > 0 && (
+          <SectionCard
+            eyebrow="სია"
+            title={`${rows.length} შეფასება`}
+            sub={counts ? `${counts.unanswered} მათგანს ექსპერტი არ უპასუხა.` : ''}
+          >
+            <RowList>
+              {rows.map(r => (
+                <div key={r.id} className="p-4 sm:p-5">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <Stars n={r.rating} />
+                        <span className="font-display text-small font-semibold text-ink-900">
+                          {r.providerName ?? 'ექსპერტი წაშლილია'}
+                        </span>
+                        {r.topic && (
+                          <span className="text-meta text-ink-500">{topicLabel(r.topic)}</span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-small text-ink-800 leading-[1.55] whitespace-pre-wrap break-words max-w-[70ch]">
+                        {r.body}
+                      </p>
+                      <div className="mt-2 font-mono text-meta text-ink-500 flex items-center gap-2 flex-wrap">
+                        {/* The author, always — moderation of anonymous text is
+                            moderation of nobody. The flag says how the PUBLIC
+                            page renders it, which is a different question. */}
+                        <span>{r.authorName ?? 'ავტორი წაშლილია'}</span>
+                        {r.anonymous && (
+                          <span className="inline-flex items-center h-5 px-1.5 rounded-pill border border-ink-200 text-ink-600 font-display text-micro font-bold uppercase">
+                            საჯაროდ ანონიმური
+                          </span>
+                        )}
+                        <span>· {fmtDT(r.createdAt)}</span>
+                        {r.priceGel != null && <span>· {r.priceGel}₾</span>}
+                      </div>
+                      {r.response && (
+                        <div className="mt-3 pl-3 border-l-2 border-ink-200">
+                          <div className="font-display text-micro font-semibold uppercase text-ink-500">ექსპერტის პასუხი</div>
+                          <p className="mt-1 text-small text-ink-700 leading-[1.55] whitespace-pre-wrap break-words max-w-[70ch]">{r.response}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {r.authorEmail && <CopyBtn value={r.authorEmail} label="ელფოსტა" />}
+                      {r.providerUserId && <OpenBtn href={`/experts/${r.providerUserId}`} label="პროფილი" />}
+                      <button
+                        type="button"
+                        onClick={() => { setFlash(null); setPending(r) }}
+                        className="h-9 px-3 rounded-btn border border-danger-200 bg-white hover:bg-danger-50 text-danger-700 font-display text-small font-semibold inline-flex items-center transition-colors duration-fast"
+                      >
+                        წაშლა
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="inline-flex items-center gap-0.5 text-warning-500">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Icon.star key={i} className={`w-3.5 h-3.5 ${i < r.rating ? '' : 'text-ink-200'}`} />
-                ))}
-                <span className="ml-2 font-display text-meta font-semibold text-ink-700 tabular-nums">{r.rating}.0</span>
-              </div>
-              <span className="font-mono text-meta tabular-nums text-ink-400">{fmtDT(r.createdAt)}</span>
-              <button
-                type="button"
-                onClick={() => setPendDelete(r)}
-                disabled={busy === r.id}
-                className="h-9 px-2.5 rounded-btn bg-white border border-ink-200 hover:border-danger-300 hover:bg-danger-50 disabled:opacity-50 text-ink-700 hover:text-danger-700 font-display font-semibold text-meta transition-colors duration-fast"
-              >
-                {busy === r.id ? '…' : 'წაშლა'}
-              </button>
-            </div>
-            <p className="mt-3 text-small text-ink-700 leading-[1.55] whitespace-pre-wrap">{r.body}</p>
-            {r.booking && (
-              <div className="mt-2 text-meta text-ink-500">
-                <span className="font-display font-semibold">ჯავშანი:</span> {r.booking.topic}
-              </div>
-            )}
-          </article>
-        ))}
-        {items && <LoadMoreBar hasMore={!!nextCursor} loading={loadingMore} onMore={loadMore} count={items.length} />}
-      </section>
+              ))}
+            </RowList>
+          </SectionCard>
+        )}
+      </div>
+
       <AdminConfirmDialog
-        open={pendDelete !== null}
+        open={pending !== null}
         title="შეფასების წაშლა"
-        body={pendDelete ? <>{pendDelete.student.fullName} → {pendDelete.tutor.user.fullName} · {pendDelete.rating}★. მიზეზი ინახება აუდიტში; ექსპერტის რეიტინგი გადაითვლება.</> : null}
         tone="danger"
-        reason="required"
         confirmLabel="წაშალე"
-        busy={pendDelete !== null && busy === pendDelete.id}
-        onCancel={() => setPendDelete(null)}
-        onConfirm={async (reason) => {
-          const r = pendDelete
-          setPendDelete(null)
-          if (r) await remove(r, reason)
-        }}
+        reason="required"
+        reasonLabel="მიზეზი"
+        reasonPlaceholder="რატომ ქრება ეს შეფასება — ერთი წინადადება."
+        body={
+          pending && (
+            <>
+              <span className="font-display font-semibold">{pending.rating} ★</span>{' '}
+              „{pending.body.slice(0, 140)}{pending.body.length > 140 ? '…' : ''}“
+              <br />
+              წაშლა შეუქცევადია. ტექსტი და მიზეზი აუდიტში რჩება, თავად შეფასება კი
+              ექსპერტის პროფილიდან და საშუალო ქულიდან მაშინვე ქრება.
+            </>
+          )
+        }
+        onConfirm={remove}
+        onCancel={() => setPending(null)}
+        busy={busy}
       />
     </>
   )
 }
-

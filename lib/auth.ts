@@ -179,23 +179,22 @@ export async function postAuthHome(user: { id: string; role: Role }): Promise<st
     // Queried together rather than in sequence: this runs on every sign-in, and
     // two awaited round-trips on the auth path for a branch that usually
     // matches neither is a cost paid by everybody.
-    const [tutorApp, masterApp] = await Promise.all([
-      prisma.tutorApplication.findUnique({
-        where: { userId: user.id },
-        select: { status: true },
-      }),
-      prisma.masterApplication.findUnique({
-        where: { userId: user.id },
-        select: { status: true },
-      }),
-    ])
-    if (tutorApp && (tutorApp.status === 'DRAFT' || tutorApp.status === 'SUBMITTED')) return '/join?can=CONSULT'
-    // ⚠️ `!== 'APPROVED'` AND NOT A LIST OF THREE. SUBMITTED, NEEDS_REVISION and
-    // REJECTED all want the applicant on that page — the first to see where it
-    // stands, the second to fix it, the third to read why. An APPROVED row
-    // falls through on purpose: by then `hatsOf` returns MASTER and the hat
-    // below sends them to their workspace, which is where they belong.
-    if (masterApp && masterApp.status !== 'APPROVED') return '/join?can=WORK'
+    // ⚠️ ONE APPLICATION SINCE 2026-08-24. There were two — `TutorApplication`
+    // (the consultation form) and `MasterApplication` (the trades one) — and
+    // this block asked about both, sending the applicant back to whichever
+    // wizard they had started. The consultation product was removed and its
+    // table with it; one door, one form, one place to send somebody who is
+    // mid-application.
+    const app = await prisma.masterApplication.findUnique({
+      where: { userId: user.id },
+      select: { status: true },
+    })
+    // ⚠️ `!== 'APPROVED'` AND NOT A LIST. SUBMITTED, NEEDS_REVISION, REJECTED
+    // and DRAFT all want the applicant on that page — to see where it stands,
+    // to fix it, or to read why. An APPROVED row falls through on purpose: by
+    // then `hatsOf` returns PROVIDER and the hat below sends them to their
+    // workspace, which is where they belong.
+    if (app && app.status !== 'APPROVED') return '/join'
   }
 
   // ⚠️ THE HAT DECIDES, NOT THE ROLE (2026-08-18). `Role` has three values and

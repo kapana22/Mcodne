@@ -12,7 +12,7 @@ import { showJoinInvite } from '@/lib/capabilities'
 // become one" bug cannot reappear per-surface.
 export function ApplyCtaGate({ children }: { children: ReactNode }) {
   const { me } = useMe()
-  if (!showJoinInvite(me?.role, me?.capabilities)) return null
+  if (!showJoinInvite(me?.role, me?.provider)) return null
   return <>{children}</>
 }
 

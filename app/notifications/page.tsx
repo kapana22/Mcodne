@@ -43,19 +43,16 @@ const timeShort = (iso: string) => fmtKaTime(new Date(iso))
 // Badge canon (2026-07-19): hairline border + colored text, NO pastel fill.
 // These chips all carried a `bg-*-50` wash, which turned a dense list into a
 // field of pastel blocks. The type stays legible from its label plus the border/
-// text hue — green for booking lifecycle, gold for ratings, red for a
-// cancellation, neutral for everything conversational.
+// text hue — gold for ratings, green for a finished job, neutral for everything
+// conversational.
+//
+// ⚠️ FIVE ROWS LEFT THIS MAP ON 2026-08-26 (ჯავშანი · გაუქმება · დასრულდა ·
+// გადადება, and MESSAGE_NEW). Every one was a chip for a notification type
+// nothing has sent since 2026-08-24; what people actually receive is the
+// REQUEST_* family at the bottom.
 const TYPE_LABEL: Record<string, { l: string; cls: string }> = {
-  BOOKING_CREATED:    { l: 'ჯავშანი',      cls: 'border-brand-200 text-brand-700' },
-  BOOKING_CANCELED:   { l: 'გაუქმება',     cls: 'border-danger-200 text-danger-700' },
-  BOOKING_COMPLETED:  { l: 'დასრულდა',     cls: 'border-success-200 text-success-700' },
-  // Reschedule traffic (request, and the „უარყოფილია" answer) — neutral, not
-  // danger: the session itself is untouched either way.
-  RESCHEDULE_REQUEST: { l: 'გადადება',     cls: 'border-ink-200 text-ink-600' },
-  MESSAGE_NEW:        { l: 'შეტყობინება',  cls: 'border-ink-200 text-ink-700' },
   REVIEW_NEW:         { l: 'შეფასება',     cls: 'border-warning-200 text-warning-700' },
   APPLICATION_STATUS: { l: 'განაცხადი',    cls: 'border-success-200 text-success-700' },
-  BOOKING_REMINDER:   { l: 'შეხსენება',    cls: 'border-brand-200 text-brand-700' },
   APPLICATION_NEW:    { l: 'განაცხადი',    cls: 'border-ink-200 text-ink-700' },
   PAYOUT:             { l: 'ანგარიშსწორება', cls: 'border-brand-300 text-brand-800' },
   ADMIN_BROADCAST:    { l: 'გუნდიდან',     cls: 'border-ink-300 text-ink-800' },
@@ -274,7 +271,7 @@ export default function NotificationsPage() {
           <EmptyState
             icon={<Icon.bell className="w-6 h-6" />}
             title="ცარიელია"
-            description="როცა რაიმე მოხდება — ჯავშანი, შეტყობინება, შეფასება — აქ ჩნდება."
+            description="როცა რაიმე მოხდება — შეთავაზება, შეტყობინება, შეფასება — აქ ჩნდება."
           />
         ) : (
           <div className="space-y-6">

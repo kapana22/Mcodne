@@ -30,7 +30,7 @@
 
 import { prisma } from './prisma'
 import { professions } from './professionSeo'
-import { SERVICE_GROUPS, SERVICE_TOPICS } from './serviceProfile'
+import { OFFER_GROUPS, OFFER_TOPICS } from './serviceProfile'
 
 /**
  * Reserved segments — a slug equal to one of these would shadow a real page.
@@ -67,8 +67,8 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   // 2. every profession landing
   ...professions.map(p => p.slug),
   // 3. every trade landing, live or not yet open
-  ...SERVICE_GROUPS.map(g => g.id),
-  ...SERVICE_TOPICS.map(t => t.id),
+  ...OFFER_GROUPS.map(g => g.id),
+  ...OFFER_TOPICS.map(t => t.id),
 ])
 
 /** True when a slug names a page rather than a person — see RESERVED_SLUGS. */
@@ -77,19 +77,21 @@ export const slugReserved = (slug: string): boolean => RESERVED_SLUGS.has(slug)
 /**
  * Is this slug already spoken for anywhere under /experts/?
  *
- * ONE QUESTION, BOTH TABLES, plus the reserved list — the whole point of the
- * file. A DB failure answers `true` („taken"), which is the safe direction: the
+ * ⚠️ IT ASKED TWO TABLES UNTIL 2026-08-24, which was the whole point of the
+ * file: a profile slug and a consultation slug shared one URL prefix and the
+ * unique index on each table could not see the other. One table now — the
+ * reserved list is what is left to check beside it, and it is the half no index
+ * could ever cover.
+ *
+ * A DB failure answers `true` („taken"), which is the safe direction: the
  * caller tries the next suffix and, at worst, a profile keeps its id URL for a
  * while. Answering `false` on an outage would mint a duplicate.
  */
 export async function slugTaken(slug: string): Promise<boolean> {
   if (slugReserved(slug)) return true
   try {
-    const [expert, provider] = await Promise.all([
-      prisma.tutorProfile.findFirst({ where: { slug }, select: { id: true } }),
-      prisma.serviceProfile.findFirst({ where: { slug }, select: { id: true } }),
-    ])
-    return expert !== null || provider !== null
+    const provider = await prisma.serviceProfile.findFirst({ where: { slug }, select: { id: true } })
+    return provider !== null
   } catch {
     return true
   }

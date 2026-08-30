@@ -254,7 +254,7 @@ export const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
               <div className="mt-7">
                 <div className="flex items-baseline justify-between mb-2.5">
                   <Eyebrow tone="muted">სასურველი ფასი</Eyebrow>
-                  <div className="font-display text-body-lg font-bold text-ink-900 tabular-nums">₾{budget}<span className="text-meta font-medium text-ink-500"> / სესია</span></div>
+                  <div className="font-display text-body-lg font-bold text-ink-900 tabular-nums">₾{budget}<span className="text-meta font-medium text-ink-500"> / სამუშაო</span></div>
                 </div>
                 <input type="range" min={30} max={200} step={10} value={budget} onChange={e => setBudget(Number(e.target.value))} className="w-full accent-brand-500" />
                 <div className="flex justify-between font-mono text-meta tabular-nums text-ink-400 mt-1">
@@ -305,7 +305,7 @@ export const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
                     </div>
                     <div>
                       <div className="font-mono text-micro uppercase text-ink-500 mb-1">მაქს. ბიუჯეტი</div>
-                      <div className="font-display text-body font-semibold text-ink-900 tabular-nums">₾{budget} / სესია</div>
+                      <div className="font-display text-body font-semibold text-ink-900 tabular-nums">₾{budget} / სამუშაო</div>
                     </div>
                   </div>
                 </div>

@@ -14,8 +14,8 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { audit } from '@/lib/audit'
-import { mailVerifiedRequest } from '@/lib/requestJobs'
-import { AdminRequestPatch } from '@/lib/requests'
+import { mailVerifiedRequest, refundDeadRequest } from '@/lib/requestJobs'
+import { AdminRequestPatch, topicLabel } from '@/lib/requests'
 import { requestsViewer, requestsNotFound } from '@/lib/requestsServer'
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -89,6 +89,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     where: { id },
     select: { id: true, publicRef: true, status: true, adminNote: true, offerLimit: true, offerCount: true },
   })
+
+  // ⚠️ THE ADMIN'S CLOSE OWES THE SAME MONEY AS THE CRON'S (2026-08-30). The
+  // sweep refunds paid contacts on a request that died unanswered; an operator
+  // closing that same request by hand must not be the way the promise gets
+  // skipped — the provider cannot see which of the two ended it.
+  //
+  // REJECTED IS UNCONDITIONAL, and that is the deliberate asymmetry. Closing
+  // with offers in hand is an ordinary ending: somebody answered, the money
+  // bought what it was for. Rejecting says the REQUEST was never real — a
+  // duplicate, a test, a number that does not answer — and nobody should be
+  // left holding 1₾ for a lead we ourselves have just declared invalid.
+  if (status === 'REJECTED' || (status === 'CLOSED' && before.offerCount === 0)) {
+    after(() => refundDeadRequest(id, topicLabel(before.topic)))
+  }
 
   await audit(admin.id, status ? `request.${status.toLowerCase()}` : 'request.update', {
     targetType: 'ServiceRequest',

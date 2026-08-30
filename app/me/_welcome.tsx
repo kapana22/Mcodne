@@ -6,45 +6,49 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Eyebrow } from '@/components/Eyebrow'
 import { Icon } from '@/components/Icon'
-import { deriveSummary } from '@/lib/bookings'
 import { Container } from '@/components/Container'
 import { KA_MONTHS_SHORT, KA_WEEKDAY_SHORT, MeData } from './_model'
 
-/* ───── Search bar — dashboard primary CTA ───── */
-const DashboardSearch = () => {
-  const [q, setQ] = useState('')
-  const go = () => {
-    const trimmed = q.trim()
-    window.location.href = trimmed ? `/experts?q=${encodeURIComponent(trimmed)}` : '/experts'
-  }
-  return (
-    <form
-      onSubmit={e => { e.preventDefault(); go() }}
-      className="mt-5 max-w-[520px] flex items-center gap-2 rounded-card bg-white border border-ink-300 focus-within:border-ink-400 focus-within:ring-4 focus-within:ring-brand-100 transition-all duration-fast p-1.5"
-    >
-      <div className="relative flex-1 min-w-0">
-        <Icon.search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none" />
-        <input
-          type="text"
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          placeholder="ეძებე ექსპერტი, კატეგორია, თემა…"
-          aria-label="ექსპერტის ძებნა"
-          className="w-full h-11 pl-10 pr-3 bg-transparent text-body text-ink-900 placeholder:text-ink-400 focus:outline-none"
-        />
-      </div>
-      <button
-        type="submit"
-        className="h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center gap-1.5 transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+/* ───── The two ways in, in the order the product actually works ─────
+ *
+ * ⚠️ SEARCHING WAS THE PRIMARY ACTION AND IT SHOULD NEVER HAVE BEEN
+ * (2026-08-30). Owner, on this screen: „მთავარ გვერდზე ექსპერტის მოსაძებნი
+ * უნდა იყოს პირველი? არაა რა თქმა უნდა."
+ *
+ * They are right, and the page's own sentence one line above said so already:
+ * „აღწერე, რა გჭირდება — ან მოძებნე ექსპერტი პირდაპირ." Describing is the
+ * product. A client who knew which expert they wanted would not need us; the
+ * whole machine — routing, offers, the price a provider quotes against a real
+ * brief — starts from a description. Searching is the ALTERNATIVE, for the
+ * minority who already have somebody in mind.
+ *
+ * So the hero asks for the brief and offers the catalogue underneath it, at the
+ * weight of a link. The rail already carries „ექსპერტები" as a permanent door;
+ * this does not need to be a third one at button weight.
+ */
+const StartRequest = ({ requestHref }: { requestHref: string | null }) => (
+  <div className="mt-6 flex flex-col items-start gap-3">
+    {requestHref && (
+      <Link
+        href={requestHref}
+        className="h-12 px-6 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center gap-2 shadow-xs transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
       >
-        ძებნა
-      </button>
-    </form>
-  )
-}
+        <Icon.edit className="w-4 h-4" />
+        აღწერე, რა გჭირდება
+      </Link>
+    )}
+    <Link
+      href="/experts"
+      className="font-display text-small font-semibold text-ink-600 hover:text-ink-900 inline-flex items-center gap-1.5 transition-colors duration-fast"
+    >
+      <Icon.search className="w-3.5 h-3.5" />
+      ან მოძებნე ექსპერტი პირდაპირ
+    </Link>
+  </div>
+)
 
 /* ───── Onboarding tour — first-run getting-started card ───── */
-export const OnboardingTour = ({ userId, hasBookings, joinedAt }: { userId?: string; hasBookings: boolean; joinedAt?: string }) => {
+export const OnboardingTour = ({ userId, joinedAt }: { userId?: string; joinedAt?: string }) => {
   const [dismissed, setDismissed] = useState(true) // start dismissed to avoid SSR flash
   useEffect(() => {
     if (!userId) return
@@ -55,7 +59,7 @@ export const OnboardingTour = ({ userId, hasBookings, joinedAt }: { userId?: str
       setDismissed(isDismissed)
     } catch {}
   }, [userId])
-  if (dismissed || hasBookings) return null
+  if (dismissed) return null
   // Only show for accounts younger than 7 days.
   if (joinedAt) {
     const ageMs = Date.now() - new Date(joinedAt).getTime()
@@ -69,8 +73,13 @@ export const OnboardingTour = ({ userId, hasBookings, joinedAt }: { userId?: str
   }
   const steps = [
     { n: 1, l: 'იპოვე ექსპერტი', d: 'აირჩიე საკითხი — საგადასახადო, სამართალი, ან სხვა.', href: '/experts' },
-    { n: 2, l: 'აირჩიე დრო და დაჯავშნე', d: 'აირჩიე დრო კალენდარში — ექსპერტი ადასტურებს.', href: '/experts' },
-    { n: 3, l: 'შედი ვიდეოოთახში', d: 'დანიშნულ დროზე ერთი დაწკაპუნებით — აპლიკაცია არ გჭირდება.', href: null as string | null },
+    // ⚠️ STEPS 2 AND 3 DESCRIBED A CALENDAR AND A VIDEO ROOM (2026-08-26).
+    // „აირჩიე დრო კალენდარში — ექსპერტი ადასტურებს" and „შედი ვიდეოოთახში":
+    // neither exists since 2026-08-24, and this is the FIRST screen a new
+    // client sees, so it was teaching them a product they would then fail to
+    // find.
+    { n: 2, l: 'მიიღე შეთავაზებები', d: 'ექსპერტები ფასთან ერთად გამოგიგზავნიან — შენ ირჩევ.', href: '/experts' },
+    { n: 3, l: 'შეათანხმე დეტალები', d: 'მიმოწერა მცოდნეზეა — იქვე ათანხმებთ ვადასა და ფორმატს.', href: null as string | null },
   ]
   return (
     <Container as="section" className="mt-6 motion-safe:animate-scale-in">
@@ -86,7 +95,7 @@ export const OnboardingTour = ({ userId, hasBookings, joinedAt }: { userId?: str
         <div className="relative">
           <Eyebrow className="mb-2 motion-safe:animate-rise-in">დასაწყისი</Eyebrow>
           <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>3 ნაბიჯი — და მზად ხარ</h2>
-          <div className="mt-5 grid sm:grid-cols-3 gap-3 motion-safe:stagger">
+          <div className="mt-5 grid sm:grid-cols-3 gap-3 stagger">
             {steps.map(s => {
               // Solid, not translucent: an in-flow card is a surface you READ,
               // and the canon reserves glass for surfaces you look PAST
@@ -113,71 +122,44 @@ export const OnboardingTour = ({ userId, hasBookings, joinedAt }: { userId?: str
   )
 }
 
-/* ───── Booking derivation — single source of truth ─────
-   Every dashboard counter (Welcome header) and every list badge (SessionsPanel,
-   NextSession) derives from the shared pure helpers in `@/lib/bookings`, so the
-   header numbers can never drift from the visible bookings — and the STUDENT and
-   TUTOR dashboards now bucket identically (Asia/Tbilisi, same "upcoming" rule),
-   which they previously did not. See lib/bookings.ts +
-   tests/student-dashboard.test.ts. `TBILISI_TZ`, `UPCOMING_STATUSES`,
-   `bucketBookings`, `deriveSummary`, `SummaryBooking` are imported at the top. */
+/* ⚠️ THE COUNTER IS GONE WITH WHAT IT COUNTED (2026-08-24). This header said
+   „დაჯავშნილი გაქვს N სესია", derived through `lib/bookings → deriveSummary`,
+   the shared helper that kept it in step with the session list beside it. There
+   are no sessions; there is one sentence, and it says what the page is for. */
 
-export const Welcome = ({ me, bookings }: { me: MeData | null; bookings: any[] }) => {
-  // Render date client-side only to avoid SSR/CSR mismatch (Node ICU lacks ka-GE).
-  const [nowLabel, setNowLabel] = useState<string>('')
-  useEffect(() => {
-    const upd = () => {
-      const d = new Date()
-      const dow = KA_WEEKDAY_SHORT[d.getDay()]
-      const mon = KA_MONTHS_SHORT[d.getMonth()]
-      const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-      setNowLabel(`${dow} ${d.getDate()} ${mon} ${d.getFullYear()} · ${time}`)
-    }
-    upd()
-    const t = setInterval(upd, 30_000)
-    return () => clearInterval(t)
-  }, [])
-
-  const firstName = me?.fullName?.split(' ')[0] ?? ''
-  // Single derivation shared with NextSession + SessionsPanel — see deriveSummary.
-  const s = deriveSummary(bookings)
+export const Welcome = ({ name, requestHref }: {
+  /** The reader's full name, resolved on the SERVER — this used to be the whole
+   *  `me` object, fetched by the page after mount. */
+  name: string
+  /** The intake address, or null when FEATURE_REQUESTS is off. Read once by the
+   *  server page so the hero and the rest of the screen cannot disagree. */
+  requestHref: string | null
+}) => {
+  // ⚠️ THE CLOCK IS GONE (2026-08-30), and it took three problems with it.
+  //
+  //   · It could not be server-rendered (Node's ICU has no ka-GE), so it drew
+  //     „—" on the first paint and swapped a beat later — a visible stutter on
+  //     the client's landing page, which is the complaint that started this.
+  //   · It re-rendered every 30 seconds, for ever, to say nothing.
+  //   · „თბილისი" beside it is a CONSTANT: `CITIES` in lib/requestTopics holds
+  //     one city. A field whose value cannot differ carries no information.
+  //
+  // What a person needs on their own home screen is their name and the one
+  // thing to do — not the time, which their device already shows them.
+  const firstName = name.split(' ')[0] ?? ''
 
   return (
     <section className="border-b border-ink-100 bg-white">
       <Container className="pt-6 sm:pt-10 lg:pt-12 pb-6 sm:pb-8">
         <div className="min-w-0">
-            <Eyebrow tone="muted" className="inline-flex items-center gap-2 mb-3">
-              <span>{nowLabel || '—'}</span>
-              <span className="text-ink-300">·</span>
-              <span className="inline-flex items-center gap-1">
-                <Icon.globe className="w-3 h-3" />
-                თბილისი
-              </span>
-            </Eyebrow>
-            <h1 className="font-display text-h1 sm:text-display-lg lg:text-display-xl font-bold tracking-[-0.028em] leading-[1.02] text-ink-900 motion-safe:animate-rise-in">
-              {firstName ? `გამარჯობა, ${firstName}.` : 'გამარჯობა.'}
-            </h1>
-            <p className="mt-3 text-body-lg text-ink-600 max-w-[560px] leading-[1.55] motion-safe:animate-rise-in" style={{ animationDelay: '60ms' }}>
-              {s.upcomingCount > 0
-                ? <>დაჯავშნილი გაქვს <span className="font-display font-semibold text-ink-900">{s.upcomingCount} სესია</span>.</>
-                : <>ჯერ არ გაქვს ჯავშანი — მოძებნე პირველი ექსპერტი.</>}
-            </p>
+          <h1 className="font-display text-h1 sm:text-display-lg lg:text-display-xl font-bold tracking-[-0.028em] leading-[1.02] text-ink-900">
+            {firstName ? `გამარჯობა, ${firstName}.` : 'გამარჯობა.'}
+          </h1>
+          <p className="mt-3 text-body-lg text-ink-600 max-w-[560px] leading-[1.55]">
+            აღწერე, რა გჭირდება — ექსპერტები ფასს შემოგთავაზებენ.
+          </p>
 
-            {/* Search bar — primary CTA on the dashboard */}
-            <div className="motion-safe:animate-rise-in" style={{ animationDelay: '140ms' }}>
-              <DashboardSearch />
-            </div>
-
-            {/* Secondary shortcuts — the search box above is the single primary
-                "find expert" CTA, so these stay neutral and non-duplicative. */}
-            <div className="mt-3 flex flex-wrap gap-2 motion-safe:stagger">
-              <Link href="/me/bookings" className="inline-flex items-center gap-1.5 h-10 sm:h-9 px-3 rounded-btn bg-ink-50 hover:bg-ink-100 text-ink-800 font-display font-semibold text-small transition-colors duration-fast">
-                <Icon.cal className="w-3.5 h-3.5" /> ჩემი ჯავშნები
-              </Link>
-              <Link href="/experts" className="inline-flex items-center gap-1.5 h-10 sm:h-9 px-3 rounded-btn bg-ink-50 hover:bg-ink-100 text-ink-800 font-display font-semibold text-small transition-colors duration-fast">
-                <Icon.search className="w-3.5 h-3.5" /> ყველა ექსპერტი
-              </Link>
-            </div>
+          <StartRequest requestHref={requestHref} />
         </div>
       </Container>
     </section>

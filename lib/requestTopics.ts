@@ -72,7 +72,7 @@
  */
 import { rankCandidates } from './topicMatch'
 
-export const REQUEST_KINDS = ['LEARNING', 'CONSULTATION', 'PROJECT', 'SERVICE'] as const
+export const REQUEST_KINDS = ['LEARNING', 'MEETING', 'PROJECT', 'SERVICE'] as const
 export type RequestKindName = (typeof REQUEST_KINDS)[number]
 
 /** What the money is attached to. Snapshotted on the row rather than derived
@@ -105,9 +105,17 @@ export const KIND: Record<RequestKindName, {
     unitLabel: 'ერთ გაკვეთილზე',
     timingLabel: 'რამდენად ხშირად',
   },
-  CONSULTATION: {
-    label: 'კონსულტაცია',
-    hint: 'ერთი შეხვედრა სპეციალისტთან',
+  // ⚠️ „შეხვედრა", AND IT WAS „კონსულტაცია" UNTIL 2026-08-24. The consultation
+  // PRODUCT — a bookable slot, a calendar, a video room, a session price — was
+  // removed that day; what remains is the SHAPE of the purchase, which is real:
+  // an hour of a lawyer's or an accountant's time, agreed in the thread and
+  // paid once. Deleting the shape instead of renaming it would have pushed
+  // every such need onto the PROJECT ladder, whose floor is 500₾ — so a request
+  // for a 100₾ meeting would have been refused on arrival. The word is gone;
+  // the way people buy an hour is not.
+  MEETING: {
+    label: 'შეხვედრა',
+    hint: 'ერთი შეხვედრა — ონლაინ ან ადგილზე',
     unit: 'PER_SESSION',
     unitLabel: 'ერთ შეხვედრაზე',
     timingLabel: 'როდის',
@@ -134,7 +142,7 @@ export const KIND: Record<RequestKindName, {
 export function kindOf(raw: string | null | undefined): RequestKindName {
   return (REQUEST_KINDS as readonly string[]).includes(raw ?? '')
     ? (raw as RequestKindName)
-    : 'CONSULTATION' // the middle shape, and the safest thing to misread as
+    : 'MEETING' // the middle shape, and the safest thing to misread as
 }
 
 /* ═══════════ the money ══════════════════════════════════════════════════
@@ -167,7 +175,7 @@ export const BUDGET_BANDS: Record<RequestKindName, BudgetBand[]> = {
     { id: 'l4', min: 120, max: null, label: '120₾-ზე მეტი' },
   ],
   // Per session. Below 50₾ nobody here answers the phone for an hour.
-  CONSULTATION: [
+  MEETING: [
     { id: 'c0', min: 0,   max: 50,   label: '50₾-მდე', floor: true },
     { id: 'c1', min: 50,  max: 100,  label: '50–100₾' },
     { id: 'c2', min: 100, max: 250,  label: '100–250₾' },
@@ -274,7 +282,7 @@ export const TIMING: Record<RequestKindName, TimingOption[]> = {
     { id: 'intensive',  label: 'ინტენსიური კურსი' },
     { id: 'unsure',     label: 'ჯერ არ ვიცი' },
   ],
-  CONSULTATION: [
+  MEETING: [
     { id: 'asap',      label: 'რაც შეიძლება მალე' },
     { id: 'this_week', label: 'ამ კვირაში' },
     { id: 'this_month',label: 'ამ თვეში' },
@@ -639,7 +647,7 @@ export type TopicGroup = {
 }
 
 const L = ['LEARNING'] as const
-const CP = ['CONSULTATION', 'PROJECT'] as const
+const CP = ['MEETING', 'PROJECT'] as const
 /** ⚠️ ONE KIND, ON PURPOSE — so the „აირჩიე ტიპი" screen never appears for a
  *  service. „მჭირდება სანტექნიკოსი" is not ambiguous between a consultation and
  *  a job, and asking would be the wizard performing a choice nobody has. */
@@ -825,7 +833,7 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     id: 'psychology', label: 'ფსიქოლოგია', kinds: CP,
     template: 'რაზე მინდა მუშაობა: …\nფორმატი: … (ინდივიდუალური / წყვილი / ბავშვი)\nსიხშირე: …',
     topics: [
-      { id: 'psy-individual', label: 'ინდივიდუალური კონსულტაცია', alt: ['ფსიქოლოგი', 'ფსიქოთერაპევტი', 'თერაპია'], categorySlug: 'psychology', professions: ['ფსიქოლოგი', 'ფსიქოთერაპევტი'] },
+      { id: 'psy-individual', label: 'ინდივიდუალური სესია', alt: ['ფსიქოლოგი', 'ფსიქოთერაპევტი', 'თერაპია'], categorySlug: 'psychology', professions: ['ფსიქოლოგი', 'ფსიქოთერაპევტი'] },
       { id: 'psy-couple',     label: 'წყვილის თერაპია', categorySlug: 'psychology', professions: ['წყვილისა და ოჯახის კონსულტანტი'] },
       { id: 'psy-child',      label: 'ბავშვისა და მოზარდის ფსიქოლოგი', categorySlug: 'psychology', professions: ['ბავშვისა და მოზარდის ფსიქოლოგი'] },
       { id: 'psy-org',        label: 'ორგანიზაციული ფსიქოლოგია', categorySlug: 'psychology', professions: ['ორგანიზაციული ფსიქოლოგი'] },
@@ -837,7 +845,7 @@ export const TOPIC_GROUPS: TopicGroup[] = [
     topics: [
       { id: 'cv',        label: 'რეზიუმე და CV', categorySlug: 'career' },
       { id: 'interview', label: 'გასაუბრებისთვის მომზადება', categorySlug: 'career' },
-      { id: 'career-adv',label: 'კარიერული კონსულტაცია', categorySlug: 'career', professions: ['კარიერული კონსულტანტი'] },
+      { id: 'career-adv',label: 'კარიერული განვითარება', categorySlug: 'career', professions: ['კარიერული კონსულტანტი'] },
       { id: 'hiring',    label: 'დაქირავება', categorySlug: 'career', professions: ['HR-მენეჯერი'] },
       { id: 'training',  label: 'ტრენინგი გუნდისთვის', categorySlug: 'career', professions: ['ბიზნეს-ტრენერი'] },
     ],
@@ -1063,7 +1071,7 @@ export const TOPIC_GROUPS: TopicGroup[] = [
  */
 const KIND_TEMPLATE: Record<RequestKindName, string> = {
   LEARNING: 'ვინ ისწავლის: …\nამჟამინდელი დონე: …\nმიზანი: …',
-  CONSULTATION: 'სიტუაცია: …\nკითხვა: …\nრა ვცადე აქამდე: …',
+  MEETING: 'სიტუაცია: …\nკითხვა: …\nრა ვცადე აქამდე: …',
   PROJECT: 'რა უნდა გაკეთდეს: …\nვისთვის არის: …\nრა შედეგს ველოდები: …',
   // The three things a master asks on the phone before naming a price, in the
   // order they ask them. „სართული და ლიფტი" is in here because it is the single
@@ -1094,7 +1102,7 @@ export function templateFor(kind: RequestKindName, topicId: string): string {
  */
 const OFFER_TEMPLATE: Record<RequestKindName, string> = {
   LEARNING: 'გამარჯობა! ამ საგანს ვასწავლი … წელია.\nგაკვეთილი: … წუთი, …\nშემიძლია დავიწყო: …',
-  CONSULTATION: 'გამარჯობა! ამ საკითხზე ვმუშაობ … წელია.\nშეხვედრაზე განვიხილავთ: …\nთავისუფალი დრო მაქვს: …',
+  MEETING: 'გამარჯობა! ამ საკითხზე ვმუშაობ … წელია.\nშეხვედრაზე განვიხილავთ: …\nთავისუფალი დრო მაქვს: …',
   PROJECT: 'გამარჯობა! მსგავსი სამუშაო გაკეთებული მაქვს: …\nროგორ შევასრულებ: …\nვადა: …',
   // ⚠️ THE THIRD LINE IS THE ONE THAT MATTERS, and it is why this template is
   // not PROJECT's. On a visit the honest answer is often „I will price it when
@@ -1295,7 +1303,7 @@ export const BROWSABLE_GROUPS: TopicGroup[] = TOPIC_GROUPS.filter(groupIsLive)
  * standing in your kitchen.
  *
  * `groupIsService` is the split, and it is read off `kinds` rather than a
- * second hand-kept list — the same derivation SERVICE_GROUPS already uses, so a
+ * second hand-kept list — the same derivation OFFER_GROUPS already uses, so a
  * trade added to the vocabulary lands on the correct side of the page the same
  * day and cannot land on both.
  */
@@ -1540,25 +1548,27 @@ export function searchTopics(kind: RequestKindName, query: string, limit = 24): 
  * a visitor who arrived with no provider at all, which is the only safe answer.
  */
 export function topicsForProvider(p: {
-  kind: 'MASTER' | 'EXPERT'
-  /** ServiceProfile.services — SERVICE topic ids. */
+  /** ServiceProfile.services — the topic ids they actually ticked. */
   services?: string[]
-  /** TutorProfile.professions — job labels from lib/professions. */
+  /** ServiceProfile.professions — job labels from lib/professions. */
   professions?: string[]
-  /** The expert's sphere slug. */
+  /** The sphere slug they are filed under. */
   categorySlug?: string | null
 }): string[] {
-  if (p.kind === 'MASTER') {
-    const want = new Set(p.services ?? [])
-    return TOPIC_GROUPS
-      .filter(groupIsService)
-      .flatMap(g => g.topics)
-      .filter(t => want.has(t.id))
-      .map(t => t.id)
+  // ⚠️ THE TICKS WIN, AND THEY ARE ASKED FIRST (2026-08-24). This used to take
+  // a `kind` — MASTER read `services`, EXPERT read `professions` and the sphere
+  // — because the two halves lived in two tables and a row had one or the
+  // other. One row carries all three now, and they are not equal evidence: a
+  // ticked service is what this person SAID they sell, while a profession and a
+  // sphere are inferences from what they call themselves. So the ladder is
+  // ticks → professions → sphere, and it stops at the first rung that answers.
+  const ticked = new Set(p.services ?? [])
+  if (ticked.size) {
+    const known = TOPIC_GROUPS.flatMap(g => g.topics).filter(t => ticked.has(t.id))
+    if (known.length) return [...new Set(known.map(t => t.id))]
   }
-  // The expert half: consultation/project topics only.
   const rows = TOPIC_GROUPS
-    .filter(g => g.kinds.includes('CONSULTATION') || g.kinds.includes('PROJECT'))
+    .filter(g => g.kinds.includes('MEETING') || g.kinds.includes('PROJECT'))
     .flatMap(g => g.topics)
   // Whole label, case-insensitively trimmed — the same comparison
   // lib/requestRouting makes, never a substring: „იურისტი" must not match

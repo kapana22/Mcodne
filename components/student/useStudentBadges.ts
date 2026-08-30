@@ -1,24 +1,23 @@
 'use client'
-import { useMessagesUnread } from '@/lib/messagesUnread'
 
 export type StudentBadges = {
   messages: number
 }
 
-/* Badge source for the student sidebar.
+/* Badge source for the client sidebar.
  *
- * The fetch + 90s interval that used to live here moved to lib/messagesUnread
- * (2026-08-17) when the public header grew the same badge: two components asking
- * the same endpoint the same question on the same screen is two requests and,
- * worse, two numbers that can disagree for a poll's length. The shared store is
- * refcounted and single-flight, so this hook now costs nothing on a screen that
- * already has another subscriber.
+ * ⚠️ IT IS ALWAYS ZERO SINCE 2026-08-24, AND THAT IS THE TRUTH RATHER THAN A
+ * STUB. It polled `/api/messages?space=client` every 90s for a CLIENT inbox —
+ * threads a signed-in client had started on somebody's profile. There is no such
+ * inbox any more: a client describes a job at /request, and the conversation
+ * that follows is addressed by its public reference (/request/<ref>), which
+ * needs no account and therefore no badge. `app/me` has no messages route at
+ * all, so the pill this feeds has nothing to open.
  *
- * Behaviour is unchanged: space=client → the count reflects ONLY client-side
- * threads, so a dual-role user's expert unread never shows on this pill; it
- * polls every 90s while visible and refreshes on `mcodne:threads-refresh`, the
- * event the chat pane fires after send/receive, so the pill clears the moment a
- * thread is opened. */
+ * The hook is KEPT rather than deleted, and the shape with it, because the
+ * client sidebar reads `badges.messages` in three places; returning a real zero
+ * removes a 404 poll from every /me page load without touching the nav. When a
+ * client-side inbox exists again, this is the one line to change. */
 export function useStudentBadges(): StudentBadges {
-  return { messages: useMessagesUnread('client') }
+  return { messages: 0 }
 }

@@ -88,8 +88,8 @@ export async function GET(req: Request) {
   // payloads) is easiest to keep by not selecting images at all.
   const categoryIds = [...new Set(requests.map(r => r.category?.id).filter((v): v is string => !!v))]
   const experts = categoryIds.length
-    ? await prisma.tutorProfile.findMany({
-        where: { categoryId: { in: categoryIds }, available: true },
+    ? await prisma.serviceProfile.findMany({
+        where: { categoryId: { in: categoryIds }, available: true, published: true },
         orderBy: [{ verified: 'desc' }, { rating: 'desc' }],
         select: {
           id: true, slug: true, categoryId: true, verified: true, rating: true,
@@ -153,7 +153,7 @@ export async function GET(req: Request) {
       user: {
         select: {
           id: true, fullName: true, email: true,
-          tutor: { select: { categoryId: true } },
+          serviceProfile: { select: { categoryId: true } },
         },
       },
     },
@@ -164,7 +164,7 @@ export async function GET(req: Request) {
       id: r.user!.id,
       name: r.user!.fullName,
       email: r.user!.email,
-      categoryId: r.user!.tutor?.categoryId ?? null,
+      categoryId: r.user!.serviceProfile?.categoryId ?? null,
     }))
 
   // ── THE NUMBER THAT WILL SET THE PRICE ───────────────────────────────────

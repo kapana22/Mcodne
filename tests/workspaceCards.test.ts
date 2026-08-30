@@ -127,9 +127,21 @@ test('no screen mints an animation, and every one is motion-safe gated', () => {
       assert.ok(TOKENS.includes(m[2]), `${f}: minted an animation: animate-${m[2]}`)
       assert.match(m[1], /motion-safe:$/, `${f}: an animation is not motion-safe gated: ${m[0]}`)
     }
-    // `.stagger` is a raw CSS animation helper, so it needs the variant too.
+    // ⚠️ AND `.stagger` IS THE EXACT OPPOSITE — THIS ASSERTION REQUIRED THE BUG
+    // (2026-08-26). It read „a raw CSS animation helper, so it needs the
+    // variant too" and demanded `motion-safe:stagger`. But `.stagger` is a
+    // hand-written rule in globals.css, NOT a Tailwind utility, so Tailwind
+    // cannot build a variant of it: `motion-safe:stagger` compiles to nothing
+    // and the element wears a literal class name that no selector matches.
+    // Measured in Chrome on 2026-08-21 (app/_home/hero.tsx says so, and fixed
+    // itself) — `animationName` came back `none`. Nine call sites across /work
+    // and /me were still writing the prefixed form and their entrance simply
+    // did not run. The contract is kept by the STYLESHEET: `.stagger` lives
+    // inside `@media (prefers-reduced-motion: no-preference)` (globals.css
+    // §314), which is the browser answering the question rather than us.
     for (const m of src.matchAll(/(\S*)stagger\b/g)) {
-      assert.match(m[1], /motion-safe:$/, `${f}: .stagger is not motion-safe gated`)
+      assert.doesNotMatch(m[1], /motion-safe:$/,
+        `${f}: motion-safe:stagger compiles to nothing — write \`stagger\`, the CSS is already gated`)
     }
   }
 })
@@ -139,9 +151,15 @@ test('the lists move and the controls do not', () => {
   // person cannot press yet — CLAUDE.md is explicit, and it is the one motion
   // rule with a usability cost rather than a taste one.
   const q = codeOf('app/work/(provider)/requests/page.tsx')
-  // 🔒 `motion-safe:` is the accessibility contract; the grid spacing is taste.
+  // 🔒 The entrance is the accessibility contract; the grid spacing is taste.
   assert.match(q, /grid-cols/, 'the queue is no longer a grid')
-  assert.match(q, /motion-safe:/, 'the queue animates without a motion-safe guard')
+  // ⚠️ THIS READ `/motion-safe:/` UNTIL 2026-08-26, and the file's ONLY match
+  // was `motion-safe:stagger` — the form that compiles to nothing (see above).
+  // So the assertion passed on the string that guaranteed no animation ran.
+  // What it means to check is that the LIST has the entrance; the reduced-motion
+  // gate is in globals.css, where the browser can answer it.
+  assert.match(q, /\bstagger\b/, 'the queue list lost its entrance')
+  assert.doesNotMatch(q, /motion-safe:stagger/, 'motion-safe:stagger compiles to nothing')
   assert.match(q, /<Card\s+key=\{r\.id\}\s+className="flex\s+flex-col\s+h-full\s+hover-lift">/, 'the queue card lost hover-lift or equal height')
   assert.doesNotMatch(q, /<Btn[^>]*animate-/, 'an entrance was put on a button')
   const jobs = codeOf('app/work/jobs/_client.tsx')

@@ -3,7 +3,7 @@ import { Card } from '@/components/Card'
 import { Icon } from '@/components/Icon'
 
 /* The one catalogue-card SHELL — the expert card (app/experts/_card.tsx) and the
-   master card (app/experts/_masterCard.tsx) render through it. It owns the SHAPE and
+   master card (app/experts/_providerCard.tsx) render through it. It owns the SHAPE and
    nothing else:
 
      <article>                        Card as="article", padding none, group/relative

@@ -22,14 +22,11 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 import {
-  LIVE_STATUSES,
+  LIVE_OFFER,
   ANON_NAME,
   ANON_HEADLINE,
   anonEmail,
   DeleteBody,
-  asEitherParty,
-  staleRatingTargets,
-  sessionCountDecrements,
   isAnonymized,
 } from '../lib/userDeletion'
 
@@ -49,80 +46,15 @@ const adminPanelSrc = () =>
     .map(f => readFileSync(join(process.cwd(), 'app/admin', f), 'utf8'))
     .join('\n')
 
-/* ── §A scope ──────────────────────────────────────────────────────────── */
-
-test('§A a client-only account scopes to the student arm ALONE — never an empty OR member', () => {
-  const w = asEitherParty('u1', null)
-  assert.equal(w.OR.length, 1, 'a null tutorId must DROP the expert arm, not add an empty one')
-  assert.deepEqual(w.OR[0], { studentId: 'u1' })
-  // The failure this pins: `OR: [{studentId}, {}]` matches every row, and
-  // `OR: []` matches none. Both are silent.
-  for (const arm of w.OR) {
-    assert.ok(Object.keys(arm).length > 0, 'no OR arm may be an empty object')
-  }
-})
-
-test('§A an expert account scopes to BOTH sides', () => {
-  const w = asEitherParty('u1', 't1')
-  assert.equal(w.OR.length, 2)
-  assert.deepEqual(w.OR, [{ studentId: 'u1' }, { tutorId: 't1' }])
-})
-
-/* ── §B cached counters ────────────────────────────────────────────────── */
-
-test('§B every other expert whose review is being deleted is marked stale', () => {
-  const stale = staleRatingTargets(
-    [{ tutorId: 'a' }, { tutorId: 'b' }, { tutorId: 'a' }],
-    null,
-  )
-  assert.deepEqual([...stale].sort(), ['a', 'b'])
-})
-
-test("§B the deleted account's OWN profile is never recomputed — it is gone", () => {
-  const stale = staleRatingTargets([{ tutorId: 'self' }, { tutorId: 'other' }], 'self')
-  assert.deepEqual([...stale], ['other'])
-})
-
-test('§B sessionsCount is decremented only for COMPLETED, UNDISPUTED bookings', () => {
-  const dec = sessionCountDecrements(
-    [
-      { tutorId: 'a', status: 'COMPLETED', dispute: null },
-      { tutorId: 'a', status: 'COMPLETED', dispute: null },
-      // Never counted on the way in (see app/api/admin/disputes/[id]) — so
-      // subtracting it here would push the counter BELOW the truth.
-      { tutorId: 'a', status: 'COMPLETED', dispute: { id: 'd1' } },
-      { tutorId: 'b', status: 'CANCELED', dispute: null },
-      { tutorId: 'b', status: 'NO_SHOW', dispute: null },
-    ],
-    null,
-  )
-  assert.equal(dec.get('a'), 2)
-  assert.equal(dec.get('b'), undefined, 'a canceled/no-show session never bumped the counter')
-})
-
-test('§B the deleted expert never decrements their own counter', () => {
-  const dec = sessionCountDecrements(
-    [{ tutorId: 'self', status: 'COMPLETED', dispute: null }],
-    'self',
-  )
-  assert.equal(dec.size, 0)
-})
-
-test('§B the counter is clamped in SQL, not by a read-then-write', () => {
-  // GREATEST(0, x - n) in one statement: the clamp and the subtraction are
-  // atomic, so a concurrent completion cannot be lost and the column can never
-  // go negative. A read, subtract, write would lose both properties.
-  assert.match(ROUTE, /GREATEST\(0,\s*"sessionsCount"\s*-\s*\$\{n\}\)/)
-})
-
-/* ── §C delete order (FK-critical) ─────────────────────────────────────── */
+/* ── §C order ─────────────────────────────────────────────────────────── */
 
 test('§C purge deletes in the order the Restrict edges demand', () => {
+  // ⚠️ THREE STEPS LEFT THIS SEQUENCE (2026-08-24) — messages, bookings and
+  // enrolments, with the tables they named. What is left is the one Restrict
+  // edge that still exists: Review→User, „reviews are a permanent record", so
+  // the review has to go before the user it points at.
   const seq = [
     'tx.review.deleteMany',
-    'tx.message.deleteMany',
-    'tx.booking.deleteMany',
-    'tx.enrollment.deleteMany',
     'tx.user.delete',
   ]
   const positions = seq.map(s => {
@@ -292,8 +224,6 @@ test('§C the FK-less dbBoot tables are deleted BY HAND, not left to a cascade',
   }
   assert.ok(!/\bFOREIGN KEY\s+\("(userId|tutorId)"\)/.test(rest),
     'dbBoot grew a foreign key on a person column — re-check the hand-deletes')
-  assert.match(ROUTE, /tx\.package\.deleteMany/)
-  assert.match(ROUTE, /tx\.enrollment\.deleteMany/)
 
   // The two halves of the requests re-check, asserted rather than described.
   // A cascade cannot reach a plain column, so if either of these disappears a
@@ -345,23 +275,23 @@ test('the reason is trimmed before it reaches the audit row', () => {
   assert.equal(p.data.reason, 'ტესტური ანგარიში')
 })
 
-test('the live-booking guard is re-run INSIDE both transactions, not only before', () => {
+test('the live-work guard is re-run INSIDE both transactions, not only before', () => {
   // „A status check you read before the write is not a guard" (CLAUDE.md). The
   // pre-check exists for the message; the real one runs on the same connection
   // immediately before the deletes, so a booking that lands in between rolls
   // the whole thing back instead of being silently deleted.
-  assert.match(ROUTE, /async function liveBookingGuard/)
+  assert.match(ROUTE, /async function liveWorkGuard/)
   for (const fn of ['async function purge', 'async function anonymize']) {
     const body = ROUTE.slice(ROUTE.indexOf(fn))
-    const guard = body.indexOf('liveBookingGuard(tx, scope)')
-    assert.ok(guard > -1, `${fn} must re-check live bookings inside its transaction`)
+    const guard = body.indexOf('liveWorkGuard(tx, id)')
+    assert.ok(guard > -1, `${fn} must re-check live work inside its transaction`)
     // …and it must be FIRST, before anything is written.
     for (const write of ['deleteMany', 'tx.user.update', 'tx.user.delete']) {
       const at = body.indexOf(write)
       if (at > -1) assert.ok(guard < at, `the guard must precede ${write} in ${fn}`)
     }
   }
-  assert.match(ROUTE, /e instanceof ActiveBookingsError/, 'the rollback must answer 409, not 500')
+  assert.match(ROUTE, /e instanceof ActiveWorkError/, 'the rollback must answer 409, not 500')
 })
 
 test('Serializable was rejected on purpose, and the reason is written down', () => {
@@ -386,17 +316,17 @@ test('an anonymized account can never be un-suspended', () => {
   assert.match(page, /u\.role\s+!==\s+'ADMIN'\s+&&\s+!isAnonymized\(u\.email\)/)
 })
 
-test('upcoming and live sessions block BOTH modes', () => {
-  // Same set the self-delete guard in /api/me uses. A COMPLETED or CANCELED
-  // session is history and must never block a deletion.
-  assert.deepEqual([...LIVE_STATUSES], ['PREPARING', 'CONFIRMED', 'LIVE'])
-  assert.match(ROUTE, /HAS_ACTIVE_BOOKINGS/)
+test('work somebody is still owed blocks BOTH modes', () => {
+  // The same fact the self-delete guard in /api/me uses. A finished or closed
+  // offer is history and must never block a deletion.
+  assert.deepEqual({ ...LIVE_OFFER }, { status: 'ACCEPTED', doneAt: null })
+  assert.match(ROUTE, /HAS_ACTIVE_WORK/)
   // The fast path fires BEFORE the mode branches, so anonymize can't slip past
   // it. (Assert on the CALL, not on the error string — that now lives in the
-  // shared activeBookingsResponse helper, declared below the handler.)
+  // shared activeWorkResponse helper, declared below the handler.)
   assert.ok(
-    ROUTE.indexOf('return activeBookingsResponse(activeBookings)') < ROUTE.indexOf("mode === 'anonymize'"),
-    'the active-booking fast path must run before either mode',
+    ROUTE.indexOf('return activeWorkResponse(activeWork)') < ROUTE.indexOf("mode === 'anonymize'"),
+    'the active-work fast path must run before either mode',
   )
 })
 
@@ -514,11 +444,10 @@ test('a MISSING impact must not read as „the account is empty"', () => {
 })
 
 test('the impact numbers come from real counts, not the capped modal arrays', () => {
-  // bookingsAsStudent/reviewsWritten etc. are take:30/15 — a preview built from
-  // them would tell an admin „30 ჯავშანი" for an account with 200.
+  // The arrays are take:15 — a preview built from them would tell an admin
+  // „15 მოთხოვნა" for an account with 200.
   assert.match(ROUTE, /deleteImpact:/)
-  assert.match(ROUTE, /prisma\.booking\.count/)
-  assert.match(ROUTE, /prisma\.message\.count/)
+  assert.match(ROUTE, /prisma\.serviceRequest\.count/)
+  assert.match(ROUTE, /prisma\.requestOffer\.count/)
   assert.match(ROUTE, /prisma\.review\.count/)
-  assert.match(ROUTE, /prisma\.enrollment\.count/)
 })

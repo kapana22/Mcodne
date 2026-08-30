@@ -19,6 +19,7 @@ import { ensureDbReady } from '@/lib/dbBoot'
 import { normalizePublicRef, topicLabel, PROVIDER_ROUTE } from '@/lib/requests'
 import { requestsViewer, requestsNotFound } from '@/lib/requestsServer'
 import { markOfferDone, providerUserIdsOf, type DoneBy } from '@/lib/offerLifecycle'
+import { grantJobDone } from '@/lib/creditsServer'
 import { notifyMany } from '@/lib/notify'
 import { sendMail } from '@/lib/mailer'
 import { offerDoneClientEmail, offerDoneProviderEmail } from '@/lib/emailTemplates'
@@ -62,6 +63,26 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ref: s
   // that was never accepted — all the same answer, decided by the database.
   const r = await markOfferDone(offer.id, by)
   if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 409 })
+
+  // ── What finishing the job paid for ──────────────────────────────────────
+  //
+  // ⚠️ INLINE AND NOT ONLY IN THE CRON, because a reward a person waits fifteen
+  // minutes for is not a reward — the provider taps „დასრულდა" and the balance
+  // in the top bar has moved by the time the page re-renders. lib/creditsServer
+  // → runCreditJobs sweeps the same condition every tick as the backstop, and
+  // both write the same `grantKey`, so whichever arrives second writes nothing.
+  // That is the only reason it is safe to have two writers.
+  //
+  // ⚠️ AWAITED, NOT `after()`. It is one indexed insert on a table with a
+  // hundred rows, and the response it delays is the one whose whole point is
+  // that the number changed. Best-effort all the same: the stamp is the
+  // deliverable and the sweep will pay it within the tick if this throws.
+  //
+  // ⚠️ AN INDIVIDUAL ONLY — the mirror of the charge (app/api/provider/offers).
+  // A company's finished job has no personal balance to land in.
+  if (offer.expertUserId) {
+    try { await grantJobDone(offer.expertUserId, offer.id) } catch (e) { console.error('[credits] job grant failed', offer.id, e) }
+  }
 
   // ── The other side hears about it ────────────────────────────────────────
   // Best-effort, after the response. The provider gets a bell and a mail (no

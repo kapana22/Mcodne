@@ -391,15 +391,24 @@ export function LiveStatus({ publicRef }: { publicRef: string }) {
           Only while there is still something to wait for: once an offer has
           arrived, the offers ARE the answer and a row of other people beside
           them is a second decision nobody asked for. */}
-      {/* ⚠️ ONLY WHEN THEY ASKED FOR IT (2026-08-18). The list used to appear on
-          its own whenever there was no offer yet — which handed a decision to
-          somebody who had just said „შეთავაზებები მომივიდეს" and meant it.
-          Owner: „მხოლოდ ამ შემთხვევაში უნდა ჰქონდეს ღილაკი."
+      {/* ⚠️ IT WAS GATED ON `pickMode === 'SELF'` AND THE GATE IS GONE
+          (2026-08-29), because the QUESTION behind it is gone.
 
-          Both modes still reach experts; what SELF adds is a list to write to.
-          A preference about a button must not become a preference about who
-          hears you. */}
-      {d.pickMode === 'SELF' && !hasOffers && d.experts.length > 0 && (
+          The 2026-08-18 rule was right for its own world: the list appeared on
+          its own whenever no offer had arrived, which handed a decision to
+          somebody who had just said „შეთავაზებები მომივიდეს" and meant it.
+          Owner then: „მხოლოდ ამ შემთხვევაში უნდა ჰქონდეს ღილაკი."
+
+          Nobody says that any more — the wizard stopped asking (owner,
+          2026-08-29: „მაქსიმალურად მარტივად… ორივეს მხარეს"), so there is no
+          stated preference left to override. What is left is a person waiting
+          with nothing to do, and a list of people who could help them. Both
+          modes always reached the same providers; this was only ever a list.
+
+          The condition that MATTERS survives untouched: `!hasOffers`. Once an
+          offer has arrived the offers ARE the answer, and a row of other people
+          beside them is a second decision nobody asked for. */}
+      {!hasOffers && d.experts.length > 0 && (
         <div className="mt-5 pt-4 border-t border-ink-100">
           <p className="text-small text-ink-600">ამ მიმართულების ექსპერტები — მისწერე პირდაპირ:</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">

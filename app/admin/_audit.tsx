@@ -20,14 +20,21 @@ type AuditItem = {
 
 // Every action string written by an audit() call site must have a label here —
 // an unmapped one falls back to the raw `noun.verb` and reads like a bug.
+//
+// ⚠️ THAT RULE WAS A COMMENT AND NOTHING CHECKED IT (fixed 2026-08-26).
+// Measured that day: THIRTEEN of the twenty-nine actions the panel writes had
+// no label — including `master.approve` (approving an expert, the single most
+// common decision here), `request.routed` (telling providers about a request)
+// and every company/B2B action. The whole point of this tab is that an admin
+// can read back what was done, and a third of it read `noun.verb`.
+// `tests/adminAudit.test.ts` now walks the audit() call sites and fails on the
+// first unlabelled one, so the comment above is enforced rather than hoped for.
 const ACTION_LABEL: Record<string, string> = {
   'application.approve': 'განაცხადი დამტკიცდა',
   'application.approve.verified': 'დამტკიცებისას მიენიჭა „გადამოწმებული“',
   'application.reject': 'განაცხადი უარყოფილია',
   'application.revise': 'განაცხადი შესასწორებლად დაბრუნდა',
-  'booking.cancel': 'ჯავშანი გაუქმდა',
   'review.delete': 'შეფასება წაიშალა',
-  'dispute.resolve': 'დავა გადაწყდა',
   'user.impersonate.start': 'იმპერსონაცია დაიწყო',
   'user.impersonate.end': 'იმპერსონაცია დასრულდა',
   'user.suspend': 'ანგარიში შეჩერდა',
@@ -56,6 +63,48 @@ const ACTION_LABEL: Record<string, string> = {
   'category.show': 'კატეგორია გამოჩნდა',
   'category.delete': 'კატეგორია წაიშალა',
   'broadcast.send': 'მასობრივი შეტყობინება გაიგზავნა',
+  'category.redirect': 'კატეგორია გადამისამართდა',
+
+  // ── The service application queue („განაცხადები") ──
+  'master.approve': 'სერვისის განაცხადი დამტკიცდა',
+  'master.reject': 'სერვისის განაცხადი უარყოფილია',
+  'master.revise': 'სერვისის განაცხადი შესასწორებლად დაბრუნდა',
+
+  // ── Requests: the verification call, and who was told about it ──
+  'request.verified': 'მოთხოვნა გადამოწმდა',
+  'request.rejected': 'მოთხოვნა უარყოფილია',
+  'request.new': 'მოთხოვნა დაბრუნდა რიგში',
+  'request.matched': 'მოთხოვნას შესრულებელი მოეძებნა',
+  'request.closed': 'მოთხოვნა დაიხურა',
+  'request.update': 'მოთხოვნა დარედაქტირდა',
+  'request.routed': 'მოთხოვნა ექსპერტებს გაეგზავნა',
+
+  // ── The requests allowlist („წვდომა") ──
+  'request.access.grant': 'წვდომა მიენიჭა',
+  'request.access.enable': 'წვდომა ჩაირთო',
+  'request.access.disable': 'წვდომა გამოირთო',
+
+  // ── Credits ──
+  'credits.grant': 'კრედიტი დაერიცხა',
+  'credits.deduct': 'კრედიტი ჩამოეჭრა',
+
+  // ── The provider's own row ──
+  'tutor.category.set': 'ექსპერტს კატეგორია შეეცვალა',
+
+  // ── B2B. The vertical is dark (lib/flags → B2B_VISIBILITY), and these stay
+  //    because the audit log is written by whatever ran, not by what is on
+  //    screen today: rows from the period it WAS on are still in the table.
+  'company.create': 'კომპანია დაემატა',
+  'company.update': 'კომპანია დარედაქტირდა',
+  'company.member.add': 'კომპანიას წევრი დაემატა',
+  'company.member.remove': 'კომპანიას წევრი მოეხსნა',
+  'company.balance.topup': 'კომპანიის ბალანსი შეივსო',
+  'company.balance.charge': 'კომპანიის ბალანსიდან ჩამოიჭრა',
+  'businessLead.status': 'B2B განაცხადის სტატუსი შეიცვალა',
+  'businessLead.deal': 'B2B განაცხადი გარიგებად ჩაიწერა',
+  'b2bService.create': 'B2B სერვისი დაემატა',
+  'b2bService.update': 'B2B სერვისი დარედაქტირდა',
+  'b2bService.delete': 'B2B სერვისი წაიშალა',
 }
 
 export const AuditSection = () => {

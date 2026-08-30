@@ -91,7 +91,14 @@ export function ServiceRail() {
             // trick out loud.
             aria-hidden={i >= chips.length}
             tabIndex={i >= chips.length ? -1 : undefined}
-            className="shrink-0 inline-flex h-9 items-center whitespace-nowrap rounded-pill border border-ink-200 bg-white/75 px-4 text-small text-ink-500
+            /* ⚠️ h-10 ON A PHONE, h-9 ABOVE IT (2026-08-21). CLAUDE.md rule 3:
+               anything tappable is ≥40px, and a bare `h-9` is 36. This rail is
+               a MOVING target — it is a marquee, so the four pixels are worth
+               more here than on a chip that holds still. Measured at 390px:
+               eight reachable chips, every one 36px tall, none carrying
+               `.tap-area`. Same `h-10 sm:h-9` step the catalogue card's own
+               CTA already uses, so the desktop design is unchanged. */
+            className="shrink-0 inline-flex h-10 sm:h-9 items-center whitespace-nowrap rounded-pill border border-ink-200 bg-white/75 px-4 text-small text-ink-500
                        transition-[color,border-color,transform] duration-fast ease-out-quart
                        hover:border-brand-300 hover:text-ink-800 motion-safe:hover:-translate-y-px
                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"

@@ -10,10 +10,11 @@
 // spaces said the opposite. `lib/slugSpace → slugTaken` is what makes it safe:
 // a slug is unique across BOTH tables now, so one address names one person.
 //
-// ⚠️ THE VISIBILITY RULE IS THE CATALOGUE'S, PLUS `published`. A profile is
-// public when the provider's own `available` switch is on, `published` is on, and
-// an active RequestAccess row names their user or their company — the same rule
-// app/experts/_masterData queries and /api/masters/[id]/photo answers for. It must
+// ⚠️ THE VISIBILITY RULE IS THE CATALOGUE'S. A profile is public when the
+// provider's own `available` switch is on, `published` is on, an active
+// RequestAccess row names their user or their company, AND the account is not
+// suspended — the same rule app/experts/_providers queries and
+// /api/masters/[id]/photo answers for. It must
 // stay one rule: a page reachable for a master the photo route refuses would
 // draw a broken portrait; a page for somebody the catalogue hides would publish
 // a profile nobody approved. Anything outside the rule is notFound(), and so is
@@ -24,13 +25,24 @@
 // file asks the database WHICH ones are servable and the parts point every
 // <img> at /api/masters/[id]/photo (`?n=<index>` for the work photos), which
 // serves one image with a long cache busted by `?v=<updatedAt>`.
+//
+// ⚠️ AND THAT INCLUDES `User.avatarUrl` (2026-08-24). The account avatar is the
+// FALLBACK portrait — a migrated professional never uploaded a `photoUrl`,
+// because the consultation profile showed their account photo — and it is a
+// base64 column exactly like the two above. It arrived here as a plain
+// `user: { select: { avatarUrl: true } }`, which put ~32KB of unreusable base64
+// into the page for the one provider whose face came from their account. The
+// probe below asks for its SHAPE instead; lib/avatarSrc → avatarRouteSrc turns
+// that into /api/avatars/<userId>.
 
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { serviceLabels, areaLabels, priceHint, pricedServices, sanitizeStored, countCovering } from '@/lib/serviceProfile'
+import { langLabel, toLangCode } from '@/lib/languages'
+import { avatarRouteSrc, AVATAR_SHAPE_SQL } from '@/lib/avatarSrc'
 
 /**
- * THE DOOR, WRITTEN ONCE — the same address app/experts/_masterData states,
+ * THE DOOR, WRITTEN ONCE — the same address app/experts/_providers states,
  * and for the same reason: `for=service` opens the
  * wizard on the trades side instead of a picker of school subjects. The wizard
  * reads no topic parameter (app/request/page.tsx), so nothing more is carried.
@@ -79,8 +91,22 @@ export const requestHrefFor = (p: { slug: string | null; id: string }, service?:
 const VISIBLE = {
   available: true,
   published: true,
+  // ⚠️ AND THE ACCOUNT MUST NOT BE SUSPENDED (2026-08-24). This clause is the
+  // one the consultation half carried and the trades half never did: the old
+  // catalogue merged two rosters, `lib/tutorsQuery` filtered
+  // `user.suspendedAt: null`, and this rule — which then covered 2 profiles —
+  // did not. Deleting the half that had the check left it covering all 29,
+  // including the 27 who were protected by it the day before, so suspending a
+  // provider stopped taking them off the site: their card stayed in the
+  // catalogue, /experts/<slug> stayed open and the photo route kept serving
+  // their face. The sitemap, the category counts and the certificate route all
+  // DID drop them, so the site disagreed with itself about who is public.
+  //
+  // Written INSIDE the OR rather than beside it, because a company profile has
+  // no user at all: `user: { is: … }` against a null relation matches nothing,
+  // and hoisting it would delete every company from the catalogue to fix this.
   OR: [
-    { user: { requestAccess: { active: true } } },
+    { user: { is: { suspendedAt: null, requestAccess: { active: true } } } },
     { company: { requestAccess: { active: true } } },
   ],
 }
@@ -132,18 +158,21 @@ export type MasterProfile = {
   /** The work-photo ROUTES, one per servable index (SVG entries are skipped
    *  here exactly as the route refuses them). Empty = nothing to draw. */
   workPhotoSrcs: string[]
-  /** The same person's expert profile, when they have one with a slug. */
-  expertHref: string | null
-  /** ⚠️ THE THIRD VERB — „მიწერე" (2026-08-20). Messaging is USER-to-user
-   *  (Message.fromId/toId), never tutor-to-client, so a provider has always
-   *  been messageable; nothing on their profile ever offered it. This page
-   *  carried exactly ONE action — the request wizard — which meant somebody who
-   *  had read the page and simply wanted to ask „ამას აკეთებ?" had to describe a
-   *  whole job in a multi-step form first.
-   *  Null for a COMPANY profile: `userId` and `companyId` are exclusive (see
-   *  the schema), so a firm has no person to write to — the request stays the
-   *  only door there, honestly. */
-  messageHref: string | null
+  /* ── the professional half, absorbed 2026-08-24 ───────────────────────
+     Every one of these is null/empty on a trades profile and filled on a
+     lawyer's. Nothing is invented to fill a gap. */
+  headline: string | null
+  professions: string[]
+  /** Human labels, resolved from the stored codes. */
+  langs: string[]
+  yearsExp: number
+  verified: boolean
+  linkedinUrl: string | null
+  websiteUrl: string | null
+  /* ⚠️ `credentials` — the three CV lists — LEFT THIS SHAPE ON 2026-08-29.
+   *  They were three joins on every open of a public profile, feeding a block
+   *  the site no longer draws (see _providerBlocks → CredentialsBlock). The
+   *  tables are untouched; nothing reads them. */
   /** Reviews of this master's finished jobs (Review → RequestOffer whose
    *  provider is this profile's user or company), newest first. */
   reviews: MasterReview[]
@@ -172,9 +201,15 @@ export const getMasterProfile = cache(async (id: string): Promise<MasterProfile 
       select: {
         id: true, slug: true, services: true, areas: true, calloutFee: true, priceFrom: true, priceList: true,
         about: true, updatedAt: true,
+        // The professional half. Scalars only — `photoUrl` and `workPhotos`
+        // are blobs and are probed below, never selected.
+        headline: true, professions: true, languages: true, yearsExp: true,
+        verified: true, linkedinUrl: true, websiteUrl: true,
         // The provider identity the reviews join on — never rendered.
         userId: true, companyId: true,
-        user: { select: { fullName: true, tutor: { select: { slug: true } } } },
+        // ⚠️ NO `avatarUrl` HERE. The name is a scalar; the face is asked for by
+        // shape in the probe below and never read into this payload.
+        user: { select: { fullName: true } },
         company: { select: { name: true } },
       },
     })
@@ -191,14 +226,43 @@ export const getMasterProfile = cache(async (id: string): Promise<MasterProfile 
       : row.userId
         ? { expertUserId: row.userId }
         : null
-    const reviewRows = providerWhere
-      ? await prisma.review.findMany({
-          where: { offer: providerWhere },
-          orderBy: { createdAt: 'desc' },
-          take: 50,
-          select: { id: true, rating: true, body: true, createdAt: true },
-        })
-      : []
+    // ⚠️ THE TWO FOLLOW-UP QUERIES GO OUT TOGETHER. Both depend only on `row`
+    // and neither depends on the other, and a round trip to the Railway proxy
+    // measures ~260ms — awaiting them in sequence spends that twice for nothing.
+    // Same rule the consultation detail API was held to before it was removed
+    // (tests/regression-invariants §E); a sequential fan-out is how a profile
+    // page quietly becomes a second slower than it has to be.
+    const [reviewRows, probe] = await Promise.all([
+      providerWhere
+        ? prisma.review.findMany({
+            where: { offer: providerWhere },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+            select: { id: true, rating: true, body: true, createdAt: true },
+          })
+        : Promise.resolve([]),
+      // Which images the photo route will actually hand back — asked as SQL over
+      // the ONE row, returning booleans and small integers, never the columns.
+      // `WITH ORDINALITY` numbers the array 1-based; the route's `?n=` is
+      // 0-based. The refusal is the route's own (SVG is a document, not an
+      // image). The account avatar rides along in the same round trip, as three
+      // small values rather than the column — see AVATAR_SHAPE_SQL. LEFT JOIN,
+      // because a company profile has no user at all.
+      prisma.$queryRawUnsafe<{
+        hasPhoto: boolean; idx: number[] | null
+        avatarPlain: string | null; avatarHasBlob: boolean | null; avatarV: string | null
+      }[]>(
+        `SELECT (s."photoUrl" IS NOT NULL AND s."photoUrl" LIKE 'data:image/%' AND s."photoUrl" NOT LIKE 'data:image/svg%') AS "hasPhoto",
+                (SELECT array_agg((i - 1)::int ORDER BY i)
+                   FROM unnest(s."workPhotos") WITH ORDINALITY AS t(p, i)
+                  WHERE p LIKE 'data:image/%' AND p NOT LIKE 'data:image/svg%') AS "idx",
+                ${AVATAR_SHAPE_SQL('u')}
+           FROM "ServiceProfile" s
+           LEFT JOIN "User" u ON u."id" = s."userId"
+          WHERE s."id" = $1`,
+        row.id,
+      ),
+    ])
     const reviews: MasterReview[] = reviewRows.map(r => ({
       id: r.id, rating: r.rating, body: r.body, at: r.createdAt.toISOString(),
     }))
@@ -207,23 +271,15 @@ export const getMasterProfile = cache(async (id: string): Promise<MasterProfile 
       ? Math.round((reviews.reduce((a, r) => a + r.rating, 0) / reviewCount) * 10) / 10
       : null
 
-    // Which images the photo route will actually hand back — asked as SQL over
-    // the ONE row, returning booleans and small integers, never the columns.
-    // `WITH ORDINALITY` numbers the array 1-based; the route's `?n=` is 0-based.
-    // The refusal is the route's own (SVG is a document, not an image).
-    const probe = await prisma.$queryRawUnsafe<{ hasPhoto: boolean; idx: number[] | null }[]>(
-      `SELECT ("photoUrl" IS NOT NULL AND "photoUrl" LIKE 'data:image/%' AND "photoUrl" NOT LIKE 'data:image/svg%') AS "hasPhoto",
-              (SELECT array_agg((i - 1)::int ORDER BY i)
-                 FROM unnest("workPhotos") WITH ORDINALITY AS t(p, i)
-                WHERE p LIKE 'data:image/%' AND p NOT LIKE 'data:image/svg%') AS "idx"
-         FROM "ServiceProfile" WHERE "id" = $1`,
-      row.id,
-    )
     const hasPhoto = probe[0]?.hasPhoto === true
     const idx = probe[0]?.idx ?? []
+    const avatar = avatarRouteSrc(row.userId, probe[0] && {
+      plain: probe[0].avatarPlain,
+      hasBlob: probe[0].avatarHasBlob === true,
+      v: probe[0].avatarV,
+    })
     const v = row.updatedAt.getTime()
     const clean = sanitizeStored(row)
-    const expertSlug = row.user?.tutor?.slug ?? null
 
     return {
       id: row.id,
@@ -237,11 +293,17 @@ export const getMasterProfile = cache(async (id: string): Promise<MasterProfile 
       // for why the order of those two operations is the guard.
       priced: pricedServices({ services: clean.services, priceList: row.priceList }),
       about: row.about?.trim() || null,
-      photoSrc: hasPhoto ? `/api/masters/${row.id}/photo?v=${v}` : null,
+      // The uploaded profile photo, else the account avatar — a migrated
+      // professional never had a `photoUrl`, and their face is on their account.
+      photoSrc: hasPhoto ? `/api/masters/${row.id}/photo?v=${v}` : avatar,
       workPhotoSrcs: idx.map(n => `/api/masters/${row.id}/photo?n=${n}&v=${v}`),
-      expertHref: expertSlug ? `/experts/${expertSlug}` : null,
-      // The pair thread that already exists for every user — app/me/messages/u/[userId].
-      messageHref: row.userId ? `/me/messages/u/${row.userId}` : null,
+      headline: row.headline?.trim() || null,
+      professions: row.professions,
+      langs: row.languages.map(l => langLabel(toLangCode(l) ?? l)),
+      yearsExp: row.yearsExp,
+      verified: row.verified,
+      linkedinUrl: row.linkedinUrl,
+      websiteUrl: row.websiteUrl,
       reviews,
       ratingAvg,
       reviewCount,

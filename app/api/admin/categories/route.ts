@@ -21,21 +21,20 @@ export async function GET() {
       id: true,
       slug: true,
       name: true,
-      defaultServiceType: true,
       isLive: true,
       status: true,
       parentId: true,
-      _count: { select: { tutors: true, children: true } },
+      _count: { select: { providers: true, children: true } },
     },
   })
   // TWO numbers, because they answer two different questions and the panel was
   // showing only the first — which is why it disagreed with the site.
   //
-  //   tutorCount   how many profiles POINT HERE. Ungated and unfolded: it is
-  //                the blast radius of hiding or deleting this row.
-  //   listedCount  what the PUBLIC actually sees under it — the same gates and
-  //                the same fold lib/categoryCounts applies everywhere else, so
-  //                a sphere shows its children's experts too.
+  //   providerCount  how many profiles POINT HERE. Ungated and unfolded: it
+  //                  is the blast radius of hiding or deleting this row.
+  //   listedCount    what the PUBLIC actually sees under it — the same gates
+  //                  and the same fold lib/categoryCounts applies everywhere
+  //                  else, so a sphere shows its children's experts too.
   //
   // For „ბიზნესი და ფინანსები" those are 2 and 4. One number could not have
   // been both, and the panel printed the one that matched nothing on the site.
@@ -44,11 +43,10 @@ export async function GET() {
     id: r.id,
     slug: r.slug,
     name: r.name,
-    defaultServiceType: r.defaultServiceType,
     isLive: r.isLive,
     status: r.status,
     parentId: r.parentId,
-    tutorCount: r._count.tutors,
+    providerCount: r._count.providers,
     listedCount: r.status === 'VISIBLE' ? (listed.get(r.id) ?? 0) : 0,
     childCount: r._count.children,
   }))
@@ -59,7 +57,6 @@ export async function GET() {
 // derived (Georgian → Latin) and de-duplicated; the new category sorts last.
 const CreateBody = z.object({
   name: z.string().trim().min(2).max(60),
-  defaultServiceType: z.enum(['CONSULTATION', 'RECURRING']).default('CONSULTATION'),
   // Create it AS a sub-category. Absent = a sphere of its own, as before.
   //
   // Added 2026-08-11 because sub-categories were effectively uncreatable: this
@@ -79,7 +76,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
   }
-  const { name, defaultServiceType, parentId } = parsed.data
+  const { name, parentId } = parsed.data
   // A sub-category's parent must be a VISIBLE sphere — the same rule
   // `canBeParent` greys the picker out with, re-asserted here because a screen
   // is not a guard. A child of a hidden or already-absorbed sphere would be
@@ -110,22 +107,21 @@ export async function POST(req: Request) {
   // VISIBLE and stands on its own.
   const created = await prisma.category.create({
     data: parent
-      ? { name, slug, defaultServiceType, order: (last?.order ?? 0) + 1, isLive: false, status: 'REDIRECTED', parentId: parent.id }
-      : { name, slug, defaultServiceType, order: (last?.order ?? 0) + 1, isLive: true, status: 'VISIBLE' },
-    select: { id: true, slug: true, name: true, defaultServiceType: true, isLive: true, status: true, parentId: true, _count: { select: { tutors: true, children: true } } },
+      ? { name, slug, order: (last?.order ?? 0) + 1, isLive: false, status: 'REDIRECTED', parentId: parent.id }
+      : { name, slug, order: (last?.order ?? 0) + 1, isLive: true, status: 'VISIBLE' },
+    select: { id: true, slug: true, name: true, isLive: true, status: true, parentId: true, _count: { select: { providers: true, children: true } } },
   })
   await audit(admin.id, 'category.create', {
     targetType: 'Category',
     targetId: created.id,
-    meta: { name: created.name, slug: created.slug, defaultServiceType: created.defaultServiceType, parentName: parent?.name ?? null },
+    meta: { name: created.name, slug: created.slug, parentName: parent?.name ?? null },
   })
   return NextResponse.json({
     ok: true,
     category: {
       id: created.id, slug: created.slug, name: created.name,
-      defaultServiceType: created.defaultServiceType,
       isLive: created.isLive, status: created.status, parentId: created.parentId,
-      tutorCount: created._count.tutors, listedCount: 0, childCount: created._count.children,
+      providerCount: created._count.providers, listedCount: 0, childCount: created._count.children,
     },
   }, { status: 201 })
 }

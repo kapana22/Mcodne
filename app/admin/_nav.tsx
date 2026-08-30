@@ -16,7 +16,7 @@ const Logo = () => (
 )
 
 /* ───── Admin shell — sidebar + top bar ───── */
-export type AdminTab = 'system' | 'insights' | 'help' | 'overview' | 'moderation' | 'users' | 'bookings' | 'reviews' | 'disputes' | 'finance' | 'broadcast' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit' | 'companies' | 'requests' | 'access' | 'masters'
+export type AdminTab = 'system' | 'help' | 'overview' | 'users' | 'broadcast' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit' | 'companies' | 'requests' | 'access' | 'masters' | 'reviews' | 'funnel'
 
 /**
  * Hashes that no longer name a tab, and where they now go.
@@ -52,7 +52,7 @@ export const TAB_ALIASES: Record<string, AdminTab> = {
 type NavGroup = 'home' | 'queue' | 'people' | 'content' | 'signals' | 'system'
 
 // Group captions (owner-renamed 2026-08-19: „ყოველდღიური" → „რიგი",
-// „კონტენტი" → „ტექსტები", „ციფრები" → „რიცხვები"). `home` is deliberately
+// „კონტენტი" → „ტექსტები"). `home` is deliberately
 // caption-less: it holds the one tab that is not a category of work but the
 // panel's front page, and a heading over a single row would only be noise. A
 // group with an empty caption renders its rows with no header above them.
@@ -61,6 +61,10 @@ const GROUP_LABEL: Record<NavGroup, string> = {
   queue: 'რიგი',
   people: 'ხალხი',
   content: 'ტექსტები',
+  // ⚠️ EMPTIED 2026-08-24, refilled 2026-08-30. „ქცევა" and „ფინანსები" both
+  // counted bookings, and there are none. „ძაბრი" replaced them on the request
+  // wizard's own events. The caption is what says these numbers are READ, not
+  // worked — the difference between this group and „რიგი" above it.
   signals: 'რიცხვები',
   system: 'სისტემა',
 }
@@ -78,7 +82,6 @@ const ADMIN_NAV: NavItem[] = ([
   // apart from the rows that are queues. It used to sit inside „ციფრები".
   { id: 'overview',   l: 'მიმოხილვა', icon: 'home', g: 'home' },
 
-  { id: 'moderation', l: 'განაცხადები', icon: 'doc', g: 'queue' },
   // Requests (2026-08-14). Filed in „ყოველდღიური" and directly under the
   // application queue, because it is the same KIND of work: a list where
   // somebody is waiting for a phone call. The whole feature dies if this tab
@@ -95,13 +98,26 @@ const ADMIN_NAV: NavItem[] = ([
   // PERSON, it is applications to sell a SERVICE, which is what it now says.
   // The route id stays `masters` — a URL is not copy, and renaming it would
   // break every bookmark an admin has.
-  { id: 'masters',    l: 'სერვისის განაცხადები', icon: 'award', g: 'queue' },
-  { id: 'bookings',   l: 'ჯავშნები', icon: 'cal', g: 'queue' },
+  // ⚠️ IT IS „განაცხადები" AGAIN SINCE 2026-08-24, and it is the ONLY one.
+  // There were two application queues — this one and `moderation`, the
+  // consultation form — and this row had to say WHICH kind it was. The
+  // consultation product is gone, so „სერვისის განაცხადები" would now be
+  // distinguishing a queue from nothing. The route id stays `masters`: a URL is
+  // not copy, and renaming it would break every bookmark an admin has.
+  { id: 'masters',    l: 'განაცხადები', icon: 'doc', g: 'queue' },
   { id: 'help',       l: 'ჩატის კითხვები', icon: 'chat', g: 'queue' },
-  { id: 'disputes',   l: 'დავები', icon: 'flag', g: 'queue' },
+  // ⚠️ THE ONE TAB OVER TEXT THE PUBLIC READS AND WE DID NOT WRITE (2026-08-26).
+  // It existed until 2026-08-24 and went with the booking a review used to hang
+  // off; the review itself did not go — it hangs off a finished offer now, and
+  // it is printed on the provider's card, their hero and their rating average.
+  // Filed in „რიგი" and not „ტექსტები": that group holds OUR copy, which is
+  // edited; this is somebody else's, which is read and occasionally removed.
+  // No badge — a low rating is not a person waiting, it is a thing to look at
+  // when somebody complains, and a permanent red number here would train the
+  // eye to ignore the badges that DO mean somebody is waiting.
+  { id: 'reviews',    l: 'შეფასებები', icon: 'star', g: 'queue' },
 
   { id: 'users',      l: 'მომხმარებლები', icon: 'users', g: 'people' },
-  { id: 'reviews',    l: 'შეფასებები', icon: 'star', g: 'people' },
   { id: 'broadcast',  l: 'შეტყობინების გაგზავნა', icon: 'send', g: 'people' },
   // B2B (2026-08-11). Filed under „ხალხი" and not „ციფრები": the tab opens on
   // the inbound enquiry queue, and there is a person at the other end of it.
@@ -117,8 +133,10 @@ const ADMIN_NAV: NavItem[] = ([
   // rail it became unfindable. It belongs with the other things you WRITE.
   { id: 'integrations', l: 'კოდი', icon: 'bolt', g: 'content' },
 
-  { id: 'insights',   l: 'ქცევა', icon: 'pulse', g: 'signals' },
-  { id: 'finance',    l: 'ფინანსები', icon: 'wallet', g: 'signals' },
+
+  // Not in „რიგი": every row there has a person waiting at the other end, this
+  // one is a number you read before deciding what to change.
+  { id: 'funnel',     l: 'ძაბრი', icon: 'pulse', g: 'signals' },
 
   { id: 'system',     l: 'სისტემა', icon: 'settings', g: 'system' },
   { id: 'audit',      l: 'აუდიტი', icon: 'shield', g: 'system' },
@@ -147,7 +165,8 @@ const ADMIN_NAV: NavItem[] = ([
   // ⚠️ Still a nav-level hide, and a hide is not a guard. Every
   // /api/admin/requests route calls requestsViewer() AND requireRoleApi('ADMIN')
   // on its own; nothing here is load-bearing for access control.
-  .filter(it => (it.id !== 'requests' && it.id !== 'access') || requestsFeatureExists())
+  // „ძაბრი" rides the same switch — with the feature off it is five bars of zero.
+  .filter(it => (it.id !== 'requests' && it.id !== 'access' && it.id !== 'funnel') || requestsFeatureExists())
   // The masters queue is the SUPPLY side and follows its own switch (D6).
   .filter(it => it.id !== 'masters' || providersFeatureExists())
 
@@ -155,8 +174,7 @@ const NAV_GROUPS: NavGroup[] = ['home', 'queue', 'people', 'content', 'signals',
 
 /** Both surfaces render this, so a badge can never mean two different things
  *  on desktop and mobile (it did: green here, grey there). */
-function navBadge(id: AdminTab, pending?: number | null, helpOpen?: number | null, b2bLeads?: number | null, newRequests?: number | null, pendingMasters?: number | null, openDisputes?: number | null): number {
-  if (id === 'moderation') return pending ?? 0
+function navBadge(id: AdminTab, helpOpen?: number | null, b2bLeads?: number | null, newRequests?: number | null, pendingMasters?: number | null): number {
   if (id === 'help') return helpOpen ?? 0
   // Unverified requests — a person waiting for a phone call. Same rationale as
   // every badge in this function.
@@ -164,9 +182,6 @@ function navBadge(id: AdminTab, pending?: number | null, helpOpen?: number | nul
   // Submitted tradesperson applications — the supply side's queue, and the same
   // kind of number as the expert queue above: an applicant waiting on a review.
   if (id === 'masters') return pendingMasters ?? 0
-  // Unresolved disputes — two people waiting on a decision. „ჯავშნები" gets no
-  // badge on purpose: a booking list is a ledger, not a queue.
-  if (id === 'disputes') return openDisputes ?? 0
   // Unanswered B2B enquiries. Same treatment as the two above and for the same
   // reason: there is a person at the other end of it. Without this a lead sat
   // in a tab nobody opens until somebody thought to look — which is what the
@@ -178,8 +193,8 @@ function navBadge(id: AdminTab, pending?: number | null, helpOpen?: number | nul
 /* Desktop-only left rail — moves the 11-item nav out of the cramped top header
    into a calm sidebar, so managing/moderating is comfortable (mobile keeps the
    TopBar drawer). */
-export const AdminSidebar = ({ active, onNav, pendingCount, helpOpen, b2bLeads, newRequests, pendingMasters, openDisputes }: {
-  active: AdminTab; onNav: (t: AdminTab) => void; pendingCount?: number | null; helpOpen?: number | null; b2bLeads?: number | null; newRequests?: number | null; pendingMasters?: number | null; openDisputes?: number | null
+export const AdminSidebar = ({ active, onNav, helpOpen, b2bLeads, newRequests, pendingMasters }: {
+  active: AdminTab; onNav: (t: AdminTab) => void; helpOpen?: number | null; b2bLeads?: number | null; newRequests?: number | null; pendingMasters?: number | null
 }) => (
   <aside className="hidden lg:flex flex-col w-[240px] shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-ink-100 bg-white px-3 py-4">
     <div className="px-3">
@@ -196,7 +211,7 @@ export const AdminSidebar = ({ active, onNav, pendingCount, helpOpen, b2bLeads, 
           <div className="flex flex-col gap-0.5">
             {ADMIN_NAV.filter(it => it.g === g).map(it => {
               const on = active === it.id
-              const badge = navBadge(it.id, pendingCount, helpOpen, b2bLeads, newRequests, pendingMasters, openDisputes)
+              const badge = navBadge(it.id, helpOpen, b2bLeads, newRequests, pendingMasters)
               const Glyph = Icon[it.icon]
               return (
                 <button
@@ -231,8 +246,8 @@ export const AdminSidebar = ({ active, onNav, pendingCount, helpOpen, b2bLeads, 
   </aside>
 )
 
-export const TopBar = ({ active, onNav, pendingCount, helpOpen, b2bLeads, newRequests, pendingMasters, openDisputes }: {
-  active: AdminTab; onNav: (t: AdminTab) => void; pendingCount?: number | null; helpOpen?: number | null; b2bLeads?: number | null; newRequests?: number | null; pendingMasters?: number | null; openDisputes?: number | null
+export const TopBar = ({ active, onNav, helpOpen, b2bLeads, newRequests, pendingMasters }: {
+  active: AdminTab; onNav: (t: AdminTab) => void; helpOpen?: number | null; b2bLeads?: number | null; newRequests?: number | null; pendingMasters?: number | null
 }) => {
   const [mobOpen, setMobOpen] = useState(false)
   // Reads the SAME ADMIN_NAV as the sidebar. It used to be a second hand-typed
@@ -278,7 +293,7 @@ export const TopBar = ({ active, onNav, pendingCount, helpOpen, b2bLeads, newReq
               {GROUP_LABEL[g] && <div className="pb-1 text-micro uppercase font-display font-semibold text-ink-400">{GROUP_LABEL[g]}</div>}
               {ADMIN_NAV.filter(it => it.g === g).map(it => {
                 const on = active === it.id
-                const badge = navBadge(it.id, pendingCount, helpOpen, b2bLeads, newRequests, pendingMasters, openDisputes)
+                const badge = navBadge(it.id, helpOpen, b2bLeads, newRequests, pendingMasters)
                 const Glyph = Icon[it.icon]
                 return (
                   <button key={it.id} type="button" onClick={() => { onNav(it.id); setMobOpen(false) }} className={`h-12 w-full flex items-center gap-3 text-body font-display font-medium border-b border-ink-100 last:border-b-0 text-left ${on ? 'text-ink-900' : 'text-ink-700'}`}>

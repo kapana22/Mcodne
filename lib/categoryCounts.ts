@@ -24,16 +24,20 @@ import type { TreeNode } from '@/lib/categoryTree'
  */
 const COUNTABLE_EXPERT = {
   available: true,
+  published: true,
   user: { is: { suspendedAt: null } },
-  consultations: { some: {} },
+  // ⚠️ AT LEAST ONE SERVICE, AND IT WAS „at least one consultation" UNTIL
+  // 2026-08-24. Same rule, one table: somebody who lists nothing is hidden from
+  // browse, so counting them promises a person the destination then withholds.
+  services: { isEmpty: false },
 } as const
 
 /** categoryId → visible experts, folded up into the sphere each is browsed under. */
 export async function expertCountsBySphere(cats: readonly TreeNode[]): Promise<Map<string, number>> {
-  const grouped = await prisma.tutorProfile.groupBy({
+  const grouped = await prisma.serviceProfile.groupBy({
     by: ['categoryId'],
     where: COUNTABLE_EXPERT,
     _count: { _all: true },
   })
-  return foldCounts(cats, grouped.map(g => ({ categoryId: g.categoryId, count: g._count._all })))
+  return foldCounts(cats, grouped.map((g: { categoryId: string | null; _count: { _all: number } }) => ({ categoryId: g.categoryId, count: g._count._all })))
 }

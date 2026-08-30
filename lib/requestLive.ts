@@ -143,7 +143,9 @@ export async function requestLiveStatus(ref: string): Promise<RequestLiveStatus 
     // A trades request is counted the way it is ROUTED: by the topic the
     // masters list and the city they travel to (lib/serviceProfile →
     // routingWhere is the same rule, in the same shape).
-    r.topic && r.kind === 'SERVICE'
+    // ⚠️ ONE TABLE SINCE 2026-08-24 — the topic branch and the sphere branch
+    // are two ways of asking the same row a question, not two rosters.
+    r.topic
       ? prisma.serviceProfile.count({
           where: {
             available: true, services: { has: r.topic },
@@ -152,16 +154,17 @@ export async function requestLiveStatus(ref: string): Promise<RequestLiveStatus 
           },
         })
       : r.categoryId
-        ? prisma.tutorProfile.count({ where: { categoryId: r.categoryId, available: true } })
+        ? prisma.serviceProfile.count({ where: { categoryId: r.categoryId, available: true } })
         : Promise.resolve(0),
-    // ⚠️ AND THE LIST ITSELF STAYS EXPERT-ONLY, deliberately. It renders cards
-    // that link to a public profile, and `ServiceProfile` has no slug and no
-    // public page — a card that cannot be opened is worse than a count. The
-    // count above is honest and useful („four masters cover this"); the cards
-    // arrive when a master profile page does.
-    r.categoryId && r.kind !== 'SERVICE'
-      ? prisma.tutorProfile.findMany({
-          where: { categoryId: r.categoryId, available: true },
+    // ⚠️ THE LIST IS NO LONGER „EXPERT-ONLY" (2026-08-24). It used to be, with
+    // a reason that has expired: it renders cards linking to a public profile,
+    // and `ServiceProfile` „has no slug and no public page". It has had both
+    // since stage 5, and it is now the ONLY profile — so the cards are drawn
+    // for whoever covers the sphere, which is what the count beside them
+    // already measured.
+    r.categoryId
+      ? prisma.serviceProfile.findMany({
+          where: { categoryId: r.categoryId, available: true, published: true },
           orderBy: [{ verified: 'desc' }, { rating: 'desc' }],
           take: 6,
           select: {
@@ -201,11 +204,11 @@ export async function requestLiveStatus(ref: string): Promise<RequestLiveStatus 
       // The profile URL prefers the slug: a cuid href 308s to the slug, and
       // that redirect downgrades a client-side navigation to a full load.
       href: `/experts/${e.slug ?? e.id}`,
-      name: e.user.fullName,
+      name: e.user?.fullName ?? 'ექსპერტი',
       headline: e.headline,
       verified: e.verified,
       rating: e.rating,
-      avatar: avatarSrc(e.user.id, e.user.avatarUrl),
+      avatar: e.user ? avatarSrc(e.user.id, e.user.avatarUrl) : null,
     })),
   }
 }

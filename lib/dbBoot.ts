@@ -30,21 +30,13 @@ const globalForBoot = globalThis as unknown as { dbBootPromise?: Promise<void> |
 let bootPromise: Promise<void> | null = globalForBoot.dbBootPromise ?? null
 
 async function runMigrations() {
-  // Enum first — column defaults reference it.
-  await prisma.$executeRawUnsafe(`
-    DO $$ BEGIN
-      CREATE TYPE "ServiceType" AS ENUM ('CONSULTATION', 'RECURRING');
-    EXCEPTION WHEN duplicate_object THEN NULL;
-    END $$;
-  `)
-
   // ApplicationStatus.NEEDS_REVISION — the enum TYPE predates this value, so
   // prod only has DRAFT/SUBMITTED/APPROVED/REJECTED while schema.prisma (and
   // the admin „შესწორება" action in api/applications/[id]) already writes
   // NEEDS_REVISION. `ADD VALUE IF NOT EXISTS` is idempotent (PG 9.6+).
   //
-  // Deliberately NOT wrapped in a `DO $$ … $$` block like the CREATE TYPE above:
-  // `ALTER TYPE … ADD VALUE` cannot run inside a transaction block on PG < 12,
+  // Deliberately NOT wrapped in a `DO $$ … $$` block like the CREATE TYPEs
+  // below: `ALTER TYPE … ADD VALUE` cannot run inside a transaction block on PG < 12,
   // and a DO block is one. It's issued as its own statement and guarded in JS
   // so an old server refusing it logs instead of aborting the whole boot.
   try {
@@ -53,94 +45,10 @@ async function runMigrations() {
     console.error('[dbBoot] ApplicationStatus NEEDS_REVISION add failed:', err)
   }
 
-  // TutorProfile — service type + standard session length + session buffer.
-  // `bufferMin` is the required gap around every session, consumed by
-  // lib/availability when deriving bookable starts. Default 0 reproduces
-  // today's back-to-back behavior exactly, so no backfill is needed.
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "TutorProfile"
-      ADD COLUMN IF NOT EXISTS "serviceType" "ServiceType" NOT NULL DEFAULT 'CONSULTATION',
-      ADD COLUMN IF NOT EXISTS "consultationDurationMin" INTEGER NOT NULL DEFAULT 30,
-      ADD COLUMN IF NOT EXISTS "bufferMin" INTEGER NOT NULL DEFAULT 0;
-  `)
-
-  // TutorProfile — MEASURED response time (median minutes + sample size).
-  // Replaces the self-declared `responseHours` as the public signal: that one is
-  // typed in by the expert and can't be verified, this one is computed from real
-  // Message rows (lib/responseTime defines it, lib/responseTimeStore writes it).
-  // Nullable with NO default — null means "not enough data yet", which the UI
-  // renders as nothing at all. Existing rows therefore need no backfill to be
-  // correct, only to be populated (`npx tsx -r dotenv/config lib/responseTimeStore.ts`).
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "TutorProfile"
-      ADD COLUMN IF NOT EXISTS "responseMedianMin" INTEGER,
-      ADD COLUMN IF NOT EXISTS "responseSampleN" INTEGER;
-  `)
-
-  // What the expert calls themselves — „ბუღალტერი", „მარკეტოლოგი" — several of
-  // them, from lib/professions.ts. A text[] with an empty default, so every
-  // existing profile keeps working untouched and no backfill is needed.
-  // Its own statement: `$executeRawUnsafe` takes ONE query, and a second
-  // template literal after a comma is passed as a PARAMETER, not executed.
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "TutorProfile"
-      ADD COLUMN IF NOT EXISTS "professions" TEXT[] NOT NULL DEFAULT '{}';
-  `)
-
-  // Public profile slug — „/experts/ana-gagoshidze" instead of a raw cuid.
-  // Nullable + UNIQUE: uniqueness is what the generator relies on to resolve
-  // collisions, and Postgres allows many NULLs under a unique index, so
-  // un-backfilled rows coexist fine. The route accepts id OR slug, so this can
-  // never orphan a profile.
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "TutorProfile" ADD COLUMN IF NOT EXISTS "slug" TEXT;
-  `)
-  await prisma.$executeRawUnsafe(`
-    CREATE UNIQUE INDEX IF NOT EXISTS "TutorProfile_slug_key" ON "TutorProfile"("slug");
-  `)
-
-  // Booking — snapshot column + reschedule proposal blob.
-  // `rescheduleRequest` holds the pending "party X proposes new time" state
-  // until the other side accepts or rejects it. Shape:
-  //   { proposedBy: 'USER' | 'PROVIDER', newStartAt: ISO string, reason?: string, proposedAt: ISO string }
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "Booking"
-      ADD COLUMN IF NOT EXISTS "serviceType" "ServiceType" NOT NULL DEFAULT 'CONSULTATION',
-      ADD COLUMN IF NOT EXISTS "rescheduleRequest" JSONB,
-      ADD COLUMN IF NOT EXISTS "autoCompleted" BOOLEAN NOT NULL DEFAULT false,
-      -- Set once the ~1h-before session reminder email has been sent, so the
-      -- reminder cron never emails the same booking twice.
-      ADD COLUMN IF NOT EXISTS "sessionReminderSentAt" TIMESTAMP,
-      -- True when the CLIENT proposed this time rather than picking it out of
-      -- the expert's published windows (request-based booking, 2026-08-04).
-      -- The expert's answer flow is unchanged — PREPARING already meant
-      -- „awaiting the expert" — but their UI has to be able to say „this time
-      -- is outside your published schedule", or an out-of-schedule request
-      -- looks like a bug in the calendar.
-      ADD COLUMN IF NOT EXISTS "proposedByStudent" BOOLEAN NOT NULL DEFAULT false,
-      -- The client's SECOND and THIRD choice of time, when they named more than
-      -- one. Shape: [{ "startAt": ISO string }, …], at most two entries; the
-      -- FIRST choice is the booking's own startAt, never duplicated in here.
-      -- Written only alongside proposedByStudent, inside the same transaction.
-      --
-      -- WHY A COLUMN AND NOT A ROW-PER-TIME: an alternate is not a booking. It
-      -- claims nothing, blocks nothing, and expires with its parent — exactly
-      -- the properties that made "rescheduleRequest" a JSONB blob rather than
-      -- the RescheduleRequest table sitting unused next to it. Same call, same
-      -- reasons.
-      ADD COLUMN IF NOT EXISTS "proposedAlternates" JSONB,
-      -- BOG/TBC payment link, pasted by the expert or an admin, shown to the
-      -- client as a „გადახდა“ button. Storage and display ONLY: no checkout, no
-      -- webhook, no charge, no reconciliation, and PAYMENTS_LIVE is untouched.
-      -- It exists so a diaspora client can pay at all before the real
-      -- integration lands, and it must stay this dumb until it does.
-      ADD COLUMN IF NOT EXISTS "paymentLinkUrl" TEXT;
-  `)
-
-  // Category — default type + public visibility toggle.
+  // Category — the deprecated public-visibility boolean. Superseded by `status`
+  // below and kept only so the hierarchy migration stays reversible.
   await prisma.$executeRawUnsafe(`
     ALTER TABLE "Category"
-      ADD COLUMN IF NOT EXISTS "defaultServiceType" "ServiceType" NOT NULL DEFAULT 'CONSULTATION',
       ADD COLUMN IF NOT EXISTS "isLive" BOOLEAN NOT NULL DEFAULT true;
   `)
 
@@ -180,15 +88,6 @@ async function runMigrations() {
     UPDATE "Category" SET "status" = 'HIDDEN' WHERE "isLive" = false AND "status" = 'VISIBLE';
   `)
 
-  // Phase-2 default flip: new experts/bookings default to CONSULTATION (instant
-  // "available now"), not the legacy RECURRING calendar model. ALTER … SET
-  // DEFAULT is idempotent and also updates existing DBs whose columns were
-  // created with the old 'RECURRING' default. Existing row *data* is untouched —
-  // tutors who were already RECURRING keep their calendar UX.
-  await prisma.$executeRawUnsafe(`ALTER TABLE "TutorProfile" ALTER COLUMN "serviceType" SET DEFAULT 'CONSULTATION';`)
-  await prisma.$executeRawUnsafe(`ALTER TABLE "Booking" ALTER COLUMN "serviceType" SET DEFAULT 'CONSULTATION';`)
-  await prisma.$executeRawUnsafe(`ALTER TABLE "Category" ALTER COLUMN "defaultServiceType" SET DEFAULT 'CONSULTATION';`)
-
   // User — per-user notification opt-outs (JSON). Nullable → all types enabled.
   // …and the operator heartbeat (2026-08-17): the ONLY input to the „ონლაინ
   // ვართ" badge on a client's thread. Stamped by an admin with the panel open;
@@ -198,15 +97,6 @@ async function runMigrations() {
     ALTER TABLE "User"
       ADD COLUMN IF NOT EXISTS "notificationPrefs" JSONB,
       ADD COLUMN IF NOT EXISTS "supportSeenAt" TIMESTAMP(3);
-  `)
-
-  // Message — stamp for the delayed "unread message" reminder email. Set once a
-  // thread's outstanding unread burst has been reminded, so the ∗/15 cron emails
-  // a missed message at most once per unread streak (reset when the recipient
-  // opens the thread and readAt is stamped). See lib/messageReminders.
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "Message"
-      ADD COLUMN IF NOT EXISTS "reminderEmailSentAt" TIMESTAMP;
   `)
 
   // Post — DB-backed blog. Content is authored in the admin panel instead of
@@ -331,185 +221,6 @@ async function runMigrations() {
     `CREATE INDEX IF NOT EXISTS "HelpMessage_status_at_idx" ON "HelpMessage" ("status", "at" DESC);`,
   )
 
-  // TutorApplication — YouTube intro-video reference + admin-only verification
-  // documents (ID front, selfie-with-doc, certificate scans). All nullable so
-  // old rows don't need a backfill.
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "TutorApplication"
-      ADD COLUMN IF NOT EXISTS "introVideoUrl" TEXT,
-      ADD COLUMN IF NOT EXISTS "introVideoId" TEXT,
-      ADD COLUMN IF NOT EXISTS "idDocUrl" TEXT,
-      ADD COLUMN IF NOT EXISTS "selfieUrl" TEXT,
-      ADD COLUMN IF NOT EXISTS "certificates" JSONB;
-  `)
-
-  // ── Teaching packages (2026-08-05) ─────────────────────────────────────────
-  // Ships DARK: lib/flags → FEATURE_PACKAGES is false, so nothing reads any of
-  // this yet. Created here anyway (rather than at switch-on) so the schema and
-  // the code land in the same deploy and the flag flip is a pure UI event.
-  //
-  // ⚠️ Every column below is ALSO declared in prisma/schema.prisma, deliberately.
-  // A column that lives only here is one `prisma db push` away from being
-  // silently dropped — that exact mistake shipped once already with
-  // Booking.proposedByStudent. If you add to one, add to the other.
-  await prisma.$executeRawUnsafe(`
-    DO $$ BEGIN
-      CREATE TYPE "EnrollmentStatus" AS ENUM ('REQUESTED', 'ACTIVE', 'COMPLETED', 'EXPIRED', 'CANCELLED');
-    EXCEPTION WHEN duplicate_object THEN NULL;
-    END $$;
-  `)
-  // What a profile IS (expert vs teacher) — not a Role; see schema.prisma.
-  // Defaulting to EXPERT means every existing profile keeps its behaviour and
-  // nobody moves when the column appears.
-  await prisma.$executeRawUnsafe(`
-    DO $$ BEGIN
-      CREATE TYPE "ProfileType" AS ENUM ('EXPERT', 'TEACHER');
-    EXCEPTION WHEN duplicate_object THEN NULL;
-    END $$;
-  `)
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "TutorProfile"
-      ADD COLUMN IF NOT EXISTS "profileType" "ProfileType" NOT NULL DEFAULT 'EXPERT';
-  `)
-  await prisma.$executeRawUnsafe(
-    `CREATE INDEX IF NOT EXISTS "TutorProfile_profileType_idx" ON "TutorProfile"("profileType");`,
-  )
-  // The ONE gate for the vertical, and an allowlist on purpose: it starts false
-  // for every existing profile, so switching the feature on cannot remove
-  // anybody from anywhere. (Gating on `serviceType` instead would have: 11 of
-  // 21 live profiles carry a legacy RECURRING value nobody reads.)
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "TutorProfile"
-      ADD COLUMN IF NOT EXISTS "packagesEnabled" BOOLEAN NOT NULL DEFAULT false;
-  `)
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "Package" (
-      "id"               TEXT PRIMARY KEY,
-      "tutorId"          TEXT NOT NULL,
-      "title"            TEXT NOT NULL,
-      "description"      TEXT NOT NULL,
-      "lessonsCount"     INTEGER NOT NULL,
-      "minutesPerLesson" INTEGER NOT NULL,
-      "price"            INTEGER NOT NULL,
-      "validDays"        INTEGER NOT NULL DEFAULT 30,
-      "active"           BOOLEAN NOT NULL DEFAULT true
-    );
-  `)
-  await prisma.$executeRawUnsafe(
-    `CREATE INDEX IF NOT EXISTS "Package_tutorId_idx" ON "Package"("tutorId");`,
-  )
-  // Money and lesson counts are SNAPSHOTTED here: editing or deleting the
-  // Package must never rewrite a deal that is already running.
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "Enrollment" (
-      "id"             TEXT PRIMARY KEY,
-      "packageId"      TEXT,
-      "studentId"      TEXT NOT NULL,
-      "tutorId"        TEXT NOT NULL,
-      "status"         "EnrollmentStatus" NOT NULL DEFAULT 'REQUESTED',
-      "lessonsTotal"   INTEGER NOT NULL,
-      "lessonsUsed"    INTEGER NOT NULL DEFAULT 0,
-      "priceTotal"     INTEGER NOT NULL,
-      "perLessonPrice" INTEGER NOT NULL,
-      "minutesPerLesson" INTEGER,
-      "paidAt"         TIMESTAMP,
-      "startsAt"       TIMESTAMP,
-      "expiresAt"      TIMESTAMP,
-      "createdAt"      TIMESTAMP NOT NULL DEFAULT now(),
-      "updatedAt"      TIMESTAMP NOT NULL DEFAULT now()
-    );
-  `)
-  await prisma.$executeRawUnsafe(
-    `CREATE INDEX IF NOT EXISTS "Enrollment_studentId_createdAt_idx" ON "Enrollment"("studentId", "createdAt");`,
-  )
-  await prisma.$executeRawUnsafe(
-    `CREATE INDEX IF NOT EXISTS "Enrollment_tutorId_status_idx" ON "Enrollment"("tutorId", "status");`,
-  )
-  await prisma.$executeRawUnsafe(
-    `CREATE INDEX IF NOT EXISTS "Enrollment_status_expiresAt_idx" ON "Enrollment"("status", "expiresAt");`,
-  )
-  await prisma.$executeRawUnsafe(
-    `CREATE INDEX IF NOT EXISTS "Enrollment_packageId_idx" ON "Enrollment"("packageId");`,
-  )
-  // Lesson LENGTH is a snapshot too — it was the one agreed scalar that was not.
-  // Both spend routes used to read it live off the Package, so a teacher editing
-  // „90 წუთი" down to „50" silently shortened every not-yet-booked lesson of
-  // every running enrollment (DELETE is refused while a package is in use;
-  // PATCH was not). Nullable rather than DEFAULT 50: a default is
-  // indistinguishable from a package that genuinely sells 50-minute lessons, and
-  // „we do not know" must not look like an answer.
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "Enrollment"
-      ADD COLUMN IF NOT EXISTS "minutesPerLesson" INTEGER;
-  `)
-  // Backfill the rows that predate the column, from the package they were sold
-  // from. Touches only NULLs, so it is idempotent and re-running it can never
-  // overwrite a snapshot that has since been taken.
-  await prisma.$executeRawUnsafe(`
-    UPDATE "Enrollment" e
-       SET "minutesPerLesson" = p."minutesPerLesson"
-      FROM "Package" p
-     WHERE e."packageId" = p."id" AND e."minutesPerLesson" IS NULL;
-  `)
-  // The whole packages design in one nullable column: a package lesson is an
-  // ORDINARY Booking, so reschedule/cancel/video/messages/reminders/disputes
-  // keep working untouched. NULL = every booking that exists today.
-  // ⚠️ Financial aggregates must filter `enrollmentId IS NULL` — the Enrollment
-  // already counted that money.
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "Booking"
-      ADD COLUMN IF NOT EXISTS "enrollmentId" TEXT;
-  `)
-  await prisma.$executeRawUnsafe(
-    `CREATE INDEX IF NOT EXISTS "Booking_enrollmentId_idx" ON "Booking"("enrollmentId");`,
-  )
-
-  // Indexes — cheap even if already present thanks to IF NOT EXISTS.
-  await prisma.$executeRawUnsafe(
-    `CREATE INDEX IF NOT EXISTS "TutorProfile_serviceType_idx" ON "TutorProfile"("serviceType");`,
-  )
-  await prisma.$executeRawUnsafe(
-    `CREATE INDEX IF NOT EXISTS "Booking_serviceType_idx" ON "Booking"("serviceType");`,
-  )
-
-  // Drop the now-dead live-now / free-trial columns and their indexes. The
-  // product removed real-time availability and the free-trial mechanic entirely
-  // (see lib/consultation, api/bookings). Idempotent — no-ops once dropped.
-  await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "TutorProfile_liveNow_idx";`)
-  await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "Booking_trial_unique";`)
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "TutorProfile"
-      DROP COLUMN IF EXISTS "isAvailableNow",
-      DROP COLUMN IF EXISTS "availableUntil",
-      DROP COLUMN IF EXISTS "offersFreeTrial";
-  `)
-  await prisma.$executeRawUnsafe(`ALTER TABLE "Booking" DROP COLUMN IF EXISTS "isTrial";`)
-
-  // Video-flow reconciliation (Batch 6). Historically the approval path did
-  // NOT copy `TutorApplication.introVideoUrl` onto the freshly-minted
-  // TutorProfile.videoUrl, so every approved tutor started with an empty
-  // video field even though they submitted a YouTube link in their apply flow.
-  // Backfill in-place — only touches profiles that currently have no video AND
-  // have a matching approved application with a videoUrl on file.
-  await prisma.$executeRawUnsafe(`
-    UPDATE "TutorProfile" tp
-       SET "videoUrl" = ta."introVideoUrl"
-      FROM "TutorApplication" ta
-     WHERE tp."userId" = ta."userId"
-       AND ta."status" = 'APPROVED'
-       AND ta."introVideoUrl" IS NOT NULL
-       AND (tp."videoUrl" IS NULL OR tp."videoUrl" = '')
-  `)
-
-  // Null out any legacy `data:video/…;base64,…` blobs left over from the
-  // deprecated /api/uploads?kind=video path. These bloated Postgres rows
-  // (100 MB → 133 MB base64) and are no longer supported — the tutor is
-  // prompted on next profile edit to paste a YouTube URL instead. Non-video
-  // data-URLs (avatars, PDFs, etc.) are untouched.
-  await prisma.$executeRawUnsafe(
-    `UPDATE "TutorProfile" SET "videoUrl" = NULL WHERE "videoUrl" LIKE 'data:video/%'`,
-  )
-
   // ── Security + data-integrity deltas (audit remediation) ───────────────
 
   // Session.impersonatorId — binds admin-impersonation restore to a server-side
@@ -519,36 +230,18 @@ async function runMigrations() {
       ADD COLUMN IF NOT EXISTS "impersonatorId" TEXT;
   `)
 
-  // Booking.heldSlotId — exact slot claimed by a scheduled booking, so
-  // cancel/decline/reschedule free the right one (never an unrelated slot).
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "Booking"
-      ADD COLUMN IF NOT EXISTS "heldSlotId" TEXT;
-  `)
-
-  // Missing FK / filter indexes flagged by the audit.
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Booking_consultationId_idx" ON "Booking"("consultationId");`)
-  // NOTE: "Message_fromId_idx" used to be created here. It is a strict prefix of
-  // "Message_fromId_createdAt_idx" (below), so it only cost write amplification —
-  // no longer created, and no longer declared in schema.prisma, so the next
-  // `prisma db push` retires the copy that still exists in prod.
+  // Missing FK / filter indexes flagged by the audit. Postgres does NOT index a
+  // foreign key for free, so each of these was a sequential scan.
+  //
+  // ⚠️ THE OTHER FOUR WENT ON 2026-08-24 with the tables they indexed —
+  // Booking_consultationId, Dispute_studentId, Favorite_tutorId (renamed to
+  // providerId by the services-only migration at the foot of this file) and the
+  // two Message ones. „Who wrote this review" is the only one whose table
+  // survived the consultation product.
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Review_studentId_idx" ON "Review"("studentId");`)
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Dispute_studentId_idx" ON "Dispute"("studentId");`)
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Favorite_tutorId_idx" ON "Favorite"("tutorId");`)
-  // Serves the cleanup cron's BOOKING_REMINDER dedupe (WHERE type=… AND href IN …)
-  // and the message-reminder scan's unread window — both grow with history.
+  // Serves the cleanup cron's notification dedupe (WHERE type=… AND href IN …),
+  // which grows with history.
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Notification_type_href_idx" ON "Notification"("type", "href");`)
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Message_readAt_createdAt_idx" ON "Message"("readAt", "createdAt");`)
-
-  // Hot-path indexes (also declared in schema.prisma so a db push keeps them).
-  // Postgres does NOT auto-index FKs, so each of these was a sequential scan.
-  // Category-filtered browse + /categories counts filter TutorProfile.categoryId.
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TutorProfile_categoryId_idx" ON "TutorProfile"("categoryId");`)
-  // Inbox query is `OR: [{fromId:me},{toId:me}] ORDER BY createdAt DESC` — the
-  // fromId arm had its composite, the toId arm had to sort. See lib/preThreadInitiators.
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Message_toId_createdAt_idx" ON "Message"("toId", "createdAt");`)
-  // Every expert profile view loads that expert's consultation offerings.
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Consultation_tutorId_idx" ON "Consultation"("tutorId");`)
 
   // ServiceProfile.priceList / MasterApplication.priceList — a price per
   // service the provider already picked, `{ topicId: lari }` (2026-08-20).
@@ -580,14 +273,6 @@ async function runMigrations() {
   `)
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "CreditEntry_userId_grantKey_key" ON "CreditEntry"("userId", "grantKey");`)
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "CreditEntry_userId_createdAt_idx" ON "CreditEntry"("userId", "createdAt");`)
-
-  // Consultation.bookable — the column that lets an expert sell a JOB and not
-  // only an hour (2026-08-20). Additive with a default, so every existing row
-  // keeps meaning exactly what it meant: a bookable consultation.
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "Consultation"
-      ADD COLUMN IF NOT EXISTS "bookable" BOOLEAN NOT NULL DEFAULT true;
-  `)
 
   // ── B2B: companies with a prepaid balance (2026-08-11) ─────────────────
   //
@@ -767,16 +452,6 @@ async function runMigrations() {
   await prisma.$executeRawUnsafe(
     `DO $$ BEGIN ALTER TABLE "BusinessLead" ADD CONSTRAINT "BusinessLead_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "B2BService"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   )
-
-  // Booking.paidBy — NULLABLE, NO DEFAULT, NO BACKFILL, and that is the point.
-  // `null` is what every booking that already exists says, and it MEANS 'CARD'
-  // (read it through paymentSourceOf() in lib/b2b.ts, never directly). A
-  // DEFAULT would mean an UPDATE across live history to record a fact nobody
-  // asserted.
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "Booking"
-      ADD COLUMN IF NOT EXISTS "paidBy" "PaymentSource";
-  `)
 
   // ── Requests: the client describes, providers bid (2026-08-14) ─────────
   //
@@ -1103,24 +778,24 @@ async function runMigrations() {
 
   // Stage 7 (2026-08-19): a job can be finished and reviewed without a Job
   // table. RequestOffer grows kind/doneAt/doneBy/closedAt; Review learns to hang
-  // off an offer. ⚠️ THE ONE REAL MIGRATION of the restructuring: Review.bookingId
-  // and Review.tutorId drop NOT NULL. Both are ALTERs that only WIDEN what the
-  // column accepts, so a stale instance mid-deploy keeps writing exactly what it
-  // wrote before; the CHECK below is what keeps a review attached to something.
+  // off an offer.
+  //
+  // ⚠️ THE OTHER HALF OF THIS BLOCK WENT ON 2026-08-24. It widened
+  // Review.bookingId / Review.tutorId to nullable and added a
+  // „bookingId IS NOT NULL OR offerId IS NOT NULL" CHECK, so that a review could
+  // hang off either a booking or an offer during the crossover. There is no
+  // booking any more: the services-only migration at the foot of this file drops
+  // both columns and that constraint, and `offerId` is the only thing left for a
+  // review to hang on.
   await prisma.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "RequestOfferKind" AS ENUM ('QUOTE', 'BOOKING'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;`)
   await prisma.$executeRawUnsafe(`ALTER TABLE "RequestOffer" ADD COLUMN IF NOT EXISTS "kind" "RequestOfferKind" NOT NULL DEFAULT 'QUOTE';`)
   await prisma.$executeRawUnsafe(`ALTER TABLE "RequestOffer" ADD COLUMN IF NOT EXISTS "doneAt" TIMESTAMP(3);`)
   await prisma.$executeRawUnsafe(`ALTER TABLE "RequestOffer" ADD COLUMN IF NOT EXISTS "doneBy" TEXT;`)
   await prisma.$executeRawUnsafe(`ALTER TABLE "RequestOffer" ADD COLUMN IF NOT EXISTS "closedAt" TIMESTAMP(3);`)
-  await prisma.$executeRawUnsafe(`ALTER TABLE "Review" ALTER COLUMN "bookingId" DROP NOT NULL;`)
-  await prisma.$executeRawUnsafe(`ALTER TABLE "Review" ALTER COLUMN "tutorId" DROP NOT NULL;`)
   await prisma.$executeRawUnsafe(`ALTER TABLE "Review" ADD COLUMN IF NOT EXISTS "offerId" TEXT;`)
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "Review_offerId_key" ON "Review"("offerId");`)
   await prisma.$executeRawUnsafe(`DO $$ BEGIN
     ALTER TABLE "Review" ADD CONSTRAINT "Review_offerId_fkey" FOREIGN KEY ("offerId") REFERENCES "RequestOffer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-  EXCEPTION WHEN duplicate_object THEN NULL; END $$;`)
-  await prisma.$executeRawUnsafe(`DO $$ BEGIN
-    ALTER TABLE "Review" ADD CONSTRAINT "Review_attached_to_something" CHECK ("bookingId" IS NOT NULL OR "offerId" IS NOT NULL);
   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`)
 
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ServiceProfile_userId_key" ON "ServiceProfile"("userId");`)
@@ -1377,18 +1052,17 @@ async function runMigrations() {
   // 2 sellers were STUDENT, and 30 plain buyers were STUDENT too. The column
   // could not answer „who is this", which is exactly what a role is for.
   //
-  // A consultation is a KIND of service, so its seller is a PROVIDER as well —
-  // there is no third identity to keep.
-  //
-  // ⚠️ ADDITIVE, AND IN THIS ORDER ON PURPOSE. `ADD VALUE` is idempotent and
-  // leaves every existing row untouched, so the build that is live right now
-  // keeps writing STUDENT/TUTOR and keeps working. The rows move only once the
-  // code that understands both is deployed — lib/roles normalises the legacy
-  // words on read, so there is no window in which anybody is locked out.
-  //
   // `ALTER TYPE … ADD VALUE` cannot run inside a transaction block on PG < 12,
   // so each is its own statement and guarded in JS, exactly like
   // ApplicationStatus.NEEDS_REVISION at the top of this file.
+  //
+  // ⚠️ THE BACKFILL THAT USED TO FOLLOW IS GONE (2026-08-24). It moved rows off
+  // STUDENT/TUTOR by asking whether the account held a TutorProfile, and that
+  // table no longer exists. The services-only migration at the foot of this file
+  // does the same work against ServiceProfile and then DROPS the two dead values
+  // from the enum, so after it has run there is nothing left for a backfill to
+  // find. These two `ADD VALUE`s stay because they are what a database that has
+  // never seen either word still needs.
   for (const value of ['USER', 'PROVIDER']) {
     try {
       await prisma.$executeRawUnsafe(`ALTER TYPE "Role" ADD VALUE IF NOT EXISTS '${value}';`)
@@ -1396,47 +1070,6 @@ async function runMigrations() {
       console.error(`[dbBoot] Role ${value} add failed:`, err)
     }
   }
-
-  // ── and now move the rows onto the new words ───────────────────────────────
-  //
-  // Runs after the ADD VALUE above, and safely at any time: lib/roles → `asRole`
-  // maps STUDENT/TUTOR on read, so the code that is live understands both
-  // vocabularies and nobody is locked out of their own account in between.
-  //
-  // ⚠️ A SELLER IS DECIDED BY WHAT THEY SELL, NOT BY THEIR OLD WORD. Both a
-  // TutorProfile (a consultation) and a ServiceProfile (a job) make somebody a
-  // PROVIDER, because a consultation is a KIND of service. That is why the first
-  // statement is not simply „TUTOR → PROVIDER": on 2026-08-21 two people were
-  // selling services while stored as STUDENT, and a plain rename would have left
-  // them filed with the buyers for ever.
-  //
-  // ADMIN is never touched. Idempotent — the WHERE clauses match only the legacy
-  // words, so every later boot changes nothing.
-  await prisma.$executeRawUnsafe(`
-    UPDATE "User" SET "role" = 'PROVIDER'
-    WHERE "role" IN ('STUDENT', 'TUTOR')
-      AND (
-        EXISTS (SELECT 1 FROM "TutorProfile" t WHERE t."userId" = "User"."id")
-        OR EXISTS (SELECT 1 FROM "ServiceProfile" s WHERE s."userId" = "User"."id")
-      );
-  `)
-  await prisma.$executeRawUnsafe(`
-    UPDATE "User" SET "role" = 'USER' WHERE "role" = 'STUDENT';
-  `)
-  // Whatever still says TUTOR after that holds the SELLER role without a profile
-  // to show for it — a granted role and an unfinished registration, which is a
-  // provider mid-setup and not a buyer. Demoting them to USER would take away a
-  // room somebody was deliberately given; the profile is what they still owe.
-  await prisma.$executeRawUnsafe(`
-    UPDATE "User" SET "role" = 'PROVIDER' WHERE "role" = 'TUTOR';
-  `)
-  // The other column that holds a Role: who cancelled a booking.
-  await prisma.$executeRawUnsafe(`
-    UPDATE "Booking" SET "cancelledBy" = 'USER' WHERE "cancelledBy" = 'STUDENT';
-  `)
-  await prisma.$executeRawUnsafe(`
-    UPDATE "Booking" SET "cancelledBy" = 'PROVIDER' WHERE "cancelledBy" = 'TUTOR';
-  `)
 
   // ── the two foreign keys Postgres was never asked to index (2026-08-21) ────
   // A FK gets no index for free. Both of these are ON DELETE SET NULL, so every
@@ -1454,15 +1087,11 @@ async function runMigrations() {
 
   try {
     await prisma.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`)
-    await prisma.$executeRawUnsafe(
-      `CREATE INDEX IF NOT EXISTS "TutorProfile_specialty_trgm_idx" ON "TutorProfile" USING GIN ("specialty" gin_trgm_ops);`,
-    )
-    await prisma.$executeRawUnsafe(
-      `CREATE INDEX IF NOT EXISTS "TutorProfile_headline_trgm_idx" ON "TutorProfile" USING GIN ("headline" gin_trgm_ops);`,
-    )
-    await prisma.$executeRawUnsafe(
-      `CREATE INDEX IF NOT EXISTS "TutorProfile_bio_trgm_idx" ON "TutorProfile" USING GIN ("bio" gin_trgm_ops);`,
-    )
+    // ⚠️ THE THREE TutorProfile ONES WENT ON 2026-08-24 (specialty, headline,
+    // bio) with the table. Their replacements are on the provider profile and
+    // are created by the services-only migration below, AFTER the columns it
+    // adds exist — a GIN index on a column that is not there yet would abort
+    // the whole boot from inside this try/catch's blind spot.
     await prisma.$executeRawUnsafe(
       `CREATE INDEX IF NOT EXISTS "User_fullName_trgm_idx" ON "User" USING GIN ("fullName" gin_trgm_ops);`,
     )
@@ -1472,6 +1101,369 @@ async function runMigrations() {
   } catch (err) {
     console.error('[dbBoot] pg_trgm setup skipped (search degrades to substring match):', err)
   }
+  // ── THE CONSULTATION PRODUCT IS REMOVED (2026-08-24) ───────────────────────
+  //
+  // Owner: „მინდა რომ მცოდნეზე კონსულტაციები საერთოდ ამოვიღოთ და მოვარგოთ
+  // სერვისებზე რაც ჩანაფიქრში იყო."
+  //
+  // The executable twin of prisma/manual-migrations/2026-08-24-services-only/,
+  // which carries the long version of every note below plus the guards. Read
+  // that one; this one is what actually runs.
+  //
+  // ⚠️ IT MUST STAY LAST IN THIS FUNCTION. Everything above assumes the tables
+  // it drops still exist on a database that has never been migrated, and every
+  // ServiceProfile column it adds is a column the statements above do not know
+  // about. Appending after it is fine; inserting before it is a boot that dies
+  // on „relation TutorProfile does not exist".
+  //
+  // ⚠️ THE 27 PROFILES ARE MIGRATED, NOT DELETED, AND THEY KEEP THEIR IDS AND
+  // SLUGS — so /experts/<slug> answers the same URL it answered yesterday, and
+  // Certificate/Education/Experience/Favorite only need their COLUMN renamed
+  // because the row they point at still has that id.
+
+  // 1. The provider profile absorbs the professional columns.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "ServiceProfile"
+      ADD COLUMN IF NOT EXISTS "headline"          TEXT,
+      ADD COLUMN IF NOT EXISTS "professions"       TEXT[] NOT NULL DEFAULT '{}',
+      ADD COLUMN IF NOT EXISTS "categoryId"        TEXT,
+      ADD COLUMN IF NOT EXISTS "yearsExp"          INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS "languages"         TEXT[] NOT NULL DEFAULT ARRAY['ka'],
+      ADD COLUMN IF NOT EXISTS "verified"          BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS "featured"          BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS "linkedinUrl"       TEXT,
+      ADD COLUMN IF NOT EXISTS "websiteUrl"        TEXT,
+      ADD COLUMN IF NOT EXISTS "videoUrl"          TEXT,
+      ADD COLUMN IF NOT EXISTS "responseHours"     INTEGER NOT NULL DEFAULT 24,
+      ADD COLUMN IF NOT EXISTS "responseMedianMin" INTEGER,
+      ADD COLUMN IF NOT EXISTS "responseSampleN"   INTEGER,
+      ADD COLUMN IF NOT EXISTS "rating"            DOUBLE PRECISION NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS "reviewsCount"      INTEGER NOT NULL DEFAULT 0;
+  `)
+  // SET NULL, never CASCADE: an admin retiring a sphere must not delete the
+  // people filed under it.
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ServiceProfile_categoryId_fkey') THEN
+        ALTER TABLE "ServiceProfile" ADD CONSTRAINT "ServiceProfile_categoryId_fkey"
+          FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$;
+  `)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceProfile_categoryId_idx" ON "ServiceProfile" ("categoryId");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceProfile_featured_idx" ON "ServiceProfile" ("featured");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ServiceProfile_published_available_idx" ON "ServiceProfile" ("published", "available");`)
+  // ServiceProfile.servicesConfirmedAt — „have they LOOKED at the list".
+  // Additive and nullable; null is the honest state for everybody the day it
+  // appears. Step 2 above seeded each migrated provider with their whole SPHERE
+  // (a provider with no services is invisible to routing), which is why all four
+  // lawyers claim all seven legal services and read as one person on a card.
+  // Deriving the real list from their own bios was built and deliberately NOT
+  // applied: a bio proves what somebody does, never what they do not, so it
+  // would have taken „დღგ" from an accountant who had not typed the word and
+  // dropped them out of every queue naming it. Owner: „წაშლა არ გვინდა, მათ
+  // უნდა შევიდნენ ისევ თავიან ექაუნთზე." This column only records whether they
+  // have been back; /work/services stamps it on save.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "ServiceProfile"
+      ADD COLUMN IF NOT EXISTS "servicesConfirmedAt" TIMESTAMP(3);
+  `)
+
+  // The one application form now asks for a profession too.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "MasterApplication" ADD COLUMN IF NOT EXISTS "professions" TEXT[] NOT NULL DEFAULT '{}';`)
+
+  // 2. The 27 people move.
+  //
+  // `services[]` is seeded from the SPHERE they are already filed under, through
+  // the taxonomy's own `Topic.categorySlug` map (lib/requestTopics). A provider
+  // with no services is invisible to routing, so „nothing ticked" would migrate
+  // them into SILENCE; the sphere is what we actually know about them, and they
+  // narrow it themselves on /work/services. The map is written out because SQL
+  // cannot read the TypeScript vocabulary; a sub-sphere falls through to its
+  // parent (`advokati` → `law`, `sales` → `marketing`, `finance` → `tax`).
+  //
+  // The whole block is a no-op once "TutorProfile" is gone — plpgsql resolves
+  // names at execution, and the early RETURN means these statements never run.
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    DECLARE
+      has_tutor BOOLEAN;
+    BEGIN
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = 'TutorProfile'
+      ) INTO has_tutor;
+      IF NOT has_tutor THEN RETURN; END IF;
+
+      CREATE TEMP TABLE _cat_topics (slug TEXT PRIMARY KEY, topics TEXT[]) ON COMMIT DROP;
+      INSERT INTO _cat_topics (slug, topics) VALUES
+        ('architecture', ARRAY['interior','architecture','estimate']),
+        ('business',     ARRAY['business-plan','strategy','startup','operations','project-mgmt','franchise']),
+        ('career',       ARRAY['cv','interview','career-adv','hiring','training']),
+        ('crypto',       ARRAY['crypto']),
+        ('design',       ARRAY['logo','uxui','print','presentation']),
+        ('finance',      ARRAY['fin-analysis','investment']),
+        ('health',       ARRAY['fitness','yoga','dietitian','nutrition','training-plan']),
+        ('it',           ARRAY['website','mobile-app','automation','data-an','ai','security','crm']),
+        ('law',          ARRAY['contract','labor-law','family-law','corp-law','ip-law','court','company-reg']),
+        ('marketing',    ARRAY['smm','seo','ads','branding','content','pr']),
+        ('psychology',   ARRAY['psy-individual','psy-couple','psy-child','psy-org']),
+        ('real-estate',  ARRAY['valuation','broker']),
+        ('relocation',   ARRAY['visa','residence','study-abroad','tax-residence']),
+        ('sales',        ARRAY['sales-sys']),
+        ('tax',          ARRAY['accounting','declaration','vat','audit']);
+
+      INSERT INTO "ServiceProfile" (
+        "id", "userId", "services", "areas", "priceFrom", "about", "slug",
+        "published", "available", "createdAt", "updatedAt", "workPhotos",
+        "headline", "professions", "categoryId", "yearsExp", "languages",
+        "verified", "featured", "linkedinUrl", "websiteUrl", "videoUrl",
+        "responseHours", "rating", "reviewsCount"
+      )
+      SELECT
+        t."id",
+        t."userId",
+        COALESCE(own.topics, parent.topics, '{}'),
+        ARRAY['TBILISI'],
+        NULLIF(t."price", 0),
+        t."bio",
+        t."slug",
+        TRUE,
+        t."available",
+        t."createdAt",
+        now(),
+        '{}',
+        NULLIF(btrim(t."headline"), ''),
+        t."professions",
+        t."categoryId",
+        t."yearsExp",
+        t."languages",
+        t."verified",
+        t."featured",
+        t."linkedinUrl",
+        t."websiteUrl",
+        t."videoUrl",
+        t."responseHours",
+        0,
+        0
+      FROM "TutorProfile" t
+      LEFT JOIN "Category" c       ON c."id" = t."categoryId"
+      LEFT JOIN "Category" cp      ON cp."id" = c."parentId"
+      LEFT JOIN _cat_topics own    ON own.slug = c."slug"
+      LEFT JOIN _cat_topics parent ON parent.slug = cp."slug"
+      ON CONFLICT ("id") DO NOTHING;
+
+      -- ⚠️ NO "updatedAt" — the table does not have one, and assuming it did is
+      -- what this statement failed on the first time it was run against the real
+      -- database (2026-08-25: column updatedAt of relation RequestAccess does
+      -- not exist). An allowlist row records an admission; there is no
+      -- second event to stamp. It failed BEFORE any DROP, which is the whole
+      -- reason the drops are last.
+      INSERT INTO "RequestAccess" ("id", "kind", "userId", "active", "note", "createdAt")
+      SELECT
+        'ra_' || substr(md5(t."userId"), 1, 21),
+        'EXPERT',
+        t."userId",
+        TRUE,
+        'მიგრირებული კონსულტაციის პროფილიდან 2026-08-24',
+        now()
+      FROM "TutorProfile" t
+      WHERE NOT EXISTS (SELECT 1 FROM "RequestAccess" ra WHERE ra."userId" = t."userId")
+      ON CONFLICT DO NOTHING;
+
+      UPDATE "User" u SET "role" = 'PROVIDER'
+       WHERE u."role" <> 'ADMIN'
+         AND EXISTS (SELECT 1 FROM "TutorProfile" t WHERE t."userId" = u."id");
+    END $$;
+  `)
+
+  // 🔒 NOT `t.rating` / `t.reviewsCount` above. Those were 0 for all 27 anyway,
+  // and they described BOOKING reviews; the new number is derived from reviews
+  // on finished jobs, of which they have none. Never carry a rating across.
+
+  // 3. The credential tables follow their owner — the rename is enough, because
+  //    the new profile carries the OLD id.
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    DECLARE tbl TEXT;
+    BEGIN
+      FOREACH tbl IN ARRAY ARRAY['Certificate','Education','Experience'] LOOP
+        IF EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name=tbl AND column_name='tutorId') THEN
+          EXECUTE format('ALTER TABLE %I RENAME COLUMN "tutorId" TO "providerId"', tbl);
+        END IF;
+        EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', tbl, tbl || '_tutorId_fkey');
+        EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', tbl, tbl || '_providerId_fkey');
+        EXECUTE format('DELETE FROM %I x WHERE NOT EXISTS (SELECT 1 FROM "ServiceProfile" s WHERE s."id" = x."providerId")', tbl);
+        EXECUTE format(
+          'ALTER TABLE %I ADD CONSTRAINT %I FOREIGN KEY ("providerId") REFERENCES "ServiceProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE',
+          tbl, tbl || '_providerId_fkey');
+        EXECUTE format('DROP INDEX IF EXISTS %I', tbl || '_tutorId_idx');
+        EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I ("providerId")', tbl || '_providerId_idx', tbl);
+      END LOOP;
+    END $$;
+  `)
+
+  // 4. A saved provider.
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema='public' AND table_name='Favorite' AND column_name='tutorId') THEN
+        ALTER TABLE "Favorite" RENAME COLUMN "tutorId" TO "providerId";
+      END IF;
+      ALTER TABLE "Favorite" DROP CONSTRAINT IF EXISTS "Favorite_tutorId_fkey";
+      ALTER TABLE "Favorite" DROP CONSTRAINT IF EXISTS "Favorite_providerId_fkey";
+      DELETE FROM "Favorite" f WHERE NOT EXISTS (SELECT 1 FROM "ServiceProfile" s WHERE s."id" = f."providerId");
+      ALTER TABLE "Favorite" ADD CONSTRAINT "Favorite_providerId_fkey"
+        FOREIGN KEY ("providerId") REFERENCES "ServiceProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END $$;
+  `)
+  await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "Favorite_userId_tutorId_key";`)
+  await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "Favorite_tutorId_idx";`)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "Favorite_userId_providerId_key" ON "Favorite" ("userId", "providerId");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Favorite_providerId_idx" ON "Favorite" ("providerId");`)
+
+  // 5. A review hangs on a finished JOB. 0 rows on production, so nothing is
+  //    lost by dropping the booking half.
+  //
+  // ⚠️ THE CHECK COMES OFF FIRST. `Review_attached_to_something` names TWO
+  // columns, and Postgres refuses to DROP COLUMN out from under a multi-column
+  // constraint — it only auto-drops the single-column ones.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Review" DROP CONSTRAINT IF EXISTS "Review_attached_to_something";`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Review" DROP CONSTRAINT IF EXISTS "Review_bookingId_fkey";`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Review" DROP CONSTRAINT IF EXISTS "Review_tutorId_fkey";`)
+  await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "Review_tutorId_createdAt_idx";`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Review" DROP COLUMN IF EXISTS "bookingId";`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Review" DROP COLUMN IF EXISTS "tutorId";`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Review_createdAt_idx" ON "Review" ("createdAt");`)
+
+  // 6. A request kind called „კონსულტაცია" becomes „შეხვედრა". `kind` is a plain
+  //    TEXT column (never an enum, deliberately — lib/requestTopics says why),
+  //    so this is one UPDATE.
+  await prisma.$executeRawUnsafe(`UPDATE "ServiceRequest" SET "kind" = 'MEETING' WHERE "kind" = 'CONSULTATION';`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ServiceRequest" ALTER COLUMN "kind" SET DEFAULT 'MEETING';`)
+
+  // 7. The machinery. Children first — Review and Favorite were repointed above,
+  //    so nothing outside this list references any of them.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Category" DROP COLUMN IF EXISTS "defaultServiceType";`)
+  // ⚠️ 'RescheduleRequest', NOT 'LegacyRescheduleRequest'. The Prisma MODEL was
+  // called LegacyRescheduleRequest and carried @@map("RescheduleRequest"), so the
+  // table on disk has always had the shorter name. Naming the model here was a
+  // silent no-op, and the miss surfaced two steps later when DROP TYPE
+  // "RescheduleStatus" refused because that table still held the type.
+  for (const table of [
+    'RescheduleRequest', 'Dispute', 'Message', 'Enrollment', 'Package',
+    'Booking', 'AvailabilitySlot', 'Consultation', 'TutorApplication', 'TutorProfile',
+  ]) {
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "${table}" CASCADE;`)
+  }
+  for (const type of [
+    'BookingStatus', 'PayoutStatus', 'ServiceType', 'ProfileType',
+    'EnrollmentStatus', 'RescheduleStatus', 'DisputeReason', 'DisputeOutcome',
+  ]) {
+    await prisma.$executeRawUnsafe(`DROP TYPE IF EXISTS "${type}";`)
+  }
+
+  // 8. Two dead enum values on Role.
+  //
+  // ⚠️ AFTER THE DROPS, AND IT USED TO BE BEFORE THEM. Postgres will not drop an
+  // enum type while a column still holds it, and `Booking.cancelledBy` was a
+  // `Role` — so this ran, renamed the type, and then died on „cannot drop type
+  // Role_old because other objects depend on it", taking the whole boot with it.
+  // Found on 2026-08-25 by running dbBoot against the real database. With the
+  // tables gone, "User"."role" is the only column left holding the type.
+  // STUDENT and TUTOR were the original pair,
+  //    STUDENT and TUTOR were the original pair,
+  //    renamed to USER/PROVIDER when the site stopped being a tutoring platform
+  //    and kept only because Postgres cannot drop a value in place. It REFUSES
+  //    rather than moves anybody: a straggler is a bug upstream, not something
+  //    to guess about.
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    DECLARE stragglers INTEGER;
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+                  WHERE t.typname = 'Role' AND e.enumlabel IN ('STUDENT','TUTOR')) THEN
+        EXECUTE 'SELECT count(*) FROM "User" WHERE "role"::text IN (''STUDENT'',''TUTOR'')' INTO stragglers;
+        IF stragglers > 0 THEN
+          RAISE EXCEPTION 'Role still has % row(s) on STUDENT/TUTOR — migrate them before dropping the values', stragglers;
+        END IF;
+        ALTER TYPE "Role" RENAME TO "Role_old";
+        CREATE TYPE "Role" AS ENUM ('USER','PROVIDER','ADMIN');
+        ALTER TABLE "User" ALTER COLUMN "role" DROP DEFAULT;
+        ALTER TABLE "User" ALTER COLUMN "role" TYPE "Role" USING ("role"::text::"Role");
+        ALTER TABLE "User" ALTER COLUMN "role" SET DEFAULT 'USER';
+        DROP TYPE "Role_old";
+      END IF;
+    END $$;
+  `)
+
+  // 9. Un-seed the university subjects that step 2's sphere map dragged in.
+  //    `higher → ბუღალტერია / სამართალი / მენეჯმენტი / ფინანსები` are what a
+  //    student ticks to be TAUGHT a subject; a practising advocate filed under
+  //    one is offering a university course. 14 of 29 public profiles carried
+  //    one and it sorted FIRST on their card, which is why every lawyer read
+  //    „სამართალი · ხელშეკრულება · +6" and looked like the same person.
+  //    Removing them unroutes nobody — each keeps 2–7 real services. The map
+  //    above no longer adds them; this is for databases that ran the old one.
+  await prisma.$executeRawUnsafe(`
+    UPDATE "ServiceProfile"
+       SET "services" = ARRAY(SELECT unnest("services") EXCEPT SELECT unnest(ARRAY['accounting-l', 'law-l', 'management-l', 'finance-l', 'economics-l', 'statistics-l', 'medicine-l']))
+     WHERE "services" && ARRAY['accounting-l', 'law-l', 'management-l', 'finance-l', 'economics-l', 'statistics-l', 'medicine-l'];
+  `)
+
+  // 10. The bell still pointed at the pages that went. Measured on the day: 88 of
+  //    479 notifications carried an href under /me/bookings or /work/bookings,
+  //    39 of them still unread — a person taps „ჯავშანი შეიქმნა" and lands on a
+  //    404 for a booking that exists nowhere any more.
+  //
+  // ⚠️ BY TYPE, NOT BY HREF. A BOOKING_* row lost its subject with the table, so
+  // there is nothing left for it to describe. Matching on the href would also
+  // catch `/apply`, which still resolves (308 → /join) and whose
+  // APPLICATION_STATUS rows are about an application that does still exist.
+  await prisma.$executeRawUnsafe(`DELETE FROM "Notification" WHERE "type" LIKE 'BOOKING\\_%';`)
+
+  // 11. The trigram indexes the catalogue's search needs, on the columns that
+  //    replaced TutorProfile.specialty / .headline / .bio. Last, because the
+  //    columns they cover are added by step 1 above.
+  //
+  // ⚠️ NO COUNT GUARDS HERE, unlike the reviewable copy. That file is run once
+  // by a person who can read the failure; this one runs at first request, where
+  // a RAISE is a site-wide 503 — and „fewer than 29 profiles" is simply TRUE on
+  // a fresh developer database. The guards live in
+  // prisma/manual-migrations/2026-08-24-services-only/up.sql and were checked
+  // against production on the day.
+  try {
+    await prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "ServiceProfile_headline_trgm_idx" ON "ServiceProfile" USING GIN ("headline" gin_trgm_ops);`,
+    )
+    await prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "ServiceProfile_about_trgm_idx" ON "ServiceProfile" USING GIN ("about" gin_trgm_ops);`,
+    )
+  } catch (err) {
+    console.error('[dbBoot] provider trigram indexes skipped (search degrades to substring match):', err)
+  }
+
+  // ── A REQUEST MAY CARRY PHOTOS (2026-08-29) ──────────────────────────────
+  //
+  // Owner: „ყველაფერი უნდა იყოს მარტივად… მაქსიმალურად მარტივად, ორივეს
+  // მხარეს." A photo of the leaking tap is the simplest thing a client can
+  // give and the most useful thing a provider can get — it is what lets an
+  // offer name a real price instead of opening a conversation to find one out.
+  // Airtasker makes it a step of its own („Snap a photo — help taskers
+  // understand what needs doing"); this is the same move.
+  //
+  // ⚠️ SAME SHAPE AS `ServiceProfile.workPhotos`, deliberately: a `String[]` of
+  // base64 data URIs, capped in the schema (lib/requests → MAX_REQUEST_PHOTOS)
+  // rather than in SQL. And the same hazard: these are BLOBS. They must never
+  // be selected into a list payload — the queue, the offers list and the admin
+  // table all read this row, and one careless `photos` in a SELECT would put
+  // megabytes on the wire.
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "ServiceRequest" ADD COLUMN IF NOT EXISTS "photos" TEXT[] NOT NULL DEFAULT '{}';`,
+  )
+
+
 }
 
 /* ── the stamp: why the second boot costs two round-trips, not 166 ─────────── */
@@ -1562,11 +1554,65 @@ async function recordApplied(fp: string): Promise<void> {
  * ensureDbReady exactly as before, and a ledger that cannot be read is treated
  * as „not applied", which costs one slow boot and never a wrong schema.
  */
+/**
+ * True only while the DDL is actually being applied.
+ *
+ * ⚠️ THIS FLAG IS THE DIFFERENCE BETWEEN „SLOW" AND „GONE" (2026-08-27), and
+ * `ensureDbReadyWithin` below is unusable without it. A warm boot is two round
+ * trips; a boot that has to apply the set is ~100 SECONDS (the fingerprint
+ * changed — CLAUDE.md says so), and that happens legitimately on the first
+ * request after a deploy that touches this file. A deadline that cannot tell
+ * the two apart would answer the first visitors after such a deploy with an
+ * empty catalogue for two minutes, which is a worse lie than a slow page.
+ */
+let applying = false
+
 async function runMigrationsOnce(): Promise<void> {
   const fp = migrationsFingerprint()
   if (await alreadyApplied(fp)) return
-  await runMigrations()
-  await recordApplied(fp)
+  applying = true
+  try {
+    await runMigrations()
+    await recordApplied(fp)
+  } finally {
+    applying = false
+  }
+}
+
+/**
+ * `ensureDbReady()` with a DEADLINE, for a render that already knows how to
+ * degrade.
+ *
+ * ⚠️ WHY IT EXISTS (2026-08-27). `ensureDbReady` is right to re-throw — a route
+ * that proceeds against an unmigrated schema returns opaque 500s. What it does
+ * not control is HOW LONG the throw takes: with Postgres unreachable, Prisma
+ * sits on the pool until `pool_timeout` (lib/prisma) and only then refuses.
+ * Measured against the standalone build with the database pointed at a black
+ * hole: the home page hung for 30 SECONDS and then failed, on a page whose own
+ * comment promises „a DB blip must not take the home page down — every branch
+ * degrades to an empty list". The catch was there; nothing ever reached it in
+ * time.
+ *
+ * Use this ONLY where an empty render is the honest answer. A workspace screen
+ * or a write path must keep waiting and then fail loudly — „no jobs" and „we
+ * could not read your jobs" are different sentences and only one of them is
+ * true.
+ *
+ * ⚠️ THE DEADLINE DOES NOT APPLY WHILE THE MIGRATIONS ARE RUNNING. That work is
+ * slow ON PURPOSE and it finishes; cutting it short would trade a rare outage
+ * for a guaranteed empty page after every DDL deploy. See `applying` above.
+ */
+export function ensureDbReadyWithin(ms: number): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      if (applying) return          // legitimately slow — keep waiting
+      reject(new Error(`[dbBoot] not ready within ${ms}ms`))
+    }, ms)
+    ensureDbReady().then(
+      () => { clearTimeout(timer); resolve() },
+      err => { clearTimeout(timer); reject(err) },
+    )
+  })
 }
 
 export function ensureDbReady(): Promise<void> {

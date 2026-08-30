@@ -29,6 +29,12 @@ import { join } from 'path'
 
 const root = join(__dirname, '..')
 const read = (p: string) => readFileSync(join(root, p), 'utf8')
+/** The same file with comments removed. Use it whenever a check asks whether
+ *  the CODE says something — a guard that greps the raw text also matches the
+ *  comment explaining why the code no longer does it, which is how K2a failed
+ *  the moment the fix it protects was written down beside it. */
+const codeOf = (p: string) =>
+  read(p).replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')
 
 let failures = 0
 function check(name: string, ok: boolean, hint: string) {
@@ -105,107 +111,75 @@ function check(name: string, ok: boolean, hint: string) {
   )
 }
 
-// ── E. detail API keeps parallel fan-out ─────────────────────────────────────
+// ── E. the profile keeps its parallel fan-out ────────────────────────────────
 {
-  const api = read('app/api/tutors/[id]/route.ts')
+  // ⚠️ IT WAS `app/api/tutors/[id]/route.ts` UNTIL 2026-08-24. That route was
+  // the consultation profile's client-side fetch and went with the product; the
+  // provider profile is server-rendered from the model below. The RULE is the
+  // one that mattered and it is unchanged — a round trip to the Railway proxy
+  // measures ~260ms, so queries that do not depend on each other must go out
+  // together or the page quietly costs a second it did not have to.
+  const model = read('app/experts/[slug]/_providerData.ts')
   check(
-    'E: /api/tutors/[id] uses Promise.all for relation queries',
-    api.includes('Promise.all'),
-    'Sequential nested includes cost ~10 round-trips on the remote DB proxy (~3s per request).',
+    'E: the provider profile fans its follow-up queries out in parallel',
+    model.includes('await Promise.all(['),
+    'Sequential follow-up queries pay the ~260ms proxy round trip once per query, for nothing.',
   )
 }
 
-// ── F. detail page keeps its error + retry state ─────────────────────────────
-{
-  // Interactive profile moved to client.tsx (page.tsx is now the thin SEO/SSR
-  // server wrapper — Phase 0.6 split).
-  const page = read('app/experts/[slug]/client.tsx')
-  check(
-    'F: expert profile has a dedicated error state with retry',
-    page.includes("loadState === 'error'") && page.includes('სცადე თავიდან'),
-    'A failed fetch must never strand the user on an infinite skeleton.',
-  )
-}
+/* ⚠️ „F: expert profile has a dedicated error state with retry" WAS HERE AND IS
+   GONE (2026-08-24). It pinned `app/experts/[slug]/client.tsx` — the interactive
+   consultation profile, which fetched itself from the browser and therefore had
+   a fetch that could fail and strand the reader on an infinite skeleton.
 
-// ── G. booking POST keeps notify out of the response path ────────────────────
-{
-  const api = read('app/api/bookings/route.ts')
-  check(
-    'G: POST /api/bookings defers notify() via after()',
-    /after\(\s*async/.test(api),
-    'notify() costs two extra DB round-trips; the student must not wait on them.',
-  )
-  check(
-    'G2: POST /api/bookings runs independent pre-checks in Promise.all',
-    api.includes('Promise.all'),
-    'tutor fetch / consultation fetch / covering-slot probe are independent and must fan out.',
-  )
-}
+   The provider profile is a SERVER component now: there is no client fetch, so
+   there is no error state to keep. What answers the same question is `notFound()`
+   in page.tsx — a real 404 rather than a blank page — and that is pinned by
+   tests/offerLifecycle §E and by the resolver's own tests. The rule the check
+   encoded still holds anywhere a page fetches itself: a failed fetch must never
+   strand the user on an infinite skeleton. */
 
-// ── H. chat system invariants (2026-07-17 fixes) ─────────────────────────────
+/* ⚠️ BLOCKS G AND H WERE HERE AND ARE GONE (2026-08-24) — nine checks over
+   `app/api/bookings/route.ts`, `app/api/messages/route.ts` and
+   `components/chat/useBookingThread.ts`. All three files went with the
+   consultation product, along with the two booking chat panes they served.
+
+   Four of the rules they encoded are not about bookings at all, and the
+   surfaces that inherited the behaviour are held to them elsewhere:
+
+     · a POST defers notify() into after(), so the person who pressed the button
+       never waits on the two extra round trips it costs — the offer routes do
+       this and tests/offerLifecycle pins it;
+     · independent pre-checks fan out in Promise.all rather than paying the
+       ~260ms proxy round trip once each — block E above now pins this on the
+       provider profile;
+     · an inbox sorts by LAST MESSAGE time, never by the parent row's
+       updatedAt: a parent is not bumped when a message arrives, so sorting on
+       it buries the freshest thread. `lib/inboxRows → InboxRow.lastAt` is the
+       field, and components/chat/ConversationList still sorts on it — checked
+       just below, because that file survived;
+     · a thread appends the sender's own bubble optimistically and reconciles
+       the temporary id, because waiting seconds for the POST reads as broken.
+
+   And one is a rule about people rather than mechanics, so it is written out
+   here even though nothing renders it today: NO STOCK FACES. A random
+   `i.pravatar.cc` portrait beside a real client's name reads as a fake
+   identity — of that person, to that person. If an avatar is missing, draw the
+   placeholder. */
+
+// ── H3. the one inbox still sorts on the message, not the parent row ─────────
 {
-  const api = read('app/api/messages/route.ts')
-  check(
-    'H: GET /api/messages?bookingId stamps read receipts',
-    api.includes('readAt: null') && api.includes('readAt: new Date()'),
-    'readAt was NEVER written before — threads stayed "unread" forever.',
-  )
-  check(
-    'H2: POST /api/messages defers notify via after()',
-    /after\(\s*async/.test(api),
-    'notify + markRelatedRead cost 3 round-trips the sender must not wait on.',
-  )
-  // BOTH inboxes became two-pane centers whose list is the SHARED
-  // components/chat/ConversationList (was app/work/messages/_components/…),
-  // rendered from the layout. app/me/messages/page.tsx is now just the
-  // desktop "pick a conversation" placeholder, so the old per-page sort
-  // assertion can never hold — the substance moved to the API + shared list,
-  // and both halves are still asserted below.
   const tList = read('components/chat/ConversationList.tsx')
   check(
-    'H3: inboxes sort by last-message time, not booking.updatedAt',
-    api.includes('at: (last?.createdAt') &&
-      // Renamed with the one-inbox row shape (lib/inboxRows → InboxRow.lastAt,
-      // 2026-08-19); same invariant, same field, one word longer.
-      tList.includes('new Date(z.lastAt).getTime() - new Date(a.lastAt).getTime()'),
-    'booking.updatedAt is not bumped by messages — sorting on it buries fresh threads.',
+    'H3: the inbox sorts by last-message time',
+    tList.includes('new Date(z.lastAt).getTime() - new Date(a.lastAt).getTime()'),
+    'A parent row is not bumped by a message — sorting on it buries fresh threads.',
   )
   check(
-    'H4: tutor inbox has no pravatar stock-face fallback',
+    'H4: the inbox has no pravatar stock-face fallback',
     // Match the actual URL, not the word — comments may mention it.
-    !read('app/work/messages/page.tsx').includes('i.pravatar.cc') && !tList.includes('i.pravatar.cc'),
+    !tList.includes('i.pravatar.cc'),
     'A random stock face next to a real client name reads as a fake identity.',
-  )
-  // The tutor pane now renders the shared <BookingChat>, whose polling and
-  // optimistic append live in the useBookingThread hook — guard the hook plus
-  // the import, and the student pane's still-local implementation.
-  // Both panes are split across `_*.tsx` files beside their page.tsx (the
-  // student pane's <BookingChat> now sits in _body.tsx), so read the whole
-  // route directory — the invariant is about the pane, not about one file.
-  const readDir = (d: string) => readdirSync(join(root, d))
-    .filter(f => f.endsWith('.tsx'))
-    .sort()
-    .map(f => read(join(d, f)))
-    .join('\n')
-  const sPane = readDir('app/me/bookings/[id]')
-  const tPane = readDir('app/work/(expert)/bookings/[id]')
-  const hook = read('components/chat/useBookingThread.ts')
-  check(
-    // REWRITTEN 2026-07-27. Both guards used to assert that the STUDENT pane
-    // carried its own local copy of the polling + optimistic-append logic. That
-    // duplication is gone: both panes now render the shared <BookingChat>, and
-    // the behavior lives once in useBookingThread. Guard the unified shape —
-    // asserting the old per-pane copies would push the duplication back.
-    'H5: both chat panes use the shared thread, which polls while visible',
-    sPane.includes('BookingChat') &&
-      tPane.includes('BookingChat') &&
-      hook.includes('/api/messages?bookingId='),
-    'Without polling, incoming messages only appeared on a full page reload.',
-  )
-  check(
-    'H6: the shared thread appends optimistically and reconciles tmp- ids',
-    hook.includes("`tmp-${Date.now()}`") && hook.includes('upsert'),
-    'Waiting for the POST (seconds on remote DB) before showing your own bubble feels broken; without id reconcile the bubble duplicates.',
   )
 }
 
@@ -223,17 +197,27 @@ function check(name: string, ok: boolean, hint: string) {
       joinPage.indexOf("redirect('/admin')") < joinPage.indexOf('<JoinClient'),
     'An ADMIN reaching /join can submit an application that, once approved, demotes them out of ADMIN.',
   )
-  const submit = read('app/api/applications/route.ts')
+  // ⚠️ I2 AND I3 ARE ONE CHECK NOW, AND A STRONGER ONE (2026-08-24). They used
+  // to pin two guards on the consultation application — „only a STUDENT may
+  // apply" on submit, „never promote a non-student" on approve — because that
+  // approval wrote `role = 'TUTOR'` directly onto the applicant, and an admin
+  // who applied was demoted out of ADMIN by their own approval.
+  //
+  // The surviving approval does not write a role AT ALL. It grants a
+  // `RequestAccess` row and creates a `ServiceProfile`; being a provider is
+  // something you HOLD, not something your role says. So the incident is not
+  // guarded against, it is unrepresentable — and what has to stay true is
+  // exactly that: no role write in the approval path.
+  const approve = read('app/api/master-applications/[id]/route.ts')
   check(
-    'I2: application submit rejects non-students',
-    submit.includes("role !== ROLE.USER") && submit.includes('ONLY_STUDENTS_CAN_APPLY'),
-    'Only a STUDENT may apply — an ADMIN/TUTOR submission is a role-integrity hazard.',
+    'I2: approving an application never writes User.role',
+    !/\brole:\s*'(ADMIN|PROVIDER|USER)'/.test(approve) && !/user\.update\(/.test(approve),
+    'A role write here is the admin-demotion incident again: the only admin approves their own application and loses /admin.',
   )
-  const approve = read('app/api/applications/[id]/route.ts')
   check(
-    'I3: application approve never promotes a non-student (no admin demotion)',
-    approve.includes("app.user.role !== ROLE.USER") && approve.includes('CANNOT_PROMOTE_ADMIN'),
-    'Approve sets role=TUTOR; without a STUDENT-only guard it demotes an admin who applied.',
+    'I3: the grant is a RequestAccess row, and it is claimed inside the transaction',
+    approve.includes('tx.requestAccess.upsert') && approve.includes("status: { not: 'APPROVED' }"),
+    'Two admins approving at the same moment must not produce two grants.',
   )
 }
 
@@ -290,17 +274,31 @@ function check(name: string, ok: boolean, hint: string) {
     publicNav.includes('href={JOIN_HREF}') && publicNav.includes('<UserMenu'),
     'The public header is the reference surface — if the door leaves it, the two chromes have diverged again.',
   )
+  // ⚠️ K0 IS ABOUT THE GUEST'S DOOR ONLY (2026-08-21). `JOIN_HREF` is /signup
+  // because a guest needs the account before the door can ask them anything.
+  // Every SIGNED-IN surface uses `JOIN_DOOR_HREF` (/join) instead — see K2.
   check(
-    'K0: the join door has ONE destination, shared by both chromes',
+    'K0: the guest join door has ONE destination',
     read('lib/roleHome.ts').includes("export const JOIN_HREF = '/signup'"),
     'Two chromes naming their own join URL is exactly how they diverged before.',
   )
   const navConfig = read('components/student/navConfig.ts')
   const sidebar = read('components/student/StudentSidebar.tsx')
+  // ⚠️ THE CONSTANT, NOT JUST THE PRESENCE (2026-08-21). This asserted
+  // `navConfig.includes('JOIN_HREF')`, which stayed true while the item pointed
+  // a SIGNED-IN client at /signup — a page that redirects them straight back to
+  // /me. The CTA was present, gated correctly, and led nowhere; §K passed
+  // throughout. Pinning the shared constant is what the invariant was always
+  // for, and it is the thing that cannot silently rot.
   check(
-    'K2: the student workspace sidebar carries the same join door',
-    navConfig.includes('JOIN_HREF') && sidebar.includes('APPLY_LINK'),
-    'Without it the CTA vanishes the moment a student enters their own workspace — the reported bug.',
+    'K2: the client workspace sidebar carries the SAME door as the signed-in public chrome',
+    navConfig.includes('JOIN_DOOR_HREF') && sidebar.includes('APPLY_LINK'),
+    'A signed-in person sent to /signup lands back on /me: the CTA is there, gated right, and dead.',
+  )
+  check(
+    'K2a: and it does not point a signed-in person at the guest door',
+    !codeOf('components/student/navConfig.ts').includes('JOIN_HREF'),
+    'JOIN_HREF is /signup — correct for a guest, a round trip to nowhere for somebody already signed in.',
   )
   check(
     'K3: the sidebar item is wrapped in <ApplyCtaGate> (real role, not the shell prop)',
@@ -327,7 +325,12 @@ function check(name: string, ok: boolean, hint: string) {
     // JOIN_DOOR_HREF). Six surfaces typed their own label and three typed their
     // own `?can=`, which is how the header ended up pre-answering the door's
     // question. What K5 protects is unchanged: the item is HERE, and it is gated.
-    menu.includes('href: JOIN_DOOR_HREF') && menu.includes('showJoinInvite(role, me?.capabilities)'),
+    // ⚠️ AND THE SECOND ARGUMENT IS A BOOLEAN SINCE 2026-08-24. It was
+    // `me?.capabilities` — a SET, because a person could sell consultations, or
+    // services, or both. There is one thing to sell now, so the question the
+    // gate asks collapsed to „is this account already a provider": lib/identity
+    // answers it in one read and lib/capabilities → showJoinInvite takes it.
+    menu.includes('href: JOIN_DOOR_HREF') && menu.includes('showJoinInvite(role, me?.provider)'),
     'On mobile the avatar menu is the ONLY path — the sidebar is desktop-only (hidden lg:flex).',
   )
 }
@@ -364,9 +367,17 @@ function check(name: string, ok: boolean, hint: string) {
   )
   const home = read('app/page.tsx')
   const homeClient = read('app/HomeClient.tsx')
+  // ⚠️ THE MECHANISM MOVED AND THE INVARIANT DID NOT CHANGE (2026-08-30). This
+  // named `getCurrentUser()` — the call home used to make — and that spelling
+  // was the LESS correct half of the rule: what it resolved was four fields,
+  // missing `provider` and `balanceTetri`, so the header still rearranged after
+  // hydration for exactly the signed-in provider this line is about. It is
+  // `initialMe()` now (lib/meServer), which builds the shape /api/me returns.
+  // The invariant is what it always was — the viewer is resolved on the SERVER
+  // and handed to the header — and tests/firstPaint holds the new shape.
   check(
     'L2: home resolves the viewer server-side and hands it to the header',
-    home.includes('getCurrentUser()') && home.includes('initialUser={initialUser}') &&
+    home.includes('initialMe()') && home.includes('initialUser={initialUser}') &&
       homeClient.includes('<PublicTopBar initialUser={initialUser} />'),
     'Without it the header rearranges after hydration for any signed-in expert.',
   )
@@ -396,40 +407,30 @@ function check(name: string, ok: boolean, hint: string) {
 }
 
 
-/* ── The three exits from a booking must say the same kind of thing ─────────
- *
- * A booking dies three ways: the expert declines, somebody cancels, or nobody
- * answers and the sweep closes it. The first two stamped an actor and a reason
- * and emailed the injured party. The third — the ONLY one the client had no
- * hand in — wrote neither and emailed nobody, so a client not sitting in an
- * open tab was never told, and the screen they eventually opened read
- * „შენ გააუქმა": it blamed them for waiting.
- */
-{
-  const sweep = read('app/api/internal/cleanup/route.ts')
-  check('auto-cancel records WHY the booking ended',
-    /cancelReason: `ექსპერტმა \$\{PREPARING_TTL_HOURS\}/.test(sweep),
-    'the sweep stopped writing cancelReason — the client sees a cancellation with no explanation')
-  check('auto-cancel emails the client, like the other two exits',
-    /bookingChangedEmail\('declined'/.test(sweep),
-    'the in-app bell is the only signal again, and this ending is terminal')
-  check('auto-cancel reuses the decline template',
-    !/autoCancel[A-Za-z]*Email/.test(sweep),
-    'a second template was written for a message that already exists')
+/* ⚠️ „WHY A BOOKING ENDED" WAS PINNED HERE AND IS GONE (2026-08-24). Eleven
+   checks over the cleanup sweep and the two booking detail panes, all of them
+   about ONE thing: an ending that nobody performed must still be explained, and
+   it must never be blamed on the client.
 
-  for (const f of ['app/me/bookings/[id]/_hero.tsx', 'app/me/bookings/[id]/_body.tsx']) {
-    const src = read(f)
-    check(`${f} does not blame the client by fallback`,
-      !/=== 'ADMIN' \? 'ადმინმა' : 'შენ'/.test(src),
-      'an unrecognised cancelledBy reads as „შენ" again — including every automatic cancellation')
-    check(`${f} names the client explicitly`, /cancelledBy === 'USER'/.test(src),
-      'the client must be named by their own value, never by being the last branch')
-    check(`${f} has wording for a cancellation nobody performed`, /ავტომატურად გაუქმ/.test(src),
-      'the sweep\'s cancellations have no sentence of their own')
-    check(`${f} shows the reason the row carries`, /cancelReason/.test(src),
-      'all three exits write a reason and this screen shows none of them')
-  }
-}
+   The sweep auto-cancelled a booking the expert had left PREPARING past its
+   TTL. Three rules came out of that, and they are worth more than the code was:
+
+     · AN AUTOMATIC ENDING WRITES ITS REASON. The row carried `cancelReason` and
+       the screen showed it; a cancellation with no explanation reads as the
+       site losing your booking.
+     · IT REACHES THE PERSON THE SAME WAY THE MANUAL ONES DO. An in-app bell is
+       not a signal for a terminal ending — it emailed, reusing the decline
+       template rather than growing a second one for a message that exists.
+     · NOBODY IS BLAMED BY FALLBACK. The pane named the client by their OWN
+       value (`cancelledBy === 'USER'`), never by being the last branch of a
+       ternary — because an unrecognised or automatic `cancelledBy` then reads
+       as „შენ" to the one person who did nothing.
+
+   The third is the one to carry forward: any screen that attributes an action
+   must name each actor explicitly and keep a sentence for „nobody did this".
+   The nearest live equivalent is an offer closed by the sweep — see
+   lib/offerLifecycle and app/api/internal/cleanup, whose request-side rules are
+   pinned by tests/offerLifecycle. */
 
 /* ── The dark verticals are dark ────────────────────────────────────────────
  * Turning these back on is one line each (lib/flags). What is pinned here is
@@ -439,11 +440,21 @@ function check(name: string, ok: boolean, hint: string) {
  */
 {
   const flags = read('lib/flags.ts')
-  check('packages ship dark', /PACKAGES_VISIBILITY: PackagesVisibility = 'off'/.test(flags), 'PACKAGES_VISIBILITY is not off')
+  // ⚠️ PACKAGES IS NOT ON THIS LIST ANY MORE (2026-08-24), and that is the
+  // point of the list. A dark vertical is one whose code is REACHABLE and whose
+  // flag flip is the whole of turning it on. Packages stopped being that when
+  // the consultation product went: `Package`/`Enrollment` are dropped and a
+  // spent lesson was a Booking, so there is nothing behind a switch to flip.
+  // The constant, the landing and lib/packages went with it — lib/flags carries
+  // the long version and what a revival would have to design first.
+  // On the STRIPPED source: the note in lib/flags names the constant several
+  // times while explaining why it is gone, and that explanation must stay
+  // readable without failing the pin it documents.
+  check('the packages flag is gone, not left switched off',
+    !codeOf('lib/flags.ts').includes('PACKAGES_VISIBILITY'),
+    'a flag with no reader is a control that lies about what it turns on')
   check('b2b ships dark', /B2B_VISIBILITY: B2BVisibility = 'off'/.test(flags), 'B2B_VISIBILITY is not off')
   check('abroad ships dark', /FEATURE_ABROAD = false/.test(flags), 'FEATURE_ABROAD is not false')
-  check('/swavleba 404s when off', /canSeePackages\(me\?\.role\)\) notFound\(\)/.test(read('app/swavleba/page.tsx')),
-    'the packages landing lost its guard')
   check('/business 404s when off', /canSeeB2B\(me\?\.role\)\) notFound\(\)/.test(read('app/business/page.tsx')),
     'the b2b landing lost its guard')
   const nav = read('app/admin/_nav.tsx')

@@ -1,19 +1,33 @@
-// /provider/requests/[id] — the full request, and the form to answer it.
+// /provider/requests/[id] — the full request, the contact, and the form.
 //
 // Same contact rule as the list it came from: the row is shaped by
 // `providerRequestView` (lib/requests) and the client's name, phone and email
-// are not parameters of that function. The only thing this page adds over the
-// card is the whole description and the form.
+// are not parameters of that function.
+//
+// ⚠️ AND THAT IS EXACTLY WHY THIS PAGE HAS A SECOND SELECT (2026-08-21). The
+// client's contact is now something a provider BUYS — 1₾ once per request, POST
+// /api/provider/requests/[id]/contact — so this screen has to be able to show
+// it. It does so without widening `ProviderRequestRow`: the three columns are
+// fetched by their own query, `CLIENT_CONTACT_SELECT`, which is reachable only
+// inside `if (unlocked)`. A rule enforced by what is FETCHED is a rule a future
+// render cannot forget; a nullable field on the shared row would be one a
+// future render forgets on its first day.
 
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { providerRequestView, timeAgoKa, KIND, kindOf } from '@/lib/requests'
+import {
+  providerRequestView, timeAgoKa, KIND, kindOf,
+  CLIENT_CONTACT_SELECT, clientContactView, type ClientContact,
+} from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
+import { contactUnlocked, contactCountOf } from '@/lib/creditsServer'
 import { PageHeader } from '@/components/PageHeader'
+import { Eyebrow } from '@/components/Eyebrow'
 import { Card } from '@/components/Card'
 import { Btn } from '@/components/Btn'
 import { RequestMessage } from './_message'
+import { ContactCard } from './_contact'
 import { OfferForm } from './OfferForm'
 
 export const dynamic = 'force-dynamic'
@@ -42,6 +56,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       budgetMin: true, budgetMax: true, budgetUnit: true,
       timing: true, format: true, city: true, status: true, details: true,
       offerCount: true, offerLimit: true, createdAt: true,
+      // ⚠️ THE ONE SCREEN THAT MAY SELECT THE BLOBS (2026-08-29). `photos` is a
+      // `String[]` of base64 data URIs — a list payload must never carry it
+      // (see prisma/schema) — and this is the DETAIL page for exactly one
+      // request, which is the whole reason it may. It is also the screen where
+      // the photos do their work: a provider naming a price wants to see the
+      // tap, not read about it.
+      photos: true,
       category: { select: { id: true, name: true, slug: true } },
     },
   })
@@ -95,6 +116,31 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     row.status === 'VERIFIED' ||
     (settled && (mine !== null || isAdmin))
   if (!mayOpen) notFound()
+
+  // ── The contact: has this provider paid for it? ──────────────────────────
+  //
+  // ⚠️ THE LEDGER IS THE AUTHORISATION, not this page. `contactUnlocked` reads
+  // the one row `contactKey(requestId)` writes (lib/creditsServer), so „may I
+  // see this number" has exactly one answer and it is the same one the charge
+  // wrote. Only when it says yes are the columns fetched at all.
+  //
+  // ⚠️ A COMPANY MEMBER IS NEVER UNLOCKED, because they can never be charged —
+  // the ledger is keyed on a USER and a company's lead must not come out of a
+  // personal balance. The endpoint refuses them with COMPANY_UNSUPPORTED and
+  // this simply never asks; measured 2026-08-21, no company holds active
+  // request access.
+  const expertUserId = p?.kind === 'EXPERT' ? p.userId : null
+  const unlocked = expertUserId ? await contactUnlocked(expertUserId, row.id) : false
+  const contact: ClientContact | null = unlocked
+    ? clientContactView(await prisma.serviceRequest.findUniqueOrThrow({
+        where: { id: row.id },
+        select: CLIENT_CONTACT_SELECT,
+      }))
+    : null
+  // How many providers already hold this client's number. Display only — the
+  // cap is claimed inside the INSERT, because a count read before a write loses
+  // to a second tab (CLAUDE.md's fourth rule).
+  const contactsTaken = await contactCountOf(row.id)
 
   const r = providerRequestView(row)
   // What this provider is looking at, in one word — the card on the right and
@@ -171,6 +217,49 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             { label: 'ქალაქი', value: r.cityLabel },
           ]}
         />
+
+        {/* ── What it looks like ──────────────────────────────────────────
+            ⚠️ ABOVE THE CONTACT AND ABOVE THE FORM, because it is what the
+            price is being named FOR. A provider reads the sentence, looks at
+            the picture, and writes a figure; putting the photos after the offer
+            form would put them after the decision. Nothing is drawn when there
+            are none — a heading over an empty row is the page apologising for
+            somebody (2026-08-29). */}
+        {r.photos.length > 0 && (
+          <section>
+            <Eyebrow tone="muted" className="mb-3">ფოტო კლიენტისგან</Eyebrow>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {r.photos.map((src, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={i}
+                  src={src}
+                  alt=""
+                  className="w-full aspect-[4/3] object-cover rounded-card border border-ink-200 bg-ink-100"
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── The client's contact ────────────────────────────────────────
+            ⚠️ BEFORE THE OFFER FORM, NOT AFTER IT (owner, 2026-08-21). The
+            provider reads the job — free — decides it is worth a call, pays 1₾,
+            and may then phone, or bid, or do nothing. The order on the screen is
+            the order of the decision.
+
+            Shown while the request is live and this provider could still buy it,
+            and shown for ever once they have: a number they paid for must not
+            disappear because the client later chose somebody else. An admin and
+            a company member see nothing here — neither can be charged. */}
+        {expertUserId && (contact || outcome === 'OPEN') && (
+          <ContactCard
+            requestId={r.id}
+            offerLimit={row.offerLimit}
+            taken={contactsTaken}
+            initial={contact}
+          />
+        )}
 
         {/* ── What happened, and the one place to go next ──────────────────
             Four states, one card. WON links to /work/offers because that is

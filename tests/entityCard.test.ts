@@ -20,7 +20,7 @@
 //   · A BASE64 COLUMN COMES BACK. The master photo is a ROUTE (`m.photoSrc` →
 //     /api/masters/[id]/photo). The image IS the column here — no object
 //     storage — so naming `photoUrl` or `workPhotos` in a card is a page that
-//     grows by megabytes and breaks nothing visible. app/experts/_masterData.ts
+//     grows by megabytes and breaks nothing visible. app/experts/_providers.ts
 //     carries the long version of this warning.
 //
 // Nothing here needs a browser: these are source-text pins, the same way the
@@ -35,16 +35,20 @@ const ROOT = join(__dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 
 const SHELL = 'components/EntityCard.tsx'
-const EXPERT = 'app/experts/_card.tsx'
-const MASTER = 'app/experts/_masterCard.tsx'
-const CARDS = [EXPERT, MASTER]
+// ⚠️ THERE WERE TWO CARDS UNTIL 2026-08-24 — `app/experts/_card.tsx` (the
+// consultation one) and this. This whole file existed to hold them to the same
+// shell so the two catalogues could not drift into two products. One roster,
+// one card; what is still worth pinning is that the card renders through the
+// shared shell and keeps the geometry it inherited.
+const MASTER = 'app/experts/_providerCard.tsx'
+const CARDS = [MASTER]
 
 /** Source with `//` and block comments stripped — for the negative assertions,
  *  which a prose mention of the forbidden word would otherwise fail. */
 const code = (p: string) =>
   read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
 
-test('both catalogues render through the ONE shell, in the SAME geometry', () => {
+test('the catalogue renders through the ONE shell, in the geometry it inherited', () => {
   for (const f of CARDS) {
     assert.match(read(f), /from '@\/components\/EntityCard'/, `${f} no longer renders through EntityCard`)
     assert.match(read(f), /<EntityCard\b/, `${f} imports the shell but does not render it`)
@@ -88,7 +92,7 @@ test('the list view is a ROW from sm up, and a stacked card below it', () => {
   assert.match(shell, /line-clamp-\d/, 'the list bio no longer clamps at all — a long bio will break the row height')
 })
 
-test('the master card is the expert card: portrait, chips, meta, clamp, footer strip', () => {
+test('the card keeps the portrait, chips, meta, clamp and footer strip', () => {
   const m = read(MASTER)
   // The expert's own plate sizes, and the flat 80px list portrait.
   // The two catalogues must show a portrait of the SAME size as each other —
@@ -102,7 +106,7 @@ test('the master card is the expert card: portrait, chips, meta, clamp, footer s
   assert.match(m, /chips=\{m\.services\}/)
   assert.match(m, /chipCap=\{CHIP_CAP\}/, 'the chip cap must come from the shell, not a local number')
   assert.match(m, /meta=\{m\.areas/)
-  assert.match(m, /about=\{m\.about\}/)
+  assert.match(m, /about=\{m\.about \?\? m\.headline\}/)
   // NO PRICE IN THE CATALOGUE. A card is where you BROWSE, and a browsing
   // client cannot know what a job costs before it is described — any number
   // here is invented, and an invented number is a lie the client discovers
@@ -111,27 +115,12 @@ test('the master card is the expert card: portrait, chips, meta, clamp, footer s
   // On the STRIPPED source: the footer's own comment explains at length why the
   // price left, and that explanation must stay readable without failing the pin.
   // ⚠️ THE PRICE IS BACK, AS A FLOOR (2026-08-20) — see the footer note in
-  // _masterCard.tsx. What must never return is an EXACT number on a browse
+  // _providerCard.tsx. What must never return is an EXACT number on a browse
   // card: „50₾" claims to be the price of a job nobody has looked at yet.
   // „50₾-დან" claims a minimum, which is the one thing that is always true,
   // and it is the form every comparable marketplace uses.
   assert.match(code(MASTER), /<EntityPrice>\{m\.priceValue\}₾-დან<\/EntityPrice>/, 'the floor price left the service card')
   assert.match(code(MASTER), /ფასს შემოგთავაზებს/, 'the no-floor sentence is gone — the slot would be blank')
-  // ⚠️ AND ON THE EXPERT CARD THE WORD IS NO LONGER WELDED ON (2026-08-20,
-  // second pass). It used to read `{flagship.label}-დან`, i.e. „-დან" appended
-  // to the FLAGSHIP tier — the most expensive thing the expert sells — so the
-  // one claim the word makes was false wherever it mattered. Measured that
-  // morning: 24 visible experts, 11 with 2+ paid tiers, 10 of them overstating
-  // their own floor („₾100-დან" against a ₾25 tier). `offerPriceLabel` is the
-  // ONE place the suffix is added and it adds it only to a real floor with a
-  // real range behind it; the card may not re-implement that decision.
-  assert.match(code(EXPERT), /<EntityPrice>\{offerPriceLabel\(offer\)\}<\/EntityPrice>/, 'the consultation card stopped reading the shared price resolver')
-  assert.doesNotMatch(code(EXPERT), /\}-დან/, 'the expert card appended „-დან" itself — that word belongs to offerPriceLabel, which only gives it to a genuine floor')
-  // The second half of the line names the SHAPE. A service („დეკლარაციის
-  // შევსება") has no clock, and printing `.minutes` there fell through to the
-  // profile-level default — advertising „· 60 წთ" for something with neither a
-  // duration nor a calendar.
-  assert.match(code(EXPERT), /· \{offer\.suffix\}/, 'the expert card went back to printing a duration a service does not have')
   assert.doesNotMatch(code(MASTER), /გამოძახება/, 'the price wording belongs to lib/serviceProfile → priceHint, never to the card')
 })
 
@@ -142,7 +131,7 @@ test('the master photo is a ROUTE — no base64 column may be named in a card', 
       assert.doesNotMatch(
         code(f),
         new RegExp(`\\b${col}\\b`),
-        `${f} names the base64 column \`${col}\` — a list that selects one is a multi-megabyte page (app/experts/_masterData.ts)`,
+        `${f} names the base64 column \`${col}\` — a list that selects one is a multi-megabyte page (app/experts/_providers.ts)`,
       )
     }
   }
@@ -192,58 +181,18 @@ test('every tappable thing in either card stays at or above the 40px floor', () 
       )
     }
   }
-  // The expert's play badge: a 28px circle inside a 40×40 button, in BOTH views.
-  // 🔒 40×40, however it is spelled.
-  assert.match(read(EXPERT), /(w-10 h-10|size-10|min-w-10)/, 'the play button lost its 40×40 hit area')
+  // ⚠️ THE PLAY BADGE WAS THE OTHER ASSERTION HERE — a 28px circle inside a
+  // 40×40 button on the consultation card, which went on 2026-08-24 with the
+  // intro video it opened.
 })
 
-test('the expert card keeps every behaviour the merge was not about', () => {
-  const t = read(EXPERT)
-  assert.match(t, /viewTransitionName: `vt-photo-\$\{t\.id\}`/, 'the shared-element photo morph is gone')
-  assert.match(t, /\/experts\/\$\{t\.slug \|\| t\.id\}/, 'the card must prefer the slug — a cuid href 308s and kills the morph')
-  assert.match(t, /youtube-nocookie\.com\/embed/, 'the hover video is gone')
-  assert.match(t, /Icon\.heartFilled/, 'the favourite control is gone')
-  assert.match(t, /superExpert/, 'the SUPER badge is gone')
-  assert.match(t, /<NewExpertSignals/, 'the new-expert signals are gone')
-  assert.match(t, /შესვლა და ჯავშანი/, 'the signed-out booking label is gone')
-  // ⚠️ ONE ACTION PER BROWSE CARD (2026-08-20). This used to pin the „მიწერე"
-  // + „დაჯავშნე" pair and the responsive grid that carried it. Both are gone:
-  // the service half of the same catalogue has always shown a single button,
-  // and so does every marketplace that lists people (Upwork's consultation
-  // card, Base44, Braintrust, Airtasker, Fiverr). Two shapes in one list is
-  // the loudest reason the two halves read as two products.
-  //
-  // The message path is NOT lost and this pins that too: an expert with no
-  // published time still gets it as their one action, and the profile this
-  // card opens carries ?intent=message for everyone else.
-  assert.doesNotMatch(t, /aria-label="მიწერე ექსპერტს"/, 'the browse card grew a second action again')
-  assert.doesNotMatch(t, /grid-cols-\[auto_1fr\]/, 'the two-button grid is back')
-  assert.match(t, /intent=message/, 'the message path left the card entirely — it must survive as the slot-less branch')
-  // The favourite button clears the 240px rail in a row — the two numbers are
-  // written down in both files precisely because nothing else ties them.
-  assert.match(t, /sm:right-\[248px\]/, 'the favourite button must clear the list rail — in the card’s own corner it sits on the price')
-  assert.match(read(SHELL), /sm:right-\[248px\]/, 'EntityCard must record that the rail width is measured from elsewhere')
-})
+/* ⚠️ „the expert card keeps every behaviour the merge was not about" WAS HERE
+   AND IS GONE (2026-08-24): the shared-element photo transition, the hover
+   video, the favourite heart and the booking button all belonged to a card that
+   no longer exists. */
 
-test('the consultation is a benefit line, never a second product', () => {
-  // ⚠️ THE HIERARCHY, ENFORCED WHERE IT IS EASIEST TO BREAK (2026-08-20). The
-  // site sells SERVICES; a consultation is what you can do BEFORE committing to
-  // one. Owner: „უბრალოდ ბენეფიტია, რომ კონსულტაციაც გვაქვს."
-  //
-  // On a card that means exactly one muted line. The three shapes it must never
-  // take are the three that would make it a product again: a badge beside the
-  // name, a second button in the footer, or a heading. Each of those has been
-  // on this card at some point.
-  const m = code(MASTER)
-  assert.match(m, /alsoConsults && \(/, 'the benefit line is unconditional or gone')
-  assert.match(m, /კონსულტაციაც შეგიძლია/, 'the benefit line lost its words')
-  assert.match(m, /text-meta text-ink-500">კონსულტაციაც/, 'the benefit line grew past text-meta — it is a line, not a claim')
-  // It is drawn from the PERSON holding both halves, never from a type field.
-  assert.match(code('app/experts/client.tsx'), /alsoConsults=\{it\.kinds\.includes\('CONSULT'\)\}/,
-    'the benefit line stopped following who actually takes consultations')
-  // …and it never becomes an action: the line and the card's ONE button are
-  // siblings, so what must not exist is a control INSIDE the line's own span.
-  const start = m.indexOf('{alsoConsults && (')
-  const line = m.slice(start, m.indexOf('</span>', m.indexOf('კონსულტაციაც შეგიძლია')))
-  assert.doesNotMatch(line, /<Btn|<button|href=/, 'the benefit line grew a control')
-})
+/* ⚠️ „the consultation is a benefit line, never a second product" WAS HERE AND
+   IS GONE (2026-08-24). It pinned one muted line under the price — „კონსულტაციაც
+   შეგიძლია" — and the three shapes it must never take: a badge beside the name,
+   a second button in the footer, a heading. There is no second thing to
+   mention, so the line went with it and the rule is unrepresentable. */

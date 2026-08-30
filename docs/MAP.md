@@ -2,7 +2,7 @@
 
 # Where every export lives
 
-1528 symbols across 555 files. `grep` the name you need.
+1043 symbols across 409 files. `grep` the name you need.
 
 | symbol | file |
 | --- | --- |
@@ -10,29 +10,26 @@
 | `__resetRefGuard` | `lib/refGuard.ts` |
 | `__runMigrationsSource` | `lib/dbBoot.ts` |
 | `AboutBlock` | `app/experts/[slug]/_providerBlocks.tsx` |
-| `AboutSection` | `app/experts/[slug]/_sections.tsx` |
 | `ABROAD_CATEGORY_SLUG` | `lib/abroad.ts` |
 | `ABROAD_EUR_PER_GEL` | `lib/flags.ts` |
 | `ABROAD_SOURCE_CATEGORY_SLUGS` | `lib/abroad.ts` |
 | `AbroadLanding` | `app/abroad/AbroadLanding.tsx` |
-| `AbroadTzNote` | `components/booking/TzLabels.tsx` |
 | `AccessGrantInput` | `lib/requests.ts` · `lib/requests.ts` |
 | `AccessSection` | `app/admin/_access.tsx` |
 | `accessSubjectError` | `lib/requests.ts` |
 | `AccountContact` | `app/request/_model.ts` |
 | `accountForRequest` | `lib/requestAccount.ts` |
 | `AccountOutcome` | `lib/requestAccount.ts` |
-| `AccountResult` | `lib/requestAccount.ts` |
 | `AccountSection` | `app/settings/_account.tsx` |
-| `AccountTab` | `app/work/(expert)/profile/_tabAccount.tsx` |
-| `ActivationCandidate` | `lib/expertActivation.ts` |
-| `activationNotificationId` | `lib/expertActivation.ts` |
-| `ActiveBookingsError` | `lib/userDeletion.ts` |
-| `addDays` | `app/work/(expert)/schedule/_shared.ts` |
-| `AddDisclosure` | `app/work/(expert)/profile/_parts.tsx` |
+| `AccountTab` | `app/work/profile/_tabAccount.tsx` |
+| `ActiveWorkError` | `lib/userDeletion.ts` |
+| `AddDisclosure` | `app/work/profile/_parts.tsx` |
+| `adjustBalance` | `lib/creditsServer.ts` |
+| `ADMIN_ADJUST` | `lib/credits.ts` |
 | `ADMIN_MESSAGE_BODY_MAX` | `lib/emailTemplates.ts` |
 | `ADMIN_MESSAGE_STARTERS` | `app/admin/_parts.tsx` |
 | `ADMIN_MESSAGE_SUBJECT_MAX` | `lib/emailTemplates.ts` |
+| `adminAdjustReason` | `lib/credits.ts` |
 | `AdminCategory` | `app/admin/_categories.tsx` |
 | `AdminConfirmDialog` | `app/admin/_parts.tsx` |
 | `AdminDeleteUserDialog` | `app/admin/_parts.tsx` |
@@ -43,73 +40,45 @@
 | `adminMessageDestination` | `lib/emailTemplates.ts` |
 | `AdminMessageDialog` | `app/admin/_parts.tsx` |
 | `AdminMessageStarterId` | `app/admin/_parts.tsx` |
-| `AdminMessageTemplate` | `lib/emailTemplates.ts` |
 | `adminOk` | `app/admin/_parts.tsx` |
 | `AdminRequestPatch` | `lib/requests.ts` · `lib/requests.ts` |
 | `adminResult` | `app/admin/_parts.tsx` |
 | `AdminSidebar` | `app/admin/_nav.tsx` |
 | `AdminTab` | `app/admin/_nav.tsx` |
-| `AlertsStack` | `app/work/_components/AlertsStack.tsx` |
 | `ALL_CITIES` | `lib/requestTopics.ts` |
 | `ALL_PROFESSIONS` | `lib/professions.ts` |
 | `ALL_TOPICS` | `lib/helpTopics.ts` |
 | `Analytics` | `components/Analytics.tsx` |
-| `ANON_EMAIL_DOMAIN` | `lib/userDeletion.ts` |
 | `ANON_HEADLINE` | `lib/userDeletion.ts` |
 | `ANON_NAME` | `lib/userDeletion.ts` |
 | `anonEmail` | `lib/userDeletion.ts` |
-| `AnonOnly` | `components/ApplyCtaGate.tsx` |
 | `answerLabel` | `app/request/_model.ts` |
-| `ApiSlot` | `components/booking/slots.ts` |
-| `ApiStatus` | `app/me/bookings/[id]/_model.tsx` |
-| `applicationApprovedEmail` | `lib/emailTemplates.ts` |
-| `ApplicationCertificate` | `app/admin/_application.ts` |
-| `ApplicationDocs` | `app/admin/_application.ts` |
-| `ApplicationForReview` | `app/admin/_application.ts` |
-| `APPLY` | `lib/applyValidation.ts` |
-| `APPLY_FIELD_LABEL` | `lib/applyValidation.ts` |
-| `APPLY_FUNNEL_EVENT_NAMES` | `app/join/_expert/applyFunnelEvents.ts` |
-| `APPLY_FUNNEL_EVENTS` | `app/join/_expert/applyFunnelEvents.ts` |
-| `APPLY_FUNNEL_PROP_KEYS` | `app/join/_expert/applyFunnelEvents.ts` |
+| `anyRefined` | `app/experts/_filters.tsx` |
 | `APPLY_LINK` | `components/student/navConfig.ts` |
 | `ApplyCtaGate` | `components/ApplyCtaGate.tsx` |
-| `ApplyErr` | `app/join/_expert/_form.tsx` |
-| `ApplyErrCtx` | `app/join/_expert/_fields.tsx` |
-| `ApplyErrorCode` | `lib/applyValidation.ts` |
-| `ApplyFailure` | `lib/applyValidation.ts` |
-| `ApplyFunnelEvent` | `app/join/_expert/applyFunnelEvents.ts` |
-| `ApplyFunnelPropKey` | `app/join/_expert/applyFunnelEvents.ts` |
-| `ApplyFunnelProps` | `app/join/_expert/applyFunnelEvents.ts` |
-| `applyIssueMessage` | `lib/applyValidation.ts` |
-| `ApplyMarketing` | `app/join/_expert/ApplyMarketing.tsx` |
-| `applyValidationFailure` | `lib/applyValidation.ts` |
+| `ApplyErr` | `app/join/_shared/_fields.tsx` |
+| `ApplyErrCtx` | `app/join/_shared/_fields.tsx` |
 | `approvalBlockers` | `lib/masterApplication.ts` |
 | `AppShell` | `components/AppShell.tsx` |
 | `areaLabels` | `lib/serviceProfile.ts` |
 | `areaRestatesKind` | `lib/b2b.ts` |
-| `asEitherParty` | `lib/userDeletion.ts` |
 | `asMatchable` | `app/admin/_categoryPicker.tsx` |
+| `asRole` | `lib/roles.ts` |
 | `ASSIGNABLE_CATEGORY` | `lib/categoryTree.ts` |
 | `ASSIGNABLE_CATEGORY_WHERE` | `lib/categoryTree.ts` |
-| `Attachment` | `components/chat/useBookingThread.ts` |
 | `audit` | `lib/audit.ts` |
 | `AuditSection` | `app/admin/_audit.tsx` |
 | `AUTH_ERROR_MESSAGES` | `lib/authErrors.ts` |
 | `authErrorMessage` | `lib/authErrors.ts` |
-| `AuthPromptSheet` | `app/experts/[slug]/_booking.tsx` |
 | `AutoRefresh` | `components/AutoRefresh.tsx` |
-| `AVAIL_WEEKS` | `app/join/_expert/_form.tsx` |
 | `Avatar` | `components/Avatar.tsx` |
-| `AVATAR_MIN_SOURCE_PX` | `components/AvatarCropper.tsx` |
-| `AVATAR_OUTPUT_PX` | `components/AvatarCropper.tsx` |
+| `AVATAR_SHAPE_SQL` | `lib/avatarSrc.ts` |
+| `avatarRouteSrc` | `lib/avatarSrc.ts` |
 | `avatarSrc` | `lib/avatarSrc.ts` |
-| `awaitsClosure` | `app/work/_components/types.ts` |
-| `awaitsRescheduleAnswer` | `app/work/_components/types.ts` |
 | `B2B_KINDS` | `lib/b2b.ts` |
 | `B2B_ROUTE` | `lib/b2b.ts` |
 | `B2B_VISIBILITY` | `lib/flags.ts` |
 | `b2bFeatureExists` | `lib/b2b.ts` |
-| `B2BKind` | `lib/b2b.ts` |
 | `B2BVisibility` | `lib/flags.ts` |
 | `b2bVisibleTo` | `lib/b2b.ts` |
 | `BackToTop` | `components/BackToTop.tsx` |
@@ -117,46 +86,10 @@
 | `bandOf` | `lib/requestTopics.ts` |
 | `BILLABLE_EVENTS` | `lib/offerEvents.ts` |
 | `BIO_MIN` | `lib/credits.ts` |
-| `BioCounter` | `app/join/_expert/_fields.tsx` |
-| `bioError` | `lib/applyValidation.ts` |
-| `Blocker` | `lib/expertActivation.ts` |
-| `BlockOffSheet` | `app/work/(expert)/schedule/_sheetBlock.tsx` |
 | `BlogSection` | `app/admin/_blog.tsx` |
-| `BoardCell` | `app/work/_components/DayBoard.tsx` |
-| `Booking` | `app/me/bookings/[id]/_model.tsx` · `app/work/(expert)/bookings/[id]/_model.tsx` · `app/work/(expert)/schedule/_shared.ts` |
-| `BOOKING_FUNNEL_EVENT_NAMES` | `components/booking/funnelEvents.ts` |
-| `BOOKING_FUNNEL_EVENTS` | `components/booking/funnelEvents.ts` |
-| `BOOKING_FUNNEL_PROP_KEYS` | `components/booking/funnelEvents.ts` |
-| `BOOKING_JOB_STATUS_LABEL` | `lib/jobRows.ts` |
-| `BOOKING_REVENUE_ONLY` | `lib/packages.ts` |
-| `bookingAwaitsClosure` | `lib/jobRows.ts` |
-| `bookingAwaitsReschedule` | `lib/jobRows.ts` |
-| `BookingBody` | `app/me/bookings/[id]/_body.tsx` |
-| `bookingCache` | `app/me/bookings/[id]/_model.tsx` |
-| `bookingChangedEmail` | `lib/emailTemplates.ts` |
-| `BookingChangeKind` | `lib/emailTemplates.ts` |
-| `BookingChangeOpts` | `lib/emailTemplates.ts` |
-| `BookingChat` | `components/chat/BookingChat.tsx` |
-| `BookingChatProps` | `components/chat/BookingChat.tsx` |
-| `bookingConfirmedEmail` | `lib/emailTemplates.ts` |
-| `BookingFlow` | `components/booking/BookingFlow.tsx` |
-| `BookingFunnelEvent` | `components/booking/funnelEvents.ts` |
-| `BookingFunnelPropKey` | `components/booking/funnelEvents.ts` |
-| `BookingFunnelProps` | `components/booking/funnelEvents.ts` |
-| `bookingInboxRow` | `lib/inboxRows.ts` |
-| `BookingInboxSource` | `lib/inboxRows.ts` |
-| `bookingJobBucket` | `lib/jobRows.ts` |
-| `BookingJobInput` | `lib/jobRows.ts` |
-| `bookingJobRow` | `lib/jobRows.ts` |
-| `bookingRequestEmail` | `lib/emailTemplates.ts` |
-| `BookingReview` | `app/work/(expert)/bookings/[id]/_model.tsx` |
-| `BookingsSection` | `app/admin/_bookings.tsx` |
-| `BookingStatus` | `app/work/(expert)/bookings/[id]/_model.tsx` · `app/work/_components/types.ts` |
-| `BookingTutorInfo` | `components/booking/mapTutorPayload.ts` |
 | `BOT_UA_MARKERS` | `lib/events.ts` |
 | `BottomNav` | `components/BottomNav.tsx` |
 | `boundProps` | `lib/events.ts` |
-| `Breadcrumb` | `app/experts/[slug]/_hero.tsx` · `app/me/bookings/[id]/_hero.tsx` |
 | `BroadcastSection` | `app/admin/_broadcast.tsx` |
 | `broadcastSessionChange` | `lib/sessionSignal.ts` |
 | `BROWSABLE_CATEGORY` | `lib/categoryTree.ts` |
@@ -164,62 +97,44 @@
 | `BROWSABLE_GROUPS` | `lib/requestTopics.ts` |
 | `browseGroupsFor` | `lib/requestTopics.ts` |
 | `Btn` | `components/Btn.tsx` |
-| `bucketBookings` | `lib/bookings.ts` |
 | `BUDGET_BANDS` | `lib/requestTopics.ts` |
 | `BUDGET_UNITS` | `lib/requestTopics.ts` |
 | `BudgetBand` | `lib/requestTopics.ts` |
 | `budgetIsBelowFloor` | `lib/requestTopics.ts` |
 | `budgetLabel` | `lib/requestTopics.ts` |
 | `BudgetUnitName` | `lib/requestTopics.ts` |
-| `buildContainsOr` | `lib/tutorsQuery.ts` |
 | `buildJobRows` | `lib/jobRows.ts` |
 | `buildProfileChecks` | `lib/profileScore.ts` |
 | `BusinessLanding` | `app/business/BusinessLanding.tsx` |
 | `BusinessLeadInput` | `lib/b2b.ts` · `lib/b2b.ts` |
 | `businessLeadRow` | `lib/b2b.ts` |
-| `BusySlot` | `components/booking/slots.ts` |
 | `byPrice` | `lib/catalogItems.ts` |
-| `Calendar` | `components/booking/Calendar.tsx` |
-| `CalendarTzLabel` | `components/booking/TzLabels.tsx` |
-| `CALL_SENTINEL` | `components/chat/CallInviteCard.tsx` |
-| `CallInviteCard` | `components/chat/CallInviteCard.tsx` |
-| `canAffordOffer` | `lib/credits.ts` |
+| `canAffordContact` | `lib/credits.ts` |
 | `canBeParent` | `lib/categoryTree.ts` |
-| `CANCEL_CUTOFF_HOURS` | `lib/flags.ts` |
-| `cancelDeadline` | `lib/expertEscalation.ts` |
 | `canMarkDone` | `lib/offerLifecycle.ts` |
-| `canonicalYouTubeUrl` | `lib/youtube.ts` |
 | `canOpenRequestForm` | `lib/requests.ts` |
 | `canSeeB2B` | `lib/b2b.ts` |
-| `canSeePackages` | `lib/packages.ts` |
 | `canSeeRequests` | `lib/requests.ts` |
 | `canSpendAsMember` | `lib/b2b.ts` |
 | `canSpendBalance` | `lib/b2b.ts` |
 | `canWithdraw` | `lib/offerLifecycle.ts` |
-| `CAPABILITIES` | `lib/capabilities.ts` |
-| `capabilitiesOf` | `lib/capabilities.ts` |
-| `Capability` | `lib/capabilities.ts` |
-| `CAPABILITY_ENABLE_LABEL` | `lib/capabilities.ts` |
-| `CAPABILITY_LABEL` | `lib/capabilities.ts` |
 | `Card` | `components/Card.tsx` |
 | `CATALOG_LINK` | `components/student/navConfig.ts` · `components/tutor/navConfig.ts` |
 | `CATALOG_VIEW_KEY` | `components/catalog/useCatalogView.ts` |
 | `CatalogClient` | `app/experts/client.tsx` |
-| `CatalogItem` | `lib/catalogItems.ts` |
+| `CatalogFilters` | `app/experts/_filters.tsx` |
 | `CatalogProps` | `app/experts/client.tsx` |
-| `CATALOGUE_GRID_SIZE` | `components/home/CatalogueGrid.tsx` |
 | `CatalogueCardItem` | `components/home/CatalogueGrid.tsx` |
 | `CatalogueGrid` | `components/home/CatalogueGrid.tsx` |
 | `CatalogView` | `components/catalog/useCatalogView.ts` |
 | `Categories` | `app/_home/categories.tsx` |
 | `CategoriesSection` | `app/admin/_categories.tsx` |
-| `Category` | `app/work/(expert)/profile/_types.ts` |
+| `Category` | `app/work/profile/_types.ts` |
 | `CATEGORY_BROWSE_PATH` | `lib/categoryRoutes.ts` |
 | `CATEGORY_READ_ORDER` | `lib/categoryTree.ts` |
 | `CategoryFaq` | `lib/categorySeo.ts` |
 | `CategoryGroup` | `app/admin/_categoryPicker.tsx` |
 | `categoryIcon` | `lib/categoryMarks.tsx` |
-| `categoryMark` | `lib/categoryMarks.tsx` |
 | `CategoryMark` | `lib/categoryMarks.tsx` |
 | `categoryPath` | `lib/categoryRoutes.ts` |
 | `CategorySelect` | `app/admin/_categoryPicker.tsx` |
@@ -229,24 +144,17 @@
 | `categorySlugOfTopic` | `lib/requestTopics.ts` |
 | `CategoryStatus` | `lib/categoryTree.ts` |
 | `CatIcon` | `components/Icon.tsx` |
-| `catNameOf` | `app/experts/_data.tsx` |
-| `CertForm` | `app/work/(expert)/profile/_types.ts` |
-| `Certificate` | `app/work/(expert)/profile/_types.ts` |
-| `certificatesPayload` | `app/join/_expert/_upload.tsx` |
-| `CertificatesSection` | `app/experts/[slug]/_sections.tsx` |
-| `CertificateUploader` | `app/join/_expert/_upload.tsx` |
-| `certSlotsLeft` | `app/join/_expert/_upload.tsx` |
-| `CertThumb` | `app/experts/[slug]/_bits.tsx` |
+| `catNameOf` | `app/experts/_cats.ts` |
+| `certificatesPayload` | `app/join/_shared/_upload.tsx` |
+| `CertificateUploader` | `app/join/_shared/_upload.tsx` |
+| `certSlotsLeft` | `app/join/_shared/_upload.tsx` |
 | `chargeFor` | `lib/offerEvents.ts` |
-| `chargeForOffer` | `lib/creditsServer.ts` |
+| `chargeForContact` | `lib/creditsServer.ts` |
 | `CHART` | `app/admin/_charts.tsx` |
 | `chatClosedReason` | `lib/requestChat.ts` |
 | `chatIsOpen` | `lib/requestChat.ts` |
-| `ChatMessage` | `components/chat/useBookingThread.ts` |
-| `ChatMessageRow` | `lib/requestChat.ts` |
 | `chatMessageView` | `lib/requestChat.ts` |
 | `ChatSide` | `lib/requestChat.ts` |
-| `ChatUser` | `components/chat/useBookingThread.ts` |
 | `checkGeorgian` | `lib/georgianText.ts` |
 | `checkGeorgianCopy` | `lib/georgianOrthography.ts` |
 | `CHIP_CAP` | `components/EntityCard.tsx` |
@@ -254,42 +162,44 @@
 | `cityLabel` | `lib/requestTopics.ts` |
 | `cityLabelOf` | `lib/catalogItems.ts` |
 | `CityName` | `lib/requestTopics.ts` |
-| `ClaimResult` | `lib/offerLifecycle.ts` |
-| `clearApplyDraft` | `app/join/_expert/_draft.tsx` |
 | `clearAsked` | `app/join/_door/DoorQuestion.tsx` |
 | `clearSignupDraft` | `app/signin/_model.tsx` |
+| `CLIENT_CONTACT_SELECT` | `lib/requests.ts` |
 | `CLIENT_FALLBACK` | `lib/jobRows.ts` |
 | `CLIENT_NUDGE_HOURS` | `lib/requestRouting.ts` |
 | `ClientContact` | `lib/requests.ts` |
-| `clientContactFor` | `lib/requests.ts` |
+| `clientContactView` | `lib/requests.ts` |
 | `ClientErrorReporter` | `components/ClientErrorReporter.tsx` |
+| `clientIdentityOpen` | `lib/requests.ts` |
 | `clientIp` | `lib/rateLimit.ts` |
 | `clientOfferView` | `lib/requests.ts` |
 | `closeDue` | `lib/offerLifecycle.ts` |
 | `ClosingBand` | `app/_home/cta.tsx` |
-| `CODE_RE` | `components/booking/funnelEvents.ts` |
+| `CODE_RE` | `lib/funnelEvents.ts` |
 | `CodeInjector` | `components/CodeInjector.tsx` |
 | `CodeInput` | `app/signin/_fields.tsx` |
-| `Collapsible` | `app/join/_expert/_chrome.tsx` |
 | `COMMISSION_PCT` | `lib/flags.ts` |
 | `CompaniesSection` | `app/admin/_companies.tsx` |
-| `CompanyBalanceChoice` | `components/booking/CompanyBalance.tsx` |
-| `CompareModal` | `app/experts/_results.tsx` |
 | `completeness` | `lib/credits.ts` |
-| `computeNextFreeStart` | `components/booking/slots.ts` |
-| `computeOpenStarts` | `lib/availability.ts` |
-| `computeResponseStats` | `lib/responseTime.ts` |
 | `ConfirmModal` | `components/ConfirmModal.tsx` |
+| `ConfirmServicesNote` | `app/work/_components/ConfirmServicesNote.tsx` |
 | `CONFLICT` | `lib/offerLifecycle.ts` |
 | `consequenceLine` | `app/join/_door/DoorQuestion.tsx` |
-| `CONSULT_ONLY_NAV` | `components/tutor/navConfig.ts` |
-| `CONSULTATION_DURATIONS` | `lib/consultation.ts` |
-| `ConsultationDuration` | `lib/consultation.ts` |
-| `ConsultationItem` | `components/booking/slots.ts` |
-| `ConsultationsSection` | `app/work/services/_consultations.tsx` |
-| `ConsultationTier` | `lib/consultationTier.ts` |
-| `consultRefined` | `app/experts/_filters.tsx` |
+| `CONTACT_BUTTON_LABEL` | `lib/credits.ts` |
+| `CONTACT_COST_NOTE` | `lib/credits.ts` |
+| `CONTACT_COST_TETRI` | `lib/credits.ts` |
+| `CONTACT_LIMIT_REASON` | `lib/credits.ts` |
+| `CONTACT_REFUND_NOTE` | `lib/credits.ts` |
+| `ContactCard` | `app/work/(provider)/requests/[id]/_contact.tsx` |
+| `contactCountOf` | `lib/creditsServer.ts` |
 | `contactIsOpen` | `lib/jobRows.ts` |
+| `contactKey` | `lib/credits.ts` |
+| `contactLimitNote` | `lib/credits.ts` |
+| `contactPlacesLeft` | `lib/credits.ts` |
+| `contactRefundedProviderEmail` | `lib/emailTemplates.ts` |
+| `contactRefundKey` | `lib/credits.ts` |
+| `contactsAffordable` | `lib/credits.ts` |
+| `contactUnlocked` | `lib/creditsServer.ts` |
 | `Container` | `components/Container.tsx` |
 | `ConversationList` | `components/chat/ConversationList.tsx` |
 | `ConversationRow` | `components/ConversationRow.tsx` |
@@ -298,57 +208,36 @@
 | `CopyBtn` | `app/admin/_parts.tsx` |
 | `CopyRule` | `lib/georgianOrthography.ts` |
 | `copyToClipboard` | `lib/clipboard.ts` |
-| `CopyViolation` | `lib/georgianOrthography.ts` |
-| `COUNTABLE_EXPERT` | `lib/categoryCounts.ts` |
 | `countCovering` | `lib/serviceProfile.ts` |
 | `countMastersCovering` | `app/experts/[slug]/_providerData.ts` |
 | `countsAsProfileView` | `lib/events.ts` |
-| `CountUp` | `components/CountUp.tsx` |
+| `coveredTopicIds` | `lib/requestsServer.ts` |
 | `covers` | `lib/serviceProfile.ts` |
 | `createServiceRequest` | `lib/requestsServer.ts` |
 | `createSession` | `lib/auth.ts` |
-| `CredentialsTab` | `app/work/(expert)/profile/_tabCredentials.tsx` |
+| `CredentialsBlock` | `app/experts/[slug]/_providerBlocks.tsx` |
 | `CREDIT_TASKS` | `lib/credits.ts` |
 | `CREDIT_TASKS_TOTAL` | `lib/credits.ts` |
-| `CreditKind` | `lib/credits.ts` |
+| `CreditPill` | `components/CreditPill.tsx` |
 | `CREDITS_ENFORCED` | `lib/credits.ts` |
 | `CreditStrip` | `app/work/_components/CreditStrip.tsx` |
+| `CreditSweepResult` | `lib/creditsServer.ts` |
 | `CreditTaskKey` | `lib/credits.ts` |
 | `creditTasks` | `lib/credits.ts` |
 | `cronAuth` | `lib/cronAuth.ts` |
-| `CronGate` | `lib/cronAuth.ts` |
-| `DashBooking` | `app/work/_components/types.ts` |
-| `DAY_LABELS` | `app/join/_expert/_form.tsx` · `app/work/(expert)/schedule/_shared.ts` |
-| `DAY_NAMES_FULL` | `components/booking/slots.ts` |
-| `DAY_SHORT` | `components/booking/slots.ts` |
-| `DayBoard` | `app/work/_components/DayBoard.tsx` |
-| `dayKey` | `components/booking/slots.ts` |
-| `dayKeyInTz` | `lib/bookings.ts` |
-| `DayTimeline` | `components/booking/DayTimeline.tsx` |
-| `DEFAULT_AVAIL` | `app/join/_expert/_form.tsx` |
 | `DEFAULT_AVATAR` | `lib/defaultAvatar.ts` |
-| `DEFAULT_CATALOG_VIEW` | `components/catalog/useCatalogView.ts` |
-| `DEFAULT_LESSON_COUNT` | `lib/packages.ts` |
-| `DEFAULT_LESSON_MINUTES` | `lib/packages.ts` |
 | `DEFAULT_OFFER_LIMIT` | `lib/requests.ts` |
 | `DEFAULT_PREFS` | `lib/notify.ts` · `app/settings/_types.ts` |
-| `DEFAULT_VALID_DAYS` | `lib/packages.ts` |
-| `DELETE` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/categories/[id]/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/reviews/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/favorites/route.ts` · `app/api/me/route.ts` · `app/api/me/tutor/certificates/[id]/route.ts` · `app/api/me/tutor/education/[id]/route.ts` · `app/api/me/tutor/experience/[id]/route.ts` · `app/api/reviews/[bookingId]/route.ts` · `app/api/tutor/availability/[id]/route.ts` · `app/api/tutor/availability/bulk/route.ts` · `app/api/tutor/consultations/[id]/route.ts` · `app/api/tutor/packages/[id]/route.ts` |
+| `DELETE` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/categories/[id]/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/reviews/[id]/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/favorites/route.ts` · `app/api/me/route.ts` |
 | `DeleteBody` | `lib/userDeletion.ts` |
 | `DeleteImpact` | `app/admin/_parts.tsx` |
 | `DeleteMode` | `lib/userDeletion.ts` · `app/admin/_parts.tsx` |
-| `deriveCapabilities` | `app/join/_door/DoorQuestion.tsx` |
-| `deriveSummary` | `lib/bookings.ts` |
 | `describeViolations` | `lib/georgianOrthography.ts` |
 | `destroySession` | `lib/auth.ts` |
-| `DetailsState` | `components/booking/IntakeStep.tsx` |
-| `diagnose` | `app/work/_components/ProfileSignal.tsx` |
 | `DIRECT_WINDOW_MS` | `lib/requestLive.ts` |
 | `Discover` | `app/me/_discover.tsx` |
 | `DiscoverTutor` | `app/me/_model.tsx` |
 | `displayHeadline` | `lib/headline.ts` |
-| `DisputeModal` | `app/me/bookings/[id]/_modals.tsx` |
-| `DisputesSection` | `app/admin/_disputes.tsx` |
 | `DONE_CLOSE_DAYS` | `lib/offerLifecycle.ts` |
 | `DONE_REMINDER_DAYS` | `lib/offerLifecycle.ts` |
 | `DoneBy` | `lib/offerLifecycle.ts` |
@@ -357,48 +246,28 @@
 | `DORMANT_GROUP_IDS` | `lib/requestTopics.ts` |
 | `downloadCsv` | `app/admin/_parts.tsx` |
 | `Draft` | `app/request/_model.ts` |
-| `dueStage` | `lib/expertActivation.ts` |
-| `dynamic` | `app/about/page.tsx` · `app/abroad/page.tsx` · `app/admin/layout.tsx` · `app/api/admin/applications/[id]/route.ts` · `app/api/admin/categories/requested/route.ts` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/insights/route.ts` · `app/api/admin/master-applications/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/b2b-services/[id]/image/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/categories/route.ts` · `app/api/certificates/[id]/file/route.ts` · `app/api/events/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/reminders/route.ts` · `app/api/log-error/route.ts` · `app/api/master-applications/[id]/route.ts` · `app/api/master-applications/route.ts` · `app/api/masters/[id]/photo/route.ts` · `app/api/me/requests/route.ts` · `app/api/me/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/tutor/insights/route.ts` · `app/blog/[slug]/page.tsx` · `app/blog/page.tsx` · `app/business/page.tsx` · `app/contact/page.tsx` · `app/experts/[slug]/page.tsx` · `app/experts/page.tsx` · `app/help/page.tsx` · `app/join/page.tsx` · `app/me/bookings/page.tsx` · `app/me/favorites/page.tsx` · `app/me/layout.tsx` · `app/me/profile/page.tsx` · `app/me/requests/page.tsx` · `app/notifications/layout.tsx` · `app/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/rss.xml/route.ts` · `app/settings/layout.tsx` · `app/sitemap.ts` · `app/swavleba/page.tsx` · `app/work/(expert)/layout.tsx` · `app/work/(provider)/layout.tsx` · `app/work/(provider)/offers/[offerId]/page.tsx` · `app/work/(provider)/offers/page.tsx` · `app/work/(provider)/requests/[id]/page.tsx` · `app/work/(provider)/requests/page.tsx` · `app/work/jobs/page.tsx` · `app/work/layout.tsx` · `app/work/messages/layout.tsx` · `app/work/messages/o/[offerId]/page.tsx` · `app/work/page.tsx` · `app/work/services/page.tsx` |
+| `dynamic` | `app/about/page.tsx` · `app/abroad/page.tsx` · `app/admin/layout.tsx` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/master-applications/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/b2b-services/[id]/image/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/categories/route.ts` · `app/api/events/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/master-applications/[id]/route.ts` · `app/api/master-applications/route.ts` · `app/api/masters/[id]/photo/route.ts` · `app/api/me/requests/route.ts` · `app/api/me/route.ts` · `app/api/providers/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/work/threads/route.ts` · `app/blog/[slug]/page.tsx` · `app/blog/page.tsx` · `app/business/page.tsx` · `app/contact/page.tsx` · `app/experts/[slug]/page.tsx` · `app/experts/page.tsx` · `app/help/page.tsx` · `app/join/page.tsx` · `app/me/favorites/page.tsx` · `app/me/layout.tsx` · `app/me/profile/page.tsx` · `app/me/requests/page.tsx` · `app/not-found.tsx` · `app/notifications/layout.tsx` · `app/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/rss.xml/route.ts` · `app/settings/layout.tsx` · `app/sitemap.ts` · `app/work/(provider)/layout.tsx` · `app/work/(provider)/offers/[offerId]/page.tsx` · `app/work/(provider)/offers/page.tsx` · `app/work/(provider)/requests/[id]/page.tsx` · `app/work/(provider)/requests/page.tsx` · `app/work/jobs/page.tsx` · `app/work/layout.tsx` · `app/work/messages/layout.tsx` · `app/work/messages/o/[offerId]/page.tsx` · `app/work/page.tsx` · `app/work/profile/page.tsx` · `app/work/services/page.tsx` |
 | `earnedTasks` | `lib/credits.ts` |
-| `Education` | `app/work/(expert)/profile/_types.ts` |
-| `EducationSection` | `app/experts/[slug]/_sections.tsx` |
-| `EduForm` | `app/work/(expert)/profile/_types.ts` |
 | `EMPTY_DRAFT` | `app/request/_model.ts` |
+| `EMPTY_FILTERS` | `app/experts/_filters.tsx` |
 | `EmptyState` | `components/EmptyState.tsx` |
-| `enableCapabilityHref` | `lib/capabilities.ts` |
-| `enrollmentMinutes` | `lib/packages.ts` |
 | `ensureDbReady` | `lib/dbBoot.ts` |
-| `ensureExpertSlug` | `lib/expertSlug.ts` |
+| `ensureDbReadyWithin` | `lib/dbBoot.ts` |
 | `ensureMasterSlug` | `lib/masterSlug.ts` |
 | `EntityCard` | `components/EntityCard.tsx` |
 | `EntityChip` | `components/EntityCard.tsx` |
 | `EntityKinds` | `components/EntityCard.tsx` |
 | `EntityPrice` | `components/EntityCard.tsx` |
 | `EntityView` | `components/EntityCard.tsx` |
-| `enumerateTimes` | `components/booking/slots.ts` |
-| `Escalation` | `lib/expertEscalation.ts` |
-| `ESCALATION_STAGES` | `lib/expertEscalation.ts` |
-| `EscalationCandidate` | `lib/expertEscalation.ts` |
-| `escalationNotificationId` | `lib/expertEscalation.ts` |
 | `eurFromGel` | `lib/abroad.ts` |
 | `eurLabel` | `lib/abroad.ts` |
 | `EVENT_PRUNE_SQL` | `lib/events.ts` |
 | `EVENT_RETENTION_DAYS` | `lib/events.ts` |
-| `EventName` | `lib/events.ts` |
 | `EVENTS` | `lib/events.ts` |
-| `ExistingAccount` | `lib/googleLink.ts` |
-| `ExistingReview` | `app/me/bookings/[id]/_model.tsx` |
 | `expandQuery` | `lib/searchSynonyms.ts` |
-| `Experience` | `app/work/(expert)/profile/_types.ts` |
-| `ExperienceSection` | `app/experts/[slug]/_sections.tsx` |
 | `EXPERT_BROWSE_GROUPS` | `lib/requestTopics.ts` |
-| `expertActivationEmail` | `lib/emailTemplates.ts` |
 | `expertCountsBySphere` | `lib/categoryCounts.ts` |
-| `expertRequestEscalationEmail` | `lib/emailTemplates.ts` |
-| `ExpertsAttentionSection` | `app/admin/_expertsAttention.tsx` |
-| `ExpForm` | `app/work/(expert)/profile/_types.ts` |
-| `extendedExpiry` | `lib/packages.ts` |
-| `extractYouTubeId` | `lib/youtube.ts` |
+| `ExpertProfileEditor` | `app/work/profile/_expertClient.tsx` |
 | `ExtraQuestion` | `lib/requestTopics.ts` |
 | `extrasFor` | `lib/requestTopics.ts` |
 | `extrasLabels` | `lib/requestTopics.ts` |
@@ -407,47 +276,34 @@
 | `fallbackSeo` | `lib/categorySeo.ts` |
 | `FaqAction` | `lib/helpTopics.ts` |
 | `FaqGroup` | `lib/helpTopics.ts` |
-| `FaqItem` | `lib/helpTopics.ts` |
 | `FavoritesClient` | `app/me/favorites/client.tsx` |
 | `FavState` | `app/me/_model.tsx` |
 | `FEATURE_ABROAD` | `lib/flags.ts` |
-| `FEATURE_PAYMENTS_V2` | `lib/flags.ts` |
-| `FEATURE_REQUEST_BOOKING` | `lib/flags.ts` |
 | `FeaturedExperts` | `app/_home/experts.tsx` |
 | `fetchMe` | `lib/me.ts` |
-| `Field` | `app/join/_expert/_fields.tsx` · `app/signin/_fields.tsx` · `app/work/(expert)/profile/_parts.tsx` |
-| `FieldError` | `app/join/_expert/_fields.tsx` |
-| `fileLabel` | `app/admin/_application.ts` |
+| `Field` | `app/join/_shared/_fields.tsx` · `app/signin/_fields.tsx` · `app/work/profile/_parts.tsx` |
+| `FieldError` | `app/join/_shared/_fields.tsx` |
 | `FILTER_LANGS` | `app/experts/_filters.tsx` |
 | `FILTER_RATINGS` | `app/experts/_filters.tsx` |
 | `FilterChip` | `components/FilterChip.tsx` |
-| `filterCounts` | `app/experts/_masterData.ts` |
-| `FilterCounts` | `app/experts/_masterData.ts` |
+| `filterCounts` | `app/experts/_providers.ts` |
+| `FilterCounts` | `app/experts/_providers.ts` |
 | `FilterGroup` | `components/catalog/FilterPanel.tsx` |
 | `FilterNest` | `components/catalog/FilterPanel.tsx` |
 | `FilterPanel` | `components/catalog/FilterPanel.tsx` |
 | `FilterRow` | `components/catalog/FilterPanel.tsx` |
 | `Filters` | `app/experts/_filters.tsx` |
-| `FinanceSection` | `app/admin/_finance.tsx` |
 | `firstGeorgianMessage` | `lib/georgianText.ts` |
-| `firstOpenDay` | `components/booking/slots.ts` |
 | `firstViewInWindow` | `lib/events.ts` |
-| `FLOW_ID_RE` | `components/booking/funnelEvents.ts` |
-| `fmtDate` | `app/me/bookings/[id]/_model.tsx` |
-| `fmtDateTime` | `lib/tz.ts` · `app/work/(expert)/bookings/[id]/_model.tsx` |
+| `FLOW_ID_RE` | `lib/funnelEvents.ts` |
+| `fmtDateTime` | `lib/tz.ts` |
 | `fmtDT` | `app/admin/_parts.tsx` |
-| `fmtDur` | `app/work/(expert)/schedule/_shared.ts` |
-| `fmtHM` | `components/booking/slots.ts` |
 | `fmtKaDate` | `lib/kaDate.ts` |
 | `fmtKaDateTime` | `lib/kaDate.ts` |
 | `fmtKaThreadTime` | `lib/kaDate.ts` |
 | `fmtKaTime` | `lib/kaDate.ts` |
-| `fmtLangs` | `app/experts/_data.tsx` |
-| `fmtRangeLabel` | `app/work/(expert)/schedule/_shared.ts` |
 | `fmtRating` | `lib/fmt.ts` |
 | `fmtShort` | `app/admin/_parts.tsx` |
-| `fmtSlotRange` | `app/work/(expert)/schedule/_shared.ts` |
-| `fmtTime` | `app/me/bookings/[id]/_model.tsx` · `app/work/(expert)/schedule/_shared.ts` |
 | `fmtWhenTz` | `lib/emailTemplates.ts` |
 | `focusSearchInput` | `lib/searchFocus.ts` |
 | `foldCounts` | `lib/categoryTree.ts` |
@@ -456,15 +312,10 @@
 | `FormatName` | `lib/requestTopics.ts` |
 | `formatPhone` | `lib/phone.ts` |
 | `FORMATS` | `lib/requestTopics.ts` |
-| `FormFooter` | `app/join/_expert/_chrome.tsx` |
-| `FormSection` | `app/join/_expert/_chrome.tsx` |
-| `FormState` | `app/join/_expert/_form.tsx` |
-| `frameQuestion` | `lib/askFraming.ts` |
-| `Framing` | `lib/askFraming.ts` |
-| `FREE_INTRO` | `app/join/_expert/_form.tsx` |
-| `fromPriceLabel` | `components/booking/slots.ts` |
-| `futureWindowSql` | `lib/bookability.ts` |
-| `futureWindowWhere` | `lib/bookability.ts` |
+| `FUNNEL_EVENT_NAMES` | `lib/funnelEvents.ts` |
+| `FUNNEL_EVENTS` | `lib/funnelEvents.ts` |
+| `FUNNEL_PROP_KEYS` | `lib/funnelEvents.ts` |
+| `FunnelEvent` | `lib/funnelEvents.ts` |
 | `gel` | `lib/requests.ts` |
 | `gelFromSiteText` | `lib/abroad.ts` |
 | `gelLabel` | `lib/credits.ts` |
@@ -473,33 +324,28 @@
 | `georgianNameError` | `lib/georgianText.ts` |
 | `georgianNameRefine` | `lib/georgianText.ts` |
 | `georgianRefine` | `lib/georgianText.ts` |
-| `GET` | `app/api/admin/analytics/route.ts` · `app/api/admin/analytics/series/route.ts` · `app/api/admin/applications/[id]/route.ts` · `app/api/admin/applications/route.ts` · `app/api/admin/audit/route.ts` · `app/api/admin/b2b-services/route.ts` · `app/api/admin/bookings/route.ts` · `app/api/admin/business-leads/route.ts` · `app/api/admin/categories/requested/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/disputes/route.ts` · `app/api/admin/experts-attention/route.ts` · `app/api/admin/finance/route.ts` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/impersonate/status/route.ts` · `app/api/admin/insights/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/master-applications/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/profile-views/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/requests/route.ts` · `app/api/admin/reviews/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/stats/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/admin/users/route.ts` · `app/api/applications/route.ts` · `app/api/auth/google/callback/route.ts` · `app/api/auth/google/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/b2b-services/[id]/image/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/bookings/[id]/ical/route.ts` · `app/api/bookings/[id]/route.ts` · `app/api/bookings/route.ts` · `app/api/categories/route.ts` · `app/api/certificates/[id]/file/route.ts` · `app/api/favorites/route.ts` · `app/api/health/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/internal/reminders/route.ts` · `app/api/master-applications/[id]/route.ts` · `app/api/master-applications/route.ts` · `app/api/masters/[id]/photo/route.ts` · `app/api/me/company/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/requests/route.ts` · `app/api/me/route.ts` · `app/api/me/tutor/certificates/route.ts` · `app/api/me/tutor/education/route.ts` · `app/api/me/tutor/experience/route.ts` · `app/api/me/tutor/route.ts` · `app/api/messages/route.ts` · `app/api/notifications/route.ts` · `app/api/provider/service-profile/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/requests/[ref]/status/route.ts` · `app/api/student/bookings/route.ts` · `app/api/student/enrollments/route.ts` · `app/api/tutor/availability/route.ts` · `app/api/tutor/bookings/route.ts` · `app/api/tutor/consultations/route.ts` · `app/api/tutor/earnings/route.ts` · `app/api/tutor/enrollments/route.ts` · `app/api/tutor/insights/route.ts` · `app/api/tutor/nav-badges/route.ts` · `app/api/tutor/packages/route.ts` · `app/api/tutor/schedule/route.ts` · `app/api/tutors/[id]/route.ts` · `app/api/tutors/route.ts` · `app/api/tutors/stats/route.ts` · `app/rss.xml/route.ts` |
+| `GET` | `app/api/admin/audit/route.ts` · `app/api/admin/b2b-services/route.ts` · `app/api/admin/business-leads/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/impersonate/status/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/master-applications/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/requests/route.ts` · `app/api/admin/reviews/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/stats/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/admin/users/route.ts` · `app/api/auth/google/callback/route.ts` · `app/api/auth/google/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/b2b-services/[id]/image/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/categories/route.ts` · `app/api/favorites/route.ts` · `app/api/health/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/master-applications/[id]/route.ts` · `app/api/master-applications/route.ts` · `app/api/masters/[id]/photo/route.ts` · `app/api/me/company/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/provider/route.ts` · `app/api/me/requests/route.ts` · `app/api/me/route.ts` · `app/api/notifications/route.ts` · `app/api/provider/service-profile/route.ts` · `app/api/providers/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/requests/[ref]/status/route.ts` · `app/api/work/nav-badges/route.ts` · `app/api/work/threads/route.ts` · `app/rss.xml/route.ts` |
 | `getCurrentUser` | `lib/auth.ts` |
 | `getImpersonatorId` | `lib/auth.ts` |
 | `getIntegrations` | `lib/integrations.ts` |
 | `getMasterProfile` | `app/experts/[slug]/_providerData.ts` |
 | `getPublicSiteTextMap` | `lib/siteText.ts` |
 | `getSiteTextMap` | `lib/siteText.ts` |
-| `GlyphBackdrop` | `components/home/GlyphBackdrop.tsx` |
-| `GoogleLinkDecision` | `lib/googleLink.ts` |
 | `googleLinkedEmail` | `lib/emailTemplates.ts` |
 | `GoogleMark` | `app/signin/_fields.tsx` |
 | `grantEarnedTasks` | `lib/creditsServer.ts` |
+| `grantJobDone` | `lib/creditsServer.ts` |
 | `groupByDirection` | `lib/b2b.ts` |
 | `groupByKind` | `lib/b2b.ts` |
 | `groupIsLive` | `lib/requestTopics.ts` |
 | `groupIsService` | `lib/requestTopics.ts` |
 | `GROUPS` | `lib/helpTopics.ts` |
 | `groupsForKind` | `lib/requestTopics.ts` |
-| `groupStartsByDay` | `components/booking/slots.ts` |
 | `groupUpcoming` | `app/me/_model.tsx` |
 | `GuestDoor` | `app/join/_door/GuestDoor.tsx` |
-| `hasExtraLanguage` | `app/experts/_data.tsx` |
-| `hasFutureWindow` | `lib/bookability.ts` |
 | `hashPassword` | `lib/auth.ts` |
 | `hasIllustration` | `components/Illustration.tsx` |
 | `hasMultipleHats` | `lib/hats.ts` |
-| `hasVerificationDocument` | `app/admin/_application.ts` |
 | `Hat` | `lib/roles.ts` |
 | `HAT_HOME` | `lib/hats.ts` |
 | `HAT_LABEL` | `lib/roles.ts` |
@@ -507,7 +353,6 @@
 | `hatsOf` | `lib/hats.ts` |
 | `HEADLINE_MAX` | `lib/headline.ts` |
 | `HEADLINE_MIN` | `lib/headline.ts` |
-| `HeadlineOffer` | `components/booking/slots.ts` |
 | `HELP_EVENT_NAMES` | `lib/helpTopics.ts` |
 | `HELP_EVENTS` | `lib/helpTopics.ts` |
 | `HELP_LOCKED_ANSWER_IDS` | `lib/helpTopics.ts` |
@@ -515,16 +360,12 @@
 | `HELP_ROUTE_RE` | `lib/helpTopics.ts` |
 | `HELP_TOPIC_IDS` | `lib/helpTopics.ts` |
 | `HELP_VISIBLE` | `lib/helpTopics.ts` |
-| `HelpEvent` | `lib/helpTopics.ts` |
 | `helpFaqKey` | `lib/helpTopics.ts` |
 | `HelpProfession` | `lib/helpProfessions.ts` |
-| `HelpProps` | `lib/helpTopics.ts` |
 | `HelpSection` | `app/admin/_help.tsx` |
 | `HelpTopic` | `lib/helpTopics.ts` |
 | `HelpWidget` | `components/HelpWidget.tsx` |
-| `Hero` | `app/me/bookings/[id]/_hero.tsx` |
 | `hierarchyError` | `lib/categoryTree.ts` |
-| `HOME_ITEMS` | `lib/homeCatalogue.ts` |
 | `HOME_TRADE_IDS` | `lib/serviceMarks.ts` |
 | `HOME_TRADES` | `lib/serviceMarks.ts` |
 | `HomeCat` | `app/_home/data.tsx` |
@@ -532,82 +373,53 @@
 | `homeForRole` | `lib/roleHome.ts` |
 | `HomeHero` | `app/_home/hero.tsx` |
 | `homeItems` | `lib/homeCatalogue.ts` |
-| `HomeTutorRow` | `lib/homeCatalogue.ts` |
-| `HORIZON_WEEKS` | `lib/availabilityTopUp.ts` |
-| `HOURS_DEFAULT` | `app/work/(expert)/schedule/_shared.ts` |
-| `HOURS_FULL` | `app/work/(expert)/schedule/_shared.ts` |
 | `HowItWorks` | `app/_home/how.tsx` |
 | `Icon` | `components/Icon.tsx` |
+| `Identity` | `lib/identity.ts` |
+| `identityOf` | `lib/identity.ts` |
 | `Illustration` | `components/Illustration.tsx` |
-| `IllustrationBand` | `components/Illustration.tsx` |
-| `IllustrationBandName` | `components/Illustration.tsx` |
 | `IllustrationName` | `components/Illustration.tsx` |
-| `IMMINENT_WINDOW_MIN` | `lib/sessionReminders.ts` |
-| `imminentNotificationId` | `lib/sessionReminders.ts` |
-| `imminentTargets` | `lib/sessionReminders.ts` |
 | `ImpersonationBanner` | `components/ImpersonationBanner.tsx` |
-| `InboxKind` | `lib/inboxRows.ts` |
 | `InboxRow` | `lib/inboxRows.ts` |
 | `inboxUnreadTotal` | `lib/inboxRows.ts` |
-| `INITIAL_FORM` | `app/join/_expert/_form.tsx` |
-| `INITIAL_PAYMENT` | `components/booking/PaymentStep.tsx` |
-| `initialsAvatarSvg` | `app/experts/_data.tsx` |
-| `InlineAvailability` | `components/booking/InlineAvailability.tsx` |
-| `InlineReviewCard` | `app/me/bookings/[id]/_review.tsx` |
-| `Input` | `app/join/_expert/_fields.tsx` |
+| `Input` | `app/join/_shared/_fields.tsx` |
 | `inputCls` | `app/signin/_fields.tsx` |
-| `InsightsData` | `app/work/_components/ProfileSignal.tsx` |
-| `InsightsDays` | `app/api/admin/insights/route.ts` · `app/api/tutor/insights/route.ts` |
-| `InsightsSection` | `app/admin/_insights.tsx` |
-| `IntakeStep` | `components/booking/IntakeStep.tsx` |
 | `INTEGRATION_KEYS` | `lib/integrations.ts` |
-| `Integrations` | `lib/integrations.ts` |
 | `INTEGRATIONS_TAG` | `lib/integrations.ts` |
 | `IntegrationsSection` | `app/admin/_integrations.tsx` |
-| `Interval` | `lib/availability.ts` |
-| `InvitableRequest` | `lib/requestInvite.ts` |
-| `InviteOutcome` | `lib/requestInvite.ts` |
 | `inviteProviderToRequest` | `lib/requestInvite.ts` |
 | `isAbroadCategory` | `lib/abroad.ts` |
+| `isAdminAdjust` | `lib/credits.ts` |
 | `isAnonymized` | `lib/userDeletion.ts` |
 | `isAssignable` | `lib/categoryTree.ts` |
 | `isBalancePaid` | `lib/b2b.ts` |
-| `isBookingLive` | `lib/bookingLive.ts` |
 | `isBotUserAgent` | `lib/events.ts` |
 | `isCmdOrCtrl` | `lib/keyboard.ts` |
-| `isExpertNoShow` | `app/me/bookings/[id]/_model.tsx` |
-| `isFreeTier` | `components/booking/slots.ts` |
 | `isGeorgian` | `lib/georgianText.ts` |
 | `isGeorgianMobile` | `lib/phone.ts` |
 | `isKnownServiceTopic` | `lib/serviceMarks.ts` |
 | `isKnownSiteTextKey` | `lib/siteTextDefs.ts` |
 | `isLaunchCategory` | `lib/launchTaxonomy.ts` |
-| `isListedProvider` | `lib/publicProvider.ts` |
+| `isOfferableTopic` | `lib/serviceProfile.ts` |
 | `isOfferEvent` | `lib/offerEvents.ts` |
-| `isOpenStart` | `components/booking/slots.ts` |
-| `isoWeekday` | `components/booking/slots.ts` |
-| `isPaymentValid` | `components/booking/PaymentStep.tsx` |
+| `isProvider` | `lib/capabilities.ts` |
 | `isProviderPath` | `lib/requests.ts` |
 | `isProviderWorkspacePath` | `lib/requests.ts` |
-| `isQuietHour` | `lib/postSession.ts` |
 | `isRequestPath` | `lib/requests.ts` |
 | `isRetiredSiteTextKey` | `lib/siteTextDefs.ts` |
 | `isServerOnlySiteTextKey` | `lib/siteTextDefs.ts` |
-| `isServiceTopic` | `lib/serviceProfile.ts` |
-| `isStaleMeetingUrl` | `lib/meeting.ts` |
-| `isStartOpen` | `lib/availability.ts` |
 | `isTopicOfKind` | `lib/requestTopics.ts` |
-| `isTutorBookable` | `app/experts/_data.tsx` |
 | `isTypeEnabled` | `lib/notify.ts` |
 | `isTypingTarget` | `lib/keyboard.ts` |
 | `isUnstated` | `lib/requestTopics.ts` |
 | `isUploadedFileUrl` | `lib/safeUrl.ts` |
 | `isUploadedImageUrl` | `lib/safeUrl.ts` |
-| `isValidEmail` | `app/join/_expert/_form.tsx` |
 | `isVertical` | `lib/requestTopics.ts` |
+| `JOB_DONE_NOTE` | `lib/credits.ts` |
+| `JOB_DONE_TETRI` | `lib/credits.ts` |
 | `JobBucket` | `lib/jobRows.ts` |
 | `jobDayKey` | `lib/jobRows.ts` |
-| `JobKind` | `lib/jobRows.ts` |
+| `jobDoneKey` | `lib/credits.ts` |
 | `JobRow` | `lib/jobRows.ts` |
 | `JobsClient` | `app/work/jobs/_client.tsx` |
 | `JOIN_DOOR_HREF` | `lib/capabilities.ts` |
@@ -625,213 +437,147 @@
 | `KA_WEEKDAYS_LONG` | `lib/kaDate.ts` |
 | `KA_WEEKDAYS_SHORT` | `lib/kaDate.ts` |
 | `KaDateOpts` | `lib/kaDate.ts` |
+| `KEPT_PHOTO` | `lib/serviceProfile.ts` |
 | `KeyboardShortcuts` | `components/KeyboardShortcuts.tsx` |
 | `kickSweep` | `lib/sweepRunner.ts` |
 | `KIND` | `lib/requestTopics.ts` |
-| `KIND_LABEL` | `lib/catalogItems.ts` |
-| `KIND_SECTION_TITLE` | `lib/catalogItems.ts` |
 | `kindLabel` | `lib/b2b.ts` |
 | `kindOf` | `lib/requestTopics.ts` |
-| `kindsOf` | `lib/catalogItems.ts` |
 | `kindsOfTopic` | `lib/requestTopics.ts` |
 | `LandingProps` | `app/HomeClient.tsx` |
 | `LANG_LABELS` | `lib/languages.ts` |
 | `langLabel` | `lib/languages.ts` |
-| `LanguageOption` | `lib/languages.ts` |
 | `LanguagePicker` | `components/LanguagePicker.tsx` |
-| `LAPSE_BUCKET_DAYS` | `lib/expertActivation.ts` |
-| `lapseBucket` | `lib/expertActivation.ts` |
 | `lastSweepRun` | `lib/sweepRunner.ts` |
 | `lastSweepRunAt` | `lib/sweepRunner.ts` |
 | `LAUNCH_CATEGORIES` | `lib/launchTaxonomy.ts` |
-| `LAUNCH_SLUGS` | `lib/launchTaxonomy.ts` |
 | `launchFirst` | `lib/launchTaxonomy.ts` |
-| `LaunchSide` | `lib/launchTaxonomy.ts` |
-| `leadDays` | `components/booking/funnelEvents.ts` |
 | `LeadForm` | `app/business/LeadForm.tsx` |
 | `LEGAL_EMAIL` | `lib/supportEmails.ts` |
-| `lessonsLeft` | `lib/packages.ts` |
 | `LifecycleRow` | `lib/offerLifecycle.ts` · `lib/requestRouting.ts` |
-| `LimitSpec` | `lib/apiParams.ts` |
-| `LineReveal` | `components/home/LineReveal.tsx` |
+| `LIVE_OFFER` | `lib/userDeletion.ts` |
+| `LIVE_OFFER_GROUPS` | `lib/serviceProfile.ts` |
+| `LIVE_OFFER_TOPICS` | `lib/serviceProfile.ts` |
 | `LIVE_SERVICE_GROUP_IDS` | `lib/requestTopics.ts` |
-| `LIVE_SERVICE_GROUPS` | `lib/serviceProfile.ts` |
-| `LIVE_SERVICE_TOPICS` | `lib/serviceProfile.ts` |
-| `LIVE_STATUSES` | `lib/userDeletion.ts` |
-| `LiveCat` | `app/experts/_data.tsx` |
-| `LiveExpert` | `lib/requestLive.ts` |
-| `LiveListener` | `lib/requestLiveClient.ts` |
-| `LivePreview` | `app/join/_expert/_steps.tsx` |
+| `LiveCat` | `app/experts/_cats.ts` |
 | `LiveRefresh` | `app/request/_liveRefresh.tsx` |
 | `LiveState` | `lib/requestLiveClient.ts` |
 | `LiveStatus` | `app/request/_live.tsx` |
 | `LoadMoreBar` | `app/admin/_parts.tsx` |
 | `lockPageScroll` | `components/Sheet.tsx` |
 | `Logo` | `components/Logo.tsx` |
-| `LOW_CONVERSION` | `app/work/_components/ProfileSignal.tsx` |
 | `lowestPrice` | `lib/serviceProfile.ts` |
 | `mailVerifiedRequest` | `lib/requestJobs.ts` |
 | `makePublicRef` | `lib/requests.ts` |
-| `mapRows` | `app/experts/_data.tsx` |
-| `mapTutorPayload` | `components/booking/mapTutorPayload.ts` |
 | `markAllNotificationsRead` | `lib/notifications.ts` |
 | `markDoneWhere` | `lib/offerLifecycle.ts` |
 | `MARKED_SLUGS` | `lib/categoryMarks.tsx` |
 | `MarketingTopBar` | `components/MarketingTopBar.tsx` |
 | `markNotificationRead` | `lib/notifications.ts` |
 | `markOfferDone` | `lib/offerLifecycle.ts` |
-| `markRelatedRead` | `lib/notifClear.ts` |
 | `MASK` | `lib/requestChat.ts` |
 | `maskContacts` | `lib/requestChat.ts` |
 | `MASKED_CLIENT_NAME` | `lib/inboxRows.ts` |
-| `MaskResult` | `lib/requestChat.ts` |
 | `MASTER` | `lib/masterApplication.ts` |
 | `MASTER_KIND_LABEL` | `lib/masterApplication.ts` |
 | `MASTER_KINDS` | `lib/masterApplication.ts` |
 | `MASTER_STATUS_TEXT` | `lib/masterApplication.ts` |
 | `MasterApplicationInput` | `lib/masterApplication.ts` · `lib/masterApplication.ts` |
 | `MasterApplyClient` | `app/join/_master/client.tsx` |
-| `MasterApplyMarketing` | `app/join/_master/_marketing.tsx` |
 | `masterApprovedEmail` | `lib/emailTemplates.ts` |
-| `MasterCard` | `app/experts/_masterCard.tsx` |
-| `masterHref` | `app/experts/_masterCard.tsx` |
 | `MasterKind` | `lib/masterApplication.ts` |
 | `masterPath` | `app/experts/[slug]/_providerData.ts` |
 | `MasterProfile` | `app/experts/[slug]/_providerData.ts` |
+| `MasterProfileEditor` | `app/work/profile/_master.tsx` |
 | `masterRejectedEmail` | `lib/emailTemplates.ts` |
 | `MasterReview` | `app/experts/[slug]/_providerData.ts` |
 | `masterRevisionEmail` | `lib/emailTemplates.ts` |
-| `MasterRow` | `app/experts/_masterData.ts` |
-| `MastersFilter` | `app/experts/_masterData.ts` |
-| `mastersHref` | `app/experts/_masterData.ts` |
-| `MastersResult` | `app/experts/_masterData.ts` |
 | `MastersSection` | `app/admin/_masters.tsx` |
 | `MATCH_THRESHOLD` | `lib/topicMatch.ts` |
 | `MatchableCategory` | `lib/categoryTree.ts` |
-| `MatchCandidate` | `lib/topicMatch.ts` |
 | `MATCHED_CLOSE_DAYS` | `lib/requestRouting.ts` |
-| `materializeWeekly` | `lib/availabilityRules.ts` |
-| `MAX_BODY_CHARS` | `components/booking/funnelEvents.ts` |
-| `MAX_CATS` | `app/join/_expert/_form.tsx` |
-| `MAX_CERTS` | `app/join/_expert/_upload.tsx` |
-| `MAX_INTAKE_CHARS` | `components/booking/IntakeStep.tsx` |
+| `matchesQuery` | `lib/catalogItems.ts` |
+| `MAX_BODY_CHARS` | `lib/funnelEvents.ts` |
+| `MAX_CERTS` | `app/join/_shared/_upload.tsx` |
 | `MAX_PROFESSIONS` | `lib/professions.ts` |
-| `MAX_PROP_KEYS` | `components/booking/funnelEvents.ts` |
-| `MAX_PROP_STRING` | `components/booking/funnelEvents.ts` |
+| `MAX_PROP_KEYS` | `lib/funnelEvents.ts` |
+| `MAX_PROP_STRING` | `lib/funnelEvents.ts` |
 | `MAX_QUERY_CHARS` | `lib/helpSearch.ts` |
-| `MAX_SEARCH_TERMS` | `lib/tutorsQuery.ts` |
+| `MAX_REQUEST_PHOTOS` | `lib/requests.ts` |
 | `MAX_SERVICES` | `lib/serviceProfile.ts` |
-| `MAX_TEXT_PROP` | `components/booking/funnelEvents.ts` |
-| `MAX_WINDOW_MS` | `lib/availabilityRules.ts` |
+| `MAX_WORK_PHOTOS` | `lib/serviceProfile.ts` |
 | `mayAutoVerify` | `lib/requestTriage.ts` |
-| `Me` | `lib/me.ts` · `app/settings/_types.ts` · `app/work/(expert)/bookings/[id]/_model.tsx` · `app/work/(expert)/profile/_types.ts` |
+| `Me` | `lib/me.ts` · `app/settings/_types.ts` · `app/work/profile/_types.ts` |
 | `MeData` | `app/me/_model.tsx` |
-| `MediaState` | `app/join/_expert/_form.tsx` |
-| `mergeIntervals` | `lib/availability.ts` |
 | `MessagesFrame` | `app/work/messages/_frame.tsx` |
 | `MessagesSpace` | `lib/messagesUnread.ts` |
-| `metadata` | `app/abroad/page.tsx` · `app/business/page.tsx` · `app/contact/layout.tsx` · `app/cookies/page.tsx` · `app/layout.tsx` · `app/not-found.tsx` · `app/privacy/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/signin/layout.tsx` · `app/signup/layout.tsx` · `app/swavleba/page.tsx` · `app/terms/page.tsx` · `app/work/(provider)/layout.tsx` · `app/work/jobs/page.tsx` · `app/work/page.tsx` · `app/work/services/page.tsx` |
-| `MIN_AGE_MIN` | `lib/expertEscalation.ts` |
-| `MIN_BIO` | `app/join/_expert/_form.tsx` |
-| `MIN_SCORE` | `lib/helpSearch.ts` |
-| `MIN_SIGNAL_VIEWS` | `app/work/_components/ProfileSignal.tsx` |
+| `metadata` | `app/abroad/page.tsx` · `app/business/page.tsx` · `app/contact/layout.tsx` · `app/cookies/page.tsx` · `app/layout.tsx` · `app/not-found.tsx` · `app/privacy/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/signin/layout.tsx` · `app/signup/layout.tsx` · `app/terms/page.tsx` · `app/work/(provider)/layout.tsx` · `app/work/jobs/page.tsx` · `app/work/page.tsx` · `app/work/profile/page.tsx` · `app/work/services/page.tsx` |
 | `MiniChart` | `app/admin/_charts.tsx` |
 | `minutesToView` | `lib/offerEvents.ts` |
 | `MISS_BUDGET` | `lib/refGuard.ts` |
-| `missingApplicationParts` | `app/admin/_application.ts` |
-| `missingCapability` | `lib/capabilities.ts` |
-| `MissingPart` | `app/admin/_application.ts` |
-| `missingWindows` | `lib/availabilityTopUp.ts` |
-| `MobileActionBar` | `app/me/bookings/[id]/_mobile.tsx` |
-| `MobileBookingBar` | `app/experts/[slug]/_booking.tsx` |
 | `MobileCollapse` | `components/catalog/MobileCollapse.tsx` |
-| `ModerationSection` | `app/admin/_moderation.tsx` |
-| `MonthSchedule` | `app/work/_components/MonthSchedule.tsx` |
 | `Msg` | `app/settings/_types.ts` |
 | `MSG_MAX_LEN` | `lib/msgText.ts` |
 | `msgPreview` | `lib/msgText.ts` |
-| `MsgPreview` | `lib/msgText.ts` |
-| `MyCompany` | `components/booking/CompanyBalance.tsx` |
 | `MyRequestRow` | `lib/myRequests.ts` |
 | `myRequests` | `lib/myRequests.ts` |
 | `MyRequestsSection` | `app/me/_requests.tsx` |
 | `NAME_MAX` | `lib/events.ts` |
-| `nameError` | `lib/applyValidation.ts` |
-| `NameScriptHint` | `app/join/_expert/_fields.tsx` |
 | `NavBadgeKey` | `components/student/navConfig.ts` · `components/tutor/navConfig.ts` |
 | `NavBadges` | `components/tutor/useNavBadges.ts` |
 | `navFor` | `components/tutor/navConfig.ts` |
 | `NavGroups` | `components/tutor/navConfig.ts` |
 | `NavItem` | `components/student/navConfig.ts` · `components/tutor/navConfig.ts` |
 | `NavProgress` | `components/NavProgress.tsx` |
-| `NavSection` | `components/tutor/navConfig.ts` |
 | `needsClientNudge` | `lib/requestRouting.ts` |
 | `needsProviderNudge` | `lib/requestRouting.ts` |
-| `NEVER_ASSIGNABLE_SLUGS` | `lib/categoryTree.ts` |
-| `newApplicationAdminEmail` | `lib/emailTemplates.ts` |
-| `newApplyFlowId` | `app/join/_expert/applyFunnelEvents.ts` |
-| `newFlowId` | `components/booking/funnelEvents.ts` |
+| `newFlowId` | `lib/funnelEvents.ts` |
 | `newMasterApplicationAdminEmail` | `lib/emailTemplates.ts` |
-| `newMeetingUrl` | `lib/meeting.ts` |
-| `newMessageEmail` | `lib/emailTemplates.ts` |
 | `newPublicRef` | `lib/requestsServer.ts` |
-| `NextSession` | `app/me/_next.tsx` |
 | `nextStepId` | `app/request/_model.ts` |
+| `NO_BALANCE_NOTE` | `lib/credits.ts` |
 | `NO_CAP` | `app/experts/_filters.tsx` |
-| `NO_SHOW_GRACE_MIN` | `app/me/bookings/[id]/_model.tsx` |
-| `NO_SHOW_GRACE_MS` | `app/me/bookings/[id]/_model.tsx` |
 | `normalize` | `lib/helpSearch.ts` |
 | `normalizeAvatar` | `lib/normalizeAvatar.ts` |
-| `normalizeCertificates` | `app/admin/_application.ts` |
 | `normalizeEventName` | `lib/events.ts` |
 | `normalizeExtras` | `lib/requestTopics.ts` |
-| `normalizeKind` | `lib/b2b.ts` |
 | `normalizeLangs` | `lib/languages.ts` |
 | `normalizePhone` | `lib/phone.ts` |
 | `normalizePrefs` | `lib/notify.ts` |
 | `normalizePublicRef` | `lib/requests.ts` |
 | `normalizeQuery` | `lib/events.ts` |
 | `normalizeRoute` | `lib/helpTopics.ts` |
-| `normalizeSearchTerms` | `lib/tutorsQuery.ts` |
-| `normExternalUrl` | `app/experts/[slug]/_data.tsx` |
 | `noteRefMiss` | `lib/refGuard.ts` |
 | `NotFoundClient` | `app/NotFoundClient.tsx` |
 | `NotifBell` | `components/NotifBell.tsx` |
 | `NotifItem` | `lib/notifications.ts` |
-| `NotifSnapshot` | `lib/notifications.ts` |
 | `NotifType` | `lib/notify.ts` |
 | `notify` | `lib/notify.ts` |
 | `notifyMany` | `lib/notify.ts` |
-| `NudgeCandidate` | `lib/postSession.ts` |
-| `nudgeNotificationId` | `lib/postSession.ts` |
 | `oauthOrigin` | `lib/googleOauth.ts` |
-| `OFFER_COST_TETRI` | `lib/credits.ts` |
 | `OFFER_EVENT_LABEL` | `lib/offerEvents.ts` |
 | `OFFER_EVENTS` | `lib/offerEvents.ts` |
+| `OFFER_FREE_NOTE` | `lib/credits.ts` |
+| `OFFER_GROUPS` | `lib/serviceProfile.ts` |
 | `OFFER_PRICE_KIND_LABEL` | `lib/requests.ts` |
 | `OFFER_PRICE_KINDS` | `lib/requests.ts` |
 | `OFFER_STATUS_LABEL` | `lib/requests.ts` |
-| `OFFER_STATUSES` | `lib/requests.ts` |
+| `OFFER_TOPICS` | `lib/serviceProfile.ts` |
 | `offerAcceptedProviderEmail` | `lib/emailTemplates.ts` |
 | `OfferActions` | `app/work/(provider)/offers/_actions.tsx` |
 | `offerArrivedClientEmail` | `lib/emailTemplates.ts` |
 | `offerDoneClientEmail` | `lib/emailTemplates.ts` |
 | `offerDoneProviderEmail` | `lib/emailTemplates.ts` |
 | `offerDoneReminderClientEmail` | `lib/emailTemplates.ts` |
-| `OfferEventName` | `lib/offerEvents.ts` |
-| `OfferEventRow` | `lib/offerEvents.ts` |
 | `OfferForm` | `app/work/(provider)/requests/[id]/OfferForm.tsx` |
 | `offerInboxRow` | `lib/inboxRows.ts` |
 | `offerInboxRows` | `lib/inboxRows.ts` |
 | `OfferInboxSource` | `lib/inboxRows.ts` |
-| `OfferLifecycleJobsResult` | `lib/offerLifecycle.ts` |
 | `OfferList` | `app/request/[ref]/OfferList.tsx` |
 | `offerPeerName` | `lib/inboxRows.ts` |
 | `OfferPriceKind` | `lib/requests.ts` |
-| `offerPriceLabel` | `lib/requests.ts` · `components/booking/slots.ts` |
-| `OfferProvider` | `lib/requests.ts` |
+| `offerPriceLabel` | `lib/requests.ts` |
 | `offerProviderError` | `lib/requests.ts` |
-| `offersAffordable` | `lib/credits.ts` |
 | `OfferStatusName` | `lib/requests.ts` |
 | `OfferStatusPill` | `components/requests/StatusPills.tsx` |
 | `offerTemplateFor` | `lib/requestTopics.ts` |
@@ -842,108 +588,60 @@
 | `OnboardingView` | `app/signin/_onboarding.tsx` |
 | `ONE_CITY` | `lib/requestTopics.ts` |
 | `OpenBtn` | `app/admin/_parts.tsx` |
-| `openStartsByDay` | `components/booking/slots.ts` |
-| `OpenStartsOpts` | `lib/availability.ts` |
-| `OpenTimeNudge` | `components/tutor/OpenTimeNudge.tsx` |
-| `orderedTiers` | `components/booking/slots.ts` |
-| `OrderSummary` | `components/booking/OrderSummary.tsx` |
-| `OTHER_CAT_MAX` | `app/join/_expert/_form.tsx` |
+| `openRequestCount` | `lib/requestsServer.ts` |
 | `OTHER_TOPIC` | `lib/requestTopics.ts` |
-| `otherCatError` | `lib/applyValidation.ts` |
-| `overlapMinutes` | `app/work/(expert)/schedule/_shared.ts` |
 | `OverviewSection` | `app/admin/_overview.tsx` |
-| `PACKAGE_LESSON_COUNTS` | `lib/packages.ts` |
-| `PackageFit` | `lib/packageFit.ts` |
-| `packageFits` | `lib/packageFit.ts` · `lib/packages.ts` |
-| `PackageLessonCount` | `lib/packages.ts` |
-| `PACKAGES_ROUTE` | `lib/packages.ts` |
-| `PACKAGES_VISIBILITY` | `lib/flags.ts` |
-| `packagesFeatureExists` | `lib/packages.ts` |
-| `PackagesSection` | `app/work/(expert)/profile/_packages.tsx` |
-| `PackagesVisibility` | `lib/flags.ts` |
 | `PAGE_SEO` | `lib/pageSeoDefs.ts` |
 | `PageHeader` | `components/PageHeader.tsx` |
 | `pageMetadata` | `lib/pageSeo.ts` |
 | `PageSeoDef` | `lib/pageSeoDefs.ts` |
 | `pageSeoKey` | `lib/pageSeoDefs.ts` |
 | `Pagination` | `app/experts/_results.tsx` |
-| `pairScore` | `lib/tutorsQuery.ts` |
-| `parseCapabilities` | `lib/capabilities.ts` |
 | `parseCities` | `lib/catalogItems.ts` |
-| `ParsedEvent` | `components/booking/funnelEvents.ts` |
-| `parseEventBody` | `components/booking/funnelEvents.ts` |
+| `parseEventBody` | `lib/funnelEvents.ts` |
 | `parseIntParam` | `lib/apiParams.ts` |
 | `parseLimit` | `lib/apiParams.ts` |
 | `parseTrades` | `lib/catalogItems.ts` |
-| `partsOf` | `app/join/_expert/_form.tsx` |
 | `passesFilters` | `app/experts/_filters.tsx` |
 | `PasswordSection` | `app/settings/_password.tsx` |
-| `PATCH` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/business-leads/route.ts` · `app/api/admin/categories/[id]/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/disputes/[id]/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/tutors/[id]/category/route.ts` · `app/api/admin/tutors/[id]/featured/route.ts` · `app/api/admin/tutors/[id]/packages/route.ts` · `app/api/admin/tutors/[id]/verified/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/applications/[id]/route.ts` · `app/api/bookings/[id]/route.ts` · `app/api/master-applications/[id]/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/route.ts` · `app/api/me/tutor/route.ts` · `app/api/notifications/[id]/read/route.ts` · `app/api/reviews/[bookingId]/route.ts` · `app/api/tutor/availability/[id]/route.ts` · `app/api/tutor/consultations/[id]/route.ts` · `app/api/tutor/enrollments/[id]/route.ts` · `app/api/tutor/packages/[id]/route.ts` |
-| `PaymentMethod` | `components/booking/PaymentStep.tsx` |
+| `PATCH` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/business-leads/route.ts` · `app/api/admin/categories/[id]/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/providers/[id]/category/route.ts` · `app/api/admin/providers/[id]/featured/route.ts` · `app/api/admin/providers/[id]/verified/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/master-applications/[id]/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/provider/route.ts` · `app/api/me/route.ts` · `app/api/notifications/[id]/read/route.ts` |
 | `PAYMENTS_LIVE` | `lib/flags.ts` |
-| `PaymentSourceName` | `lib/b2b.ts` |
 | `paymentSourceOf` | `lib/b2b.ts` |
-| `PaymentState` | `components/booking/PaymentStep.tsx` |
-| `PaymentStep` | `components/booking/PaymentStep.tsx` |
-| `PendingDelete` | `app/work/(expert)/profile/_types.ts` |
-| `PendingRequests` | `app/work/_components/PendingRequests.tsx` |
 | `PeriodSwitch` | `app/admin/_parts.tsx` |
-| `perLessonPrice` | `lib/packages.ts` |
-| `personKeyOfConsult` | `lib/catalogItems.ts` |
-| `personKeyOfWork` | `lib/catalogItems.ts` |
-| `phoneError` | `lib/applyValidation.ts` |
 | `phoneFormatError` | `lib/phone.ts` |
-| `phoneForSubmit` | `components/PhoneInput.tsx` |
 | `PhoneInput` | `components/PhoneInput.tsx` |
-| `phoneRequiredError` | `lib/applyValidation.ts` |
-| `PhotoUploader` | `app/join/_expert/_upload.tsx` |
+| `PhotoUploader` | `app/join/_shared/_upload.tsx` |
 | `PICK_MODE_OPTION` | `lib/requests.ts` |
 | `PICK_MODES` | `lib/requests.ts` |
-| `PickerSphere` | `components/ProfessionPicker.tsx` |
-| `PickMode` | `lib/requests.ts` |
 | `PickOption` | `app/request/_stepPick.tsx` |
 | `PitchFaqLd` | `app/join/_sections.tsx` |
 | `PitchSections` | `app/join/_sections.tsx` |
 | `placesLeft` | `lib/requests.ts` |
-| `PlannedNudge` | `lib/expertActivation.ts` |
-| `POST` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/broadcast/preview/route.ts` · `app/api/admin/broadcast/send/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/balance/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/impersonate/[userId]/route.ts` · `app/api/admin/impersonate/exit/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/presence/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/users/[id]/message/route.ts` · `app/api/applications/route.ts` · `app/api/auth/otp/send/route.ts` · `app/api/auth/otp/verify/route.ts` · `app/api/auth/reset/confirm/route.ts` · `app/api/auth/reset/request/route.ts` · `app/api/auth/signin/route.ts` · `app/api/auth/signout/route.ts` · `app/api/auth/signup/route.ts` · `app/api/bookings/[id]/call/route.ts` · `app/api/bookings/[id]/cancel/route.ts` · `app/api/bookings/[id]/reschedule/respond/route.ts` · `app/api/bookings/[id]/reschedule/route.ts` · `app/api/bookings/route.ts` · `app/api/business/lead/route.ts` · `app/api/contact/route.ts` · `app/api/disputes/route.ts` · `app/api/enrollments/[id]/book/route.ts` · `app/api/enrollments/[id]/schedule/route.ts` · `app/api/events/route.ts` · `app/api/favorites/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/internal/reminders/route.ts` · `app/api/log-error/route.ts` · `app/api/master-applications/route.ts` · `app/api/me/password/route.ts` · `app/api/me/tutor/certificates/route.ts` · `app/api/me/tutor/education/route.ts` · `app/api/me/tutor/experience/route.ts` · `app/api/messages/route.ts` · `app/api/notifications/read/route.ts` · `app/api/notifications/read-all/route.ts` · `app/api/packages/[id]/request/route.ts` · `app/api/provider/offers/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/accept/route.ts` · `app/api/requests/[ref]/invite/route.ts` · `app/api/requests/[ref]/offers/[offerId]/done/route.ts` · `app/api/requests/[ref]/offers/[offerId]/review/route.ts` · `app/api/requests/[ref]/offers/[offerId]/withdraw/route.ts` · `app/api/requests/[ref]/open/route.ts` · `app/api/requests/route.ts` · `app/api/reviews/route.ts` · `app/api/tutor/availability/bulk/route.ts` · `app/api/tutor/availability/route.ts` · `app/api/tutor/consultations/route.ts` · `app/api/tutor/packages/route.ts` · `app/api/uploads/route.ts` |
+| `POST` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/broadcast/preview/route.ts` · `app/api/admin/broadcast/send/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/balance/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/impersonate/[userId]/route.ts` · `app/api/admin/impersonate/exit/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/presence/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/message/route.ts` · `app/api/auth/otp/send/route.ts` · `app/api/auth/otp/verify/route.ts` · `app/api/auth/reset/confirm/route.ts` · `app/api/auth/reset/request/route.ts` · `app/api/auth/signin/route.ts` · `app/api/auth/signout/route.ts` · `app/api/auth/signup/route.ts` · `app/api/business/lead/route.ts` · `app/api/contact/route.ts` · `app/api/events/route.ts` · `app/api/favorites/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/master-applications/route.ts` · `app/api/me/password/route.ts` · `app/api/notifications/read/route.ts` · `app/api/provider/offers/route.ts` · `app/api/provider/requests/[id]/contact/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/accept/route.ts` · `app/api/requests/[ref]/invite/route.ts` · `app/api/requests/[ref]/offers/[offerId]/done/route.ts` · `app/api/requests/[ref]/offers/[offerId]/review/route.ts` · `app/api/requests/[ref]/offers/[offerId]/withdraw/route.ts` · `app/api/requests/[ref]/open/route.ts` · `app/api/requests/route.ts` · `app/api/uploads/route.ts` |
 | `postAuthHome` | `lib/auth.ts` |
-| `PREFILL_DAYS` | `app/work/(expert)/schedule/_shared.ts` |
-| `PREFILL_END_HOUR` | `app/work/(expert)/schedule/_shared.ts` |
-| `PREFILL_START_HOUR` | `app/work/(expert)/schedule/_shared.ts` |
 | `PrefKey` | `lib/notify.ts` · `app/settings/_types.ts` |
 | `prefRows` | `app/settings/_types.ts` |
 | `PrefsMap` | `app/settings/_types.ts` |
 | `PrefsSection` | `app/settings/_prefs.tsx` |
-| `PREPARING_TTL_HOURS` | `lib/expertEscalation.ts` |
 | `PRESENCE_TTL_MS` | `lib/requestThread.ts` |
 | `PresenceBeat` | `app/admin/_presence.tsx` |
 | `presenceHint` | `lib/requestThread.ts` |
 | `presenceLabel` | `lib/requestThread.ts` |
-| `preThreadInitiators` | `lib/preThreadInitiators.ts` |
-| `PreThreadLink` | `components/chat/ThreadHeader.tsx` |
 | `prevStepId` | `app/request/_model.ts` |
 | `priceBandActive` | `app/experts/_filters.tsx` |
 | `priceBandLabel` | `app/experts/_filters.tsx` |
 | `pricedServices` | `lib/serviceProfile.ts` |
 | `PricedServicesBlock` | `app/experts/[slug]/_providerBlocks.tsx` |
-| `priceError` | `lib/applyValidation.ts` |
 | `PriceField` | `components/PriceField.tsx` |
-| `priceForDuration` | `components/booking/slots.ts` |
 | `priceHint` | `lib/serviceProfile.ts` |
 | `PriceRange` | `app/experts/_filters.tsx` |
 | `PRIMARY_LANG_CODES` | `lib/languages.ts` |
 | `PRIMARY_LANGUAGES` | `lib/languages.ts` |
-| `primaryPrice` | `components/booking/slots.ts` |
-| `primaryPriceLabel` | `components/booking/slots.ts` |
-| `primaryService` | `components/booking/slots.ts` |
-| `primaryServiceMin` | `components/booking/slots.ts` |
 | `prisma` | `lib/prisma.ts` |
 | `PRIVACY_EMAIL` | `lib/supportEmails.ts` |
 | `PROFESSION_CAN` | `lib/professions.ts` |
 | `professionBySlug` | `lib/professionSeo.ts` |
 | `professionCan` | `lib/professions.ts` |
-| `ProfessionCapability` | `lib/professions.ts` |
 | `professionHit` | `lib/helpProfessions.ts` |
 | `ProfessionLanding` | `app/experts/[slug]/_profession.tsx` |
 | `professionMetadata` | `app/experts/[slug]/_profession.tsx` |
@@ -952,31 +650,22 @@
 | `professions` | `lib/professionSeo.ts` |
 | `PROFESSIONS` | `lib/professions.ts` |
 | `ProfessionSeo` | `lib/professionSeo.ts` |
-| `ProfessionService` | `app/admin/_application.ts` |
 | `professionsForCategory` | `lib/professionSeo.ts` |
 | `professionsOfTopic` | `lib/requestTopics.ts` |
 | `professionsThatCan` | `lib/professions.ts` |
-| `ProfessionSummary` | `app/admin/_application.ts` |
 | `PROFILE_VIEW_DEDUPE_MS` | `lib/events.ts` |
-| `ProfileCheck` | `lib/profileScore.ts` |
 | `ProfileClient` | `app/me/profile/client.tsx` |
 | `ProfileCompleteness` | `components/ProfileCompleteness.tsx` |
-| `ProfileCompletenessProps` | `components/ProfileCompleteness.tsx` |
 | `profileFacts` | `lib/creditsServer.ts` |
 | `ProfileFacts` | `lib/credits.ts` |
 | `ProfileForCompleteness` | `lib/profileScore.ts` |
-| `ProfileForm` | `app/work/(expert)/profile/_types.ts` |
+| `ProfileForm` | `app/work/profile/_types.ts` |
 | `profileGaps` | `lib/serviceProfile.ts` |
 | `profileIsRoutable` | `lib/serviceProfile.ts` |
 | `profilePercent` | `lib/profileScore.ts` |
-| `ProfilePhoto` | `app/experts/[slug]/_bits.tsx` |
 | `ProfileSection` | `app/settings/_profile.tsx` |
-| `ProfileSignal` | `app/work/_components/ProfileSignal.tsx` |
-| `ProfileTab` | `app/work/(expert)/profile/_tabProfile.tsx` |
-| `ProfileViewer` | `lib/events.ts` |
+| `ProfileTab` | `app/work/profile/_tabProfile.tsx` |
 | `profileViewKey` | `lib/events.ts` |
-| `ProfileViewsSection` | `app/admin/_profileViews.tsx` |
-| `ProgressNav` | `app/join/_expert/_chrome.tsx` |
 | `progressOf` | `app/request/_model.ts` |
 | `PROPS_ARRAY_MAX` | `lib/events.ts` |
 | `PROPS_JSON_MAX` | `lib/events.ts` |
@@ -988,66 +677,63 @@
 | `PROVIDER_ROUTE` | `lib/requests.ts` |
 | `PROVIDER_WORKSPACE_PATHS` | `lib/requests.ts` |
 | `ProviderBreadcrumb` | `app/experts/[slug]/_providerHero.tsx` |
-| `ProviderContact` | `lib/requests.ts` |
+| `ProviderCard` | `app/experts/_providerCard.tsx` |
 | `ProviderCta` | `app/experts/[slug]/_providerCta.tsx` |
 | `ProviderHero` | `app/experts/[slug]/_providerHero.tsx` |
+| `providerHref` | `app/experts/_providerCard.tsx` |
 | `ProviderIdentity` | `lib/requestsServer.ts` |
 | `ProviderKindName` | `lib/requests.ts` |
+| `providerQueueScope` | `lib/requestsServer.ts` |
 | `ProviderRequestRow` | `lib/requests.ts` |
 | `providerRequestView` | `lib/requests.ts` |
+| `ProviderRow` | `app/experts/_providers.ts` |
 | `providersFeatureExists` | `lib/requests.ts` |
+| `ProvidersFilter` | `app/experts/_providers.ts` |
+| `providersHref` | `app/experts/_providers.ts` |
 | `providersOn` | `lib/requests.ts` |
+| `ProvidersResult` | `app/experts/_providers.ts` |
 | `ProviderStars` | `app/experts/[slug]/_providerBlocks.tsx` |
 | `providerUserIdsOf` | `lib/offerLifecycle.ts` |
 | `pruneEvents` | `lib/events.ts` |
-| `PUBLIC` | `app/experts/_masterData.ts` |
+| `PUBLIC` | `app/experts/_providers.ts` |
 | `PUBLIC_REF_RE` | `lib/requests.ts` |
-| `PUBLIC_TUTOR` | `lib/tutorsQuery.ts` |
 | `PublicDoor` | `app/join/_door/PublicDoor.tsx` |
 | `PublicHeader` | `components/PublicHeader.tsx` |
 | `PublicService` | `app/business/BusinessLanding.tsx` |
 | `PublicTopBar` | `components/PublicTopBar.tsx` |
 | `PUT` | `app/api/provider/service-profile/route.ts` |
-| `PWD_MIN` | `app/work/(expert)/profile/_types.ts` |
-| `PWD_MIN_MSG` | `app/work/(expert)/profile/_types.ts` |
+| `PWD_MIN` | `app/work/profile/_types.ts` |
+| `PWD_MIN_MSG` | `app/work/profile/_types.ts` |
 | `PwInput` | `app/signin/_fields.tsx` |
 | `QUERY_MAX` | `lib/events.ts` |
 | `QUERY_MIN` | `lib/events.ts` |
-| `queryMasters` | `app/experts/_masterData.ts` |
-| `queryTutors` | `lib/tutorsQuery.ts` |
+| `queryProviders` | `app/experts/_providers.ts` |
+| `QueueOffer` | `lib/requestRouting.ts` |
+| `queueScope` | `lib/requestRouting.ts` |
+| `QueueScope` | `lib/requestRouting.ts` |
+| `queueWhere` | `lib/requestRouting.ts` |
 | `QUOTE_JOB_STATUS_LABEL` | `lib/jobRows.ts` |
 | `QuoteJobInput` | `lib/jobRows.ts` |
 | `quoteJobRow` | `lib/jobRows.ts` |
 | `quoteJobStatus` | `lib/jobRows.ts` |
-| `QuoteJobStatus` | `lib/jobRows.ts` |
 | `quotePeerName` | `lib/jobRows.ts` |
 | `rankCandidates` | `lib/topicMatch.ts` |
-| `RATE_MIN_VIEWS` | `app/work/_components/ProfileSignal.tsx` |
 | `rateLimit` | `lib/rateLimit.ts` |
-| `RateResult` | `lib/rateLimit.ts` |
 | `ratingUseless` | `app/experts/_filters.tsx` |
-| `readApplyDraft` | `app/join/_expert/_draft.tsx` |
 | `readEmailParam` | `app/signin/_model.tsx` |
 | `readJoin` | `app/join/_door/DoorQuestion.tsx` |
-| `readPattern` | `lib/availabilityTopUp.ts` |
 | `readSignupDraft` | `app/signin/_model.tsx` |
-| `readTeacherFields` | `lib/packages.ts` |
 | `readyToApprove` | `lib/masterApplication.ts` |
-| `rebookHref` | `app/me/bookings/[id]/_model.tsx` |
-| `recomputeResponseTime` | `lib/responseTimeStore.ts` |
 | `recordOfferEvent` | `lib/offerEvents.ts` |
-| `RecordResult` | `lib/offerEvents.ts` |
 | `redactQuery` | `lib/helpSearch.ts` |
 | `redirectAfterSignin` | `app/signin/_model.tsx` |
 | `REF_ALPHABET` | `lib/requests.ts` |
 | `REF_LENGTH` | `lib/requests.ts` |
-| `REF_PREFIX` | `lib/requests.ts` |
 | `refBudgetSpent` | `lib/refGuard.ts` |
-| `refine` | `lib/applyValidation.ts` |
 | `refreshNavBadges` | `components/tutor/useNavBadges.ts` |
+| `refundDeadContacts` | `lib/creditsServer.ts` |
+| `refundDeadRequest` | `lib/requestJobs.ts` |
 | `registerSearchInput` | `lib/searchFocus.ts` |
-| `releaseBookingCredit` | `lib/bookingCredit.ts` |
-| `remainingText` | `lib/expertEscalation.ts` |
 | `reminderDue` | `lib/offerLifecycle.ts` |
 | `renderMarkdown` | `lib/markdown.ts` |
 | `REPEAT_LIMIT` | `lib/requestTriage.ts` |
@@ -1056,7 +742,7 @@
 | `REQUEST_FUNNEL_EVENT_NAMES` | `app/request/requestFunnelEvents.ts` |
 | `REQUEST_FUNNEL_EVENTS` | `app/request/requestFunnelEvents.ts` |
 | `REQUEST_FUNNEL_PROP_KEYS` | `app/request/requestFunnelEvents.ts` |
-| `REQUEST_HREF` | `app/experts/[slug]/_providerData.ts` · `app/experts/_masterData.ts` |
+| `REQUEST_HREF` | `app/experts/[slug]/_providerData.ts` · `app/experts/_providers.ts` |
 | `REQUEST_KINDS` | `lib/requestTopics.ts` |
 | `REQUEST_PATH_PREFIXES` | `lib/requests.ts` |
 | `REQUEST_ROUTE` | `lib/requests.ts` |
@@ -1065,7 +751,6 @@
 | `REQUEST_STATUSES` | `lib/requests.ts` |
 | `requestAccessOf` | `lib/requestsServer.ts` |
 | `RequestBand` | `app/_home/request.tsx` |
-| `RequestButton` | `app/swavleba/RequestButton.tsx` |
 | `RequestChat` | `components/RequestChat.tsx` |
 | `requestChatEmail` | `lib/emailTemplates.ts` |
 | `requestClosedNoOffersClientEmail` | `lib/emailTemplates.ts` |
@@ -1074,12 +759,10 @@
 | `requestHeadline` | `lib/requests.ts` |
 | `requestHrefFor` | `app/experts/[slug]/_providerData.ts` |
 | `requestIsOpen` | `lib/requests.ts` |
-| `RequestJobsResult` | `lib/requestJobs.ts` |
 | `RequestKindName` | `lib/requestTopics.ts` |
 | `requestLiveMark` | `lib/requestLive.ts` |
 | `RequestLiveMark` | `lib/requestLive.ts` |
 | `requestLiveStatus` | `lib/requestLive.ts` |
-| `RequestLiveStatus` | `lib/requestLive.ts` |
 | `RequestMessage` | `app/work/(provider)/requests/[id]/_message.tsx` |
 | `RequestMessageInput` | `lib/requestChat.ts` · `lib/requestChat.ts` |
 | `RequestOfferInput` | `lib/requests.ts` · `lib/requests.ts` |
@@ -1092,9 +775,7 @@
 | `RequestStatusName` | `lib/requests.ts` |
 | `RequestStatusPill` | `components/requests/StatusPills.tsx` |
 | `requestsViewer` | `lib/requestsServer.ts` |
-| `RequestsViewerState` | `lib/requestsServer.ts` |
 | `requestsVisibleTo` | `lib/requests.ts` |
-| `RequestTarget` | `lib/requestTarget.ts` |
 | `requestThreadEmail` | `lib/emailTemplates.ts` |
 | `requestVerifiedProviderEmail` | `lib/emailTemplates.ts` |
 | `RequestViewer` | `lib/requests.ts` |
@@ -1102,10 +783,6 @@
 | `requireRole` | `lib/auth.ts` |
 | `requireRoleApi` | `lib/auth.ts` |
 | `requireUser` | `lib/auth.ts` |
-| `RescheduleBanner` | `app/me/bookings/[id]/_body.tsx` |
-| `RescheduleModal` | `app/me/bookings/[id]/_modals.tsx` |
-| `ReschedulePayload` | `app/work/_components/types.ts` |
-| `RescheduleTimePicker` | `components/booking/RescheduleTimePicker.tsx` |
 | `RESERVED_SLUGS` | `lib/slugSpace.ts` |
 | `ResetView` | `app/signin/_reset.tsx` |
 | `resolveCategoryByName` | `lib/categoryTree.ts` |
@@ -1113,32 +790,16 @@
 | `resolveGroups` | `lib/helpTopics.ts` |
 | `resolveMaster` | `app/experts/[slug]/_providerData.ts` |
 | `resolveRequestTarget` | `lib/requestTarget.ts` |
-| `resolveTopics` | `lib/helpTopics.ts` |
 | `resolveTrade` | `lib/serviceProfile.ts` |
-| `resolveTypes` | `lib/catalogItems.ts` |
-| `resolveVerifiedGrant` | `app/admin/_application.ts` |
-| `RESPONSE_MIN_SAMPLE` | `lib/responseTime.ts` |
-| `RESPONSE_WINDOW_DAYS` | `lib/responseTime.ts` |
-| `ResponseMsgRow` | `lib/responseTime.ts` |
-| `ResponseStats` | `lib/responseTime.ts` |
-| `responseTimeLabelKa` | `lib/responseTime.ts` |
-| `responseWindowStart` | `lib/responseTime.ts` |
 | `ResultsBar` | `app/experts/_results.tsx` |
 | `resumeStepId` | `app/request/_model.ts` |
 | `Reveal` | `components/Reveal.tsx` |
 | `RevealableCategory` | `lib/categoryReveal.ts` |
 | `revealCategoryIfHidden` | `lib/categoryReveal.ts` |
-| `RevealContext` | `lib/categoryReveal.ts` |
 | `RevealWrites` | `lib/categoryReveal.ts` |
 | `REVIEW_BODY_MAX` | `lib/offerLifecycle.ts` |
-| `REVIEW_NUDGE_DELAY_HOURS` | `lib/postSession.ts` |
-| `REVIEW_NUDGE_MAX_AGE_DAYS` | `lib/postSession.ts` |
-| `ReviewBlock` | `app/work/(expert)/bookings/[id]/_review.tsx` |
 | `reviewGate` | `lib/offerLifecycle.ts` |
-| `ReviewGate` | `lib/offerLifecycle.ts` |
 | `ReviewInput` | `lib/offerLifecycle.ts` · `lib/offerLifecycle.ts` |
-| `reviewNudgeEmail` | `lib/emailTemplates.ts` |
-| `Reviews` | `app/experts/[slug]/_reviews.tsx` |
 | `ReviewsBlock` | `app/experts/[slug]/_providerBlocks.tsx` |
 | `ReviewsSection` | `app/admin/_reviews.tsx` |
 | `reviveDraft` | `app/request/_model.ts` |
@@ -1148,61 +809,36 @@
 | `roleLabel` | `lib/roles.ts` |
 | `RoutableProvider` | `lib/requestRouting.ts` |
 | `routableProviders` | `lib/requestJobs.ts` |
-| `RoutedCategory` | `lib/categoryRoutes.ts` |
 | `routeRequest` | `lib/requestRouting.ts` |
-| `RoutingAudience` | `lib/requestRouting.ts` |
-| `RoutingResult` | `lib/requestRouting.ts` |
-| `routingWhere` | `lib/serviceProfile.ts` |
 | `RowList` | `app/admin/_parts.tsx` |
+| `runCreditJobs` | `lib/creditsServer.ts` |
 | `runOfferLifecycleJobs` | `lib/offerLifecycle.ts` |
 | `runRequestJobs` | `lib/requestJobs.ts` |
-| `runtime` | `app/api/admin/help/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/events/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/reminders/route.ts` · `app/api/log-error/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/uploads/route.ts` |
+| `runtime` | `app/api/admin/help/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/events/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/uploads/route.ts` · `app/api/work/threads/route.ts` |
 | `safeHttpUrl` | `lib/safeUrl.ts` |
 | `safeInternalPath` | `lib/roleHome.ts` |
 | `safeStoredFileUrl` | `lib/safeUrl.ts` |
-| `sameDay` | `components/booking/slots.ts` |
 | `sanitizeMsgBody` | `lib/msgText.ts` |
-| `sanitizePhoneInput` | `components/PhoneInput.tsx` |
 | `sanitizeStored` | `lib/serviceProfile.ts` |
 | `sanitizeSubject` | `lib/emailTemplates.ts` |
 | `SavedExpert` | `app/me/_model.tsx` |
 | `SavedStrip` | `app/me/_saved.tsx` |
-| `savingPct` | `lib/packages.ts` |
-| `scheduleCapacity` | `lib/packages.ts` |
-| `ScheduleLesson` | `app/work/_components/MonthSchedule.tsx` |
+| `SaveProviderBtn` | `components/SaveProviderBtn.tsx` |
 | `scoreCandidate` | `lib/topicMatch.ts` |
-| `Scored` | `lib/helpSearch.ts` |
 | `scoreTopics` | `lib/helpSearch.ts` |
-| `ScriptCheck` | `lib/georgianText.ts` |
 | `SEARCH_FALLBACK_HREF` | `lib/searchFocus.ts` |
-| `SEARCH_FIELD_WEIGHTS` | `lib/tutorsQuery.ts` |
-| `SEARCH_SIMILARITY_THRESHOLD` | `lib/tutorsQuery.ts` |
 | `SEARCH_SYNONYMS` | `lib/searchSynonyms.ts` |
 | `searchAllTopics` | `lib/requestTopics.ts` |
 | `searchAnswer` | `lib/helpSearch.ts` |
-| `SearchField` | `lib/tutorsQuery.ts` |
 | `SearchHero` | `app/experts/_hero.tsx` |
-| `SearchResult` | `lib/helpSearch.ts` |
-| `SearchTerm` | `lib/tutorsQuery.ts` |
 | `searchTopics` | `lib/requestTopics.ts` |
 | `SectionCard` | `app/admin/_parts.tsx` |
-| `selectActivationNudges` | `lib/expertActivation.ts` |
-| `selectExpertEscalations` | `lib/expertEscalation.ts` |
-| `selectReviewNudges` | `lib/postSession.ts` |
 | `sendErrorText` | `lib/msgText.ts` |
-| `sendExpertActivationNudges` | `lib/expertActivation.ts` |
-| `sendExpertRequestEscalations` | `lib/expertEscalation.ts` |
 | `sendMail` | `lib/mailer.ts` |
-| `sendMessageReminders` | `lib/messageReminders.ts` |
-| `sendPostSessionNudges` | `lib/postSession.ts` |
-| `sendSessionReminders` | `lib/sessionReminders.ts` |
 | `Sent` | `app/request/RequestWizard.tsx` |
 | `SeriesData` | `app/admin/_charts.tsx` |
-| `SERVER_FIELD` | `app/join/_expert/_form.tsx` |
 | `SERVICE_BROWSE_GROUPS` | `lib/requestTopics.ts` |
-| `SERVICE_GROUPS` | `lib/serviceProfile.ts` |
-| `SERVICE_SUFFIX` | `components/booking/slots.ts` |
-| `SERVICE_TOPICS` | `lib/serviceProfile.ts` |
+| `SERVICE_SUFFIX` | `lib/homeCatalogue.ts` |
 | `serviceLabels` | `lib/serviceProfile.ts` |
 | `servicePriceLabel` | `lib/b2b.ts` |
 | `ServiceProfileForm` | `app/work/services/_trades.tsx` |
@@ -1210,31 +846,23 @@
 | `ServiceRail` | `app/_home/rail.tsx` |
 | `ServiceRequestInput` | `lib/requests.ts` · `lib/requests.ts` |
 | `serviceRequestRow` | `lib/requests.ts` |
-| `ServicesSection` | `app/experts/[slug]/_sections.tsx` |
-| `ServiceTypeAndAvailability` | `app/work/(expert)/profile/_parts.tsx` |
 | `Session` | `app/me/_model.tsx` |
-| `sessionCountDecrements` | `lib/userDeletion.ts` |
-| `SessionDashboard` | `app/work/_components/SessionDashboard.tsx` |
 | `sessionDate` | `components/workspace/sessionTime.ts` |
 | `sessionDateTime` | `components/workspace/sessionTime.ts` |
-| `sessionImminentEmail` | `lib/emailTemplates.ts` |
-| `sessionReminderEmail` | `lib/emailTemplates.ts` |
-| `SessionsPanel` | `app/me/_sessions.tsx` |
 | `SessionStatus` | `app/me/_model.tsx` |
 | `sessionTime` | `components/workspace/sessionTime.ts` |
-| `SessionTimeline` | `app/work/(expert)/bookings/[id]/_timeline.tsx` |
 | `sessionWeekdayShort` | `components/workspace/sessionTime.ts` |
-| `setCatalogView` | `components/catalog/useCatalogView.ts` |
 | `Sheet` | `components/Sheet.tsx` |
+| `ShopfrontCard` | `app/work/_components/ShopfrontCard.tsx` |
+| `ShopfrontLabel` | `app/work/_components/ShopfrontCard.tsx` |
+| `ShopfrontProps` | `app/work/_components/ShopfrontCard.tsx` |
 | `shouldAutoClose` | `lib/requestRouting.ts` |
-| `shouldPromptRebook` | `lib/postSession.ts` |
 | `showApplyCta` | `lib/roleHome.ts` |
 | `showJoinInvite` | `lib/capabilities.ts` |
 | `showRequestCta` | `lib/requests.ts` |
 | `SignInView` | `app/signin/_signin.tsx` |
 | `signOut` | `lib/signout.ts` |
 | `SignUpView` | `app/signin/_signup.tsx` |
-| `SimilarExperts` | `app/experts/[slug]/_similar.tsx` |
 | `SITE_TEXT_DEFAULTS` | `lib/siteTextDefs.ts` |
 | `SITE_TEXT_PUBLIC_DEFAULTS` | `lib/siteTextDefs.ts` |
 | `SITE_TEXT_TAG` | `lib/siteText.ts` |
@@ -1246,141 +874,76 @@
 | `siteUrl` | `lib/siteUrl.ts` |
 | `Skeleton` | `components/Skeleton.tsx` |
 | `SkeletonKpi` | `components/Skeleton.tsx` |
-| `SkeletonLine` | `components/Skeleton.tsx` |
 | `SkeletonRow` | `components/Skeleton.tsx` |
 | `SkipLink` | `components/SkipLink.tsx` |
-| `Slot` | `app/work/(expert)/schedule/_shared.ts` |
-| `SLOT_GRANULARITY_MIN` | `components/booking/slots.ts` |
-| `SlotRules` | `components/booking/slots.ts` |
-| `SlotSheet` | `app/work/(expert)/schedule/_sheetSlot.tsx` |
-| `SlotsState` | `app/experts/[slug]/_booking.tsx` |
 | `slugify` | `lib/slug.ts` |
 | `slugReserved` | `lib/slugSpace.ts` |
 | `slugTaken` | `lib/slugSpace.ts` |
 | `smallTalk` | `lib/helpSearch.ts` |
-| `SnapshotRow` | `app/work/_components/SnapshotRow.tsx` |
 | `socialMeta` | `lib/seo.ts` |
 | `sortInboxRows` | `lib/inboxRows.ts` |
 | `sortJobRows` | `lib/jobRows.ts` |
 | `SPACE_LABEL` | `lib/roles.ts` |
-| `specialtyError` | `lib/applyValidation.ts` |
-| `Sphere` | `app/join/_expert/_steps.tsx` |
+| `Sphere` | `app/join/_shared/useSpheres.ts` |
 | `sphereOfProfession` | `lib/professions.ts` |
 | `sphereOfProfessions` | `lib/professions.ts` |
 | `sphereToReveal` | `lib/categoryTree.ts` |
 | `splitDated` | `lib/jobRows.ts` |
 | `staffIsOnline` | `lib/requestThread.ts` |
-| `STAGE_DAYS` | `lib/expertActivation.ts` |
 | `StageId` | `app/request/_model.ts` |
-| `StageKey` | `lib/expertEscalation.ts` |
 | `stageOfStep` | `app/request/_model.ts` |
 | `STAGES` | `app/request/_model.ts` |
 | `stagesFor` | `app/request/_model.ts` |
 | `stageState` | `app/request/_model.ts` |
 | `STALE_OPEN_DAYS` | `lib/requestRouting.ts` |
-| `staleRatingTargets` | `lib/userDeletion.ts` |
-| `Stars` | `app/experts/[slug]/_bits.tsx` |
 | `startGoogleSignin` | `app/signin/_model.tsx` |
-| `startOfDay` | `components/booking/slots.ts` |
-| `startOfWeek` | `app/work/(expert)/schedule/_shared.ts` |
-| `StartsByDay` | `components/booking/slots.ts` |
-| `startsOnDay` | `components/booking/slots.ts` |
 | `Stat` | `app/admin/_parts.tsx` |
 | `stationsReached` | `lib/requests.ts` |
 | `STATUS_LABEL` | `lib/requests.ts` |
-| `STATUS_MAP` | `app/me/bookings/[id]/_model.tsx` |
 | `StatusBadge` | `app/me/_model.tsx` |
 | `StatusPill` | `components/StatusPill.tsx` |
 | `stem` | `lib/helpSearch.ts` |
 | `stemWord` | `lib/topicMatch.ts` |
 | `Step` | `components/StepIndicator.tsx` |
-| `Step1` | `app/join/_expert/_steps.tsx` |
-| `Step2` | `app/join/_expert/_steps.tsx` |
 | `stepComplete` | `app/request/_model.ts` |
 | `StepContact` | `app/request/_stepContact.tsx` |
 | `StepDef` | `app/request/_model.ts` |
 | `stepDotClass` | `components/StepIndicator.tsx` |
-| `StepHeader` | `app/join/_expert/_chrome.tsx` |
-| `StepId` | `app/join/_expert/_form.tsx` |
 | `StepIndicator` | `components/StepIndicator.tsx` |
-| `StepPart` | `app/join/_expert/_form.tsx` |
 | `StepPick` | `app/request/_stepPick.tsx` |
-| `StepProps` | `app/join/_expert/_form.tsx` |
-| `STEPS` | `app/join/_expert/_form.tsx` |
 | `stepsFor` | `app/request/_model.ts` |
-| `StepState` | `components/StepIndicator.tsx` |
 | `StepWhat` | `app/request/_stepWhat.tsx` |
-| `StickyBookingCard` | `app/experts/[slug]/_booking.tsx` |
-| `StoredPattern` | `lib/availabilityTopUp.ts` |
 | `strandedBy` | `lib/categoryTree.ts` |
 | `StrengthBar` | `app/signin/_fields.tsx` |
-| `stripAvatar` | `lib/stripTutorBlobs.ts` |
-| `stripTutorBlobs` | `lib/stripTutorBlobs.ts` |
 | `StudentBadges` | `components/student/useStudentBadges.ts` |
-| `StudentPackages` | `app/me/_packages.tsx` |
 | `StudentSidebar` | `components/student/StudentSidebar.tsx` |
-| `StudentsSection` | `app/work/(expert)/profile/_students.tsx` |
 | `StudentWorkspaceShell` | `components/student/StudentWorkspaceShell.tsx` |
 | `StudentWorkspaceTopBar` | `components/student/StudentWorkspaceTopBar.tsx` |
 | `subscribeRequestLive` | `lib/requestLiveClient.ts` |
 | `SubTabs` | `app/admin/_parts.tsx` |
-| `subtractIntervals` | `lib/availability.ts` |
 | `SUGGESTED_TOPIC_IDS` | `lib/requestTopics.ts` |
 | `SUGGESTED_TOPICS` | `lib/requestTopics.ts` |
 | `suggestedFor` | `lib/requestTopics.ts` |
-| `summarizeProfessionData` | `app/admin/_application.ts` |
-| `SummaryBooking` | `lib/bookings.ts` |
 | `SUPPORT_EMAIL` | `lib/supportEmails.ts` |
 | `SWEEP_STALE_MIN` | `lib/sweepRunner.ts` |
-| `SweepStatus` | `lib/sweepRunner.ts` |
-| `SYNONYM_TERM_WEIGHT` | `lib/tutorsQuery.ts` |
 | `SystemSection` | `app/admin/_system.tsx` |
 | `Tab` | `app/me/_model.tsx` |
 | `TAB_ALIASES` | `app/admin/_nav.tsx` |
 | `TabHeader` | `app/admin/_parts.tsx` |
-| `tabOf` | `app/me/bookings/[id]/_model.tsx` |
-| `TabPanel` | `app/work/(expert)/profile/_parts.tsx` |
-| `takeCertFiles` | `app/join/_expert/_upload.tsx` |
-| `TB_OFFSET_MS` | `lib/tz.ts` · `app/work/(expert)/schedule/_shared.ts` |
-| `tbDateValue` | `app/work/(expert)/schedule/_shared.ts` |
-| `tbDayNum` | `app/work/(expert)/schedule/_shared.ts` |
-| `tbFrom` | `app/work/(expert)/schedule/_shared.ts` |
-| `tbHour` | `app/work/(expert)/schedule/_shared.ts` |
+| `TabPanel` | `app/work/profile/_parts.tsx` |
+| `takeCertFiles` | `app/join/_shared/_upload.tsx` |
+| `taskHref` | `lib/credits.ts` |
+| `TB_OFFSET_MS` | `lib/tz.ts` |
 | `TBILISI` | `lib/tz.ts` |
-| `TBILISI_TZ` | `lib/bookings.ts` |
 | `tbilisiDeltaHours` | `lib/tz.ts` |
-| `TbilisiHint` | `components/booking/TzLabels.tsx` |
-| `tbilisiHour` | `lib/postSession.ts` |
-| `tbilisiInstant` | `app/work/(expert)/schedule/_shared.ts` |
 | `tbilisiParts` | `lib/tz.ts` |
-| `tbInputValue` | `app/work/(expert)/schedule/_shared.ts` |
-| `tbShift` | `app/work/(expert)/schedule/_shared.ts` |
-| `tbStartOfDay` | `app/work/(expert)/schedule/_shared.ts` |
-| `tbTimeValue` | `app/work/(expert)/schedule/_shared.ts` |
-| `tbWeekdayMon0` | `app/work/(expert)/schedule/_shared.ts` |
-| `TEACHER_AGES` | `lib/packages.ts` |
-| `TEACHER_LEVELS` | `lib/packages.ts` |
-| `teacherFieldLabels` | `lib/packages.ts` |
-| `TeacherFields` | `lib/packages.ts` |
-| `TEMPLATE_PARAM` | `app/work/(expert)/schedule/_shared.ts` |
 | `templateFor` | `lib/requestTopics.ts` |
-| `TemplateSheet` | `app/work/(expert)/schedule/_sheetTemplate.tsx` |
 | `TETRI` | `lib/credits.ts` |
 | `ThanksCard` | `app/request/_thanks.tsx` |
-| `ThreadBooking` | `components/chat/useBookingThread.ts` |
 | `threadClosedReason` | `lib/requestThread.ts` |
-| `ThreadHeader` | `components/chat/ThreadHeader.tsx` |
 | `threadIsOpen` | `lib/requestThread.ts` |
-| `ThreadPair` | `components/chat/useBookingThread.ts` |
-| `ThreadPre` | `components/chat/useBookingThread.ts` |
-| `ThreadRef` | `components/RequestChat.tsx` |
 | `ThreadSide` | `lib/requestThread.ts` |
-| `tierOf` | `lib/consultationTier.ts` |
-| `tierPriceLabel` | `components/booking/slots.ts` |
-| `TierShape` | `components/booking/slots.ts` |
-| `TIME_BANDS` | `components/booking/slots.ts` |
 | `timeAgoKa` | `lib/requests.ts` |
-| `TimeChoice` | `components/booking/slots.ts` |
 | `timelineOf` | `lib/offerEvents.ts` |
 | `TIMING` | `lib/requestTopics.ts` |
 | `timingLabel` | `lib/requestTopics.ts` |
@@ -1389,113 +952,75 @@
 | `Toast` | `components/Toast.tsx` |
 | `ToastKind` | `components/Toast.tsx` |
 | `ToastProvider` | `components/ToastProvider.tsx` |
-| `toCatalogItems` | `lib/catalogItems.ts` |
-| `TodayHero` | `app/work/_components/TodayHero.tsx` |
 | `toggleIn` | `app/experts/_filters.tsx` |
-| `toggleType` | `lib/catalogItems.ts` |
 | `tokenize` | `lib/topicMatch.ts` |
 | `tokens` | `lib/helpSearch.ts` |
 | `toLangCode` | `lib/languages.ts` |
-| `toLangLabel` | `app/experts/[slug]/_data.tsx` |
-| `toneOf` | `app/work/(expert)/bookings/[id]/_model.tsx` · `app/work/_components/types.ts` |
 | `TopBar` | `app/admin/_nav.tsx` |
 | `Topic` | `lib/requestTopics.ts` |
 | `TOPIC_GROUPS` | `lib/requestTopics.ts` |
 | `TOPIC_KEYWORDS` | `lib/helpSearch.ts` |
-| `TOPIC_OPTIONS` | `components/booking/IntakeStep.tsx` |
 | `topicById` | `lib/requestTopics.ts` |
 | `TopicGroup` | `lib/requestTopics.ts` |
 | `TopicHit` | `lib/requestTopics.ts` |
 | `topicLabel` | `lib/requestTopics.ts` |
+| `topicsForProfessions` | `lib/requestRouting.ts` |
 | `topicsForProvider` | `lib/requestTopics.ts` |
 | `topicsForRoute` | `lib/helpTopics.ts` |
-| `topUpAvailability` | `lib/availabilityTopUp.ts` |
-| `TopUpResult` | `lib/availabilityTopUp.ts` |
-| `toTimeChoices` | `components/booking/slots.ts` |
 | `track` | `lib/events.ts` |
-| `trackApply` | `app/join/_expert/applyFunnelEvents.ts` |
-| `trackFunnel` | `components/booking/funnelEvents.ts` |
+| `trackFunnel` | `lib/funnelEvents.ts` |
 | `trackHelp` | `lib/helpTopics.ts` |
 | `trackRequestFunnel` | `app/request/requestFunnelEvents.ts` |
 | `Trade` | `app/experts/[slug]/_tradeLanding.tsx` |
 | `TRADE_LANDING_MIN` | `lib/serviceProfile.ts` |
-| `TradeIconKey` | `lib/serviceMarks.ts` |
 | `tradeLabel` | `lib/catalogItems.ts` · `app/experts/[slug]/_tradeLanding.tsx` |
 | `TradeLanding` | `app/experts/[slug]/_tradeLanding.tsx` |
-| `TradeMark` | `lib/serviceMarks.ts` |
 | `tradeTopicIds` | `lib/catalogItems.ts` · `lib/serviceProfile.ts` |
 | `Transcript` | `app/request/_transcript.tsx` |
 | `TREE_ERROR` | `lib/categoryTree.ts` |
-| `TreeChange` | `lib/categoryTree.ts` |
-| `TreeErrorCode` | `lib/categoryTree.ts` |
 | `TreeNode` | `lib/categoryTree.ts` |
 | `TreeTarget` | `lib/categoryTree.ts` |
 | `TRIAGE_LABEL` | `lib/requestTriage.ts` |
-| `TriageFlag` | `lib/requestTriage.ts` |
 | `triageFlags` | `lib/requestTriage.ts` |
-| `TriageInput` | `lib/requestTriage.ts` |
 | `triageNote` | `lib/requestTriage.ts` |
 | `TrustStrip` | `components/TrustStrip.tsx` |
-| `Tutor` | `app/experts/_data.tsx` |
-| `TUTOR_DEFAULTS` | `components/booking/slots.ts` |
-| `TUTOR_ID_RE` | `components/booking/funnelEvents.ts` |
 | `TUTOR_PAYOUT_PCT` | `lib/flags.ts` |
-| `tutorBookingCache` | `app/work/(expert)/bookings/[id]/_model.tsx` |
-| `TutorCard` | `app/experts/_card.tsx` |
-| `TutorDetail` | `app/experts/[slug]/_data.tsx` |
-| `TutorFilters` | `app/experts/_filters.tsx` |
-| `TutorListRow` | `lib/tutorsQuery.ts` |
-| `TutorProfile` | `app/work/(expert)/profile/_types.ts` |
-| `tutorScheduleCapacity` | `lib/packageFit.ts` |
-| `TutorsQueryParams` | `lib/tutorsQuery.ts` |
-| `tutorYouTubeId` | `app/experts/_data.tsx` |
-| `typeParam` | `lib/catalogItems.ts` |
+| `TutorProfile` | `app/work/profile/_types.ts` |
 | `TZ_LABEL` | `lib/emailTemplates.ts` · `lib/tz.ts` |
 | `TzNote` | `components/workspace/TzNote.tsx` |
 | `UNANSWERED_NUDGE_HOURS` | `lib/requestRouting.ts` |
 | `UNDATED_LABEL` | `lib/jobRows.ts` |
+| `UnlockResult` | `lib/creditsServer.ts` |
 | `unreadFor` | `lib/requestChat.ts` |
 | `UNSTATED` | `lib/requestTopics.ts` |
 | `UNSTATED_BUDGET` | `lib/requestTopics.ts` |
-| `UPCOMING_STATUSES` | `lib/bookings.ts` |
-| `urlError` | `lib/applyValidation.ts` |
 | `useAssignableCategories` | `app/admin/_categoryPicker.tsx` |
 | `useAvatarCropper` | `components/AvatarCropper.tsx` |
-| `useBookingThread` | `components/chat/useBookingThread.ts` |
 | `useCatalogView` | `components/catalog/useCatalogView.ts` |
-| `useCompanyBalance` | `components/booking/CompanyBalance.tsx` |
-| `useCountdown` | `app/me/bookings/[id]/_model.tsx` |
 | `usefulLangs` | `app/experts/_filters.tsx` |
 | `useMe` | `lib/me.ts` |
 | `useMenuKeys` | `lib/useMenuKeys.ts` |
 | `useMessagesUnread` | `lib/messagesUnread.ts` |
 | `useNavBadges` | `components/tutor/useNavBadges.ts` |
 | `useNotifications` | `lib/notifications.ts` |
-| `useRemainingLabel` | `app/me/bookings/[id]/_model.tsx` · `app/work/(expert)/bookings/[id]/_model.tsx` |
 | `UserMenu` | `components/UserMenu.tsx` |
 | `UsersSection` | `app/admin/_users.tsx` |
 | `userTimezone` | `lib/tz.ts` |
 | `useScrollIntoResults` | `lib/useScrollIntoResults.ts` |
 | `useSiteText` | `components/SiteTextProvider.tsx` |
 | `useSiteTextMap` | `components/SiteTextProvider.tsx` |
-| `useSpheres` | `app/join/_expert/_steps.tsx` |
+| `useSpheres` | `app/join/_shared/useSpheres.ts` |
 | `useStudentBadges` | `components/student/useStudentBadges.ts` |
 | `useToast` | `components/ToastProvider.tsx` |
 | `useUnsavedGuard` | `lib/useUnsavedGuard.ts` |
-| `useUserTz` | `app/me/bookings/[id]/_model.tsx` |
 | `VALID_TABS` | `app/admin/_nav.tsx` |
-| `Verdict` | `app/work/_components/ProfileSignal.tsx` |
-| `VerifiedGrant` | `app/admin/_application.ts` |
-| `VerifiedMark` | `components/Avatar.tsx` · `app/experts/[slug]/_bits.tsx` |
+| `VerifiedMark` | `components/Avatar.tsx` |
 | `verifyPassword` | `lib/auth.ts` |
 | `VerifyView` | `app/signin/_verify.tsx` |
 | `Vertical` | `lib/requestTopics.ts` |
 | `VERTICAL_COPY` | `lib/requestTopics.ts` |
 | `verticalOfTopic` | `lib/requestTopics.ts` |
 | `VERTICALS` | `lib/requestTopics.ts` |
-| `videoError` | `lib/applyValidation.ts` |
-| `VideoHero` | `app/experts/[slug]/_hero.tsx` |
-| `VideoPreview` | `app/experts/_card.tsx` |
 | `View` | `app/signin/_model.tsx` |
 | `VIEW_CLASS` | `components/catalog/useCatalogView.ts` |
 | `VIEW_TITLES` | `app/signin/_model.tsx` |
@@ -1503,57 +1028,43 @@
 | `viewport` | `app/layout.tsx` |
 | `ViewToggle` | `components/catalog/ViewToggle.tsx` |
 | `vocabularyIsConsistent` | `lib/serviceProfile.ts` |
-| `WEEK_HEADERS` | `components/booking/slots.ts` |
-| `WeeklyBlock` | `lib/availabilityRules.ts` |
-| `WeeklyPattern` | `app/me/_pattern.tsx` |
 | `Welcome` | `app/me/_welcome.tsx` |
 | `welcomeEmail` | `lib/emailTemplates.ts` |
-| `WindowErrorCode` | `lib/availabilityRules.ts` |
-| `windowErrorMessage` | `lib/availabilityRules.ts` |
-| `windowRangeError` | `lib/availabilityRules.ts` |
 | `withAccountContact` | `app/request/_model.ts` |
 | `withdrawOffer` | `lib/offerLifecycle.ts` |
 | `withdrawWhere` | `lib/offerLifecycle.ts` |
 | `withKind` | `app/request/_model.ts` |
 | `withTarget` | `app/request/_model.ts` |
 | `withTopic` | `app/request/_model.ts` |
-| `WordReveal` | `components/home/WordReveal.tsx` |
 | `wordScore` | `lib/topicMatch.ts` |
 | `WORK_ONLY_NAV` | `components/tutor/navConfig.ts` |
 | `WorkBlock` | `app/experts/[slug]/_providerBlocks.tsx` |
-| `workMatchesQuery` | `lib/catalogItems.ts` |
 | `WorkPhotos` | `app/join/_master/_workPhotos.tsx` |
-| `workRefined` | `app/experts/_filters.tsx` |
 | `WORKSPACE_NAV` | `components/student/navConfig.ts` · `components/tutor/navConfig.ts` |
 | `WorkspaceFooter` | `components/WorkspaceFooter.tsx` |
 | `WorkspaceShell` | `components/tutor/WorkspaceShell.tsx` |
 | `WorkspaceSidebar` | `components/tutor/WorkspaceSidebar.tsx` |
 | `WorkspaceTopBar` | `components/tutor/WorkspaceTopBar.tsx` |
+| `WorkTabs` | `app/work/_components/WorkTabs.tsx` |
 | `wrapIndex` | `lib/keyboard.ts` |
-| `writeApplyDraft` | `app/join/_expert/_draft.tsx` |
 | `writeJoin` | `app/join/_door/DoorQuestion.tsx` |
 | `writeSignupDraft` | `app/signin/_model.tsx` |
-| `yearsError` | `lib/applyValidation.ts` |
 
 ---
 
 # Prisma models and their fields
 
-40 models. The UI word is not the column name — check here before writing a query.
+30 models. The UI word is not the column name — check here before writing a query.
 
 **AuditLog** — id:String · actorId:String · action:String · targetType:String? · targetId:String? · meta:Json? · createdAt:DateTime
 
-**AvailabilitySlot** — id:String · tutorId:String · startAt:DateTime · endAt:DateTime · booked:Boolean · tutor:TutorProfile
-
 **B2BService** — id:String · kind:String · direction:String · title:String · description:String? · format:String? · imageUrl:String? · priceGel:Int · priceOnRequest:Boolean · order:Int · visible:Boolean · createdAt:DateTime · updatedAt:DateTime · requests:BusinessLead[]
-
-**Booking** — id:String · ref:String · studentId:String · tutorId:String · consultationId:String? · topic:String · status:BookingStatus · startAt:DateTime · durationMin:Int · price:Int · serviceType:ServiceType · autoCompleted:Boolean · payoutStatus:PayoutStatus · heldSlotId:String? · studentNotes:String? · tutorNotes:String? · meetingUrl:String? · cancelledBy:Role? · cancelReason:String? · rescheduleRequest:Json? · sessionReminderSentAt:DateTime? · proposedByStudent:Boolean · proposedAlternates:Json? · paymentLinkUrl:String? · enrollmentId:String? · paidBy:PaymentSource? · createdAt:DateTime · updatedAt:DateTime · student:User · tutor:TutorProfile · consultation:Consultation? · enrollment:Enrollment? · messages:Message[] · review:Review? · legacyRescheduleRequests:LegacyRescheduleRequest[] · dispute:Dispute?
 
 **BusinessLead** — id:String · companyName:String · taxId:String? · contactName:String · phone:String · email:String · interest:String? · message:String? · status:BusinessLeadStatus · serviceId:String? · service:B2BService? · agreedPrice:Int? · adminNote:String? · createdAt:DateTime
 
-**Category** — id:String · slug:String · name:String · icon:String? · count:Int · order:Int · defaultServiceType:ServiceType · isLive:Boolean · status:CategoryStatus · parentId:String? · parent:Category? · children:Category[] · tutors:TutorProfile[] · serviceRequests:ServiceRequest[]
+**Category** — id:String · slug:String · name:String · icon:String? · count:Int · order:Int · isLive:Boolean · status:CategoryStatus · parentId:String? · parent:Category? · children:Category[] · providers:ServiceProfile[] · serviceRequests:ServiceRequest[]
 
-**Certificate** — id:String · tutorId:String · title:String · issuer:String · year:Int · fileUrl:String? · verified:Boolean · createdAt:DateTime · tutor:TutorProfile
+**Certificate** — id:String · providerId:String · title:String · issuer:String · year:Int · fileUrl:String? · verified:Boolean · createdAt:DateTime · provider:ServiceProfile
 
 **Company** — id:String · name:String · taxId:String? · balance:Int · status:CompanyStatus · note:String? · createdAt:DateTime · updatedAt:DateTime · members:CompanyMember[] · transactions:CompanyTransaction[] · serviceProfile:ServiceProfile? · requestOffers:RequestOffer[] · requestAccess:RequestAccess?
 
@@ -1561,39 +1072,27 @@
 
 **CompanyTransaction** — id:String · companyId:String · type:CompanyTransactionType · amount:Int · balanceAfter:Int · bookingId:String? · actorId:String? · note:String? · createdAt:DateTime · company:Company
 
-**Consultation** — id:String · tutorId:String · tier:ConsultationTier · title:String · description:String · minutes:Int · price:Int · bookable:Boolean · tutor:TutorProfile · bookings:Booking[]
-
 **CreditEntry** — id:String · userId:String · user:User · amountTetri:Int · reason:String · grantKey:String? · refId:String? · createdAt:DateTime
 
-**Dispute** — id:String · bookingId:String · studentId:String · tutorId:String · reason:DisputeReason · details:String? · requested:DisputeOutcome · outcome:DisputeOutcome · resolution:String? · createdAt:DateTime · resolvedAt:DateTime? · resolvedBy:String? · booking:Booking
-
-**Education** — id:String · tutorId:String · school:String · degree:String · field:String? · startYear:Int · endYear:Int? · createdAt:DateTime · tutor:TutorProfile
-
-**Enrollment** — id:String · packageId:String? · studentId:String · tutorId:String · status:EnrollmentStatus · lessonsTotal:Int · lessonsUsed:Int · priceTotal:Int · perLessonPrice:Int · minutesPerLesson:Int? · paidAt:DateTime? · startsAt:DateTime? · expiresAt:DateTime? · createdAt:DateTime · updatedAt:DateTime · student:User · tutor:TutorProfile · package:Package? · bookings:Booking[]
+**Education** — id:String · providerId:String · school:String · degree:String · field:String? · startYear:Int · endYear:Int? · createdAt:DateTime · provider:ServiceProfile
 
 **Event** — id:String · name:String · at:DateTime · userId:String? · props:Json?
 
-**Experience** — id:String · tutorId:String · company:String · role:String · startYear:Int · endYear:Int? · description:String? · createdAt:DateTime · tutor:TutorProfile
+**Experience** — id:String · providerId:String · company:String · role:String · startYear:Int · endYear:Int? · description:String? · createdAt:DateTime · provider:ServiceProfile
 
-**Favorite** — id:String · userId:String · tutorId:String · createdAt:DateTime · user:User · tutor:TutorProfile
+**Favorite** — id:String · userId:String · providerId:String · createdAt:DateTime · user:User · provider:ServiceProfile
 
 **HelpMessage** — id:String · at:DateTime · route:String? · question:String? · message:String · email:String? · name:String? · userId:String? · status:String · handledAt:DateTime?
 
 **JobRun** — key:String · ranAt:DateTime · ok:Boolean? · result:Json?
 
-**LegacyRescheduleRequest** — id:String · bookingId:String · proposedBy:String · newStartAt:DateTime · newDurationMin:Int · reason:String? · status:RescheduleStatus · decidedAt:DateTime? · createdAt:DateTime · booking:Booking
-
-**MasterApplication** — id:String · userId:String · user:User · kind:MasterKind · fullName:String · phone:String · companyName:String? · taxId:String? · services:String[] · areas:String[] · about:String · yearsExp:Int? · calloutFee:Int? · priceFrom:Int? · priceList:Json? · photoUrl:String? · workPhotos:String[] · status:ApplicationStatus · moderatorNote:String? · reviewedAt:DateTime? · createdAt:DateTime · updatedAt:DateTime
-
-**Message** — id:String · bookingId:String? · fromId:String · toId:String · body:String · fileUrl:String? · fileName:String? · readAt:DateTime? · reminderEmailSentAt:DateTime? · createdAt:DateTime · booking:Booking? · from:User · to:User
+**MasterApplication** — id:String · userId:String · user:User · kind:MasterKind · fullName:String · phone:String · companyName:String? · taxId:String? · services:String[] · areas:String[] · professions:String[] · about:String · yearsExp:Int? · calloutFee:Int? · priceFrom:Int? · priceList:Json? · photoUrl:String? · workPhotos:String[] · status:ApplicationStatus · moderatorNote:String? · reviewedAt:DateTime? · createdAt:DateTime · updatedAt:DateTime
 
 **Notification** — id:String · userId:String · title:String · body:String? · href:String? · type:String · readAt:DateTime? · createdAt:DateTime · user:User
 
 **OfferEvent** — id:String · offerId:String · offer:RequestOffer · type:String · at:DateTime · meta:Json?
 
 **OtpCode** — id:String · userId:String · code:String · purpose:String · expiresAt:DateTime · consumed:Boolean · createdAt:DateTime · user:User
-
-**Package** — id:String · tutorId:String · title:String · description:String · lessonsCount:Int · minutesPerLesson:Int · price:Int · validDays:Int · active:Boolean · tutor:TutorProfile · enrollments:Enrollment[]
 
 **PasswordResetToken** — id:String · userId:String · tokenHash:String · expiresAt:DateTime · consumed:Boolean · createdAt:DateTime · user:User
 
@@ -1605,19 +1104,15 @@
 
 **RequestOffer** — id:String · requestId:String · request:ServiceRequest · providerKind:RequestProviderKind · expertUserId:String? · expertUser:User? · companyId:String? · company:Company? · priceGel:Int · priceKind:String · daysEstimate:Int? · message:String · status:RequestOfferStatus · kind:RequestOfferKind · doneAt:DateTime? · doneBy:String? · closedAt:DateTime? · review:Review? · createdAt:DateTime · updatedAt:DateTime · messages:RequestMessage[] · events:OfferEvent[]
 
-**Review** — id:String · bookingId:String? · offerId:String? · studentId:String · tutorId:String? · rating:Int · body:String · ratingKnowledge:Int? · ratingClarity:Int? · ratingValue:Int? · ratingPunctuality:Int? · tutorResponse:String? · respondedAt:DateTime? · anonymous:Boolean · createdAt:DateTime · booking:Booking? · offer:RequestOffer? · student:User · tutor:TutorProfile?
+**Review** — id:String · offerId:String? · studentId:String · rating:Int · body:String · ratingKnowledge:Int? · ratingClarity:Int? · ratingValue:Int? · ratingPunctuality:Int? · tutorResponse:String? · respondedAt:DateTime? · anonymous:Boolean · createdAt:DateTime · offer:RequestOffer? · student:User
 
-**ServiceProfile** — id:String · userId:String? · user:User? · companyId:String? · company:Company? · services:String[] · areas:String[] · calloutFee:Int? · priceFrom:Int? · priceList:Json? · photoUrl:String? · about:String? · workPhotos:String[] · slug:String? · published:Boolean · available:Boolean · createdAt:DateTime · updatedAt:DateTime
+**ServiceProfile** — id:String · userId:String? · user:User? · companyId:String? · company:Company? · services:String[] · areas:String[] · calloutFee:Int? · priceFrom:Int? · priceList:Json? · photoUrl:String? · about:String? · workPhotos:String[] · slug:String? · published:Boolean · available:Boolean · servicesConfirmedAt:DateTime? · headline:String? · professions:String[] · categoryId:String? · category:Category? · yearsExp:Int · languages:String[] · verified:Boolean · featured:Boolean · linkedinUrl:String? · websiteUrl:String? · videoUrl:String? · responseHours:Int · responseMedianMin:Int? · responseSampleN:Int? · rating:Float · reviewsCount:Int · certificates:Certificate[] · education:Education[] · experience:Experience[] · favorites:Favorite[] · createdAt:DateTime · updatedAt:DateTime
 
-**ServiceRequest** — id:String · publicRef:String · kind:String · topic:String · categoryId:String? · category:Category? · pickMode:String · description:String · budgetMin:Int · budgetMax:Int? · budgetUnit:String · timing:String · details:Json? · format:String · city:String · contactName:String · phone:String · email:String? · userId:String? · user:User? · status:ServiceRequestStatus · adminNote:String? · verifiedAt:DateTime? · verifiedById:String? · providerNudgeAt:DateTime? · clientNudgeAt:DateTime? · offerLimit:Int · offerCount:Int · createdAt:DateTime · updatedAt:DateTime · offers:RequestOffer[] · messages:RequestMessage[]
+**ServiceRequest** — id:String · publicRef:String · kind:String · topic:String · categoryId:String? · category:Category? · pickMode:String · description:String · budgetMin:Int · budgetMax:Int? · budgetUnit:String · timing:String · details:Json? · format:String · city:String · contactName:String · phone:String · email:String? · userId:String? · user:User? · photos:String[] · status:ServiceRequestStatus · adminNote:String? · verifiedAt:DateTime? · verifiedById:String? · providerNudgeAt:DateTime? · clientNudgeAt:DateTime? · offerLimit:Int · offerCount:Int · createdAt:DateTime · updatedAt:DateTime · offers:RequestOffer[] · messages:RequestMessage[]
 
 **Session** — id:String · userId:String · token:String · expiresAt:DateTime · impersonatorId:String? · createdAt:DateTime · user:User
 
 **SiteText** — key:String · value:String · updatedAt:DateTime
 
-**TutorApplication** — id:String · userId:String · fullName:String · phone:String · city:String? · specialty:String · yearsExp:Int · hourlyRate:Int · motivation:String · linkedinUrl:String? · websiteUrl:String? · introVideoUrl:String? · introVideoId:String? · professionData:Json? · idDocUrl:String? · selfieUrl:String? · certificates:Json? · status:ApplicationStatus · moderatorNote:String? · createdAt:DateTime · reviewedAt:DateTime? · user:User
-
-**TutorProfile** — id:String · slug:String? · userId:String · headline:String · bio:String? · specialty:String · yearsExp:Int · rating:Float · reviewsCount:Int · sessionsCount:Int · price:Int · currency:String · verified:Boolean · available:Boolean · responseHours:Int · responseMedianMin:Int? · responseSampleN:Int? · languages:String[] · professions:String[] · linkedinUrl:String? · websiteUrl:String? · professionData:Json? · serviceType:ServiceType · consultationDurationMin:Int · bufferMin:Int · videoUrl:String? · featured:Boolean · profileType:ProfileType · packagesEnabled:Boolean · createdAt:DateTime · updatedAt:DateTime · user:User · categoryId:String? · category:Category? · consultations:Consultation[] · bookings:Booking[] · availability:AvailabilitySlot[] · reviews:Review[] · favorites:Favorite[] · certificates:Certificate[] · education:Education[] · experience:Experience[] · packages:Package[] · enrollments:Enrollment[]
-
-**User** — id:String · email:String · passwordHash:String · fullName:String · phone:String? · avatarUrl:String? · bio:String? · role:Role · locale:String · emailVerified:Boolean · notificationPrefs:Json? · suspendedAt:DateTime? · supportSeenAt:DateTime? · createdAt:DateTime · updatedAt:DateTime · tutor:TutorProfile? · application:TutorApplication? · companyMemberships:CompanyMember[] · bookingsAsStudent:Booking[] · enrollments:Enrollment[] · sentMessages:Message[] · receivedMessages:Message[] · reviewsGiven:Review[] · favorites:Favorite[] · creditEntries:CreditEntry[] · notifications:Notification[] · sessions:Session[] · otpCodes:OtpCode[] · resetTokens:PasswordResetToken[] · serviceRequests:ServiceRequest[] · requestOffers:RequestOffer[] · requestMessages:RequestMessage[] · requestAccess:RequestAccess? · serviceProfile:ServiceProfile? · masterApplication:MasterApplication?
+**User** — id:String · email:String · passwordHash:String · fullName:String · phone:String? · avatarUrl:String? · bio:String? · role:Role · locale:String · emailVerified:Boolean · notificationPrefs:Json? · suspendedAt:DateTime? · supportSeenAt:DateTime? · createdAt:DateTime · updatedAt:DateTime · companyMemberships:CompanyMember[] · reviewsGiven:Review[] · favorites:Favorite[] · creditEntries:CreditEntry[] · notifications:Notification[] · sessions:Session[] · otpCodes:OtpCode[] · resetTokens:PasswordResetToken[] · serviceRequests:ServiceRequest[] · requestOffers:RequestOffer[] · requestMessages:RequestMessage[] · requestAccess:RequestAccess? · serviceProfile:ServiceProfile? · masterApplication:MasterApplication?
 

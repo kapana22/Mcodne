@@ -36,7 +36,10 @@ export async function GET(req: Request) {
     select: {
       id: true, email: true, fullName: true, role: true, emailVerified: true,
       createdAt: true, avatarUrl: true,
-      _count: { select: { bookingsAsStudent: true, sentMessages: true } },
+      // ⚠️ WAS „bookings as a student, messages sent" (2026-08-24) — two
+      // counts of a product that is gone. What says the same thing now is what
+      // they asked for and what they offered.
+      _count: { select: { serviceRequests: true, requestOffers: true } },
     },
   })
 

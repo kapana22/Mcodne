@@ -7,8 +7,16 @@ import { hierarchyError, TREE_ERROR } from '@/lib/categoryTree'
 
 // PATCH /api/admin/categories/[id]
 // Partial update — any of `name`, `status` (VISIBLE / HIDDEN / REDIRECTED),
-// `parentId`, `defaultServiceType`. Zod refuses empty bodies so no-op PATCHes
-// fail loud instead of silently returning 200.
+// `parentId`. Zod refuses empty bodies so no-op PATCHes fail loud instead of
+// silently returning 200.
+//
+// ⚠️ `defaultServiceType` WAS A FOURTH FIELD AND THE COLUMN IS GONE — the
+// services-only migration dropped Category.defaultServiceType on 2026-08-24
+// (prisma/manual-migrations/2026-08-24-services-only/up.sql) and these two
+// route files kept selecting it, so EVERY request here threw
+// PrismaClientValidationError in production and the whole „კატეგორიები" tab
+// was dead. `tsc` does not catch a stale Prisma select; tests/schemaDrift
+// does.
 //
 // `isLive` is NOT accepted. Visibility now has exactly one input — `status` —
 // and the boolean is written from it below, so the two cannot disagree. It is
@@ -21,7 +29,6 @@ const Body = z
     // `null` clears the parent; absent leaves it alone. The two are different
     // requests and zod has to keep them apart, hence nullable + optional.
     parentId: z.string().min(1).nullable().optional(),
-    defaultServiceType: z.enum(['CONSULTATION', 'RECURRING']).optional(),
   })
   .refine(v => Object.keys(v).length > 0, { message: 'EMPTY_BODY' })
 
@@ -76,11 +83,10 @@ export async function PATCH(
         id: true,
         slug: true,
         name: true,
-        defaultServiceType: true,
         isLive: true,
         status: true,
         parentId: true,
-        _count: { select: { tutors: true, children: true } },
+        _count: { select: { providers: true, children: true } },
       },
     })
     // A status change delists or re-lists every expert in the category on the
@@ -92,7 +98,7 @@ export async function PATCH(
     await audit(admin.id, action, {
       targetType: 'Category',
       targetId: id,
-      meta: { name: updated.name, slug: updated.slug, tutorCount: updated._count.tutors, changes: change },
+      meta: { name: updated.name, slug: updated.slug, providerCount: updated._count.providers, changes: change },
     })
     return NextResponse.json({
       ok: true,
@@ -100,13 +106,12 @@ export async function PATCH(
         id: updated.id,
         slug: updated.slug,
         name: updated.name,
-        defaultServiceType: updated.defaultServiceType,
         isLive: updated.isLive,
         status: updated.status,
         parentId: updated.parentId,
-        tutorCount: updated._count.tutors,
+        providerCount: updated._count.providers,
         // Recomputed on the next load; the row only needs it to stay a number.
-        listedCount: updated.status === 'VISIBLE' ? updated._count.tutors : 0,
+        listedCount: updated.status === 'VISIBLE' ? updated._count.providers : 0,
         childCount: updated._count.children,
       },
     })
@@ -125,10 +130,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (auth.response) return auth.response
   const admin = auth.user
   const { id } = await params
-  const cat = await prisma.category.findUnique({ where: { id }, select: { name: true, slug: true, _count: { select: { tutors: true, children: true } } } })
+  const cat = await prisma.category.findUnique({ where: { id }, select: { name: true, slug: true, _count: { select: { providers: true, children: true } } } })
   if (!cat) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
-  if (cat._count.tutors > 0) {
-    return NextResponse.json({ ok: false, error: 'HAS_TUTORS' }, { status: 409 })
+  if (cat._count.providers > 0) {
+    return NextResponse.json({ ok: false, error: 'HAS_PROVIDERS' }, { status: 409 })
   }
   if (cat._count.children > 0) {
     return NextResponse.json({ ok: false, error: 'HAS_CHILDREN', message: TREE_ERROR.HAS_CHILDREN }, { status: 409 })

@@ -22,28 +22,20 @@
 
 import { cache } from 'react'
 import { prisma } from './prisma'
-import { topicsForProvider, type Vertical } from './requests'
-import { PUBLIC_TUTOR } from './tutorsQuery'
+import { topicsForProvider } from './requests'
 import { avatarSrc } from './avatarSrc'
-import { PUBLIC as PUBLIC_MASTER } from '@/app/experts/_masterData'
+import { PUBLIC as PUBLIC_MASTER } from '@/app/experts/_providers'
 
 type RequestTarget = {
-  /** MASTER = a ServiceProfile; EXPERT = a TutorProfile. Both answer at
-   *  /experts/<slug> since stage 11 — ONE namespace, so this no longer says
-   *  which prefix the slug came from, only which TABLE it was found in. The
-   *  wizard only prints the name; the difference matters to the topic
-   *  inference. A slug is unique across both tables (lib/slugSpace), so the
-   *  two lookups below can never both answer. */
-  kind: 'MASTER' | 'EXPERT'
   /** The profile row's id — never rendered, and never the thing written to.
    *  An offer is opened with a USER (see `userId`). */
   id: string
   /** The slug the URL carried, echoed back so the wizard can re-send it. */
   slug: string
   name: string
-  /** The photo ROUTE, never the image (both halves store base64 columns). */
+  /** The photo ROUTE, never the image (the column is base64). */
   photoSrc: string | null
-  /** Whose INVITED thread this opens. Null for a company-owned service profile:
+  /** Whose INVITED thread this opens. Null for a company-owned profile:
    *  RequestOffer can carry a company, but `inviteProviderToRequest` writes to a
    *  person, and inventing a member to write to would be picking somebody. The
    *  request is still created and still routes — only the thread is skipped. */
@@ -53,8 +45,8 @@ type RequestTarget = {
   topics: string[]
 }
 
-/** The slug shape both namespaces produce (lib/masterSlug, lib/expertSlug),
- *  plus the raw cuid both resolvers also accept. Bounded before it reaches a
+/** The slug shape lib/masterSlug produces, plus the raw cuid the resolver
+ *  also accepts. Bounded before it reaches a
  *  query: this is a URL anybody can craft. */
 function cleanTo(raw: string | null | undefined): string {
   const v = (raw ?? '').trim().toLowerCase()
@@ -70,7 +62,8 @@ async function master(to: string): Promise<RequestTarget | null> {
     // below asks whether one is servable and gets back a boolean.
     select: {
       id: true, slug: true, services: true, updatedAt: true, userId: true,
-      user: { select: { fullName: true } },
+      professions: true, category: { select: { slug: true } },
+      user: { select: { id: true, fullName: true, avatarUrl: true } },
       company: { select: { name: true } },
     },
   })
@@ -81,40 +74,18 @@ async function master(to: string): Promise<RequestTarget | null> {
     row.id,
   ).catch(() => [])
   return {
-    kind: 'MASTER',
     id: row.id,
     slug: row.slug || row.id,
     name: row.company?.name ?? row.user?.fullName ?? '',
+    // The uploaded photo, else the account avatar — a migrated professional
+    // never had a `photoUrl` and their face is on their account.
     photoSrc: probe[0]?.hasPhoto
       ? `/api/masters/${row.id}/photo?v=${row.updatedAt.getTime()}`
-      : null,
-    userId: row.userId,
-    topics: topicsForProvider({ kind: 'MASTER', services: row.services }),
-  }
-}
-
-async function expert(to: string): Promise<RequestTarget | null> {
-  const row = await prisma.tutorProfile.findFirst({
-    where: { AND: [{ OR: [{ slug: to }, { id: to }] }, PUBLIC_TUTOR] },
-    select: {
-      id: true, slug: true, professions: true, userId: true,
-      category: { select: { slug: true } },
-      // ONE row, so the stored avatar is a fair read — `avatarSrc` turns it
-      // into the cached route rather than shipping the data URI.
-      user: { select: { id: true, fullName: true, avatarUrl: true } },
-    },
-  })
-  if (!row) return null
-  return {
-    kind: 'EXPERT',
-    id: row.id,
-    slug: row.slug || row.id,
-    name: row.user?.fullName ?? '',
-    photoSrc: avatarSrc(row.user?.id, row.user?.avatarUrl),
+      : avatarSrc(row.user?.id, row.user?.avatarUrl),
     userId: row.userId,
     topics: topicsForProvider({
-      kind: 'EXPERT',
-      professions: row.professions ?? [],
+      services: row.services,
+      professions: row.professions,
       categorySlug: row.category?.slug ?? null,
     }),
   }
@@ -123,30 +94,24 @@ async function expert(to: string): Promise<RequestTarget | null> {
 /**
  * Resolve `?to=` to a provider, or null.
  *
- * `prefer` breaks the tie: the two slug namespaces are independent (a master
- * slug and an expert slug could in principle read the same), so the door the
- * visitor came through decides which table is asked first — `for=service` on a
- * trades CTA, the expert side otherwise. Both are tried either way, because the
- * cost of guessing wrong is silently losing the recipient.
+ * ⚠️ ONE LOOKUP SINCE 2026-08-24. There were two — one per profile table — and
+ * a `prefer` argument decided which was asked first, because the two slug
+ * namespaces were independent and could in principle collide. One table, one
+ * namespace, one query; the parameter is gone rather than ignored.
  *
  * React-cached: the page resolves it for the recipient line and the metadata
  * pass must not pay for it twice.
  */
 export const resolveRequestTarget = cache(async (
   raw: string | null | undefined,
-  prefer: Vertical = 'EXPERT',
 ): Promise<RequestTarget | null> => {
   const to = cleanTo(raw)
   if (!to) return null
   try {
-    const order = prefer === 'SERVICE' ? [master, expert] : [expert, master]
-    for (const look of order) {
-      const hit = await look(to)
-      // A row with nobody's name on it is not somebody a visitor can be told
-      // they are writing to.
-      if (hit && hit.name.trim() !== '') return hit
-    }
-    return null
+    const hit = await master(to)
+    // A row with nobody's name on it is not somebody a visitor can be told
+    // they are writing to.
+    return hit && hit.name.trim() !== '' ? hit : null
   } catch {
     // A database wobble must not take the form down — see the header.
     return null

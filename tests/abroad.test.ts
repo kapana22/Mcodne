@@ -351,22 +351,15 @@ test('the seed script creates a HIDDEN category, and refuses to re-hide a live o
 
 /* ═══════════ 5. the payment link is a link, and nothing more ═══════════ */
 
-test('the payment link stores and displays — it does not charge', () => {
-  const route = read('app/api/bookings/[id]/route.ts')
-  // https only. lib/safeUrl's render guard also passes mailto:, tel: and
-  // relative paths; none of those is a bank payment page, and a plain http one
-  // is either a typo or a downgrade.
-  assert.match(route, /if \(!\/\^https:\\\/\\\/\/i\.test\(raw\)\)/)
-  assert.match(route, /error: 'BAD_PAYMENT_URL'/)
-  // An empty string must CLEAR it — a wrong payment link the expert cannot take
-  // down is worse than none at all.
-  assert.match(route, /let value: string \| null = null/)
-  // …and nothing in that branch touches the money model.
-  const branch = route.slice(
-    route.indexOf("typeof rawBody?.paymentLinkUrl === 'string'"),
-    route.indexOf("if (rawBody?.action === 'expert_no_show')"),
-  )
-  for (const forbidden of ['payoutStatus', 'PAYMENTS_LIVE', 'price:']) {
-    assert.ok(!branch.includes(forbidden), `the payment-link branch touches ${forbidden} — it is supposed to store a string`)
-  }
-})
+/* ⚠️ „the payment link stores and displays — it does not charge" WAS HERE AND
+   IS GONE (2026-08-24). It pinned `Booking.paymentLinkUrl` — a BOG/TBC link an
+   expert or admin pasted onto a booking so a diaspora client could pay at all
+   before a real integration landed — down to https-only, clearable, and touching
+   nothing in the money model. There is no booking to hang it on any more.
+
+   The need it answered has not gone away: a client abroad still has to pay
+   somebody here. It now lives one layer up, on the offer a provider writes
+   (RequestOffer.priceGel, lib/offerLifecycle), and if a pasted bank link comes
+   back it belongs there — with the same three rules, which is why they are
+   written down rather than deleted: https only, an empty string CLEARS it, and
+   the branch that stores it touches no payout state. */

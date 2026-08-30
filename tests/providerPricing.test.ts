@@ -76,7 +76,7 @@ test('the card’s floor is the cheapest thing actually sold', () => {
   assert.equal(lowestPrice({ services: ['clean-flat', 'plumb-leak'], priceList: { 'clean-flat': 60, 'plumb-leak': 40 } }), 40)
   assert.equal(lowestPrice({ services: ['clean-flat'], priceList: {} }), null, 'an unpriced provider must stay „ask"')
   // …and the card falls back the way it always did when nothing is priced.
-  assert.match(read('app/experts/_masterData.ts'), /lowestPrice\(r\) \?\? r\.priceFrom \?\? r\.calloutFee \?\? null/,
+  assert.match(read('app/experts/_providers.ts'), /lowestPrice\(r\) \?\? r\.priceFrom \?\? r\.calloutFee \?\? null/,
     'the card stopped preferring a real service price, or lost its fallback')
 })
 

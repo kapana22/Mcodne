@@ -9,7 +9,6 @@ import { Icon } from '@/components/Icon'
 import { EmptyState } from '@/components/EmptyState'
 import { VerifiedMark } from '@/components/Avatar'
 import { displayHeadline } from '@/lib/headline'
-import { primaryPriceLabel, offerPriceLabel, TUTOR_DEFAULTS } from '@/components/booking/slots'
 import { DiscoverTutor } from './_model'
 
 export const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => {
@@ -28,28 +27,26 @@ export const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => 
     if (cat !== 'all') params.set('category', cat)
     ;(async () => {
       try {
-        const res = await fetch(`/api/tutors?${params}`)
+        const res = await fetch(`/api/providers?${params}`)
         if (!res.ok) throw new Error('tutors failed')
         const d = await res.json()
         if (!Array.isArray(d)) throw new Error('bad shape')
         if (cancelled) return
+        // ⚠️ THE ROWS ARE THE CATALOGUE'S OWN (2026-08-24) — same query, same
+        // visibility rule, same words on the card. This used to map a
+        // TutorProfile and derive a „flagship" session price out of its tiers.
         setTutors(d.map((t: any) => ({
-          id: t.id,
-          name: t.user?.fullName ?? 'ექსპერტი',
-          avatar: t.user?.avatarUrl ?? null,
+          id: t.slug ?? t.id,
+          name: t.name ?? 'ექსპერტი',
+          avatar: t.photoSrc ?? null,
           headline: t.headline ?? '',
-          specialty: t.specialty ?? '',
-          category: t.category?.name ?? '',
+          specialty: (t.professions ?? [])[0] ?? '',
+          category: (t.services ?? [])[0] ?? '',
           rating: t.rating ?? 0,
-          reviews: t.reviewsCount ?? 0,
-          // FLAGSHIP price, via the shared helper — the raw profile `price` is
-          // not a service anyone can buy, and printing it here made one expert
-          // read ₾60 on this dashboard and ₾30 on /experts (measured 2026-07-31).
-          priceLabel: offerPriceLabel(primaryPriceLabel(
-            Array.isArray(t.consultations) ? t.consultations : [],
-            t.price ?? TUTOR_DEFAULTS.price,
-            t.consultationDurationMin ?? TUTOR_DEFAULTS.durationMin,
-          )),
+          reviews: 0,
+          // 🔒 NEVER INVENT A NUMBER. Null is „they quote per job", which is a
+          // way of working, not a missing field.
+          priceLabel: typeof t.priceValue === 'number' ? `${t.priceValue}₾-დან` : 'ფასს შემოგთავაზებს',
           verified: t.verified ?? false,
         })))
       } catch {
@@ -78,7 +75,7 @@ export const Discover = ({ onOpen }: { onOpen: (t: DiscoverTutor) => void }) => 
             რეკომენდებული ექსპერტები
           </h2>
           <p className="text-small text-ink-500 mt-1.5 max-w-[480px] leading-relaxed">
-            გადახედე და დაჯავშნე.
+            გადახედე და აირჩიე.
           </p>
         </div>
         <Link href="/experts" className="h-10 sm:h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-meta inline-flex items-center gap-1.5 transition-colors duration-fast">

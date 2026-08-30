@@ -13,7 +13,7 @@
 // what it buys, and anything that cannot answer that question is optional.
 
 import { z } from 'zod'
-import { isServiceTopic } from './serviceProfile'
+import { isOfferableTopic, MAX_WORK_PHOTOS } from './serviceProfile'
 import { CITIES, type CityName } from './requestTopics'
 
 const AREA_IDS = new Set(CITIES.map(c => c.id))
@@ -41,8 +41,13 @@ export const MASTER = {
    *  object storage on this site — /api/uploads returns a base64 data URI and
    *  the image IS the column. Six photos at ~200KB is a 1.2MB row, which is
    *  survivable only because nothing ever lists these rows with the photos in
-   *  them. Raise this and check the admin queue's `omit` first. */
-  MAX_WORK_PHOTOS: 6,
+   *  them. Raise this and check the admin queue's `omit` first.
+   *
+   *  ⚠️ AND IT IS RE-EXPORTED, NOT RETYPED (2026-08-21). /work/services edits
+   *  the same column for the rest of the profile's life, so the number lives in
+   *  lib/serviceProfile beside the other ceilings on that row — two copies
+   *  would let the editor accept a seventh photo the intake refuses. */
+  MAX_WORK_PHOTOS,
   NAME_MIN: 3,
   NAME_MAX: 80,
 } as const
@@ -69,7 +74,7 @@ export const MasterApplicationInput = z.object({
   services: z.array(z.string().trim().min(1).max(40))
     .min(1, { message: 'აირჩიე ერთი სერვისი მაინც' })
     .max(MASTER.MAX_SERVICES)
-    .refine(ids => ids.every(isServiceTopic), { message: 'არჩეულია სერვისი, რომელიც სიაში არ არის' })
+    .refine(ids => ids.every(isOfferableTopic), { message: 'არჩეულია სერვისი, რომელიც სიაში არ არის' })
     .refine(ids => new Set(ids).size === ids.length, { message: 'სერვისი ორჯერ არის არჩეული' }),
 
   areas: z.array(z.string().trim().min(1).max(20))

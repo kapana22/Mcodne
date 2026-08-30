@@ -8,10 +8,18 @@
 // rather than duplicated.
 //
 // The flag-gated tenses are deliberate and must stay: PAYMENTS_LIVE decides
-// whether a booking implies a charge, and CANCEL_CUTOFF_HOURS / COMMISSION_PCT
-// are read, never typed. An answer that hardcodes „24 საათი“ becomes a lie the
-// day the constant changes.
-import { CANCEL_CUTOFF_HOURS, COMMISSION_PCT, PAYMENTS_LIVE } from '@/lib/flags'
+// whether accepting an offer implies a charge, and COMMISSION_PCT is read,
+// never typed. An answer that hardcodes a number becomes a lie the day the
+// constant changes.
+//
+// ⚠️ REWRITTEN 2026-08-26, AND CANCEL_CUTOFF_HOURS LEFT WITH THE PRODUCT. Half
+// this file described the booking: „როგორ დავჯავშნო სესია", a cancellation
+// window counted back from a start time, a session held in the browser, a
+// length of 15/30/60 minutes. None of it exists — there is no calendar, no
+// slot and no video room since 2026-08-24, and `ServiceProfile` carries a
+// price and no duration at all. A person who followed these instructions went
+// looking for a date picker on a profile that has none.
+import { COMMISSION_PCT, PAYMENTS_LIVE } from '@/lib/flags'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 
 /**
@@ -53,7 +61,7 @@ export const GROUPS: FaqGroup[] = [
       {
         id: 'what-is',
         q: 'რა არის მცოდნე?',
-        a: 'პლატფორმა, სადაც აღწერ რა გჭირდება და ხელით შერჩეული ექსპერტები თავად გამოგიგზავნიან შეთავაზებას — ხელშეკრულებიდან და დეკლარაციიდან დალაგებამდე. ბევრ მათგანთან ჯერ კონსულტაციაც შეგიძლია, ჩატით ან ვიდეოთი — ეს იმის გარკვევაა, სწორ ადამიანთან ხარ თუ არა.',
+        a: 'პლატფორმა, სადაც აღწერ რა გჭირდება და ხელით შერჩეული ექსპერტები თავად გამოგიგზავნიან შეთავაზებას — ხელშეკრულებიდან და დეკლარაციიდან დალაგებამდე. შეთავაზების მიღების შემდეგ მიმოწერაც გაქვს — ეს იმის გარკვევაა, სწორ ადამიანთან ხარ თუ არა.',
         action: { label: 'ნახე ექსპერტები', href: '/experts' },
       },
       {
@@ -64,44 +72,56 @@ export const GROUPS: FaqGroup[] = [
       },
       {
         id: 'price',
-        q: 'რა ჯდება პირველი გაცნობა?',
+        q: 'რა ჯდება?',
         // Payment tense is gated on PAYMENTS_LIVE — the same flag the „გადახდა“
         // section below reads. While it's off a booking costs nothing, so the
         // page must not imply a charge.
         a: PAYMENTS_LIVE
-          ? 'ფასს ადგენს ექსპერტი და წინასწარ ხედავ — გადაიხდი მხოლოდ დაჯავშნისას.'
-          : 'ფასს ადგენს ექსპერტი და წინასწარ ხედავ. ონლაინ გადახდა ჯერ არ არის — დაჯავშნა ახლა უფასოა, ბარათს არ ვთხოვთ.',
+          ? 'ფასს ადგენს ექსპერტი — პროფილში წინასწარ ხედავ, შეთავაზებაში კი ზუსტად შენს სამუშაოზე მიიღებ. გადაიხდი მას შემდეგ, რაც შეთავაზებას დაეთანხმები.'
+          : 'ფასს ადგენს ექსპერტი — პროფილში წინასწარ ხედავ, შეთავაზებაში კი ზუსტად შენს სამუშაოზე მიიღებ. მოთხოვნის დატოვება უფასოა და ბარათს არ ვთხოვთ.',
         action: { label: 'ნახე ფასები', href: '/experts' },
       },
     ],
   },
   {
-    title: 'დაჯავშნა და სესია',
+    title: 'მოთხოვნა და შეთავაზება',
     items: [
       {
+        // ⚠️ THE `id` IS PERMANENT — it is the analytics handle and the
+        // SiteText key, and the file's own rule is „reword `q` freely, never
+        // renumber an `id`". So the question that used to be „how do I book"
+        // keeps the handle `how-to-book` while asking what a person can
+        // actually do.
         id: 'how-to-book',
-        q: 'როგორ დავჯავშნო სესია?',
+        q: 'როგორ დავიწყო?',
         a: PAYMENTS_LIVE
-          ? 'პროფილში აირჩიე თარიღი და დრო, გადაიხადე — დადასტურება ელფოსტით მოვა.'
-          : 'პროფილში აირჩიე თარიღი და დრო — დადასტურება ელფოსტით მოვა. გადახდის ეტაპი ჯერ არ არის, დაჯავშნა ახლა უფასოა.',
-        action: { label: 'აირჩიე ექსპერტი', href: '/experts' },
+          ? 'აღწერე რა გჭირდება — ექსპერტები შეთავაზებას ფასთან ერთად თავად გამოგიგზავნიან. აირჩიე ერთი, გადაიხადე და დანარჩენს მიმოწერაში ათანხმებთ.'
+          : 'აღწერე რა გჭირდება — ექსპერტები შეთავაზებას ფასთან ერთად თავად გამოგიგზავნიან. აირჩიე ერთი და დანარჩენს მიმოწერაში ათანხმებთ. მოთხოვნა უფასოა, ბარათს არ ვთხოვთ.',
+        // ⚠️ THE CATALOGUE, NOT /request. The intake is flag-gated
+        // (`requestsOn`) and every link into it must sit in a file that reads
+        // the flag — tests/requests.test.ts enforces exactly that, and this
+        // one does not. /experts carries the gated CTA one tap away.
+        action: { label: 'ნახე ექსპერტები', href: '/experts' },
       },
       {
         id: 'where-session',
-        q: 'სად ტარდება სესია?',
-        a: 'პირდაპირ პლატფორმაზე — არ გჭირდება Zoom ან სხვა აპლიკაცია. საკმარისია ბრაუზერი და კამერა.',
+        q: 'სად სრულდება სამუშაო?',
+        a: 'დამოკიდებულია იმაზე, რა გჭირდება: ადგილზე შესასრულებელი სამუშაო შენს მისამართზე კეთდება, დანარჩენს კი ექსპერტთან ერთად ათანხმებ — ონლაინ თუ პირისპირ. მიმოწერა მცოდნეზეა.',
       },
       {
         id: 'cancel',
-        q: 'შეიძლება თუ არა გავაუქმო ან გადავიტანო?',
+        q: 'შემიძლია გავაუქმო?',
+        // ⚠️ NO CUTOFF ANY MORE, AND THAT IS THE POINT. The window was counted
+        // back from a session's START TIME; nothing has a start time now. What
+        // a person can actually do is decline every offer, or close the request.
         a: PAYMENTS_LIVE
-          ? `დიახ — ${CANCEL_CUTOFF_HOURS} საათით ადრე უფასოა. ამის შემდეგ თანხა აღარ ბრუნდება, გარდა დასაბუთებული გამონაკლისისა.`
-          : `დიახ — ${CANCEL_CUTOFF_HOURS} საათით ადრე უფასოა. ახლა დაჯავშნა უფასოა, ამიტომ დასაბრუნებელი თანხა არ არსებობს; გადახდების ამოქმედების შემდეგ ამ ვადის შემდეგ თანხა აღარ დაბრუნდება, გარდა დასაბუთებული გამონაკლისისა.`,
+          ? 'დიახ — სანამ რომელიმე შეთავაზებას დაეთანხმები, მოთხოვნა ნებისმიერ დროს შეგიძლია დახურო და არაფერს იხდი. დათანხმების შემდეგ გაუქმებას ექსპერტთან ათანხმებ.'
+          : 'დიახ — სანამ რომელიმე შეთავაზებას დაეთანხმები, მოთხოვნა ნებისმიერ დროს შეგიძლია დახურო. ონლაინ გადახდა ჯერ არ არის, ამიტომ დასაბრუნებელი თანხა არ არსებობს.',
       },
       {
         id: 'expert-noshow',
-        q: 'რა მოხდება, თუ ექსპერტი არ გამოცხადდა?',
-        a: 'უფასოდ შემოგთავაზებთ გადატანას ან სხვა ექსპერტს. გადახდის ამოქმედების შემდეგ თანხა სრულად დაბრუნდება.',
+        q: 'რა მოხდება, თუ ექსპერტმა სამუშაო არ შეასრულა?',
+        a: 'მოგვწერე — გამოვიძიებთ და სხვა ექსპერტს შემოგთავაზებთ. გადახდების ამოქმედების შემდეგ თანხა ექსპერტს მხოლოდ სამუშაოს დასრულების შემდეგ გადაერიცხება.',
       },
     ],
   },
@@ -111,17 +131,17 @@ export const GROUPS: FaqGroup[] = [
       {
         id: 'payment-safety',
         q: 'უსაფრთხოა თუ არა გადახდა?',
-        a: 'ახლა დაჯავშნა უფასოა, ბარათს არ ვთხოვთ. გაშვების შემდეგ თანხა დაცული იქნება — ექსპერტს მხოლოდ სესიის შემდეგ გადაერიცხება.',
+        a: 'მოთხოვნის დატოვება უფასოა, ბარათს არ ვთხოვთ. გაშვების შემდეგ თანხა დაცული იქნება — ექსპერტს მხოლოდ სამუშაოს დასრულების შემდეგ გადაერიცხება.',
       },
       {
         id: 'payment-methods',
         q: 'რომელი გადახდის მეთოდები მიიღება?',
-        a: 'ონლაინ გადახდა ჯერ არ არის — ახლა დაჯავშნა უფასოა. მეთოდების სიას ამოქმედებისთანავე გამოვაქვეყნებთ.',
+        a: 'ონლაინ გადახდა ჯერ არ არის — მოთხოვნის დატოვება უფასოა. მეთოდების სიას ამოქმედებისთანავე გამოვაქვეყნებთ.',
       },
       {
         id: 'invoice',
         q: 'შემიძლია მივიღო ინვოისი?',
-        a: 'ინვოისები გადახდებთან ერთად ამოქმედდება — ავტომატურად მოვა ელფოსტაზე. მანამდე დაჯავშნა უფასოა.',
+        a: 'ინვოისები გადახდებთან ერთად ამოქმედდება — ავტომატურად მოვა ელფოსტაზე. მანამდე მოთხოვნა უფასოა.',
       },
     ],
   },
@@ -148,7 +168,7 @@ export const GROUPS: FaqGroup[] = [
       {
         id: 'payout',
         q: 'როდის მივიღებ თანხას?',
-        a: 'გადახდები მალე ამოქმედდება — მანამდე სესიები უფასოა. გაშვების შემდეგ შემოსავალი რეგულარული გრაფიკით გადმოგერიცხება.',
+        a: 'გადახდები მალე ამოქმედდება — მანამდე პლატფორმა საკომისიოს არ იკავებს. გაშვების შემდეგ შემოსავალი რეგულარული გრაფიკით გადმოგერიცხება.',
         action: { label: 'განაცხადის შევსება', href: '/join', gate: 'apply' },
       },
     ],
@@ -171,7 +191,7 @@ export const GROUPS: FaqGroup[] = [
         // The DELETE in app/api/me/route.ts runs prisma.user.delete() straight
         // away — no grace period, no restore. It refuses only when live bookings
         // or historical records exist (then support handles it by hand).
-        a: `„პარამეტრები → ანგარიში → ანგარიშის წაშლა“. წაშლა მყისიერია და შეუქცევადი — მონაცემები აღდგენას აღარ ექვემდებარება. თუ დაგეგმილი ან მიმდინარე ჯავშანი გაქვს, ჯერ გააუქმე; თუ ანგარიშს დასრულებული ჯავშნები ან მიმოწერა აქვს, წაშლა ავტომატურად არ სრულდება — მოგვწერე ${SUPPORT_EMAIL}.`,
+        a: `„პარამეტრები → ანგარიში → ანგარიშის წაშლა“. წაშლა მყისიერია და შეუქცევადი — მონაცემები აღდგენას აღარ ექვემდებარება. თუ ღია მოთხოვნა ან მიმდინარე შეთანხმება გაქვს, ჯერ დახურე; თუ ანგარიშს დასრულებული სამუშაოები ან მიმოწერა აქვს, წაშლა ავტომატურად არ სრულდება — მოგვწერე ${SUPPORT_EMAIL}.`,
         action: { label: 'პარამეტრები', href: '/settings', gate: 'auth' },
       },
       {
@@ -199,26 +219,26 @@ export const GROUPS: FaqGroup[] = [
         // დავრესგისტრირდე". Client registration had no answer at all —
         // „become-expert" is the EXPERT application, a different thing.
         q: 'როგორ დავრეგისტრირდე?',
-        a: 'რეგისტრაცია უფასოა — გახსენი „დარეგისტრირდი“ და შედი Google-ით ან ელფოსტითა და პაროლით. ანგარიში მხოლოდ დაჯავშნისთვის გჭირდება; ექსპერტების დათვალიერება რეგისტრაციის გარეშეც შეგიძლია.',
+        a: 'რეგისტრაცია უფასოა — გახსენი „დარეგისტრირდი“ და შედი Google-ით ან ელფოსტითა და პაროლით. ანგარიში მხოლოდ მოთხოვნის დასატოვებლად გჭირდება; ექსპერტების დათვალიერება რეგისტრაციის გარეშეც შეგიძლია.',
         action: { label: 'რეგისტრაცია', href: '/signup' },
       },
       {
         id: 'duration',
         // PROD ×2 — „რამდენი ხანი გრძელდება სესია".
-        q: 'რამდენი ხანი გრძელდება კონსულტაცია?',
-        // „ყველაზე ხშირად", not a closed list: 15/30/60 are only the profile
-        // DEFAULT's buttons. A published service accepts any length from 5 to
-        // 240 minutes (app/tutor/profile/page.tsx:1105), so naming three values
-        // as the whole set becomes a lie the first time somebody sells a 45- or
-        // 90-minute session.
-        a: 'ხანგრძლივობას ექსპერტი ადგენს თითოეული სერვისისთვის — ყველაზე ხშირად 15, 30 ან 60 წუთი. დაჯავშნამდე ზუსტად ხედავ, რომელ ვარიანტს ირჩევ და რამდენი ხანი გაგრძელდება.',
+        q: 'რამდენი ხანი გრძელდება?',
+        // ⚠️ THIS NAMED „15, 30 ან 60 წუთი" AND NOTHING STORES A LENGTH. That
+        // was the bookable session's picker; `ServiceProfile` carries
+        // `services` and `priceFrom` and no duration column at all, so the
+        // three numbers were a promise the product cannot keep. The offer is
+        // where scope and time are actually stated, by the person doing it.
+        a: 'ეს სამუშაოზეა დამოკიდებული და შეთავაზებაში წერია — ექსპერტი მოცულობასა და ვადას იქვე უთითებს.',
         action: { label: 'ნახე ექსპერტები', href: '/experts' },
       },
       {
         id: 'location',
         // PROD ×4 — „სად არის" / „სად ვარ" / „სად მდებარეობს" / „სად ხარ".
         q: 'სად მდებარეობთ? ოფისში უნდა მოვიდე?',
-        a: 'დამოკიდებულია იმაზე, რა გჭირდება. სამუშაო, რომელიც ადგილზე კეთდება, შენს მისამართზე სრულდება — ამას ექსპერტთან შეათანხმებ. კონსულტაცია ონლაინ ტარდება, პირდაპირ ბრაუზერში — საჭიროა მხოლოდ ინტერნეტი, კამერა და მიკროფონი.',
+        a: 'დამოკიდებულია იმაზე, რა გჭირდება. სამუშაო, რომელიც ადგილზე კეთდება, შენს მისამართზე სრულდება — ამას ექსპერტთან შეათანხმებ. დანარჩენს ექსპერტთან ერთად ათანხმებ — ონლაინ თუ პირისპირ. ჩვენთან ოფისში მოსვლა არასდროს გჭირდება.',
       },
       {
         id: 'contact',
@@ -234,13 +254,18 @@ export const GROUPS: FaqGroup[] = [
       },
       {
         id: 'pre-contact',
-        q: 'შემიძლია ექსპერტს დაჯავშნამდე მივწერო?',
-        // The sign-in requirement is stated because it is enforced: a signed-out
-        // visitor tapping „მიწერე ექსპერტს" gets the auth sheet („შედი, რომ
-        // მისწერო ექსპერტს" — app/experts/[slug]/client.tsx:951). An answer that
-        // says „yes you can" and then hands over a login wall is the same
-        // broken promise as a wrong price.
-        a: 'დიახ — ექსპერტს შეტყობინებას დაჯავშნამდეც უგზავნი და საკითხს წინასწარ დააზუსტებ. ამისთვის ანგარიშში შესვლა დაგჭირდება, გადახდა კი არა. მიმოწერა „შეტყობინებებში“ გამოჩნდება.',
+        q: 'შემიძლია ექსპერტს წინასწარ მივწერო?',
+        // ⚠️ THE OLD ANSWER SAID YES AND POINTED AT A BUTTON THAT IS GONE. It
+        // cited `app/experts/[slug]/client.tsx` — the file went with the
+        // booking product on 2026-08-24, and the profile's one action is
+        // „დატოვე მოთხოვნა". The chat opens on an OFFER (RequestMessage hangs
+        // off RequestOffer), so this now says where the conversation really
+        // starts instead of sending somebody looking for a button.
+        a: 'მიმოწერა შეთავაზების მიღების შემდეგ იხსნება — სწორედ იქ აზუსტებთ დეტალებს, სანამ დაეთანხმები. მანამდე კითხვა თავად მოთხოვნაში დაწერე, რომ ექსპერტმა ზუსტად ის შემოგთავაზოს, რაც გჭირდება.',
+        // ⚠️ THE CATALOGUE, NOT /request. The intake is flag-gated
+        // (`requestsOn`) and every link into it must sit in a file that reads
+        // the flag — tests/requests.test.ts enforces exactly that, and this
+        // one does not. /experts carries the gated CTA one tap away.
         action: { label: 'ნახე ექსპერტები', href: '/experts' },
       },
     ],
@@ -335,15 +360,19 @@ const LEAD_BY_ROUTE: { prefix: string; lead: string[] }[] = [
   // Becoming an expert: money and the process, in that order — those are the
   // two things that stop someone mid-application.
   { prefix: '/join', lead: ['become-expert', 'commission', 'payout'] },
-  // On a profile / in the booking sheet the doubt is „what am I paying for and
-  // what happens next", never „what is mcodne“.
+  // On a profile the doubt is „what am I paying for and what happens next",
+  // never „what is mcodne“.
   { prefix: '/experts/', lead: ['price', 'where-session', 'cancel', 'expert-noshow'] },
   { prefix: '/experts', lead: ['find-expert', 'price', 'how-to-book'] },
   // Auth: the honest question is „why do you need an account at all“.
   { prefix: '/signup', lead: ['what-is', 'how-to-book', 'price'] },
   { prefix: '/signin', lead: ['account-security', 'what-is'] },
-  // Inside a booking, the questions are about the session that already exists.
-  { prefix: '/me/bookings', lead: ['where-session', 'cancel', 'expert-noshow'] },
+  // ⚠️ THE PREFIX WAS `/me/bookings` UNTIL 2026-08-26 AND THAT ROUTE IS GONE,
+  // so this row matched nothing and the client's own request screen fell back
+  // to DEFAULT_LEAD — the „what is mcodne" questions, offered to somebody who
+  // is already mid-job. Inside a request, the questions are about the work
+  // that is already agreed.
+  { prefix: '/me/requests', lead: ['where-session', 'cancel', 'expert-noshow'] },
   { prefix: '/work', lead: ['payout', 'commission'] },
 ]
 

@@ -21,6 +21,7 @@ import { normalizePublicRef } from '@/lib/requests'
 import { inviteProviderToRequest } from '@/lib/requestInvite'
 import { requestsViewer } from '@/lib/requestsServer'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
+import { refBudgetSpent, noteRefMiss } from '@/lib/refGuard'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
@@ -28,9 +29,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
   const viewer = await requestsViewer()
   if (!viewer.clientAllowed) return notFound()
 
+  // ⚠️ THE MISSES GO ON THE REFERENCE BUDGET TOO, not only on this route's own
+  // ceiling (2026-08-21). The `rateLimit` below bounds how fast THIS endpoint
+  // can be worked; it does not tell lib/refGuard that somebody is sweeping the
+  // reference space. Measured before the fix: 25 POSTs with random references
+  // from one IP → 20 × 404 then 429, and a /open probe from that same IP was
+  // still answering 409 — i.e. twenty free guesses that the guard never saw,
+  // renewable every hour, and a hit force-invites a named provider.
+  if (refBudgetSpent(req)) return notFound()
+
   const { ref: raw } = await params
   const ref = normalizePublicRef(raw)
-  if (!ref) return notFound()
+  if (!ref) { noteRefMiss(req); return notFound() }
 
   // ⚠️ RATE LIMITED, because this endpoint CREATES ROWS and the only credential
   // it asks for is a five-character code. Without a ceiling one leaked
@@ -51,7 +61,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
     where: { publicRef: ref },
     select: { id: true, status: true, topic: true },
   })
-  if (!request) return notFound()
+  if (!request) { noteRefMiss(req); return notFound() }
 
   // ⚠️ THE ROW ITSELF IS NOT WRITTEN HERE. Status gate, allowlist check, the
   // „already talking?" answer and the notification are all lib/requestInvite —

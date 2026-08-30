@@ -24,6 +24,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
+import { getCurrentUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,11 +54,42 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     id,
     available: true,
     published: true,
+    // ⚠️ SUSPENDED IS NOT PUBLIC — the same clause app/experts/_providers → PUBLIC
+    // carries, and it has to be the same rule or a suspended provider's face is
+    // still served at a guessable URL after their card and page have gone. It
+    // sits inside the OR because a company profile has no user row to check.
     OR: [
-      { user: { requestAccess: { active: true } } },
+      { user: { is: { suspendedAt: null, requestAccess: { active: true } } } },
       { company: { requestAccess: { active: true } } },
     ],
   }
+
+  /* ⚠️ THE OWNER SEES THEIR OWN, LISTED OR NOT (2026-08-21).
+   *
+   * The refusal above is about STRANGERS: a profile that is not in the
+   * catalogue must not have its face readable by anybody who guesses an id.
+   * Applied to the person the photos belong to it was a different thing — their
+   * own editor could not draw them. A master who unticks „ახალი მოთხოვნები
+   * მომდის", or whose page an admin has taken down, opens /work/services and
+   * finds their photo and every picture of finished work replaced by a broken
+   * thumbnail, on the screen whose whole job is to let them replace those.
+   *
+   * ⚠️ AND IT IS A FALLBACK, NEVER THE FIRST QUESTION. The public path is a
+   * catalogue drawing up to sixty of these and must not read a session per
+   * image; this only runs once the visible query has already answered „no".
+   */
+  async function ownsIt(): Promise<boolean> {
+    const me = await getCurrentUser()
+    if (!me) return false
+    return (await prisma.serviceProfile.count({
+      where: {
+        id,
+        OR: [{ userId: me.id }, { company: { members: { some: { userId: me.id } } } }],
+      },
+    })) > 0
+  }
+  const isPublic = (await prisma.serviceProfile.count({ where: visible })) > 0
+  if (!isPublic && !(await ownsIt())) return notFound()
   // ONE image is read either way — this route is the one place a base64 column
   // may be read, and it reads one image for one response. The face is a single
   // nullable column; a work photo is ONE element of the array, picked in SQL
@@ -65,16 +97,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   let dataUri: string | null = null
   if (n === null) {
     const row = await prisma.serviceProfile.findFirst({
-      where: { ...visible, NOT: { photoUrl: null } },
+      where: { id, NOT: { photoUrl: null } },
       select: { photoUrl: true },
     })
     dataUri = row?.photoUrl ?? null
   } else {
-    const row = await prisma.serviceProfile.findFirst({ where: visible, select: { id: true } })
-    if (!row) return notFound()
     const picked = await prisma.$queryRawUnsafe<{ p: string | null }[]>(
       `SELECT "workPhotos"[$2] AS p FROM "ServiceProfile" WHERE "id" = $1`,
-      row.id, n + 1,
+      id, n + 1,
     )
     dataUri = picked[0]?.p ?? null
   }
@@ -118,7 +148,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       // changing, and the card busts the cache with `?v=<updatedAt>` — so a
       // year is safe and a re-upload is visible immediately. Without the query
       // param this would have to be `no-cache`, which defeats the whole route.
-      'cache-control': 'public, max-age=31536000, immutable',
+      //
+      // ⚠️ EXCEPT WHEN OWNERSHIP IS WHAT UNLOCKED IT (2026-08-21). „public" is
+      // an instruction to every cache between here and the browser, and a photo
+      // the catalogue refuses to show must not be sitting in a shared one keyed
+      // on a URL anybody can construct. Listed → cached for a year; the owner's
+      // own preview of an unlisted profile → nobody but them.
+      'cache-control': isPublic
+        ? 'public, max-age=31536000, immutable'
+        : 'private, no-store',
     },
   })
 }

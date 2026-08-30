@@ -32,8 +32,13 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ['⌘', 'K'], label: 'ძებნაზე გადასვლა (ველშიც მუშაობს)' },
   { keys: ['Esc'], label: 'დახურვა — ფანჯარა, მენიუ, ძებნა' },
   { keys: ['↑', '↓'], label: 'მენიუსა და სიაში გადაადგილება' },
-  { keys: ['←', '→'], label: 'კალენდარში დღე' },
-  { keys: ['⇞', '⇟'], label: 'კალენდარში თვე' },
+  // ⚠️ „კალენდარში დღე" (←/→) AND „კალენდარში თვე" (⇞/⇟) WERE HERE AND BOUND TO
+  // NOTHING (removed 2026-08-29). The weekly calendar went with the booking
+  // product on 2026-08-24; the only ArrowLeft/ArrowRight handler left on the
+  // site nudges the avatar crop inside its own dialog, and nothing anywhere
+  // listens for PageUp/PageDown. A shortcut list is read by somebody deciding
+  // what to press — two of its eight rows named keys that do nothing, on a
+  // screen whose whole job is to be believed.
   { keys: ['Enter'], label: 'არჩევა' },
   { keys: ['?'], label: 'ეს სია' },
 ]

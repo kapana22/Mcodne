@@ -23,13 +23,7 @@ export type { ProfileForCompleteness }
 
 type ProfileCompletenessProps = {
   profile: ProfileForCompleteness
-  certificates: number
-  education: number
-  experience: number
   avatarUrl?: string | null
-  /** Count of upcoming (future) availability slots — drives the „თავისუფალი
-      დრო" check. Booking is slot-gated, so 0 slots = unbookable. */
-  slotCount?: number
   /** Optional visual variant. `card` = full section (used on profile page),
       `compact` = right-rail widget (used on dashboard). */
   variant?: 'card' | 'compact'
@@ -55,19 +49,15 @@ const scrollToAnchor = (anchor: string) => {
 
 export function ProfileCompleteness({
   profile,
-  certificates,
-  education,
-  experience,
   avatarUrl,
-  slotCount = 0,
   variant = 'card',
   alwaysShow = false,
   className = '',
 }: ProfileCompletenessProps) {
   const router = useRouter()
   const checks = useMemo(
-    () => buildProfileChecks(profile, certificates, education, experience, avatarUrl, slotCount),
-    [profile, certificates, education, experience, avatarUrl, slotCount],
+    () => buildProfileChecks(profile, avatarUrl),
+    [profile, avatarUrl],
   )
 
   const { percent, undone } = useMemo(

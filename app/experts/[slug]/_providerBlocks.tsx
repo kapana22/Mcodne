@@ -136,6 +136,61 @@ export function AboutBlock({ p }: { p: MasterProfile }) {
   )
 }
 
+/**
+ * THE TWO LINKS — a website and a LinkedIn, when they gave one.
+ *
+ * ⚠️ THIS WAS „გამოცდილება და განათლება" AND IT LISTED A CV (2026-08-29). Three
+ * tables — certificates, education, experience — hung off the consultation
+ * profile and were inherited by the one provider profile when the products
+ * merged. Owner, looking at the editor that fills them: „რითი დაგიჯერებს
+ * აღარ გვჭირდება, ეს ხომ სერვისებს ყიდის."
+ *
+ * That is the product argument and it is right: somebody with water on the
+ * floor does not read a degree. Measured on the live database the same day,
+ * it was not carrying the site either — 4 of 29 providers had a certificate,
+ * 8 had an education row, 5 had a job. What sells here is the priced list, the
+ * paragraph and the photos of finished work, and all three are already blocks
+ * on this page.
+ *
+ * The LINKS stayed. They are not a CV: a website is where a client checks that
+ * a business is real, and 13 of the 29 gave one. The tables are untouched in
+ * the database; nothing on the site reads them any more.
+ */
+export function CredentialsBlock({ p }: { p: MasterProfile }) {
+  const links = [
+    p.websiteUrl ? { href: p.websiteUrl, label: 'ვებგვერდი' } : null,
+    p.linkedinUrl ? { href: p.linkedinUrl, label: 'LinkedIn' } : null,
+  ].filter((x): x is { href: string; label: string } => x !== null)
+  if (links.length === 0) return null
+  return (
+    <Section id="links" title="ბმულები">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        {links.map(l => (
+          <a
+            key={l.href}
+            href={l.href}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="inline-flex items-center gap-1.5 text-small font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-4 decoration-brand-300"
+          >
+            {l.label}
+            <Icon.external aria-hidden className="w-3.5 h-3.5" />
+          </a>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
+/* ⚠️ `VideoBlock` STOOD HERE AND NOBODY EVER FILLED IT (removed 2026-08-29).
+ * A YouTube intro embed on the public profile — an artefact of the consultation
+ * product, where you watched somebody introduce themselves before booking an
+ * hour of their time. Measured on the live database that day: **0 of 29
+ * providers had a `videoUrl`**, published or not. Not a low number — zero.
+ *
+ * Nothing replaces it. What sells a service on this page is already here: the
+ * priced list, the paragraph, and the photos of finished work. */
+
 export function WorkBlock({ p }: { p: MasterProfile }) {
   if (p.workPhotoSrcs.length === 0) return null
   return (

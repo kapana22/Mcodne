@@ -783,12 +783,21 @@ export function AdminMessageDialog({
    audit row is the only place the story survives.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+// ⚠️ THIS SHAPE WAS THE BOOKING'S AND THE API HAD ALREADY MOVED ON (fixed
+// 2026-08-26). It declared `{ bookings, activeBookings, messages, reviews,
+// enrollments }`; /api/admin/users/[id] sends `{ requests, offers, activeWork,
+// reviews }`. Two consequences, and the second is the dangerous one:
+//   · the impact list filters on `impact[key] > 0`, and `undefined > 0` is
+//     false — so every row except „შეფასება" was invisible and an account with
+//     history looked empty;
+//   · `blocked` read `activeBookings`, which was ALWAYS undefined, so the guard
+//     that refuses to delete somebody mid-job never fired once. The API
+//     computes `activeWork` for exactly that purpose.
 export type DeleteImpact = {
-  bookings: number
-  activeBookings: number
-  messages: number
+  requests: number
+  offers: number
+  activeWork: number
   reviews: number
-  enrollments: number
 }
 
 export type DeleteMode = 'purge' | 'anonymize'
@@ -796,10 +805,9 @@ export type DeleteMode = 'purge' | 'anonymize'
 type DeleteTarget = { id: string; fullName: string; email: string; isExpert: boolean }
 
 const IMPACT_ROWS: { key: keyof DeleteImpact; label: string }[] = [
-  { key: 'bookings', label: 'ჯავშანი' },
-  { key: 'messages', label: 'შეტყობინება' },
+  { key: 'requests', label: 'მოთხოვნა' },
+  { key: 'offers', label: 'შეთავაზება' },
   { key: 'reviews', label: 'შეფასება' },
-  { key: 'enrollments', label: 'პაკეტი' },
 ]
 
 export function AdminDeleteUserDialog({
@@ -833,7 +841,7 @@ export function AdminDeleteUserDialog({
      Unknown behaves like „has history": both modes offered, nothing claimed. */
   const known = !!impact
   const hasHistory = !known ||
-    impact.bookings + impact.messages + impact.reviews + impact.enrollments > 0
+    impact.requests + impact.offers + impact.reviews > 0
 
   // A fresh decision every time. The default follows the account: whenever
   // anything might be lost the reversible option is preselected; only a
@@ -848,7 +856,7 @@ export function AdminDeleteUserDialog({
 
   if (!open || !user) return null
 
-  const blocked = (impact?.activeBookings ?? 0) > 0
+  const blocked = (impact?.activeWork ?? 0) > 0
   const canSubmit = !busy && !blocked && reason.trim().length >= 3
 
   const submit = async () => {
@@ -920,7 +928,7 @@ export function AdminDeleteUserDialog({
               </p>
             ) : rows.length === 0 ? (
               <p className="text-small text-ink-600">
-                ჯავშანი, მიმოწერა და შეფასება არ აქვს — ანგარიში ცარიელია.
+                მოთხოვნა, შეთავაზება და შეფასება არ აქვს — ანგარიში ცარიელია.
               </p>
             ) : (
               <ul className="flex flex-wrap gap-1.5">
@@ -941,8 +949,8 @@ export function AdminDeleteUserDialog({
               after a failed submit. */}
           {blocked && (
             <div role="alert" className="rounded-btn border border-warning-200 bg-warning-50 px-3 py-2.5 text-small text-warning-800">
-              <span className="font-display font-semibold">{impact!.activeBookings} აქტიური ჯავშანი აქვს.</span>{' '}
-              წაშლამდე ეს სესიები უნდა გაუქმდეს — თორემ მეორე მხარეს დარჩება ჯავშანი, რომელზეც აღარავინ მოვა.
+              <span className="font-display font-semibold">{impact!.activeWork} მიმდინარე სამუშაო აქვს.</span>{' '}
+              წაშლამდე ეს უნდა დაიხუროს — თორემ მეორე მხარეს დარჩება შეთანხმება, რომელსაც აღარავინ შეასრულებს.
             </div>
           )}
 

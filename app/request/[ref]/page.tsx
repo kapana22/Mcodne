@@ -103,7 +103,7 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
               // The PUBLIC profile facts for the offer card — slug, verified,
               // rating. Public by definition (/experts/[slug] shows them to
               // anyone), so this widens nothing the seal protects.
-              tutor: { select: { slug: true, verified: true, rating: true, reviewsCount: true } },
+              serviceProfile: { select: { slug: true, verified: true, rating: true, reviewsCount: true } },
             },
           },
           company: { select: { name: true } },
@@ -158,12 +158,12 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
       provider: o.expertUser
         ? {
             name: o.expertUser.fullName,
-            profile: o.expertUser.tutor
+            profile: o.expertUser.serviceProfile
               ? {
-                  slug: o.expertUser.tutor.slug,
-                  verified: o.expertUser.tutor.verified,
-                  rating: o.expertUser.tutor.rating,
-                  reviewsCount: o.expertUser.tutor.reviewsCount,
+                  slug: o.expertUser.serviceProfile.slug,
+                  verified: o.expertUser.serviceProfile.verified,
+                  rating: o.expertUser.serviceProfile.rating,
+                  reviewsCount: o.expertUser.serviceProfile.reviewsCount,
                 }
               : null,
           }

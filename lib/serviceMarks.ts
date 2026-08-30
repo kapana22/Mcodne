@@ -18,7 +18,7 @@
 // also the stronger assertion: „two tiles name the same mark" is exact, where
 // comparing two rendered SVGs is a guess about what a reader sees.
 
-import { SERVICE_TOPICS, LIVE_SERVICE_TOPICS } from './serviceProfile'
+import { OFFER_TOPICS, LIVE_OFFER_TOPICS } from './serviceProfile'
 
 /** The `CatIcon` keys this row may use. Typed as a union rather than `string`
  *  so a typo is a compile error and not a blank tile. */
@@ -50,7 +50,7 @@ const ROW: TradeMark[] = [
   { topic: 'app-ac', icon: 'climate' },
 ]
 
-const LIVE_IDS = new Set(LIVE_SERVICE_TOPICS.map(t => t.id))
+const LIVE_IDS = new Set(LIVE_OFFER_TOPICS.map(t => t.id))
 
 /**
  * The row, with anything that has left the OPEN vocabulary dropped.
@@ -74,5 +74,5 @@ export const HOME_TRADE_IDS: string[] = ROW.map(m => m.topic)
 /** Is this id a real service topic at all? Lets the test tell „closed" (a
  *  decision) apart from „renamed" (a bug). */
 export function isKnownServiceTopic(id: string): boolean {
-  return SERVICE_TOPICS.some(t => t.id === id)
+  return OFFER_TOPICS.some(t => t.id === id)
 }

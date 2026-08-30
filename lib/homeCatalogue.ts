@@ -13,80 +13,27 @@
 // the whole merged model into six compact cards would drag the filter
 // vocabulary, the sort keys and both raw row types onto a marketing page.
 //
-// ⚠️ THE ORDER IS RULE 4 (CLAUDE.md §1): „wherever both appear, the SERVICE
-// comes first". It is expressed as an order, not as a hope — see `homeItems`.
+// ⚠️ THE „SERVICE FIRST" ORDER IS GONE BECAUSE THE SPLIT IS (2026-08-24). This
+// file used to interleave two row types — consultation experts and trades
+// providers — and lead with up to three of the second, so that the service half
+// always ARRIVED first without the consulting half ever being absent. There is
+// one kind of row now; every card is a service, and the order is simply the
+// roster's.
 
-import { primaryPriceLabel, offerPriceLabel, SERVICE_SUFFIX } from '@/components/booking/slots'
 import type { CatalogueCardItem } from '@/components/home/CatalogueGrid'
-import type { MasterRow } from '@/app/experts/_masterData'
+import type { ProviderRow } from '@/app/experts/_providers'
 
-/** Six cards: 3×2 on desktop. Kept here because the ORDER rule below is
- *  meaningless without the size it is dividing up. */
+/** Six cards: 3×2 on desktop. */
 const HOME_ITEMS = 6
-/**
- * How many of the six the SERVICE half leads with when it has that many.
- *
- * ⚠️ IT IS A LEAD, NOT A QUOTA, and the difference is the whole design. „Service
- * first" as a plain sort would show six providers the day a seventh signs up
- * and quietly drop the consulting half off the home page — the „two catalogues"
- * failure arriving from the opposite direction. Leading with up to three, then
- * filling from the other half, then topping up from whichever still has rows,
- * means the service always ARRIVES first and neither half can ever be absent
- * while it has somebody to show.
- */
-const SERVICE_LEAD = 3
 
-/** The tutor rows this needs — a structural subset of `TutorListRow`, written
- *  out so this file never imports the query (which imports prisma). */
-type HomeTutorRow = {
-  id: string
-  slug?: string | null
-  headline?: string | null
-  bio?: string | null
-  price?: number | null
-  consultationDurationMin?: number | null
-  professions?: string[] | null
-  verified?: boolean | null
-  user?: { fullName?: string | null; avatarUrl?: string | null } | null
-  category?: { name?: string | null } | null
-  consultations?: { minutes: number; price: number; tier?: string | null; bookable?: boolean | null }[] | null
-}
-
-/** One expert → one card. The flagship price and its suffix come off the SAME
- *  tier (`primaryPriceLabel`), which is the entire reason that helper exists:
- *  reading the price from the profile's flat rate and the clock from a tier is
- *  how a card ends up advertising an hour at a third of its price. */
-function fromExpert(t: HomeTutorRow): CatalogueCardItem {
-  // `bookable` is nullable on the row and `undefined`-able in `OfferShape` —
-  // and the difference is load-bearing rather than cosmetic: `bookable === false`
-  // is what marks a tier a SERVICE (no clock, no calendar), so collapsing null
-  // to `false` here would advertise every consultation as one. Null means „not
-  // stated", which is exactly what `undefined` means to the resolver.
-  const tiers = (t.consultations ?? []).map(c => ({
-    minutes: c.minutes,
-    price: c.price,
-    bookable: c.bookable ?? undefined,
-  }))
-  const offer = primaryPriceLabel(tiers, t.price ?? 80, t.consultationDurationMin ?? 60)
-  return {
-    id: t.id,
-    slug: t.slug ?? null,
-    name: t.user?.fullName ?? 'ექსპერტი',
-    // WHAT THEY CALL THEMSELVES first, the sphere only as a fallback. Two
-    // experts in „ბიზნესი და სტრატეგია" are told apart by „ბიზნეს-კონსულტანტი"
-    // vs „ბრენდ-სტრატეგი", never by the sphere they share. Never `specialty`
-    // free text — an unvalidated string must not wear a platform-issued badge.
-    badge: t.professions?.[0] ?? t.category?.name ?? '',
-    blurb: (t.headline || t.bio || '').trim(),
-    priceLabel: offerPriceLabel(offer),
-    priceSuffix: offer.suffix,
-    photo: t.user?.avatarUrl ?? null,
-    verified: !!t.verified,
-  }
-}
+/** What the price on a card is FOR. One suffix, because there is one kind of
+ *  row: „-დან" already says it is a floor, and this says what it is a floor on.
+ *  It used to live in components/booking/slots beside the session-length
+ *  labels — the file went with the booking product on 2026-08-24. */
+export const SERVICE_SUFFIX = 'სერვისზე'
 
 /** One provider → one card. */
-function fromProvider(m: MasterRow): CatalogueCardItem {
+function fromProvider(m: ProviderRow): CatalogueCardItem {
   return {
     id: m.id,
     slug: m.slug,
@@ -101,7 +48,7 @@ function fromProvider(m: MasterRow): CatalogueCardItem {
     priceLabel: m.priceValue !== null ? `₾${m.priceValue}-დან` : null,
     priceSuffix: SERVICE_SUFFIX,
     photo: m.photoSrc,
-    verified: false,
+    verified: m.verified,
   }
 }
 
@@ -113,16 +60,6 @@ function fromProvider(m: MasterRow): CatalogueCardItem {
  * page does not exist yet (`slug: null`) would be a card that goes nowhere, and
  * a card that does nothing is worse on a home page than one fewer card.
  */
-export function homeItems(tutors: HomeTutorRow[], masters: MasterRow[]): CatalogueCardItem[] {
-  const services = masters.filter(m => !!m.slug).map(fromProvider)
-  const experts = tutors.map(fromExpert)
-
-  const out = [
-    ...services.slice(0, SERVICE_LEAD),
-    ...experts.slice(0, HOME_ITEMS - Math.min(services.length, SERVICE_LEAD)),
-  ]
-  // Top up from whichever half still has rows — only reachable when the other
-  // one ran out, which is exactly the „the site is young" case this guards.
-  if (out.length < HOME_ITEMS) out.push(...services.slice(SERVICE_LEAD))
-  return out.slice(0, HOME_ITEMS)
+export function homeItems(providers: ProviderRow[]): CatalogueCardItem[] {
+  return providers.filter(m => !!m.slug).slice(0, HOME_ITEMS).map(fromProvider)
 }

@@ -74,7 +74,7 @@ export function StudentSidebar({ badges }: { badges: StudentBadges }) {
         className="mt-4 block rounded-card border border-ink-200 bg-ink-50/50 p-3.5 hover:border-ink-300 hover:bg-ink-50 transition-colors duration-fast"
       >
         <Eyebrow tone="muted">
-          ახალი კონსულტაცია
+          ახალი სერვისი
         </Eyebrow>
         <div className="mt-1 font-display text-small font-semibold text-ink-800">
           იპოვე ექსპერტი

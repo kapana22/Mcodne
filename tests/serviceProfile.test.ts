@@ -12,9 +12,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  SERVICE_GROUPS, SERVICE_TOPICS, isServiceTopic, MAX_SERVICES,
-  LIVE_SERVICE_GROUPS, LIVE_SERVICE_TOPICS,
-  ServiceProfileInput, profileIsRoutable, profileGaps,
+  OFFER_GROUPS, OFFER_TOPICS, isOfferableTopic, MAX_SERVICES,
+  LIVE_OFFER_GROUPS, LIVE_OFFER_TOPICS,
+  ServiceProfileInput, profileIsRoutable, profileGaps, MAX_WORK_PHOTOS,
   serviceLabels, areaLabels, priceHint, covers, sanitizeStored,
   vocabularyIsConsistent,
 } from '../lib/serviceProfile'
@@ -25,18 +25,22 @@ import {
 /* ═══════════ A. the vocabulary is derived, never re-typed ═══════════════ */
 
 test('§A the service vocabulary comes from the topics themselves', () => {
-  assert.ok(SERVICE_GROUPS.length > 0, 'no service groups — kinds: S disappeared')
-  assert.ok(SERVICE_TOPICS.length >= 20, `only ${SERVICE_TOPICS.length} service topics`)
+  assert.ok(OFFER_GROUPS.length > 0, 'no service groups — kinds: S disappeared')
+  assert.ok(OFFER_TOPICS.length >= 20, `only ${OFFER_TOPICS.length} service topics`)
 
   // THE INVARIANT. Every id this table may hold is an id a request may carry.
   assert.ok(vocabularyIsConsistent(),
     'a service topic is no longer of kind SERVICE — the two vocabularies have split')
 
-  // …and nothing from the other side leaked in. „ქიმია" is a LEARNING topic and
-  // a plumber must not be able to file themselves under it.
-  assert.ok(!isServiceTopic('chemistry'), 'a learning topic is selectable as a service')
-  assert.ok(!isServiceTopic('contract'), 'a consultation topic is selectable as a service')
-  assert.ok(isServiceTopic('plumb-leak'))
+  // ⚠️ THE ROSTER IS THE WHOLE VOCABULARY SINCE 2026-08-24. It used to be the
+  // eight SERVICE groups alone, and „nothing from the other side leaked in" was
+  // the assertion — a plumber must not file themselves under „ქიმია". That
+  // fence is what kept every professional off this table and forced the whole
+  // consulting side into a second one. What is still refused is an id the
+  // vocabulary does not contain at all.
+  assert.ok(isOfferableTopic('contract'), 'a professional service is not selectable')
+  assert.ok(isOfferableTopic('plumb-leak'))
+  assert.ok(!isOfferableTopic('not-a-topic'), 'an unknown id is selectable')
 })
 
 /* ═══════════ B. an unknown id is REFUSED, not quietly dropped ═══════════ */
@@ -44,18 +48,15 @@ test('§A the service vocabulary comes from the topics themselves', () => {
 test('§B an id that is not a service is refused rather than stripped', () => {
   const base = { areas: ['TBILISI'], calloutFee: null, priceFrom: null, available: true }
 
-  // The load-bearing case: a real topic, of the wrong kind. This is what a
-  // copy-pasted id or a drifted form actually looks like — not gibberish.
-  const wrongKind = ServiceProfileInput.safeParse({ ...base, services: ['plumb-leak', 'chemistry'] })
-  assert.equal(wrongKind.success, false, 'a LEARNING topic saved as a service')
-
-  const nonsense = ServiceProfileInput.safeParse({ ...base, services: ['not-a-topic'] })
-  assert.equal(nonsense.success, false)
+  // The load-bearing case: one real id and one that is not in the vocabulary at
+  // all. This is what a copy-pasted id or a drifted form actually looks like.
+  const wrongId = ServiceProfileInput.safeParse({ ...base, services: ['plumb-leak', 'not-a-topic'] })
+  assert.equal(wrongId.success, false, 'an id outside the vocabulary was saved')
 
   // ⚠️ AND IT MUST NOT SAVE THE GOOD ONES AND DROP THE BAD. Stripping would
-  // leave the master believing they are listed for something they are not.
-  if (!wrongKind.success) {
-    assert.ok(wrongKind.error.issues.length > 0)
+  // leave the provider believing they are listed for something they are not.
+  if (!wrongId.success) {
+    assert.ok(wrongId.error.issues.length > 0)
   }
 
   const ok = ServiceProfileInput.safeParse({ ...base, services: ['plumb-leak', 'plumb-boiler'] })
@@ -70,7 +71,7 @@ test('§B a duplicate, an over-long list and a bad city are each refused', () =>
     false, 'the same service twice was accepted')
 
   // „send me everything" is the lead-mill shape the cap exists to refuse.
-  const tooMany = SERVICE_TOPICS.slice(0, MAX_SERVICES + 1).map(t => t.id)
+  const tooMany = OFFER_TOPICS.slice(0, MAX_SERVICES + 1).map(t => t.id)
   assert.equal(ServiceProfileInput.safeParse({ ...base, services: tooMany }).success, false,
     `${MAX_SERVICES + 1} services were accepted over a cap of ${MAX_SERVICES}`)
 
@@ -100,17 +101,71 @@ test('§B a price of zero is refused and null stays legal', () => {
   assert.equal(ServiceProfileInput.safeParse({ ...base, calloutFee: 30, priceFrom: 50 }).success, true)
 })
 
+test('§B a price belongs to a service they actually offer', () => {
+  /* ⚠️ THE COLUMN THE BONUS IS PAID FOR (2026-08-21). `priceList` became
+   * editable at /work/services because lib/credits pays PROFILE_SERVICE for it
+   * and `profileFacts` reads it — before that its only writer was the intake,
+   * which is sealed at approval, so 20₾ of the grant had no field behind it.
+   * An editable map needs the intake's own rule kept: a price against a service
+   * they do not offer is a stale key left behind by an untick, or a crafted
+   * body, and either way it is a row nobody can explain. */
+  const base = { services: ['plumb-leak'], areas: ['TBILISI'], available: true, calloutFee: null, priceFrom: null }
+  assert.equal(ServiceProfileInput.safeParse({ ...base, priceList: { 'plumb-leak': 60 } }).success, true)
+  assert.equal(ServiceProfileInput.safeParse({ ...base, priceList: {} }).success, true)
+  // Absent is „leave it alone" — this endpoint is a full replace and an older
+  // client that never drew the field must not blank the map.
+  assert.equal(ServiceProfileInput.safeParse(base).success, true)
+  assert.equal(ServiceProfileInput.safeParse({ ...base, priceList: { 'clean-flat': 60 } }).success, false,
+    'a price is accepted for a service the provider does not offer')
+  assert.equal(ServiceProfileInput.safeParse({ ...base, priceList: { 'plumb-leak': 0 } }).success, false,
+    'a zero price is stored — blank is what „ask me" means, not free')
+})
+
+test('§B a stored work photo travels back as a token, never as bytes', () => {
+  /* Six base64 images is about a megabyte, so the editor is never sent the ones
+   * it already holds (see the endpoint's GET). It keeps `kept:<n>` in their
+   * place and the endpoint resolves it against the column — which only works if
+   * the schema accepts the token and nothing else that is not an image. */
+  const base = { services: ['plumb-leak'], areas: ['TBILISI'], available: true, calloutFee: null, priceFrom: null }
+  const img = 'data:image/webp;base64,AAAA'
+  assert.equal(ServiceProfileInput.safeParse({ ...base, workPhotos: ['kept:0', img] }).success, true)
+  assert.equal(ServiceProfileInput.safeParse({ ...base, workPhotos: [] }).success, true)
+  assert.equal(ServiceProfileInput.safeParse({ ...base, workPhotos: ['/api/masters/x/photo?n=0'] }).success, false,
+    'a URL is accepted where an image belongs — the column would hold a link to itself')
+  assert.equal(ServiceProfileInput.safeParse({ ...base, workPhotos: ['kept:9'] }).success, false,
+    'a token past the ceiling is accepted')
+  assert.equal(
+    ServiceProfileInput.safeParse({ ...base, workPhotos: Array.from({ length: MAX_WORK_PHOTOS + 1 }, () => img) }).success,
+    false, 'the editor may store more photos than the intake allows')
+})
+
 /* ═══════════ C. ready, not-ready, and off ══════════════════════════════ */
 
 test('§C an empty profile is „not ready" and never routable', () => {
   const empty = { services: [], areas: [], available: true }
   assert.equal(profileIsRoutable(empty), false)
-  // Two gaps, each nameable on the screen — „not ready" has to be actionable.
-  assert.equal(profileGaps(empty).length, 2)
+
+  // ⚠️ THE ASSERTION WAS `length === 2` AND IT PINNED A NUMBER (2026-08-29).
+  // What it meant to pin is that every gap is ACTIONABLE — nameable on the
+  // screen, with a control behind it. The city stopped being one the day
+  // `CITIES` came down to Tbilisi alone: /work/services no longer draws the
+  // block (the intake had already dropped it on 2026-08-20) and the PUT fills
+  // the column in, so „აირჩიე ქალაქი" would have been an instruction with
+  // nowhere to carry it out. So the rule is pinned instead of the count, and
+  // this test now passes both before and after a second city opens.
+  const cityIsAsked = CITIES.length > 1
+  assert.equal(profileGaps(empty).length, cityIsAsked ? 2 : 1)
+  assert.ok(profileGaps(empty).includes('აირჩიე ერთი სერვისი მაინც'),
+    'the one thing a provider must decide stopped being reported')
+  assert.equal(profileGaps(empty).includes('აირჩიე ქალაქი'), cityIsAsked,
+    'the city is reported as a gap exactly when the screen offers a choice of cities')
 
   const half = { services: ['plumb-leak'], areas: [], available: true }
+  // ROUTABILITY IS UNCHANGED, and deliberately: a row seeded before the PUT
+  // started filling the column really does have nowhere to be routed until its
+  // next save. What moved is only what we ASK somebody to go and do.
   assert.equal(profileIsRoutable(half), false, 'a master with no city was routable')
-  assert.equal(profileGaps(half).length, 1)
+  assert.equal(profileGaps(half).length, cityIsAsked ? 1 : 0)
 
   const ready = { services: ['plumb-leak'], areas: ['TBILISI'], available: true }
   assert.equal(profileIsRoutable(ready), true)
@@ -186,10 +241,12 @@ test('§F an unpriced master says nothing rather than „—"', () => {
 // If a trade is ever closed again, this number moves and the vocabulary does
 // not — that is the whole assertion.
 test('§L live groups gate the pickers but not the vocabulary', () => {
-  const ALL_SERVICE = TOPIC_GROUPS.filter(g => g.kinds.includes('SERVICE'))
-  assert.equal(LIVE_SERVICE_GROUPS.length, ALL_SERVICE.length, 'a trade was closed — say why here')
-  for (const g of LIVE_SERVICE_GROUPS) {
-    assert.ok(g.kinds.includes('SERVICE'), `${g.id} is live but not a service group`)
+  // ⚠️ THE ROSTER IS EVERY LIVE GROUP SINCE 2026-08-24, not the eight trades.
+  // What the gate still does is the point: it narrows what is OFFERED without
+  // narrowing what is UNDERSTOOD.
+  assert.equal(LIVE_OFFER_GROUPS.length, BROWSABLE_GROUPS.length, 'the picker and the browse list disagree about what is open')
+  for (const g of LIVE_OFFER_GROUPS) {
+    assert.ok(groupIsLive(g), `${g.id} is offered but not live`)
   }
   // ⚠️ THE MECHANISM IS PROVEN ON WHATEVER IS CLOSED TODAY. Every trade is open
   // now, so the closed set is the DORMANT one (positioning, not staffing) — and
@@ -235,10 +292,8 @@ test('§L the suggested chips only point at open groups', () => {
   // Six chips are the first thing on the wizard's what-step. One pointing into
   // a closed trade is the exact promise the gate exists to stop making, and it
   // would be made in the most prominent place on the screen.
-  const live = new Set(LIVE_SERVICE_TOPICS.map(t => t.id))
+  const live = new Set(LIVE_OFFER_TOPICS.map(t => t.id))
   for (const t of SUGGESTED_TOPICS) {
-    if (isServiceTopic(t.id)) {
-      assert.ok(live.has(t.id), `suggested chip „${t.label}" points at a closed trade`)
-    }
+    assert.ok(live.has(t.id), `suggested chip „${t.label}" points at a closed group`)
   }
 })

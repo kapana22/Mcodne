@@ -16,7 +16,16 @@ function tunedDatabaseUrl(): string | undefined {
   const base = process.env.DATABASE_URL
   if (!base || base.includes('connection_limit')) return base
   const sep = base.includes('?') ? '&' : '?'
-  return `${base}${sep}connection_limit=15&pool_timeout=30`
+  // ⚠️ `pool_timeout` WAS 30 AND IS 10 (2026-08-27). Thirty seconds was chosen
+  // for BURSTS — several pollers per open tab queueing behind a small pool —
+  // and it is far more than a burst ever needs at connection_limit=15. What it
+  // also governed was the pathological case: with Postgres unreachable, every
+  // request sat here for thirty seconds before anything could report a failure,
+  // which is long past the point where a proxy has given the visitor a gateway
+  // error. Ten still absorbs a burst and bounds the outage.
+  // `connect_timeout` is stated rather than left to the default so both halves
+  // of „the database is not answering" are written down in one place.
+  return `${base}${sep}connection_limit=15&pool_timeout=10&connect_timeout=5`
 }
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({

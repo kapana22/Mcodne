@@ -53,14 +53,20 @@ const STUDENT_ITEMS = (onSignout: () => void): MenuItem[] => [
 
 // Two logical groups, in order:
 //  1. Mobile escape-hatch — the workspace sections the 4-tab BottomNav can't
-//     hold (schedule/earnings/catalog). `mobileOnly` hides them on desktop,
-//     where the sidebar already lists them, so the dropdown isn't a duplicate
-//     of the sidebar. Messages/Home/Bookings are omitted entirely — they're in
-//     the BottomNav on mobile and the sidebar on desktop.
+//     hold. `mobileOnly` hides them on desktop, where the sidebar already lists
+//     them, so the dropdown isn't a duplicate of the sidebar. Messages and Home
+//     are omitted entirely — they're in the BottomNav on mobile and the sidebar
+//     on desktop.
 //  2. Account menu — profile/settings/help/sign-out, shown at every breakpoint.
+//
+// ⚠️ „გრაფიკი" (/work/schedule) AND „შემოსავალი" (/work/earnings) WERE THE
+// FIRST TWO ROWS AND BOTH 404ed (removed 2026-08-26). They were the booking
+// calendar and the consultation earnings screen; both pages went with the
+// product on 2026-08-24 and the menu kept offering them — so the provider's
+// avatar menu on a phone led with two dead ends. The balance a provider does
+// have is the credits pill in the top bar, which is a number rather than a
+// screen; there is nothing at /work/earnings to point at.
 const TUTOR_ITEMS = (onSignout: () => void): MenuItem[] => [
-  { href: '/work/schedule',    label: 'გრაფიკი',       icon: Icon.clock,  mobileOnly: true },
-  { href: '/work/earnings',    label: 'შემოსავალი',    icon: Icon.wallet, mobileOnly: true },
   { href: '/experts',            label: 'ექსპერტები', icon: Icon.search, mobileOnly: true },
   // Also mobileOnly: /work/profile is a rail row on desktop (navConfig).
   { href: '/work/profile',     label: 'პროფილი',       icon: Icon.user, mobileOnly: true },
@@ -124,7 +130,7 @@ export function UserMenu({
   // the master's screens from anywhere on the site. Their own workspace was
   // reachable only by typing the URL or signing in again.
   const hats = me?.hats ?? []
-  const isMaster = hats.includes('MASTER')
+  const sellsHere = hats.includes('PROVIDER')
   const inProviderSpace = isProviderWorkspacePath(pathname)
   const inExpertSpace = pathname.startsWith('/work') && !inProviderSpace
 
@@ -179,8 +185,8 @@ export function UserMenu({
   // → /work/requests — so somebody holding both hats read two entries for one
   // room, and the provider's entry skipped the home screen carrying their
   // balance. /work now serves both, so the two checks answer one item.
-  if ((isDualRole || isMaster) && !inExpertSpace && !inProviderSpace) {
-    switchItems.push({ href: '/work', label: SPACE_LABEL.EXPERT, icon: Icon.briefcase })
+  if ((isDualRole || sellsHere) && !inExpertSpace && !inProviderSpace) {
+    switchItems.push({ href: '/work', label: SPACE_LABEL.PROVIDER, icon: Icon.briefcase })
   }
   // ⚠️ ONLY WHEN THERE IS SOMETHING IN IT (2026-08-21). Owner: „ირევა
   // ჩვეულებრივ იუზერსა და ეს უნდა გავმიჯნოთ სწორად." „ჩემი სივრცე" sat directly
@@ -196,7 +202,7 @@ export function UserMenu({
   //
   // Somebody ALREADY IN the client space keeps the way back regardless — that is
   // the switcher doing its job, not an invitation.
-  if ((isDualRole || isMaster) && !inClientSpace && me?.clientRoom) {
+  if ((isDualRole || sellsHere) && !inClientSpace && me?.clientRoom) {
     switchItems.push({ href: '/me', label: SPACE_LABEL.CLIENT, icon: Icon.home })
   }
   // ADMIN manages all three worlds — give the menu direct doors into both
@@ -204,12 +210,12 @@ export function UserMenu({
   const adminSpaceItems: MenuItem[] = role === 'ADMIN'
     ? [
         { href: '/me', label: SPACE_LABEL.CLIENT, icon: Icon.home },
-        { href: '/work', label: SPACE_LABEL.EXPERT, icon: Icon.briefcase },
+        { href: '/work', label: SPACE_LABEL.PROVIDER, icon: Icon.briefcase },
       ]
     : []
   // „გახდი ექსპერტი" only for someone who can actually apply — an approved
   // expert browsing their client space was still being invited to become one.
-  const gated = baseItems.filter(i => i.href !== '/join' || showJoinInvite(role, me?.capabilities))
+  const gated = baseItems.filter(i => i.href !== '/join' || showJoinInvite(role, me?.provider))
   // ⚠️ THE OTHER HALF (2026-08-19). A provider who holds one capability is the
   // one person `showApplyCta` hides the join door from — so the switch the
   // product is built on („ვიღაცას ექნებოდა ჩართული კონსულტაციის ფუნქცია,
@@ -233,11 +239,11 @@ export function UserMenu({
   // „/join's job" and this is that comment being paid off — the 2026-08-19 fix
   // („ფუნქციებში ექნებოდა ეს გასააქტიურებელი") kept its meaning and lost its
   // nag.
-  const caps = me?.capabilities
+  const sells = me?.provider === true
   // `mobileOnly`, because the workspace rail already carries this exact row on
   // desktop — the convention the გრაფიკი/შემოსავალი/ექსპერტები rows above
   // already follow. Without it the menu repeated the rail two items running.
-  const servicesItem: MenuItem[] = (caps?.length ?? 0) > 0
+  const servicesItem: MenuItem[] = sells
     ? [{ href: '/work/services', label: 'ჩემი სერვისები', icon: Icon.briefcase, mobileOnly: true }]
     : []
   const items = [...switchItems, ...adminSpaceItems, ...servicesItem, ...gated]
@@ -282,7 +288,7 @@ export function UserMenu({
                   actually are; the role stays the fallback for everybody
                   without one. */}
               <Eyebrow tone="muted" className="mt-0.5">
-                {isMaster ? HAT_LABEL.MASTER : roleLabel(role)}
+                {sellsHere ? HAT_LABEL.PROVIDER : roleLabel(role)}
               </Eyebrow>
             </div>
           )}

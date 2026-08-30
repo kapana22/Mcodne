@@ -17,9 +17,11 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 const has = (p: string) => existsSync(join(ROOT, p))
 
 test('archetype 2 — catalogue: one card shell, one chip, a breadcrumb, two empty states', () => {
-  for (const f of ['app/experts/_card.tsx', 'app/experts/_masterCard.tsx']) {
-    assert.match(read(f), /from '@\/components\/EntityCard'/, `${f} no longer renders through EntityCard — the two catalogues will drift apart again`)
-  }
+  // ⚠️ ONE CARD SINCE 2026-08-24 — `_card.tsx` (the consultation one) went with
+  // the product. The shell it renders through is what kept the two from
+  // drifting; it is still the shared one.
+  assert.match(read('app/experts/_providerCard.tsx'), /from '@\/components\/EntityCard'/,
+    'the card no longer renders through EntityCard')
   assert.ok(has('components/EntityCard.tsx') && has('components/FilterChip.tsx'))
   // The chip moved with the refinements it undoes (2026-08-19): the hero no
   // longer filters at all, so the active-filter row in the results bar is where
@@ -43,13 +45,13 @@ test('archetype 2 — catalogue: one card shell, one chip, a breadcrumb, two emp
   // Two empty states, distinguished — „nobody is here yet" (nothing loaded at
   // all) and „nobody matches this" (the filters emptied a non-empty list).
   const empties = shell
-  assert.match(empties, /items\.length === 0 \? \(/, 'the cold-marketplace empty state is gone')
+  assert.match(empties, /providers\.length === 0 \? \(/, 'the cold-marketplace empty state is gone')
   assert.match(empties, /ვერ ვიპოვეთ — სცადე სხვა ფილტრი/, 'the filtered-to-zero empty state is gone')
 })
 
 test('archetype 4 — intake wizard: one StepIndicator, Container sizes, no hand max-w', () => {
   assert.ok(has('components/StepIndicator.tsx'))
-  assert.match(read('app/join/_expert/ApplyClient.tsx'), /<StepIndicator/)
+  // ⚠️ THE CONSULTATION WIZARD WAS THE OTHER CALLER (2026-08-24) and is gone.
   assert.match(read('app/request/_shell.tsx'), /<StepIndicator[^>]*variant="list"/)
   for (const f of ['app/join/_master/client.tsx', 'app/join/JoinClient.tsx', 'app/request/_shell.tsx']) {
     assert.doesNotMatch(read(f), /<Container[^>]*max-w-\[/, `${f} hand-writes a max-w on Container — pick a size instead`)
@@ -69,10 +71,10 @@ test('archetypes 5/6 — workspace and form pages open with the shared PageHeade
   assert.equal(has('components/tutor/PageHeader.tsx'), false, 'the tutor PageHeader re-export is back — import @/components/PageHeader directly')
   assert.match(read('app/settings/page.tsx'), /<PageHeader/)
   // ⚠️ `app/work/(expert)/bookings/page.tsx` WAS HERE AND IS GONE (2026-08-19).
-  // The expert's booking LIST became the one list of work at /work/jobs (the
-  // detail page under it did not move); the archetype it stood for is the same
-  // one, so the assertion follows the page rather than being dropped.
-  for (const f of ['app/work/page.tsx', 'app/work/jobs/page.tsx', 'app/me/bookings/page.tsx']) {
+  // The expert's booking LIST became the one list of work at /work/jobs; the
+  // client's own list („app/me/bookings") went with the product on 2026-08-24
+  // and their requests page took its place in this archetype.
+  for (const f of ['app/work/page.tsx', 'app/work/jobs/page.tsx', 'app/me/requests/page.tsx']) {
     assert.match(read(f), /from '@\/components\/PageHeader'/, `${f} imports PageHeader from somewhere else`)
   }
 })

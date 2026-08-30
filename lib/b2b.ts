@@ -61,9 +61,9 @@ export function b2bVisibleTo(visibility: B2BVisibility, role: string | null | un
  *
  * Takes the viewer's role (or null/undefined when signed out) rather than a
  * whole user, so it is usable from a server page, an API route and a client
- * component alike. A plain `string` and not the Prisma `Role` enum for the same
- * reason canSeePackages does it: this file must stay importable from a client
- * component without dragging @prisma/client into the browser bundle.
+ * component alike. A plain `string` and not the Prisma `Role` enum, so this file
+ * stays importable from a client component without dragging @prisma/client into
+ * the browser bundle.
  */
 export function canSeeB2B(role: string | null | undefined): boolean {
   return b2bVisibleTo(B2B_VISIBILITY, role)

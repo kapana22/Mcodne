@@ -20,11 +20,20 @@ import { Footer } from '@/components/Footer'
 import { Card } from '@/components/Card'
 import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
-import { PhotoUploader } from '../_expert/_upload'
+import { PhotoUploader } from '../_shared/_upload'
 import { MASTER, MASTER_KINDS, MASTER_KIND_LABEL, MASTER_STATUS_TEXT, type MasterKind } from '@/lib/masterApplication'
 import { WorkPhotos } from './_workPhotos'
 
-type Group = { id: string; label: string; topics: { id: string; label: string; alt?: string[] }[] }
+type Vertical = 'SERVICE' | 'EXPERT'
+type Group = { id: string; label: string; vertical?: Vertical; topics: { id: string; label: string; alt?: string[] }[] }
+
+/* ⚠️ THE TWO WORLDS, IN THE CATALOGUE'S OWN WORDS. app/experts/_filters.tsx
+   already splits this exact vocabulary under these two headings, so a provider
+   picking here and a client filtering there are reading the same two names. */
+const WORLD: { id: Vertical; label: string; hint: string }[] = [
+  { id: 'SERVICE', label: 'სერვისი სახლში', hint: 'დალაგება, სანტექნიკა, ელექტრიკა, რემონტი, გადაზიდვა' },
+  { id: 'EXPERT', label: 'პროფესიული სერვისები', hint: 'ბუღალტერია, სამართალი, მარკეტინგი, IT, დიზაინი' },
+]
 type City = { id: string; label: string }
 
 const FIELD =
@@ -90,7 +99,7 @@ function PickChip({ on, onClick, children, disabled }: {
   )
 }
 
-export function MasterApplyClient({ email, name, phone: accountPhone = '', me, seed, onContinueExpert }: {
+export function MasterApplyClient({ email, name, phone: accountPhone = '', me, seed }: {
   email: string; name: string; phone?: string; me: any
   /**
    * ⚠️ THE DOOR'S ANSWER, CARRIED IN (2026-08-20). The applicant has already
@@ -105,23 +114,22 @@ export function MasterApplyClient({ email, name, phone: accountPhone = '', me, s
    * worse than an empty one.
    */
   seed?: { cats?: string[]; professions?: string[] }
-  /**
-   * ⚠️ THE OTHER HALF, WHEN THEIR PROFESSION HAS ONE (2026-08-20).
-   *
-   * The mirror of `onContinueMaster` on the expert wizard, and it exists
-   * because the order was reversed the same day: /join used to open the
-   * consultation wizard first and offer the service from ITS success screen,
-   * which is the hierarchy upside down (CLAUDE.md rule 4). Now a ბუღალტერი —
-   * CONSULT and WORK both — lands here first, and without this the
-   * consultation half would simply have no door.
-   *
-   * Undefined when they only sell a job, which is most of this form's traffic.
-   */
-  onContinueExpert?: () => void
 }) {
   const router = useRouter()
 
   const [groups, setGroups] = useState<Group[]>([])
+  /* ⚠️ ASKED ONCE, AND IT NARROWS EVERYTHING BELOW IT (2026-08-30). Owner:
+     „როდესაც დამლაგებლად დაამატა სერვისი, იმას ხომ არ ექნება სურვილი
+     ბუღალტრის სერვისი ჰქონდეს… ზედმეტ რაღაცებს აღარ უნდა თავაზობდეს."
+
+     Measured the same day on the 28 live providers with services: every one
+     is inside ONE vertical and 26 of 28 inside one GROUP — 1.1 groups each.
+     The browse list was 28 groups deep for people who use one.
+
+     Null until they answer, because the honest default is „we do not know
+     yet" — not „professional", which would put a cleaner in front of a law
+     column on their first screen. */
+  const [world, setWorld] = useState<Vertical | null>(null)
   const [cities, setCities] = useState<City[]>([])
   const [status, setStatus] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -398,30 +406,18 @@ export function MasterApplyClient({ email, name, phone: accountPhone = '', me, s
               The photo button is FIRST and primary when it is missing, because
               it is the only blocker left; when the photo is there it is not
               drawn at all and „სერვისები" is the whole footer. */}
-          {/* ⚠️ THE CONSULTATION IS OFFERED, NEVER ASKED — and it is offered
-              HERE, after the service is filed, because that is what it is in
-              this product: a pre-step to buying the service, not a second
-              product (CLAUDE.md → THE HIERARCHY, rule 2). It appears only when
-              their own profession can do it (lib/professions → PROFESSION_CAN),
-              so nobody is invited to sell something their trade does not. */}
-          {onContinueExpert && (
-            <p className="mt-4 pt-4 border-t border-ink-100 text-body text-ink-700 leading-relaxed">
-              შენს პროფესიაზე ზოგი სერვისი დროზე იყიდება — კლიენტი ირჩევს საათს და ჯავშნის.
-              გინდა, ასეთიც დაამატო?
-            </p>
-          )}
+          {/* ⚠️ „ჯავშნადი სერვისის დამატება" WAS HERE AND IS GONE (2026-08-24).
+              It offered the consultation half — a service bought by picking an
+              hour — from this success screen, which was the right PLACE for it
+              (after the service is filed, never as a question before it). The
+              product went; an offer with nothing behind it is worse than none. */}
           <div className="mt-5 flex flex-wrap gap-3">
             {!photoUrl && (
-              <Btn href="/join?can=WORK">ფოტოს დამატება</Btn>
+              <Btn href="/work/profile">ფოტოს დამატება</Btn>
             )}
             {/* Secondary next to the photo blocker, primary when nothing is
                 blocking: the photo is the only thing standing between this
                 person and approval, and an optional extra must not outrank it. */}
-            {onContinueExpert && (
-              <Btn onClick={onContinueExpert} variant={photoUrl ? 'primary' : 'secondary'}>
-                ჯავშნადი სერვისის დამატება
-              </Btn>
-            )}
             <Btn href="/experts" variant="secondary">ექსპერტები</Btn>
           </div>
         </Card>
@@ -508,6 +504,43 @@ export function MasterApplyClient({ email, name, phone: accountPhone = '', me, s
         </Block>
 
         {/* `data-field` is the jump target for the „დარჩა" list — see jumpTo. */}
+        <Block n={++blockNo} title="რომელ კატეგორიაშია შენი საქმე"
+          hint="ერთი პასუხი — შემდეგ მხოლოდ ამ კატეგორიის სერვისებს გაჩვენებთ. შემდეგაც შეგიძლია შეცვალო."
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            {WORLD.map(w => {
+              const on = world === w.id
+              return (
+                <button
+                  key={w.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setWorld(w.id)}
+                  className={`text-left rounded-card border p-4 transition-colors duration-fast ${
+                    on ? 'border-brand-600 bg-brand-50' : 'border-ink-200 bg-white hover:border-ink-300'
+                  }`}
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span className={`font-display text-body font-bold ${on ? 'text-brand-800' : 'text-ink-900'}`}>
+                      {w.label}
+                    </span>
+                    {/* ⚠️ THE CHOICE IS SHOWN AS A STATE, not only as a fill —
+                        Glassdoor marks the primary industry the same way, and
+                        it is what makes a single-answer question read as
+                        answered rather than merely highlighted. */}
+                    {on && (
+                      <span className="shrink-0 inline-flex items-center h-[22px] px-2 rounded-pill bg-brand-600 text-white font-display text-micro font-bold">
+                        არჩეული
+                      </span>
+                    )}
+                  </span>
+                  <span className="block mt-1 text-small text-ink-500 leading-snug">{w.hint}</span>
+                </button>
+              )
+            })}
+          </div>
+        </Block>
+
         <Block n={++blockNo} title="რას აკეთებ" field="services"
           hint={`აირჩიე მხოლოდ ის, რასაც მართლა აკეთებ — მოთხოვნებიც მხოლოდ ეს მოგდის. მაქსიმუმ ${MASTER.MAX_SERVICES}.`}
         >
@@ -573,7 +606,13 @@ export function MasterApplyClient({ email, name, phone: accountPhone = '', me, s
             </div>
           ) : (
             <div className="mt-3 divide-y divide-ink-100 border-t border-ink-100">
-              {groups.map(g => {
+              {/* ⚠️ BROWSE NARROWS, SEARCH DOES NOT. Typing „დალაგება" while
+                  the professional world is chosen still finds it — the search
+                  above crosses both verticals on purpose, exactly as the client
+                  intake's does (lib/requestTopics: „A separation that loses a
+                  request is worse than the confusion it fixed"). What narrows
+                  is only the list somebody SCROLLS. */}
+              {groups.filter(g => !world || !g.vertical || g.vertical === world).map(g => {
                 const picked = g.topics.filter(t => services.includes(t.id)).length
                 const open = openGroup === g.id
                 return (

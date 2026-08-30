@@ -37,11 +37,11 @@ const STUDENT_TABS: Tab[] = [
   // /experts/<slug> is the profile (own address space since 2026-08-19); it is
   // still the ექსპერტები section, so it lights the same tab.
   { href: '/experts',            label: 'ექსპერტები',     icon: Icon.search,   match: startsWith('/experts') },
-  // Bookings — the core object of the product — earns a tab.
-  { href: '/me/bookings',  label: 'ჯავშნები',     icon: Icon.calendar, match: startsWith('/me/bookings') },
-  // Messages — a marketplace conversation surface earns its own tab (mirrors
-  // the tutor nav).
-  { href: '/me/messages',  label: 'მიმოწერა',      icon: Icon.chat,     match: startsWith('/me/messages') },
+  // ⚠️ „ჯავშნები" AND „მიმოწერა" WENT WITH THE BOOKING PRODUCT (2026-08-24) —
+  // a session list and the pair inbox that carried a booking's conversation.
+  // What a client has instead is their own requests, and each one carries its
+  // thread at /request/<ref>.
+  { href: '/me/requests',  label: 'მოთხოვნები',   icon: Icon.list,     match: startsWith('/me/requests') },
   // „შენახული" TOOK THE PROFILE SLOT (2026-07-31). The old comment above claimed
   // saved-experts lived „in the StudentAppBar rail + profile" — but that rail is
   // `hidden lg:flex` and the public header's heart was `hidden sm:`, so on a
@@ -78,11 +78,26 @@ const TUTOR_TABS: Tab[] = [
 // stage 6 (components/tutor/navConfig → WORKSPACE_NAV); the phone did not, so
 // the feature was desktop-only by accident. It leads the list for the same
 // reason it does there: it is the screen the other three are reached from.
+//
+// ⚠️ AND „შეთავაზებები" BECAME „პროფილი" (2026-08-21, the same day the rail was
+// rebuilt around the service pipeline). Two reasons, and the second is the one
+// that was actually broken:
+//   · a sent offer is a STAGE of a job rather than a place — /work/jobs and
+//     /work/offers now share one tab bar, so a phone tab for each is the split
+//     the rail just stopped drawing;
+//   · a master had NO route to their own profile on a phone at all. /work/profile
+//     was inside the (expert) group until that day, so this bar could not have
+//     carried it — their photo and their sentence were edited inside „ჩემი
+//     სერვისები". Both halves open the page now, and their bar says so.
 const PROVIDER_TABS: Tab[] = [
   { href: '/work',                 label: 'მთავარი',           icon: Icon.home,      match: p => p === '/work' },
   { href: '/work/requests',        label: 'მოთხოვნები',        icon: Icon.list,      match: startsWith('/work/requests') },
-  { href: '/work/offers',          label: 'შეთავაზებები',      icon: Icon.send,      match: startsWith('/work/offers') },
+  // ⚠️ THE JOBS TAB LIGHTS UP ON THE OFFERS PAGE, exactly as the rail's does
+  // (components/tutor/navConfig): they are two stages of one screen and share a
+  // tab bar, so the phone must not show the page with nothing selected.
+  { href: '/work/jobs',            label: 'სამუშაოები',        icon: Icon.calendar,  match: p => startsWith('/work/jobs')(p) || startsWith('/work/offers')(p) },
   { href: '/work/services',        label: 'ჩემი სერვისები',    icon: Icon.briefcase, match: startsWith('/work/services') },
+  { href: '/work/profile',         label: 'პროფილი',           icon: Icon.user,      match: startsWith('/work/profile') },
 ]
 
 // Keyed by the two roles the product has plus the admin — USER buys, PROVIDER

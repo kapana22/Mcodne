@@ -19,6 +19,7 @@ import {
   RequestOfferInput, offerTemplateFor, kindOf,
   OFFER_PRICE_KINDS, OFFER_PRICE_KIND_LABEL, type OfferPriceKind,
 } from '@/lib/requests'
+import { OFFER_FREE_NOTE } from '@/lib/credits'
 
 type Status = 'idle' | 'sending' | 'error'
 
@@ -239,6 +240,14 @@ export function OfferForm({ requestId, kind, budgetMin, budgetMax, unitLabel }: 
         <Btn type="submit" disabled={status === 'sending'} aria-busy={status === 'sending'}>
           {status === 'sending' ? 'იგზავნება…' : 'პასუხის გაგზავნა'}
         </Btn>
+        {/* ⚠️ SAYING THAT IT IS FREE IS NOT NOTHING (2026-08-21). This line
+            said „შეთავაზების გაგზავნა — 5₾ ბალანსიდან" for one day, because
+            sending an offer cost 5₾. The owner moved the price onto the
+            client's CONTACT and made the answer free, and a provider who was
+            told a price once will assume it still applies unless told
+            otherwise — so the line stays and its content flips. The place a
+            balance is spent is now the contact button above, not this one. */}
+        <p className="mt-2 text-meta text-ink-500 leading-snug">{OFFER_FREE_NOTE}</p>
       </div>
     </Card>
   )

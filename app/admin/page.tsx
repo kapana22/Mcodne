@@ -7,12 +7,7 @@ import { useState, useEffect } from 'react'
 import { AdminSidebar, TopBar, VALID_TABS, TAB_ALIASES, type AdminTab } from './_nav'
 import { PresenceBeat } from './_presence'
 import { OverviewSection } from './_overview'
-import { ModerationSection } from './_moderation'
 import { UsersSection } from './_users'
-import { BookingsSection } from './_bookings'
-import { ReviewsSection } from './_reviews'
-import { DisputesSection } from './_disputes'
-import { FinanceSection } from './_finance'
 import { BroadcastSection } from './_broadcast'
 import { CategoriesSection } from './_categories'
 import { AuditSection } from './_audit'
@@ -20,12 +15,13 @@ import { BlogSection } from './_blog'
 import { SiteTextsSection } from './_texts'
 import { IntegrationsSection } from './_integrations'
 import { SystemSection } from './_system'
-import { InsightsSection } from './_insights'
 import { HelpSection } from './_help'
 import { CompaniesSection } from './_companies'
 import { RequestsSection } from './_requests'
+import { FunnelSection } from './_funnel'
 import { AccessSection } from './_access'
 import { MastersSection } from './_masters'
+import { ReviewsSection } from './_reviews'
 
 /* ───── Impersonation banner ─────
    Polls the /status endpoint (a cheap read of the impersonation cookie, no DB
@@ -41,7 +37,6 @@ export default function AdminOverview() {
   // away, and every one of them that has somebody waiting carries a badge in
   // the rail — the six counts below — so an unopened queue is not a silent one.
   const [active, setActive] = useState<AdminTab>('overview')
-  const [pendingCount, setPendingCount] = useState<number | null>(null)
   // People waiting for a reply from the help chat. It gets a nav badge for the
   // same reason the application queue does: it is a person, not a number, and
   // until now the only way to discover one was to open the tab and scroll past
@@ -56,7 +51,6 @@ export default function AdminOverview() {
   // Submitted tradesperson applications and unresolved disputes — the last two
   // queues on the panel that had no badge, from the same stats fetch (2026-08-19).
   const [pendingMasters, setPendingMasters] = useState<number | null>(null)
-  const [openDisputes, setOpenDisputes] = useState<number | null>(null)
   // Bump this to force <OverviewSection> KPI re-fetch after a moderation
   // decision (approve/reject changes counts).
   const [statsTick, setStatsTick] = useState(0)
@@ -80,12 +74,10 @@ export default function AdminOverview() {
       const r = await fetch('/api/admin/stats', { cache: 'no-store' })
       if (!r.ok) return
       const d = await r.json()
-      if (typeof d?.pendingApps === 'number') setPendingCount(d.pendingApps)
       if (typeof d?.helpOpen === 'number') setHelpOpen(d.helpOpen)
       if (typeof d?.b2bLeads === 'number') setB2bLeads(d.b2bLeads)
       if (typeof d?.newRequests === 'number') setNewRequests(d.newRequests)
       if (typeof d?.pendingMasters === 'number') setPendingMasters(d.pendingMasters)
-      if (typeof d?.openDisputes === 'number') setOpenDisputes(d.openDisputes)
     } catch {}
   }
   useEffect(() => { loadPending() }, [statsTick])
@@ -100,9 +92,9 @@ export default function AdminOverview() {
       {/* Renders nothing. Here rather than inside the requests tab because an
           operator reading any tab is still an operator — see _presence. */}
       <PresenceBeat />
-      <AdminSidebar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingMasters={pendingMasters} openDisputes={openDisputes} />
+      <AdminSidebar active={active} onNav={setActiveWithHash} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingMasters={pendingMasters} />
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-      <TopBar active={active} onNav={setActiveWithHash} pendingCount={pendingCount} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingMasters={pendingMasters} openDisputes={openDisputes} />
+      <TopBar active={active} onNav={setActiveWithHash} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingMasters={pendingMasters} />
 
       {/* NB: the `key` used to be `active + ':' + statsTick` so that a moderation
           decision would remount the overview KPIs. But `statsTick` also
@@ -112,7 +104,6 @@ export default function AdminOverview() {
           re-fetches its own KPIs whenever it mounts. */}
       <main key={active}>
         {active === 'overview' && <OverviewSection />}
-        {active === 'moderation' && <ModerationSection onDecision={() => setStatsTick(t => t + 1)} />}
         {active === 'users' && <UsersSection />}
         {/* B2B. Unreachable while the vertical is off: `companies` is filtered
             out of ADMIN_NAV, and VALID_TABS is derived from it, so `active` can
@@ -125,18 +116,19 @@ export default function AdminOverview() {
         {active === 'requests' && <RequestsSection onChanged={() => setStatsTick(t => t + 1)} />}
         {active === 'masters' && <MastersSection onChanged={() => setStatsTick(t => t + 1)} />}
         {active === 'access' && <AccessSection />}
-        {active === 'bookings' && <BookingsSection />}
-        {active === 'reviews' && <ReviewsSection />}
-        {active === 'disputes' && <DisputesSection />}
-        {active === 'finance' && <FinanceSection />}
-        {active === 'insights' && <InsightsSection />}
         {active === 'help' && <HelpSection />}
+        {active === 'reviews' && <ReviewsSection />}
         {active === 'broadcast' && <BroadcastSection />}
         {active === 'categories' && <CategoriesSection />}
         {active === 'blog' && <BlogSection />}
         {active === 'texts' && <SiteTextsSection />}
         {active === 'integrations' && <IntegrationsSection />}
         {active === 'audit' && <AuditSection />}
+        {/* Same nav-level hide as `requests` and `access`: filtered out of
+            ADMIN_NAV with the feature off, and VALID_TABS is derived from it,
+            so `active` can never hold 'funnel' on a deployment without the
+            request wizard. */}
+        {active === 'funnel' && <FunnelSection />}
         {active === 'system' && <SystemSection />}
       </main>
       </div>

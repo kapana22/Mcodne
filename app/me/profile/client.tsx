@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useState } from 'react'
 import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { useAvatarCropper } from '@/components/AvatarCropper'
@@ -187,9 +188,9 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
           <div className="font-display text-small font-bold text-ink-900">შეტყობინებები</div>
           <div className="text-small text-ink-600 mt-0.5">აირჩიე, რაზე მიიღო.</div>
         </div>
-        <a href="/settings" className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-small inline-flex items-center gap-1.5 shrink-0">
+        <Link href="/settings" className="h-11 px-4 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 font-display font-semibold text-small inline-flex items-center gap-1.5 shrink-0">
           გახსნა
-        </a>
+        </Link>
       </div>
 
       {/* ABOVE the sign-out card, deliberately. Traced from a real signup
@@ -205,9 +206,9 @@ export function ProfileClient({ initialName, initialEmail, initialPhone, initial
             <div className="font-display text-small font-bold text-ink-900">შემოგვიერთდი</div>
             <div className="text-small text-ink-600 mt-0.5">გააზიარე ცოდნა, გამოიმუშავე.</div>
           </div>
-          <a href="/join" className="h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body inline-flex items-center gap-1.5">
+          <Link href="/join" className="h-11 px-4 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body inline-flex items-center gap-1.5">
             განაცხადი
-          </a>
+          </Link>
         </div>
       )}
 

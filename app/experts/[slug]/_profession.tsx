@@ -7,8 +7,7 @@ import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { EmptyState } from '@/components/EmptyState'
-import { queryTutors } from '@/lib/tutorsQuery'
-import { primaryPrice } from '@/components/booking/slots'
+import { queryProviders } from '@/app/experts/_providers'
 import { categorySeo, fallbackSeo } from '@/lib/categorySeo'
 import { professions, type ProfessionSeo } from '@/lib/professionSeo'
 import { jsonLdString } from '@/lib/jsonLd'
@@ -54,7 +53,13 @@ export function professionMetadata(p: ProfessionSeo): Metadata {
 export async function ProfessionLanding({ p }: { p: ProfessionSeo }) {
   // Supply is genuinely allowed to be zero here — the catalog fills in sphere by
   // sphere — so a failed/empty query is an empty state, never an error page.
-  const experts = await queryTutors({ category: p.categorySlug, limit: 24 }).catch(() => [])
+  // ⚠️ ONE ROSTER SINCE 2026-08-24. This read `queryTutors({ category })` — the
+  // consultation table — and every landing on the site drew its grid from it.
+  // The people are the same people; they are rows in the one provider table now,
+  // and the sphere they are filed under is the same `categoryId`.
+  const experts = (await queryProviders({ groups: [], topics: [], cities: [], cats: [p.categorySlug], limit: 24 })
+    .then(r => r.rows)
+    .catch(() => []))
   const sphere = categorySeo[p.categorySlug] ?? fallbackSeo(p.categorySlug)
 
   const breadcrumbLd = {
@@ -62,7 +67,7 @@ export async function ProfessionLanding({ p }: { p: ProfessionSeo }) {
     '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'მთავარი', item: SITE_URL },
-      { '@type': 'ListItem', position: 2, name: 'კონსულტაციები', item: `${SITE_URL}/experts` },
+      { '@type': 'ListItem', position: 2, name: 'ექსპერტები', item: `${SITE_URL}/experts` },
       { '@type': 'ListItem', position: 3, name: p.keyword },
     ],
   }
@@ -112,7 +117,7 @@ export async function ProfessionLanding({ p }: { p: ProfessionSeo }) {
         <nav className="flex items-center gap-1.5 text-meta text-ink-400 mb-5">
           <Link href="/" className="tap-area hover:text-ink-700">მთავარი</Link>
           <span>/</span>
-          <Link href="/experts" className="tap-area hover:text-ink-700">კონსულტაციები</Link>
+          <Link href="/experts" className="tap-area hover:text-ink-700">ექსპერტები</Link>
           <span>/</span>
           <span className="text-ink-600">{p.label}</span>
         </nav>
@@ -164,25 +169,24 @@ export async function ProfessionLanding({ p }: { p: ProfessionSeo }) {
           ) : (
             <div className={`grid gap-4 ${experts.length <= 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
               {experts.map(t => {
-                const name = t.user?.fullName ?? 'ექსპერტი'
-                const rating = typeof t.rating === 'number' ? t.rating : 0
-                // The FLAGSHIP service's price, never the flat rate — the same
-                // shared rule /experts, the profile and the home grid use. The
-                // two differ for any expert who set one and priced the other.
-                const price = primaryPrice(t.consultations ?? [], typeof t.price === 'number' ? t.price : 0) || null
+                const name = t.name
+                const rating = t.rating
+                // The lowest priced service, which is what the card prints as a
+                // floor — never a flat rate nobody stands behind.
+                const price = t.priceValue
                 return (
                   <Link key={t.id} href={`/experts/${t.slug || t.id}`} className="group rounded-card border border-ink-200 bg-white p-5 flex flex-col hover-lift transition-all duration-fast">
                     <div className="flex items-center gap-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       {/* Below-fold, remote, so lazy + an intrinsic box. */}
-                      <img src={t.user?.avatarUrl || DEFAULT_AVATAR} alt={name} loading="lazy" decoding="async" width={56} height={56} className="w-14 h-14 rounded-full object-cover ring-1 ring-ink-200" />
+                      <img src={t.photoSrc || DEFAULT_AVATAR} alt={name} loading="lazy" decoding="async" width={56} height={56} className="w-14 h-14 rounded-full object-cover ring-1 ring-ink-200" />
                       <div className="min-w-0">
                         <div className="font-display text-body-lg font-bold text-ink-900 truncate group-hover:text-brand-700 transition-colors duration-fast">{name}</div>
                         {/* The CATEGORY, not `specialty` — every card on this
                             page is already inside one sphere, and `specialty`
                             is a frozen copy of the category name from approval
                             day that contradicts it after a rename. */}
-                        {(t.category?.name ?? t.specialty) && <div className="text-meta text-ink-500 truncate">{t.category?.name ?? t.specialty}</div>}
+                        {(t.headline || t.professions[0]) && <div className="text-meta text-ink-500 truncate">{t.headline || t.professions[0]}</div>}
                       </div>
                     </div>
                     <div className="mt-4 pt-3 border-t border-ink-100 flex items-center justify-between text-meta">

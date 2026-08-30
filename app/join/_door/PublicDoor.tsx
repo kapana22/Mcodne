@@ -7,19 +7,21 @@
  * — sat on the far side of that wall. See `GuestDoor` for why the order was
  * inverted; this file is the page that inversion needed.
  *
- * ⚠️ AND IT IS CAPABILITY-NEUTRAL, deliberately. The two pitches that still
- * exist each speak to one half — `_expert/ApplyMarketing` („გახდი ექსპერტი",
+ * ⚠️ AND IT IS THE ONLY PITCH NOW (2026-08-24). There were two beside it, each
+ * speaking to one half — `_expert/ApplyMarketing` („გახდი ექსპერტი",
  * `?can=CONSULT`) and `_master/_marketing` („დაარეგისტრირე შენი სერვისი",
- * `?can=WORK`) — and both are real landing pages for real search intent, so
- * they stay, crawlable, linked from the footer under their own headings. But
- * the BARE address cannot be either of them: whichever it were, half of the
- * people the site is recruiting would read the first sentence and conclude
- * that this is not for them. The bare door names no half at all; the applicant
- * names their job, and the site works out the rest.
+ * `?can=WORK`) — because a provider could sell either of two things and a page
+ * that named one lost the other. Both are gone with the split: `?can=` is
+ * ignored, so those addresses rendered THIS page anyway, and the sitemap has
+ * stopped submitting `/join?can=WORK` as a second entry rather than advertising
+ * a duplicate of an address it already lists.
  *
- * The four supporting sections are shared with the consultation pitch
- * (`../_sections`) — one source, so they cannot answer the same question two
- * ways.
+ * What the bare door was FOR survives unchanged and is now simply the whole
+ * design: it names no half, the applicant names their job, and the site works
+ * out the rest.
+ *
+ * The four supporting sections live in `../_sections` — one source, so the door
+ * and the signed-in form cannot answer the same question two ways.
  */
 
 import { MarketingTopBar } from '@/components/MarketingTopBar'
@@ -29,22 +31,15 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { jsonLdString } from '@/lib/jsonLd'
 import { getSiteTextMap } from '@/lib/siteText'
 import { SITE_TEXT_DEFAULTS } from '@/lib/siteTextDefs'
-import { providersOn } from '@/lib/requests'
-import { CAPABILITIES, JOIN_DOOR_LABEL, type Capability } from '@/lib/capabilities'
+import { JOIN_DOOR_LABEL } from '@/lib/capabilities'
 import { PitchFaqLd, PitchSections } from '../_sections'
 import { GuestDoor } from './GuestDoor'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
-export async function PublicDoor({ preset = [] }: { preset?: Capability[] }) {
+export async function PublicDoor() {
   const map = await getSiteTextMap()
   const t = (k: string) => map[k] ?? SITE_TEXT_DEFAULTS[k] ?? ''
-
-  // The same gate the signed-in door applies (app/join/page.tsx): the WORK
-  // half is not offered while FEATURE_PROVIDERS is off. A guest must not be
-  // told they can register a service and then find the half missing after
-  // making an account.
-  const offer: Capability[] = CAPABILITIES.filter(c => c !== 'WORK' || providersOn())
 
   const breadcrumbLd = {
     '@context': 'https://schema.org',
@@ -76,7 +71,7 @@ export async function PublicDoor({ preset = [] }: { preset?: Capability[] }) {
           {/* ⚠️ THE QUESTION IS THE HERO'S ACTION — there is no „create an
               account" button above it. That was the wall. */}
           <p className="mt-8 text-body font-display font-semibold text-ink-900">{t('join.hero.ask')}</p>
-          <GuestDoor offer={offer} preset={preset.filter(c => offer.includes(c))} />
+          <GuestDoor />
 
           <p className="mt-3 text-meta text-ink-500">{t('join.hero.note')}</p>
         </div>

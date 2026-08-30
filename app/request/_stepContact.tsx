@@ -47,7 +47,7 @@ export function StepContact({ draft, patch, signedIn }: {
    *  answered and gets submitted with the blanks still in it. */
   const placeholder =
     kind === 'LEARNING' ? 'ვინ ისწავლის, რა დონეა და რა არის მიზანი'
-    : kind === 'CONSULTATION' ? 'რა კითხვა გაქვს და რა სიტუაციაა'
+    : kind === 'MEETING' ? 'რა კითხვა გაქვს და რა სიტუაციაა'
     : kind === 'SERVICE' ? 'რა პრობლემაა, სართული და ლიფტი'
     : 'რა უნდა გაკეთდეს და რა შედეგს ელი'
 

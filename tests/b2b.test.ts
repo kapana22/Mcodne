@@ -448,68 +448,41 @@ test('the admin tab disappears with the vertical, from the SOURCE array', () => 
 
 /* ═══════════ 4. the charge ═════════════════════════════════════════════ */
 
-test('the booking charge is inside the booking transaction', () => {
-  // If the charge sat outside, a balance could be spent on a booking that then
-  // failed to be created — and runSerializable RETRIES the transaction up to
-  // three times on P2034, so a charge outside it would double- or triple-bill.
-  const src = read('app/api/bookings/route.ts')
-  const txStart = src.indexOf('const attemptBooking = () => prisma.$transaction')
-  const txEnd = src.indexOf("{ isolationLevel: 'Serializable' }")
-  assert.ok(txStart > -1 && txEnd > txStart, 'the booking transaction moved — re-check this test')
-  const body = src.slice(txStart, txEnd)
-  assert.match(body, /company\.updateMany/, 'the charge is not inside the booking transaction')
-  assert.match(body, /companyTransaction\.create/, 'the ledger row is not inside the booking transaction')
-  assert.match(body, /balance: \{ gte: price \}/, 'the charge does not claim the row')
-})
+/* ⚠️ FOUR TESTS WERE HERE AND ARE GONE (2026-08-24) — the whole
+   „spend a company balance on a booking" half of this vertical:
 
-test('the charge uses the SERVER price and re-reads membership', () => {
-  // Nothing about the request is trusted. `price` is derived above from the
-  // consultation row or the expert's rate — a client that sends price 0 and
-  // paidBy COMPANY_BALANCE must still be charged the real amount.
-  //
-  // codeOf, not read — the FOURTH time in this file that a comment satisfied an
-  // assertion meant for code. The note in the route explaining why the gate is
-  // NOT canSeeB2B(user.role) contains that exact string, so the negative
-  // assertion below failed against prose while the code was already correct.
-  const src = codeOf('app/api/bookings/route.ts')
-  // canSpendAsMember(), NOT canSeeB2B(user.role). Pinned as the exact
-  // expression because the difference is what made the feature work at all:
-  // gating the CHARGE on the rollout stage left no account able to use it —
-  // an employee is a STUDENT (refused by the stage) and an ADMIN cannot book
-  // (refused by this route). Found by driving the real flow, not by reading.
-  assert.match(src, /const\s+wantsBalance\s+=\s+canSpendAsMember\(\)\s+&&\s+parsed\.data\.paidBy\s+===\s+'COMPANY_BALANCE'/)
-  assert.doesNotMatch(src, /canSeeB2B\(user\.role\)/,
-    'the charge is gated on the viewer role again — no account can complete the flow')
-  assert.match(src, /amount: price/, 'the ledger records a client-supplied amount')
-  assert.match(src, /companyMember\.findFirst/, 'membership is not re-read server-side')
-  // The status term: a frozen company may receive money but never spend it.
-  assert.match(src, /status: 'ACTIVE'/)
-})
+     · the booking charge is inside the booking transaction
+     · the charge uses the SERVER price and re-reads membership
+     · an ordinary booking is untouched by any of it
+     · the booking sheet makes no request at all while the vertical is off
 
-test('an ordinary booking is untouched by any of it', () => {
-  // The promise the whole stage rests on. paidBy is written ONLY when a balance
-  // was actually charged, so every other booking still stores null — which
-  // paymentSourceOf reads as CARD, the same value the entire history has.
-  const src = read('app/api/bookings/route.ts')
-  assert.match(src, /\.\.\.\(chargedCompanyId\s+\?\s+\{\s+paidBy:\s+'COMPANY_BALANCE'\s+as\s+const\s+\}\s+:\s+\{\}\)/,
-    'paidBy is written unconditionally — ordinary bookings would stop reading as history')
-  // …and on the client, the key is absent rather than false: JSON.stringify
-  // drops undefined, so a non-member's payload is byte-for-byte the old one.
-  assert.match(read('components/booking/BookingFlow.tsx'),
-    /paidBy: useBalance \? 'COMPANY_BALANCE' : undefined/)
-})
+   Every one of them pinned `app/api/bookings/route.ts`, `Booking.paidBy` or
+   `components/booking/CompanyBalance.tsx`, and all three went with the
+   consultation product. THE REST OF THE VERTICAL IS UNTOUCHED: a Company still
+   has a prepaid balance, a CompanyTransaction is still the ledger, an employee
+   is still a CompanyMember, and B2BService/BusinessLead still drive /business.
+   What has no consumer today is the SPEND.
 
-test('the booking sheet makes no request at all while the vertical is off', () => {
-  // Not „a request that 404s" — none. Otherwise every booking-sheet open on the
-  // site gains a network call for a feature nobody can use, which is a change
-  // to the booking path however harmless it looks.
-  const src = read('components/booking/CompanyBalance.tsx')
-  assert.match(src, /if\s+\(!open\s+\|\|\s+!b2bFeatureExists\(\)\)\s+return/)
-  // The fetch failing must never break the flow: this is an OPTIONAL payment
-  // method and its absence is exactly what every booking already does.
-  assert.match(src, /catch \{/)
-  assert.doesNotMatch(src, /setSubmitError|throw new/, 'a failed lookup surfaces an error into the booking flow')
-})
+   The rules those four encoded are the ones a rebuild has to satisfy, so they
+   are written down rather than deleted:
+     · the charge lives INSIDE the transaction that creates the thing being paid
+       for — runSerializable retries on P2034, and a charge outside it bills two
+       or three times;
+     · the amount is the SERVER's, never the client's, and membership is re-read
+       server-side with `status: 'ACTIVE'` (a frozen company may receive money
+       and never spend it);
+     · the balance is CLAIMED (`balance: { gte: price }` inside updateMany), not
+       read and then debited;
+     · the gate is `canSpendAsMember()`, never `canSeeB2B(user.role)` — gating a
+       charge on the rollout stage left no account able to complete the flow, an
+       employee being refused by the stage and an admin by the route;
+     · a payer marker is written ONLY when a balance was actually charged, so
+       everything else keeps reading as the history it already is;
+     · and a surface that offers the method makes NO request while the flag is
+       off — not one that 404s, none.
+
+   Where it would go: the offer a provider writes (RequestOffer, priceGel) is
+   now the one place on the site where an amount is agreed. */
 
 /* ═══════════ 5. the money rules ════════════════════════════════════════ */
 
@@ -623,19 +596,18 @@ test('the migration has a rollback, and it warns about the ledger', () => {
   assert.match(down, /redeploy the previous build/i)
 })
 
-test('every dbBoot column is declared in schema.prisma', () => {
-  // The warning block on model Booking says it plainly: a dbBoot column that
-  // schema.prisma does not know about is one `prisma db push` away from being
-  // dropped. For paidBy that would silently erase which bookings a company paid
-  // for; for the four tables it would drop the ledger.
+test('every table dbBoot creates for this vertical is declared in schema.prisma', () => {
+  // A dbBoot table that schema.prisma does not know about is one
+  // `prisma db push` away from being dropped — here, that is the ledger.
+  //
+  // ⚠️ `Booking.paidBy` WAS THE FIFTH ASSERTION AND IS GONE (2026-08-24) with
+  // the table. It was the one COLUMN this vertical added outside its own tables,
+  // and it recorded which bookings a company paid for. tests/schemaCoverage
+  // holds the general form of this rule across every table dbBoot creates.
   const schema = read('prisma/schema.prisma')
-  assert.match(schema, /paidBy\s+PaymentSource\?/)
   for (const m of ['model Company ', 'model CompanyMember ', 'model CompanyTransaction ', 'model BusinessLead ']) {
     assert.match(schema, new RegExp(m), `${m.trim()} is created by dbBoot but not declared`)
   }
-  // And no default on paidBy — a DEFAULT would mean backfilling live history.
-  assert.doesNotMatch(schema, /paidBy\s+PaymentSource\?\s*@default/,
-    'paidBy grew a default — every existing booking would have to be backfilled')
 })
 
 test('the company detail endpoint returns every field the panel reads', () => {

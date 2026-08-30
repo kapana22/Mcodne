@@ -88,7 +88,15 @@ function check(name: string, ok: boolean, hint: string) {
     // client) reaches their OWN client-side bookings/messages here. Data is
     // scoped by ?space=client|expert, not by the layout guard.
     ['app/me/layout.tsx', /requireRole\(\[ROLE\.USER, ROLE\.PROVIDER, ROLE\.ADMIN\]\)/],
-    ['app/work/(expert)/layout.tsx', /requireRole\(\[ROLE\.PROVIDER, ROLE\.ADMIN\]\)/],
+    // ⚠️ IT WAS `app/work/(expert)/layout.tsx` WITH A requireRole UNTIL
+    // 2026-08-24. That route group went with the consultation product, and the
+    // screens it wrapped (/work, /work/services, /work/profile, /work/jobs)
+    // each gate themselves on `requestsViewer()` instead. What is left under a
+    // layout is the request queue and the thread list, and both answer a
+    // stranger with notFound() rather than a redirect — the shell above them is
+    // deliberately NOT a guard (see app/work/layout.tsx).
+    ['app/work/(provider)/layout.tsx', /viewer\.providerAllowed\) notFound\(\)/],
+    ['app/work/messages/layout.tsx', /notFound\(\)/],
     ['app/admin/layout.tsx', /requireRole\('ADMIN'\)/],
     ['app/settings/layout.tsx', /requireUser\(\)/],
     ['app/notifications/layout.tsx', /requireUser\(\)/],

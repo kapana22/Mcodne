@@ -111,20 +111,20 @@ test('the role words come from lib/roles, never a hand-typed ternary', () => {
   assert.deepEqual(bad, [])
   const roles = readFileSync(join(ROOT, 'lib/roles.ts'), 'utf8')
   assert.match(roles, /USER: 'USER'/); assert.match(roles, /PROVIDER: 'PROVIDER'/)
-  assert.match(roles, /CLIENT: 'კლიენტი'/); assert.match(roles, /EXPERT: 'ექსპერტი'/); assert.match(roles, /MASTER: 'ექსპერტი'/)
+  assert.match(roles, /CLIENT: 'კლიენტი'/); assert.match(roles, /PROVIDER: 'ექსპერტი'/)
   // …and it stays a pure leaf: a client component imports the words from it.
   assert.doesNotMatch(roles, /from '\.\/prisma'|@prisma\/client|from 'react'/)
   // The two screens the audit named read the shared label.
-  assert.match(codeOf('components/UserMenu.tsx'), /isMaster \? HAT_LABEL\.MASTER : roleLabel\(role\)/)
+  assert.match(codeOf('components/UserMenu.tsx'), /sellsHere \? HAT_LABEL\.PROVIDER : roleLabel\(role\)/)
   assert.match(codeOf('app/settings/_account.tsx'), /\{roleLabel\(me\.role\)\}/)
   assert.match(codeOf('app/admin/_users.tsx'), /roleLabelOf\(u\.role\)/)
 })
 
-test('one booking, one set of words on both screens', () => {
-  // The client's bookings page is titled what the tab is called.
-  assert.match(codeOf('app/me/bookings/page.tsx'), /title="ჯავშნები"/)
-  // The expert's booking detail says „ფასი", like the hero on the client side.
-  assert.match(codeOf('app/work/(expert)/bookings/[id]/page.tsx'), />ფასი<\/Eyebrow>/)
+test('one word per thing, on every screen that says it', () => {
+  // ⚠️ THE TWO BOOKING SCREENS THIS OPENED WITH WENT WITH THE PRODUCT
+  // (2026-08-24): „ჯავშნები" on the client's list and „ფასი" on the expert's
+  // booking detail. What the test is FOR — one word per thing, wherever it is
+  // said — is what the rest of it still checks.
   // The categories page was retired in stage 8 (2026-08-19) and the header's
   // „კატეგორიები" item went in stage 9 (the bar names the two verticals only),
   // so the word is pinned where the site still says it: the home section's
@@ -137,7 +137,6 @@ test('one booking, one set of words on both screens', () => {
   // were two catalogues to tell apart. What must never come back is „სფეროები",
   // which the loop below still guards.
   assert.match(codeOf('app/experts/_filters.tsx'), /პროფესიული სერვისები/)
-  assert.match(codeOf('app/experts/_filters.tsx'), /ყოველდღიური სერვისები/)
   for (const f of ['components/PublicTopBar.tsx', 'lib/siteTextDefs.ts', 'app/experts/_hero.tsx', 'app/experts/_filters.tsx']) {
     assert.doesNotMatch(codeOf(f), /სფეროები/, `${f} says „სფეროები"`)
   }

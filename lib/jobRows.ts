@@ -17,13 +17,12 @@
 // exactly how the student and expert dashboards once counted the same account
 // differently. Executed by tests/jobs.test.ts.
 
-import { UPCOMING_STATUSES, dayKeyInTz } from './bookings'
 import { clientIdentityOpen, gel, offerPriceLabel } from './requests'
 import { topicLabel } from './requestTopics'
 
 /* ═══════════ the row ════════════════════════════════════════════════════ */
 
-type JobKind = 'BOOKING' | 'QUOTE'
+type JobKind = 'QUOTE'
 
 /** Which part of the list a row belongs to. Three, not two, because
  *  „somebody is waiting on MY answer" was already a bucket on the bookings
@@ -49,12 +48,11 @@ export type JobRow = {
    * and sort the row into a calendar it does not belong to. See `sortAt`.
    */
   when: Date | null
-  /** BOOKING: the existing booking vocabulary, untouched.
-   *  QUOTE: ACTIVE | DONE | CLOSED — see `quoteJobStatus`. */
+  /** ACTIVE | DONE | CLOSED — see `quoteJobStatus`. */
   status: string
   statusLabel: string
-  /** Already formatted, because the two kinds price differently: a booking is
-   *  a lari figure, a quote may be „-დან" or a call-out fee (offerPriceLabel). */
+  /** Already formatted: a quote may be „-დან" or a call-out fee
+   *  (offerPriceLabel), so the row carries words rather than a number. */
   price: string
   /** THE SORT KEY, and the documented fallback. `when` when there is one;
    *  otherwise the row's own last movement (`updatedAt` for a quote). Rows are
@@ -70,75 +68,20 @@ export const UNDATED_LABEL = 'თარიღის გარეშე'
 /** What a nameless client is called. */
 export const CLIENT_FALLBACK = 'კლიენტი'
 
-/* ═══════════ bookings ═══════════════════════════════════════════════════ */
-
-/** The booking status vocabulary, unchanged — this list adopts it, it does not
- *  translate it. The words are the ones components/StatusPill already prints,
- *  so a row and its pill can never disagree. */
-export const BOOKING_JOB_STATUS_LABEL: Record<string, string> = {
-  PREPARING: 'ელოდება დადასტურებას',
-  CONFIRMED: 'დადასტურდა',
-  LIVE: 'მიმდინარეობს',
-  COMPLETED: 'დასრულდა',
-  CANCELED: 'გაუქმდა',
-  NO_SHOW: 'არ გამოცხადდა',
-}
-
-export type BookingJobInput = {
-  id: string
-  topic: string
-  status: string
-  startAt: string | number | Date
-  durationMin: number
-  price: number
-  student?: { fullName?: string | null } | null
-  rescheduleRequest?: { proposedBy?: string | null } | null
-}
+/* ═══════════ bookings — GONE (2026-08-24) ══════════════════════════════
+ *
+ * This file used to build TWO kinds of row: a BOOKING (a consultation with a
+ * start time, a duration and a status vocabulary of six words) and a QUOTE (an
+ * offer on a request). The booking product was removed and its table with it,
+ * so the list has one kind of row — but the SHAPE stays two-kinded on purpose:
+ * `JobKind` still exists, `when` is still nullable, and rows are still bucketed
+ * rather than sorted into one calendar. That shape is what let a quote sit in
+ * this list at all, and re-flattening it would have to be undone by whatever
+ * comes back with a time attached.
+ */
 
 const ms = (d: string | number | Date): number =>
   typeof d === 'number' ? d : typeof d === 'string' ? Date.parse(d) : d.getTime()
-
-/** The booking's own end has passed while it is still CONFIRMED/LIVE — the
- *  expert owes a complete / no-show decision. Mirrors `awaitsClosure` in
- *  app/work/_components/types (which is a .tsx-side helper over the same two
- *  fields); kept here because bucketing must stay importable by a pure test. */
-function bookingAwaitsClosure(b: BookingJobInput, now: number): boolean {
-  return (b.status === 'CONFIRMED' || b.status === 'LIVE') &&
-    ms(b.startAt) + b.durationMin * 60_000 < now
-}
-
-/** The client proposed a new time and the expert has not answered. */
-function bookingAwaitsReschedule(b: BookingJobInput): boolean {
-  return (b.status === 'PREPARING' || b.status === 'CONFIRMED') &&
-    b.rescheduleRequest?.proposedBy === 'USER'
-}
-
-function bookingJobBucket(b: BookingJobInput, now: number): JobBucket {
-  if (b.status === 'COMPLETED' || b.status === 'CANCELED' || b.status === 'NO_SHOW') return 'history'
-  if (b.status === 'PREPARING' || bookingAwaitsReschedule(b) || bookingAwaitsClosure(b, now)) return 'attention'
-  // Live counts as active even once its start is behind us — that is the whole
-  // meaning of LIVE, and `UPCOMING_STATUSES` is the set the dashboards use.
-  if ((UPCOMING_STATUSES as readonly string[]).includes(b.status)) return 'active'
-  return 'history'
-}
-
-export function bookingJobRow(b: BookingJobInput, now: number): JobRow {
-  const when = new Date(ms(b.startAt))
-  return {
-    kind: 'BOOKING',
-    id: b.id,
-    // ⚠️ THE DETAIL PAGE DID NOT MOVE. Only the LIST did.
-    href: `/work/bookings/${b.id}`,
-    title: b.topic,
-    peerName: (b.student?.fullName ?? '').trim() || 'უცნობი კლიენტი',
-    when,
-    status: b.status,
-    statusLabel: BOOKING_JOB_STATUS_LABEL[b.status] ?? b.status,
-    price: gel(b.price),
-    sortAt: when.getTime(),
-    bucket: bookingJobBucket(b, now),
-  }
-}
 
 /* ═══════════ quotes ═════════════════════════════════════════════════════ */
 
@@ -258,11 +201,10 @@ export function splitDated(rows: JobRow[]): { dated: JobRow[]; undated: JobRow[]
 /** The whole list, bucketed and ordered. One call, so the tabs, the counters
  *  and the rows can never be built from three different sorts. */
 export function buildJobRows(
-  input: { bookings?: BookingJobInput[]; quotes?: QuoteJobInput[] },
+  input: { quotes?: QuoteJobInput[] },
   now: number = Date.now(),
 ): Record<JobBucket, JobRow[]> {
   const rows = [
-    ...(input.bookings ?? []).map(b => bookingJobRow(b, now)),
     ...(input.quotes ?? []).map(quoteJobRow),
   ]
   const of = (b: JobBucket) => rows.filter(r => r.bucket === b)
@@ -275,8 +217,20 @@ export function buildJobRows(
   }
 }
 
-/** The Tbilisi day a dated row is filed under. Re-exported so the page never
- *  reaches for a second timezone helper. */
+/** The Tbilisi day a dated row is filed under.
+ *
+ *  ⚠️ IT FORMATS ITS OWN KEY SINCE 2026-08-24, and it is the same three lines
+ *  `lib/bookings → dayKeyInTz` held before that file went with the booking
+ *  product. `en-CA` gives YYYY-MM-DD, which sorts as a string; the timezone is
+ *  Tbilisi's, never the machine's, which is the whole reason a helper exists.
+ *  No dated row can occur while `when` is null on every kind — it is kept
+ *  because the row SHAPE still allows one. */
+const TBILISI_TZ = 'Asia/Tbilisi'
+let _dayKeyFmt: Intl.DateTimeFormat | null = null
 export function jobDayKey(row: JobRow): string | null {
-  return row.when ? dayKeyInTz(row.when) : null
+  if (!row.when) return null
+  _dayKeyFmt ??= new Intl.DateTimeFormat('en-CA', {
+    timeZone: TBILISI_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+  })
+  return _dayKeyFmt.format(row.when)
 }

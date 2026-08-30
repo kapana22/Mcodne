@@ -211,7 +211,7 @@ export async function POST(req: Request) {
   const toRaw = typeof (json as { to?: unknown })?.to === 'string' ? (json as { to: string }).to : null
   if (toRaw) {
     try {
-      const target = await resolveRequestTarget(toRaw, row.kind === 'SERVICE' ? 'SERVICE' : 'EXPERT')
+      const target = await resolveRequestTarget(toRaw)
       if (target?.userId) {
         await inviteProviderToRequest(
           { id: created.id, status: rejected ? 'REJECTED' : autoVerified ? 'VERIFIED' : 'NEW', topic: row.topic },

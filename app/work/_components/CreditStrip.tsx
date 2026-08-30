@@ -14,17 +14,24 @@
 // the pill into a second strip, and never let the strip's number and the pill's
 // disagree: both read `balanceOf`, which sums the one ledger.
 //
-// ⚠️ THE UNIT ON SCREEN IS AN OFFER, NOT A NUMBER. „85₾" is the currency and it
-// is deliberately lari (lib/credits: a token is an abstraction, „85₾" is one a
-// provider already understands), but what they actually want to know is how
-// many times they can answer. So the number is translated: „17 შეთავაზება".
+// ⚠️ THE UNIT ON SCREEN IS WHAT THE BALANCE BUYS, NOT A NUMBER. „85₾" is the
+// currency and it is deliberately lari (lib/credits: a token is an abstraction,
+// „85₾" is one a provider already understands), but what they actually want to
+// know is how many times they can act. So the number is translated.
+//
+// ⚠️ AND THE UNIT CHANGED ON 2026-08-21. It read „17 შეთავაზება" while an offer
+// cost 5₾; the owner moved the price onto the client's CONTACT and made the
+// offer free, so it reads „85 კონტაქტი" — the same translation, of the only
+// thing a balance now buys. Never print an offer count here again: telling a
+// provider their balance is worth N answers, when answering is free, is telling
+// them something that is not true.
 //
 // ⚠️ AND IT MAY NEVER READ AS CASH. No „ანაზღაურება", no „შენი ფული", no
 // withdrawal. The wording rules live at the top of lib/credits and are pinned
 // by tests/credits — this component is the main thing they were written for.
 import { Btn } from '@/components/Btn'
 import { Card } from '@/components/Card'
-import { gelLabel, offersAffordable, OFFER_COST_TETRI } from '@/lib/credits'
+import { gelLabel, contactsAffordable, CONTACT_COST_TETRI, JOB_DONE_NOTE } from '@/lib/credits'
 
 export function CreditStrip({ balanceTetri, percent, nextTask, editHref }: {
   balanceTetri: number
@@ -35,7 +42,7 @@ export function CreditStrip({ balanceTetri, percent, nextTask, editHref }: {
   /** Where that task is answered — it differs by capability, see the caller. */
   editHref: string
 }) {
-  const offers = offersAffordable(balanceTetri)
+  const contacts = contactsAffordable(balanceTetri)
   return (
     <Card className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
@@ -45,7 +52,7 @@ export function CreditStrip({ balanceTetri, percent, nextTask, editHref }: {
           {/* The translation. „85₾" is what it is; „17 შეთავაზება" is what it
               does, and the second is the one that decides anything. */}
           <span className="text-small text-ink-600 tabular-nums">
-            {offers} შეთავაზება · {gelLabel(OFFER_COST_TETRI)} თითო
+            {contacts} კონტაქტი · {gelLabel(CONTACT_COST_TETRI)} თითო
           </span>
         </p>
       </div>
@@ -66,7 +73,17 @@ export function CreditStrip({ balanceTetri, percent, nextTask, editHref }: {
           <Btn href={editHref} className="shrink-0">შევსება</Btn>
         </div>
       ) : (
-        <p className="text-small text-ink-600">პროფილი სრულადაა შევსებული.</p>
+        /* ⚠️ THE ONE SCREEN THAT HAS TO ANSWER „და მერე?" (2026-08-21). A
+           finished profile means every one-off grant is paid, so this is
+           precisely the person for whom the number can now only go down — and
+           until today the strip's answer to them was „პროფილი სრულადაა
+           შევსებული" and nothing else. The earn-back is the whole of the loop
+           and it is a fact, not a pitch: one sentence, from lib/credits, so the
+           25₾ is spelled in one place. */
+        <div className="min-w-0">
+          <p className="text-small text-ink-600">პროფილი სრულადაა შევსებული.</p>
+          <p className="mt-0.5 text-meta text-brand-700 font-display font-semibold">{JOB_DONE_NOTE}</p>
+        </div>
       )}
     </Card>
   )

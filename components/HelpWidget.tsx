@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Icon } from '@/components/Icon'
@@ -331,7 +332,7 @@ export function HelpWidget() {
   const actionOf = (t: HelpTopic) => {
     const a = t.action
     if (!a) return null
-    if (a.gate === 'apply' && !showJoinInvite(me?.role, me?.capabilities)) return null
+    if (a.gate === 'apply' && !showJoinInvite(me?.role, me?.provider)) return null
     if (a.gate === 'auth' && !me) return null
     return a
   }
@@ -674,9 +675,9 @@ export function HelpWidget() {
           </form>
 
           <div className="shrink-0 px-4 py-2 border-t border-ink-100 bg-ink-50/40 flex items-center justify-between gap-3">
-            <a href="/help" className="font-display text-meta font-semibold text-brand-700 hover:text-brand-800 transition-colors duration-fast">
+            <Link href="/help" className="font-display text-meta font-semibold text-brand-700 hover:text-brand-800 transition-colors duration-fast">
               ყველა კითხვა
-            </a>
+            </Link>
             {/* „Couldn't find it“ goes to a human, CARRYING what just failed:
                 the page and the answers that were read and did not help. The
                 contact form turns those into an editable first line, so the

@@ -149,8 +149,14 @@ test('the sitemap names no retired prefix and lists one catalogue', () => {
   // 308 now, so the sitemap must not name the prefix at all (comments stripped;
   // prose is allowed to remember where a page used to live).
   assert.doesNotMatch(src, new RegExp("['\"`]/services"), 'sitemap still names /services')
-  // The profile URL is built under /experts/ (id fallback kept)
-  assert.match(src, /url:\s+`\$\{SITE_URL\}\/experts\/\$\{t\.slug\s+\|\|\s+t\.id\}`/)
+  // ⚠️ THE ID FALLBACK IS GONE AND THIS PIN CHANGED WITH IT (2026-08-26). It
+  // used to require `${t.slug || t.id}`, which is the opposite of what this
+  // file is for: a profile with no slug has no page (ProviderRow.slug — „Null
+  // = no page yet", the card is not a link), so the id URL advertised an
+  // address nobody could reach. The behaviour is executed in
+  // tests/sitemap.test.ts; what stays here is that no id fallback comes back.
+  assert.match(src, /url:\s+`\$\{SITE_URL\}\/experts\/\$\{p\.slug\}`/)
+  assert.doesNotMatch(src, /\|\|\s+\w+\.id\}`/, 'sitemap fell back to an id URL again')
   // The static list is exactly the final public doors — ONE catalogue entry.
   for (const p of ['/', '/experts', '/join', '/about', '/blog', '/contact', '/help']) {
     assert.match(src, new RegExp(`path: '${p.replace(/[/]/g, '\\/')}'`), `sitemap does not list ${p}`)
@@ -160,8 +166,12 @@ test('the sitemap names no retired prefix and lists one catalogue', () => {
   // The dynamic blocks — ONE namespace since stage 11: expert profiles,
   // provider profiles, profession landings and trade landings, all under
   // /experts/, plus the posts.
-  assert.match(src, /url: `\$\{SITE_URL\}\/experts\/\$\{p\.slug\}`/, 'no /experts/<profession> entries')
-  assert.match(src, /url: `\$\{SITE_URL\}\/experts\/\$\{m\.slug\}`/, 'no /experts/<slug> provider entries')
+  // ⚠️ ONE PROVIDER BLOCK SINCE 2026-08-26, so `${p.slug}` now covers BOTH the
+  // profession landings and the profiles — there were two blocks over the same
+  // table and the second one submitted every provider a second time.
+  assert.equal((src.match(/url: `\$\{SITE_URL\}\/experts\/\$\{p\.slug\}`/g) ?? []).length, 2,
+    'expected exactly two /experts/<slug> builders — the providers and the profession landings')
+  assert.doesNotMatch(src, /\$\{m\.slug\}/, 'the second provider block came back — every profile would be listed twice')
   assert.match(src, /url: `\$\{SITE_URL\}\/experts\/\$\{g\.id\}`/, 'no /experts/<trade> entries')
   assert.match(src, />= TRADE_LANDING_MIN/, 'trade landings are no longer counted at the bar')
   assert.match(src, /url: `\$\{SITE_URL\}\/blog\/\$\{p\.slug\}`/, 'no blog entries')

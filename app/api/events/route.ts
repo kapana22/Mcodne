@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { getCurrentUser } from '@/lib/auth'
 import { track } from '@/lib/events'
-import { parseEventBody, MAX_BODY_CHARS } from '@/components/booking/funnelEvents'
+import { parseEventBody, MAX_BODY_CHARS } from '@/lib/funnelEvents'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

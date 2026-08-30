@@ -24,12 +24,67 @@ export const SITE_TEXT_TAG = 'site-text'
  * DB unreachable still means DEFAULTS, never a crash: a site that cannot reach
  * its database still renders its own words.
  */
+/**
+ * How long the ROOT LAYOUT may wait for the copy before rendering the code's own
+ * words instead.
+ *
+ * ⚠️ THE `catch` BELOW ONLY HELPS IF THE DATABASE SAYS NO. Measured on
+ * 2026-08-27, with Railway's Postgres dropping connections: it does not say no,
+ * it says nothing — `ensureDbReady()` sat there and every request to the
+ * standalone build hung, home page included, until the client gave up. This
+ * file's own promise („DB unreachable still means DEFAULTS, never a crash: a
+ * site that cannot reach its database still renders its own words") was true
+ * for a REFUSED connection and false for a silent one, which is the failure
+ * mode that actually happens.
+ *
+ * Four seconds because this read is behind `unstable_cache` with a one-hour
+ * window, so on a healthy deployment it happens a few times an hour and takes
+ * milliseconds over the private network. When it does fire the visitor gets the
+ * page with the defaults — which are correct copy, only possibly stale — rather
+ * than a spinner and then a gateway error.
+ */
+const COPY_WAIT_MS = 4000
+
+/**
+ * The last map the database actually answered with, for this process.
+ *
+ * ⚠️ WHY NOT JUST FALL BACK TO THE DEFAULTS. Because the defaults are the copy
+ * as it stood when the code shipped, and the owner edits this table — reverting
+ * to them during an outage silently un-does every correction they have made.
+ * The last GOOD answer is at worst stale by the length of the outage, and it is
+ * the copy the visitor saw a minute ago.
+ *
+ * Also what keeps two reads in one process AGREEING. tests/abroad.test.ts
+ * resolves its expectations with `getSiteTextMap()` and then renders the page,
+ * which reads again; outside a request there is no React cache to dedupe them,
+ * so one read timing out and the other not produced a page that genuinely did
+ * not match its own copy. Remembering the answer removes the disagreement
+ * instead of hiding it.
+ */
+let lastGood: Record<string, string> | null = null
+
+/** The copy, or the best we already have, whichever arrives first. */
+const withDeadline = (p: Promise<Record<string, string>>, ms: number): Promise<Record<string, string>> =>
+  new Promise(resolve => {
+    const timer = setTimeout(() => {
+      console.warn(
+        `[siteText] no answer in ${ms}ms — serving ${lastGood ? 'the last copy read' : 'default copy'}`,
+      )
+      resolve(lastGood ?? { ...SITE_TEXT_DEFAULTS })
+    }, ms)
+    p.then(
+      v => { clearTimeout(timer); resolve(v) },
+      () => { clearTimeout(timer); resolve(lastGood ?? { ...SITE_TEXT_DEFAULTS }) },
+    )
+  })
+
 const readSiteTextMap = async (): Promise<Record<string, string>> => {
   const map: Record<string, string> = { ...SITE_TEXT_DEFAULTS }
   try {
     await ensureDbReady()
     const rows = await prisma.siteText.findMany({ select: { key: true, value: true } })
     for (const r of rows) if (r.key in map) map[r.key] = r.value
+    lastGood = map
   } catch { /* keep defaults */ }
   return map
 }
@@ -70,7 +125,16 @@ export const getSiteTextMap = cache(async (): Promise<Record<string, string>> =>
  * still calls `getSiteTextMap` directly.
  */
 export const getPublicSiteTextMap = cache(async (): Promise<Record<string, string>> => {
-  const full = await getSiteTextMap()
+  // ⚠️ THE DEADLINE LIVES HERE AND NOWHERE ELSE (2026-08-27). It was briefly
+  // inside `readSiteTextMap`, which bounded EVERY reader — and two readers in
+  // one process can then disagree: one times out onto the fallback while the
+  // other gets the rows, so a page and the copy it was checked against stop
+  // matching (tests/abroad.test.ts caught exactly that, intermittently, which
+  // is the worst way to find out). This is the function the ROOT LAYOUT awaits,
+  // so it is the one that runs on every page and the only one whose stall takes
+  // the whole site down. Everything else — metadata, a landing, a script —
+  // keeps waiting for a real answer.
+  const full = await withDeadline(getSiteTextMap(), COPY_WAIT_MS)
   const out: Record<string, string> = {}
   // Two independent reasons a key does not travel: it describes a page that no
   // longer exists (retired), or it is only ever read on the server (`seo.*`,

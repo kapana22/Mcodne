@@ -46,11 +46,11 @@ const RAW_AVATAR_OK = new Set([
   'app/api/uploads/route.ts',           // writes them
   'app/api/auth/google/callback/route.ts', // stores Google's https URL
   'app/api/me/route.ts',                // the caller's OWN avatar, one record
-  'app/api/admin/applications/[id]/route.ts', // one application, moderator view
-  'app/api/bookings/[id]/route.ts',     // one booking, two participants
-  'app/api/admin/insights/route.ts',    // aggregates, avatar not returned
-  'app/api/tutor/nav-badges/route.ts',
-  'app/api/tutor/earnings/route.ts',
+  // ⚠️ FOUR ENTRIES WENT ON 2026-08-24 with the routes themselves — the
+  // consultation application, a booking, the insights aggregate and the expert's
+  // earnings. The two below replace the last of them.
+  'app/api/work/nav-badges/route.ts',   // scores the caller's own profile; never returned
+  'app/api/admin/users/[id]/route.ts',  // WRITES `avatarUrl: null` when anonymising — not a payload
 ])
 
 test('every API route selecting avatarUrl either shapes it or is on the reviewed list', () => {
@@ -77,18 +77,13 @@ test('every API route selecting avatarUrl either shapes it or is on the reviewed
   )
 })
 
-test('the message inbox does not pull avatar blobs for all 200 scanned rows', () => {
-  // The inbox shows ONE avatar per partner; selecting avatarUrl on both `from`
-  // and `to` of a 200-row scan read up to 400 blobs (~12 MB) to render a couple
-  // of dozen faces. The partners' photos are fetched after the dedup instead.
-  const src = readFileSync(join(ROOT, 'app/api/messages/route.ts'), 'utf8')
-  const scan = src.slice(src.indexOf('const [preMsgs'), src.indexOf('preThreadInitiators(user.id)'))
-  assert.ok(scan.length > 0, 'inbox scan query not found — update this test')
-  // Comments stripped first: the block explains WHY avatarUrl is absent, so a
-  // naive match on the raw text fails on the explanation itself.
-  const code = scan.replace(/\/\/.*$/gm, '')
-  assert.ok(!/avatarUrl/.test(code), 'the 200-row inbox scan is selecting avatarUrl again')
-})
+/* ⚠️ „the message inbox does not pull avatar blobs for all 200 scanned rows"
+   WAS HERE AND IS GONE (2026-08-24). It pinned `app/api/messages/route.ts`,
+   the consultation inbox, which selected avatarUrl on both `from` and `to` of a
+   200-row scan — up to 400 blobs, ~12MB, to render a couple of dozen faces. The
+   thread list is per-offer now (lib/requestMessages) and there is no inbox scan
+   to hold to the rule. The RULE itself is unchanged and is what the test above
+   enforces across every route that exists. */
 
 /* ═══════════ 2. limits ══════════════════════════════════════════════════ */
 

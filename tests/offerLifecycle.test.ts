@@ -183,7 +183,13 @@ test('§B who may call what: client by reference, provider by session, never a r
   const review = codeOf(REVIEW)
   assert.match(review, /where:\s+\{\s+id:\s+offerId,\s+request:\s+\{\s+publicRef:\s+ref\s+\}\s+\}/)
   assert.match(review, /studentId: offer\.request\.userId!/)
-  assert.match(review, /tutorId: null/)
+  // ⚠️ THIS LINE REQUIRED `tutorId: null` UNTIL 2026-08-26, AND THE COLUMN WAS
+  // DROPPED ON 2026-08-24. So the create threw PrismaClientValidationError,
+  // nobody could review a finished job, and this file stayed green BECAUSE the
+  // dead write was still there. A review hangs on the OFFER now — `offerId` is
+  // the unique key the P2002 branch below is catching.
+  assert.match(review, /offerId: offer\.id/)
+  assert.doesNotMatch(review, /tutorId/, 'the review writes a column the database dropped — the create throws')
   // The withdraw route never reads the ref — a provider must never need it.
   const withdraw = codeOf(WITHDRAW)
   assert.doesNotMatch(withdraw, /normalizePublicRef|publicRef/, 'the withdraw route reads the client\'s credential')
@@ -303,7 +309,15 @@ test('§E the master profile lists real reviews through the offer, and never a p
   assert.match(code, /select:\s+\{\s+id:\s+true,\s+rating:\s+true,\s+body:\s+true,\s+createdAt:\s+true\s+\}/)
   // Nothing about the reviewer, and no blob anywhere in the file.
   assert.doesNotMatch(code, /student:|studentId:\s+true|fullName:\s+true,\s+tutor:\s+\{\s+select:\s+\{\s+slug:\s+true\s+\}\s+\}\s+\},\s*company:\s+\{\s+select:\s+\{\s+name:\s+true\s+\}\s+\},\s*photo/)
-  assert.doesNotMatch(data, /photoUrl:\s*true|workPhotos:\s*true|avatarUrl/, 'a base64 column in the profile query')
+  // ⚠️ ON THE STRIPPED SOURCE, and it was `data` (raw) until 2026-08-24. The
+  // file now carries a long note explaining why `User.avatarUrl` — the FALLBACK
+  // portrait for a migrated professional — is asked for by shape rather than
+  // selected, and that explanation must stay readable without failing the very
+  // pin it documents. Same trap, opposite direction, as the `codeOf` note above:
+  // there a comment SATISFIED a positive assertion; here one FAILED a negative.
+  assert.doesNotMatch(code, /photoUrl:\s*true|workPhotos:\s*true|avatarUrl/, 'a base64 column in the profile query')
+  // …and the fallback goes through the route builder, never the stored value.
+  assert.match(code, /avatarRouteSrc\(/, 'the account-avatar fallback bypasses lib/avatarSrc')
   // The model stays a leaf.
   assert.doesNotMatch(data, /from '\.\//)
   // Average + count, one decimal, null when none.

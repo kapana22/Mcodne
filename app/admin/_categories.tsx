@@ -22,58 +22,26 @@ export type AdminCategory = {
   id: string
   slug: string
   name: string
-  defaultServiceType: 'CONSULTATION' | 'RECURRING'
   isLive: boolean
   status: CategoryStatus
   parentId: string | null
   /** Profiles pointing HERE — the blast radius of hiding or deleting. */
-  tutorCount: number
+  providerCount: number
   /** What the public sees under it: gated, and folded for a sphere. */
   listedCount: number
   childCount: number
 }
 
-/* „ვინ რა მოითხოვა" — the list this tab was missing.
+/* ⚠️ „განმცხადებლებმა მოითხოვეს" WAS HERE AND IS GONE (2026-08-24).
  *
- * Adding a sphere was always a guess: /apply offered a fixed set and, until
- * 2026-08-11, could not be completed by anyone outside it, so an expert in a
- * field nobody had thought of mis-filed themselves or left. Neither reached
- * this screen. Now „ჩემი სფერო სიაში არ არის" is stored on every application
- * and aggregated here, so the taxonomy grows from what people typed.
- *
- * Renders NOTHING when nobody has asked — an empty „0 requests" panel on a
- * management screen is furniture. It appears the day it has something to say.
+ * It listed the spheres applicants had typed by hand — „ჩემი სფერო სიაში
+ * არ არის" — aggregated out of `TutorApplication.professionData`, so the
+ * taxonomy could grow from what people actually asked for. The consultation
+ * application went with the consultation product, and with it that column. The
+ * idea is worth rebuilding on `MasterApplication` the day it carries the same
+ * free-text answer; it does not today, and a panel reading from nothing would
+ * be furniture that says the feature works.
  */
-const RequestedSpheres = () => {
-  const [items, setItems] = useState<{ label: string; count: number; lastAt: string }[]>([])
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/admin/categories/requested', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (!cancelled && Array.isArray(d?.items)) setItems(d.items) })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [])
-  if (!items.length) return null
-  return (
-    <div className="mb-4 rounded-card border border-ink-200 bg-white p-4">
-      <Eyebrow tone="muted" className="mb-1">განმცხადებლებმა მოითხოვეს</Eyebrow>
-      <p className="text-meta text-ink-500 mb-3">კატეგორიები, რომლებიც სიაში არ იყო და ხელით ჩაწერეს. ბოლო 6 თვე.</p>
-      <div className="flex flex-wrap gap-1.5">
-        {items.map(r => (
-          <span
-            key={r.label}
-            title={`ბოლოს: ${fmtKaDate(new Date(r.lastAt))}`}
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border border-ink-200 bg-ink-50 text-small text-ink-800"
-          >
-            {r.label}
-            <b className="font-display text-micro font-bold text-ink-500 tabular-nums">{r.count}</b>
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 /* ONE checkbox, used on spheres and sub-categories alike — the only visibility
    control on this screen. A sphere toggles VISIBLE ↔ HIDDEN; a sub-category
@@ -101,8 +69,8 @@ const DeleteBtn = ({ row, onAsk }: { row: AdminCategory; onAsk: (r: AdminCategor
   <button
     type="button"
     onClick={() => onAsk(row)}
-    disabled={row.tutorCount > 0 || row.childCount > 0}
-    title={row.tutorCount > 0 ? 'ჯერ ექსპერტები ჰყავს — მოხსენი პტიჩკა' : row.childCount > 0 ? TREE_ERROR.HAS_CHILDREN : 'წაშლა'}
+    disabled={row.providerCount > 0 || row.childCount > 0}
+    title={row.providerCount > 0 ? 'ჯერ ექსპერტები ჰყავს — მოხსენი პტიჩკა' : row.childCount > 0 ? TREE_ERROR.HAS_CHILDREN : 'წაშლა'}
     aria-label={`${row.name} — წაშლა`}
     className="shrink-0 h-10 w-10 sm:h-9 sm:w-9 rounded-btn text-danger-600 hover:bg-danger-50 disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center justify-center transition-colors duration-fast"
   >
@@ -147,7 +115,7 @@ export const CategoriesSection = () => {
     return () => { cancelled = true }
   }, [])
 
-  const patch = async (id: string, body: Partial<Pick<AdminCategory, 'status' | 'parentId' | 'defaultServiceType'>>) => {
+  const patch = async (id: string, body: Partial<Pick<AdminCategory, 'status' | 'parentId'>>) => {
     if (!rows) return
     const before = rows
     // Optimistic mutation first — the UI feels instant. If the server rejects
@@ -295,8 +263,8 @@ export const CategoriesSection = () => {
     // admin cannot see from the row, which is the whole reason to interrupt).
     if (next === 'VISIBLE') { patch(row.id, { status: next }); return }
     const alsoLost = strandedBy(rows ?? [], row, next)
-      .reduce((n, id) => n + ((rows ?? []).find(r => r.id === id)?.tutorCount ?? 0), 0)
-    if (row.tutorCount + alsoLost === 0) { patch(row.id, { status: next }); return }
+      .reduce((n, id) => n + ((rows ?? []).find(r => r.id === id)?.providerCount ?? 0), 0)
+    if (row.providerCount + alsoLost === 0) { patch(row.id, { status: next }); return }
     setPendStatus({ row, next })
   }
 
@@ -340,8 +308,8 @@ export const CategoriesSection = () => {
   const hideStranded = pendStatus
     ? strandedBy(rows ?? [], pendStatus.row, pendStatus.next)
     : []
-  const hideCount = (pendStatus?.row.tutorCount ?? 0)
-    + hideStranded.reduce((n, id) => n + ((rows ?? []).find(r => r.id === id)?.tutorCount ?? 0), 0)
+  const hideCount = (pendStatus?.row.providerCount ?? 0)
+    + hideStranded.reduce((n, id) => n + ((rows ?? []).find(r => r.id === id)?.providerCount ?? 0), 0)
   const nameOf = (id: string | null) => (id ? (rows ?? []).find(r => r.id === id)?.name ?? '' : '')
 
   return (
@@ -369,8 +337,7 @@ export const CategoriesSection = () => {
           <div><dt className="inline font-display font-semibold text-ink-800">ქვეკატეგორია</dt>
             <dd className="inline text-ink-600"> — ექსპერტები კატეგორიაში ჩანან და იქვე ითვლებიან, არჩევისას კი საკუთარი სახელით. სწორედ ეს გამოჩნდება /apply-ზე კატეგორიის ქვეშ.</dd></div>
         </dl>
-        <RequestedSpheres />
-        {err && <AdminError message={err} className="mb-4" />}
+          {err && <AdminError message={err} className="mb-4" />}
         {flash && (
           <div role="alert" className={`mb-4 rounded-btn border px-3 py-2 text-small font-medium ${flash.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>
             {flash.msg}
@@ -468,7 +435,7 @@ export const CategoriesSection = () => {
                     </div>
                     <VisibleBox row={s} onToggle={toggleVisible} />
                     <div className="font-display font-semibold text-small text-ink-800 tabular-nums">
-                      <span className="lg:hidden text-ink-500 font-normal">ექსპერტი: </span>{s.tutorCount}
+                      <span className="lg:hidden text-ink-500 font-normal">ექსპერტი: </span>{s.providerCount}
                     </div>
                     <div className="font-display font-semibold text-small tabular-nums">
                       <span className="lg:hidden text-ink-500 font-normal">საიტზე: </span>
@@ -550,7 +517,7 @@ export const CategoriesSection = () => {
                             </button>
                           )}
                         </div>
-                        <span className="shrink-0 text-meta text-ink-500 tabular-nums" title="ამ ქვეკატეგორიაში მყოფი ექსპერტები">{k.tutorCount}</span>
+                        <span className="shrink-0 text-meta text-ink-500 tabular-nums" title="ამ ქვეკატეგორიაში მყოფი ექსპერტები">{k.providerCount}</span>
                         {/* Move to another sphere, or promote back to a sphere
                             of its own. Same handler as the merge above. */}
                         <select
@@ -599,11 +566,11 @@ export const CategoriesSection = () => {
         open={pendStatus !== null}
         title={pendStatus?.next === 'REDIRECTED' ? 'კატეგორიის გადამისამართება' : 'კატეგორიის დამალვა'}
         body={pendStatus?.next === 'REDIRECTED' ? (
-          <>„{pendStatus?.row.name ?? ''}“ გვერდი გადამისამართდება „{nameOf(pendStatus?.row.parentId ?? null)}“-ზე. მისი <span className="font-display font-semibold tabular-nums">{pendStatus?.row.tutorCount ?? 0}</span> ექსპერტი „{nameOf(pendStatus?.row.parentId ?? null)}“-ში ჩაითვლება. ძველი ბმული მუშაობს.</>
+          <>„{pendStatus?.row.name ?? ''}“ გვერდი გადამისამართდება „{nameOf(pendStatus?.row.parentId ?? null)}“-ზე. მისი <span className="font-display font-semibold tabular-nums">{pendStatus?.row.providerCount ?? 0}</span> ექსპერტი „{nameOf(pendStatus?.row.parentId ?? null)}“-ში ჩაითვლება. ძველი ბმული მუშაობს.</>
         ) : (
           <>
             „{pendStatus?.row.name ?? ''}“ საჯარო საიტიდან გაქრება — მისი <span className="font-display font-semibold tabular-nums">{hideCount}</span> ექსპერტი აღარ გამოჩნდება ძებნაში, კატეგორიის გვერდზე, sitemap-სა და მთავარ გვერდზე.
-            {hideCount > 0 && <span className="mt-2 block text-danger-700">ჯავშნები და პროფილები რჩება — მაგრამ ვეღარავინ იპოვის. ჩართვით ყველაფერი დაბრუნდება.</span>}
+            {hideCount > 0 && <span className="mt-2 block text-danger-700">მოთხოვნები და პროფილები რჩება — მაგრამ ვეღარავინ იპოვის. ჩართვით ყველაფერი დაბრუნდება.</span>}
           </>
         )}
         tone="danger"

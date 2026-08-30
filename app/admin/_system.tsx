@@ -23,8 +23,7 @@ type Health = {
     gaFromDb: boolean; gaFromEnv: boolean; trgmInstalled: boolean; timezone: string
   }
   attention: {
-    expertsWithoutAvailability: number; expertsWithoutService: number; liveExperts: number; pendingApplications: number
-    bookingsAwaitingExpert: number; openDisputes: number; sessionsNext24h: number
+    providersWithoutService: number; liveProviders: number; pendingApplications: number
   }
 }
 
@@ -115,7 +114,7 @@ export function SystemSection() {
                 {s.stale && (
                   <div className="mt-3 rounded-btn border border-danger-200 p-3.5 text-meta text-ink-800 leading-[1.6]">
                     <div className="font-display font-bold text-danger-700 mb-1">ამ დროს არ იგზავნება არც ერთი შეხსენება</div>
-                    სესიის შეხსენება, წაუკითხავი მიმოწერის შეხსენება, შეფასების მოთხოვნა, უპასუხო ჯავშნების გაუქმება — ყველა ჩერდება.
+                    წაუკითხავი მიმოწერის შეხსენება, შეფასების მოთხოვნა, უპასუხო მოთხოვნების დახურვა — ყველა ჩერდება.
                     <div className="mt-2">
                       შეამოწმე Railway → <span className="font-mono">cleanup-cron</span> → Start Command. სწორი ბრძანებაა:
                       <div className="mt-1.5 font-mono text-micro bg-ink-50 border border-ink-200 rounded-btn p-2 break-all">
@@ -154,21 +153,12 @@ export function SystemSection() {
             <div className="font-display text-micro font-semibold uppercase text-ink-900 mb-3">საჭიროებს ყურადღებას</div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Count
-                n={a.expertsWithoutAvailability} warn
-                label="ექსპერტი დროის გარეშე"
-                sub={`${a.liveExperts} ხილული ექსპერტიდან — ვინ არიან, ინსაითებშია`}
-                href="/admin#insights"
-              />
-              <Count
-                n={a.expertsWithoutService} warn
+                n={a.providersWithoutService} warn
                 label="ექსპერტი სერვისის გარეშე"
-                sub="ჯავშნის ღილაკს გასაყიდი არაფერი აქვს — ვინ არიან, ინსაითებშია"
-                href="/admin#insights"
+                sub={`${a.liveProviders} ხილულიდან — მოთხოვნა ვერ მიდის მათთან`}
+                href="/admin#masters"
               />
-              <Count n={a.pendingApplications} warn label="განაცხადი მოლოდინში" sub="ელოდება მოდერაციას" href="/admin#moderation" />
-              <Count n={a.bookingsAwaitingExpert} warn label="ჯავშანი უპასუხოდ" sub="ექსპერტს ჯერ არ უპასუხია" href="/admin#bookings" />
-              <Count n={a.openDisputes} warn label="ღია დავა" sub="გადაწყვეტას ელოდება" href="/admin#disputes" />
-              <Count n={a.sessionsNext24h} label="სესია 24 საათში" sub="დადასტურებული და მოახლოებული" href="/admin#bookings" />
+              <Count n={a.pendingApplications} warn label="განაცხადი მოლოდინში" sub="ელოდება მოდერაციას" href="/admin#masters" />
             </div>
           </section>
         )}
@@ -185,7 +175,7 @@ export function SystemSection() {
         {c && (
           <section className="rounded-card border border-ink-200 bg-white p-5">
             <div className="font-display text-micro font-semibold uppercase text-ink-900 mb-1">კონფიგურაცია</div>
-            <Row label="ონლაინ გადახდები" value={c.paymentsLive ? 'ჩართული' : 'გამორთული'} meaning="გამორთულზე დაჯავშნა უფასოა და საკომისიო არ იკავება." />
+            <Row label="ონლაინ გადახდები" value={c.paymentsLive ? 'ჩართული' : 'გამორთული'} meaning="გამორთულზე მოთხოვნა უფასოა და საკომისიო არ იკავება." />
             <Row label="სამუშაოს გასაღები" value={c.cleanupSecretSet ? 'დაყენებული' : 'არ არის'} bad={!c.cleanupSecretSet} meaning="მის გარეშე ავტომატური სამუშაო საერთოდ ვერ გაეშვება." />
             <Row label="ფოსტა" value={c.mailerMode === 'send' ? 'იგზავნება' : 'მხოლოდ ლოგში'} bad={c.mailerMode !== 'send'} meaning={`გამგზავნი: ${c.mailFrom}`} />
             <Row

@@ -1,26 +1,31 @@
-// Unit tests for the expert-application REVIEW panel's pure helpers, plus the
-// source-level invariants that keep the moderation panel readable.
+// The APPLICATION REVIEW QUEUE — the one screen that decides whether the supply
+// side exists at all.
 //
-// Run: npx tsx tests/admin-application-review.test.ts
+// Run: npx tsx tests/admin-application-review.test.ts   (also in `npm run check`)
 //
-// WHY THIS FILE EXISTS. app/admin/_application.ts was written on 2026-07-29 to
-// fix „[object Object]" in the moderation panel — its own header even cites this
-// test file — but the helpers were never wired into the JSX and this test was
-// never written. The panel kept rendering `Object.entries(professionData).map(
-// ([k, v]) => String(v))`, so for the REAL prod shape (services is an array of
-// objects) the moderator saw „[object Object],[object Object]" where the
-// applicant's services and prices should be. Fixed and wired 2026-08-03; these
-// checks are what stop it coming back.
+// ⚠️ THIS FILE USED TO TEST A DIFFERENT SCREEN, AND MOST OF IT IS GONE
+// (2026-08-24). It was written on 2026-08-03 around `app/admin/_application.ts`,
+// a set of pure helpers that shaped a consultation application's
+// `professionData` blob for `app/admin/_moderation.tsx` — the fix for
+// „[object Object],[object Object]" appearing where a moderator should have seen
+// an applicant's services and prices. Both the helpers and the panel went with
+// the consultation product; the SHAPE rules that replaced them live in
+// lib/masterApplication and are pinned by tests/masterApplication.test.ts.
+//
+// What is left here is the half that is about the SCREEN rather than the shape,
+// and every rule below survived the move unchanged because none of them was
+// ever about consultations:
+//
+//   · a queue payload never ships a base64 photo column;
+//   · a decision route must not lie about what it did;
+//   · a refusal the moderator cannot read is a refusal they will retry;
+//   · two admins clicking at once must not overwrite each other silently.
 
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import {
-  normalizeCertificates,
-  summarizeProfessionData,
-  hasVerificationDocument,
-  missingApplicationParts,
-  fileLabel,
-} from '../app/admin/_application'
+
+const ROOT = join(__dirname, '..')
+const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 
 let passed = 0
 let failed = 0
@@ -29,140 +34,60 @@ function check(name: string, cond: boolean, detail = '') {
   else { failed++; console.log(`✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 
-/* ═════ 1. professionData — the real prod shape ═════════════════════════════ */
+/* ═════ 1. the queue payload ════════════════════════════════════════════════ */
 
-// Verified against production on 2026-08-03: 19 of 20 rows carry exactly this,
-// one legacy row carries { reFocus, ageGroups, platforms }, one is null.
-const REAL = {
-  headline: 'ჩემი საქმის სიყვარული',
-  languages: ['ქართული', 'ინგლისური'],
-  services: [
-    { name: 'კონსულტაცია', desc: 'დასვი შენი კითხვა', dur: 60, price: 80, free: false },
-    { name: 'გაცნობითი შეხვედრა', desc: '', dur: 15, price: 0, free: true },
-  ],
-  requestedCategory: 'ბუღალტერია',
-}
+const listRoute = read('app/api/admin/master-applications/route.ts')
 
-const sum = summarizeProfessionData(REAL)
-check('headline is extracted', sum.headline === 'ჩემი საქმის სიყვარული')
-check('languages survive as an array', sum.languages.join(',') === 'ქართული,ინგლისური')
-check('services are shaped, not stringified', sum.services.length === 2 && sum.services[0].name === 'კონსულტაცია')
-check('service duration comes from `dur`', sum.services[0].minutes === 60)
-check('paid price is kept', sum.services[0].price === 80)
-check('a zero price counts as free', sum.services[1].free === true)
-check('unknown keys become labelled extras', sum.extras.some(e => e.key === 'requestedCategory' && e.value === 'ბუღალტერია'))
-check('a filled blob is not empty', sum.isEmpty === false)
-
-// THE REGRESSION ITSELF: nothing the panel renders may stringify to
-// „[object Object]". This is the exact string the old JSX produced.
-const rendered = [
-  sum.headline ?? '',
-  ...sum.languages,
-  ...sum.services.flatMap(s => [s.name, s.desc, String(s.minutes), String(s.price)]),
-  ...sum.extras.map(e => e.value),
-].join(' ')
-check('no [object Object] anywhere in the rendered summary', !rendered.includes('[object'), rendered.slice(0, 120))
-
-// Legacy + empty shapes must not crash or invent content.
-const legacy = summarizeProfessionData({ reFocus: 'ბიზნესი', ageGroups: ['18+', '25+'], platforms: { zoom: true } })
-check('legacy keys flatten to readable text', legacy.extras.some(e => e.value.includes('18+') && e.value.includes('25+')))
-check('nested objects flatten with their key', legacy.extras.some(e => e.value.includes('zoom')))
-check('null blob is empty, not a crash', summarizeProfessionData(null).isEmpty === true)
-check('array blob is empty, not a crash', summarizeProfessionData([1, 2]).isEmpty === true)
-
-/* ═════ 2. certificates + documents ═════════════════════════════════════════ */
-
-check('certificates normalize from the Json column', normalizeCertificates([{ title: 'დიპლომი', url: 'data:image/webp;base64,AAAA' }]).length === 1)
-check('a titleless certificate still gets a name', normalizeCertificates([{ url: 'x' }])[0].title === 'უსახელო ფაილი')
-check('garbage certificates are dropped, not rendered', normalizeCertificates([{}, null, 7]).length === 0)
-check('non-array certificates are dropped', normalizeCertificates('nope').length === 0)
-check('a certificate counts as a verification document', hasVerificationDocument({ certificates: [{ title: 'დიპლომი', url: 'data:image/webp;base64,AA' }] }) === true)
-check('nothing attached = no verification document', hasVerificationDocument({ idDocUrl: null, selfieUrl: '', certificates: [] }) === false)
-check('a base64 blob is labelled by type and size, never printed raw', /^WEBP · \d+ KB$/.test(fileLabel(`data:image/webp;base64,${'A'.repeat(4000)}`)))
-
-/* ═════ 3. „what is missing" ════════════════════════════════════════════════ */
-
-const missingAll = missingApplicationParts({ professionData: null, docs: null })
-for (const key of ['photo', 'document', 'video', 'phone', 'city', 'links', 'motivation', 'headline', 'services', 'languages']) {
-  check(`an empty application names its missing „${key}"`, missingAll.some(m => m.key === key))
-}
-const complete = missingApplicationParts({
-  avatarUrl: 'data:image/webp;base64,AA',
-  phone: '+995555', city: 'თბილისი', motivation: 'ტექსტი', linkedinUrl: 'https://x.com',
-  introVideoId: 'abc', professionData: REAL, docs: { certificates: [{ title: 'd', url: 'u' }] },
-})
-check('a complete application reports nothing missing', complete.length === 0, JSON.stringify(complete))
-
-/* ═════ 4. source invariants on the panel ═══════════════════════════════════ */
-
-// The review queue moved out of page.tsx into its own tab file; page.tsx is now
-// just the composition root and contains none of what is asserted below.
-const panel = readFileSync(join(process.cwd(), 'app/admin/_moderation.tsx'), 'utf8')
-
+// `photoUrl`, `workPhotos` and `about` are base64 and long-text columns on the application
+// row. A 40-row queue that selects them is megabytes of payload to render forty
+// names — the same arithmetic as every avatar fix before it.
 check(
-  'the panel no longer stringifies professionData with String(v)',
-  !/professionData\)\.map\(\(\[k, v\]\) => \(/.test(panel) && !panel.includes('{String(v)}'),
+  'the list payload omits the base64 columns',
+  /omit:\s*\{[^}]*photoUrl:\s*true[^}]*workPhotos:\s*true/.test(listRoute),
+  'the queue is selecting the photo columns again',
 )
-check('the panel renders the shaped summary instead', panel.includes('prof.services.map') && panel.includes('prof.languages.map'))
-check('„what is missing" is rendered, not just computed', panel.includes('missing.map('))
-check('documents go through DocTile (safe href + real file label)', panel.includes('<DocTile'))
-check('a failed detail fetch is shown with a retry', panel.includes('detailErr &&') && panel.includes('loadDetail'))
-check('the queue shows the applicant photo', panel.includes('a.photo'))
-check('the queue can be filtered by status', panel.includes('APP_STATUS_TABS'))
-check('decided applications hide the decision controls', panel.includes('isOpenStatus(active.status'))
-
-const listRoute = readFileSync(join(process.cwd(), 'app/api/admin/applications/route.ts'), 'utf8')
-check('the list payload never ships a raw base64 avatar', listRoute.includes('avatarSrc(') && !/avatarUrl:\s*u\?\.avatarUrl/.test(listRoute))
+check(
+  'the photos load per OPENED row, not for the list',
+  read('app/admin/_masters.tsx').includes('detail.photoUrl'),
+  'the panel must read the photo off the detail fetch',
+)
 check('the list payload carries per-status counts', listRoute.includes('groupBy'))
 
-const submitRoute = readFileSync(join(process.cwd(), 'app/api/applications/route.ts'), 'utf8')
-check('a new application emails the admins, not only the bell', submitRoute.includes('newApplicationAdminEmail'))
+/* ═════ 2. a decision route must not lie about what it did ══════════════════ */
 
-/* A DECISION ROUTE MUST NOT LIE ABOUT WHAT IT DID.
-   `approve` promotes: role=TUTOR, a public profile, a published calendar.
-   `reject`/`revise` move only the APPLICATION's status — so on an already
-   APPROVED row they told the applicant „შენი განაცხადი უარყოფილია" while the
-   person stayed listed and bookable, and told the moderator nothing. */
-const decideRoute = readFileSync(join(process.cwd(), 'app/api/applications/[id]/route.ts'), 'utf8')
+// `approve` promotes: it publishes a profile and opens the request queue to a
+// person. `reject`/`revise` move only the APPLICATION's status — so on an
+// already-APPROVED row they would tell the applicant „განაცხადი უარყოფილია"
+// while the person stayed listed and routable, and tell the moderator nothing.
+const decideRoute = read('app/api/master-applications/[id]/route.ts')
 check(
-  'reject/revise are refused on an already-approved application',
-  /app\.status === 'APPROVED' && action !== 'approve'/.test(decideRoute) && /ALREADY_APPROVED/.test(decideRoute),
-  'Without this the application record and the live site disagree about whether the person is an expert.',
+  'a decision claims the row on „not already approved" rather than reading it first',
+  /updateMany\(\{\s*where:\s*\{ id, status: \{ not: 'APPROVED' \} \}/.test(decideRoute),
+  'a status read before the write is not a guard — see CLAIM THE ROW in CLAUDE.md',
 )
 check(
-  'the moderation panel shows the server\u2019s reason, not a generic line',
-  readFileSync(join(process.cwd(), 'app/admin/_moderation.tsx'), 'utf8').includes('r.message ||'),
+  'the refusal is a 409 the caller can act on, not a silent no-op',
+  /ALREADY_APPROVED/.test(decideRoute) && /status: 409/.test(decideRoute),
+)
+check(
+  'an incomplete application is refused with the blockers NAMED',
+  /approvalBlockers\(/.test(decideRoute) && /blockers,\s*message: blockers\.join/.test(decideRoute),
+  'a bare 400 sends the moderator back to guess which field was missing',
+)
+check(
+  'the panel shows the server’s reason, not a generic line',
+  read('app/admin/_masters.tsx').includes('d?.message ||'),
   'A refusal the moderator cannot read is a refusal they will retry.',
 )
 
-/* ═════ D3 + D4 — a moderator's second click cannot duplicate or clobber ════ */
-{
-  const root = join(__dirname, '..')
-  const approve = readFileSync(join(root, 'app/api/applications/[id]/route.ts'), 'utf8')
-  // Every „count, then createMany" seed runs under seedOnce, which takes the
-  // profile's row lock so two approvals in flight serialise instead of both
-  // counting zero.
-  check(
-    'D3: seedOnce locks the profile row (FOR UPDATE) before counting',
-    /async function seedOnce\(/.test(approve) && /FOR UPDATE/.test(approve),
-    'Two concurrent approvals both count zero and both create — the live profile shows every tier and diploma twice.',
-  )
-  for (const table of ['consultation', 'certificate', 'availabilitySlot']) {
-    const usesTx = new RegExp(`tx\\.${table}\\.count\\(`).test(approve) && new RegExp(`tx\\.${table}\\.createMany\\(`).test(approve)
-    const usesBare = new RegExp(`prisma\\.${table}\\.count\\(`).test(approve) || new RegExp(`prisma\\.${table}\\.createMany\\(`).test(approve)
-    check(
-      `D3: the ${table} seed counts and creates through the locked transaction`,
-      usesTx && !usesBare,
-      'A seed step outside seedOnce is the duplicate factory again.',
-    )
-  }
-  const patch = readFileSync(join(root, 'app/api/admin/requests/[id]/route.ts'), 'utf8')
-  check(
-    'D4: the admin request PATCH claims the row on the status it was read at',
-    /updateMany\(\{\s*where: \{ id, status: before\.status \}/.test(patch) && /claim\.count !== 1/.test(patch) && /status: 409/.test(patch),
-    'A plain update() lets two admins overwrite each other silently — the second one’s status wins and nobody is told.',
-  )
-}
+/* ═════ 3. a second click cannot clobber ════════════════════════════════════ */
+
+const patch = read('app/api/admin/requests/[id]/route.ts')
+check(
+  'the admin request PATCH claims the row on the status it was read at',
+  /updateMany\(\{\s*where: \{ id, status: before\.status \}/.test(patch) && /claim\.count !== 1/.test(patch) && /status: 409/.test(patch),
+  'A plain update() lets two admins overwrite each other silently — the second one’s status wins and nobody is told.',
+)
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

@@ -27,7 +27,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { requestsViewer } from '@/lib/requestsServer'
 import {
-  timeAgoKa, topicLabel,
+  timeAgoKa, topicLabel, offerPriceLabel,
   OFFER_STATUS_LABEL, type OfferStatusName,
 } from '@/lib/requests'
 import { offerPeerName } from '@/lib/inboxRows'
@@ -74,6 +74,13 @@ export async function OfferThreadPane({
     },
     select: {
       id: true, status: true, createdAt: true,
+      // ⚠️ THE PRICE, SINCE 2026-08-29 — the one thing that told these threads
+      // apart and was not on screen. A provider with three jobs open can have
+      // two of them under the same topic („დეკლარაცია"), and the header named
+      // the topic and the status but not the number they agreed. It is the
+      // agreed sum, not a contact detail: `offerPriceLabel` turns it into words
+      // („ფასს შემოგთავაზებს") when there is no figure.
+      priceGel: true, priceKind: true,
       request: {
         select: {
           topic: true, status: true,
@@ -100,6 +107,7 @@ export async function OfferThreadPane({
             </div>
             <p className="text-meta text-ink-500 truncate">
               {topicLabel(offer.request.topic)}
+              {' · '}{offerPriceLabel(offer.priceGel, offer.priceKind)}
               {' · '}{OFFER_STATUS_LABEL[offer.status as OfferStatusName]}
               {' · '}{timeAgoKa(offer.createdAt)}
             </p>

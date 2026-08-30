@@ -30,13 +30,12 @@ import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
 import { Container } from '@/components/Container'
 import { PAYMENTS_LIVE } from '@/lib/flags'
-import { LiveCat, catNameOf } from './_data'
+import { LiveCat, catNameOf } from './_cats'
 import { Filters } from './_filters'
 
-export const SearchHero = ({ filters, total, loading, liveCats, requestHref }: {
+export const SearchHero = ({ filters, total, liveCats, requestHref }: {
   filters: Filters
   total: number
-  loading: boolean
   liveCats: LiveCat[]
   /** The intake address, or null when FEATURE_REQUESTS is off. The flag is read
    *  ONCE in the server page so this header and the empty state cannot
@@ -103,15 +102,16 @@ export const SearchHero = ({ filters, total, loading, liveCats, requestHref }: {
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
           <div className="min-w-0">
             <h1 className="font-display text-h1 sm:text-display font-bold text-ink-900 tracking-tight">
-              {!loading && headingLabel ? headingLabel : 'იპოვე შენი ექსპერტი'}
+              {headingLabel ?? 'იპოვე შენი ექსპერტი'}
             </h1>
-            <span aria-live="polite" className="sr-only">
-              {loading ? 'იტვირთება' : `ნაპოვნია ${total}`}
-            </span>
+            <span aria-live="polite" className="sr-only">{`ნაპოვნია ${total}`}</span>
 
             {/* Honest by flag: only claim escrow once the payment gateway is
                 live. */}
-            <p className="text-body text-ink-500 mt-2">ხელით შერჩეული · გამჭვირვალე ფასი · {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'დაჯავშნა უფასოა'}</p>
+            {/* ⚠️ „მოთხოვნა უფასოა", AND IT WAS „დაჯავშნა უფასოა" UNTIL
+                2026-08-24. There is nothing to book: the way to reach somebody
+                here is to describe what you need, and that is what is free. */}
+            <p className="text-body text-ink-500 mt-2">ხელით შერჩეული · გამჭვირვალე ფასი · {PAYMENTS_LIVE ? 'დაცული გადახდა' : 'მოთხოვნა უფასოა'}</p>
           </div>
 
           {/* ⚠️ THE CTA IS GATED, THE PAGE IS NOT. FEATURE_REQUESTS is a kill

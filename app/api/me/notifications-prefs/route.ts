@@ -25,7 +25,6 @@ export async function GET() {
 const PrefsBody = z.object({
   prefs: z
     .object({
-      BOOKING_CREATED: z.boolean().optional(),
       MESSAGE_NEW: z.boolean().optional(),
       REVIEW_NEW: z.boolean().optional(),
       APPLICATION_STATUS: z.boolean().optional(),

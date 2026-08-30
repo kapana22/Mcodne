@@ -4,15 +4,14 @@ import { PROVIDER_ROUTE } from '@/lib/requests'
 // Single source of truth for the /work destinations. Consumed by
 // WorkspaceSidebar (desktop nav) and WorkspaceTopBar (page title).
 //
-// TWO GROUPS, ONE RAIL (stage 6, 2026-08-19). /work is the supply side's
-// space whatever you supply: an expert's items (CONSULT) and a master's items
-// (WORK) share the prefix and the chrome, and the shell draws each group only
-// for the capability that owns it — lib/capabilities → capabilitiesOf, ADMIN
-// sees both. Never one flat list: „is this about a booking or a request?" was
-// the confusion the old separate /provider space was carved out to avoid, and
-// the visual divider between the groups is what keeps that answer visible.
+// ONE RAIL, ONE PIPELINE (2026-08-21). /work is the supply side's space
+// whatever you supply. Every destination below is shared except three, and each
+// of those three is a TOOL one capability owns — never a group, never a half of
+// the product. The shell decides which by capability (lib/capabilities →
+// capabilitiesOf; ADMIN sees both) and the order is the pipeline, not the
+// capability — see the note above WORKSPACE_NAV.
 
-export type NavBadgeKey = 'attention' | 'messages' | 'openRequests'
+export type NavBadgeKey = 'messages' | 'openRequests'
 
 export type NavItem = {
   href: string
@@ -27,69 +26,92 @@ const startsWith = (prefix: string) => (path: string) =>
   path === prefix || path.startsWith(prefix + '/')
 
 /**
- * THE RAIL — ONE LIST, ITEMS BY FUNCTION (rewritten 2026-08-19).
+ * THE RAIL — THE SERVICE PIPELINE, IN ORDER (rewritten 2026-08-21).
  *
- * ⚠️ THERE ARE NO LONGER TWO GROUPS. The workspace used to hold the expert's
- * six items and the master's three, split by a hairline and then (for one
- * afternoon) by captions — nine rows saying „you are in two products". Owner:
- * „ხელოსნის სივრცე ზედმეტია… ჩემი აზრით არასწორია." The product model says the
- * same thing: one provider, capabilities are switches, and a consultation is
- * one KIND of service rather than a second half of the site.
+ * ⚠️ WHAT WAS WRONG WITH THE PREVIOUS LIST, in the owner's words: „ეს სივრცე
+ * ძველებურად არის მოწყობილი — კონსულტაციაზეა აგებული და ამიტომ
+ * არაკომფორტულია." Ten rows for somebody holding both capabilities, and they
+ * read as two products stacked: four shared, then the master's two, then the
+ * expert's three. The last three were not tools a provider reaches for — they
+ * were the old expert workspace, still standing, with the service screens added
+ * beside it. And one of them, „პროფილი", answered the same question as „ჩემი
+ * სერვისები" did for a master, because that page held their photo and their
+ * sentence (see app/work/profile/page.tsx).
  *
- * So the rail asks what a provider DOES, not which kind they are:
- *   · everything that exists for both capabilities is unconditional;
- *   · exactly two items are conditional, and each is a TOOL only one half owns
- *     — the calendar (you sell time) and the requests feed (you bid on work).
- * Nine rows become seven, and five for somebody holding one capability.
+ * So the rail follows what actually happens to a piece of work, and the site
+ * sells services, so that pipeline is the service one:
  *
- * The captions are gone with the groups: a heading over one list is noise, and
- * a heading over two was the split wearing a label.
+ *     მთავარი → მოთხოვნები → სამუშაოები → მიმოწერა → ჩემი სერვისები → პროფილი
+ *
+ * ⚠️ TWO QUESTIONS, TWO PAGES, FOR BOTH HALVES. „რას ვყიდი" is /work/services
+ * and „ვინ ვარ" is /work/profile — and since 2026-08-21 both open for whoever
+ * holds either capability, so neither row is somebody else's product any more.
+ *
+ * ⚠️ AND „შეთავაზებები" IS NOT A ROW ANY MORE. A sent offer is the first stage
+ * of a job, not a separate place: /work/jobs and /work/offers now carry one tab
+ * bar between them („გაგზავნილი" / „ხელში მაქვს"), which is where a stage
+ * belongs. Nothing was deleted — the page and its address are untouched.
+ *
+ * What is left conditional is exactly what one capability OWNS: the requests
+ * feed (you bid on work) and the calendar and the earnings report (you sell
+ * time). Eight rows become six for one capability and seven for both.
  */
 export const WORKSPACE_NAV: NavItem[] = [
   { href: '/work',          label: 'მთავარი',        icon: 'category', match: p => p === '/work' },
-  { href: '/work/jobs',     label: 'სამუშაოები',     icon: 'calendar', match: startsWith('/work/jobs'), badgeKey: 'attention' },
+  // ⚠️ ONE ROW FOR THE WHOLE FLOW (2026-08-29). „მოთხოვნები" was a second row,
+  // and the two of them named three stages of ONE job: an open request, the
+  // offer you sent for it, the work you won. Owner: „ერთი ნაკადი გახდეს."
+  // The row matches all three addresses and carries the queue's badge, because
+  // the number a person is waiting behind is the same number either way.
+  { href: '/work/jobs',     label: 'სამუშაოები',     icon: 'list',
+    match: p => startsWith('/work/jobs')(p)
+      || startsWith(`${PROVIDER_ROUTE}/offers`)(p)
+      || startsWith(`${PROVIDER_ROUTE}/requests`)(p),
+    badgeKey: 'openRequests' },
   { href: '/work/messages', label: 'მიმოწერა',        icon: 'chat',     match: startsWith('/work/messages'), badgeKey: 'messages' },
   { href: '/work/services', label: 'ჩემი სერვისები', icon: 'briefcase', match: startsWith('/work/services') },
+  { href: '/work/profile',  label: 'პროფილი',        icon: 'user',     match: startsWith('/work/profile') },
 ]
 
-/** The two tools, each owned by one capability. `requests` keeps its href from
- *  the subsystem's own constant — the dependency direction lib/hats uses. */
-export const CONSULT_ONLY_NAV: NavItem[] = [
-  { href: '/work/schedule', label: 'გრაფიკი',    icon: 'clock',  match: startsWith('/work/schedule') },
-  { href: '/work/earnings', label: 'შემოსავალი', icon: 'wallet', match: startsWith('/work/earnings') },
-  { href: '/work/profile',  label: 'პროფილი',    icon: 'user',   match: startsWith('/work/profile') },
-]
+/* ⚠️ „გრაფიკი" AND „შემოსავალი" WENT WITH THE BOOKING PRODUCT (2026-08-24).
+   They were `CONSULT_ONLY_NAV` — a weekly calendar and an earnings report, the
+   two tools that only made sense for somebody selling time. Nothing replaces
+   them: the money on this side of the site is a credit balance, and the shell
+   already draws it. */
 
-export const WORK_ONLY_NAV: NavItem[] = [
-  { href: `${PROVIDER_ROUTE}/requests`, label: 'მოთხოვნები',   icon: 'list', match: startsWith(`${PROVIDER_ROUTE}/requests`), badgeKey: 'openRequests' },
-  { href: `${PROVIDER_ROUTE}/offers`,   label: 'შეთავაზებები', icon: 'send', match: startsWith(`${PROVIDER_ROUTE}/offers`) },
-]
+/* ⚠️ EMPTY SINCE 2026-08-29, AND THE SHAPE SURVIVES ON PURPOSE. „მოთხოვნები"
+   was the one conditional row; it is the first STAGE of „სამუშაოები" now
+   (app/work/_components/WorkTabs), so the rail has nothing left that depends
+   on the allowlist. `navFor` still splices this list in, so the day a
+   supply-side-only destination appears it has a place to go — and the day it
+   does, the conditional is already written. */
+export const WORK_ONLY_NAV: NavItem[] = []
 
-/** Which capabilities a viewer holds — decided by the server layout from
- *  capabilitiesOf(), passed down, never derived in the browser. The field
- *  names stay `expert`/`work` because every caller already speaks them; what
- *  changed is what they DO: they no longer pick a group, they add one tool. */
-export type NavGroups = { expert: boolean; work: boolean }
+/** What the viewer may see. `work` is the request queue — the one row that is
+ *  still conditional, because a provider who was never admitted to the
+ *  allowlist has nothing behind it. It was a pair (`expert` and `work`) while
+ *  two capabilities existed. */
+export type NavGroups = { work: boolean }
 
 /** A block of the rail. One today; the shape survives so a divider can return
  *  without changing every caller. */
 type NavSection = { caption: string | null; items: NavItem[] }
 
 /**
- * The rail, in order. ONE list — see the note above WORKSPACE_NAV for why the
- * groups and their captions are gone. The shared items come first because they
- * are the same question for everybody („what do I have, who is waiting, what do
- * I sell"); the two conditional tools follow, in the order the capability that
- * owns them was added.
- *
- * Returns a single section so the sidebar keeps one code path; the shape is a
- * list of sections only because a divider may return one day.
+ * The rail, in order. ONE list, and a single section so the sidebar keeps one
+ * code path — the shape is a list of sections only because a divider may return.
  */
 export function navFor(groups: NavGroups): NavSection[] {
+  // ⚠️ THE ORDER IS THE PIPELINE, NOT THE CAPABILITIES. „მოთხოვნები" is spliced
+  // in after the home rather than appended after the shared rows, because that
+  // is where the work ENTERS: demand, then what you are doing about it, then
+  // what you sell, then who you are. Appending the conditional rows at the end
+  // is what made the rail read as „the shared product, and then the other one".
+  const [home, ...rest] = WORKSPACE_NAV
   const items = [
-    ...WORKSPACE_NAV,
+    home,
     ...(groups.work ? WORK_ONLY_NAV : []),
-    ...(groups.expert ? CONSULT_ONLY_NAV : []),
+    ...rest,
   ]
   return items.length ? [{ caption: null, items }] : []
 }
@@ -102,7 +124,7 @@ export const CATALOG_LINK: NavItem = {
 /** Page title for the top bar: longest matching workspace destination. */
 export function titleForPath(path: string): string {
   let best: NavItem | null = null
-  for (const item of [...WORKSPACE_NAV, ...WORK_ONLY_NAV, ...CONSULT_ONLY_NAV]) {
+  for (const item of [...WORKSPACE_NAV, ...WORK_ONLY_NAV]) {
     if (item.match(path) && (!best || item.href.length > best.href.length)) best = item
   }
   return best?.label ?? 'სამუშაო სივრცე'

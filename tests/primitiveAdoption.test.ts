@@ -63,13 +63,13 @@ const handButtons = count(
 ratchet(
   'hand-built card shells',
   cardShells,
-  189, // 2026-08-19 (catalogue merge): measured 189 — the /tutors dropdown bar and its duplicate drawer went when both catalogues moved to the one shared rail.
+  100, // 2026-08-29: measured 100. The ratchet had been sitting at 189 since the catalogue merge while the real number fell to 100 — a ceiling 89 above the floor is not a ratchet, it is permission. Lowered to what is actually there, so the next hand-rolled card fails this test instead of being absorbed silently.
   'Use <Card> (components/Card.tsx). If the padding is not one of its tiers, that is a design decision — raise it rather than hand-rolling a shell.',
 )
 ratchet(
   'hand-built primary buttons',
   handButtons,
-  98, // 2026-08-19 (catalogue merge): the /tutors filter drawer's own apply button went with the drawer.
+  47, // 2026-08-29: measured 47, down from a 98 ceiling set at the catalogue merge. Same reasoning as the line above — the limit is the measurement, or it stops guarding anything.
   'Use <Btn variant="primary">. A hand-built copy opts out of the shared focus ring, press state and disabled handling.',
 )
 

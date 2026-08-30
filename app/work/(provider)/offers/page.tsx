@@ -20,9 +20,10 @@ import {
 } from '@/lib/requests'
 import { offerPeerName } from '@/lib/inboxRows'
 import { OfferStatusPill } from '@/components/requests/StatusPills'
-import { requestsViewer } from '@/lib/requestsServer'
+import { requestsViewer, openRequestCount } from '@/lib/requestsServer'
 import Link from 'next/link'
 import { PageHeader } from '@/components/PageHeader'
+import { WorkTabs } from '@/app/work/_components/WorkTabs'
 import { Card } from '@/components/Card'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
@@ -33,6 +34,9 @@ export const dynamic = 'force-dynamic'
 export default async function Page() {
   const viewer = await requestsViewer()
   const p = viewer.provider
+  // The first stage's count — one helper, so the bar and the queue it links to
+  // can never disagree (lib/requestsServer).
+  const openRequests = await openRequestCount(viewer.user)
 
   // An admin has no offers because they cannot write any. An empty list would
   // read as „you sent none yet", which is a different and wrong statement.
@@ -88,11 +92,17 @@ export default async function Page() {
 
   return (
     <>
+      {/* ⚠️ THE HEADING IS THE JOBS SCREEN'S (2026-08-21), because this IS that
+          screen — its earlier stage. The rail carries one row („სამუშაოები")
+          and the tab bar below says which stage you are looking at; a second
+          title here would put the old two-destinations split back on screen in
+          words. */}
       <PageHeader
-        eyebrow="შეთავაზებები"
-        title="ჩემი შეთავაზებები"
-        sub="კლიენტთან კავშირი მიმოწერაშია."
+        className="mb-5"
+        title="სამუშაოები"
+        sub="მიღებული და დადასტურებული შეთავაზებები — ერთ სიაში."
       />
+      <WorkTabs showOffers openRequests={openRequests} />
 
       {offers.length === 0 ? (
         <div className="mt-6">
@@ -106,7 +116,7 @@ export default async function Page() {
       ) : (
         // The list arrives as a list — the site's own cascade, and reduced
         // motion lands every row on its end state.
-        <div className="mt-6 space-y-3 motion-safe:stagger">
+        <div className="mt-6 space-y-3 stagger">
           {offers.map(o => {
             // THE one call that decides — „კლიენტი" until this offer is the
             // chosen one, the person's own name afterwards. Since 2026-08-21

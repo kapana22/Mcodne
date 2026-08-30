@@ -23,7 +23,6 @@
 import { z } from 'zod'
 // TYPE ONLY — lib/capabilities imports prisma and this file must not; see
 // `showRequestCta` below.
-import type { Capability } from '@/lib/capabilities'
 import { phoneFormatError, normalizePhone } from '@/lib/phone'
 import { UNSTATED } from '@/lib/requestTopics'
 
@@ -72,6 +71,9 @@ export const REQUEST_PATH_PREFIXES = [
   '/api/request-thread',
   '/api/provider',
   '/api/admin/requests',
+  // Same trap as the two above: the intake funnel gates itself with
+  // requestsViewer() and does not start with „/api/admin/requests/".
+  '/api/admin/funnel',
 ] as const
 
 /* ── the switch ─────────────────────────────────────────────────────────── */
@@ -80,8 +82,8 @@ export const REQUEST_PATH_PREFIXES = [
  * Is the subsystem on for this deployment?
  *
  * AN ENV VAR AND NOT A CONSTANT, deliberately unlike B2B_VISIBILITY and
- * PACKAGES_VISIBILITY. Those two are constants because their owner flips them
- * as part of a release. This one is a kill switch for an unfinished experiment
+ * FEATURE_ABROAD. Those are constants because their owner flips them as part of
+ * a release. This one is a kill switch for an unfinished experiment
  * that is being tested against the live database: it has to be turnable off
  * from the Railway dashboard at three in the morning, without a code change and
  * without a working laptop.
@@ -222,10 +224,10 @@ export function canOpenRequestForm(): boolean {
  * CAPABILITIES, NOT THE ROLE, for the same reason `showJoinInvite` reads them:
  * an admitted provider keeps role CLIENT (lib/hats says why), so a role test
  * would hide the CTA from approved experts and keep showing it to exactly the
- * person who asked for this. „A service added" IS a capability — a TutorProfile
- * (CONSULT) or an admitted ServiceProfile (WORK). The type is imported
- * `import type` and nothing else: lib/capabilities imports prisma, and this
- * file's whole contract is that it does not.
+ * person who asked for this. „A service added" is an admitted ServiceProfile —
+ * one boolean, since 2026-08-24 (it was two capabilities, CONSULT and WORK,
+ * when there were two profile tables). The caller passes the answer in: this
+ * file's whole contract is that it does not import prisma.
  *
  * ⚠️ A HIDDEN INVITATION IS NOT A CLOSED DOOR. `canOpenRequestForm` is
  * untouched, so /request still answers everyone the flag admits — a provider
@@ -239,8 +241,8 @@ export function canOpenRequestForm(): boolean {
  * as demand, so an empty (or not-yet-resolved) list answers `true`; the one
  * audience this removes is people who already sell.
  */
-export function showRequestCta(caps: readonly Capability[] | undefined | null): boolean {
-  return (caps?.length ?? 0) === 0
+export function showRequestCta(provider: boolean | undefined | null): boolean {
+  return provider !== true
 }
 
 /**
@@ -664,6 +666,12 @@ export type ProviderRequestRow = {
   createdAt: Date | string
   details?: unknown
   category?: { id: string; name: string; slug: string } | null
+  /** ⚠️ OPTIONAL, AND THE LISTS LEAVE IT UNSET ON PURPOSE (2026-08-29). These
+   *  are base64 blobs; only the DETAIL page selects them (see
+   *  prisma/schema → ServiceRequest.photos). A queue row that started passing
+   *  them would put megabytes on the wire, so the shape makes the omission
+   *  legal rather than making every list remember. */
+  photos?: string[]
 }
 
 export function providerRequestView(r: ProviderRequestRow) {
@@ -680,6 +688,7 @@ export function providerRequestView(r: ProviderRequestRow) {
     // provider wondering whether they clicked the right row.
     headline: requestHeadline(r.description, topicLabel(r.topic)),
     description: r.description,
+    photos: r.photos ?? [],
     // Rendered here rather than in three page components, so the same request
     // never reads „40–70₾" on one screen and „40–70₾ ერთ გაკვეთილზე" on
     // another — the unit is not decoration, it is what the number means.
@@ -729,6 +738,52 @@ export function providerRequestView(r: ProviderRequestRow) {
  */
 export function clientIdentityOpen(offer: { status: string }): boolean {
   return offer.status === 'ACCEPTED'
+}
+
+/* ── the client's contact, and the only way to it ──────────────────────── */
+
+/**
+ * ⚠️ THE THREE COLUMNS, NAMED IN ONE PLACE — and the point is that a caller has
+ * to reach for this deliberately (2026-08-21).
+ *
+ * `clientIdentityOpen` above records why the contact is not printed on arrival:
+ * „the contact IS the lead… Whatever it eventually costs, it has to be opened
+ * by a deliberate act that can carry a price." That act now exists — the
+ * provider pays CONTACT_COST_TETRI (lib/credits) once per request — and this is
+ * the select it unlocks.
+ *
+ * ⚠️ IT IS DELIBERATELY NOT PART OF `ProviderRequestRow`, AND MUST NEVER BE.
+ * That type is the funnel every provider surface is shaped through, so a card
+ * that „just shows the number" cannot compile. The rule this codebase already
+ * chose is enforcement by what is FETCHED — the three surfaces that used to
+ * print a phone number stopped SELECTing it at all — and a second select,
+ * reachable only inside an `if (paid)`, is that same rule with a price on it.
+ *
+ * There are exactly two callers and both check the ledger first:
+ * POST /api/provider/requests/[id]/contact, which charges, and the provider's
+ * request page, which renders what was already paid for.
+ */
+export const CLIENT_CONTACT_SELECT = { contactName: true, phone: true, email: true } as const
+
+export type ClientContact = {
+  name: string
+  phone: string
+  /** Optional at the source: a client may leave only a phone. See
+   *  `RequestIntake` — most services run on the number. */
+  email: string | null
+}
+
+/**
+ * The contact, shaped. PURE, and it takes a row that has already been fetched —
+ * it cannot decide whether somebody paid, and must never be asked to: this
+ * function returning something is not authorisation, the ledger row is.
+ *
+ * It exists so the three field names are read the same way at both call sites
+ * and so „the client's name" is one concept rather than `contactName` in one
+ * component and `name` in another.
+ */
+export function clientContactView(r: { contactName: string; phone: string; email: string | null }): ClientContact {
+  return { name: r.contactName, phone: r.phone, email: r.email }
 }
 
 type ProviderContact = {
@@ -812,6 +867,15 @@ export function clientOfferView(o: {
  * ღილაკი" — so this is a preference about a BUTTON, and deliberately not about
  * routing. Both modes reach experts; only one of them offers a list to write to.
  */
+/**
+ * ⚠️ THREE, NOT SIX. A provider's portfolio is a body of work and earns six
+ * (lib/serviceProfile → MAX_WORK_PHOTOS); a request is one thing that needs
+ * doing, and three angles of a leaking tap is already more than anybody sends.
+ * The number is small on purpose: this is an OPTIONAL step in an intake, and
+ * every extra slot on it reads as an obligation.
+ */
+export const MAX_REQUEST_PHOTOS = 3
+
 export const PICK_MODES = ['OFFERS', 'SELF'] as const
 type PickMode = (typeof PICK_MODES)[number]
 
@@ -861,6 +925,17 @@ export const ServiceRequestInput = z.object({
   /** How they want to be helped. Defaults so a request written before this
    *  question existed still parses. */
   pickMode: z.enum(PICK_MODES).default('OFFERS'),
+  // ⚠️ OPTIONAL, AND IT HAS TO STAY OPTIONAL. The photo step exists to make a
+  // request easier to price, not to add a hurdle to sending one — a person on
+  // a phone with water on the floor may have nothing to upload, and their
+  // request is exactly the one that must still arrive. Same `data:image/`
+  // refusal the provider intake uses (lib/masterApplication), same reason: the
+  // column is rendered as an <img> and anything else is either a mistake or a
+  // crafted body.
+  photos: z.array(
+    z.string().trim().max(4_000_000)
+      .refine(v => v.startsWith('data:image/'), { message: 'ფოტო ვერ აიტვირთა' }),
+  ).max(MAX_REQUEST_PHOTOS).optional(),
   budgetBand: z.string().trim().max(8).default(''),
   timing: z.string().trim().min(1).max(24),
   format: z.enum(['ONLINE', 'IN_PERSON', 'EITHER']),
@@ -994,6 +1069,7 @@ export function serviceRequestRow(input: ServiceRequestInput) {
   return {
     kind: input.kind,
     topic: input.topic,
+    photos: input.photos ?? [],
     // '' rather than null: the column is NOT NULL, and an empty description is
     // an ordinary state now — the pages simply do not render the paragraph.
     description: (input.description ?? '').trim(),

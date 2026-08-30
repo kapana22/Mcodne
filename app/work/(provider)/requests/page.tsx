@@ -12,11 +12,12 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { requestsViewer } from '@/lib/requestsServer'
+import { requestsViewer, providerQueueScope } from '@/lib/requestsServer'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { providerRequestView, timeAgoKa, REQUEST_KINDS, KIND, PROVIDER_ROUTE, type RequestKindName } from '@/lib/requests'
-import { routingWhere } from '@/lib/serviceProfile'
+import { queueWhere } from '@/lib/requestRouting'
 import { PageHeader } from '@/components/PageHeader'
+import { WorkTabs } from '@/app/work/_components/WorkTabs'
 import { AutoRefresh } from '@/components/AutoRefresh'
 import { Card } from '@/components/Card'
 import { EmptyState } from '@/components/EmptyState'
@@ -57,51 +58,24 @@ export default async function Page({ searchParams }: {
   // and the first three cards were ქიმია, მათემატიკა and ბინის დალაგება — not
   // one of them plumbing. Owner: „საერთოდ არაფერში წერია… გაურკვეველია."
   //
-  // `ServiceProfile` has held the answer since the day it was built — the exact
-  // topic ids a request carries, plus the cities they travel to — and nothing
-  // read it. The storage was the easy half; this is the half that matters.
+  // ⚠️ AND IT WENT ON SHOWING EVERYTHING TO EVERYBODY WITHOUT A SERVICE
+  // PROFILE UNTIL 2026-08-21, which is the same bug wearing the fix. The
+  // narrowing read `ServiceProfile` alone and treated its absence as „no
+  // filter" — so an expert holding only CONSULT, an admin and a company member
+  // each got the whole platform. Measured that day: 12 open requests with room
+  // left, all 12 in those queues, ქიმია · მათემატიკა · ეროვნული გამოცდები
+  // included. Owner: „რეალურად უსარგებლო მოთხოვნები არ უნდა შედიოდეს — თუ
+  // ქიმიის მასწავლებელს ეძებენ, არ უნდა მიუვიდეს დამლაგებელს."
   //
-  // ⚠️ NO PROFILE MEANS NO FILTER, NOT AN EMPTY QUEUE. An expert bidding on
-  // consultations has no ServiceProfile and never will; narrowing them to
-  // nothing would take a working screen away to fix somebody else's. The filter
-  // exists only for somebody who has told us what they do.
-  //
-  // ⚠️ `available` IS SELECTED, NOT FILTERED ON — and the difference was a
-  // shipped bug (2026-08-18). It used to sit in the `where`, so a master who
-  // switched themselves off returned `svc = null`, which this code reads as
-  // „no profile, therefore no filter" — and the queue WIDENED to every open
-  // request on the platform, chemistry and maths included. Turning yourself off
-  // made the noise worse, which is the exact opposite of the control's meaning
-  // and the exact failure the filter was written to fix, coming back through a
-  // side door.
-  //
-  // Absent and paused are different states and the screen has to tell them
-  // apart, so the question „is there a profile" and the question „is it on" are
-  // now asked separately.
-  const svc = viewer.user
-    ? await prisma.serviceProfile.findFirst({
-        where: {
-          OR: [
-            { userId: viewer.user.id },
-            { company: { members: { some: { userId: viewer.user.id } } } },
-          ],
-        },
-        select: { services: true, areas: true, available: true },
-      })
-    : null
-
-  /** They have a profile and have switched themselves off. Nothing is routed to
-   *  them, and the screen must say which of the two silences this is. */
-  const paused = !!svc && !svc.available
-
-  // The narrowing itself lives in lib/serviceProfile so the nav badge in
-  // app/provider/layout can apply the identical one — they disagreed for a day
-  // and the badge was advertising work the list would never show.
-  const mine = routingWhere(svc) ?? {}
-
-  /** Is this provider seeing a NARROWED queue? The empty state has to say so —
-   *  otherwise „nothing here" reads as „the site is broken". */
-  const filtered = Object.keys(mine).length > 0
+  // The narrowing now asks BOTH halves of what a person offers — the trades
+  // they ticked and the sphere/professions they are filed under — using the
+  // same three facts that decide who gets MAILED, and it says which silence an
+  // empty result is. All of that lives in lib/requestRouting → queueScope, so
+  // the nav badge (app/work/layout) and the home board (app/work/page) apply
+  // the identical one; they disagreed for a day once and the badge was
+  // advertising work the list would never show.
+  const scope = await providerQueueScope(viewer.user)
+  const mine = queueWhere(scope)
 
   const me = viewer.provider
   /**
@@ -181,12 +155,17 @@ export default async function Page({ searchParams }: {
 
   return (
     <>
+      {/* ⚠️ ONE HEADING FOR THE WHOLE FLOW (2026-08-29). This page called itself
+          „მოთხოვნები / ღია მოთხოვნები" and /work/jobs called itself
+          „სამუშაოები", which is how three stages of one job read as two
+          products. The heading is the job now; which stage you are looking at
+          is the bar below it. Owner: „ერთი ნაკადი გახდეს." */}
       <PageHeader
-        eyebrow="მოთხოვნები"
-        title="ღია მოთხოვნები"
+        title="სამუშაოები"
         sub="დამოწმებული მოთხოვნები, რომლებზეც ჯერ ადგილი რჩება."
         actions={<AutoRefresh />}
       />
+      <WorkTabs showOffers openRequests={rows.length} />
 
       {/* THE KIND FILTER, IN THE WORKSPACE'S ONE TAB GRAMMAR (2026-08-19).
           It was a row of pill buttons; /work/jobs one directory over is an
@@ -224,37 +203,66 @@ export default async function Page({ searchParams }: {
 
       {requests.length === 0 ? (
         <div className="mt-6">
-          {/* ⚠️ EMPTY HAS TWO CAUSES AND THEY NEED DIFFERENT SENTENCES
-              (2026-08-18). „ჯერ არაფერია" is true when the whole queue is
-              quiet; it is a LIE when the queue is busy and this provider's own
-              services simply do not match it, and that reading — „the site is
-              broken" — is exactly what an unexplained empty screen produces.
-              The second sentence also names the fix and where it lives. */}
-          {/* ⚠️ AND A THIRD CAUSE, WHICH USED TO BE INVISIBLE (2026-08-18):
-              they switched THEMSELVES off. That state used to fall through to
-              „no profile, no filter" and quietly widen the queue instead of
-              emptying it; now it empties it, and an empty screen that does not
-              name the switch is somebody staring at silence they caused and
-              cannot see. It is the only one of the three with a control to
-              point at, so it is the only one that carries a link. */}
+          {/* ⚠️ EMPTY HAS FOUR CAUSES AND THEY NEED DIFFERENT SENTENCES.
+              „ჯერ არაფერია" is true when the whole queue is quiet; it is a LIE
+              when the queue is busy and this provider's own services simply do
+              not match it, and that reading — „the site is broken" — is exactly
+              what an unexplained empty screen produces (2026-08-18).
+
+              The third was invisible until 2026-08-18: they switched THEMSELVES
+              off. That used to fall through to „no profile, no filter" and
+              quietly WIDEN the queue instead of emptying it — somebody staring
+              at noise they caused and could not see.
+
+              The fourth arrived with the fix on 2026-08-21 and is the one this
+              screen owes the most explanation. They offer nothing we can narrow
+              by: a master who ticked no trade, a company member, an expert with
+              no sphere and no profession. Until today they saw EVERY open
+              request on the platform, which is the bug; „nothing", said without
+              a reason, is a different bug. So it names the gap and links to the
+              editor that owns it — `scope.fix` is „ჩემი სერვისები" for the
+              trades half and „პროფილი" for the expert half.
+
+              ⚠️ EVERY STRING HERE ALREADY EXISTED. „აირჩიე ერთი სერვისი მაინც"
+              is the owner's own sentence from lib/serviceProfile → profileGaps,
+              which is the wording the services editor already shows this exact
+              person; the two link labels are the nav's. Nothing on this screen
+              was authored here — see CLAUDE.md, „The copy is the owner's".
+
+              ⚠️ AN ADMIN IS NOT A SILENCE AT ALL. `mode: 'ALL'` means the queue
+              really is empty, so it gets the quiet sentence — and the shell
+              above already prints „ხედავ როგორც ადმინი" on every one of these
+              screens, so the unnarrowed view is labelled where it is read
+              rather than explained twice. */}
           <EmptyState
             icon={<Icon.search className="w-6 h-6" />}
-            title={paused ? 'შენ თავი გამორთე' : filtered ? 'შენს სერვისებზე ჯერ არაფერია' : 'ჯერ არაფერია'}
-            description={paused
-              ? 'სანამ გამორთული ხარ, მოთხოვნები არ მოგდის. ჩართვა „ჩემი სერვისები“-შია.'
-              : filtered
+            title={
+              scope.mode === 'PAUSED' ? 'შენ თავი გამორთე'
+              : scope.mode === 'UNLISTED' ? 'აირჩიე ერთი სერვისი მაინც'
+              : scope.mode === 'FILTERED' ? 'შენს სერვისებზე ჯერ არაფერია'
+              : 'ჯერ არაფერია'
+            }
+            description={
+              scope.mode === 'PAUSED' ? 'სანამ გამორთული ხარ, მოთხოვნები არ მოგდის. ჩართვა „ჩემი სერვისები“-შია.'
+              : scope.mode === 'UNLISTED' || scope.mode === 'FILTERED'
                 ? 'ჩანს მხოლოდ ის მოთხოვნები, რაც შენს სერვისებსა და ქალაქებს ემთხვევა. სია „ჩემი სერვისები“-ში იცვლება.'
-                : 'ახალი მოთხოვნა აქ გამოჩნდება, როგორც კი გადამოწმდება.'}
-            cta={paused
-              ? { label: 'ჩემი სერვისები', href: `${PROVIDER_ROUTE}/services` }
-              : undefined}
+                : 'ახალი მოთხოვნა აქ გამოჩნდება, როგორც კი გადამოწმდება.'
+            }
+            cta={
+              scope.mode === 'PAUSED' ? { label: 'ჩემი სერვისები', href: `${PROVIDER_ROUTE}/services` }
+              : scope.mode === 'UNLISTED'
+                ? (scope.fix === 'PROFILE'
+                    ? { label: 'პროფილი', href: '/work/profile' }
+                    : { label: 'ჩემი სერვისები', href: `${PROVIDER_ROUTE}/services` })
+                : undefined
+            }
           />
         </div>
       ) : (
         // The queue enters as a queue: `.stagger` is the site's own cascade
         // (rise-in per child, 40ms apart) and reduced motion lands every card
         // on its end state, which is the visible one.
-        <div className="mt-6 grid gap-3 md:grid-cols-2 motion-safe:stagger">
+        <div className="mt-6 grid gap-3 md:grid-cols-2 stagger">
           {requests.map(r => {
             // The last place is the one worth hurrying for; before that the
             // count is information, not pressure.

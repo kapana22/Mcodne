@@ -1,4 +1,4 @@
-import { JOIN_HREF } from '@/lib/roleHome'
+import { JOIN_DOOR_HREF, JOIN_DOOR_LABEL } from '@/lib/capabilities'
 import { requestsFeatureExists } from '@/lib/requests'
 import { Icon } from '@/components/Icon'
 
@@ -22,13 +22,14 @@ const startsWith = (prefix: string) => (path: string) =>
 
 export const WORKSPACE_NAV: NavItem[] = [
   { href: '/me',          label: 'მთავარი',   icon: 'home',     match: p => p === '/me' },
-  { href: '/me/bookings', label: 'ჯავშნები',  icon: 'calendar', match: startsWith('/me/bookings') },
-  { href: '/me/messages', label: 'მიმოწერა',   icon: 'chat',     match: startsWith('/me/messages'), badgeKey: 'messages' },
-  // The client's own service requests (D7, stage 6). Desktop rail only — the
-  // five mobile tabs are full (components/BottomNav → STUDENT_TABS), and the
-  // /me home carries a section for it. Filtered below on the subsystem's
-  // flag: the page 404s without it, and a rail item leading to a 404 is a
-  // broken promise, not a link.
+  // ⚠️ „ჯავშნები" AND „მიმოწერა" WENT WITH THE BOOKING PRODUCT (2026-08-24).
+  // The first listed sessions; the second was the pair inbox that carried a
+  // booking's conversation. A client's thread with a provider is the request's
+  // own thread — /request/<ref> — which is reached from the row below.
+  //
+  // The client's own service requests. Filtered on the subsystem's flag: the
+  // page 404s without it, and a rail item leading to a 404 is a broken promise,
+  // not a link.
   ...(requestsFeatureExists()
     ? [{ href: '/me/requests', label: 'მოთხოვნები', icon: 'list', match: startsWith('/me/requests') } as NavItem]
     : []),
@@ -55,7 +56,22 @@ export const APPLY_LINK: NavItem = {
   // for; the constant is how they cannot. It moved from /apply — the EXPERT
   // application — because a tradesperson in their own workspace was being
   // invited to become an expert, with no route to the trades form anywhere.
-  href: JOIN_HREF, label: 'შემოგვიერთდი', icon: 'briefcase', match: startsWith('/signup'),
+  //
+  // ⚠️ AND IT IS `JOIN_DOOR_*`, NOT `JOIN_HREF` (2026-08-21). This item is only
+  // ever drawn for somebody who is SIGNED IN — it lives in the client
+  // workspace sidebar — and `JOIN_HREF` is `/signup`, which for a signed-in
+  // person redirects straight back to `/me`. So the one invitation a client
+  // gets to start selling was a link to the page they were already past: click
+  // it, land back where you started, no error, no door. Walked in the browser
+  // 2026-08-21 as a freshly registered client.
+  //
+  // `JOIN_HREF` is still correct where it is used — the guest's „დაწყება"
+  // button in PublicTopBar, where an account genuinely has to exist first.
+  // What diverged is that every OTHER signed-in surface (the UserMenu item,
+  // the footer action, the home CTA) had already moved to `JOIN_DOOR_HREF`
+  // and this one had not. §K2 now pins the constant rather than the presence,
+  // so the sidebar cannot name a different door again.
+  href: JOIN_DOOR_HREF, label: JOIN_DOOR_LABEL, icon: 'briefcase', match: startsWith('/join'),
 }
 
 /** Page title for the top bar: longest matching workspace destination. */

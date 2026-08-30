@@ -13,7 +13,7 @@
 // app/work/(provider)/layout.tsx explains at length.
 import { notFound } from 'next/navigation'
 import { requireUser } from '@/lib/auth'
-import { capabilitiesOf } from '@/lib/capabilities'
+import { isProvider } from '@/lib/capabilities'
 import { ROLE } from '@/lib/roles'
 import { MessagesFrame } from './_frame'
 
@@ -22,9 +22,6 @@ export const dynamic = 'force-dynamic'
 export default async function MessagesLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser()
   const privileged = user.role === ROLE.PROVIDER || user.role === ROLE.ADMIN
-  if (!privileged) {
-    const caps = await capabilitiesOf(user.id)
-    if (caps.length === 0) notFound()
-  }
+  if (!privileged && !(await isProvider(user.id))) notFound()
   return <MessagesFrame>{children}</MessagesFrame>
 }

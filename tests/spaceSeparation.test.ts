@@ -35,14 +35,18 @@ test('somebody already IN the client space keeps the way back', () => {
   const menu = read('components/UserMenu.tsx')
   const line = menu.slice(menu.indexOf('SPACE_LABEL.CLIENT') - 400, menu.indexOf('SPACE_LABEL.CLIENT') + 120)
   assert.match(line, /!inClientSpace/, 'the client door no longer checks where you are — it would vanish while you stand in the room')
-  assert.match(menu, /href: '\/work', label: SPACE_LABEL\.EXPERT/, 'the way back to the workspace is gone')
+  assert.match(menu, /href: '\/work', label: SPACE_LABEL\.PROVIDER/, 'the way back to the workspace is gone')
 })
 
 test('the signal is live, not cached or derived from a role', () => {
   const api = read('app/api/me/route.ts')
   assert.match(api, /clientRoom: await hasClientActivity\(user\.id\)/, '/api/me stopped reporting whether the client room has anything')
   const fn = api.slice(api.indexOf('async function hasClientActivity'))
-  for (const model of ['booking.count', 'favorite.count', 'serviceRequest.count']) {
+  // ⚠️ „bought" IS `review.count` SINCE 2026-08-24 — it was `booking.count`,
+  // and a booking is not a thing any more. You can only rate a job you actually
+  // hired somebody for, so the question („have you bought anything here")
+  // survives with a different column behind it.
+  for (const model of ['review.count', 'favorite.count', 'serviceRequest.count']) {
     assert.ok(fn.includes(model), `hasClientActivity no longer counts ${model} — a provider who did exactly that would lose their own room`)
   }
   const lib = read('lib/me.ts')
@@ -53,6 +57,6 @@ test('the signal is live, not cached or derived from a role', () => {
 test('the two rooms are still named by different words', () => {
   // Whatever they are called, they must not be called the same thing — that was
   // the complaint underneath the complaint.
-  assert.notEqual(SPACE_LABEL.CLIENT, SPACE_LABEL.EXPERT)
-  assert.ok(SPACE_LABEL.CLIENT.length > 0 && SPACE_LABEL.EXPERT.length > 0)
+  assert.notEqual(SPACE_LABEL.CLIENT, SPACE_LABEL.PROVIDER)
+  assert.ok(SPACE_LABEL.CLIENT.length > 0 && SPACE_LABEL.PROVIDER.length > 0)
 })

@@ -1,49 +1,57 @@
 'use client'
-/* TWO LEVELS, BOTH VISIBLE — the sphere, then its professions.  2026-08-11
+/* ONE QUESTION, ONE CONTROL — THE PROFESSION.  2026-08-21
  *
- * WHAT THE FOUR EARLIER ATTEMPTS GOT WRONG. A wall of 16 chips, a
- * search-and-drill list, a bare <select>, and a single combobox over all 91
- * professions. The last one was the worst of the four and it is worth saying
- * why, because it looked like progress:
+ * Owner, looking at the two-step version: „ორი ჩასაწერი არ უნდა იყოს სერვისის
+ * დამატება — უფრო კომფორტული და მარტივი უნდა იყოს."
  *
- *   · it FLATTENED a structure the owner had deliberately defined. 16 spheres
- *     with their own professions became one 91-row list in which the sphere was
- *     a grey heading — the hierarchy stopped being visible at all;
- *   · it made the SPHERE a footnote. „სფერო: X" in 12px grey under the field,
- *     for the single most consequential value on the form: `categoryId` decides
- *     browse, the filter, /categories/*, the counts and the SEO;
- *   · and it was justified with the wrong research. Baymard's autocomplete
- *     rules are about SEARCH SUGGESTIONS. Search is a shortcut for somebody who
- *     already knows the word; it is not how you present a taxonomy to somebody
- *     deciding where they belong.
+ * WHAT THIS REPLACED, and why the two steps were never the applicant's problem
+ * to solve. The control asked ① კატეგორია and ② პროფესია as two required
+ * fields, and step ② was dead until step ① was answered. But the file itself
+ * already knew the truth, in the comment above the search field:
  *
- * SO: two numbered, labelled controls, both on screen at once, the relationship
- * carried by layout instead of by explanation.
+ *     „A person knows their JOB TITLE. The category is OUR taxonomy's need,
+ *      not theirs."
  *
- *   ① სფერო      — one, a native <select>. The OS owns its scrolling, it is one
- *                  h-11 field like every other, and the chosen value IS the
- *                  field. It is control number one because it is the decision
- *                  that matters most.
- *   ② პროფესია   — several, as CHECKBOXES, and every one of them visible:
- *                  the largest sphere holds 9, which fits two columns without
- *                  a scrollbar anywhere on the step. Multi-select is a fact you
- *                  can see rather than a behaviour you have to discover.
+ * That was written to justify a SHORTCUT past step ① — a search that sets the
+ * category on the applicant's behalf. If the shortcut is the honest path, the
+ * step it goes around is not a question, it is a form asking somebody to do our
+ * filing. So the category stopped being a control. It is now DERIVED from the
+ * profession (`sphereOfProfessions`, first pick wins) and shown back on the
+ * answer, and there is exactly one thing to do on this screen.
  *
- * Picks made under a DIFFERENT sphere are kept and listed separately rather
- * than dropped — switching spheres to add „ბუღალტერი" must not silently
- * discard „მარკეტოლოგი".
+ * ⚠️ THIS IS NOT THE 91-ROW COMBOBOX OF 2026-08-11, and the difference is the
+ * whole design. That attempt was recorded here as „the worst of the four" for
+ * two reasons, and a single field only earns its place by fixing both:
  *
- * Prototyped in claude-design/two-level.html and agreed before shipping.
+ *   1. IT FLATTENED THE TAXONOMY and made the sphere a footnote — while
+ *      `categoryId` decides browse, the filter, /categories/*, the counts and
+ *      the SEO. → Here the categories are still on screen and still in the
+ *      owner's launch order: they are the GROUP HEADINGS the professions sit
+ *      under. The hierarchy is visible as structure. What is gone is only the
+ *      obligation to fill it in. And the chosen category is printed on the
+ *      answer chip („სანტექნიკოსი · სახლის რემონტი"), so it is confirmed to the
+ *      applicant rather than filed silently behind them.
  *
- * SHARED, in components/ rather than app/apply/: /apply asks this question of a
- * new applicant and /tutor/profile asks it of an existing expert. Two screens
- * asking the same question with two controls is exactly how the category
- * vocabulary drifted apart before — one component, one behaviour.
+ *   2. IT REQUIRED TYPING — 97 professions in one flat list is not something
+ *      you browse unless you already know the word. → The list here is open by
+ *      default, grouped, and the launch set (6 categories, 32 professions) is
+ *      what a new applicant meets. The other fourteen categories sit behind one
+ *      line, exactly as they did. Nobody has to type anything.
+ *
+ * Ticks are SQUARE and multi-select, up to MAX_PROFESSIONS. There is no longer
+ * a round „one of" tick anywhere on the control, because there is no longer a
+ * one-of question — which is the point.
+ *
+ * SHARED, in components/ rather than in one screen's folder: the door
+ * (`app/join/_door/DoorQuestion`), the expert wizard (`app/join/_expert/_steps`)
+ * and an existing expert's profile (`app/work/(expert)/profile/_tabProfile`)
+ * all ask this one question. Two screens asking it with two controls is exactly
+ * how the category vocabulary drifted apart before.
  */
 
 import { Icon } from '@/components/Icon'
 import { useState } from 'react'
-import { ALL_PROFESSIONS, MAX_PROFESSIONS, PROFESSIONS } from '@/lib/professions'
+import { ALL_PROFESSIONS, MAX_PROFESSIONS, PROFESSIONS, sphereOfProfessions } from '@/lib/professions'
 import { isLaunchCategory, launchFirst } from '@/lib/launchTaxonomy'
 
 type PickerSphere = { slug: string; name: string }
@@ -53,267 +61,152 @@ export function ProfessionPicker({
 }: {
   /** Every sphere, in the admin's display order, from /api/categories. */
   spheres: PickerSphere[]
-  /** The chosen sphere's NAME (that is what `specialty` carries), or ''. */
+  /** The resolved category NAME (that is what `specialty` carries), or ''.
+   *  ⚠️ NO LONGER CHOSEN — derived from `value`. Still a prop because the
+   *  three parents each store it in their own shape (`cats[0]`, `categoryId`,
+   *  the draft) and are the ones who submit it. */
   sphere: string
   onSphere: (name: string) => void
   /** The chosen professions, in the order they were ticked. */
   value: string[]
   onChange: (next: string[]) => void
 }) {
-  const [sphereQuery, setSphereQuery] = useState('')
+  const [query, setQuery] = useState('')
   const [showRest, setShowRest] = useState(false)
-  const q = sphereQuery.trim().toLowerCase()
+  const q = query.trim().toLowerCase()
   const searching = q.length >= 2
-
-  /** ⚠️ THE CHOSEN SPHERE IS NEVER FILTERED OUT. A search that hides the row
-   *  you already ticked reads as „your answer was lost", and the tick is the
-   *  only thing on this step that carries state. */
-  const shownSpheres = launchFirst(!searching
-    ? spheres
-    : spheres.filter(sp => sp.name.toLowerCase().includes(q) || sp.name === sphere))
-
-  /**
-   * ⚠️ ტალღა 1 IS WHAT A NEW APPLICANT MEETS (2026-08-20). The owner handed
-   * over a launch taxonomy — seven categories, fifteen professions, teaching
-   * and services beside consulting — and this screen was still offering the
-   * nineteen-sphere consulting directory it grew out of: „ახლებს უნდა
-   * დავახვედროთ უკვე გამოსწორებული ვარიანტი."
-   *
-   * The rest are NOT hidden and NOT deleted — twenty-six experts are filed
-   * under them. They sit behind one line, because nineteen options is a
-   * taxonomy to study and seven is a choice to make. A search that matches
-   * anything in the tail opens the tail on its own, so nobody has to know the
-   * fold is there.
-   */
-  const launch = shownSpheres.filter(sp => isLaunchCategory(sp.slug))
-  const rest = shownSpheres.filter(sp => !isLaunchCategory(sp.slug))
-  const restOpen = showRest || searching || (!!sphere && rest.some(sp => sp.name === sphere))
-
-  /**
-   * ⚠️ THE SEARCH READS PROFESSIONS TOO, AND THAT IS THE POINT (2026-08-20).
-   *
-   * The field searched SPHERE NAMES only, while its own placeholder invited a
-   * profession („მოძებნე — ბუღალტერია…"). So somebody who typed the one word
-   * they are certain of — „ბუღალტერი", „იურისტი", „დიზაინერი" — was told
-   * „ვერაფერი მოიძებნა", and step ② sat dead underneath saying „ჯერ კატეგორია
-   * აირჩიე". Two blocking steps, and the shortcut past them was a dead end.
-   *
-   * A person knows their JOB TITLE. The category is our taxonomy's need, not
-   * theirs — so picking a profession here answers BOTH steps in one tap and
-   * sets the sphere on their behalf. The grid below is untouched and is still
-   * how somebody who does not know the word browses; this only adds the way in
-   * for somebody who does.
-   */
-  const jobHits = searching
-    ? ALL_PROFESSIONS
-        .filter(p => p.job.toLowerCase().includes(q) && spheres.some(sp => sp.slug === p.slug))
-        .slice(0, 12)
-    : []
-
-  const current = spheres.find(s => s.name === sphere)
-  const jobs = current ? (PROFESSIONS[current.slug] ?? []) : []
   const full = value.length >= MAX_PROFESSIONS
 
-  /* Ticks that belong to some OTHER sphere. They are not shown among the
-     checkboxes (those are this sphere's), so without this block they would be
-     invisible while still being submitted — the worst of both. */
-  const elsewhere = value.filter(j => !jobs.includes(j))
+  const nameOfSlug = (slug: string) => spheres.find(s => s.slug === slug)?.name ?? ''
 
-  const toggle = (job: string) => {
-    if (value.includes(job)) onChange(value.filter(v => v !== job))
-    else if (!full) onChange([...value, job])
+  /** The offer: every sphere the API knows that has professions behind it,
+   *  launch set first. A sphere with none is not a group — it is an empty
+   *  heading, which is the „dead step ②" of the old design by another route. */
+  const groups = launchFirst(spheres)
+    .map(sp => ({ ...sp, jobs: PROFESSIONS[sp.slug] ?? [] }))
+    .filter(g => g.jobs.length > 0)
+
+  /**
+   * ⚠️ THE SEARCH READS PROFESSIONS, and it is now the only thing it needs to
+   * read, because a profession IS the answer. Kept from the two-step version:
+   * the one word an applicant is certain of („ბუღალტერი", „იურისტი") has to
+   * find them. A category name still matches too — typing „სამართალი" opens
+   * that group whole — so the taxonomy is searchable without being a step.
+   */
+  const jobHits = searching
+    ? ALL_PROFESSIONS.filter(p => p.job.toLowerCase().includes(q) && spheres.some(sp => sp.slug === p.slug))
+    : []
+
+  const shown = groups
+    .map(g => (!searching || g.name.toLowerCase().includes(q))
+      ? g
+      : { ...g, jobs: g.jobs.filter(j => j.toLowerCase().includes(q)) })
+    .filter(g => g.jobs.length > 0)
+
+  /* ⚠️ A SEARCH MAY NOW HIDE A TICKED ROW, and that is safe here — it was not
+     before. The old grid was the only place an answer was visible, so filtering
+     it read as „your answer was lost". Every pick now has a permanent chip
+     above the field, outside the filter, so the answer is on screen whatever
+     the search is doing. */
+  const launch = shown.filter(g => isLaunchCategory(g.slug))
+  const rest = shown.filter(g => !isLaunchCategory(g.slug))
+  const restOpen = showRest || searching || rest.some(g => g.jobs.some(j => value.includes(j)))
+
+  /**
+   * Tick a profession, and let the category follow.
+   *
+   * ⚠️ FIRST PICK WINS (`sphereOfProfessions`), not „the one just clicked".
+   * Picking across categories is legitimate but rare — a lawyer who is also an
+   * accountant — and the category is what they LED with. Having it jump to
+   * whatever was tapped last would rewrite the applicant's headline answer as a
+   * side effect of adding a second trade.
+   */
+  function pick(job: string) {
+    const next = value.includes(job)
+      ? value.filter(v => v !== job)
+      : full ? value : [...value, job]
+    if (next === value) return
+    onChange(next)
+    const slug = sphereOfProfessions(next)
+    onSphere(slug ? nameOfSlug(slug) : '')
   }
 
   return (
-    <div className="grid gap-5">
-      {/* ── ① the sphere ─────────────────────────────────────────────────── */}
+    <div className="grid gap-3">
+      {/* ── the answer, always on screen ──────────────────────────────────
+          The category is printed ON the chip rather than in a field of its
+          own: „სანტექნიკოსი · სახლის რემონტი" is the applicant reading back
+          both the thing they said and the thing we filed. */}
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5" aria-label="არჩეული">
+          {value.map(job => {
+            const cat = nameOfSlug(sphereOfProfessions([job]) ?? '')
+            return (
+              <span key={job} className="inline-flex items-center gap-2 min-h-11 pl-3.5 pr-1.5 rounded-pill border border-brand-200 bg-brand-50 text-brand-800">
+                <span className="text-body leading-snug">
+                  <b className="font-display font-semibold">{job}</b>
+                  {cat && <span className="text-brand-700"> · {cat}</span>}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => pick(job)}
+                  aria-label={`${job} — მოხსნა`}
+                  className="w-8 h-8 shrink-0 rounded-full inline-flex items-center justify-center text-brand-700 hover:bg-white hover:text-danger-700 transition-colors duration-fast"
+                >
+                  <Icon.x className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )
+          })}
+        </div>
+      )}
+
+      {/* An existing profile whose category was set before this control asked
+          for professions. Say what is on file rather than showing nothing —
+          removing every profession is what clears it, and that is visible. */}
+      {value.length === 0 && !!sphere && (
+        <p className="text-small text-ink-500">კატეგორია: <b className="font-display font-semibold text-ink-900">{sphere}</b></p>
+      )}
+
       <div>
-        <StepLabel n={1} on={!!sphere}>კატეგორია</StepLabel>
-        {/* A GRID, NOT A <select>. Seventeen spheres in a native dropdown is a
-            list you scroll blind: macOS paints it as an overlay across the
-            page, a phone as a wheel, and either way you cannot see the options
-            you are choosing between — which is the entire job of step ①.
-            All seventeen fit here in nine rows and are chosen in one tap.
+        <input
+          type="search"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="მოძებნე პროფესია — სანტექნიკოსი, ბუღალტერი, იურისტი…"
+          aria-label="მოძებნე პროფესია"
+          className="w-full h-11 px-3.5 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-[border-color,box-shadow] duration-fast"
+        />
 
-            It is deliberately the SAME control as the professions grid below:
-            same container, same row, same tick. Two steps of one question
-            should not look like two different mechanisms — the only difference
-            is the tick's shape, round for „one of", square for „any of", which
-            is the one convention that tells them apart without a word. */}
-        {/* ⚠️ A FIELD ABOVE THE GRID (2026-08-20), the same one the service
-            door already had. Nineteen spheres in a two-column grid is nine rows
-            of reading before the one that is yours, and half the labels wrap to
-            two lines („არქიტექტურა და მშენებლობა"). Somebody who already knows
-            they are an accountant should not have to scan a taxonomy.
-
-            The grid stays underneath for browsing — this narrows it, it does
-            not replace it. Two characters before it filters: one letter matches
-            half the list and reads as broken. Shown only when there is enough
-            to be worth searching. */}
-        {spheres.length > 8 && (
-          <input
-            type="search"
-            value={sphereQuery}
-            onChange={e => setSphereQuery(e.target.value)}
-            placeholder="მოძებნე პროფესია ან კატეგორია — ბუღალტერი, იურისტი…"
-            className="mb-2 w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-500 outline-none transition-colors duration-fast"
-          />
-        )}
-        {/* THE HITS. Profession first, its category in grey underneath — the
-            answer they were looking for, with the answer we need attached to
-            it. One tap sets both, which is why this block sits above the grid
-            rather than inside step ②. */}
-        {jobHits.length > 0 && (
-          <div className="mb-2 rounded-card border border-brand-200 bg-brand-50/40 p-2">
-            <p className="px-1 pb-1.5 text-meta text-ink-500">პროფესიები — აირჩიე და კატეგორია თავად შეივსება</p>
-            <div className="grid sm:grid-cols-2 gap-1">
-              {jobHits.map(p => {
-                const on = value.includes(p.job)
-                const cat = spheres.find(sp => sp.slug === p.slug)
-                return (
-                  <button
-                    key={`${p.slug}:${p.job}`}
-                    type="button"
-                    role="checkbox"
-                    aria-checked={on}
-                    disabled={!on && full}
-                    onClick={() => {
-                      if (cat) onSphere(cat.name)
-                      if (on) onChange(value.filter(v => v !== p.job))
-                      else if (!full) onChange([...value, p.job])
-                    }}
-                    className={`min-w-0 min-h-11 px-2.5 py-2 flex items-center gap-2.5 text-left rounded-btn border transition-colors duration-fast disabled:opacity-45 disabled:cursor-not-allowed ${
-                      on ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-transparent bg-white text-ink-900 hover:border-ink-200'
-                    }`}
-                  >
-                    <span className={`w-[18px] h-[18px] shrink-0 rounded border-[1.5px] inline-flex items-center justify-center ${
-                      on ? 'bg-brand-600 border-brand-600 text-white' : 'border-ink-300 bg-white'
-                    }`}>
-                      {on && <Icon.check className="w-3 h-3" />}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className={`block text-body leading-snug ${on ? 'font-display font-semibold' : ''}`}>{p.job}</span>
-                      <span className="block text-meta text-ink-500 leading-snug">{cat?.name}</span>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* A ROW IS A ROW WHEREVER IT SITS. The launch set and the rest use
-            the same button — the fold is the only thing that separates them,
-            because a second visual treatment would read as „these are the
-            real ones" and the rest already carry twenty-six experts. */}
-        <div
-          role="radiogroup"
-          aria-label="კატეგორია"
-          className="grid sm:grid-cols-2 gap-1 rounded-card border border-ink-200 bg-ink-50/40 p-2"
-        >
-          {shownSpheres.length === 0 && (
-            <p className="col-span-full px-2.5 py-3 text-small text-ink-500">
-              {jobHits.length > 0
-                ? 'კატეგორია ამ სიტყვით არ მოიძებნა — აირჩიე პროფესია ზემოთ.'
-                : 'ვერაფერი მოიძებნა — მოხსენი ძებნა და გადახედე სიას.'}
+        <div className="mt-2 rounded-card border border-ink-200 bg-ink-75 p-2" role="group" aria-label="პროფესია">
+          {shown.length === 0 && (
+            <p className="px-2.5 py-4 text-center text-small text-ink-500">
+              ვერაფერი მოიძებნა — მოხსენი ძებნა და გადახედე სიას.
             </p>
           )}
-          {launch.map(sp => <SphereRow key={sp.slug} sp={sp} on={sphere === sp.name} onPick={onSphere} />)}
+
+          {launch.map(g => (
+            <Group key={g.slug} name={g.name} jobs={g.jobs} value={value} full={full} onPick={pick} />
+          ))}
 
           {rest.length > 0 && !restOpen && (
             <button
               type="button"
               onClick={() => setShowRest(true)}
-              className="col-span-full min-h-11 px-2.5 py-2 text-left rounded-btn text-small text-ink-600 hover:text-ink-900 hover:bg-white transition-colors duration-fast"
+              aria-expanded={false}
+              className="w-full mt-1 pt-3 min-h-11 px-2.5 border-t border-ink-100 inline-flex items-center gap-1.5 rounded-btn text-small font-display font-semibold text-ink-600 hover:text-ink-900 transition-colors duration-fast"
             >
-              სხვა კატეგორიები ({rest.length}) ↓
+              სხვა კატეგორიები ({rest.length})
+              <Icon.chevD className="w-4 h-4" aria-hidden />
             </button>
           )}
-          {restOpen && rest.map(sp => <SphereRow key={sp.slug} sp={sp} on={sphere === sp.name} onPick={onSphere} />)}
+          {restOpen && rest.map(g => (
+            <Group key={g.slug} name={g.name} jobs={g.jobs} value={value} full={full} onPick={pick} />
+          ))}
         </div>
-      </div>
 
-      {/* ── ② its professions ────────────────────────────────────────────── */}
-      <div>
-        <StepLabel
-          n={2}
-          on={value.length > 0}
-          right={value.length > 0 ? `${value.length}/${MAX_PROFESSIONS}` : undefined}
-        >
-          პროფესია
-        </StepLabel>
-
-        {!current ? (
-          <p className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 px-4 py-6 text-center text-small text-ink-500">
-            მოძებნე შენი პროფესია ზემოთ, ან ჯერ კატეგორია აირჩიე.
-          </p>
-        ) : jobs.length === 0 ? (
-          // A sphere the admin added that has no professions listed yet. Say so;
-          // the applicant can still finish (the sphere alone is a valid answer).
-          <p className="rounded-card border border-dashed border-ink-200 bg-ink-50/40 px-4 py-6 text-center text-small text-ink-500">
-            ამ კატეგორიის პროფესიები ჯერ არ აქვს — კატეგორია საკმარისია.
-          </p>
-        ) : (
-          /* ONE BLOCK. Loose rows on a bare background read as a scattered list;
-             the hairline container makes the set read as ONE answer to ONE
-             question rather than nine unrelated switches. Nine is the largest
-             sphere, so it never scrolls at any width.
-             TWO columns, not three: at three, „შრომითი სამართლის სპეციალისტი"
-             and „ინტელექტუალური საკუთრების იურისტი" no longer fit on one line. */
-          <div className="grid sm:grid-cols-2 gap-1 rounded-card border border-ink-200 bg-ink-50/40 p-2">
-            {jobs.map(job => {
-              const on = value.includes(job)
-              return (
-                <button
-                  key={job}
-                  type="button"
-                  role="checkbox"
-                  aria-checked={on}
-                  onClick={() => toggle(job)}
-                  disabled={!on && full}
-                  className={`min-w-0 min-h-11 px-2.5 py-2 flex items-center gap-2.5 text-left rounded-btn border transition-colors duration-fast disabled:opacity-45 disabled:cursor-not-allowed ${
-                    on
-                      ? 'border-brand-500 bg-brand-50 text-brand-800 font-display font-semibold'
-                      : 'border-transparent bg-white text-ink-900 hover:border-ink-200'
-                  }`}
-                >
-                  <span className={`w-[18px] h-[18px] shrink-0 rounded border-[1.5px] inline-flex items-center justify-center ${
-                    on ? 'bg-brand-600 border-brand-600 text-white' : 'border-ink-300 bg-white'
-                  }`}>
-                    {on && <Icon.check className="w-3 h-3" />}
-                  </span>
-                  {/* WRAPS, never truncates. `truncate` here cost twice: a label
-                      cut to „…სპეცი…" is not a choice, and inside a grid item
-                      (min-width:auto) whitespace-nowrap widened the track past
-                      the card on a 390px screen. */}
-                  <span className="min-w-0 flex-1 text-body leading-snug">{job}</span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {elsewhere.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-ink-100">
-            <p className="mb-1.5 text-meta text-ink-500">სხვა კატეგორიიდან არჩეული:</p>
-            <div className="flex flex-wrap gap-1.5">
-              {elsewhere.map(job => (
-                <span key={job} className="inline-flex items-center gap-1.5 h-7 pl-3 pr-1 rounded-pill border border-ink-200 bg-ink-50 text-meta text-ink-700">
-                  <b className="font-display font-semibold text-ink-900">{job}</b>
-                  <button
-                    type="button"
-                    onClick={() => onChange(value.filter(v => v !== job))}
-                    aria-label={`${job} — მოხსნა`}
-                    className="w-6 h-6 rounded-full inline-flex items-center justify-center text-ink-500 hover:text-danger-700 transition-colors duration-fast"
-                  >
-                    <Icon.x className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
+        {/* The limit is stated ONLY once it binds. „მაქსიმუმ 5" printed under an
+            empty control is a rule about a problem nobody has yet. */}
         {full && (
           <p className="mt-2 text-meta text-ink-500">
             {MAX_PROFESSIONS} პროფესია მაქსიმუმია — მოხსენი ერთი, თუ სხვის დამატება გინდა.
@@ -324,46 +217,48 @@ export function ProfessionPicker({
   )
 }
 
-/* The number is not decoration: it says these two are ONE question in order,
-   which is the relationship the previous designs kept failing to show. */
-const StepLabel = ({ n, on, right, children }: { n: number; on: boolean; right?: string; children: React.ReactNode }) => (
-  <div className="mb-2 flex items-center gap-2">
-    <span className={`w-5 h-5 shrink-0 rounded inline-flex items-center justify-center font-display text-micro font-bold transition-colors duration-fast ${
-      on ? 'bg-brand-600 text-white' : 'bg-ink-900 text-white'
-    }`}>{n}</span>
-    <span className="font-display text-micro font-semibold uppercase text-ink-500">{children}</span>
-    <span className="text-danger-500" aria-hidden>*</span>
-    {/* A SIBLING of the label, not part of its text. Nested inside it, `ml-auto`
-        had no flex parent to push against and the counter rendered glued to the
-        word: „პროფესია2/5". */}
-    {right && (
-      <span className="ml-auto font-display text-meta font-semibold tabular-nums text-brand-700">{right}</span>
-    )}
+/* ONE CATEGORY, AS A HEADING. This is the whole answer to „the 2026-08-11
+   combobox flattened the taxonomy": the sphere is still here, still in the
+   owner's order, still naming itself — it is simply not a field. */
+const Group = ({ name, jobs, value, full, onPick }: {
+  name: string
+  jobs: readonly string[]
+  value: string[]
+  full: boolean
+  onPick: (job: string) => void
+}) => (
+  <div className="mb-1 last:mb-0">
+    <p className="px-2.5 pt-2 pb-1 font-display text-micro font-semibold uppercase text-ink-500">{name}</p>
+    <div className="grid sm:grid-cols-2 gap-1">
+      {jobs.map(job => {
+        const on = value.includes(job)
+        return (
+          <button
+            key={job}
+            type="button"
+            role="checkbox"
+            aria-checked={on}
+            onClick={() => onPick(job)}
+            disabled={!on && full}
+            className={`min-w-0 min-h-11 px-2.5 py-2 flex items-center gap-2.5 text-left rounded-btn border transition-colors duration-fast disabled:opacity-45 disabled:cursor-not-allowed ${
+              on
+                ? 'border-brand-500 bg-brand-50 text-brand-800'
+                : 'border-transparent text-ink-900 hover:bg-white hover:border-ink-200'
+            }`}
+          >
+            <span className={`w-[18px] h-[18px] shrink-0 rounded border-[1.5px] inline-flex items-center justify-center ${
+              on ? 'bg-brand-600 border-brand-600 text-white' : 'border-ink-300 bg-white'
+            }`}>
+              {on && <Icon.check className="w-3 h-3" />}
+            </span>
+            {/* WRAPS, never truncates. `truncate` here cost twice: a label cut
+                to „…სპეცი…" is not a choice, and inside a grid item
+                (min-width:auto) whitespace-nowrap widened the track past the
+                card on a 390px screen. */}
+            <span className="min-w-0 flex-1 text-body leading-snug">{job}</span>
+          </button>
+        )
+      })}
+    </div>
   </div>
-)
-
-/* One category row. Extracted the day the list gained a fold: the launch set
-   and the tail must be the SAME control, and two copies of a 20-line button is
-   how they stop being. */
-const SphereRow = ({ sp, on, onPick }: { sp: PickerSphere; on: boolean; onPick: (name: string) => void }) => (
-  <button
-    type="button"
-    role="radio"
-    aria-checked={on}
-    onClick={() => onPick(on ? '' : sp.name)}
-    className={`min-w-0 min-h-11 px-2.5 py-2 flex items-center gap-2.5 text-left rounded-btn border transition-colors duration-fast ${
-      on
-        ? 'border-brand-500 bg-brand-50 text-brand-800 font-display font-semibold'
-        : 'border-transparent bg-white text-ink-900 hover:border-ink-200'
-    }`}
-  >
-    <span className={`w-[18px] h-[18px] shrink-0 rounded-full border-[1.5px] inline-flex items-center justify-center ${
-      on ? 'bg-brand-600 border-brand-600 text-white' : 'border-ink-300 bg-white'
-    }`}>
-      {on && <Icon.check className="w-3 h-3" />}
-    </span>
-    {/* Wraps, never truncates — „არქიტექტურა და მშენებლობა" is two words long
-        and a cut label is not a choice. */}
-    <span className="min-w-0 flex-1 text-body leading-snug">{sp.name}</span>
-  </button>
 )

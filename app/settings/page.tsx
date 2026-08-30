@@ -364,7 +364,7 @@ export default function SettingsPage() {
         setDeleteErr(
           data?.error === 'BAD_CURRENT_PASSWORD' ? 'მიმდინარე პაროლი არასწორია'
             : data?.error === 'CURRENT_PASSWORD_REQUIRED' ? 'შეიყვანე მიმდინარე პაროლი'
-            : data?.error === 'HAS_ACTIVE_BOOKINGS' ? 'ჯერ დაასრულე ან გააუქმე აქტიური ჯავშნები'
+            : data?.error === 'HAS_ACTIVE_BOOKINGS' ? 'ჯერ დაასრულე ან დახურე მიმდინარე სამუშაოები'
             : data?.error === 'HAS_HISTORY' ? 'ანგარიშს აქვს ისტორია — მიმართე მხარდაჭერას'
             : 'წაშლა ვერ მოხერხდა — სცადე მოგვიანებით'
         )

@@ -48,7 +48,7 @@ function baseMasterSlug(name: string | null | undefined): string {
  * Idempotent, and safe to call from several requests at once.
  *
  * The name is the person's (`user.fullName`) or, for a firm, the company's
- * (`company.name`) — the same precedence app/experts/_masterData prints.
+ * (`company.name`) — the same precedence app/experts/_providers prints.
  *
  * Returns null only if every candidate collided (practically impossible — the
  * loop allows 50 suffixes) or the write failed for another reason; callers

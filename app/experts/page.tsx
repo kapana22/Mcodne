@@ -23,13 +23,11 @@
 export const dynamic = 'force-dynamic'
 
 import { pageMetadata } from '@/lib/pageSeo'
-import { queryTutors } from '@/lib/tutorsQuery'
 import { jsonLdString } from '@/lib/jsonLd'
 import { requestsOn } from '@/lib/requests'
-import { getCurrentUser } from '@/lib/auth'
-import { REQUEST_HREF, filterCounts, queryMasters } from './_masterData'
+import { initialMe } from '@/lib/meServer'
+import { REQUEST_HREF, filterCounts, queryProviders } from './_providers'
 import { CatalogClient } from './client'
-import { asRole } from '@/lib/roles'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -43,30 +41,29 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').repla
 export const generateMetadata = () => pageMetadata('tutors', '/experts')
 
 export default async function ExpertsCatalogue() {
-  // ⚠️ BOTH HALVES, UNFILTERED. Owner: „ექსპერტები და სერვისები ხო ერთია." The
-  // page opens on everybody, so ticking either type must not need a round trip;
-  // at 26 + 6 rows loading the second half costs one small query rather than a
-  // database union across two visibility rules (see lib/catalogItems).
-  // `queryMasters` is called UNFILTERED and its VISIBLE rule (available +
-  // published + an active RequestAccess) is untouched — the browser narrows it.
-  //
-  // Category / price / language / trade / city filters are applied client-side
-  // on top of this seed; only a free-text `?q=` triggers a client refetch. The
-  // session resolves server-side too, so the shared header renders the correct
-  // auth state on first paint (no client-side flip).
-  const [initialTutors, mastersResult, tradeCounts, user] = await Promise.all([
-    // The full live set (the client filters in memory), so a category deep-link
-    // does not dead-end once there are more than 40 live experts.
-    queryTutors({ limit: 200 }),
-    queryMasters({ groups: [], topics: [], cities: [] }),
-    // Roster-wide counts for the job half's rows — the same one query the rail
-    // has drawn its numbers from since /masters.
+  // ⚠️ THE WHOLE ROSTER, UNFILTERED, IN ONE QUERY. It was two — one per profile
+  // table — until 2026-08-24. `queryProviders`'s VISIBLE rule (available +
+  // published + an active RequestAccess) is untouched; EVERY refinement,
+  // including the typed query, is applied in the browser over this seed, so no
+  // filter change costs a round trip. The session resolves here too, so the
+  // shared header renders the correct auth state on first paint.
+  // ⚠️ THE WHOLE IDENTITY, NOT FOUR FIELDS OF IT (2026-08-30). The third slot
+  // was `getCurrentUser()`, out of which this page hand-built
+  // `{ id, fullName, avatarUrl, role }` — leaving out `provider` and
+  // `balanceTetri`, the two the header actually branches on. So on the busiest
+  // page on the site a signed-in provider watched the request button appear and
+  // vanish, and the balance pill arrive late, on every load. lib/meServer
+  // carries the finding — and it stays INSIDE this Promise.all, because
+  // awaiting it afterwards would put a second session read on the critical path
+  // to fix a flicker.
+  const [providersResult, tradeCounts, initialUser] = await Promise.all([
+    queryProviders({ groups: [], topics: [], cities: [] }),
+    // Roster-wide counts for the rail's rows — the same one query it has drawn
+    // its numbers from since /masters.
     filterCounts(),
-    getCurrentUser(),
+    initialMe(),
   ])
-  const initialUser = user
-    ? { id: user.id, fullName: user.fullName, avatarUrl: user.avatarUrl, role: asRole(user.role) }
-    : null
+  const providers = providersResult.rows
 
   // ⚠️ THE FLAG IS READ ONCE, HERE, AND HANDED DOWN. The header's CTA and the
   // empty state's CTA are two doors into the same subsystem; reading the
@@ -86,14 +83,14 @@ export default async function ExpertsCatalogue() {
     inLanguage: 'ka',
     mainEntity: {
       '@type': 'ItemList',
-      numberOfItems: initialTutors.length,
+      numberOfItems: providers.length,
       // Capped at 20: schema.org has no limit, but a 200-item blob would add
       // tens of KB to every response for no additional ranking value.
-      itemListElement: initialTutors.slice(0, 20).map((t: { id: string; slug?: string | null; user?: { fullName?: string | null } | null }, i: number) => ({
+      itemListElement: providers.slice(0, 20).map((p, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        url: `${SITE_URL}/experts/${t.slug || t.id}`,
-        name: t.user?.fullName ?? 'ექსპერტი',
+        url: `${SITE_URL}/experts/${p.slug || p.id}`,
+        name: p.name,
       })),
     },
   }
@@ -111,8 +108,7 @@ export default async function ExpertsCatalogue() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(collectionLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbLd) }} />
       <CatalogClient
-        initialTutors={initialTutors}
-        initialMasters={mastersResult.rows}
+        initialProviders={providers}
         tradeCounts={tradeCounts}
         initialUser={initialUser}
         requestHref={on ? REQUEST_HREF : null}

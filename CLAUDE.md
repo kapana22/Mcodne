@@ -1,7 +1,8 @@
 # mcodne.ge
 
 Georgian services marketplace. Next.js 15 · React 19 · Tailwind · Prisma · Postgres.
-UI is Georgian. Rewritten 2026-08-21.
+UI is Georgian. Rewritten 2026-08-21; the product section rewritten 2026-08-24,
+when consultations were removed.
 
 > ### Why this file was rewritten
 >
@@ -30,18 +31,26 @@ UI is Georgian. Rewritten 2026-08-21.
 
 ## The product
 
-**The site sells SERVICES.** A consultation is one KIND of service — the one with
-a fixed price and a bookable time. It is a step somebody takes before buying the
-bigger thing, offered small: on the card, in the thread, over the video room that
-already exists. Not a second product, not a headline, not its own button.
+**The site sells SERVICES. There is nothing else.** Owner, 2026-08-24: „მინდა რომ
+მცოდნეზე კონსულტაციები საერთოდ ამოვიღოთ და მოვარგოთ სერვისებზე რაც ჩანაფიქრში
+იყო." A consultation used to be a second product with its own table, catalogue,
+booking calendar, video room and chat; it is gone, and „შეხვედრა" is now simply
+one KIND of request somebody can file.
 
-**Where both appear, the service comes first** — sentence, list, filter, rail,
-example. This gets broken by writing naturally rather than by deciding wrongly,
-so read your own sentence back and check which half arrives first.
+**Nothing is bought by clicking a price.** A client describes what they need,
+providers write offers, one is accepted, the work is marked done. That is the
+whole commerce model — `ServiceRequest → RequestOffer → RequestMessage`, with a
+credits ledger behind it. There is no booking, no slot, no calendar, no session.
 
-**One provider, one catalogue, one card, one namespace.** `lib/capabilities`
-holds CONSULT and WORK; a person switches the second on from the same account.
-The type belongs to what is OFFERED, never to what kind of person somebody is.
+**One provider, one catalogue, one card, one namespace.** A provider is somebody
+with a `ServiceProfile` AND an active `RequestAccess` row — ask
+`lib/identity → identityOf`, which answers in one read. The old CONSULT/WORK
+capability pair is gone with the second product it distinguished.
+
+**The four request kinds** — `LEARNING`, `MEETING`, `PROJECT`, `SERVICE`
+(`lib/requestTopics`). „შეხვედრა" is what „კონსულტაცია" became, and it kept its
+own kind rather than folding into PROJECT because PROJECT carries a 500₾ floor
+that would refuse every professional request.
 
 **Words that were retired**, pinned by `tests/lexicon.test.ts`: ხელოსანი ·
 მასწავლებელი *as a label* · სფერო · ტუტორი · მასტერი · სპეციალისტი *as a role
@@ -51,6 +60,12 @@ word* · რეპეტიტორი · სტუდენტი (→ კლ�
 
 **Tbilisi only, for now** — `CITIES` in `lib/requestTopics`.
 
+**The word „კონსულტაცია" is NOT banned, and this is a real distinction.** As a
+PRODUCT MECHANIC it is gone — no screen offers one, no column stores one. As a
+thing a person searches for („იურიდიული კონსულტაცია"), it is what Georgians
+actually type, and it is still all over `lib/categorySeo` and
+`lib/professionSeo` on purpose. That copy is the owner's; do not tidy it.
+
 ### Who is who — two registrations, and they must not blur
 
 Owner, 2026-08-21: „ორი რეგისტრაცია მაგიტომ არსებობს, რომ ერთი არის ვინც სერვისს
@@ -58,33 +73,22 @@ Owner, 2026-08-21: „ორი რეგისტრაცია მაგი�
 უნდა იყოს გაწერილი ვინ ვინ არის."
 
 **A PROVIDER sells.** They registered through `/join`, they have a
-`TutorProfile` (CONSULT) or a `ServiceProfile` + an active `RequestAccess`
-(WORK), and `/work` is their room. One provider may hold both capabilities;
-that is one person with two offers, not two people.
+`ServiceProfile` and an active `RequestAccess` row, and `/work` is their room.
 
 **A CLIENT buys.** They registered through `/signup`, they sell nothing, and
 `/me` is their room.
 
-**Ask `capabilitiesOf`, never `role`.** This is the part that actually blurs, and
-it blurs in the DATABASE rather than on a screen. Measured 2026-08-21:
+**`Role` finally answers the question** — `USER` · `PROVIDER` · `ADMIN`, since
+2026-08-24. It used to be `STUDENT` / `TUTOR` / `ADMIN` with no provider value,
+so somebody selling services was stored under the same word as somebody who had
+only ever bought, and no guard could tell them apart. Both dead values are gone
+from the enum, not merely unused.
 
-| who | `User.role` |
-| --- | --- |
-| 26 selling consultations | `TUTOR` |
-| **2 selling services** | **`STUDENT`** |
-| 30 plain buyers | `STUDENT` |
-
-`Role` has three values — `STUDENT`, `TUTOR`, `ADMIN` — and **no provider
-value**, so a tradesperson who sells services is stored under the same word as
-somebody who has only ever bought. `lib/hats` explains the history; the effect is
-that `role` cannot answer „who is this" for the supply side, and any guard that
-branches on it alone is wrong for exactly the people the requests subsystem was
-built for.
-
-Until a `PROVIDER` role exists, the reliable answers are
-`capabilitiesOf(userId)` (what they sell) and `hatsOf(userId)` (which rooms they
-may open). A menu, a guard or a label that reads `role === ROLE.CLIENT` and
-concludes „ordinary user" is making the mistake this section exists to name.
+**Still ask `identityOf`, not `role`, for „what does this person sell".** A role
+is a permission; a profile plus an allowlist row is the fact.
+`lib/identity → identityOf(userId)` returns `{ role, hats, provider }` from one
+query, and `provider` is the boolean every supply-side surface gates on. A role
+alone cannot tell you whether a granted PROVIDER has finished registering.
 
 **A provider's menu is about selling.** The client room is offered only when they
 have actually been a client — bought, saved or asked for something (`clientRoom`
@@ -94,7 +98,8 @@ Pinned by `tests/spaceSeparation.test.ts`.
 
 **The copy is the owner's.** Don't author or reword site text. Much of it lives
 in the `SiteText` table and overrides `lib/siteTextDefs`, so no test can see it:
-change the default AND the row.
+change the default AND the row. A key whose surface was deleted is marked
+`retired: true`, never removed — a production row may hold copy typed under it.
 
 → history, owner quotes, the full screen map: **`docs/product-model.md`**
 
@@ -129,32 +134,34 @@ needs `lib/tz → tbilisiParts()`. Not moral — just wrong otherwise.
 
 ## Where things live
 
-585 files, ~105 000 lines across `app/`, `components/`, `lib/`. Big screens are a
-container plus `_*.tsx` siblings in their own folder — **open the part, not the
-page**.
+424 files, ~71 500 lines across `app/`, `components/`, `lib/` (re-measured
+2026-08-30; it was 446/~72 000 on 2026-08-25, after the consultation removal
+took roughly a third of it). Big screens are a container plus `_*.tsx` siblings
+in their own folder — **open the part, not the page**.
 
 | | |
 | --- | --- |
 | home | `app/HomeClient.tsx` + `app/_home/` |
 | the catalogue — one list, one address | `app/experts/` + `lib/catalogItems.ts` |
-| `/experts/[slug]` — one namespace, four pages resolve through it | `app/experts/[slug]/page.tsx` |
-| the door | `app/join/` — `_door/` `_expert/` `_master/` |
+| `/experts/[slug]` — one namespace: profession → trade → provider | `app/experts/[slug]/page.tsx` |
+| the door — one question, one form | `app/join/` — `_door/` `_master/` `_shared/` |
 | the two spaces | `app/me/` (client) · `app/work/` (supply) |
 | what a provider sells | `app/work/services/` |
 | the intake | `app/request/` |
 | admin | `app/admin/` — one `_<tab>.tsx` per tab |
 | retired URLs → 308 | `middleware.ts`, executed by `tests/redirects.test.ts` |
 
-**`docs/MAP.md` is generated — grep it, never read it whole.** 1 528 exported
-symbols → their file; 40 Prisma models → their real columns. `lib/` is 129 files
+**`docs/MAP.md` is generated — grep it, never read it whole.** 1 043 exported
+symbols → their file; 30 Prisma models → their real columns. `lib/` is 103 files
 flat and the request family alone is 13 whose names differ by a suffix —
 `requestsViewer` lives in `requestsServer.ts`, which is not guessable. The UI word
-is rarely the column: a Booking's price is `price`, a RequestOffer's is
-`priceGel`. Regenerate with `npm run map` after adding or moving an export.
+is rarely the column: a RequestOffer's price is `priceGel`, a ServiceProfile's
+floor is `priceFrom`. Regenerate with `npm run map` after adding or moving an
+export.
 
 ```
-grep '| `primaryPriceLabel` |' docs/MAP.md
-grep '^\*\*RequestOffer\*\*'   docs/MAP.md
+grep '| `identityOf` |'      docs/MAP.md
+grep '^\*\*RequestOffer\*\*' docs/MAP.md
 ```
 
 ---
@@ -167,7 +174,7 @@ on Node 26 in ways that read as code errors.
 **While working:** `npx tsc --noEmit` (~2s), or one test file
 (`npx tsx tests/<file>.test.ts`). Not the whole gate after every edit.
 
-**Before deploying:** `npm run check` — types → schema → 101 tests → `next build`.
+**Before deploying:** `npm run check` — types → schema → 79 tests → `next build`.
 There is no CI, and `railway up` uploads the WORKING TREE, so this script is the
 only thing that ever runs the tests and a commit is a record rather than a
 release.
@@ -175,25 +182,42 @@ release.
 **Deploy:** `railway up --detach` (project Tutor → service mcodne → mcodne.ge),
 then verify live.
 
-**Two things that cost an afternoon if you don't know them:**
+**Three things that cost an afternoon if you don't know them:**
 - `npm run check` and `npm run dev` share `.next`, and two `next build`s fight
   over it. The symptoms read as product bugs — unstyled pages, missing
   manifests, `PageNotFoundError` on an API route. Stop the other one,
   `rm -rf .next`, retry.
 - Keep the project off an iCloud-synced folder.
+- ⚠️ **`tsc` DOES NOT CATCH A STALE PRISMA SELECT.** It looks like it must —
+  the generated client types every field — and measured on 2026-08-26 it does
+  not: a select carrying ONE unknown key stops the rest of that literal being
+  checked and the whole call passes. Two queries had been throwing in
+  production for two days with a green gate: `/api/admin/categories` (a column
+  the services-only migration dropped) and `routableProviders()` in
+  `lib/requestJobs` (a relation to a dropped table) — the second one is the
+  query that decides who is mailed about a new request, so nobody was.
+  `tests/schemaDrift.test.ts` reads the migrations and the schema and checks
+  the selects; run the query if you want certainty.
 
 **The database.** Schema deltas are hand-written SQL in
 `prisma/manual-migrations/<date>-<name>/` with an `up.sql`, a `down.sql` and
 guards that fail loudly. `lib/dbBoot` applies them at first request and stamps
 the set with a hash of its own source, so a warm boot costs two round trips
-instead of 166 — edit that file and the next boot legitimately re-runs once.
+instead of one per statement — edit that file and the next boot legitimately
+re-runs once.
+
+⚠️ **`lib/dbBoot` throws the whole boot on one failed statement**, so it holds no
+DDL that names a dropped table. The 2026-08-24 services-only migration sits LAST
+in `runMigrations()` and everything above it assumes the old tables still exist
+on a database that has never been migrated; insert before it and the next boot
+dies on „relation TutorProfile does not exist".
 
 Prefer additive DDL, and **that is advice, not a prohibition.** Dropping a
 `NOT NULL` column just has an order: drop the constraint, deploy the code that
 stops writing it, then drop the column. The hazard is the sequence and it has a
 known answer — it was never a reason to keep dead columns.
 
-**Testing.** 101 files, no runner, each exits non-zero on failure. Pin
+**Testing.** 79 files, no runner, each exits non-zero on failure. Pin
 BEHAVIOUR: call the function, render the tree, execute the redirect table. A
 regex over source text is a last resort, and ~1 500 of them exist — debt, not a
 pattern to copy. If an assertion can break on a rename, a reformat or a restyle
@@ -209,10 +233,17 @@ When the owner ships a design canvas, that is the newer decision — port it and
 update whatever test pinned the older one.
 → the full canon and its measurements: **`docs/design-system.md`**
 
-**Dark features.** `FEATURE_PAYMENTS_V2` · `PAYMENTS_LIVE` ·
-`FEATURE_REQUEST_BOOKING` · `FEATURE_ABROAD` · `PACKAGES_VISIBILITY` ·
-`B2B_VISIBILITY` are off in `lib/flags.ts`. Their code and copy stay reachable so
-the flag can simply be turned on. A dark feature is not a deleted one.
+**Dark features.** `PAYMENTS_LIVE` · `FEATURE_ABROAD` · `B2B_VISIBILITY` are off
+in `lib/flags.ts`. (`FEATURE_PAYMENTS_V2` and `FEATURE_REQUEST_BOOKING` were on
+this list until 2026-08-26 and neither had a single importer — the first had no
+wallet behind it and the second described a booking. A dark feature is one whose
+code is reachable; a switch with no reader is the thing the paragraph below
+warns about, and this file was naming two of them as examples of the opposite.) Their code and copy stay reachable so
+the flag can simply be turned on. A dark feature is not a deleted one — and the
+converse matters too: `PACKAGES_VISIBILITY` was removed on 2026-08-24 rather
+than left switched off, because a spent lesson WAS a booking and there is
+nothing behind the switch any more. A flag with no reader is a control that
+lies.
 
 **`docs/archive/` is history.** Nothing in it is current; never quote a number
 out of it.

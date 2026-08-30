@@ -1,105 +1,83 @@
+// GET /api/admin/reviews — every review, newest first.
+//
+// ⚠️ WHY THIS EXISTS AGAIN (2026-08-26). There WAS an admin reviews tab; it went
+// on 2026-08-24 with `app/api/admin/reviews` when the consultation product was
+// removed, because a review then hung off a Booking. It does not any more — it
+// hangs off a RequestOffer the client marked done — so the CONTENT survived the
+// deletion and its only moderation path did not. Measured that day: a review is
+// printed on the provider's card (`app/experts/_providerCard`), in the profile
+// hero and in the profile body, it carries free text a stranger typed, and the
+// one way an admin could remove it was to delete the whole account it was
+// written by. Public text with no way to take it down is the shape of problem
+// that only becomes urgent once, and by then it is on the page.
+//
+// `lib/audit` records the removal — the action string `review.delete` was still
+// in the audit tab's label table the whole time this route did not exist.
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
-import { audit } from '@/lib/audit'
-import { stripTutorBlobs, stripAvatar } from '@/lib/stripTutorBlobs'
-import { parseLimit, parseIntParam } from '@/lib/apiParams'
+import { ensureDbReady } from '@/lib/dbBoot'
 
-// List reviews with filters — flagged (rating < 2 by default), search body/authors.
 export async function GET(req: Request) {
   const auth = await requireRoleApi('ADMIN')
   if (auth.response) return auth.response
-  const { searchParams } = new URL(req.url)
-  const maxRating = parseIntParam(searchParams.get('maxRating'), { fallback: 5, min: 1, max: 5 })
-  const q = searchParams.get('q')?.trim()
-  const limit = parseLimit(searchParams.get('limit'), { fallback: 100, max: 300 })
-  const cursor = searchParams.get('cursor')?.trim() || undefined
+  await ensureDbReady()
 
-  const where: any = {}
-  if (maxRating < 5) where.rating = { lte: maxRating }
-  if (q) {
-    where.OR = [
-      { body: { contains: q, mode: 'insensitive' } },
-      { student: { fullName: { contains: q, mode: 'insensitive' } } },
-      { tutor: { user: { fullName: { contains: q, mode: 'insensitive' } } } },
-    ]
-  }
+  // `?low=1` — the only filter worth having on day one: a 1★ or 2★ review is
+  // the one an operator is looking for, and everything else is a scroll.
+  const low = new URL(req.url).searchParams.get('low') === '1'
 
   const rows = await prisma.review.findMany({
-    where,
-    // `createdAt` is NOT unique — an id tiebreaker keeps the cursor deterministic,
-    // otherwise reviews sharing a timestamp get dropped/repeated at page borders.
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: limit + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    include: {
-      student: { select: { id: true, fullName: true, avatarUrl: true } },
-      tutor: { include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } },
-      booking: { select: { id: true, topic: true, ref: true } },
+    where: low ? { rating: { lte: 2 } } : {},
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+    select: {
+      id: true,
+      rating: true,
+      body: true,
+      anonymous: true,
+      tutorResponse: true,
+      respondedAt: true,
+      createdAt: true,
+      student: { select: { id: true, fullName: true, email: true } },
+      offer: {
+        select: {
+          id: true,
+          priceGel: true,
+          doneAt: true,
+          expertUser: { select: { id: true, fullName: true } },
+          company: { select: { id: true, name: true } },
+          request: { select: { publicRef: true, topic: true } },
+        },
+      },
     },
   })
-  const hasMore = rows.length > limit
-  const page = hasMore ? rows.slice(0, limit) : rows
-  return NextResponse.json({
-    items: page.map(r => ({ ...r, tutor: stripTutorBlobs(r.tutor), student: stripAvatar(r.student) })),
-    nextCursor: hasMore ? page[page.length - 1].id : null,
-  })
-}
 
-const DelBody = z.object({ reason: z.string().max(300).optional() })
+  const items = rows.map(r => ({
+    id: r.id,
+    rating: r.rating,
+    body: r.body,
+    // The flag is the CLIENT's choice on the public page. The admin still sees
+    // who wrote it — moderation without an author is moderation of nobody — but
+    // the row says which way the public page renders it.
+    anonymous: r.anonymous,
+    authorName: r.student?.fullName ?? null,
+    authorEmail: r.student?.email ?? null,
+    providerName: r.offer?.expertUser?.fullName ?? r.offer?.company?.name ?? null,
+    providerUserId: r.offer?.expertUser?.id ?? null,
+    topic: r.offer?.request?.topic ?? null,
+    publicRef: r.offer?.request?.publicRef ?? null,
+    priceGel: r.offer?.priceGel ?? null,
+    response: r.tutorResponse,
+    respondedAt: r.respondedAt?.toISOString() ?? null,
+    createdAt: r.createdAt.toISOString(),
+  }))
 
-// Delete a review. Also decrement TutorProfile.reviewsCount and recompute rating.
-export async function DELETE(req: Request) {
-  const auth = await requireRoleApi('ADMIN')
-  if (auth.response) return auth.response
-  const admin = auth.user
-  const { searchParams } = new URL(req.url)
-  const id = searchParams.get('id')
-  if (!id) return NextResponse.json({ ok: false, error: 'MISSING_ID' }, { status: 400 })
+  const [total, lowCount, unanswered] = await Promise.all([
+    prisma.review.count(),
+    prisma.review.count({ where: { rating: { lte: 2 } } }),
+    prisma.review.count({ where: { tutorResponse: null } }),
+  ])
 
-  const parsed = DelBody.safeParse(await req.json().catch(() => ({})))
-  if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
-
-  // Deleting user-generated content requires a stated reason for the audit
-  // trail. UI enforces this too; server is the backstop.
-  if (!parsed.data.reason?.trim()) {
-    return NextResponse.json(
-      { ok: false, error: 'REASON_REQUIRED', message: 'წაშლის მიზეზი სავალდებულოა' },
-      { status: 400 },
-    )
-  }
-
-  const review = await prisma.review.findUnique({
-    where: { id },
-    select: { id: true, tutorId: true, rating: true, studentId: true, body: true },
-  })
-  if (!review) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
-
-  // Recompute tutor rating/count in a transaction so we don't drift.
-  // A job review (offerId set, tutorId null) has no expert aggregate to keep.
-  const tutorId = review.tutorId
-  await prisma.$transaction(async tx => {
-    await tx.review.delete({ where: { id } })
-    if (!tutorId) return
-    const stats = await tx.review.aggregate({
-      where: { tutorId },
-      _count: { _all: true },
-      _avg: { rating: true },
-    })
-    const count = stats._count._all
-    const avg = stats._avg.rating ?? 0
-    await tx.tutorProfile.update({
-      where: { id: tutorId },
-      data: { reviewsCount: count, rating: avg },
-    })
-  })
-
-  await audit(admin.id, 'review.delete', {
-    targetType: 'Review',
-    targetId: id,
-    meta: { reason: parsed.data.reason, tutorId: review.tutorId, studentId: review.studentId, prevRating: review.rating, prevBody: review.body.slice(0, 200) },
-  })
-
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, items, counts: { total, low: lowCount, unanswered } })
 }

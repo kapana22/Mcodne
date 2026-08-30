@@ -49,9 +49,10 @@ export type Me = {
    *  for why — so any menu that branches on `role` alone calls them a student
    *  and offers them the expert application. Carried on the identity so a
    *  client component can draw the right doors. */
-  hats?: ('ADMIN' | 'EXPERT' | 'MASTER' | 'COMPANY' | 'CLIENT')[]
-  /** What the person already offers — see lib/capabilities. */
-  capabilities?: ('CONSULT' | 'WORK')[]
+  hats?: ('ADMIN' | 'PROVIDER' | 'COMPANY' | 'CLIENT')[]
+  /** Do they sell anything here? — see lib/capabilities. It was a list of two
+   *  capabilities until 2026-08-24; every reader asked it this question. */
+  provider?: boolean
   /** The provider's balance in tetri, or null for somebody who sells nothing.
    *  Drives the pill in the top bar's signed-in cluster (components/CreditPill).
    *  ⚠️ NULL AND ZERO ARE DIFFERENT: null = „no balance to show", 0 = „spent it
@@ -108,7 +109,7 @@ export function fetchMe(): Promise<Me> {
     .then(d => (d?.user ? {
       ...d.user,
       hats: d.hats ?? [],
-      capabilities: d.capabilities ?? [],
+      provider: d.provider === true,
       clientRoom: d.clientRoom ?? false,
       balanceTetri: d.balanceTetri ?? null,
     } : null) as Me)

@@ -12,7 +12,7 @@ import {
   MasterApplicationInput, MASTER, MASTER_KINDS, MASTER_KIND_LABEL,
   approvalBlockers, readyToApprove, MASTER_STATUS_TEXT,
 } from '../lib/masterApplication'
-import { LIVE_SERVICE_TOPICS } from '../lib/serviceProfile'
+import { LIVE_OFFER_TOPICS } from '../lib/serviceProfile'
 
 const ok = () => ({
   kind: 'INDIVIDUAL' as const,
@@ -20,7 +20,7 @@ const ok = () => ({
   phone: '555123456',
   companyName: null,
   taxId: null,
-  services: [LIVE_SERVICE_TOPICS[0].id],
+  services: [LIVE_OFFER_TOPICS[0].id],
   areas: ['TBILISI'],
   about: 'თორმეტი წელია ვმუშაობ სანტექნიკაზე, ბოილერი და გათბობა.',
   yearsExp: 12,
@@ -63,7 +63,7 @@ test('§A a request with no trade or no city cannot be submitted', () => {
 })
 
 test('§A the ceilings hold', () => {
-  const tooMany = LIVE_SERVICE_TOPICS.slice(0, MASTER.MAX_SERVICES + 1).map(t => t.id)
+  const tooMany = LIVE_OFFER_TOPICS.slice(0, MASTER.MAX_SERVICES + 1).map(t => t.id)
   if (tooMany.length > MASTER.MAX_SERVICES) {
     assert.equal(MasterApplicationInput.safeParse({ ...ok(), services: tooMany }).success, false)
   }

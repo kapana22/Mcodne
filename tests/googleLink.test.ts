@@ -52,7 +52,9 @@ test('anything that is not literally `true` fails SAFE (revoke)', () => {
   // Only a real boolean true is proof. A null column, a legacy row, a value
   // that arrived through some other path — none of those are evidence that the
   // password belongs to the mailbox owner, and keeping it is the branch with a
-  // victim. Mirrors resolveVerifiedGrant's strictness in app/admin/_application.
+  // victim. Mirrored resolveVerifiedGrant's strictness in app/admin/_application,
+  // which went with the consultation moderation panel on 2026-08-24; the rule
+  // it encoded — a verification grant is never inferred — is what stays.
   for (const v of [null, undefined, 1, 'true', {}] as unknown[]) {
     const d = resolveGoogleLink({ emailVerified: v as boolean })
     assert.equal(d.revokePassword, true, `emailVerified=${JSON.stringify(v)} must revoke`)

@@ -21,7 +21,6 @@
 
 import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { chargeForOffer } from '@/lib/creditsServer'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { RequestOfferInput, offerProviderError, kindOf, KIND, gel, offerPriceLabel, topicLabel } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
@@ -104,18 +103,42 @@ export async function POST(req: Request) {
       daysEstimate: parsed.data.daysEstimate ?? null,
       message: parsed.data.message.trim(),
     }
+    const SELECT = {
+      id: true,
+      expertUser: { select: { fullName: true } },
+      company: { select: { name: true } },
+      request: { select: { publicRef: true, topic: true, kind: true, email: true, offerCount: true } },
+    } as const
+
+    // ── The offer itself, and it is FREE ─────────────────────────────────
+    //
+    // ⚠️ SENDING AN OFFER COST 5₾ UNTIL 2026-08-21, AND THE CHARGE IS GONE —
+    // the code with it, not switched off. The owner moved the price onto the
+    // client's CONTACT (POST /api/provider/requests/[id]/contact, 1₾ once per
+    // request), so what a provider pays for is the phone number and not the
+    // answer. lib/credits carries the whole history, including the objection
+    // that this reverses an earlier decision and why the price fell to a fifth
+    // when it moved.
+    //
+    // ⚠️ WHAT THAT DELETED, AND WHY NOTHING REPLACES IT. The old charge needed a
+    // counterweight — an offer nobody ever answered released its 5₾ back, swept
+    // by the cron — because 28 of 32 requests got no offer at all and charging
+    // for silence is what this design existed not to do. A free offer reaches
+    // the same place one step earlier and with no bookkeeping: an unanswered
+    // offer now costs its provider nothing, so there is nothing to give back.
+    //
+    // ⚠️ AND THE TRANSACTION WENT WITH IT. The offer and its charge had to be
+    // one write („a charge without its offer is money taken for nothing"). With
+    // no charge there is one statement again, which is the correct shape — a
+    // `$transaction` wrapping a single write is a comment pretending to be a
+    // guard.
     const offer = invited
       // The conversation keeps its id, so every message already in it stays
       // attached and the client does not watch a thread vanish and reappear.
       ? await prisma.requestOffer.update({
           where: { id: invited.id },
           data: { ...data, status: 'SENT' },
-          select: {
-            id: true,
-            expertUser: { select: { fullName: true } },
-            company: { select: { name: true } },
-            request: { select: { publicRef: true, topic: true, kind: true, email: true, offerCount: true } },
-          },
+          select: SELECT,
         })
       : await prisma.requestOffer.create({
           data: {
@@ -125,36 +148,8 @@ export async function POST(req: Request) {
             companyId,
             ...data,
           },
-          select: {
-            id: true,
-            expertUser: { select: { fullName: true } },
-            company: { select: { name: true } },
-            request: { select: { publicRef: true, topic: true, kind: true, email: true, offerCount: true } },
-          },
+          select: SELECT,
         })
-
-    // ── What it cost to answer ───────────────────────────────────────────
-    //
-    // ⚠️ CHARGED ON SENDING, NEVER ON SEEING (lib/credits → OFFER_COST_TETRI).
-    // The provider read the whole request, decided, and spent on their own
-    // decision — the model this industry is most criticised for is the other
-    // one, where you pay to look and most leads never answer.
-    //
-    // ⚠️ BEST-EFFORT, AND DELIBERATELY SO WHILE `CREDITS_ENFORCED` IS FALSE.
-    // The offer is the deliverable; a ledger write that fails must never lose
-    // an answer the client is waiting for. When enforcement lands, the check
-    // moves ABOVE the create and this becomes part of the same transaction —
-    // charging for an offer that does not exist is the one direction that
-    // cannot be allowed.
-    //
-    // ⚠️ ONLY AN INDIVIDUAL IS CHARGED. The ledger is keyed on a USER, and a
-    // company offer is sent by an organisation — debiting whichever member
-    // happened to press the button would take from a personal balance for a
-    // company's lead. A company ledger is the fix when companies matter; until
-    // then not charging is the honest half of the mistake, not the expensive one.
-    if (expertUserId) {
-      try { await chargeForOffer(prisma, expertUserId, offer.id) } catch { /* the offer is the deliverable */ }
-    }
 
     // ── The clock every later event is measured against ──────────────────
     // SENT is what „how long did the client take to open it" subtracts from,

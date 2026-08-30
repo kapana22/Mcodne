@@ -2,22 +2,22 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
+// ⚠️ THREE KEYS LEFT THIS SHAPE ON 2026-08-26 — `requests`, `reschedules` and
+// `noAvailability`. All three were booking numbers the route had been sending
+// as hardcoded 0/null since 2026-08-24 („they go when that file does", says its
+// own comment). `noAvailability` fed a modal telling providers to publish
+// calendar time; `requests + reschedules` was the „სამუშაოები" pill, which
+// therefore could never appear.
 export type NavBadges = {
-  requests: number
   messages: number
-  reschedules: number
   profilePercent: number | null
-  // true = no AvailabilitySlot window ends in the future (the expert is
-  // unbookable). NULL until the first response lands — consumers must treat
-  // „unknown" differently from „has time", or they'd act on the initial zero.
-  noAvailability: boolean | null
   // The master's queue badge — verified requests with a place left. Counted
   // once per page load by app/work/layout.tsx (server), not polled: it is
   // seeded here so the sidebar reads every pill from one object.
   openRequests: number
 }
 
-const ZERO: NavBadges = { requests: 0, messages: 0, reschedules: 0, profilePercent: null, noAvailability: null, openRequests: 0 }
+const ZERO: NavBadges = { messages: 0, profilePercent: null, openRequests: 0 }
 
 /* Sidebar badge counts. Refreshes: on mount, every 60s while the tab is
    visible, on route change (so acting on a request clears its pill without
@@ -39,22 +39,24 @@ export function useNavBadges(opts: { enabled?: boolean; openRequests?: number } 
   const path = usePathname()
 
   useEffect(() => {
-    // /api/tutor/nav-badges answers the EXPERT's counts and 403s anybody else;
-    // a WORK-only master in the shared shell has nothing to poll for.
+    // ⚠️ THE PATH IS `/api/work/nav-badges` AND IT WAS `/api/tutor/…` UNTIL
+    // 2026-08-26. The route moved with everything else on 2026-08-24 — its own
+    // header records the move — and this, its only caller, kept polling the old
+    // address. `r.ok ? … : null` swallowed the 404, so every provider's sidebar
+    // showed zero unread messages and no profile percentage, every 60 seconds,
+    // silently. It answers the PROVIDER's counts and 403s anybody else; a
+    // WORK-only master in the shared shell has nothing to poll for.
     if (!enabled) return
     let cancelled = false
     const load = () => {
       if (document.visibilityState === 'hidden') return
-      fetch('/api/tutor/nav-badges')
+      fetch('/api/work/nav-badges')
         .then(r => (r.ok ? r.json() : null))
         .then(d => {
           if (cancelled || !d?.ok) return
           setBadges({
-            requests: d.requests ?? 0,
             messages: d.messages ?? 0,
-            reschedules: d.reschedules ?? 0,
             profilePercent: typeof d.profilePercent === 'number' ? d.profilePercent : null,
-            noAvailability: typeof d.noAvailability === 'boolean' ? d.noAvailability : null,
             openRequests,
           })
         })

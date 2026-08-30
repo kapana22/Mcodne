@@ -46,7 +46,7 @@ export default async function MyRequestsPage() {
         // site's own `.stagger`, which is `rise-in` on each child with the
         // established 40ms cascade. Reduced motion crushes it to its end state,
         // which is the visible one.
-        <ul className="flex flex-col gap-3 motion-safe:stagger">
+        <ul className="flex flex-col gap-3 stagger">
           {rows.map(r => (
             <li key={r.id} id={r.publicRef} className="scroll-mt-24">
               <Card as={Link} href={`${REQUEST_ROUTE}/${r.publicRef}`} padding="compact" interactive className="block sm:p-5">

@@ -52,9 +52,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
       data: {
         offerId: offer.id,
         studentId: offer.request.userId!,
-        // Not a lesson: no TutorProfile behind a trades offer. The master's
-        // profile page joins through the offer instead (app/experts/[slug]).
-        tutorId: null,
+        // ⚠️ `tutorId: null` WAS WRITTEN HERE AND THE COLUMN IS GONE
+        // (2026-08-26). It said „not a lesson: no TutorProfile behind a trades
+        // offer" — true, and then the services-only migration dropped
+        // Review.tutorId outright, so this create threw
+        // PrismaClientValidationError and NOBODY COULD LEAVE A REVIEW on a
+        // finished job. `offerId` is the key a review hangs on now, and
+        // app/experts/[slug] joins the provider through the offer.
         rating: parsed.data.rating,
         body: parsed.data.body,
       },

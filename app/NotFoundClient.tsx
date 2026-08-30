@@ -78,7 +78,7 @@ export function NotFoundClient() {
           <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
             {[
               { href: '/experts', l: 'ექსპერტები' },
-              { href: '/experts', l: 'კონსულტაციები' },
+              { href: '/experts', l: 'ექსპერტები' },
               { href: '/blog', l: 'ბლოგი' },
               { href: '/help', l: 'დახმარება' },
             ].map(x => (

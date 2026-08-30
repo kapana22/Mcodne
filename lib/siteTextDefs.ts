@@ -265,9 +265,9 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'about.value1.title', group: 'ჩვენ შესახებ', label: 'პრინციპი 1 — სათაური', default: 'გადამოწმებული ცოდნა' },
   { key: 'about.value1.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 1 — ტექსტი', multiline: true, default: 'ხელით ვამოწმებთ გამოცდილებას, პორტფოლიოსა და რეპუტაციას.' },
   { key: 'about.value2.title', group: 'ჩვენ შესახებ', label: 'პრინციპი 2 — სათაური', default: 'გამჭვირვალე ფასი' },
-  { key: 'about.value2.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 2 — ტექსტი', multiline: true, default: 'ერთი ფასი, გადახდა დაჯავშნისას. დაცული გადახდები — მალე.' },
+  { key: 'about.value2.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 2 — ტექსტი', multiline: true, default: 'ფასი შეთავაზებაშივე წერია — ფარული დანამატები არ არის. დაცული გადახდები — მალე.' },
   { key: 'about.value3.title', group: 'ჩვენ შესახებ', label: 'პრინციპი 3 — სათაური', default: 'ღირებული დრო' },
-  { key: 'about.value3.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 3 — ტექსტი', multiline: true, default: 'ფასი წინასწარ ცნობილია. სესია სტრუქტურული და შედეგზე ორიენტირებული.' },
+  { key: 'about.value3.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 3 — ტექსტი', multiline: true, default: 'ფასი წინასწარ ცნობილია. სამუშაო კონკრეტულია და შედეგზე ორიენტირებული.' },
   { key: 'about.value4.title', group: 'ჩვენ შესახებ', label: 'პრინციპი 4 — სათაური', default: 'ქართული საზოგადოება' },
   { key: 'about.value4.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 4 — ტექსტი', multiline: true, default: 'ცოდნა ქართულად — ბიზნესი, სამართალი, კარიერა, ფსიქოლოგია.' },
   { key: 'about.create.title', group: 'ჩვენ შესახებ', label: 'რას ვქმნით — სათაური', default: 'პირდაპირი წვდომა ცოდნაზე' },
@@ -307,20 +307,50 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // (an editable template can be saved broken, and it has to change the day
   // payments ship anyway). Page metadata / JSON-LD stay in code too — they are
   // resolved before React renders, so this registry cannot reach them.
-  { key: 'apply.hero.eyebrow', group: 'გახდი ექსპერტი — შესავალი', label: 'პატარა იარლიყი', default: 'ექსპერტებისთვის' },
-  { key: 'apply.hero.title', group: 'გახდი ექსპერტი — შესავალი', label: 'სათაური', default: 'გახდი ექსპერტი მცოდნეზე' },
-  { key: 'apply.hero.body', group: 'გახდი ექსპერტი — შესავალი', label: 'შესავალი ტექსტი', multiline: true, default: 'შენი გამოცდილება ვიღაცის პასუხგაუცემელი კითხვაა. მცოდნე ქართველ სპეციალისტებს აკავშირებს იმ ადამიანებთან, რომლებსაც კონკრეტულ საკითხზე პასუხი სჭირდებათ — ერთსაათიან ონლაინ კონსულტაციაზე, შენს მიერ დადგენილ დროსა და ფასად.' },
-  { key: 'apply.hero.ctaPrimary', group: 'გახდი ექსპერტი — შესავალი', label: 'მთავარი ღილაკი', default: 'დაიწყე განაცხადი' },
-  { key: 'apply.hero.ctaSecondary', group: 'გახდი ექსპერტი — შესავალი', label: 'მეორე ღილაკი', default: 'უკვე გაქვს ანგარიში?' },
-  { key: 'apply.hero.note', group: 'გახდი ექსპერტი — შესავალი', label: 'პატარა ხაზი ღილაკების ქვეშ', multiline: true, default: 'რეგისტრაცია 2 წუთია · განაცხადს ინდივიდუალურად განვიხილავთ 24–48 საათში' },
+  // ⚠️ RETIRED 2026-08-24, NOT DELETED — the six keys below plus the three
+  // under „დასასრული". They were the /apply landing page: its hero (eyebrow,
+  // title, body, two buttons, the note under them) and its closing call to
+  // action. /apply WAS the consultation expert's application and went with the
+  // consultation product; /join is the one door now and draws its own opening
+  // from app/join/_door. The REST of this group still renders there — „როგორ
+  // მუშაობს", „ვის ვეძებთ", „რას იღებ" and „კითხვები" are all live on /join —
+  // which is why only these nine carry the flag.
+  //
+  // Retired rather than removed because a production SiteText row may hold copy
+  // the owner typed under exactly these strings: the row survives, the key can
+  // never be reused for something else, putting the section back restores the
+  // text with it, and the admin editor stops showing a control that edits a page
+  // nobody can open.
+  { key: 'apply.hero.eyebrow', group: 'გახდი ექსპერტი — შესავალი', label: 'პატარა იარლიყი', default: 'ექსპერტებისთვის', retired: true },
+  { key: 'apply.hero.title', group: 'გახდი ექსპერტი — შესავალი', label: 'სათაური', default: 'გახდი ექსპერტი მცოდნეზე', retired: true },
+  { key: 'apply.hero.body', group: 'გახდი ექსპერტი — შესავალი', label: 'შესავალი ტექსტი', multiline: true, default: 'შენი გამოცდილება ვიღაცის პასუხგაუცემელი კითხვაა. მცოდნე ქართველ სპეციალისტებს აკავშირებს იმ ადამიანებთან, რომლებსაც კონკრეტულ საკითხზე პასუხი სჭირდებათ — ერთსაათიან ონლაინ კონსულტაციაზე, შენს მიერ დადგენილ დროსა და ფასად.', retired: true },
+  { key: 'apply.hero.ctaPrimary', group: 'გახდი ექსპერტი — შესავალი', label: 'მთავარი ღილაკი', default: 'დაიწყე განაცხადი', retired: true },
+  { key: 'apply.hero.ctaSecondary', group: 'გახდი ექსპერტი — შესავალი', label: 'მეორე ღილაკი', default: 'უკვე გაქვს ანგარიში?', retired: true },
+  { key: 'apply.hero.note', group: 'გახდი ექსპერტი — შესავალი', label: 'პატარა ხაზი ღილაკების ქვეშ', multiline: true, default: 'რეგისტრაცია 2 წუთია · განაცხადს ინდივიდუალურად განვიხილავთ 24–48 საათში', retired: true },
 
   { key: 'apply.how.eyebrow', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'პატარა იარლიყი', default: 'როგორ მუშაობს' },
   { key: 'apply.how.step1.title', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 1 — სათაური', default: 'შეავსე განაცხადი' },
   { key: 'apply.how.step1.desc', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'შეავსე მოკლე ინფორმაცია შენს შესახებ, აირჩიე მიმართულება და მიუთითე ფასი.' },
   { key: 'apply.how.step2.title', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 2 — სათაური', default: 'ჩვენ გადავხედავთ' },
   { key: 'apply.how.step2.desc', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'თითოეულ განაცხადს დეტალურად განვიხილავთ და პასუხს 24–48 საათში მიიღებ.' },
-  { key: 'apply.how.step3.title', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'გამოაქვეყნე თავისუფალი დრო' },
-  { key: 'apply.how.step3.desc', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'დამტკიცების შემდეგ შენი პროფილი გამოჩნდება ძიებაში, ხოლო მომხმარებლები დაჯავშნას შენი გამოქვეყნებული გრაფიკის მიხედვით შეძლებენ.' },
+  // ⚠️ IT READ „გამოაქვეყნე თავისუფალი დრო" UNTIL 2026-08-29, AND ITS OWN
+  // DESCRIPTION HAD ALREADY STOPPED AGREEING WITH IT. Publishing availability
+  // was the booking product's third step; that product went on 2026-08-24 and
+  // step 3's `desc` was updated to what actually happens („კლიენტების
+  // მოთხოვნებს მიიღებ — შეთავაზებას თავად აგზავნი"), while the TITLE above it
+  // was not. So the recruiting page told every applicant that the first thing
+  // they would do after approval is publish free time — a screen that does not
+  // exist — with the correction printed underneath in smaller type.
+  //
+  // The new title is taken from the description's own words rather than
+  // written: what the step IS, is receiving requests.
+  //
+  // ⚠️ THE DEFAULT IS HALF THE FIX. The live site reads the `SiteText` ROW and
+  // falls back here only when there is none — run
+  // `scripts/sitetext-step3-2026-08-29.ts`, or edit the key in
+  // ადმინი → ტექსტები.
+  { key: 'apply.how.step3.title', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'მიიღე მოთხოვნები' },
+  { key: 'apply.how.step3.desc', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'დამტკიცების შემდეგ შენი პროფილი ძიებაში გამოჩნდება და კლიენტების მოთხოვნებს მიიღებ — შეთავაზებას თავად აგზავნი.' },
 
   { key: 'apply.who.eyebrow', group: 'გახდი ექსპერტი — ვის ვეძებთ', label: 'პატარა იარლიყი', default: 'ვის ვეძებთ' },
   // One profession per LINE. Empty lines are ignored, so the list length is
@@ -330,9 +360,9 @@ export const SITE_TEXTS: SiteTextDef[] = [
 
   { key: 'apply.get.eyebrow', group: 'გახდი ექსპერტი — რას იღებ', label: 'პატარა იარლიყი', default: 'რას იღებ' },
   { key: 'apply.get.card1.title', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 1 — სათაური', default: 'ფასს შენ ადგენ' },
-  { key: 'apply.get.card1.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 1 — ტექსტი', multiline: true, default: 'თითოეულ სერვისს ცალ-ცალკე მიუთითე ფასი — მომხმარებელი ზუსტად შენს მიერ განსაზღვრულ ფასს დაინახავს.' },
+  { key: 'apply.get.card1.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 1 — ტექსტი', multiline: true, default: 'თითოეულ სერვისს ცალ-ცალკე მიუთითე ფასი — კლიენტი ზუსტად შენ მიერ განსაზღვრულ ფასს დაინახავს.' },
   { key: 'apply.get.card2.title', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 2 — სათაური', default: 'დროც შენია' },
-  { key: 'apply.get.card2.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 2 — ტექსტი', multiline: true, default: 'მიუთითებ შენთვის მოსახერხებელ თავისუფალ დროს — ჯავშნები მხოლოდ ამ საათებში იქნება შესაძლებელი.' },
+  { key: 'apply.get.card2.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 2 — ტექსტი', multiline: true, default: 'მოცულობასა და ვადას თითოეულ შეთავაზებაში შენ წერ — რასაც ვერ ასწრებ, უბრალოდ არ პასუხობ.' },
   { key: 'apply.get.card3.title', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 3 — სათაური', default: 'პროფილი ძებნაში' },
   { key: 'apply.get.card3.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 3 — ტექსტი', multiline: true, default: 'დამტკიცების შემდეგ ჩნდები კატალოგსა და შენი კატეგორიის გვერდზე.' },
   // Card 4 was PAYMENTS_LIVE-branched with a COMMISSION_PCT template until
@@ -348,19 +378,19 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'apply.faq.a2', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 2', multiline: true, default: 'რამდენიმე წუთი. დანარჩენს — ვიდეო, სერტიფიკატები, ბმულები — პროფილში ავსებ დამტკიცების შემდეგ.' },
   { key: 'apply.faq.q3', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 3', default: 'ვინ ადგენს ფასს?' },
   { key: 'apply.faq.a3', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 3', multiline: true, default: 'შენ. ფასს თითოეულ სერვისზე ცალკე ადგენ და კლიენტი მას წინასწარ ხედავს.' },
-  { key: 'apply.faq.q4', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 4', default: 'როგორ ტარდება კონსულტაცია?' },
-  { key: 'apply.faq.a4', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 4', multiline: true, default: 'სამუშაო, რომელიც ადგილზე კეთდება, კლიენტის მისამართზე სრულდება. კონსულტაცია ვიდეოსესიის ფორმატში ტარდება, პირდაპირ ბრაუზერიდან — დამატებითი აპლიკაცია არც შენ დაგჭირდება და არც კლიენტს.' },
+  { key: 'apply.faq.q4', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 4', default: 'როგორ სრულდება სამუშაო?' },
+  { key: 'apply.faq.a4', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 4', multiline: true, default: 'სამუშაო, რომელიც ადგილზე კეთდება, კლიენტის მისამართზე სრულდება. დანარჩენს კლიენტთან ერთად ათანხმებ — ონლაინ თუ პირისპირ. მიმოწერა მცოდნეზეა.' },
   // Q6 is the money question. It sits FOURTH on the page (see ApplyMarketing's
   // FAQ array) but is numbered 6 because keys may never be renumbered — its
   // predecessor was hardcoded, so there is simply no q6 row anywhere yet.
   { key: 'apply.faq.q6', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა — გადახდები', default: 'რა ხდება გადახდებთან დაკავშირებით?' },
   { key: 'apply.faq.a6', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი — გადახდები', multiline: true, default: 'პლატფორმა 15%-ს იტოვებს. ონლაინ გადახდები ჯერ არ ამოქმედებულა — როცა ამოქმედდება, წინასწარ შეგატყობინებთ.' },
-  { key: 'apply.faq.q5', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 5', default: 'შემიძლია დრო თავად განვსაზღვრო?' },
-  { key: 'apply.faq.a5', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 5', multiline: true, default: 'დიახ. შენ აქვეყნებ თავისუფალ დროებს და მხოლოდ იმ საათებში გიჯავშნიან. ნებისმიერ დროს შეგიძლია პროფილი პაუზაზე დააყენო.' },
+  { key: 'apply.faq.q5', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 5', default: 'შემიძლია დატვირთვა თავად განვსაზღვრო?' },
+  { key: 'apply.faq.a5', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 5', multiline: true, default: 'დიახ. რომელ მოთხოვნას უპასუხებ, შენ წყვეტ, ვადას კი შეთავაზებაში წერ. ნებისმიერ დროს შეგიძლია პროფილი პაუზაზე დააყენო.' },
 
-  { key: 'apply.cta.title', group: 'გახდი ექსპერტი — დასასრული', label: 'სათაური', default: 'მზად ხარ?' },
-  { key: 'apply.cta.body', group: 'გახდი ექსპერტი — დასასრული', label: 'ტექსტი', multiline: true, default: 'განაცხადი ორ ეკრანზეა და რამდენიმე წუთს წაიღებს.' },
-  { key: 'apply.cta.button', group: 'გახდი ექსპერტი — დასასრული', label: 'ღილაკი', default: 'დაიწყე განაცხადი' },
+  { key: 'apply.cta.title', group: 'გახდი ექსპერტი — დასასრული', label: 'სათაური', default: 'მზად ხარ?', retired: true },
+  { key: 'apply.cta.body', group: 'გახდი ექსპერტი — დასასრული', label: 'ტექსტი', multiline: true, default: 'განაცხადი ორ ეკრანზეა და რამდენიმე წუთს წაიღებს.', retired: true },
+  { key: 'apply.cta.button', group: 'გახდი ექსპერტი — დასასრული', label: 'ღილაკი', default: 'დაიწყე განაცხადი', retired: true },
 
   // ── Footer ──
   { key: 'footer.col1.title', group: 'Footer', label: 'სვეტი 1 — სათაური', default: 'პროდუქტი' },
@@ -396,45 +426,45 @@ export const SITE_TEXTS: SiteTextDef[] = [
 
   // ── დახმარება · დაწყება ──
   { key: 'help.faq.what-is.q', group: 'დახმარება — დაწყება', label: 'კითხვა', default: 'რა არის მცოდნე?' },
-  { key: 'help.faq.what-is.a', group: 'დახმარება — დაწყება', label: 'პასუხი', multiline: true, default: 'პლატფორმა, სადაც აღწერ რა გჭირდება და ხელით შერჩეული ექსპერტები თავად გამოგიგზავნიან შეთავაზებას — ხელშეკრულებიდან და დეკლარაციიდან დალაგებამდე. ბევრ მათგანთან ჯერ კონსულტაციაც შეგიძლია, ჩატით ან ვიდეოთი — ეს იმის გარკვევაა, სწორ ადამიანთან ხარ თუ არა.' },
+  { key: 'help.faq.what-is.a', group: 'დახმარება — დაწყება', label: 'პასუხი', multiline: true, default: 'პლატფორმა, სადაც აღწერ რა გჭირდება და ხელით შერჩეული ექსპერტები თავად გამოგიგზავნიან შეთავაზებას — ხელშეკრულებიდან და დეკლარაციიდან დალაგებამდე. შეთავაზების მიღების შემდეგ მიმოწერაც გაქვს — ეს იმის გარკვევაა, სწორ ადამიანთან ხარ თუ არა.' },
   { key: 'help.faq.find-expert.q', group: 'დახმარება — დაწყება', label: 'კითხვა', default: 'როგორ ვიპოვო შესაფერისი ექსპერტი?' },
   { key: 'help.faq.find-expert.a', group: 'დახმარება — დაწყება', label: 'პასუხი', multiline: true, default: 'გვერდზე „ექსპერტები“ გაფილტრე კატეგორიით, ფასითა და შეფასებით. პროფილში ნახავ ვიდეოგაცნობას, გამოცდილებასა და შეფასებებს.' },
-  { key: 'help.faq.price.q', group: 'დახმარება — დაწყება', label: 'კითხვა', default: 'რა ჯდება პირველი გაცნობა?' },
+  { key: 'help.faq.price.q', group: 'დახმარება — დაწყება', label: 'კითხვა', default: 'რა ჯდება?' },
   // პასუხი „price" გამოთვლადია (კონსტანტა/ფლაგი) — იხ. HELP_LOCKED_ANSWER_IDS
 
   // ── დახმარება · დაჯავშნა და სესია ──
-  { key: 'help.faq.how-to-book.q', group: 'დახმარება — დაჯავშნა და სესია', label: 'კითხვა', default: 'როგორ დავჯავშნო სესია?' },
+  { key: 'help.faq.how-to-book.q', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'კითხვა', default: 'როგორ დავიწყო?' },
   // პასუხი „how-to-book" გამოთვლადია (კონსტანტა/ფლაგი) — იხ. HELP_LOCKED_ANSWER_IDS
-  { key: 'help.faq.where-session.q', group: 'დახმარება — დაჯავშნა და სესია', label: 'კითხვა', default: 'სად ტარდება სესია?' },
-  { key: 'help.faq.where-session.a', group: 'დახმარება — დაჯავშნა და სესია', label: 'პასუხი', multiline: true, default: 'პირდაპირ პლატფორმაზე — არ გჭირდება Zoom ან სხვა აპლიკაცია. საკმარისია ბრაუზერი და კამერა.' },
-  { key: 'help.faq.cancel.q', group: 'დახმარება — დაჯავშნა და სესია', label: 'კითხვა', default: 'შეიძლება თუ არა გავაუქმო ან გადავიტანო?' },
+  { key: 'help.faq.where-session.q', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'კითხვა', default: 'სად სრულდება სამუშაო?' },
+  { key: 'help.faq.where-session.a', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'პასუხი', multiline: true, default: 'დამოკიდებულია იმაზე, რა გჭირდება: ადგილზე შესასრულებელი სამუშაო შენს მისამართზე კეთდება, დანარჩენს კი ექსპერტთან ერთად ათანხმებ — ონლაინ თუ პირისპირ. მიმოწერა მცოდნეზეა.' },
+  { key: 'help.faq.cancel.q', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'კითხვა', default: 'შემიძლია გავაუქმო?' },
   // პასუხი „cancel" გამოთვლადია (კონსტანტა/ფლაგი) — იხ. HELP_LOCKED_ANSWER_IDS
-  { key: 'help.faq.expert-noshow.q', group: 'დახმარება — დაჯავშნა და სესია', label: 'კითხვა', default: 'რა მოხდება, თუ ექსპერტი არ გამოცხადდა?' },
-  { key: 'help.faq.expert-noshow.a', group: 'დახმარება — დაჯავშნა და სესია', label: 'პასუხი', multiline: true, default: 'უფასოდ შემოგთავაზებთ გადატანას ან სხვა ექსპერტს. გადახდის ამოქმედების შემდეგ თანხა სრულად დაბრუნდება.' },
+  { key: 'help.faq.expert-noshow.q', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'კითხვა', default: 'რა მოხდება, თუ ექსპერტმა სამუშაო არ შეასრულა?' },
+  { key: 'help.faq.expert-noshow.a', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'პასუხი', multiline: true, default: 'მოგვწერე — გამოვიძიებთ და სხვა ექსპერტს შემოგთავაზებთ. გადახდების ამოქმედების შემდეგ თანხა ექსპერტს მხოლოდ სამუშაოს დასრულების შემდეგ გადაერიცხება.' },
 
   // ── დახმარება · ანგარიში და შეხვედრა ──
   // Added 2026-08-04 from the unanswered log — every one of these was typed by
   // a real visitor and got „I have no answer for that".
   { key: 'help.faq.signup.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'როგორ დავრეგისტრირდე?' },
-  { key: 'help.faq.signup.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'რეგისტრაცია უფასოა — გახსენი „დარეგისტრირდი“ და შედი Google-ით ან ელფოსტითა და პაროლით. ანგარიში მხოლოდ დაჯავშნისთვის გჭირდება; ექსპერტების დათვალიერება რეგისტრაციის გარეშეც შეგიძლია.' },
-  { key: 'help.faq.duration.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'რამდენი ხანი გრძელდება კონსულტაცია?' },
-  { key: 'help.faq.duration.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'ხანგრძლივობას ექსპერტი ადგენს თითოეული სერვისისთვის — ყველაზე ხშირად 15, 30 ან 60 წუთი. დაჯავშნამდე ზუსტად ხედავ, რომელ ვარიანტს ირჩევ და რამდენი ხანი გაგრძელდება.' },
+  { key: 'help.faq.signup.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'რეგისტრაცია უფასოა — გახსენი „დარეგისტრირდი“ და შედი Google-ით ან ელფოსტითა და პაროლით. ანგარიში მხოლოდ მოთხოვნის დასატოვებლად გჭირდება; ექსპერტების დათვალიერება რეგისტრაციის გარეშეც შეგიძლია.' },
+  { key: 'help.faq.duration.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'რამდენი ხანი გრძელდება?' },
+  { key: 'help.faq.duration.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'ეს სამუშაოზეა დამოკიდებული და შეთავაზებაში წერია — ექსპერტი მოცულობასა და ვადას იქვე უთითებს.' },
   { key: 'help.faq.location.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'სად მდებარეობთ? ოფისში უნდა მოვიდე?' },
-  { key: 'help.faq.location.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'დამოკიდებულია იმაზე, რა გჭირდება. სამუშაო, რომელიც ადგილზე კეთდება, შენს მისამართზე სრულდება — ამას ექსპერტთან შეათანხმებ. კონსულტაცია ონლაინ ტარდება, პირდაპირ ბრაუზერში — საჭიროა მხოლოდ ინტერნეტი, კამერა და მიკროფონი.' },
+  { key: 'help.faq.location.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'დამოკიდებულია იმაზე, რა გჭირდება. სამუშაო, რომელიც ადგილზე კეთდება, შენს მისამართზე სრულდება — ამას ექსპერტთან შეათანხმებ. დანარჩენს ექსპერტთან ერთად ათანხმებ — ონლაინ თუ პირისპირ. ჩვენთან ოფისში მოსვლა არასდროს გჭირდება.' },
   { key: 'help.faq.contact.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'ტელეფონის ნომერი გაქვთ?' },
   // პასუხი „contact" გამოთვლადია (SUPPORT_EMAIL) — იხ. HELP_LOCKED_ANSWER_IDS
   { key: 'help.faq.language.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'რომელ ენაზე ტარდება კონსულტაცია?' },
   { key: 'help.faq.language.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'ენას ექსპერტი უთითებს და პროფილშივე ხედავ — უმეტესობა ქართულად მუშაობს, ნაწილი ინგლისურადაც. აირჩიე ის, ვისაც შენთვის სასურველი ენა უწერია.' },
-  { key: 'help.faq.pre-contact.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'შემიძლია ექსპერტს დაჯავშნამდე მივწერო?' },
-  { key: 'help.faq.pre-contact.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'დიახ — ექსპერტს შეტყობინებას დაჯავშნამდეც უგზავნი და საკითხს წინასწარ დააზუსტებ. ამისთვის ანგარიშში შესვლა დაგჭირდება, გადახდა კი არა. მიმოწერა „შეტყობინებებში“ გამოჩნდება.' },
+  { key: 'help.faq.pre-contact.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'შემიძლია ექსპერტს წინასწარ მივწერო?' },
+  { key: 'help.faq.pre-contact.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'მიმოწერა შეთავაზების მიღების შემდეგ იხსნება — სწორედ იქ აზუსტებთ დეტალებს, სანამ დაეთანხმები. მანამდე კითხვა თავად მოთხოვნაში დაწერე, რომ ექსპერტმა ზუსტად ის შემოგთავაზოს, რაც გჭირდება.' },
 
   // ── დახმარება · გადახდა ──
   { key: 'help.faq.payment-safety.q', group: 'დახმარება — გადახდა', label: 'კითხვა', default: 'უსაფრთხოა თუ არა გადახდა?' },
-  { key: 'help.faq.payment-safety.a', group: 'დახმარება — გადახდა', label: 'პასუხი', multiline: true, default: 'ახლა დაჯავშნა უფასოა, ბარათს არ ვთხოვთ. გაშვების შემდეგ თანხა დაცული იქნება — ექსპერტს მხოლოდ სესიის შემდეგ გადაერიცხება.' },
+  { key: 'help.faq.payment-safety.a', group: 'დახმარება — გადახდა', label: 'პასუხი', multiline: true, default: 'მოთხოვნის დატოვება უფასოა, ბარათს არ ვთხოვთ. გაშვების შემდეგ თანხა დაცული იქნება — ექსპერტს მხოლოდ სამუშაოს დასრულების შემდეგ გადაერიცხება.' },
   { key: 'help.faq.payment-methods.q', group: 'დახმარება — გადახდა', label: 'კითხვა', default: 'რომელი გადახდის მეთოდები მიიღება?' },
-  { key: 'help.faq.payment-methods.a', group: 'დახმარება — გადახდა', label: 'პასუხი', multiline: true, default: 'ონლაინ გადახდა ჯერ არ არის — ახლა დაჯავშნა უფასოა. მეთოდების სიას ამოქმედებისთანავე გამოვაქვეყნებთ.' },
+  { key: 'help.faq.payment-methods.a', group: 'დახმარება — გადახდა', label: 'პასუხი', multiline: true, default: 'ონლაინ გადახდა ჯერ არ არის — მოთხოვნის დატოვება უფასოა. მეთოდების სიას ამოქმედებისთანავე გამოვაქვეყნებთ.' },
   { key: 'help.faq.invoice.q', group: 'დახმარება — გადახდა', label: 'კითხვა', default: 'შემიძლია მივიღო ინვოისი?' },
-  { key: 'help.faq.invoice.a', group: 'დახმარება — გადახდა', label: 'პასუხი', multiline: true, default: 'ინვოისები გადახდებთან ერთად ამოქმედდება — ავტომატურად მოვა ელფოსტაზე. მანამდე დაჯავშნა უფასოა.' },
+  { key: 'help.faq.invoice.a', group: 'დახმარება — გადახდა', label: 'პასუხი', multiline: true, default: 'ინვოისები გადახდებთან ერთად ამოქმედდება — ავტომატურად მოვა ელფოსტაზე. მანამდე მოთხოვნა უფასოა.' },
 
   // ── დახმარება · ექსპერტებისთვის ──
   { key: 'help.faq.become-expert.q', group: 'დახმარება — ექსპერტებისთვის', label: 'კითხვა', default: 'როგორ ვხდები ექსპერტი?' },
@@ -442,7 +472,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'help.faq.commission.q', group: 'დახმარება — ექსპერტებისთვის', label: 'კითხვა', default: 'რა კომისიას იღებს პლატფორმა?' },
   // პასუხი „commission" გამოთვლადია (კონსტანტა/ფლაგი) — იხ. HELP_LOCKED_ANSWER_IDS
   { key: 'help.faq.payout.q', group: 'დახმარება — ექსპერტებისთვის', label: 'კითხვა', default: 'როდის მივიღებ თანხას?' },
-  { key: 'help.faq.payout.a', group: 'დახმარება — ექსპერტებისთვის', label: 'პასუხი', multiline: true, default: 'გადახდები მალე ამოქმედდება — მანამდე სესიები უფასოა. გაშვების შემდეგ შემოსავალი რეგულარული გრაფიკით გადმოგერიცხება.' },
+  { key: 'help.faq.payout.a', group: 'დახმარება — ექსპერტებისთვის', label: 'პასუხი', multiline: true, default: 'გადახდები მალე ამოქმედდება — მანამდე პლატფორმა საკომისიოს არ იკავებს. გაშვების შემდეგ შემოსავალი რეგულარული გრაფიკით გადმოგერიცხება.' },
 
   // ── დახმარება · ანგარიში და უსაფრთხოება ──
   { key: 'help.faq.account-security.q', group: 'დახმარება — ანგარიში და უსაფრთხოება', label: 'კითხვა', default: 'როგორ დავიცვა ჩემი ანგარიში?' },
@@ -466,7 +496,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // by lib/abroad → eurLabel. Editing the lari number here moves the euro figure
   // with it; the rate itself is ABROAD_EUR_PER_GEL in lib/flags.ts.
   { key: 'abroad.hero.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'Hero — სათაური', multiline: true, default: 'ცხოვრობ საზღვარგარეთ? მოაგვარე საქმეები საქართველოში — ონლაინ' },
-  { key: 'abroad.hero.subtitle', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'Hero — ქვესათაური', multiline: true, default: 'ქართველი იურისტი, ბუღალტერი და კარიერის ექსპერტი ვიდეოსესიაზე. ჩამოსვლა და რიგში დგომა არ დაგჭირდება — საკმარისია ტელეფონი.' },
+  { key: 'abroad.hero.subtitle', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'Hero — ქვესათაური', multiline: true, default: 'ქართველი იურისტი, ბუღალტერი და კარიერის ექსპერტი ონლაინ. ჩამოსვლა და რიგში დგომა არ დაგჭირდება — საკმარისია ტელეფონი.' },
   { key: 'abroad.hero.cta', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'Hero — ღილაკი', default: 'ნახე ექსპერტები' },
 
   { key: 'abroad.cards.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისები — სათაური', default: 'რა გჭირდება?' },
@@ -497,8 +527,8 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'abroad.how.step1.desc', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'ნახე ვინ რას აკეთებს, რა ღირს და როგორ შეაფასეს სხვებმა.' },
   { key: 'abroad.how.step2.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 2 — სათაური', default: 'დაასახელე შენთვის მოსახერხებელი დრო' },
   { key: 'abroad.how.step2.desc', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'დროები შენი ქვეყნის საათით ჩანს. ექსპერტი დაგიდასტურებს ან შემოგთავაზებს სხვას.' },
-  { key: 'abroad.how.step3.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 3 — სათაური', default: 'შეხვდი ვიდეოზე' },
-  { key: 'abroad.how.step3.desc', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'ბრაუზერიდან, პროგრამის დაყენების გარეშე. ბმულს წინასწარ მიიღებ.' },
+  { key: 'abroad.how.step3.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 3 — სათაური', default: 'შეხვდი ონლაინ' },
+  { key: 'abroad.how.step3.desc', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'ფორმატს ექსპერტთან ერთად ირჩევთ — დეტალებს მიმოწერაში ათანხმებთ.' },
 
   { key: 'abroad.experts.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ექსპერტები — სათაური', default: 'ვინ დაგელაპარაკება' },
   { key: 'abroad.experts.subtitle', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ექსპერტები — ქვესათაური', multiline: true, default: 'ხელით შერჩეული ქართველი ექსპერტები — გამოცდილება შემოწმებულია.' },
@@ -536,10 +566,10 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'signup.learn.pill', group: 'რეგისტრაცია — ვსწავლობ', label: 'იარლიყის ტექსტი', default: 'რეგისტრაცია' },
   { key: 'signup.learn.title1', group: 'რეგისტრაცია — ვსწავლობ', label: 'სათაური, 1-ლი ხაზი', default: 'შემოგვიერთდი.' },
   { key: 'signup.learn.title2', group: 'რეგისტრაცია — ვსწავლობ', label: 'სათაური, აქცენტი (მწვანე)', default: 'ფასი წინასწარ ცნობილია.' },
-  { key: 'signup.learn.subEmphasis', group: 'რეგისტრაცია — ვსწავლობ', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'ამჟამად ჯავშნა უფასოა' },
+  { key: 'signup.learn.subEmphasis', group: 'რეგისტრაცია — ვსწავლობ', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'ამჟამად მოთხოვნა უფასოა' },
   { key: 'signup.learn.subRest', group: 'რეგისტრაცია — ვსწავლობ', label: 'ქვესათაური — გაგრძელება', default: '— დაცული გადახდა მალე.' },
   { key: 'signup.learn.step1.title', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 1 — სათაური', default: 'ფასი წინასწარ ცნობილია' },
-  { key: 'signup.learn.step1.desc', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 1 — აღწერა', default: 'გადაიხდი მხოლოდ დაჯავშნისას.' },
+  { key: 'signup.learn.step1.desc', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 1 — აღწერა', default: 'გადაიხდი მხოლოდ მაშინ, როცა შეთავაზებას დაეთანხმები.' },
   { key: 'signup.learn.step2.title', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 2 — სათაური', default: 'დაცული გადახდა (მალე)' },
   { key: 'signup.learn.step2.desc', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 2 — აღწერა', default: 'თანხა ერიცხება სესიის შემდეგ.' },
   { key: 'signup.learn.step3.title', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 3 — სათაური', default: 'ხელით განხილული' },
@@ -564,31 +594,41 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'signup.serve.step3.title', group: 'რეგისტრაცია — სერვისი', label: 'ნაბიჯი 3 — სათაური', default: 'მოთხოვნები მოგდის' },
   { key: 'signup.serve.step3.desc', group: 'რეგისტრაცია — სერვისი', label: 'ნაბიჯი 3 — აღწერა', default: 'მხოლოდ შენი მიმართულების და შენი ქალაქის.' },
 
-  { key: 'signup.teach.pill', group: 'რეგისტრაცია — ვასწავლი', label: 'იარლიყის ტექსტი', default: 'ექსპერტის განაცხადი' },
-  { key: 'signup.teach.title1', group: 'რეგისტრაცია — ვასწავლი', label: 'სათაური, 1-ლი ხაზი', default: 'გახდი მცოდნე.' },
-  { key: 'signup.teach.title2', group: 'რეგისტრაცია — ვასწავლი', label: 'სათაური, აქცენტი (მწვანე)', default: 'შენი ცოდნა — შენი შემოსავალი.' },
-  { key: 'signup.teach.sub', group: 'რეგისტრაცია — ვასწავლი', label: 'ქვესათაური', multiline: true, default: 'შენ ირჩევ ფასს, დროსა და თემას.' },
+  // ⚠️ RETIRED 2026-08-24 — the whole `signup.teach.*` group below. It was the
+  // CONSULTATION applicant's panel on /signup: „15% საკომისიო" as a stat tile
+  // and a four-step review timeline. There is one provider now and one panel
+  // (`signup.serve.*`), and those numbers were true of a consultation and false
+  // of everybody who signs up today — a lead costs a provider nothing.
+  //
+  // Not deleted, and the rule is the file's own: a production row may hold copy
+  // the owner typed under one of these keys, so the key stays known, the row
+  // survives, the string can never be reused for something else, and the admin
+  // editor simply stops offering a control over a panel nobody can open.
+  { key: 'signup.teach.pill', group: 'რეგისტრაცია — ვასწავლი', label: 'იარლიყის ტექსტი', default: 'ექსპერტის განაცხადი', retired: true },
+  { key: 'signup.teach.title1', group: 'რეგისტრაცია — ვასწავლი', label: 'სათაური, 1-ლი ხაზი', default: 'გახდი მცოდნე.', retired: true },
+  { key: 'signup.teach.title2', group: 'რეგისტრაცია — ვასწავლი', label: 'სათაური, აქცენტი (მწვანე)', default: 'შენი ცოდნა — შენი შემოსავალი.', retired: true },
+  { key: 'signup.teach.sub', group: 'რეგისტრაცია — ვასწავლი', label: 'ქვესათაური', multiline: true, default: 'შენ ირჩევ ფასს, დროსა და თემას.', retired: true },
   // RETIRED 2026-08-10: it repeated the commission two lines above the stat
   // tile that already carries it. One mention per surface (owner).
   { key: 'signup.teach.subEmphasis', group: 'რეგისტრაცია — ვასწავლი', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'გასამრჯელო — სესიის შემდეგ.', retired: true },
-  { key: 'signup.teach.stat1.n', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1', default: '15%' },
-  { key: 'signup.teach.stat1.label', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1 — იარლიყი', default: 'საკომისიო' },
-  { key: 'signup.teach.stat1.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1 — ქვეტექსტი', default: 'ონლაინ გადახდების ამოქმედების შემდეგ' },
-  { key: 'signup.teach.stat2.n', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 2', default: 'შენ' },
-  { key: 'signup.teach.stat2.label', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 2 — იარლიყი', default: 'ადგენ ფასს' },
-  { key: 'signup.teach.stat2.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 2 — ქვეტექსტი', default: 'დროსა და თემას' },
-  { key: 'signup.teach.stat3.n', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 3', default: '1 სთ' },
-  { key: 'signup.teach.stat3.label', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 3 — იარლიყი', default: 'კონსულტაცია' },
-  { key: 'signup.teach.stat3.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 3 — ქვეტექსტი', default: 'ვიდეოზარით' },
-  { key: 'signup.teach.processEyebrow', group: 'რეგისტრაცია — ვასწავლი', label: 'პროცესის იარლიყი', default: 'პროცესი · 4 ნაბიჯი' },
-  { key: 'signup.teach.step1.title', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 1 — სათაური', default: 'შეავსე განაცხადი' },
-  { key: 'signup.teach.step1.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 1 — გვერდით', default: 'მოკლე ფორმა' },
-  { key: 'signup.teach.step2.title', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 2 — სათაური', default: 'ჩვენი განხილვა' },
-  { key: 'signup.teach.step2.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 2 — გვერდით', default: '24–48 საათი' },
-  { key: 'signup.teach.step3.title', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 3 — სათაური', default: 'პროფილი ცოცხალდება' },
-  { key: 'signup.teach.step3.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 3 — გვერდით', default: 'დასტურის შემდეგ' },
-  { key: 'signup.teach.step4.title', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 4 — სათაური', default: 'პირველი ჯავშანი' },
-  { key: 'signup.teach.step4.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 4 — გვერდით', default: 'დაამატე დროები' },
+  { key: 'signup.teach.stat1.n', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1', default: '15%', retired: true },
+  { key: 'signup.teach.stat1.label', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1 — იარლიყი', default: 'საკომისიო', retired: true },
+  { key: 'signup.teach.stat1.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 1 — ქვეტექსტი', default: 'ონლაინ გადახდების ამოქმედების შემდეგ', retired: true },
+  { key: 'signup.teach.stat2.n', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 2', default: 'შენ', retired: true },
+  { key: 'signup.teach.stat2.label', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 2 — იარლიყი', default: 'ადგენ ფასს', retired: true },
+  { key: 'signup.teach.stat2.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 2 — ქვეტექსტი', default: 'დროსა და თემას', retired: true },
+  { key: 'signup.teach.stat3.n', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 3', default: '1 სთ', retired: true },
+  { key: 'signup.teach.stat3.label', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 3 — იარლიყი', default: 'კონსულტაცია', retired: true },
+  { key: 'signup.teach.stat3.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ციფრი 3 — ქვეტექსტი', default: 'ვიდეოზარით', retired: true },
+  { key: 'signup.teach.processEyebrow', group: 'რეგისტრაცია — ვასწავლი', label: 'პროცესის იარლიყი', default: 'პროცესი · 4 ნაბიჯი', retired: true },
+  { key: 'signup.teach.step1.title', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 1 — სათაური', default: 'შეავსე განაცხადი', retired: true },
+  { key: 'signup.teach.step1.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 1 — გვერდით', default: 'მოკლე ფორმა', retired: true },
+  { key: 'signup.teach.step2.title', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 2 — სათაური', default: 'ჩვენი განხილვა', retired: true },
+  { key: 'signup.teach.step2.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 2 — გვერდით', default: '24–48 საათი', retired: true },
+  { key: 'signup.teach.step3.title', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 3 — სათაური', default: 'პროფილი ცოცხალდება', retired: true },
+  { key: 'signup.teach.step3.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 3 — გვერდით', default: 'დასტურის შემდეგ', retired: true },
+  { key: 'signup.teach.step4.title', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 4 — სათაური', default: 'პირველი ჯავშანი', retired: true },
+  { key: 'signup.teach.step4.desc', group: 'რეგისტრაცია — ვასწავლი', label: 'ნაბიჯი 4 — გვერდით', default: 'დაამატე დროები', retired: true },
 
   // SEO LAST, deliberately. These ~32 Google/Facebook metadata fields used to
   // sit at the HEAD of this array, so „ტექსტები" opened on nine groups of

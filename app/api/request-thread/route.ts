@@ -26,6 +26,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { normalizePublicRef } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
+import { refBudgetSpent, noteRefMiss } from '@/lib/refGuard'
 import { chatMessageView } from '@/lib/requestChat'
 import {
   threadIsOpen, threadClosedReason, PRESENCE_TTL_MS,
@@ -94,10 +95,31 @@ export async function GET(req: Request) {
   const viewer = await requestsViewer()
   if (!viewer.clientAllowed) return notFound()
 
+  // ⚠️ THE REFERENCE IS THE AUTHORISATION HERE, SO THE MISSES ARE COUNTED
+  // (2026-08-21). This route accepts `?ref=` exactly as `./accept` and
+  // `./[ref]/open` do — possession of the reference IS the client's identity,
+  // said in this file's own header — and it was the ONE client surface that
+  // did not call lib/refGuard.
+  //
+  // WHAT THAT MADE IT. A clean 200/404 discriminator at unlimited rate, i.e.
+  // the exact primitive the budget exists to remove. `MC-` + 5 characters is 25
+  // bits, which refGuard's header calls „fine against a guess and thin against
+  // a sweep"; the whole defence is that a sweep runs out of misses. Measured:
+  // 80 wrong references from one IP → 80 × 404, no 429, and the valid one still
+  // answering 200 afterwards. Worse, the guard was ALREADY SPENT for that IP —
+  // /request/<ref> was correctly 404ing — and this door still opened, so it did
+  // not merely lack the budget, it handed it back.
+  //
+  // A harvested reference opens /request/<ref> (a phone number, after
+  // acceptance) and POST ./accept (spends the client's one choice) from any
+  // fresh IP. Same two lines as /open, and `resolve()` already collapses „wrong
+  // reference" and „no such request" into one null — which is the miss signal.
+  if (refBudgetSpent(req)) return notFound()
+
   await ensureDbReady()
   const url = new URL(req.url)
   const r = await resolve(url.searchParams.get('ref'), url.searchParams.get('requestId'))
-  if (!r) return notFound()
+  if (!r) { noteRefMiss(req); return notFound() }
 
   const rows = await prisma.requestMessage.findMany({
     // ⚠️ `offerId: null` IS THE THREAD SELECTOR. Without it this reads every
@@ -154,12 +176,18 @@ export async function POST(req: Request) {
   const viewer = await requestsViewer()
   if (!viewer.clientAllowed) return notFound()
 
+  // The same budget as GET, and it matters more here: an unguarded POST let an
+  // anonymous caller WRITE into the client↔staff thread on a reference they had
+  // merely guessed. Verified before the fix: 200 {"ok":true,"id":…}, read back
+  // by the client on their next open.
+  if (refBudgetSpent(req)) return notFound()
+
   const parsed = Body.safeParse(await req.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
 
   await ensureDbReady()
   const r = await resolve(parsed.data.ref ?? null, parsed.data.requestId ?? null)
-  if (!r) return notFound()
+  if (!r) { noteRefMiss(req); return notFound() }
 
   if (!threadIsOpen(r.request)) {
     return NextResponse.json({ ok: false, error: 'CLOSED' }, { status: 409 })

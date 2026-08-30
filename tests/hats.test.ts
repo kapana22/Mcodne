@@ -35,27 +35,27 @@ test('§B the order is the priority, and CLIENT is the floor', () => {
 
   // An expert's calendar outranks their client history: that is the side other
   // people are waiting on.
-  assert.ok(HATS.indexOf('EXPERT') < HATS.indexOf('CLIENT'))
-  assert.ok(HATS.indexOf('MASTER') < HATS.indexOf('CLIENT'))
+  assert.ok(HATS.indexOf('PROVIDER') < HATS.indexOf('CLIENT'))
+  assert.ok(HATS.indexOf('PROVIDER') < HATS.indexOf('CLIENT'))
 })
 
 test('§C the first hat wins — a tradesperson never lands on the student dashboard', () => {
   // THE REGRESSION, stated directly.
-  assert.equal(homeForHats(['MASTER', 'CLIENT']), HAT_HOME.MASTER)
-  assert.notEqual(homeForHats(['MASTER', 'CLIENT']), '/me')
-  // ⚠️ AND THE ADDRESS ITSELF (2026-08-21). Against `HAT_HOME.MASTER` this was
+  assert.equal(homeForHats(['PROVIDER', 'CLIENT']), HAT_HOME.PROVIDER)
+  assert.notEqual(homeForHats(['PROVIDER', 'CLIENT']), '/me')
+  // ⚠️ AND THE ADDRESS ITSELF (2026-08-21). Against `HAT_HOME.PROVIDER` this was
   // a tautology: it could not fail whatever that constant said, and what it
   // said for a year was the QUEUE. /work is the only screen that runs the
   // profile grant and draws the balance, so the service half — the one hat
   // pointed elsewhere — earned a bonus it was never shown. Name the path.
-  assert.equal(homeForHats(['MASTER', 'CLIENT']), '/work')
+  assert.equal(homeForHats(['PROVIDER', 'CLIENT']), '/work')
 
   assert.equal(homeForHats(['CLIENT']), '/me')
-  assert.equal(homeForHats(['EXPERT', 'CLIENT']), '/work')
+  assert.equal(homeForHats(['PROVIDER', 'CLIENT']), '/work')
   // The owner's own shape: admin AND on the allowlist. The panel wins.
-  assert.equal(homeForHats(['ADMIN', 'MASTER', 'CLIENT']), '/admin')
+  assert.equal(homeForHats(['ADMIN', 'PROVIDER', 'CLIENT']), '/admin')
   // A tutor who also does home repairs — the case a fourth Role could not hold.
-  assert.equal(homeForHats(['EXPERT', 'MASTER', 'CLIENT']), '/work')
+  assert.equal(homeForHats(['PROVIDER', 'CLIENT']), '/work')
 
   // An empty list cannot happen while hatsOf always returns CLIENT, but the
   // fallback must still be a real path rather than undefined.
@@ -64,32 +64,27 @@ test('§C the first hat wins — a tradesperson never lands on the student dashb
 
 test('§D a switcher is drawn only for somebody who has one', () => {
   assert.equal(hasMultipleHats(['CLIENT']), false)
-  assert.equal(hasMultipleHats(['MASTER', 'CLIENT']), true)
+  assert.equal(hasMultipleHats(['PROVIDER', 'CLIENT']), true)
 })
 
-test('§E the allowlist is required for MASTER, not just the profile', () => {
+test('§E the allowlist is required, not just the profile', () => {
   // ⚠️ A ServiceProfile WITHOUT an active RequestAccess is somebody who filled
   // in a form and was never let in. Sending them to a workspace listing
   // requests they cannot answer would be the emptiest room on the site.
-  // The decision moved to lib/identity on 2026-08-21 — hatsOf and capabilitiesOf
-  // were computing the same two facts in two queries, so there is one reader now
-  // and both vocabularies come off it. The RULE is unchanged and is asserted at
-  // its new home.
+  //
+  // The decision lives in lib/identity: `hatsOf` and the „do they sell
+  // anything" question are one read, so the two answers cannot drift. It was
+  // two facts (a TutorProfile → EXPERT, a ServiceProfile + allowlist → MASTER)
+  // until 2026-08-24; the consultation product went and the first fact with it,
+  // so there is ONE condition and this asserts it whole.
   const src = readFileSync('lib/identity.ts', 'utf8')
-  assert.match(src, /requestAccess\?\.active === true/,
-    'MASTER stopped requiring an active allowlist row')
-  assert.match(src, /if \(sellsWork\) hats\.push\('MASTER'\)/,
-    'MASTER is no longer derived from the same fact as WORK — the two answers can drift again')
-  // The local `allowed` variable went with the merge; the conjunction it stood
-  // for is the line asserted above, in full.
-  assert.match(src, /!!u\.serviceProfile && u\.requestAccess\?\.active === true/,
-    'MASTER is granted on the profile alone')
-  // EXPERT keys on the PROFILE, not the role: a seller-role row with no profile
-  // has nothing to put on a calendar.
-  assert.match(src, /const sellsConsultation = !!u\.tutor/,
-    'EXPERT went back to keying on the role')
-  assert.match(src, /if \(sellsConsultation\) hats\.push\('EXPERT'\)/,
-    'EXPERT is no longer derived from the same fact as CONSULT')
+  assert.match(src, /const provider = !!u\.serviceProfile && u\.requestAccess\?\.active === true/,
+    'the provider hat is granted on the profile alone, or on something else entirely')
+  assert.match(src, /if \(provider\) hats\.push\('PROVIDER'\)/,
+    'the hat is no longer derived from the same fact the rest of the site asks for')
+  // And there is no second supply-side hat to disagree with it.
+  assert.doesNotMatch(src, /'EXPERT'|'MASTER'/,
+    'a second supply-side hat came back — one profile, one hat')
 })
 
 test('§F sign-in asks the model, not four separate tables', () => {

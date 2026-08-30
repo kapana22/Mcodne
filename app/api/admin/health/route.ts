@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
-import { hasFutureWindow } from '@/lib/bookability'
-import { BROWSABLE_CATEGORY } from '@/lib/categoryTree'
 import { PAYMENTS_LIVE } from '@/lib/flags'
 import { lastSweepRun, SWEEP_STALE_MIN } from '@/lib/sweepRunner'
 import { getIntegrations } from '@/lib/integrations'
@@ -23,20 +21,20 @@ export async function GET() {
   const auth = await requireRoleApi('ADMIN')
   if (auth.response) return auth.response
 
-  const now = new Date()
-  const in24h = new Date(now.getTime() + 24 * 3600_000)
-
+  // ⚠️ THE BOOKING HALF OF THIS ANSWER IS GONE (2026-08-24), and it was most of
+  // it: sessions in the next 24 hours, bookings awaiting an expert, open
+  // disputes, and the two „why does this marketplace look alive and sell
+  // nothing" counts (no future availability window, no consultation). All five
+  // described a product that no longer exists. What replaces them is the same
+  // question asked of the one that does: a provider who is listed but has
+  // nothing listed cannot be routed to.
   const [
     sweep,
     integrations,
     trgm,
     pendingApps,
-    preparingBookings,
-    openDisputes,
-    upcoming24h,
-    liveExperts,
-    expertsWithFutureWindow,
-    expertsWithoutService,
+    liveProviders,
+    providersWithoutService,
   ] = await Promise.all([
     lastSweepRun(),
     getIntegrations().catch(() => ({ gaId: '' } as any)),
@@ -49,38 +47,21 @@ export async function GET() {
       )
       .then(r => Boolean(r[0]?.installed))
       .catch(() => false),
-    prisma.tutorApplication.count({ where: { status: 'SUBMITTED' } }),
-    prisma.booking.count({ where: { status: 'PREPARING' } }),
-    prisma.dispute.count({ where: { resolvedAt: null } }).catch(() => 0),
-    prisma.booking.count({ where: { status: 'CONFIRMED', startAt: { gt: now, lte: in24h } } }),
-    // Publicly bookable experts = the same visibility rule lib/tutorsQuery uses.
-    prisma.tutorProfile.count({
-      where: { available: true, user: { suspendedAt: null }, category: { is: BROWSABLE_CATEGORY } },
+    prisma.masterApplication.count({ where: { status: 'SUBMITTED' } }),
+    // Publicly listed providers = the catalogue's own visibility rule.
+    prisma.serviceProfile.count({
+      where: { available: true, published: true, user: { suspendedAt: null } },
     }),
-    // …of those, how many actually have a future availability WINDOW. An expert
-    // with none cannot be booked at all, which is the single most common reason
-    // the marketplace looks alive but sells nothing.
-    prisma.tutorProfile
+    // …of those, how many list NOTHING. They are invisible to routing and their
+    // card has no offer on it, which is the most common reason the marketplace
+    // looks alive and sells nothing.
+    prisma.serviceProfile
       .count({
         where: {
           available: true,
+          published: true,
           user: { suspendedAt: null },
-          category: { is: BROWSABLE_CATEGORY },
-          availability: hasFutureWindow(now),
-        },
-      })
-      .catch(() => 0),
-    // …and how many have no SERVICE at all. A different blocker with a
-    // different fix: free times are worthless until there is something to sell,
-    // and unlike the windows case this one now hides the expert from browse
-    // outright (lib/tutorsQuery), so the admin panel is the only place it
-    // surfaces. lib/expertActivation emails both groups.
-    prisma.tutorProfile
-      .count({
-        where: {
-          available: true,
-          user: { suspendedAt: null },
-          consultations: { none: {} },
+          services: { isEmpty: true },
         },
       })
       .catch(() => 0),
@@ -107,13 +88,9 @@ export async function GET() {
       timezone: process.env.TZ || '(unset)',
     },
     attention: {
-      expertsWithoutAvailability: Math.max(0, liveExperts - expertsWithFutureWindow),
-      expertsWithoutService,
-      liveExperts,
+      providersWithoutService,
+      liveProviders,
       pendingApplications: pendingApps,
-      bookingsAwaitingExpert: preparingBookings,
-      openDisputes,
-      sessionsNext24h: upcoming24h,
     },
   })
 }

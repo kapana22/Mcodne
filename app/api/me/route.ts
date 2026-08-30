@@ -33,8 +33,12 @@ const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-ag
  * provider who books their first consultation finds the door already there.
  */
 async function hasClientActivity(userId: string): Promise<boolean> {
+  // ⚠️ „BOUGHT" WAS A BOOKING COUNT UNTIL 2026-08-24. The equivalent fact now
+  // is a review they wrote — you can only rate a job you actually hired
+  // somebody for — so the three questions are still „have you bought, saved, or
+  // asked for anything".
   const [bought, saved, asked] = await Promise.all([
-    prisma.booking.count({ where: { studentId: userId }, take: 1 }),
+    prisma.review.count({ where: { studentId: userId }, take: 1 }),
     prisma.favorite.count({ where: { userId }, take: 1 }),
     prisma.serviceRequest.count({ where: { userId }, take: 1 }),
   ])
@@ -100,14 +104,15 @@ export async function GET() {
     // `hatsOf` is one indexed read and this endpoint is already per-request and
     // no-store, so nothing is being paid for twice.
     hats: identity.hats,
-    // What the person already OFFERS (lib/capabilities): CONSULT = a
-    // TutorProfile, WORK = a ServiceProfile plus active RequestAccess. The
-    // /join door reads it to stop offering a half somebody already has.
-    capabilities: identity.capabilities,
+    // ⚠️ ONE BOOLEAN SINCE 2026-08-24. It was `capabilities: ('CONSULT' |
+    // 'WORK')[]` — what the person offered, out of two — and every reader used
+    // it as „do they sell anything at all". They do or they do not: a
+    // ServiceProfile plus an active RequestAccess.
+    provider: identity.provider,
     // The provider's balance in tetri, or null for somebody who sells nothing.
     // Null and not 0: the pill renders nothing for null and „0₾" for zero, and
     // a client must get the first.
-    balanceTetri: identity.capabilities.length > 0 ? balanceTetri : null,
+    balanceTetri: identity.provider ? balanceTetri : null,
     // ⚠️ WHETHER THE CLIENT ROOM HOLDS ANYTHING (2026-08-21). Owner: „ირევა
     // ჩვეულებრივ იუზერსა და ეს უნდა გავმიჯნოთ სწორად." The user menu offered
     // „ჩემი სივრცე" beside „სამუშაო სივრცე" to every provider — and measured
@@ -238,26 +243,18 @@ export async function DELETE(req: Request) {
     if (!ok) return NextResponse.json({ ok: false, error: 'BAD_CURRENT_PASSWORD' }, { status: 400 })
   }
 
-  // Refuse if the account has live obligations (upcoming/live sessions in either role).
-  const [asStudent, asTutor] = await Promise.all([
-    prisma.booking.count({
-      where: {
-        studentId: user.id,
-        status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] },
-      },
-    }),
-    prisma.booking.count({
-      where: {
-        tutor: { userId: user.id },
-        status: { in: ['PREPARING', 'CONFIRMED', 'LIVE'] },
-      },
-    }),
-  ])
-  if (asStudent + asTutor > 0) {
+  // Refuse if the account owes somebody work — an ACCEPTED offer nobody has
+  // marked done. ⚠️ IT WAS „upcoming or live sessions in either role" until
+  // 2026-08-24; this is the same rule against the thing that exists now, and
+  // the admin's delete (app/api/admin/users/[id]) enforces it identically.
+  const owed = await prisma.requestOffer.count({
+    where: { expertUserId: user.id, status: 'ACCEPTED', doneAt: null },
+  })
+  if (owed > 0) {
     return NextResponse.json({
       ok: false,
-      error: 'HAS_ACTIVE_BOOKINGS',
-      count: asStudent + asTutor,
+      error: 'HAS_ACTIVE_WORK',
+      count: owed,
     }, { status: 409 })
   }
 
@@ -272,7 +269,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({
         ok: false,
         error: 'HAS_HISTORY',
-        hint: 'ანგარიშს აქვს დასრულებული ჯავშნები ან შეტყობინებები. მიმართე მხარდაჭერას ხელით წასაშლელად.',
+        hint: 'ანგარიშს აქვს ისტორია — შესრულებული სამუშაო ან შეფასება. მიმართე მხარდაჭერას ხელით წასაშლელად.',
       }, { status: 409 })
     }
     throw e

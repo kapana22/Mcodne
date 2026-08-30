@@ -1,14 +1,16 @@
 // /work/jobs — ONE LIST OF THE WORK I HAVE. („სამუშაოები", 2026-08-19.)
 //
-// ⚠️ IT IS NOT UNDER (expert) OR (provider), AND THAT IS THE POINT. Those two
-// route groups are two guards, and a person is not two people: an expert holds
-// CONSULT, a master holds WORK, and the same account may hold both (CLAUDE.md,
-// THE PRODUCT MODEL). A page that lives inside either group would hide half of
-// somebody's own work behind the other group's gate — the (expert) layout even
-// redirects a WORK-only account away, so an accepted quote would have been
-// unreachable from the list that claims to hold it. So the guard is here, it is
-// the UNION of the two halves, and somebody who has neither is sent to /me
-// rather than shown an empty workspace.
+// ⚠️ IT IS NOT UNDER (provider), AND THAT IS STILL THE POINT. The route group
+// is a guard for the QUEUE — the allowlist decides who may read other people's
+// requests — and this page is about work somebody has already agreed to do. The
+// guard is here, and somebody with no provider identity is sent to /me rather
+// than shown an empty workspace.
+//
+// ⚠️ THE BOOKING HALF OF THIS LIST IS GONE (2026-08-24). It held two kinds of
+// row: a confirmed consultation with a start time and a lifecycle the provider
+// drove from here (accept, decline, cancel, complete, no-show, a video room),
+// and an accepted QUOTE, which has none of that. One kind is left, and the
+// SHAPE stays two-kinded on purpose — see lib/jobRows.
 //
 // ⚠️ WHAT THE QUERY MAY NOT SELECT. No `phone`, no `email` — a list never
 // prints a contact, and the one screen that does (/work/offers) reads it
@@ -24,12 +26,11 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { requireUser } from '@/lib/auth'
-import { capabilitiesOf } from '@/lib/capabilities'
 import { providersOn } from '@/lib/requests'
-import { requestsViewer } from '@/lib/requestsServer'
-import { ROLE } from '@/lib/roles'
+import { requestsViewer, openRequestCount } from '@/lib/requestsServer'
 import type { QuoteJobInput } from '@/lib/jobRows'
 import { PageHeader } from '@/components/PageHeader'
+import { WorkTabs } from '@/app/work/_components/WorkTabs'
 import { JobsClient } from './_client'
 
 export const dynamic = 'force-dynamic'
@@ -42,19 +43,15 @@ export const metadata: Metadata = {
 export default async function Page() {
   const user = await requireUser()
 
-  // The consultation half: an expert profile (or an admin looking).
-  const caps = await capabilitiesOf(user.id)
-  const showBookings = user.role === ROLE.PROVIDER || user.role === ROLE.ADMIN || caps.includes('CONSULT')
-
-  // The job half. `providersOn()` first, so the supply switch being off costs
-  // no query — and the viewer, never a role, decides who has an identity to
-  // hang an offer on (lib/requestsServer).
+  // `providersOn()` first, so the supply switch being off costs no query — and
+  // the viewer, never a role, decides who has an identity to hang an offer on
+  // (lib/requestsServer).
   const viewer = providersOn() ? await requestsViewer() : null
   const provider = viewer?.provider ?? null
 
-  // Neither half is theirs: this is not their workspace, and an empty list
-  // would say „you have no work" to somebody who never could have any.
-  if (!showBookings && !provider) redirect('/me')
+  // Not their workspace: an empty list would say „you have no work" to somebody
+  // who never could have any.
+  if (!provider) redirect('/me')
 
   let quotes: QuoteJobInput[] = []
   if (provider) {
@@ -91,6 +88,10 @@ export default async function Page() {
     }))
   }
 
+  // The first stage's count — one helper, so the bar and the queue it links to
+  // can never disagree (lib/requestsServer).
+  const openRequests = await openRequestCount(user)
+
   return (
     <div>
       {/* Visible at every width, like /work/offers beside it. The bookings list
@@ -101,9 +102,15 @@ export default async function Page() {
       <PageHeader
         className="mb-5"
         title="სამუშაოები"
-        sub="დადასტურებული ჯავშნები და მიღებული შეთავაზებები — ერთ სიაში."
+        sub="მიღებული შეთავაზებები — ერთ სიაში."
       />
-      <JobsClient quotes={quotes} showBookings={showBookings} hasProvider={!!provider} />
+      {/* ⚠️ ONE SCREEN, TWO STAGES (2026-08-21). „შეთავაზებები" stopped being a
+          rail row of its own: a sent offer is what a job looks like before the
+          client answers, and two destinations for one subject is part of what
+          made the rail read as two products. The page did not move — see
+          WorkTabs. Drawn only for somebody who can actually send an offer. */}
+      <WorkTabs showOffers={!!provider} openRequests={openRequests} />
+      <JobsClient quotes={quotes} />
     </div>
   )
 }

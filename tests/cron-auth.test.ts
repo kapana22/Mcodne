@@ -64,6 +64,18 @@ test('a correct-prefix but truncated secret does not pass', () => {
   })
 })
 
+/*
+ * ⚠️ THIS ASSERTION WAS INVERTED FOR ONE DEPLOY ON 2026-08-30 AND PUT BACK —
+ * and NOT because the theory behind the inversion was wrong. It was right: the
+ * crashed `cleanup-cron` sends POST with `?secret=`, and widening the gate made
+ * the next clean tick run green.
+ *
+ * It was put back because a green cron is not the only thing at stake. Widening
+ * this gate makes a secret in a URL the normal way to call a MUTATING endpoint,
+ * permanently, to accommodate one caller's quoting — so the fix moved to the
+ * cron command, where the fault is. The strict rule is the rule again, and
+ * lib/cronAuth carries the whole finding including the operator step.
+ */
 test('query secret is rejected by default (POST path)', () => {
   withSecret(SECRET, () => {
     assert.equal(cronAuth(req({ secretQuery: SECRET })).ok, false)

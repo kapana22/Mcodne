@@ -17,14 +17,14 @@
  *
  * WHY HIDDEN IS THE WHOLE MECHANISM, and why there is no new code behind it:
  * the platform already treats a hidden category as invisible in exactly the
- * places that matter — lib/categoryTree states the rule, lib/tutorsQuery and
- * app/sitemap.ts both apply it, /categories lists spheres only — while
- * app/experts/[id]/page.tsx never checks it, so a profile in it opens fine by
- * direct link. „Invisible in the catalog, reachable from /abroad" is therefore
- * a data state, not a feature.
+ * places that matter — lib/categoryTree states the rule, the catalogue query in
+ * app/experts/_providers.ts and app/sitemap.ts both apply it, /categories lists
+ * spheres only — while app/experts/[slug]/page.tsx never checks it, so a profile
+ * in it opens fine by direct link. „Invisible in the catalogue, reachable from
+ * /abroad" is therefore a data state, not a feature.
  *
- * AFTER RUNNING: assign the diaspora experts to it from ადმინი, or by setting
- * TutorProfile.categoryId. Nothing else is needed — lib/abroad keys off the
+ * AFTER RUNNING: assign the diaspora providers to it from ადმინი, or by setting
+ * ServiceProfile.categoryId. Nothing else is needed — lib/abroad keys off the
  * slug and every surface reads it from there.
  */
 import { prisma } from '../lib/prisma'
@@ -33,14 +33,16 @@ import { ABROAD_CATEGORY_SLUG } from '../lib/abroad'
 async function main() {
   const existing = await prisma.category.findUnique({
     where: { slug: ABROAD_CATEGORY_SLUG },
-    select: { id: true, status: true, _count: { select: { tutors: true } } },
+    // ⚠️ `providers`, NOT `tutors` (2026-08-24). Same relation, renamed with the
+    // profile it counts — a Category's people are ServiceProfiles now.
+    select: { id: true, status: true, _count: { select: { providers: true } } },
   })
 
   if (existing?.status === 'VISIBLE') {
     // Someone made it public on purpose. Flipping it back from a script would
     // be an invisible outage of a live category — refuse and say so.
     console.log(
-      `[abroad] „${ABROAD_CATEGORY_SLUG}" already exists and is LIVE (${existing._count.tutors} expert(s)).\n` +
+      `[abroad] „${ABROAD_CATEGORY_SLUG}" already exists and is LIVE (${existing._count.providers} provider(s)).\n` +
       '         Refusing to re-hide it — use ადმინი → კატეგორიები if that is really what you want.',
     )
     return
@@ -54,9 +56,6 @@ async function main() {
       name: 'დიასპორა',
       isLive: false,
       status: 'HIDDEN',
-      // Diaspora work is one-off consultation, not a weekly schedule — the same
-      // default every other category carries today.
-      defaultServiceType: 'CONSULTATION',
       // Last in any admin ordering; it is not a browse destination.
       order: 900,
     },
@@ -65,7 +64,7 @@ async function main() {
 
   console.log(
     `[abroad] ${existing ? 'updated' : 'created'} category ${row.slug} (${row.id}) — status=${row.status}\n` +
-    '         Assign diaspora experts to it, then flip FEATURE_ABROAD in lib/flags.ts.',
+    '         Assign diaspora providers to it, then flip FEATURE_ABROAD in lib/flags.ts.',
   )
 }
 

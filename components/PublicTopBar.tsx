@@ -240,7 +240,7 @@ export function PublicTopBar({
   // the profiles — where a provider actually browses), and the alternative,
   // rendering nothing until `ready`, would pop the button in late for the
   // guests and clients it is for, which is everyone else.
-  const cta = showRequestCta(me?.capabilities) ? nav.find(i => i.cta) : undefined
+  const cta = showRequestCta(me?.provider) ? nav.find(i => i.cta) : undefined
   const isActive = (href: string) => activePath === href || activePath.startsWith(href + '/')
 
   return (
@@ -302,7 +302,7 @@ export function PublicTopBar({
               This was a hard-coded „გახდი ექსპერტი" → `/join?can=CONSULT`: the
               site's most visible supply link, pre-answering the door's one
               question with the half the hierarchy says comes second. */}
-          {showJoinInvite(me?.role, me?.capabilities) && (
+          {showJoinInvite(me?.role, me?.provider) && (
             <Link
               href={JOIN_DOOR_HREF}
               className="hidden lg:inline-flex h-11 px-3 rounded-btn font-display font-semibold text-meta uppercase text-ink-600 hover:text-ink-900 hover:bg-ink-100 items-center whitespace-nowrap transition-colors duration-fast"
@@ -538,7 +538,7 @@ export function PublicTopBar({
                     </Link>
                   </li>
                 )}
-                {showJoinInvite(me?.role, me?.capabilities) && (
+                {showJoinInvite(me?.role, me?.provider) && (
                   <li>
                     <Link
                       href={JOIN_DOOR_HREF}

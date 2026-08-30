@@ -1,6 +1,9 @@
-// /work — THE SHELL, and nothing else. One chrome for the whole supply side:
-// the expert's items and the master's items in one rail, each group drawn only
-// for the capability that owns it (stage 6, 2026-08-19).
+// /work — THE SHELL, and nothing else. One chrome for the whole supply side.
+//
+// ⚠️ IT USED TO DRAW TWO GROUPS OF ITEMS — the expert's and the master's, each
+// gated on its own capability. There is one provider since 2026-08-24 and one
+// rail; the only conditional row left is the request queue, which follows the
+// allowlist rather than a capability.
 //
 // ⚠️ NOT A GUARD. The guards live one level down, in the route groups —
 // app/work/(expert)/layout.tsx (requireRole → /signin) and
@@ -11,12 +14,10 @@
 // workspace frame around it that says „there is something here".
 
 import { getCurrentUser } from '@/lib/auth'
-import { capabilitiesOf } from '@/lib/capabilities'
-import { prisma } from '@/lib/prisma'
+import { isProvider } from '@/lib/capabilities'
 import { providersOn } from '@/lib/requests'
-import { requestsViewer } from '@/lib/requestsServer'
-import { ROLE, asRole } from '@/lib/roles'
-import { routingWhere } from '@/lib/serviceProfile'
+import { requestsViewer, openRequestCount } from '@/lib/requestsServer'
+import { asRole } from '@/lib/roles'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { balanceOf, grantEarnedTasks } from '@/lib/creditsServer'
 import { WorkspaceShell } from '@/components/tutor/WorkspaceShell'
@@ -29,8 +30,7 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
   const user = await getCurrentUser()
   if (!user) return <>{children}</>
 
-  const isAdmin = user.role === ROLE.ADMIN
-  const caps = await capabilitiesOf(user.id)
+  const provider = await isProvider(user.id)
   // The master's group follows the same gate its screens do
   // (app/work/(provider)/layout.tsx): the WORK capability, or whoever the
   // requests allowlist admits by another door — an admin, a company member.
@@ -38,10 +38,15 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
   // Nothing at all when the supply side is switched off — the items would
   // lead to the middleware's 404.
   const viewer = providersOn() ? await requestsViewer() : null
-  const groups = {
-    expert: isAdmin || user.role === ROLE.PROVIDER || caps.includes('CONSULT'),
-    work: viewer !== null && (caps.includes('WORK') || viewer.providerAllowed),
-  }
+  // ⚠️ ONE GROUP SINCE 2026-08-24. There were two — the consultation tools
+  // (განრიგი · შემოსავალი) and the request queue — and the first was drawn from
+  // `consultRoomVerdict`, a rule that existed because a service provider kept
+  // meeting a booking calendar they had nothing to put in. The consultation
+  // tools are gone; what is left is the queue, which still follows the
+  // allowlist: the WORK capability, or whoever is admitted by another door — an
+  // admin, a company member. Read here only to decide what to DRAW; the pages
+  // still gate themselves.
+  const groups = { work: viewer !== null && (provider || viewer.providerAllowed) }
 
   // ⚠️ THE GRANT RUNS ON THE SHELL, NOT ON ONE PAGE (2026-08-21). It used to sit
   // in app/work/page.tsx alone, and that is the whole reason the balance „did
@@ -66,40 +71,22 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
   // The balance is read AFTER the grant on purpose: a provider who has just
   // finished a field must not be shown yesterday's number for one navigation.
   let balanceTetri: number | null = null
-  if (caps.length > 0) {
+  // What finishing the profile is still worth, drawn by the rail on every
+  // workspace screen. It rides back from the grant rather than costing a second
+  // read of the same facts — see grantEarnedTasks.
+  let unearnedTetri = 0
+  if (provider) {
     await ensureDbReady()
-    await grantEarnedTasks(user.id)
+    unearnedTetri = (await grantEarnedTasks(user.id)).unearnedTetri
     balanceTetri = await balanceOf(user.id)
   }
 
-  // The queue badge — how many verified requests still have a place. Same
-  // philosophy as the admin rail's badges: a number on a nav item means a
-  // person is waiting behind it. One indexed count per page load, and only for
-  // somebody who has the item.
-  // ⚠️ NARROWED THE SAME WAY THE LIST IS (2026-08-18). This used to be a
-  // platform-wide count while the page beside it filtered by the viewer's own
-  // trades and cities — so the badge advertised work that the queue would never
-  // show, and kept advertising it to a master who had switched themselves off.
-  // One helper, two readers: see lib/serviceProfile → routingWhere.
-  let openRequests = 0
-  if (groups.work) {
-    const svc = await prisma.serviceProfile.findFirst({
-      where: {
-        OR: [
-          { userId: user.id },
-          { company: { members: { some: { userId: user.id } } } },
-        ],
-      },
-      select: { services: true, areas: true, available: true },
-    })
-    openRequests = await prisma.serviceRequest.count({
-      where: {
-        status: 'VERIFIED',
-        offerCount: { lt: prisma.serviceRequest.fields.offerLimit },
-        ...(routingWhere(svc) ?? {}),
-      },
-    })
-  }
+  // ⚠️ THE SAME HELPER THE THREE SCREENS USE (2026-08-29). This count is drawn
+  // in four places — the rail badge here and the „ახალი" stage on each screen
+  // of the flow — and it is exactly the number that was wrong before for want
+  // of one source: the badge once counted platform-wide while the list beside
+  // it filtered by the viewer's own trades. See lib/requestsServer.
+  const openRequests = groups.work ? await openRequestCount(user) : 0
 
   return (
     <WorkspaceShell
@@ -116,6 +103,7 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
       // control that cannot work.
       isProvider={viewer === null || viewer.provider !== null}
       balanceTetri={balanceTetri}
+      unearnedTetri={unearnedTetri}
     >
       {children}
     </WorkspaceShell>

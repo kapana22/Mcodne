@@ -32,12 +32,12 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { Icon } from '@/components/Icon'
 import { Avatar, VerifiedMark } from '@/components/Avatar'
 import { SiteText } from '@/components/SiteTextProvider'
-import { primaryPrice } from '@/components/booking/slots'
+import { lowestPrice } from '@/lib/serviceProfile'
 
 type AbroadExpert = {
   id: string
   slug: string | null
-  headline: string
+  headline: string | null
   specialty: string
   price: number
   rating: number
@@ -63,19 +63,20 @@ const STEPS = [1, 2, 3] as const
 async function loadExperts(): Promise<AbroadExpert[]> {
   try {
     await ensureDbReady()
-    const rows = await prisma.tutorProfile.findMany({
-      // Experts from the categories this offering is built on — see
+    const rows = await prisma.serviceProfile.findMany({
+      // Providers from the categories this offering is built on — see
       // ABROAD_SOURCE_CATEGORY_SLUGS for why this is a VIEW over existing
       // categories and not a `diaspora` category of its own. Nobody is moved,
-      // so nothing changes in the public catalog.
+      // so nothing changes in the public catalogue.
       //
-      // The rest is exactly the public catalog's visibility rule
-      // (lib/tutorsQuery): a self-paused or admin-suspended expert must
-      // disappear from here too, or the landing page advertises someone who
-      // cannot be booked.
+      // The rest is exactly the catalogue's visibility rule
+      // (app/experts/_providers → PUBLIC): a self-paused, unpublished or
+      // admin-suspended provider must disappear from here too, or the landing
+      // page advertises somebody the site does not list.
       where: {
         category: categorySlugFilter(ABROAD_SOURCE_CATEGORY_SLUGS),
         available: true,
+        published: true,
         user: { is: { suspendedAt: null } },
       },
       orderBy: [{ verified: 'desc' }, { rating: 'desc' }],
@@ -84,22 +85,14 @@ async function loadExperts(): Promise<AbroadExpert[]> {
         id: true,
         slug: true,
         headline: true,
-        specialty: true,
-        price: true,
-        // Needed to price the FLAGSHIP service rather than the flat rate — the
-        // shared rule every other expert surface follows (components/booking
-        // /slots → primaryPrice). Without it this page would ship the „one
-        // expert, two prices" bug the moment FEATURE_ABROAD is switched on.
-        consultationDurationMin: true,
-        consultations: { select: { minutes: true, price: true } },
+        services: true,
+        priceList: true,
+        priceFrom: true,
         rating: true,
         reviewsCount: true,
         verified: true,
         user: { select: { id: true, fullName: true, avatarUrl: true } },
-        // The label the rest of the site shows. `specialty` alone made this
-        // page say „ბიზნესი" about an expert whose card says „ბიზნესი და
-        // ფინანსები" — it is a frozen copy of the category name from approval
-        // day, kept only as the fallback for an expert who has no category.
+        // The label the rest of the site shows.
         category: { select: { name: true } },
       },
     })
@@ -107,15 +100,17 @@ async function loadExperts(): Promise<AbroadExpert[]> {
       id: r.id,
       slug: r.slug,
       headline: r.headline,
-      specialty: r.category?.name ?? r.specialty,
-      price: primaryPrice(r.consultations ?? [], r.price),
+      specialty: r.category?.name ?? '',
+      // The lowest priced service — the same floor every card on the site
+      // prints. 🔒 Zero when they quote per job; the card reads that as „ask".
+      price: lowestPrice({ services: r.services, priceList: r.priceList }) ?? r.priceFrom ?? 0,
       rating: r.rating,
       reviewsCount: r.reviewsCount,
       verified: r.verified,
-      fullName: r.user.fullName,
+      fullName: r.user?.fullName ?? 'ექსპერტი',
       // NEVER the raw stored value: avatars are base64 in Postgres, and passing
       // one through a list payload is half a megabyte of uncacheable HTML.
-      avatar: avatarSrc(r.user.id, r.user.avatarUrl),
+      avatar: r.user ? avatarSrc(r.user.id, r.user.avatarUrl) : null,
     }))
   } catch {
     // A DB blip renders the page with no expert section rather than a 500 —

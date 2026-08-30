@@ -225,7 +225,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         <div className="mt-14 pt-8 border-t border-ink-100 max-w-[720px]">
           <div className="rounded-card border border-ink-200 bg-ink-50/50 p-6 lg:p-8">
             <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight">გჭირდება პრაქტიკული რჩევა?</h2>
-            <p className="mt-2 text-body-lg text-ink-600 leading-relaxed">დაჯავშნე კონსულტაცია ექსპერტთან და მიიღე პასუხი შენს კონკრეტულ კითხვაზე.</p>
+            <p className="mt-2 text-body-lg text-ink-600 leading-relaxed">აღწერე, რა გჭირდება — ექსპერტი მოგწერს და შემოგთავაზებს.</p>
             <Link href="/experts" className="mt-5 inline-flex h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body items-center gap-2 transition-colors duration-fast">იპოვე ექსპერტი</Link>
           </div>
         </div>

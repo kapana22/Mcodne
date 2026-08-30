@@ -16,12 +16,20 @@ datasource db {
 /// until the backfill has run — lib/roles → `asRole` maps them on read so the
 /// deploy and the data move stay independent. Delete them once
 /// `SELECT DISTINCT role FROM "User"` shows three values.
+// ⚠️ TWO VALUES LEFT ON 2026-08-24: `STUDENT` and `TUTOR`. They were the
+// original pair — a learner and a teacher — renamed to USER/PROVIDER when the
+// site stopped being a tutoring platform, and kept afterwards only because a
+// Postgres enum cannot drop a value in place. Measured before the drop: 29
+// PROVIDER, 30 USER, 4 ADMIN, and NOBODY on either legacy value. The migration
+// swaps the type; the guard refuses if a single row still carries one.
+//
+// What this ends is the confusion CLAUDE.md spent a section on — „2 selling
+// services carry role STUDENT" — which stopped being true when the roles were
+// renamed and stayed in the file as a warning about a table nobody could fix.
 enum Role {
   USER
   PROVIDER
   ADMIN
-  STUDENT
-  TUTOR
 }
 
 enum ApplicationStatus {
@@ -30,29 +38,6 @@ enum ApplicationStatus {
   APPROVED
   REJECTED
   NEEDS_REVISION
-}
-
-enum BookingStatus {
-  PREPARING
-  CONFIRMED
-  LIVE
-  COMPLETED
-  CANCELED
-  NO_SHOW
-}
-
-enum PayoutStatus {
-  PENDING
-  RELEASED
-  REFUNDED
-}
-
-// Product pivot: two service shapes coexist on the platform.
-// CONSULTATION = one-off, "available now" experience (default going forward).
-// RECURRING    = weekly-schedule tutoring (existing behavior, default for legacy rows).
-enum ServiceType {
-  CONSULTATION
-  RECURRING
 }
 
 // How a sphere behaves in public. Replaces the old `isLive` boolean, which
@@ -70,39 +55,6 @@ enum CategoryStatus {
   VISIBLE
   HIDDEN
   REDIRECTED
-}
-
-// WHAT this profile is, as opposed to what it may DO.
-//
-// Deliberately NOT a Role. A role answers „what are you allowed to do", and an
-// expert and a teacher are allowed exactly the same things: publish time, be
-// booked, message, be paid, be reviewed. What differs is what they SELL and how
-// they are presented — that is a type. Making it a Role would have touched 87
-// call sites, roleHome/postAuthHome, the approve flow, the dual-role switcher
-// and the auth-routing invariants, and bought nothing this field does not.
-//
-// italki ships exactly this shape: „Professional Teacher" and „Community Tutor"
-// are two types of the same account, with different admission requirements and
-// different presentation, not two roles.
-//
-// Mutually exclusive on purpose — a person is one or the other. Existing rows
-// default to EXPERT, so nothing moves when the column lands.
-enum ProfileType {
-  EXPERT
-  TEACHER
-}
-
-// A bought package's life. REQUESTED is the state that exists only because
-// there is no payment gateway yet: the client asks, the two settle offline, and
-// the expert flips it to ACTIVE by hand (audit-logged). Once checkout ships,
-// the gateway callback sets ACTIVE and REQUESTED simply stops being reachable —
-// no migration, no rename.
-enum EnrollmentStatus {
-  REQUESTED
-  ACTIVE
-  COMPLETED
-  EXPIRED
-  CANCELLED
 }
 
 model User {
@@ -136,17 +88,11 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  tutor             TutorProfile?
-  application       TutorApplication?
   // B2B (2026-08-11). A VIRTUAL field — Prisma back-relations emit no SQL, so
   // this line adds nothing to the User table. The whole vertical is dark behind
   // B2B_VISIBILITY (lib/flags.ts); an account with no membership row is
   // indistinguishable from one on a deployment where B2B does not exist.
   companyMemberships CompanyMember[]
-  bookingsAsStudent Booking[]            @relation("StudentBookings")
-  enrollments       Enrollment[]         @relation("StudentEnrollments")
-  sentMessages      Message[]            @relation("SentMessages")
-  receivedMessages  Message[]            @relation("ReceivedMessages")
   reviewsGiven      Review[]             @relation("ReviewsGiven")
   favorites         Favorite[]
   creditEntries     CreditEntry[]
@@ -226,8 +172,6 @@ model Category {
   icon               String?
   count              Int            @default(0)
   order              Int            @default(0)
-  // Sensible default that new tutors in this category inherit (they can override).
-  defaultServiceType ServiceType    @default(CONSULTATION)
   // DEPRECATED — superseded by `status`, kept for one release so the migration
   // is reversible without data loss. Dropped in the follow-up migration once
   // every reader is on `status`.
@@ -243,7 +187,7 @@ model Category {
   parent             Category?      @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
   children           Category[]     @relation("CategoryTree")
 
-  tutors             TutorProfile[]
+  providers          ServiceProfile[]
   // Requests filed under this sphere (2026-08-14). Virtual back-relation, no
   // SQL. The FK on ServiceRequest is Restrict, so deleting a sphere that still
   // carries requests fails loudly instead of silently unfiling them.
@@ -330,522 +274,61 @@ model SiteText {
   updatedAt DateTime @updatedAt
 }
 
-model TutorProfile {
-  id                      String      @id @default(cuid())
-  // Human-readable public URL segment, e.g. "ana-gagoshidze" → /tutors/ana-gagoshidze.
-  // Nullable: legacy rows are backfilled by lib/expertSlug.ts, and the route
-  // resolves by id as well, so a null slug is never a broken profile.
-  slug                    String?     @unique
-  userId                  String      @unique
-  headline                String
-  bio                     String?
-  specialty               String
-  yearsExp                Int         @default(0)
-  rating                  Float       @default(0)
-  reviewsCount            Int         @default(0)
-  sessionsCount           Int         @default(0)
-  price                   Int // GEL, flat price the expert sets per consultation — what they set is what the client pays (not re-derived from an hourly rate)
-  currency                String      @default("GEL")
-  verified                Boolean     @default(false)
-  available               Boolean     @default(true)
-  // SELF-DECLARED response promise, typed in by the expert in /tutor/profile.
-  // Unverifiable, so it is NO LONGER a public trust signal — the browse list
-  // omits it entirely and the card/profile render `responseMedianMin` instead.
-  // Kept only because the profile editor still writes it; the editor field
-  // should be relabelled or removed.
-  responseHours           Int         @default(24)
-  // MEASURED first-response time: the median minutes an expert takes to answer
-  // a conversation the OTHER party started, over the last 90 days, and the
-  // number of answered conversations that median came from. Both nullable —
-  // null (or a sample below RESPONSE_MIN_SAMPLE) means "not enough data", and
-  // the UI must then show NOTHING rather than fall back to responseHours.
-  // Definition + math: lib/responseTime.ts. Written by lib/responseTimeStore.
-  // Also added idempotently in lib/dbBoot, so no `prisma db push` is required.
-  responseMedianMin       Int?
-  responseSampleN         Int?
-  languages               String[]    @default(["ka"])
-  // WHAT THIS PERSON IS, in their own words — „ბუღალტერი", „მარკეტოლოგი".
-  // Several on purpose (owner, 2026-08-11): „მარკეტოლოგმა იცის დიზაინი და
-  // რეკლამირებაც", and a field that holds one makes them under-describe
-  // themselves. The vocabulary is lib/professions.ts (16 spheres, 91 jobs).
-  //
-  // NOT a replacement for `categoryId`. The sphere stays single and keeps
-  // driving browse, the filter, /categories/*, the counts and the SEO; this is
-  // the finer grain that only ever shows on the profile and the card. Added
-  // idempotently in lib/dbBoot, so no `prisma db push` is required.
-  professions             String[]    @default([])
-  linkedinUrl             String?
-  websiteUrl              String?
-  professionData          Json?
-  // Product pivot fields — see enum ServiceType.
-  // New experts default to CONSULTATION (instant "available now"); legacy rows
-  // that predate this flip keep whatever value they were created with.
-  serviceType             ServiceType @default(CONSULTATION)
-  // Standard session length for this expert (15|30|60 min). Only a DEFAULT for
-  // the browse "soonest bookable time" hint and the picker — an individual
-  // service (Consultation.minutes) carries its own length, and openness is
-  // always derived against THAT (see lib/availability).
-  consultationDurationMin Int         @default(30)
-  // Required gap around every session, in minutes. 0 = back-to-back allowed,
-  // which is exactly today's behavior. Read wherever bookable starts are
-  // derived (lib/availability implements it by fattening each busy interval on
-  // both sides). Also added idempotently in lib/dbBoot.
-  bufferMin               Int         @default(0)
-  // Optional 60-90s tutor intro video (data URL or hosted URL from /api/uploads?kind=video).
-  videoUrl                String?
-  // Admin-curated homepage featured slot — appears in landing hero when true.
-  featured                Boolean     @default(false)
-  // EXPERT (one-off consultations) or TEACHER (monthly packages). See enum
-  // ProfileType for why this is a type and not a Role.
-  //
-  // Drives four things and nothing else: which route lists them, which product
-  // they may create, which profile FIELDS they are asked for (stored in
-  // `professionData`, the existing per-profession JSON bag), and which words the
-  // UI uses. Permissions are untouched.
-  profileType             ProfileType @default(EXPERT)
-  // Admin-curated: may this expert sell teaching PACKAGES? (2026-08-05)
-  //
-  // This is the ONE gate for the whole packages vertical, and it is deliberately
-  // an allowlist that starts empty. It is NOT `serviceType`: 11 of 21 live
-  // profiles already carry a legacy RECURRING value nobody reads, so filtering
-  // browse on serviceType would have wiped half the catalog (see lib/flags.ts →
-  // FEATURE_PACKAGES). An empty allowlist can only ever produce an empty page.
-  //
-  // Two directions, both safe while nobody is enabled:
-  //   · the teaching route lists ONLY profiles where this is true;
-  //   · the consultation browse (lib/tutorsQuery) EXCLUDES them, so one card
-  //     never mixes „₾100 · 60 წთ" with „₾640 · 8 გაკვეთილი".
-  packagesEnabled         Boolean     @default(false)
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
-
-  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  categoryId    String?
-  category      Category?          @relation(fields: [categoryId], references: [id])
-  consultations Consultation[]
-  bookings      Booking[]
-  availability  AvailabilitySlot[]
-  reviews       Review[]
-  favorites     Favorite[]
-  certificates  Certificate[]
-  education     Education[]
-  experience    Experience[]
-  packages      Package[]
-  enrollments   Enrollment[]
-
-  @@index([serviceType])
-  // Fast lookup for admin-curated hero on /
-  @@index([featured])
-  // Public browse + hero: filter `available` then sort `verified desc, rating desc`.
-  // Equality on `available` + a backward scan satisfies the sort, so the take:N
-  // reads the top rows directly instead of scanning+sorting the whole table.
-  @@index([available, verified, rating])
-  // Postgres doesn't auto-index FKs: every category-filtered browse and the
-  // /categories counts scanned the whole table without this. Also in dbBoot.
-  @@index([categoryId])
-  // Trigram (GIN) indexes backing the Georgian-aware search in
-  // lib/tutorsQuery: Georgian declines heavily, so search ranks by
-  // word_similarity() rather than substring. A gin_trgm_ops index also serves
-  // the ILIKE '%…%' arm that predicate keeps. Requires the pg_trgm extension,
-  // which lib/dbBoot creates idempotently at boot (so no `prisma db push` is
-  // needed); dbBoot also creates these same indexes under the same names.
-  @@index([specialty(ops: raw("gin_trgm_ops"))], type: Gin, map: "TutorProfile_specialty_trgm_idx")
-  @@index([headline(ops: raw("gin_trgm_ops"))], type: Gin, map: "TutorProfile_headline_trgm_idx")
-  @@index([bio(ops: raw("gin_trgm_ops"))], type: Gin, map: "TutorProfile_bio_trgm_idx")
-}
-
-model Certificate {
-  id        String   @id @default(cuid())
-  tutorId   String
-  title     String
-  issuer    String
-  year      Int
-  fileUrl   String?
-  verified  Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
-
-  @@index([tutorId])
-}
-
-model Education {
-  id        String   @id @default(cuid())
-  tutorId   String
-  school    String
-  degree    String
-  field     String?
-  startYear Int
-  endYear   Int?
-  createdAt DateTime @default(now())
-
-  tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
-
-  @@index([tutorId])
-}
-
-model Experience {
-  id          String   @id @default(cuid())
-  tutorId     String
-  company     String
-  role        String
-  startYear   Int
-  endYear     Int?
-  description String?
-  createdAt   DateTime @default(now())
-
-  tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
-
-  @@index([tutorId])
-}
-
-model Consultation {
-  id          String           @id @default(cuid())
-  tutorId     String
-  title       String
-  description String
-  minutes     Int
-  price       Int
-  /// ⚠️ THE TABLE HOLDS TWO SHAPES SINCE 2026-08-20, and this column is the
-  /// difference. Both are SERVICES — the product model has always said so —
-  /// but only one is bought by picking a time:
-  ///
-  ///   bookable = true   „კონსულტაცია 60წთ — 80₾"   a slot on a calendar
-  ///   bookable = false  „დეკლარაციის შევსება — 100₾" a job, arranged in the thread
-  ///
-  /// It exists because an accountant could not publish the second one at all.
-  /// Every row on this table required `minutes`, so selling „draft my contract"
-  /// meant inventing a duration for it and putting it on a booking calendar —
-  /// and the whole expert side of the catalogue therefore sold nothing but
-  /// hours. The site says it sells services; this is the column that lets the
-  /// expert half actually do it.
-  ///
-  /// `minutes` STAYS REQUIRED and is 0 on a service row. Forty-four call sites
-  /// read it; making it nullable would have touched every one of them for a
-  /// value none of them needs when `bookable` is false. Anything that offers a
-  /// TIME must filter on this column — see lib/bookableConsultations.
-  bookable    Boolean          @default(true)
-  tutor       TutorProfile     @relation(fields: [tutorId], references: [id], onDelete: Cascade)
-  bookings    Booking[]
-
-  // FK lookup behind "this expert's offerings" on every profile view. Also in dbBoot.
-  @@index([tutorId])
-}
-
-// A teaching PACKAGE — N prepaid lessons an expert sells as one product.
-// Sibling of Consultation: that model is one session you buy once, this one is
-// a block you draw down over a month. Gated by TutorProfile.packagesEnabled and
-// FEATURE_PACKAGES; invisible until both are on.
-model Package {
-  id               String  @id @default(cuid())
-  tutorId          String
-  title            String
-  description      String
-  // How many lessons the block contains. 8 is the Georgian market's unit
-  // (2/week × 4 weeks) — gurus.ge/servisebi.ge listings price exactly that.
-  lessonsCount     Int
-  minutesPerLesson Int
-  // The TOTAL price of the block in GEL — never a per-lesson rate.
-  //
-  // The per-lesson figure is DERIVED for display (price / lessonsCount) and is
-  // never an input. Reason, learned the hard way on this codebase: an expert
-  // whose card said „₾80 · 30 წთ" while their profile rail said „₾25-დან" had
-  // one real offer and three published prices. One stored number, one truth.
-  price            Int
-  // How long the block stays spendable once it goes ACTIVE. 30 = „1 თვე".
-  validDays        Int     @default(30)
-  // Expert's own on/off, independent of the admin's packagesEnabled gate.
-  active           Boolean @default(true)
-
-  tutor       TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
-  enrollments Enrollment[]
-
-  // „this expert's packages" on every profile view
-  @@index([tutorId])
-}
-
-// One package, bought by one client — the thing that actually holds the money
-// and the remaining lessons. Every scalar the client agreed to is SNAPSHOTTED
-// here, so an expert editing (or deleting) the Package later cannot rewrite a
-// deal that is already running.
-model Enrollment {
-  id        String           @id @default(cuid())
-  packageId String?
-  studentId String
-  // Denormalised from Package.tutorId so „my students" is one indexed read and
-  // survives the package being deleted.
-  tutorId   String
-  status    EnrollmentStatus @default(REQUESTED)
-
-  lessonsTotal   Int
-  lessonsUsed    Int @default(0)
-  // priceTotal is what the client owes; perLessonPrice is priceTotal spread
-  // over lessonsTotal and exists ONLY so a package lesson can display a
-  // non-zero value to the expert.
-  //
-  // ⚠️ REVENUE IS COUNTED HERE, NEVER ON THE BOOKINGS. A booking that carries
-  // an enrollmentId contributes 0 — its Enrollment already counted. Summing
-  // Booking.price across a package would double-count the whole block.
-  priceTotal     Int
-  perLessonPrice Int
-  // Lesson length, snapshotted like the money above. Nullable ONLY for rows
-  // created before this column existed (dbBoot backfills them from the
-  // package); every new enrollment writes it. Read it through
-  // `enrollmentMinutes()` in lib/packages — never off `package` directly, or a
-  // later edit to the Package rewrites a deal someone already agreed to.
-  minutesPerLesson Int?
-
-  // Set by hand by the expert while PAYMENTS_LIVE is false (audit-logged), by
-  // the gateway callback once it isn't. Null → still REQUESTED.
-  paidAt    DateTime?
-  startsAt  DateTime?
-  // paidAt + validDays. EXTENDS when the EXPERT cancels or no-shows: the client
-  // did nothing wrong and must not lose the days. A client-side cancellation
-  // refunds the credit (subject to CANCEL_CUTOFF_HOURS) but never moves this.
-  expiresAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Restrict on student/tutor, matching Booking: an account with package
-  // history must not be cascade-wiped out from under its counterparty.
-  student  User         @relation("StudentEnrollments", fields: [studentId], references: [id])
-  tutor    TutorProfile @relation(fields: [tutorId], references: [id])
-  // A deleted package nulls the FK; this row keeps its own snapshot, so the
-  // running deal loses nothing.
-  package  Package?     @relation(fields: [packageId], references: [id], onDelete: SetNull)
-  bookings Booking[]
-
-  // „my packages", newest first — the student dashboard's only query here.
-  @@index([studentId, createdAt])
-  // „students on a package with me" + the expert's inbox of REQUESTED ones.
-  @@index([tutorId, status])
-  // The expiry sweep: find ACTIVE rows past their date.
-  @@index([status, expiresAt])
-  @@index([packageId])
-}
-
-// A row is a WINDOW of published availability, never a pre-sliced ticket. Start
-// times are derived at request time (windows − active bookings − service length
-// − buffer) by lib/availability; exactly-touching rows merge, so legacy
-// pre-sliced rows keep working with no migration.
-model AvailabilitySlot {
-  id      String   @id @default(cuid())
-  tutorId String
-  startAt DateTime
-  endAt   DateTime
-  // RETIRED (stage 11, 2026-08-19). Nothing claims a window any more — a
-  // booking's own [startAt, end) is the single source of "busy". No code reads
-  // or writes this column since stage 11; `@ignore` drops it from the Prisma
-  // client while the COLUMN STAYS (DEFAULT false, so creates are fine). It may
-  // be dropped by hand — `ALTER TABLE "AvailabilitySlot" DROP COLUMN "booked"`
-  // — once no old instance runs; a rolling deploy still has the previous
-  // instance writing it, which is why tonight only the code went. The wire
-  // shape /api/tutors/[id] emits still carries `booked: false` for old clients.
-  booked  Boolean      @default(false) @ignore
-  tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
-
-  @@index([tutorId, startAt])
-  // Legacy companion of the `booked` column (the old browse "next free slot"
-  // query). Kept so no db push is needed; the new browse query rides
-  // [tutorId, startAt] above. Goes with the column when it is dropped by hand.
-  @@index([tutorId, booked, startAt])
-}
-
-model Booking {
-  id             String        @id @default(cuid())
-  ref            String        @unique @default(cuid())
-  studentId      String
-  tutorId        String
-  consultationId String?
-  topic          String
-  status         BookingStatus @default(PREPARING)
-  startAt        DateTime
-  durationMin    Int
-  price          Int
-  // Snapshotted at booking time so a later tutor-type switch never rewrites history.
-  serviceType    ServiceType   @default(CONSULTATION)
-  // True when the cleanup cron auto-transitioned CONFIRMED/LIVE → COMPLETED
-  // because ≥48h passed after the scheduled end and nobody flipped it manually.
-  // Reviews API rejects submissions on auto-completed bookings — the session
-  // may not have actually happened, so a "we're not sure it took place" review
-  // is not trustworthy signal.
-  autoCompleted  Boolean       @default(false)
-  payoutStatus   PayoutStatus  @default(PENDING)
-  // LEGACY. Bookings no longer claim an AvailabilitySlot — availability rows are
-  // windows and this booking's own [startAt, startAt+durationMin) IS the busy
-  // interval. Always `null` for new bookings; cancel/decline/cleanup only null
-  // it (the `booked` flag it used to release is retired — stage 11).
-  heldSlotId     String?
-  studentNotes   String?
-  tutorNotes     String?
-  meetingUrl     String?
-  // Track cancellation source so admin can see tutor-cancel rate vs student.
-  cancelledBy    Role?
-  cancelReason   String?
-  // These columns are created at boot by lib/dbBoot.ts. They MUST be declared
-  // here so a `prisma db push` treats them as source-of-truth and does NOT drop
-  // them (dropping rescheduleRequest wipes all pending reschedule proposals;
-  // dropping sessionReminderSentAt double-sends reminder emails). See lib/dbBoot.ts.
-  rescheduleRequest     Json?
-  sessionReminderSentAt DateTime?
-  // ⚠️ proposedByStudent shipped 2026-08-04 in dbBoot WITHOUT a declaration
-  // here — i.e. one `prisma db push` away from silently erasing which bookings
-  // the client had proposed. Declared now, together with the two columns the
-  // diaspora vertical adds, so the block above tells the whole truth again.
-  //   proposedByStudent  — the client named this time; it is not in the
-  //                        expert's published schedule and their UI says so.
-  //   proposedAlternates — their 2nd/3rd choice, [{ startAt }], max 2.
-  //   paymentLinkUrl     — a BOG/TBC link an expert or admin pasted. Display
-  //                        only; no checkout, no webhook, PAYMENTS_LIVE untouched.
-  proposedByStudent     Boolean   @default(false)
-  proposedAlternates    Json?
-  paymentLinkUrl        String?
-  // The lesson this booking spends, when it came out of a package (2026-08-05).
-  // NULL = an ordinary one-off booking, i.e. every row that exists today.
-  //
-  // This single nullable column is the whole packages design. A package lesson
-  // is an ORDINARY Booking, so reschedule, cancel, the video room, messages,
-  // reminders, no-show, disputes and the .ics feed all keep working with no new
-  // code — there is deliberately no parallel booking system to maintain.
-  //
-  // ⚠️ Financial aggregates MUST filter `enrollmentId IS NULL`. The Enrollment
-  // already booked the revenue; counting these too double-counts the block.
-  enrollmentId          String?
-  // Who paid for this booking (2026-08-11, the B2B vertical).
-  //
-  // NULL IS THE HISTORY, AND IT STAYS NULL. Every booking that exists today
-  // predates company balances, so `null` MEANS `CARD` — `paymentSourceOf()` in
-  // lib/b2b.ts is the one place that reads it that way. A `DEFAULT 'CARD'`
-  // would have to be backfilled across live history to record something nobody
-  // ever asserted; nothing writes this column at all unless a company balance
-  // is actually charged.
-  //
-  // No index: the only reader is the booking's own row.
-  paidBy                PaymentSource?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  // NOTE: student/tutor deliberately use the default Restrict (no onDelete).
-  // The self-delete flow (/api/me DELETE) relies on it to refuse deleting an
-  // account that has booking history — preserving the counterparty's records
-  // rather than cascade-wiping them. Do not switch these to Cascade.
-  student            User                @relation("StudentBookings", fields: [studentId], references: [id])
-  tutor              TutorProfile        @relation(fields: [tutorId], references: [id])
-  // A deleted consultation offering nulls the FK; the booking keeps its own
-  // snapshotted price/duration, so no data is lost.
-  consultation       Consultation?       @relation(fields: [consultationId], references: [id], onDelete: SetNull)
-  enrollment         Enrollment?         @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
-  messages           Message[]
-  review             Review?
-  legacyRescheduleRequests LegacyRescheduleRequest[]
-  dispute            Dispute?
-
-  @@index([serviceType])
-  // NOTE: no single-column [studentId] / [tutorId] indexes — each is a strict
-  // prefix of the composites below, so they only cost write amplification.
-  // Student dashboard: where studentId, orderBy startAt desc (up to 500 rows).
-  @@index([studentId, startAt])
-  // Cleanup cron + admin finance: filter by status within a startAt range.
-  @@index([status, startAt])
-  // FK lookups + "bookings for this consultation" scans
-  @@index([consultationId])
-  // Hot path: "tutor's upcoming/live bookings ordered by start"
-  @@index([tutorId, status, startAt])
-  // Sort order on both messages pages (list bookings-with-messages by recency)
-  @@index([updatedAt])
-  // Admin finance / analytics filter by createdAt for date-window aggregates
-  @@index([createdAt])
-  // „the lessons of this package", and the revenue rule's IS NULL filter
-  @@index([enrollmentId])
-}
-
-model Message {
-  id        String    @id @default(cuid())
-  bookingId String?
-  fromId    String
-  toId      String
-  body      String
-  fileUrl   String?
-  fileName  String?
-  // Recipient-side read receipt — set when the receiving user opens the
-  // conversation. Used for "N new" badges on the messages inbox.
-  readAt    DateTime?
-  // Created at boot by lib/dbBoot.ts, accessed via raw SQL only — declared here
-  // so `prisma db push` won't drop it (dropping it re-sends unread-message
-  // reminder emails). See lib/dbBoot.ts.
-  reminderEmailSentAt DateTime?
-  createdAt DateTime  @default(now())
-
-  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  // from/to keep the default Restrict so /api/me DELETE refuses to wipe an
-  // account that has message history (see Booking.student note).
-  from    User     @relation("SentMessages", fields: [fromId], references: [id])
-  to      User     @relation("ReceivedMessages", fields: [toId], references: [id])
-
-  @@index([bookingId, createdAt])
-  // Fast "unread messages for this user" query for the messages inbox badge.
-  @@index([toId, readAt])
-  // Pre-booking inbox: (fromId=me) arm ordered by createdAt desc. Covers the
-  // plain fromId lookups ("messages I sent" + FK maintenance) too, so no
-  // separate single-column [fromId] index is declared.
-  @@index([fromId, createdAt])
-  // …and the (toId=me) arm of the same OR-query, which otherwise had to sort.
-  @@index([toId, createdAt])
-  // Created by lib/dbBoot.ts — declared here so `prisma db push` won't drop it.
-  // Serves the message-reminder cron's unread-window scan.
-  @@index([readAt, createdAt])
-}
-
 model Review {
-  id                String    @id @default(cuid())
-  /// ONE of bookingId / offerId is set (CHECK in lib/dbBoot). A review of a
-  /// consultation hangs off the booking; a review of a job (stage 7, 2026-08-19)
-  /// hangs off the accepted offer. Made nullable by the ONE real column
-  /// migration in the restructuring — an ALTER, not a @map.
-  bookingId         String?   @unique
-  offerId           String?   @unique
-  studentId         String
-  /// Nullable for the same reason: a job review has no TutorProfile.
-  tutorId           String?
-  rating            Int
-  body              String
-  // Multi-dimensional ratings (1..5). Overall `rating` is derived (avg).
+  id String @id @default(cuid())
+
+  /// THE FINISHED JOB THIS RATES.
+  ///
+  /// ⚠️ IT WAS `bookingId` UNTIL 2026-08-24, and the column is gone with the
+  /// booking. A review is now written against a RequestOffer the client marked
+  /// done — the one path on the site where money and work actually changed
+  /// hands. Nullable + unique for the same reason it always was: unique makes
+  /// „once" the DATABASE's answer rather than a check, and NULLs do not fight
+  /// under a unique index in Postgres.
+  offerId String? @unique
+
+  /// Who wrote it. The relation name is historical („ReviewsGiven") and stays —
+  /// renaming it would rewrite every include for nothing.
+  studentId String
+
+  rating Int
+  body   String
+
   ratingKnowledge   Int?
   ratingClarity     Int?
   ratingValue       Int?
   ratingPunctuality Int?
-  tutorResponse     String?
-  respondedAt       DateTime?
-  anonymous         Boolean   @default(false)
-  createdAt         DateTime  @default(now())
 
-  // Default Restrict — reviews are permanent record; /api/me DELETE refuses
-  // accounts with review history rather than cascade-deleting it.
-  booking Booking?     @relation(fields: [bookingId], references: [id])
+  /// The provider's answer, and when they gave it.
+  tutorResponse String?
+  respondedAt   DateTime?
+
+  anonymous Boolean  @default(false)
+  createdAt DateTime @default(now())
+
   offer   RequestOffer? @relation(fields: [offerId], references: [id])
-  student User         @relation("ReviewsGiven", fields: [studentId], references: [id])
-  tutor   TutorProfile? @relation(fields: [tutorId], references: [id])
+  student User          @relation("ReviewsGiven", fields: [studentId], references: [id])
 
-  @@index([tutorId, createdAt])
-  // "reviews written by this student" + FK maintenance on user delete
   @@index([studentId])
+  @@index([createdAt])
 }
 
 model Favorite {
-  id        String   @id @default(cuid())
-  userId    String
-  tutorId   String
-  createdAt DateTime @default(now())
+  id     String @id @default(cuid())
+  userId String
+  /// ⚠️ WAS `tutorId` → TutorProfile UNTIL 2026-08-24. Same column, renamed and
+  /// repointed at the one provider profile; the saved row survived the move
+  /// because the new profile carries the OLD id (see the migration).
+  providerId String
+  createdAt  DateTime @default(now())
 
-  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider ServiceProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, tutorId])
-  // The composite unique is (userId, tutorId)-prefixed, so a tutorId-only
-  // lookup (cascade-delete favorites when a tutor is removed) can't use it.
-  @@index([tutorId])
-  // "my favorites, newest first" — filter userId, sort createdAt desc.
+  @@unique([userId, providerId])
+  // The composite unique is (userId, providerId)-prefixed, so a providerId-only
+  // lookup (cascade-delete favourites when a profile is removed) can't use it.
+  @@index([providerId])
   @@index([userId, createdAt])
 }
 
@@ -883,122 +366,6 @@ model AuditLog {
 
   @@index([actorId, createdAt])
   @@index([action, createdAt])
-  @@index([createdAt])
-}
-
-// Reschedule proposal — one row per outstanding request. Either party may
-// propose; the other party accepts/declines. On accept, we swap the covering
-// availability slot in a transaction (see /api/bookings/[id]/reschedule).
-enum RescheduleStatus {
-  PENDING
-  ACCEPTED
-  DECLINED
-  CANCELLED
-}
-
-// ⚠️ LEGACY / UNUSED — do not write to this model. The live reschedule feature
-// stores its pending proposal in Booking."rescheduleRequest" (a dbBoot-added
-// JSONB column, accessed via raw SQL), NOT in this relational table. Kept only
-// to avoid a destructive prod `db push` drop; treat the JSONB column as the
-// source of truth. Renamed in the client to `LegacyRescheduleRequest` (stage 11,
-// 2026-08-19) so `prisma.legacyRescheduleRequest` reads as what it is; the TABLE
-// name is unchanged via @@map — no DDL.
-model LegacyRescheduleRequest {
-  id           String           @id @default(cuid())
-  bookingId    String
-  proposedBy   String           // userId of proposer (student or tutor)
-  newStartAt   DateTime
-  newDurationMin Int
-  reason       String?
-  status       RescheduleStatus @default(PENDING)
-  decidedAt    DateTime?
-  createdAt    DateTime         @default(now())
-
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@index([bookingId, status])
-  @@index([status, createdAt])
-  @@map("RescheduleRequest")
-}
-
-// Formal dispute filed by student against a booking. Different from cancel:
-// dispute keeps booking on the books, admin investigates, resolves with a
-// refund / partial refund / dismiss / redo.
-enum DisputeReason {
-  NO_SHOW
-  QUALITY
-  WRONG_TOPIC
-  UNPROFESSIONAL
-  TECHNICAL
-  OTHER
-}
-
-enum DisputeOutcome {
-  PENDING
-  REFUND_FULL
-  REFUND_PARTIAL
-  REDO_FREE
-  DISMISSED
-}
-
-model Dispute {
-  id         String          @id @default(cuid())
-  bookingId  String          @unique
-  studentId  String          // convenience — same as booking.studentId
-  tutorId    String          // convenience — same as booking.tutorId
-  reason     DisputeReason
-  details    String?
-  requested  DisputeOutcome  @default(PENDING) // what student wants
-  outcome    DisputeOutcome  @default(PENDING) // what admin decided
-  resolution String?         // admin notes
-  createdAt  DateTime        @default(now())
-  resolvedAt DateTime?
-  resolvedBy String?         // admin userId
-
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@index([outcome, createdAt])
-  @@index([tutorId, outcome])
-  // "disputes filed by this student"
-  @@index([studentId])
-}
-
-model TutorApplication {
-  id             String            @id @default(cuid())
-  userId         String            @unique
-  fullName       String
-  phone          String
-  city           String?
-  specialty      String
-  yearsExp       Int
-  hourlyRate     Int
-  motivation     String
-  linkedinUrl    String?
-  websiteUrl     String?
-  // YouTube intro-video — the applicant uploads to their YouTube channel
-  // (unlisted) and pastes the link. We keep both the raw URL (for admin
-  // display) and the extracted 11-char video ID (for embed iframes).
-  introVideoUrl  String?
-  introVideoId   String?
-  // Profession-specific answers captured on apply (e.g. bar number, CFA, exits count).
-  professionData Json?
-  // Verification documents — ADMIN-ONLY. Deliberately kept on the application
-  // (never copied to the public TutorProfile / professionData) because
-  // /api/tutors/[id] returns the whole profile, incl. professionData, publicly.
-  // idDoc = ID front photo, selfie = selfie-with-doc, certificates = list of
-  // { title, url } diploma/cert scans uploaded via /api/uploads.
-  idDocUrl       String?
-  selfieUrl      String?
-  certificates   Json?
-  status         ApplicationStatus @default(SUBMITTED)
-  moderatorNote  String?
-  createdAt      DateTime          @default(now())
-  reviewedAt     DateTime?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Admin moderation queue filters by status + sorts by recency
-  @@index([status])
   @@index([createdAt])
 }
 
@@ -1500,6 +867,16 @@ model ServiceRequest {
   userId String?
   user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  /// Photos of the thing that needs doing — base64 data URIs, at most
+  /// MAX_REQUEST_PHOTOS (lib/requests). A picture of the leaking tap is what
+  /// lets a provider name a real price instead of opening a conversation to
+  /// find one out (2026-08-29).
+  ///
+  /// ⚠️ BLOBS. Never select this into a list payload — the queue, the offers
+  /// list and the admin table all read this row. Same rule as
+  /// ServiceProfile.workPhotos, and the same reason.
+  photos String[]
+
   status ServiceRequestStatus @default(NEW)
 
   // The admin's own scratch note — who they spoke to, what was actually wanted.
@@ -1798,6 +1175,12 @@ model MasterApplication {
   services String[]
   areas    String[]
 
+  /// ⚠️ ADDED 2026-08-24, WHEN THIS BECAME THE ONLY APPLICATION. A lawyer and a
+  /// plumber now fill in the same form; the lawyer's answer to „ვინ ხარ" is a
+  /// profession from lib/professions, and it is what the approved profile's
+  /// sphere is derived from. Empty for a trade that names no profession.
+  professions String[] @default([])
+
   /// „12 წელი ვმუშაობ სანტექნიკაზე, ვმუშაობ თბილისში და რუსთავში." Free text,
   /// shown to clients after approval.
   about    String
@@ -2038,14 +1421,156 @@ model ServiceProfile {
   /// switch — this one is the master's own.
   available Boolean @default(true)
 
+  /// WHEN THE PROVIDER LAST SAID „yes, this is what I sell" — null means they
+  /// never have.
+  ///
+  /// ⚠️ IT EXISTS BECAUSE OF THE MIGRATION (2026-08-25). When consultations were
+  /// removed, the 27 people who came across were seeded with their whole SPHERE:
+  /// a provider with no services is invisible to routing, so „nothing ticked"
+  /// would have migrated them into silence. The cost is that all four lawyers
+  /// claim all seven legal services — so they read as the same person on a card,
+  /// and the filter cannot narrow anything.
+  ///
+  /// It cannot be fixed FOR them. Their own bios are evidence of what they
+  /// definitely do, never of what they do not, so narrowing by text would have
+  /// quietly taken „დღგ" away from an accountant who simply had not used the
+  /// word — and dropped them out of every queue that names it. Owner, the same
+  /// day: „არაფერი არ უნდა შეცვალოს, წაშლა არ გვინდა, მათ უნდა შევიდნენ ისევ
+  /// თავიან ექაუნთზე."
+  ///
+  /// So nothing is changed and nothing is deleted. This column only records
+  /// whether the list has been LOOKED AT: /work/services stamps it on save, and
+  /// until it is stamped the workspace says so plainly. `null` is the honest
+  /// state for everybody who has not been asked yet, including the two profiles
+  /// that predate the migration.
+  servicesConfirmedAt DateTime?
+
+  /* ═══════════ THE PROFESSIONAL HALF, ABSORBED 2026-08-24 ═══════════════
+   *
+   * ⚠️ THESE COLUMNS ARE `TutorProfile`'S, MOVED — not new ideas. The
+   * consultation product was removed that day and with it the table that held
+   * the 27 lawyers, accountants and psychologists on this site. They are
+   * providers who sell services, exactly like the two plumbers already here,
+   * so they belong in THIS row; what they must not lose on the way is the half
+   * of a professional profile a trades profile never needed — the sphere, the
+   * professions, the diploma, the years, the languages.
+   *
+   * The rows carry their OLD ids and their OLD slugs (see the migration), so
+   * /experts/<slug> answers the same URL it answered yesterday and every
+   * credential still points at the right person.
+   */
+
+  /// „12 წელია სამართალში ვმუშაობ" — the one line under the name. Optional: a
+  /// plumber's card has never had one and does not need one.
+  headline String?
+
+  /// Job labels from lib/professions („ადვოკატი", „ბუღალტერი"). Several,
+  /// because one person is several professions inside one sphere — the reason
+  /// this was an array on TutorProfile and stays one here.
+  professions String[] @default([])
+
+  /// The ONE sphere, derived from the first profession. Drives browse
+  /// (/experts?category=), the counts and the SEO landing pages.
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  yearsExp  Int      @default(0)
+  languages String[] @default(["ka"])
+
+  /// Checked by an admin. „გადამოწმებული" on the card — never „ვერიფიცირებული".
+  verified Boolean @default(false)
+  /// The admin's thumb on the catalogue order.
+  featured Boolean @default(false)
+
+  linkedinUrl String?
+  websiteUrl  String?
+  /// A short intro video, YouTube only (lib/youtube).
+  videoUrl String?
+
+  /// What the card promises about replies. `responseHours` is the provider's
+  /// own claim; the pair beside it is MEASURED, and only the measured pair is
+  /// ever printed as a number (CLAUDE.md rule 6).
+  responseHours     Int  @default(24)
+  responseMedianMin Int?
+  responseSampleN   Int?
+
+  /// Derived from the reviews on this provider's finished jobs. Both stay 0
+  /// until somebody rates one — there is nothing to invent here.
+  rating       Float @default(0)
+  reviewsCount Int   @default(0)
+
+  certificates Certificate[]
+  education    Education[]
+  experience   Experience[]
+  favorites    Favorite[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  /// The stage-3 routing query is „who lists this topic", so the index goes on
-  /// the array. GIN is the only kind that answers `services @> ARRAY[…]`
-  /// without a sequential scan; it is created in lib/dbBoot, because Prisma
-  /// cannot express a GIN index on a scalar list.
+  /// The stage-3 routing query is „who lists this topic", so the GIN index goes
+  /// on `services` — created in lib/dbBoot, because Prisma cannot express a GIN
+  /// index on a scalar list.
   @@index([available])
+  @@index([categoryId])
+  @@index([featured])
+  @@index([published, available])
+}
+
+/* ═══════════ WHAT A PROVIDER CAN SHOW FOR THEMSELVES ══════════════════════
+ *
+ * Three tables that hung on `TutorProfile.id` until 2026-08-24 and now hang on
+ * `ServiceProfile.id`. The column was `tutorId`; it is `providerId`, and the
+ * migration only had to rename it because the new profile keeps the old id.
+ *
+ * They stay OPTIONAL and they stay three tables rather than one JSON blob: a
+ * diploma is verifiable and a job is not, and `Certificate.verified` is the
+ * column an admin actually ticks.
+ */
+model Certificate {
+  id         String   @id @default(cuid())
+  providerId String
+  title      String
+  issuer     String
+  year       Int
+  /// A scan. Base64 data URI like every other upload here — there is no object
+  /// storage, so the file IS the column and is never selected into a list.
+  fileUrl    String?
+  verified   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  provider ServiceProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+}
+
+model Education {
+  id         String   @id @default(cuid())
+  providerId String
+  school     String
+  degree     String
+  field      String?
+  startYear  Int
+  endYear    Int?
+  createdAt  DateTime @default(now())
+
+  provider ServiceProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+}
+
+model Experience {
+  id          String   @id @default(cuid())
+  providerId  String
+  company     String
+  role        String
+  startYear   Int
+  endYear     Int?
+  description String?
+  createdAt   DateTime @default(now())
+
+  provider ServiceProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
 }
 
 

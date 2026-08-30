@@ -34,17 +34,20 @@ const SignInIntro = () => (
       <span className="text-brand-600">დაბრუნება.</span>
     </h1>
     <p className="text-body-lg sm:text-h3 text-ink-700 mt-5 sm:mt-7 max-w-[440px] motion-safe:animate-rise-in" style={{ animationDelay: '80ms' }}>
-      აირჩიე ექსპერტი, დაჯავშნე, შეხვდი.
+      აღწერე რა გჭირდება, მიიღე შეთავაზებები, აირჩიე ერთი.
     </p>
 
     {/* Honest value points — no invented counts or stock (pravatar) faces. The
         landing and /experts deliberately removed exactly that pattern; sign-in,
-        the last screen before a booking, must not reintroduce a trust lie. */}
+        the last screen before somebody commits, must not reintroduce a trust
+        lie. ⚠️ AND THE THREE POINTS THEMSELVES WERE ONE (2026-08-26): they
+        promised „უფასო დაჯავშნა · გადაწყვიტე ჯავშნის შემდეგ" on a site with no
+        booking. */}
     <ul className="mt-10 lg:mt-12 pt-8 border-t border-ink-200 space-y-4">
       {[
         { icon: Icon.users, t: 'ხელით შერჩეული ექსპერტები', s: 'ყველა პროფილი გამოწმებული' },
-        { icon: Icon.shieldCheck, t: 'უფასო დაჯავშნა', s: 'გადაწყვიტე ჯავშნის შემდეგ' },
-        { icon: Icon.clock, t: 'ყველაფერი ერთ ადგილას', s: 'ჯავშნები და მიმოწერა' },
+        { icon: Icon.shieldCheck, t: 'უფასო მოთხოვნა', s: 'გადაწყვიტე შეთავაზებების ნახვის შემდეგ' },
+        { icon: Icon.clock, t: 'ყველაფერი ერთ ადგილას', s: 'მოთხოვნები და მიმოწერა' },
       ].map((r, i) => (
         <li key={i} className="flex items-start gap-3.5">
           <span className="w-9 h-9 rounded-btn bg-brand-50 text-brand-700 inline-flex items-center justify-center shrink-0">
@@ -229,7 +232,7 @@ export const SignInView = ({ setView }: { setView: (v: View) => void }) => {
           <div className="mb-5 rounded-card border border-ink-200 bg-ink-50/60 px-4 py-3">
             <div className="font-display text-small font-bold text-ink-900">ერთი ნაბიჯიღა დარჩა</div>
             <p className="text-meta text-ink-600 mt-0.5">
-              {bookingIntent ? 'შედი — ჯავშანი გაგრძელდება არჩეული დროიდან.' : 'შედი — განაცხადი გაგრძელდება.'}
+              {bookingIntent ? 'შედი — მოთხოვნა გაგრძელდება იქიდან, სადაც შეწყვიტე.' : 'შედი — განაცხადი გაგრძელდება.'}
             </p>
           </div>
         )}

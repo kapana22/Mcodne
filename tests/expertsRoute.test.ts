@@ -58,9 +58,13 @@ function sourceFiles(): string[] {
 
 test('§A the profile lives at app/experts/[slug] and nowhere else', () => {
   assert.ok(has('app/experts/[slug]/page.tsx'), 'app/experts/[slug]/page.tsx is missing')
-  assert.ok(has('app/experts/[slug]/client.tsx'), 'app/experts/[slug]/client.tsx is missing')
-  for (const part of ['_bits', '_data', '_hero', '_reviews', '_booking', '_similar', '_sections']) {
-    assert.ok(has(`app/experts/[slug]/${part}.tsx`), `app/experts/[slug]/${part}.tsx is missing — CLAUDE.md's map names it`)
+  // ⚠️ THE CONSULTATION PROFILE AND ITS SEVEN PARTS WENT ON 2026-08-24 —
+  // `client.tsx`, `_bits`, `_data`, `_hero`, `_reviews`, `_booking`, `_similar`
+  // and `_sections`. What answers here is the PROVIDER profile, server-rendered,
+  // and its parts are pinned by tests/oneNamespace.test.ts §A2.
+  assert.ok(!has('app/experts/[slug]/client.tsx'), 'the consultation profile came back')
+  for (const part of ['_providerData.ts', '_providerHero.tsx', '_providerBlocks.tsx', '_providerCta.tsx']) {
+    assert.ok(has(`app/experts/[slug]/${part}`), `app/experts/[slug]/${part} is missing — CLAUDE.md's map names it`)
   }
   assert.ok(!has('app/tutors'), 'app/tutors is back — two routes for one profile means two canonicals')
   // …and the CATALOGUE is this segment's own page (stage 10), not a second app
@@ -74,33 +78,19 @@ test('§B the page reads `slug`, resolves id OR slug, and 308s a cuid to /expert
   assert.match(page, /type Params = \{ slug: string \}/)
   assert.match(page, /const \{ slug: param \} = await params/)
   assert.doesNotMatch(page, /const \{ id: param \}/, 'the param is still read as `id`')
-  // /experts/<cuid> keeps working forever (bookings, messages, admin link by id).
-  assert.match(page, /where:\s+\{\s+OR:\s+\[\{\s+id:\s+param\s+\},\s+\{\s+slug:\s+param\s+\}\]\s+\}/)
-  assert.match(page, /permanentRedirect\(`\/experts\/\$\{resolved\.slug\}/)
-  // Canonical + JSON-LD name the new address, never the old one.
-  assert.match(page, /const\s+canonical\s+=\s+`\$\{SITE_URL\}\/experts\/\$\{resolved\?\.slug\s+\|\|\s+id\}`/)
-  assert.match(page, /url:\s+`\$\{SITE_URL\}\/experts\/\$\{resolved\?\.slug\s+\|\|\s+id\}`/)
+  // /experts/<cuid> keeps working forever — a dozen links were built that way.
+  assert.match(read('app/experts/[slug]/_providerData.ts'),
+    /OR:\s+\[\{\s+slug:\s+param\s+\},\s+\{\s+id:\s+param\s+\}\]/,
+    'the resolver stopped accepting the raw id')
+  assert.match(page, /permanentRedirect\(`\$\{masterPath\(provider\)\}/)
   assert.doesNotMatch(page, /\/tutors\/\$\{/, 'the page still builds a /tutors/ profile URL')
-  const client = codeOf('app/experts/[slug]/client.tsx')
-  assert.match(client, /useParams<\{ slug: string \}>\(\)/)
-  assert.match(client, /initialTutor\?\.id \?\? params\?\.slug/, 'the fallback id must come from the renamed param')
 })
 
-test('§C dual providers: the profile links „სერვისის პროფილი" → /experts/<slug>, photos never selected', () => {
-  const page = read('app/experts/[slug]/page.tsx')
-  assert.match(page, /serviceProfile:\s+\{\s+select:\s+\{\s+slug:\s+true,\s+published:\s+true\s+\}\s+\}/,
-    'the select must be exactly slug + published — ServiceProfile photo columns are base64')
-  assert.doesNotMatch(codeOf('app/experts/[slug]/page.tsx'), /photoUrl|workPhotos/, 'a ServiceProfile photo column is selected into the profile page')
-  // ONE namespace since stage 11: the other profile is /experts/<slug> too.
-  assert.match(page, /serviceProfile\?\.published\s+&&\s+serviceProfile\.slug\s+\?\s+`\/experts\/\$\{serviceProfile\.slug\}`\s+:\s+null/)
-  assert.match(page, /masterHref=\{masterHref\}/)
-  const hero = read('app/experts/[slug]/_hero.tsx')
-  assert.match(hero, /<Link href=\{masterHref\}/)
-  // ⚠️ „ხელოსნის" UNTIL 2026-08-20 — the retired word, in the one link a dual
-  // provider follows to their other half. Owner: „ხელოსნები აღარ უნდა
-  // გამოგყევენებინა არსად."
-  assert.match(hero, /სერვისის პროფილი/)
-})
+/* ⚠️ „§C dual providers" WAS HERE AND IS GONE (2026-08-24). It pinned the link
+   between somebody's TWO profiles — „სერვისის პროფილი" on the consultation
+   page — and the rule that the select behind it must never touch a base64
+   column. One profile, no cross-link; the blob rule is pinned where the query
+   that could break it now lives (tests/catalog.test.ts). */
 
 /* ═══════════ 2. the redirect ════════════════════════════════════════════ */
 
@@ -173,13 +163,19 @@ test('§F the cards, sitemap, nav and JSON-LD name /experts/', () => {
   // consulting half of a merged catalogue), and the hero stopped carrying cards
   // at all in the same redesign — its entrance is a search field now. Both
   // edits move where the href is WRITTEN; neither weakens the rule.
-  for (const f of ['app/experts/_card.tsx', 'components/home/CatalogueGrid.tsx']) {
+  for (const f of ['components/home/CatalogueGrid.tsx']) {
     const src = codeOf(f)
     assert.match(src, /`\/experts\/\$\{[a-z]+\.(?:slug|urlSlug)\s+\|\|\s+[a-z]+\.id\}/, `${f}: the card href must be the SLUG when present, under /experts/`)
   }
   // The sitemap emits only the new address.
+  //
+  // ⚠️ AND ONLY THE SLUG SINCE 2026-08-26. The card above still falls back to
+  // an id — correct, a card is a link the visitor already has in front of them
+  // — but a SITEMAP is a submission, and a profile with no slug has no page at
+  // all (ProviderRow.slug: „Null = no page yet"), so the fallback advertised an
+  // address nobody could reach.
   const sitemap = codeOf('app/sitemap.ts')
-  assert.match(sitemap, /url:\s+`\$\{SITE_URL\}\/experts\/\$\{t\.slug\s+\|\|\s+t\.id\}`/)
+  assert.match(sitemap, /url: `\$\{SITE_URL\}\/experts\/\$\{p\.slug\}`/)
   assert.doesNotMatch(sitemap, /\/tutors\/\$\{/)
   // robots allows the catalogue and everything under it; a redirecting URL does
   // not belong in an Allow, so the three retired doors are absent.
@@ -212,32 +208,14 @@ test('§F the cards, sitemap, nav and JSON-LD name /experts/', () => {
   assert.ok(bare > deep, 'the bare /experts help entry shadows the profile one')
   // Auth's „booking intent" reads the new prefix out of ?redirect=.
   for (const f of ['app/signin/_signin.tsx', 'app/signin/_signup.tsx']) {
-    assert.match(codeOf(f), /redirect\.includes\('\/experts\/'\)/, `${f} still detects booking intent by /tutors/`)
+    assert.match(codeOf(f), /redirect\.includes\('\/experts\/'\)/, `${f} still reads the old prefix out of ?redirect=`)
   }
 })
 
-test('§G the View Transitions morph is intact: vt-photo-<id> on card AND profile', () => {
-  assert.match(read('app/experts/_card.tsx'), /vt-photo-\$\{/)
-  const profile = readdirSync(join(ROOT, 'app/experts/[slug]'))
-    .filter(f => f.endsWith('.tsx'))
-    .map(f => read(`app/experts/[slug]/${f}`))
-    .join('\n')
-  assert.match(profile, /vt-photo-\$\{/)
-})
-
-test('the profile fetches the API route that exists', () => {
-  // The page moved to /experts; `app/api/tutors/[id]` did not. Renaming the
-  // fetch with the page made every profile 404 its own data — invisible,
-  // because the server seed still painted the page. Pinned against the real
-  // directory rather than a string, so moving the route breaks this test.
-  const client = read('app/experts/[slug]/client.tsx')
-  const m = client.match(/fetch\(`(\/api\/[a-z-]+)\/\$\{tutorId\}`\)/)
-  assert.ok(m, 'the profile stopped fetching its payload')
-  assert.ok(existsSync(join(ROOT, 'app', m![1], '[id]', 'route.ts')),
-    `${m![1]}/[id]/route.ts does not exist — the profile fetches a 404`)
-  // The other three callers of the same payload must agree with it.
-  for (const f of ['components/booking/BookingFlow.tsx', 'components/booking/RescheduleTimePicker.tsx']) {
-    assert.ok(read(f).includes(`${m![1]}/\${tutorId}`) || read(f).includes(m![1]),
-      `${f} fetches a different profile route than the profile page`)
-  }
-})
+/* ⚠️ „§G the View Transitions morph" AND „the profile fetches the API route that
+   exists" WERE HERE AND ARE GONE (2026-08-24). The first pinned `vt-photo-<id>`
+   on the consultation card and its profile — a shared-element transition between
+   two files that no longer exist. The second pinned that the profile's own
+   client fetch named a route that was really there (`/api/tutors/[id]`); the
+   provider profile is server-rendered and fetches nothing, which is the same
+   guarantee arriving by construction. */

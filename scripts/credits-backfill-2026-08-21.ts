@@ -51,7 +51,7 @@ async function main() {
     const facts = await profileFacts(u.id)
     const done = earnedTasks(facts)
     const before = await balanceOf(u.id)
-    const fresh = WRITE ? await grantEarnedTasks(u.id) : []
+    const fresh = WRITE ? (await grantEarnedTasks(u.id)).granted : []
     const owed = WRITE
       ? fresh.reduce((n, t) => n + t.tetri, 0)
       : CREDIT_TASKS.filter(t => (done as string[]).includes(t.key)).reduce((n, t) => n + t.tetri, 0) - Math.max(0, before)

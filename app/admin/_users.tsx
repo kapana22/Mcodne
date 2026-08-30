@@ -6,7 +6,6 @@ import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { broadcastSessionChange } from '@/lib/sessionSignal'
 import { fmtKaDate } from '@/lib/kaDate'
 import { isAnonymized } from '@/lib/userDeletion'
-import { packagesFeatureExists } from '@/lib/packages'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { EmptyState } from '@/components/EmptyState'
@@ -22,22 +21,32 @@ type UserDetail = {
     emailVerified: boolean; createdAt: string; avatarUrl: string | null;
     phone?: string | null; bio?: string | null;
     suspendedAt?: string | null;
-    tutor?: {
-      id: string; headline: string; specialty: string; price: number;
-      yearsExp: number; rating: number; reviewsCount: number;
-      sessionsCount: number; verified: boolean;
-      featured?: boolean;
-      packagesEnabled?: boolean;
-      professions?: string[];
-      videoUrl?: string | null;
+    // ⚠️ IT WAS `tutor`, AND THE PANEL WAS READING A KEY NOBODY SENT
+    // (2026-08-25). The API has returned `serviceProfile` since the consultation
+    // product was removed, so `u.tutor` was always undefined — which meant the
+    // block holding the „გადამოწმებული" toggle and the category picker never
+    // rendered, and an admin silently lost both controls. The three fetches
+    // inside them still pointed at /api/admin/experts/…, a prefix that no longer
+    // exists; nobody noticed, because the buttons could not be reached to fail.
+    serviceProfile?: {
+      id: string; slug: string | null;
+      headline: string | null; professions: string[];
+      services: string[]; areas: string[];
+      priceFrom: number | null; calloutFee: number | null;
+      yearsExp: number; verified: boolean; featured: boolean;
+      available: boolean; published: boolean;
+      servicesConfirmedAt: string | null;
       category?: { id: string; slug: string; name: string } | null;
     } | null;
-    _count: { bookingsAsStudent: number; reviewsGiven: number; sentMessages: number; notifications: number; favorites: number };
+    _count: { reviewsGiven: number; notifications: number; favorites: number; serviceRequests: number; requestOffers: number };
   }
-  bookingsAsStudent: any[]
-  bookingsAsTutor: any[]
+  // What the API actually sends. ⚠️ `bookingsAsStudent`, `bookingsAsTutor` and
+  // `reviewsReceived` were declared here and are GONE: reading
+  // `data.bookingsAsStudent.length` in the tab label threw the moment anybody
+  // opened a user, because the key is simply not in the response.
   reviewsWritten: any[]
-  reviewsReceived: any[]
+  requests: any[]
+  offers: any[]
   recentNotifications: any[]
   // Real totals for the delete dialog. The arrays above are capped at take:30/15,
   // so they can't be used to tell an admin what a deletion would destroy.
@@ -46,7 +55,7 @@ type UserDetail = {
 
 const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted }: { userId: string | null; onClose: () => void; onImpersonate: (userId: string, fullName: string) => void; onChanged?: () => void; onDeleted?: (msg: string) => void }) => {
   const [data, setData] = useState<UserDetail | null>(null)
-  const [tab, setTab] = useState<'profile' | 'bookings' | 'reviews' | 'activity'>('profile')
+  const [tab, setTab] = useState<'profile' | 'work' | 'reviews' | 'activity'>('profile')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   // Suspend/unsuspend flow — confirm dialog with a required reason on suspend.
@@ -100,7 +109,7 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
   if (!userId) return null
 
   const u = data?.user
-  const isTutor = !!u?.tutor
+  const provider = u?.serviceProfile ?? null
 
   const doSuspendToggle = async (reason: string) => {
     if (!u || suspBusy) return
@@ -195,8 +204,13 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
           <div className="px-6 border-b border-ink-100 flex items-center gap-1 overflow-x-auto shrink-0">
             {[
               { id: 'profile' as const, l: 'პროფილი' },
-              { id: 'bookings' as const, l: `ჯავშნები (${data.bookingsAsStudent.length + data.bookingsAsTutor.length})` },
-              { id: 'reviews' as const, l: `შეფასებები (${data.reviewsWritten.length + data.reviewsReceived.length})` },
+              // ⚠️ „ჯავშნები" BECAME „საქმეები" (2026-08-25). It counted this
+              // person's bookings on both sides; there are none, and the two
+              // arrays it read are not in the payload — so this label threw and
+              // took the whole drawer with it. What says the same thing now is
+              // what they ASKED for and what they OFFERED.
+              { id: 'work' as const, l: `საქმეები (${data.requests.length + data.offers.length})` },
+              { id: 'reviews' as const, l: `შეფასებები (${data.reviewsWritten.length})` },
               { id: 'activity' as const, l: `აქტივობა (${data.recentNotifications.length})` },
             ].map(t => (
               <button
@@ -224,8 +238,8 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
                   <div className="grid sm:grid-cols-2 gap-3">
                     <Field label="რეგისტრაცია" value={fmtShort(u.createdAt)} />
                     <Field label="ტელეფონი" value={u.phone ?? '—'} />
-                    <Field label="მიმოწერები" value={String(u._count.sentMessages)} />
-                    <Field label="ჯავშნები (კლიენტი)" value={String(u._count.bookingsAsStudent)} />
+                    <Field label="მოთხოვნები" value={String(u._count.serviceRequests)} />
+                    <Field label="შეთავაზებები" value={String(u._count.requestOffers)} />
                     <Field label="დაწერილი შეფასებები" value={String(u._count.reviewsGiven)} />
                     <Field label="ფავორიტები" value={String(u._count.favorites)} />
                   </div>
@@ -235,41 +249,79 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
                       <p className="text-body text-ink-700 whitespace-pre-wrap">{u.bio}</p>
                     </div>
                   )}
-                  {isTutor && u.tutor && (
+                  {provider && (
                     <div className="rounded-card border border-brand-200 bg-brand-50/40 p-4">
                       <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
-                        <Eyebrow>ექსპერტის პროფილი</Eyebrow>
+                        <Eyebrow>პროვაიდერის პროფილი</Eyebrow>
                         <div className="flex items-center gap-2">
-                          <VerifiedToggle tutorId={u.tutor.id} initial={!!u.tutor.verified} onSaved={() => { dirtyRef.current = true }} />
-                          <FeaturedToggle tutorId={u.tutor.id} initial={!!u.tutor.featured} onSaved={() => { dirtyRef.current = true }} />
-                          <PackagesToggle tutorId={u.tutor.id} initial={!!u.tutor.packagesEnabled} onSaved={() => { dirtyRef.current = true }} />
+                          <VerifiedToggle providerId={provider.id} initial={provider.verified} onSaved={() => { dirtyRef.current = true }} />
+                          <FeaturedToggle providerId={provider.id} initial={provider.featured} onSaved={() => { dirtyRef.current = true }} />
                         </div>
                       </div>
                       {/* Category is EDITABLE here — see CategoryPicker below
                           for why a read-only line was the wrong control. */}
                       <CategoryPicker
-                        tutorId={u.tutor.id}
-                        initial={u.tutor.category?.id ?? ''}
+                        providerId={provider.id}
+                        initial={provider.category?.id ?? ''}
                         onSaved={() => { dirtyRef.current = true }}
                       />
-                      <div className="mt-3 grid sm:grid-cols-2 gap-3 text-small">
-                        <div><span className="text-ink-500">სპეც.:</span> <span className="font-display font-bold text-ink-900">{u.tutor.specialty}</span></div>
-                        <div><span className="text-ink-500">ფასი:</span> <span className="font-display font-bold text-ink-900 tabular-nums">₾{u.tutor.price}</span></div>
-                        <div><span className="text-ink-500">გამოცდილება:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{u.tutor.yearsExp} წ.</span></div>
-                        <div><span className="text-ink-500">რეიტინგი:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{u.tutor.rating.toFixed(2)}</span> <span className="text-ink-500 tabular-nums">({u.tutor.reviewsCount})</span></div>
-                        <div><span className="text-ink-500">სესიები:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{u.tutor.sessionsCount}</span></div>
-                        <div><span className="text-ink-500">ინტრო ვიდეო:</span> <span className="font-display font-bold text-ink-900">{u.tutor.videoUrl ? '✓ ატვირთული' : '—'}</span></div>
+                      {/* ⚠️ THE ROW AN ADMIN NEEDS MOST SINCE THE MIGRATION.
+                          The 27 who came across were seeded with their whole
+                          category — a lawyer claiming all seven legal services —
+                          and only they can narrow it. This says whether they
+                          have been back to look, so the admin knows who to
+                          chase without opening every profile. */}
+                      <div className={`mt-3 rounded-btn px-3 py-2 text-small ${
+                        provider.servicesConfirmedAt
+                          ? 'bg-white border border-ink-200 text-ink-600'
+                          : 'bg-warning-50 border border-warning-200 text-warning-800'
+                      }`}>
+                        {provider.servicesConfirmedAt
+                          ? `სერვისები დაადასტურა — ${fmtShort(provider.servicesConfirmedAt)}`
+                          : 'სერვისები ჯერ არ გადაუხედავს — სია მიგრაციისას შეივსო'}
                       </div>
-                      <div className="mt-3 text-small text-ink-700"><span className="font-display font-semibold">სათაური:</span> {u.tutor.headline}</div>
-                      {/* What this expert calls themselves (lib/professions) —
+                      <div className="mt-3 grid sm:grid-cols-2 gap-3 text-small">
+                        <div><span className="text-ink-500">სერვისები:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{provider.services.length}</span></div>
+                        <div><span className="text-ink-500">ქალაქები:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{provider.areas.length}</span></div>
+                        <div>
+                          <span className="text-ink-500">ფასი:</span>{' '}
+                          <span className="font-display font-bold text-ink-900 tabular-nums">
+                            {provider.priceFrom ? `${provider.priceFrom}₾-დან` : provider.calloutFee ? `გამოძახება ${provider.calloutFee}₾` : '—'}
+                          </span>
+                        </div>
+                        <div><span className="text-ink-500">გამოცდილება:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{provider.yearsExp} წ.</span></div>
+                        <div>
+                          <span className="text-ink-500">კატალოგში:</span>{' '}
+                          <span className="font-display font-bold text-ink-900">
+                            {provider.published && provider.available ? '✓ ჩანს' : 'არ ჩანს'}
+                          </span>
+                        </div>
+                        {provider.slug && (
+                          <div className="min-w-0">
+                            <span className="text-ink-500">გვერდი:</span>{' '}
+                            <a
+                              href={`/experts/${provider.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="tap-area font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 break-all"
+                            >
+                              /experts/{provider.slug}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                      {provider.headline && (
+                        <div className="mt-3 text-small text-ink-700"><span className="font-display font-semibold">სათაური:</span> {provider.headline}</div>
+                      )}
+                      {/* What this provider calls themselves (lib/professions) —
                           several, and the finest-grained thing on the profile.
-                          Read-only here: the expert owns it, and the one thing
+                          Read-only here: the provider owns it, and the one thing
                           an admin needs is to SEE it while judging a report. */}
-                      {(u.tutor.professions?.length ?? 0) > 0 && (
+                      {provider.professions.length > 0 && (
                         <div className="mt-3">
                           <Eyebrow tone="muted" className="mb-1.5">პროფესიები</Eyebrow>
                           <div className="flex flex-wrap gap-1">
-                            {u.tutor.professions!.map(job => (
+                            {provider.professions.map(job => (
                               <span key={job} className="inline-flex items-center h-6 px-2 rounded-pill border border-ink-200 bg-white text-meta text-ink-700">{job}</span>
                             ))}
                           </div>
@@ -279,41 +331,62 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
                   )}
                 </div>
               )}
-              {tab === 'bookings' && (
+              {/* ⚠️ IT WAS „ჯავშნები" AND IT RENDERED FROM TWO ARRAYS THE API
+                  DOES NOT SEND. Both sides of a booking are gone; the two
+                  things this account can have now are the requests it FILED and
+                  the offers it WROTE, which is the same question — what has
+                  this person done here — asked of the product that exists. */}
+              {tab === 'work' && (
                 <div className="px-6 py-5 space-y-6">
-                  {data.bookingsAsStudent.length > 0 && (
+                  {data.requests.length > 0 && (
                     <div>
-                      <Eyebrow tone="muted" className="mb-3">როგორც კლიენტი ({data.bookingsAsStudent.length})</Eyebrow>
-                      <BookingList items={data.bookingsAsStudent} otherKey="tutor" />
+                      <Eyebrow tone="muted" className="mb-3">მოთხოვნები ({data.requests.length})</Eyebrow>
+                      <ul className="divide-y divide-ink-100">
+                        {data.requests.map((r: any) => (
+                          <li key={r.id} className="py-2.5 flex items-baseline gap-3">
+                            <span className="font-mono text-meta text-ink-500 shrink-0">{r.publicRef}</span>
+                            <span className="font-display text-small font-semibold text-ink-900 truncate flex-1 min-w-0">{r.topic}</span>
+                            <span className="text-meta text-ink-600 shrink-0">{KA_STATUS[r.status] ?? r.status}</span>
+                            <span className="font-mono text-meta tabular-nums text-ink-400 shrink-0">{fmtShort(r.createdAt)}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
-                  {data.bookingsAsTutor.length > 0 && (
+                  {data.offers.length > 0 && (
                     <div>
-                      <Eyebrow tone="muted" className="mb-3">როგორც ექსპერტი ({data.bookingsAsTutor.length})</Eyebrow>
-                      <BookingList items={data.bookingsAsTutor} otherKey="student" />
+                      <Eyebrow tone="muted" className="mb-3">შეთავაზებები ({data.offers.length})</Eyebrow>
+                      <ul className="divide-y divide-ink-100">
+                        {data.offers.map((o: any) => (
+                          <li key={o.id} className="py-2.5 flex items-baseline gap-3">
+                            <span className="font-display text-small font-bold text-ink-900 tabular-nums shrink-0">{o.priceGel}₾</span>
+                            <span className="text-meta text-ink-600 flex-1 min-w-0">{KA_STATUS[o.status] ?? o.status}</span>
+                            {o.doneAt && <span className="text-meta text-success-700 shrink-0">დასრულდა</span>}
+                            <span className="font-mono text-meta tabular-nums text-ink-400 shrink-0">{fmtShort(o.createdAt)}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
-                  {data.bookingsAsStudent.length === 0 && data.bookingsAsTutor.length === 0 && (
-                    <EmptyState variant="inline" icon={<Icon.calendar className="w-6 h-6" />} title="ჯავშნები ჯერ არ არის" description="ამ ანგარიშს არც ერთი ჯავშანი არ ჰქონია." />
+                  {data.requests.length === 0 && data.offers.length === 0 && (
+                    <EmptyState variant="inline" icon={<Icon.list className="w-6 h-6" />} title="საქმეები ჯერ არ არის" description="ამ ანგარიშს არც მოთხოვნა და არც შეთავაზება არ ჰქონია." />
                   )}
                 </div>
               )}
               {tab === 'reviews' && (
                 <div className="px-6 py-5 space-y-6">
-                  {data.reviewsReceived.length > 0 && (
-                    <div>
-                      <Eyebrow tone="muted" className="mb-3">მიღებული ({data.reviewsReceived.length})</Eyebrow>
-                      <ReviewList items={data.reviewsReceived} authorKey="student" />
-                    </div>
-                  )}
-                  {data.reviewsWritten.length > 0 && (
+                  {/* ⚠️ „მიღებული" IS GONE (2026-08-25) — the API sends only the
+                      reviews this account WROTE. A review hangs on a finished
+                      offer now (Review.offerId), not on a tutor id, so „reviews
+                      received by this person" is a join nothing performs yet.
+                      Showing an always-empty half read as „nobody rates them". */}
+                  {data.reviewsWritten.length > 0 ? (
                     <div>
                       <Eyebrow tone="muted" className="mb-3">დაწერილი ({data.reviewsWritten.length})</Eyebrow>
-                      <ReviewList items={data.reviewsWritten} authorKey="tutor" />
+                      <ReviewList items={data.reviewsWritten} authorKey="student" />
                     </div>
-                  )}
-                  {data.reviewsReceived.length === 0 && data.reviewsWritten.length === 0 && (
-                    <EmptyState variant="inline" icon={<Icon.star className="w-6 h-6" />} title="შეფასებები ჯერ არ არის" description="არც დაწერილი და არც მიღებული შეფასება არ აქვს." />
+                  ) : (
+                    <EmptyState variant="inline" icon={<Icon.star className="w-6 h-6" />} title="შეფასებები ჯერ არ არის" description="ამ ანგარიშს შეფასება არ დაუწერია." />
                   )}
                 </div>
               )}
@@ -423,7 +496,7 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
           open={pendRole !== null}
           title={pendRole === 'makeAdmin' ? 'ადმინად დანიშვნა' : 'ადმინის მოხსნა'}
           body={pendRole === 'makeAdmin'
-            ? <>{u.fullName} მიიღებს სრულ წვდომას ადმინ პანელზე — მომხმარებლები, ჯავშნები, ფინანსები, იმპერსონაცია.</>
+            ? <>{u.fullName} მიიღებს სრულ წვდომას ადმინ პანელზე — მომხმარებლები, მოთხოვნები, ფინანსები, იმპერსონაცია.</>
             : <>{u.fullName} დაკარგავს ადმინის უფლებებს და ყველა სესიიდან გავა.</>}
           tone="danger"
           reason="required"
@@ -465,7 +538,7 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
       {u && (
         <AdminDeleteUserDialog
           open={deleteOpen}
-          user={{ id: u.id, fullName: u.fullName, email: u.email, isExpert: isTutor }}
+          user={{ id: u.id, fullName: u.fullName, email: u.email, isExpert: provider !== null }}
           impact={data?.deleteImpact ?? null}
           onClose={() => setDeleteOpen(false)}
           onDeleted={(mode: DeleteMode, name: string) => {
@@ -485,12 +558,19 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
   )
 }
 
-// The verified-badge toggle — the ONLY way an approved expert gets the public
-// „ვერიფიცირებული“ trust badge (approval seeds verified:false). Mirrors FeaturedToggle.
+// The verified-badge toggle — the ONLY way an approved provider gets the public
+// „გადამოწმებული“ trust badge (approval seeds verified:false). Mirrors FeaturedToggle.
 // Success is judged with adminOk, not `res.ok` — an expired session redirects
 // to sign-in and fetch hands the HTML page back as a 200, so the badge used to
 // flip on screen while the DB never changed.
-const VerifiedToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initial: boolean; onSaved?: () => void }) => {
+//
+// ⚠️ IT WAS UNREACHABLE FROM 2026-08-24 TO 2026-08-25, and that is worse than a
+// broken button: the badge it sets is drawn on every catalogue card, and the
+// home page promises „ყველა პროფილი ხელით მოწმდება". For a day nobody could
+// keep that promise — the block that renders this read `u.tutor`, a key the API
+// had stopped sending, so the control simply was not on the screen to fail.
+// Measured when it was found: 1 of 29 providers verified.
+const VerifiedToggle = ({ providerId, initial, onSaved }: { providerId: string; initial: boolean; onSaved?: () => void }) => {
   const [verified, setVerified] = useState(initial)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -501,7 +581,7 @@ const VerifiedToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
     const next = !verified
     setVerified(next)
     try {
-      const res = await fetch(`/api/admin/experts/${tutorId}/verified`, {
+      const res = await fetch(`/api/admin/providers/${providerId}/verified`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ verified: next }),
@@ -522,7 +602,7 @@ const VerifiedToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
             ? 'bg-brand-600 border-brand-600 text-white hover:bg-brand-700'
             : 'bg-white border-ink-300 text-ink-600 hover:border-brand-500 hover:text-brand-700'
         }`}
-        title="გადამოწმებული ექსპერტი — გამოჩნდება ✓ ბეჯი ბარათსა და პროფილზე"
+        title="გადამოწმებული პროვაიდერი — გამოჩნდება ✓ ბეჯი ბარათსა და პროფილზე"
       >
         <Icon.shieldCheck className="w-3 h-3" /> ვერიფ.
       </button>
@@ -531,7 +611,12 @@ const VerifiedToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
   )
 }
 
-const FeaturedToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initial: boolean; onSaved?: () => void }) => {
+// ⚠️ AND IT NOW DOES SOMETHING (2026-08-25). `featured` was a column, an index
+// and this button, and NOTHING read it — the catalogue's „ჩვენი რჩევით" sort
+// kept the server's order and ignored it entirely, so an admin could tick a
+// provider and watch nothing happen anywhere. It is the owner's one editorial
+// lever over the roster, so the sort reads it: see app/experts/client.tsx.
+const FeaturedToggle = ({ providerId, initial, onSaved }: { providerId: string; initial: boolean; onSaved?: () => void }) => {
   const [featured, setFeatured] = useState(initial)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -542,7 +627,7 @@ const FeaturedToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
     const next = !featured
     setFeatured(next)
     try {
-      const res = await fetch(`/api/admin/experts/${tutorId}/featured`, {
+      const res = await fetch(`/api/admin/providers/${providerId}/featured`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ featured: next }),
@@ -572,58 +657,15 @@ const FeaturedToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
     </span>
   )
 }
+/* ⚠️ „პაკეტები" WAS A TOGGLE HERE AND WENT WITH THE TEACHING VERTICAL
+   (2026-08-24). It decided whether one expert could sell lesson packages —
+   `TutorProfile.packagesEnabled`, a column on a table that no longer exists,
+   gating a `Package`/`Enrollment` pair created by lib/dbBoot with no foreign
+   keys. The flag went too — lib/flags says at length why packages are not a
+   dark feature waiting on a flip but a vertical whose data model was removed,
+   and what a revival would have to design first. A switch with nothing behind
+   it is not a dark feature, it is a control that lies. */
 
-// „პაკეტები" — the ONE gate for the teaching vertical (lib/packages.ts).
-//
-// Renders only while the feature exists at all; with PACKAGES_VISIBILITY 'off'
-// the control is absent rather than disabled, so an unfinished vertical leaves
-// no trace in the admin either.
-//
-// Deliberately NOT styled like „რჩეული"/„ვერიფ.": those describe what an
-// expert IS, this one decides what they may SELL. Brand green marks it as the
-// same family as the site's other „this is live" affordances.
-const PackagesToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initial: boolean; onSaved?: () => void }) => {
-  const [on, setOn] = useState(initial)
-  const [busy, setBusy] = useState(false)
-  const [failed, setFailed] = useState(false)
-  if (!packagesFeatureExists()) return null
-  const toggle = async () => {
-    if (busy) return
-    setBusy(true)
-    setFailed(false)
-    const next = !on
-    setOn(next)
-    try {
-      const res = await fetch(`/api/admin/experts/${tutorId}/packages`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packagesEnabled: next }),
-      })
-      // adminOk, not res.ok — see VerifiedToggle.
-      if (await adminOk(res)) onSaved?.()
-      else { setOn(!next); setFailed(true) }
-    } catch { setOn(!next); setFailed(true) }
-    finally { setBusy(false) }
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <button
-        type="button"
-        onClick={toggle}
-        disabled={busy}
-        className={`tap-area inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border font-display text-micro font-bold uppercase transition-colors duration-fast disabled:opacity-60 ${
-          on
-            ? 'bg-brand-600 border-brand-600 text-white hover:bg-brand-700'
-            : 'bg-white border-ink-300 text-ink-600 hover:border-brand-500 hover:text-brand-700'
-        }`}
-        title="ჩართე თვიური პაკეტები — ექსპერტი გამოჩნდება სწავლების გვერდზე"
-      >
-        <Icon.calendar className="w-3 h-3" /> პაკეტები
-      </button>
-      {failed && <span role="alert" className="font-display text-meta font-semibold text-danger-700">ვერ შეინახა</span>}
-    </span>
-  )
-}
 
 /* Re-file an expert. 2026-08-11.
  *
@@ -644,7 +686,7 @@ const PackagesToggle = ({ tutorId, initial, onSaved }: { tutorId: string; initia
  * legitimate move — the line under the control states exactly what it costs
  * instead of hiding the option behind a warning that isn't true.
  */
-const CategoryPicker = ({ tutorId, initial, onSaved }: { tutorId: string; initial: string; onSaved?: () => void }) => {
+const CategoryPicker = ({ providerId, initial, onSaved }: { providerId: string; initial: string; onSaved?: () => void }) => {
   const { groups, loaded } = useAssignableCategories()
   const [val, setVal] = useState(initial)
   const [busy, setBusy] = useState(false)
@@ -656,7 +698,7 @@ const CategoryPicker = ({ tutorId, initial, onSaved }: { tutorId: string; initia
     setBusy(true)
     setFailed(false)
     try {
-      const res = await fetch(`/api/admin/experts/${tutorId}/category`, {
+      const res = await fetch(`/api/admin/providers/${providerId}/category`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ categoryId: next || null }),
@@ -693,30 +735,17 @@ const Field = ({ label, value }: { label: string; value: string }) => (
   </div>
 )
 
-const BookingList = ({ items, otherKey }: { items: any[]; otherKey: 'tutor' | 'student' }) => (
-  <ul className="divide-y divide-ink-100 rounded-card border border-ink-200 overflow-hidden bg-white">
-    {items.map(b => {
-      const other = otherKey === 'tutor' ? b.tutor?.user : b.student
-      const start = new Date(b.startAt)
-      return (
-        <li key={b.id} className="p-3 flex items-center gap-3 flex-wrap">
-          <img src={other?.avatarUrl || DEFAULT_AVATAR} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-          <div className="min-w-0 flex-1">
-            <div className="font-display text-small font-bold text-ink-900 truncate">{b.topic}</div>
-            <div className="text-meta text-ink-500 truncate">{other?.fullName ?? '—'} · {fmtDT(start.toISOString())}</div>
-          </div>
-          <span className={`inline-flex items-center h-5 px-1.5 rounded-pill font-display text-micro font-bold uppercase ${
-            b.status === 'COMPLETED' ? 'bg-success-50 text-success-700 border border-success-200'
-            : b.status === 'CANCELED' || b.status === 'NO_SHOW' ? 'bg-ink-100 text-ink-600 border border-ink-200'
-            : b.status === 'LIVE' ? 'bg-danger-50 text-danger-700 border border-danger-200'
-            : 'bg-brand-50 text-brand-700 border border-brand-200'
-          }`}>{KA_STATUS[b.status] ?? b.status}</span>
-          <div className="font-display text-meta font-bold text-ink-900 tabular-nums shrink-0">₾{b.price}</div>
-        </li>
-      )
-    })}
-  </ul>
-)
+/* ⚠️ `BookingList` WAS HERE AND IS GONE (2026-08-25). It drew one booking per
+   row — the other party's face, the topic, the start time in Tbilisi, a status
+   pill and the price — for the „ჯავშნები" tab of this drawer. Both the tab and
+   the two arrays that fed it went with the booking itself; the tab is „საქმეები"
+   now and renders requests and offers inline, because each is three fields and
+   does not earn a component.
+
+   The one rule it carried, in case a list like it comes back: a status pill is
+   COLOURED by meaning, never by position in an enum — done is green, ended is
+   grey, live is red — so an admin scanning forty rows reads state without
+   reading words. */
 
 const ReviewList = ({ items, authorKey }: { items: any[]; authorKey: 'student' | 'tutor' }) => (
   <ul className="divide-y divide-ink-100 rounded-card border border-ink-200 overflow-hidden bg-white">
@@ -745,7 +774,13 @@ type ApiUser = {
   id: string; email: string; fullName: string;
   role: 'USER' | 'PROVIDER' | 'ADMIN';
   emailVerified: boolean; createdAt: string; avatarUrl: string | null;
-  _count: { bookingsAsStudent: number; sentMessages: number };
+  // ⚠️ THIS SAID `{ bookingsAsStudent, sentMessages }` UNTIL 2026-08-26 AND THE
+  // API HAD STOPPED SENDING EITHER (2026-08-24 — its own comment says so). The
+  // table's „ჯავშნები" column, the phone row and the CSV export therefore all
+  // printed `undefined`, for every account, silently: a missing key on a typed
+  // shape is only a lie at runtime. These two are what the route actually
+  // returns — what the person ASKED FOR and what they OFFERED.
+  _count: { serviceRequests: number; requestOffers: number };
 }
 
 export const UsersSection = () => {
@@ -842,8 +877,8 @@ export const UsersSection = () => {
             type="button"
             title="ექსპორტდება მხოლოდ ჩატვირთული ჩანაწერები"
             onClick={() => downloadCsv(`users-${new Date().toISOString().slice(0, 10)}.csv`, [
-              ['id', 'email', 'fullName', 'role', 'emailVerified', 'bookingsAsStudent', 'createdAt'],
-              ...users.map(u => [u.id, u.email, u.fullName, u.role, u.emailVerified ? 'yes' : 'no', u._count.bookingsAsStudent, u.createdAt]),
+              ['id', 'email', 'fullName', 'role', 'emailVerified', 'serviceRequests', 'requestOffers', 'createdAt'],
+              ...users.map(u => [u.id, u.email, u.fullName, u.role, u.emailVerified ? 'yes' : 'no', u._count.serviceRequests, u._count.requestOffers, u.createdAt]),
             ])}
             className="h-9 px-3 rounded-btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-700 font-display font-semibold text-meta inline-flex items-center gap-1.5 transition-colors duration-fast"
           >
@@ -883,7 +918,7 @@ export const UsersSection = () => {
                 <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">მომხმარებელი</th>
                 <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">როლი</th>
                 <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">ვერიფიც.</th>
-                <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">ჯავშნები</th>
+                <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">მოთხოვნები</th>
                 <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 whitespace-nowrap">რეგისტრ.</th>
                 <th className="px-3 py-2.5 font-display text-micro font-semibold uppercase text-ink-500 text-right whitespace-nowrap">მოქმ.</th>
               </tr>
@@ -928,7 +963,7 @@ export const UsersSection = () => {
                     }`}>{roleLabel(u.role)}</span>
                   </td>
                   <td className="px-3 py-3">{u.emailVerified ? <span className="text-success-700"><Icon.check className="w-4 h-4 inline" /></span> : <span className="text-ink-400">—</span>}</td>
-                  <td className="px-3 py-3"><div className="font-display text-small font-bold text-ink-900 tabular-nums">{u._count.bookingsAsStudent}</div></td>
+                  <td className="px-3 py-3"><div className="font-display text-small font-bold text-ink-900 tabular-nums">{u._count.serviceRequests}</div></td>
                   <td className="px-3 py-3"><div className="font-mono text-meta tabular-nums text-ink-500">{fmtKaDate(new Date(u.createdAt), { year: true })}</div></td>
                   <td className="px-3 py-3 text-right" onClick={e => e.stopPropagation()}>
                     <button
@@ -972,7 +1007,7 @@ export const UsersSection = () => {
                     </div>
                     <div className="font-mono text-meta tabular-nums text-ink-500 truncate mt-0.5">{u.email}</div>
                     <div className="font-mono text-meta tabular-nums text-ink-500 mt-0.5">
-                      {u._count.bookingsAsStudent} ჯავშანი · {fmtKaDate(new Date(u.createdAt), { year: true })}
+                      {u._count.serviceRequests} მოთხოვნა · {fmtKaDate(new Date(u.createdAt), { year: true })}
                     </div>
                   </div>
                   <button

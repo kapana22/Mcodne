@@ -2,12 +2,13 @@ import type { MetadataRoute } from 'next'
 import { prisma } from '@/lib/prisma'
 import { professions } from '@/lib/professionSeo'
 import { BROWSABLE_CATEGORY } from '@/lib/categoryTree'
-import { LIVE_SERVICE_GROUPS, TRADE_LANDING_MIN, countCovering } from '@/lib/serviceProfile'
+import { LIVE_OFFER_GROUPS, TRADE_LANDING_MIN, countCovering } from '@/lib/serviceProfile'
+import { PUBLIC } from '@/app/experts/_providers'
 
 // Next auto-serves this at /sitemap.xml. We keep the surface small and static
-// for public routes, then splice in tutor detail pages sourced directly from
+// for public routes, then splice in provider detail pages sourced directly from
 // Prisma. A hard cap of 5000 keeps the file well under the 50k / 50MB limit
-// even if the tutor catalog grows.
+// even if the catalogue grows.
 //
 // force-dynamic: generate at REQUEST time, never at build. Railway's build
 // container can't reach the DB, so a statically-built sitemap silently drops
@@ -56,14 +57,16 @@ const STATIC_ROUTES: Array<{
   // since 2026-08-20 the bare address is the DOOR (app/join/_door/PublicDoor):
   // the pitch AND the one question, asked before the account is required.
   { path: '/join', changeFrequency: 'monthly', priority: 0.7 },
-  // ⚠️ THE TRADES LANDING IS A SEPARATE URL AND A SEPARATE PAGE (2026-08-20).
-  // /join is the DOOR now — it asks the profession and names no half — while
-  // `?can=WORK` is „დაარეგისტრირე შენი სერვისი", with its own copy and its own
-  // canonical (`pageMetadata('apply-master', '/join?can=WORK')`), so it is a
-  // real second entry rather than a duplicate of the one above.
-  // ⚠️ `?can=CONSULT` IS NOT LISTED, and must not be: it canonicalises to
-  // /join, so submitting it would submit a duplicate of an address already here.
-  { path: '/join?can=WORK', changeFrequency: 'monthly', priority: 0.6 },
+  // ⚠️ `/join?can=WORK` WAS LISTED HERE AND IS NOT ANY MORE (2026-08-24). It was
+  // a real second landing — „დაარეგისტრირე შენი სერვისი", its own copy, its own
+  // canonical — because /join had TWO pitches behind one address and the
+  // parameter chose between them. There is one pitch now: `?can=` is ignored and
+  // the URL renders the same bytes as the row above it, so leaving it here would
+  // be submitting a duplicate of our own page to Google. That is precisely why
+  // `?can=CONSULT` was never listed, and the reason has simply grown to cover
+  // both. The SEO registry row `apply-master` stays retired in lib/pageSeoDefs;
+  // a key is never deleted, because a production SiteText row may hold copy
+  // typed under it.
   { path: '/about', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/blog', changeFrequency: 'weekly', priority: 0.6 },
   { path: '/contact', changeFrequency: 'monthly', priority: 0.5 },
@@ -100,66 +103,43 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: r.priority,
   }))
 
-  let tutorEntries: MetadataRoute.Sitemap = []
+  // ⚠️ ONE BLOCK, AND IT ASKS `PUBLIC` RATHER THAN RESTATING IT (2026-08-26).
+  //
+  // There were TWO — `tutors` and `masters` — a leftover of the two profile
+  // tables, and after the services-only merge both queried the SAME
+  // `serviceProfile` with hand-copied where clauses. Measured on the live
+  // sitemap that morning: 89 entries, 63 unique. Every provider was submitted
+  // TWICE (at two different priorities, 0.7 and 0.6, and two lastModifieds), and
+  // the second copy carried a rule the first did not have — no
+  // `user.suspendedAt: null` — so two suspended providers were still being
+  // submitted to Google and both answered 404.
+  //
+  // `PUBLIC` (app/experts/_providers) is the one rule that decides who has a
+  // page: the catalogue, /experts/<slug> and the photo route all read it. A
+  // sitemap that restates it is a sitemap that drifts from it.
+  //
+  // ⚠️ AND ONLY ROWS WITH A SLUG. A profile with none has no address at all —
+  // the card does not link (ProviderRow.slug: „Null = no page yet"), so the id
+  // URL the old block fell back to advertised a page nobody could reach.
+  let providerEntries: MetadataRoute.Sitemap = []
   try {
-    const tutors = await prisma.tutorProfile.findMany({
-      // Must mirror the public visibility rule in lib/tutorsQuery.ts EXACTLY,
-      // otherwise we submit profiles that no public listing links to:
-      //   available: true      — self-paused experts are pulled from browse
-      //   suspendedAt: null    — admin-suspended experts 404 on /experts/[slug]
-      //   BROWSABLE_CATEGORY   — hidden-category (and categoryId-null) experts
-      //                          are unreachable from browse and unbookable
-      where: {
-        available: true,
-        user: { is: { suspendedAt: null } },
-        category: { is: BROWSABLE_CATEGORY },
-      },
-      select: { id: true, slug: true, updatedAt: true },
+    const providers = await prisma.serviceProfile.findMany({
+      where: { ...PUBLIC, slug: { not: null } },
+      select: { slug: true, updatedAt: true },
       orderBy: { updatedAt: 'desc' },
       take: 5000,
     })
-    tutorEntries = tutors.map((t) => ({
-      // Slug when the profile has one — submitting the id URL would advertise a
-      // page that 308s straight to the slug, and a sitemap must list only final
-      // canonical URLs. `t.id` remains the fallback for un-backfilled rows.
-      url: `${SITE_URL}/experts/${t.slug || t.id}`,
-      lastModified: t.updatedAt ?? now,
+    providerEntries = providers.map(p => ({
+      url: `${SITE_URL}/experts/${p.slug}`,
+      lastModified: p.updatedAt ?? now,
       changeFrequency: 'weekly' as const,
       priority: 0.7,
     }))
   } catch {
     // If DB is unreachable at build time we still emit a valid sitemap for
     // static routes instead of failing the entire route.
-    tutorEntries = []
+    providerEntries = []
   }
-
-  // Provider profiles with a public page (stage 5; moved under /experts in
-  // stage 11, 2026-08-19). The SAME visibility rule as the catalogue and the
-  // photo route (app/experts/_masterData → PUBLIC): available, published, and an
-  // active RequestAccess on the person or the company. Only rows WITH a slug —
-  // the id URL 308s to the slug and a sitemap lists finals.
-  let masterEntries: MetadataRoute.Sitemap = []
-  try {
-    const masters = await prisma.serviceProfile.findMany({
-      where: {
-        available: true,
-        published: true,
-        slug: { not: null },
-        OR: [
-          { user: { requestAccess: { active: true } } },
-          { company: { requestAccess: { active: true } } },
-        ],
-      },
-      select: { slug: true },
-      take: 5000,
-    })
-    masterEntries = masters.map(m => ({
-      url: `${SITE_URL}/experts/${m.slug}`,
-      lastModified: now,
-      changeFrequency: 'weekly' as const,
-      priority: 0.6,
-    }))
-  } catch { masterEntries = [] }
 
   // Published blog posts (admin CMS). Same DB-unreachable fallback as tutors.
   let postEntries: MetadataRoute.Sitemap = []
@@ -193,18 +173,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let tradeEntries: MetadataRoute.Sitemap = []
   try {
     const rows = await prisma.serviceProfile.findMany({
-      where: {
-        available: true,
-        published: true,
-        OR: [
-          { user: { requestAccess: { active: true } } },
-          { company: { requestAccess: { active: true } } },
-        ],
-      },
+      // The SAME roster the landing will list — `PUBLIC`, not a copy of it.
+      // Counted with the old copy, a suspended provider still pushed a trade
+      // over TRADE_LANDING_MIN and published a landing they are not on.
+      where: PUBLIC,
       select: { services: true },
       take: 5000,
     })
-    tradeEntries = LIVE_SERVICE_GROUPS
+    tradeEntries = LIVE_OFFER_GROUPS
       .filter(g => countCovering(rows, g.topics.map(t => t.id)) >= TRADE_LANDING_MIN)
       .map(g => ({
         url: `${SITE_URL}/experts/${g.id}`,
@@ -223,5 +199,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }))
 
-  return [...staticEntries, ...tutorEntries, ...masterEntries, ...tradeEntries, ...postEntries, ...professionEntries]
+  return [...staticEntries, ...providerEntries, ...tradeEntries, ...postEntries, ...professionEntries]
 }

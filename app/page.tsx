@@ -1,11 +1,12 @@
 import { pageMetadata } from '@/lib/pageSeo'
+import { getSiteTextMap } from '@/lib/siteText'
+import { PAGE_SEO, pageSeoKey } from '@/lib/pageSeoDefs'
 import Landing from './HomeClient'
 import { jsonLdString } from '@/lib/jsonLd'
 import { prisma } from '@/lib/prisma'
-import { ensureDbReady } from '@/lib/dbBoot'
-import { getCurrentUser } from '@/lib/auth'
-import { queryTutors } from '@/lib/tutorsQuery'
-import { queryMasters } from './experts/_masterData'
+import { ensureDbReadyWithin } from '@/lib/dbBoot'
+import { initialMe } from '@/lib/meServer'
+import { queryProviders } from './experts/_providers'
 import { expertCountsBySphere } from '@/lib/categoryCounts'
 import { ABROAD_CATEGORY_SLUG } from '@/lib/abroad'
 import { homeItems } from '@/lib/homeCatalogue'
@@ -25,12 +26,31 @@ export const dynamic = 'force-dynamic'
 // box). Without this the homepage inherited the weak layout defaults.
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
-const DESC = 'დაჯავშნე ონლაინ კონსულტაცია ქართველ ექსპერტთან — ბიზნესი, ფინანსები, კარიერა და სამართალი. ხელით შერჩეული ბაზა, ვიდეოსესია, გამჭვირვალე ფასი.'
+
+// ⚠️ THE ORGANIZATION'S DESCRIPTION IS THE PAGE'S DESCRIPTION, RESOLVED THE SAME
+// WAY (2026-08-26). It was a `const DESC` sitting in this file, and it still
+// read „დაჯავშნე ონლაინ კონსულტაცია … ვიდეოსესია" — the booking product, gone
+// since 2026-08-24 — while the meta description beside it had been corrected in
+// ადმინი → ტექსტები months earlier. The two could not agree because only ONE of
+// them was editable: a literal here is reachable from no screen, so nobody who
+// noticed it could fix it. Reading `seo.home.description` gives Google's
+// knowledge panel and the SERP snippet the same sentence, and gives the admin
+// one place to change it. `getSiteTextMap` is React-cached per request and
+// `generateMetadata` has already called it, so this costs no round trip.
+const orgDescription = async () => {
+  const def = PAGE_SEO.find(p => p.page === 'home')?.description ?? ''
+  try {
+    const map = await getSiteTextMap()
+    return map[pageSeoKey('home', 'description')] || def
+  } catch {
+    return def
+  }
+}
 
 // Editable in ადმინი → ტექსტები (group „SEO — …"). See lib/pageSeo.
 export const generateMetadata = () => pageMetadata('home', '/')
 
-const jsonLd = {
+const jsonLd = (description: string) => ({
   '@context': 'https://schema.org',
   '@graph': [
     {
@@ -39,7 +59,7 @@ const jsonLd = {
       name: 'მცოდნე',
       url: SITE_URL,
       logo: `${SITE_URL}/logo.png`,
-      description: DESC,
+      description,
     },
     {
       '@type': 'WebSite',
@@ -55,7 +75,7 @@ const jsonLd = {
       },
     },
   ],
-}
+})
 
 /**
  * The spheres the home tiles render — VISIBLE, browsable, and POPULATED, with
@@ -102,26 +122,29 @@ export default async function Page() {
   // nor the real category links. The queries are the SAME ones /experts runs,
   // so the two surfaces can never describe different catalogues.
   //
-  // BOTH HALVES, because the catalogue is one list: a provider lives in a
-  // second table with no list endpoint at all, which is why the old client
-  // fetch could only ever show the consulting half. `queryMasters` is called
-  // UNFILTERED and its VISIBLE rule is untouched.
+  // ONE ROSTER since 2026-08-24 — it was two, and this page interleaved them.
+  // `queryProviders` is called UNFILTERED and its VISIBLE rule is untouched, so
+  // the home grid and /experts can never describe different catalogues.
   //
   // A DB blip must not take the home page down — every branch degrades to an
   // empty list, and each section draws nothing rather than an error.
   let items: CatalogueCardItem[] = []
   let categories: HomeCat[] = []
   try {
-    await ensureDbReady()
-    const [tutors, masters, cats] = await Promise.all([
-      // Enough to fill six cards after the service half has led — not the
-      // catalogue's 200: this page renders six of them and pays for the rest in
-      // SSR payload.
-      queryTutors({ limit: 12 }),
-      queryMasters({ groups: [], topics: [], cities: [] }),
+    // ⚠️ BOUNDED, AND THE BOUND IS WHAT MAKES THE PROMISE ABOVE TRUE
+    // (2026-08-27). The `catch` below has always been here; what it could not
+    // do was fire in time. With Postgres unreachable this line waited the full
+    // pool timeout and the visitor got a gateway error instead of the page —
+    // measured on the standalone build. Four seconds, then the catch renders
+    // the same empty state a blip has always been supposed to produce.
+    await ensureDbReadyWithin(4000)
+    const [providers, cats] = await Promise.all([
+      // Enough to fill six cards — not the catalogue's whole roster: this page
+      // renders six and would pay for the rest in SSR payload.
+      queryProviders({ groups: [], topics: [], cities: [], limit: 12 }),
       homeCategories(),
     ])
-    items = homeItems(tutors, masters.rows)
+    items = homeItems(providers.rows)
     categories = cats
   } catch {
     items = []
@@ -134,24 +157,19 @@ export default async function Page() {
   // signed-in expert watched „დაარეგისტრირე სერვისი" render and then disappear.
   // Free here: this page is already force-dynamic for the queries above. A
   // session blip must not take the page down — null just means „render as guest".
-  let initialUser: Me | null = null
-  try {
-    const u = await getCurrentUser()
-    if (u) {
-      initialUser = {
-        id: u.id,
-        fullName: u.fullName,
-        avatarUrl: u.avatarUrl,
-        role: u.role as NonNullable<Me>['role'],
-      }
-    }
-  } catch {
-    initialUser = null
-  }
+  // ⚠️ THE WHOLE IDENTITY, AND THE DEADLINE MOVED WITH IT (2026-08-30). This
+  // block hand-built `{ id, fullName, avatarUrl, role }` behind its own 2s
+  // guard, which left out `provider` and `balanceTetri` — so a signed-in
+  // provider saw the request button drawn and then removed, and the balance
+  // pill arrive late. `initialMe` builds the shape /api/me returns, and carries
+  // the same „a session blip must not take the page down" ceiling that used to
+  // live here, for the same reason: with Postgres unreachable the session read
+  // spent the pool timeout and this page answered in ten seconds.
+  const initialUser: Me | null = await initialMe()
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd(await orgDescription())) }} />
       <Landing categories={categories} items={items} initialUser={initialUser} />
     </>
   )

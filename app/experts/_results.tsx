@@ -12,7 +12,6 @@ import type { CatalogView } from '@/components/catalog/useCatalogView'
 import { registerSearchInput } from '@/lib/searchFocus'
 import { Eyebrow } from '@/components/Eyebrow'
 import { fmtRating } from '@/lib/fmt'
-import { Tutor } from './_data'
 
 /* Quick-Book popup DELETED (DESIGN_FIX_PROMPT 1.1) — the listing's
    booking CTA opens the shared components/booking/BookingFlow with the
@@ -42,10 +41,16 @@ import { Tutor } from './_data'
 // exactly „our recommendation", and it surfaces a brand-new expert the moment
 // they are bookable, which is the outcome the old default was reaching for.
 // „ახლის მიხედვით" stays available as an explicit choice.
+// ⚠️ „სესიებით, კლებადი" WAS THE THIRD OPTION AND IS GONE (2026-08-25). It
+// sorted on `TutorProfile.sessionsCount` — how many consultations somebody had
+// delivered — and that column went with the table on 2026-08-24. The option
+// stayed in this list and the switch in client.tsx had no `case 'sessions'`, so
+// choosing it fell through and returned the list UNCHANGED: a control that
+// looks like it works, changes the „დახარისხებული X" line to say it worked, and
+// does nothing. Every option here must have an arm in that switch.
 const SORT_OPTS = [
   { id: 'rating',   l: 'ჩვენი რჩევით' },
   { id: 'new',      l: 'ახლის მიხედვით' },
-  { id: 'sessions', l: 'სესიებით, კლებადი' },
   { id: 'price-a',  l: 'ფასით, ზრდადი' },
   { id: 'price-d',  l: 'ფასით, კლებადი' },
 ] as const
@@ -228,59 +233,8 @@ export const Pagination = ({ page, setPage, totalPages }: { page: number; setPag
 
 /* ───── Page ───── */
 /* ───── Quick-Compare modal ───── */
-export const CompareModal = ({ open, tutors, onClose, onBook }: { open: boolean; tutors: Tutor[]; onClose: () => void; onBook: (t: Tutor) => void }) => {
-  // Escape / focus trap / scroll-lock come from the Sheet container.
-  if (!open || tutors.length === 0) return null
-
-  // Compute "best" per row for highlighting
-  const best = {
-    rating:   Math.max(...tutors.map(t => t.rating)),
-    reviews:  Math.max(...tutors.map(t => t.reviews)),
-    sessions: Math.max(...tutors.map(t => t.sessions)),
-    price:    Math.min(...tutors.map(t => t.price)),
-  }
-
-  const Row = ({ label, value, isBest }: { label: string; value: React.ReactNode; isBest?: boolean }) => (
-    <div className={`px-3 py-2.5 ${isBest ? 'bg-brand-50/60' : ''}`}>
-      <Eyebrow tone="muted" className="mb-1">{label}</Eyebrow>
-      <div className={`font-display text-body font-semibold tabular-nums ${isBest ? 'text-brand-800' : 'text-ink-900'}`}>{value}</div>
-    </div>
-  )
-
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      size="lg"
-      ariaLabel="ექსპერტების შედარება"
-      eyebrow="სწრაფი შედარება"
-      title={`${tutors.length} ექსპერტი გვერდიგვერდ`}
-    >
-        {/* Full-bleed, sideways-scrollable compare table inside the sheet body */}
-        <div className="overflow-x-auto -mx-5 sm:-mx-6 -my-4">
-          <div className="grid" style={{ gridTemplateColumns: `repeat(${tutors.length}, minmax(220px, 1fr))` }}>
-            {tutors.map(t => (
-              <div key={t.id} className="border-r border-ink-100 last:border-r-0">
-                {/* Header */}
-                <div className="px-4 py-5 border-b border-ink-100 text-center">
-                  <img src={t.avatarUrl || DEFAULT_AVATAR} alt={t.name} className="w-16 h-16 mx-auto rounded-full object-cover ring-2 ring-ink-200 mb-3" />
-                  <div className="font-display text-body font-bold text-ink-900 tracking-tight truncate">{t.name}</div>
-                  <div className="text-meta text-ink-500 mt-0.5 truncate">{t.cat}</div>
-                  {t.superExpert && <span className="inline-flex items-center gap-1 mt-2 px-1.5 h-5 rounded-pill bg-ink-900 border border-transparent text-white font-display text-micro font-bold uppercase"><Icon.spark className="w-3 h-3" /> Super</span>}
-                </div>
-                <Row label="რეიტინგი" isBest={t.rating === best.rating} value={<span className="inline-flex items-center gap-1"><Icon.star className="w-3.5 h-3.5 text-warning-500" />{fmtRating(t.rating)} · {t.reviews}</span>} />
-                <Row label="სესია" isBest={t.sessions === best.sessions} value={<>{t.sessions.toLocaleString()}</>} />
-                <Row label="ფასი"          isBest={t.price === best.price}      value={<>₾{t.price}</>} />
-                <Row label="ენები"          value={<span className="text-meta text-ink-700 font-normal">{t.langs.join(' · ')}</span>} />
-                <div className="p-3 border-t border-ink-100">
-                  <button type="button" onClick={() => { onClose(); onBook(t) }} className="w-full h-11 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body inline-flex items-center justify-center gap-1.5 transition-colors duration-fast">
-                    დაჯავშნე
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-    </Sheet>
-  )
-}
+/* ⚠️ QUICK-COMPARE WAS HERE AND IS GONE (2026-08-24). It put three
+   consultation profiles side by side on four fields — rating, session count,
+   price and languages — three of which the one provider row does not carry a
+   comparable value for. A table with one real column is not a comparison, and
+   the strip that opened it went with it. */

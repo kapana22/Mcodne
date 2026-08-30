@@ -27,7 +27,7 @@ import { join, relative } from 'node:path'
 import { NextRequest } from 'next/server'
 import { middleware } from '../middleware'
 import { professions } from '../lib/professionSeo'
-import { SERVICE_GROUPS, SERVICE_TOPICS } from '../lib/serviceProfile'
+import { OFFER_GROUPS, OFFER_TOPICS } from '../lib/serviceProfile'
 import { RESERVED_SLUGS, slugReserved } from '../lib/slugSpace'
 
 const ROOT = join(__dirname, '..')
@@ -62,7 +62,7 @@ const PAGE = 'app/experts/[slug]/page.tsx'
 
 /* ═══════════ A. the resolver's precedence ═══════════════════════════════ */
 
-test('§A four pages share /experts/[slug], resolved in ONE documented order', () => {
+test('§A three pages share /experts/[slug], resolved in ONE documented order', () => {
   const page = read(PAGE)
   // The order is stated in the file, not only performed by it — the next
   // person to add a fifth thing has to read what the four already are.
@@ -72,10 +72,14 @@ test('§A four pages share /experts/[slug], resolved in ONE documented order', (
   // link would unfurl as one page and open as another.
   const meta = page.slice(page.indexOf('export async function generateMetadata'), page.indexOf('export default async function'))
   const render = page.slice(page.indexOf('export default async function'), page.indexOf('function queryOf('))
+  // ⚠️ IT WAS FOUR UNTIL 2026-08-24. „The expert profile" (`resolveExpert`) sat
+  // third, between the two code-owned landings and the provider profile; it
+  // went with the consultation table, and the provider profile moved up into
+  // its place. The ORDER is still the guarantee: the fixed lists win, because
+  // both of them are source and a profile slug is generated from a name.
   const STEPS: [label: string, marker: string][] = [
     ['the profession landing', 'professionBySlug[param]'],
     ['the trade landing', 'resolveTrade(param)'],
-    ['the expert profile', 'resolveExpert(param)'],
     ['the provider profile', 'resolveMaster(param)'],
   ]
   for (const [name, src] of [['generateMetadata', meta], ['the page', render]] as const) {
@@ -96,7 +100,7 @@ test('§A four pages share /experts/[slug], resolved in ONE documented order', (
   // source while both profile slugs are generated from people's names. That is
   // only safe because neither list can collide with the other.
   const profSlugs = new Set(professions.map(p => p.slug))
-  const tradeIds = [...SERVICE_GROUPS.map(g => g.id), ...SERVICE_TOPICS.map(t => t.id)]
+  const tradeIds = [...OFFER_GROUPS.map(g => g.id), ...OFFER_TOPICS.map(t => t.id)]
   assert.deepEqual(tradeIds.filter(id => profSlugs.has(id)), [],
     'a trade id and a profession slug name the same URL — the two landings would shadow each other')
 })
@@ -105,9 +109,8 @@ test('§A2 each of the four is drawn by its own part, and the provider profile i
   const page = read(PAGE)
   assert.match(page, /<ProfessionLanding p=\{prof\} \/>/)
   assert.match(page, /<TradeLanding trade=\{trade\}/)
-  assert.match(page, /<ExpertProfilePage /)
   assert.match(page, /<ProviderHero p=\{p\} \/>/)
-  for (const part of ['_profession.tsx', '_tradeLanding.tsx', 'client.tsx',
+  for (const part of ['_profession.tsx', '_tradeLanding.tsx',
                       '_providerData.ts', '_providerHero.tsx', '_providerBlocks.tsx', '_providerCta.tsx']) {
     assert.ok(has(`app/experts/[slug]/${part}`), `app/experts/[slug]/${part} is missing`)
   }
@@ -120,7 +123,7 @@ test('§A3 a provider profile is REACHABLE at /experts/<slug> — the branch is 
   const page = codeOf(PAGE)
   // Entered only when the expert table answered nothing (a slug is unique
   // across both tables, so at most one of the two can be here) …
-  assert.match(page, /if\s+\(!resolved\)\s+\{\s*\n\s*const\s+provider\s+=\s+await\s+resolveMaster\(param\)/,
+  assert.match(page, /const\s+provider\s+=\s+await\s+resolveMaster\(param\)/,
     'the provider branch is no longer reached from the resolver')
   // … and it RETURNS the profile rather than falling through to the 404.
   assert.match(page, /return providerProfile\(provider\)/, 'the provider branch resolves and then drops the row')
@@ -129,7 +132,8 @@ test('§A3 a provider profile is REACHABLE at /experts/<slug> — the branch is 
   // …and every address this profile prints for itself is under /experts.
   const data = read('app/experts/[slug]/_providerData.ts')
   assert.match(data, /export\s+const\s+masterPath\s+=\s+\(p:\s+\{\s+slug:\s+string\s+\|\s+null;\s+id:\s+string\s+\}\)\s+=>\s+`\/experts\/\$\{p\.slug\s+\|\|\s+p\.id\}`/)
-  assert.match(data, /`\/experts\/\$\{expertSlug\}`/, 'the cross-link to the same person’s expert profile is gone')
+  // ⚠️ THE CROSS-LINK TO „the same person's expert profile" IS GONE (2026-08-24)
+  // — there was a second profile to link to, and there is not.
   // The metadata half canonicalises to the same address, never the old one.
   assert.match(codeOf(PAGE), /alternates:\s+\{\s+canonical:\s+providerCanonical\s+\}/)
   assert.match(codeOf(PAGE), /const\s+providerCanonical\s+=\s+`\$\{SITE_URL\}\$\{masterPath\(pp\)\}`/)
@@ -141,14 +145,17 @@ test('§B one shared helper answers „is this slug taken?" for both generators'
   const space = read('lib/slugSpace.ts')
   // BOTH tables, in one function. Either half missing is a duplicate waiting.
   assert.match(space, /export\s+async\s+function\s+slugTaken\(slug:\s+string\):\s+Promise<boolean>/)
-  assert.match(space, /prisma\.tutorProfile\.findFirst\(\{\s+where:\s+\{\s+slug\s+\}/, 'slugTaken does not look at TutorProfile')
+  // ⚠️ IT ASKED TWO TABLES UNTIL 2026-08-24 — that was the whole point of the
+  // file: two profile tables shared one URL prefix and neither unique index
+  // could see the other. One table now, plus the reserved list, which is the
+  // half no index could ever cover.
   assert.match(space, /prisma\.serviceProfile\.findFirst\(\{\s+where:\s+\{\s+slug\s+\}/, 'slugTaken does not look at ServiceProfile')
   // A DB outage answers „taken" — the safe direction (the caller suffixes and
   // at worst a profile keeps its id URL). „free" would mint a duplicate.
   assert.match(space, /catch \{\n\s*return true\n\s*\}/, 'slugTaken fails open — an outage would mint duplicates')
 
   // BOTH generators ask it, and neither keeps a private list any more.
-  for (const f of ['lib/expertSlug.ts', 'lib/masterSlug.ts']) {
+  for (const f of ['lib/masterSlug.ts']) {
     const src = read(f)
     assert.match(src, /import\s+\{\s+slugReserved,\s+slugTaken\s+\}\s+from\s+'\.\/slugSpace'/, `${f} does not use the shared helper`)
     assert.match(src, /if \(await slugTaken\(candidate\)\) continue/, `${f} writes a candidate without asking both tables`)
@@ -168,12 +175,12 @@ test('§B2 the reserved list covers the route words, every profession and every 
     assert.ok(slugReserved(w), `„${w}" 308s somewhere — a profile minted onto it would be unreachable`)
   }
   for (const p of professions) assert.ok(slugReserved(p.slug), `the profession „${p.slug}" is not reserved`)
-  for (const g of SERVICE_GROUPS) assert.ok(slugReserved(g.id), `the trade group „${g.id}" is not reserved`)
+  for (const g of OFFER_GROUPS) assert.ok(slugReserved(g.id), `the trade group „${g.id}" is not reserved`)
   // ⚠️ EVERY topic, not only the live groups': a trade we open next month must
   // not collide with a slug minted today.
-  for (const t of SERVICE_TOPICS) assert.ok(slugReserved(t.id), `the trade topic „${t.id}" is not reserved`)
+  for (const t of OFFER_TOPICS) assert.ok(slugReserved(t.id), `the trade topic „${t.id}" is not reserved`)
   assert.ok(!slugReserved('ana-gagoshidze'), 'a person’s name must still be mintable')
-  assert.ok(RESERVED_SLUGS.size >= professions.length + SERVICE_GROUPS.length + SERVICE_TOPICS.length)
+  assert.ok(RESERVED_SLUGS.size >= professions.length + OFFER_GROUPS.length + OFFER_TOPICS.length)
 })
 
 /* ═══════════ C. the second namespace is gone ════════════════════════════ */
@@ -223,12 +230,20 @@ test('§C2 no live /services link is left in app, components or lib', () => {
 
 test('§C3 the sitemap and robots know one namespace', () => {
   const sitemap = codeOf('app/sitemap.ts')
-  // Every dynamic block under /experts/: expert profiles, provider profiles,
-  // trade landings, profession landings.
-  assert.match(sitemap, /url:\s+`\$\{SITE_URL\}\/experts\/\$\{t\.slug\s+\|\|\s+t\.id\}`/, 'expert profiles left the sitemap')
-  assert.match(sitemap, /url: `\$\{SITE_URL\}\/experts\/\$\{m\.slug\}`/, 'provider profiles left the sitemap')
+  // Every dynamic block under /experts/: the profiles, the trade landings, the
+  // profession landings.
+  //
+  // ⚠️ THE PROFILES ARE ONE BLOCK SINCE 2026-08-26, and this pin moved with
+  // them. There were two — `t.slug || t.id` and `m.slug` — one per profile
+  // table, and after the merge both read the SAME table: every provider was
+  // submitted twice, and the second copy had been hand-copied without the
+  // suspension check, so two 404s went to Google. What matters here is that the
+  // namespace is one; that the roster is right is executed against the database
+  // in tests/sitemap.test.ts.
+  assert.equal((sitemap.match(/url: `\$\{SITE_URL\}\/experts\/\$\{p\.slug\}`/g) ?? []).length, 2,
+    'the profiles or the profession landings left the sitemap')
   assert.match(sitemap, /url: `\$\{SITE_URL\}\/experts\/\$\{g\.id\}`/, 'trade landings left the sitemap')
-  assert.match(sitemap, /url: `\$\{SITE_URL\}\/experts\/\$\{p\.slug\}`/, 'profession landings left the sitemap')
+  assert.doesNotMatch(sitemap, /\$\{m\.slug\}|\|\|\s+\w+\.id\}`/, 'a second profile block is back — every provider would be listed twice')
   assert.doesNotMatch(sitemap, /\/services/, 'the sitemap still names the retired namespace')
   // ONE Allow covers all four pages; a redirecting prefix is not an Allow.
   const robots = codeOf('app/robots.ts')

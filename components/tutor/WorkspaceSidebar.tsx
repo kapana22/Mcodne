@@ -3,12 +3,18 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Icon } from '@/components/Icon'
 import { Logo } from '@/components/Logo'
+import { gelLabel } from '@/lib/credits'
 import { Eyebrow } from '@/components/Eyebrow'
 import { navFor, CATALOG_LINK, type NavItem, type NavGroups } from './navConfig'
 import type { NavBadges } from './useNavBadges'
 
 function badgeCount(item: NavItem, badges: NavBadges): number {
-  if (item.badgeKey === 'attention') return badges.requests + badges.reschedules
+  // ⚠️ `attention` WAS THE FIRST BRANCH AND IT SUMMED TWO ZEROES
+  // (removed 2026-08-26): `requests + reschedules` were booking counts the API
+  // stopped computing on 2026-08-24, so the „სამუშაოები" pill could never
+  // render a number. If that item should carry one again, the honest source is
+  // the jobs page's own „attention" bucket (lib → buildJobRows), counted on the
+  // server the way `openRequests` already is.
   if (item.badgeKey === 'messages') return badges.messages
   // The queue badge — verified requests with a place left. Counted by the
   // server layout (app/work/layout.tsx), the same narrowing the queue page
@@ -51,7 +57,12 @@ function NavRow({ item, badges }: { item: NavItem; badges: NavBadges }) {
    `groups` = which of the two /work groups this viewer holds (navConfig →
    NAV_GROUPS): the expert's items, the master's items, or both with a divider
    between them. Decided by capabilities on the server, never here. */
-export function WorkspaceSidebar({ badges, groups }: { badges: NavBadges; groups: NavGroups }) {
+export function WorkspaceSidebar({ badges, groups, unearnedTetri = 0 }: {
+  badges: NavBadges
+  groups: NavGroups
+  /** What the unfinished profile is still worth, in tetri. 0 hides the line. */
+  unearnedTetri?: number
+}) {
   const percent = badges.profilePercent
   const sections = navFor(groups)
   return (
@@ -79,14 +90,27 @@ export function WorkspaceSidebar({ badges, groups }: { badges: NavBadges; groups
 
       <div className="flex-1" />
 
-      {groups.expert && percent !== null && percent < 100 && (
+      {/* ⚠️ THE BAR NOW SAYS WHAT IT IS WORTH, NOT HOW FULL IT IS (2026-08-30,
+          from the owner's canvas, where this line is on SEVEN of the fourteen
+          artboards — it is the most-repeated element in the whole design).
+          It used to read „პროფილის სისრულე · 60%", which is a metric about a
+          form: true, and it answers nothing a person would act on. „კიდევ 40 ₾
+          პროფილის შევსებისთვის" is the same bar with the reason attached.
+
+          ⚠️ IT DOES NOT REPEAT THE BALANCE. The canvas prints „ბალანსი 60 ₾"
+          here because its rail is the only place that number appears; ours has
+          it in the top bar already (components/CreditPill, put there on the
+          owner's „აქ უნდა ჩანდეს ლამაზად", 2026-08-21). Two readouts of one
+          number in one chrome is the confusion this session keeps removing, so
+          this block keeps the half the pill cannot carry: what is still unearned. */}
+      {percent !== null && percent < 100 && (
         <Link
           href="/work/profile"
           className="mt-4 block rounded-card border border-brand-200 bg-brand-50/40 p-3.5 hover:bg-brand-50/70 transition-colors duration-fast"
         >
           <div className="flex items-baseline justify-between gap-2">
             <Eyebrow as="span">
-              პროფილის სისრულე
+              პროფილი
             </Eyebrow>
             <span className="font-display text-small font-bold text-brand-700 tabular-nums">{percent}%</span>
           </div>
@@ -96,6 +120,14 @@ export function WorkspaceSidebar({ badges, groups }: { badges: NavBadges; groups
               style={{ width: `${percent}%` }}
             />
           </div>
+          {/* Only when there is something left to earn. A provider whose grants
+              are all paid but whose profile is short of 100% would otherwise be
+              shown „კიდევ 0 ₾", which is a promise of nothing. */}
+          {unearnedTetri > 0 && (
+            <p className="mt-2 text-meta text-brand-700 leading-snug">
+              კიდევ {gelLabel(unearnedTetri)} პროფილის შევსებისთვის
+            </p>
+          )}
         </Link>
       )}
     </aside>

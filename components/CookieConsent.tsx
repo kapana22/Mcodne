@@ -89,7 +89,12 @@ export function CookieConsent() {
         <p className="flex-1 min-w-0 text-meta sm:text-small leading-snug sm:leading-[1.55] text-ink-700 sm:text-ink-800">
           <span className="sm:hidden">ვიყენებთ ქუქიებს.</span>
           <span className="hidden sm:inline">ვიყენებთ ქუქიებს პლატფორმის მუშაობისთვის.</span>{' '}
-          <Link href="/cookies" className="font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 decoration-brand-300">
+          {/* `.tap-area` and not padding: this link sits INSIDE a sentence in a
+              bar that is deliberately ~56px tall on a phone, so growing the box
+              would reflow the copy it is part of. The utility hangs an
+              invisible ≥40px ::before over a 14px line instead — CLAUDE.md
+              rule 3 without moving a neighbour. See app/globals.css. */}
+          <Link href="/cookies" className="tap-area font-display font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 decoration-brand-300">
             <span className="sm:hidden">პოლიტიკა</span>
             <span className="hidden sm:inline">ქუქიების პოლიტიკა</span>
           </Link>

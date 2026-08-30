@@ -100,7 +100,7 @@ export const VerifyView = ({ setView }: { setView: (v: View) => void }) => {
           <h1 className="font-display text-display lg:text-display-lg font-bold text-ink-900 tracking-tight leading-[1.1]">
             ანგარიში მზადაა
           </h1>
-          <p className="mt-4 text-body text-ink-600 leading-[1.6]">ახლა შეგიძლია იპოვო ექსპერტი და დაჯავშნო სესია.</p>
+          <p className="mt-4 text-body text-ink-600 leading-[1.6]">ახლა შეგიძლია აღწერო რა გჭირდება და შეთავაზებები მიიღო.</p>
           <button type="button" onClick={() => setView('onboarding')} className="mt-7 h-12 px-6 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body-lg inline-flex items-center gap-2 transition-colors duration-fast">
             გავაგრძელოთ
           </button>

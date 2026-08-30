@@ -13,11 +13,14 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { getCurrentUser } from './auth'
 import { ensureDbReady } from './dbBoot'
+import { queueWhere } from './requestRouting'
 import {
   makePublicRef,
   canSeeRequests, canOpenRequestForm,
   type RequestViewer,
 } from './requests'
+import { queueScope, type QueueScope } from './requestRouting'
+import { asRole, ROLE } from './roles'
 
 /**
  * A fresh public reference, from real crypto randomness.
@@ -203,4 +206,126 @@ export async function requestsViewer(): Promise<RequestsViewerState> {
  */
 export function requestsNotFound(): Response {
   return Response.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
+}
+
+/* ── the queue narrowing, resolved ──────────────────────────────────────── */
+
+/**
+ * WHAT THIS PERSON OFFERS, read once, for the three screens that must agree.
+ *
+ * ⚠️ ONE READER, BECAUSE THREE COPIES OF A QUERY IS THREE ANSWERS. The nav
+ * badge (app/work/layout), the home board (app/work/page) and the queue itself
+ * each used to fetch the ServiceProfile with their own `findFirst` and pass it
+ * to the same narrowing. That was already one rule too thinly spread — the
+ * badge and the list had disagreed once before over exactly this — and adding
+ * the CONSULT half would have meant a second query duplicated three times.
+ * The DECISION is pure and lives in lib/requestRouting; this only resolves it
+ * against the database, which is why it is in this file and not that one.
+ *
+ * The service profile is looked up through the company as well as the person:
+ * a member of an allowlisted company is a provider (see requestAccessOf), and
+ * the trades live on the company's row rather than theirs.
+ */
+export async function providerQueueScope(
+  user: { id: string; role?: string | null } | null | undefined,
+): Promise<QueueScope> {
+  // No session is not a state this screen can be in — the layouts 404 first —
+  // but the narrowest possible answer is still the right default.
+  if (!user) return { mode: 'UNLISTED', fix: 'SERVICES' }
+  await ensureDbReady()
+  // ⚠️ ONE ROW SINCE 2026-08-24. This asked two tables the same question about
+  // one person — the services and cities from `ServiceProfile`, the sphere and
+  // the professions from `TutorProfile` — and merged the answers. They are
+  // columns on one row now, so the merge is gone and the two halves cannot
+  // disagree.
+  const profile = await prisma.serviceProfile.findFirst({
+    where: {
+      OR: [
+        { userId: user.id },
+        { company: { members: { some: { userId: user.id } } } },
+      ],
+    },
+    // ⚠️ `available` IS SELECTED, NOT FILTERED ON, and the difference was a
+    // shipped bug (2026-08-18). Filtering here returns null for a paused
+    // provider, which every reader downstream would have to read as „no
+    // profile" — and „no profile" used to widen the queue to the whole
+    // platform. Turning yourself off made the noise worse. Absent and paused
+    // are different facts and only the row can tell them apart.
+    select: {
+      services: true, areas: true, available: true,
+      categoryId: true, professions: true, category: { select: { slug: true } },
+    },
+  })
+  return queueScope({
+    service: profile ? { services: profile.services, areas: profile.areas, available: profile.available } : null,
+    expert: profile
+      ? {
+          categoryId: profile.categoryId,
+          categorySlug: profile.category?.slug ?? null,
+          professions: profile.professions,
+        }
+      : null,
+    isAdmin: asRole(user.role) === ROLE.ADMIN,
+  })
+}
+
+/**
+ * HOW MANY OPEN REQUESTS THIS PERSON CAN ACTUALLY SEE.
+ *
+ * ⚠️ ONE HELPER, FOUR READERS (2026-08-29). This count is printed in four
+ * places now — the rail badge (app/work/layout.tsx) and the „ახალი" stage on
+ * each of the three screens the flow is drawn on — and it was already the kind
+ * of number that had been wrong before for exactly this reason: the badge once
+ * counted platform-wide while the list beside it filtered by the viewer's own
+ * trades, so it advertised work the queue would never show.
+ *
+ * The narrowing is `queueWhere(providerQueueScope(user))` — the SAME pair the
+ * queue page and the routing use (lib/requestRouting). A second copy of these
+ * three lines is how the badge and the list start disagreeing again.
+ */
+export async function openRequestCount(
+  user: { id: string; role?: string | null } | null | undefined,
+): Promise<number> {
+  if (!user) return 0
+  return prisma.serviceRequest.count({
+    where: {
+      status: 'VERIFIED',
+      offerCount: { lt: prisma.serviceRequest.fields.offerLimit },
+      ...queueWhere(await providerQueueScope(user)),
+    },
+  })
+}
+
+/**
+ * WHICH TOPICS ANYBODY ACTUALLY DOES — the client intake's own vocabulary.
+ *
+ * ⚠️ THE INTAKE WAS OFFERING WORK NOBODY CAN ANSWER (2026-08-30). Owner:
+ * „როდესაც სერვისი არაა გამოტანილი სერჩში, ვერ უნდა გაგზავნოს… და ისინი უნდა
+ * იყოს, რომლებიც გვყავს კატეგორიაში და დამატებული."
+ *
+ * Measured that day: the wizard offered 148 topics and exactly 46 of them had a
+ * live provider. **102 topics — 69% — were a request that could reach nobody**,
+ * and 19 of the 28 groups were empty end to end. Somebody describing an IELTS
+ * course or a visa was walking five screens to join a queue with no other side.
+ *
+ * ⚠️ DERIVED, NEVER LISTED — that is the owner's „პარალელურად". The moment a
+ * provider ticks a trade on /work/services it becomes offerable here, and the
+ * moment the last one un-ticks it, it stops. A hand-kept list would be a second
+ * copy of the roster and the copy that goes stale.
+ *
+ * ⚠️ AND NOTHING IS LOST BY NARROWING. A person whose words match no offered
+ * topic still reaches the free-text escape („ამ სახელით ვერ ვიპოვეთ — მაგრამ
+ * მაინც მოგვწერე", app/request/_stepWhat.tsx), which files under OTHER_TOPIC
+ * and routes to EVERYONE rather than to a filed specialist. So the narrowing
+ * removes dead ends, not requests.
+ *
+ * The same pair every routing read uses: published AND available. A paused
+ * provider is not supply.
+ */
+export async function coveredTopicIds(): Promise<string[]> {
+  const rows = await prisma.serviceProfile.findMany({
+    where: { published: true, available: true },
+    select: { services: true },
+  })
+  return [...new Set(rows.flatMap(r => r.services))]
 }

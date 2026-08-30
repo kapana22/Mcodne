@@ -45,24 +45,17 @@ export type { Hat }
  */
 export const HAT_HOME: Record<Hat, string> = {
   ADMIN: '/admin',
-  EXPERT: '/work',
-  // ⚠️ THE HOME, NOT THE QUEUE (2026-08-21). This pointed at the master's queue
-  // — PROVIDER_ROUTE + the requests segment — and that was the reason the balance „did not exist": /work is the ONLY screen that
-  // runs `grantEarnedTasks` and draws the CreditStrip, and a person who
-  // registered a SERVICE was the one supply-side hat never sent there. Measured
-  // that day on live data: both service providers had zero grants — one of them
-  // had six priced services, a photo, a work photo and an area (85₾ earned) and
-  // a balance of −5₾ from the single offer they had sent.
-  //
-  // /work was BUILT for this hat — read its own header: „a work-only provider
-  // had no home at all… the first screen of their workspace was a queue with no
-  // context and no balance." The page landed, this line did not follow. The
-  // (expert) layout and the avatar menu were both repointed at /work on
-  // 2026-08-20; sign-in and /join were the two doors left behind.
-  MASTER: PROVIDER_ROUTE,
+  // ⚠️ THE HOME, NOT THE QUEUE (2026-08-21). The supply side's two hats pointed
+  // at two different screens — /work for the expert, the request queue for the
+  // trades provider — and that split was the reason a service provider's
+  // balance „did not exist": /work is the ONLY screen that runs
+  // `grantEarnedTasks` and draws the CreditStrip, and they were the one hat
+  // never sent there. One hat since 2026-08-24, one home, and it is the one
+  // that was built for it.
+  PROVIDER: '/work',
   // COMPANY stays on the queue's sibling: a company member holds RequestAccess
-  // WITHOUT a ServiceProfile, so `capabilitiesOf` gives them no WORK capability
-  // and /work would 404 them. Their home is the screen their gate actually opens.
+  // WITHOUT a ServiceProfile, so they are not a `provider` and /work would 404
+  // them. Their home is the screen their gate actually opens.
   COMPANY: `${PROVIDER_ROUTE}/offers`,
   CLIENT: '/me',
 }

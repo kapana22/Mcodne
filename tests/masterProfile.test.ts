@@ -82,26 +82,50 @@ test('it resolves by slug AND by id, and the id form redirects to the slug', () 
   const page = read(PAGE)
   assert.match(page, /permanentRedirect\(`\$\{masterPath\(provider\)\}\$\{queryOf\(await\s+searchParams\)\}`\)/,
     'an id URL must 308 to the slug URL — carrying the query string, like the expert branch')
-  // Nothing found in EITHER table is the one 404 this route has.
-  assert.match(page, /if \(tutor === null\) notFound\(\)/)
+  // Nothing found is the one 404 this route has. ⚠️ IT WAS „nothing found in
+  // EITHER table" until 2026-08-24 — there was a second profile table to fall
+  // through to first.
+  assert.match(page, /notFound\(\)\n\}/, 'the resolver lost its 404')
   assert.match(page, /if \(!p\) notFound\(\)/, 'a row that vanished between the two reads must 404, never render blank')
 })
 
-test('unpublished, paused, or not admitted → not found; and the three readers agree', () => {
-  // The profile's rule.
-  const data = read(DATA)
-  assert.match(data, /published: true/)
-  assert.match(data, /available: true/)
-  assert.match(data, /requestAccess: \{ active: true \}/)
-  // The catalogue's rule carries `published` too — a card must never link to a 404.
-  assert.match(read('app/experts/_masterData.ts'), /published: true/)
-  // …and so does the photo route, or the profile would draw a portrait it refuses.
-  assert.match(read(PHOTO), /published: true/)
+test('unpublished, paused, suspended or not admitted → not found; and the three readers agree', () => {
+  const CATALOGUE = 'app/experts/_providers.ts'
+  // ONE RULE, THREE READERS, and the whole point is that they cannot drift: a
+  // page reachable for somebody the photo route refuses draws a broken
+  // portrait, and a card that links to a 404 is worse than no card.
+  for (const f of [DATA, CATALOGUE, PHOTO]) {
+    const src = read(f)
+    assert.match(src, /published: true/, `${f} lost \`published\``)
+    assert.match(src, /available: true/, `${f} lost \`available\``)
+    assert.match(src, /requestAccess: \{ active: true \}/, `${f} lost the allowlist clause`)
+    // ⚠️ ADDED 2026-08-24, AND IT WAS MISSING FROM ALL THREE. The old catalogue
+    // merged two rosters and only the CONSULTATION half filtered
+    // `user.suspendedAt: null` (lib/tutorsQuery). Deleting that half left the
+    // trades rule — which had never carried the clause — covering all 29
+    // providers, so suspending somebody stopped removing them: card, profile
+    // and portrait all stayed up, while the sitemap, the category counts and
+    // the certificate route DID drop them. The site disagreed with itself
+    // about who is public, and the admin's one emergency control did nothing.
+    assert.match(
+      src,
+      /suspendedAt: null/,
+      `${f} does not exclude a SUSPENDED account — suspension is the admin's one take-this-person-down-now control and it must work on every reader at once`,
+    )
+    // Inside the OR, never beside it: a company profile has no user row, and a
+    // hoisted `user: { is: … }` matches nothing, which would delete every
+    // company from the catalogue.
+    assert.match(
+      src,
+      /\{ user: \{ is: \{ suspendedAt: null, requestAccess: \{ active: true \} \} \} \}/,
+      `${f} hoisted the suspension clause out of the OR — that silently drops every company profile`,
+    )
+  }
 })
 
 test('no page or list query ever selects a base64 column', () => {
   const BLOB = /photoUrl:\s*true|workPhotos:\s*true|include:\s*\{[^}]*(photoUrl|workPhotos)/
-  for (const f of ['app/experts/_masterData.ts', DATA, PAGE]) {
+  for (const f of ['app/experts/_providers.ts', DATA, PAGE]) {
     assert.doesNotMatch(read(f), BLOB, `${f} selects a base64 column into a page — count it and point at the photo route`)
   }
   // The route reads ONE image per response: the face by column, a work photo by
@@ -135,14 +159,14 @@ test('the photo route refuses SVG and serves ?n=<index> through the same refusal
 })
 
 test('the catalogue card is a link to /experts/<slug> — only when the row has one', () => {
-  const card = read('app/experts/_masterCard.tsx')
+  const card = read('app/experts/_providerCard.tsx')
   assert.match(card, /`\/experts\/\$\{m\.slug\}`/)
   assert.doesNotMatch(card, /`\/services\//, 'the card still addresses the retired namespace')
   assert.match(card, /m\.slug \? /, 'a slugless row must not become a link to nowhere')
   assert.match(card, /overlay=\{href \?/, 'the whole card opens the profile through EntityCard’s overlay slot')
-  assert.match(read('app/experts/_masterData.ts'), /id: true, slug: true,/, 'the catalogue query must select the slug')
+  assert.match(read('app/experts/_providers.ts'), /id: true, slug: true,/, 'the catalogue query must select the slug')
   // Cards born before slugs get theirs lazily, guarded and bounded.
-  const data = read('app/experts/_masterData.ts')
+  const data = read('app/experts/_providers.ts')
   assert.match(data, /ensureMasterSlug\(r\.id\)/)
   assert.match(data, /slugless\.length <= 20/)
 })
@@ -159,7 +183,8 @@ test('lib/masterSlug checks BOTH namespaces, and approval calls it guarded', () 
   assert.match(lib, /import\s+\{\s+slugReserved,\s+slugTaken\s+\}\s+from\s+'\.\/slugSpace'/)
   assert.match(lib, /if \(await slugTaken\(candidate\)\) continue/)
   const space = read('lib/slugSpace.ts')
-  assert.match(space, /prisma\.tutorProfile\.findFirst\(\{\s+where:\s+\{\s+slug\s+\}/)
+  // ⚠️ IT ASKED BOTH TABLES UNTIL 2026-08-24. One table now, plus the reserved
+  // list — which is the half no unique index could ever cover.
   assert.match(space, /prisma\.serviceProfile\.findFirst\(\{\s+where:\s+\{\s+slug\s+\}/)
   assert.match(lib, /export\s+async\s+function\s+ensureMasterSlug\(serviceProfileId:\s+string\)/)
   assert.match(lib, /company\?\.name \?\? profile\.user\?\.fullName/, 'the name is the firm’s or the person’s, in that order')
@@ -192,12 +217,21 @@ test('the CTA is the intake, gated by the page, and the dual link goes to /exper
   // CTA imports the builder rather than assembling a query string of its own.
   assert.match(cta, /import\s+\{\s+requestHrefFor\s+\}\s+from\s+'\.\/_providerData'/)
   assert.match(cta, /href=\{requestHrefFor\(master\)\}/)
-  assert.match(cta, /გამოაგზავნე მოთხოვნა/)
+  // ⚠️ „დატოვე მოთხოვნა" SINCE 2026-08-21. The word changed, not the property:
+  // this line exists so the card keeps ONE primary that is the intake. Owner:
+  // „რეალურად მოთხოვნას უგზავნი და უტოვებ ლიდს, რომ დაუკავშირდე." See the
+  // component for why „გამოაგზავნე" was tender language for an addressed request.
+  assert.match(cta, /დატოვე მოთხოვნა/)
+  // …and the card now SAYS the request is addressed. That is not decoration:
+  // `offerLimit: 1` has made it exclusive since 2026-08-20 and no screen said so.
+  assert.match(cta, /სხვას არ ეჩვენება/,
+    'the CTA stopped telling the client their request goes to this provider alone')
   assert.match(read(DATA), /REQUEST_HREF = '\/request\?for=service'/)
   assert.match(read(DATA), /requestHrefFor[\s\S]{0,200}&to=\$\{encodeURIComponent\(p\.slug\s+\|\|\s+p\.id\)\}/,
     'the recipient is no longer carried, or is carried unencoded')
-  // The other profile of the same person.
-  assert.match(read(DATA), /tutor: \{ select: \{ slug: true \} \}/)
-  assert.match(read(DATA), /`\/experts\/\$\{expertSlug\}`/)
-  assert.match(read(`${DIR}/_providerHero.tsx`), /ექსპერტის პროფილი/)
+  // ⚠️ „THE OTHER PROFILE OF THE SAME PERSON" WAS PINNED HERE UNTIL 2026-08-24
+  // — the link a dual provider followed to their consultation page. There is
+  // one profile, so there is nothing to cross-link to.
+  assert.doesNotMatch(read(`${DIR}/_providerHero.tsx`), /ექსპერტის პროფილი/,
+    'the cross-link to a second profile came back')
 })

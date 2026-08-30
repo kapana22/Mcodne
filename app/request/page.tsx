@@ -29,7 +29,7 @@
 
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { requestsViewer } from '@/lib/requestsServer'
+import { requestsViewer, coveredTopicIds } from '@/lib/requestsServer'
 import { isVertical } from '@/lib/requests'
 import { resolveRequestTarget } from '@/lib/requestTarget'
 import { RequestWizard } from './RequestWizard'
@@ -87,17 +87,25 @@ export default async function Page({ searchParams }: {
   // ⚠️ AN UNKNOWN, HIDDEN OR MISTYPED `to` IS SIMPLY IGNORED — never a 404. The
   // form has to work for everybody who reaches it, and taking the whole intake
   // away because a decoration did not resolve is the trade nobody would make.
-  // See lib/requestTarget; the door decides which namespace is asked first.
-  const target = await resolveRequestTarget(typeof sp.to === 'string' ? sp.to : null, vertical)
+  // See lib/requestTarget — one namespace since 2026-08-24, so nothing has to
+  // decide which table is asked first.
+  const target = await resolveRequestTarget(typeof sp.to === 'string' ? sp.to : null)
 
   // The three fields the contact screen would otherwise ask a signed-in person
   // to retype. Passed down rather than fetched by the wizard — see the prop's
   // note in RequestWizard, and app/request/_model → withAccountContact for the
   // fill rule (empty fields only, never an overwrite).
+  const covered = await coveredTopicIds()
+
   return (
     <RequestWizard
       initialQuery={initialQuery}
       vertical={vertical}
+      // ⚠️ WHAT ANYBODY ACTUALLY DOES, read fresh on every open. The wizard
+      // offered 148 topics against 46 with a live provider until 2026-08-30 —
+      // see lib/requestsServer → coveredTopicIds for the measurement and for
+      // why this is derived rather than listed.
+      covered={covered}
       // Only what the browser has any use for: a public slug, a name to print,
       // a photo route and the topics that narrow one screen. Never the user id
       // the INVITED offer is written with — the endpoint resolves that itself.

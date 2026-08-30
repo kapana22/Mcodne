@@ -76,6 +76,10 @@ export type Draft = {
   kind: RequestKindName | ''
   topic: string
   description: string
+  /** Photos of the thing that needs doing — base64 data URIs, at most
+   *  MAX_REQUEST_PHOTOS. Optional at every point: an empty array is a complete
+   *  request (2026-08-29). */
+  photos: string[]
   budgetBand: string
   /** 'OFFERS' | 'SELF' — see lib/requests → PICK_MODES. */
   pickMode: 'OFFERS' | 'SELF'
@@ -144,6 +148,7 @@ export const EMPTY_DRAFT: Draft = {
   kind: '',
   topic: '',
   description: '',
+  photos: [],
   // ⚠️ THE BUDGET QUESTION IS GONE (2026-08-19) — owner: „არ გვინდა ბიუჯეტი
   // საერთოდ, 5 ეტაპამდე უნდა შემცირდეს." It asked the person who knows least
   // what the work costs to name a number first, and that number then anchored
@@ -380,7 +385,44 @@ export function stepsFor(d: Draft): StepDef[] {
   // that changes what the next screen offers them. The owner chose to ask it
   // before sending rather than after (2026-08-18) — at that point they are
   // still deciding how they want to be helped, and afterwards they are waiting.
-  out.push({ id: 'mode', title: 'როგორ გირჩევნია?' })
+  /* ⚠️ THE PHOTO STEP (2026-08-29). Owner: „ყველაფერი უნდა იყოს მარტივად…
+     ორივეს მხარეს" — and a picture is the cheapest thing a client can give and
+     the most useful thing a provider can get: it is what lets a first offer
+     name a real price instead of opening a conversation to find one out.
+     Airtasker makes it its own screen („Snap a photo — help taskers understand
+     what needs doing") and this is the same move.
+
+     ⚠️ SERVICE ONLY, AND THE FIRST VERSION OF THIS GOT IT WRONG. It was pushed
+     for every run, which measured out at 132 of the 171 topics being asked to
+     photograph something that has no photograph: a contract, an English
+     lesson, a business plan. „SERVICE" is the kind whose own definition is
+     „somebody comes to your address" — the work is physical and in front of
+     you — so it is the one kind where a picture answers the question the offer
+     is about. 39 topics gain a screen; 132 stop being asked a question that
+     could not apply to them. Owner, the same day: „არ უნდა გაურთულოთ საქმე."
+
+     ⚠️ AND IT IS STILL SKIPPABLE. Its own control offers „გამოტოვება" and
+     `photos: []` is a complete request — the person with water on the floor is
+     exactly the one who has nothing to upload and exactly the one whose
+     request must still arrive. */
+  if (kind === 'SERVICE') out.push({ id: 'photos', title: 'დაურთე ფოტო' })
+
+  /* ⚠️ „როგორ გირჩევნია?" WAS A STEP AND IT IS GONE (2026-08-29). Owner:
+     „ყველაფერი უნდა იყოს მარტივად… მაქსიმალურად მარტივად კლიენტის და დამკვეთის
+     მხარეც, ორივეს მხარეს."
+
+     It asked the person to choose between „შეთავაზებები მომივიდეს" and „მე
+     ავირჩევ" — our own routing question, handed to the visitor, one screen
+     before their phone number. Airtasker, Thumbtack and Bark never ask it: the
+     platform decides and the person describes the job. It was also the step
+     with the weakest promise on this site — see lib/requests → PICK_MODE_OPTION
+     for the note about SELF's list being empty on the trades side.
+
+     ⚠️ NOTHING IS LOST BY REMOVING IT, and that is why it could go. The two
+     modes always reached the SAME providers; all SELF added was a list of
+     people to write to while waiting. That list now shows for everybody
+     (app/request/_live.tsx) — which is strictly more useful and one decision
+     fewer. The column stays and still defaults to OFFERS. */
   out.push({ id: 'contact', title: 'როგორ დაგიკავშირდეთ?' })
   return out
 }

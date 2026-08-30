@@ -32,7 +32,11 @@ import type { ProviderIdentity } from './requestsServer'
 
 /* ═══════════ the shape ══════════════════════════════════════════════════ */
 
-type InboxKind = 'BOOKING' | 'OFFER'
+// ⚠️ ONE KIND SINCE 2026-08-26. It was `'BOOKING' | 'OFFER'`; the booking half
+// had no builder left (see the note further down). Kept as a named union rather
+// than inlined, because the id-prefix rule below is about kinds not colliding
+// and that rule comes back the day a second kind does.
+type InboxKind = 'OFFER'
 
 export type InboxRow = {
   kind: InboxKind
@@ -125,42 +129,11 @@ export function offerInboxRow(o: OfferInboxSource): InboxRow {
   }
 }
 
-/**
- * A booking / pre-booking thread, as app/api/messages already builds it.
- *
- * Deliberately the endpoint's OWN object rather than a second query: that code
- * folds a suppressed pre-booking thread's unread into its booking host, and a
- * parallel derivation would drop the fold and disagree with the badge — the
- * exact bug this subsystem has hit before.
- */
-export type BookingInboxSource = {
-  key: string
-  href: string
-  name: string | null
-  avatarUrl: string | null
-  topic: string
-  preview: string
-  lastFromMe: boolean
-  lastHasFile: boolean
-  at: Date | string
-  unreadCount: number
-}
-
-export function bookingInboxRow(t: BookingInboxSource): InboxRow {
-  return {
-    kind: 'BOOKING',
-    id: t.key,
-    href: t.href,
-    peerName: t.name,
-    avatarUrl: t.avatarUrl,
-    topic: t.topic,
-    lastAt: iso(t.at),
-    lastPreview: t.preview,
-    lastFromMe: t.lastFromMe,
-    lastHasFile: t.lastHasFile,
-    unread: t.unreadCount,
-  }
-}
+// ⚠️ `BookingInboxSource` AND `bookingInboxRow` WERE HERE AND ARE GONE
+// (2026-08-26). They built the second kind of inbox row from „app/api/messages",
+// a route that went with the `Message` table on 2026-08-24 — so the builder had
+// no source and no caller, and no row of kind BOOKING could be produced by
+// anything. The inbox is offer threads.
 
 /* ═══════════ the list, and the one number ═══════════════════════════════ */
 

@@ -40,6 +40,12 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
   const cheapest = items.length ? items.reduce((a, b) => (a.price < b.price ? a : b), items[0]) : null
   const topRated = items.length ? items.reduce((a, b) => (a.rating > b.rating ? a : b), items[0]) : null
 
+  // ⚠️ THE BODY KEY IS `providerId`, AND SENDING `tutorId` WAS A 400
+  // (2026-08-26). /api/favorites was renamed on 2026-08-24 and its own header
+  // says „the browser sends the new name" — this, the only caller, did not, so
+  // every „remove" answered INVALID: the card vanished optimistically and then
+  // came back with the failure toast. The local names stay `tutorId` because
+  // that is what the row's prop is called here; only the WIRE key matters.
   const remove = async (tutorId: string) => {
     setRemoving(tutorId)
     // Optimistic: the card disappears on tap — that IS the feedback. Keep the
@@ -51,7 +57,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
       const res = await fetch('/api/favorites', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tutorId }),
+        body: JSON.stringify({ providerId: tutorId }),
       })
       if (!res.ok) throw new Error('http ' + res.status)
       // Re-run the parent server component's data-fetch so returning to the
@@ -127,7 +133,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
         </div>
       )}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 motion-safe:stagger">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 stagger">
       {items.map(t => (
         // ROUND-THUMB card (2026-08-05), replacing a 4/3 photo banner. The
         // banner was the last place on the site that cropped a portrait into a
@@ -215,7 +221,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
                 href={`/experts/${t.tutorId}?rebook=1`}
                 className="mt-3 w-full h-11 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body tracking-wide inline-flex items-center justify-center transition-colors duration-fast shadow-xs"
               >
-                დაჯავშნე
+                დატოვე მოთხოვნა
               </Link>
             </div>
           </div>

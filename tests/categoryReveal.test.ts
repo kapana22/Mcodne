@@ -75,10 +75,14 @@ test('the write itself flips status AND isLive together — the one place that s
   assert.match(src, /status: 'VISIBLE', isLive: true/)
 })
 
-test('both category-setting routes call it, and neither inlines the reveal write any more', () => {
-  const approve = read('app/api/applications/[id]/route.ts')
-  const refile = read('app/api/admin/tutors/[id]/category/route.ts')
-  for (const [name, src] of [['approve', approve], ['re-file', refile]] as const) {
+// ⚠️ THERE WERE TWO ROUTES UNTIL 2026-08-24. The other was the consultation
+// application approval (`app/api/applications/[id]`), which went with the
+// application itself; the admin re-file endpoint moved from `admin/tutors/[id]`
+// to `admin/providers/[id]`. One caller left, and the rule it is held to is the
+// same one: call the function, inline nothing.
+test('the category-setting route calls it, and inlines the reveal write nowhere', () => {
+  const refile = read('app/api/admin/providers/[id]/category/route.ts')
+  for (const [name, src] of [['re-file', refile]] as const) {
     assert.match(src, /revealCategoryIfHidden\(/, `${name} route must call revealCategoryIfHidden`)
     assert.doesNotMatch(src, /status: 'VISIBLE', isLive: true/, `${name} route inlines the reveal write again`)
     assert.doesNotMatch(src, /'category\.show'/, `${name} route writes its own category.show audit again`)

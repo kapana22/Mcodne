@@ -47,7 +47,12 @@ import { View, clearSignupDraft, readEmailParam, readSignupDraft, redirectAfterS
  * lines of Georgian, and the subtitle is the half that says what the tile
  * means.
  */
-type SignupRole = 'learn' | 'teach' | 'serve'
+// ⚠️ TWO ROLES, AND THERE WERE THREE (2026-08-24). `teach` was the
+// consultation applicant and `serve` the trades one; they signed up on the same
+// form, differing only in the panel beside it and — this is the part that
+// mattered — in the noun on the consent line. There is one provider now, so
+// there is one word for them, and `serve` is it.
+type SignupRole = 'learn' | 'serve'
 
 // ⚠️ TWO TILES, NOT THREE (2026-08-19). „ვარ ექსპერტი" and „ვარ ხელოსანი" split
 // one person into two kinds at the door — the opposite of the model the site is
@@ -62,7 +67,7 @@ const SIGNUP_TILES = [
   { v: 'learn' as const, t: 'ვეძებ ექსპერტს', s: 'კლიენტი' },
   // ⚠️ SERVICE FIRST — CLAUDE.md → THE HIERARCHY, rule 4. Read the sentence
   // back and check which half arrives first; this one had it backwards.
-  { v: 'teach' as const, t: 'ვთავაზობ',       s: 'სერვისი ან კონსულტაცია' },
+  { v: 'serve' as const, t: 'ვთავაზობ',       s: 'ჩემი სერვისი' },
 ]
 
 const RoleSwitch = ({ role, setRole }: { role: SignupRole; setRole: (r: SignupRole) => void }) => (
@@ -217,7 +222,7 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
         )}
 
         <p className="text-center text-small text-ink-500 mt-2 leading-relaxed">
-          <span className="font-display font-semibold text-brand-700">ჯავშნა ამჟამად უფასოა.</span>
+          <span className="font-display font-semibold text-brand-700">მოთხოვნა ამჟამად უფასოა.</span>
         </p>
       </form>
     </div>
@@ -228,7 +233,12 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
  * (expertise, portfolio, pricing, identity docs) lives at /apply, the single
  * source of expert onboarding. We deliberately do NOT duplicate that form —
  * or its uploads — here; this hands off to /apply after the account is made. */
-const TutorSignUp = ({ setView, kind = 'teach' }: { setView: (v: View) => void; kind?: 'teach' | 'serve' }) => {
+// ⚠️ IT TOOK A `kind` AND NO LONGER DOES (2026-08-24). One provider, one set of
+// words — and the word that had to change is on the CONSENT line: the default
+// branch read „ვეთანხმები ექსპერტის წესებს", so the tile that says
+// „ჩემი სერვისი" was asking a plumber to agree to the expert terms. Consent is
+// the one place where the wrong noun is not a typo (CLAUDE.md).
+const TutorSignUp = ({ setView }: { setView: (v: View) => void }) => {
   // ⚠️ ONE FORM, TWO DESTINATIONS — deliberately not a second copy. Both sides
   // collect exactly the same thing here (an account: name, surname, email,
   // phone, password) because the identity-specific questions live on the
@@ -237,7 +247,10 @@ const TutorSignUp = ({ setView, kind = 'teach' }: { setView: (v: View) => void; 
   // those are the only two things this prop changes.
   // No `?can=` from the „ვთავაზობ" tile: the door asks which halves, and
   // pre-ticking one here would answer a question the person has not seen.
-  const dest = kind === 'serve' ? '/join?can=WORK' : '/join'
+  // ⚠️ `?can=WORK` WENT WITH THE SECOND WIZARD. /join is the one door and it
+  // ignores the parameter; carrying it would only put a dead query string into
+  // every provider signup link on the site.
+  const dest = '/join'
   // ⚠️ EVERY VISIBLE STRING IN THIS COMPONENT MUST ASK `kind`, and one did not
   // (2026-08-18). The consent line read „ვეთანხმები ექსპერტის წესებს" on both
   // branches — so a plumber was ticking a box agreeing to the expert terms.
@@ -301,19 +314,14 @@ const TutorSignUp = ({ setView, kind = 'teach' }: { setView: (v: View) => void; 
         <Icon.info className="w-4 h-4 mt-0.5 text-brand-700 shrink-0" />
         <div>
           <div className="font-display text-small font-bold text-ink-900 tracking-tight">ჯერ ანგარიში — შემდეგ განაცხადი</div>
-          {kind === 'serve' ? (
-            /* Not the expert sentence with two words swapped: „ექსპერტიზა,
-               პორტფოლიო და ფასი" names three things the trades form does not
-               ask for, and „48 საათი" is a review time we have never measured
-               on this queue. Say what is actually next. */
-            <p className="text-small text-ink-600 mt-1">
-              რას აკეთებ და რომელ ქალაქში — <span className="font-display font-semibold text-ink-800">შემდეგ</span> შეავსებ. შემდეგ დაგირეკავთ.
-            </p>
-          ) : (
-            <p className="text-small text-ink-600 mt-1">
-              ექსპერტიზას, პორტფოლიოსა და ფასს <span className="font-display font-semibold text-ink-800">შემდეგ</span> შეავსებ. განაცხადს გავამოწმებთ <span className="font-display font-semibold text-ink-800">48 საათში</span>.
-            </p>
-          )}
+          {/* ⚠️ THE EXPERT SENTENCE WAS THE OTHER BRANCH AND IS GONE. It read
+              „ექსპერტიზას, პორტფოლიოსა და ფასს შემდეგ შეავსებ. განაცხადს
+              გავამოწმებთ 48 საათში" — three things the one remaining form does
+              not ask for, and a review time nobody has measured on this queue.
+              This one says what is actually next. */}
+          <p className="text-small text-ink-600 mt-1">
+            რას აკეთებ და რომელ ქალაქში — <span className="font-display font-semibold text-ink-800">შემდეგ</span> შეავსებ. შემდეგ დაგირეკავთ.
+          </p>
         </div>
       </div>
 
@@ -370,7 +378,7 @@ const TutorSignUp = ({ setView, kind = 'teach' }: { setView: (v: View) => void; 
             </span>
             <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} className="sr-only" />
             <span className="text-small text-ink-700">
-              ვეთანხმები <a href="/terms" target="_blank" rel="noopener noreferrer" className="tap-area text-brand-700 hover:text-brand-800 font-medium underline underline-offset-2 decoration-brand-300">{kind === 'serve' ? 'წესებს' : 'ექსპერტის წესებს'}</a> და <a href="/privacy" target="_blank" rel="noopener noreferrer" className="tap-area text-brand-700 hover:text-brand-800 font-medium underline underline-offset-2 decoration-brand-300">კონფიდენციალურობის პოლიტიკას</a>.
+              ვეთანხმები <a href="/terms" target="_blank" rel="noopener noreferrer" className="tap-area text-brand-700 hover:text-brand-800 font-medium underline underline-offset-2 decoration-brand-300">წესებს</a> და <a href="/privacy" target="_blank" rel="noopener noreferrer" className="tap-area text-brand-700 hover:text-brand-800 font-medium underline underline-offset-2 decoration-brand-300">კონფიდენციალურობის პოლიტიკას</a>.
             </span>
           </label>
 
@@ -487,55 +495,19 @@ const SignUpIntro = ({ role }: { role: SignupRole }) => {
           </div>
         </div>
       </>
-    ) : (
-      <>
-        <h1 className="font-display text-display lg:text-display-lg font-bold leading-[0.98] tracking-[-0.03em] text-ink-900">
-          {t('signup.teach.title1')}<br />
-          <span className="text-brand-600">{t('signup.teach.title2')}</span>
-        </h1>
-        {/* ONE sentence, and ONE mention of the commission (owner, 2026-08-10).
-            The figure is the stat tile directly below — a number belongs in the
-            number slot — and repeating it here said the same thing twice, two
-            lines apart. `signup.teach.subEmphasis` is RETIRED rather than
-            deleted: the key stays in the registry so any row an admin already
-            saved for it survives, exactly as the seven home.why.* keys do. */}
-        <p className="text-body-lg sm:text-h3 text-ink-700 mt-6 sm:mt-7 max-w-[440px]">
-          {t('signup.teach.sub')}
-        </p>
+    ) : null}
+    {/* ⚠️ THE THIRD PANEL WAS HERE AND IS GONE (2026-08-24) — the CONSULTATION
+        applicant's, and it is the reason the collapse was worth doing rather
+        than aliasing one role onto another. It led with „15% საკომისიო" as a
+        stat tile and a four-step review timeline: numbers that were true of a
+        consultation and false of everybody who signs up now, because a lead
+        costs a provider nothing today. The first thing a plumber read on this
+        screen was a fee we do not charge them.
 
-        <dl className="mt-10 lg:mt-12 grid grid-cols-3 gap-x-6 sm:gap-x-8">
-          {[
-            { n: t('signup.teach.stat1.n'), l: t('signup.teach.stat1.label'), d: t('signup.teach.stat1.desc') },
-            { n: t('signup.teach.stat2.n'), l: t('signup.teach.stat2.label'), d: t('signup.teach.stat2.desc') },
-            { n: t('signup.teach.stat3.n'), l: t('signup.teach.stat3.label'), d: t('signup.teach.stat3.desc') },
-          ].map(k => (
-            <div key={k.l}>
-              <dt className="font-display text-h1 lg:text-display font-bold tabular-nums tracking-[-0.025em] text-ink-900 leading-none">{k.n}</dt>
-              <dd className="font-display text-micro font-semibold uppercase text-ink-700 mt-2.5">{k.l}</dd>
-              <dd className="text-meta text-ink-500 mt-0.5 leading-snug">{k.d}</dd>
-            </div>
-          ))}
-        </dl>
-
-        <div className="mt-10 lg:mt-12 pt-8 border-t border-ink-200">
-          <div className="font-display text-micro font-semibold uppercase text-ink-700 mb-4">{t('signup.teach.processEyebrow')}</div>
-          <ol className="space-y-4">
-            {[
-              { n: '01', t: t('signup.teach.step1.title'), d: t('signup.teach.step1.desc') },
-              { n: '02', t: t('signup.teach.step2.title'), d: t('signup.teach.step2.desc') },
-              { n: '03', t: t('signup.teach.step3.title'), d: t('signup.teach.step3.desc') },
-              { n: '04', t: t('signup.teach.step4.title'), d: t('signup.teach.step4.desc') },
-            ].map(step => (
-              <li key={step.n} className="grid grid-cols-[32px_1fr_auto] gap-3 items-baseline">
-                <span className="font-display font-bold text-brand-700 tabular-nums text-meta">{step.n}</span>
-                <span className="font-display text-body font-semibold text-ink-900 tracking-tight">{step.t}</span>
-                <span className="text-meta text-ink-500 tabular-nums">{step.d}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </>
-    )}
+        Its twenty-three `signup.teach.*` keys stay in lib/siteTextDefs as
+        RETIRED — never deleted, because a production row may hold copy the
+        owner typed under one of them, and the admin editor hides a retired
+        field rather than offering a control over a panel nobody can open. */}
   </div>
   )
 }
@@ -544,35 +516,36 @@ export const SignUpView = ({ setView }: { setView: (v: View) => void }) => {
   const [role, setRole] = useState<SignupRole>('learn')
   const params = useSearchParams()
   const redirect = params?.get('redirect') || params?.get('next') || ''
-  // Arriving from a "book / message this expert" tap (redirect points at a
-  // profile) → the visitor is unambiguously a CLIENT. Drop the learn/teach fork
-  // (the only real decision on this form) and remind them why they're here, so
-  // the highest-intent signup has zero extra choices to make.
-  const bookingIntent = redirect.includes('/experts/')
+  // Arriving from a provider's profile → the visitor is unambiguously a CLIENT.
+  // Drop the fork (the only real decision on this form) so the highest-intent
+  // signup has zero extra choices to make.
+  //
+  // ⚠️ IT WAS CALLED `bookingIntent` AND CAME WITH A SENTENCE — „დაასრულე
+  // რეგისტრაცია — ჯავშანი გაგრძელდება". There is no booking to continue
+  // (2026-08-24), and a promise the site cannot keep is worse than no note at
+  // all, so the note went and the FORK stayed: whoever arrives from a profile
+  // is still a client and still should not be asked which they are.
+  const profileIntent = redirect.includes('/experts/')
   // redirect=/join is the single most unambiguous EXPERT signal on the site —
   // yet this form used to preselect „სტუდენტი" and make the applicant notice
   // and fix a pre-answered question (wrong-role accounts were the real
   // failure). Same fork-drop as bookingIntent, opposite branch.
-  // ⚠️ THE TRADES HALF IS CHECKED FIRST AND IT IS NOT A NICETY. Both halves
-  // live under /join, so a plain prefix test would have read a plumber
-  // arriving from the trades pitch as an EXPERT — dropped the fork, preselected
-  // the wrong branch, and sent them to the expert form after signup, which is
-  // the exact wrong-role account this whole block exists to prevent (see the
-  // note below). Adding a second door under the same prefix silently broke the
-  // first one; since 2026-08-19 the half is named by `?can=` and read here.
-  const joinIntent = !bookingIntent && redirect.startsWith('/join')
-  const masterIntent = joinIntent && /[?&]can=WORK\b/.test(redirect) && !/[?&]can=[^&]*CONSULT/.test(redirect)
-  const applyIntent = joinIntent && !masterIntent
-  const effectiveRole: SignupRole =
-    bookingIntent ? 'learn' : masterIntent ? 'serve' : applyIntent ? 'teach' : role
+  // ⚠️ IT USED TO READ `?can=` TO PICK A HALF, and getting that wrong was the
+  // wrong-role account this block exists to prevent: both wizards lived under
+  // /join, so a plain prefix test read a plumber arriving from the trades pitch
+  // as an EXPERT and sent them to the expert form after signup. There is one
+  // form now, so the prefix IS the answer and there is nothing left to
+  // mis-read.
+  const joinIntent = !profileIntent && redirect.startsWith('/join')
+  const effectiveRole: SignupRole = profileIntent ? 'learn' : joinIntent ? 'serve' : role
   // Both handoffs show the same „one step left" note: the account is a step
   // inside an application they already started, not a new decision.
-  const continuingApplication = applyIntent || masterIntent
+  const continuingApplication = joinIntent
   return (
     <Container as="main" id="main" className="relative pt-6 sm:pt-14 lg:pt-20 pb-16 lg:pb-20">
       {/* Form-first on mobile (see SignInView) — the role switch + form come
           before the pitch so signup starts immediately. */}
-      <div className={`grid gap-12 lg:gap-20 items-start ${effectiveRole === 'teach' ? 'lg:grid-cols-[1fr_1.15fr]' : 'lg:grid-cols-2'}`}>
+      <div className="grid gap-12 lg:gap-20 items-start lg:grid-cols-2">
         <div className="order-2 lg:order-1 min-w-0"><SignUpIntro role={effectiveRole} /></div>
         <div className="order-1 lg:order-2 min-w-0">
           {continuingApplication ? (
@@ -580,12 +553,7 @@ export const SignUpView = ({ setView }: { setView: (v: View) => void }) => {
               <div className="font-display text-small font-bold text-ink-900">ერთი ნაბიჯიღა დარჩა</div>
               <p className="text-meta text-ink-600 mt-0.5">დაასრულე რეგისტრაცია — განაცხადი გაგრძელდება.</p>
             </div>
-          ) : bookingIntent ? (
-            <div className="mb-5 rounded-card border border-ink-200 bg-ink-50/60 px-4 py-3">
-              <div className="font-display text-small font-bold text-ink-900">ერთი ნაბიჯიღა დარჩა</div>
-              <p className="text-meta text-ink-600 mt-0.5">დაასრულე რეგისტრაცია — ჯავშანი გაგრძელდება.</p>
-            </div>
-          ) : (
+          ) : profileIntent ? null : (
             // The switch defaults to „learn" with its check already drawn, so
             // nothing on screen signals that a decision is pending — it reads as
             // a filter, not a question. A real signup (2026-07-29) completed as
@@ -598,7 +566,7 @@ export const SignUpView = ({ setView }: { setView: (v: View) => void }) => {
           )}
           {effectiveRole === 'learn'
             ? <StudentSignUp setView={setView} />
-            : <TutorSignUp setView={setView} kind={effectiveRole} />}
+            : <TutorSignUp setView={setView} />}
         </div>
       </div>
     </Container>

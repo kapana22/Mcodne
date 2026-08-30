@@ -57,14 +57,18 @@ export function asRole(role: string | null | undefined): RoleCode {
 
 /** What a person can do here. Ordered by how much of the site each one owns —
  *  `homeForHats` (lib/hats) walks this order and the first match wins. */
-export const HATS = ['ADMIN', 'EXPERT', 'MASTER', 'COMPANY', 'CLIENT'] as const
+export const HATS = ['ADMIN', 'PROVIDER', 'COMPANY', 'CLIENT'] as const
 export type Hat = (typeof HATS)[number]
 
 /** The word for each, for a switcher or a label. Never a raw code on a screen. */
 export const HAT_LABEL: Record<Hat, string> = {
   ADMIN: 'ადმინი',
-  EXPERT: 'ექსპერტი',
-  MASTER: 'ექსპერტი',
+  // ⚠️ ONE HAT ON THE SUPPLY SIDE SINCE 2026-08-24. `EXPERT` and `MASTER` were
+  // two rows that had ALWAYS carried the same word on screen — the label below
+  // was written twice, identically, which is the shape of a distinction the
+  // product does not have. It existed because there were two profile tables;
+  // there is one now, and one hat.
+  PROVIDER: 'ექსპერტი',
   COMPANY: 'კომპანია',
   CLIENT: 'კლიენტი',
 }
@@ -81,7 +85,7 @@ export const HAT_LABEL: Record<Hat, string> = {
 export function roleLabel(role: string | null | undefined): string {
   const r = asRole(role)
   if (r === ROLE.ADMIN) return HAT_LABEL.ADMIN
-  if (r === ROLE.PROVIDER) return HAT_LABEL.EXPERT
+  if (r === ROLE.PROVIDER) return HAT_LABEL.PROVIDER
   return HAT_LABEL.CLIENT
 }
 
@@ -93,16 +97,14 @@ export const SPACE_LABEL = {
   // ⚠️ ONE LABEL FOR THE SUPPLY SIDE SINCE 2026-08-20, and it names the ROOM
   // rather than a kind of person. There were two — „ექსპერტის სივრცე" and
   // „ხელოსნის სივრცე" — sitting in the same menu, pointing at two doors into
-  // what is now ONE workspace (/work serves both capabilities). The second
-  // also carried a retired word into the live menu for weeks; owner, on the
-  // label itself: „ხელოსნის სივრცე ზედმეტია… ჩემი აზრით არასწორია", and on the
-  // word: „ხელოსნები აღარ უნდა გამოგყევენებინა არსად".
+  // one workspace. The second also carried a retired word into the live menu
+  // for weeks; owner, on the label itself: „ხელოსნის სივრცე ზედმეტია… ჩემი
+  // აზრით არასწორია", and on the word: „ხელოსნები აღარ უნდა გამოგყევენებინა
+  // არსად".
   //
-  // EXPERT and MASTER are kept as separate keys and given the SAME words: the
-  // callers still ask a different question („do they consult" / „are they on
-  // the allowlist"), and collapsing the keys would hide that they are two
-  // checks. What is collapsed is the SENTENCE, which is all a person reads.
-  EXPERT: 'სამუშაო სივრცე',
-  MASTER: 'სამუშაო სივრცე',
+  // The two KEYS survived that change („EXPERT" and „MASTER", same words)
+  // because the callers were still asking two different questions. They are one
+  // question since 2026-08-24, so there is one key.
+  PROVIDER: 'სამუშაო სივრცე',
   ADMIN: 'ადმინის სივრცე',
 } as const

@@ -18,7 +18,7 @@
 
 import { z } from 'zod'
 import {
-  TOPIC_GROUPS, CITIES, ALL_CITIES, topicLabel, cityLabel, isTopicOfKind, groupIsLive,
+  TOPIC_GROUPS, CITIES, ALL_CITIES, topicLabel, cityLabel, isTopicOfKind, groupIsLive, REQUEST_KINDS,
   type Topic, type TopicGroup, type CityName,
 } from './requestTopics'
 
@@ -32,31 +32,45 @@ import {
  * requestTopics — and it would go stale silently, because the only symptom is a
  * service nobody can select.
  */
-export const SERVICE_GROUPS = TOPIC_GROUPS.filter(g => g.kinds.includes('SERVICE'))
+/* ═══════════ WHAT A PROVIDER MAY REGISTER ═══════════════════════════════
+ *
+ * ⚠️ EVERY GROUP, SINCE 2026-08-24 — IT WAS THE EIGHT TRADES. This file read
+ * `kinds.includes('SERVICE')`, i.e. „somebody comes to your address", and that
+ * was the only kind of thing a ServiceProfile could hold. It is why the whole
+ * professional side of the site had to live in a second table: a იურისტი had
+ * nothing to tick here. Owner, 2026-08-24: „ტაქსონომია ახლავე გავაფართოვოთ."
+ *
+ * So the roster is the vocabulary. A lawyer registers „ხელშეკრულების მომზადება"
+ * exactly as a plumber registers „ონკანი და მილი" — one list, one form, one
+ * table — and `kinds` goes back to meaning what it always meant on the DEMAND
+ * side: which questions the request wizard asks about money and time.
+ */
+export const OFFER_GROUPS = TOPIC_GROUPS
 
 /** The flat set, for validation. */
-const SERVICE_TOPIC_IDS = new Set(SERVICE_GROUPS.flatMap(g => g.topics.map(t => t.id)))
+const OFFER_TOPIC_IDS = new Set(OFFER_GROUPS.flatMap(g => g.topics.map(t => t.id)))
 
-export function isServiceTopic(id: string): boolean {
-  return SERVICE_TOPIC_IDS.has(id)
+export function isOfferableTopic(id: string): boolean {
+  return OFFER_TOPIC_IDS.has(id)
 }
 
-/** Every service topic, flat — for a picker that does not group. */
-export const SERVICE_TOPICS: Topic[] = SERVICE_GROUPS.flatMap(g => g.topics)
+/** Every offerable topic, flat — for a picker that does not group. */
+export const OFFER_TOPICS: Topic[] = OFFER_GROUPS.flatMap(g => g.topics)
 
 /**
- * The subset a master may actually TICK today — see requestTopics →
- * LIVE_SERVICE_GROUP_IDS for which four and why.
+ * The subset a provider may actually TICK today — `groupIsLive` in
+ * requestTopics decides, and three groups (school · arts · sport) are written,
+ * kept and not offered.
  *
- * ⚠️ VALIDATION DELIBERATELY DOES NOT USE THIS. `isServiceTopic` still accepts
- * all 39, because the gate is a supply decision that will move and a stored row
- * must survive it moving: a master admitted by hand into a group we have not
- * opened yet is a real thing we will want to do, and a profile saved today must
- * not become unsavable the week we close a group to re-staff it. The picker
- * narrows what is OFFERED; the schema keeps meaning what it meant.
+ * ⚠️ VALIDATION DELIBERATELY DOES NOT USE THIS. `isOfferableTopic` accepts the
+ * whole vocabulary, because the gate is a supply decision that will move and a
+ * stored row must survive it moving: a provider admitted by hand into a group
+ * we have not opened yet is a real thing we will want to do, and a profile saved
+ * today must not become unsavable the week we close a group to re-staff it. The
+ * picker narrows what is OFFERED; the schema keeps meaning what it meant.
  */
-export const LIVE_SERVICE_GROUPS = SERVICE_GROUPS.filter(groupIsLive)
-export const LIVE_SERVICE_TOPICS: Topic[] = LIVE_SERVICE_GROUPS.flatMap(g => g.topics)
+export const LIVE_OFFER_GROUPS = OFFER_GROUPS.filter(groupIsLive)
+export const LIVE_OFFER_TOPICS: Topic[] = LIVE_OFFER_GROUPS.flatMap(g => g.topics)
 
 // ⚠️ WHAT MAY BE SAVED reads the OFFERED list, not the vocabulary: a provider
 // cannot tick a city the site does not serve. Reading a stored value uses
@@ -68,18 +82,71 @@ const AREA_IDS = new Set(CITIES.map(c => c.id))
 /**
  * ⚠️ THE CEILINGS ARE NOT ARBITRARY AND THEY ARE NOT ABOUT STORAGE.
  *
- * A master who ticks all 39 services is telling us nothing — they are saying
- * „send me everything", which is the lead-mill behaviour the routing exists to
- * stop, and it would put them in the audience for every request on the site
- * while looking like a targeted match. 12 is more than any real trade spans and
- * still forces a choice.
+ * A provider who ticks everything is telling us nothing — they are saying „send
+ * me everything", which is the lead-mill behaviour the routing exists to stop,
+ * and it would put them in the audience for every request on the site while
+ * looking like a targeted match. The cap has to sit above the widest REAL
+ * business and below „all of it".
+ *
+ * ⚠️ 12 → 16 ON 2026-08-29, BECAUSE THE VOCABULARY MOVED UNDER IT AND THE CAP
+ * DID NOT. This number was chosen against 39 topics in 8 groups; the sentence
+ * that justified it („12 is more than any real trade spans") was written that
+ * day and stayed here, unchanged, through the 2026-08-24 expansion to 171
+ * topics in 31 groups. 12 of 39 left a provider 31% of the catalogue. 12 of 148
+ * live topics leaves them 8%, and it had stopped clearing real businesses:
+ *
+ *   · a full-service renovation crew — სარემონტო (6) + სანტექნიკა (5) +
+ *     ელექტრიკა (4) = 15 topics, all of them things one brigade genuinely does;
+ *   · a full-stack developer — პროგრამირება (8) + IT (7) = 15.
+ *
+ * 16 is one above the widest of those, measured against the live vocabulary on
+ * 2026-08-29, and still refuses „send me everything" by a factor of nine. When
+ * the vocabulary next moves, RE-MEASURE — that is the failure this note is
+ * here to stop repeating, not the number itself.
  *
  * Areas are capped at the list's own length: picking every city is a legitimate
  * answer for a company with vans, so the only thing to enforce is that each one
  * is real.
  */
-export const MAX_SERVICES = 12
+export const MAX_SERVICES = 16
 
+/** ⚠️ SIX, AND IT LIVES HERE BECAUSE TWO SCREENS WRITE THE SAME COLUMN. The
+ *  application collects work photos at intake (lib/masterApplication → MASTER,
+ *  which re-exports this one) and /work/services edits them for the rest of the
+ *  profile's life. Two constants would let the editor accept a seventh photo
+ *  the intake refuses, and /api/masters/[id]/photo — which serves them by index
+ *  — carries the same ceiling as `MAX_WORK_INDEX`. */
+export const MAX_WORK_PHOTOS = 6
+
+/** ⚠️ A STORED PHOTO IS NEVER SENT BACK TO THE BROWSER, so the editor cannot
+ *  return one. It sends this token instead — „the k-th photo you already hold"
+ *  — and the endpoint resolves it against the column. Without it a full-replace
+ *  PUT would have to round-trip a megabyte of base64 through a form, or the
+ *  first save from that form would erase every photo it never received. */
+export const KEPT_PHOTO = /^kept:([0-5])$/
+
+/**
+ * ⚠️ EVERY FIELD IS `.optional()` SINCE 2026-08-29, AND THAT IS A BUG FIX, NOT A
+ * LOOSENING. The five below used to be REQUIRED, so a form that edits none of
+ * them still had to send all five — and `app/work/profile/_master.tsx`, which
+ * edits work photos and nothing else, sent the values it had loaded ON MOUNT.
+ * Both forms live on pages a provider uses in one sitting, and one of the five
+ * has its own switch on the SAME PAGE:
+ *
+ *   hide the profile in the ხილვადობა tab (PATCH /api/me/provider writes
+ *   `available: false`) → add a work photo below it → save → this endpoint
+ *   receives `available: true` from a form mounted before the switch was
+ *   touched, and the provider is PUBLIC AND ROUTABLE AGAIN with nothing on
+ *   screen saying so.
+ *
+ * The same shape put the mount-time `services` and `areas` back over anything
+ * changed on /work/services in another tab.
+ *
+ * So the rule the media fields already followed — ABSENT MEANS LEAVE IT ALONE —
+ * is now the whole endpoint's rule, and each form sends only what it draws. A
+ * full replace still happens for anything a form DOES send: unticking every
+ * service sends `services: []`, which is present and empty.
+ */
 export const ServiceProfileInput = z.object({
   services: z.array(z.string().trim().min(1).max(40))
     .max(MAX_SERVICES)
@@ -90,12 +157,12 @@ export const ServiceProfileInput = z.object({
     // unknown id means the form and this file disagree — and quietly saving
     // eleven of twelve ticks would leave them believing they are listed for
     // something they are not.
-    .refine(ids => ids.every(isServiceTopic), {
+    .refine(ids => ids.every(isOfferableTopic), {
       message: 'არჩეულია სერვისი, რომელიც სიაში არ არის',
     })
     .refine(ids => new Set(ids).size === ids.length, {
       message: 'სერვისი ორჯერ არის არჩეული',
-    }),
+    }).optional(),
   areas: z.array(z.string().trim().min(1).max(20))
     .max(ALL_CITIES.length)
     .refine(ids => ids.every(id => AREA_IDS.has(id as CityName)), {
@@ -103,13 +170,13 @@ export const ServiceProfileInput = z.object({
     })
     .refine(ids => new Set(ids).size === ids.length, {
       message: 'ქალაქი ორჯერ არის არჩეული',
-    }),
+    }).optional(),
   // Null is „ask me", and it has to stay expressible — see prisma/schema. The
   // DB CHECK carries the same bounds, so a raw insert cannot get past them
   // either.
-  calloutFee: z.number().int().positive().max(100_000).nullable(),
-  priceFrom: z.number().int().positive().max(1_000_000).nullable(),
-  available: z.boolean(),
+  calloutFee: z.number().int().positive().max(100_000).nullable().optional(),
+  priceFrom: z.number().int().positive().max(1_000_000).nullable().optional(),
+  available: z.boolean().optional(),
 
   /* ⚠️ THE FACE AND THE SENTENCE BECAME EDITABLE 2026-08-18, AND UNTIL THEN
      THEY WERE FROZEN AT APPLICATION DAY — PERMANENTLY.
@@ -128,7 +195,50 @@ export const ServiceProfileInput = z.object({
     .refine(v => v.startsWith('data:image/'), { message: 'ფოტო ვერ აიტვირთა' })
     .nullable().optional(),
   about: z.string().trim().max(1500).nullable().optional(),
+
+  /* ⚠️ THE PRICE PER SERVICE AND THE PHOTOS OF FINISHED WORK BECAME EDITABLE
+     2026-08-21, AND UNTIL THEN THEY WERE FROZEN AT APPLICATION DAY — exactly
+     like the face and the sentence above them, and with a second cost the other
+     two did not have.
+
+     Both columns are what the SERVICE half of the bonus is paid for
+     (lib/credits → PROFILE_SERVICE „დაუწერე ფასი ერთ სერვისს მაინც" and
+     PROFILE_CERTIFICATE „ატვირთე ნამუშევრის ფოტო"), and `profileFacts` reads
+     precisely these two columns to decide whether the 40₾ has been earned. The
+     intake wrote them once and no screen has written them since — so a provider
+     who signed up without a price could see two tasks worth 40₾ of a grant the
+     landing calls 100₾ and had nowhere on the site to complete either. The
+     wording was adapted for them months before the fields were.
+
+     Optional for the same reason as the two above: this is a full-replace
+     endpoint, and a client that does not send a field must not blank it. */
+  priceList: z.record(z.string(), z.number().int().positive().max(1_000_000)).optional(),
+
+  /** Either a fresh data URI or `kept:<n>` for one already stored — see
+   *  KEPT_PHOTO. Resolved by the endpoint; the column only ever holds images. */
+  workPhotos: z.array(
+    z.string().trim().max(4_000_000)
+      .refine(v => v.startsWith('data:image/') || KEPT_PHOTO.test(v), { message: 'ფოტო ვერ აიტვირთა' }),
+  ).max(MAX_WORK_PHOTOS).optional(),
 })
+  // A price against a service they do not offer is either a stale key left
+  // behind when a tick came off, or a crafted body — the same rule the intake
+  // enforces (lib/masterApplication). `pricedServices` would ignore it on read,
+  // but a row holding a price for a service the provider does not do is a row
+  // nobody can explain, and it would be shown by whatever reads the map next.
+  //
+  // ⚠️ AND A PRICE MAP MAY NOT ARRIVE WITHOUT THE LIST IT IS PRICED AGAINST
+  // (2026-08-29). Now that every field is optional, `services` could be absent
+  // while `priceList` is present — and this rule would then have nothing to
+  // check the keys against, so it would pass anything. They are one answer from
+  // one form (the rows are the ticks; see app/work/services/_trades.tsx), so a
+  // body carrying one and not the other is a client we do not have.
+  .refine(v => v.priceList === undefined || v.services !== undefined, {
+    message: 'ფასი გამოგზავნილია სერვისების სიის გარეშე', path: ['priceList'],
+  })
+  .refine(v => Object.keys(v.priceList ?? {}).every(k => (v.services ?? []).includes(k)), {
+    message: 'ფასი მითითებულია სერვისზე, რომელიც არჩეული არ არის', path: ['priceList'],
+  })
 export type ServiceProfileInput = z.infer<typeof ServiceProfileInput>
 
 /* ═══════════ is this profile any use? ═══════════════════════════════════ */
@@ -151,14 +261,26 @@ export function profileIsRoutable(p: {
   return p.available && p.services.length > 0 && p.areas.length > 0
 }
 
-/** What is still missing, in the words the screen shows. Empty when ready. */
+/** What is still missing, in the words the screen shows. Empty when ready.
+ *
+ *  ⚠️ THE CITY IS NOT REPORTED WHILE THERE IS ONE CITY (2026-08-29). It stayed
+ *  in this list after the form stopped asking for it, so a provider read „ჯერ
+ *  არ ხარ სიაში — აირჩიე ქალაქი" above a screen with no city on it: a demand
+ *  with no control behind it, which is worse than either asking or not asking.
+ *  The PUT fills it in (see the route), so what is left to report is the one
+ *  thing the person actually has to decide.
+ *
+ *  `profileIsRoutable` above deliberately KEEPS its `areas.length > 0` test:
+ *  routability is a fact about the stored row, and a row seeded before the
+ *  change really does have nowhere to be routed until its next save. What
+ *  changes here is only what we ASK somebody to go and do. */
 export function profileGaps(p: {
   services: string[]
   areas: string[]
 }): string[] {
   const out: string[] = []
   if (p.services.length === 0) out.push('აირჩიე ერთი სერვისი მაინც')
-  if (p.areas.length === 0) out.push('აირჩიე ქალაქი')
+  if (p.areas.length === 0 && CITIES.length > 1) out.push('აირჩიე ქალაქი')
   return out
 }
 
@@ -174,7 +296,23 @@ export function profileGaps(p: {
  */
 export function serviceLabels(ids: string[]): string[] {
   const set = new Set(ids)
-  return SERVICE_TOPICS.filter(t => set.has(t.id)).map(t => topicLabel(t.id))
+  // ⚠️ DE-DUPLICATED BY LABEL, NOT BY ID (2026-08-25). Four topic ids share a
+  // label with another — `accounting-l`/`accounting` are both „ბუღალტერია",
+  // and so are `data-l`/`data-an`, `ai-l`/`ai`, `photo-l`/`photo` — because one
+  // is the academic subject and the other the service, and Georgian uses the
+  // same word for both. A provider holding both printed „ბუღალტერია ·
+  // ბუღალტერია" on their card, which was live on four accountants.
+  //
+  // The ids stay distinct in the database and in the routing, where the
+  // distinction is real; it is only the READER who must never be shown one word
+  // twice. Order is preserved — the first occurrence wins.
+  const out: string[] = []
+  for (const t of OFFER_TOPICS) {
+    if (!set.has(t.id)) continue
+    const label = topicLabel(t.id)
+    if (!out.includes(label)) out.push(label)
+  }
+  return out
 }
 
 /** The same, for areas. */
@@ -217,7 +355,7 @@ export function pricedServices(
   const map = raw as Record<string, unknown>
   const owned = new Set(p.services)
   const out: { id: string; label: string; price: number }[] = []
-  for (const t of LIVE_SERVICE_TOPICS) {
+  for (const t of LIVE_OFFER_TOPICS) {
     if (!owned.has(t.id)) continue
     const v = map[t.id]
     const n = typeof v === 'number' ? v : Number(v)
@@ -274,45 +412,28 @@ export function sanitizeStored(p: { services: string[]; areas: string[] }): {
   areas: string[]
 } {
   return {
-    services: p.services.filter(isServiceTopic),
+    services: p.services.filter(isOfferableTopic),
     areas: p.areas.filter(id => AREA_IDS.has(id as CityName)),
   }
 }
 
-/**
- * THE ROUTING NARROWING, AS A PRISMA `where` FRAGMENT.
+/* ═══════════ the queue narrowing MOVED OUT (2026-08-21) ═════════════════
  *
- * ⚠️ IT EXISTS BECAUSE THE BADGE AND THE LIST DISAGREED (2026-08-18). The queue
- * page filtered by `topic ∈ services` and `city ∈ areas`; the nav badge beside
- * it counted every open request on the platform. Measured against production:
- * the badge read 2 while two of the three open requests were school subjects
- * that no master can answer — and a master who had switched themselves OFF saw
- * „შენ თავი გამორთე" with a number next to it insisting work was waiting.
+ * `routingWhere(ServiceProfile | null)` used to live here, and its whole
+ * signature was the bug. A ServiceProfile is only ONE HALF of what a person
+ * offers, so „no ServiceProfile" was read as „no narrowing" and returned null
+ * — and every viewer without one saw the entire platform. Measured 2026-08-21:
+ * 12 open requests with room left, and an expert holding only CONSULT, an
+ * admin and a company member each saw all 12, ქიმია and მათემატიკა included.
  *
- * A badge that disagrees with the list it points at is worse than no badge:
- * the first time somebody taps a „2" and finds nothing, the badge stops meaning
- * anything.
- *
- * Returns `null` when the viewer should see EVERYTHING (an expert bidding on
- * consultations has no ServiceProfile and never will — narrowing them to
- * nothing would take a working screen away to fix somebody else's), and an
- * impossible clause when they are paused, so „off" means off in both readers.
+ * It is `queueScope` + `queueWhere` in lib/requestRouting now, which is the
+ * file that already decides who a request is for and holds the sphere and
+ * profession facts the other half needs. Moved rather than widened here, so
+ * that every call site had to say which question it was asking — the same
+ * argument lib/requestsServer makes for renaming `allowed` to
+ * `providerAllowed`. `covers()` above is unchanged and is still the TypeScript
+ * twin of the trades half of that clause.
  */
-export function routingWhere(p: {
-  services: string[]
-  areas: string[]
-  available: boolean
-} | null): Record<string, unknown> | null {
-  if (!p) return null
-  // Paused: match nothing. Expressed as an empty `in` rather than a boolean
-  // flag so both callers can spread it into a `where` without a second branch.
-  if (!p.available) return { topic: { in: [] } }
-  if (p.services.length === 0) return null
-  return {
-    topic: { in: p.services },
-    ...(p.areas.length > 0 ? { city: { in: p.areas } } : {}),
-  }
-}
 
 /* ═══════════ the trade landing (stage 8, §3.6) ═════════════════════════ */
 
@@ -336,7 +457,7 @@ export const TRADE_LANDING_MIN = 3
  * Null = not a trade, try the masters.
  */
 export function resolveTrade(slug: string): { group: TopicGroup; topic: Topic | null } | null {
-  for (const g of LIVE_SERVICE_GROUPS) {
+  for (const g of LIVE_OFFER_GROUPS) {
     if (g.id === slug) return { group: g, topic: null }
     const t = g.topics.find(t => t.id === slug)
     if (t) return { group: g, topic: t }
@@ -357,8 +478,11 @@ export function countCovering(rows: { services: string[] }[], topicIds: string[]
   return rows.filter(r => r.services.some(s => owned.has(s))).length
 }
 
-/** Every service topic still belongs to the SERVICE kind — the invariant that
- *  makes the id in this table and the id on a request the same thing. */
+/** Every offerable topic belongs to a KIND the request wizard can ask about —
+ *  the invariant that makes the id in this table and the id on a request the
+ *  same thing. It used to read „every service topic is of kind SERVICE"; the
+ *  roster is the whole vocabulary now, so the check is that no topic is
+ *  orphaned from every kind. */
 export function vocabularyIsConsistent(): boolean {
-  return SERVICE_TOPICS.every(t => isTopicOfKind('SERVICE', t.id))
+  return OFFER_TOPICS.every(t => REQUEST_KINDS.some(k => isTopicOfKind(k, t.id)))
 }

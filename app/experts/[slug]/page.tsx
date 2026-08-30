@@ -53,199 +53,30 @@
 export const dynamic = 'force-dynamic'
 
 import type { Metadata } from 'next'
-import { asRole } from '@/lib/roles'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
-import { stripAvatar } from '@/lib/stripTutorBlobs'
+import { initialMe } from '@/lib/meServer'
 import { jsonLdString } from '@/lib/jsonLd'
 import { socialMeta } from '@/lib/seo'
 import { avatarSrc } from '@/lib/avatarSrc'
 import { professionBySlug } from '@/lib/professionSeo'
 import { requestsOn } from '@/lib/requests'
 import { resolveTrade, tradeTopicIds, TRADE_LANDING_MIN } from '@/lib/serviceProfile'
-import { queryMasters } from '@/app/experts/_masterData'
+import { queryProviders } from '@/app/experts/_providers'
 import { PublicTopBar } from '@/components/PublicTopBar'
 import { Footer } from '@/components/Footer'
 import { Container } from '@/components/Container'
-import ExpertProfilePage from './client'
 import { ProfessionLanding, professionMetadata } from './_profession'
 import { resolveMaster, getMasterProfile, masterPath, countMastersCovering } from './_providerData'
 import { ProviderBreadcrumb, ProviderHero } from './_providerHero'
-import { PricedServicesBlock, AboutBlock, WorkBlock, ReviewsBlock } from './_providerBlocks'
+import { PricedServicesBlock, AboutBlock, CredentialsBlock, WorkBlock, ReviewsBlock } from './_providerBlocks'
 import { ProviderCta } from './_providerCta'
 import { TradeLanding, tradeLabel } from './_tradeLanding'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
 type Params = { slug: string }
-
-/**
- * The `[slug]` segment accepts BOTH the public slug („ana-gagoshidze") and the
- * raw cuid. Two reasons it must accept the id forever:
- *   • roughly 35 places across the app build links as `/experts/${id}` (booking
- *     rows, messages, admin, notifications) — they keep working untouched, and
- *     the id form 301s to the slug below, so nothing has to be rewritten;
- *   • a profile whose slug generation failed is still reachable.
- *
- * Returns null for unknown params so callers can 404. React-cached: metadata
- * and the render share the single lookup.
- */
-const resolveExpert = cache(async (param: string) => {
-  try {
-    return await prisma.tutorProfile.findFirst({
-      where: { OR: [{ id: param }, { slug: param }] },
-      select: { id: true, slug: true },
-    })
-  } catch {
-    return null
-  }
-})
-
-// One DB round-trip shared by generateMetadata + the page render (React
-// per-request cache). Returns 'error' (not null) on DB failure so a transient
-// outage degrades to generic metadata + client render instead of a false 404.
-const getTutorSeo = cache(async (id: string) => {
-  try {
-    const t = await prisma.tutorProfile.findUnique({
-      where: { id },
-      select: {
-        specialty: true,
-        headline: true,
-        bio: true,
-        rating: true,
-        reviewsCount: true,
-        price: true,
-        category: { select: { name: true } },
-        // `id` is here for absoluteAvatar — the avatar route is keyed on it.
-        user: { select: { id: true, fullName: true, avatarUrl: true, suspendedAt: true } },
-      },
-    })
-    // Admin-suspended experts (User.suspendedAt) are fully removed from the
-    // public site: return null so the page 404s exactly like a missing id.
-    // (findUnique can't filter on a relation field, so we check after fetch.)
-    if (t?.user?.suspendedAt) return null
-    return t
-  } catch {
-    return 'error' as const
-  }
-})
-
-// Core profile fields the client needs for FIRST PAINT, loaded server-side so
-// the interactive component (./client.tsx) renders the hero/identity/specs/
-// about/price immediately instead of a blank skeleton while its own
-// /api/experts/[slug] fetch is in flight. Deliberately scalar + relation-name
-// only: NO Date / availability / review-timestamp fields, which are viewer-tz
-// dependent and must stay client-computed to avoid an SSR hydration mismatch.
-// Those (live slots, reviews, experience/education/certificates) hydrate from
-// the client's existing fetch. Returns null on any DB error so the client
-// cleanly falls back to its pure client-fetch path (skeleton + retry).
-//
-// CONTRACT: this seed is PARTIAL by design. ./client.tsx tracks it with its own
-// `detailsState` flag and keeps every availability-/review-derived region in a
-// neutral loading state until the fetch lands — so nothing here may be read as
-// „the expert has no free time" or „the histogram is all zeros". If you add a
-// field to the seed, keep that flag's meaning intact.
-const getTutorInitial = cache(async (id: string) => {
-  try {
-    const [tutor, consultations, education, experience, reviews] = await Promise.all([
-      prisma.tutorProfile.findUnique({
-        where: { id },
-        select: {
-          id: true, headline: true, bio: true, specialty: true, yearsExp: true,
-          rating: true, reviewsCount: true, sessionsCount: true, price: true,
-          verified: true, available: true, responseHours: true, languages: true,
-          // What the expert calls themselves (lib/professions) — seeded so the
-          // chips are on the FIRST paint, not after the client fetch.
-          professions: true,
-          // MEASURED response time (lib/responseTime) — seeded so the profile
-          // can print the real number on FIRST PAINT instead of waiting for
-          // its own fetch. Both nullable: null = „not enough data", which the
-          // UI must render as nothing (never as a fallback constant).
-          responseMedianMin: true, responseSampleN: true,
-          videoUrl: true, consultationDurationMin: true,
-          user: {
-            select: {
-              id: true, fullName: true, avatarUrl: true, bio: true, suspendedAt: true,
-              // A dual provider (expert AND ხელოსანი) gets one plain link to the
-              // other profile. slug + published ONLY — ServiceProfile's photo
-              // columns are base64 and must never ride along (see the model).
-              serviceProfile: { select: { slug: true, published: true } },
-            },
-          },
-          category: { select: { id: true, slug: true, name: true, icon: true, status: true, parent: { select: { slug: true } } } },
-        },
-      }),
-      prisma.consultation.findMany({
-        where: { tutorId: id },
-        // `bookable` decides which of the two lists a row lands in on the
-        // profile — without it every service renders as a bookable hour. See
-        // Consultation.bookable.
-        select: { id: true, title: true, description: true, minutes: true, price: true, bookable: true },
-      }),
-      // Education / experience / reviews are seeded server-side too.
-      //
-      // WHY: measured 2026-07-29 — the SSR HTML held 226–397 words while the
-      // hydrated page held 416–752. On one profile 70% of the text existed only
-      // after JavaScript ran. Google does render JS, but on a delayed second
-      // pass, so the richest part of a profile — the very page type this
-      // marketplace most needs to rank — was the least reliably indexed. These
-      // are small text tables and they join the SAME parallel fan-out, so the
-      // cost is bounded by the slowest query, not the sum.
-      //
-      // CERTIFICATES ARE DELIBERATELY NOT SEEDED: their `url` is frequently a
-      // base64 data: blob, and inlining those into this page's HTML is exactly
-      // the failure that once made profiles multi-megabyte. The client fetch
-      // still loads them.
-      prisma.education.findMany({
-        where: { tutorId: id },
-        orderBy: [{ startYear: 'desc' }, { createdAt: 'desc' }],
-      }),
-      prisma.experience.findMany({
-        where: { tutorId: id },
-        orderBy: [{ startYear: 'desc' }, { createdAt: 'desc' }],
-      }),
-      prisma.review.findMany({
-        where: { tutorId: id },
-        take: 8,
-        orderBy: { createdAt: 'desc' },
-        include: { student: { select: { id: true, fullName: true } } },
-      }),
-    ])
-    if (!tutor) return null
-    // Admin-suspended experts are hidden site-wide — drop the first-paint seed
-    // (the route also 404s via getTutorSeo, and stripAvatar drops suspendedAt
-    // from what ships to the client).
-    if (tutor.user?.suspendedAt) return null
-    // Shape matches /api/experts/[slug] for the seeded fields; the arrays the seed
-    // omits are read as `?? []` in the client, so their absence is safe.
-    // Apply the SAME blob guards the /api/experts/[slug] route uses — otherwise a
-    // legacy `data:` base64 video or an oversized base64 avatar would be inlined
-    // raw into this high-traffic page's SSR HTML (blocking first byte).
-    // The master cross-link is lifted OUT of the seed: the seed's shape mirrors
-    // /api/tutors/[id] (which knows nothing of ServiceProfile), and the client
-    // replaces the seed with that payload once its own fetch lands — a field
-    // living only in the seed would vanish on hydration.
-    const { serviceProfile, ...seedUser } = tutor.user
-    const masterHref = serviceProfile?.published && serviceProfile.slug ? `/experts/${serviceProfile.slug}` : null
-    const safe = {
-      ...tutor,
-      videoUrl: typeof tutor.videoUrl === 'string' && tutor.videoUrl.startsWith('data:') ? null : tutor.videoUrl,
-      user: stripAvatar(seedUser),
-    }
-    // Mirror /api/experts/[slug]'s privacy rule: an anonymous review must never
-    // ship the reviewer's identity. Avatars are omitted entirely here (they can
-    // be multi-MB base64) — the client fetch fills them in.
-    const safeReviews = reviews.map(r => ({
-      ...r,
-      student: r.anonymous ? null : (r.student ? { ...r.student, avatarUrl: null } : null),
-    }))
-    return { seed: { ...safe, consultations, education, experience, reviews: safeReviews }, masterHref }
-  } catch {
-    return null
-  }
-})
 
 // Bio excerpt for meta description — first ~155 chars, cut at a word edge.
 function excerpt(text: string | null | undefined, max = 155): string | null {
@@ -307,41 +138,8 @@ export async function generateMetadata(
     const description = `${label}: სერვისები მცოდნეზე. აღწერე, რა გჭირდება, და მიიღე შეთავაზებები.`
     return { title, description, alternates: { canonical }, ...socialMeta({ title, description, url: canonical }) }
   }
-  // ── 3. the expert profile ───────────────────────────────────────────────
-  const resolved = await resolveExpert(param)
-  const id = resolved?.id ?? param
-  // Canonical is ALWAYS the slug URL when one exists — otherwise an id-form
-  // link that someone shared would self-canonicalise and compete with the slug
-  // URL for the same profile.
-  const canonical = `${SITE_URL}/experts/${resolved?.slug || id}`
-  const tutor = await getTutorSeo(id)
-
-  if (tutor && tutor !== 'error') {
-    const name = tutor.user?.fullName?.trim() || 'ექსპერტი'
-    const specialty = tutor.specialty?.trim() || tutor.category?.name?.trim()
-    const title = specialty ? `${name} — ${specialty} | მცოდნე` : `${name} | მცოდნე`
-    const description =
-      excerpt(tutor.bio) ||
-      tutor.headline?.trim() ||
-      `დაჯავშნე კონსულტაცია ${name}-სთან მცოდნეზე.`
-    // The expert's own face, served through /api/avatars — see absoluteAvatar.
-    // socialMeta still falls back to /og.png when there is no photo at all, so
-    // a shared link can never unfurl as a blank card.
-    const image = absoluteAvatar(tutor.user?.id, tutor.user?.avatarUrl)
-    return {
-      title,
-      description,
-      alternates: { canonical },
-      ...socialMeta({ title, description, url: canonical, image, type: 'article' }),
-    }
-  }
-
-  // ── 4. the provider profile ─────────────────────────────────────────────
-  // Only when the expert table answered NOTHING (not when it answered with a
-  // DB error, which must degrade to generic metadata rather than change which
-  // page this URL is). A slug is unique across both tables since stage 11, so
-  // at most one of the two can be here.
-  if (!resolved) {
+  // ── 3. the provider profile ─────────────────────────────────────────────
+  {
     const provider = await resolveMaster(param)
     const pp = provider ? await getMasterProfile(provider.id) : null
     if (pp) {
@@ -363,15 +161,17 @@ export async function generateMetadata(
     }
   }
 
+  // Nothing resolved — generic, and self-canonical to the address that was
+  // asked for. The page itself 404s; this only decides what a crawler that
+  // already has the URL is told about it.
+  const canonical = `${SITE_URL}/experts/${param}`
+  const title = 'ექსპერტი — მცოდნე'
+  const description = 'იპოვე ექსპერტი მცოდნეზე და აღწერე, რა გჭირდება.'
   return {
-    title: 'ექსპერტი — მცოდნე',
-    description: 'დაჯავშნე კონსულტაცია მცოდნის ექსპერტთან.',
+    title,
+    description,
     alternates: { canonical },
-    ...socialMeta({
-      title: 'ექსპერტი — მცოდნე',
-      description: 'დაჯავშნე კონსულტაცია მცოდნის ექსპერტთან.',
-      url: canonical,
-    }),
+    ...socialMeta({ title, description, url: canonical }),
   }
 }
 
@@ -393,12 +193,14 @@ export default async function TutorProfileRoute(
   const trade = resolveTrade(param)
   if (trade) {
     const topicIds = tradeTopicIds(trade)
-    const [count, user] = await Promise.all([countMastersCovering(topicIds), getCurrentUser()])
+    // ⚠️ `initialMe`, NOT `getCurrentUser` (2026-08-30) — and still inside the
+    // Promise.all. The hand-built object below carried four fields and left out
+    // `provider` and `balanceTetri`, the two the header branches on, so a
+    // provider browsing a trade landing saw the request button drawn and then
+    // removed. lib/meServer carries the finding.
+    const [count, initialUser] = await Promise.all([countMastersCovering(topicIds), initialMe()])
     const result = count >= TRADE_LANDING_MIN
-      ? await queryMasters(trade.topic ? { groups: [], topics: [trade.topic.id], cities: [] } : { groups: [trade.group.id], topics: [], cities: [] })
-      : null
-    const initialUser = user
-      ? { id: user.id, fullName: user.fullName, avatarUrl: user.avatarUrl, role: asRole(user.role) }
+      ? await queryProviders(trade.topic ? { groups: [], topics: [trade.topic.id], cities: [] } : { groups: [trade.group.id], topics: [], cities: [] })
       : null
     const breadcrumbLd = {
       '@context': 'https://schema.org',
@@ -420,137 +222,21 @@ export default async function TutorProfileRoute(
     )
   }
 
-  // ── 3. THE EXPERT PROFILE ───────────────────────────────────────────────
-  const resolved = await resolveExpert(param)
-
-  // ── 4. THE PROVIDER PROFILE — only when the expert table answered nothing.
-  // A slug is unique across BOTH tables since stage 11 (lib/slugSpace), so at
-  // most one of the two profiles can claim this address and the order between
-  // them decides nothing. Anything the provider rule hides — unpublished,
-  // paused, not admitted — falls through to the 404 below, exactly as it did
-  // under the old prefix.
-  if (!resolved) {
-    const provider = await resolveMaster(param)
-    if (provider) {
-      // The same id→slug 308 the expert branch does, and it carries the query
-      // string too (it used to drop it under the old prefix).
-      if (provider.slug && param !== provider.slug) {
-        permanentRedirect(`${masterPath(provider)}${queryOf(await searchParams)}`)
-      }
-      return providerProfile(provider)
+  // ── 3. THE PROVIDER PROFILE — the last thing this address can be.
+  // Anything the visibility rule hides — unpublished, paused, not admitted —
+  // falls through to a 404, exactly as it always did.
+  const provider = await resolveMaster(param)
+  if (provider) {
+    // id→slug 308, carrying the query string: every deep-link into a profile
+    // carries its intent there (?utm_*, and whatever the next one is), and a
+    // redirect to a bare path silently drops all of it.
+    if (provider.slug && param !== provider.slug) {
+      permanentRedirect(`${masterPath(provider)}${queryOf(await searchParams)}`)
     }
+    return providerProfile(provider)
   }
 
-  // Reached by cuid while a slug exists → send the crawler (and the human) to
-  // the one canonical address. permanentRedirect = 308, which browsers and
-  // Google treat as a permanent move exactly like a 301, and unlike 302 it
-  // transfers ranking signals to the slug URL.
-  //
-  // THE QUERY STRING MUST SURVIVE. Every deep-link into a profile carries its
-  // intent there — `?intent=message` opens the message sheet, `?rebook=1`
-  // reopens booking, `?preview=1` is the owner's own preview. Redirecting to a
-  // bare path silently dropped all of them: an old link someone had shared
-  // still landed on the right expert, but did nothing it promised.
-  if (resolved?.slug && param !== resolved.slug) {
-    permanentRedirect(`/experts/${resolved.slug}${queryOf(await searchParams)}`)
-  }
-  const id = resolved?.id ?? param
-  // SEO row (unchanged) for notFound + JSON-LD, plus the fuller first-paint
-  // seed for the client. Both are React-cached; the seed adds one findUnique +
-  // one consultation read, run in parallel.
-  const [tutor, initial, viewer] = await Promise.all([getTutorSeo(id), getTutorInitial(id), getCurrentUser()])
-  const initialTutor = initial?.seed ?? null
-  // „ხელოსნის პროფილი" — only when the same person also has a published
-  // ServiceProfile with a public address. ONE namespace since stage 11: it is
-  // /experts/<slug> too, resolved by this very file's step 4.
-  const masterHref = initial?.masterHref ?? null
-  const initialUser = viewer
-    ? { id: viewer.id, fullName: viewer.fullName, avatarUrl: viewer.avatarUrl, role: asRole(viewer.role) }
-    : null
-
-  // ⚠️ THE SECOND VERB, AND IT IS THE SECONDARY ONE (2026-08-19). „დაჯავშნე"
-  // stays this page's primary action — an expert with published time is booked,
-  // not negotiated with. What was missing is „აღწერე": describing a piece of
-  // work TO THIS PERSON, which until today could only be done by posting a
-  // request into the void and then inviting them from the room.
-  //
-  // ⚠️ GATED HERE AND ONLY HERE. `requestsOn()` is read ONCE, in the page, and
-  // handed to the rail — the same shape the provider profile below and the
-  // catalogue use.
-  // The profile itself must survive FEATURE_REQUESTS being off: it is an
-  // indexable page, and a URL that 404s teaches the crawler to distrust the
-  // file. No flag, no href, no second button — nothing else changes.
-  //
-  // The slug and not the id: the wizard resolves it against the catalogue's own
-  // visibility rule and ignores anything that does not resolve.
-  const requestHref = requestsOn() ? `/request?to=${encodeURIComponent(resolved?.slug || id)}` : null
-
-  // Missing id → real 404. DB error ('error') falls through: the client
-  // component has its own error/retry state for that case.
-  if (tutor === null) notFound()
-
-  let jsonLd: Record<string, unknown> | null = null
-  let breadcrumbLd: Record<string, unknown> | null = null
-  if (tutor && tutor !== 'error') {
-    const name = tutor.user?.fullName?.trim() || 'ექსპერტი'
-    const jobTitle = tutor.specialty?.trim() || tutor.category?.name?.trim()
-    const description = excerpt(tutor.bio)
-    const image = absoluteAvatar(tutor.user?.id, tutor.user?.avatarUrl)
-    const hasRealRating = (tutor.rating ?? 0) > 0 && (tutor.reviewsCount ?? 0) > 0
-    const price = typeof tutor.price === 'number' && tutor.price > 0 ? tutor.price : null
-    jsonLd = {
-      '@context': 'https://schema.org',
-      '@type': 'Person',
-      name,
-      url: `${SITE_URL}/experts/${resolved?.slug || id}`,
-      ...(jobTitle ? { jobTitle } : {}),
-      ...(description ? { description } : {}),
-      ...(image ? { image } : {}),
-      // Real price → an Offer, so Google can surface it. Never fabricated.
-      ...(price
-        ? { makesOffer: { '@type': 'Offer', priceCurrency: 'GEL', price, category: 'კონსულტაცია', availability: 'https://schema.org/InStock' } }
-        : {}),
-      // Only when a real rating exists — never fabricated.
-      ...(hasRealRating
-        ? {
-            aggregateRating: {
-              '@type': 'AggregateRating',
-              ratingValue: Number(tutor.rating.toFixed(2)),
-              reviewCount: tutor.reviewsCount,
-              bestRating: 5,
-              worstRating: 1,
-            },
-          }
-        : {}),
-    }
-    breadcrumbLd = {
-      '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'მთავარი', item: SITE_URL },
-        { '@type': 'ListItem', position: 2, name: 'ექსპერტები', item: `${SITE_URL}/experts` },
-        { '@type': 'ListItem', position: 3, name },
-      ],
-    }
-  }
-
-  return (
-    <>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }}
-        />
-      )}
-      {breadcrumbLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbLd) }}
-        />
-      )}
-      <ExpertProfilePage initialTutor={initialTutor} initialUser={initialUser} masterHref={masterHref} requestHref={requestHref} />
-    </>
-  )
+  notFound()
 }
 
 /**
@@ -585,11 +271,10 @@ function queryOf(sp: Record<string, string | string[] | undefined>): string {
  * read that disagrees (a row hidden between the two queries) is notFound().
  */
 async function providerProfile(provider: { id: string; slug: string | null }) {
-  const [p, user] = await Promise.all([getMasterProfile(provider.id), getCurrentUser()])
+  // ⚠️ `initialMe`, NOT `getCurrentUser` — see the trade landing above and
+  // lib/meServer. A provider's own public page is exactly where they look.
+  const [p, initialUser] = await Promise.all([getMasterProfile(provider.id), initialMe()])
   if (!p) notFound()
-  const initialUser = user
-    ? { id: user.id, fullName: user.fullName, avatarUrl: user.avatarUrl, role: asRole(user.role) }
-    : null
 
   // ⚠️ THE FLAG IS READ ONCE, HERE, AND HANDED DOWN — see app/experts/page.tsx.
   const on = requestsOn()
@@ -676,6 +361,7 @@ async function providerProfile(provider: { id: string; slug: string | null }) {
             <div className="min-w-0 lg:col-start-1">
               {/* The person, then the proof, then what others said. */}
               <AboutBlock p={p} />
+              <CredentialsBlock p={p} />
               <WorkBlock p={p} />
               <ReviewsBlock p={p} />
             </div>

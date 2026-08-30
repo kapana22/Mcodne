@@ -24,7 +24,8 @@ import { sendMail } from '@/lib/mailer'
 import { newMasterApplicationAdminEmail } from '@/lib/emailTemplates'
 import { providersOn } from '@/lib/requests'
 import { MasterApplicationInput, MASTER_KIND_LABEL, MASTER_STATUS_TEXT } from '@/lib/masterApplication'
-import { LIVE_SERVICE_GROUPS } from '@/lib/serviceProfile'
+import { groupIsService } from '@/lib/requestTopics'
+import { LIVE_OFFER_GROUPS } from '@/lib/serviceProfile'
 import { CITIES, topicLabel, cityLabel } from '@/lib/requestTopics'
 
 export const dynamic = 'force-dynamic'
@@ -33,11 +34,25 @@ const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { st
 
 /** The picker's contents, sent with the application so the form cannot hold a
  *  stale copy of the vocabulary. The LIVE four only — see
- *  lib/serviceProfile → LIVE_SERVICE_GROUPS. */
+ *  lib/serviceProfile → LIVE_OFFER_GROUPS. */
 const vocabulary = () => ({
-  groups: LIVE_SERVICE_GROUPS.map(g => ({
+  groups: LIVE_OFFER_GROUPS.map(g => ({
     id: g.id,
     label: g.label,
+    // ⚠️ WHICH WORLD THIS GROUP BELONGS TO (2026-08-30). Owner: „როდესაც
+    // დამლაგებლად დაამატა სერვისი, იმას ხომ არ ექნება სურვილი ბუღალტრის
+    // სერვისი ჰქონდეს… რეგისტრაციისას ეს დეტალები კომფორტულად უნდა იყოს და
+    // ზედმეტ რაღაცებს აღარ უნდა თავაზობდეს."
+    //
+    // Measured on the 28 live providers who have any services: EVERY ONE of
+    // them is inside a single vertical, and 26 of the 28 inside a single
+    // GROUP — an average of 1.1 groups each. So the form was offering 28
+    // groups to people who use one, and the 27 they scroll past include the
+    // ones that could not possibly apply to them.
+    //
+    // `groupIsService` is the same function the catalogue filter and the
+    // client intake read, so the split cannot drift between the three.
+    vertical: groupIsService(g) ? 'SERVICE' : 'EXPERT',
     // ⚠️ `alt` TRAVELS TOO (2026-08-20). The application's service search
     // matches on it, and those are the words people actually type —
     // „დამლაგებელი" for „ბინის დალაგება", „სანტექნიკოსი" for the plumbing

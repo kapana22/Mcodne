@@ -23,13 +23,10 @@
  */
 
 import { DoorQuestion } from './DoorQuestion'
-import type { Capability } from '@/lib/capabilities'
 
-export function GuestDoor({ offer, preset }: { offer: Capability[]; preset: Capability[] }) {
+export function GuestDoor() {
   return (
     <DoorQuestion
-      offer={offer}
-      preset={preset}
       onContinue={() => {
         // A full navigation, not `router.push`: signup is a different shell and
         // the draft has just been written to localStorage — nothing to carry.

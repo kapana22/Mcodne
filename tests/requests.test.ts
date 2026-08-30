@@ -37,6 +37,8 @@ import {
   placesLeft, requestIsOpen,
   providerRequestView, clientOfferView, clientIdentityOpen,
   ServiceRequestInput, RequestOfferInput, AdminRequestPatch,
+  kindsOfTopic,
+  MAX_REQUEST_PHOTOS,
   serviceRequestRow, topicLabel, REQUEST_STATIONS, stationsReached,
   canOpenRequestForm, showRequestCta,
 } from '../lib/requests'
@@ -184,7 +186,11 @@ test('FEATURE_PROVIDERS narrows, never widens (D6)', () => {
   assert.match(mw, /if\s+\(!providersOn\(\)\s+&&\s+isProviderPath\(req\.nextUrl\.pathname\)\)/,
     'the middleware does not gate the supply-side paths on FEATURE_PROVIDERS')
   // Every supply-side route reads providersOn(), not requestsOn().
-  for (const f of ['app/join/page.tsx', 'app/api/master-applications/route.ts',
+  // ⚠️ /join NO LONGER READS THE SWITCH ITSELF (2026-08-24). It used to offer
+  // „the missing half" and had to know whether the WORK half existed at all;
+  // there is one half now, the middleware gates the whole path (asserted just
+  // above), and the API routes below still check for themselves.
+  for (const f of ['app/api/master-applications/route.ts',
     'app/api/master-applications/[id]/route.ts', 'app/api/admin/master-applications/route.ts']) {
     assert.match(codeOf(f), /providersOn\(\)/, `${f} does not check the supply-side switch`)
     assert.doesNotMatch(codeOf(f), /requestsOn\(\)/, `${f} still checks the subsystem switch directly`)
@@ -196,8 +202,13 @@ test('FEATURE_PROVIDERS narrows, never widens (D6)', () => {
   // „ვარ ხელოსანი" tile to gate. The WORK half is offered, and gated, on the
   // door itself: app/join/page.tsx builds `offer` behind providersOn().
   assert.doesNotMatch(signup, /ვარ ხელოსანი/, 'the signup page forks by provider type again')
-  assert.match(codeOf('app/join/page.tsx'), /providersOn\(\) && !have\.includes\('WORK'\)/,
-    'the WORK half is offered without checking the supply-side switch')
+  // ⚠️ THE „OFFER" ITSELF IS GONE (2026-08-24). The door built a list of the
+  // halves somebody could still apply for and gated the WORK one on the
+  // switch; there is one thing to register, the middleware gates /join whole
+  // (asserted above), and what the page decides now is only whether this
+  // person is already selling.
+  assert.match(codeOf('app/join/page.tsx'), /if \(await isProvider\(user\.id\)\) redirect\('\/work'\)/,
+    'the door stopped sending a finished applicant to their workspace')
 })
 
 test('an allowlist row is the ONLY way in that is not being an admin', () => {
@@ -368,7 +379,7 @@ test('a client we cannot reach is refused at the door', () => {
   // absent email did not mean „reach me by phone" — it meant the system never
   // spoke to them again: no offer notice, no reply notice, no nudge.
   const base = {
-    kind: 'CONSULTATION', topic: 'contract',
+    kind: 'MEETING', topic: 'contract',
     description: 'ხელშეკრულება მჭირდება იჯარაზე.',
     budgetBand: 'c2', timing: 'this_week', format: 'ONLINE', city: 'TBILISI',
     contactName: 'ნინო მაგალიძე', phone: '555123456',
@@ -453,7 +464,7 @@ test('the waiting screen animates FACTS — no invented audience', () => {
     'the waiting screen claims people are LOOKING at the request — nobody is until it is routed')
   assert.match(api, /prisma\.notification\.count/,
     '„how many were told" stopped being a count of what we actually sent')
-  assert.match(api, /prisma\.tutorProfile\.count/,
+  assert.match(api, /prisma\.serviceProfile\.count/,
     '„how many experts are in this sphere" stopped being a count')
 
   // „N ექსპერტს ვაცნობეთ" may only render when the count is real and non-zero.
@@ -768,12 +779,12 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     // written once with `for=service` baked in: the parameter the wizard needs
     // to open on the trades side instead of offering a plumbing visitor 23
     // groups of experts. Gated in the PAGE rather than here on purpose:
-    // `_masterData` is a pure model with no react and no environment, and the
+    // `_providers` is a pure model with no react and no environment, and the
     // page reads the flag once and hands it to both surfaces, so the two cannot
     // disagree. Only the CTAs are gated — the page itself must survive
     // FEATURE_REQUESTS being off, because it is in the sitemap and a submitted
     // URL that 404s teaches the crawler to distrust the file.
-    ['app/experts/_masterData.ts', 'app/experts/page.tsx'],
+    ['app/experts/_providers.ts', 'app/experts/page.tsx'],
     // ⚠️ THE SERVICE PROFILE (stage 5, 2026-08-19; moved into the ONE namespace
     // in stage 11, the same day — it answers at /experts/<slug> now and its
     // parts are the `_provider*` siblings of the expert profile's). It is the
@@ -808,8 +819,10 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     // page's primary; the request path takes the slot „მიწერე ექსპერტს" has,
     // never a third button — asserted under the scan below.
     ['app/experts/[slug]/page.tsx', 'app/experts/[slug]/page.tsx'],
-    ['app/experts/[slug]/_booking.tsx', 'app/experts/[slug]/page.tsx'],
-    ['app/experts/[slug]/client.tsx', 'app/experts/[slug]/page.tsx'],
+    // ⚠️ THE EXPERT PROFILE'S OWN PARTS WENT WITH THE BOOKING PRODUCT
+    // (2026-08-24) — `_booking.tsx` (the rail) and `client.tsx` (the page).
+    // The provider profile's CTA is the same door and is listed above.
+    ['app/experts/[slug]/_providerCta.tsx', 'app/experts/[slug]/page.tsx'],
   ]
   for (const [f, gate] of CLIENT_ENTRY_POINTS) {
     // ⚠️ A SECTION NOTHING COMPOSES IS NOT AN ENTRY POINT (2026-08-21). The home
@@ -876,7 +889,7 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     // a WORK-only account to the queue for the same reason lib/hats does: that
     // is somebody the allowlist already names going home, not a door. All
     // three mechanisms are asserted just under this scan.
-    if (rel === 'components/tutor/navConfig.ts' || rel === 'app/work/layout.tsx' || rel === 'app/work/(expert)/layout.tsx') continue
+    if (rel === 'components/tutor/navConfig.ts' || rel === 'app/work/layout.tsx') continue
     // The client's OWN request list (D7): /me/requests reads `userId = me` and
     // links each row to /request/<ref> — a page its owner already holds the
     // key to. Named here, gated below (requestsOn() + the signed-in owner).
@@ -972,26 +985,31 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   // a role — a `role === 'TUTOR'`-style test would show the door to somebody
   // the requests allowlist has never admitted.
   const menu = read('components/UserMenu.tsx')
-  assert.match(menu, /const isMaster = hats\.includes\('MASTER'\)/,
-    'the user menu stopped deriving the master door from the hat')
+  assert.match(menu, /const sellsHere = hats\.includes\('PROVIDER'\)/,
+    'the user menu stopped deriving the workspace door from the hat')
   // ⚠️ THE DOOR IS /work SINCE 2026-08-20 and there is only one of it — what
   // this pins is unchanged: a provider reaches the supply side through the
-  // MASTER HAT, never through a role, and the hat requires the same allowlist
+  // PROVIDER HAT, never through a role, and the hat requires the same allowlist
   // row the workspace itself checks.
-  assert.match(menu, /if\s+\(\(isDualRole\s+\|\|\s+isMaster\)\s+&&\s+!inExpertSpace\s+&&\s+!inProviderSpace\)\s+\{\s*\n\s*switchItems\.push\(\{\s+href:\s+'\/work'/,
-    'the provider link in the user menu is no longer behind the MASTER hat')
+  assert.match(menu, /if\s+\(\(isDualRole\s+\|\|\s+sellsHere\)\s+&&\s+!inExpertSpace\s+&&\s+!inProviderSpace\)\s+\{\s*\n\s*switchItems\.push\(\{\s+href:\s+'\/work'/,
+    'the provider link in the user menu is no longer behind the provider hat')
 
   // Same shape for /work/jobs: the allowlist entry above says WHERE to look,
   // this says the two strings are unreachable without the allowlist. The page
-  // asks `requestsViewer()` behind `providersOn()` and hands the answer down as
-  // `hasProvider`; the CTA is behind that flag, and a QUOTE row cannot exist at
-  // all unless the query found an ACCEPTED offer belonging to that provider.
+  // asks `requestsViewer()` behind `providersOn()` and sends anybody without a
+  // provider identity to /me — the whole list is quotes since 2026-08-24, so
+  // there is nothing to show them and no `hasProvider` flag to hand down.
   const jobsPage = read('app/work/jobs/page.tsx')
   assert.match(jobsPage, /const\s+viewer\s+=\s+providersOn\(\)\s+\?\s+await\s+requestsViewer\(\)\s+:\s+null/,
     'the jobs page derives the provider from something other than the viewer + the switch')
-  assert.match(jobsPage, /hasProvider=\{!!provider\}/, 'the jobs screen no longer learns whether it has a provider')
-  assert.match(read('app/work/jobs/_client.tsx'), /hasProvider \? \{ label: '[^']+', href: '\/work\/requests' \}/,
-    'the queue CTA on /work/jobs is no longer behind the allowlist')
+  assert.match(jobsPage, /if \(!provider\) redirect\('\/me'\)/,
+    'the jobs screen no longer turns away somebody with no provider identity')
+  // ⚠️ THE CTA IS UNCONDITIONAL NOW, AND THE GATE MOVED UP (2026-08-24). It
+  // used to be `hasProvider ? … : undefined` because the page also served
+  // somebody with only a consultation profile; the page redirects them away
+  // instead, so everybody who reads this empty state can open the queue.
+  assert.match(read('app/work/jobs/_client.tsx'), /cta=\{\{ label: '[^']+', href: '\/work\/requests' \}\}/,
+    'the queue CTA on /work/jobs points somewhere else')
 
   // The tab bar's provider tabs are keyed on the SPACE the pathname is in —
   // never on a role, never on a hat, never anywhere but the master's three
@@ -1043,16 +1061,14 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   assert.match(navCfg, /\.\.\.\(groups\.work\s+\?\s+WORK_ONLY_NAV\s+:\s+\[\]\)/, 'the subsystem items are no longer drawn by capability')
   const workLayout = codeOf('app/work/layout.tsx')
   assert.match(workLayout, /if \(!user\) return <>\{children\}<\/>/, 'the /work shell draws chrome for a signed-out visitor')
-  assert.match(workLayout, /work:\s+viewer\s+!==\s+null\s+&&\s+\(caps\.includes\('WORK'\)\s+\|\|\s+viewer\.providerAllowed\)/,
-    'the master group is no longer keyed on the WORK capability / the allowlist')
+  assert.match(workLayout, /work:\s+viewer\s+!==\s+null\s+&&\s+\(provider\s+\|\|\s+viewer\.providerAllowed\)/,
+    'the queue row is no longer keyed on the profile / the allowlist')
   assert.doesNotMatch(workLayout, /work: [^\n]*ROLE\./, 'the master group became role-keyed — a role is not the allowlist')
-  assert.doesNotMatch(workLayout, /redirect\(|notFound\(|requireRole\(/, 'the /work shell became a guard — the guards are the two route groups')
-  const expertLayout = codeOf('app/work/(expert)/layout.tsx')
-  // The TARGET moved to /work on 2026-08-20 (the shared home); what this pins
-  // is unchanged — the bounce is keyed on the CAPABILITY and not on a role.
-  assert.match(expertLayout, /if\s+\(caps\.includes\('WORK'\)\)\s+redirect\('\/work'\)/,
-    'the WORK-only redirect is not keyed on the capability')
-  assert.match(expertLayout, /requireRole\(\[ROLE\.PROVIDER, ROLE\.ADMIN\]\)/, 'the expert guard is gone')
+  assert.doesNotMatch(workLayout, /redirect\(|notFound\(|requireRole\(/, 'the /work shell became a guard — the guard is the route group')
+  // ⚠️ THE (expert) GROUP AND ITS BOUNCE ARE GONE (2026-08-24). Its layout ran
+  // `requireRole` and then redirected a WORK-only provider to /work — a rule
+  // that existed only because a service provider kept meeting a booking
+  // calendar. One group is left and tests/spaces.test.ts §C pins its 404.
 
   // /me/requests (D7): the owner's list, and only the owner's — gated on the
   // flag and on the session, scoped by userId.
@@ -1106,12 +1122,13 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
 // everyone the flag admits, because a provider who needs a plumber is a client
 // like anybody else. A hidden invitation is not a closed door.
 test('the header CTA invites the demand side only — and never mistakes that for a gate', () => {
-  assert.equal(showRequestCta([]), true, 'a guest or a plain client lost the intake CTA')
+  assert.equal(showRequestCta(false), true, 'a guest or a plain client lost the intake CTA')
   assert.equal(showRequestCta(undefined), true, 'an unresolved identity must read as demand, not as supply')
   assert.equal(showRequestCta(null), true)
-  assert.equal(showRequestCta(['CONSULT']), false, 'an expert is still invited to send a request from the bar')
-  assert.equal(showRequestCta(['WORK']), false, 'a provider with a registered service is still invited to buy one')
-  assert.equal(showRequestCta(['CONSULT', 'WORK']), false)
+  // ⚠️ IT TOOK A LIST OF CAPABILITIES UNTIL 2026-08-24 — CONSULT, WORK, or
+  // both. One profile, one boolean; the rule („anybody who sells is not the
+  // audience for this invitation") is unchanged.
+  assert.equal(showRequestCta(true), false, 'a provider with a registered service is still invited to buy one')
   // The invitation and the door are not the same question — the form stays open
   // to everyone the flag admits, whatever the bar shows.
   assert.equal(canOpenRequestForm(), requestsOn(), 'the CTA’s audience leaked into the form’s gate')
@@ -1161,7 +1178,9 @@ test('the admin tabs disappear with the subsystem', () => {
   // the same subsystem for the same reason the other two do: it approves people
   // INTO /provider, so leaving it visible with the flag off would offer an admin
   // a button that admits somebody to a workspace that 404s.
-  assert.match(nav, /\.filter\(it\s+=>\s+\(it\.id\s+!==\s+'requests'\s+&&\s+it\.id\s+!==\s+'access'\)\s+\|\|\s+requestsFeatureExists\(\)\)/,
+  // „ძაბრი" joined 2026-08-30: with the flag off it is five bars of zero, which
+  // reads as a broken panel rather than an absent feature.
+  assert.match(nav, /\.filter\(it\s+=>\s+\(it\.id\s+!==\s+'requests'\s+&&\s+it\.id\s+!==\s+'access'\s+&&\s+it\.id\s+!==\s+'funnel'\)\s+\|\|\s+requestsFeatureExists\(\)\)/,
     'the requests tabs are no longer filtered out of ADMIN_NAV')
   // …and the masters queue follows the SUPPLY-side switch (D6): it approves
   // people into /provider, which is what FEATURE_PROVIDERS turns off.
@@ -1189,7 +1208,7 @@ test('a provider payload cannot carry the client‘s name, phone or email', () =
   const row = {
     id: 'req_1', publicRef: 'MC-7A4K2',
     description: 'ვეძებ ბუღალტერს შპს-სთვის',
-    kind: 'CONSULTATION', topic: 'accounting',
+    kind: 'MEETING', topic: 'accounting',
     budgetMin: 100, budgetMax: 250, budgetUnit: 'PER_SESSION',
     timing: 'this_week', format: 'ONLINE', city: 'TBILISI',
     status: 'VERIFIED', offerCount: 1, offerLimit: 3,
@@ -1461,7 +1480,7 @@ test('the vocabulary holds together', () => {
     ['LEARNING', 'ქიმიის', 'chemistry'],
     ['LEARNING', 'ინგლისურის', 'english'],
     ['PROJECT', 'ვებგვერდის', 'website'],
-    ['CONSULTATION', 'ხელშეკრულებას', 'contract'],
+    ['MEETING', 'ხელშეკრულებას', 'contract'],
   ] as const) {
     const hits = searchTopics(kind, q)
     assert.ok(hits.some(h => h.topic.id === expected),
@@ -1539,27 +1558,57 @@ test('the run is one question per screen, derived from the draft', () => {
   // The CLARIFIERS did not go anywhere; they lost their own page and sit on the
   // timing screen, which is the move „აირჩიე ტიპი" made a day before.
   //
+  // ⚠️ THE RUN CHANGED TWICE ON 2026-08-29 AND CAME BACK TO FIVE. „mode" went
+  // (see below) and „photos" arrived — a swap, not a growth: one screen that
+  // asked the visitor to answer OUR routing question, for one that makes every
+  // offer they receive more accurate. Owner: „მაქსიმალურად მარტივად, ორივეს
+  // მხარეს" — and the photo step is the only one in the run that can be passed
+  // with a single tap („გამოტოვება"), because `photos: []` is a complete
+  // request.
+  //
+  // On „mode": Owner:
+  // „ყველაფერი უნდა იყოს მარტივად… მაქსიმალურად მარტივად, ორივეს მხარეს."
+  // „როგორ გირჩევნია?" was our routing question handed to the visitor one
+  // screen before their phone number — Airtasker, Thumbtack and Bark never ask
+  // it. See app/request/_model.ts, and the note in this file's pickMode test
+  // for what happened to the list it used to gate.
+  //
   // The distribution is the pin, not one example: measured across all 171
-  // topics, every single run is five screens. If a step returns, this is the
+  // topics, every single run is the same length. If a step returns, this is the
   // test that says so.
-  assert.deepEqual(chemRun, ['what', 'timing', 'format', 'mode', 'contact'])
+  assert.deepEqual(chemRun, ['what', 'timing', 'format', 'contact'])
   assert.ok(!chemRun.includes('budget'), 'the budget question came back')
   assert.ok(!chemRun.includes('details'), 'the free-text screen came back')
 
   // An ambiguous topic no longer earns a screen — it is answered on screen one.
   const con = withTopic(EMPTY_DRAFT, 'contract')
   assert.deepEqual(stepsFor(con).map(st => st.id),
-    ['what', 'timing', 'format', 'mode', 'contact'])
+    ['what', 'timing', 'format', 'contact'])
   // …but an EMPTY draft still lists it, so the counter can count before the
   // first tap.
   assert.ok(stepsFor(EMPTY_DRAFT).map(st => st.id).includes('kind'),
     'the empty run lost its provisional kind step — the counter would jump')
 
-  // EVERY topic, not the two above.
+  /* EVERY topic, not the two above.
+   *
+   * ⚠️ TWO LENGTHS SINCE 2026-08-29, AND THE SPLIT IS THE POINT. The photo
+   * screen belongs to SERVICE — the kind whose definition is „somebody comes to
+   * your address", where the work is physical and a picture answers the
+   * question the offer is about. The first version of that step was pushed for
+   * every run, which measured out at 132 of these 171 topics being asked to
+   * photograph a contract or an English lesson.
+   *
+   * So the pin is no longer one number; it is that NOBODY gets a screen their
+   * kind cannot use. Four for the professional half, five for the household
+   * one, and no third answer. */
   for (const g of TOPIC_GROUPS) {
     for (const t of g.topics) {
-      const run = stepsFor(withTopic(EMPTY_DRAFT, t.id))
-      assert.equal(run.length, 5, `${t.id} runs in ${run.length} screens, not 5`)
+      const run = stepsFor(withTopic(EMPTY_DRAFT, t.id)).map(st => st.id)
+      const service = kindsOfTopic(t.id).includes('SERVICE')
+      assert.equal(run.includes('photos'), service,
+        `${t.id} ${service ? 'lost' : 'was given'} the photo screen`)
+      assert.equal(run.length, service ? 5 : 4,
+        `${t.id} runs in ${run.length} screens`)
     }
   }
 
@@ -1812,7 +1861,7 @@ test('the clarifying answers are stripped against the question list', () => {
   // POST cannot store a script tag under „audience" and a renamed option cannot
   // leave an unreadable id behind.
   assert.ok(extrasFor('LEARNING').length >= 2, 'LEARNING lost its clarifying questions')
-  assert.equal(extrasFor('CONSULTATION').length, 0)
+  assert.equal(extrasFor('MEETING').length, 0)
   assert.equal(extrasFor('PROJECT').length, 0)
 
   assert.deepEqual(
@@ -1830,7 +1879,7 @@ test('the clarifying answers are stripped against the question list', () => {
   )
   // Nothing legal → null, never {} — the column must read „nothing to clarify".
   assert.equal(normalizeExtras('LEARNING', 'chemistry', { junk: 'x' }), null)
-  assert.equal(normalizeExtras('CONSULTATION', 'contract', { audience: 'pupil' }), null)
+  assert.equal(normalizeExtras('MEETING', 'contract', { audience: 'pupil' }), null)
   assert.equal(normalizeExtras('LEARNING', 'chemistry', 'garbage'), null)
   assert.equal(normalizeExtras('LEARNING', 'chemistry', ['a']), null)
 
@@ -1922,7 +1971,7 @@ test('the ceilings admit what a person actually types', () => {
   // Pinned as VALUES rather than as source text, so a ceiling cannot be quietly
   // tightened into the certificates bug.
   const ok = {
-    kind: 'CONSULTATION',
+    kind: 'MEETING',
     topic: 'accounting',
     description: 'ვეძებ ბუღალტერს შპს-სთვის, საგადასახადო შემოწმება მოვიდა და დახმარება მჭირდება.',
     budgetBand: 'c2', timing: 'this_week', format: 'ONLINE', city: 'TBILISI',
@@ -1951,7 +2000,7 @@ test('the ceilings admit what a person actually types', () => {
   // each mismatch is refused: a chemistry topic on a legal project, a
   // per-lesson band on a project, a frequency on a consultation.
   assert.equal(ServiceRequestInput.safeParse({ ...ok, topic: 'chemistry' }).success, false,
-    'a LEARNING topic was accepted on a CONSULTATION')
+    'a LEARNING topic was accepted on a MEETING')
   assert.equal(ServiceRequestInput.safeParse({ ...ok, budgetBand: 'l2' }).success, false,
     'a per-lesson band was accepted on a consultation')
   assert.equal(ServiceRequestInput.safeParse({ ...ok, timing: 'twice_week' }).success, false,
@@ -2019,7 +2068,7 @@ test('the honeypot answers ok and writes nothing', () => {
   // real endpoint; a schema test that asserted `.max(0)` would have agreed with
   // the bug.
   assert.equal(ServiceRequestInput.safeParse({
-    kind: 'CONSULTATION', topic: 'accounting',
+    kind: 'MEETING', topic: 'accounting',
     description: 'ვეძებ ბუღალტერს შპს-სთვის, საგადასახადო შემოწმება მოვიდა და დახმარება მჭირდება.',
     budgetBand: 'c2', timing: 'this_week', format: 'ONLINE', city: 'TBILISI',
     contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
@@ -2051,7 +2100,7 @@ test('an empty optional becomes NULL, never an empty string', () => {
   // null is the demand signal, not a bug.
   assert.equal(row.categorySlug, null)
   assert.equal(serviceRequestRow({
-    ...({ kind: 'CONSULTATION', topic: 'contract',
+    ...({ kind: 'MEETING', topic: 'contract',
       description: 'ხელშეკრულება მჭირდება იჯარაზე, ორი მხარე ვართ და პირობები შეთანხმებულია.',
       budgetBand: 'c2', timing: 'this_week', format: 'ONLINE', city: 'TBILISI',
       contactName: 'ნინო', phone: '555123456', email: '' } as any),
@@ -2160,7 +2209,7 @@ test('the subsystem shares nothing with bookings, packages or B2B', () => {
   // unmaintainable one.
   // Case-SENSITIVE, and matching the two spellings a Prisma model actually has
   // in code: the client accessor (prisma.booking) and the type (Booking).
-  // Deliberately NOT /i — 'CONSULTATION' is one of this subsystem's own KIND
+  // Deliberately NOT /i — 'MEETING' is one of this subsystem's own KIND
   // values (lib/requestTopics), and a case-insensitive net caught our own
   // vocabulary the day the kinds landed.
   const FORBIDDEN = /\b(booking|consultation|enrollment|availabilitySlot|dispute|businessLead|b2BService|Booking|Consultation|Package|Enrollment|AvailabilitySlot|Dispute|BusinessLead|B2BService)\b|\bprisma\.package\b/
@@ -2415,7 +2464,7 @@ test('the transcript restates ANSWERS, in words, and only answered ones', () => 
   // still looks like a chat, and is a debug view shown to a customer.
   const d: Draft = {
     ...EMPTY_DRAFT,
-    kind: 'CONSULTATION', topic: 'contract',
+    kind: 'MEETING', topic: 'contract',
     budgetBand: 'c2', timing: 'this_week',
     format: 'IN_PERSON', city: 'BATUMI',
   }
@@ -2665,14 +2714,26 @@ test('„მე ავირჩევ" is a preference about a button, not about
   assert.equal(self.success && serviceRequestRow(self.data).pickMode, 'SELF')
   assert.equal(ServiceRequestInput.safeParse({ ...base, pickMode: 'NOPE' }).success, false)
 
-  // ⚠️ THE LOAD-BEARING HALF. Owner: „მხოლოდ ამ შემთხვევაში უნდა ჰქონდეს
-  // ღილაკი." SELF adds a list to write to; it must NOT decide who is told about
-  // the request. Somebody who picks „I'll choose" and then picks nobody would
-  // otherwise hear from nobody — a silence produced by a preference about a
-  // button.
+  /* ⚠️ THE QUESTION IS GONE, SO THE GATE IS TOO (2026-08-29). Owner:
+   * „ყველაფერი უნდა იყოს მარტივად… მაქსიმალურად მარტივად, ორივეს მხარეს."
+   *
+   * The 2026-08-18 rule („მხოლოდ ამ შემთხვევაში უნდა ჰქონდეს ღილაკი") existed
+   * to stop the list overriding a STATED preference. The wizard no longer asks
+   * for one, so there is nothing to override — and what is left is a person
+   * waiting with nothing to do beside a list of people who could help.
+   *
+   * ⚠️ WHAT WAS ACTUALLY LOAD-BEARING SURVIVES, and it is asserted below and
+   * in the paragraph after: the mode never decided who is TOLD about the
+   * request, and `!hasOffers` still hides the list the moment a real offer
+   * arrives. Those two are the rule; the gate was its 2026-08-18 shape. */
   const live = read('app/request/_live.tsx')
-  assert.match(live, /d\.pickMode === 'SELF' && !hasOffers/,
-    'the expert list stopped honouring the choice')
+  assert.match(live, /\{!hasOffers && d\.experts\.length > 0 &&/,
+    'the expert list is gated again, or stopped hiding once offers arrive')
+  assert.doesNotMatch(live, /d\.pickMode === 'SELF'/,
+    'the removed question is being read again')
+  // The wizard must not ask it: one screen fewer is the whole change.
+  assert.doesNotMatch(read('app/request/_model.ts'), /id: 'mode'/,
+    'the „როგორ გირჩევნია?" step is back in the run')
   const create = read('app/api/requests/route.ts')
   assert.doesNotMatch(create, /pickMode[\s\S]{0,120}mailVerifiedRequest/,
     'routing became conditional on pickMode — a button preference must not silence a request')
@@ -2712,4 +2773,95 @@ test('one city means the question is not asked, and the vocabulary still reads',
       contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
     }).success, true, 'a service request stopped parsing without the city screen')
   }
+})
+
+test('a request may carry photos, and they never ride in a list', () => {
+  /* ⚠️ WHY THE STEP EXISTS (2026-08-29). Owner: „ყველაფერი უნდა იყოს
+   * მარტივად… მაქსიმალურად მარტივად, ორივეს მხარეს." A photo of the leaking
+   * tap is the cheapest thing a client can give and the most useful thing a
+   * provider can get: it is what lets a first offer name a real price instead
+   * of opening a conversation to find one out. Airtasker makes it its own
+   * screen and this is the same move. */
+  // The same shape the fixture above uses — an email is required (a client
+  // who cannot be told an offer arrived is not a request this site accepts).
+  const base = {
+    kind: 'SERVICE', topic: 'plumb-leak',
+    description: 'ონკანი ჟონავს სამზარეულოში.',
+    budgetBand: 's1', timing: 'today', format: 'IN_PERSON', city: 'TBILISI',
+    contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
+  }
+
+  // ⚠️ OPTIONAL, AND THAT IS THE LOAD-BEARING HALF. The person with water on
+  // the floor has nothing to upload and their request is exactly the one that
+  // must still arrive — an empty array and an absent key both mean „none".
+  const none = ServiceRequestInput.safeParse(base)
+  assert.equal(none.success, true, 'a request without photos was refused')
+  if (none.success) assert.deepEqual(serviceRequestRow(none.data).photos, [])
+
+  const img = 'data:image/webp;base64,AAAA'
+  const one = ServiceRequestInput.safeParse({ ...base, photos: [img] })
+  assert.equal(one.success && serviceRequestRow(one.data).photos.length, 1)
+
+  // The ceiling, and the refusal of anything that is not an image: the column
+  // is rendered as an <img>, so a non-image is either a mistake or a crafted
+  // body. Same rule the provider intake uses (lib/masterApplication).
+  assert.equal(
+    ServiceRequestInput.safeParse({ ...base, photos: Array(MAX_REQUEST_PHOTOS + 1).fill(img) }).success,
+    false, 'the photo ceiling stopped being enforced')
+  assert.equal(
+    ServiceRequestInput.safeParse({ ...base, photos: ['https://example.com/x.png'] }).success,
+    false, 'a non-data URI was accepted into the photo column')
+
+  /* ⚠️ AND THEY MUST NEVER RIDE IN A LIST. These are base64 blobs on a table
+   * the queue, the offers list and the admin panel all read; one careless
+   * `photos: true` in a list select would put megabytes on the wire. Exactly
+   * one file may select them: the detail page for a single request. */
+  const ALLOWED = 'app/work/(provider)/requests/[id]/page.tsx'
+  const offenders = sourceFiles()
+    .filter(f => /photos:\s*true/.test(readFileSync(f, 'utf8')))
+    .map(f => relative(ROOT, f))
+    .filter(f => f !== ALLOWED)
+  assert.deepEqual(offenders, [],
+    `these files select the photo blobs into a payload: ${offenders.join(', ')}`)
+})
+
+test('the intake offers only work somebody can actually answer', () => {
+  /* ⚠️ THE WIZARD WAS A QUEUE WITH NO OTHER SIDE (fixed 2026-08-30). Owner:
+   * „როდესაც სერვისი არაა გამოტანილი სერჩში, ვერ უნდა გაგზავნოს… და ისინი უნდა
+   * იყოს, რომლებიც გვყავს კატეგორიაში და დამატებული."
+   *
+   * Measured that day: 148 topics offered, 46 with a live provider. 102 of them
+   * — 69% — were a request that could reach nobody, and 19 of the 28 groups
+   * were empty end to end. Somebody describing an IELTS course walked five
+   * screens to wait forever.
+   */
+  const server = read('lib/requestsServer.ts')
+  assert.match(server, /export async function coveredTopicIds/,
+    'the live-supply read is gone — the intake has nothing to narrow by')
+
+  /* ⚠️ DERIVED, NEVER LISTED — the owner's „პარალელურად". A trade becomes
+   * offerable the moment a provider ticks it and stops when the last one
+   * un-ticks it, because the set is a query over the roster rather than a
+   * constant somebody has to remember to edit. */
+  assert.match(server, /published: true, available: true/,
+    'coveredTopicIds stopped asking for LIVE supply — a paused provider is not supply')
+  assert.doesNotMatch(server.slice(server.indexOf('coveredTopicIds')), /const COVERED|\[\s*'[a-z-]+',\s*'[a-z-]+'/,
+    'the covered set became a hand-kept list — it must stay a query')
+
+  // It reaches the screen, and it narrows BOTH the browse list and the search.
+  assert.match(read('app/request/page.tsx'), /covered=\{covered\}/,
+    'the page stopped passing live supply to the wizard')
+  assert.match(read('app/request/RequestWizard.tsx'), /onlyTopics=\{to\?\.topics \?\? covered\}/,
+    'the wizard stopped narrowing, or stopped letting a direct target win')
+  const step = read('app/request/_stepWhat.tsx')
+  assert.match(step, /only\.size \? all\.filter\(h => only\.has\(h\.topic\.id\)\) : all/,
+    'the search stopped honouring the narrowing — an unanswerable topic is offerable again')
+
+  /* ⚠️ AND NOTHING IS LOST BY NARROWING. Whoever types words that match no
+   * offered topic still reaches the free-text escape, which files under
+   * OTHER_TOPIC and routes to EVERYONE rather than to a filed specialist. The
+   * narrowing removes dead ends, not requests — if that escape ever goes, this
+   * change becomes a way to lose demand. */
+  assert.match(step, /onFreeText\(q\.trim\(\)\)/,
+    'the „მაინც მოგვწერე" escape is gone — narrowing without it loses requests')
 })

@@ -4,12 +4,12 @@ import { prisma } from './prisma'
 // dead notification write never blocks the primary transition (e.g. accepting
 // a booking must succeed even if the notification INSERT fails).
 
+// ⚠️ FIVE BOOKING TYPES LEFT THIS UNION ON 2026-08-26 — `BOOKING_CREATED`,
+// `BOOKING_CANCELED`, `BOOKING_COMPLETED`, `BOOKING_REMINDER` and
+// `RESCHEDULE_REQUEST`. Nothing had emitted one since the booking product was
+// removed on 2026-08-24, and their pref row („ჯავშნის ცვლილება") sat in
+// /settings as a switch that governed no notification anybody could receive.
 export type NotifType =
-  | 'BOOKING_CREATED'
-  | 'BOOKING_CANCELED'
-  | 'BOOKING_COMPLETED'
-  | 'BOOKING_REMINDER'
-  | 'RESCHEDULE_REQUEST'
   | 'MESSAGE_NEW'
   | 'REVIEW_NEW'
   | 'APPLICATION_STATUS'
@@ -19,9 +19,12 @@ export type NotifType =
   | 'GENERIC'
   // The requests subsystem (2026-08-19, D10/D12). Typed so the bell can tell
   // „a client wrote first" from „a request came in" without parsing titles;
-  // pref-wise they are GENERIC — none maps to a PrefKey below, so all four are
-  // always delivered. REQUEST_NEW goes to admins only (the queue ping, like
-  // APPLICATION_NEW). PAYOUT never fires yet — payments are not live.
+  // pref-wise REQUEST_MESSAGE follows MESSAGE_NEW (see below) and the other
+  // three are always delivered. REQUEST_NEW goes to admins only (the queue ping, like
+  // APPLICATION_NEW). PAYOUT carries ONE thing since 2026-08-30 — the automatic
+  // refund of a contact bought on a request that died unanswered (lib/requestJobs
+  // → refundDeadRequest). It is filed here, among the uncontrolled types, for the
+  // reason those exist: money moving is not a notification anybody may switch off.
   | 'REQUEST_NEW'
   | 'REQUEST_INVITE'
   | 'REQUEST_MESSAGE'
@@ -32,28 +35,29 @@ export type NotifType =
 // not marketing. APPLICATION_NEW in particular goes only to admins as a
 // moderation-queue ping (same rationale as the GENERIC dispute pings).
 export type PrefKey =
-  | 'BOOKING_CREATED'
   | 'MESSAGE_NEW'
   | 'REVIEW_NEW'
   | 'APPLICATION_STATUS'
   | 'ADMIN_BROADCAST'
 
-// Group all booking lifecycle types under BOOKING_CREATED — one toggle for
-// "ჯავშნის ცვლილება" covers new-request, canceled, completed, reschedule AND
-// session-reminder notifications.
+// ⚠️ `MESSAGE_NEW` NOW ANSWERS FOR `REQUEST_MESSAGE` (2026-08-26). The toggle
+// reads „ახალი შეტყობინება · ახალი ტექსტი მიმოწერაში" and that is EXACTLY what
+// a REQUEST_MESSAGE is — but the two were never wired together, so the switch
+// governed a type nothing sends while the chat pings it describes were
+// always-on. The rest of the REQUEST_* family stays always-on deliberately:
+// REQUEST_NEW is the admins' queue ping, and INVITE/DONE are the transaction
+// itself — a provider who silenced those would simply stop hearing about work.
 function prefKeyForType(t: string): PrefKey | null {
-  if (t === 'BOOKING_CREATED' || t === 'BOOKING_CANCELED' || t === 'BOOKING_COMPLETED' || t === 'BOOKING_REMINDER' || t === 'RESCHEDULE_REQUEST') return 'BOOKING_CREATED'
-  if (t === 'MESSAGE_NEW') return 'MESSAGE_NEW'
+  if (t === 'MESSAGE_NEW' || t === 'REQUEST_MESSAGE') return 'MESSAGE_NEW'
   if (t === 'REVIEW_NEW') return 'REVIEW_NEW'
   if (t === 'APPLICATION_STATUS') return 'APPLICATION_STATUS'
   if (t === 'ADMIN_BROADCAST') return 'ADMIN_BROADCAST'
-  // REQUEST_NEW / REQUEST_INVITE / REQUEST_MESSAGE / REQUEST_DONE fall through
-  // to null on purpose — the same always-on group GENERIC sits in.
+  // REQUEST_NEW / REQUEST_INVITE / REQUEST_DONE fall through to null on
+  // purpose — the same always-on group GENERIC sits in.
   return null
 }
 
 export const DEFAULT_PREFS: Record<PrefKey, boolean> = {
-  BOOKING_CREATED: true,
   MESSAGE_NEW: true,
   REVIEW_NEW: true,
   APPLICATION_STATUS: true,

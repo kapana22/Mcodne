@@ -57,9 +57,25 @@ test('a boot failure still cannot record a stamp', () => {
   const record = once.indexOf('await recordApplied(')
   assert.ok(run > -1 && record > -1, 'runMigrationsOnce no longer runs or records the set')
   assert.ok(record > run, 'the stamp is written before the migrations finish — a failed boot would be remembered as done')
+  // ⚠️ THE BAN IS ON `catch`, NOT ON `try` (2026-08-27). This read
+  // `doesNotMatch(/try\s*\{/)` and cut the body at the FIRST `}` — so the day
+  // `runMigrationsOnce` grew a `try { … } finally { applying = false }` around
+  // the run, to tell „the migrations are genuinely running" from „the database
+  // is gone" (see ensureDbReadyWithin), this fired on a function that swallows
+  // nothing: a `finally` re-throws, only a `catch` eats. The rule the comment
+  // above states is „ensureDbReady must SEE the throw", and that is what is
+  // checked now — over the whole body rather than up to the first brace.
+  const bodyEnd = (() => {
+    let d = 0
+    for (let i = once.indexOf('{'); i < once.length; i++) {
+      if (once[i] === '{') d++
+      else if (once[i] === '}' && --d === 0) return i
+    }
+    return once.length
+  })()
   assert.doesNotMatch(
-    once.slice(0, once.indexOf('}')),
-    /try\s*\{/,
+    once.slice(0, bodyEnd),
+    /catch\s*[({]/,
     'runMigrationsOnce swallows its own failure — ensureDbReady must see the throw so the next request retries',
   )
 })

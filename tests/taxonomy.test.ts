@@ -5,7 +5,7 @@
  *
  * What was decided that day, pinned so it stays decided:
  *   A. every profession says what it CAN do (CONSULT, and for a short list WORK);
- *   B. a CONSULTATION / PROJECT topic may name the professions that answer it,
+ *   B. a MEETING / PROJECT topic may name the professions that answer it,
  *      and never a LEARNING / SERVICE one — the two vocabularies touch, they do
  *      not merge (lib/requestTopics' header);
  *   C. routing mails by sphere ∪ profession, and the fallback is untouched;
@@ -28,7 +28,7 @@ import { TOPIC_GROUPS, professionsOfTopic, topicById } from '../lib/requestTopic
 import { routeRequest, type RoutableProvider } from '../lib/requestRouting'
 import { professions, professionBySlug } from '../lib/professionSeo'
 import {
-  LIVE_SERVICE_GROUPS, SERVICE_GROUPS, SERVICE_TOPICS,
+  LIVE_OFFER_GROUPS, OFFER_GROUPS, OFFER_TOPICS,
   TRADE_LANDING_MIN, resolveTrade, tradeTopicIds, countCovering,
 } from '../lib/serviceProfile'
 import { categoryPath } from '../lib/categoryRoutes'
@@ -87,11 +87,11 @@ test('A. every profession sells SERVICES; consulting is the offer, not the base'
 
 /* ═══════════ B. the two vocabularies touch, they do not merge ══════════ */
 
-test('B. topic professions name real professions, only on CONSULTATION / PROJECT topics', () => {
+test('B. topic professions name real professions, only on MEETING / PROJECT topics', () => {
   const known = new Set(ALL_PROFESSIONS.map(p => p.job))
   let mapped = 0
   for (const g of TOPIC_GROUPS) {
-    const cp = g.kinds.includes('CONSULTATION') || g.kinds.includes('PROJECT')
+    const cp = g.kinds.includes('MEETING') || g.kinds.includes('PROJECT')
     for (const t of g.topics) {
       const profs = t.professions ?? []
       if (!cp) {
@@ -103,7 +103,7 @@ test('B. topic professions name real professions, only on CONSULTATION / PROJECT
       if (profs.length) mapped++
     }
   }
-  assert.ok(mapped >= 15, `only ${mapped} CONSULTATION/PROJECT topics name a profession`)
+  assert.ok(mapped >= 15, `only ${mapped} MEETING/PROJECT topics name a profession`)
   // The obvious ones, by name.
   assert.deepEqual(professionsOfTopic('accounting'), ['ბუღალტერი'])
   assert.ok(professionsOfTopic('contract').includes('იურისტი'))
@@ -186,8 +186,20 @@ test('C5. the trades match still comes first, and a company member is never targ
 
 test('C6. the caller hands the professions over — the query selects them', () => {
   const jobs = read('lib/requestJobs.ts')
-  assert.match(jobs, /tutor:\s+\{\s+select:\s+\{\s+categoryId:\s+true,\s+professions:\s+true\s+\}\s+\}/, 'routableProviders no longer selects TutorProfile.professions')
-  assert.match(jobs, /professions: p\.user\.tutor\?\.professions \?\? \[\]/)
+  // ⚠️ THIS ASSERTION USED TO REQUIRE THE BUG (2026-08-26). It read
+  // `tutor: { select: { categoryId: true, professions: true } }` — the
+  // consultation profile, DROPPED with TutorProfile on 2026-08-24. So the
+  // query threw on every call, `routableProviders()` returned nothing to
+  // nobody, and this file went green BECAUSE the dead select was still there:
+  // a pin can hold a fix out as easily as it holds a regression back. The two
+  // columns live on ServiceProfile now, and the rest of this test — the pure
+  // routing above — is where the behaviour actually is.
+  assert.doesNotMatch(jobs, /\btutor:\s*\{/, 'routableProviders selects a relation that no longer exists — the query throws')
+  const svc = jobs.slice(jobs.indexOf('serviceProfile: {'), jobs.indexOf('prisma.companyMember'))
+  for (const field of ['categoryId: true', 'professions: true', 'services: true', 'areas: true', 'available: true']) {
+    assert.ok(svc.includes(field), `routableProviders no longer selects ServiceProfile.${field.split(':')[0]}`)
+  }
+  assert.match(jobs, /professions: svc\?\.professions \?\? \[\]/)
   assert.match(jobs, /routeRequest\(r\.categoryId,\s+providers,\s+\{\s+topic:\s+r\.topic,\s+city:\s+r\.city\s+\}\)/, 'the topic is no longer passed — the profession match needs it')
 })
 
@@ -200,7 +212,11 @@ test('D. /experts resolves a profession slug BEFORE an expert, and no expert can
   const render = page.slice(page.indexOf('export default async function'))
   for (const [name, src] of [['generateMetadata', meta], ['the page', render]] as const) {
     const prof = src.indexOf('professionBySlug[param]')
-    const expert = src.indexOf('resolveExpert(param)')
+    // ⚠️ IT WAS `resolveExpert` UNTIL 2026-08-24 — the consultation profile,
+    // third in the chain. The rule is the same one: a CODE-OWNED list resolves
+    // before any generated slug, because a profession page must not be
+    // shadowed by somebody's name.
+    const expert = src.indexOf('resolveMaster(param)')
     assert.ok(prof >= 0 && expert >= 0, `${name}: one of the two resolvers is missing`)
     assert.ok(prof < expert, `${name}: the expert is resolved before the profession — a DB row could shadow a code-owned page`)
   }
@@ -212,7 +228,7 @@ test('D. /experts resolves a profession slug BEFORE an expert, and no expert can
   // onto „iuristi" would shadow the landing exactly as an expert would.
   const gen = read('lib/slugSpace.ts')
   assert.match(gen, /\.\.\.professions\.map\(p => p\.slug\)/, 'lib/slugSpace no longer reserves the profession slugs')
-  for (const f of ['lib/expertSlug.ts', 'lib/masterSlug.ts']) {
+  for (const f of ['lib/masterSlug.ts']) {
     assert.match(read(f), /slugReserved|slugTaken/, `${f} no longer reads the shared reserved list`)
   }
   // The landing keeps its content and its structured data, at the new address.
@@ -240,7 +256,7 @@ test('D. /experts resolves a profession slug BEFORE an expert, and no expert can
 /* ═══════════ E. /experts/<slug>: the trade wins, and the ≥3 rule ══════ */
 
 test('E1. resolveTrade knows the live groups and their topics, and nothing else', () => {
-  for (const g of LIVE_SERVICE_GROUPS) {
+  for (const g of LIVE_OFFER_GROUPS) {
     const r = resolveTrade(g.id)
     assert.ok(r && r.group.id === g.id && r.topic === null)
     assert.deepEqual(tradeTopicIds(r!), g.topics.map(t => t.id))
@@ -251,10 +267,13 @@ test('E1. resolveTrade knows the live groups and their topics, and nothing else'
     }
   }
   // A group that is not open yet is not a landing — the URL falls through to the masters.
-  const dark = SERVICE_GROUPS.find(g => !LIVE_SERVICE_GROUPS.includes(g))
+  const dark = OFFER_GROUPS.find(g => !LIVE_OFFER_GROUPS.includes(g))
   if (dark) assert.equal(resolveTrade(dark.id), null)
   assert.equal(resolveTrade('giorgi-maisuradze'), null)
-  assert.equal(resolveTrade('accounting'), null, 'an EXPERT topic is not a trade')
+  // ⚠️ „an EXPERT topic is not a trade" WAS ASSERTED HERE UNTIL 2026-08-24, and
+  // it stopped being true on purpose: every live group is offerable, so a
+  // professional topic resolves to a landing exactly as a trade does. What must
+  // still NOT resolve is a person's slug.
 })
 
 test('E2. the ≥3 rule is three, counted once per master, and the page reads it', () => {
@@ -287,12 +306,12 @@ test('E2. the ≥3 rule is three, counted once per master, and the page reads it
     assert.ok(trade < master, `${name}: the provider profile is resolved before the trade`)
   }
   // At the bar → the catalogue's own query; below it → NO list query, the door.
-  assert.match(render, /count\s+>=\s+TRADE_LANDING_MIN\s*\?\s*await\s+queryMasters\(/)
+  assert.match(render, /count\s+>=\s+TRADE_LANDING_MIN\s*\?\s*await\s+queryProviders\(/)
   assert.match(render, /: null/)
   const part = read('app/experts/[slug]/_tradeLanding.tsx')
-  assert.match(part, /result: MastersResult \| null/)
+  assert.match(part, /result: ProvidersResult \| null/)
   assert.match(part, /\{result && \(/, 'the list is not gated on the result — an empty grid would render below the bar')
-  assert.match(part, /import\s+\{\s+MasterCard\s+\}\s+from\s+'@\/app\/experts\/_masterCard'/, 'the trade landing draws its own card instead of the catalogue’s')
+  assert.match(part, /import\s+\{\s+ProviderCard\s+\}\s+from\s+'@\/app\/experts\/_providerCard'/, 'the trade landing draws its own card instead of the catalogue’s')
   assert.match(part, /REQUEST_HREF/)
   assert.doesNotMatch(strip(part), /["'`]\/request/, 'the CTA address is written by hand instead of REQUEST_HREF')
   // The count itself is the same VISIBLE rule as the profile.
@@ -307,12 +326,12 @@ test('E2. the ≥3 rule is three, counted once per master, and the page reads it
   // BOTH slug generators reserve every trade id — the same safety as D, and
   // since stage 11 it is stated once, in the shared list they both read.
   const gen = read('lib/slugSpace.ts')
-  assert.match(gen, /\.\.\.SERVICE_GROUPS\.map\(g => g\.id\)/)
-  assert.match(gen, /\.\.\.SERVICE_TOPICS\.map\(t => t\.id\)/)
-  for (const f of ['lib/masterSlug.ts', 'lib/expertSlug.ts']) {
+  assert.match(gen, /\.\.\.OFFER_GROUPS\.map\(g => g\.id\)/)
+  assert.match(gen, /\.\.\.OFFER_TOPICS\.map\(t => t\.id\)/)
+  for (const f of ['lib/masterSlug.ts']) {
     assert.match(read(f), /from '\.\/slugSpace'/, `${f} no longer reads the shared reserved list`)
   }
-  for (const t of SERVICE_TOPICS) assert.match(t.id, /^[a-z0-9-]+$/)
+  for (const t of OFFER_TOPICS) assert.match(t.id, /^[a-z0-9-]+$/)
 })
 
 /* ═══════════ F. the redirects, executed ════════════════════════════════ */
@@ -381,8 +400,8 @@ test('G. nothing in app/, components/, lib/ links to /konsultacia or /categories
   for (const f of files) {
     const rel = relative(ROOT, f)
     // The middleware is the one place the old addresses may be spelled: it is
-    // where they are redirected. lib/expertSlug reserves them as segments.
-    if (rel === 'middleware.ts' || rel === 'lib/expertSlug.ts' || rel === 'lib/masterSlug.ts') continue
+    // where they are redirected. lib/slugSpace reserves them as segments.
+    if (rel === 'middleware.ts' || rel === 'lib/masterSlug.ts') continue
     codeOf(rel).split('\n').forEach((line, n) => {
       // A quoted address — a link target, not the word „categories" (the admin
       // API /api/admin/categories and /api/categories are not the page).

@@ -37,14 +37,14 @@ const VALUES = [
     title: 'გამჭვირვალე ფასი',
     // Honest posture — payments are not live yet, so escrow is framed as the
     // coming model (same „მალე" note as the home page), not a live fact.
-    body: 'ერთი ფასი, გადახდა დაჯავშნისას. დაცული გადახდები — მალე.',
+    body: 'ფასი შეთავაზებაშივე წერია — ფარული დანამატები არ არის. დაცული გადახდები — მალე.',
   },
   {
     icon: <Icon.clock className="w-5 h-5" />,
     titleKey: 'about.value3.title',
     bodyKey: 'about.value3.body',
     title: 'ღირებული დრო',
-    body: 'ფასი წინასწარ ცნობილია. სესია სტრუქტურული და შედეგზე ორიენტირებული.',
+    body: 'ფასი წინასწარ ცნობილია. სამუშაო კონკრეტულია და შედეგზე ორიენტირებული.',
   },
   {
     icon: <Icon.users className="w-5 h-5" />,
@@ -71,7 +71,7 @@ export default function AboutPage() {
       url: SITE_URL,
       logo: `${SITE_URL}/logo.png`,
       areaServed: { '@type': 'Country', name: 'Georgia' },
-      description: 'ქართული ექსპერტ-კონსულტაციის პლატფორმა — ონლაინ ვიდეოსესიები ხელით შერჩეულ სპეციალისტებთან.',
+      description: 'ქართული სერვისების პლატფორმა — აღწერე რა გჭირდება და მიიღე შეთავაზებები ხელით შერჩეული ექსპერტებისგან.',
       // `sameAs` is intentionally absent until real social profiles exist —
       // a guessed or empty array is a worse signal than none.
     },

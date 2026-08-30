@@ -13,8 +13,13 @@
 
 import { z } from 'zod'
 
-/** Statuses that mean "this session is still ahead of us". */
-export const LIVE_STATUSES = ['PREPARING', 'CONFIRMED', 'LIVE'] as const
+/** ⚠️ WAS „statuses that mean this session is still ahead of us" — PREPARING,
+ *  CONFIRMED, LIVE on a Booking (2026-08-24). There are no sessions; the
+ *  analogous fact, and the one that must block a delete for the same reason, is
+ *  an ACCEPTED offer that nobody has marked done: somebody is waiting on work
+ *  from this account, and anonymising it leaves them a job against „წაშლილი
+ *  მომხმარებელი" with no way to reach them. */
+export const LIVE_OFFER = { status: 'ACCEPTED', doneAt: null } as const
 
 /** The two Georgian strings a purged-in-place account is left wearing. */
 export const ANON_NAME = 'წაშლილი მომხმარებელი'
@@ -35,13 +40,13 @@ export const anonEmail = (userId: string) => `deleted-${userId}${ANON_EMAIL_DOMA
 export const isAnonymized = (email: string | null | undefined) =>
   !!email && email.endsWith(ANON_EMAIL_DOMAIN)
 
-/** Thrown from inside the delete transaction when a live booking appears
- *  between the pre-check and the deletes. Carried as a class so the route can
- *  tell it apart from a real database failure. */
-export class ActiveBookingsError extends Error {
+/** Thrown from inside the delete transaction when live work appears between
+ *  the pre-check and the deletes. Carried as a class so the route can tell it
+ *  apart from a real database failure. */
+export class ActiveWorkError extends Error {
   constructor(public readonly count: number) {
-    super('HAS_ACTIVE_BOOKINGS')
-    this.name = 'ActiveBookingsError'
+    super('HAS_ACTIVE_WORK')
+    this.name = 'ActiveWorkError'
   }
 }
 
@@ -54,45 +59,12 @@ export const DeleteBody = z.object({
 })
 export type DeleteMode = z.infer<typeof DeleteBody>['mode']
 
-/* Both halves of a user's footprint in one `where`. Booking, Review and
- * Enrollment all carry `studentId` + `tutorId`, so one shape serves all three.
- *
- * The `tutorId ? [...] : []` spread is load-bearing: Prisma reads `OR: []` as
- * "match nothing", so leaving an empty arm in for a client-only account would
- * silently scope every count and delete to zero rows — the account would
- * report "clean" no matter what it had. */
-export function asEitherParty(userId: string, tutorId: string | null) {
-  return { OR: [{ studentId: userId }, ...(tutorId ? [{ tutorId }] : [])] }
-}
-
-/* Which OTHER experts' cached `rating`/`reviewsCount` go stale when this
- * account's reviews disappear. The account's own profile is excluded — it is
- * being deleted in the same transaction. */
-export function staleRatingTargets(
-  reviews: { tutorId: string | null }[],
-  ownTutorId: string | null,
-): Set<string> {
-  // Job reviews (tutorId null) have no expert aggregate to refresh.
-  return new Set(reviews.map(r => r.tutorId).filter((t): t is string => !!t && t !== ownTutorId))
-}
-
-/* How much to subtract from each OTHER expert's `sessionsCount`.
- *
- * That column is INCREMENTED on completion and never recounted, and a disputed
- * session is deliberately never counted at all (app/api/admin/disputes/[id]).
- * So the honest inverse is "completed AND undisputed rows being removed" — a
- * full recount would quietly inflate every profile that has ever had a
- * dispute, which is the opposite of the bug we are fixing. */
-export function sessionCountDecrements(
-  bookings: { tutorId: string; status: string; dispute?: { id: string } | null }[],
-  ownTutorId: string | null,
-): Map<string, number> {
-  const out = new Map<string, number>()
-  for (const b of bookings) {
-    if (b.tutorId === ownTutorId) continue
-    if (b.status !== 'COMPLETED') continue
-    if (b.dispute) continue
-    out.set(b.tutorId, (out.get(b.tutorId) ?? 0) + 1)
-  }
-  return out
-}
+/* ⚠️ THREE HELPERS LEFT THIS FILE ON 2026-08-24 — `asEitherParty`,
+ * `staleRatingTargets` and `sessionCountDecrements`. All three existed because
+ * Booking, Review and Enrollment each carried a `studentId` AND a `tutorId`, so
+ * a person's footprint had two halves and two cached counters
+ * (`TutorProfile.rating`, `.sessionsCount`) had to be repaired by hand when
+ * rows on the other side disappeared. None of those tables or columns exists
+ * now: a review hangs on an offer, and the provider's rating is derived. What
+ * is left is one scope — the account itself.
+ */
