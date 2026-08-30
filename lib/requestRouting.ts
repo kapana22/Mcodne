@@ -1,51 +1,37 @@
 // WHO A REQUEST IS FOR — the routing rules, and the lifecycle clock.
 //
-// ⚠️ THIS IS NOT A MATCHING ALGORITHM, and the difference is deliberate. There
-// is no score, no ranking, no weighting and no learned relevance: a request
-// carries the sphere its topic maps onto (lib/requestTopics →
-// categorySlugOfTopic), an expert carries the sphere they are filed under, and
-// the two either agree or they do not. That is a FACT, and a fact can be
-// explained to the provider who asks „why did I get this".
+// ⚠️ NOT A MATCHING ALGORITHM, deliberately. No score, no ranking, no weighting,
+// no learned relevance. A request carries the sphere its topic maps onto, an
+// expert carries the sphere they are filed under, and the two either agree or
+// they do not. That is a FACT, and a fact can be explained to the provider who
+// asks „why did I get this". The stage-1 brief refused „ავტომატური დაკავშირება,
+// ალგორითმი, ქულები, რეიტინგი" and this still refuses all four.
 //
-// The stage-1 brief refused „ავტომატური დაკავშირება, ალგორითმი, ქულები,
-// რეიტინგი" — and this still refuses all four. What the owner asked for on
-// 2026-08-17 is the thing underneath them: stop mailing every request to
-// everybody. Sphere-agreement does that without inventing a ranking nobody can
-// audit.
-//
-// STAGE 8 (2026-08-19) ADDED THE SECOND FACT: the PROFESSION. A CONSULTATION /
-// PROJECT topic may name the professions that answer it (lib/requestTopics →
-// Topic.professions, job labels from lib/professions), and an expert lists the
-// professions they are (TutorProfile.professions). Those either intersect or
-// they do not — still a fact, still explainable: „you were mailed because you
-// are a ბუღალტერი and the request is a დღგ question". The two facts are UNIONED:
-// the sphere match keeps everybody it reached before, the profession match
-// adds the expert filed under another sphere who is nonetheless the person.
-// The shipped bug this closes: `categoryId` was the ONLY expert key, and a
-// topic with no sphere („ფოტოგრაფია", „გიდი", „საბაჟო") went to everyone.
+// THE SECOND FACT IS THE PROFESSION. A topic may name the professions that
+// answer it and an expert lists the professions they are; those intersect or
+// they do not. The two facts are UNIONED — the sphere match keeps everybody it
+// reached before, the profession match adds the expert filed under another
+// sphere who is nonetheless the person. It closes the bug where `categoryId`
+// was the only key and a topic with no sphere went to everyone.
 //
 // PURE — no prisma, no react, so the cron, the admin route and the tests share
 // one copy of every rule. The queries live at the call sites; the DECISIONS
-// live here. The one import is the topic vocabulary, itself pure.
+// live here.
 import { TOPIC_GROUPS, professionsOfTopic } from './requestTopics'
 import { LAUNCH_CATEGORIES } from './launchTaxonomy'
 import { sphereOfProfession } from './professions'
 
 /* ═══════════ who gets the email ═════════════════════════════════════════
  *
- * Two audiences, and the second one is the honest half:
+ *   TARGETED   the request maps onto a sphere somebody is filed under, or its
+ *              topic names a profession somebody claims, or a master lists the
+ *              topic and the city. Everybody else still SEES it in the queue —
+ *              the mail is a nudge, never a permission.
  *
- *   TARGETED   the request maps onto a sphere and somebody is filed under it,
- *              OR its topic names a profession somebody claims (stage 8) —
- *              or, on the trades side, a master lists the topic and the city.
- *              They are mailed. Everybody else still SEES the request in the
- *              queue — the mail is a nudge, never a permission.
- *
- *   EVERYONE   the request maps onto no sphere (most learning topics: this
- *              platform has no „ქიმია" sphere), or it maps onto one nobody is
- *              filed under. Then we genuinely do not know who fits, and a
- *              request nobody is told about is a request that dies. Silence
- *              would be us pretending to a precision we do not have.
+ *   EVERYONE   it maps onto no sphere (most learning topics), or onto one
+ *              nobody is filed under. We genuinely do not know who fits, and a
+ *              request nobody is told about dies. Silence would be pretending
+ *              to a precision we do not have.
  */
 type RoutingAudience = 'TARGETED' | 'EVERYONE'
 
@@ -60,18 +46,12 @@ export type RoutableProvider = {
    *  facts and only one of them is a gap. */
   isCompanyMember?: boolean
 
-  /** ⚠️ WHAT THIS PROVIDER ACTUALLY DOES, AND WHERE (2026-08-18). A trades
-   *  request carries no `categoryId` — the sphere table is the EXPERT
-   *  taxonomy and no service topic maps into it — so `routeRequest` fell
-   *  straight through to „EVERYONE" for every single one. Measured: a Tbilisi
-   *  flat-cleaning request was mailed to all six allowlisted providers,
-   *  including the Batumi electrician and the appliance repairman.
-   *
-   *  Harmless at five masters and fatal at fifty: lib/requestJobs opens by
-   *  saying the file exists so this platform is not the lead-mill whose
-   *  providers drown in work they cannot do, and the trades path was exactly
-   *  that. Empty arrays mean „this provider has no service profile", which is
-   *  every expert, and they are matched the old way. */
+  /** ⚠️ WHAT THIS PROVIDER DOES, AND WHERE. A trades request carries no
+   *  `categoryId` — the sphere table is the EXPERT taxonomy — so `routeRequest`
+   *  fell through to „EVERYONE" for every one. Measured: a Tbilisi flat-cleaning
+   *  request was mailed to all six providers, the Batumi electrician included.
+   *  Harmless at five masters, fatal at fifty. Empty arrays mean „no service
+   *  profile", which is every expert, and they match the old way. */
   services?: string[]
   areas?: string[]
 
@@ -93,12 +73,11 @@ type RoutingResult = {
 /**
  * Who to mail about this request.
  *
- * ⚠️ THE FALLBACK IS THE POINT. A targeted list that comes back empty must
- * NEVER mean „mail nobody": the first thing this platform will learn from the
- * requests table is demand it has no experts for, and a chemistry request that
- * silently reached zero inboxes teaches us nothing and helps nobody. Empty
- * target → everybody, and the audience name records which happened so the
- * admin panel can say so.
+ * ⚠️ THE FALLBACK IS THE POINT. An empty targeted list must NEVER mean „mail
+ * nobody": the first thing this platform learns from the requests table is
+ * demand it has no experts for, and a chemistry request that reached zero
+ * inboxes teaches nothing. Empty target → everybody, and the audience name
+ * records which happened.
  */
 export function routeRequest(
   categoryId: string | null,
@@ -149,54 +128,37 @@ export function routeRequest(
 
 /* ═══════════ what a provider SEES — the queue, not the mail ═════════════
  *
- * ⚠️ THE QUEUE AND THE MAIL ARE THE SAME TWO FACTS AND THE OPPOSITE FALLBACK,
- * and holding both ideas at once is the whole of this section.
+ * THE FACTS ARE SHARED. `queueScope` narrows by the same three agreements
+ * `routeRequest` targets on — the trade a master ticked plus their cities, the
+ * SPHERE an expert is filed under, the PROFESSION they claim — and invents no
+ * fourth. Every row is answerable with a sentence the provider could have
+ * predicted.
  *
- * THE FACTS ARE SHARED. `routeRequest` above decides who is TARGETED from
- * exactly three agreements — the trade a master ticked (a topic id, plus the
- * cities they travel to), the SPHERE an expert is filed under, and the
- * PROFESSION they claim. `queueScope` narrows the queue by the same three and
- * invents no fourth. There is still no score, no ranking and no learned
- * relevance: every row a provider sees can be answered with a sentence they
- * could have predicted — „you list ბინის დალაგება in თბილისი", „your profile
- * is filed under ფსიქოლოგია", „you are a ბუღალტერი and this is a დღგ
- * question".
+ * ⚠️ THE FALLBACK IS DELIBERATELY NOT SHARED. `routeRequest` ends in EVERYONE
+ * because a request nobody is TOLD about dies. The queue fails the other way:
+ * it is a screen walked to on purpose, and „everything on the platform" there
+ * is the lead-mill noise lib/requestJobs opens by refusing. Measured 2026-08-21:
+ * of 12 open requests, an expert holding only CONSULT saw all 12, ქიმია
+ * included, because `routingWhere` returned „no narrowing" for anybody with no
+ * ServiceProfile.
  *
- * THE FALLBACK IS DELIBERATELY NOT SHARED, and that is not an inconsistency.
- * `routeRequest` ends in EVERYONE because a request nobody is TOLD about is a
- * request that dies — silence in an inbox loses the demand signal this table
- * exists to collect. The queue fails the other way: it is a screen a provider
- * walks to on purpose, and „everything on the platform" there is the lead-mill
- * noise lib/requestJobs opens by refusing. Measured on production 2026-08-21:
- * of 12 open requests with room left, an expert holding only CONSULT — and an
- * admin, and a company member — saw all 12, ქიმია and მათემატიკა included,
- * because `routingWhere` returned „no narrowing" for anybody with no
- * ServiceProfile. Owner: „რეალურად უსარგებლო მოთხოვნები არ უნდა შედიოდეს — თუ
- * ქიმიის მასწავლებელს ეძებენ, არ უნდა მიუვიდეს დამლაგებელს."
- *
- * ⚠️ AND NOTHING BECOMES UNREACHABLE BY NARROWING THE QUEUE. The EVERYONE mail
- * still goes out, and it links straight to the request's own DETAIL page, which
- * carries the allowlist gate and no narrowing at all. So a request that
- * matches nobody's ticks is still delivered, still openable, still biddable;
- * what changed is that it stopped sitting in twelve people's queues pretending
+ * ⚠️ NOTHING BECOMES UNREACHABLE. The EVERYONE mail still goes out and links to
+ * the request's DETAIL page, which carries the gate and no narrowing — still
+ * openable, still biddable. It just stopped sitting in twelve queues pretending
  * to be their work.
  */
 
 /** Every LEARNING topic id, from the groups that declare the kind.
  *
  *  ⚠️ WHY THE KIND AND NOT THE SPHERE, FOR TEACHING ONLY. The sphere table is
- *  the EXPERT taxonomy and requestTopics' header measures the consequence: 16
- *  professional spheres, 91 professions, and not one school subject. So no
- *  amount of sphere-agreement can ever reach „ქიმია" — the fact does not exist
- *  to be compared. What DOES exist is the owner's own launch list
- *  (lib/launchTaxonomy), which files სწავლება under `side: 'LEARN'`: that
- *  sphere IS the fact „this person teaches", and the kind a teacher answers is
- *  LEARNING. Coarser than a topic match, and coarse is the honest grain when
- *  the vocabulary holds nothing finer — a maths tutor seeing a chemistry
- *  request is a near miss they can explain; a cleaner seeing it is the bug.
- *  The day lib/professions grows „ქიმიის მასწავლებელი" and a topic names it,
- *  the profession fact below narrows this automatically and nothing here has
- *  to change. */
+ *  the EXPERT taxonomy: 16 professional spheres, 91 professions, and not one
+ *  school subject — so no amount of sphere-agreement can reach „ქიმია"; the
+ *  fact does not exist to be compared. The owner's launch list files სწავლება
+ *  under `side: 'LEARN'`, and THAT sphere is the fact „this person teaches".
+ *  Coarse, and coarse is honest when the vocabulary holds nothing finer: a
+ *  maths tutor seeing a chemistry request is a near miss they can explain, a
+ *  cleaner seeing it is the bug. The day a profession names it, the profession
+ *  fact narrows this automatically. */
 const LEARNING_TOPIC_IDS: readonly string[] =
   TOPIC_GROUPS.filter(g => g.kinds.includes('LEARNING')).flatMap(g => g.topics.map(t => t.id))
 

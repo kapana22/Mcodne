@@ -1,41 +1,22 @@
 // THE PROVIDER'S BALANCE — what earns it, what spends it, and what it may be
 // called on a screen.
 //
-// ⚠️ WHY IT IS DENOMINATED IN LARI (2026-08-20). Owner: „ეს რეალურად 100₾
-// ტოლფასი მივცეთ, ვთქვათ, რომ ფულად პრიზად წარმოვადგინოთ — და არა რაღაც
-// უაზრო ტოკენები." A token is an abstraction the provider has to learn before
-// it can motivate them; „100₾" is a number they already understand, and the
-// whole point of the grant is to be worth completing a profile for.
-//
-// ⚠️ AND WHY THAT IS SAFE WHILE `PAYMENTS_LIVE` IS FALSE. Denominating in lari
-// is not the same as owing lari. This balance buys exactly ONE thing — sending
-// an offer — and it cannot be withdrawn, transferred or refunded. Nothing here
-// is a purchase, a payment or a liability; it is a discount on a service we
-// have not started charging for. The wording rules below are what keep that
-// true, and they are not decoration: call it „ანაზღაურება" or „შენი ფული" once
-// and it becomes a promise somebody can hold us to.
+// ⚠️ DENOMINATED IN LARI, AND THAT IS SAFE WHILE `PAYMENTS_LIVE` IS FALSE.
+// „100₾" motivates in a way a token cannot, but denominating in lari is not
+// owing lari: this balance buys exactly ONE thing — opening a client's contact
+// — and cannot be withdrawn, transferred or refunded. The wording rules are
+// what keep that true. Call it „ანაზღაურება" once and it becomes a promise
+// somebody can hold us to.
 //
 //   SAY:        „ბალანსი", „100₾ საჩუქრად", „შეთავაზების ღირებულება 5₾"
 //   NEVER SAY:  „ანაზღაურება", „შენი ფული", „გამომუშავებული", „გატანა",
 //               „დაბრუნება", „ქეშბექი"
 //
-// ⚠️ THE LEDGER IS THE TRUTH. `prisma.creditEntry` holds one row per movement
-// and the balance is their sum — see the model's own note for why there is no
-// counter to edit. Everything below is PURE so the arithmetic can be tested
-// without a database; the writes live in lib/creditsServer.ts.
+// ⚠️ THE LEDGER IS THE TRUTH — one `creditEntry` row per movement, the balance
+// is their sum, there is no counter to edit. Everything here is PURE so the
+// arithmetic can be tested without a database; the writes are in creditsServer.
 //
-// ═══════════ THE LOOP (2026-08-21) ═══════════════════════════════════════
-//
-// Owner: „ბალანსის სისტემა შემსრულებლის მხარეს გამოყენებაში უნდა იყოს და
-// ლიდები გახსნას — კარგი ლოგიკით და სწორი გადაწყვეტილებებით."
-//
-// Until today the accounting was real and nothing used it. The grant paid, an
-// offer charged, and `CREDITS_ENFORCED` was false — so a zero or negative
-// balance stopped nobody, and there was no way to obtain more balance than the
-// one-off 100₾ of profile tasks. A currency with one deposit and no withdrawal
-// pressure is a scoreboard, not a loop.
-//
-// Three movements, and the middle one is the product:
+// THE LOOP — three movements, and the middle one is the product:
 //
 //   +100₾  the profile tasks              one-off, per key, idempotent
 //    −1₾   opening a client's CONTACT     once per request, for ever
@@ -44,51 +25,10 @@
 // Reading a request is FREE. Sending an offer is FREE. The only thing a balance
 // buys is the client's name and number, and it buys them once.
 //
-// ═══════════ ⚠️ THIS REVERSED AN EARLIER DECISION, AND THE HISTORY MATTERS ══
-//
-// What stood here until 2026-08-21 was the opposite rule, stated as the one
-// structural decision in the feature:
-//
-//   „SPENT ON SENDING AN OFFER, NEVER ON SEEING A REQUEST. Charging to VIEW a
-//    lead is the model most of this industry uses and the one it is most hated
-//    for: the provider pays before knowing whether anybody will answer. On our
-//    own numbers that would be indefensible — 32 requests have produced 4
-//    offers, so a provider paying to look would pay for silence most of the
-//    time. Charging to RESPOND inverts it."
-//
-// ⚠️ THE OWNER DECIDED OTHERWISE ON 2026-08-21, and the objection above was put
-// to them before they did. It is kept here rather than deleted because it is
-// still TRUE, and because it is what shaped the answer:
-//
-//   · The request itself is still free to read. Nobody pays to look at a job —
-//     the description, the budget, the deadline and the city arrive at no cost,
-//     which is exactly what „never on seeing a request" was protecting. What is
-//     paid for is the CONTACT, and a phone number is not a look at a lead: it
-//     is the lead.
-//   · The price fell from 5₾ to 1₾, and that is the objection's direct answer.
-//     If most leads go quiet, the amount a provider risks on one has to be
-//     small enough that silence costs them almost nothing. 1₾ is a fifth of
-//     what an unanswered offer used to cost them.
-//   · It is paid ONCE per request, for ever. Re-opening the same number
-//     tomorrow, or from a second tab, is free. Charging twice for the same
-//     phone number is theft.
-//
-// ⚠️ AND 1₾ IS PROVISIONAL — owner: „ჯერ". It is one named constant
-// (CONTACT_COST_TETRI) precisely so the number can move without the shape of
-// anything moving with it.
-//
-// WHY THIS IS THE ACT THAT CARRIES A PRICE. lib/requests → clientIdentityOpen
-// had already written the reason down, before there was anything to charge:
-// „the contact IS the lead. Handing it over automatically the moment a client
-// chooses means the platform gives away, for free, the only thing it has to
-// sell. Whatever it eventually costs, it has to be opened by a deliberate act
-// that can carry a price — never printed on arrival." This is that act.
-//
-// ⚠️ AND THE CONTACT OPENS BEFORE THE OFFER, NOT AFTER IT. The provider reads
-// the job, decides it is worth a call, pays 1₾, and then may phone, or bid, or
-// do nothing. That ordering is the owner's, and it is what makes the 1₾ buy
-// something: a contact released only after the client already chose you would
-// be charging for a door that is already open.
+// ⚠️ THE CONTACT OPENS BEFORE THE OFFER, NOT AFTER. The provider reads the job,
+// decides it is worth a call, pays, and may then phone, bid, or do nothing. A
+// contact released only after the client already chose you would be charging
+// for a door that is already open.
 
 /** Money is integers. 100₾ = 10 000 თეთრი. */
 export const TETRI = 100
@@ -102,20 +42,14 @@ export function gelLabel(tetri: number): string {
 
 /* ═══════════ what earns it ══════════════════════════════════════════════
  *
- * ⚠️ THE TASKS ARE THE PROFILE THE MARKETPLACE ACTUALLY NEEDS, and the amounts
- * say which parts matter. Measured 2026-08-20 across the 26 expert profiles:
+ * ⚠️ THE AMOUNTS SAY WHICH PARTS MATTER. Measured 2026-08-20 across 26 expert
+ * profiles: photo 24/26, bio 23/26 — already done, worth little. Professions
+ * 3/26, certificate 4/26, video 0/26.
  *
- *     ფოტო        24/26      already done — worth little
- *     ბიო 80+     23/26      already done
- *     პროფესია     3/26  ⚠️  and routeRequest MATCHES ON IT
- *     სერტიფიკატი  4/26  ⚠️
- *     ვიდეო        0/26
- *
- * `professions` is the field that decides who a request is shown to, and
- * twenty-three profiles have none — so twenty-three people are invisible to
- * the routing for want of one answer. It is therefore the single biggest grant
- * here. This is the whole reason the bonus is worth building: it pays for the
- * thing the product needs and the provider has no other reason to do.
+ * `professions` is what routeRequest MATCHES ON, and twenty-three profiles have
+ * none — twenty-three people invisible to the routing for want of one answer.
+ * Hence the biggest grant here: it pays for the thing the product needs and the
+ * provider has no other reason to do.
  */
 export const CREDIT_TASKS = [
   {
@@ -163,25 +97,9 @@ export const CREDIT_TASKS = [
   },
 ] as const
 
-/* ⚠️ AND THE SECOND WORDINGS ARE GONE (2026-08-29). Each task carried a `work:`
- * pair beside its own label, and `creditTasks()` — the only reader of this list
- * — returns `t.label` and `t.why`, never `t.work`. Six unread strings that read
- * as a live alternative. The one that was still worth saying was
- * PROFILE_CERTIFICATE's, and it is that task's label now.
- *
- * ⚠️ SIX KEYS, ONE VOCABULARY AGAIN (2026-08-24).
- *
- * Between 2026-08-20 and that day each task carried TWO wordings, chosen by
- * capability: „ატვირთე სერტიფიკატი" for an expert and „ატვირთე ნამუშევრის ფოტო"
- * for a trades provider, because three of the six keys named fields a
- * `ServiceProfile` did not have — so a services-only provider could earn 50₾ of
- * a grant the landing calls 100₾.
- *
- * One profile now has all of those fields, so there is one list again. What did
- * NOT change is the rule underneath it: a key is earned by EITHER of two facts
- * (lib/creditsServer → profileFacts), and the pairs stay disjoint so one tick
- * can never pay twice — `services[]` earns PROFESSIONS, a PRICE on one of them
- * earns SERVICE.
+/* ⚠️ A KEY IS EARNED BY EITHER OF TWO FACTS (lib/creditsServer → profileFacts),
+ * and the pairs stay disjoint so one tick can never pay twice: `services[]`
+ * earns PROFESSIONS, a PRICE on one of them earns SERVICE.
  */
 
 /** The task list. Copy only — the ledger, the unique index and
@@ -193,13 +111,8 @@ export function creditTasks(): { key: CreditTaskKey; tetri: number; label: strin
 /**
  * WHERE A TASK IS ANSWERED — the editor that owns that field.
  *
- * Two pages, two questions, and every task belongs to exactly one of them:
- *
- *   /work/services  — what I SELL: the services, the price on them, and the
- *                     cities I travel to.
- *   /work/profile   — who I AM: the photo, the sentence, the professions, the
- *                     years, and the proof (a certificate, or a photo of
- *                     finished work).
+ *   /work/services  — what I SELL: the services, their price, the cities.
+ *   /work/profile   — who I AM: photo, sentence, professions, years, proof.
  */
 export function taskHref(key: CreditTaskKey): string {
   const SERVICES = '/work/services'
@@ -220,24 +133,17 @@ export const CREDIT_TASKS_TOTAL = CREDIT_TASKS.reduce((n, t) => n + t.tetri, 0)
 /* ═══════════ what spends it ════════════════════════════════════════════ */
 
 /**
- * ⚠️ ONE CLIENT'S CONTACT, ONE LARI — AND „ჯერ" IS PART OF THE DECISION.
+ * ⚠️ ONE CLIENT'S CONTACT, ONE LARI — and „ჯერ" is part of the decision, so it
+ * is a single named constant every screen, refusal and test reads from.
  *
- * Owner, 2026-08-21: the balance opens the client's contact, and one contact
- * costs 1₾ „ჯერ" — for now. So this is a single named constant and every
- * screen, every refusal and every test reads it from here; moving it is one
- * line and nothing about the mechanism moves with it.
+ * WHY SO SMALL. Most leads go quiet, so what a provider risks on one has to be
+ * small enough that silence costs almost nothing. It also has to be a number
+ * nobody stops to weigh — the point of charging for the contact is that the
+ * provider decides „is this worth a phone call", and a price worth thinking
+ * about puts a second decision in front of the first.
  *
- * WHY SO SMALL. The header records the objection this price is the answer to:
- * on our own numbers most leads go quiet, so the amount a provider risks on one
- * has to be small enough that silence costs them almost nothing. It also has to
- * be a number a person does not stop to think about — the whole point of moving
- * the charge to the contact is that the provider decides „is this job worth a
- * phone call", and a price they have to weigh would put a second decision in
- * front of the first.
- *
- * ⚠️ AND IT IS PAID ONCE PER REQUEST, FOR EVER — see `contactKey`. That is not
- * a courtesy; charging twice for the same phone number is theft, and it is the
- * kind that happens by accident, from a read-then-write under two tabs.
+ * ⚠️ PAID ONCE PER REQUEST, FOR EVER — see `contactKey`. Charging twice for the
+ * same phone number is theft, and it is the kind that happens by accident.
  */
 export const CONTACT_COST_TETRI = 1 * TETRI
 
@@ -249,35 +155,31 @@ export function contactsAffordable(balanceTetri: number): number {
 }
 
 /**
- * ⚠️ THE IDEMPOTENCY KEY FOR ONE UNLOCK, and it is the whole of „paid once".
+ * ⚠️ THE IDEMPOTENCY KEY FOR ONE UNLOCK — the whole of „paid once".
  *
- * `CreditEntry` carries the unique index `(userId, grantKey)`, so this string
- * IS the guarantee: the second insert is refused by the database, whatever
- * calls it and however often. A `findFirst` followed by a `create` is how a
- * provider gets billed twice for a number they already hold, and it takes two
- * tabs and no bad luck at all.
+ * `CreditEntry` carries `@@unique(userId, grantKey)`, so this string IS the
+ * guarantee: the second insert is refused by the database. A `findFirst` then
+ * `create` is how a provider gets billed twice for a number they already hold,
+ * and it takes two tabs and no bad luck at all.
  *
- * ⚠️ IT IS ALSO THE COUNTER. „How many providers opened this request's
- * contact" is `count(CreditEntry where grantKey = contactKey(requestId))` —
- * one key, read two ways — which is why the prefix is per REQUEST and the row
- * is per USER. See CONTACT_LIMIT_REASON for what that count is used for.
+ * ⚠️ IT IS ALSO THE COUNTER: „how many providers opened this request's contact"
+ * is `count(CreditEntry where grantKey = contactKey(requestId))` — which is why
+ * the prefix is per REQUEST and the row is per USER.
  *
- * Prefixed so it can never collide with a `CreditTaskKey` (a bare `PROFILE_*`)
- * or with `jobDoneKey`; a collision would make one of the two silently
- * unpayable, which reads as the feature being broken rather than as a bug.
+ * Prefixed so it can never collide with a `CreditTaskKey` or `jobDoneKey`; a
+ * collision would make one of them silently unpayable.
  */
 export function contactKey(requestId: string): string {
   return `CONTACT:${requestId}`
 }
 
 /**
- * ⚠️ ONE REFUND PER PROVIDER PER REQUEST, AND THE INDEX IS THE GUARANTEE.
- * `@@unique([userId, grantKey])` means a second attempt writes nothing, so the
- * sweep may run this every fifteen minutes for ever and the ledger is right.
+ * ⚠️ ONE REFUND PER PROVIDER PER REQUEST — `@@unique([userId, grantKey])` is
+ * the guarantee, so the sweep may run every fifteen minutes for ever.
  *
- * It is deliberately a DIFFERENT key from `contactKey`: that one is shared by
- * every provider on the request (the `offerLimit` cap counts it), so reusing it
- * would make one refund look like somebody else's purchase.
+ * Deliberately a DIFFERENT key from `contactKey`: that one is shared by every
+ * provider on the request (the `offerLimit` cap counts it), so reusing it would
+ * make one refund look like somebody else's purchase.
  */
 export function contactRefundKey(requestId: string): string {
   return `CONTACT_REFUND:${requestId}`
@@ -286,32 +188,17 @@ export function contactRefundKey(requestId: string): string {
 /* ═══════════ what gives it back ═════════════════════════════════════════ */
 
 /**
- * ⚠️ WHAT A FINISHED JOB PAYS. 25₾ — AND THE NUMBER IS UNDER REVIEW.
+ * ⚠️ 25₾ IS UNDER REVIEW, AND NOT CHANGED HERE. It was derived when answering
+ * cost 5₾ — one finished job bought five more attempts. At 1₾ a contact it buys
+ * twenty-five, and a number a fortnight's work makes irrelevant stops informing
+ * the decision it exists for. The shape that was right still is: ONE FINISHED
+ * JOB BUYS FIVE MORE LEADS, i.e. 5₾. The amounts are the owner's to set, and a
+ * re-price arriving as a silent diff is how „100₾ საჩუქრად" stops being true.
  *
- * It was derived against the OLD model, where answering cost 5₾: a request has
- * `offerLimit` = 3 places, so a request that ended in a finished job took at
- * most 15₾ out of the supply side, and 25₾ put back more than the competition
- * for it removed. In the unit a provider read it, that was „5 შეთავაზება" — one
- * finished job buys five more attempts.
- *
- * ⚠️ THE PRICE UNDERNEATH IT MOVED AND THIS DID NOT (2026-08-21). At 1₾ a
- * contact, 25₾ is TWENTY-FIVE leads for one finished job, and a provider who
- * completes four jobs is back at the full starting grant. A price that a
- * fortnight's work makes irrelevant stops informing any decision, which is the
- * one thing this number exists to do.
- *
- * The shape that was right before is still right: ONE FINISHED JOB BUYS FIVE
- * MORE LEADS. At the new price that is 5₾, and 5₾ is what this file recommends.
- * It is deliberately NOT changed here — the task amounts and this number are the
- * owner's to set, and a re-price that arrives as a silent diff is how „100₾
- * საჩუქრად" quietly stops being true.
- *
- * ⚠️ IT IS PAID ON `doneAt`, WHICH EITHER SIDE MAY STAMP — and that is not a
- * hole. Reaching a stamp at all requires the CLIENT to have accepted the offer
- * first (lib/offerLifecycle → markDoneWhere claims `status: 'ACCEPTED'`), and a
- * provider cannot accept their own. Paying on the stamp also pays for pressing
- * the button, which is the thing the product wants pressed: it is what opens
- * the review, and 21 days of nobody pressing it is what closes a job silently.
+ * ⚠️ PAID ON `doneAt`, WHICH EITHER SIDE MAY STAMP — not a hole. Reaching the
+ * stamp requires the CLIENT to have accepted the offer first (markDoneWhere
+ * claims `status: 'ACCEPTED'`) and nobody accepts their own. Paying on the
+ * stamp also pays for pressing the button, which is what opens the review.
  */
 export const JOB_DONE_TETRI = 25 * TETRI
 
@@ -362,18 +249,10 @@ export function contactPlacesLeft(r: { contactCount: number; offerLimit: number 
 /* ═══════════ what an admin can move by hand ═════════════════════════════ */
 
 /**
- * ⚠️ THE REASON LIVES ON THE ROW, IN `reason` — there is no note column and
- * this is deliberately not a migration (2026-08-21).
- *
- * `CreditEntry.reason` is free text by its own schema note („stored as text so
- * adding one is an edit to an array and never a migration"), and a hand
- * movement's reason is the one thing that cannot be reconstructed later: the
- * balance says what it became, and only this string says why somebody typed it.
- * A separate `note` column would be a schema change for one field that exactly
- * one route ever writes.
- *
- * The prefix is what keeps it machine-readable — an audit or an export can tell
- * a hand movement from an earned one without a second column.
+ * ⚠️ THE REASON LIVES ON THE ROW, IN `reason` — no note column, deliberately.
+ * A hand movement's reason is the one thing that cannot be reconstructed: the
+ * balance says what it became, only this string says why somebody typed it. The
+ * prefix is what lets an audit tell a hand movement from an earned one.
  */
 export const ADMIN_ADJUST = 'ADMIN_ADJUST'
 export function adminAdjustReason(note: string): string {
@@ -388,41 +267,23 @@ export function isAdminAdjust(reason: string): boolean {
 /* ═══════════ what blocks ════════════════════════════════════════════════ */
 
 /**
- * ⚠️ A BALANCE BELOW 1₾ NOW REFUSES TO OPEN A CONTACT, AND THIS FLAG IS THE
- * WHOLE OF IT.
+ * ⚠️ A BALANCE BELOW 1₾ REFUSES TO OPEN A CONTACT, AND THIS FLAG IS ALL OF IT.
  *
- * It shipped `false` — owner: „დასაწყისში უფასო იქნება" — and stayed false
- * because enforcement without replenishment is a trap: a provider who spends
- * the grant has no route back, and there was none. Enforcement and replenishment
- * were never two decisions.
- *
- * `true` SINCE 2026-08-21, because the routes back now exist. Owner: „ბალანსის
- * სისტემა შემსრულებლის მხარეს გამოყენებაში უნდა იყოს და ლიდები გახსნას." A
- * balance that refuses nothing opens nothing.
+ * It shipped `false`, because enforcement without replenishment is a trap: a
+ * provider who spends the grant needs a route back. The routes exist now.
  *
  *   what it gates   ONE act: opening a client's contact. Reading a request and
- *                   sending an offer are free, so a provider at zero can still
- *                   see every job and still answer one — they simply cannot
- *                   have the phone number. Nothing about the marketplace's own
- *                   scarce resource (answers) is rationed by this line.
+ *                   sending an offer stay free, so a provider at zero still
+ *                   sees every job and can still answer — they cannot have the
+ *                   phone number. The scarce resource (answers) is not rationed.
  *   the way back    a finished job pays 25₾; an admin can move any balance by
- *                   hand with a reason on the row (POST
- *                   /api/admin/users/[id]/credits) — no deploy.
- *   who it blocks   measured 2026-08-21 across all 29 sellers: NOBODY. The
- *                   lowest balance is 10₾ — a hundred contacts at today's
- *                   price — and the median is 60₾.
+ *                   hand with a reason (POST /api/admin/users/[id]/credits).
+ *   who it blocks   measured 2026-08-21 across all 29 sellers: NOBODY. Lowest
+ *                   balance 10₾ — a hundred contacts — median 60₾.
  *
- * ⚠️ THE ARGUMENT FOR TURNING IT ON GOT STRONGER WHEN THE MODEL CHANGED. While
- * the charge sat on SENDING AN OFFER, enforcement meant a provider could be
- * stopped from answering a job — pointed the wrong way on a marketplace whose
- * measured problem is that 28 of 32 requests got no offer at all. It no longer
- * can: the offer is free and only the phone number is gated.
- *
- * ⚠️ FLIP IT BACK TO `false` IF providers start reading jobs and not calling
- * because of the price. The signal to watch is an unlock refused for want of
- * balance on a request that then received no offer. One line, both directions,
- * nothing else to undo. Same contract as the switches in lib/flags: read it
- * here, never re-spell it.
+ * ⚠️ FLIP BACK TO `false` IF providers read jobs and do not call because of the
+ * price. The signal is an unlock refused for want of balance on a request that
+ * then received no offer.
  */
 export const CREDITS_ENFORCED = true
 
@@ -435,32 +296,26 @@ export function canAffordContact(balanceTetri: number): boolean {
 /* ═══════════ what the provider is told ══════════════════════════════════ */
 
 /**
- * ⚠️ THE PRICE IS SPELLED ONCE, HERE, AND NEVER ON A SCREEN (2026-08-21). A
- * hard-coded „1₾" in a component is how a re-price and a copy change stop
- * agreeing — and „ჯერ" says out loud that this number is going to move.
- *
- * Kept to the facts and nothing else: no benefit, no reassurance, no marketing.
- * The wording rules at the top of this file apply to every string below — this
- * is „ბალანსი", never „ანაზღაურება", „შენი ფული" or „გატანა".
+ * ⚠️ THE PRICE IS SPELLED ONCE, HERE, NEVER ON A SCREEN. A hard-coded „1₾" in a
+ * component is how a re-price and a copy change stop agreeing. Facts only — no
+ * benefit, no reassurance; the wording rules at the top apply to every string
+ * below.
  */
 export const CONTACT_COST_NOTE = `კლიენტის კონტაქტი — ${CONTACT_COST_TETRI / TETRI}₾ ბალანსიდან. ერთხელ იხდი, მერე ყოველთვის გიჩანს.`
 
 /**
- * ⚠️ THE HALF THAT MAKES THE PRICE FAIR, AND IT IS SAID BEFORE THE CLICK.
+ * ⚠️ THE HALF THAT MAKES THE PRICE FAIR, SAID BEFORE THE CLICK.
  *
- * Researched 2026-08-30: the defining complaint against the lead-mills is a
- * provider paying for a contact, answering at once, and the client never
- * speaking again — with the money kept. mcodne gives it back automatically
- * (lib/creditsServer → refundDeadContacts, fired by the sweep and by the
- * admin's close/reject), and this is the sentence that says so at the moment
- * money is about to leave. A refund nobody knows about before paying changes
- * no decision; it is a rebate discovered later, not a term of the sale.
+ * The defining complaint against lead-mills (researched 2026-08-30) is paying
+ * for a contact, answering at once, and the client never speaking again — money
+ * kept. mcodne refunds it automatically (refundDeadContacts). A refund nobody
+ * knows about before paying changes no decision; it is a rebate discovered
+ * later, not a term of the sale.
  *
- * ⚠️ NO DEADLINE IN THE COPY, ON PURPOSE. „14 დღეში" would be a second place
- * `STALE_OPEN_DAYS` is written down, and the day this file and requestRouting
- * disagree is the day the promise becomes a lie. The condition is stated in
- * the terms it is actually enforced in: the request closes with nobody having
- * answered.
+ * ⚠️ NO DEADLINE IN THE COPY. „14 დღეში" would be a second place
+ * `STALE_OPEN_DAYS` is written down, and the day the two disagree the promise
+ * becomes a lie. The condition is stated as it is enforced: the request closed
+ * with nobody having answered.
  */
 export const CONTACT_REFUND_NOTE = `თუ კლიენტს არავინ გამოეხმაურა და მოთხოვნა დაიხურა — ${CONTACT_COST_TETRI / TETRI}₾ ავტომატურად ბრუნდება ბალანსზე.`
 
@@ -484,14 +339,11 @@ export const NO_BALANCE_NOTE = `ბალანსი არ არის სა
 
 /** What they are told when the client has already been reached by as many
  *  providers as they asked for. A function, because the ceiling is the
- *  request's own `offerLimit` and it is 1 on an addressed request.
+ *  request's own `offerLimit`, which is 1 on an addressed request.
  *
- *  ⚠️ THE SENTENCE IS ABOUT THE CLIENT, NOT ABOUT THE OTHERS (2026-08-21). It
- *  first read „…უკვე N შემსრულებელთანაა გახსნილი" and „შემსრულებელი" is
- *  retired contract language (tests/lexicon). Naming the rivals at all was the
- *  weaker sentence anyway: what the provider needs to know is that this client
- *  has already been reached as often as they agreed to be, which is the reason
- *  the answer is „no" and the only part that is any of their business. */
+ *  ⚠️ THE SENTENCE IS ABOUT THE CLIENT, NOT THE RIVALS — what the provider
+ *  needs to know is that this client has already been reached as often as they
+ *  agreed to be. The rest is none of their business. */
 export function contactLimitNote(limit: number): string {
   return `ამ კლიენტს უკვე ${limit}-ჯერ დაუკავშირდნენ — მეტს არ ელოდება.`
 }
@@ -509,15 +361,13 @@ export type ProfileFacts = {
   /**
    * Has this provider ever SAVED their own service list?
    *
-   * ⚠️ IT IS NOT A TASK AND EARNS NOTHING, deliberately — it rides on
-   * ProfileFacts only because `profileFacts()` already reads the row and
-   * tests/requestQueue §F forbids /work a second serviceProfile query. Paying
-   * for it would put money behind pressing save, which is the one thing that
+   * ⚠️ NOT A TASK, EARNS NOTHING. It rides on ProfileFacts only because
+   * `profileFacts()` already reads the row (tests/requestQueue §F forbids /work
+   * a second query). Paying for it would put money behind pressing save, which
    * must stay a free, honest „yes, this is what I sell".
    *
-   * `false` for the 27 the migration seeded from their category, and for the
-   * two profiles that predate it — nobody has been asked yet. See
-   * prisma/schema → servicesConfirmedAt.
+   * `false` for the 27 the migration seeded and the two that predate it —
+   * nobody has been asked yet.
    */
   servicesConfirmed: boolean
 }
@@ -539,11 +389,9 @@ export function earnedTasks(f: ProfileFacts): CreditTaskKey[] {
 }
 
 /**
- * 0–100, and it is the SAME arithmetic as the grant — one mechanism, two uses.
- *
- * The second use is the one the catalogue has been missing: a service card
- * carries no trust signal at all today, and „profile completeness" is a real,
- * earned one. Never invent a second score for that.
+ * 0–100, the SAME arithmetic as the grant — one mechanism, two uses. The second
+ * is the trust signal a service card otherwise has none of. Never invent a
+ * second score for that.
  */
 export function completeness(f: ProfileFacts): number {
   const earned = earnedTasks(f)
