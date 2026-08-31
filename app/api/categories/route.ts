@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { expertCountsBySphere } from '@/lib/categoryCounts'
+import { expertCountsByCategory } from '@/lib/categoryCounts'
 import { ABROAD_CATEGORY_SLUG } from '@/lib/abroad'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +23,7 @@ export async function GET() {
     // show only POPULATED spheres (an empty filter option just produces an
     // empty result and reads as a dead end), while the /apply picker must keep
     // offering all of them — somebody has to be the first expert in a sphere.
-    const counts = await expertCountsBySphere(all)
+    const counts = await expertCountsByCategory(all)
     // `children` = the sub-fields absorbed into this sphere. They are offered
     // where somebody DESCRIBES THEMSELVES (the application, the profile editor,
     // the approval screen) and ignored where somebody BROWSES — a client

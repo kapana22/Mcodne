@@ -61,9 +61,11 @@ test('every list that shows a request titles it with the headline', () => {
   // card and the page it opens cannot call the same request two things.
   assert.match(codeOf('lib/requests.ts'), /headline: requestHeadline\(r\.description, topicLabel\(r\.topic\)\)/)
   assert.match(codeOf('lib/myRequests.ts'), /headline: requestHeadline\(r\.description/)
+  // ⚠️ `app/me/requests/page.tsx` LEFT THIS LIST ON 2026-08-30 — it is a
+  // redirect now; the rows it drew are `app/me/_requests.tsx`, which is still
+  // here and still asserted.
   for (const f of [
     'app/work/(provider)/requests/[id]/page.tsx',
-    'app/me/requests/page.tsx',
     'app/me/_requests.tsx',
   ]) {
     assert.match(codeOf(f), /\{r\.headline\}/, `${f} still titles rows by category`)
@@ -114,7 +116,6 @@ const SCREENS = [
   'app/work/(provider)/requests/page.tsx',
   'app/work/(provider)/offers/page.tsx',
   'app/work/(provider)/requests/[id]/page.tsx',
-  'app/me/requests/page.tsx',
   'app/me/_requests.tsx',
   'app/work/jobs/_client.tsx',
   'components/requests/StatusPills.tsx',

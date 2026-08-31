@@ -79,7 +79,7 @@ export function normalizePrefs(raw: unknown): Record<PrefKey, boolean> {
 // Cheap single-row read + normalize. Returns defaults on any failure so a
 // prefs-lookup outage never suppresses notifications.
 /** Exported 2026-08-18 so the trades queue can pref-gate its own mails the same
- *  way `notify` does — see app/api/master-applications/[id]. */
+ *  way `notify` does — see app/api/provider-applications/[id]. */
 export async function isTypeEnabled(userId: string, type: string): Promise<boolean> {
   const key = prefKeyForType(type)
   if (!key) return true // uncontrolled types (PAYOUT, GENERIC) always fire

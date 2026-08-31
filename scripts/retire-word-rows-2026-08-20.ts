@@ -4,7 +4,7 @@
 //   npx tsx scripts/retire-word-rows-2026-08-20.ts
 //
 // ⚠️ NO ROW IS DELETED. Each is rewritten in place, and only the word changes.
-// The writers were fixed first (app/api/master-applications emits „ახალი
+// The writers were fixed first (app/api/provider-applications emits „ახალი
 // განაცხადი — სერვისი" now), so nothing regenerates these.
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()

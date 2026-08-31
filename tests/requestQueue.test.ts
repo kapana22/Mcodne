@@ -153,7 +153,7 @@ test('§C somebody filed under სწავლება is shown LEARNING, inclu
 
 test('§C a teaching PROFESSION counts even under another sphere', () => {
   // „პროგრამირების მასწავლებელი" is filed under swavleba in lib/professions
-  // while the person may sit in the `it` sphere. Sphere ∪ profession, exactly
+  // while the person may sit in the `it` sphere. CategoryNode ∪ profession, exactly
   // as the mail unions them — leaving one half out would be a second rule.
   assert.ok(topicsOf(expert('it', ['პროგრამირების მასწავლებელი'])).has('chemistry'))
   assert.ok(!topicsOf(expert('it', [])).has('chemistry'))
@@ -170,17 +170,23 @@ test('§C a consulting sphere does not become a teaching one', () => {
 test('§D nobody with nothing to offer is shown the platform', () => {
   // The measured bug: each of these saw all 12 open requests.
   const nothing: QueueOffer = { service: null, expert: null, isAdmin: false }
-  assert.deepEqual(queueScope(nothing), { mode: 'UNLISTED', fix: 'SERVICES' })
+  // ⚠️ NO `fix` SINCE 2026-08-30. The variant carried „SERVICES" | „PROFILE" to
+  // tell the queue's empty state WHICH of two editors owned the missing field.
+  // /work/services and /work/profile became one editor („ჩემი გვერდი") that
+  // day, so the discriminator had one destination and no reader — see
+  // lib/requestRouting. What the three cases below pin is unchanged and is the
+  // thing that mattered: each of these is UNLISTED and matches no topic.
+  assert.deepEqual(queueScope(nothing), { mode: 'UNLISTED' })
   assert.deepEqual(queueWhere(queueScope(nothing)), { AND: [{ topic: { in: [] } }] })
 
-  // A master who ticked nothing is the same silence, and the services editor
-  // is where they fix it — profileIsRoutable has said „not ready, not broken"
-  // about this row since the day it was written.
+  // A master who ticked nothing is the same silence — profileIsRoutable has
+  // said „not ready, not broken" about this row since the day it was written.
   const untick: QueueOffer = { service: { services: [], areas: ['TBILISI'], available: true }, expert: null, isAdmin: false }
-  assert.deepEqual(queueScope(untick), { mode: 'UNLISTED', fix: 'SERVICES' })
+  assert.deepEqual(queueScope(untick), { mode: 'UNLISTED' })
 
-  // An expert with neither sphere nor profession is pointed at THEIR editor.
-  assert.deepEqual(queueScope(expert(null, [], null)), { mode: 'UNLISTED', fix: 'PROFILE' })
+  // An expert with neither sphere nor profession is the same silence too — and
+  // that these two USED to be told apart is exactly what stopped being true.
+  assert.deepEqual(queueScope(expert(null, [], null)), { mode: 'UNLISTED' })
 })
 
 test('§D „off" is its own silence, and it is not „unlisted"', () => {

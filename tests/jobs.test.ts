@@ -88,8 +88,14 @@ test('a quote reads „-დან" and a call-out the way the offer card does', 
 
 /* ⚠️ „bookings keep their existing status vocabulary and bucket by it" WAS HERE
    AND IS GONE (2026-08-24), with `BOOKING_JOB_STATUS_LABEL` — six words held in
-   step with components/StatusPill — and the bucket rules that read a start
-   time, a duration and a reschedule proposal. */
+   step with `components/StatusPill` — and the bucket rules that read a start
+   time, a duration and a reschedule proposal.
+
+   ⚠️ AND THAT COMPONENT WENT ON 2026-08-30. It held the booking vocabulary
+   itself — „ელოდება დადასტურებას", „მიმდინარეობს", „არ გამოცხადდა" — six states
+   nothing in the product can reach. Its last importer was the client home's
+   `StatusBadge`, which went the same day; a tree scan then found it was the
+   only file in components/ and lib/ that nothing imported. */
 
 test('quote statuses map ACCEPTED → მიმდინარე, doneAt → დასრულებული, closedAt → დაიხურა', () => {
   const day = new Date(NOW).toISOString()
@@ -305,7 +311,7 @@ test('the pipeline is one screen with four stages, and each stage is reachable',
   }
 
   // The rail carries ONE row for it, and that row still lights up on all three.
-  const nav = codeOf('components/tutor/navConfig.ts')
+  const nav = codeOf('components/work/navConfig.ts')
   assert.doesNotMatch(nav, /label: 'მოთხოვნები'/, 'the queue is a rail row again — it is a stage')
   assert.match(nav, /WORK_ONLY_NAV: NavItem\[\] = \[\]/,
     'a rail row depends on the allowlist again')

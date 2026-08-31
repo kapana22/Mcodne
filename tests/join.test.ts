@@ -89,10 +89,10 @@ test('§C /join exists, /apply does not, and there is ONE form behind it', () =>
   for (const f of [
     'app/join/page.tsx', 'app/join/JoinClient.tsx',
     'app/join/_door/DoorQuestion.tsx', 'app/join/_door/GuestDoor.tsx', 'app/join/_door/PublicDoor.tsx',
-    'app/join/_master/client.tsx', 'app/join/_master/_workPhotos.tsx',
+    'app/join/_provider/client.tsx', 'app/join/_provider/_workPhotos.tsx',
     // Shared with /work/profile since the consultation wizard was deleted and
     // took the uploader and the sphere list with it.
-    'app/join/_shared/_upload.tsx', 'app/join/_shared/useSpheres.ts',
+    'app/join/_shared/_upload.tsx', 'app/join/_shared/useCategories.ts',
   ]) assert.ok(has(f), `${f} is missing`)
   assert.equal(has('app/apply'), false, 'app/apply is back — the old routes must 308 to /join, not render')
   assert.equal(has('app/join/_expert'), false, 'the consultation wizard came back')
@@ -101,10 +101,10 @@ test('§C /join exists, /apply does not, and there is ONE form behind it', () =>
   // provider could sell either of two things and a page naming one lost the
   // other. `?can=` is ignored now, so that address rendered the bare door
   // anyway and the file was reachable from nothing. The door IS the pitch.
-  assert.equal(has('app/join/_master/_marketing.tsx'), false,
+  assert.equal(has('app/join/_provider/_marketing.tsx'), false,
     'the second pitch came back — one product, one door, one page')
   // A private folder, so the form is not a route of its own.
-  assert.equal(has('app/join/_master/page.tsx'), false)
+  assert.equal(has('app/join/_provider/page.tsx'), false)
 })
 
 test('§D the page: guest → the pitch WITH the question on it, admin → /admin', () => {
@@ -136,7 +136,7 @@ test('§E the door: one question, one form, and the answer persists', () => {
   // wall; `JoinClient` kept what only a signed-in door can do.
   const door = codeOf('app/join/JoinClient.tsx') + codeOf('app/join/_door/DoorQuestion.tsx')
   assert.match(door, /<ProfessionPicker/, 'the door grew its own profession control instead of the shared one')
-  assert.match(door, /useSpheres\(\)/, 'the door fetches spheres its own way — one fetch shape, one fallback')
+  assert.match(door, /useCategories\(\)/, 'the door fetches spheres its own way — one fetch shape, one fallback')
   assert.match(door, /disabled=\{!answered\}/, 'a person who has answered nothing can continue')
   assert.match(door, /'mcodne:join'/, 'the choice is not persisted')
   assert.match(read('lib/signout.ts'), /'mcodne:join'/, 'sign-out leaves the door choice for the next person on a shared device')
@@ -205,5 +205,9 @@ test('§H the invitation is for people who sell nothing — never for a provider
   // სერვისები" switch was replaced by when the capabilities collapsed.
   const menu = codeOf('components/UserMenu.tsx')
   assert.doesNotMatch(menu, /CAPABILITY_ENABLE_LABEL/, 'the „ჩართე…" row is back in the menu')
-  assert.match(menu, /'\/work\/services'/, 'the menu no longer carries a provider to what they sell')
+  // ⚠️ ONE EDITOR SINCE 2026-08-30 — it was /work/services („ჩემი სერვისები")
+  // while the row had two editors. What this pins is unchanged: somebody who
+  // already sells is offered the page where they edit it, never the invitation
+  // to register again.
+  assert.match(menu, /'\/work\/profile'/, 'the menu no longer carries a provider to what they sell')
 })

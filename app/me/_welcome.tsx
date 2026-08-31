@@ -7,7 +7,6 @@ import Link from 'next/link'
 import { Eyebrow } from '@/components/Eyebrow'
 import { Icon } from '@/components/Icon'
 import { Container } from '@/components/Container'
-import { KA_MONTHS_SHORT, KA_WEEKDAY_SHORT, MeData } from './_model'
 
 /* ───── The two ways in, in the order the product actually works ─────
  *
@@ -48,7 +47,13 @@ const StartRequest = ({ requestHref }: { requestHref: string | null }) => (
 )
 
 /* ───── Onboarding tour — first-run getting-started card ───── */
-export const OnboardingTour = ({ userId, joinedAt }: { userId?: string; joinedAt?: string }) => {
+export const OnboardingTour = ({ userId, joinedAt, requestHref }: {
+  userId?: string
+  joinedAt?: string
+  /** The intake address — the same one the hero uses, so the first screen a
+   *  client sees cannot offer two different „start here"s. */
+  requestHref: string | null
+}) => {
   const [dismissed, setDismissed] = useState(true) // start dismissed to avoid SSR flash
   useEffect(() => {
     if (!userId) return
@@ -71,14 +76,23 @@ export const OnboardingTour = ({ userId, joinedAt }: { userId?: string; joinedAt
     }
     setDismissed(true)
   }
+  // ⚠️ STEPS 2 AND 3 DESCRIBED A CALENDAR AND A VIDEO ROOM (2026-08-26).
+  // „აირჩიე დრო კალენდარში — ექსპერტი ადასტურებს" and „შედი ვიდეოოთახში":
+  // neither exists since 2026-08-24, and this is the FIRST screen a new client
+  // sees, so it was teaching them a product they would then fail to find.
+  //
+  // ⚠️ AND STEP 1 WAS STILL WRONG AFTER THAT FIX (2026-08-30). It read „იპოვე
+  // ექსპერტი" and pointed at /experts — so the card that teaches a new client
+  // how this works never mentioned the intake at all, while the headline four
+  // lines above it said „აღწერე, რა გჭირდება". Two answers to „what do I do
+  // first" on one screen, and the tour was giving the wrong one.
+  //
+  // Step 2 pointed at /experts TOO, which is worse than a wrong link: you do
+  // not receive offers by going to the catalogue. It waits, so it links to the
+  // place the waiting is visible — the client's own request list.
   const steps = [
-    { n: 1, l: 'იპოვე ექსპერტი', d: 'აირჩიე საკითხი — საგადასახადო, სამართალი, ან სხვა.', href: '/experts' },
-    // ⚠️ STEPS 2 AND 3 DESCRIBED A CALENDAR AND A VIDEO ROOM (2026-08-26).
-    // „აირჩიე დრო კალენდარში — ექსპერტი ადასტურებს" and „შედი ვიდეოოთახში":
-    // neither exists since 2026-08-24, and this is the FIRST screen a new
-    // client sees, so it was teaching them a product they would then fail to
-    // find.
-    { n: 2, l: 'მიიღე შეთავაზებები', d: 'ექსპერტები ფასთან ერთად გამოგიგზავნიან — შენ ირჩევ.', href: '/experts' },
+    { n: 1, l: 'აღწერე, რა გჭირდება', d: 'რამდენიმე კითხვა — და მოთხოვნა გასულია.', href: requestHref },
+    { n: 2, l: 'მიიღე შეთავაზებები', d: 'ექსპერტები ფასთან ერთად გამოგიგზავნიან — შენ ირჩევ.', href: '/me/requests' },
     { n: 3, l: 'შეათანხმე დეტალები', d: 'მიმოწერა მცოდნეზეა — იქვე ათანხმებთ ვადასა და ფორმატს.', href: null as string | null },
   ]
   return (

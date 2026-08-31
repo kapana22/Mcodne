@@ -261,7 +261,7 @@ export function requestsFeatureExists(): boolean {
 
 /** Same split for the supply side: does the admin rail draw the „ხელოსნები"
  *  tab, does the signup page offer the „ვარ ხელოსანი" tile. A hide, not a
- *  guard — every /api/master-applications route checks providersOn() itself. */
+ *  guard — every /api/provider-applications route checks providersOn() itself. */
 export function providersFeatureExists(): boolean {
   return providersOn()
 }
@@ -292,7 +292,7 @@ export function isRequestPath(pathname: string): boolean {
 export const PROVIDER_PATH_PREFIXES = [
   ...PROVIDER_WORKSPACE_PATHS,
   '/api/provider',
-  '/api/master-applications',
+  '/api/provider-applications',
   '/api/admin/master-applications',
 ] as const
 
@@ -929,7 +929,7 @@ export const ServiceRequestInput = z.object({
   // request easier to price, not to add a hurdle to sending one — a person on
   // a phone with water on the floor may have nothing to upload, and their
   // request is exactly the one that must still arrive. Same `data:image/`
-  // refusal the provider intake uses (lib/masterApplication), same reason: the
+  // refusal the provider intake uses (lib/providerApplication), same reason: the
   // column is rendered as an <img> and anything else is either a mistake or a
   // crafted body.
   photos: z.array(

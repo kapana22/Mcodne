@@ -1,6 +1,6 @@
 // Next.js route-level loading UI for /student/favorites — mirrors the page's
 // title + card-grid layout using the shared Skeleton primitives. It renders
-// INSIDE StudentWorkspaceShell (sidebar + top bar + footer), so it must repeat
+// INSIDE ClientShell (sidebar + top bar + footer), so it must repeat
 // neither the logo header nor the page background — a second `sticky top-0
 // z-40` bar here flashed two stacked headers on every nav. Root element
 // mirrors the real page's <Container as="main"> exactly.

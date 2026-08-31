@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { slugify } from '@/lib/slug'
-import { expertCountsBySphere } from '@/lib/categoryCounts'
+import { expertCountsByCategory } from '@/lib/categoryCounts'
 import { TREE_ERROR } from '@/lib/categoryTree'
 
 // GET /api/admin/categories
@@ -38,7 +38,7 @@ export async function GET() {
   //
   // For „ბიზნესი და ფინანსები" those are 2 and 4. One number could not have
   // been both, and the panel printed the one that matched nothing on the site.
-  const listed = await expertCountsBySphere(rows)
+  const listed = await expertCountsByCategory(rows)
   const out = rows.map(r => ({
     id: r.id,
     slug: r.slug,

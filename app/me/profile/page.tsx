@@ -11,8 +11,7 @@ export default async function StudentProfilePage() {
     <Container as="main" size="content" className="w-full py-8 lg:py-10 flex-1">
         <PageHeader
           className="mb-8"
-          eyebrow="პროფილი"
-          title="ჩემი პროფილი"
+          title="პროფილი"
           sub="ინფორმაცია, ავატარი და პაროლი"
         />
 

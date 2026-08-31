@@ -27,7 +27,7 @@ import { Icon } from '@/components/Icon'
  * they changed anything — pressing save IS having looked. A dismiss button would
  * let the one state we are trying to clear be cleared without looking.
  */
-export function ConfirmServicesNote({ href = '/work/services' }: { href?: string }) {
+export function ConfirmServicesNote({ href = '/work/profile' }: { href?: string }) {
   return (
     <div className="rounded-card border border-brand-200 bg-brand-50/60 px-4 py-3.5 grid grid-cols-[auto_1fr] gap-3.5 items-start">
       <span className="w-8 h-8 rounded-full bg-white border border-brand-200 text-brand-700 inline-flex items-center justify-center shrink-0">

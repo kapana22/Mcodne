@@ -651,7 +651,13 @@ test('a retired service never deletes the requests it produced', () => {
   for (const f of ['lib/dbBoot.ts', 'prisma/manual-migrations/2026-08-11-b2b-services/up.sql']) {
     assert.match(read(f), /"BusinessLead_serviceId_fkey"\s+FOREIGN\s+KEY\s+\("serviceId"\)\s+REFERENCES\s+"B2BService"\("id"\)\s+ON\s+DELETE\s+SET\s+NULL/, f)
   }
-  assert.match(read('prisma/schema.prisma'), /service\s+B2BService\? @relation\(fields: \[serviceId\], references: \[id\], onDelete: SetNull\)/)
+  // ⚠️ WHITESPACE-TOLERANT ON PURPOSE (2026-08-30). This pinned a single space
+  // before `@relation`, and `npx prisma format` — which aligns every attribute
+  // column in the file — moved it while changing nothing about the RULE. A test
+  // that fails on a formatter is pinning the layout of the schema instead of
+  // what it says: `onDelete: SetNull` is the promise, and it is what a retired
+  // service must do to the requests it produced.
+  assert.match(read('prisma/schema.prisma'), /service\s+B2BService\?\s+@relation\(fields: \[serviceId\], references: \[id\], onDelete: SetNull\)/)
 })
 
 test('the requested service is verified against the catalogue, never trusted', () => {

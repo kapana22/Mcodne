@@ -21,6 +21,25 @@ import {
   TOPIC_GROUPS, CITIES, ALL_CITIES, topicLabel, cityLabel, isTopicOfKind, groupIsLive, REQUEST_KINDS,
   type Topic, type TopicGroup, type CityName,
 } from './requestTopics'
+// The professional half of this row moved here on 2026-08-30 (see
+// ServiceProfileInput). All three are pure, like this file.
+import { georgianRefine, georgianNameRefine } from './georgianText'
+import { MAX_PROFESSIONS } from './professions'
+import { HEADLINE_MAX } from './headline'
+
+/** The bounds `lib/providerApplication` already applied at intake, named here
+ *  because the editor now enforces the same two — a second copy in the input's
+ *  `minLength` is how a form starts refusing what the endpoint accepts. */
+export const NAME_MIN = 3
+export const NAME_MAX = 80
+
+/** Deliberately loose — an unusual TLD is not our business to refuse, and the
+ *  empty string means „clear this". Copied from `/api/me/provider`, which held
+ *  the only definition while it was the only writer. */
+const optionalUrl = z.string().trim().max(500).refine(
+  v => v === '' || /^https?:\/\/\S+\.\S+/.test(v),
+  { message: 'ბმული უნდა იწყებოდეს http:// ან https://-ით' },
+).nullable().optional()
 
 /* ═══════════ the vocabulary a master may choose from ════════════════════ */
 
@@ -111,10 +130,10 @@ const AREA_IDS = new Set(CITIES.map(c => c.id))
 export const MAX_SERVICES = 16
 
 /** ⚠️ SIX, AND IT LIVES HERE BECAUSE TWO SCREENS WRITE THE SAME COLUMN. The
- *  application collects work photos at intake (lib/masterApplication → MASTER,
+ *  application collects work photos at intake (lib/providerApplication → MASTER,
  *  which re-exports this one) and /work/services edits them for the rest of the
  *  profile's life. Two constants would let the editor accept a seventh photo
- *  the intake refuses, and /api/masters/[id]/photo — which serves them by index
+ *  the intake refuses, and /api/providers/[id]/photo — which serves them by index
  *  — carries the same ceiling as `MAX_WORK_INDEX`. */
 export const MAX_WORK_PHOTOS = 6
 
@@ -128,7 +147,7 @@ export const KEPT_PHOTO = /^kept:([0-5])$/
 /**
  * ⚠️ EVERY FIELD IS `.optional()` SINCE 2026-08-29, AND THAT IS A BUG FIX, NOT A
  * LOOSENING. The five below used to be REQUIRED, so a form that edits none of
- * them still had to send all five — and `app/work/profile/_master.tsx`, which
+ * them still had to send all five — and `app/work/profile/_provider.tsx`, which
  * edits work photos and nothing else, sent the values it had loaded ON MOUNT.
  * Both forms live on pages a provider uses in one sitting, and one of the five
  * has its own switch on the SAME PAGE:
@@ -194,7 +213,15 @@ export const ServiceProfileInput = z.object({
   photoUrl: z.string().trim().max(4_000_000)
     .refine(v => v.startsWith('data:image/'), { message: 'ფოტო ვერ აიტვირთა' })
     .nullable().optional(),
-  about: z.string().trim().max(1500).nullable().optional(),
+  /* ⚠️ 2000 AND A SCRIPT GATE SINCE 2026-08-30, both taken from the endpoint
+     that used to own this column. `/api/me/provider` sent it as `bio`, capped
+     at 2000 and refused it in Latin; this schema capped it at 1500 and accepted
+     any script. Two writers, two answers — and the LOOSER one was reachable, so
+     the gate the other endpoint enforced could be walked around by saving from
+     the services form. Keeping 1500 would have been the other bug: a provider
+     whose 1 800-character paragraph was written through the old route could no
+     longer save their own page. */
+  about: z.string().trim().max(2000).superRefine(georgianRefine('აღწერა')).nullable().optional(),
 
   /* ⚠️ THE PRICE PER SERVICE AND THE PHOTOS OF FINISHED WORK BECAME EDITABLE
      2026-08-21, AND UNTIL THEN THEY WERE FROZEN AT APPLICATION DAY — exactly
@@ -220,10 +247,40 @@ export const ServiceProfileInput = z.object({
     z.string().trim().max(4_000_000)
       .refine(v => v.startsWith('data:image/') || KEPT_PHOTO.test(v), { message: 'ფოტო ვერ აიტვირთა' }),
   ).max(MAX_WORK_PHOTOS).optional(),
+
+  /* ═════════ THE PROFESSIONAL HALF, ABSORBED 2026-08-30 ══════════════════
+     ⚠️ THESE ARRIVED FROM `/api/me/provider`'s OWN `Body`, and the move is the
+     point rather than a tidy. Until today two endpoints wrote this ONE row and
+     a comment above that schema explained why that was safe: „every field
+     belongs to exactly one of them". It was true of the fields and false of the
+     screen. The provider saw two pages, two „ნახე შენი პროფილი" buttons, two
+     copies of the same preview card and SIX save controls — and one column,
+     `available`, really was on both, with a different label and a different
+     interaction model on each. Owner, 2026-08-30: „ერთი და იგივე ინფოს აკეთებს
+     თითქოს და რატომ".
+
+     One row, one editor, ONE save — and that last word is why this is a schema
+     change and not a second fetch. Two requests behind one button can half-fail,
+     and „half your profile saved" is a worse answer than either outcome.
+     `prisma.serviceProfile.upsert` writes all of it or none of it.
+
+     ⚠️ THE VALIDATORS ARE THE ONES THAT WERE ALREADY ON THESE FIELDS, not new
+     ones: the Georgian-script gate on the two free-text fields, the profession
+     vocabulary, the loose URL check, the same ceilings. `categoryId` is checked
+     against the live Category set BY THE ENDPOINT, exactly as before — this file
+     is pure and has no database. */
+  fullName: z.string().trim().min(NAME_MIN).max(NAME_MAX).superRefine(georgianNameRefine('სახელი და გვარი')).optional(),
+  headline: z.string().trim().min(2).max(HEADLINE_MAX).superRefine(georgianRefine('ერთი წინადადება შენზე')).optional(),
+  yearsExp: z.number().int().min(0).max(80).optional(),
+  languages: z.array(z.string().trim().min(2).max(10)).max(20).optional(),
+  categoryId: z.string().trim().min(1).max(40).nullable().optional(),
+  professions: z.array(z.string().trim().max(80)).max(MAX_PROFESSIONS).optional(),
+  linkedinUrl: optionalUrl,
+  websiteUrl: optionalUrl,
 })
   // A price against a service they do not offer is either a stale key left
   // behind when a tick came off, or a crafted body — the same rule the intake
-  // enforces (lib/masterApplication). `pricedServices` would ignore it on read,
+  // enforces (lib/providerApplication). `pricedServices` would ignore it on read,
   // but a row holding a price for a service the provider does not do is a row
   // nobody can explain, and it would be shown by whatever reads the map next.
   //
@@ -453,7 +510,7 @@ export const TRADE_LANDING_MIN = 3
  * group id, or a topic id inside a live group. Resolved BEFORE the master
  * lookup by app/experts/[slug]/page.tsx — step 2 of its chain (the vocabulary
  * is a fixed list;
- * master slugs are generated, and lib/masterSlug reserves every trade id).
+ * master slugs are generated, and lib/providerSlug reserves every trade id).
  * Null = not a trade, try the masters.
  */
 export function resolveTrade(slug: string): { group: TopicGroup; topic: Topic | null } | null {

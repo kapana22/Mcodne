@@ -216,7 +216,7 @@ test('D. /experts resolves a profession slug BEFORE an expert, and no expert can
     // third in the chain. The rule is the same one: a CODE-OWNED list resolves
     // before any generated slug, because a profession page must not be
     // shadowed by somebody's name.
-    const expert = src.indexOf('resolveMaster(param)')
+    const expert = src.indexOf('resolveProvider(param)')
     assert.ok(prof >= 0 && expert >= 0, `${name}: one of the two resolvers is missing`)
     assert.ok(prof < expert, `${name}: the expert is resolved before the profession — a DB row could shadow a code-owned page`)
   }
@@ -228,7 +228,7 @@ test('D. /experts resolves a profession slug BEFORE an expert, and no expert can
   // onto „iuristi" would shadow the landing exactly as an expert would.
   const gen = read('lib/slugSpace.ts')
   assert.match(gen, /\.\.\.professions\.map\(p => p\.slug\)/, 'lib/slugSpace no longer reserves the profession slugs')
-  for (const f of ['lib/masterSlug.ts']) {
+  for (const f of ['lib/providerSlug.ts']) {
     assert.match(read(f), /slugReserved|slugTaken/, `${f} no longer reads the shared reserved list`)
   }
   // The landing keeps its content and its structured data, at the new address.
@@ -301,7 +301,7 @@ test('E2. the ≥3 rule is three, counted once per master, and the page reads it
   const meta = page.slice(page.indexOf('export async function generateMetadata'), page.indexOf('export default async function'))
   for (const [name, src] of [['generateMetadata', meta], ['the page', render]] as const) {
     const trade = src.indexOf('resolveTrade(param)')
-    const master = src.indexOf('resolveMaster(param)')
+    const master = src.indexOf('resolveProvider(param)')
     assert.ok(trade >= 0 && master >= 0, `${name}: one of the two resolvers is missing`)
     assert.ok(trade < master, `${name}: the provider profile is resolved before the trade`)
   }
@@ -328,7 +328,7 @@ test('E2. the ≥3 rule is three, counted once per master, and the page reads it
   const gen = read('lib/slugSpace.ts')
   assert.match(gen, /\.\.\.OFFER_GROUPS\.map\(g => g\.id\)/)
   assert.match(gen, /\.\.\.OFFER_TOPICS\.map\(t => t\.id\)/)
-  for (const f of ['lib/masterSlug.ts']) {
+  for (const f of ['lib/providerSlug.ts']) {
     assert.match(read(f), /from '\.\/slugSpace'/, `${f} no longer reads the shared reserved list`)
   }
   for (const t of OFFER_TOPICS) assert.match(t.id, /^[a-z0-9-]+$/)
@@ -401,7 +401,7 @@ test('G. nothing in app/, components/, lib/ links to /konsultacia or /categories
     const rel = relative(ROOT, f)
     // The middleware is the one place the old addresses may be spelled: it is
     // where they are redirected. lib/slugSpace reserves them as segments.
-    if (rel === 'middleware.ts' || rel === 'lib/masterSlug.ts') continue
+    if (rel === 'middleware.ts' || rel === 'lib/providerSlug.ts') continue
     codeOf(rel).split('\n').forEach((line, n) => {
       // A quoted address — a link target, not the word „categories" (the admin
       // API /api/admin/categories and /api/categories are not the page).

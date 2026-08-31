@@ -38,7 +38,7 @@ export type AdminCategory = {
  * არ არის" — aggregated out of `TutorApplication.professionData`, so the
  * taxonomy could grow from what people actually asked for. The consultation
  * application went with the consultation product, and with it that column. The
- * idea is worth rebuilding on `MasterApplication` the day it carries the same
+ * idea is worth rebuilding on `ProviderApplication` the day it carries the same
  * free-text answer; it does not today, and a panel reading from nothing would
  * be furniture that says the feature works.
  */

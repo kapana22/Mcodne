@@ -21,7 +21,7 @@
 /**
  * A sphere, as the home tiles render it.
  *
- * `expertCount` is MEASURED (lib/categoryCounts → expertCountsBySphere: the
+ * `expertCount` is MEASURED (lib/categoryCounts → expertCountsByCategory: the
  * same fold the catalogue's own filter counts with), never estimated. It is
  * optional only because the type is also the shape a caller may hand over
  * before counting; a tile with no count simply omits the numeral rather than

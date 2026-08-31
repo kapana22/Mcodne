@@ -130,7 +130,7 @@ test('§B a stored work photo travels back as a token, never as bytes', () => {
   const img = 'data:image/webp;base64,AAAA'
   assert.equal(ServiceProfileInput.safeParse({ ...base, workPhotos: ['kept:0', img] }).success, true)
   assert.equal(ServiceProfileInput.safeParse({ ...base, workPhotos: [] }).success, true)
-  assert.equal(ServiceProfileInput.safeParse({ ...base, workPhotos: ['/api/masters/x/photo?n=0'] }).success, false,
+  assert.equal(ServiceProfileInput.safeParse({ ...base, workPhotos: ['/api/providers/x/photo?n=0'] }).success, false,
     'a URL is accepted where an image belongs — the column would hold a link to itself')
   assert.equal(ServiceProfileInput.safeParse({ ...base, workPhotos: ['kept:9'] }).success, false,
     'a token past the ceiling is accepted')

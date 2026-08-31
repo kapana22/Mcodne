@@ -18,7 +18,7 @@
 //     card that quietly stops reading the prop still renders, still typechecks,
 //     and simply ignores the toggle the reader just tapped.
 //   · A BASE64 COLUMN COMES BACK. The master photo is a ROUTE (`m.photoSrc` →
-//     /api/masters/[id]/photo). The image IS the column here — no object
+//     /api/providers/[id]/photo). The image IS the column here — no object
 //     storage — so naming `photoUrl` or `workPhotos` in a card is a page that
 //     grows by megabytes and breaks nothing visible. app/experts/_providers.ts
 //     carries the long version of this warning.

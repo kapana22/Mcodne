@@ -43,10 +43,10 @@ export default function robots(): MetadataRoute.Robots {
           // '/api/∗' for these URLs and nothing else under /api opens up.
           '/api/avatars/',
           // The same, for the trades side: a master's face and work photos are
-          // base64 columns served only by /api/masters/[id]/photo, which is
+          // base64 columns served only by /api/providers/[id]/photo, which is
           // what the service profile's og:image and JSON-LD point at
           // (/experts/<slug>, 2026-08-19).
-          '/api/masters/',
+          '/api/providers/',
         ],
         disallow: [
           '/admin',

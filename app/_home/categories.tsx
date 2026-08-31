@@ -6,10 +6,10 @@
 // had somebody in them — so the first paint printed six names that could each
 // be replaced a beat later, and the counts the design canvas puts on the tiles
 // were not available at all until after hydration. `app/page.tsx` resolves the
-// spheres AND their counts server-side (the same `expertCountsBySphere` the API
+// spheres AND their counts server-side (the same `expertCountsByCategory` the API
 // route uses), so the tiles are correct in the HTML a crawler reads.
 //
-// ⚠️ POPULATED SPHERES ONLY, and that filter is the whole reason the count is
+// ⚠️ POPULATED CATEGORIES ONLY, and that filter is the whole reason the count is
 // on the tile. A tile that leads to „ვერ ვიპოვეთ" is a dead end the visitor
 // built for us; printing „7" beside the name is the same promise made checkable
 // before the click. The filter lives in app/page.tsx with the query — see there.

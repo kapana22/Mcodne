@@ -136,12 +136,21 @@ test('§C the FK-less dbBoot tables are deleted BY HAND, not left to a cascade',
   //
   // Each is allowlisted BY NAME and BY ITS REFERENTIAL ACTION, so weakening any
   // of them — or adding a fourth person-edge — still fails here.
+  // ⚠️ AND THE RENAME CARRIES IT. A `RENAME TO` keeps every constraint on the
+  // table, so the cascade above survives — but the CONSTRAINT NAME would keep
+  // saying „Master" on a table that no longer does, and a half-renamed schema
+  // is how the next reader concludes the FK belongs to something else.
+  assert.match(boot, /ALTER TABLE "MasterApplication" RENAME TO "ProviderApplication"/,
+    'the application table is no longer renamed — the schema declares ProviderApplication')
+  assert.match(boot, /RENAME CONSTRAINT "MasterApplication_userId_fkey" TO "ProviderApplication_userId_fkey"/,
+    'the cascade constraint keeps the retired name on the renamed table')
+
   const ALLOWED_PERSON_EDGES: [RegExp, string][] = [
     [/ALTER TABLE "CompanyMember" ADD CONSTRAINT "CompanyMember_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
       'the CompanyMember→User cascade is gone — a deleted account now leaves its membership behind'],
     [/ALTER TABLE "RequestAccess" ADD CONSTRAINT "RequestAccess_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
       'the RequestAccess→User cascade is gone — a deleted account keeps its requests allowlist row'],
-    // MasterApplication.userId  CASCADE — the only referential action available
+    // ProviderApplication.userId  CASCADE — the only referential action available
     //     and the only correct one. The row is not a record ABOUT the person
     //     the way a ServiceRequest is (that one survives anonymised, because
     //     what somebody needed fixing is market data with the name scrubbed);
@@ -151,8 +160,13 @@ test('§C the FK-less dbBoot tables are deleted BY HAND, not left to a cascade',
     //     NULL is not on the table (NOT NULL column, one row per account) and
     //     RESTRICT would make an account undeletable because somebody once
     //     applied to fix taps.
-    [/ALTER TABLE "MasterApplication" ADD CONSTRAINT "MasterApplication_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
-      'the MasterApplication→User cascade is gone — a deleted account keeps its photo, phone and application'],
+    // ⚠️ THE NEW NAME, BECAUSE THE RENAME RUNS FIRST (2026-08-30). dbBoot's
+    // opening block renames the table, so every statement after it — this FK
+    // included — names `ProviderApplication`, on an empty database and on the
+    // live one alike. The guarantee is unchanged; the assertions above pin that
+    // the rename itself still happens and still carries this constraint.
+    [/ALTER TABLE "ProviderApplication" ADD CONSTRAINT "ProviderApplication_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
+      'the ProviderApplication→User cascade is gone — a deleted account keeps its photo, phone and application'],
     // ServiceProfile.userId  CASCADE — added 2026-08-18, and it was MISSING
     //     ENTIRELY until then. prisma/schema declared the cascade; the raw DDL
     //     that actually creates this table never emitted a foreign key, so
@@ -160,7 +174,7 @@ test('§C the FK-less dbBoot tables are deleted BY HAND, not left to a cascade',
     //     a `userId` pointing at nothing — still `available`, still matched by
     //     the routing query, still drawn on /services with a null name. Nothing
     //     errored, and nothing would have. CASCADE is the only correct action
-    //     here for the same reason as MasterApplication: the row is a person's
+    //     here for the same reason as ProviderApplication: the row is a person's
     //     trade listing, and it cannot outlive the account.
     [/ALTER TABLE "ServiceProfile" ADD CONSTRAINT "ServiceProfile_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE CASCADE[^;]*;/,
       'the ServiceProfile→User cascade is gone — deleting a master would orphan their listing, and the listing keeps being routed'],

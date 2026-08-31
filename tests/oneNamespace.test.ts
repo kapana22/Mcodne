@@ -80,7 +80,7 @@ test('§A three pages share /experts/[slug], resolved in ONE documented order', 
   const STEPS: [label: string, marker: string][] = [
     ['the profession landing', 'professionBySlug[param]'],
     ['the trade landing', 'resolveTrade(param)'],
-    ['the provider profile', 'resolveMaster(param)'],
+    ['the provider profile', 'resolveProvider(param)'],
   ]
   for (const [name, src] of [['generateMetadata', meta], ['the page', render]] as const) {
     const at = STEPS.map(([label, marker]) => {
@@ -123,20 +123,20 @@ test('§A3 a provider profile is REACHABLE at /experts/<slug> — the branch is 
   const page = codeOf(PAGE)
   // Entered only when the expert table answered nothing (a slug is unique
   // across both tables, so at most one of the two can be here) …
-  assert.match(page, /const\s+provider\s+=\s+await\s+resolveMaster\(param\)/,
+  assert.match(page, /const\s+provider\s+=\s+await\s+resolveProvider\(param\)/,
     'the provider branch is no longer reached from the resolver')
   // … and it RETURNS the profile rather than falling through to the 404.
   assert.match(page, /return providerProfile\(provider\)/, 'the provider branch resolves and then drops the row')
   // The id form 308s to the slug, carrying the query string.
-  assert.match(page, /permanentRedirect\(`\$\{masterPath\(provider\)\}\$\{queryOf\(await\s+searchParams\)\}`\)/)
+  assert.match(page, /permanentRedirect\(`\$\{providerPath\(provider\)\}\$\{queryOf\(await\s+searchParams\)\}`\)/)
   // …and every address this profile prints for itself is under /experts.
   const data = read('app/experts/[slug]/_providerData.ts')
-  assert.match(data, /export\s+const\s+masterPath\s+=\s+\(p:\s+\{\s+slug:\s+string\s+\|\s+null;\s+id:\s+string\s+\}\)\s+=>\s+`\/experts\/\$\{p\.slug\s+\|\|\s+p\.id\}`/)
+  assert.match(data, /export\s+const\s+providerPath\s+=\s+\(p:\s+\{\s+slug:\s+string\s+\|\s+null;\s+id:\s+string\s+\}\)\s+=>\s+`\/experts\/\$\{p\.slug\s+\|\|\s+p\.id\}`/)
   // ⚠️ THE CROSS-LINK TO „the same person's expert profile" IS GONE (2026-08-24)
   // — there was a second profile to link to, and there is not.
   // The metadata half canonicalises to the same address, never the old one.
   assert.match(codeOf(PAGE), /alternates:\s+\{\s+canonical:\s+providerCanonical\s+\}/)
-  assert.match(codeOf(PAGE), /const\s+providerCanonical\s+=\s+`\$\{SITE_URL\}\$\{masterPath\(pp\)\}`/)
+  assert.match(codeOf(PAGE), /const\s+providerCanonical\s+=\s+`\$\{SITE_URL\}\$\{providerPath\(pp\)\}`/)
 })
 
 /* ═══════════ B. a slug is unique across BOTH tables ═════════════════════ */
@@ -155,7 +155,7 @@ test('§B one shared helper answers „is this slug taken?" for both generators'
   assert.match(space, /catch \{\n\s*return true\n\s*\}/, 'slugTaken fails open — an outage would mint duplicates')
 
   // BOTH generators ask it, and neither keeps a private list any more.
-  for (const f of ['lib/masterSlug.ts']) {
+  for (const f of ['lib/providerSlug.ts']) {
     const src = read(f)
     assert.match(src, /import\s+\{\s+slugReserved,\s+slugTaken\s+\}\s+from\s+'\.\/slugSpace'/, `${f} does not use the shared helper`)
     assert.match(src, /if \(await slugTaken\(candidate\)\) continue/, `${f} writes a candidate without asking both tables`)
@@ -206,9 +206,13 @@ test('§C app/services is not a route at all, and /services/<x> 308s segment-for
   assert.equal(hit('/experts/nino-a1b2').status, 200)
   // Segment-bounded: starts-with-the-letters is not the prefix.
   assert.equal(hit('/servicesx').status, 200)
-  // …and the WORKSPACE page of the same name is untouched — it is a screen, not
-  // this namespace (/work/services, „რას ვყიდი?").
-  assert.equal(hit('/work/services').status, 200)
+  // ⚠️ THE WORKSPACE PAGE OF THE SAME NAME WAS UNTOUCHED HERE UNTIL 2026-08-30,
+  // and it is worth keeping the distinction rather than deleting the line: this
+  // §C is about the PUBLIC „/services" namespace, and /work/services was never
+  // part of it — it was a screen. It 308s now for an unrelated reason (the two
+  // provider editors became one, see tests/providerEditor §C), so what this
+  // asserts is that it does NOT land in the public namespace.
+  assert.deepEqual(where('/work/services'), { status: 308, to: `${ORIGIN}/work/profile` })
 })
 
 test('§C2 no live /services link is left in app, components or lib', () => {

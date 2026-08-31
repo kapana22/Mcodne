@@ -15,7 +15,7 @@ import { Icon } from '@/components/Icon'
 import { fmtDateTime, TBILISI } from '@/lib/tz'
 import Link from 'next/link'
 import { Card } from '@/components/Card'
-import type { MasterProfile } from './_providerData'
+import type { ProviderProfileData } from './_providerData'
 import { requestHrefFor } from './_providerData'
 
 const Section = ({ id, title, children }: { id: string; title: string; children: ReactNode }) => (
@@ -71,7 +71,7 @@ const RAIL_ROWS = 4
 
 /** One priced service. Extracted because the block draws the list twice (open
  *  and folded) and two copies of a row is how the two halves drift apart. */
-const PricedRow = ({ s, p, ordering }: { s: { id: string; label: string; price: number }; p: MasterProfile; ordering: boolean }) => (
+const PricedRow = ({ s, p, ordering }: { s: { id: string; label: string; price: number }; p: ProviderProfileData; ordering: boolean }) => (
   <li className="flex items-center justify-between gap-3 py-2.5">
     <span className="min-w-0 text-small text-ink-900">{s.label}</span>
     <span className="shrink-0 flex items-center gap-2.5">
@@ -93,7 +93,49 @@ const PricedRow = ({ s, p, ordering }: { s: { id: string; label: string; price: 
   </li>
 )
 
-export function PricedServicesBlock({ p, ordering = true }: { p: MasterProfile; ordering?: boolean }) {
+/* ⚠️ THE FACTS LEFT THE HERO (2026-08-30). City, years and languages sat in one
+   `text-small` row under the chips, five words apart and all weighing the same
+   as each other — and on a profile with no priced services the rail held one
+   button and then stopped, leaving the page empty exactly where a reader looks
+   for the answer to „who is this".
+   Measured on /experts/nika-tsotsoria: name, headline, chips, that one grey
+   line, one paragraph, footer. sheniani.ge puts the same four facts in a rail
+   block with a LABEL on each row, and that is the whole of the difference —
+   the facts were already here, they had no room.
+   THE LABELS ARE THE SITE'S OWN WORDS, not new copy: „ქალაქი" and „ენა" are the
+   catalogue's own filter groups (app/experts/_filters.tsx) and „გამოცდილება" is
+   what the hero said. NO SECTION HEADING for the same reason — a title here
+   would be a word nobody has approved, and every row already names itself. */
+const FACT_ROWS = (p: ProviderProfileData) => [
+  p.areas.length > 0 ? { k: 'ქალაქი', v: p.areas.join(', ') } : null,
+  p.yearsExp > 0 ? { k: 'გამოცდილება', v: `${p.yearsExp} წელი` } : null,
+  p.langs.length > 0 ? { k: 'ენა', v: p.langs.join(', ') } : null,
+].filter((x): x is { k: string; v: string } => x !== null)
+
+export function ProfileFactsBlock({ p }: { p: ProviderProfileData }) {
+  const rows = FACT_ROWS(p)
+  if (rows.length === 0) return null
+  return (
+    <Card as="section" className="mt-3">
+      {/* A `<dl>`, because that is what this is: a term and its value. Hairline
+          rows in the rail's own grammar — the same `divide-y divide-ink-100
+          border-t` the price list uses two blocks down.
+          NOT a two-column grid with `display:contents` rows: `contents` removes
+          the wrapper from the box tree, so `divide-y` would have nothing to draw
+          a border on. Each row is a real flex box instead. */}
+      <dl className="divide-y divide-ink-100 border-t border-ink-100">
+        {rows.map(r => (
+          <div key={r.k} className="flex items-baseline justify-between gap-4 py-2.5">
+            <dt className="shrink-0 text-meta text-ink-500">{r.k}</dt>
+            <dd className="min-w-0 text-small text-ink-900 text-right break-words">{r.v}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
+  )
+}
+
+export function PricedServicesBlock({ p, ordering = true }: { p: ProviderProfileData; ordering?: boolean }) {
   if (p.priced.length === 0) return null
   const shown = p.priced.slice(0, RAIL_ROWS)
   const rest = p.priced.slice(RAIL_ROWS)
@@ -124,7 +166,7 @@ export function PricedServicesBlock({ p, ordering = true }: { p: MasterProfile; 
   )
 }
 
-export function AboutBlock({ p }: { p: MasterProfile }) {
+export function AboutBlock({ p }: { p: ProviderProfileData }) {
   if (!p.about) return null
   const paragraphs = p.about.split(/\n\n+/).filter(t => t.trim())
   return (
@@ -156,7 +198,7 @@ export function AboutBlock({ p }: { p: MasterProfile }) {
  * a business is real, and 13 of the 29 gave one. The tables are untouched in
  * the database; nothing on the site reads them any more.
  */
-export function CredentialsBlock({ p }: { p: MasterProfile }) {
+export function CredentialsBlock({ p }: { p: ProviderProfileData }) {
   const links = [
     p.websiteUrl ? { href: p.websiteUrl, label: 'ვებგვერდი' } : null,
     p.linkedinUrl ? { href: p.linkedinUrl, label: 'LinkedIn' } : null,
@@ -191,7 +233,7 @@ export function CredentialsBlock({ p }: { p: MasterProfile }) {
  * Nothing replaces it. What sells a service on this page is already here: the
  * priced list, the paragraph, and the photos of finished work. */
 
-export function WorkBlock({ p }: { p: MasterProfile }) {
+export function WorkBlock({ p }: { p: ProviderProfileData }) {
   if (p.workPhotoSrcs.length === 0) return null
   return (
     <Section id="work" title="ნამუშევრები">
@@ -232,7 +274,7 @@ export function ProviderStars({ n, className = 'w-3.5 h-3.5' }: { n: number; cla
   )
 }
 
-export function ReviewsBlock({ p }: { p: MasterProfile }) {
+export function ReviewsBlock({ p }: { p: ProviderProfileData }) {
   // ⚠️ NOTHING RATHER THAN „ჯერ არ არის შეფასება" (2026-08-20). Measured that
   // day: 0 reviews on the whole site. So every profile drew a heading, a
   // bordered box and an icon to announce an absence — three elements saying

@@ -14,7 +14,7 @@
 // provider's own `available` switch is on, `published` is on, an active
 // RequestAccess row names their user or their company, AND the account is not
 // suspended — the same rule app/experts/_providers queries and
-// /api/masters/[id]/photo answers for. It must
+// /api/providers/[id]/photo answers for. It must
 // stay one rule: a page reachable for a master the photo route refuses would
 // draw a broken portrait; a page for somebody the catalogue hides would publish
 // a profile nobody approved. Anything outside the rule is notFound(), and so is
@@ -23,7 +23,7 @@
 // ⚠️ THE IMAGES ARE NEVER SELECTED. `photoUrl` is a base64 data URI and
 // `workPhotos` is up to six of them (~1MB together) — see prisma/schema. This
 // file asks the database WHICH ones are servable and the parts point every
-// <img> at /api/masters/[id]/photo (`?n=<index>` for the work photos), which
+// <img> at /api/providers/[id]/photo (`?n=<index>` for the work photos), which
 // serves one image with a long cache busted by `?v=<updatedAt>`.
 //
 // ⚠️ AND THAT INCLUDES `User.avatarUrl` (2026-08-24). The account avatar is the
@@ -122,7 +122,7 @@ const VISIBLE = {
  * profession landing, then a trade landing, then an expert, and only then this
  * — see app/experts/[slug]/page.tsx for why the code-owned lists win.
  */
-export const resolveMaster = cache(async (param: string) => {
+export const resolveProvider = cache(async (param: string) => {
   try {
     return await prisma.serviceProfile.findFirst({
       where: { AND: [{ OR: [{ slug: param }, { id: param }] }, VISIBLE] },
@@ -135,7 +135,7 @@ export const resolveMaster = cache(async (param: string) => {
 
 /** One profile, in the words the parts print. Labels are resolved here so the
  *  parts never see a topic id. */
-export type MasterProfile = {
+export type ProviderProfileData = {
   id: string
   slug: string | null
   name: string
@@ -175,13 +175,13 @@ export type MasterProfile = {
    *  tables are untouched; nothing reads them. */
   /** Reviews of this master's finished jobs (Review → RequestOffer whose
    *  provider is this profile's user or company), newest first. */
-  reviews: MasterReview[]
+  reviews: ProviderReview[]
   /** Average ★ over `reviews`, one decimal, null when there are none. */
   ratingAvg: number | null
   reviewCount: number
 }
 
-export type MasterReview = {
+export type ProviderReview = {
   id: string
   rating: number
   body: string
@@ -194,7 +194,7 @@ export type MasterReview = {
  * answered that, but the two are separate reads and the rule is applied to
  * both). Cached per request: metadata and the render share one round trip.
  */
-export const getMasterProfile = cache(async (id: string): Promise<MasterProfile | null> => {
+export const getProviderProfile = cache(async (id: string): Promise<ProviderProfileData | null> => {
   try {
     const row = await prisma.serviceProfile.findFirst({
       where: { id, ...VISIBLE },
@@ -263,7 +263,7 @@ export const getMasterProfile = cache(async (id: string): Promise<MasterProfile 
         row.id,
       ),
     ])
-    const reviews: MasterReview[] = reviewRows.map(r => ({
+    const reviews: ProviderReview[] = reviewRows.map(r => ({
       id: r.id, rating: r.rating, body: r.body, at: r.createdAt.toISOString(),
     }))
     const reviewCount = reviews.length
@@ -295,8 +295,8 @@ export const getMasterProfile = cache(async (id: string): Promise<MasterProfile 
       about: row.about?.trim() || null,
       // The uploaded profile photo, else the account avatar — a migrated
       // professional never had a `photoUrl`, and their face is on their account.
-      photoSrc: hasPhoto ? `/api/masters/${row.id}/photo?v=${v}` : avatar,
-      workPhotoSrcs: idx.map(n => `/api/masters/${row.id}/photo?n=${n}&v=${v}`),
+      photoSrc: hasPhoto ? `/api/providers/${row.id}/photo?v=${v}` : avatar,
+      workPhotoSrcs: idx.map(n => `/api/providers/${row.id}/photo?n=${n}&v=${v}`),
       headline: row.headline?.trim() || null,
       professions: row.professions,
       langs: row.languages.map(l => langLabel(toLangCode(l) ?? l)),
@@ -321,7 +321,7 @@ export const getMasterProfile = cache(async (id: string): Promise<MasterProfile 
  * share it. A DB failure counts as nobody, which renders the door — the honest
  * answer when we cannot say who is here.
  */
-export const countMastersCovering = cache(async (topicIds: string[]): Promise<number> => {
+export const countProvidersCovering = cache(async (topicIds: string[]): Promise<number> => {
   try {
     const rows = await prisma.serviceProfile.findMany({ where: VISIBLE, select: { services: true } })
     return countCovering(rows, topicIds)
@@ -333,4 +333,4 @@ export const countMastersCovering = cache(async (topicIds: string[]): Promise<nu
 /** The public address of a profile — slug when it has one, id otherwise.
  *  ONE namespace since stage 11: /experts, the same prefix the expert profile
  *  and both landings answer under. */
-export const masterPath = (p: { slug: string | null; id: string }) => `/experts/${p.slug || p.id}`
+export const providerPath = (p: { slug: string | null; id: string }) => `/experts/${p.slug || p.id}`

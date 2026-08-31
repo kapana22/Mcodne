@@ -20,7 +20,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
   CREDIT_TASKS, CONTACT_COST_TETRI, JOB_DONE_TETRI, BIO_MIN, CREDITS_ENFORCED,
-  earnedTasks, contactKey, contactRefundKey, jobDoneKey, adminAdjustReason,
+  earnedTasks, completeness, contactKey, contactRefundKey, jobDoneKey, adminAdjustReason,
   type CreditTaskKey, type ProfileFacts,
 } from '@/lib/credits'
 
@@ -120,13 +120,24 @@ export async function grantEarnedTasks(userId: string): Promise<{
    * line above; the sum is arithmetic, not a query.
    */
   unearnedTetri: number
+  /**
+   * ⚠️ THE SAME ARITHMETIC AS `unearnedTetri`, EXPRESSED AS A BAR. The rail
+   * draws both, one above the other, and until 2026-08-30 the bar came from
+   * lib/profileScore instead — a different six-item list, weighted differently,
+   * asking for a headline and a language where the grant pays for a certificate
+   * and years of experience. A bar at 100% above „კიდევ 40 ₾ პროფილის
+   * შევსებისთვის" is not a rounding difference, it is two questions wearing one
+   * control. `completeness` is the grant's own measure, so they cannot disagree.
+   */
+  percent: number
 }> {
   const facts = await profileFacts(userId)
   const earned = earnedTasks(facts)
   const unearnedTetri = CREDIT_TASKS
     .filter(t => !(earned as string[]).includes(t.key))
     .reduce((n, t) => n + t.tetri, 0)
-  if (earned.length === 0) return { granted: [], unearnedTetri }
+  const percent = completeness(facts)
+  if (earned.length === 0) return { granted: [], unearnedTetri, percent }
 
   const already = await prisma.creditEntry.findMany({
     where: { userId, grantKey: { in: earned } },
@@ -134,7 +145,7 @@ export async function grantEarnedTasks(userId: string): Promise<{
   })
   const paid = new Set(already.map(r => r.grantKey))
   const fresh = CREDIT_TASKS.filter(t => (earned as string[]).includes(t.key) && !paid.has(t.key))
-  if (fresh.length === 0) return { granted: [], unearnedTetri }
+  if (fresh.length === 0) return { granted: [], unearnedTetri, percent }
 
   await prisma.creditEntry.createMany({
     data: fresh.map(t => ({
@@ -145,7 +156,7 @@ export async function grantEarnedTasks(userId: string): Promise<{
     })),
     skipDuplicates: true,
   })
-  return { granted: fresh.map(t => ({ key: t.key, tetri: t.tetri })), unearnedTetri }
+  return { granted: fresh.map(t => ({ key: t.key, tetri: t.tetri })), unearnedTetri, percent }
 }
 
 /* ═══════════ what spends it: one client's contact ═══════════════════════ */

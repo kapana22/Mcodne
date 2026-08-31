@@ -30,7 +30,7 @@
 // trades page „რეიტინგები და ფასები" and shows neither.
 //
 // ⚠️ THE PHOTO IS A ROUTE, NEVER THE COLUMN. `m.photoSrc` is already
-// /api/masters/[id]/photo — see app/experts/_providers.ts for why selecting the
+// /api/providers/[id]/photo — see app/experts/_providers.ts for why selecting the
 // base64 column into a list is a twelve-megabyte page. Growing the plate from
 // 64 to 144px changes nothing about that: the route serves one image with a
 // year-long cache. Do not "optimise" this into a data URI.
@@ -73,7 +73,7 @@ export function ProviderCard({ m, view = 'grid' }: { m: ProviderRow; view?: Enti
      ROUND FOR A PERSON, ROUNDED-SQUARE FOR A FIRM. Round reads as a face and
      square reads as a logo — the same distinction the „ფირმა" badge makes in
      words, and a client is entitled to know which they are dealing with.
-     (Today approval never sets `companyId`; see /api/master-applications/[id]
+     (Today approval never sets `companyId`; see /api/provider-applications/[id]
      for why, and the admin is warned.) That distinction is the ONE thing this
      plate keeps that the expert's does not: an expert is always a person.
 
@@ -218,7 +218,17 @@ export function ProviderCard({ m, view = 'grid' }: { m: ProviderRow; view?: Enti
             {m.priceValue !== null ? (
               <EntityPrice>{m.priceValue}₾-დან</EntityPrice>
             ) : (
-              <span className="text-small text-ink-500">ფასს შემოგთავაზებს</span>
+              /* ⚠️ IT NOW WEIGHS WHAT THE PARAGRAPH ABOVE PROMISES (2026-08-30).
+                 „Same position, same weight, different sentence" was the rule
+                 and the code did not keep it: the floor is `text-h2 font-bold
+                 ink-900` (EntityPrice) and this was `text-small ink-500`, four
+                 steps down and grey. In a two-up grid the two cards read as two
+                 different products rather than one catalogue — which is the
+                 thing the Square pattern exists to prevent.
+                 NOT EntityPrice: this is a sentence, not a number, and setting
+                 it at h2 would make a card with no price shout louder than one
+                 with. Body-large semibold is the same LINE, one notch quieter. */
+              <span className="font-display text-body-lg font-semibold text-ink-700 leading-none">ფასს შემოგთავაზებს</span>
             )}
             {/* One line, `text-meta`, under the number — the smallest thing on
                 the card that still reads. See `alsoConsults` for why it is a

@@ -58,16 +58,16 @@ enum CategoryStatus {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  passwordHash  String
-  fullName      String
-  phone         String?
-  avatarUrl     String?
-  bio           String?
-  role          Role     @default(USER)
-  locale        String   @default("ka")
-  emailVerified Boolean  @default(false)
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  fullName          String
+  phone             String?
+  avatarUrl         String?
+  bio               String?
+  role              Role      @default(USER)
+  locale            String    @default("ka")
+  emailVerified     Boolean   @default(false)
   // Per-type opt-outs for in-app Notification writes. Keyed by NotifType string
   // (BOOKING_CREATED, MESSAGE_NEW, REVIEW_NEW, APPLICATION_STATUS,
   // ADMIN_BROADCAST). `null` → all types enabled (default). Missing keys inside
@@ -75,7 +75,7 @@ model User {
   notificationPrefs Json?
   // Admin safety switch: non-null → account is suspended (signin blocked).
   // Set/cleared via PATCH /api/admin/users/[id]; reason lives in the audit log.
-  suspendedAt   DateTime?
+  suspendedAt       DateTime?
   // ⚠️ THE ONLY THING BEHIND „ონლაინ ვართ" (2026-08-17). Stamped every ~40s by
   // an admin with the panel open, and read by nobody else: the client's thread
   // asks „is anybody at the desk" and gets an answer computed from THIS, not
@@ -84,33 +84,33 @@ model User {
   // whole reason to show one is that the person deciding whether to wait can
   // trust it. One nullable column rather than a presence table: there is one
   // fact per account and it has no history worth keeping.
-  supportSeenAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  supportSeenAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   // B2B (2026-08-11). A VIRTUAL field — Prisma back-relations emit no SQL, so
   // this line adds nothing to the User table. The whole vertical is dark behind
   // B2B_VISIBILITY (lib/flags.ts); an account with no membership row is
   // indistinguishable from one on a deployment where B2B does not exist.
-  companyMemberships CompanyMember[]
-  reviewsGiven      Review[]             @relation("ReviewsGiven")
-  favorites         Favorite[]
-  creditEntries     CreditEntry[]
-  notifications     Notification[]
-  sessions          Session[]
-  otpCodes          OtpCode[]
-  resetTokens       PasswordResetToken[]
+  companyMemberships  CompanyMember[]
+  reviewsGiven        Review[]             @relation("ReviewsGiven")
+  favorites           Favorite[]
+  creditEntries       CreditEntry[]
+  notifications       Notification[]
+  sessions            Session[]
+  otpCodes            OtpCode[]
+  resetTokens         PasswordResetToken[]
   // Requests (2026-08-14). All three are VIRTUAL — Prisma back-relations emit
   // no SQL, so these lines add nothing to the User table. The subsystem is dark
   // behind FEATURE_REQUESTS (lib/requests.ts); an account with no
   // `requestAccess` row is indistinguishable from one on a deployment where the
   // feature does not exist.
-  serviceRequests   ServiceRequest[]
-  requestOffers     RequestOffer[]
-  requestMessages   RequestMessage[]
-  requestAccess     RequestAccess?
-  serviceProfile    ServiceProfile?
-  masterApplication MasterApplication?
+  serviceRequests     ServiceRequest[]
+  requestOffers       RequestOffer[]
+  requestMessages     RequestMessage[]
+  requestAccess       RequestAccess?
+  serviceProfile      ServiceProfile?
+  providerApplication ProviderApplication?
 
   // Admin filters + list order-by
   @@index([role])
@@ -147,17 +147,17 @@ model PasswordResetToken {
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
+  id             String   @id @default(cuid())
+  userId         String
+  token          String   @unique
+  expiresAt      DateTime
   // When this session was created via admin impersonation, holds the original
   // admin's userId. `null` for normal sessions. The impersonation "exit" flow
   // restores THIS admin — bound server-side so a client-forged cookie can no
   // longer mint an admin session.
   impersonatorId String?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // revokeOtherSessions + password-reset session wipes filter by userId
   @@index([userId])
@@ -166,32 +166,32 @@ model Session {
 }
 
 model Category {
-  id                 String         @id @default(cuid())
-  slug               String         @unique
-  name               String
-  icon               String?
-  count              Int            @default(0)
-  order              Int            @default(0)
+  id     String         @id @default(cuid())
+  slug   String         @unique
+  name   String
+  icon   String?
+  count  Int            @default(0)
+  order  Int            @default(0)
   // DEPRECATED — superseded by `status`, kept for one release so the migration
   // is reversible without data loss. Dropped in the follow-up migration once
   // every reader is on `status`.
-  isLive             Boolean        @default(true)
-  status             CategoryStatus @default(VISIBLE)
+  isLive Boolean        @default(true)
+  status CategoryStatus @default(VISIBLE)
 
   // Sub-topic hierarchy. A REDIRECTED sphere points at the one that absorbed
   // it; experts keep their own categoryId, so nothing is re-pointed and no
   // booking history moves — the parent simply counts its children's experts
   // as well. Self-referential, nullable, and never cascading: deleting a
   // parent must fail loudly rather than orphan a subtree.
-  parentId           String?
-  parent             Category?      @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
-  children           Category[]     @relation("CategoryTree")
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children Category[] @relation("CategoryTree")
 
-  providers          ServiceProfile[]
+  providers       ServiceProfile[]
   // Requests filed under this sphere (2026-08-14). Virtual back-relation, no
   // SQL. The FK on ServiceRequest is Restrict, so deleting a sphere that still
   // carries requests fails loudly instead of silently unfiling them.
-  serviceRequests    ServiceRequest[]
+  serviceRequests ServiceRequest[]
 
   // Searching a sphere by its visible label („მარკეტინგში") must find that
   // sphere's experts — see the TutorProfile trigram block. Also in lib/dbBoot.
@@ -250,7 +250,7 @@ model CreditEntry {
   /// Why this row exists — a `CreditReason` from lib/credits, stored as text so
   /// adding one is an edit to an array and never a migration (the same choice
   /// the budget bands and the request timings already made).
-  reason String
+  reason      String
 
   /// ⚠️ THE IDEMPOTENCY KEY FOR A ONE-OFF GRANT, and NULL for everything else.
   /// „a photo is worth 15₾" must pay once however many times the profile is
@@ -260,7 +260,7 @@ model CreditEntry {
   /// mechanism; do not add a second table for it.
   grantKey String?
   /// What was bought, when something was: the RequestOffer id.
-  refId String?
+  refId    String?
 
   createdAt DateTime @default(now())
 
@@ -314,8 +314,8 @@ model Review {
 }
 
 model Favorite {
-  id     String @id @default(cuid())
-  userId String
+  id         String   @id @default(cuid())
+  userId     String
   /// ⚠️ WAS `tutorId` → TutorProfile UNTIL 2026-08-24. Same column, renamed and
   /// repointed at the one provider profile; the saved row survived the move
   /// because the new profile carries the OLD id (see the migration).
@@ -357,11 +357,11 @@ model Notification {
 // review delete, category toggle, broadcast send) writes one row here.
 model AuditLog {
   id         String   @id @default(cuid())
-  actorId    String   // admin user id (or null for system)
-  action     String   // e.g. 'application.approve', 'booking.cancel', 'review.delete'
-  targetType String?  // e.g. 'Booking', 'Review', 'User', 'TutorApplication'
-  targetId   String?  // FK to the target; not enforced (targets may be soft-deleted later)
-  meta       Json?    // action-specific detail (reason, previous status, etc.)
+  actorId    String // admin user id (or null for system)
+  action     String // e.g. 'application.approve', 'booking.cancel', 'review.delete'
+  targetType String? // e.g. 'Booking', 'Review', 'User', 'TutorApplication'
+  targetId   String? // FK to the target; not enforced (targets may be soft-deleted later)
+  meta       Json? // action-specific detail (reason, previous status, etc.)
   createdAt  DateTime @default(now())
 
   @@index([actorId, createdAt])
@@ -448,13 +448,13 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members      CompanyMember[]
-  transactions CompanyTransaction[]
+  members        CompanyMember[]
+  transactions   CompanyTransaction[]
   serviceProfile ServiceProfile?
   // Requests (2026-08-14) — virtual back-relations, no SQL. A company bids on a
   // request as one counterparty; the members do not each get their own offer.
-  requestOffers RequestOffer[]
-  requestAccess RequestAccess?
+  requestOffers  RequestOffer[]
+  requestAccess  RequestAccess?
 
   // The admin list: active companies first, newest first.
   @@index([status, createdAt])
@@ -487,13 +487,13 @@ model CompanyMember {
 }
 
 model CompanyTransaction {
-  id        String                 @id @default(cuid())
-  companyId String
-  type      CompanyTransactionType
+  id           String                 @id @default(cuid())
+  companyId    String
+  type         CompanyTransactionType
   // ALWAYS POSITIVE. The direction lives in `type`, so no reader has to
   // remember a sign convention, and `SUM(amount)` can never silently mean two
   // different things depending on which rows it caught.
-  amount    Int
+  amount       Int
   // The balance this row left behind. Redundant with a replay of the ledger and
   // kept anyway: it is how you find the row where the arithmetic went wrong.
   balanceAfter Int
@@ -536,7 +536,7 @@ model CompanyTransaction {
 // No booking, no calendar, no escrow. A request arrives, the owner agrees a
 // price, and the invoice happens outside this system.
 model B2BService {
-  id       String @id @default(cuid())
+  id             String  @id @default(cuid())
   // WHAT KIND of service it is — 'CONSULTATION' or 'TRAINING'.
   //
   // WHY THIS EXISTS (2026-08-12, owner): the offer is „a consultation or a
@@ -551,14 +551,14 @@ model B2BService {
   // A String and not a Postgres enum, deliberately: the set is read through
   // lib/b2b (B2B_KINDS) and validated by zod at both ends, and a two-value enum
   // type is not worth a migration that has to run before any column using it.
-  kind        String @default("CONSULTATION")
+  kind           String  @default("CONSULTATION")
   // The AREA it belongs to — „იურიდიული", „ფინანსური", „გაყიდვები".
   // Free text and NOT a Category FK on purpose: the sphere taxonomy describes
   // what EXPERTS do and is admin-edited for the public catalogue. Borrowing it
   // here would tie a B2B price list to a rename made for a different reason.
-  direction   String
-  title       String
-  description String?
+  direction      String
+  title          String
+  description    String?
   // One short meta line under the title: „4 საათი · ჯგუფური · ონლაინ",
   // „ერთჯერადი", „თვეში 2 შეხვედრა". Optional and free text.
   //
@@ -567,7 +567,7 @@ model B2BService {
   // at all — how many people, how long, where. Buried in a sentence a company
   // has to read for it; on its own line they can scan a whole direction and
   // rule things in or out. Everything else may simply leave it empty.
-  format      String?
+  format         String?
   // The card image, as a `data:image/webp;base64,…` produced by /api/uploads
   // (kind=cover → hard-cropped to 1200x675). There is no object storage, so it
   // lives in the column like every other image here.
@@ -577,19 +577,19 @@ model B2BService {
   // the exact shape /api/avatars/[id] was built to undo. /business selects a
   // `hasImage` boolean and points <img> at /api/b2b-services/[id]/image, which
   // the browser then caches per service.
-  imageUrl    String?
+  imageUrl       String?
   // Lari, like every other price in this database. This is the number a company
   // reads on the page — the one actually invoiced may differ after a
   // conversation, which is what BusinessLead.agreedPrice records.
-  priceGel    Int
+  priceGel       Int
   // „ფასი შეთანხმებით" — shown instead of the number when true, for work that
   // cannot honestly carry a fixed figure. priceGel stays as the internal
   // estimate so the list can still be ordered and reasoned about.
   priceOnRequest Boolean @default(false)
-  order       Int     @default(0)
+  order          Int     @default(0)
   // Hidden services keep their row and their history; they simply leave the
   // page. Nothing here is ever deleted — a request may still point at it.
-  visible     Boolean @default(true)
+  visible        Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -623,7 +623,7 @@ model BusinessLead {
   // SetNull, not Cascade: a retired service must never take the requests it
   // generated with it — those are the record of who asked for what.
   serviceId   String?
-  service     B2BService? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  service     B2BService?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   // What the owner actually agreed after talking to them, in lari. The price on
   // the card is the advertised one; this is the real one, and the two are
   // deliberately separate — editing the catalogue must not rewrite a deal that
@@ -680,11 +680,11 @@ model BusinessLead {
 // naming: a request that changed state on its own would be a request nobody can
 // explain on the phone, and the phone is currently the whole verification story.
 enum ServiceRequestStatus {
-  NEW      // it arrived; no admin has looked at it
+  NEW // it arrived; no admin has looked at it
   VERIFIED // an admin called and confirmed it — providers can see it
   REJECTED // spam, an unreal budget, or nobody could reach them
-  MATCHED  // the client accepted an offer
-  CLOSED   // finished, or abandoned
+  MATCHED // the client accepted an offer
+  CLOSED // finished, or abandoned
 }
 
 // ⚠️ THERE ARE NO `RequestBudget` / `RequestDeadline` ENUMS, and there were,
@@ -750,7 +750,7 @@ enum RequestProviderKind {
 }
 
 model ServiceRequest {
-  id String @id @default(cuid())
+  id        String @id @default(cuid())
   // THE CODE WE SAY OUT LOUD. „MC-7A4K2" — five characters from an alphabet
   // with no O/0/I/1, so it survives being read down a phone line, which is
   // exactly what the admin does with it. A cuid cannot be dictated.
@@ -854,7 +854,7 @@ model ServiceRequest {
   // what the form SAYS never rewrites rows — lib/requestTopics → CITIES owns
   // the words. A plain String and not an enum: the list will grow by cities,
   // which is not worth a migration each time.
-  city     String
+  city String
 
   contactName String
   phone       String
@@ -865,7 +865,7 @@ model ServiceRequest {
   // request, and must not erase the request either — what somebody asked for is
   // a record of the market, and it stays readable with no name on it.
   userId String?
-  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   /// Photos of the thing that needs doing — base64 data URIs, at most
   /// MAX_REQUEST_PHOTOS (lib/requests). A picture of the leaking tap is what
@@ -883,7 +883,7 @@ model ServiceRequest {
   // NEVER shown to a client or a provider; only /api/admin/requests selects it.
   adminNote String?
 
-  verifiedAt DateTime?
+  verifiedAt   DateTime?
   // The admin who verified it. A plain String with no FK, for the same reason
   // AuditLog.actorId and CompanyTransaction.actorId are: this is a record of
   // something that happened, and it must outlive the account that did it.
@@ -897,9 +897,13 @@ model ServiceRequest {
   //
   // Null = never nudged, which is what every row starts as. See
   // lib/requestRouting for the clock these two are read against.
-  /** The unanswered-request re-mail, widened to every provider. Once. */
+  /**
+   * /** The unanswered-request re-mail, widened to every provider. Once.
+   */
   providerNudgeAt DateTime?
-  /** The „you have offers waiting" reminder to the client. Once. */
+  /**
+   * The „you have offers waiting" reminder to the client. Once.
+   */
   clientNudgeAt   DateTime?
 
   // HOW MANY OFFERS THIS REQUEST ACCEPTS. Three by default because that is what
@@ -945,7 +949,7 @@ model RequestOffer {
   providerKind RequestProviderKind
 
   expertUserId String?
-  expertUser   User?    @relation(fields: [expertUserId], references: [id], onDelete: Cascade)
+  expertUser   User?   @relation(fields: [expertUserId], references: [id], onDelete: Cascade)
 
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -981,20 +985,20 @@ model RequestOffer {
   /// A String and not an enum, for the reason the rest of this subsystem gives:
   /// the set will grow (a per-hour form is the obvious fourth) and a taxonomy
   /// expected to grow is not worth an ALTER TYPE each time.
-  priceKind String @default("FIXED")
+  priceKind    String @default("FIXED")
   // „about ten days". Nullable because some work honestly cannot be estimated
   // before a conversation, and forcing a number there produces a fictional one.
   daysEstimate Int?
   // What they will actually do. The 20-character floor is zod's (lib/requests):
   // a price with no sentence beside it is not an offer, it is a guess.
-  message String
+  message      String
 
   status RequestOfferStatus @default(SENT)
 
   /// QUOTE = a price for a job (accepting marks the work as agreed; the client
   /// later says „დასრულდა"); BOOKING = an offer that, accepted, creates a
   /// Booking (the consultation path). Stage 7, 2026-08-19.
-  kind RequestOfferKind @default(QUOTE)
+  kind     RequestOfferKind @default(QUOTE)
   /// Completion of a QUOTE: who pressed „დასრულდა" and when; closedAt = the
   /// silent close after the 14-day reminder. No Job table on purpose (§3.3).
   doneAt   DateTime?
@@ -1013,7 +1017,6 @@ model RequestOffer {
 
   @@unique([requestId, expertUserId])
   @@unique([requestId, companyId])
-
   // „my offers, by state" — the /provider/offers page, for both kinds.
   @@index([expertUserId, status])
   @@index([companyId, status])
@@ -1129,7 +1132,7 @@ model RequestMessage {
 /// one-man plumber owes us a face and is answerable as himself. The two
 /// therefore collect different fields and, at approval, hang their
 /// `ServiceProfile` off different columns — `companyId` or `userId`.
-enum MasterKind {
+enum ProviderKind {
   INDIVIDUAL
   COMPANY
 }
@@ -1152,19 +1155,19 @@ enum MasterKind {
 /// `omit`s them and loads them per opened row, exactly as the tutor queue
 /// already does with `idDocUrl`/`certificates`. Forget this and the
 /// moderation tab ships twenty megabytes to draw twenty names.
-model MasterApplication {
+model ProviderApplication {
   id     String @id @default(cuid())
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  kind MasterKind @default(INDIVIDUAL)
+  kind ProviderKind @default(INDIVIDUAL)
 
   /// The person we will be speaking to, in both cases — a firm still has
   /// somebody who answers the phone, and „the company" cannot be called.
   fullName String
   phone    String
 
-  /// COMPANY only. Enforced in lib/masterApplication, not by the column: a
+  /// COMPANY only. Enforced in lib/providerApplication, not by the column: a
   /// draft that switches kind mid-form must not lose what was typed.
   companyName String?
   taxId       String?
@@ -1191,14 +1194,14 @@ model MasterApplication {
   calloutFee Int?
   priceFrom  Int?
   /// The same `{ topicId: lari }` map — see ServiceProfile.priceList.
-  priceList      Json?
+  priceList  Json?
 
   /// The face, or the logo when kind = COMPANY. One image, 512×512 webp data
   /// URI, produced by /api/uploads?kind=avatar.
   photoUrl String?
 
   /// Photos of finished work. Array of data URIs — capped hard in
-  /// lib/masterApplication, because there is no object storage to spill into.
+  /// lib/providerApplication, because there is no object storage to spill into.
   workPhotos String[]
 
   status        ApplicationStatus @default(SUBMITTED)
@@ -1227,7 +1230,7 @@ model RequestAccess {
   active Boolean @default(true)
   // The admin's reason: „ბესიკი — ტესტისთვის", „აღარ პასუხობს". Never shown to
   // the person it is about.
-  note String?
+  note   String?
 
   createdAt DateTime @default(now())
 
@@ -1397,7 +1400,7 @@ model ServiceProfile {
   /// PHOTOS OF FINISHED WORK.
   ///
   /// ⚠️ THE APPLICATION COLLECTED THESE AND APPROVAL THREW THEM AWAY
-  /// (2026-08-18). `MasterApplication.workPhotos` has held up to six since the
+  /// (2026-08-18). `ProviderApplication.workPhotos` has held up to six since the
   /// intake shipped — uploaded one at a time, thumbnails, a delete on each —
   /// and there was no column here to copy them into, so the only place they
   /// were ever seen was the admin drawer. Real effort from the applicant,
@@ -1411,10 +1414,10 @@ model ServiceProfile {
   /// Public address (stage 5, 2026-08-19): /services/<slug>. Its OWN namespace —
   /// uniqueness is per table, so this never collides with TutorProfile.slug and
   /// the two never share a URL prefix (§3.5 of the restructuring plan).
-  slug      String?  @unique
+  slug       String?  @unique
   /// Listed in the catalogue and reachable at /services/<slug>. Approval sets
   /// it; the master (or an admin) can take the page down without losing the row.
-  published Boolean  @default(true)
+  published  Boolean  @default(true)
 
   /// Off without deleting: a master on holiday stops being routed to and keeps
   /// their list. Separate from `RequestAccess.active`, which is the admin's
@@ -1445,8 +1448,8 @@ model ServiceProfile {
   /// that predate the migration.
   servicesConfirmedAt DateTime?
 
-  /* ═══════════ THE PROFESSIONAL HALF, ABSORBED 2026-08-24 ═══════════════
-   *
+  /**
+   * ═══════════ THE PROFESSIONAL HALF, ABSORBED 2026-08-24 ═══════════════
    * ⚠️ THESE COLUMNS ARE `TutorProfile`'S, MOVED — not new ideas. The
    * consultation product was removed that day and with it the table that held
    * the 27 lawyers, accountants and psychologists on this site. They are
@@ -1454,7 +1457,6 @@ model ServiceProfile {
    * so they belong in THIS row; what they must not lose on the way is the half
    * of a professional profile a trades profile never needed — the sphere, the
    * professions, the diploma, the years, the languages.
-   *
    * The rows carry their OLD ids and their OLD slugs (see the migration), so
    * /experts/<slug> answers the same URL it answered yesterday and every
    * credential still points at the right person.
@@ -1485,7 +1487,7 @@ model ServiceProfile {
   linkedinUrl String?
   websiteUrl  String?
   /// A short intro video, YouTube only (lib/youtube).
-  videoUrl String?
+  videoUrl    String?
 
   /// What the card promises about replies. `responseHours` is the provider's
   /// own claim; the pair beside it is MEASURED, and only the measured pair is
@@ -1516,12 +1518,11 @@ model ServiceProfile {
   @@index([published, available])
 }
 
-/* ═══════════ WHAT A PROVIDER CAN SHOW FOR THEMSELVES ══════════════════════
- *
+/**
+ * ═══════════ WHAT A PROVIDER CAN SHOW FOR THEMSELVES ══════════════════════
  * Three tables that hung on `TutorProfile.id` until 2026-08-24 and now hang on
  * `ServiceProfile.id`. The column was `tutorId`; it is `providerId`, and the
  * migration only had to rename it because the new profile keeps the old id.
- *
  * They stay OPTIONAL and they stay three tables rather than one JSON blob: a
  * diploma is verifiable and a job is not, and `Certificate.verified` is the
  * column an admin actually ticks.
@@ -1572,7 +1573,6 @@ model Experience {
 
   @@index([providerId])
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // THE THREE TABLES PRISMA DID NOT KNOW ABOUT (declared 2026-08-21)

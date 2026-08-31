@@ -130,7 +130,6 @@ export default async function WorkHome() {
     <div>
       <PageHeader
         className="mb-6"
-        eyebrow="სამუშაო სივრცე"
         title={`გამარჯობა${user.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}`}
         sub={openRequests > 0
           ? `${openRequests} ახალი მოთხოვნა გელოდება`
@@ -144,6 +143,16 @@ export default async function WorkHome() {
             thing here that asks the reader for something we cannot do for them,
             and it is the reason their card looks like three other people’s. */}
         {unconfirmed && <ConfirmServicesNote />}
+        {/* ⚠️ ONLY WHERE THE RAIL IS NOT (2026-08-30). The rail now carries the
+            balance's other half permanently — „კიდევ 40 ₾ პროფილის
+            შევსებისთვის" — and the top bar carries the number itself
+            (components/CreditPill). On a wide screen this card was therefore a
+            THIRD statement of the same money on one page, with a second button
+            to the same editor. It is not deleted, because the rail is
+            `hidden lg:flex`: below that width this card is the ONLY place the
+            unearned grant is said, and deleting it would fix a desktop
+            duplicate by blinding every phone. One instance per viewport. */}
+        <div className="lg:hidden">
         <CreditStrip
           balanceTetri={balance}
           percent={completeness(facts)}
@@ -152,10 +161,11 @@ export default async function WorkHome() {
           // person (2026-08-21). This branched on the capability while a master
           // had no profile page — their photo and sentence lived inside „ჩემი
           // სერვისები", so one address answered everything. Both halves now open
-          // /work/profile for „ვინ ვარ" and /work/services for „რას ვყიდი", and
+          // one editor for the whole row since 2026-08-30 (`taskHref`), and
           // the button follows the task: see lib/credits → taskHref.
-          editHref={next ? taskHref(next.key) : '/work/services'}
+          editHref={next ? taskHref(next.key) : '/work/profile'}
         />
+        </div>
 
         {nextUp ? (
           <Link

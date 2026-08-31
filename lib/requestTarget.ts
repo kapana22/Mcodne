@@ -45,7 +45,7 @@ type RequestTarget = {
   topics: string[]
 }
 
-/** The slug shape lib/masterSlug produces, plus the raw cuid the resolver
+/** The slug shape lib/providerSlug produces, plus the raw cuid the resolver
  *  also accepts. Bounded before it reaches a
  *  query: this is a URL anybody can craft. */
 function cleanTo(raw: string | null | undefined): string {
@@ -80,7 +80,7 @@ async function master(to: string): Promise<RequestTarget | null> {
     // The uploaded photo, else the account avatar — a migrated professional
     // never had a `photoUrl` and their face is on their account.
     photoSrc: probe[0]?.hasPhoto
-      ? `/api/masters/${row.id}/photo?v=${row.updatedAt.getTime()}`
+      ? `/api/providers/${row.id}/photo?v=${row.updatedAt.getTime()}`
       : avatarSrc(row.user?.id, row.user?.avatarUrl),
     userId: row.userId,
     topics: topicsForProvider({

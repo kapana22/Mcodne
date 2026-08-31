@@ -12,7 +12,7 @@
 // and a plumber's card simply leaves empty — see the model, which documents each.
 
 import { prisma } from '@/lib/prisma'
-import { ensureMasterSlug } from '@/lib/masterSlug'
+import { ensureProviderSlug } from '@/lib/providerSlug'
 import { LIVE_OFFER_GROUPS, serviceLabels, areaLabels, priceHint, lowestPrice } from '@/lib/serviceProfile'
 import { CITIES, type CityName } from '@/lib/requestTopics'
 import { langLabel, toLangCode } from '@/lib/languages'
@@ -365,7 +365,7 @@ export async function queryProviders(f: ProvidersFilter): Promise<ProvidersResul
       where: {
         id: { in: rows.map(r => r.id) },
         NOT: { photoUrl: null },
-        // The same refusal /api/masters/[id]/photo applies, expressed as SQL.
+        // The same refusal /api/providers/[id]/photo applies, expressed as SQL.
         photoUrl: { not: { startsWith: 'data:image/svg' } },
       },
       select: { id: true },
@@ -401,13 +401,13 @@ export async function queryProviders(f: ProvidersFilter): Promise<ProvidersResul
   // link. Approval assigns one from now on; the rows already here get theirs the
   // first time a page reads them. Guarded, bounded, and cheap: one UPDATE per
   // slugless row, at most twenty per read, and never again once it has landed
-  // (`ensureMasterSlug` is idempotent and never overwrites).
+  // (`ensureProviderSlug` is idempotent and never overwrites).
   const slugless = rows.filter(r => !r.slug)
   const filled = new Map<string, string>()
   if (slugless.length > 0 && slugless.length <= 20) {
     for (const r of slugless) {
       try {
-        const slug = await ensureMasterSlug(r.id)
+        const slug = await ensureProviderSlug(r.id)
         if (slug) filled.set(r.id, slug)
       } catch { /* the id URL keeps working; the card simply is not a link yet */ }
     }
@@ -449,7 +449,7 @@ export async function queryProviders(f: ProvidersFilter): Promise<ProvidersResul
       // the avatar-shape probe above for why the second one cannot be the
       // stored column.
       photoSrc: withPhoto.has(r.id)
-        ? `/api/masters/${r.id}/photo?v=${r.updatedAt.getTime()}`
+        ? `/api/providers/${r.id}/photo?v=${r.updatedAt.getTime()}`
         : avatarRouteSrc(r.userId, r.userId ? avatarShape.get(r.userId) : null),
     })),
   }

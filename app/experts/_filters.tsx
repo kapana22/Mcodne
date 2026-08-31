@@ -29,6 +29,12 @@ import { FilterGroup, FilterNest, FilterPanel, FilterRow } from '@/components/ca
 import { LANG_LABELS, PRIMARY_LANG_CODES } from '@/lib/languages'
 import { tradeTopicIds } from '@/lib/catalogItems'
 import { LIVE_OFFER_GROUPS } from '@/lib/serviceProfile'
+import { LIVE_SERVICE_GROUP_IDS } from '@/lib/requestTopics'
+
+/** The everyday half of the roster — the trades that arrive with daily demand.
+ *  The professional half is the block above, drawn from the admin categories,
+ *  and the two must not name the same thing twice. */
+const EVERYDAY_OFFER_GROUPS = LIVE_OFFER_GROUPS.filter(g => LIVE_SERVICE_GROUP_IDS.includes(g.id))
 import { CITIES, ONE_CITY } from '@/lib/requestTopics'
 import type { ProviderRow } from './_providers'
 import { LiveCat } from './_cats'
@@ -294,10 +300,28 @@ export const CatalogFilters = ({ filters, setFilters, liveCats, facets, activeCo
       {/* OPEN, like the block above it. Collapsing it made the ordering into a
           hiding place: the professional block leads because it is drawn FIRST,
           which is enough — a second tap to reach half of what the site sells is
-          a barrier, not a hierarchy. */}
-      {LIVE_OFFER_GROUPS.length > 0 && (
-        <FilterGroup title="სერვისი">
-          {LIVE_OFFER_GROUPS
+          a barrier, not a hierarchy.
+
+          ⚠️ IT DRAWS THE EVERYDAY GROUPS ONLY, SINCE 2026-08-31 — and it is now
+          called what this file, tests/catalog and tests/lexicon have all called
+          it in prose since the day it was written: „ყოველდღიური სერვისები".
+          It used to draw all of `LIVE_OFFER_GROUPS`, which is 28 groups, 20 of
+          them professional — so THIRTEEN slugs were listed in BOTH blocks:
+          business, law, marketing, it, design, psychology, career, media,
+          relocation, grants, logistics, health, agriculture. „მარკეტინგი და
+          გაყიდვები" appeared twice with 6 beside one and 5 beside the other,
+          because the two blocks are counted by two different queries over two
+          different columns — `expertCount` on the Category row above,
+          `facets.trades` over `services[]` here.
+          The note two comments up says „a reader cannot tell, and should not
+          have to". Measured on the live rail, a reader CAN tell: the same words
+          twice, with different numbers, is the one thing that makes a filter
+          look broken rather than plentiful. The blocks stay two — merging them
+          into one flat list has been tried twice and was wrong twice — but each
+          one now owns its own words. Overlap after this change: zero. */}
+      {EVERYDAY_OFFER_GROUPS.length > 0 && (
+        <FilterGroup title="ყოველდღიური სერვისები">
+          {EVERYDAY_OFFER_GROUPS
             .map(g => ({
               key: `t:${g.id}`,
               label: g.label,

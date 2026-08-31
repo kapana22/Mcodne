@@ -33,7 +33,7 @@ const COUNTABLE_EXPERT = {
 } as const
 
 /** categoryId → visible experts, folded up into the sphere each is browsed under. */
-export async function expertCountsBySphere(cats: readonly TreeNode[]): Promise<Map<string, number>> {
+export async function expertCountsByCategory(cats: readonly TreeNode[]): Promise<Map<string, number>> {
   const grouped = await prisma.serviceProfile.groupBy({
     by: ['categoryId'],
     where: COUNTABLE_EXPERT,

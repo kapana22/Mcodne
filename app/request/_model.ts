@@ -364,8 +364,24 @@ export function stepsFor(d: Draft): StepDef[] {
   // has. `city` keeps its honest default (TBILISI, set in EMPTY_DRAFT), so the
   // row is written with the same value the screen would have collected. Serve
   // a second city and the screen returns by itself — see CITIES.
-  if (kind === 'SERVICE' && !ONE_CITY) out.push({ id: 'city', title: 'რომელ ქალაქში?' })
-  else out.push({ id: 'format', title: 'ონლაინ თუ ადგილზე?' })
+  //
+  // ⚠️ AND THE `else` HAD A HOLE IN IT (2026-08-30). The two rules above are
+  // independent — „a service is never asked online-or-in-person" and „nobody is
+  // asked which city while there is one" — but they were written as one
+  // if/else, so switching the second one OFF switched the first one back ON.
+  // With `ONE_CITY` true, which it has been since 2026-08-20, every trades
+  // request was asked „ონლაინ თუ ადგილზე?" — the exact screen the paragraph
+  // above calls „the wizard performing a choice nobody has". Measured by
+  // running `stepsFor` over one request per kind: the plumbing run was FIVE
+  // steps and four of them were real.
+  //
+  // Two rules, two statements. A service is never asked the format; a city is
+  // asked only when there is more than one.
+  if (kind === 'SERVICE') {
+    if (!ONE_CITY) out.push({ id: 'city', title: 'რომელ ქალაქში?' })
+  } else {
+    out.push({ id: 'format', title: 'ონლაინ თუ ადგილზე?' })
+  }
   // Free text LAST among the questions and OPTIONAL — the reference decision.
   // The structured taps above already carry a quotable request, and the
   // admin's verification call fills any gap a sentence would have.

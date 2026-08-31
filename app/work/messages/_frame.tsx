@@ -2,13 +2,18 @@
 import { useSelectedLayoutSegment } from 'next/navigation'
 import { PageHeader } from '@/components/PageHeader'
 import { ConversationList } from '@/components/chat/ConversationList'
+import type { InboxRow } from '@/lib/inboxRows'
 
 /* Two-pane messages center frame. Desktop: conversation list (360px) +
    thread pane inside one card. Mobile: list full-width; opening a thread
    (/tutor/messages/[bookingId]) swaps to a full-screen thread — the segment
    presence decides which pane shows. The list lives in the LAYOUT so it
    doesn't remount (and refetch) on every thread switch. */
-export function MessagesFrame({ children }: { children: React.ReactNode }) {
+export function MessagesFrame({ children, threads }: {
+  children: React.ReactNode
+  /** The inbox rows, read by the server layout — see there. */
+  threads: InboxRow[]
+}) {
   const segment = useSelectedLayoutSegment()
   const threadOpen = segment !== null
 
@@ -23,7 +28,6 @@ export function MessagesFrame({ children }: { children: React.ReactNode }) {
         //   <lg : only with a thread open, where the list pane collapses and
         //         the phone gives the conversation the whole screen.
         className={`mb-4 lg:mb-5 ${threadOpen ? 'sr-only' : 'lg:sr-only'}`}
-        eyebrow="შეტყობინებები"
         title="მიმოწერა"
       />
 
@@ -42,6 +46,7 @@ export function MessagesFrame({ children }: { children: React.ReactNode }) {
       }`}>
         <div className={`${threadOpen ? 'hidden lg:flex' : 'flex'} flex-col min-h-0 h-full lg:border-r lg:border-ink-100`}>
           <ConversationList
+            initialThreads={threads}
             empty={{
               title: 'მიმოწერა ჯერ არ გაქვს',
               description: 'როცა კლიენტი დაგიწერს, საუბარი აქ გამოჩნდება.',

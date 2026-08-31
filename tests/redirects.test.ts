@@ -119,7 +119,7 @@ test('a redirect is one hop: no target in the table is itself redirected', () =>
 test('the live addresses beside them are not touched (segment boundaries hold)', () => {
   for (const p of [
     '/api/tutor/x', '/api/student/x', '/api/tutors', '/api/tutors/stats',
-    '/api/masters/x/photo',
+    '/api/providers/x/photo',
     '/join', '/join?can=WORK', '/me', '/me/x', '/work', '/work/x',
     '/experts', '/experts/x', '/experts?type=WORK',
     // ⚠️ THE FOUR PAGES THAT NOW SHARE ONE SEGMENT (stage 11): the profession

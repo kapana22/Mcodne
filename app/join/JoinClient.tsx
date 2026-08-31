@@ -25,7 +25,7 @@ import { PublicTopBar } from '@/components/PublicTopBar'
 import { Footer } from '@/components/Footer'
 import type { Me } from '@/lib/me'
 import { JOIN_DOOR_LABEL } from '@/lib/capabilities'
-import { MasterApplyClient } from './_master/client'
+import { ProviderApplyClient } from './_provider/client'
 import { DoorQuestion, clearAsked, readJoin, type DoorAnswer } from './_door/DoorQuestion'
 
 export function JoinClient({ me }: { me: Me }) {
@@ -61,7 +61,7 @@ export function JoinClient({ me }: { me: Me }) {
 
   if (stage === 'form') {
     return (
-      <MasterApplyClient
+      <ProviderApplyClient
         email={me?.email ?? ''}
         name={me?.fullName ?? ''}
         phone={me?.phone ?? ''}

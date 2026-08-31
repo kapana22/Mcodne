@@ -262,7 +262,10 @@ test('§D the requests subsystem has typed notifications, always delivered', () 
   assert.match(codeOf('app/api/request-chat/route.ts'), /type: 'REQUEST_MESSAGE'/)
   assert.doesNotMatch(codeOf('lib/requestInvite.ts'), /type: 'GENERIC'/)
   // The bell's label table knows them (a raw code never reaches a screen).
-  const labels = read('app/notifications/page.tsx')
+  // ⚠️ THE TABLE MOVED WITH THE SPLIT (2026-08-30): /notifications is a server
+  // page now — it resolves the viewer so the header is never half-drawn — and
+  // the list, with its label table, is app/notifications/client.tsx.
+  const labels = read('app/notifications/client.tsx')
   for (const t of ['REQUEST_NEW', 'REQUEST_INVITE', 'REQUEST_MESSAGE', 'REQUEST_DONE']) {
     assert.match(labels, new RegExp(`${t}:\\s*\\{ l: '`), `${t} has no bell label`)
   }

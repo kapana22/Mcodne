@@ -20,7 +20,7 @@ import { CompaniesSection } from './_companies'
 import { RequestsSection } from './_requests'
 import { FunnelSection } from './_funnel'
 import { AccessSection } from './_access'
-import { MastersSection } from './_masters'
+import { ProvidersSection } from './_providers'
 import { ReviewsSection } from './_reviews'
 
 /* ───── Impersonation banner ─────
@@ -50,7 +50,7 @@ export default function AdminOverview() {
   const [newRequests, setNewRequests] = useState<number | null>(null)
   // Submitted tradesperson applications and unresolved disputes — the last two
   // queues on the panel that had no badge, from the same stats fetch (2026-08-19).
-  const [pendingMasters, setPendingMasters] = useState<number | null>(null)
+  const [pendingProviders, setPendingMasters] = useState<number | null>(null)
   // Bump this to force <OverviewSection> KPI re-fetch after a moderation
   // decision (approve/reject changes counts).
   const [statsTick, setStatsTick] = useState(0)
@@ -77,7 +77,7 @@ export default function AdminOverview() {
       if (typeof d?.helpOpen === 'number') setHelpOpen(d.helpOpen)
       if (typeof d?.b2bLeads === 'number') setB2bLeads(d.b2bLeads)
       if (typeof d?.newRequests === 'number') setNewRequests(d.newRequests)
-      if (typeof d?.pendingMasters === 'number') setPendingMasters(d.pendingMasters)
+      if (typeof d?.pendingProviders === 'number') setPendingMasters(d.pendingProviders)
     } catch {}
   }
   useEffect(() => { loadPending() }, [statsTick])
@@ -92,9 +92,9 @@ export default function AdminOverview() {
       {/* Renders nothing. Here rather than inside the requests tab because an
           operator reading any tab is still an operator — see _presence. */}
       <PresenceBeat />
-      <AdminSidebar active={active} onNav={setActiveWithHash} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingMasters={pendingMasters} />
+      <AdminSidebar active={active} onNav={setActiveWithHash} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingProviders={pendingProviders} />
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-      <TopBar active={active} onNav={setActiveWithHash} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingMasters={pendingMasters} />
+      <TopBar active={active} onNav={setActiveWithHash} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingProviders={pendingProviders} />
 
       {/* NB: the `key` used to be `active + ':' + statsTick` so that a moderation
           decision would remount the overview KPIs. But `statsTick` also
@@ -114,7 +114,7 @@ export default function AdminOverview() {
             `active` can never hold either value. Their APIs are gated
             independently — see app/api/admin/requests. */}
         {active === 'requests' && <RequestsSection onChanged={() => setStatsTick(t => t + 1)} />}
-        {active === 'masters' && <MastersSection onChanged={() => setStatsTick(t => t + 1)} />}
+        {active === 'providers' && <ProvidersSection onChanged={() => setStatsTick(t => t + 1)} />}
         {active === 'access' && <AccessSection />}
         {active === 'help' && <HelpSection />}
         {active === 'reviews' && <ReviewsSection />}

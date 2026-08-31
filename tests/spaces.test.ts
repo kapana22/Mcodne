@@ -18,7 +18,7 @@ import { join, relative } from 'node:path'
 import { PROVIDER_ROUTE, PROVIDER_WORKSPACE_PATHS, isProviderWorkspacePath, isRequestPath, isProviderPath } from '../lib/requests'
 import { homeForRole } from '../lib/roleHome'
 import { homeForHats } from '../lib/hats'
-import { navFor, WORKSPACE_NAV } from '../components/tutor/navConfig'
+import { navFor, WORKSPACE_NAV } from '../components/work/navConfig'
 
 const ROOT = join(import.meta.dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -61,7 +61,7 @@ test('§A /me carries every client screen; /student is gone', () => {
   assert.ok(!has('app/student'), 'app/student is back — the client space is /me')
   // The guard is the old one: a TUTOR is admitted to their own client side.
   assert.match(codeOf('app/me/layout.tsx'), /requireRole\(\[ROLE\.USER, ROLE\.PROVIDER, ROLE\.ADMIN\]\)/)
-  assert.match(codeOf('app/me/layout.tsx'), /StudentWorkspaceShell/)
+  assert.match(codeOf('app/me/layout.tsx'), /ClientShell/)
 })
 
 test('§B /work carries both groups under one shell; /tutor and /provider are gone', () => {
@@ -118,9 +118,10 @@ test('§B /work carries both groups under one shell; /tutor and /provider are go
     'app/work/(provider)/requests/[id]/page.tsx', 'app/work/(provider)/offers/page.tsx',
     // ⚠️ „რას ვყიდი?" IS ONE PAGE NOW (2026-08-19) and it is in NEITHER group:
     // /work/service-profile was the master's answer, the „სესიები" tab of
-    // /work/profile was the expert's, and /work/services is both halves behind
+    // /work/profile was the expert's; since 2026-08-30 it is the ONE editor for
+    // the row and /work/account is the switch and the password beside it.
     // its own gate. Pinned in full by tests/servicesPage.test.ts.
-    'app/work/services/page.tsx',
+    'app/work/account/page.tsx',
   ]) assert.ok(has(p), `${p} is missing`)
   // ⚠️ `app/work/_components/ProfileSignal.tsx` WAS IN THAT LIST AND IS DELETED
   // (2026-08-26). It diagnosed a profile by views-against-BOOKINGS and „free
@@ -183,7 +184,7 @@ test('§D the /work shell is chrome only: nothing without a session, groups by c
   // „ეს სივრცე ძველებურად არის მოწყობილი — კონსულტაციაზეა აგებული და ამიტომ
   // არაკომფორტულია." Nobody may reintroduce a group per kind of person, and
   // this is asserted by CALLING navFor rather than by matching how it is spelt.
-  const nav = read('components/tutor/navConfig.ts')
+  const nav = read('components/work/navConfig.ts')
   assert.doesNotMatch(nav, /export const PROVIDER_NAV/, 'the rail has a per-person group again')
 
   /* The home is one action, not a board of counts. */
@@ -211,7 +212,7 @@ test('§D the /work shell is chrome only: nothing without a session, groups by c
      ⚠️ THE RAIL IS THE SAME FOR BOTH GROUPS NOW, and that is the real change
      this pins: nothing in it depends on the allowlist any more. */
   assert.deepEqual(railOf({ work: true }), [
-    '/work', '/work/jobs', '/work/messages', '/work/services', '/work/profile',
+    '/work', '/work/jobs', '/work/messages', '/work/profile', '/work/account',
   ], 'the rail is no longer the service pipeline in order')
   assert.deepEqual(railOf({ work: false }), railOf({ work: true }),
     'a rail row depends on the allowlist again — every destination in it opens for both')
@@ -226,13 +227,15 @@ test('§D the /work shell is chrome only: nothing without a session, groups by c
     'the queue badge is not on the row that now leads to the queue')
 
   // ⚠️ THE TWO PAGES BOTH HALVES OPEN ARE IN EVERY RAIL. „რას ვყიდი"
-  // (/work/services) and „ვინ ვარ" (/work/profile) — /work/profile was inside
+  // ⚠️ ONE EDITOR SINCE 2026-08-30. „რას ვყიდი" and „ვინ ვარ" were two rows
+  // here because they were two tables; they became one row on 2026-08-24 and
+  // one page six days later. /work/profile was inside
   // the (expert) group until 2026-08-21, so a master had no profile page at all
   // and their photo lived inside „ჩემი სერვისები", which is why the rail read
   // as two products with one question answered twice.
   for (const g of [{ work: false }, { work: true }]) {
     const rail = railOf(g)
-    for (const href of ['/work', '/work/jobs', '/work/messages', '/work/services', '/work/profile']) {
+    for (const href of ['/work', '/work/jobs', '/work/messages', '/work/profile', '/work/account']) {
       assert.ok(rail.includes(href), `${JSON.stringify(g)} lost the shared destination ${href}`)
     }
   }
@@ -248,15 +251,15 @@ test('§D the /work shell is chrome only: nothing without a session, groups by c
   const jobs = navFor({ work: true }).flatMap(s => s.items).find(i => i.href === '/work/jobs')!
   assert.ok(jobs.match('/work/offers'), 'the jobs row stops lighting up on the offers page it now owns')
 
-  const sidebar = read('components/tutor/WorkspaceSidebar.tsx')
+  const sidebar = read('components/work/WorkspaceSidebar.tsx')
   assert.match(sidebar, /const sections = navFor\(groups\)/)
   assert.match(sidebar, /i > 0 \? '[^']*border-t/, 'the two groups are no longer visually separated')
   // The shell carries the retired provider bar's note and the real role.
-  const ws = read('components/tutor/WorkspaceShell.tsx')
+  const ws = read('components/work/WorkspaceShell.tsx')
   assert.match(ws, /ხედავ როგორც ადმინი — შეთავაზების დაწერა არ შეგიძლია\./)
   assert.match(ws, /onMasterScreen && !isProvider/)
   assert.match(ws, /<WorkspaceTopBar\s+user=\{user\}\s+role=\{role\}/)
-  assert.doesNotMatch(read('components/tutor/WorkspaceTopBar.tsx'), /role="TUTOR"/, 'the top bar hard-codes TUTOR again — a master gets the wrong menu')
+  assert.doesNotMatch(read('components/work/WorkspaceTopBar.tsx'), /role="TUTOR"/, 'the top bar hard-codes TUTOR again — a master gets the wrong menu')
 })
 
 /* ═══════════ 3. the redirects ════════════════════════════════════════════ */
@@ -323,26 +326,36 @@ test('§F the subsystem owns three /work screens, never /work — and the chrome
   // tabs, and the choice moved to the CAPABILITY, where it always belonged. The
   // ternary now selects the tab set directly. The ORDER is still the rule, and
   // it is still read off the same expression.
+  // ⚠️ TWO ASSERTIONS RETIRED HERE ON 2026-08-30, both for shapes the code no
+  // longer has. The ordering rule („the master test must run BEFORE the /work
+  // prefix test") protected a choice between two supply-side tab sets; there is
+  // one now, so there is no order to get wrong. And `/me/requests` left
+  // STUDENT_TABS with the rail row of the same name — the home IS the request
+  // list, so a tab for it opened the screen the first tab already opens.
   const tabExpr = nav.slice(nav.indexOf('const tabs ='), nav.indexOf('// Focused screens'))
   assert.ok(tabExpr.includes("path.startsWith('/me')"), 'BottomNav no longer reads the client space off the path')
-  assert.ok(
-    tabExpr.indexOf('isProviderWorkspacePath(path)') < tabExpr.indexOf("path.startsWith('/work')"),
-    'BottomNav space detection changed — the master test must run BEFORE the /work prefix test',
-  )
-  for (const href of ['/me', '/me/requests', '/me/favorites']) assert.ok(nav.includes(`href: '${href}'`), `STUDENT_TABS lost ${href}`)
-  for (const href of ['/work', '/work/jobs', '/work/messages', '/work/profile']) assert.ok(nav.includes(`href: '${href}'`), `TUTOR_TABS lost ${href}`)
-  // ⚠️ „შეთავაზებები" IS NOT A TAB ANY MORE (2026-08-21) — a sent offer is the
-  // first stage of a job, so /work/jobs owns the offers page and lights up on
-  // it, on the phone exactly as on the rail. What the master's bar must carry
-  // is the pipeline plus the two pages both halves open.
-  for (const href of ['/work/requests', '/work/jobs', '/work/services', '/work/profile']) {
+  assert.ok(tabExpr.includes("path.startsWith('/work')"), 'BottomNav no longer reads the provider space off the path')
+  for (const href of ['/me', '/me/favorites']) assert.ok(nav.includes(`href: '${href}'`), `STUDENT_TABS lost ${href}`)
+  // ⚠️ ONE SUPPLY-SIDE SET SINCE 2026-08-30, so the two loops that stood here —
+  // one for TUTOR_TABS, one for PROVIDER_TABS — are one loop, and it is the
+  // rail's five rows exactly (components/work/navConfig → WORKSPACE_NAV).
+  // „მოთხოვნები" is not among them and must not be: the rail collapsed it into
+  // „სამუშაოები" (owner: „ერთი ნაკადი გახდეს") because an open request, the
+  // offer sent for it and the work won are three stages of ONE job. The tab
+  // LIGHTS UP on that path instead, which is asserted just below.
+  // ⚠️ FOUR, NOT FIVE (2026-08-30). „ანგარიში" is a rail row and deliberately
+  // NOT a phone tab: five tabs is the ceiling on a bottom bar, and a password
+  // is not something anybody reaches for from one. The four below are the ones
+  // a provider actually moves between.
+  for (const href of ['/work', '/work/jobs', '/work/messages', '/work/profile']) {
     assert.ok(nav.includes(`href: '${href}'`), `PROVIDER_TABS lost ${href}`)
   }
   const providerTabs = nav.slice(nav.indexOf('const PROVIDER_TABS'), nav.indexOf('// Keyed by the two roles'))
-  assert.doesNotMatch(providerTabs, /href: '\/work\/offers'/,
-    'the offers page is a phone tab of its own again')
-  assert.match(providerTabs, /startsWith\('\/work\/offers'\)/,
-    'nothing on the master\'s phone bar lights up on the offers page')
+  for (const gone of ['/work/offers', '/work/requests']) {
+    assert.ok(!providerTabs.includes(`href: '${gone}'`), `${gone} is a phone tab of its own again`)
+    assert.ok(providerTabs.includes(`startsWith('${gone}')`),
+      `nothing on the provider's phone bar lights up on ${gone}`)
+  }
   // ⚠️ AND THE HOME (2026-08-21). /work is the only screen that draws the
   // balance and runs the grant; a phone with no tab for it made the feature
   // desktop-only, which is how „the credits do not exist" was reported.
@@ -406,3 +419,68 @@ test('§G no live /student, /tutor or /provider link survives in app, components
   // address is an offender, not a carry.
   assert.equal(carried.length, 0, `nothing may carry an old address any more: ${carried.length}`)
 })
+
+/* ═══════════ 6. one header rule, both rooms ══════════════════════════════ */
+
+test('the eyebrow names a parent you cannot see — never the room you are in', () => {
+  // ⚠️ THE RULE AND ITS EVIDENCE LIVE IN components/PageHeader. Audited
+  // 2026-08-30: eight headers, four with an eyebrow and four without, and
+  // nothing deciding which. The four disagreed about what an eyebrow even
+  // names — the space, the thing, or the title again.
+  //
+  // On a top-level page the eyebrow names the room, which the rail is already
+  // saying in a lit row ~40px to its left. On a DETAIL page it is the one fact
+  // the screen cannot otherwise give you. So: detail pages only.
+  const DETAIL = [
+    'app/work/(provider)/offers/[offerId]/page.tsx',
+    'app/work/(provider)/requests/[id]/page.tsx',
+  ]
+  const withEyebrow: string[] = []
+  for (const f of tsxUnderSpaces()) {
+    const s = codeOf(f)
+    if (/<PageHeader[\s\S]{0,240}?eyebrow=/.test(s)) withEyebrow.push(f)
+  }
+  assert.deepEqual(withEyebrow.sort(), [...DETAIL].sort(),
+    'a top-level page grew an eyebrow again — the rail already says where you are')
+})
+
+test('a page title is the rail row that was clicked', () => {
+  // Clicking „პროფილი" and landing on „ჩემი პროფილი" is a small dissonance
+  // paid on every page. „ჩემი" inside somebody's own workspace answers a
+  // question nobody asked — except where it separates two real things, which
+  // is why „ჩემი სერვისები" (mine, not the catalogue's) keeps it.
+  const labels = new Set(WORKSPACE_NAV.map(i => i.label))
+  // ⚠️ „პროფილი" BECAME „ჩემი გვერდი" ON 2026-08-30. The row is the same
+  // destination; the word changed because the page stopped being half of the
+  // answer — it is now everything a client reads, services and prices included.
+  assert.ok(labels.has('ჩემი გვერდი'), 'the provider rail lost its profile row')
+  assert.ok(labels.has('ანგარიში'), 'the provider rail lost its account row')
+  for (const [file, title] of [
+    ['app/me/profile/page.tsx', 'პროფილი'],
+    // ⚠️ `app/me/requests/page.tsx` WAS HERE AND IS A REDIRECT NOW (2026-08-30):
+    // the home draws the list, and a home's title is a greeting in both rooms,
+    // so it has no rail-row title to match.
+    ['app/work/(provider)/offers/page.tsx', 'შეთავაზებები'],
+  ] as const) {
+    assert.match(read(file), new RegExp(`title="${title}"`),
+      `${file} no longer titles itself the way its rail row is spelled`)
+  }
+  for (const f of ['app/me/profile/page.tsx', 'app/work/(provider)/offers/page.tsx']) {
+    assert.doesNotMatch(read(f), /title="ჩემი /,
+      `${f} put „ჩემი" back in front of a title inside the reader's own workspace`)
+  }
+})
+
+/** Every .tsx under the two workspaces. */
+function tsxUnderSpaces(): string[] {
+  const out: string[] = []
+  const walk = (rel: string) => {
+    for (const name of readdirSync(join(ROOT, rel))) {
+      const r = `${rel}/${name}`
+      if (statSync(join(ROOT, r)).isDirectory()) walk(r)
+      else if (name.endsWith('.tsx')) out.push(r)
+    }
+  }
+  walk('app/work'); walk('app/me')
+  return out
+}

@@ -27,7 +27,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pricedServices, lowestPrice } from '../lib/serviceProfile'
-import { MasterApplicationInput } from '../lib/masterApplication'
+import { ProviderApplicationInput } from '../lib/providerApplication'
 
 const ROOT = join(__dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -94,16 +94,16 @@ test('a price for an unticked service is refused at the door', () => {
     yearsExp: 12, calloutFee: null, priceFrom: null,
     photoUrl: null, workPhotos: [],
   }
-  assert.equal(MasterApplicationInput.safeParse({ ...base, priceList: { 'clean-flat': 60 } }).success, true)
-  assert.equal(MasterApplicationInput.safeParse({ ...base, priceList: {} }).success, true, 'pricing nothing must stay legal')
-  assert.equal(MasterApplicationInput.safeParse({ ...base, priceList: { 'plumb-leak': 40 } }).success, false,
+  assert.equal(ProviderApplicationInput.safeParse({ ...base, priceList: { 'clean-flat': 60 } }).success, true)
+  assert.equal(ProviderApplicationInput.safeParse({ ...base, priceList: {} }).success, true, 'pricing nothing must stay legal')
+  assert.equal(ProviderApplicationInput.safeParse({ ...base, priceList: { 'plumb-leak': 40 } }).success, false,
     'a price for a service the applicant does not offer was accepted')
-  assert.equal(MasterApplicationInput.safeParse({ ...base, priceList: { 'clean-flat': 0 } }).success, false,
+  assert.equal(ProviderApplicationInput.safeParse({ ...base, priceList: { 'clean-flat': 0 } }).success, false,
     'a zero price was accepted — it prints as „0₾"')
   // Absent is legal and means „ask" — every application written before the
   // column existed parses unchanged.
   const { priceList: _drop, ...noList } = { ...base, priceList: {} }
-  assert.equal(MasterApplicationInput.safeParse(noList).success, true, 'an older application body stopped parsing')
+  assert.equal(ProviderApplicationInput.safeParse(noList).success, true, 'an older application body stopped parsing')
 })
 
 /* ── C. It survives the trip to a profile ─────────────────────────────────── */
@@ -111,8 +111,8 @@ test('a price for an unticked service is refused at the door', () => {
 test('the price list is carried, not collected and dropped', () => {
   // The photo taught this lesson once: the application collected a face,
   // approval created a profile without one, and the card had nothing to draw.
-  assert.match(read('app/api/master-applications/route.ts'), /priceList: d\.priceList/, 'the application stopped storing it')
-  assert.match(read('app/api/master-applications/[id]/route.ts'), /priceList: app\.priceList \?\? \{\}/,
+  assert.match(read('app/api/provider-applications/route.ts'), /priceList: d\.priceList/, 'the application stopped storing it')
+  assert.match(read('app/api/provider-applications/[id]/route.ts'), /priceList: app\.priceList \?\? \{\}/,
     'approval creates a profile without the prices the applicant gave')
   assert.match(read('lib/dbBoot.ts'), /"ServiceProfile" ADD COLUMN IF NOT EXISTS "priceList" JSONB/,
     'the column is not created at boot — it exists in schema.prisma and nowhere else')

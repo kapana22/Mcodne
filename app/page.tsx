@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureDbReadyWithin } from '@/lib/dbBoot'
 import { initialMe } from '@/lib/meServer'
 import { queryProviders } from './experts/_providers'
-import { expertCountsBySphere } from '@/lib/categoryCounts'
+import { expertCountsByCategory } from '@/lib/categoryCounts'
 import { ABROAD_CATEGORY_SLUG } from '@/lib/abroad'
 import { homeItems } from '@/lib/homeCatalogue'
 import type { CatalogueCardItem } from '@/components/home/CatalogueGrid'
@@ -84,7 +84,7 @@ const jsonLd = (description: string) => ({
  * ⚠️ POPULATED ONLY, and the count on the tile is why. A tile that leads to
  * „ვერ ვიპოვეთ" is a dead end the visitor built for us; printing the measured
  * number beside the name is that same promise made checkable BEFORE the click.
- * `expertCountsBySphere` is the fold the catalogue's own filter counts with, so
+ * `expertCountsByCategory` is the fold the catalogue's own filter counts with, so
  * the tile and the page it opens can never disagree.
  *
  * ⚠️ THE WHOLE TREE IS READ, NOT JUST THE VISIBLE ROWS: the fold needs a
@@ -97,7 +97,7 @@ async function homeCategories(): Promise<HomeCat[]> {
     orderBy: [{ order: 'asc' }, { name: 'asc' }],
     select: { id: true, slug: true, name: true, status: true, parentId: true },
   })
-  const counts = await expertCountsBySphere(all)
+  const counts = await expertCountsByCategory(all)
   return all
     // The /abroad marker is not a sphere anybody should be filed under
     // (lib/abroad) and never belongs in a browse list.

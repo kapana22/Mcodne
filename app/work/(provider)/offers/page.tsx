@@ -43,7 +43,7 @@ export default async function Page() {
   if (!p) {
     return (
       <>
-        <PageHeader eyebrow="შეთავაზებები" title="ჩემი შეთავაზებები" />
+        <PageHeader title="შეთავაზებები" />
         <div className="mt-6">
           <EmptyState
             icon={<Icon.doc className="w-6 h-6" />}

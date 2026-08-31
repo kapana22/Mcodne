@@ -71,7 +71,7 @@ export const buildProfileChecks = (
   // polished the rest of it is.
   //
   // ⚠️ „აირჩიე ქალაქი" WAS A CHECK AND IT WAS WORTH 8 (removed 2026-08-29).
-  // `CITIES` holds one city, so it scored a choice nobody has: /work/services
+  // `CITIES` holds one city, so it scored a choice nobody has: the editor
   // stopped drawing the block and the PUT now fills it in, which would have
   // made this 8 points that arrive on their own and say nothing about whether
   // a profile is worth reading. Its weight went to the two fields a client
@@ -79,15 +79,22 @@ export const buildProfileChecks = (
   // two that were already the highest. Restore the check, at whatever it is
   // then worth, on the day a second city opens.
   return [
+    // ⚠️ THE FIRST TWO ANCHORS WERE ANOTHER PAGE UNTIL 2026-08-30, and that is
+    // the shape this checklist was describing: „services" and „price" sent the
+    // provider to /work/services while the four below scrolled within
+    // /work/profile — one list, two destinations, because one row had two
+    // editors. There is one editor now, so all six are in-page anchors and the
+    // card no longer navigates away from the form it is scoring.
+    //
     // ⚠️ „HAS ONE" IS NOT THE QUESTION ANY MORE (2026-08-25). Every migrated
     // provider has four to eight, because the migration seeded their whole
     // sphere — so this check read DONE for exactly the people whose list is
     // least likely to be true. What has to be asked is whether they have ever
     // LOOKED at it; `servicesConfirmedAt` is stamped by the save on
-    // /work/services and is null until then.
+    // the one editor and is null until then.
     { id: 'services',    label: servicesConfirmed ? 'აირჩიე სერვისი, რომელსაც ყიდი' : 'გადახედე სერვისების სიას — ჩვენ შევავსეთ',
-      done: services.length >= 1 && servicesConfirmed, weight: 15, anchor: '/work/services' },
-    { id: 'price',       label: 'დაწერე ფასი ერთ სერვისს მაინც',       done: hasPricedService(profile?.priceList), weight: 12, anchor: '/work/services' },
+      done: services.length >= 1 && servicesConfirmed, weight: 15, anchor: '#section-services' },
+    { id: 'price',       label: 'დაწერე ფასი ერთ სერვისს მაინც',       done: hasPricedService(profile?.priceList), weight: 12, anchor: '#section-services' },
     { id: 'bio',         label: 'დაწერე აღწერა (მინ. 100 სიმბოლო)',     done: about.length >= 100,           weight: 25, anchor: '#section-public-profile' },
     { id: 'headline',    label: 'დაწერე მოკლე სათაური (მინ. 20 სიმბოლო)', done: headline.length >= 20,       weight: 20, anchor: '#section-public-profile' },
     { id: 'avatar',      label: 'ატვირთე პროფილის ფოტო',                done: !!avatarUrl,                   weight: 18, anchor: '#section-avatar' },

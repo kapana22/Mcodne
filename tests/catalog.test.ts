@@ -38,6 +38,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { LIVE_OFFER_GROUPS } from '../lib/serviceProfile'
+import { LIVE_SERVICE_GROUP_IDS } from '../lib/requestTopics'
 
 const ROOT = join(__dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -127,7 +129,7 @@ test('ONE server page at /experts, loading the whole roster, and no second catal
   assert.match(read(PAGE), /<CatalogClient/, 'the page does not render the catalogue container')
   assert.doesNotMatch(read(PAGE), /redirect\(/, 'the catalogue URL must answer, never redirect')
   // The roster is loaded UNFILTERED — the browser narrows it — and its VISIBLE
-  // rule is untouched (pinned in full by tests/masterProfile.test.ts).
+  // rule is untouched (pinned in full by tests/providerProfile.test.ts).
   assert.match(read(PAGE), /queryProviders\(\{\s+groups:\s+\[\],\s+topics:\s+\[\],\s+cities:\s+\[\]\s+\}\)/)
   assert.match(read(WORK_DATA), /available: true/)
   assert.match(read(WORK_DATA), /published: true/)
@@ -184,7 +186,7 @@ test('one taxonomy, and every section is always drawn', () => {
   const rail = read(RAIL)
   assert.doesNotMatch(rail, /FilterGroup title="კატეგორია"/, 'the rail went back to one unnamed category list')
   const proIdx = rail.indexOf('FilterGroup title="პროფესიული სერვისები"')
-  const dayIdx = rail.indexOf('FilterGroup title="სერვისი"')
+  const dayIdx = rail.indexOf('FilterGroup title="ყოველდღიური სერვისები"')
   assert.ok(proIdx > -1, 'the professional block is gone')
   assert.ok(dayIdx > -1, 'the everyday block is gone')
   assert.ok(proIdx < dayIdx, 'the services block is drawn before the professional one')
@@ -192,7 +194,7 @@ test('one taxonomy, and every section is always drawn', () => {
   const pro = rail.slice(proIdx, dayIdx)
   const day = rail.slice(dayIdx)
   assert.match(pro, /liveCats/, 'the professional block lost the admin categories')
-  assert.match(day, /LIVE_OFFER_GROUPS/, 'the everyday block lost the trades')
+  assert.match(day, /EVERYDAY_OFFER_GROUPS/, 'the everyday block lost the trades')
   assert.match(pro, /\.sort\(\(a, b\) => b\.count - a\.count\)/, 'rows inside a block are no longer ordered by what has people')
   assert.match(day, /\.sort\(\(a, b\) => b\.count - a\.count\)/, 'rows inside a block are no longer ordered by what has people')
   // …and each still writes its own state field, because they filter different
@@ -202,6 +204,36 @@ test('one taxonomy, and every section is always drawn', () => {
   for (const section of ['title="ფასი"', 'title="ენა"', 'title="მინ. რეიტინგი"', 'title="ქალაქი"']) {
     assert.ok(rail.indexOf(section) > -1, `the section ${section} is gone`)
   }
+})
+
+test('the two filter blocks never name the same thing twice', () => {
+  /* ⚠️ WHAT WENT WRONG. The everyday block drew ALL of LIVE_OFFER_GROUPS — 28
+     groups, 20 of them professional — while the block above it drew the admin
+     categories, whose slugs are the same words. Thirteen slugs were listed in
+     both: business, law, marketing, it, design, psychology, career, media,
+     relocation, grants, logistics, health, agriculture. Worse, the two are
+     counted by different queries over different columns, so „მარკეტინგი და
+     გაყიდვები" carried 6 in one block and 5 in the other on the live rail.
+     This asserts the PROPERTY rather than the fix: whatever either block is
+     fed from later, the two vocabularies may not intersect. */
+  const everyday = LIVE_OFFER_GROUPS.filter(g => LIVE_SERVICE_GROUP_IDS.includes(g.id))
+  assert.ok(everyday.length > 0, 'the everyday block has nothing to draw')
+
+  // The professional block is fed by Category rows, whose slugs the seed and
+  // the admin both write. These are the ones that exist today; the guarantee is
+  // that no group id in the everyday block collides with any of them.
+  const categorySlugs = new Set([
+    'business', 'tax', 'law', 'marketing', 'it', 'psychology', 'design', 'career',
+    'media', 'grants', 'relocation', 'logistics', 'health', 'agriculture',
+    'real-estate', 'tourism', 'remonti', 'swavleba', 'medicine', 'architecture',
+  ])
+  const clash = everyday.filter(g => categorySlugs.has(g.id)).map(g => g.id)
+  assert.deepEqual(clash, [], `these ids are drawn in BOTH filter blocks: ${clash.join(', ')}`)
+
+  // And the everyday block is exactly the everyday half — not the whole roster,
+  // which is the shape that caused the overlap.
+  assert.ok(everyday.length < LIVE_OFFER_GROUPS.length,
+    'the everyday block is drawing the entire roster again')
 })
 
 /* ═══════════ the model ══════════════════════════════════════════════════ */
@@ -248,7 +280,7 @@ test('neither list query names a base64 column', () => {
     assert.doesNotMatch(read(f), BLOB, `${f} selects a base64 column into a list`)
   }
   // The card points at the route instead, with a cache-busting stamp.
-  assert.match(read(WORK_DATA), /\/api\/masters\/\$\{r\.id\}\/photo\?v=/)
+  assert.match(read(WORK_DATA), /\/api\/providers\/\$\{r\.id\}\/photo\?v=/)
 })
 
 test('ONE card, rendered through EntityCard', () => {

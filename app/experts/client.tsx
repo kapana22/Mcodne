@@ -211,7 +211,7 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
   // Reset returns the page to what the address alone shows: EVERYBODY.
   const resetFilters = () => setFilters({ ...EMPTY_FILTERS, price: [0, NO_CAP] })
 
-  // The admin-managed SPHERES (GET /api/categories → VISIBLE only). Starts empty
+  // The admin-managed CATEGORIES (GET /api/categories → VISIBLE only). Starts empty
   // → the sphere filter is hidden until this resolves (and stays hidden if the
   // fetch fails), so we never show a dead/unmatched chip.
   const [liveCats, setLiveCats] = useState<LiveCat[]>([])

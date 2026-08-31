@@ -35,7 +35,7 @@ export async function GET(req: Request) {
       provider: {
         // ⚠️ NEVER THE BLOBS. `photoUrl` and `workPhotos` are base64 columns;
         // a page of saved cards would carry megabytes of them. The card points
-        // at /api/masters/[id]/photo instead.
+        // at /api/providers/[id]/photo instead.
         omit: { photoUrl: true, workPhotos: true },
         include: {
           user: { select: { id: true, fullName: true, avatarUrl: true } },

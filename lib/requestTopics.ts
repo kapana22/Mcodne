@@ -339,29 +339,65 @@ export function timingLabel(kind: RequestKindName, id: string): string {
  */
 export type ExtraQuestion = { id: string; label: string; options: readonly { id: string; label: string }[] }
 
-const LEARNING_EXTRAS: ExtraQuestion[] = [
-  {
-    id: 'audience',
-    label: 'ვისთვის',
-    options: [
-      { id: 'primary',   label: 'დაწყებითი კლასები' },
-      { id: 'pupil',     label: 'სკოლის მოსწავლე' },
-      { id: 'abiturient',label: 'აბიტურიენტი' },
-      { id: 'student',   label: 'სტუდენტი' },
-      { id: 'adult',     label: 'ზრდასრული' },
-    ],
-  },
-  {
-    id: 'level',
-    label: 'რა დონეა',
-    options: [
-      { id: 'beginner',     label: 'დამწყები' },
-      { id: 'intermediate', label: 'საშუალო' },
-      { id: 'advanced',     label: 'მაღალი' },
-      { id: 'unsure',       label: 'არ ვიცი' },
-    ],
-  },
-]
+/* ⚠️ THE SCHOOL FRAME IS NOT THE SITE (2026-08-30). „ვისთვის: დაწყებითი
+   კლასები / სკოლის მოსწავლე / აბიტურიენტი" was asked of EVERY learning
+   request, whatever the subject — so somebody who wanted to learn
+   ვებდეველოპმენტი was asked which year of school they were in. Owner: „როცა
+   ვებ დეველოპერთან კავშირი მინდა, რატომ უნდა მინდოდეს რომ ავირჩიო
+   დაწყებითების კლასი".
+   The audience question is real, and it belongs to a SHAPE of subject rather
+   than to the kind: a fifth-grader's chemistry has an audience, React does
+   not. `SCHOOLING_GROUPS` below is the list where the learner really is a
+   pupil; everywhere else the question is simply not asked. */
+const AUDIENCE_SCHOOL: ExtraQuestion = {
+  id: 'audience',
+  label: 'ვისთვის',
+  options: [
+    { id: 'primary',   label: 'დაწყებითი კლასები' },
+    { id: 'pupil',     label: 'სკოლის მოსწავლე' },
+    { id: 'abiturient',label: 'აბიტურიენტი' },
+    { id: 'student',   label: 'სტუდენტი' },
+    { id: 'adult',     label: 'ზრდასრული' },
+  ],
+}
+
+/** Universal to LEARNING — a beginner and an advanced learner are not the
+ *  same hour's work, whatever the subject. */
+const LEVEL: ExtraQuestion = {
+  id: 'level',
+  label: 'რა დონეა',
+  options: [
+    { id: 'beginner',     label: 'დამწყები' },
+    { id: 'intermediate', label: 'საშუალო' },
+    { id: 'advanced',     label: 'მაღალი' },
+    { id: 'unsure',       label: 'არ ვიცი' },
+  ],
+}
+
+/* ⚠️ MEETING ASKS NOTHING HERE, AND THAT IS THE ANSWER — checked 2026-08-30.
+   The obvious clarifier to add was „ონლაინ თუ პირისპირ", and it would have been
+   the SECOND time the wizard asked it: `stepsFor` already pushes a whole
+   `format` step titled „ონლაინ თუ ადგილზე?" for every kind but SERVICE
+   (app/request/_model.ts), it is stored in its own column, and the request page
+   prints it as „ფორმატი". A clarifier beside it would have been the same
+   question in a second vocabulary. Owner: „არ უნდა იყოს გართულებული." */
+
+/* ⚠️ PROJECT DELIBERATELY ASKS NOTHING. It asked nothing before this change
+   either — the difference is that it is now a decision instead of a gap.
+   Owner, 2026-08-30: „ყველაფერი უნდა იყოს სიმარტივისკენ წაყვანილი… ჯერ
+   მინიმალური ინფორმაცია უნდა გამოვითხოვოთ." A project already carries a
+   description, a budget band and a deadline; a fifth tap before the request is
+   filed buys the provider nothing the description does not already say. */
+
+/** Subjects whose learner is a pupil. Everywhere else the audience question is
+ *  not asked at all — see AUDIENCE_SCHOOL. */
+const SCHOOLING_GROUPS = new Set(['school', 'exams', 'higher', 'languages', 'arts', 'sport'])
+
+/** ⚠️ „სად: ბინაში / კერძო სახლში / ოფისში" IS NOT A UNIVERSAL QUESTION. It was
+ *  asked of every SERVICE request, so a website was asked which flat to come
+ *  to. Work that physically happens at an address is listed here; a service
+ *  delivered over a wire is not asked where. */
+const ONSITE_GROUPS = new Set(['cleaning', 'plumbing', 'electrical', 'repairs', 'appliances', 'moving', 'outdoor', 'systems', 'property'])
 
 /**
  * What a visiting master cannot quote without.
@@ -508,11 +544,46 @@ function groupIdOf(topicId: string): string | undefined {
  * is (the kind-wide question), then the trade's own detail. Both are one tap.
  */
 export function extrasFor(kind: RequestKindName, topic?: string): ExtraQuestion[] {
-  if (kind === 'LEARNING') return LEARNING_EXTRAS
-  if (kind !== 'SERVICE') return []
+  /* ⚠️ THE TOPIC DECIDES, NOT THE KIND (2026-08-30). This function used to read
+     `if (kind === 'LEARNING') return LEARNING_EXTRAS` and hand the SAME two
+     school questions to every subject, then `if (kind !== 'SERVICE') return []`
+     and hand MEETING and PROJECT nothing at all. Measured on „ვებდეველოპმენტი"
+     before the change: LEARNING asked which year of school, SERVICE asked which
+     flat to come to, MEETING and PROJECT asked nothing. Four kinds, four wrong
+     answers, for a topic the site sells.
+     The docstring above this block already promised „PER KIND TODAY, BUILT TO GO
+     PER TOPIC" — the lookup took `topic` and used it on one branch out of four.
+     It uses it on all of them now.
+     AND IT ASKS LESS THAN IT DID. Owner: „ჯერ მინიმალური ინფორმაცია უნდა
+     გამოვითხოვოთ." A skill subject drops from two questions to one, a digital
+     service from one to none, and a meeting gains the single question it cannot
+     be arranged without. Nothing here asks a second time what the description
+     already says. */
   const group = topic ? groupIdOf(topic) : undefined
-  const perTrade = group ? GROUP_EXTRAS[group] ?? [] : []
-  return [...SERVICE_EXTRAS, ...perTrade]
+  switch (kind) {
+    case 'LEARNING':
+      /* ⚠️ THE DEFAULT IS THE SIMPLE ONE, and that is the whole point of the
+         rule. An unlisted group — a new one, or „სხვა" typed by hand — gets the
+         level question and nothing else. The school pair is opt-IN, held by the
+         six groups whose learner really is a pupil, so the frame can never
+         spread back over the catalogue as it grows. Owner: „ზოგადადი უნდა იყოს
+         რომ ყველაფერს ერგებოდეს." */
+      return SCHOOLING_GROUPS.has(group ?? '') ? [AUDIENCE_SCHOOL, LEVEL] : [LEVEL]
+    case 'MEETING':
+    case 'PROJECT':
+      // Both already carry description, budget, timing — and MEETING carries
+      // the format step too. Nothing here is worth a fifth tap.
+      return []
+    case 'SERVICE': {
+      // The per-trade question is the sharp one („წყალი ახლა გადმოდის") and it
+      // is only ever defined for work that happens at an address, so it rides
+      // with the place question rather than beside it.
+      // Same rule, same direction: „სად" is opt-in, held by the groups whose
+      // work has an address. Anything else — and anything new — asks nothing.
+      if (!ONSITE_GROUPS.has(group ?? '')) return []
+      return [...SERVICE_EXTRAS, ...(GROUP_EXTRAS[group ?? ''] ?? [])]
+    }
+  }
 }
 
 /**

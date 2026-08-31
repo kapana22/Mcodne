@@ -38,7 +38,7 @@ export async function GET() {
     // reason as the two below: a badge is never worth 500-ing the whole admin
     // shell over, and every other number on the panel would go down with it.
     providersFeatureExists()
-      ? prisma.masterApplication.count({ where: { status: 'SUBMITTED' } }).catch(() => 0)
+      ? prisma.providerApplication.count({ where: { status: 'SUBMITTED' } }).catch(() => 0)
       : Promise.resolve(0),
     // The help-chat badge rides along here rather than on its own request. It
     // used to be a separate `/api/admin/help?days=7` call fired from the shell
@@ -98,10 +98,10 @@ export async function GET() {
     // ⚠️ TWO NAMES, ONE NUMBER. There were two application queues until
     // 2026-08-24 — the consultation form and the service one — and two counts to
     // match. The overview tile still reads `pendingApps` and the nav badge still
-    // reads `pendingMasters`; both are answered with the one queue that exists,
+    // reads `pendingProviders`; both are answered with the one queue that exists,
     // because leaving either undefined renders as „no applications waiting",
     // which is a lie the operator cannot see.
-    pendingMasters: pendingApps,
+    pendingProviders: pendingApps,
     awaitingOffers,
     stalled24h,
     offersSent,

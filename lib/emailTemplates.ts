@@ -196,7 +196,7 @@ export function googleLinkedEmail(name: string) {
 // day; a master who misses theirs is the supply side of a vertical that has no
 // supply, and they are the person we asked to upload a photo of their face.
 
-export function newMasterApplicationAdminEmail(o: {
+export function newProviderApplicationAdminEmail(o: {
   name: string; kind: string; company?: string | null
   services: string[]; areas: string[]; phone?: string | null; email?: string | null
 }) {
@@ -224,7 +224,7 @@ export function newMasterApplicationAdminEmail(o: {
 // whole point of the message. /provider is reachable from nowhere on the site —
 // not the header, not the user menu — so until this mail existed an approved
 // master's only route in was to guess the URL or wait for the next sign-in.
-export function masterApprovedEmail(o: { name: string; note?: string | null }) {
+export function providerApprovedEmail(o: { name: string; note?: string | null }) {
   const first = (o.name || '').trim().split(/\s+/)[0] || ''
   return {
     subject: 'დამტკიცდი — მოთხოვნები უკვე მოგდის',
@@ -248,7 +248,7 @@ export function masterApprovedEmail(o: { name: string; note?: string | null }) {
 
 // The note is the message. A revision request without its reason is „fix it"
 // and nothing else, which is why the endpoint refuses to send one without.
-export function masterRevisionEmail(o: { name: string; note: string }) {
+export function providerRevisionEmail(o: { name: string; note: string }) {
   const first = (o.name || '').trim().split(/\s+/)[0] || ''
   return {
     subject: 'განაცხადს ერთი რამ აკლია',
@@ -265,7 +265,7 @@ export function masterRevisionEmail(o: { name: string; note: string }) {
 // Sent, not silent. A refusal nobody is told about is somebody waiting for a
 // call that will not come — and /apply/master used to render nothing at all for
 // this status, so they could not have found out by visiting either.
-export function masterRejectedEmail(o: { name: string; note: string }) {
+export function providerRejectedEmail(o: { name: string; note: string }) {
   const first = (o.name || '').trim().split(/\s+/)[0] || ''
   return {
     subject: 'განაცხადი არ დამტკიცდა',

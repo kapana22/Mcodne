@@ -47,7 +47,7 @@ export async function GET() {
       )
       .then(r => Boolean(r[0]?.installed))
       .catch(() => false),
-    prisma.masterApplication.count({ where: { status: 'SUBMITTED' } }),
+    prisma.providerApplication.count({ where: { status: 'SUBMITTED' } }),
     // Publicly listed providers = the catalogue's own visibility rule.
     prisma.serviceProfile.count({
       where: { available: true, published: true, user: { suspendedAt: null } },

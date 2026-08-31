@@ -230,9 +230,15 @@ export type QueueScope =
   | { mode: 'ALL' }
   /** They have a service profile and switched it off. Their own control. */
   | { mode: 'PAUSED' }
-  /** They offer nothing we can narrow by. `fix` is the editor that owns the
-   *  gap, so the empty state's one link goes where the answer is typed. */
-  | { mode: 'UNLISTED'; fix: 'SERVICES' | 'PROFILE' }
+  /** They offer nothing we can narrow by.
+   *
+   *  ⚠️ IT CARRIED A `fix` UNTIL 2026-08-30 — „SERVICES" or „PROFILE", naming
+   *  WHICH of the two editors owned the empty field, so the queue's empty state
+   *  could send them to the right one. There is one editor now (/work/profile,
+   *  „ჩემი გვერდი"), so the discriminator had one value in practice and no
+   *  reader at all in code. A field nothing reads is a control that lies:
+   *  removed rather than left switched off. */
+  | { mode: 'UNLISTED' }
   /** Narrowed to the facts they published. */
   | {
       mode: 'FILTERED'
@@ -251,7 +257,7 @@ export type QueueScope =
  * An admin must keep being able to INSPECT the queue: they are the only person
  * who can answer „why did this provider not get that request", and blinding
  * them to fix somebody else's screen would take a working tool away. The shell
- * already says so out loud — components/tutor/WorkspaceShell prints „ხედავ
+ * already says so out loud — components/work/WorkspaceShell prints „ხედავ
  * როგორც ადმინი — შეთავაზების დაწერა არ შეგიძლია" above every one of these
  * screens for a viewer with no provider identity — so the unnarrowed queue is
  * labelled where a person will read it, and this file does not have to invent
@@ -266,7 +272,7 @@ export type QueueScope =
 export function queueScope(o: QueueOffer): QueueScope {
   const svc = o.service
   // Paused silences the TRADES half only. `available` is „I am not taking
-  // service work this week" — it is the switch in „ჩემი სერვისები" and it says
+  // service work this week" — it is the switch on /work/account and it says
   // nothing about consultations, so a person who sells both keeps their expert
   // queue. It is still the whole answer for every master on the platform
   // today, because none of them holds a TutorProfile.
@@ -288,10 +294,10 @@ export function queueScope(o: QueueOffer): QueueScope {
   // Nothing to narrow by, so the only question left is which silence it is.
   if (svc && !svc.available) return { mode: 'PAUSED' }
   if (o.isAdmin) return { mode: 'ALL' }
-  // A company member has neither profile and lands here with the services
-  // editor as their fix, which is the right one: their company's row is what
-  // carries the trades.
-  return { mode: 'UNLISTED', fix: e && !svc ? 'PROFILE' : 'SERVICES' }
+  // A company member has neither profile and lands here too — their company's
+  // row is what carries the trades, and the one editor is where they would go
+  // to fill in their own.
+  return { mode: 'UNLISTED' }
 }
 
 /**

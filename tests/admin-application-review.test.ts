@@ -10,7 +10,7 @@
 // „[object Object],[object Object]" appearing where a moderator should have seen
 // an applicant's services and prices. Both the helpers and the panel went with
 // the consultation product; the SHAPE rules that replaced them live in
-// lib/masterApplication and are pinned by tests/masterApplication.test.ts.
+// lib/providerApplication and are pinned by tests/providerApplication.test.ts.
 //
 // What is left here is the half that is about the SCREEN rather than the shape,
 // and every rule below survived the move unchanged because none of them was
@@ -36,7 +36,7 @@ function check(name: string, cond: boolean, detail = '') {
 
 /* ═════ 1. the queue payload ════════════════════════════════════════════════ */
 
-const listRoute = read('app/api/admin/master-applications/route.ts')
+const listRoute = read('app/api/admin/provider-applications/route.ts')
 
 // `photoUrl`, `workPhotos` and `about` are base64 and long-text columns on the application
 // row. A 40-row queue that selects them is megabytes of payload to render forty
@@ -48,7 +48,7 @@ check(
 )
 check(
   'the photos load per OPENED row, not for the list',
-  read('app/admin/_masters.tsx').includes('detail.photoUrl'),
+  read('app/admin/_providers.tsx').includes('detail.photoUrl'),
   'the panel must read the photo off the detail fetch',
 )
 check('the list payload carries per-status counts', listRoute.includes('groupBy'))
@@ -59,7 +59,7 @@ check('the list payload carries per-status counts', listRoute.includes('groupBy'
 // person. `reject`/`revise` move only the APPLICATION's status — so on an
 // already-APPROVED row they would tell the applicant „განაცხადი უარყოფილია"
 // while the person stayed listed and routable, and tell the moderator nothing.
-const decideRoute = read('app/api/master-applications/[id]/route.ts')
+const decideRoute = read('app/api/provider-applications/[id]/route.ts')
 check(
   'a decision claims the row on „not already approved" rather than reading it first',
   /updateMany\(\{\s*where:\s*\{ id, status: \{ not: 'APPROVED' \} \}/.test(decideRoute),
@@ -76,7 +76,7 @@ check(
 )
 check(
   'the panel shows the server’s reason, not a generic line',
-  read('app/admin/_masters.tsx').includes('d?.message ||'),
+  read('app/admin/_providers.tsx').includes('d?.message ||'),
   'A refusal the moderator cannot read is a refusal they will retry.',
 )
 

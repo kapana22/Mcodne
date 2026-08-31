@@ -14,7 +14,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
-import { buildProfileChecks, profilePercent } from '@/lib/profileScore'
 import { requestAccessOf } from '@/lib/requestsServer'
 import { offerUnreadTotal } from '@/lib/inboxRows'
 import { ROLE } from '@/lib/roles'
@@ -45,23 +44,25 @@ export async function GET() {
   // not on the allowlist — an ADMIN browsing the workspace included.
   const messages = await offerUnreadTotal(await requestAccessOf(user.id))
 
-  if (!profile) {
-    // No profile at all (an ADMIN browsing the workspace): nothing to score.
-    return NextResponse.json({ ok: true, requests: 0, messages, reschedules: 0, profilePercent: 0, noAvailability: null })
-  }
-
-  const percent = profilePercent(buildProfileChecks(profile, user.avatarUrl))
+  // ⚠️ `profilePercent` LEFT THIS ROUTE ON 2026-08-30, and the reason is worth
+  // keeping. The rail's progress block was its only reader, polling it every 90
+  // seconds — so the block could not paint until the first poll returned, which
+  // is the „ნახევარს ტვირთავს და მერე ჩნდება" the owner reported that day. The
+  // rail reads the server layout now (app/work/layout → grantEarnedTasks), in
+  // the first paint.
+  //
+  // It was also the WRONG NUMBER for where it was drawn: lib/profileScore's
+  // weighted checks, sitting directly above a line derived from the grant's
+  // tasks — two different six-item lists. lib/profileScore is still right for
+  // the checklist on /work/profile, which is about whether a profile READS
+  // well; it was never the grant's measure.
 
   // ⚠️ AND THE THREE PLACEHOLDERS ARE GONE (2026-08-26). `requests: 0`,
   // `reschedules: 0` and `noAvailability: null` were kept because the browser's
   // badge reader still read them — „they go when that file does", said the note
-  // that stood here. That file went today: components/tutor/useNavBadges no
+  // that stood here. That file went today: components/work/useNavBadges no
   // longer has the keys, the pill they fed could never show a number, and the
   // modal `noAvailability` drove asked providers to publish calendar time that
   // has not existed since 2026-08-24.
-  return NextResponse.json({
-    ok: true,
-    messages,
-    profilePercent: percent,
-  })
+  return NextResponse.json({ ok: true, messages })
 }

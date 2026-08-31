@@ -26,8 +26,11 @@ import {
   ServiceProfileInput, LIVE_OFFER_GROUPS, sanitizeStored, profileGaps,
   KEPT_PHOTO, MAX_WORK_PHOTOS,
 } from '@/lib/serviceProfile'
+import { ASSIGNABLE_CATEGORY_WHERE } from '@/lib/categoryTree'
+import { ALL_PROFESSIONS, MAX_PROFESSIONS } from '@/lib/professions'
 import { grantEarnedTasks } from '@/lib/creditsServer'
 import { gelLabel } from '@/lib/credits'
+import { avatarSrc } from '@/lib/avatarSrc'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
@@ -48,7 +51,7 @@ const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { st
  *    „დამლაგებელი" for „ბინის დალაგება" (lib/requestTopics → Topic.alt).
  *    Measured on 2026-08-29: 45 of the 148 live topics carry 115 such words.
  *    A search over the printed label alone fails the exact person it is for.
- *    The intake has searched `alt` since it was built (app/join/_master);
+ *    The intake has searched `alt` since it was built (app/join/_provider);
  *    sending it here is what let the EDITOR do the same.
  *
  *  · `vertical` IS THE ORDER, NOT A FILTER. 20 professional groups are listed
@@ -76,28 +79,46 @@ export async function GET() {
   // MORE (2026-08-18, narrowed 2026-08-29). The photo is a base64 column of up
   // to a few hundred kilobytes and this response is fetched every time either
   // form opens, so returning it would ship the image twice — once here and once
-  // through /api/masters/[id]/photo, which is what actually draws it. Until
+  // through /api/providers/[id]/photo, which is what actually draws it. Until
   // 2026-08-29 a COUNT stood in for it so the face uploader could say „ფოტო
   // ატვირთულია"; that uploader is gone (one portrait control, the ავატარი
   // block) and nothing read the boolean, so the query went with it.
   //
   // The rule survives its instance: NO BLOB IN A FORM PAYLOAD. Same split
-  // /api/master-applications already uses.
+  // /api/provider-applications already uses.
   const row = await prisma.serviceProfile.findUnique({
     where: { userId: viewer.user.id },
     select: {
       id: true, services: true, areas: true, calloutFee: true, priceFrom: true,
       available: true, about: true, updatedAt: true,
-      // ⚠️ `headline` IS SENT SINCE 2026-08-29 — not to be edited here (that is
-      // /work/profile), but because the services editor now draws the card a
-      // client sees, and the sentence under the name is part of it. Read-only
-      // on this screen: `ServiceProfileInput` has never accepted it.
+      // ⚠️ `headline` WAS READ-ONLY HERE AND IS NOW EDITED HERE (2026-08-30).
+      // It arrived on 2026-08-29 so the services editor could draw the card a
+      // client sees — the sentence under the name is part of it — while
+      // /work/profile owned the field itself. There is one editor now, so the
+      // whole professional half is selected below and every one of these is
+      // writable through the PUT.
       headline: true,
+      // ⚠️ THE PROFESSIONAL HALF (2026-08-30). These are the columns
+      // `/api/me/provider` selected while it was the other writer of this row.
+      // `category` is INCLUDED rather than just its id, and the reason is the
+      // one that endpoint recorded: a provider can legitimately hold a sphere
+      // the picker no longer offers („ფინანსები" was absorbed into „ბიზნესი და
+      // ფინანსები"), and without the name their category renders as an EMPTY
+      // dropdown — which reads as „my category was deleted" while the „აირჩიე
+      // კატეგორია" warning stays silent, because the field is not empty.
+      categoryId: true,
+      category: { select: { id: true, slug: true, name: true, status: true } },
+      professions: true, yearsExp: true, languages: true,
+      linkedinUrl: true, websiteUrl: true,
+      // Have they ever said „yes, this is what I sell"? Null means never — the
+      // 27 migrated providers were seeded with their whole sphere, so „has a
+      // list" cannot answer it. The editor draws ConfirmServicesNote off this.
+      servicesConfirmedAt: true,
       // ⚠️ `priceList` IS SELECTED AND `workPhotos` IS NOT, and the difference
       // is size, not importance: the map is a handful of integers keyed by
       // topic id, the photos are up to six base64 images — the same reason
       // `photoUrl` is not here at all. The form is sent HOW MANY it holds and
-      // draws each one through /api/masters/[id]/photo?n=.
+      // draws each one through /api/providers/[id]/photo?n=.
       priceList: true,
     },
   })
@@ -113,7 +134,7 @@ export async function GET() {
   // instance of, not a casualty of it.
   // The LENGTH of the array, computed in SQL — `select: { workPhotos: true }`
   // would pull the megabyte this route exists not to pull. Same shape
-  // /api/master-applications uses to count the applicant's own.
+  // /api/provider-applications uses to count the applicant's own.
   const workPhotoCount = row
     ? (await prisma.$queryRawUnsafe<{ n: number }[]>(
         `SELECT COALESCE(array_length("workPhotos", 1), 0)::int AS n FROM "ServiceProfile" WHERE "id" = $1`,
@@ -127,6 +148,8 @@ export async function GET() {
   const stored = row ?? {
     id: null, services: [], areas: [], calloutFee: null, priceFrom: null,
     available: true, about: null, updatedAt: null, priceList: null, headline: null,
+    categoryId: null, category: null, professions: [], yearsExp: 0, servicesConfirmedAt: null,
+    languages: ['ka'], linkedinUrl: null, websiteUrl: null,
   }
   // The vocabulary moves; a row written last month may name a retired trade.
   const clean = sanitizeStored(stored)
@@ -134,6 +157,20 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     profile: { ...stored, ...clean },
+    // ⚠️ THE NAME AND THE FACE RIDE ALONG (2026-08-30). They are `User` columns,
+    // not this row's, and the editor draws them at the top of the same card —
+    // the name IS the largest text a client reads. Two scalars beside a payload
+    // this size, and it saves the merged form a second GET whose only job would
+    // be to fill in one field.
+    //
+    // ⚠️ AND THE FACE GOES THROUGH `avatarSrc`, NEVER RAW. `User.avatarUrl` holds
+    // a `data:` URI — files live in Postgres, not a bucket — so passing it
+    // through would put tens of kilobytes of base64 in a payload the editor
+    // fetches on every open, uncacheably. This hands back a URL to
+    // /api/avatars/[id], which the browser caches once. It is the rule
+    // tests/apiPayloadHygiene enforces, and it is invisible when broken: the
+    // page looks identical and is simply half a megabyte heavier.
+    user: { fullName: viewer.user.fullName, avatarUrl: avatarSrc(viewer.user.id, viewer.user.avatarUrl) },
     workPhotoCount,
     // „What is still missing", computed HERE rather than in the component, so
     // the page and the routing agree on what „ready" means.
@@ -174,7 +211,14 @@ export async function PUT(req: Request) {
   // it. Now each form sends only what it draws, and „replaced whole" still
   // holds for whatever DOES arrive: unticking every service sends
   // `services: []`, present and empty.
-  const { photoUrl, about, workPhotos, priceList, ...sent } = d
+  const {
+    photoUrl, about, workPhotos, priceList,
+    // The professional half, absorbed 2026-08-30 — pulled out of `sent` because
+    // three of them need work before they can be written and one of them is not
+    // even on this table.
+    fullName, categoryId, professions, linkedinUrl, websiteUrl,
+    ...sent
+  } = d
 
   // ⚠️ ONE CITY ANSWERS ITSELF, AND ONLY WHEN THE CITY WAS ASKED ABOUT
   // (2026-08-29). `CITIES` holds Tbilisi and nothing else, and the form stopped
@@ -236,6 +280,70 @@ export async function PUT(req: Request) {
       .slice(0, MAX_WORK_PHOTOS)
   }
 
+  /* ═════════ the professional half (2026-08-30) ═══════════════════════════
+     ⚠️ EVERY RULE BELOW CAME OVER FROM `/api/me/provider` UNCHANGED. This is
+     the same row it was writing; what moved is which endpoint the ONE editor
+     talks to. Where that file explained a decision, the explanation moved too —
+     losing it is how the rule gets „simplified" back into the bug it prevents. */
+
+  // ⚠️ THE CATEGORY IS CHECKED AGAINST WHAT THE PICKER ACTUALLY OFFERS, and
+  // this used to say `status: 'VISIBLE'`, which is not the same set. The editor
+  // draws the sub-fields absorbed into each sphere inside an <optgroup>, and
+  // every one of those is REDIRECTED — so 7 of 15 categories on screen were
+  // guaranteed 400s. And `categoryId` rides the same save as everything else,
+  // so choosing one did not merely fail: it took the whole form down.
+  //
+  // ⚠️ THE ONE THEY ALREADY HOLD ALWAYS PASSES, and that exception is
+  // load-bearing: the form sends `categoryId` on every save, and somebody whose
+  // sphere was later hidden by an admin must not lose the ability to edit their
+  // own page over an action they had no part in.
+  let category: { categoryId: string | null } | Record<string, never> = {}
+  if (categoryId !== undefined) {
+    if (categoryId === null) {
+      category = { categoryId: null }
+    } else {
+      const current = await prisma.serviceProfile.findUnique({
+        where: { userId: viewer.user.id },
+        select: { categoryId: true },
+      })
+      const cat = categoryId === current?.categoryId
+        ? { id: categoryId }
+        : await prisma.category.findFirst({
+          where: { ...ASSIGNABLE_CATEGORY_WHERE, id: categoryId },
+          select: { id: true },
+        })
+      // Say WHICH field refused. Without this the only signal was the generic
+      // sentence, which names nothing and is therefore unfixable from inside
+      // the screen.
+      if (!cat) {
+        return NextResponse.json({
+          ok: false, error: 'BAD_CATEGORY',
+          detail: 'ეს კატეგორია აღარ არის ხელმისაწვდომი — აირჩიე სხვა.',
+        }, { status: 400 })
+      }
+      category = { categoryId: cat.id }
+    }
+  }
+
+  // ⚠️ UNKNOWN ENTRIES ARE DROPPED, NOT REFUSED — the opposite of the rule on
+  // `services` one file over, and deliberately so. The vocabulary can be edited
+  // between this page loading and the save, and refusing the whole write would
+  // lose the bio, the prices and the photos somebody just typed alongside it.
+  // A service id, by contrast, decides who is ROUTED work: saving eleven of
+  // twelve ticks would leave a provider believing they are listed for something
+  // they are not.
+  const trade = professions === undefined ? {} : {
+    professions: [...new Set(
+      professions.map(p => p.trim()).filter(p => ALL_PROFESSIONS.some(x => x.job === p)),
+    )].slice(0, MAX_PROFESSIONS),
+  }
+
+  // Empty string means „clear it", which is why these are not just spread.
+  const links = {
+    ...(linkedinUrl !== undefined ? { linkedinUrl: (linkedinUrl ?? '').trim() || null } : {}),
+    ...(websiteUrl !== undefined ? { websiteUrl: (websiteUrl ?? '').trim() || null } : {}),
+  }
+
   const media = {
     ...(photoUrl !== undefined ? { photoUrl } : {}),
     ...(about !== undefined ? { about } : {}),
@@ -246,15 +354,33 @@ export async function PUT(req: Request) {
     ...(priceList !== undefined ? { priceList } : {}),
   }
 
-  const saved = await prisma.serviceProfile.upsert({
-    where: { userId: viewer.user.id },
-    create: { userId: viewer.user.id, ...core, ...media },
-    update: { ...core, ...media, ...confirmed },
-    select: {
-      services: true, areas: true, calloutFee: true, priceFrom: true,
-      available: true, about: true, updatedAt: true, priceList: true,
-    },
-  })
+  /* ⚠️ ONE TRANSACTION, BECAUSE THERE IS ONE SAVE BUTTON (2026-08-30).
+     `fullName` lives on `User` and everything else on `ServiceProfile`, and the
+     editor writes both from a single press. Two awaits in sequence would leave a
+     window where the name saved and the page did not — and a form that reports
+     „შენახულია ✓" over a half-written profile is the failure this merge exists
+     to remove, not a smaller version of it. */
+  const [, saved] = await prisma.$transaction([
+    prisma.user.update({
+      where: { id: viewer.user.id },
+      // No name sent (the account page, or an older client) means leave it: the
+      // same „absent means leave it alone" rule every field on this route obeys.
+      data: fullName !== undefined ? { fullName } : {},
+      select: { id: true },
+    }),
+    prisma.serviceProfile.upsert({
+      where: { userId: viewer.user.id },
+      create: { userId: viewer.user.id, ...core, ...media, ...category, ...trade, ...links },
+      update: { ...core, ...media, ...category, ...trade, ...links, ...confirmed },
+      select: {
+        services: true, areas: true, calloutFee: true, priceFrom: true,
+        available: true, about: true, updatedAt: true, priceList: true,
+        headline: true, categoryId: true, professions: true, yearsExp: true,
+        languages: true, linkedinUrl: true, websiteUrl: true,
+        category: { select: { id: true, slug: true, name: true, status: true } },
+      },
+    }),
+  ])
 
   /* ⚠️ THE BONUS IS PAID HERE, NOT ON THE NEXT NAVIGATION (2026-08-21).
    *
@@ -281,6 +407,9 @@ export async function PUT(req: Request) {
   // that went on believing in it would send the same stale token next time.
   return NextResponse.json({
     ok: true, profile: saved, gaps: profileGaps(saved), earned,
+    // Echoed back for the same reason the profile is: the form re-seeds its
+    // „saved" snapshot from what the server stored, never from what it sent.
+    ...(fullName !== undefined ? { user: { fullName } } : {}),
     ...(photos !== undefined ? { workPhotoCount: photos.length } : {}),
   })
 }

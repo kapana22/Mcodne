@@ -66,6 +66,14 @@ const ACTION_LABEL: Record<string, string> = {
   'category.redirect': 'კატეგორია გადამისამართდა',
 
   // ── The service application queue („განაცხადები") ──
+  // ⚠️ BOTH SPELLINGS, AND THE OLD ONE IS NOT A LEFTOVER (2026-08-30). The
+  // writer says `provider.*` since the „მასტერი" rename; every row already in
+  // the table says `master.*`, and an audit log's whole job is to still be
+  // readable years later. Dropping the old keys would turn real history into
+  // raw codes on screen — which is the one thing this map exists to prevent.
+  'provider.approve': 'სერვისის განაცხადი დამტკიცდა',
+  'provider.reject': 'სერვისის განაცხადი უარყოფილია',
+  'provider.revise': 'სერვისის განაცხადი შესასწორებლად დაბრუნდა',
   'master.approve': 'სერვისის განაცხადი დამტკიცდა',
   'master.reject': 'სერვისის განაცხადი უარყოფილია',
   'master.revise': 'სერვისის განაცხადი შესასწორებლად დაბრუნდა',
@@ -148,7 +156,13 @@ export const AuditSection = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[240px] max-w-[360px]">
             <Icon.search className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input type="text" value={actionFilter} onChange={e => setActionFilter(e.target.value)} placeholder="მოქმედების პრეფიქსი (booking, review, application…)" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-small focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
+            {/* ⚠️ THE EXAMPLES ARE PREFIXES THE CODE STILL WRITES (2026-08-30). It read
+              „booking, review, application…" and led with the one that is dead:
+              no `booking.*` row has been written since the product went on
+              2026-08-24, so the panel's own first suggestion returned nothing.
+              A filter that teaches a query with no rows is worse than an empty
+              box — it reads as „the log is broken". */}
+            <input type="text" value={actionFilter} onChange={e => setActionFilter(e.target.value)} placeholder="მოქმედების პრეფიქსი (request, user, company…)" className="w-full h-11 pl-9 pr-3 rounded-field border border-ink-200 bg-white text-small focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none" />
           </div>
         </div>
       </section>

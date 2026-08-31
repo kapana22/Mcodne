@@ -75,7 +75,7 @@ test('there is ONE wizard, and the door opens it', () => {
 test('neither door makes the applicant retype what they already answered', () => {
   // Both doors reached comfort parity on 2026-08-20; before that each had
   // exactly what the other lacked, which is the shape of a split nobody sees.
-  const work = read('app/join/_master/client.tsx')
+  const work = read('app/join/_provider/client.tsx')
 
   // A draft. Six blocks, a photo upload and an incoming call — on a phone that
   // is not an edge case — used to send this applicant back to „ვინ ხარ".
@@ -93,7 +93,7 @@ test('neither door makes the applicant retype what they already answered', () =>
 })
 
 test('„დარჩა" takes you there instead of naming it', () => {
-  const work = codeOf('app/join/_master/client.tsx')
+  const work = codeOf('app/join/_provider/client.tsx')
   assert.match(work, /const jumpTo = \(field: string\)/, 'the missing list went back to being words under a disabled button')
   assert.match(work, /scrollIntoView/)
   // Every entry has a target, or the button is a dead control. Two spellings
@@ -110,16 +110,16 @@ test('„დარჩა" takes you there instead of naming it', () => {
 test('no question is asked that has one answer', () => {
   // The rule the intake already follows, applied at the door: with one city
   // served, „სად მუშაობ" is the form performing a choice nobody has.
-  assert.match(codeOf('app/join/_master/client.tsx'), /cities\.length > 1 && \(/,
+  assert.match(codeOf('app/join/_provider/client.tsx'), /cities\.length > 1 && \(/,
     'the city block is unconditional again')
-  assert.match(codeOf('app/join/_master/client.tsx'), /if \(cs\.length === 1\) setAreas/,
+  assert.match(codeOf('app/join/_provider/client.tsx'), /if \(cs\.length === 1\) setAreas/,
     'the single city is no longer answered for them — the form cannot be submitted')
 })
 
 test('a hidden block does not leave a hole in the numbering', () => {
   // Hard-coded `n={3}` meant that hiding one block made the form count
   // „1 2 4 5 6 7" — which tells the applicant something is missing.
-  const work = codeOf('app/join/_master/client.tsx')
+  const work = codeOf('app/join/_provider/client.tsx')
   assert.doesNotMatch(work, /<Block n=\{\d+\}/, 'a block number was typed by hand again')
   assert.match(work, /n=\{\+\+blockNo\}/, 'the blocks stopped numbering themselves')
 })
@@ -180,7 +180,7 @@ test('the form offers no second half to switch to', () => {
    * Each success screen offered the other half, and neither could point at a
    * half already filed, which is why `filed` existed. One form, no hand-off,
    * and the „ჩართე კონსულტაციები" switch it fed is gone with the capability. */
-  const master = codeOf('app/join/_master/client.tsx')
+  const master = codeOf('app/join/_provider/client.tsx')
   assert.doesNotMatch(master, /onContinueExpert/, 'the service form offers a second wizard again')
   // …and nothing on it asks for a consultation as a second axis.
   assert.doesNotMatch(master, /role="(checkbox|radio)"[\s\S]{0,200}კონსულტაცი/,
@@ -240,6 +240,6 @@ test('the site invites people to ONE address, in ONE word', () => {
 test('nothing is asked twice that the account already answered', () => {
   // The service form gets the door's answer typed into its search, so the
   // person's own word („სანტექნიკოსი") finds their service rows.
-  assert.match(codeOf('app/join/_master/client.tsx'), /setQuery\(cur => \(cur\.trim\(\) \? cur : job\)\)/,
+  assert.match(codeOf('app/join/_provider/client.tsx'), /setQuery\(cur => \(cur\.trim\(\) \? cur : job\)\)/,
     'the service catalogue no longer starts from the profession they just named')
 })

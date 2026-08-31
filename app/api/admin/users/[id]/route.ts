@@ -444,7 +444,7 @@ async function anonymize(id: string, providerId: string | null) {
       // Personal, and worthless once the person is gone.
       await tx.favorite.deleteMany({ where: { userId: id } })
       await tx.notification.deleteMany({ where: { userId: id } })
-      await tx.masterApplication.deleteMany({ where: { userId: id } })
+      await tx.providerApplication.deleteMany({ where: { userId: id } })
 
       /* HelpMessage is outside Prisma (raw SQL, dbBoot-created) and carries the
          sender's EMAIL and NAME — the two columns this whole mode exists to

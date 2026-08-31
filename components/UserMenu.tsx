@@ -244,7 +244,7 @@ export function UserMenu({
   // desktop — the convention the გრაფიკი/შემოსავალი/ექსპერტები rows above
   // already follow. Without it the menu repeated the rail two items running.
   const servicesItem: MenuItem[] = sells
-    ? [{ href: '/work/services', label: 'ჩემი სერვისები', icon: Icon.briefcase, mobileOnly: true }]
+    ? [{ href: '/work/profile', label: 'ჩემი გვერდი', icon: Icon.user, mobileOnly: true }]
     : []
   const items = [...switchItems, ...adminSpaceItems, ...servicesItem, ...gated]
 

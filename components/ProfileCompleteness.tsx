@@ -72,7 +72,10 @@ export function ProfileCompleteness({
   const shownItems = undone.length > 0
     ? undone.slice(0, 5)
     : checks.slice(0, 3) // if none undone, show first 3 as "all-done" recap
-  const label = variant === 'compact' ? 'პროფილის სისრულე' : 'პროფილის სისრულე'
+  // ⚠️ IT WAS A TERNARY WITH TWO IDENTICAL BRANCHES (2026-08-30) — the compact
+  // variant once said something shorter, the two converged, and the fork was
+  // left behind reading as though a choice were still being made.
+  const label = 'პროფილის სისრულე'
 
   return (
     <section

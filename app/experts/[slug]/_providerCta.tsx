@@ -11,7 +11,7 @@
 // published no bookable time and no price the site can charge for — the ONE
 // difference between the two profiles that share this segment, and it is about
 // HOW YOU BUY, never about what kind of person somebody is. What the client does here is
-// describe the job; the master answers through the requests subsystem, which is
+// describe the job; the provider answers through the requests subsystem, which is
 // why the address comes from the model (`for=service` baked in).
 //
 // ⚠️ AND IT NOW CARRIES THIS MASTER (2026-08-19). Until today the button led to
@@ -57,9 +57,9 @@ import { Card } from '@/components/Card'
 import { requestHrefFor } from './_providerData'
 import { SaveProviderBtn } from '@/components/SaveProviderBtn'
 
-export function ProviderCta({ master }: {
+export function ProviderCta({ provider }: {
   /** The profile this button belongs to — its address, nothing more. */
-  master: { slug: string | null; id: string }
+  provider: { slug: string | null; id: string }
 }) {
   return (
     <Card>
@@ -71,7 +71,7 @@ export function ProviderCta({ master }: {
           `offerLimit: 1`, one INVITED thread — so what the visitor is doing is
           LEAVING their job with this one provider, who then comes back to them.
           „დატოვე" carries the return; „გამოაგზავნე" carries only the sending. */}
-      <Btn href={requestHrefFor(master)} variant="hero" size="lg" className="w-full">დატოვე მოთხოვნა</Btn>
+      <Btn href={requestHrefFor(provider)} variant="hero" size="lg" className="w-full">დატოვე მოთხოვნა</Btn>
       {/* ⚠️ IT NOW SAYS WHERE THE REQUEST GOES (2026-08-21), which is the half
           the visitor could not see. The terms sentence is the owner's own, from
           the deleted trades door, and it answered „what does this cost me" —
@@ -98,7 +98,7 @@ export function ProviderCta({ master }: {
           nav, the top bar and the client room. Secondary by construction: the
           request is the action, saving is the „not yet". It renders only for a
           signed-in client (see the component). */}
-      <SaveProviderBtn providerId={master.id} />
+      <SaveProviderBtn providerId={provider.id} />
     </Card>
   )
 }

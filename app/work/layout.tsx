@@ -20,7 +20,7 @@ import { requestsViewer, openRequestCount } from '@/lib/requestsServer'
 import { asRole } from '@/lib/roles'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { balanceOf, grantEarnedTasks } from '@/lib/creditsServer'
-import { WorkspaceShell } from '@/components/tutor/WorkspaceShell'
+import { WorkspaceShell } from '@/components/work/WorkspaceShell'
 
 // Re-verify on every request for this segment: the shell must never be served
 // from a cached render that outlived the session or a capability behind it.
@@ -75,9 +75,20 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
   // workspace screen. It rides back from the grant rather than costing a second
   // read of the same facts — see grantEarnedTasks.
   let unearnedTetri = 0
+  // ⚠️ THE BAR AND THE LINE UNDER IT MUST MEASURE ONE THING (2026-08-30). The
+  // rail drew `badges.profilePercent` — lib/profileScore's weighted checks —
+  // directly above „კიდევ N ₾", which comes from lib/credits' grant tasks. They
+  // are DIFFERENT SIX-ITEM LISTS: profileScore asks for a headline, a language
+  // and a priced service; the grant pays for professions, a certificate and
+  // years of experience. So the bar could read 100% above a line promising 40₾
+  // still to earn. Both numbers are honest and they answer different questions;
+  // drawing them as one control is what was wrong.
+  let grantPercent: number | null = null
   if (provider) {
     await ensureDbReady()
-    unearnedTetri = (await grantEarnedTasks(user.id)).unearnedTetri
+    const granted = await grantEarnedTasks(user.id)
+    unearnedTetri = granted.unearnedTetri
+    grantPercent = granted.percent
     balanceTetri = await balanceOf(user.id)
   }
 
@@ -104,6 +115,7 @@ export default async function WorkLayout({ children }: { children: React.ReactNo
       isProvider={viewer === null || viewer.provider !== null}
       balanceTetri={balanceTetri}
       unearnedTetri={unearnedTetri}
+      grantPercent={grantPercent}
     >
       {children}
     </WorkspaceShell>

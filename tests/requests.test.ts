@@ -178,7 +178,7 @@ test('FEATURE_PROVIDERS narrows, never widens (D6)', () => {
   // ⚠️ /join stays OUTSIDE the gate (2026-08-19): it is the expert door too,
   // and 404ing it would take the expert half down. Its WORK half is gated in
   // the page — asserted just below.
-  for (const p of ['/', '/request', '/api/requests', '/services', '/masters', '/api/masters/x/photo', '/providers', '/apply', '/join', '/work', '/work/bookings', '/work/schedule', '/me/requests']) {
+  for (const p of ['/', '/request', '/api/requests', '/services', '/masters', '/api/providers/x/photo', '/providers', '/apply', '/join', '/work', '/work/bookings', '/work/schedule', '/me/requests']) {
     assert.equal(isProviderPath(p), false, `${p} was swallowed by the providers gate`)
   }
   // The middleware walks the second list too, with the same 404.
@@ -190,8 +190,8 @@ test('FEATURE_PROVIDERS narrows, never widens (D6)', () => {
   // „the missing half" and had to know whether the WORK half existed at all;
   // there is one half now, the middleware gates the whole path (asserted just
   // above), and the API routes below still check for themselves.
-  for (const f of ['app/api/master-applications/route.ts',
-    'app/api/master-applications/[id]/route.ts', 'app/api/admin/master-applications/route.ts']) {
+  for (const f of ['app/api/provider-applications/route.ts',
+    'app/api/provider-applications/[id]/route.ts', 'app/api/admin/provider-applications/route.ts']) {
     assert.match(codeOf(f), /providersOn\(\)/, `${f} does not check the supply-side switch`)
     assert.doesNotMatch(codeOf(f), /requestsOn\(\)/, `${f} still checks the subsystem switch directly`)
   }
@@ -801,12 +801,14 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     // is `REQUEST_HREF` from the same model, mounted only when the page hands
     // it `requestsEnabled` — never read from the environment by the part.
     ['app/experts/[slug]/_tradeLanding.tsx', 'app/experts/[slug]/page.tsx'],
-    // ⚠️ THE CLIENT'S OWN LIST (D7, stage 6, 2026-08-19). /me/requests shows
-    // the signed-in owner their requests and links each to /request/<ref> — a
-    // page they already hold the key to. It gates itself (requestsOn() →
-    // notFound) and reads `userId = me` and nothing wider; the mechanism is
-    // asserted under the tree scan below.
-    ['app/me/requests/page.tsx', 'app/me/requests/page.tsx'],
+    // ⚠️ THE CLIENT'S OWN LIST (D7, stage 6, 2026-08-19) — AND IT MOVED TO THE
+    // HOME ON 2026-08-30. /me/requests is a redirect now: „მთავარი" and
+    // „მოთხოვნები" were one thing said twice, so the home draws the list and
+    // the rail carries three rows. The entry point is the same in every way
+    // that matters here — the signed-in owner's own rows, each linking to
+    // /request/<ref>, a page they already hold the key to — and it still gates
+    // itself with `requestsOn()`, now to decide whether to read them at all.
+    ['app/me/page.tsx', 'app/me/page.tsx'],
     // ⚠️ THE EXPERT'S PROFILE (2026-08-19) — the counterpart of the master's
     // above, and the same shape: the href is BUILT in the page („/request?to="
     // + the expert's slug), the page reads `requestsOn()` ONCE and hands the
@@ -882,14 +884,14 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     // The subsystem's own files are allowed to know their own URLs.
     if (rel.startsWith('app/request/') || rel.startsWith('app/work/(provider)/')) continue
     // ⚠️ THE /work SHELL AND ITS RAIL (stage 6, 2026-08-19). The master's three
-    // items live in components/tutor/navConfig beside the expert's, and the
+    // items live in components/work/navConfig beside the expert's, and the
     // shell (app/work/layout.tsx) draws them only for a viewer the (provider)
     // gate itself admits — capabilitiesOf → WORK, or requestsViewer().
     // providerAllowed — never for a role. The (expert) layout's redirect sends
     // a WORK-only account to the queue for the same reason lib/hats does: that
     // is somebody the allowlist already names going home, not a door. All
     // three mechanisms are asserted just under this scan.
-    if (rel === 'components/tutor/navConfig.ts' || rel === 'app/work/layout.tsx') continue
+    if (rel === 'components/work/navConfig.ts' || rel === 'app/work/layout.tsx') continue
     // The client's OWN request list (D7): /me/requests reads `userId = me` and
     // links each row to /request/<ref> — a page its owner already holds the
     // key to. Named here, gated below (requestsOn() + the signed-in owner).
@@ -1016,12 +1018,17 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   // paths (lib/requests → isProviderWorkspacePath — and that helper is bound
   // to PROVIDER_WORKSPACE_PATHS, asserted executed below).
   const nav = read('components/BottomNav.tsx')
-  // The tab set is chosen straight from the path now — the `space` variable that
-  // sat in between went with STUDENT/TUTOR (2026-08-21), because one ROLE can no
-  // longer distinguish a trades provider from a consulting one. What must hold
-  // is unchanged: the provider's own paths are recognised from the pathname.
-  assert.match(nav, /isProviderWorkspacePath\(path\) \? PROVIDER_TABS/,
-    'BottomNav no longer derives the provider space from the pathname')
+  // ⚠️ THE PROVIDER'S THREE PATHS NO LONGER NEED THEIR OWN BRANCH (2026-08-30).
+  // This asserted `isProviderWorkspacePath(path) ? PROVIDER_TABS`, which existed
+  // because /work had TWO tab sets and those three paths picked the right one.
+  // There is one supply-side set now — the same five rows the rail draws — so
+  // the whole of /work resolves to it and the special case is the thing that
+  // would reintroduce a difference. What must hold is unchanged and is asserted
+  // right here: standing anywhere in /work gives a provider the provider's tabs.
+  assert.match(nav, /path\.startsWith\('\/work'\) \? PROVIDER_TABS/,
+    'BottomNav no longer gives the whole provider space one tab set')
+  assert.ok(nav.includes("href: '/work/profile'"),
+    'the phone lost the tab for the editor where a provider sets what they sell')
   for (const p of PROVIDER_WORKSPACE_PATHS) {
     assert.equal(isProviderWorkspacePath(p), true, `${p} is not the master's space`)
     assert.equal(isProviderWorkspacePath(p + '/x'), true, `${p}/… is not the master's space`)
@@ -1029,18 +1036,21 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   for (const p of ['/work', '/work/bookings', '/work/requests-x', '/me', '/provider/requests', '/request']) {
     assert.equal(isProviderWorkspacePath(p), false, `${p} was read as the master's space`)
   }
-  // ⚠️ THIS PINNED `space === 'PROVIDER' ? PROVIDER_TABS`, AND THE SENTENCE IT
-  // CLAIMED WAS ALREADY FALSE. A WORK-only provider standing on /work got
-  // PROVIDER_TABS too — the old ternary said so — so „shown by nothing but being
-  // inside /provider" was never the rule. The real one has two arms and both are
-  // asserted below: the provider's own paths, and a provider whose only
-  // capability is WORK. Anyone else gets the tabs of the room they are in.
-  assert.match(nav, /isProviderWorkspacePath\(path\) \? PROVIDER_TABS/,
-    'PROVIDER_TABS no longer follow the provider paths')
-  assert.match(nav, /workOnly \? PROVIDER_TABS/,
-    'a WORK-only provider lost their tabs on /work — the trades half would show the expert rail')
-  assert.match(nav, /const workOnly = caps\.includes\('WORK'\) && !caps\.includes\('CONSULT'\)/,
-    'the tab set stopped being chosen by CAPABILITY — one role cannot tell a trades provider from a consulting one')
+  // ⚠️ THREE ASSERTIONS STOOD HERE AND ALL THREE PINNED A DEAD DISTINCTION
+  // (retired 2026-08-30). They required `isProviderWorkspacePath(path) ?
+  // PROVIDER_TABS`, `workOnly ? PROVIDER_TABS`, and the definition
+  //
+  //     const workOnly = caps.includes('WORK') && !caps.includes('CONSULT')
+  //
+  // — and that last one could not be true. `/api/me` stopped returning
+  // `capabilities` on 2026-08-24 when the CONSULT/WORK pair went with the second
+  // product, so `caps` was always `[]`, `workOnly` always false, and /work
+  // always drew the OTHER set — the one with no tab for „ჩემი სერვისები". These
+  // tests were green throughout: they asserted that the branch existed, never
+  // that it could be taken.
+  //
+  // There is one kind of provider, so there is one supply-side set — asserted
+  // above, together with the tab whose absence was the actual cost.
   assert.doesNotMatch(nav, /PROVIDER_TABS[\s\S]{0,200}role === /,
     'PROVIDER_TABS became role-keyed — a role is not the allowlist')
   const shell = read('components/AppShell.tsx')
@@ -1051,7 +1061,7 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   // the capability (or the allowlist), never for a role — and the shell draws
   // nothing at all for a viewer with no session, so the (provider) 404 stays a
   // bare 404.
-  const navCfg = read('components/tutor/navConfig.ts')
+  const navCfg = read('components/work/navConfig.ts')
   // ⚠️ THE GROUP IS GONE, THE GATE IS NOT (2026-08-19). The rail became ONE list
   // of functions rather than two lists of person-kinds; what this test protects
   // is unchanged — the subsystem's two screens are drawn only for a viewer the
@@ -1072,13 +1082,26 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
 
   // /me/requests (D7): the owner's list, and only the owner's — gated on the
   // flag and on the session, scoped by userId.
-  const mine = codeOf('app/me/requests/page.tsx')
-  assert.match(mine, /if \(!requestsOn\(\)\) notFound\(\)/, '/me/requests does not 404 with the subsystem off')
-  assert.match(mine, /const user = await requireUser\(\)/, '/me/requests does not require a session')
-  assert.match(mine, /myRequests\(user\.id\)/, '/me/requests lists something other than the signed-in owner’s requests')
+  // ⚠️ THE LIST IS THE HOME SINCE 2026-08-30, and the three guarantees moved
+  // with it unchanged: a session is required, the rows are the signed-in
+  // owner's, and the subsystem's absence is honoured. What CHANGED is the
+  // shape of the last one — /me is the client's home whether or not requests
+  // exist, so it cannot 404 the way a dedicated page could; it reads no rows
+  // and offers no intake instead. Same promise, the only form it can take on a
+  // screen that has other reasons to exist.
+  const mine = codeOf('app/me/page.tsx')
+  assert.match(mine, /const on = requestsOn\(\)/, '/me stopped checking whether the subsystem exists')
+  assert.match(mine, /on \? await myRequests\(user\.id\) : \[\]/, '/me reads requests on a deployment without the subsystem')
+  assert.match(mine, /const user = await requireUser\(\)/, '/me does not require a session')
+  assert.match(mine, /myRequests\(user\.id\)/, '/me lists something other than the signed-in owner’s requests')
   assert.match(codeOf('lib/myRequests.ts'), /where: \{ userId \}/, 'lib/myRequests widened the owner match')
-  assert.match(codeOf('app/api/me/requests/route.ts'), /if \(!requestsOn\(\)\) return requestsNotFound\(\)/, '/api/me/requests is not gated on the flag')
-  assert.match(codeOf('app/api/me/requests/route.ts'), /myRequests\(user\.id/, '/api/me/requests reads somebody else’s list')
+  // ⚠️ `/api/me/requests` WAS ASSERTED HERE AND THE ROUTE IS GONE (2026-08-30).
+  // Its own header said why it existed: „this route exists only because the
+  // home is a client component." The /me home is a server component now — it
+  // calls `myRequests` directly, like /me/requests always did — so the route
+  // had no caller left. The gate it carried is not lost: both remaining readers
+  // are asserted directly above, and an endpoint that answers a person's own
+  // request list is one more surface to keep scoped for no reader at all.
   assert.match(shell, /\(!inRequests \|\| inProviderSpace\) && \(/,
     'the provider workspace lost its bottom nav again (M1)')
 
@@ -1151,7 +1174,18 @@ test('it is not in the sitemap, not in the feed, and not named in robots.txt', (
   // keep unlisted — to anyone who reads it, including every scraper that treats
   // Disallow as a list of interesting places. /business and /abroad are absent
   // from that file for the same reason.
-  assert.doesNotMatch(read('app/robots.ts'), /request|provider/)
+  // ⚠️ THE ASSERTION IS ON THE `disallow` ARRAY, WHICH IS WHAT THE PARAGRAPH
+  // ABOVE ACTUALLY SAYS (narrowed 2026-08-30). It used to scan the WHOLE file
+  // for the words, and passed only by an accident of vocabulary: the public
+  // photo route was spelled `/api/masters/` and sat in the ALLOW list — an
+  // Allow is the opposite of publishing a private URL, it is what lets a shared
+  // link show a face at all. The rename to `/api/providers/` put the word in
+  // the file for an entirely legitimate reason and the blunt scan called it a
+  // leak. What must never happen is a DISALLOW line naming the subsystem, and
+  // that is now what is checked.
+  const robots = read('app/robots.ts')
+  const disallow = robots.slice(robots.indexOf('disallow: ['), robots.indexOf(']', robots.indexOf('disallow: [')))
+  assert.doesNotMatch(disallow, /request|provider/)
   // /work is Disallowed as a workspace (like /me), never NAMED as the
   // subsystem's — the line reads „/work$" and „/work/", nothing longer.
   assert.doesNotMatch(read('app/robots.ts'), /\/work\/[a-z]/)
@@ -1182,10 +1216,14 @@ test('the admin tabs disappear with the subsystem', () => {
   // reads as a broken panel rather than an absent feature.
   assert.match(nav, /\.filter\(it\s+=>\s+\(it\.id\s+!==\s+'requests'\s+&&\s+it\.id\s+!==\s+'access'\s+&&\s+it\.id\s+!==\s+'funnel'\)\s+\|\|\s+requestsFeatureExists\(\)\)/,
     'the requests tabs are no longer filtered out of ADMIN_NAV')
-  // …and the masters queue follows the SUPPLY-side switch (D6): it approves
-  // people into /provider, which is what FEATURE_PROVIDERS turns off.
-  assert.match(nav, /\.filter\(it\s+=>\s+it\.id\s+!==\s+'masters'\s+\|\|\s+providersFeatureExists\(\)\)/,
-    'the masters tab is not filtered on providersFeatureExists()')
+  // …and the applications queue follows the SUPPLY-side switch (D6): it
+  // approves people into /provider, which is what FEATURE_PROVIDERS turns off.
+  // The tab id was `masters` until 2026-08-30; `#masters` still lands here
+  // through TAB_ALIASES.
+  assert.match(nav, /\.filter\(it\s+=>\s+it\.id\s+!==\s+'providers'\s+\|\|\s+providersFeatureExists\(\)\)/,
+    'the applications tab is not filtered on providersFeatureExists()')
+  assert.match(nav, /masters: 'providers'/,
+    'the old #masters hash no longer lands on the applications queue')
   // VALID_TABS is DERIVED from that array, so filtering there means
   // /admin#requests does nothing at all with the subsystem off — exactly like
   // any other unknown hash — rather than opening a tab that is not drawn.
@@ -1599,16 +1637,36 @@ test('the run is one question per screen, derived from the draft', () => {
    * photograph a contract or an English lesson.
    *
    * So the pin is no longer one number; it is that NOBODY gets a screen their
-   * kind cannot use. Four for the professional half, five for the household
-   * one, and no third answer. */
+   * kind cannot use.
+   *
+   * ⚠️ AND FOUR EACH SINCE 2026-08-30, NOT FIVE FOR THE HOUSEHOLD HALF. The
+   * trades run was carrying „ონლაინ თუ ადგილზე?" — the screen `stepsFor`'s own
+   * paragraph calls „the wizard performing a choice nobody has", because there
+   * is no online plumber. Two independent rules had been written as one
+   * if/else, so turning the CITY question off (one city, 2026-08-20) turned the
+   * FORMAT question back on for exactly the kind that must never see it.
+   *
+   * `withKind` had been telling the truth about the intent the whole time — it
+   * sets `format: IN_PERSON` for a service and says „the run never shows the
+   * format screen for this kind (see stepsFor)". It did. That is what this loop
+   * now pins from both ends: no service is asked, and every service still
+   * SUBMITS in-person rather than inheriting the ONLINE default. */
   for (const g of TOPIC_GROUPS) {
     for (const t of g.topics) {
-      const run = stepsFor(withTopic(EMPTY_DRAFT, t.id)).map(st => st.id)
+      const d = withTopic(EMPTY_DRAFT, t.id)
+      const run = stepsFor(d).map(st => st.id)
       const service = kindsOfTopic(t.id).includes('SERVICE')
       assert.equal(run.includes('photos'), service,
         `${t.id} ${service ? 'lost' : 'was given'} the photo screen`)
-      assert.equal(run.length, service ? 5 : 4,
-        `${t.id} runs in ${run.length} screens`)
+      assert.equal(run.includes('format'), !service,
+        `${t.id} ${service ? 'was asked' : 'lost'} the online-or-in-person question`)
+      assert.equal(run.length, 4, `${t.id} runs in ${run.length} screens`)
+      // ⚠️ THE SKIPPED SCREEN MUST NOT LEAVE A WRONG ANSWER BEHIND. The draft
+      // defaults to ONLINE — safe only while the screen shows and confirms it.
+      if (kindsOfTopic(t.id).length === 1 && service) {
+        assert.equal(d.format, 'IN_PERSON',
+          `${t.id} would be filed as an online job — somebody has to be in the room`)
+      }
     }
   }
 
@@ -1855,14 +1913,56 @@ test('the live layer and the budget-fit line hold', () => {
     'the requests tab lost its badge')
 })
 
+test('a clarifier is asked only where it means something', () => {
+  /* ⚠️ THE BUG THIS PINS. Owner, 2026-08-30: „როცა ვებ დეველოპერთან კავშირი
+     მინდა, რატომ უნდა მინდოდეს რომ ავირჩიო დაწყებითების კლასი." Measured on
+     `webdev-l` before the fix: LEARNING asked which year of school, SERVICE
+     asked which flat to come to, MEETING and PROJECT asked nothing at all.
+     This walks the WHOLE vocabulary rather than that one topic, because the
+     owner's next sentence was „ზოგადადი უნდა იყოს რომ ყველაფერს ერგებოდეს" —
+     one topic passing is not the property we want. */
+  const idsFor = (k: Parameters<typeof extrasFor>[0], t: string) => extrasFor(k, t).map(q => q.id)
+
+  // Nobody outside a classroom is asked which year of school they are in.
+  const schooling = new Set(['school', 'exams', 'higher', 'languages', 'arts', 'sport'])
+  for (const g of TOPIC_GROUPS) {
+    const topic = g.topics[0].id
+    const asksAudience = idsFor('LEARNING', topic).includes('audience')
+    assert.equal(asksAudience, schooling.has(g.id),
+      `${g.id}: LEARNING ${asksAudience ? 'asks' : 'does not ask'} „ვისთვის" and should ${schooling.has(g.id) ? 'ask' : 'not ask'} it`)
+    // Every subject is still asked the one question that survives the change.
+    assert.ok(idsFor('LEARNING', topic).includes('level'), `${g.id}: LEARNING lost „რა დონეა"`)
+  }
+
+  // „სად: ბინაში / კერძო სახლში" is asked only of work that has an address.
+  const onsite = new Set(['cleaning', 'plumbing', 'electrical', 'repairs', 'appliances', 'moving', 'outdoor', 'systems', 'property'])
+  for (const g of TOPIC_GROUPS) {
+    const asksPlace = idsFor('SERVICE', g.topics[0].id).includes('property')
+    assert.equal(asksPlace, onsite.has(g.id),
+      `${g.id}: SERVICE ${asksPlace ? 'asks' : 'does not ask'} „სად"`)
+  }
+
+  // An unknown topic — „სხვა", or a group added tomorrow — gets the SIMPLE
+  // treatment, never the school frame. This is the direction of the default and
+  // it is the thing that stops the frame spreading back as the catalogue grows.
+  assert.deepEqual(idsFor('LEARNING', 'no-such-topic-at-all'), ['level'])
+  assert.deepEqual(idsFor('SERVICE', 'no-such-topic-at-all'), [])
+})
+
 test('the clarifying answers are stripped against the question list', () => {
   // The `details` column is free-form only in SHAPE. normalizeExtras is the
   // door: off-list keys and values do not survive to the database, so a crafted
   // POST cannot store a script tag under „audience" and a renamed option cannot
   // leave an unreadable id behind.
-  assert.ok(extrasFor('LEARNING').length >= 2, 'LEARNING lost its clarifying questions')
-  assert.equal(extrasFor('MEETING').length, 0)
-  assert.equal(extrasFor('PROJECT').length, 0)
+  // ⚠️ THESE THREE PINNED THE SCHOOL FRAME (rewritten 2026-08-30). They read
+  // `extrasFor('LEARNING').length >= 2` / MEETING 0 / PROJECT 0 with NO TOPIC,
+  // which is exactly the shape the bug had: the kind decided and the topic was
+  // ignored. Deleting them is the point of the change, not collateral.
+  assert.ok(extrasFor('LEARNING', 'chemistry').length >= 2, 'a school subject lost its audience question')
+  // MEETING and PROJECT ask nothing. The wizard already gives a meeting a whole
+  // format step, so a clarifier beside it would be the same question twice.
+  assert.equal(extrasFor('MEETING').length, 0, 'a meeting gained a duplicate of the format step')
+  assert.equal(extrasFor('PROJECT').length, 0, 'a project asks nothing before it is filed')
 
   assert.deepEqual(
     normalizeExtras('LEARNING', 'chemistry', { audience: 'abiturient', level: 'intermediate' }),
@@ -2804,7 +2904,7 @@ test('a request may carry photos, and they never ride in a list', () => {
 
   // The ceiling, and the refusal of anything that is not an image: the column
   // is rendered as an <img>, so a non-image is either a mistake or a crafted
-  // body. Same rule the provider intake uses (lib/masterApplication).
+  // body. Same rule the provider intake uses (lib/providerApplication).
   assert.equal(
     ServiceRequestInput.safeParse({ ...base, photos: Array(MAX_REQUEST_PHOTOS + 1).fill(img) }).success,
     false, 'the photo ceiling stopped being enforced')

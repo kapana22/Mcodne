@@ -14,7 +14,6 @@ import { usePathname } from 'next/navigation'
 import { useEffect, type ReactElement } from 'react'
 import { Icon } from './Icon'
 import { useNotifications } from '@/lib/notifications'
-import { isProviderWorkspacePath } from '@/lib/requests'
 import { HELP_PROFESSIONS } from '@/lib/helpProfessions'
 
 type Role = 'USER' | 'PROVIDER' | 'ADMIN'
@@ -33,84 +32,78 @@ const startsWith = (prefix: string) => (path: string) =>
   path === prefix || path.startsWith(prefix + '/')
 
 const STUDENT_TABS: Tab[] = [
-  { href: '/me',           label: 'მთავარი',      icon: Icon.home, match: p => p === '/me' },
+  // ⚠️ THE PHONE SHOWS WHAT THE RAIL SHOWS, plus the catalogue (2026-08-30).
+  // „მოთხოვნები" left with the rail row of the same name: the home IS the
+  // request list now, so a tab for it was a second route to the screen the
+  // first tab already opens. See components/me/navConfig.
+  { href: '/me',           label: 'მთავარი',    icon: Icon.home,   match: p => p === '/me' },
   // /experts/<slug> is the profile (own address space since 2026-08-19); it is
   // still the ექსპერტები section, so it lights the same tab.
-  { href: '/experts',            label: 'ექსპერტები',     icon: Icon.search,   match: startsWith('/experts') },
-  // ⚠️ „ჯავშნები" AND „მიმოწერა" WENT WITH THE BOOKING PRODUCT (2026-08-24) —
-  // a session list and the pair inbox that carried a booking's conversation.
-  // What a client has instead is their own requests, and each one carries its
-  // thread at /request/<ref>.
-  { href: '/me/requests',  label: 'მოთხოვნები',   icon: Icon.list,     match: startsWith('/me/requests') },
+  //
+  // ⚠️ IT STAYS ON THE BAR EVEN THOUGH THE RAIL PUTS IT BELOW A DIVIDER: the
+  // catalogue is the core action of a marketplace and must be one tap away.
+  { href: '/experts',      label: 'ექსპერტები', icon: Icon.search, match: startsWith('/experts') },
   // „შენახული" TOOK THE PROFILE SLOT (2026-07-31). The old comment above claimed
   // saved-experts lived „in the StudentAppBar rail + profile" — but that rail is
   // `hidden lg:flex` and the public header's heart was `hidden sm:`, so on a
   // phone a student had NO route to their shortlist anywhere. It was reported to
   // us as „the save function was deleted", which is exactly how an unreachable
   // feature reads.
-  // Why PROFILE gave up the slot rather than „ექსპერტები": /experts is the
-  // catalog — the core action of a marketplace — and must stay one tap away.
-  // The profile is a rare destination that ALREADY has a permanent entry point
-  // in the always-visible avatar menu (UserMenu → „პროფილი"), so it loses
-  // nothing by leaving the bar. A shortlist, by contrast, is used exactly while
-  // the visitor is deciding, which is the whole job of this nav.
-  { href: '/me/favorites', label: 'შენახული',     icon: Icon.heart,    match: startsWith('/me/favorites') },
+  // Why PROFILE gave up the slot: it is a rare destination that ALREADY has a
+  // permanent entry point in the always-visible avatar menu (UserMenu →
+  // „პროფილი"), so it loses nothing by leaving the bar. A shortlist, by
+  // contrast, is used exactly while the visitor is deciding, which is the whole
+  // job of this nav.
+  { href: '/me/favorites', label: 'შენახული',   icon: Icon.heart,  match: startsWith('/me/favorites') },
 ]
 
-const TUTOR_TABS: Tab[] = [
-  { href: '/work',             label: 'მთავარი',      icon: Icon.home, match: p => p === '/work' },
-  { href: '/work/jobs',        label: 'სამუშაოები',   icon: Icon.calendar, match: startsWith('/work/jobs') },
-  { href: '/work/messages',    label: 'მიმოწერა',      icon: Icon.chat,    match: startsWith('/work/messages') },
-  { href: '/work/profile',     label: 'პროფილი',      icon: Icon.user,     match: startsWith('/work/profile') },
-]
-
-// The master's workspace (M1, 2026-08-18). The screens the /work rail lists
-// for this capability (components/tutor/navConfig), because on a phone the
-// rail is hidden. Shown by SPACE, not role — a master's `role` is
-// STUDENT or TUTOR (lib/hats says why), and anybody who can see these three
-// paths at all has already passed their 404 gate (app/work/(provider)/layout).
-// ⚠️ THE SPACE IS THE THREE PATHS, NEVER THE /work PREFIX (stage 6): the rest
-// of /work is the expert's, and gets TUTOR_TABS.
-// ⚠️ FOUR SINCE 2026-08-21, AND THE HOME IS THE ONE THAT WAS MISSING. /work is
-// the only screen that draws the balance and the only one that runs the grant,
-// and this bar — the whole of a provider's navigation on a phone — had no route
-// to it. The desktop rail has carried „მთავარი" for both capabilities since
-// stage 6 (components/tutor/navConfig → WORKSPACE_NAV); the phone did not, so
-// the feature was desktop-only by accident. It leads the list for the same
-// reason it does there: it is the screen the other three are reached from.
+// ⚠️ ONE PROVIDER, ONE TAB SET (merged 2026-08-30). There were TWO — TUTOR_TABS
+// (4) and PROVIDER_TABS (5) — chosen by
 //
-// ⚠️ AND „შეთავაზებები" BECAME „პროფილი" (2026-08-21, the same day the rail was
-// rebuilt around the service pipeline). Two reasons, and the second is the one
-// that was actually broken:
-//   · a sent offer is a STAGE of a job rather than a place — /work/jobs and
-//     /work/offers now share one tab bar, so a phone tab for each is the split
-//     the rail just stopped drawing;
-//   · a master had NO route to their own profile on a phone at all. /work/profile
-//     was inside the (expert) group until that day, so this bar could not have
-//     carried it — their photo and their sentence were edited inside „ჩემი
-//     სერვისები". Both halves open the page now, and their bar says so.
+//     const workOnly = caps.includes('WORK') && !caps.includes('CONSULT')
+//
+// and that test could no longer be true. `/api/me` stopped returning
+// `capabilities` on 2026-08-24, when the CONSULT/WORK pair went with the second
+// product: it answers one boolean now. AppShell still reads the old field, so
+// `caps` is ALWAYS `[]`, so `workOnly` is ALWAYS false, so /work always drew the
+// four-tab set.
+//
+// What that cost, on a phone, on the supply side: no tab for „ჩემი სერვისები" —
+// the editor where a provider chooses what they sell and writes the prices. It
+// was reachable only from a link in the body of the home screen, or by first
+// landing on one of the three /work/(provider) paths, which draw the other set.
+// PROVIDER_TABS, with its careful notes from 2026-08-21, rendered on those
+// three paths alone.
+//
+// The rail already knows the answer and has since stage 6: these are exactly
+// components/work/navConfig → WORKSPACE_NAV, in its order. The phone shows
+// what the rail shows.
 const PROVIDER_TABS: Tab[] = [
-  { href: '/work',                 label: 'მთავარი',           icon: Icon.home,      match: p => p === '/work' },
-  { href: '/work/requests',        label: 'მოთხოვნები',        icon: Icon.list,      match: startsWith('/work/requests') },
-  // ⚠️ THE JOBS TAB LIGHTS UP ON THE OFFERS PAGE, exactly as the rail's does
-  // (components/tutor/navConfig): they are two stages of one screen and share a
-  // tab bar, so the phone must not show the page with nothing selected.
-  { href: '/work/jobs',            label: 'სამუშაოები',        icon: Icon.calendar,  match: p => startsWith('/work/jobs')(p) || startsWith('/work/offers')(p) },
-  { href: '/work/services',        label: 'ჩემი სერვისები',    icon: Icon.briefcase, match: startsWith('/work/services') },
-  { href: '/work/profile',         label: 'პროფილი',           icon: Icon.user,      match: startsWith('/work/profile') },
+  { href: '/work',          label: 'მთავარი',        icon: Icon.home,      match: p => p === '/work' },
+  // ⚠️ THE JOBS TAB LIGHTS UP ON THE OFFERS PAGE, exactly as the rail's does:
+  // they are two stages of one screen and share a tab bar, so the phone must
+  // not show the page with nothing selected.
+  { href: '/work/jobs',     label: 'სამუშაოები',     icon: Icon.calendar,  match: p => startsWith('/work/jobs')(p) || startsWith('/work/offers')(p) || startsWith('/work/requests')(p) },
+  { href: '/work/messages', label: 'მიმოწერა',        icon: Icon.chat,      match: startsWith('/work/messages') },
+  // One editor since 2026-08-30 — see components/work/navConfig. „ანგარიში" is
+  // deliberately NOT here: five tabs is the ceiling on a phone, and the
+  // password is not something anybody reaches for from a bottom bar.
+  { href: '/work/profile', label: 'ჩემი გვერდი', icon: Icon.user,
+    match: p => startsWith('/work/profile')(p) || startsWith('/work/services')(p) },
+  { href: '/work/profile',  label: 'პროფილი',        icon: Icon.user,      match: startsWith('/work/profile') },
 ]
 
-// Keyed by the two roles the product has plus the admin — USER buys, PROVIDER
-// sells, and a consultation is a KIND of service so its seller is a PROVIDER
-// too (2026-08-21). The legacy words never reach here: every caller passes a
-// role through lib/roles → `asRole`.
 const TABS_BY_ROLE: Record<Role, Tab[]> = {
   USER:     STUDENT_TABS,
-  PROVIDER: TUTOR_TABS,
+  PROVIDER: PROVIDER_TABS,
   ADMIN:    [],
 }
 
-export function BottomNav({ role, caps = [] }: { role: Role | null; caps?: string[] }) {
+// ⚠️ NO `caps` PROP ANY MORE (2026-08-30). It carried the CONSULT/WORK pair
+// that the second product took with it on 2026-08-24; every caller passed an
+// array that /api/me had stopped filling, and the one branch that read it could
+// not be reached. A parameter nobody can populate is not an input.
+export function BottomNav({ role }: { role: Role | null }) {
   const path = usePathname() ?? ''
   // Shared store (one poll app-wide, visibility-gated + cross-tab). Reads the
   // unread count for the profile/messages dot.
@@ -133,16 +126,16 @@ export function BottomNav({ role, caps = [] }: { role: Role | null; caps?: strin
   // capability decides, exactly as the desktop rail's groups do
   // (app/work/layout → NAV_GROUPS). Someone holding both stays on the expert's
   // tabs: that profile is the one with more in it.
-  // ⚠️ THE TAB SET IS CHOSEN BY CAPABILITY, NOT BY ROLE (restated 2026-08-21,
-  // when USER/PROVIDER replaced STUDENT/TUTOR). Both a trades provider and a
-  // consulting one are now the same ROLE, so the role can no longer tell their
-  // tabs apart — and it never should have: what differs is what they SELL.
-  // A provider holding both stays on the expert tabs, which have more in them.
-  const workOnly = caps.includes('WORK') && !caps.includes('CONSULT')
+  // ⚠️ THE PATH DECIDES, AND IT IS THE ONLY THING THAT CAN (2026-08-30). This
+  // read „THE TAB SET IS CHOSEN BY CAPABILITY, NOT BY ROLE" and computed
+  // `workOnly` out of a `caps` array that has been empty since /api/me stopped
+  // sending one — see the note above PROVIDER_TABS. There is one kind of
+  // provider now, so there is one supply-side set, and which ROOM you are
+  // standing in is the whole question: /me is the client's, /work is the
+  // provider's. Role is the last resort, for a page in neither.
   const tabs =
       path.startsWith('/me') ? STUDENT_TABS
-    : isProviderWorkspacePath(path) ? PROVIDER_TABS
-    : path.startsWith('/work') ? (workOnly ? PROVIDER_TABS : TUTOR_TABS)
+    : path.startsWith('/work') ? PROVIDER_TABS
     : !role ? []
     : TABS_BY_ROLE[role] ?? []
   // Focused screens own the full viewport including the bottom edge, so the

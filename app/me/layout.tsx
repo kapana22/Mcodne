@@ -1,5 +1,5 @@
 import { requireRole } from '@/lib/auth'
-import { StudentWorkspaceShell } from '@/components/student/StudentWorkspaceShell'
+import { ClientShell } from '@/components/me/ClientShell'
 import { ROLE } from '@/lib/roles'
 
 // /me — the client's space (was /student until stage 6, 2026-08-19; the old
@@ -18,8 +18,8 @@ export default async function StudentLayout({ children }: { children: React.Reac
   // a switch back to the expert workspace.
   const user = await requireRole([ROLE.USER, ROLE.PROVIDER, ROLE.ADMIN])
   return (
-    <StudentWorkspaceShell user={{ name: user.fullName, avatar: user.avatarUrl ?? undefined }}>
+    <ClientShell user={{ name: user.fullName, avatar: user.avatarUrl ?? undefined }}>
       {children}
-    </StudentWorkspaceShell>
+    </ClientShell>
   )
 }

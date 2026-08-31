@@ -118,6 +118,36 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url, 308)
   }
 
+  // ── /api/master… → /api/provider… ─────────────────────────────────────────
+  // 2026-08-30, with the `MasterApplication` → `ProviderApplication` rename.
+  // „მასტერი" is on the retired list in CLAUDE.md and the product has one kind
+  // of seller, so the table, the enum and these three addresses all say
+  // PROVIDER now. The old addresses keep working.
+  //
+  // ⚠️ WHY THESE NEED A REDIRECT AT ALL, when an API is not a page somebody
+  // bookmarks: `/api/masters/<id>/photo` IS an <img src>. It sits in every
+  // catalogue card, every saved-expert row and every offer, which means it sits
+  // in browser caches, in the HTML of any page a crawler kept, and in whatever
+  // a client has open right now. A photo route that 404s draws a broken face.
+  //
+  // ⚠️ AND THE CALL SITES WERE UPDATED TOO — all fifteen. A 308 costs an extra
+  // round trip per image, so leaving the app itself on the old path would have
+  // paid that on the busiest page on the site for ever. This block is for links
+  // WE no longer make: cached HTML, an open tab, an external referrer.
+  //
+  // 308 and not 302: permanent, and method-preserving, so the POST that submits
+  // an application still arrives as a POST with its body.
+  if (req.nextUrl.pathname.startsWith('/api/masters/')
+      || req.nextUrl.pathname.startsWith('/api/master-applications')
+      || req.nextUrl.pathname.startsWith('/api/admin/master-applications')) {
+    const url = req.nextUrl.clone()
+    url.pathname = req.nextUrl.pathname
+      .replace('/api/masters/', '/api/providers/')
+      .replace('/api/master-applications', '/api/provider-applications')
+      .replace('/api/admin/master-applications', '/api/admin/provider-applications')
+    return NextResponse.redirect(url, 308)
+  }
+
   // ── /masters[/…] → /experts, and /services EXACTLY → /experts ──────────────
   // Stage 10 (2026-08-19). The trades catalogue and the trades DOOR are gone:
   // one list holds both halves, and the door listed trades the rail now lists
@@ -165,28 +195,32 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url, 308)
   }
 
-  // ── /work/service-profile → /work/services, permanently ───────────────────
-  // ONE PAGE FOR „რას ვყიდი?" (2026-08-19). The master answered that question
-  // here and the expert answered it in a tab of /work/profile — two screens,
-  // two halves of one workspace, for the one question a provider has about what
-  // they sell. /work/services is both halves, gated per capability, and this is
-  // the master's old address landing on it.
+  // ── /work/service-profile · /work/services → /work/profile, permanently ───
+  // ONE EDITOR FOR ONE ROW (2026-08-30). Both of these named a page that asked
+  // „რას ვყიდი?" while /work/profile asked „ვინ ვარ?" — a split that was real
+  // while they were two tables and stopped being real on 2026-08-24, when
+  // `TutorProfile` was absorbed into `ServiceProfile`. One row, one page; these
+  // are the two retired addresses landing on it.
   //
-  // ⚠️ IT SITS ABOVE THE SPACE MOVES, so the CURRENT old address lands in one
-  // hop. The pre-stage-6 form (/provider/service-profile) reaches it in two —
-  // the block below maps it onto /work/service-profile first — and that is
-  // accepted: it is an address retired twice, and naming it here would put a
-  // live „/provider…" literal back into this file, which is the one thing
-  // tests/spaces.test.ts §G forbids outside the space block itself.
+  // ⚠️ ONE HOP EACH, AND THAT IS WHY BOTH ARE LISTED. /work/service-profile
+  // used to 308 onto /work/services, which now 308s onto /work/profile — a
+  // chain, and `tests/servicesPage.test.ts` has forbidden exactly that since
+  // the first of these moves. Naming both here keeps each at a single hop.
+  // (The pre-stage-6 form, /provider/service-profile, still reaches it in two:
+  // the block below maps it onto /work/service-profile first. Accepted — it is
+  // an address retired three times now, and naming it here would put a live
+  // „/provider…" literal back into this file, which tests/spaces §G forbids
+  // outside the space block itself.)
   //
-  // Prefix-plus-slash as well as the exact match: nothing ever lived under it,
-  // so a deeper path is a typo and belongs on the page rather than on a 404.
-  {
-    const from = '/work/service-profile'
+  // ⚠️ IT SITS ABOVE THE SPACE MOVES so the current addresses are matched first.
+  //
+  // Prefix-plus-slash as well as the exact match: nothing ever lived under
+  // either, so a deeper path is a typo and belongs on the page, not on a 404.
+  for (const from of ['/work/service-profile', '/work/services']) {
     const p = req.nextUrl.pathname
     if (p === from || p.startsWith(from + '/')) {
       const url = req.nextUrl.clone()
-      url.pathname = '/work/services'
+      url.pathname = '/work/profile'
       return NextResponse.redirect(url, 308)
     }
   }

@@ -1,31 +1,17 @@
 # mcodne.ge
 
 Georgian services marketplace. Next.js 15 · React 19 · Tailwind · Prisma · Postgres.
-UI is Georgian. Rewritten 2026-08-21; the product section rewritten 2026-08-24,
-when consultations were removed.
+UI is Georgian.
 
-> ### Why this file was rewritten
+> **This file describes; it does not legislate.** Owner: „რატომ უნდა იყოს ისეთი
+> წესები, რაც მიშლის მუშაობაში" — **a rule that blocks the owner's work is a bug
+> in the rule.** Change any of it; change the line too.
 >
-> Owner: „რატომ უნდა იყოს ისეთი წესები, რაც მიშლის მუშაობაში" — and before that,
-> „წესები წაშალე და ახლიდან დაწერე, მასშტაბურად იცვლება საიტი."
+> The one exception is **Things that protect a person**: each item there breaks
+> something for somebody real. Everything else is taste.
 >
-> The previous version had grown into a body of law. It was accurate and it was
-> in the way: in a single session it was quoted back at the owner as the reason
-> NOT to do something they had asked for — most plainly „Additive DDL only" as
-> grounds for keeping a dead column they wanted gone.
->
-> **A rule that blocks the owner's work is a bug in the rule.** So this file no
-> longer legislates. Nearly all of it is DESCRIPTION — how the thing works today,
-> written down so nobody has to rediscover it. Change any of it; change the line
-> too.
->
-> The list under **Things that protect a person** is different, and it is short
-> on purpose: each one exists because breaking it hurts somebody — a reader who
-> cannot see the text, a client whose phone number leaks, two providers promised
-> the same job. Those are not taste. Everything else is.
->
-> Numbers here were measured on 2026-08-21 and they rot. `npm run map`, a
-> `count()`, an `ls` — re-measure before reasoning from one.
+> Every number here rots. `npm run map`, a `count()`, an `ls` — re-measure before
+> reasoning from one.
 
 ---
 
@@ -44,8 +30,7 @@ credits ledger behind it. There is no booking, no slot, no calendar, no session.
 
 **One provider, one catalogue, one card, one namespace.** A provider is somebody
 with a `ServiceProfile` AND an active `RequestAccess` row — ask
-`lib/identity → identityOf`, which answers in one read. The old CONSULT/WORK
-capability pair is gone with the second product it distinguished.
+`lib/identity → identityOf`, which answers in one read.
 
 **The four request kinds** — `LEARNING`, `MEETING`, `PROJECT`, `SERVICE`
 (`lib/requestTopics`). „შეხვედრა" is what „კონსულტაცია" became, and it kept its
@@ -78,11 +63,8 @@ Owner, 2026-08-21: „ორი რეგისტრაცია მაგი�
 **A CLIENT buys.** They registered through `/signup`, they sell nothing, and
 `/me` is their room.
 
-**`Role` finally answers the question** — `USER` · `PROVIDER` · `ADMIN`, since
-2026-08-24. It used to be `STUDENT` / `TUTOR` / `ADMIN` with no provider value,
-so somebody selling services was stored under the same word as somebody who had
-only ever bought, and no guard could tell them apart. Both dead values are gone
-from the enum, not merely unused.
+**`Role` is `USER` · `PROVIDER` · `ADMIN`** since 2026-08-24. The old
+`STUDENT` / `TUTOR` values are gone from the enum, not merely unused.
 
 **Still ask `identityOf`, not `role`, for „what does this person sell".** A role
 is a permission; a profile plus an allowlist row is the fact.
@@ -134,10 +116,9 @@ needs `lib/tz → tbilisiParts()`. Not moral — just wrong otherwise.
 
 ## Where things live
 
-424 files, ~71 500 lines across `app/`, `components/`, `lib/` (re-measured
-2026-08-30; it was 446/~72 000 on 2026-08-25, after the consultation removal
-took roughly a third of it). Big screens are a container plus `_*.tsx` siblings
-in their own folder — **open the part, not the page**.
+424 files, ~71 500 lines across `app/`, `components/`, `lib/` (2026-08-30). Big
+screens are a container plus `_*.tsx` siblings in their own folder — **open the
+part, not the page**.
 
 | | |
 | --- | --- |
@@ -146,7 +127,8 @@ in their own folder — **open the part, not the page**.
 | `/experts/[slug]` — one namespace: profession → trade → provider | `app/experts/[slug]/page.tsx` |
 | the door — one question, one form | `app/join/` — `_door/` `_master/` `_shared/` |
 | the two spaces | `app/me/` (client) · `app/work/` (supply) |
-| what a provider sells | `app/work/services/` |
+| a provider's whole public card — ONE editor, one save | `app/work/profile/` (`_editor` + `_sec*`) |
+| the password and the one visibility switch | `app/work/account/` |
 | the intake | `app/request/` |
 | admin | `app/admin/` — one `_<tab>.tsx` per tab |
 | retired URLs → 308 | `middleware.ts`, executed by `tests/redirects.test.ts` |
@@ -234,16 +216,10 @@ update whatever test pinned the older one.
 → the full canon and its measurements: **`docs/design-system.md`**
 
 **Dark features.** `PAYMENTS_LIVE` · `FEATURE_ABROAD` · `B2B_VISIBILITY` are off
-in `lib/flags.ts`. (`FEATURE_PAYMENTS_V2` and `FEATURE_REQUEST_BOOKING` were on
-this list until 2026-08-26 and neither had a single importer — the first had no
-wallet behind it and the second described a booking. A dark feature is one whose
-code is reachable; a switch with no reader is the thing the paragraph below
-warns about, and this file was naming two of them as examples of the opposite.) Their code and copy stay reachable so
-the flag can simply be turned on. A dark feature is not a deleted one — and the
-converse matters too: `PACKAGES_VISIBILITY` was removed on 2026-08-24 rather
-than left switched off, because a spent lesson WAS a booking and there is
-nothing behind the switch any more. A flag with no reader is a control that
-lies.
+in `lib/flags.ts`, and their code and copy stay reachable so the flag can simply
+be turned on. A dark feature is not a deleted one — but the converse holds too:
+a flag whose code nobody imports is a control that lies, and it gets deleted
+rather than left switched off.
 
 **`docs/archive/` is history.** Nothing in it is current; never quote a number
 out of it.

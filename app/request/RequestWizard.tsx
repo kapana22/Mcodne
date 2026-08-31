@@ -16,7 +16,7 @@ import {
   type RequestKindName, type Vertical,
 } from '@/lib/requests'
 import { newFlowId } from '@/lib/funnelEvents'
-import { WorkPhotos } from '@/app/join/_master/_workPhotos'
+import { WorkPhotos } from '@/app/join/_provider/_workPhotos'
 import { REQUEST_FUNNEL_EVENTS, trackRequestFunnel } from './requestFunnelEvents'
 import { RequestShell } from './_shell'
 import {

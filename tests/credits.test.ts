@@ -303,7 +303,7 @@ test('the vocabulary never turns a discount into a liability', () => {
   // spoken to a provider. „დაბრუნება" is banned, so a released charge is stated
   // as the balance ending where it started — never as money coming back.
   for (const f of [
-    'lib/credits.ts', 'lib/creditsServer.ts', 'app/work/services/_trades.tsx',
+    'lib/credits.ts', 'lib/creditsServer.ts', 'app/work/profile/_editor.tsx',
     'app/work/(provider)/requests/[id]/OfferForm.tsx', 'app/work/_components/CreditStrip.tsx',
     'app/api/admin/users/[id]/credits/route.ts',
   ]) {
@@ -406,20 +406,27 @@ test('a services-only provider can reach the same 100₾', () => {
   // day that file lost its second face uploader and the `about` it had no
   // field for, and the failure read as „the photo task is unreachable" when the
   // photo had simply moved to the block beside it.
+  // ⚠️ ONE KEY SINCE 2026-08-30, and it used to be two. This map existed to say
+  // which of the two editors drew the control a task is completed with; the two
+  // wrote one `ServiceProfile` row and became one page („ჩემი გვერდი"), so the
+  // question it answers is now „which SECTION", and all of them are that page.
   const EDITOR: Record<string, string[]> = {
-    '/work/services': ['app/work/services/_trades.tsx'],
     '/work/profile': [
-      'app/work/profile/_tabProfile.tsx',
-      'app/work/profile/_master.tsx',
-      'app/work/profile/_expertClient.tsx',
+      'app/work/profile/_editor.tsx',
+      'app/work/profile/_secIdentity.tsx',
+      'app/work/profile/_secServices.tsx',
+      'app/work/profile/_secPhotos.tsx',
     ],
   }
 
   // ⚠️ AND THE CONTROL IS NAMED, BECAUSE THE COLUMN IS NOT ALWAYS THE FIELD.
   // Two of the six never spelled their column on screen and a grep for it was
   // passing on the surrounding prose rather than on a control:
-  //   · `about` is `bio` in the form — mapped at the two edges on purpose, see
-  //     app/work/profile/_types.ts;
+  //   · `about` USED TO BE `bio` in the form and was mapped at the two edges.
+  //     Since 2026-08-30 the draft carries the endpoint's own field names, so
+  //     the body is `JSON.stringify(draft)` and nothing translates in between —
+  //     a mapping layer is where „the bio saved and the headline did not" comes
+  //     from. The control is `draft.about` now (app/work/profile/_types.ts);
   //   · `photoUrl` is written by /api/uploads from the ავატარი block, not by
   //     the page's own PUT body — and `profileFacts` pays the task for EITHER
   //     portrait column, which is what makes one uploader enough.
@@ -430,7 +437,7 @@ test('a services-only provider can reach the same 100₾', () => {
     PROFILE_SERVICE: /setPrice|priceList/,
     PROFILE_CERTIFICATE: /WorkPhotos/,
     PROFILE_PHOTO: /pickAvatar/,
-    PROFILE_BIO: /form\.bio/,
+    PROFILE_BIO: /draft\.about/,
     PROFILE_EXPERIENCE: /yearsExp|toggleArea/,
   }
 
@@ -464,7 +471,7 @@ test('the grant arrives with the act that earned it', () => {
   const api = read('app/api/provider/service-profile/route.ts')
   assert.match(api, /grantEarnedTasks\(viewer\.user\.id\)/,
     'the services editor stopped paying on save — the grant is back to arriving silently')
-  assert.match(read('app/work/services/_trades.tsx'), /ბალანსზე დაგერიცხა/,
+  assert.match(read('app/work/profile/_editor.tsx'), /ბალანსზე დაგერიცხა/,
     'the form stopped saying what the save earned')
   // The vocabulary it uses to say so is pinned by the wording test above, which
   // now reads this file too.
@@ -494,7 +501,7 @@ test('the strip sends each task to the editor that owns it', () => {
   const OWNS: Record<CreditTaskKey, string> = {
     PROFILE_PROFESSIONS: '/work/profile',
     PROFILE_EXPERIENCE:  '/work/profile',
-    PROFILE_SERVICE:     '/work/services',
+    PROFILE_SERVICE:     '/work/profile',
     PROFILE_CERTIFICATE: '/work/profile',
     PROFILE_PHOTO:       '/work/profile',
     PROFILE_BIO:         '/work/profile',
@@ -504,7 +511,9 @@ test('the strip sends each task to the editor that owns it', () => {
       `${t.key} („${t.label}") sends the provider to a page that does not hold that field`)
   }
   // Two pages and only two: every task is either what I sell or who I am.
-  assert.deepEqual([...new Set(Object.values(OWNS))].sort(), ['/work/profile', '/work/services'],
+  // ⚠️ ONE ADDRESS SINCE 2026-08-30. This list held two while the row had two
+  // editors; `taskHref` no longer branches at all — see lib/credits.
+  assert.deepEqual([...new Set(Object.values(OWNS))].sort(), ['/work/profile'],
     'a third editor appeared — „რას ვყიდი" and „ვინ ვარ" are the whole of it')
   // The page passes the task's own address, and the strip hard-codes nothing.
   assert.match(read('app/work/page.tsx'), /editHref=\{next \? taskHref\(next\.key\)/,
@@ -541,7 +550,7 @@ test('the balance is readable from the chrome, in the sanctioned wording', () =>
   // so a provider browsing the catalogue or their own public page never saw the
   // thing the whole bonus exists to motivate.
   const pill = read('components/CreditPill.tsx')
-  for (const bar of ['components/PublicTopBar.tsx', 'components/tutor/WorkspaceTopBar.tsx']) {
+  for (const bar of ['components/PublicTopBar.tsx', 'components/work/WorkspaceTopBar.tsx']) {
     assert.match(read(bar), /<CreditPill\s/, `${bar} no longer shows the balance`)
   }
 
@@ -740,7 +749,7 @@ test('the rail says what the profile is worth, not how full it is', () => {
   // rail used to read „პროფილის სისრულე · 60%": true, and about a form rather
   // than about the reader. The bar is the same; what changed is that it now
   // names the money it is worth.
-  const rail = read('components/tutor/WorkspaceSidebar.tsx')
+  const rail = read('components/work/WorkspaceSidebar.tsx')
   assert.match(rail, /კიდევ \{gelLabel\(unearnedTetri\)\} პროფილის შევსებისთვის/,
     'the rail dropped the line that says what finishing the profile pays')
   assert.match(rail, /unearnedTetri > 0 &&/,
@@ -749,9 +758,24 @@ test('the rail says what the profile is worth, not how full it is', () => {
   // ⚠️ NOT A SECOND READ OF THE SAME FACTS. The number rides back from the
   // grant the shell already performs; a `profileFacts` call of its own is the
   // duplicate query lib/creditsServer and tests/requestQueue §F both forbid.
-  assert.match(codeOf('app/work/layout.tsx'), /\(await grantEarnedTasks\(user\.id\)\)\.unearnedTetri/,
+  const layout = codeOf('app/work/layout.tsx')
+  assert.match(layout, /const granted = await grantEarnedTasks\(user\.id\)/,
     'the rail number costs a second read of the profile again')
-  assert.doesNotMatch(codeOf('components/tutor/WorkspaceSidebar.tsx'), /profileFacts|prisma/,
+  assert.match(layout, /grantPercent = granted\.percent/,
+    'the rail bar is fetched separately from the line beneath it')
+
+  // ⚠️ THE BAR AND THE LINE COME FROM ONE MEASURE (2026-08-30). The bar used to
+  // be lib/profileScore's weighted checks — a different six-item list, asking
+  // for a headline and a language where the grant pays for a certificate and
+  // years of experience — drawn directly above „კიდევ N ₾". It could read 100%
+  // over a promise of 40₾ still to earn.
+  assert.match(codeOf('lib/creditsServer.ts'), /const percent = completeness\(facts\)/,
+    'the grant stopped reporting its own completeness')
+  assert.doesNotMatch(codeOf('components/work/WorkspaceSidebar.tsx'), /badges\.profilePercent/,
+    'the rail reads the polled score again — a different measure, and one that arrives late')
+  assert.doesNotMatch(codeOf('app/api/work/nav-badges/route.ts'), /profilePercent/,
+    'the badge poll computes a percentage nobody reads')
+  assert.doesNotMatch(codeOf('components/work/WorkspaceSidebar.tsx'), /profileFacts|prisma/,
     'the rail queries for its own number — it is a client component')
 
   // And it must not restate the balance the top bar already carries.

@@ -82,7 +82,7 @@ test('§B the page reads `slug`, resolves id OR slug, and 308s a cuid to /expert
   assert.match(read('app/experts/[slug]/_providerData.ts'),
     /OR:\s+\[\{\s+slug:\s+param\s+\},\s+\{\s+id:\s+param\s+\}\]/,
     'the resolver stopped accepting the raw id')
-  assert.match(page, /permanentRedirect\(`\$\{masterPath\(provider\)\}/)
+  assert.match(page, /permanentRedirect\(`\$\{providerPath\(provider\)\}/)
   assert.doesNotMatch(page, /\/tutors\/\$\{/, 'the page still builds a /tutors/ profile URL')
 })
 

@@ -14,7 +14,7 @@
 import { Link } from 'next-view-transitions'
 import { Icon } from '@/components/Icon'
 import { EntityChip } from '@/components/EntityCard'
-import type { MasterProfile } from './_providerData'
+import type { ProviderProfileData } from './_providerData'
 
 /** The same trail the catalogue draws (app/experts/_hero), one step deeper.
  *  Hidden below sm for the same reason, kept in the DOM for crawlers and
@@ -40,7 +40,7 @@ export function ProviderBreadcrumb({ name }: { name: string }) {
   )
 }
 
-export function ProviderHero({ p }: { p: MasterProfile }) {
+export function ProviderHero({ p }: { p: ProviderProfileData }) {
   // Round for a person, rounded-square for a firm — the card's rule, so the
   // plate somebody just clicked keeps its shape here.
   const shape = p.isCompany ? 'rounded-card' : 'rounded-full'
@@ -134,31 +134,16 @@ export function ProviderHero({ p }: { p: MasterProfile }) {
           </div>
         )}
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-small">
-          {p.areas.length > 0 && (
-            <div className="inline-flex items-center gap-1.5 text-ink-700">
-              <Icon.globe className="w-3.5 h-3.5 text-ink-500 shrink-0" />
-              <span>{p.areas.join(', ')}</span>
-            </div>
-          )}
-          {p.yearsExp > 0 && (
-            <div className="inline-flex items-center gap-1.5 text-ink-700">
-              <Icon.briefcase className="w-3.5 h-3.5 text-ink-500 shrink-0" />
-              <span>{p.yearsExp} წლის გამოცდილება</span>
-            </div>
-          )}
-          {p.langs.length > 0 && (
-            <div className="inline-flex items-center gap-1.5 text-ink-700">
-              <Icon.chat className="w-3.5 h-3.5 text-ink-500 shrink-0" />
-              <span>{p.langs.join(', ')}</span>
-            </div>
-          )}
-          {/* ⚠️ NO PRICE HERE (2026-08-19). A service is quoted after somebody
-              looks at the job — „22₾-დან" was a number the offer would
-              overwrite anyway, and a figure nobody stands behind is worse than
-              none. Owner: „არ იცის კლიენტმა რამდენი ღირს სერვისი." The CTA
-              beside this says what actually happens instead. */}
-        </div>
+        {/* ⚠️ CITY · YEARS · LANGUAGES MOVED TO THE RAIL (2026-08-30). They were
+            one `text-small` row here, three facts five words apart with nothing
+            naming any of them, and they were the last thing on a profile whose
+            rail held one button — so the page ran out under the reader exactly
+            where „who is this" gets answered. `ProfileFactsBlock` gives each one
+            a label and a row (_providerBlocks.tsx).
+            NO PRICE HERE EITHER (2026-08-19, and still true). A service is
+            quoted after somebody looks at the job — „22₾-დან" was a number the
+            offer would overwrite anyway, and a figure nobody stands behind is
+            worse than none. Owner: „არ იცის კლიენტმა რამდენი ღირს სერვისი." */}
 
       </div>
     </header>

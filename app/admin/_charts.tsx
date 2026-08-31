@@ -33,7 +33,11 @@ export const CHART = {
  *  the component that draws it — it used to live in `_analytics.tsx`, which made
  *  the overview tab import a type from a sibling tab it had nothing else to do
  *  with, and kept that file alive purely as a type holder. */
-export type SeriesData = { days: string[]; signups: number[]; bookings: number[]; revenue: number[] }
+// ⚠️ `SeriesData` STOOD HERE AND NOTHING IMPORTED IT (removed 2026-08-30). It
+// typed the response of /api/admin/analytics/series — a route deleted earlier in
+// the same session — and named two series the product cannot produce:
+// `bookings` and `revenue`. `MiniChart` below is the live export; /admin's
+// „ჩატის კითხვები" tab is its one reader.
 
 type Props = {
   title: string

@@ -152,7 +152,7 @@ test('the group captions and the renamed tabs read as the owner wrote them', () 
   assert.match(navFile, /\{\s+id:\s+'broadcast',\s+l:\s+'შეტყობინების\s+გაგზავნა'/)
   // The one application queue left says „განაცხადები" flat, because there is no
   // longer a second kind of application to tell it apart from.
-  assert.match(navFile, /\{ id: 'masters',\s+l: 'განაცხადები'/)
+  assert.match(navFile, /\{ id: 'providers',\s+l: 'განაცხადები'/)
 })
 
 test('the masters badge rides on the ONE stats fetch', () => {
@@ -164,19 +164,19 @@ test('the masters badge rides on the ONE stats fetch', () => {
   // Same Promise.all as every other badge — a badge is never a second request
   // from the shell, and never worth 500-ing the shell over (.catch(() => 0)).
   const all = statsFile.slice(statsFile.indexOf('await Promise.all(['), statsFile.indexOf('])', statsFile.indexOf('await Promise.all([')))
-  assert.match(all, /prisma\.masterApplication\.count\(\{\s+where:\s+\{\s+status:\s+'SUBMITTED'\s+\}\s+\}\)\.catch\(\(\)\s+=>\s+0\)/,
+  assert.match(all, /prisma\.providerApplication\.count\(\{\s+where:\s+\{\s+status:\s+'SUBMITTED'\s+\}\s+\}\)\.catch\(\(\)\s+=>\s+0\)/,
     'the application count is not inside Promise.all with .catch(() => 0)')
-  assert.match(statsFile, /pendingMasters: pendingApps,/, 'the count is not in the JSON response')
+  assert.match(statsFile, /pendingProviders: pendingApps,/, 'the count is not in the JSON response')
   assert.doesNotMatch(statsFile, /prisma\.dispute\b/, 'the stats route counts disputes again — the table is gone')
   // …and the shell reads it the same way it reads the other three.
-  assert.match(pageFile, /if \(typeof d\?\.pendingMasters === 'number'\)/, 'page.tsx does not read pendingMasters from the stats response')
-  assert.equal((pageFile.match(/pendingMasters=\{pendingMasters\}/g) ?? []).length, 2, 'pendingMasters is not passed to both AdminSidebar and TopBar')
+  assert.match(pageFile, /if \(typeof d\?\.pendingProviders === 'number'\)/, 'page.tsx does not read pendingProviders from the stats response')
+  assert.equal((pageFile.match(/pendingProviders=\{pendingProviders\}/g) ?? []).length, 2, 'pendingProviders is not passed to both AdminSidebar and TopBar')
   // The badge helper is the ONE place both surfaces read, so a badge means the
   // same thing on desktop and mobile.
-  assert.match(navFile, /if\s+\(id\s+===\s+'masters'\)\s+return\s+pendingMasters\s+\?\?\s+0/)
+  assert.match(navFile, /if\s+\(id\s+===\s+'providers'\)\s+return\s+pendingProviders\s+\?\?\s+0/)
   assert.doesNotMatch(navFile, /if \(id === 'bookings'\)/, 'a bookings badge came back — there are no bookings')
   assert.doesNotMatch(navFile, /if \(id === 'disputes'\)/, 'a disputes badge came back — there are no disputes')
-  assert.equal((navFile.match(/navBadge\(it\.id, helpOpen, b2bLeads, newRequests, pendingMasters\)/g) ?? []).length, 2,
+  assert.equal((navFile.match(/navBadge\(it\.id, helpOpen, b2bLeads, newRequests, pendingProviders\)/g) ?? []).length, 2,
     'both surfaces must call navBadge with the same four counts')
 })
 

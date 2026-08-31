@@ -65,7 +65,6 @@ export default async function StudentFavoritesPage() {
     <Container as="main" className="w-full py-8 lg:py-10 flex-1">
         <PageHeader
           className="mb-8"
-          eyebrow="პირადი სია"
           title={<>შენახული ექსპერტები <span className="text-ink-400 font-normal">({items.length})</span></>}
         />
 

@@ -68,9 +68,9 @@ import { PublicTopBar } from '@/components/PublicTopBar'
 import { Footer } from '@/components/Footer'
 import { Container } from '@/components/Container'
 import { ProfessionLanding, professionMetadata } from './_profession'
-import { resolveMaster, getMasterProfile, masterPath, countMastersCovering } from './_providerData'
+import { resolveProvider, getProviderProfile, providerPath, countProvidersCovering } from './_providerData'
 import { ProviderBreadcrumb, ProviderHero } from './_providerHero'
-import { PricedServicesBlock, AboutBlock, CredentialsBlock, WorkBlock, ReviewsBlock } from './_providerBlocks'
+import { PricedServicesBlock, ProfileFactsBlock, AboutBlock, CredentialsBlock, WorkBlock, ReviewsBlock } from './_providerBlocks'
 import { ProviderCta } from './_providerCta'
 import { TradeLanding, tradeLabel } from './_tradeLanding'
 
@@ -140,12 +140,12 @@ export async function generateMetadata(
   }
   // ── 3. the provider profile ─────────────────────────────────────────────
   {
-    const provider = await resolveMaster(param)
-    const pp = provider ? await getMasterProfile(provider.id) : null
+    const provider = await resolveProvider(param)
+    const pp = provider ? await getProviderProfile(provider.id) : null
     if (pp) {
       // Canonical is ALWAYS the slug URL when one exists — otherwise an
       // id-form link would self-canonicalise and compete with it.
-      const providerCanonical = `${SITE_URL}${masterPath(pp)}`
+      const providerCanonical = `${SITE_URL}${providerPath(pp)}`
       const title = `${pp.name} — სერვისი | მცოდნე`
       const description =
         excerpt(pp.about) || [pp.services.join(', '), pp.areas.join(', ')].filter(Boolean).join(' · ') || title
@@ -198,7 +198,7 @@ export default async function TutorProfileRoute(
     // `provider` and `balanceTetri`, the two the header branches on, so a
     // provider browsing a trade landing saw the request button drawn and then
     // removed. lib/meServer carries the finding.
-    const [count, initialUser] = await Promise.all([countMastersCovering(topicIds), initialMe()])
+    const [count, initialUser] = await Promise.all([countProvidersCovering(topicIds), initialMe()])
     const result = count >= TRADE_LANDING_MIN
       ? await queryProviders(trade.topic ? { groups: [], topics: [trade.topic.id], cities: [] } : { groups: [trade.group.id], topics: [], cities: [] })
       : null
@@ -225,13 +225,13 @@ export default async function TutorProfileRoute(
   // ── 3. THE PROVIDER PROFILE — the last thing this address can be.
   // Anything the visibility rule hides — unpublished, paused, not admitted —
   // falls through to a 404, exactly as it always did.
-  const provider = await resolveMaster(param)
+  const provider = await resolveProvider(param)
   if (provider) {
     // id→slug 308, carrying the query string: every deep-link into a profile
     // carries its intent there (?utm_*, and whatever the next one is), and a
     // redirect to a bare path silently drops all of it.
     if (provider.slug && param !== provider.slug) {
-      permanentRedirect(`${masterPath(provider)}${queryOf(await searchParams)}`)
+      permanentRedirect(`${providerPath(provider)}${queryOf(await searchParams)}`)
     }
     return providerProfile(provider)
   }
@@ -263,7 +263,7 @@ function queryOf(sp: Record<string, string | string[] | undefined>): string {
  * base64 column, and the intake CTA mounted only when `requestsOn()`.
  *
  * ⚠️ SLUG OR ID, AND THE ID REDIRECTS — in the CALLER, before this runs
- * (`_providerData → resolveMaster` accepts both forms; reached by cuid while a
+ * (`_providerData → resolveProvider` accepts both forms; reached by cuid while a
  * slug exists it 308s to the slug, so one profile has one address).
  *
  * Unknown, unpublished, paused, or not admitted never reaches here: the caller
@@ -273,13 +273,13 @@ function queryOf(sp: Record<string, string | string[] | undefined>): string {
 async function providerProfile(provider: { id: string; slug: string | null }) {
   // ⚠️ `initialMe`, NOT `getCurrentUser` — see the trade landing above and
   // lib/meServer. A provider's own public page is exactly where they look.
-  const [p, initialUser] = await Promise.all([getMasterProfile(provider.id), initialMe()])
+  const [p, initialUser] = await Promise.all([getProviderProfile(provider.id), initialMe()])
   if (!p) notFound()
 
   // ⚠️ THE FLAG IS READ ONCE, HERE, AND HANDED DOWN — see app/experts/page.tsx.
   const on = requestsOn()
 
-  const url = `${SITE_URL}${masterPath(p)}`
+  const url = `${SITE_URL}${providerPath(p)}`
   const image = p.photoSrc ? `${SITE_URL}${p.photoSrc}` : null
   const description = excerpt(p.about)
   // A firm is a LocalBusiness, a person is a Person. Minimal and real: name,
@@ -353,7 +353,12 @@ async function providerProfile(provider: { id: string; slug: string | null }) {
                 way and `ordering` decides whether a row carries „დაკვეთა". */}
             <aside className="min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2">
               <div className="lg:sticky lg:top-[80px]">
-                {on && <ProviderCta master={p} />}
+                {on && <ProviderCta provider={p} />}
+                {/* The facts before the price list: „who is this" is the
+                    question the rail could not answer until 2026-08-30, and on
+                    a profile that prices nothing it is the only thing the rail
+                    has to say. */}
+                <ProfileFactsBlock p={p} />
                 <PricedServicesBlock p={p} ordering={on} />
               </div>
             </aside>

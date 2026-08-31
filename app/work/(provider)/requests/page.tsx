@@ -220,8 +220,14 @@ export default async function Page({ searchParams }: {
               no sphere and no profession. Until today they saw EVERY open
               request on the platform, which is the bug; „nothing", said without
               a reason, is a different bug. So it names the gap and links to the
-              editor that owns it — `scope.fix` is „ჩემი სერვისები" for the
-              trades half and „პროფილი" for the expert half.
+              editor that owns it.
+
+              ⚠️ AND THAT IS ONE ADDRESS SINCE 2026-08-30. `scope.fix` used to
+              choose between „ჩემი სერვისები" and „პროფილი" — two editors for
+              one `ServiceProfile` row — so this banner had to know which half
+              of a person's own page they needed. There is one editor now
+              („ჩემი გვერდი"), so the discriminator was left with nothing to
+              discriminate and went with the split (lib/requestRouting).
 
               ⚠️ EVERY STRING HERE ALREADY EXISTED. „აირჩიე ერთი სერვისი მაინც"
               is the owner's own sentence from lib/serviceProfile → profileGaps,
@@ -243,17 +249,18 @@ export default async function Page({ searchParams }: {
               : 'ჯერ არაფერია'
             }
             description={
-              scope.mode === 'PAUSED' ? 'სანამ გამორთული ხარ, მოთხოვნები არ მოგდის. ჩართვა „ჩემი სერვისები“-შია.'
+              scope.mode === 'PAUSED' ? 'სანამ გამორთული ხარ, მოთხოვნები არ მოგდის. ჩართვა „ანგარიში“-შია.'
               : scope.mode === 'UNLISTED' || scope.mode === 'FILTERED'
-                ? 'ჩანს მხოლოდ ის მოთხოვნები, რაც შენს სერვისებსა და ქალაქებს ემთხვევა. სია „ჩემი სერვისები“-ში იცვლება.'
+                ? 'ჩანს მხოლოდ ის მოთხოვნები, რაც შენს სერვისებსა და ქალაქებს ემთხვევა. სია „ჩემი გვერდი“-ზე იცვლება.'
                 : 'ახალი მოთხოვნა აქ გამოჩნდება, როგორც კი გადამოწმდება.'
             }
             cta={
-              scope.mode === 'PAUSED' ? { label: 'ჩემი სერვისები', href: `${PROVIDER_ROUTE}/services` }
+              // ⚠️ PAUSED GOES TO THE SWITCH, NOT TO THE EDITOR. It is the one
+              // of these three that is not fixed by filling a field in — and
+              // the switch is the single control on /work/account.
+              scope.mode === 'PAUSED' ? { label: 'ანგარიში', href: `${PROVIDER_ROUTE}/account` }
               : scope.mode === 'UNLISTED'
-                ? (scope.fix === 'PROFILE'
-                    ? { label: 'პროფილი', href: '/work/profile' }
-                    : { label: 'ჩემი სერვისები', href: `${PROVIDER_ROUTE}/services` })
+                ? { label: 'ჩემი გვერდი', href: `${PROVIDER_ROUTE}/profile` }
                 : undefined
             }
           />

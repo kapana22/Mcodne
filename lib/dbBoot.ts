@@ -30,6 +30,106 @@ const globalForBoot = globalThis as unknown as { dbBootPromise?: Promise<void> |
 let bootPromise: Promise<void> | null = globalForBoot.dbBootPromise ?? null
 
 async function runMigrations() {
+  // ── FIRST OF ALL: „MASTER" LEAVES THE DATABASE (2026-08-30) ─────────────
+  //
+  // Owner: „რაც შეგხვდება ძველი გადარქვი." „მასტერი" is on the retired list in
+  // CLAUDE.md and the product has ONE kind of seller — PROVIDER — so the table
+  // that holds their application, and the enum that says whether they are a
+  // person or a firm, are renamed to match the word the code now uses
+  // everywhere else.
+  //
+  // ⚠️ RENAMES, NOT A COPY. `ALTER TABLE … RENAME` is instant and keeps every
+  // row, index and grant; a create-copy-drop would rewrite base64 photo columns
+  // for nothing and give the boot a window where both tables exist.
+  //
+  // ⚠️ AND EVERY STATEMENT IS GUARDED ON THE OLD NAME EXISTING. This set runs on
+  // every cold boot until the hash stamp catches up, and on a database that has
+  // already been renamed a bare RENAME throws — which, per this file's own
+  // rule, would take the WHOLE boot down rather than one statement.
+  //
+  // ⚠️ IT IS FIRST, AND THAT ORDER IS THE WHOLE DESIGN. Two wrong versions were
+  // written before this one, and each failed on a different database:
+  //
+  //   1. Rename LAST, history keeps the old name. Correct on an empty database
+  //      and fatal on the live one — the moment this file's source changes the
+  //      stamp is void and the WHOLE set replays, so the very first statement
+  //      naming „MasterApplication" hit a table that had already been renamed:
+  //      `relation "MasterApplication" does not exist`.
+  //   2. Rename last, history renamed too. Fatal on an empty database — the
+  //      CREATE minted the new name, so the rename found nothing and an ALTER
+  //      600 statements earlier touched a table that did not exist yet.
+  //
+  // Running it FIRST satisfies both. On an empty database it is a no-op (the
+  // guards find nothing) and everything downstream creates the new names
+  // directly. On a live one it renames, and everything downstream — replayed in
+  // full, as this file always assumes — finds exactly what it expects. The
+  // statements below therefore say `ProviderApplication` from here on, and this
+  // block is the only place the old name may appear.
+  // ⚠️ EVERY GUARD ASKS BOTH SIDES: the old name exists AND the new one does
+  // not. „Old exists" alone is not enough, and the gate proved it (2026-08-30):
+  // an earlier broken run of this set had already renamed the enum, after which
+  // the CREATE TYPE 600 statements above re-minted the old one — so BOTH
+  // existed, and a bare RENAME died with `type "ProviderKind" already exists`.
+  // A half-applied migration is the normal state of a boot that failed once;
+  // a rename that only checks its source cannot survive its own retry.
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'MasterApplication' AND relkind = 'r')
+         AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'ProviderApplication' AND relkind = 'r') THEN
+        ALTER TABLE "MasterApplication" RENAME TO "ProviderApplication";
+      END IF;
+      -- ⚠️ AND IT HEALS A HALF-APPLIED STATE RATHER THAN FREEZING IT. Measured
+      -- against the live database on 2026-08-30: an earlier broken run had left
+      -- BOTH enums, with the column still on the old one — so a guard that only
+      -- skips when the target exists would have skipped for ever, leaving
+      -- ProviderApplication.kind typed MasterKind with an unused ProviderKind
+      -- beside it. Dropping the orphan is safe BECAUSE it is an
+      -- orphan: the DROP is conditional on nothing having a column of that type.
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MasterKind')
+         AND EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ProviderKind')
+         AND NOT EXISTS (
+           SELECT 1 FROM pg_attribute a
+             JOIN pg_type t ON t.oid = a.atttypid
+            WHERE t.typname = 'ProviderKind' AND a.attnum > 0 AND NOT a.attisdropped
+         ) THEN
+        DROP TYPE "ProviderKind";
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MasterKind')
+         AND NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ProviderKind') THEN
+        ALTER TYPE "MasterKind" RENAME TO "ProviderKind";
+      END IF;
+      -- The constraint and index names ride along on a table rename, so they
+      -- would keep saying „Master" on a table that no longer does. Cosmetic to
+      -- Postgres and to Prisma (both match on columns), and exactly the kind of
+      -- half-rename this migration exists to stop.
+      IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'MasterApplication_pkey')
+         AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'ProviderApplication_pkey') THEN
+        ALTER INDEX "MasterApplication_pkey" RENAME TO "ProviderApplication_pkey";
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'MasterApplication_userId_key')
+         AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'ProviderApplication_userId_key') THEN
+        ALTER INDEX "MasterApplication_userId_key" RENAME TO "ProviderApplication_userId_key";
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'MasterApplication_status_createdAt_idx')
+         AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'ProviderApplication_status_createdAt_idx') THEN
+        ALTER INDEX "MasterApplication_status_createdAt_idx" RENAME TO "ProviderApplication_status_createdAt_idx";
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'MasterApplication_userId_fkey')
+         AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ProviderApplication_userId_fkey') THEN
+        ALTER TABLE "ProviderApplication" RENAME CONSTRAINT "MasterApplication_userId_fkey" TO "ProviderApplication_userId_fkey";
+      END IF;
+      -- The price CHECK, created with the table ~600 statements above. That
+      -- statement is left as it was: it is the history of a table that WAS
+      -- called MasterApplication, and rewriting it would make a fresh boot
+      -- create a name this block then fails to find.
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'MasterApplication_prices_sane')
+         AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ProviderApplication_prices_sane') THEN
+        ALTER TABLE "ProviderApplication" RENAME CONSTRAINT "MasterApplication_prices_sane" TO "ProviderApplication_prices_sane";
+      END IF;
+    END $$;
+  `)
+
   // ApplicationStatus.NEEDS_REVISION — the enum TYPE predates this value, so
   // prod only has DRAFT/SUBMITTED/APPROVED/REJECTED while schema.prisma (and
   // the admin „შესწორება" action in api/applications/[id]) already writes
@@ -243,12 +343,12 @@ async function runMigrations() {
   // which grows with history.
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Notification_type_href_idx" ON "Notification"("type", "href");`)
 
-  // ServiceProfile.priceList / MasterApplication.priceList — a price per
+  // ServiceProfile.priceList / ProviderApplication.priceList — a price per
   // service the provider already picked, `{ topicId: lari }` (2026-08-20).
   // Additive and nullable: every existing row keeps meaning „ask", which is
   // what it meant before the column existed.
   await prisma.$executeRawUnsafe(`ALTER TABLE "ServiceProfile" ADD COLUMN IF NOT EXISTS "priceList" JSONB;`)
-  await prisma.$executeRawUnsafe(`ALTER TABLE "MasterApplication" ADD COLUMN IF NOT EXISTS "priceList" JSONB;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ProviderApplication" ADD COLUMN IF NOT EXISTS "priceList" JSONB;`)
 
   // ── CreditEntry: the provider's balance, as a ledger (2026-08-20) ───────
   //
@@ -813,22 +913,22 @@ async function runMigrations() {
   // The object that did not exist: until now a master could only be admitted
   // by an admin typing their id into /admin → access. That is not a product,
   // it is a favour — there was no way to APPLY, no queue, and nothing for the
-  // applicant to look at afterwards. See prisma/schema → MasterApplication.
+  // applicant to look at afterwards. See prisma/schema → ProviderApplication.
   //
-  // ⚠️ THE ENUM IS CREATED BEFORE THE TABLE, and defensively. `MasterKind` is
+  // ⚠️ THE ENUM IS CREATED BEFORE THE TABLE, and defensively. `ProviderKind` is
   // new, so on a database that predates this deploy the CREATE TABLE below
   // would fail on an unknown type — and `dbBoot` runs before the first request
   // is served, so that failure is the whole site, not one screen.
   await prisma.$executeRawUnsafe(`
     DO $$ BEGIN
-      CREATE TYPE "MasterKind" AS ENUM ('INDIVIDUAL', 'COMPANY');
+      CREATE TYPE "ProviderKind" AS ENUM ('INDIVIDUAL', 'COMPANY');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$;
   `)
   await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "MasterApplication" (
+    CREATE TABLE IF NOT EXISTS "ProviderApplication" (
       "id"            TEXT PRIMARY KEY,
       "userId"        TEXT NOT NULL,
-      "kind"          "MasterKind" NOT NULL DEFAULT 'INDIVIDUAL',
+      "kind"          "ProviderKind" NOT NULL DEFAULT 'INDIVIDUAL',
       "fullName"      TEXT NOT NULL,
       "phone"         TEXT NOT NULL,
       "companyName"   TEXT,
@@ -846,10 +946,10 @@ async function runMigrations() {
       "reviewedAt"    TIMESTAMP(3),
       "createdAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      -- The same bounds lib/masterApplication enforces, restated where a raw
+      -- The same bounds lib/providerApplication enforces, restated where a raw
       -- INSERT cannot get past them. A price of zero is not „free", it is a
       -- form that was submitted empty and read as a number.
-      CONSTRAINT "MasterApplication_prices_sane" CHECK (
+      CONSTRAINT "ProviderApplication_prices_sane" CHECK (
         ("calloutFee" IS NULL OR ("calloutFee" > 0 AND "calloutFee" <= 100000))
         AND ("priceFrom" IS NULL OR ("priceFrom" > 0 AND "priceFrom" <= 1000000))
         AND ("yearsExp" IS NULL OR ("yearsExp" >= 0 AND "yearsExp" <= 70))
@@ -859,8 +959,8 @@ async function runMigrations() {
   // One application per account, upserted — a re-submit after NEEDS_REVISION
   // updates the row rather than queueing a second one, exactly as
   // TutorApplication does.
-  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "MasterApplication_userId_key" ON "MasterApplication"("userId");`)
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MasterApplication_status_createdAt_idx" ON "MasterApplication"("status", "createdAt");`)
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ProviderApplication_userId_key" ON "ProviderApplication"("userId");`)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProviderApplication_status_createdAt_idx" ON "ProviderApplication"("status", "createdAt");`)
 
   // ── What happened to an offer (2026-08-17) ──────────────────────────────
   // The append-only record a PRICE will be read from: the owner's decision is
@@ -989,14 +1089,14 @@ async function runMigrations() {
     `ALTER TABLE "RequestOffer" ADD CONSTRAINT "RequestOffer_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
     `ALTER TABLE "RequestAccess" ADD CONSTRAINT "RequestAccess_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
     `ALTER TABLE "RequestAccess" ADD CONSTRAINT "RequestAccess_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
-    // MasterApplication → User, CASCADE (2026-08-18). Not a judgement call: the
+    // ProviderApplication → User, CASCADE (2026-08-18). Not a judgement call: the
     // row IS the person — their name, phone, face photo and a paragraph about
     // themselves — so it cannot outlive the account the way a ServiceRequest's
     // anonymised history can. SET NULL is not even available (the column is NOT
     // NULL, one application per account), and RESTRICT would make an account
     // undeletable because somebody once applied to fix taps. Deliberately
     // allowlisted in tests/userDeletion.test.ts rather than excused there.
-    `ALTER TABLE "MasterApplication" ADD CONSTRAINT "MasterApplication_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+    `ALTER TABLE "ProviderApplication" ADD CONSTRAINT "ProviderApplication_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
     // ⚠️ THESE TWO WERE MISSING, AND THE GAP WAS REAL (found 2026-08-18 by
     // deleting three test accounts and watching their profiles survive).
     //
@@ -1010,7 +1110,7 @@ async function runMigrations() {
     // Nothing reported it. The Prisma client believes the relation exists, so
     // it never complains; the page just draws „—" where a name should be. This
     // is exactly the class of defect tests/userDeletion.test.ts exists to catch,
-    // and it caught the MasterApplication edge above the same day — it could not
+    // and it caught the ProviderApplication edge above the same day — it could not
     // catch this one, because a foreign key that was never written is not a
     // foreign key that changed.
     `ALTER TABLE "ServiceProfile" ADD CONSTRAINT "ServiceProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
@@ -1170,7 +1270,7 @@ async function runMigrations() {
   `)
 
   // The one application form now asks for a profession too.
-  await prisma.$executeRawUnsafe(`ALTER TABLE "MasterApplication" ADD COLUMN IF NOT EXISTS "professions" TEXT[] NOT NULL DEFAULT '{}';`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ProviderApplication" ADD COLUMN IF NOT EXISTS "professions" TEXT[] NOT NULL DEFAULT '{}';`)
 
   // 2. The 27 people move.
   //
@@ -1462,6 +1562,8 @@ async function runMigrations() {
   await prisma.$executeRawUnsafe(
     `ALTER TABLE "ServiceRequest" ADD COLUMN IF NOT EXISTS "photos" TEXT[] NOT NULL DEFAULT '{}';`,
   )
+
+
 
 
 }

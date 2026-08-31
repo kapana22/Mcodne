@@ -66,10 +66,13 @@ const TEMPLATED: { file: string; shape: RegExp; expands: string[] }[] = [
     expands: ['request.new', 'request.verified', 'request.rejected', 'request.matched', 'request.closed', 'request.update'],
   },
   {
-    // The three verbs app/api/master-applications/[id] accepts.
-    file: 'app/api/master-applications/[id]/route.ts',
-    shape: /audit\(me\.id, `master\.\$\{action\}`/,
-    expands: ['master.approve', 'master.revise', 'master.reject'],
+    // The three verbs app/api/provider-applications/[id] accepts.
+    file: 'app/api/provider-applications/[id]/route.ts',
+    // ⚠️ THE WRITER SAYS `provider.*` SINCE 2026-08-30 („მასტერი" is retired);
+    // the rows already in the table say `master.*` and the panel's label map
+    // keeps BOTH — an audit log that stops being readable is not a log.
+    shape: /audit\(me\.id, `provider\.\$\{action\}`/,
+    expands: ['provider.approve', 'provider.revise', 'provider.reject'],
   },
 ]
 

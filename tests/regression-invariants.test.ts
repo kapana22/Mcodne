@@ -208,7 +208,7 @@ function check(name: string, ok: boolean, hint: string) {
   // something you HOLD, not something your role says. So the incident is not
   // guarded against, it is unrepresentable — and what has to stay true is
   // exactly that: no role write in the approval path.
-  const approve = read('app/api/master-applications/[id]/route.ts')
+  const approve = read('app/api/provider-applications/[id]/route.ts')
   check(
     'I2: approving an application never writes User.role',
     !/\brole:\s*'(ADMIN|PROVIDER|USER)'/.test(approve) && !/user\.update\(/.test(approve),
@@ -282,8 +282,8 @@ function check(name: string, ok: boolean, hint: string) {
     read('lib/roleHome.ts').includes("export const JOIN_HREF = '/signup'"),
     'Two chromes naming their own join URL is exactly how they diverged before.',
   )
-  const navConfig = read('components/student/navConfig.ts')
-  const sidebar = read('components/student/StudentSidebar.tsx')
+  const navConfig = read('components/me/navConfig.ts')
+  const sidebar = read('components/me/ClientSidebar.tsx')
   // ⚠️ THE CONSTANT, NOT JUST THE PRESENCE (2026-08-21). This asserted
   // `navConfig.includes('JOIN_HREF')`, which stayed true while the item pointed
   // a SIGNED-IN client at /signup — a page that redirects them straight back to
@@ -297,7 +297,7 @@ function check(name: string, ok: boolean, hint: string) {
   )
   check(
     'K2a: and it does not point a signed-in person at the guest door',
-    !codeOf('components/student/navConfig.ts').includes('JOIN_HREF'),
+    !codeOf('components/me/navConfig.ts').includes('JOIN_HREF'),
     'JOIN_HREF is /signup — correct for a guest, a round trip to nowhere for somebody already signed in.',
   )
   check(

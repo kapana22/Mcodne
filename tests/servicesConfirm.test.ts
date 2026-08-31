@@ -116,7 +116,10 @@ test('B2: confirming earns nothing — save must stay a free, honest yes', () =>
 /* ═══════════ C. the note, and how it goes away ═══════════════════════════ */
 
 test('C: the note is shown by the two workspace screens, above the rest', () => {
-  for (const f of ['app/work/page.tsx', 'app/work/services/page.tsx']) {
+  // ⚠️ TWO SCREENS, AND THE SECOND ONE MOVED (2026-08-30). The note used to sit
+  // on /work/services; that page and /work/profile are one editor now, and the
+  // note is drawn by the editor component rather than by its page shell.
+  for (const f of ['app/work/page.tsx', 'app/work/profile/_editor.tsx']) {
     assert.match(code(f), /<ConfirmServicesNote/, `${f} stopped asking`)
   }
   // ⚠️ /work reads the FACT, never its own query: tests/requestQueue §F holds

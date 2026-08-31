@@ -1,40 +1,65 @@
-// /tutor/profile — shapes shared by the page and its four tab panels.
+// /work/profile — the shapes the one provider editor and its three sections share.
 //
-// Several of these used to be inferred from a useState literal or declared
-// inside the component body. They are named here so a tab can state what it
-// receives; the literals in page.tsx are annotated with them, so tsc still
-// checks that the defaults match.
+// ⚠️ THERE IS ONE DRAFT SINCE 2026-08-30, and that is the whole point of the
+// type. Before today this folder held `ProfileForm` (headline, bio, years,
+// links, category, professions) while `app/work/services/_trades.tsx` held a
+// second, separate `Profile` (services, areas, prices, the switch) — two
+// objects, two dirty flags, two save buttons, two endpoints, one
+// `ServiceProfile` row underneath. A provider saw two pages that seemed to do
+// the same thing because in the database they did.
+//
+// One row, one draft, one save. Every field below is a column on that row
+// except `fullName`, which is `User.fullName` and rides the same transaction —
+// see the PUT in app/api/provider/service-profile.
 
-export type Me = {
-  id: string
+/** What the editor holds and PUTs. Field names are the ENDPOINT's, not the
+ *  UI's, so the save is `JSON.stringify(draft)` and nothing translates in
+ *  between — a mapping layer is where „the bio saved but the headline did not"
+ *  comes from. */
+export type Draft = {
+  /** `User.fullName`. The largest text on the card a client reads. */
   fullName: string
-  email: string
-  avatarUrl?: string | null
-  phone?: string | null
-} | null
-
-/** ⚠️ IT IS THE `ServiceProfile` ROW SINCE 2026-08-24, and five fields left with
- *  the consultation product: `specialty`, `price`, `serviceType`,
- *  `consultationDurationMin` and `bufferMin`. `bio` is `about` on the row and
- *  is mapped at the two edges (the GET that fills the form, the PATCH that
- *  saves it) rather than renamed through 300 lines of form state. */
-export type TutorProfile = {
-  id: string
-  headline: string | null
-  about: string | null
-  services?: string[]
-  areas?: string[]
-  priceList?: unknown
+  headline: string
+  /** The paragraph. Stored as `about`; the column the card and the public page
+   *  both print, and what Google indexes. */
+  about: string
   yearsExp: number
   languages: string[]
-  available?: boolean
-  linkedinUrl?: string | null
-  websiteUrl?: string | null
-  responseHours?: number
-  categoryId?: string | null
-  professions?: string[]
-  category?: { id: string; slug: string; name: string; status?: string } | null
-} | null
+  /** Empty string means „clear it" — the endpoint stores null for it. */
+  linkedinUrl: string
+  websiteUrl: string
+  categoryId: string
+  professions: string[]
+  services: string[]
+  areas: string[]
+  calloutFee: number | null
+  priceFrom: number | null
+  /** Always an object in the draft: a stored `null` must never reach `[id]`. */
+  priceList: Record<string, number>
+  /** `kept:<n>` for one already stored, or a fresh data URI. Resolved by the
+   *  endpoint — see `_secPhotos`. */
+  workPhotos: string[]
+}
+
+/** What GET /api/provider/service-profile answers with. */
+export type Topic = { id: string; label: string; alt: string[] }
+export type Group = { id: string; label: string; vertical: 'SERVICE' | 'EXPERT'; topics: Topic[] }
+export type City = { id: string; label: string }
+
+export type Loaded = {
+  /** The row id — the address of the public page, and of the photo route. */
+  id: string | null
+  /** `updatedAt`, busting the year-long cache on stored work photos. */
+  stamp: string
+  /** „What is still missing", computed by the endpoint so this screen and the
+   *  routing agree on what „ready" means. */
+  gaps: string[]
+  groups: Group[]
+  cities: City[]
+  /** Is the profile switched on? READ-ONLY here — /work/account owns the
+   *  control, and this screen only reports what it is currently true. */
+  available: boolean
+}
 
 export type Category = {
   id: string
@@ -44,28 +69,7 @@ export type Category = {
   children?: { id: string; slug: string; name: string }[]
 }
 
-// ⚠️ THE CV SHAPES WENT WITH THE TAB THAT EDITED THEM (2026-08-29):
-// `Certificate`, `Education`, `Experience`, their three add-forms and
-// `PendingDelete`, which had no kinds left once the three lists were gone.
-// Owner: „რითი დაგიჯერებს აღარ გვჭირდება, ეს ხომ სერვისებს ყიდის." The three
-// tables are untouched in the database; nothing on the site reads them.
-//
-// The consultation shapes had already gone the same way on 2026-08-19.
-
-export type ProfileForm = {
-  headline: string
-  /** The paragraph. Sent as `bio` and stored as `about` — see TutorProfile. */
-  bio: string
-  yearsExp: number
-  languages: string[]
-  linkedinUrl: string
-  websiteUrl: string
-  categoryId: string
-  /** What this expert calls themselves — several (lib/professions). */
-  professions: string[]
-}
-
 // Password policy — mirrors /api/me/password (min 8). Kept in one place so the
-// inline check, the input `minLength` and the copy can never drift apart again.
+// inline check, the input `minLength` and the copy can never drift apart.
 export const PWD_MIN = 8
 export const PWD_MIN_MSG = 'პაროლი უნდა იყოს მინიმუმ 8 სიმბოლო'

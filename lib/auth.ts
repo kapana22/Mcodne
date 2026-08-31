@@ -170,7 +170,7 @@ export async function postAuthHome(user: { id: string; role: Role }): Promise<st
     // The tutor half of this check has been here since the expert flow shipped,
     // for the reason stated above: an applicant keeps role STUDENT, so without
     // it they sign in and land on the learner's dashboard with no cue that
-    // their application exists. `MasterApplication` arrived with the trades
+    // their application exists. `ProviderApplication` arrived with the trades
     // vertical and nothing here was taught about it — so a tradesperson who
     // applied got exactly the failure this block was written to prevent, plus a
     // worse one: /student is a page inviting them to hire a tutor, and nothing
@@ -180,12 +180,12 @@ export async function postAuthHome(user: { id: string; role: Role }): Promise<st
     // two awaited round-trips on the auth path for a branch that usually
     // matches neither is a cost paid by everybody.
     // ⚠️ ONE APPLICATION SINCE 2026-08-24. There were two — `TutorApplication`
-    // (the consultation form) and `MasterApplication` (the trades one) — and
+    // (the consultation form) and `ProviderApplication` (the trades one) — and
     // this block asked about both, sending the applicant back to whichever
     // wizard they had started. The consultation product was removed and its
     // table with it; one door, one form, one place to send somebody who is
     // mid-application.
-    const app = await prisma.masterApplication.findUnique({
+    const app = await prisma.providerApplication.findUnique({
       where: { userId: user.id },
       select: { status: true },
     })

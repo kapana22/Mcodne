@@ -8,7 +8,7 @@
 // supply side's, whatever you supply); the separation the old note argued for
 // survives as two ROUTE GROUPS under one prefix — this file's gate is not the
 // expert group's, and the shell above draws each group's items only for the
-// capability that owns them (components/tutor/navConfig → NAV_GROUPS).
+// capability that owns them (components/work/navConfig → NAV_GROUPS).
 //
 // It also still means the two can be switched off independently, and that an
 // account with requests access but no expert profile (a company member) has

@@ -201,7 +201,7 @@ export async function providerQueueScope(
 ): Promise<QueueScope> {
   // No session is not a state this screen can be in — the layouts 404 first —
   // but the narrowest possible answer is still the right default.
-  if (!user) return { mode: 'UNLISTED', fix: 'SERVICES' }
+  if (!user) return { mode: 'UNLISTED' }
   await ensureDbReady()
   // ⚠️ ONE ROW SINCE 2026-08-24. This asked two tables the same question about
   // one person — the services and cities from `ServiceProfile`, the sphere and

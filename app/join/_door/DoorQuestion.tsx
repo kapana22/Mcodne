@@ -29,7 +29,7 @@
 import { useEffect, useState } from 'react'
 import { Btn } from '@/components/Btn'
 import { ProfessionPicker } from '@/components/ProfessionPicker'
-import { useSpheres } from '../_shared/useSpheres'
+import { useCategories } from '../_shared/useCategories'
 
 /* ═══════════ the draft ═════════════════════════════════════════════════ */
 
@@ -101,7 +101,7 @@ export function DoorQuestion({ cta = 'გაგრძელება', onContinu
   const [sphere, setSphere] = useState('')
   const [professions, setProfessions] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
-  const spheres = useSpheres()
+  const spheres = useCategories()
 
   // Restore. Only the two ANSWERS are restored — `can` is re-derived below
   // against today's taxonomy rather than trusted from a week-old draft.

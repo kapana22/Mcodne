@@ -53,10 +53,10 @@ test('archetype 4 — intake wizard: one StepIndicator, Container sizes, no hand
   assert.ok(has('components/StepIndicator.tsx'))
   // ⚠️ THE CONSULTATION WIZARD WAS THE OTHER CALLER (2026-08-24) and is gone.
   assert.match(read('app/request/_shell.tsx'), /<StepIndicator[^>]*variant="list"/)
-  for (const f of ['app/join/_master/client.tsx', 'app/join/JoinClient.tsx', 'app/request/_shell.tsx']) {
+  for (const f of ['app/join/_provider/client.tsx', 'app/join/JoinClient.tsx', 'app/request/_shell.tsx']) {
     assert.doesNotMatch(read(f), /<Container[^>]*max-w-\[/, `${f} hand-writes a max-w on Container — pick a size instead`)
   }
-  assert.match(read('app/join/_master/client.tsx'), /<Container size="(narrow|content)"/)
+  assert.match(read('app/join/_provider/client.tsx'), /<Container size="(narrow|content)"/)
   // The door itself is the wizard archetype too: the narrow column, and it
   // hands the profession question to the shared picker rather than a copy.
   // ⚠️ THE PICKER LIVES IN THE LEAF SINCE 2026-08-20 (`_door/DoorQuestion`),
@@ -68,13 +68,20 @@ test('archetype 4 — intake wizard: one StepIndicator, Container sizes, no hand
 })
 
 test('archetypes 5/6 — workspace and form pages open with the shared PageHeader', () => {
-  assert.equal(has('components/tutor/PageHeader.tsx'), false, 'the tutor PageHeader re-export is back — import @/components/PageHeader directly')
-  assert.match(read('app/settings/page.tsx'), /<PageHeader/)
+  assert.equal(has('components/work/PageHeader.tsx'), false, 'the tutor PageHeader re-export is back — import @/components/PageHeader directly')
+  // ⚠️ THE HEADER MOVED WITH THE SPLIT (2026-08-30). /settings is a server page
+  // that resolves the session and hands it to the client half, so the markup —
+  // and the shared PageHeader with it — lives in app/settings/client.tsx now.
+  assert.match(read('app/settings/client.tsx'), /<PageHeader/)
   // ⚠️ `app/work/(expert)/bookings/page.tsx` WAS HERE AND IS GONE (2026-08-19).
   // The expert's booking LIST became the one list of work at /work/jobs; the
-  // client's own list („app/me/bookings") went with the product on 2026-08-24
-  // and their requests page took its place in this archetype.
-  for (const f of ['app/work/page.tsx', 'app/work/jobs/page.tsx', 'app/me/requests/page.tsx']) {
+  // client's own list („app/me/bookings") went with the product on 2026-08-24.
+  //
+  // ⚠️ AND `app/me/requests/page.tsx` LEFT THIS LIST ON 2026-08-30 — it is a
+  // redirect now, not a page. „მთავარი" and „მოთხოვნები" were one thing said
+  // twice, so the home became the list; /me/favorites stands in for the client
+  // room in this archetype, because it is the room's remaining titled page.
+  for (const f of ['app/work/page.tsx', 'app/work/jobs/page.tsx', 'app/me/favorites/page.tsx']) {
     assert.match(read(f), /from '@\/components\/PageHeader'/, `${f} imports PageHeader from somewhere else`)
   }
 })

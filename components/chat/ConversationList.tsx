@@ -42,9 +42,18 @@ let cachedThreads: Thread[] | undefined
    — the thread GET stamped readByProviderAt), and on the
    `mcodne:threads-refresh` window event the thread pane fires after
    sends/receives. The empty-state copy is the caller's. */
-export function ConversationList({ empty }: { empty: EmptyCopy }) {
+// ⚠️ `initialThreads` IS WHY THE FIRST PAINT IS RIGHT (2026-08-30). The list
+// used to open from `cachedThreads ?? null` — a module-scope cache that makes a
+// SECOND visit instant and does nothing for the first, which is the visit that
+// matters. The server layout now reads the same rows from the same helper and
+// hands them over; the poll below stays, because a message can arrive while the
+// page is open.
+export function ConversationList({ empty, initialThreads }: {
+  empty: EmptyCopy
+  initialThreads?: Thread[]
+}) {
   const path = usePathname()
-  const [threads, setThreads] = useState<Thread[] | null>(cachedThreads ?? null)
+  const [threads, setThreads] = useState<Thread[] | null>(initialThreads ?? cachedThreads ?? null)
   const [err, setErr] = useState(false)
   const [query, setQuery] = useState('')
   const params = useParams<{ offerId?: string }>()

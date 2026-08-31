@@ -1,5 +1,5 @@
 'use client'
-// THE SPHERES, AS THE CATALOGUE SEES THEM — the shape GET /api/categories
+// THE CATEGORIES, AS THE CATALOGUE SEES THEM — the shape GET /api/categories
 // returns and the one lookup every surface does over it.
 //
 // Split out of `_data.tsx` on 2026-08-24, when that file (the consultation row

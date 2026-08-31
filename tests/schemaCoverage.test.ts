@@ -33,7 +33,17 @@ for (const m of schema.matchAll(/model\s+(\w+)\s*\{([\s\S]*?)\n\}/g)) {
 }
 
 test('every table lib/dbBoot creates is declared in schema.prisma', () => {
-  const created = [...boot.matchAll(/CREATE TABLE IF NOT EXISTS\s+"(\w+)"/g)].map(m => m[1])
+  // ⚠️ A TABLE MAY BE CREATED UNDER ONE NAME AND RENAMED LATER IN THE SAME SET
+  // (2026-08-30). `MasterApplication` is created ~800 statements in — that
+  // statement is HISTORY and must keep saying so, or a fresh boot mints a name
+  // the rename then cannot find — and the last block renames it to
+  // `ProviderApplication`, which is what the schema declares. Reading only the
+  // CREATEs made this test report a drop that cannot happen.
+  const renames = new Map(
+    [...boot.matchAll(/ALTER TABLE "(\w+)" RENAME TO "(\w+)"/g)].map(m => [m[1], m[2]]),
+  )
+  const created = [...boot.matchAll(/CREATE TABLE IF NOT EXISTS\s+"(\w+)"/g)]
+    .map(m => renames.get(m[1]) ?? m[1])
   assert.ok(created.length > 0, 'no CREATE TABLE found — this test stopped reading dbBoot')
   const missing = [...new Set(created)].filter(t => !declared.has(t) && t !== '_DbBootStamp')
   assert.deepEqual(

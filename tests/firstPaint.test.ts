@@ -121,3 +121,50 @@ test('no <a> points at a route inside this app', () => {
   assert.deepEqual(bad, [],
     'these <a> tags reload the whole document instead of navigating — use <Link>')
 })
+
+test('no signed-in page opens as a spinner over data the session already holds', () => {
+  // ⚠️ THE LAST TWO WERE FOUND ON 2026-08-30 in the sweep after /me.
+  // /settings rendered a centred „იტვირთება…" over the WHOLE screen until
+  // /api/me answered — for a name, a phone and an avatar the session carries.
+  // /notifications asked the same endpoint purely to fill the header's name and
+  // avatar, so the top bar drew with a hole in it.
+  //
+  // Both are split now: a server page resolves the identity, the client half
+  // keeps every interaction. What they may NOT do again is fetch the viewer on
+  // mount — that is the whole defect, and it is one line to reintroduce.
+  for (const f of ['app/settings/client.tsx', 'app/notifications/client.tsx']) {
+    const s = codeOf(f)
+    assert.doesNotMatch(s, /useEffect\([\s\S]{0,200}?fetch\('\/api\/me'\)/,
+      `${f} fetches the viewer on mount again — the page will open incomplete`)
+  }
+  // And the server halves must actually require a session rather than letting
+  // the client bounce to /signin, which cannot happen until React has booted.
+  for (const f of ['app/settings/page.tsx', 'app/notifications/page.tsx']) {
+    assert.match(read(f), /await requireUser\(\)/,
+      `${f} leaves the sign-in redirect to the browser`)
+  }
+})
+
+test('the inbox list is in the first paint, not one round trip later', () => {
+  // ⚠️ THE LAST ONE, FOUND 2026-08-30 in the sweep after /settings. The left
+  // pane opened from a module-scope cache — which makes a SECOND visit instant
+  // and does nothing for the first, the visit that matters — then fetched
+  // /api/work/threads. So the inbox showed an empty column and filled it a
+  // round trip later, on the one screen where the missing thing is a person
+  // waiting for an answer.
+  assert.match(codeOf('components/chat/ConversationList.tsx'),
+    /useState<Thread\[\] \| null>\(initialThreads \?\? cachedThreads \?\? null\)/,
+    'the conversation list opens empty again')
+
+  // Seeded from the SAME helper the route calls, so the rows on screen and the
+  // rows the poll returns cannot disagree.
+  const layout = codeOf('app/work/messages/layout.tsx')
+  assert.match(layout, /offerInboxRows\(await requestAccessOf\(user\.id\)\)/,
+    'the inbox layout stopped reading the rows it hands down')
+  assert.match(codeOf('app/api/work/threads/route.ts'), /offerInboxRows\(await requestAccessOf\(user\.id\)\)/,
+    'the route and the layout build the inbox two different ways')
+
+  // The poll STAYS: a message can arrive while the page is open.
+  assert.match(codeOf('components/chat/ConversationList.tsx'), /fetch\('\/api\/work\/threads'\)/,
+    'the inbox stopped refreshing — a message arriving while the page is open would not show')
+})

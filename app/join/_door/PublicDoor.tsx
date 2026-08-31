@@ -9,7 +9,7 @@
  *
  * ⚠️ AND IT IS THE ONLY PITCH NOW (2026-08-24). There were two beside it, each
  * speaking to one half — `_expert/ApplyMarketing` („გახდი ექსპერტი",
- * `?can=CONSULT`) and `_master/_marketing` („დაარეგისტრირე შენი სერვისი",
+ * `?can=CONSULT`) and `_provider/_marketing` („დაარეგისტრირე შენი სერვისი",
  * `?can=WORK`) — because a provider could sell either of two things and a page
  * that named one lost the other. Both are gone with the split: `?can=` is
  * ignored, so those addresses rendered THIS page anyway, and the sitemap has

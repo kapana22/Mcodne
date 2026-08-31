@@ -111,17 +111,16 @@ export function creditTasks(): { key: CreditTaskKey; tetri: number; label: strin
 /**
  * WHERE A TASK IS ANSWERED — the editor that owns that field.
  *
- *   /work/services  — what I SELL: the services, their price, the cities.
- *   /work/profile   — who I AM: photo, sentence, professions, years, proof.
+ * ⚠️ IT IS ONE ADDRESS SINCE 2026-08-30, and the switch that used to stand here
+ * is the clearest small measure of what the merge fixed. This function existed
+ * to route „დაუწერე ფასი ერთ სერვისს მაინც" to /work/services and everything
+ * else to /work/profile — a fork the provider had to hold in their head too,
+ * because the two pages looked and opened identically. One row, one editor, one
+ * answer; the shape survives so a future task with its own home has somewhere
+ * to say so.
  */
-export function taskHref(key: CreditTaskKey): string {
-  const SERVICES = '/work/services'
-  const PROFILE = '/work/profile'
-  switch (key) {
-    // A price on a ticked service. That is what is sold, so it lives with it.
-    case 'PROFILE_SERVICE': return SERVICES
-    default: return PROFILE
-  }
+export function taskHref(_key: CreditTaskKey): string {
+  return '/work/profile'
 }
 
 export type CreditTaskKey = (typeof CREDIT_TASKS)[number]['key']

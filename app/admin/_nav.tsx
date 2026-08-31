@@ -16,7 +16,7 @@ const Logo = () => (
 )
 
 /* ───── Admin shell — sidebar + top bar ───── */
-export type AdminTab = 'system' | 'help' | 'overview' | 'users' | 'broadcast' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit' | 'companies' | 'requests' | 'access' | 'masters' | 'reviews' | 'funnel'
+export type AdminTab = 'system' | 'help' | 'overview' | 'users' | 'broadcast' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit' | 'companies' | 'requests' | 'access' | 'providers' | 'reviews' | 'funnel'
 
 /**
  * Hashes that no longer name a tab, and where they now go.
@@ -28,6 +28,10 @@ export type AdminTab = 'system' | 'help' | 'overview' | 'users' | 'broadcast' | 
  */
 export const TAB_ALIASES: Record<string, AdminTab> = {
   analytics: 'overview',
+  // The applications queue was `#masters` until 2026-08-30. An alias, not a
+  // rename-and-forget: this hash is in the operator's own bookmarks and in
+  // every link this panel has ever printed.
+  masters: 'providers',
 }
 
 /**
@@ -104,7 +108,7 @@ const ADMIN_NAV: NavItem[] = ([
   // consultation product is gone, so „სერვისის განაცხადები" would now be
   // distinguishing a queue from nothing. The route id stays `masters`: a URL is
   // not copy, and renaming it would break every bookmark an admin has.
-  { id: 'masters',    l: 'განაცხადები', icon: 'doc', g: 'queue' },
+  { id: 'providers',  l: 'განაცხადები', icon: 'doc', g: 'queue' },
   { id: 'help',       l: 'ჩატის კითხვები', icon: 'chat', g: 'queue' },
   // ⚠️ THE ONE TAB OVER TEXT THE PUBLIC READS AND WE DID NOT WRITE (2026-08-26).
   // It existed until 2026-08-24 and went with the booking a review used to hang
@@ -168,20 +172,20 @@ const ADMIN_NAV: NavItem[] = ([
   // „ძაბრი" rides the same switch — with the feature off it is five bars of zero.
   .filter(it => (it.id !== 'requests' && it.id !== 'access' && it.id !== 'funnel') || requestsFeatureExists())
   // The masters queue is the SUPPLY side and follows its own switch (D6).
-  .filter(it => it.id !== 'masters' || providersFeatureExists())
+  .filter(it => it.id !== 'providers' || providersFeatureExists())
 
 const NAV_GROUPS: NavGroup[] = ['home', 'queue', 'people', 'content', 'signals', 'system']
 
 /** Both surfaces render this, so a badge can never mean two different things
  *  on desktop and mobile (it did: green here, grey there). */
-function navBadge(id: AdminTab, helpOpen?: number | null, b2bLeads?: number | null, newRequests?: number | null, pendingMasters?: number | null): number {
+function navBadge(id: AdminTab, helpOpen?: number | null, b2bLeads?: number | null, newRequests?: number | null, pendingProviders?: number | null): number {
   if (id === 'help') return helpOpen ?? 0
   // Unverified requests — a person waiting for a phone call. Same rationale as
   // every badge in this function.
   if (id === 'requests') return newRequests ?? 0
   // Submitted tradesperson applications — the supply side's queue, and the same
   // kind of number as the expert queue above: an applicant waiting on a review.
-  if (id === 'masters') return pendingMasters ?? 0
+  if (id === 'providers') return pendingProviders ?? 0
   // Unanswered B2B enquiries. Same treatment as the two above and for the same
   // reason: there is a person at the other end of it. Without this a lead sat
   // in a tab nobody opens until somebody thought to look — which is what the
@@ -193,8 +197,8 @@ function navBadge(id: AdminTab, helpOpen?: number | null, b2bLeads?: number | nu
 /* Desktop-only left rail — moves the 11-item nav out of the cramped top header
    into a calm sidebar, so managing/moderating is comfortable (mobile keeps the
    TopBar drawer). */
-export const AdminSidebar = ({ active, onNav, helpOpen, b2bLeads, newRequests, pendingMasters }: {
-  active: AdminTab; onNav: (t: AdminTab) => void; helpOpen?: number | null; b2bLeads?: number | null; newRequests?: number | null; pendingMasters?: number | null
+export const AdminSidebar = ({ active, onNav, helpOpen, b2bLeads, newRequests, pendingProviders }: {
+  active: AdminTab; onNav: (t: AdminTab) => void; helpOpen?: number | null; b2bLeads?: number | null; newRequests?: number | null; pendingProviders?: number | null
 }) => (
   <aside className="hidden lg:flex flex-col w-[240px] shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-ink-100 bg-white px-3 py-4">
     <div className="px-3">
@@ -211,7 +215,7 @@ export const AdminSidebar = ({ active, onNav, helpOpen, b2bLeads, newRequests, p
           <div className="flex flex-col gap-0.5">
             {ADMIN_NAV.filter(it => it.g === g).map(it => {
               const on = active === it.id
-              const badge = navBadge(it.id, helpOpen, b2bLeads, newRequests, pendingMasters)
+              const badge = navBadge(it.id, helpOpen, b2bLeads, newRequests, pendingProviders)
               const Glyph = Icon[it.icon]
               return (
                 <button
@@ -246,8 +250,8 @@ export const AdminSidebar = ({ active, onNav, helpOpen, b2bLeads, newRequests, p
   </aside>
 )
 
-export const TopBar = ({ active, onNav, helpOpen, b2bLeads, newRequests, pendingMasters }: {
-  active: AdminTab; onNav: (t: AdminTab) => void; helpOpen?: number | null; b2bLeads?: number | null; newRequests?: number | null; pendingMasters?: number | null
+export const TopBar = ({ active, onNav, helpOpen, b2bLeads, newRequests, pendingProviders }: {
+  active: AdminTab; onNav: (t: AdminTab) => void; helpOpen?: number | null; b2bLeads?: number | null; newRequests?: number | null; pendingProviders?: number | null
 }) => {
   const [mobOpen, setMobOpen] = useState(false)
   // Reads the SAME ADMIN_NAV as the sidebar. It used to be a second hand-typed
@@ -293,7 +297,7 @@ export const TopBar = ({ active, onNav, helpOpen, b2bLeads, newRequests, pending
               {GROUP_LABEL[g] && <div className="pb-1 text-micro uppercase font-display font-semibold text-ink-400">{GROUP_LABEL[g]}</div>}
               {ADMIN_NAV.filter(it => it.g === g).map(it => {
                 const on = active === it.id
-                const badge = navBadge(it.id, helpOpen, b2bLeads, newRequests, pendingMasters)
+                const badge = navBadge(it.id, helpOpen, b2bLeads, newRequests, pendingProviders)
                 const Glyph = Icon[it.icon]
                 return (
                   <button key={it.id} type="button" onClick={() => { onNav(it.id); setMobOpen(false) }} className={`h-12 w-full flex items-center gap-3 text-body font-display font-medium border-b border-ink-100 last:border-b-0 text-left ${on ? 'text-ink-900' : 'text-ink-700'}`}>
