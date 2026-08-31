@@ -22,6 +22,7 @@
 
 import nodemailer, { type Transporter } from 'nodemailer'
 import { SUPPORT_EMAIL } from './supportEmails'
+import { prisma } from './prisma'
 
 type MailPayload = {
   to: string
@@ -76,6 +77,45 @@ export async function sendMail({ to, subject, html, text, replyTo }: MailPayload
   if (explicitMode === 'off') {
     console.log('📧 [MAIL:off]', { to, replyTo: replyToAddr, subject })
     return { ok: true, mode: 'off' }
+  }
+
+  /* ── 0b. NOBODY WHO WAS ALREADY HERE ─────────────────────────────────────
+     Owner, 2026-08-31: „ვინც user არის ახლანდელი, იმათ არ გაუგზავნო, და ახლებს
+     გაუგზავნე." The site is pre-launch and the people in it are the owner's own
+     test rows; the ones who arrive from now on are real and should hear from it.
+     MAIL_ONLY_AFTER is an ISO instant. An address the system already knew at
+     that instant is held; everything newer goes out normally. Unset = no
+     filtering at all, which is what every deployment that has not asked for
+     this does.
+     ⚠️ TWO TABLES, NOT ONE. The obvious check is User.createdAt, and it would
+     have missed the mail that caused this: cleanup-cron reminds the CLIENT at
+     `request.email` (lib/offerLifecycle), which is the address typed into the
+     intake and need not belong to a User row at all. Whoever was reachable
+     before the cutoff is held, by either name.
+     ⚠️ AND IT FAILS CLOSED. A lookup that throws holds the letter rather than
+     sending it. On a pre-launch site a missed mail costs nothing and a mail to
+     somebody who was promised silence is the whole of the complaint. */
+  const onlyAfter = process.env.MAIL_ONLY_AFTER
+  if (onlyAfter) {
+    const cutoff = new Date(onlyAfter)
+    if (Number.isNaN(cutoff.getTime())) {
+      console.error('[server-error]', JSON.stringify({ scope: 'mailer', err: 'MAIL_ONLY_AFTER is not a date', value: onlyAfter }))
+      return { ok: true, mode: 'held-bad-cutoff' }
+    }
+    const addr = to.trim().toLowerCase()
+    try {
+      const [user, request] = await Promise.all([
+        prisma.user.findFirst({ where: { email: addr, createdAt: { lte: cutoff } }, select: { id: true } }),
+        prisma.serviceRequest.findFirst({ where: { email: addr, createdAt: { lte: cutoff } }, select: { id: true } }),
+      ])
+      if (user || request) {
+        console.log('📧 [MAIL:held]', { to, subject, why: user ? 'user predates cutoff' : 'request predates cutoff' })
+        return { ok: true, mode: 'held-pre-existing' }
+      }
+    } catch (err) {
+      console.error('[server-error]', JSON.stringify({ scope: 'mailer', stage: 'cutoff-lookup', to, err: String(err) }))
+      return { ok: true, mode: 'held-lookup-failed' }
+    }
   }
 
   // ── 1. Gmail SMTP ────────────────────────────────────────────────────────
