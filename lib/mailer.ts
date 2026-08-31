@@ -60,6 +60,24 @@ export async function sendMail({ to, subject, html, text, replyTo }: MailPayload
   // validate before passing an address, but a header must never carry a newline.
   const replyToAddr = (replyTo || process.env.SUPPORT_EMAIL || SUPPORT_EMAIL).replace(/[\r\n]/g, '').trim()
 
+  /* ── 0. THE OFF SWITCH, AND IT COMES BEFORE BOTH TRANSPORTS ──────────────
+     ⚠️ MAILER_MODE USED TO GATE ONLY RESEND (2026-08-31). The Gmail branch
+     below was reached first and read nothing but its own two credentials, so a
+     deployment with GMAIL_USER and GMAIL_APP_PASSWORD set went on sending no
+     matter what MAILER_MODE said — the switch that looks like the off switch
+     turned off one of the two ways out.
+     Owner, on a pre-launch site that was mailing people: „ჯერ არაფერი არ უნდა
+     მისდიოდეს მეილებზე… სანამ საიტი არ გამიმართება." A kill switch that one
+     environment variable can walk around is not a kill switch.
+     `off` is explicit and it is the only value that stops everything; anything
+     else keeps the old behaviour exactly, so this cannot change a deployment
+     that has not asked for it. The message is still logged, so what WOULD have
+     been sent is still visible in the deploy logs. */
+  if (explicitMode === 'off') {
+    console.log('📧 [MAIL:off]', { to, replyTo: replyToAddr, subject })
+    return { ok: true, mode: 'off' }
+  }
+
   // ── 1. Gmail SMTP ────────────────────────────────────────────────────────
   if (gmailUser && gmailPass) {
     try {
