@@ -165,7 +165,6 @@ export type ProviderProfileData = {
   professions: string[]
   /** Human labels, resolved from the stored codes. */
   langs: string[]
-  yearsExp: number
   verified: boolean
   linkedinUrl: string | null
   websiteUrl: string | null
@@ -203,7 +202,7 @@ export const getProviderProfile = cache(async (id: string): Promise<ProviderProf
         about: true, updatedAt: true,
         // The professional half. Scalars only — `photoUrl` and `workPhotos`
         // are blobs and are probed below, never selected.
-        headline: true, professions: true, languages: true, yearsExp: true,
+        headline: true, professions: true, languages: true,
         verified: true, linkedinUrl: true, websiteUrl: true,
         // The provider identity the reviews join on — never rendered.
         userId: true, companyId: true,
@@ -300,7 +299,6 @@ export const getProviderProfile = cache(async (id: string): Promise<ProviderProf
       headline: row.headline?.trim() || null,
       professions: row.professions,
       langs: row.languages.map(l => langLabel(toLangCode(l) ?? l)),
-      yearsExp: row.yearsExp,
       verified: row.verified,
       linkedinUrl: row.linkedinUrl,
       websiteUrl: row.websiteUrl,

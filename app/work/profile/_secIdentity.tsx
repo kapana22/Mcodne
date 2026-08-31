@@ -179,16 +179,12 @@ export function IdentitySection({
               })()}
             </Field>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* ⚠️ „სესიის ფასი" SAT BESIDE THIS AND WENT WITH THE BOOKING
-                  PRODUCT (2026-08-24). A price now belongs to a SERVICE — one
-                  number per thing sold, on /work/services — not to the person. */}
-              <Field label="გამოცდილება (წლები)">
-                <input type="number" inputMode="numeric" min={0} max={80} required
-                       value={draft.yearsExp} onChange={e => patch({ yearsExp: Number(e.target.value) })}
-                       className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 focus:border-brand-400 focus:outline-none tabular-nums" />
-              </Field>
-            </div>
+            {/* ⚠️ TWO FIELDS USED TO SIT HERE AND BOTH ARE GONE. „სესიის ფასი"
+                went with the booking product (2026-08-24) — a price belongs to a
+                SERVICE now, one number per thing sold. „გამოცდილება (წლები)"
+                went on 2026-08-31: it was `required` here and optional on /join,
+                so the same question had two different answers, and a profile
+                that skipped it printed „0 წელი" on its public page. */}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="LinkedIn ბმული">

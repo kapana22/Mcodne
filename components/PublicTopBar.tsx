@@ -67,8 +67,34 @@ import { ROLE } from '@/lib/roles'
 // Reading the bar left-to-right should say what the site is before it says
 // what to press — so the two sections come first and the action is a button
 // on the right, not a fourth word in the row.
+/* ⚠️ FOUR WORDS AGAIN, FROM THE OWNER'S OWN HEADER DESIGN (2026-08-31).
+   Everything above is why the bar came DOWN to one word over stages 9–10; the
+   owner handed over a header design („ესეთი ჰედერი მჭირდება") that puts four
+   back, sentence-case, with the browse words on the left and the account
+   actions behind a divider on the right. The design is the newer decision — the
+   argument above is kept because it is the record of what the one-word bar
+   cost and why, not because it out-votes a later call.
+
+   ⚠️ TWO OF THE FOUR HAD NO DESTINATION ON THIS SITE, and that is the one place
+   this is not a 1:1 port. A nav word pointing at a 404 — or at the page the word
+   beside it already opens — is worse than a missing word:
+
+     · „როგორ მუშაობს" has no page. /about is the one that explains the model
+       („გადამოწმებული ცოდნა", „გამჭვირვალე ფასი", the principles), so it points
+       there. Honest, and one edit from a real page if the owner wants one.
+
+     · „კატეგორიები" IS STILL OUT, pending the owner. /categories was retired in
+       stage 8 and 308s to /experts (middleware.ts), so the only address behind
+       the word is the page „ექსპერტები" already opens — and two items opening
+       one view is exactly what stage 9 removed them for. Inventing
+       „/experts?view=categories" was the other candidate and is worse: the
+       catalogue reads q · category · sort · trade · city and nothing else, so
+       that param would be a control that lies. The label is written and needs
+       only an href the day there is one to give it. */
 const NAV: { label: string; href: string; cta?: boolean }[] = [
-  { label: 'ექსპერტები',     href: '/experts' },
+  { label: 'ექსპერტები',   href: '/experts' },
+  { label: 'როგორ მუშაობს', href: '/about' },
+  { label: 'დახმარება',    href: '/help' },
   // The one ACTION. Rendered as a button (desktop: right of the nav; phone:
   // inside the drawer), never as a nav word.
   { label: 'მოთხოვნის გაგზავნა', href: '/request', cta: true },
@@ -266,8 +292,21 @@ export function PublicTopBar({
       className={`sticky top-0 ${mobOpen ? 'z-drawer' : 'z-chrome'}`}
     >
       {/* The bar. Full width; `.glass-bar` owns background/hairline/shadow/blur
-          — add nothing but geometry. `-quiet` = the flat scroll-top state. */}
-      <div className={`glass-bar ${scrolled ? '' : 'glass-bar-quiet'}`}>
+          — add nothing but geometry. `-quiet` = the flat scroll-top state.
+
+          ⚠️ ROUNDED AT THE BOTTOM ONLY (2026-08-31), from the owner's design.
+          `.glass-bar` documents itself as „no radius, because a bar's
+          left/right/top edges are the screen itself" — which is still true of
+          three of its four edges. The fourth is not the screen: it is the seam
+          against the page, and the design curves it. Radius is the one thing
+          that class leaves to its host („the host only adds rounded-*"), so
+          this needs no change there.
+
+          ⚠️ AND IT SQUARES OFF ONCE YOU SCROLL. A floating card reads as a
+          card; a bar that content passes UNDER should meet the page flat. The
+          curve is the at-rest state the design shows, and `scrolled` already
+          drives the hairline and the shadow, so it costs no new state. */}
+      <div className={`glass-bar ${scrolled ? '' : 'glass-bar-quiet rounded-b-[1.75rem]'} transition-[border-radius] duration-base ease-out-quart`}>
         {/* …but the nav content still lives in the site content column, so the
             logo and the account controls line up with the page beneath. */}
         <Container className="h-16 sm:h-20 flex items-center justify-between gap-4 lg:gap-8">
@@ -283,7 +322,13 @@ export function PublicTopBar({
                   key={item.href}
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
-                  className={`relative h-11 px-3.5 rounded-btn font-display text-meta font-semibold uppercase inline-flex items-center transition-colors duration-fast ease-out-quart ${
+                  /* ⚠️ SENTENCE CASE SINCE 2026-08-31, from the owner's design,
+                     and it is not only taste here: Georgian has no capitals, so
+                     `uppercase` on ქართული is a no-op that still pays the
+                     letter-spacing and the weight meant to rescue it. Four
+                     words at `text-meta uppercase` read as a row of labels;
+                     `text-small` sentence case reads as a menu. */
+                  className={`relative h-11 px-3.5 rounded-btn font-display text-small font-semibold inline-flex items-center transition-colors duration-fast ease-out-quart ${
                     active ? 'text-brand-800 bg-brand-50' : 'text-ink-700 hover:text-ink-900 hover:bg-ink-100/70'
                   }`}
                 >
@@ -294,6 +339,36 @@ export function PublicTopBar({
           </nav>
         </div>
         <div className="flex items-center gap-2">
+          {/* ⚠️ THE DIVIDER IS THE DESIGN'S ONE STRUCTURAL IDEA (2026-08-31), and
+              it is worth naming rather than copying. Everything left of it is
+              LOOKING (the four sections, and the search that is the fifth way
+              in); everything right of it is DOING something to your own account
+              — register a service, sign in, start. The bar used to run one
+              undifferentiated row of controls left to right, so „დაარეგისტრირე
+              სერვისი" sat in the same visual breath as „დახმარება" and read as
+              a fifth section. A hairline says which half you are in.
+              `hidden lg:block`, because below that the nav is a drawer and there
+              are no two halves left to separate. */}
+          {/* ⚠️ THE SEARCH SITS ON THE BROWSING SIDE OF THE LINE (2026-08-31).
+              It used to live inside the guest cluster, between the request
+              button and „შესვლა" — i.e. filed with the account actions, when
+              what it actually does is open the catalogue. The design puts it
+              immediately left of the divider and that is the correct reading:
+              it is a fifth way to LOOK, and the shortest one.
+              STILL GUEST-ONLY, and the reason is unchanged: a signed-in
+              client's row already carries ♥ + bell + avatar + ☰, and a fifth
+              control does not fit at 390px. They also have the workspace nav. */}
+          {ready && !me && (
+            <Link
+              href="/experts"
+              aria-label="ექსპერტების ძებნა"
+              title="ექსპერტების ძებნა"
+              className="w-10 h-10 rounded-btn text-ink-600 hover:text-ink-900 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast"
+            >
+              <Icon.search className="w-[18px] h-[18px]" />
+            </Link>
+          )}
+          <span aria-hidden className="hidden lg:block w-px h-6 bg-ink-200 mx-1" />
           {/* SUPPLY, as a quiet word (2026-08-19). Text, not a button: the bar
               already carries one outlined action and one filled one, and a
               third would make the row a shelf of buttons. Gated — an existing
@@ -305,8 +380,14 @@ export function PublicTopBar({
           {showJoinInvite(me?.role, me?.provider) && (
             <Link
               href={JOIN_DOOR_HREF}
-              className="hidden lg:inline-flex h-11 px-3 rounded-btn font-display font-semibold text-meta uppercase text-ink-600 hover:text-ink-900 hover:bg-ink-100 items-center whitespace-nowrap transition-colors duration-fast"
+              /* ⚠️ THE „+" IS THE DESIGN'S (2026-08-31) AND IT DOES REAL WORK.
+                 This is the one control in the bar that CREATES something, and
+                 as bare text among four section words it read as a fifth one.
+                 A plus is the universal „add" and it costs 14px. Sentence case
+                 for the same reason as the nav — Georgian has no capitals. */
+              className="hidden lg:inline-flex h-11 px-3 rounded-btn font-display font-semibold text-small text-ink-600 hover:text-ink-900 hover:bg-ink-100 items-center gap-1.5 whitespace-nowrap transition-colors duration-fast"
             >
+              <Icon.plus className="w-4 h-4" aria-hidden />
               {JOIN_DOOR_LABEL}
             </Link>
           )}
@@ -343,22 +424,20 @@ export function PublicTopBar({
                   carries ♥ + bell + avatar + ☰, and a fifth control does not
                   fit at 390px. They also have the workspace nav. */}
               <Link
-                href="/experts"
-                aria-label="ექსპერტების ძებნა"
-                title="ექსპერტების ძებნა"
-                className="w-10 h-10 rounded-btn text-ink-600 hover:text-ink-900 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast"
-              >
-                <Icon.search className="w-[18px] h-[18px]" />
-              </Link>
-              <Link
                 href="/signin"
-                className="hidden md:inline-flex h-11 px-4 rounded-btn font-display font-semibold text-meta uppercase text-ink-800 hover:bg-ink-100 items-center transition-colors duration-fast"
+                className="hidden md:inline-flex h-11 px-4 rounded-btn font-display font-semibold text-small text-ink-800 hover:bg-ink-100 items-center transition-colors duration-fast"
               >
                 შესვლა
               </Link>
               <Link
                 href={JOIN_HREF}
-                className="tap-shrink h-11 px-5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-bold text-body uppercase transition-all duration-fast ease-out-quart inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)]"
+                /* The one filled action, and the design keeps it that way.
+                   `uppercase` dropped with the rest — see the nav.
+                   ⚠️ AND THE SIZE STAYS `text-body`: tests/designTokens §F ties a
+                   button's label to its height tier (h-11 → text-body), so
+                   shrinking this to match the nav words would have made the one
+                   filled control in the bar quieter than the links around it. */
+                className="tap-shrink h-11 px-6 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-bold text-body transition-all duration-fast ease-out-quart inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)]"
               >
                 დაწყება
               </Link>

@@ -23,7 +23,6 @@ export type Draft = {
   /** The paragraph. Stored as `about`; the column the card and the public page
    *  both print, and what Google indexes. */
   about: string
-  yearsExp: number
   languages: string[]
   /** Empty string means „clear it" — the endpoint stores null for it. */
   linkedinUrl: string

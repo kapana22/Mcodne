@@ -88,7 +88,13 @@ export async function profileFacts(userId: string): Promise<ProfileFacts> {
     // professions and years; a plumber ticks services and the cities they
     // travel to. Both are „have you said who you are and where you work".
     hasProfessions: (provider?.professions ?? []).length > 0 || (provider?.services ?? []).length > 0,
-    hasExperience: (provider?.yearsExp ?? 0) > 0 || (provider?.areas ?? []).length > 0,
+    // ⚠️ THE YEARS HALF OF THIS PAIR WENT ON 2026-08-31, the same way the
+    // certificate half went on 2026-08-29: no screen collects it any more, and
+    // a fact nothing can make true keeps a task alive with nowhere to do it.
+    // The cities half stands alone now. THE LABEL IN lib/credits STILL SAYS
+    // „მიუთითე გამოცდილება · რამდენი წელია მუშაობ" and that is the owner's
+    // copy to change — it is flagged, not rewritten here.
+    hasExperience: (provider?.areas ?? []).length > 0,
     hasService: priced,
     // ⚠️ THE CERTIFICATE HALF OF THIS PAIR IS GONE (2026-08-29) — no screen
     // uploads one any more, so a fact nothing can make true would have kept a

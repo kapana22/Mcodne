@@ -33,7 +33,7 @@ type UserDetail = {
       headline: string | null; professions: string[];
       services: string[]; areas: string[];
       priceFrom: number | null; calloutFee: number | null;
-      yearsExp: number; verified: boolean; featured: boolean;
+      verified: boolean; featured: boolean;
       available: boolean; published: boolean;
       servicesConfirmedAt: string | null;
       category?: { id: string; slug: string; name: string } | null;
@@ -289,7 +289,6 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
                             {provider.priceFrom ? `${provider.priceFrom}₾-დან` : provider.calloutFee ? `გამოძახება ${provider.calloutFee}₾` : '—'}
                           </span>
                         </div>
-                        <div><span className="text-ink-500">გამოცდილება:</span> <span className="font-display font-bold text-ink-900 tabular-nums">{provider.yearsExp} წ.</span></div>
                         <div>
                           <span className="text-ink-500">კატალოგში:</span>{' '}
                           <span className="font-display font-bold text-ink-900">

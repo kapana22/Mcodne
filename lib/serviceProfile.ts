@@ -271,7 +271,6 @@ export const ServiceProfileInput = z.object({
      is pure and has no database. */
   fullName: z.string().trim().min(NAME_MIN).max(NAME_MAX).superRefine(georgianNameRefine('სახელი და გვარი')).optional(),
   headline: z.string().trim().min(2).max(HEADLINE_MAX).superRefine(georgianRefine('ერთი წინადადება შენზე')).optional(),
-  yearsExp: z.number().int().min(0).max(80).optional(),
   languages: z.array(z.string().trim().min(2).max(10)).max(20).optional(),
   categoryId: z.string().trim().min(1).max(40).nullable().optional(),
   professions: z.array(z.string().trim().max(80)).max(MAX_PROFESSIONS).optional(),

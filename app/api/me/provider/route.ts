@@ -38,7 +38,6 @@ const Body = z.object({
    *  both print. ⚠️ THIS ENDPOINT IS ITS ONLY WRITER: the service editor sends
    *  a full replace and simply omits the field, so the two cannot fight. */
   bio: z.string().max(2000).superRefine(georgianRefine('აღწერა')).nullable().optional(),
-  yearsExp: z.number().int().min(0).max(80).optional(),
   languages: z.array(z.string().min(2).max(10)).max(20).optional(),
   // The browse category. Validated against the live Category set in the handler
   // so an arbitrary id cannot be set.
@@ -96,7 +95,7 @@ export async function PATCH(req: Request) {
 
   const data: Record<string, unknown> = {}
   const {
-    headline, bio, yearsExp, languages, categoryId, professions,
+    headline, bio, languages, categoryId, professions,
     available, linkedinUrl, websiteUrl, responseHours,
   } = parsed.data
   if (available !== undefined) data.available = available
@@ -161,7 +160,6 @@ export async function PATCH(req: Request) {
   }
   if (headline !== undefined) data.headline = headline.trim()
   if (bio !== undefined) data.about = bio === null ? null : bio.trim() || null
-  if (yearsExp !== undefined) data.yearsExp = yearsExp
   if (languages !== undefined) data.languages = languages
 
   if (Object.keys(data).length === 0) {

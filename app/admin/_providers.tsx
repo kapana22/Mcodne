@@ -26,7 +26,7 @@ import { PROVIDER_KIND_LABEL, type ProviderKind } from '@/lib/providerApplicatio
 type Row = {
   id: string; kind: ProviderKind; fullName: string; companyName: string | null
   phone: string; email: string
-  services: string[]; areas: string[]; yearsExp: number | null
+  services: string[]; areas: string[]
   status: string; createdAt: string
 }
 
@@ -162,7 +162,6 @@ export function ProvidersSection({ onChanged }: { onChanged?: () => void }) {
                           {r.companyName || r.fullName}
                         </span>
                         <span className="text-meta text-ink-500">{PROVIDER_KIND_LABEL[r.kind]}</span>
-                        {r.yearsExp != null && <span className="text-meta text-ink-500">{r.yearsExp} წელი</span>}
                         <span className="ml-auto text-meta text-ink-400">{fmtDT(r.createdAt)}</span>
                       </div>
                       {/* The two facts the decision is actually made on. */}

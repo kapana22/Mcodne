@@ -106,9 +106,13 @@ const PricedRow = ({ s, p, ordering }: { s: { id: string; label: string; price: 
    catalogue's own filter groups (app/experts/_filters.tsx) and „გამოცდილება" is
    what the hero said. NO SECTION HEADING for the same reason — a title here
    would be a word nobody has approved, and every row already names itself. */
+/* ⚠️ „გამოცდილება — N წელი" LEFT THIS BLOCK ON 2026-08-31, one day after it
+   arrived. Owner: „გამოცდილება 0 წელი … წაშალე, ყველგან არაა საჭირო." The
+   number was collected in two places and read in four, and a profile that had
+   never been asked the question printed „0 წელი" — a measured-looking figure
+   that measured nothing. The two fields that wrote it are gone with it. */
 const FACT_ROWS = (p: ProviderProfileData) => [
   p.areas.length > 0 ? { k: 'ქალაქი', v: p.areas.join(', ') } : null,
-  p.yearsExp > 0 ? { k: 'გამოცდილება', v: `${p.yearsExp} წელი` } : null,
   p.langs.length > 0 ? { k: 'ენა', v: p.langs.join(', ') } : null,
 ].filter((x): x is { k: string; v: string } => x !== null)
 

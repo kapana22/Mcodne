@@ -174,7 +174,6 @@ export function ProviderApplyClient({ email, name, phone: accountPhone = '', me,
       .slice(0, 24)
   }, [query, groups])
   const [about, setAbout] = useState('')
-  const [yearsExp, setYearsExp] = useState('')
   const [calloutFee, setCalloutFee] = useState('')
   const [priceFrom, setPriceFrom] = useState('')
   const [photoUrl, setPhotoUrl] = useState<string | undefined>()
@@ -215,7 +214,6 @@ export function ProviderApplyClient({ email, name, phone: accountPhone = '', me,
       if (typeof d.taxId === 'string') setTaxId(d.taxId)
       if (Array.isArray(d.services)) setServices(d.services as string[])
       if (typeof d.about === 'string') setAbout(d.about)
-      if (typeof d.yearsExp === 'string') setYearsExp(d.yearsExp)
       if (typeof d.calloutFee === 'string') setCalloutFee(d.calloutFee)
       if (d.priceList && typeof d.priceList === 'object') setPriceList(d.priceList as Record<string, string>)
     } catch { /* a corrupt draft is not worth a broken form */ }
@@ -226,10 +224,10 @@ export function ProviderApplyClient({ email, name, phone: accountPhone = '', me,
   useEffect(() => {
     try {
       window.localStorage.setItem(DRAFT_KEY, JSON.stringify({
-        kind, fullName, phone, companyName, taxId, services, about, yearsExp, calloutFee, priceList,
+        kind, fullName, phone, companyName, taxId, services, about, calloutFee, priceList,
       }))
     } catch { /* full or blocked — carry on */ }
-  }, [kind, fullName, phone, companyName, taxId, services, about, yearsExp, calloutFee, priceList])
+  }, [kind, fullName, phone, companyName, taxId, services, about, calloutFee, priceList])
 
   useEffect(() => {
     let live = true
@@ -272,7 +270,6 @@ export function ProviderApplyClient({ email, name, phone: accountPhone = '', me,
           setCompanyName(a.companyName ?? ''); setTaxId(a.taxId ?? '')
           setServices(a.services ?? []); setAreas(a.areas ?? [])
           setAbout(a.about ?? '')
-          setYearsExp(a.yearsExp == null ? '' : String(a.yearsExp))
           setCalloutFee(a.calloutFee == null ? '' : String(a.calloutFee))
           setPriceFrom(a.priceFrom == null ? '' : String(a.priceFrom))
           // The map comes back as `{ topicId: lari }`; the inputs hold strings.
@@ -339,7 +336,7 @@ export function ProviderApplyClient({ email, name, phone: accountPhone = '', me,
           companyName: kind === 'COMPANY' ? companyName.trim() : null,
           taxId: kind === 'COMPANY' ? (taxId.trim() || null) : null,
           services, areas, about: about.trim(),
-          yearsExp: num(yearsExp), calloutFee: num(calloutFee), priceFrom: num(priceFrom),
+          calloutFee: num(calloutFee), priceFrom: num(priceFrom),
           // ⚠️ CLEANED HERE AND VALIDATED AGAIN ON THE SERVER. Only keys the
           // provider actually ticked, only positive numbers — a blank input is
           // „ask" and must not travel as 0, which would print „0₾" on a card.
@@ -694,17 +691,14 @@ export function ProviderApplyClient({ email, name, phone: accountPhone = '', me,
           {/* `flex-wrap` — measured at 390px the four children ran to 372px
               inside a 366px card. Four items on one line is fine at any width
               that fits them and must wrap at the one that does not. */}
-          <label className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-small text-ink-600">გამოცდილება</span>
-            <input
-              type="number" min={0} max={70} inputMode="numeric"
-              value={yearsExp} onChange={e => setYearsExp(e.target.value)}
-              aria-label="გამოცდილება წლებში"
-              className="w-20 h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 tabular-nums focus:border-brand-500 outline-none transition-colors duration-fast"
-            />
-            <span className="text-small text-ink-600">წელი</span>
-            <span className="text-meta text-ink-400">არასავალდებულო</span>
-          </label>
+          {/* ⚠️ „გამოცდილება — N წელი" WAS ASKED HERE AND IS NOT ANY MORE
+              (2026-08-31). Owner: „გამოცდილება 0 წელი … წაშალე, ყველგან არაა
+              საჭირო." It was optional on this form and `required` in the
+              provider's own editor, so one question had two different answers;
+              and a profile that skipped it printed „0 წელი" on its public page,
+              which is a measured-looking number that measured nothing. Rule 6:
+              never invent a number. The four surfaces that read it are gone with
+              it — the profile rail, both admin lists, and the editor. */}
         </Block>
 
         <Block n={++blockNo} title={kind === 'COMPANY' ? 'ლოგო ან ფოტო' : 'შენი ფოტო'}
