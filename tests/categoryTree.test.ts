@@ -21,7 +21,6 @@ import {
   isAssignable, resolveCategoryByName, ASSIGNABLE_CATEGORY_WHERE, CATEGORY_READ_ORDER, sphereToReveal,
 } from '../lib/categoryTree'
 import type { TreeNode, TreeTarget } from '../lib/categoryTree'
-import { ABROAD_CATEGORY_SLUG } from '../lib/abroad'
 
 const node = (id: string, over: Partial<TreeNode> = {}): TreeNode =>
   ({ id, status: 'VISIBLE', parentId: null, ...over })
@@ -211,15 +210,13 @@ test('§A a sub-field under a sphere that went dark stays offerable', () => {
   assert.equal(sphereToReveal(hr, [career, hr])?.id, 'career')
 })
 
-test('§A the /abroad marker can never be assigned', () => {
-  // lib/abroad: filing a real expert here does not ADD them to the diaspora
-  // page, it DELETES them from the catalogue. The approve route's old
-  // candidate set („browsable OR hidden") let this row in, and the un-hide
-  // step would then have published the marker into the public menu.
-  const diaspora = SLUGGED('d', ABROAD_CATEGORY_SLUG, { status: 'HIDDEN' })
-  assert.equal(isAssignable(diaspora, [diaspora]), false)
-  assert.ok(ASSIGNABLE_CATEGORY_WHERE.slug.notIn.includes(ABROAD_CATEGORY_SLUG))
-})
+// ⚠️ „§A the /abroad marker can never be assigned" WAS HERE (deleted 2026-09-03).
+// It pinned that `diaspora` sat in `NEVER_ASSIGNABLE_SLUGS`, which mattered
+// while filing an expert into that hidden row would have deleted them from the
+// catalogue. /abroad went on 2026-09-03 and the `diaspora` Category had never
+// existed in the database, so the assertion pinned a slug against a row nobody
+// could pick. The MECHANISM survives — `NEVER_ASSIGNABLE_SLUGS` is empty, not
+// gone — and the day it has a member again, that member gets this test back.
 
 test('§A the candidate read order can never tie', () => {
   // The resolver SCANS its candidate list, so an unordered findMany made the

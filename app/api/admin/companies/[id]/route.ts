@@ -1,22 +1,23 @@
-// GET   /api/admin/companies/[id] — one company: members + the ledger.
+// GET   /api/admin/companies/[id] — one company and its members.
 // PATCH /api/admin/companies/[id] — rename, re-note, freeze/unfreeze.
 //
-// The balance is NOT editable here. It moves only through ./balance, which
-// writes a CompanyTransaction in the same transaction — see the note there.
+// ⚠️ THE LEDGER WENT ON 2026-09-03, with the B2B vertical. This route also
+// returned the last 200 `CompanyTransaction` rows and the balance they summed
+// to — a company topped up out of band and its members spent it. Nothing was
+// ever spent, the table is gone, and a firm that SELLS here uses the provider
+// credit ledger (`CreditEntry`) like every other provider.
 
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser, requireRoleApi } from '@/lib/auth'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { canSeeB2B } from '@/lib/b2b'
 import { audit } from '@/lib/audit'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
 async function gate() {
   const me = await getCurrentUser()
-  if (!canSeeB2B(me?.role)) return { response: notFound(), admin: null as null }
   const auth = await requireRoleApi('ADMIN')
   if (auth.response) return { response: auth.response, admin: null as null }
   return { response: null, admin: auth.user }
@@ -32,36 +33,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const company = await prisma.company.findUnique({
     where: { id },
     select: {
-      id: true, name: true, taxId: true, balance: true, status: true, note: true, createdAt: true,
+      id: true, name: true, taxId: true, status: true, note: true, createdAt: true,
       // ⚠️ REQUIRED BY THE PANEL, and its absence was a hard 500 (found by
-      // opening a real company on production, 2026-08-11). `transactions` below
-      // is capped at 200, so the LIST cannot be counted client-side — the panel
-      // reads `_count.transactions` to say „the last 200 of N". It read
-      // `_count.members` too, and with `_count` undefined that is a TypeError
-      // on the first render of the detail view.
+      // opening a real company on production, 2026-08-11): the detail view
+      // reads `_count.members`, and with `_count` undefined that is a TypeError
+      // on its first render.
       //
       // TypeScript did not catch it: the client types this response by hand
       // (type Detail = Company & …), so the declaration was a claim about the
       // API, not a check of it.
-      _count: { select: { members: true, transactions: true } },
+      _count: { select: { members: true } },
       members: {
         orderBy: { createdAt: 'asc' },
         select: {
           id: true, role: true, createdAt: true,
           // Never the whole user row — passwordHash lives on it.
           user: { select: { id: true, fullName: true, email: true, role: true } },
-        },
-      },
-      transactions: {
-        orderBy: { createdAt: 'desc' },
-        // A ledger is read newest-first and the tail is history, not a queue.
-        // 200 is far past what one company generates before somebody asks for
-        // an export instead — and a cap is what stops one busy company from
-        // making this endpoint the slowest thing in the panel.
-        take: 200,
-        select: {
-          id: true, type: true, amount: true, balanceAfter: true,
-          bookingId: true, actorId: true, note: true, createdAt: true,
         },
       },
     },
@@ -117,7 +104,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     company = await prisma.company.update({
       where: { id },
       data,
-      select: { id: true, name: true, taxId: true, balance: true, status: true, note: true },
+      select: { id: true, name: true, taxId: true, status: true, note: true },
     })
   } catch (e: any) {
     if (e?.code === 'P2002') {

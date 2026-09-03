@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { expertCountsByCategory } from '@/lib/categoryCounts'
-import { ABROAD_CATEGORY_SLUG } from '@/lib/abroad'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,11 +40,9 @@ export async function GET() {
     //
     // So the flag decides, not the query: BROWSE consumers (the /experts filter,
     // the home tiles) drop anything not browsable, while the screens where an
-    // expert DESCRIBES THEMSELVES offer the whole list. Only the /abroad marker
-    // is withheld outright — it is not a sphere anybody should be filed under
-    // (lib/abroad.ts), and assigning an expert to it removes them from the site.
+    // expert DESCRIBES THEMSELVES offer the whole list.
     const rows = all
-      .filter(c => (c.status === 'VISIBLE' || c.status === 'HIDDEN') && c.slug !== ABROAD_CATEGORY_SLUG)
+      .filter(c => c.status === 'VISIBLE' || c.status === 'HIDDEN')
       .map(c => ({
         id: c.id,
         slug: c.slug,

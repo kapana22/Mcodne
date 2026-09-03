@@ -116,7 +116,7 @@ needs `lib/tz → tbilisiParts()`. Not moral — just wrong otherwise.
 
 ## Where things live
 
-424 files, ~71 500 lines across `app/`, `components/`, `lib/` (2026-08-30). Big
+436 files, ~81 600 lines across `app/`, `components/`, `lib/` (2026-09-03). Big
 screens are a container plus `_*.tsx` siblings in their own folder — **open the
 part, not the page**.
 
@@ -133,8 +133,8 @@ part, not the page**.
 | admin | `app/admin/` — one `_<tab>.tsx` per tab |
 | retired URLs → 308 | `middleware.ts`, executed by `tests/redirects.test.ts` |
 
-**`docs/MAP.md` is generated — grep it, never read it whole.** 1 043 exported
-symbols → their file; 30 Prisma models → their real columns. `lib/` is 103 files
+**`docs/MAP.md` is generated — grep it, never read it whole.** 1 134 exported
+symbols → their file; 29 Prisma models → their real columns. `lib/` is 103 files
 flat and the request family alone is 13 whose names differ by a suffix —
 `requestsViewer` lives in `requestsServer.ts`, which is not guessable. The UI word
 is rarely the column: a RequestOffer's price is `priceGel`, a ServiceProfile's
@@ -156,7 +156,7 @@ on Node 26 in ways that read as code errors.
 **While working:** `npx tsc --noEmit` (~2s), or one test file
 (`npx tsx tests/<file>.test.ts`). Not the whole gate after every edit.
 
-**Before deploying:** `npm run check` — types → schema → 84 tests → `next build`.
+**Before deploying:** `npm run check` — types → schema → 83 tests → `next build`.
 There is no CI, and `railway up` uploads the WORKING TREE, so this script is the
 only thing that ever runs the tests and a commit is a record rather than a
 release.
@@ -216,7 +216,7 @@ Prefer additive DDL, and **that is advice, not a prohibition.** Dropping a
 stops writing it, then drop the column. The hazard is the sequence and it has a
 known answer — it was never a reason to keep dead columns.
 
-**Testing.** 84 files, no runner, each exits non-zero on failure. Pin
+**Testing.** 83 files, no runner, each exits non-zero on failure. Pin
 BEHAVIOUR: call the function, render the tree, execute the redirect table. A
 regex over source text is a last resort, and ~1 500 of them exist — debt, not a
 pattern to copy. If an assertion can break on a rename, a reformat or a restyle
@@ -232,11 +232,27 @@ When the owner ships a design canvas, that is the newer decision — port it and
 update whatever test pinned the older one.
 → the full canon and its measurements: **`docs/design-system.md`**
 
-**Dark features.** `PAYMENTS_LIVE` · `FEATURE_ABROAD` · `B2B_VISIBILITY` are off
-in `lib/flags.ts`, and their code and copy stay reachable so the flag can simply
-be turned on. A dark feature is not a deleted one — but the converse holds too:
-a flag whose code nobody imports is a control that lies, and it gets deleted
-rather than left switched off.
+**Dark features.** `PAYMENTS_LIVE` is off in `lib/flags.ts`, and its code and
+copy stay reachable so the flag can simply be turned on. A dark feature is not a
+deleted one — but the converse holds too: a flag whose code nobody imports is a
+control that lies, and it gets deleted rather than left switched off.
+
+⚠️ **The other two dark features were DELETED on 2026-09-03, not flipped.**
+Owner: „ააღარ გვინდა ეგ ორი გვერდი". `FEATURE_ABROAD` had held /abroad dark
+since 2026-08-04 and the `diaspora` Category it keyed off had never been created
+at all; `B2B_VISIBILITY` had held the whole B2B vertical — /business, the
+fixed-price catalogue we sold to companies, its enquiry queue and a prepaid
+company balance — at `'off'` since 2026-08-11, and every table behind it held
+test rows only. Gone with them: `lib/abroad.ts`, `lib/b2b.ts`, the models
+`B2BService` · `BusinessLead` · `CompanyTransaction`, `Company.balance`, and
+`tests/abroad.test.ts` · `tests/b2b.test.ts` (1 075 lines of pins).
+
+**A company can still SELL here, and that is a different thing.** `/join` asks
+„ფიზიკური პირი თუ კომპანია"; answer „კომპანია" and the ServiceProfile hangs off
+a `Company` row whose `CompanyMember`s act in its name. That is supply, it is
+not behind any flag, and the /admin „კომპანიები" tab exists to create the row and
+its members. The tables stay in the database — dropping one is the migration
+that cannot be re-run — so `lib/dbBoot` simply stops naming them.
 
 **`docs/archive/` is history.** Nothing in it is current; never quote a number
 out of it.

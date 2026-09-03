@@ -1929,14 +1929,38 @@ test('the run is one question per screen, derived from the draft', () => {
   // The distribution is the pin, not one example: measured across all 171
   // topics, every single run is the same length. If a step returns, this is the
   // test that says so.
-  assert.deepEqual(chemRun, ['what', 'timing', 'format', 'contact'])
-  assert.ok(!chemRun.includes('budget'), 'the budget question came back')
+  /* ⚠️ THE BUDGET SCREEN CAME BACK ON 2026-09-03 AND THE RUN IS SIX. Owner:
+     „სავალდებულო გავხადოთ ბიუჯეტის რეინჯის მითითება მაინც." Everything above
+     about why it went on 2026-08-19 still stands and is not being argued with —
+     what changed underneath it is that the fee a provider pays for a contact is
+     now sized by this band (lib/credits → contactCostTetri), and measured that
+     morning NINETEEN OF TWENTY live requests carried no budget at all. The
+     ladder had nothing to read.
+     It is a BAND and one tap, which is the half of the old objection that can
+     be answered: „500–1 000₾" is a range somebody picks, „750₾" was a figure
+     they had to invent. */
+  /* ⚠️ THE CLARIFIERS HAVE THEIR OWN SCREENS AGAIN (2026-09-03), reversing the
+     2026-08-18 merge. Owner, on a screenshot of the stacked page: „ორად რომ
+     არის ჩამოშლილი ამას ვგულისხმობ… დაყო ცალკე გვერდებად." Chemistry asks two
+     — who it is for, and what level — so its run is seven. See stepsFor for
+     what the merge was right about and what it cost. */
+  assert.deepEqual(chemRun,
+    ['what', 'budget', 'extra:audience', 'extra:level', 'timing', 'format', 'contact'])
   assert.ok(!chemRun.includes('details'), 'the free-text screen came back')
 
   // An ambiguous topic no longer earns a screen — it is answered on screen one.
+  /* An ambiguous topic lists the budget screen too, before the kind that
+     decides its bands is known — the provisional entry that keeps the counter's
+     denominator still. See the note at the `else` in stepsFor. */
   const con = withTopic(EMPTY_DRAFT, 'contract')
   assert.deepEqual(stepsFor(con).map(st => st.id),
-    ['what', 'timing', 'format', 'contact'])
+    ['what', 'budget', 'timing', 'format', 'contact'])
+  // A clarifier screen is OPTIONAL and says so — it is the only kind of screen
+  // in the run besides the photos that may be walked past.
+  for (const st of stepsFor(chem)) {
+    assert.equal(!!st.skippable, st.id.startsWith('extra:') || st.id === 'photos',
+      `${st.id} disagrees with itself about being skippable`)
+  }
   // …but an EMPTY draft still lists it, so the counter can count before the
   // first tap.
   assert.ok(stepsFor(EMPTY_DRAFT).map(st => st.id).includes('kind'),
@@ -1975,7 +1999,19 @@ test('the run is one question per screen, derived from the draft', () => {
         `${t.id} ${service ? 'lost' : 'was given'} the photo screen`)
       assert.equal(run.includes('format'), !service,
         `${t.id} ${service ? 'was asked' : 'lost'} the online-or-in-person question`)
-      assert.equal(run.length, 4, `${t.id} runs in ${run.length} screens`)
+      /* ⚠️ THE LENGTH IS NO LONGER ONE NUMBER, AND THE PIN MOVED RATHER THAN
+         WENT (2026-09-03). Every run was four, then five when the budget band
+         came back; splitting the clarifiers onto their own screens made it
+         5 + however many this topic asks. „Every run is the same length" was
+         the strongest available statement while that was true, and the honest
+         replacement is the FORMULA — a step that appears for some kinds and not
+         others still fails here, because the only thing allowed to vary is the
+         clarifier count. */
+      const clarifiers = run.filter(id => id.startsWith('extra:')).length
+      assert.equal(run.length, 5 + clarifiers,
+        `${t.id} runs in ${run.length} screens with ${clarifiers} clarifiers`)
+      assert.ok(clarifiers <= 2, `${t.id} asks ${clarifiers} clarifiers — the run is getting long`)
+      assert.ok(run.includes('budget'), `${t.id} is never asked what it can spend`)
       // ⚠️ THE SKIPPED SCREEN MUST NOT LEAVE A WRONG ANSWER BEHIND. The draft
       // defaults to ONLINE — safe only while the screen shows and confirms it.
       if (kindsOfTopic(t.id).length === 1 && service) {
@@ -1985,15 +2021,25 @@ test('the run is one question per screen, derived from the draft', () => {
     }
   }
 
-  // The clarifiers share the timing screen, and the heading says so.
-  assert.equal(stepsFor(chem).find(st => st.id === 'timing')!.title, 'ორიოდე დეტალი')
-  // …while a topic with no clarifiers keeps the kind's own timing wording.
+  /* ⚠️ THE TIMING SCREEN IS NAMED AFTER ITS OWN QUESTION AGAIN (2026-09-03).
+     It read „ორიოდე დეტალი" while the clarifiers shared it — a heading that
+     names none of the questions on the page, which is what a page holding three
+     of them forces. With one question per screen the kind's own wording is
+     right for every topic, so there is no longer a with-clarifiers branch to
+     test: the two below assert the same thing about different topics. */
+  assert.ok(!stepsFor(chem).find(st => st.id === 'timing')!.title.includes('დეტალი'))
   const plain = withTopic(EMPTY_DRAFT, 'contract')
   assert.ok(!stepsFor(plain).find(st => st.id === 'timing')!.title.includes('დეტალი'))
+  // …and every clarifier screen is named by its own question, never by a count.
+  for (const st of stepsFor(chem).filter(s2 => s2.id.startsWith('extra:'))) {
+    assert.ok(st.title.length > 0 && !st.title.includes('დეტალი'),
+      `${st.id} lost its own question for a generic heading`)
+  }
 
   // Resume lands on the frontier: a draft holding only its topic resumes at the
-  // first unanswered question, which is now the shared details screen.
-  assert.equal(resumeStepId(chem), 'timing')
+  // first unanswered question — the budget band since 2026-09-03, which is the
+  // screen that now sits directly after „what".
+  assert.equal(resumeStepId(chem), 'budget')
 
   // The description is OPTIONAL — the schema accepts an empty one, because the
   // structured answers carry the request. It has no screen at all; the contact
@@ -2842,26 +2888,41 @@ test('the honeypot stays invisible and stays dumb', () => {
     'the honeypot branch stopped answering ok:true — it now tells bots they were caught')
 })
 
-test('the money question is gone from the wizard, warning and all', () => {
-  // ⚠️ THIS TEST USED TO PIN THE OPPOSITE. It guarded a warning under the
-  // budget ladder („ამ ბიუჯეტში შეთავაზება ნაკლები იქნება") and the rule that
-  // the low band must not block the run. Both were right about the screen they
-  // were on; the screen itself is what the owner removed on 2026-08-19, and a
-  // pin that outlives its subject fails the next honest change instead of the
-  // dishonest one.
-  //
-  // What is worth pinning now is the absence, because a money question is the
-  // easiest thing in the world to add back „just optionally".
-  const w = codeOf('app/request/RequestWizard.tsx')
-  assert.doesNotMatch(w, /budgetIsBelowFloor/, 'the floor warning is back on a screen that no longer exists')
-  assert.doesNotMatch(w, /BUDGET_BANDS/, 'the wizard offers a budget ladder again')
-  assert.doesNotMatch(w, /step\.id === 'budget'/, 'the budget screen came back')
-  const m = codeOf('app/request/_model.ts')
-  assert.doesNotMatch(m, /id: 'budget'/, 'stepsFor lists a budget screen again')
+test('the money question is a REQUIRED BAND, never a number and never a refusal', () => {
+  /* ⚠️ THIS TEST HAS NOW PINNED BOTH ANSWERS, AND THE THIRD VERSION IS THE
+     INTERESTING ONE. It first guarded a warning under a budget ladder; on
+     2026-08-19 the owner deleted the screen („არ გვინდა ბიუჯეტი საერთოდ") and
+     it was rewritten to pin the ABSENCE, warning that „a money question is the
+     easiest thing in the world to add back just optionally". On 2026-09-03 the
+     owner asked for it back — „სავალდებულო გავხადოთ ბიუჯეტის რეინჯის მითითება
+     მაინც" — and the old note's fear is exactly what this version rules out: it
+     did NOT come back optionally, and it did not come back as a number.
 
-  // …and the RULE still lives in one place, unused but intact: it is the thing
-  // to reach for if unservable requests ever become the problem the owner
-  // traded it away against.
+     What forced it is written at the step in _model: the contact fee is priced
+     off this band now, and 19 of 20 live requests carried no budget for it to
+     read. */
+  const w = codeOf('app/request/RequestWizard.tsx')
+  const m = codeOf('app/request/_model.ts')
+  assert.match(m, /id: 'budget'/, 'stepsFor stopped listing the budget screen')
+  assert.match(w, /step\.id === 'budget'/, 'the wizard stopped rendering the budget screen')
+  assert.match(w, /BUDGET_BANDS\[kind\]/, 'the budget screen stopped offering this kind‘s own bands')
+
+  // ⚠️ REQUIRED, WHICH HERE MEANS „NOT SKIPPABLE". The photo screen is the only
+  // one in the run that carries `skippable`; a budget screen that grew one
+  // would be the optional question the previous version of this test warned
+  // about, wearing a required screen's clothes.
+  const { withTopic, stepsFor, EMPTY_DRAFT } =
+    require('../app/request/_model') as typeof import('../app/request/_model')
+  const budgetStep = stepsFor(withTopic(EMPTY_DRAFT, 'chemistry')).find(s => s.id === 'budget')
+  assert.ok(budgetStep, 'the budget screen is not in a real run')
+  assert.ok(!budgetStep!.skippable, 'the budget screen became skippable — that is the optional question again')
+
+  // ⚠️ AND IT STILL DOES NOT REFUSE ANYBODY. `budgetIsBelowFloor` is called by
+  // no route and this is the assertion that keeps it that way: the question is
+  // back to PRICE a lead, not to turn a cheap job away at the door. The rule
+  // stays intact and dormant, for the day unservable requests are the problem.
+  assert.doesNotMatch(codeOf('app/api/requests/route.ts'), /budgetIsBelowFloor\(/,
+    'the intake refuses a low band again — the question came back as a gate')
   assert.equal(budgetIsBelowFloor('LEARNING', 'l0'), true)
   assert.equal(budgetIsBelowFloor('LEARNING', 'l1'), false)
 })

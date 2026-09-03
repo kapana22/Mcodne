@@ -37,6 +37,15 @@ export type MessageTextGroup = {
   key: string
   /** The group heading in the admin editor. */
   label: string
+  /**
+   * The message this copy belonged to is no longer sent, but the KEY must
+   * survive: `msg.<key>.<part>` is a SiteText key, a production row may hold
+   * copy typed under it, and tests/siteTexts.test.ts § „NO KEY MAY EVER BE
+   * RENAMED OR REMOVED" is the ledger that says so. Retiring hides the field
+   * from the editor and drops the group out of lib/outbound — the registry of
+   * what the site CAN send — while the string stays known.
+   */
+  retired?: true
   texts: MessageTextDef[]
 }
 
@@ -87,7 +96,10 @@ export const MESSAGE_TEXTS: MessageTextGroup[] = [
     ],
   },
   {
-    key: 'inbox.businessLead', label: 'B2B განაცხადი (ჩვენს ინბოქსში)',
+    // ⚠️ RETIRED 2026-09-03 with the B2B vertical. /business and its lead form
+    // are gone, so nothing can produce this letter; the key stays because a
+    // SiteText row may hold a subject line somebody typed.
+    key: 'inbox.businessLead', label: 'B2B განაცხადი (ჩვენს ინბოქსში)', retired: true,
     texts: [
       { part: 'subject', label: SUBJ, vars: ['company'], default: '[მცოდნე] B2B — {company}' },
     ],

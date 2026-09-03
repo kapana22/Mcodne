@@ -69,40 +69,9 @@ export const EntityChip = ({ children }: { children: ReactNode }) => (
   <span className="inline-flex items-center h-[22px] px-2 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 font-display text-meta font-semibold tracking-tight max-w-full truncate">{children}</span>
 )
 
-/**
- * WHAT THIS PERSON OFFERS, ON THE TITLE ROW — „კონსულტაცია" / „სამუშაო".
- *
- * ⚠️ IT EXISTS BECAUSE THERE IS ONE LIST NOW (2026-08-19). Owner: „ექსპერტები
- * და სერვისები ხო ერთია — ექსპერტს აქვს სერვისი რეალურად და პარალელურად აკეთებს
- * კონსულტაციასაც." A mixed list where the only difference between two cards is
- * their footer makes the reader work out the kind from the button; and a person
- * who offers BOTH is one card that has to say so, since neither footer alone
- * would.
- *
- * ⚠️ DRAWN ONLY WHEN IT DISTINGUISHES — the shells pass it when both halves are
- * on screen, or when this person holds both. A label that sits on every card in
- * a single-type list distinguishes nobody, which is the exact argument that
- * removed the „ახალი" pill from the expert card on 2026-07-31.
- *
- * The box is the „ფირმა" badge's, class for class: hairline border, no pastel
- * fill (the canon), and the same h-[22px] the EntityChip row uses, so it sits
- * on the title row exactly as the taxonomy chips sit on the row below it.
- */
-export function EntityKinds({ kinds }: { kinds?: string[] }) {
-  if (!kinds || kinds.length === 0) return null
-  return (
-    <>
-      {kinds.map(k => (
-        <span
-          key={k}
-          className="shrink-0 inline-flex items-center h-[22px] px-2 rounded-pill bg-ink-75 text-ink-700 border border-ink-200 font-display text-meta font-semibold"
-        >
-          {k}
-        </span>
-      ))}
-    </>
-  )
-}
+// ⚠️ `EntityKinds` WAS HERE (deleted 2026-09-03) — the „ფირმა"-style pill row
+// that printed an entity's kinds beside its title. No call site named it and
+// none had for some time; the card draws its kinds through EntityChip.
 
 export function EntityCard({
   layout = 'portrait',

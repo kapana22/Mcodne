@@ -113,9 +113,14 @@ const ACTION_LABEL: Record<string, string> = {
   'provider.category.set': 'ექსპერტს კატეგორია შეეცვალა',
   'tutor.category.set': 'ექსპერტს კატეგორია შეეცვალა', // historical rows — see above
 
-  // ── B2B. The vertical is dark (lib/flags → B2B_VISIBILITY), and these stay
-  //    because the audit log is written by whatever ran, not by what is on
-  //    screen today: rows from the period it WAS on are still in the table.
+  // ── Companies. „company.*" is live — a firm that sells here is an ordinary
+  //    provider and an admin still creates the row and its members.
+  //
+  //    ⚠️ THE REST ARE HISTORY AND THEY STAY. The balance, the lead queue and
+  //    the B2B service catalogue went on 2026-09-03 with /business, so nothing
+  //    writes these actions any more — but the audit log records what RAN, not
+  //    what is on screen today, and rows filed while it was live are still in
+  //    the table. Drop the label and that row renders as a raw code.
   'company.create': 'კომპანია დაემატა',
   'company.update': 'კომპანია დარედაქტირდა',
   'company.member.add': 'კომპანიას წევრი დაემატა',

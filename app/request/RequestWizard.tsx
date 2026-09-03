@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation'
 import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
 import {
-  ServiceRequestInput, KIND, kindOf, TIMING, FORMATS, CITIES, ONE_CITY,
+  ServiceRequestInput, KIND, kindOf, TIMING, BUDGET_BANDS, FORMATS, CITIES, ONE_CITY,
   extrasFor, topicLabel, kindsOfTopic, OTHER_TOPIC,
   MAX_REQUEST_PHOTOS, VERTICAL_COPY,
   type RequestKindName, type Vertical,
@@ -405,6 +405,18 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
     // advances the run; pointing the digits at an optional chip row would make
     // „press 2" mean something different on 94 of 171 topics. The clarifiers
     // answer by tap, which names its own question.
+    /* ⚠️ THE BANDS ARE THIS KIND'S OWN (2026-09-03). LEARNING prices a LESSON,
+       SERVICE a VISIT, PROJECT the whole job — one shared ladder would ask a
+       tutor's client about 15 000₾. `BUDGET_BANDS` is keyed on the kind for
+       exactly that reason, and the label is the band's, never a number this
+       screen invents. */
+    /* ⚠️ ONE CLARIFIER PER SCREEN SINCE 2026-09-03 (see _model → stepsFor for
+       the owner's words and what it costs). The question is named by the step,
+       so the digits point at the only list on the page — which is what makes
+       them honest again: while two questions shared a screen the badges could
+       only ever number one of them. */
+    : step.extraId ? [...(extrasFor(kind, draft.topic).find(q => q.id === step.extraId)?.options ?? [])]
+    : step.id === 'budget' ? BUDGET_BANDS[kind].map(b => ({ id: b.id, label: b.label }))
     : step.id === 'timing' ? [...TIMING[kind]]
     // ⚠️ THE CITY FOLLOW-UP IS SKIPPED WHILE THERE IS ONE CITY (2026-08-20).
     // With a single row the reveal is a list that answers itself, and the
@@ -469,6 +481,18 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
       advance(d, 'kind')
       return
     }
+    /* A clarifier: write the answer under ITS OWN question id and move on. The
+       option ids collide across ladders („unsure" is in three of them), so the
+       question can only come from the screen — never from the option. */
+    if (step.extraId) {
+      const d = { ...draft, details: { ...draft.details, [step.extraId]: id } }
+      setDraft(d)
+      advance(d)
+      return
+    }
+    /* One tap, and it is the only question on the screen — so it advances,
+       the same contract every single-question screen in this run has. */
+    if (step.id === 'budget') { pickAndGo({ budgetBand: id }); return }
     if (step.id === 'timing') {
       /* ⚠️ THE TAP THAT ENDED THE SCREEN COULD SKIP THE QUESTIONS ABOVE IT
          (2026-09-01, owner: „ერთს რომ ვაწვები ვერ ვხდები რომ მეორესაც უნდა

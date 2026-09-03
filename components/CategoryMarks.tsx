@@ -102,5 +102,6 @@ export function phMark(key: string | null | undefined, className = 'w-5 h-5'): R
   )
 }
 
-/** Every key this file draws — read by tests/topicMarks. */
-export const PH_KEYS = Object.keys(PH)
+// ⚠️ `PH_KEYS` WAS HERE, exported „for tests/topicMarks" (deleted 2026-09-03).
+// Same story as `MARKED_GROUP_IDS` next door: that test reads the source as
+// text, so nothing ever imported this.

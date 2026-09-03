@@ -13,15 +13,6 @@ export type SiteTextDef = {
   default: string
   multiline?: boolean
   /**
-   * Belongs to a feature-flagged vertical. The admin editor hides these while
-   * the vertical is dark (app/api/admin/site-texts GET filters on it), so a
-   * hidden surface cannot leak into the CMS as a group of keys that edit
-   * nothing anyone can see. Nothing else reads this field — the DEFAULTS map
-   * below deliberately still includes them, because the pages themselves must
-   * resolve their copy the moment the flag flips.
-   */
-  vertical?: 'abroad'
-  /**
    * The surface that rendered this key was DELETED, but the key itself must
    * never be. A production SiteText row may hold copy the owner typed by hand
    * under this exact string; dropping the entry would orphan it silently and
@@ -30,8 +21,12 @@ export type SiteTextDef = {
    * string can never be reused for something else, and putting the section back
    * restores the text with it — while the admin editor hides the field, because
    * a control that edits a page nobody can see is exactly the dead control the
-   * whole registry exists to prevent. Same mechanism as `vertical`, different
-   * reason: a dark vertical is not built yet, a retired key is no longer built.
+   * whole registry exists to prevent.
+   *
+   * ⚠️ THIS IS NOW THE ONLY REASON A KEY IS HIDDEN. A sibling field `vertical`
+   * hid the keys of a vertical that was dark rather than deleted; /abroad and
+   * /business were both removed on 2026-09-03, their keys are `retired`, and a
+   * field with no members left is a control that lies.
    */
   retired?: true
 }
@@ -68,6 +63,8 @@ const MESSAGE_COPY: SiteTextDef[] = MESSAGE_TEXTS.flatMap(g =>
     label: t.vars?.length ? `${t.label}  ·  ${t.vars.map(v => `{${v}}`).join(' ')}` : t.label,
     default: t.default,
     ...(t.multiline ? { multiline: true as const } : {}),
+    // A retired message's copy is retired copy — see MessageTextGroup.retired.
+    ...(g.retired ? { retired: true as const } : {}),
   })),
 )
 
@@ -738,20 +735,20 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // is in, and the currency that is actually charged) and converted for display
   // by lib/abroad → eurLabel. Editing the lari number here moves the euro figure
   // with it; the rate itself is ABROAD_EUR_PER_GEL in lib/flags.ts.
-  { key: 'abroad.hero.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'Hero — სათაური', multiline: true, default: 'ცხოვრობ საზღვარგარეთ? მოაგვარე საქმეები საქართველოში — ონლაინ' },
-  { key: 'abroad.hero.subtitle', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'Hero — ქვესათაური', multiline: true, default: 'ქართველი იურისტი, ბუღალტერი და კარიერის ექსპერტი ონლაინ.' },
-  { key: 'abroad.hero.cta', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'Hero — ღილაკი', default: 'ნახე ექსპერტები' },
+  { key: 'abroad.hero.title', group: 'დიასპორა (/abroad)', label: 'Hero — სათაური', multiline: true, default: 'ცხოვრობ საზღვარგარეთ? მოაგვარე საქმეები საქართველოში — ონლაინ', retired: true },
+  { key: 'abroad.hero.subtitle', group: 'დიასპორა (/abroad)', label: 'Hero — ქვესათაური', multiline: true, default: 'ქართველი იურისტი, ბუღალტერი და კარიერის ექსპერტი ონლაინ.', retired: true },
+  { key: 'abroad.hero.cta', group: 'დიასპორა (/abroad)', label: 'Hero — ღილაკი', default: 'ნახე ექსპერტები', retired: true },
 
-  { key: 'abroad.cards.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისები — სათაური', default: 'რა გჭირდება?' },
-  { key: 'abroad.card1.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 1 — სათაური', default: 'ქონება, მინდობილობა და მემკვიდრეობა' },
-  { key: 'abroad.card1.body', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 1 — ტექსტი', multiline: true, default: 'ბინა, მიწა თუ მემკვიდრეობა — რა დოკუმენტი გჭირდება და როგორ გააფორმო ჩამოსვლის გარეშე.' },
-  { key: 'abroad.card1.priceGel', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 1 — ფასი ლარში (ევრო თავად გამოითვლება)', default: '120' },
-  { key: 'abroad.card1.cta', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 1 — ღილაკი', default: 'იურისტთან' },
+  { key: 'abroad.cards.title', group: 'დიასპორა (/abroad)', label: 'სერვისები — სათაური', default: 'რა გჭირდება?', retired: true },
+  { key: 'abroad.card1.title', group: 'დიასპორა (/abroad)', label: 'სერვისი 1 — სათაური', default: 'ქონება, მინდობილობა და მემკვიდრეობა', retired: true },
+  { key: 'abroad.card1.body', group: 'დიასპორა (/abroad)', label: 'სერვისი 1 — ტექსტი', multiline: true, default: 'ბინა, მიწა თუ მემკვიდრეობა — რა დოკუმენტი გჭირდება და როგორ გააფორმო ჩამოსვლის გარეშე.', retired: true },
+  { key: 'abroad.card1.priceGel', group: 'დიასპორა (/abroad)', label: 'სერვისი 1 — ფასი ლარში (ევრო თავად გამოითვლება)', default: '120', retired: true },
+  { key: 'abroad.card1.cta', group: 'დიასპორა (/abroad)', label: 'სერვისი 1 — ღილაკი', default: 'იურისტთან', retired: true },
 
-  { key: 'abroad.card2.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 2 — სათაური', default: 'გადასახადები და ინდივიდუალური მეწარმე' },
-  { key: 'abroad.card2.body', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 2 — ტექსტი', multiline: true, default: 'უცხოური შემოსავალი, ქონების გადასახადი, ინდივიდუალური მეწარმის სტატუსი.' },
-  { key: 'abroad.card2.priceGel', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 2 — ფასი ლარში (ევრო თავად გამოითვლება)', default: '150' },
-  { key: 'abroad.card2.cta', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 2 — ღილაკი', default: 'ბუღალტერთან' },
+  { key: 'abroad.card2.title', group: 'დიასპორა (/abroad)', label: 'სერვისი 2 — სათაური', default: 'გადასახადები და ინდივიდუალური მეწარმე', retired: true },
+  { key: 'abroad.card2.body', group: 'დიასპორა (/abroad)', label: 'სერვისი 2 — ტექსტი', multiline: true, default: 'უცხოური შემოსავალი, ქონების გადასახადი, ინდივიდუალური მეწარმის სტატუსი.', retired: true },
+  { key: 'abroad.card2.priceGel', group: 'დიასპორა (/abroad)', label: 'სერვისი 2 — ფასი ლარში (ევრო თავად გამოითვლება)', default: '150', retired: true },
+  { key: 'abroad.card2.cta', group: 'დიასპორა (/abroad)', label: 'სერვისი 2 — ღილაკი', default: 'ბუღალტერთან', retired: true },
 
   // ⚠️ CARD 3 WAS „შვილს გაკვეთილი მინდა" (school tutoring) and was replaced
   // 2026-08-04. The development plan's §6 „რას არ ვაკეთებთ" excludes tutoring
@@ -760,26 +757,26 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // points at the plan's own „კარიერა" line (§4 item 6), whose stated buyer is
   // „ვისაც სამსახური აქვს და გადასვლა უნდა" — which is precisely a Georgian
   // working abroad. Do not reintroduce a tutoring card here.
-  { key: 'abroad.card3.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 3 — სათაური', default: 'ვფიქრობ დაბრუნებაზე — რა მელოდება?' },
-  { key: 'abroad.card3.body', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 3 — ტექსტი', multiline: true, default: 'ხელფასი, ვაკანსიები, საკუთარი საქმის დაწყება.' },
-  { key: 'abroad.card3.priceGel', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 3 — ფასი ლარში (ევრო თავად გამოითვლება)', default: '150' },
-  { key: 'abroad.card3.cta', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 3 — ღილაკი', default: 'ესაუბრე ექსპერტს' },
+  { key: 'abroad.card3.title', group: 'დიასპორა (/abroad)', label: 'სერვისი 3 — სათაური', default: 'ვფიქრობ დაბრუნებაზე — რა მელოდება?', retired: true },
+  { key: 'abroad.card3.body', group: 'დიასპორა (/abroad)', label: 'სერვისი 3 — ტექსტი', multiline: true, default: 'ხელფასი, ვაკანსიები, საკუთარი საქმის დაწყება.', retired: true },
+  { key: 'abroad.card3.priceGel', group: 'დიასპორა (/abroad)', label: 'სერვისი 3 — ფასი ლარში (ევრო თავად გამოითვლება)', default: '150', retired: true },
+  { key: 'abroad.card3.cta', group: 'დიასპორა (/abroad)', label: 'სერვისი 3 — ღილაკი', default: 'ესაუბრე ექსპერტს', retired: true },
 
-  { key: 'abroad.how.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'როგორ მუშაობს — სათაური', default: 'როგორ მუშაობს' },
-  { key: 'abroad.how.step1.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 1 — სათაური', default: 'აირჩიე ექსპერტი' },
-  { key: 'abroad.how.step1.desc', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'ნახე ვინ რას აკეთებს, რა ღირს და როგორ შეაფასეს სხვებმა.' },
-  { key: 'abroad.how.step2.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 2 — სათაური', default: 'დაასახელე შენთვის მოსახერხებელი დრო' },
-  { key: 'abroad.how.step2.desc', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'დროები შენი ქვეყნის საათით ჩანს. ექსპერტი დაგიდასტურებს ან შემოგთავაზებს სხვას.' },
-  { key: 'abroad.how.step3.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 3 — სათაური', default: 'შეხვდი ონლაინ' },
-  { key: 'abroad.how.step3.desc', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'ფორმატს ექსპერტთან ერთად ირჩევთ — დეტალებს მიმოწერაში ათანხმებთ.' },
+  { key: 'abroad.how.title', group: 'დიასპორა (/abroad)', label: 'როგორ მუშაობს — სათაური', default: 'როგორ მუშაობს', retired: true },
+  { key: 'abroad.how.step1.title', group: 'დიასპორა (/abroad)', label: 'ნაბიჯი 1 — სათაური', default: 'აირჩიე ექსპერტი', retired: true },
+  { key: 'abroad.how.step1.desc', group: 'დიასპორა (/abroad)', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'ნახე ვინ რას აკეთებს, რა ღირს და როგორ შეაფასეს სხვებმა.', retired: true },
+  { key: 'abroad.how.step2.title', group: 'დიასპორა (/abroad)', label: 'ნაბიჯი 2 — სათაური', default: 'დაასახელე შენთვის მოსახერხებელი დრო', retired: true },
+  { key: 'abroad.how.step2.desc', group: 'დიასპორა (/abroad)', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'დროები შენი ქვეყნის საათით ჩანს. ექსპერტი დაგიდასტურებს ან შემოგთავაზებს სხვას.', retired: true },
+  { key: 'abroad.how.step3.title', group: 'დიასპორა (/abroad)', label: 'ნაბიჯი 3 — სათაური', default: 'შეხვდი ონლაინ', retired: true },
+  { key: 'abroad.how.step3.desc', group: 'დიასპორა (/abroad)', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'ფორმატს ექსპერტთან ერთად ირჩევთ — დეტალებს მიმოწერაში ათანხმებთ.', retired: true },
 
-  { key: 'abroad.experts.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ექსპერტები — სათაური', default: 'ვინ დაგელაპარაკება' },
-  { key: 'abroad.experts.subtitle', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ექსპერტები — ქვესათაური', multiline: true, default: 'ქართველი ექსპერტები.' },
-  { key: 'abroad.experts.empty', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ექსპერტები — ცარიელი მდგომარეობა', multiline: true, default: 'ექსპერტების სია მზადდება. მოგვწერე და შენს საკითხზე სპეციალისტს შეგირჩევთ.' },
+  { key: 'abroad.experts.title', group: 'დიასპორა (/abroad)', label: 'ექსპერტები — სათაური', default: 'ვინ დაგელაპარაკება', retired: true },
+  { key: 'abroad.experts.subtitle', group: 'დიასპორა (/abroad)', label: 'ექსპერტები — ქვესათაური', multiline: true, default: 'ქართველი ექსპერტები.', retired: true },
+  { key: 'abroad.experts.empty', group: 'დიასპორა (/abroad)', label: 'ექსპერტები — ცარიელი მდგომარეობა', multiline: true, default: 'ექსპერტების სია მზადდება. მოგვწერე და შენს საკითხზე სპეციალისტს შეგირჩევთ.', retired: true },
 
-  { key: 'abroad.cta.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ბოლო CTA — სათაური', default: 'ვერ იპოვე შენი საკითხი?' },
-  { key: 'abroad.cta.body', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ბოლო CTA — ტექსტი', multiline: true, default: 'მოგვწერე ორი წინადადებით, რა გჭირდება — ექსპერტს შეგირჩევთ და დაგიბრუნდებით.' },
-  { key: 'abroad.cta.button', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ბოლო CTA — ღილაკი', default: 'მომწერეთ' },
+  { key: 'abroad.cta.title', group: 'დიასპორა (/abroad)', label: 'ბოლო CTA — სათაური', default: 'ვერ იპოვე შენი საკითხი?', retired: true },
+  { key: 'abroad.cta.body', group: 'დიასპორა (/abroad)', label: 'ბოლო CTA — ტექსტი', multiline: true, default: 'მოგვწერე ორი წინადადებით, რა გჭირდება — ექსპერტს შეგირჩევთ და დაგიბრუნდებით.', retired: true },
+  { key: 'abroad.cta.button', group: 'დიასპორა (/abroad)', label: 'ბოლო CTA — ღილაკი', default: 'მომწერეთ', retired: true },
 
   // ── /signup · the marketing panel beside the form (added 2026-08-05) ──────
   // The whole panel, both roles, top to bottom. It was invisible to the admin
@@ -949,14 +946,14 @@ export function isRetiredSiteTextKey(key: string): boolean {
  * that very much does, in a place the browser cannot see. Both stay readable
  * through `getSiteTextMap` on the server and through the admin panel.
  */
-// ⚠️ `abroad.*` WAS ADDED HERE ON 2026-08-21 AND TAKEN STRAIGHT BACK OUT.
-// 29 keys and 4 KB, for a vertical whose flag is off — it looked free. It is
-// not: three tests failed on it, and they were right to. The diaspora landing
-// renders through the SAME provider as everything else, `siteTexts.test.ts`
-// requires every registered key to be rendered by some component, and both
-// depend on the copy being reachable from the browser whether or not the flag
-// is on today. Withholding it would mean the vertical could not simply be
-// switched on. A dark feature is not the same thing as a deleted one.
+// ⚠️ `abroad.*` WAS ADDED HERE ON 2026-08-21 AND TAKEN STRAIGHT BACK OUT — and
+// the argument that kept it out has since been overtaken. It ran: a dark
+// feature is not a deleted one, so the diaspora copy must stay reachable from
+// the browser for the day the flag flips. On 2026-09-03 the owner deleted the
+// vertical instead of flipping it, so those 29 keys are `retired` now and no
+// component renders them. They stay in the registry because a production
+// SiteText row may hold copy typed under one of them; they are simply no longer
+// anything the payload has to carry.
 const SERVER_ONLY_PREFIXES = ['seo.']
 export function isServerOnlySiteTextKey(key: string): boolean {
   return SERVER_ONLY_PREFIXES.some(p => key.startsWith(p))

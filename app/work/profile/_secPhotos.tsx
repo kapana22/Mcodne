@@ -34,8 +34,13 @@ export function PhotosSection({ profileId, stamp, photos, setPhotos }: {
       ? `/api/providers/${profileId}/photo?n=${v.slice(5)}&v=${stamp}-${i}`
       : v
 
+  /* ⚠️ `id` AND `scroll-mt-24` SO THE CHECKLIST CAN REACH IT (2026-09-03). The
+     card beside the form now lists the six tasks that PAY, and one of them is
+     the work photos — `taskAnchor('PROFILE_CERTIFICATE')` names this exact id.
+     Without it that row scrolled nowhere. The margin matches the other two
+     sections, so the heading clears the sticky bar. */
   return (
-    <Card>
+    <Card id="section-photos" className="scroll-mt-24">
       {/* ⚠️ THE FACE UPLOADER WAS HERE AND IT WAS THE SECOND ONE (removed
           2026-08-29). This card wrote `ServiceProfile.photoUrl` under the words
           „ფოტო — ეს ჩანს კლიენტთან, სიაში", while the ავატარი block above wrote

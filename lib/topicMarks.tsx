@@ -76,5 +76,8 @@ export function topicGroupMark(
   return key ? phMark(key, className) : null
 }
 
-/** Every group id this file has a mark for — read by tests/topicMarks. */
-export const MARKED_GROUP_IDS = Object.keys(GROUP_MARK)
+// ⚠️ `MARKED_GROUP_IDS` WAS HERE, exported „for tests/topicMarks" (deleted
+// 2026-09-03). That test reads this file AS TEXT and always has — importing it
+// pulls in components/Icon, whose glyphs are ready-rendered JSX that throws
+// under a plain `tsx` run — so the export had no reader and its own comment
+// named one that could not exist.

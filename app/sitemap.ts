@@ -85,12 +85,12 @@ const STATIC_ROUTES: Array<{
   //                      below under that address, never their old one.
   //   /terms /privacy    legal pages. Indexable and linked, but nobody searches
   //   /cookies           for them, so they don't belong in a targeted sitemap.
-  //   /abroad            the diaspora landing (FEATURE_ABROAD). It is noindex,
-  //                      nofollow and 404s while the flag is off — listing it
-  //                      would be submitting a URL we are simultaneously telling
-  //                      the crawler to ignore. When the vertical goes public,
-  //                      drop the noindex in app/abroad/page.tsx FIRST, then add
-  //                      it here; the two must never disagree.
+  //   /abroad /business  BOTH DELETED on 2026-09-03. They were noindex,
+  //                      nofollow and flag-gated, and the rule they were listed
+  //                      under still holds for whatever comes next: never
+  //                      submit a URL you are simultaneously telling the
+  //                      crawler to ignore. Drop the noindex on the page FIRST,
+  //                      then add it here; the two must never disagree.
 ]
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

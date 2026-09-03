@@ -24,7 +24,7 @@
 //   G. POST /api/bookings must keep notify() out of the response path (after)
 //      and its independent pre-checks parallel.
 
-import { readFileSync, readdirSync } from 'fs'
+import { readFileSync, readdirSync, existsSync } from 'fs'
 import { join } from 'path'
 
 const root = join(__dirname, '..')
@@ -475,22 +475,29 @@ function check(name: string, ok: boolean, hint: string) {
   check('the packages flag is gone, not left switched off',
     !codeOf('lib/flags.ts').includes('PACKAGES_VISIBILITY'),
     'a flag with no reader is a control that lies about what it turns on')
-  check('b2b ships dark', /B2B_VISIBILITY: B2BVisibility = 'off'/.test(flags), 'B2B_VISIBILITY is not off')
-  check('abroad ships dark', /FEATURE_ABROAD = false/.test(flags), 'FEATURE_ABROAD is not false')
-  check('/business 404s when off', /canSeeB2B\(me\?\.role\)\) notFound\(\)/.test(read('app/business/page.tsx')),
-    'the b2b landing lost its guard')
+  // ⚠️ FOUR PINS WENT HERE ON 2026-09-03, and they went because what they
+  // guarded went. They held the B2B vertical and /abroad DARK — the flags at
+  // 'off', /business 404-ing behind `canSeeB2B`, the admin tab filtered out of
+  // ADMIN_NAV rather than merely unrendered, the one /business link gated at
+  // its source. The owner deleted both verticals („ააღარ გვინდა ეგ ორი
+  // გვერდი"), so there is no flag left to be flipped by accident and no page
+  // left to leak. A pin whose subject no longer exists is not a weaker pin, it
+  // is a false one.
+  //
+  // What SURVIVES is the shape of the argument, and it is still load-bearing
+  // for the next dark thing: a tab must leave the ARRAY, not just the render.
   const nav = read('app/admin/_nav.tsx')
-  check('the companies tab leaves the ARRAY, not just the render',
-    /\.filter\(it => it\.id !== 'companies' \|\| b2bFeatureExists\(\)\)/.test(nav),
-    'a hidden-but-present tab means /admin#companies still opens something')
   check('VALID_TABS is derived from the filtered array', /VALID_TABS[^=]*= ADMIN_NAV\.map/.test(nav),
     'VALID_TABS stopped following the nav — a dark tab is addressable again')
-  check('the only /business link is gated at its source',
-    /b2bFeatureExists\(\)/.test(read('components/UserMenu.tsx')),
-    'the admin menu links a dark vertical unconditionally')
+  // …and the two deleted pages must not reappear in the sitemap, which is the
+  // one file where a dead URL costs something real: a crawler asked to fetch it.
   const sitemap = read('app/sitemap.ts')
   for (const path of ['/swavleba', '/business', '/abroad']) {
     check(`the sitemap does not list ${path}`, !sitemap.includes(`'${path}'`), `app/sitemap.ts lists ${path}`)
+  }
+  for (const gone of ['app/business', 'app/abroad', 'lib/b2b.ts', 'lib/abroad.ts']) {
+    check(`${gone} stays deleted`, !existsSync(join(root, gone)),
+      'a vertical the owner removed grew back')
   }
 }
 

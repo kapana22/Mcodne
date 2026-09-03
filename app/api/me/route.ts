@@ -9,6 +9,7 @@ import { balanceOf } from '@/lib/creditsServer'
 import { getCurrentUser, hashPassword, verifyPassword, revokeOtherSessions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeAvatar } from '@/lib/normalizeAvatar'
+import { isAvatarPick } from '@/lib/defaultAvatar'
 import { rateLimit } from '@/lib/rateLimit'
 import { firstGeorgianIssue, georgianNameRefine, georgianRefine } from '@/lib/georgianText'
 import { ROLE } from '@/lib/roles'
@@ -137,8 +138,15 @@ const Patch = z.object({
   bio: z.string().max(500).superRefine(georgianRefine('აღწერა')).optional(),
   // Only a same-origin uploaded image (data:image/…) or an https URL — never a
   // `javascript:`/`data:text/html` string that could be reflected elsewhere.
+  //
+  // ⚠️ THE THIRD CASE IS AN EXACT-MATCH ALLOWLIST, NOT A PATTERN (2026-09-03).
+  // Somebody with no photo can pick one of the two drawn faces in /settings,
+  // and a pick is stored here exactly like an upload — so the endpoint has to
+  // accept a path. `isAvatarPick` compares against the two literal strings in
+  // lib/defaultAvatar; it is not `startsWith('/avatars/')`, because that would
+  // let any path under that prefix through and this value ends up in an `src`.
   avatarUrl: z.string().max(500_000)
-    .refine(v => /^data:image\/(png|jpeg|webp|gif);base64,/.test(v) || /^https:\/\//.test(v), 'BAD_AVATAR')
+    .refine(v => /^data:image\/(png|jpeg|webp|gif);base64,/.test(v) || /^https:\/\//.test(v) || isAvatarPick(v), 'BAD_AVATAR')
     .nullable().optional(),
   currentPassword: z.string().min(1).optional(),
   newPassword: z.string().min(PWD_MIN).max(PWD_MAX).optional(),

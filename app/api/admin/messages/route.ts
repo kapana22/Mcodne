@@ -114,7 +114,7 @@ export async function GET(req: Request) {
     (await prisma.siteText.findMany({ select: { key: true, value: true } }).catch(() => []))
       .map(r => [r.key, r.value] as const),
   )
-  const copy = MESSAGE_TEXTS.map(g => ({
+  const copy = MESSAGE_TEXTS.filter(g => !g.retired).map(g => ({
     key: g.key,
     label: g.label,
     texts: g.texts.map(x => {

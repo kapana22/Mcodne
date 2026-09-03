@@ -2,7 +2,7 @@
 import type { Dispatch, SetStateAction } from 'react'
 // /settings — the profile card: photo, name, phone, bio.
 
-import { defaultAvatarFor } from '@/lib/defaultAvatar'
+import { AVATAR_PICKS, DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { Icon } from '@/components/Icon'
 import { FIELD_ERROR_BORDER } from '@/components/FieldError'
 import type { FaultKit, Me, Msg } from './_types'
@@ -24,11 +24,13 @@ type Props = {
   pickAvatar: () => void
   uploadAvatar: (file: File) => void
   removeAvatar: () => void
+  /** One of the two drawn faces from lib/defaultAvatar, stored like an upload. */
+  chooseAvatar: (url: string) => void
   /** Which of the three boxes a refusal is about — see ./client.tsx. */
   fault: FaultKit
 }
 
-export function ProfileSection({ me, fullName, setFullName, phone, setPhone, bio, setBio, avatarUrl, savingProfile, profileMsg, fileInput, uploading, saveProfile, pickAvatar, uploadAvatar, removeAvatar, fault }: Props) {
+export function ProfileSection({ me, fullName, setFullName, phone, setPhone, bio, setBio, avatarUrl, savingProfile, profileMsg, fileInput, uploading, saveProfile, pickAvatar, uploadAvatar, removeAvatar, chooseAvatar, fault }: Props) {
   const { props, bad, clearField, error } = fault
   return (
     <section className="bg-white rounded-card border border-ink-200 p-6 lg:p-8">
@@ -55,7 +57,7 @@ export function ProfileSection({ me, fullName, setFullName, phone, setPhone, bio
             aria-label="ავატარის შეცვლა"
             className="group relative w-20 h-20 rounded-full overflow-hidden bg-ink-100 ring-1 ring-ink-200 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-wait"
           >
-            <img src={avatarUrl || defaultAvatarFor(me.fullName)} alt={me.fullName} className="w-full h-full object-cover" />
+            <img src={avatarUrl || DEFAULT_AVATAR} alt={me.fullName} className="w-full h-full object-cover" />
             {/* Desktop: overlay on hover; Mobile: overlay always visible (opacity-100). */}
             {!uploading && (
               <span
@@ -83,6 +85,29 @@ export function ProfileSection({ me, fullName, setFullName, phone, setPhone, bio
                 </button>
               )}
             </div>
+            {/* ⚠️ THE TWO FACES ARE A CHOICE, NOT A GUESS, AND THEY APPEAR
+                ONLY WITH NO PHOTO (2026-09-03). The default avatar is faceless
+                on purpose — see lib/defaultAvatar for the measurement that
+                killed the name-hash — so this is the one place a person says
+                which one is them. With a photo uploaded the row is noise, so it
+                is not drawn. 44px each: it is a tappable control. */}
+            {!avatarUrl && (
+              <div className="flex items-center gap-2">
+                <span className="text-meta text-ink-500">ან აირჩიე:</span>
+                {AVATAR_PICKS.map((url, i) => (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => chooseAvatar(url)}
+                    disabled={uploading}
+                    aria-label={`ავატარის არჩევა ${i + 1}`}
+                    className="w-11 h-11 rounded-full overflow-hidden ring-1 ring-ink-200 hover:ring-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 motion-safe:transition-[box-shadow] motion-safe:duration-fast"
+                  >
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="text-meta text-ink-500">მაქს. 8MB · JPG/PNG/WEBP/GIF</div>
             <input
               ref={fileInput}

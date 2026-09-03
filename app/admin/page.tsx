@@ -45,7 +45,6 @@ export default function AdminOverview() {
   const [helpOpen, setHelpOpen] = useState<number | null>(null)
   // Unanswered B2B enquiries — the same kind of number as the two above: a
   // queue with a person waiting at the other end of it.
-  const [b2bLeads, setB2bLeads] = useState<number | null>(null)
   // Unverified requests — a phone call waiting. Same treatment as the three
   // queue badges above it, from the same stats fetch.
   const [newRequests, setNewRequests] = useState<number | null>(null)
@@ -76,7 +75,6 @@ export default function AdminOverview() {
       if (!r.ok) return
       const d = await r.json()
       if (typeof d?.helpOpen === 'number') setHelpOpen(d.helpOpen)
-      if (typeof d?.b2bLeads === 'number') setB2bLeads(d.b2bLeads)
       if (typeof d?.newRequests === 'number') setNewRequests(d.newRequests)
       if (typeof d?.pendingProviders === 'number') setPendingMasters(d.pendingProviders)
     } catch {}
@@ -93,9 +91,9 @@ export default function AdminOverview() {
       {/* Renders nothing. Here rather than inside the requests tab because an
           operator reading any tab is still an operator — see _presence. */}
       <PresenceBeat />
-      <AdminSidebar active={active} onNav={setActiveWithHash} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingProviders={pendingProviders} />
+      <AdminSidebar active={active} onNav={setActiveWithHash} helpOpen={helpOpen} newRequests={newRequests} pendingProviders={pendingProviders} />
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-      <TopBar active={active} onNav={setActiveWithHash} helpOpen={helpOpen} b2bLeads={b2bLeads} newRequests={newRequests} pendingProviders={pendingProviders} />
+      <TopBar active={active} onNav={setActiveWithHash} helpOpen={helpOpen} newRequests={newRequests} pendingProviders={pendingProviders} />
 
       {/* NB: the `key` used to be `active + ':' + statsTick` so that a moderation
           decision would remount the overview KPIs. But `statsTick` also
@@ -106,10 +104,9 @@ export default function AdminOverview() {
       <main key={active}>
         {active === 'overview' && <OverviewSection />}
         {active === 'users' && <UsersSection />}
-        {/* B2B. Unreachable while the vertical is off: `companies` is filtered
-            out of ADMIN_NAV, and VALID_TABS is derived from it, so `active` can
-            never hold this value. Its APIs are gated independently. */}
-        {active === 'companies' && <CompaniesSection onLeadsChanged={() => setStatsTick(t => t + 1)} />}
+        {/* The firms that sell here — a supply-side record, not the B2B
+            vertical that used to live under this id (removed 2026-09-03). */}
+        {active === 'companies' && <CompaniesSection />}
         {/* Requests. Unreachable while the subsystem is off: both ids are
             filtered out of ADMIN_NAV, and VALID_TABS is derived from it, so
             `active` can never hold either value. Their APIs are gated

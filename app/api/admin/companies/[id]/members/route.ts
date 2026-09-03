@@ -17,14 +17,12 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser, requireRoleApi } from '@/lib/auth'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { canSeeB2B } from '@/lib/b2b'
 import { audit } from '@/lib/audit'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
 async function gate() {
   const me = await getCurrentUser()
-  if (!canSeeB2B(me?.role)) return { response: notFound(), admin: null as null }
   const auth = await requireRoleApi('ADMIN')
   if (auth.response) return { response: auth.response, admin: null as null }
   return { response: null, admin: auth.user }

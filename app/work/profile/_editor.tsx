@@ -48,6 +48,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Skeleton } from '@/components/Skeleton'
 import { ProfileStatusBand } from './_parts'
 import { ProfileCompleteness } from '@/components/ProfileCompleteness'
+import { BIO_MIN } from '@/lib/credits'
 import { useAvatarCropper } from '@/components/AvatarCropper'
 import { useToast } from '@/components/ToastProvider'
 import { useUnsavedGuard } from '@/lib/useUnsavedGuard'
@@ -298,19 +299,31 @@ export function ProfileEditor() {
     }
   }
 
-  /** What `ProfileCompleteness` scores. It reads the stored shape, and it is
-   *  fed the DRAFT so the checklist moves while somebody types rather than one
-   *  save later — the same rule the card beside it follows. */
-  const scored = {
-    id: data.id ?? '',
-    headline: draft.headline,
-    about: draft.about,
-    services: draft.services,
-    priceList: draft.priceList,
-    languages: draft.languages,
-    professions: draft.professions,
-    categoryId: draft.categoryId || null,
-    servicesConfirmedAt: unconfirmed ? null : new Date().toISOString(),
+  /** What `ProfileCompleteness` scores — THE SIX TASKS THAT PAY, not a second
+   *  weighted checklist (see that component's header for what changed on
+   *  2026-09-03 and why).
+   *
+   *  Built from the DRAFT so the card moves while somebody types rather than
+   *  one save later, and mirroring `profileFacts` in lib/creditsServer field
+   *  for field: the server is what actually grants, and a card that disagreed
+   *  with it would promise money the ledger then refuses. */
+  const facts = {
+    /* ⚠️ THE USER AVATAR ONLY. `profileFacts` also counts a ServiceProfile
+       `photoUrl`, which this editor does not hold and no screen writes any
+       more — so on the one profile that still carries one the card would say
+       „+15₾ to earn" for something already paid. Named rather than hidden; the
+       server is the payer and it will simply grant nothing. */
+    hasPhoto: !!avatarUrl,
+    hasBio: draft.about.trim().length >= BIO_MIN,
+    // Either answer earns it — the same pair the server reads.
+    hasProfessions: draft.professions.length > 0 || draft.services.length > 0,
+    hasExperience: draft.areas.length > 0,
+    // The single price earns it; the legacy per-service map still counts for
+    // the one provider who filled it in before the question changed.
+    hasService: (draft.priceFrom ?? 0) > 0
+      || Object.values(draft.priceList ?? {}).some(v => typeof v === 'number' && v > 0),
+    hasCertificate: draft.workPhotos.length > 0,
+    servicesConfirmed: !unconfirmed,
   }
 
   return (
@@ -386,7 +399,7 @@ export function ProfileEditor() {
               priceFrom={draft.priceFrom}
             />
           </div>
-          <ProfileCompleteness profile={scored} avatarUrl={avatarUrl} variant="card" alwaysShow />
+          <ProfileCompleteness facts={facts} variant="card" alwaysShow />
         </aside>
       </div>
 

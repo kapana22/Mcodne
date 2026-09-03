@@ -325,6 +325,31 @@ export default function SettingsClient({ initialMe, chrome = true }: {
     }
   }
 
+  /** A drawn face, saved exactly like an upload — see lib/defaultAvatar for why
+   *  this is a pick rather than something the app works out from the name. */
+  const chooseAvatar = async (url: string) => {
+    if (uploading) return
+    setUploading(true)
+    setProfileMsg(null)
+    try {
+      const res = await fetch('/api/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: url }),
+      })
+      if (res.ok) {
+        setAvatarUrl(url)
+        setProfileMsg({ kind: 'success', text: 'ავატარი განახლდა' })
+      } else {
+        setProfileMsg({ kind: 'error', text: 'ვერ შეინახა — სცადე თავიდან' })
+      }
+    } catch {
+      setProfileMsg({ kind: 'error', text: 'ქსელის შეცდომა' })
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const removeAvatar = async () => {
     if (uploading) return
     setUploading(true)
@@ -543,6 +568,7 @@ export default function SettingsClient({ initialMe, chrome = true }: {
           pickAvatar={pickAvatar}
           uploadAvatar={uploadAvatar}
           removeAvatar={removeAvatar}
+          chooseAvatar={chooseAvatar}
           fault={profileFault}
         />
 

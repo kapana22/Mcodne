@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
-import { defaultAvatarFor } from '@/lib/defaultAvatar'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { Container } from '@/components/Container'
 import { Footer } from '@/components/Footer'
 import { Icon } from '@/components/Icon'
@@ -178,7 +178,7 @@ export async function ProfessionLanding({ p }: { p: ProfessionSeo }) {
                     <div className="flex items-center gap-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       {/* Below-fold, remote, so lazy + an intrinsic box. */}
-                      <img src={t.photoSrc || defaultAvatarFor(name)} alt={name} loading="lazy" decoding="async" width={56} height={56} className="w-14 h-14 rounded-full object-cover ring-1 ring-ink-200" />
+                      <img src={t.photoSrc || DEFAULT_AVATAR} alt={name} loading="lazy" decoding="async" width={56} height={56} className="w-14 h-14 rounded-full object-cover ring-1 ring-ink-200" />
                       <div className="min-w-0">
                         <div className="font-display text-body-lg font-bold text-ink-900 truncate group-hover:text-brand-700 transition-colors duration-fast">{name}</div>
                         {/* The CATEGORY, not `specialty` — every card on this

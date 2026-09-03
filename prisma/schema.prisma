@@ -370,22 +370,26 @@ model AuditLog {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// B2B — companies with a prepaid balance.  2026-08-11
+// A PROVIDER THAT IS A FIRM.  2026-08-11, cut back to this on 2026-09-03
 //
-// The whole vertical is dark behind `B2B_VISIBILITY` in lib/flags.ts. These
-// four tables exist on every deployment (lib/dbBoot creates them at boot) and
-// are EMPTY until an admin fills them, which is the same contract every other
-// vertical here ships on: the schema knows about the feature, the site does not.
+// /join asks „ფიზიკური პირი თუ კომპანია". Answer „კომპანია" and the identity a
+// ServiceProfile and a RequestAccess grant hang off is a `Company` row rather
+// than a person — the members are who acts in its name. That is the whole
+// remaining purpose of these two tables: supply, described the way supply
+// actually arrives.
 //
-// WHAT THIS IS NOT, so nobody builds it by accident: there is no gateway, no
-// invoice, no escrow, no subscription and no automatic charge. A balance is a
-// number an admin types in after money arrived by some other route, and a
-// charge is that number going down when a member books. `PAYMENTS_LIVE` stays
-// false and is untouched by any of this.
+// ⚠️ THREE MORE TABLES WERE HERE AND THEY WERE A DIFFERENT PRODUCT ENTIRELY.
+// `B2BService` was a catalogue of fixed-price services WE sold to companies,
+// `BusinessLead` the enquiry queue it produced, and `CompanyTransaction` the
+// ledger behind `Company.balance` — money an admin typed in out of band so a
+// company's members could spend it. The whole vertical lived behind
+// `B2B_VISIBILITY` and never left 'off'; the owner deleted it on 2026-09-03
+// („ააღარ გვინდა ეგ ორი გვერდი"), and every one of those tables held test rows
+// only. The columns still stand in the database — dropping them is a separate,
+// reversible-in-one-direction decision — but nothing in this schema names them.
 //
-// MONEY IS `Int` LARI, matching Booking.price, Enrollment.priceTotal and
-// TutorProfile.price. There is no tetri anywhere in this database and this is
-// not the feature that should introduce one.
+// A firm that SELLS here spends the provider credit ledger (`CreditEntry`) like
+// every other provider. There is no second balance.
 // ═══════════════════════════════════════════════════════════════════════════
 
 enum CompanyStatus {
@@ -404,27 +408,12 @@ enum CompanyMemberRole {
   MEMBER
 }
 
-enum CompanyTransactionType {
-  // An admin put money on the balance (ჩარიცხვა). Also covers a correction
-  // upward — the note says which, and the audit log says who.
-  TOPUP
-  // A booking spent it (ჩამოჭრა), or an admin corrected downward.
-  CHARGE
-}
 
-// Where a booking's money came from. Read `Booking.paidBy` through
-// `paymentSourceOf()` in lib/b2b.ts, never directly — `null` is the historical
-// value and means CARD.
-enum PaymentSource {
-  CARD
-  COMPANY_BALANCE
-}
+// ⚠️ `PaymentSource` WAS HERE (CARD | COMPANY_BALANCE, deleted 2026-09-03). It
+// told you where a Booking's money came from; Booking went with the
+// consultation product on 2026-08-24 and the company balance went with the B2B
+// vertical, so the enum described two things that no longer exist.
 
-enum BusinessLeadStatus {
-  NEW
-  CONTACTED
-  CLOSED
-}
 
 model Company {
   id      String        @id @default(cuid())
@@ -435,11 +424,6 @@ model Company {
   // allows any number of NULLs under a unique constraint so the nullable and
   // the unique do not fight.
   taxId   String?       @unique
-  // Lari. NEVER decrement this with a read-then-write: claim it conditionally
-  // (`where: { id, balance: { gte: amount } }` + `count !== 1 → 409`), the rule
-  // in CLAUDE.md and the pattern in app/api/bookings/[id]/cancel. A second tab
-  // beats a check-then-set every time, and here that overdraws a real balance.
-  balance Int           @default(0)
   status  CompanyStatus @default(ACTIVE)
   // Admin's own scratch note (contract number, who to call). Never shown to a
   // member — only the admin panel reads it.
@@ -449,7 +433,6 @@ model Company {
   updatedAt DateTime @updatedAt
 
   members        CompanyMember[]
-  transactions   CompanyTransaction[]
   serviceProfile ServiceProfile?
   // Requests (2026-08-14) — virtual back-relations, no SQL. A company bids on a
   // request as one counterparty; the members do not each get their own offer.
@@ -474,8 +457,7 @@ model CompanyMember {
   // anything that happened: it is a permission. When the account goes, the
   // permission must go with it, and it must never be the reason an account
   // cannot be deleted (app/api/admin/users/[id] DELETE would start refusing
-  // accounts for a reason the operator cannot see). The MONEY is not here — it
-  // is in CompanyTransaction, which has no FK to anything and survives both.
+  // accounts for a reason the operator cannot see).
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -486,159 +468,8 @@ model CompanyMember {
   @@index([userId])
 }
 
-model CompanyTransaction {
-  id           String                 @id @default(cuid())
-  companyId    String
-  type         CompanyTransactionType
-  // ALWAYS POSITIVE. The direction lives in `type`, so no reader has to
-  // remember a sign convention, and `SUM(amount)` can never silently mean two
-  // different things depending on which rows it caught.
-  amount       Int
-  // The balance this row left behind. Redundant with a replay of the ledger and
-  // kept anyway: it is how you find the row where the arithmetic went wrong.
-  balanceAfter Int
 
-  // The booking that spent it, when a booking spent it. A PLAIN STRING, with an
-  // index and NO foreign key — on purpose. A ledger row must outlive its
-  // subject: if a Booking is ever deleted, a FK would either take the money row
-  // with it (CASCADE) or block the delete (RESTRICT), and both are wrong for an
-  // accounting record. Same reasoning as AuditLog.targetId.
-  bookingId String?
-  // The admin who did it. Null for a charge the booking flow made by itself.
-  // Plain string for the same reason as bookingId; the full story is in AuditLog.
-  actorId   String?
-  note      String?
 
-  createdAt DateTime @default(now())
-
-  // Cascade from Company only. Deleting a company is not a thing the admin
-  // panel offers — but if it is ever done by hand, an orphaned ledger pointing
-  // at a company that does not exist is worse than no ledger.
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  // The ledger view: one company, newest first.
-  @@index([companyId, createdAt])
-  // „was this booking charged to a balance, and which row did it?"
-  @@index([bookingId])
-}
-
-// A service we sell to companies, at a fixed price.  2026-08-11
-//
-// THE PRODUCT IS THE SERVICE, NOT THE EXPERT — and that is the whole difference
-// from the rest of this platform. On /tutors a client picks a person and books
-// their hour; here a company buys „იურიდიული აუდიტი — 800₾" and WE decide who
-// delivers it. That choice happens off the platform entirely: the owner agrees
-// it by phone or mail and assigns somebody they already know. There is
-// deliberately NO expert field on this model and no assignment flow — modelling
-// a decision that is made in a conversation would only produce a column nobody
-// keeps up to date.
-//
-// No booking, no calendar, no escrow. A request arrives, the owner agrees a
-// price, and the invoice happens outside this system.
-model B2BService {
-  id             String  @id @default(cuid())
-  // WHAT KIND of service it is — 'CONSULTATION' or 'TRAINING'.
-  //
-  // WHY THIS EXISTS (2026-08-12, owner): the offer is „a consultation or a
-  // training, in business or sales or something else" — two independent
-  // questions. There was only `direction`, so the two got mixed INTO one field:
-  // production held „HR", „იურიდიული", „ფინანსური" (areas) alongside
-  // „ტრენინგები" (a kind). The model therefore could not express „a training in
-  // sales" at all — a sales training had to be filed either under its kind or
-  // under its area, never both, and the page grouped them as if they were the
-  // same axis.
-  //
-  // A String and not a Postgres enum, deliberately: the set is read through
-  // lib/b2b (B2B_KINDS) and validated by zod at both ends, and a two-value enum
-  // type is not worth a migration that has to run before any column using it.
-  kind           String  @default("CONSULTATION")
-  // The AREA it belongs to — „იურიდიული", „ფინანსური", „გაყიდვები".
-  // Free text and NOT a Category FK on purpose: the sphere taxonomy describes
-  // what EXPERTS do and is admin-edited for the public catalogue. Borrowing it
-  // here would tie a B2B price list to a rename made for a different reason.
-  direction      String
-  title          String
-  description    String?
-  // One short meta line under the title: „4 საათი · ჯგუფური · ონლაინ",
-  // „ერთჯერადი", „თვეში 2 შეხვედრა". Optional and free text.
-  //
-  // WHY A SEPARATE FIELD AND NOT PART OF description. A TRAINING is a service
-  // like any other here, but it is the one where format decides whether it fits
-  // at all — how many people, how long, where. Buried in a sentence a company
-  // has to read for it; on its own line they can scan a whole direction and
-  // rule things in or out. Everything else may simply leave it empty.
-  format         String?
-  // The card image, as a `data:image/webp;base64,…` produced by /api/uploads
-  // (kind=cover → hard-cropped to 1200x675). There is no object storage, so it
-  // lives in the column like every other image here.
-  //
-  // ⚠️ NEVER SELECT THIS INTO A PAGE PAYLOAD. Six cards of inline base64 is
-  // most of a megabyte re-sent on every navigation and cacheable by nothing —
-  // the exact shape /api/avatars/[id] was built to undo. /business selects a
-  // `hasImage` boolean and points <img> at /api/b2b-services/[id]/image, which
-  // the browser then caches per service.
-  imageUrl       String?
-  // Lari, like every other price in this database. This is the number a company
-  // reads on the page — the one actually invoiced may differ after a
-  // conversation, which is what BusinessLead.agreedPrice records.
-  priceGel       Int
-  // „ფასი შეთანხმებით" — shown instead of the number when true, for work that
-  // cannot honestly carry a fixed figure. priceGel stays as the internal
-  // estimate so the list can still be ordered and reasoned about.
-  priceOnRequest Boolean @default(false)
-  order          Int     @default(0)
-  // Hidden services keep their row and their history; they simply leave the
-  // page. Nothing here is ever deleted — a request may still point at it.
-  visible        Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  requests BusinessLead[]
-
-  // The page reads: visible services, grouped by direction, in order.
-  @@index([visible, direction, order])
-}
-
-// An inbound enquiry from /business. NOT a Company — nobody is a customer until
-// an admin says so, and a form anyone can post must never create a billable
-// entity. Converting a lead into a Company is a deliberate admin action.
-model BusinessLead {
-  id          String             @id @default(cuid())
-  companyName String
-  taxId       String?
-  contactName String
-  phone       String
-  email       String
-  // Which direction they are interested in — free text, because the categories
-  // on this site are for experts and a company describes its need differently.
-  interest    String?
-  message     String?
-  status      BusinessLeadStatus @default(NEW)
-  // Which service they asked for, when they came through a service card rather
-  // than the general form at the bottom of the page. Nullable because the
-  // general form still exists and because every lead created before 2026-08-11
-  // predates the catalogue.
-  //
-  // SetNull, not Cascade: a retired service must never take the requests it
-  // generated with it — those are the record of who asked for what.
-  serviceId   String?
-  service     B2BService?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  // What the owner actually agreed after talking to them, in lari. The price on
-  // the card is the advertised one; this is the real one, and the two are
-  // deliberately separate — editing the catalogue must not rewrite a deal that
-  // was already struck.
-  agreedPrice Int?
-  // The owner's own notes on the deal: invoice number, what was promised, who
-  // it was handed to. Free text because the process it describes lives in a
-  // conversation, not in this system.
-  adminNote   String?
-  createdAt   DateTime           @default(now())
-
-  // The admin queue: unhandled first, newest first.
-  @@index([status, createdAt])
-  @@index([serviceId])
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // REQUESTS — the client describes a problem, providers bid on it.  2026-08-14
@@ -655,9 +486,9 @@ model BusinessLead {
 // by this block and must stay that way — a request that quietly grew a startAt
 // is the point at which two products become one unmaintainable one.
 //
-// It is also NOT the B2B block above. `BusinessLead` is a company asking for a
-// service WE priced; this is an individual describing a problem NOBODY has
-// priced yet, and the price is what the providers compete on.
+// It is also NOT the block above. That describes WHO a provider is when the
+// provider is a firm; this describes what somebody ASKED for, at a price the
+// providers compete on rather than one we set.
 //
 // WHAT STAGE 1 DELIBERATELY OMITS: payment, credits, buying a lead, escrow,
 // automatic matching, scoring, ranking, and messaging on a request. The one
@@ -666,11 +497,10 @@ model BusinessLead {
 //
 // The whole subsystem is dark behind `FEATURE_REQUESTS` (lib/requests.ts).
 // These three tables exist on every deployment and stay EMPTY until somebody
-// uses them — the same contract the B2B and packages verticals ship on.
+// uses them.
 //
-// MONEY IS `Int` LARI, matching Company.balance, Booking.price and B2BService
-// .priceGel. There is no tetri in this database and this is not the feature
-// that should introduce one.
+// MONEY IS `Int` LARI. There is no tetri in this database and this is not the
+// feature that should introduce one.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // The life of a request, and every state is a thing a HUMAN did.
@@ -693,8 +523,9 @@ enum ServiceRequestStatus {
 //
 //   „500–1 000₾" and „20–40₾ ერთ გაკვეთილზე" are both correct answers to „what
 //   is your budget", and they are NOT THE SAME QUESTION. One enum holding both
-//   is one field answering two — the exact defect the B2BService.kind comment
-//   below describes at length, arriving by a different road.
+//   is one field answering two — the same defect that once had a whole model
+//   comment of its own (`B2BService.kind`, deleted 2026-09-03), arriving by a
+//   different road.
 //
 // So the money is stored as NUMBERS (`budgetMin`/`budgetMax`) plus the UNIT it
 // is measured in, the bands live in lib/requestTopics.ts, and adding a band is
@@ -766,10 +597,9 @@ model ServiceRequest {
   // is measured in and what `timing` means. See lib/requestTopics → KIND for why
   // there are exactly three and what the test for a fourth is.
   //
-  // A String and not a Postgres enum, deliberately and for the same reason
-  // B2BService.kind is: the set is read through lib/requestTopics and validated
-  // by zod at both ends, and a taxonomy that is expected to grow is not worth an
-  // ALTER TYPE every time it does.
+  // A String and not a Postgres enum, deliberately: the set is read through
+  // lib/requestTopics and validated by zod at both ends, and a taxonomy that is
+  // expected to grow is not worth an ALTER TYPE every time it does.
   kind String
 
   // WHAT THEY NEED — a stable slug from lib/requestTopics ('chemistry',
@@ -885,8 +715,8 @@ model ServiceRequest {
 
   verifiedAt   DateTime?
   // The admin who verified it. A plain String with no FK, for the same reason
-  // AuditLog.actorId and CompanyTransaction.actorId are: this is a record of
-  // something that happened, and it must outlive the account that did it.
+  // AuditLog.actorId is: this is a record of something that happened, and it
+  // must outlive the account that did it.
   verifiedById String?
 
   // ⚠️ TWO „DONE" FLAGS FOR THE AUTOMATION, and they are columns rather than a
@@ -1410,8 +1240,7 @@ model ServiceProfile {
   /// a 512×512 webp is ~40–200KB, and /services draws up to 60 of these. The
   /// listing therefore selects `hasPhoto` — a computed boolean — and the card
   /// points at /api/masters/[id]/photo, which serves one image with a cache
-  /// header. This is the pattern B2BService.imageUrl already uses, and the
-  /// reason it exists there is the same reason it exists here.
+  /// header.
   photoUrl String?
 
   /// „12 წელია ვმუშაობ სანტექნიკაზე." Copied from the application at approval

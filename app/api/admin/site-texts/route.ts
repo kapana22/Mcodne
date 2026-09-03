@@ -9,7 +9,6 @@ import { SITE_TEXTS, isKnownSiteTextKey } from '@/lib/siteTextDefs'
 import { SITE_TEXT_TAG } from '@/lib/siteText'
 import { INTEGRATION_KEYS } from '@/lib/integrations'
 import { checkGeorgianCopy, describeViolations } from '@/lib/georgianOrthography'
-import { FEATURE_ABROAD } from '@/lib/flags'
 
 // GET /api/admin/site-texts — the editable-text registry merged with current
 // DB overrides, grouped-ready for the admin editor.
@@ -19,14 +18,15 @@ export async function GET() {
   await ensureDbReady()
   const rows = await prisma.siteText.findMany({ select: { key: true, value: true } })
   const overrides = new Map(rows.map(r => [r.key, r.value]))
-  // Keys belonging to a dark vertical are withheld from the editor. Not for
-  // secrecy — an admin can read the source — but because a group of fields that
-  // edit a page nobody can open is a dead control, and the admin panel must not
-  // change at all until the vertical is switched on.
-  // `retired` keys are withheld for the mirror-image reason: their surface was
-  // deleted, so the field would edit a void. The key stays in the registry (the
-  // DB row is preserved) — it just stops being offered here.
-  const items = SITE_TEXTS.filter(t => !t.retired && (t.vertical !== 'abroad' || FEATURE_ABROAD)).map(t => ({
+  // `retired` keys are withheld: their surface was deleted, so the field would
+  // edit a void. The key stays in the registry (the DB row is preserved) — it
+  // just stops being offered here.
+  //
+  // ⚠️ THE DARK-VERTICAL CLAUSE WENT ON 2026-09-03 with /abroad and /business.
+  // It read `t.vertical !== 'abroad' || FEATURE_ABROAD`, and there is no third
+  // vertical to hide: both were removed rather than switched on, and their keys
+  // are `retired` now, which this line already handles.
+  const items = SITE_TEXTS.filter(t => !t.retired).map(t => ({
     key: t.key,
     group: t.group,
     label: t.label,

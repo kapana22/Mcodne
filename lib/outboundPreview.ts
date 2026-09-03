@@ -138,7 +138,6 @@ export async function previewOf(key: string): Promise<OutboundPreview | null> {
     case 'auth.passwordReset': return { subject: null, body: '', source: 'app/api/auth/reset/request/route.ts' }
     case 'inbox.contact':      return { subject: null, body: '', source: 'app/api/contact/route.ts' }
     case 'inbox.help':         return { subject: null, body: '', source: 'app/api/help/message/route.ts' }
-    case 'inbox.businessLead': return { subject: null, body: '', source: 'app/api/business/lead/route.ts' }
     case 'inbox.newRequest':   return { subject: null, body: '', source: 'app/api/requests/route.ts' }
     case 'admin.broadcast':    return { subject: null, body: '', source: 'app/api/admin/broadcast/send/route.ts' }
     default: return null

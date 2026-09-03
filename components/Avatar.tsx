@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import { defaultAvatarFor } from '@/lib/defaultAvatar'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 
 export function Avatar({
   src,
@@ -70,11 +70,13 @@ export function Avatar({
             className="w-full h-full object-cover"
           />
         ) : shape === 'card' ? (
-          // ⚠️ A FIRM DOES NOT GET A FACE. The rounded square is the one thing
-          // on a catalogue card that says „this is a company" without a badge,
-          // and a portrait inside it says the opposite in a louder voice. The
-          // abstract glyph that used to be everybody's default stays here,
-          // where „a person" is not the answer, until the set has a firm mark.
+          // ⚠️ A FIRM KEEPS THE FLAT GLYPH, AND IT IS THE SHAPE RULE THAT SAYS
+          // SO (verified by screenshot 2026-09-03). The clay mark is a round
+          // badge with transparent corners, so inside the rounded SQUARE a firm
+          // is drawn in it reads as a circle — and the square is the one thing
+          // on a catalogue card that says „company" without a badge saying so.
+          // The glyph fills its box, so the shape survives. It goes when the
+          // set has a firm mark of its own.
           <span
             aria-label={name ? `${name} — ავატარი` : 'ავატარი'}
             className="w-full h-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-end justify-center overflow-hidden"
@@ -85,16 +87,15 @@ export function Avatar({
             </svg>
           </span>
         ) : (
-          // The default for a PERSON: one of the two drawn portraits, picked
-          // from the name so the same person keeps the same face on every
-          // screen (see lib/defaultAvatar). It replaced the glyph above on
-          // 2026-09-03, with the rest of the 3D set.
+          // The default for a PERSON: the faceless clay mark
+          // (lib/defaultAvatar) — the same drawing at every size, with nothing
+          // in it to get wrong about somebody.
           //
-          // NO entrance animation here either, for the reason given above: the
-          // fallback is what most rows draw, and a fade-in with fill-mode holds
-          // them invisible until the first frame.
+          // NO entrance animation, for the reason given above: the fallback is
+          // what most rows draw, and a fade-in with fill-mode holds them
+          // invisible until the first frame.
           <Image
-            src={defaultAvatarFor(name)}
+            src={DEFAULT_AVATAR}
             alt=""
             aria-label={name ? `${name} — ავატარი` : 'ავატარი'}
             width={size}

@@ -14,37 +14,22 @@ export const PAYMENTS_LIVE = false
 // here, so „15% here / 10% there" cannot regress.
 export const COMMISSION_PCT = 15
 
-// The diaspora vertical: /abroad, the EUR display, the diaspora surfaces. This
-// one line is the entire switch — off, /abroad 404s and no other page changes.
-export const FEATURE_ABROAD = false
+// ⚠️ `FEATURE_ABROAD` AND `ABROAD_EUR_PER_GEL` WENT ON 2026-09-03, WITH /abroad
+// AND lib/abroad.ts. The vertical had been dark since 2026-08-04 and the owner
+// ruled it out („ააღარ გვინდა ეგ ორი გვერდი"). The `diaspora` Category the whole
+// thing keyed off had never been created — `Category` held no such row — so the
+// switch guarded a page whose data did not exist. Git holds the landing, the FX
+// helper and the four curated cards; if the diaspora comes back it comes back
+// with a category row and a decision, not a flag somebody forgot to flip.
 
-// GEL → EUR, for DISPLAY ONLY. Nothing is stored, charged or compared in euro;
-// this decides what the /abroad pages SAY, so a reader on a euro salary can
-// judge a price without a converter.
+// ⚠️ `B2B_VISIBILITY` AND `B2BVisibility` WENT ON 2026-09-03. They gated the
+// B2B vertical — /business, the fixed-price service catalogue we sold to
+// companies, the enquiry queue and a prepaid company balance — through three
+// states ('off' | 'admin' | 'public') so it could be walked into production a
+// step at a time. It never was: the flag read 'off' from 2026-08-11 to the day
+// the owner removed the vertical („ააღარ გვინდა ეგ ორი გვერდი"), and every
+// table behind it held test rows only.
 //
-// Hardcoded rather than a live feed: a marketing price that moves hourly is
-// worse than one honestly approximate, and a feed is a dependency plus a
-// failure mode for a number that moves a percent a month. Prices are rounded
-// and prefixed „≈" (lib/abroad → eurLabel), never quoted as exact.
-//
-// ⚠️ Review by hand every few months. 2026-08-04: 1 GEL ≈ 0.33 EUR.
-export const ABROAD_EUR_PER_GEL = 0.33
-
-// B2B: a company pays us out of band, an admin types the amount onto a balance
-// by hand, and members of that company spend it. No gateway, no auto-charge, no
-// invoicing, no self-serve top-up — it is bookkeeping, not a card on file.
-//
-// Three states and not a pair of booleans: „enabled" + „adminOnly" can
-// contradict each other, and the contradiction always resolves in whichever
-// surface somebody forgot to update. One question, one answer.
-//
-//   'off'     nothing exists: no route, no admin tab, no API.
-//   'admin'   signed-in ADMINs only; everyone else gets 404, not 403 — a 403
-//             confirms the thing is there.
-//   'public'  live for everyone, and only ever set together with the linking,
-//             sitemap and noindex work (lib/b2b.ts → B2B_ROUTE).
-//
-// ⚠️ Read it through `canSeeB2B()`. Never compare this constant at a call site,
-// and never add an env var beside it — one switch, or the next person adds a third.
-export type B2BVisibility = 'off' | 'admin' | 'public'
-export const B2B_VISIBILITY: B2BVisibility = 'off'
+// A company can still SELL here — /join offers „კომპანია" beside „ფიზიკური
+// პირი", and `Company` + `CompanyMember` are what that registration hangs on.
+// That is supply, not a sales channel, and nothing hides it behind a flag.

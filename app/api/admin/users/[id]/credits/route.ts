@@ -32,12 +32,13 @@ import { adjustBalance, balanceOf } from '@/lib/creditsServer'
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
 /**
- * ADMIN, and a non-admin gets `requireRoleApi`'s own 403 — NOT the 404 the b2b
- * routes answer with. The difference is deliberate: those hide behind
- * `B2B_VISIBILITY` because the whole vertical is dark and a 403 would confirm it
- * exists. The balance is not a dark feature — it is on screen for every
- * provider — so there is nothing here for a 404 to conceal, and every other
- * route under /api/admin/users answers a non-admin the same way.
+ * ADMIN, and a non-admin gets `requireRoleApi`'s own 403. The balance is not a
+ * dark feature — it is on screen for every provider — so there is nothing here
+ * for a 404 to conceal, and every other route under /api/admin/users answers a
+ * non-admin the same way.
+ *
+ * (The b2b routes used to answer 404 instead, to hide a vertical that was dark.
+ * They went on 2026-09-03 and so did that distinction.)
  *
  * 404 is still what an unknown user id gets, below.
  */

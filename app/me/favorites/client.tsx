@@ -8,7 +8,7 @@ import { Icon } from '@/components/Icon'
 import { Avatar } from '@/components/Avatar'
 import { Btn } from '@/components/Btn'
 import { Card } from '@/components/Card'
-import { defaultAvatarFor } from '@/lib/defaultAvatar'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { useToast } from '@/components/ToastProvider'
 import { tileHue } from '@/app/_home/data'
 
@@ -127,7 +127,7 @@ export function FavoritesClient({ items: initial }: { items: Item[] }) {
                   {items.map(t => (
                     <th key={t.id} className="font-medium py-2 px-2">
                       <Link href={t.href} className="inline-flex items-center gap-1.5 text-white normal-case tracking-normal hover:text-brand-300 transition-colors duration-fast">
-                        <img src={t.photo || defaultAvatarFor(t.name)} alt="" className="w-5 h-5 rounded-full object-cover" />
+                        <img src={t.photo || DEFAULT_AVATAR} alt="" className="w-5 h-5 rounded-full object-cover" />
                         <span className="font-display text-meta font-bold">{t.name.split(' ')[0]}</span>
                       </Link>
                     </th>

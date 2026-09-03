@@ -39,7 +39,6 @@ import {
 import { emailFormatError } from '../lib/emailRule'
 import { phoneFormatError } from '../lib/phone'
 import { validationIssueMessage } from '../lib/validationMessages'
-import { BusinessLeadInput } from '../lib/b2b'
 import { ServiceRequestInput, RequestOfferInput } from '../lib/requests'
 import { ProviderApplicationInput, MASTER, providerApplicationBody } from '../lib/providerApplication'
 
@@ -170,12 +169,14 @@ test('phone, email and password all answer „null, or the sentence"', () => {
 
 /**
  * The schemas both a form and its route parse with. Each is the „valid is
- * decided once" contract lib/b2b's header describes — so a field either has a
- * Georgian word for it, or a refusal on that field reads „შეავსე ველები
- * სწორად." and the reader is left to guess which of eight boxes it means.
+ * decided once" contract — so a field either has a Georgian word for it, or a
+ * refusal on that field reads „შეავსე ველები სწორად." and the reader is left to
+ * guess which of its boxes it means.
  *
- * That was live: /business refuses `taxId` under four characters and could say
- * nothing better than the generic line, on a form with eight fields.
+ * That was live: /business refused `taxId` under four characters and could say
+ * nothing better than the generic line, on a form with eight fields. That page
+ * and its `BusinessLeadInput` went on 2026-09-03 with the B2B vertical; the
+ * lesson it paid for is why the three schemas below are still checked.
  */
 /**
  * Fields that are NOT a box somebody types into, so there is nothing to name.
@@ -188,7 +189,6 @@ test('phone, email and password all answer „null, or the sentence"', () => {
 const NOT_A_CONTROL = new Set(['RequestOfferInput.requestId', 'ProviderApplicationInput.yearsExp'])
 
 const SHARED_SCHEMAS: Array<[string, z.ZodTypeAny]> = [
-  ['BusinessLeadInput', BusinessLeadInput],
   ['ServiceRequestInput', ServiceRequestInput],
   ['RequestOfferInput', RequestOfferInput],
   ['ProviderApplicationInput', ProviderApplicationInput],

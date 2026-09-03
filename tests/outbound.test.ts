@@ -141,6 +141,11 @@ test('every editable message string belongs to a registered message', () => {
   // or the editor offers a field that changes nothing anybody receives.
   const known = new Set([...OUTBOUND.map(d => d.key as string), 'shell'])
   for (const g of MESSAGE_TEXTS) {
+    // A RETIRED group is the one exception, and it is the mirror image: its
+    // message is no longer sendable, so it left the registry — but the key must
+    // stay known, because `msg.<key>.<part>` is a SiteText key a production row
+    // may hold copy under. The admin editor hides it; nothing offers a field.
+    if (g.retired) { assert.ok(!known.has(g.key), `${g.key} is retired but still registered as sendable`); continue }
     assert.ok(known.has(g.key), `${g.key} has editable copy but is not in the registry`)
     assert.ok(g.texts.length > 0, `${g.key} has an empty copy group`)
   }

@@ -1,29 +1,26 @@
-// GET  /api/admin/companies — the list, with balances and member counts.
+// GET  /api/admin/companies — the list, with member counts.
 // POST /api/admin/companies — create one.
 //
-// TWO GATES, BOTH REQUIRED, and they answer differently on purpose:
-//   canSeeB2B()      → 404. „This deployment has no such endpoint." Runs FIRST,
-//                      so a non-admin learns nothing, not even that admin-only
-//                      endpoints exist under this path.
-//   requireRoleApi() → 401/403. „You are not an admin." Only reachable once the
-//                      vertical is visible to you at all.
+// A company here is a PROVIDER that happens to be a firm: /join offers
+// „კომპანია" beside „ფიზიკური პირი", and the row this creates is what a
+// ServiceProfile and a RequestAccess grant hang off. Admin-only, one gate.
 //
-// At the 'public' stage those come apart, which is why they are two checks and
-// not one: everyone may see /business, and nobody but an admin may see this.
+// ⚠️ IT USED TO HAVE TWO. `canSeeB2B()` ran first and answered 404 so that a
+// non-admin could not learn the endpoint existed while the B2B vertical was
+// dark. The vertical went on 2026-09-03 and the flag with it; `requireRoleApi`
+// is the whole check now, and its 403 gives nothing away that /admin does not.
 
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser, requireRoleApi } from '@/lib/auth'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { canSeeB2B } from '@/lib/b2b'
 import { audit } from '@/lib/audit'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
 export async function GET() {
   const me = await getCurrentUser()
-  if (!canSeeB2B(me?.role)) return notFound()
   const auth = await requireRoleApi('ADMIN')
   if (auth.response) return auth.response
 
@@ -33,8 +30,8 @@ export async function GET() {
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
     take: 500,
     select: {
-      id: true, name: true, taxId: true, balance: true, status: true, note: true, createdAt: true,
-      _count: { select: { members: true, transactions: true } },
+      id: true, name: true, taxId: true, status: true, note: true, createdAt: true,
+      _count: { select: { members: true } },
     },
   })
   return NextResponse.json({ ok: true, companies })
@@ -48,16 +45,10 @@ const CreateBody = z.object({
   // is caught below rather than silently creating a second company.
   taxId: z.string().trim().min(4).max(32).optional().or(z.literal('')),
   note: z.string().trim().max(2000).optional().or(z.literal('')),
-  // Deliberately NO opening balance. Money arrives through the balance endpoint
-  // and ONLY through it, so every lari that ever existed on a balance has a
-  // CompanyTransaction row explaining it. An `initialBalance` here would be the
-  // one movement with no ledger entry — and it would be the first one, which is
-  // exactly the row somebody later needs to find.
 })
 
 export async function POST(req: Request) {
   const me = await getCurrentUser()
-  if (!canSeeB2B(me?.role)) return notFound()
   const auth = await requireRoleApi('ADMIN')
   if (auth.response) return auth.response
   const admin = auth.user
@@ -74,7 +65,7 @@ export async function POST(req: Request) {
   try {
     company = await prisma.company.create({
       data: { name: parsed.data.name.trim(), taxId, note },
-      select: { id: true, name: true, taxId: true, balance: true, status: true },
+      select: { id: true, name: true, taxId: true, status: true },
     })
   } catch (e: any) {
     // P2002 = the unique index on taxId. Answered as its own code so the panel

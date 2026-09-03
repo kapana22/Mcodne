@@ -343,14 +343,64 @@ export function stepsFor(d: Draft): StepDef[] {
     // not merged, the PAPER is. Every clarifier stays optional and answers in
     // place; the timing tap is the one that advances, because it is the last
     // question on the page and the only one that is asked of everybody.
-    const hasExtras = extrasFor(kind, d.topic).length > 0
-    out.push({
-      id: 'timing',
-      // The heading has to name the whole page. With clarifiers on it the page
-      // is „a couple of details", of which when-you-need-it is one.
-      title: hasExtras ? 'ორიოდე დეტალი' : KIND[kind].timingLabel,
-    })
+    /* ⚠️ THE BUDGET QUESTION IS BACK (2026-09-03), AND IT IS REQUIRED.
+       Owner: „სავალდებულო გავხადოთ ბიუჯეტის რეინჯის მითითება მაინც."
+
+       ⚠️ IT WAS REMOVED ON 2026-08-19 BY THE SAME PERSON, and the reason is
+       still written above at `budgetBand` in the empty draft: „არ გვინდა
+       ბიუჯეტი საერთოდ" — it asks the person who knows least what the work costs
+       to name a number first, and that number then anchors every offer. That
+       objection has NOT been answered; what changed is that the fee a provider
+       pays for a contact is now sized by this band (lib/credits →
+       contactCostTetri), and measured 2026-09-03 nineteen of twenty live
+       requests carried no budget at all, so the ladder had nothing to read.
+
+       ⚠️ WHAT MAKES IT SURVIVABLE IS THAT IT IS A BAND AND NOT A NUMBER. „500–
+       1 000₾" is one tap and a range; „750₾" is a figure somebody has to invent
+       and then defend. Airtasker — the closest product that requires this —
+       asks for a budget and calls it „a starting point", which is the same
+       shape. It costs the run one screen and no typing.
+
+       Placed BEFORE the timing screen: money and deadline are the two facts a
+       provider quotes against, and the run reads better asking the harder one
+       while the description is still fresh. */
+    out.push({ id: 'budget', title: 'რა ბიუჯეტი გაქვს?' })
+    /* ⚠️ ONE QUESTION PER SCREEN AGAIN (2026-09-03) — THE 2026-08-18 MERGE IS
+       REVERSED. Owner, on a screenshot of the stacked page: „ორად რომ არის
+       ჩამოშლილი ამას ვგულისხმობ… დაყო ცალკე გვერდებად."
+
+       The merge was right about what it was fixing (two one-tap questions about
+       the same thing got a page each, in a run that was too long) and it cost
+       two things that are now visible:
+
+         · NINE ROWS DOWN ONE PAGE. „რა დონეა" has four answers and „რამდენად
+           ხშირად" has five; stacked they are a scrolling list on a phone, which
+           is the shape one-question-per-screen exists to avoid.
+         · A BUG THAT NEEDED ITS OWN FIX. 2026-09-01, owner: „ერთს რომ ვაწვები
+           ვერ ვხდები რომ მეორესაც უნდა დავაწვე" — the tap that ended the screen
+           silently skipped the question above it. The answer then was to stop
+           the last row advancing and add a „გავაგრძელოთ"; with one question per
+           screen the tap simply is the answer again, and that whole mechanism
+           has nothing left to guard.
+
+       WHAT IT COSTS, SAID PLAINLY: the run is no longer one length. A topic with
+       no clarifier runs in five screens, one clarifier six, two seven. „5
+       ეტაპამდე უნდა შემცირდეს" (2026-08-19) is the line this crosses, and it is
+       crossed knowingly — every added screen is a single tap. */
+    for (const q of extrasFor(kind, d.topic)) {
+      out.push({ id: `extra:${q.id}`, title: q.label, extraId: q.id, skippable: true })
+    }
+    out.push({ id: 'timing', title: KIND[kind].timingLabel })
   } else {
+    /* ⚠️ THE BUDGET IS LISTED HERE TOO, BEFORE THE KIND IS KNOWN, and it is the
+       same reason the provisional „kind" entry exists a few lines up: the
+       counter needs a denominator that does not jump. Every run on the site is
+       five screens (tests/requests §„one question per screen" measures all 171
+       topics), and a screen that appears only once an ambiguous topic resolves
+       would make „3 / 4" become „3 / 5" under somebody's finger.
+       It renders nothing until a kind exists — the bands are per-kind — and by
+       then the kind has landed on screen one. */
+    out.push({ id: 'budget', title: 'რა ბიუჯეტი გაქვს?' })
     out.push({ id: 'timing', title: 'როდის' })
   }
   // ⚠️ A SERVICE IS NEVER ASKED „ONLINE OR IN PERSON" — there is no online
@@ -513,8 +563,28 @@ export function stepComplete(id: string, d: Draft): boolean {
   if (id === 'what') return d.topic !== '' && kindsOfTopic(d.topic).length > 0
   if (id === 'kind') return d.kind !== '' && d.topic !== '' && isTopicOfKind(d.kind, d.topic)
   if (id === 'timing') return d.kind !== '' && TIMING[kindOf(d.kind)].some(t => t.id === d.timing)
+  /* ⚠️ REQUIRED, AND ASKED OF THE BANDS RATHER THAN OF THE STRING (2026-09-03).
+     `bandOf` returns undefined for UNSTATED and for a band belonging to another
+     kind — which is the case that matters, because changing the kind clears the
+     answer (`withKind`) and a plain `!== UNSTATED` would call a stale „p2" from
+     a project ladder a complete answer on a lesson.
+     Without this line the id fell through to `return false` and the screen was
+     never complete: the run would park a person on a question they had just
+     answered. */
+  if (id === 'budget') {
+    // ⚠️ `UNSTATED` IS EXCLUDED FIRST, and it has to be: `bandOf` resolves it to
+    // `UNSTATED_BUDGET` — a real pseudo-band (min 0, max null) that exists so a
+    // request with no money question can still be stored. Asking `bandOf` alone
+    // would therefore call „nothing was said" a complete answer, which is the
+    // exact state this screen was brought back to end.
+    if (d.budgetBand === UNSTATED || d.kind === '') return false
+    return bandOf(kindOf(d.kind), d.budgetBand) !== undefined
+  }
   // format and city both carry an honest default (ONLINE / თბილისი) that the
   // screen shows pre-selected; details and the clarifiers are optional.
+  // A clarifier answers in one tap and is OPTIONAL — the screen may be walked
+  // past. `resumeStepId` is what decides whether to park somebody on it.
+  if (id.startsWith('extra:')) return true
   if (id === 'format' || id === 'city' || id === 'extras') return true
   // Always answered — it ships with a default, and the screen shows that
   // default pre-selected so one tap confirms or changes it.
@@ -549,9 +619,15 @@ export function resumeStepId(d: Draft): string {
     const s = steps[i]
     if (!stepComplete(s.id, d)) return s.id
     if (s.skippable) {
-      const answered = s.id === 'extras'
-        ? Object.keys(d.details).length > 0
-        : d.description !== ''
+      const answered = s.id.startsWith('extra:')
+        // ⚠️ THIS SCREEN'S OWN QUESTION, not „any clarifier" (2026-09-03). With
+        // one screen per clarifier, asking whether ANY of them is answered
+        // would walk a person past the second one the moment they answered the
+        // first.
+        ? d.details[s.id.slice(6)] !== undefined && d.details[s.id.slice(6)] !== ''
+        : s.id === 'extras'
+          ? Object.keys(d.details).length > 0
+          : d.description !== ''
       if (answered) continue
       const later = steps.slice(i + 1)
       const anyLaterAnswered = later.some(l =>

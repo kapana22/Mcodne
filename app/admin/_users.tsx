@@ -2,7 +2,7 @@
 // Admin tab: მომხმარებლები — list, detail modal, per-tutor toggles.
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { defaultAvatarFor } from '@/lib/defaultAvatar'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { broadcastSessionChange } from '@/lib/sessionSignal'
 import { fmtKaDate } from '@/lib/kaDate'
 import { isAnonymized } from '@/lib/userDeletion'
@@ -172,7 +172,7 @@ const UserDetailModal = ({ userId, onClose, onImpersonate, onChanged, onDeleted 
             <AdminLoading />
           ) : (
             <div className="flex items-center gap-3 min-w-0">
-              <img src={u.avatarUrl || defaultAvatarFor(u.fullName)} alt={u.fullName} className="w-12 h-12 rounded-full object-cover ring-1 ring-ink-200 shrink-0" />
+              <img src={u.avatarUrl || DEFAULT_AVATAR} alt={u.fullName} className="w-12 h-12 rounded-full object-cover ring-1 ring-ink-200 shrink-0" />
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="font-display text-h3 font-bold text-ink-900 truncate">{u.fullName}</div>
@@ -947,7 +947,7 @@ export const UsersSection = () => {
                 >
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <img src={u.avatarUrl || defaultAvatarFor(u.fullName)} alt={u.fullName} className="w-9 h-9 rounded-full object-cover ring-1 ring-ink-200" />
+                      <img src={u.avatarUrl || DEFAULT_AVATAR} alt={u.fullName} className="w-9 h-9 rounded-full object-cover ring-1 ring-ink-200" />
                       <div className="min-w-0">
                         <div className="font-display text-small font-bold text-ink-900 truncate">{u.fullName}</div>
                         <div className="font-mono text-meta tabular-nums text-ink-500 truncate">{u.email}</div>
@@ -993,7 +993,7 @@ export const UsersSection = () => {
             ) : users.map(u => (
               <div key={u.id} className="px-4 py-3 border-b border-ink-100 last:border-b-0">
                 <div className="flex items-center gap-3">
-                  <img src={u.avatarUrl || defaultAvatarFor(u.fullName)} alt={u.fullName} className="w-9 h-9 rounded-full object-cover ring-1 ring-ink-200 shrink-0" />
+                  <img src={u.avatarUrl || DEFAULT_AVATAR} alt={u.fullName} className="w-9 h-9 rounded-full object-cover ring-1 ring-ink-200 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-display text-small font-bold text-ink-900 truncate">{u.fullName}</span>

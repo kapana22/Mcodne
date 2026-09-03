@@ -11,7 +11,6 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRoleApi } from '@/lib/auth'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { b2bFeatureExists } from '@/lib/b2b'
 import { requestsFeatureExists, providersFeatureExists } from '@/lib/requests'
 import { ROLE } from '@/lib/roles'
 
@@ -27,7 +26,7 @@ export async function GET() {
   // is the one shape that looks fine on every screen and is broken; measured
   // that morning it was 1 of 1. Counted, never inferred.
   const DAY_AGO = new Date(Date.now() - 24 * 3600 * 1000)
-  const [users, providers, clients, pendingApps, helpOpen, b2bLeads, newRequests,
+  const [users, providers, clients, pendingApps, helpOpen, newRequests,
          awaitingOffers, stalled24h, offersSent, offersAccepted] = await Promise.all([
     prisma.user.count(),
     // Profiles, not roles. A provider is somebody with a ServiceProfile; the
@@ -48,16 +47,6 @@ export async function GET() {
     prisma.$queryRawUnsafe<{ n: number }[]>(
       `SELECT COUNT(*)::int AS n FROM "HelpMessage" WHERE "status" = 'new'`,
     ).then(r => Number(r[0]?.n ?? 0)).catch(() => 0),
-    // Unanswered B2B enquiries, riding along for the same reason: the shell
-    // already makes this request, and a queue with a person waiting at the
-    // other end of it has to announce itself.
-    //
-    // `.catch(() => 0)` because this table only exists once lib/dbBoot has run.
-    // A B2B count is never worth 500-ing the whole admin shell over — every
-    // other badge on the panel would go with it.
-    b2bFeatureExists()
-      ? prisma.businessLead.count({ where: { status: 'NEW' } }).catch(() => 0)
-      : Promise.resolve(0),
     // Unverified requests — a queue with a person waiting for a PHONE CALL at
     // the other end, and the whole feature dies if it goes unopened for a day.
     requestsFeatureExists()
@@ -93,7 +82,6 @@ export async function GET() {
     clients,
     pendingApps,
     helpOpen,
-    b2bLeads,
     newRequests,
     // ⚠️ TWO NAMES, ONE NUMBER. There were two application queues until
     // 2026-08-24 — the consultation form and the service one — and two counts to

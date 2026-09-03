@@ -25,7 +25,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { routeRequest } from '../lib/requestRouting'
-import { HOME_TRADES, HOME_TRADE_IDS, isKnownServiceTopic } from '../lib/serviceMarks'
 
 import {
   VERTICALS, isVertical, browseGroupsFor, verticalOfTopic,
@@ -291,47 +290,14 @@ test('§H the door copy is written in Georgian punctuation', () => {
 // topic makes a tile vanish, a closed one makes it a promise of work nobody can
 // do, and a repeated icon makes two tiles read as one thing — none of which
 // errors, and none of which anybody would notice from the code.
+//
+// ⚠️ ALL FOUR §I TESTS WENT ON 2026-09-03, WITH lib/serviceMarks.ts. The row is
+// not on the home page any more (app/_home is hero · categories · experts ·
+// how · cta) and nothing in app/ or components/ had imported `serviceMarks`, so
+// these were guarding a second copy of a list no screen read: the failure they
+// describe above could not happen and the pin could not catch it. The reasoning
+// stays here because it is the brief for the row if it ever returns.
 
-test('§I every home trade tile names a real, OPEN service topic', () => {
-  for (const id of HOME_TRADE_IDS) {
-    assert.ok(isKnownServiceTopic(id),
-      `„${id}" is not a service topic at all — it was renamed or retired, and the tile silently disappeared from the home page`)
-  }
-  // Closed is a decision and the filter handles it; the row must still be full.
-  assert.equal(HOME_TRADES.length, HOME_TRADE_IDS.length,
-    `${HOME_TRADE_IDS.length - HOME_TRADES.length} of the home tiles point at a CLOSED trade — the front page is promising work nobody can be routed`)
-})
-
-test('§I the row is six tiles', () => {
-  // Owner asked for six („გაფართოვდეს, 6 რომ იყოს მაგალითად") and the layout is
-  // built on it: lg:grid-cols-6 is one clean row, and grid-cols-2 on a phone is
-  // three clean rows. Five or seven leaves a ragged last row on every breakpoint.
-  assert.equal(HOME_TRADES.length, 6)
-})
-
-test('§I no two tiles draw the same mark', () => {
-  // components/Icon → CatIcon's own header records fourteen spheres sharing
-  // seven drawings, found only by counting. Six tiles side by side in one row
-  // is where that failure is most visible, so it is asserted rather than
-  // trusted.
-  const seen = new Map<string, string>()
-  for (const m of HOME_TRADES) {
-    const prev = seen.get(m.icon)
-    assert.equal(prev, undefined,
-      `„${m.topic}" and „${prev}" both draw „${m.icon}" — on a row of six the eye reads them as one thing`)
-    seen.set(m.icon, m.topic)
-  }
-})
-
-test('§I every tile is a SERVICE topic, never an expert one', () => {
-  // The row sits on a page that also carries the expert sphere grid, and its
-  // links all set `for=service`. A tutoring topic in here would open the trades
-  // door onto a catalogue that does not contain it.
-  for (const m of HOME_TRADES) {
-    assert.equal(verticalOfTopic(m.topic), 'SERVICE',
-      `„${m.topic}" is on the trades row but is not a trade`)
-  }
-})
 
 /* ═══════════ §J the trades are ROUTED, not broadcast ════════════════════ */
 // ⚠️ MEASURED FAILURE, 2026-08-18. A Tbilisi flat-cleaning request was mailed

@@ -4,26 +4,37 @@ import { useRouter } from 'next/navigation'
 import { Icon } from './Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import {
-  buildProfileChecks,
-  profilePercent,
-  type ProfileForCompleteness,
-} from '@/lib/profileScore'
+  creditTasks, earnedTasks, completeness, taskAnchor, gelLabel,
+  type ProfileFacts,
+} from '@/lib/credits'
 
-/* ProfileCompleteness — small, warm-tinted card that scores the tutor profile
-   on ten fields, totalling 100%. Scoring lives in lib/profileScore.ts so
-   /api/tutor/nav-badges (sidebar hint) computes the identical percent
-   server-side.
+/* ProfileCompleteness — the card beside the profile editor: what is still
+   missing, and what finishing it pays.
 
-   Most check anchors are #IDs that the /tutor/profile page attaches to its
-   sections — clicking scrolls in-page. The „availability" check anchors to a
-   full ROUTE (/tutor/schedule), so a non-"#" anchor navigates there instead.
-   Missing #anchors fall back to hash "#" which is a no-op — never a broken link. */
+   ⚠️ IT SCORED A DIFFERENT SIX THINGS UNTIL 2026-09-03, and that was the bug.
+   It ran on `lib/profileScore` — services, price, bio, headline, avatar,
+   languages, weighted to 100 — and printed „+15%" against each row, while the
+   balance page listed the SIX TASKS THAT ACTUALLY PAY (professions, service,
+   work photo, photo, bio, experience) with „+20₾" against each. Two lists, two
+   scales, both called „finish your profile", 300px apart on the same screen.
+   app/work/layout.tsx had already written down what that costs: „the bar could
+   read 100% above a line promising 40₾ still to earn."
 
-export type { ProfileForCompleteness }
+   Owner, on a screenshot of the percentages: „ვფიქრობ აქ ეგ კრედიტები ან
+   ლარები უნდა ეწეროს." So the card moved onto the paying list. Relabelling the
+   percentages as lari would have been the same defect with worse numbers — the
+   rows were not the rows that pay.
+
+   ⚠️ THE FACTS ARE THE CALLER'S, AND THEY COME FROM THE DRAFT. `earnedTasks`
+   and `completeness` are pure (lib/credits), so the editor recomputes them from
+   what is being typed and the checklist moves with the form rather than one
+   save later. The GRANT is still the server's — this card promises, the ledger
+   pays. */
 
 type ProfileCompletenessProps = {
-  profile: ProfileForCompleteness
-  avatarUrl?: string | null
+  /** What the profile currently contains — the same shape lib/creditsServer
+   *  builds on the server, computed here from the draft so the card is live. */
+  facts: ProfileFacts
   /** Optional visual variant. `card` = full section (used on profile page),
       `compact` = right-rail widget (used on dashboard). */
   variant?: 'card' | 'compact'
@@ -48,21 +59,26 @@ const scrollToAnchor = (anchor: string) => {
 }
 
 export function ProfileCompleteness({
-  profile,
-  avatarUrl,
+  facts,
   variant = 'card',
   alwaysShow = false,
   className = '',
 }: ProfileCompletenessProps) {
   const router = useRouter()
-  const checks = useMemo(
-    () => buildProfileChecks(profile, avatarUrl),
-    [profile, avatarUrl],
-  )
+  const checks = useMemo(() => {
+    const done = earnedTasks(facts)
+    return creditTasks().map(t => ({
+      id: t.key,
+      label: t.label,
+      tetri: t.tetri,
+      done: done.includes(t.key),
+      anchor: taskAnchor(t.key),
+    }))
+  }, [facts])
 
   const { percent, undone } = useMemo(
-    () => ({ percent: profilePercent(checks), undone: checks.filter(c => !c.done) }),
-    [checks],
+    () => ({ percent: completeness(facts), undone: checks.filter(c => !c.done) }),
+    [facts, checks],
   )
 
   // Hide compact variant once profile is fully polished — dashboard shouldn't
@@ -148,8 +164,13 @@ export function ProfileCompleteness({
               <span className={`flex-1 leading-snug ${item.done ? 'line-through' : 'font-display font-semibold'}`}>
                 {item.label}
               </span>
+              {/* ⚠️ WHAT IT PAYS, NOT WHAT IT WEIGHS (2026-09-03). „+15%" was a
+                  share of a completeness score nobody is paid for; „+20₾" is a
+                  fact about the ledger, and it is the same figure the balance
+                  page prints against the same task. Through `gelLabel`, so the
+                  two screens cannot punctuate one amount two ways. */}
               {!item.done && (
-                <span className="font-mono text-meta tabular-nums text-brand-700 shrink-0 mt-0.5">+{item.weight}%</span>
+                <span className="font-mono text-meta tabular-nums text-brand-700 shrink-0 mt-0.5">+{gelLabel(item.tetri)}</span>
               )}
             </a>
           </li>

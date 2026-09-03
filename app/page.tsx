@@ -11,7 +11,6 @@ import { expertCountsByCategory, priceFloorsByCategory } from '@/lib/categoryCou
 import { requestsOn, REQUEST_ROUTE } from '@/lib/requests'
 import { providerKey, replyLabel, responseStatsFor } from '@/lib/responseStats'
 import type { SupplyFacts } from './_home/cta'
-import { ABROAD_CATEGORY_SLUG } from '@/lib/abroad'
 import { homeItems } from '@/lib/homeCatalogue'
 import type { CatalogueCardItem } from '@/components/home/CatalogueGrid'
 import type { HomeCat } from './_home/data'
@@ -109,9 +108,7 @@ async function homeCategories(): Promise<HomeCat[]> {
     priceFloorsByCategory(all),
   ])
   return all
-    // The /abroad marker is not a sphere anybody should be filed under
-    // (lib/abroad) and never belongs in a browse list.
-    .filter(c => c.status === 'VISIBLE' && c.slug !== ABROAD_CATEGORY_SLUG)
+    .filter(c => c.status === 'VISIBLE')
     .map(c => ({
       slug: c.slug,
       name: c.name,

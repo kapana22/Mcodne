@@ -19,8 +19,6 @@
  *
  * Pinned by tests/categoryTree.test.ts.
  */
-import { ABROAD_CATEGORY_SLUG } from './abroad'
-
 export type CategoryStatus = 'VISIBLE' | 'HIDDEN' | 'REDIRECTED'
 
 /** The minimum an invariant check needs to know about a row. */
@@ -269,11 +267,16 @@ export function foldMin(
  * 400 and took the whole profile save down with them.
  */
 
-/** The rows an expert may never be filed into. Read from lib/abroad rather than
- *  restated — a second copy of that slug is exactly how the marker would get
- *  protected in one place and left open in another. (No cycle: lib/abroad
- *  imports only lib/flags.) */
-const NEVER_ASSIGNABLE_SLUGS = [ABROAD_CATEGORY_SLUG] as const
+/** The rows an expert may never be filed into.
+ *
+ *  ⚠️ EMPTY SINCE 2026-09-03, AND THE LIST IS KEPT ON PURPOSE. Its only member
+ *  was the `diaspora` marker, which went with /abroad — and the row it named had
+ *  never existed in the database, so the guard was protecting nothing. The
+ *  mechanism stays because the NEXT hidden marker will need it, and rebuilding
+ *  it means touching `ASSIGNABLE_CATEGORY_WHERE` and `isAssignable` again rather
+ *  than adding one slug here. Prisma reads `notIn: []` as „exclude nothing".
+ */
+const NEVER_ASSIGNABLE_SLUGS: readonly string[] = []
 
 /** Prisma: every category an EXPERT may be filed into. Pair with
  *  `slug: { notIn: [...NEVER_ASSIGNABLE_SLUGS] }` — expressed separately so the
@@ -321,7 +324,7 @@ export function isAssignable(
   cat: TreeNode & { slug: string },
   all: readonly (TreeNode & { slug: string })[],
 ): boolean {
-  if ((NEVER_ASSIGNABLE_SLUGS as readonly string[]).includes(cat.slug)) return false
+  if (NEVER_ASSIGNABLE_SLUGS.includes(cat.slug)) return false
   if (cat.status === 'VISIBLE') return true
   if (cat.status === 'HIDDEN') return !cat.parentId
   // A sub-field is assignable under any SPHERE, visible or still hidden — see

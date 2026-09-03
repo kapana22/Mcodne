@@ -98,7 +98,6 @@ export const OUTBOUND = [
   /* ── us, receiving ───────────────────────────────────────────────────── */
   { key: 'inbox.contact',      label: 'საკონტაქტო ფორმა',          when: '/contact-ის შევსებისას', audience: 'inbox', channels: ['mail'] },
   { key: 'inbox.help',         label: 'დახმარების კითხვა',         when: 'ვიზიტორი წერს დახმარების მიმოწერაში', audience: 'inbox', channels: ['mail'] },
-  { key: 'inbox.businessLead', label: 'B2B განაცხადი',             when: '/business-ის ფორმის შევსებისას', audience: 'inbox', channels: ['mail'] },
   { key: 'inbox.newRequest',   label: 'ახალი განაცხადი — ჩვენი ასლი', when: 'განაცხადის შევსებისთანავე, თუ არ იყო უარყოფილი', audience: 'inbox', channels: ['mail'] },
   { key: 'inbox.threadCopy',   label: 'მიმოწერის ასლი',            when: 'როცა მიმოწერაში მისამართი ჩვენია', audience: 'inbox', channels: ['mail'] },
 

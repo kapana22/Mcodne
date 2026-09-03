@@ -2,7 +2,7 @@
 
 # Where every export lives
 
-1158 symbols across 436 files. `grep` the name you need.
+1134 symbols across 421 files. `grep` the name you need.
 
 | symbol | file |
 | --- | --- |
@@ -10,10 +10,6 @@
 | `__resetRefGuard` | `lib/refGuard.ts` |
 | `__runMigrationsSource` | `lib/dbBoot.ts` |
 | `AboutBlock` | `app/experts/[slug]/_providerBlocks.tsx` |
-| `ABROAD_CATEGORY_SLUG` | `lib/abroad.ts` |
-| `ABROAD_EUR_PER_GEL` | `lib/flags.ts` |
-| `ABROAD_SOURCE_CATEGORY_SLUGS` | `lib/abroad.ts` |
-| `AbroadLanding` | `app/abroad/AbroadLanding.tsx` |
 | `AccessGrantInput` | `lib/requests.ts` · `lib/requests.ts` |
 | `AccessSection` | `app/admin/_access.tsx` |
 | `accessSubjectError` | `lib/requests.ts` |
@@ -67,7 +63,6 @@
 | `approvalBlockers` | `lib/providerApplication.ts` |
 | `AppShell` | `components/AppShell.tsx` |
 | `areaLabels` | `lib/serviceProfile.ts` |
-| `areaRestatesKind` | `lib/b2b.ts` |
 | `asMatchable` | `app/admin/_categoryPicker.tsx` |
 | `asRole` | `lib/roles.ts` |
 | `ASSIGNABLE_CATEGORY` | `lib/categoryTree.ts` |
@@ -80,15 +75,10 @@
 | `authErrorMessage` | `lib/authErrors.ts` |
 | `AutoRefresh` | `components/AutoRefresh.tsx` |
 | `Avatar` | `components/Avatar.tsx` |
+| `AVATAR_PICKS` | `lib/defaultAvatar.ts` |
 | `AVATAR_SHAPE_SQL` | `lib/avatarSrc.ts` |
 | `avatarRouteSrc` | `lib/avatarSrc.ts` |
 | `avatarSrc` | `lib/avatarSrc.ts` |
-| `B2B_KINDS` | `lib/b2b.ts` |
-| `B2B_ROUTE` | `lib/b2b.ts` |
-| `B2B_VISIBILITY` | `lib/flags.ts` |
-| `b2bFeatureExists` | `lib/b2b.ts` |
-| `B2BVisibility` | `lib/flags.ts` |
-| `b2bVisibleTo` | `lib/b2b.ts` |
 | `BackToTop` | `components/BackToTop.tsx` |
 | `balanceOf` | `lib/creditsServer.ts` |
 | `bandOf` | `lib/requestTopics.ts` |
@@ -113,20 +103,15 @@
 | `BudgetUnitName` | `lib/requestTopics.ts` |
 | `buildJobRows` | `lib/jobRows.ts` |
 | `buildProfileChecks` | `lib/profileScore.ts` |
-| `BusinessLanding` | `app/business/BusinessLanding.tsx` |
-| `BusinessLeadInput` | `lib/b2b.ts` · `lib/b2b.ts` |
-| `businessLeadRow` | `lib/b2b.ts` |
 | `byPrice` | `lib/catalogItems.ts` |
+| `callableProviders` | `lib/creditsServer.ts` |
 | `canAffordContact` | `lib/credits.ts` |
 | `canBeParent` | `lib/categoryTree.ts` |
 | `CancelRequest` | `app/request/[ref]/_cancel.tsx` |
 | `canFileRequest` | `lib/requests.ts` |
 | `canMarkDone` | `lib/offerLifecycle.ts` |
 | `canOpenRequestForm` | `lib/requests.ts` |
-| `canSeeB2B` | `lib/b2b.ts` |
 | `canSeeRequests` | `lib/requests.ts` |
-| `canSpendAsMember` | `lib/b2b.ts` |
-| `canSpendBalance` | `lib/b2b.ts` |
 | `canToggle` | `lib/outbound.ts` |
 | `canWithdraw` | `lib/offerLifecycle.ts` |
 | `Card` | `components/Card.tsx` |
@@ -140,14 +125,12 @@
 | `CatalogView` | `components/catalog/useCatalogView.ts` |
 | `Categories` | `app/_home/categories.tsx` |
 | `CategoriesSection` | `app/admin/_categories.tsx` |
-| `CATEGORY_BROWSE_PATH` | `lib/categoryRoutes.ts` |
 | `CATEGORY_READ_ORDER` | `lib/categoryTree.ts` |
 | `CategoryFaq` | `lib/categorySeo.ts` |
 | `CategoryGroup` | `app/admin/_categoryPicker.tsx` |
 | `categoryIcon` | `lib/categoryMarks.tsx` |
 | `CategoryMark` | `lib/categoryMarks.tsx` |
 | `CategoryNode` | `app/join/_shared/useCategories.ts` |
-| `categoryPath` | `lib/categoryRoutes.ts` |
 | `categoryPhoto` | `lib/categoryMarks.tsx` |
 | `CategorySelect` | `app/admin/_categoryPicker.tsx` |
 | `categorySeo` | `lib/categorySeo.ts` |
@@ -172,6 +155,7 @@
 | `checkGeorgian` | `lib/georgianText.ts` |
 | `checkGeorgianCopy` | `lib/georgianOrthography.ts` |
 | `CHIP_CAP` | `components/EntityCard.tsx` |
+| `ChromeUser` | `components/SpaceChrome.tsx` |
 | `CITIES` | `lib/requestTopics.ts` |
 | `City` | `app/work/profile/_types.ts` |
 | `cityLabel` | `lib/requestTopics.ts` |
@@ -216,14 +200,18 @@
 | `CONFLICT` | `lib/offerLifecycle.ts` |
 | `consequenceLine` | `app/join/_door/DoorQuestion.tsx` |
 | `CONTACT_BUTTON_LABEL` | `lib/credits.ts` |
-| `CONTACT_CHARGE_NOTE` | `lib/credits.ts` |
+| `CONTACT_COST_DEFAULT_TETRI` | `lib/credits.ts` |
+| `CONTACT_COST_MAX_TETRI` | `lib/credits.ts` |
+| `CONTACT_COST_MIN_TETRI` | `lib/credits.ts` |
 | `CONTACT_COST_NOTE` | `lib/credits.ts` |
-| `CONTACT_COST_TETRI` | `lib/credits.ts` |
 | `CONTACT_FEE_LABEL` | `lib/credits.ts` |
 | `CONTACT_LIMIT_REASON` | `lib/credits.ts` |
 | `CONTACT_REFUND_HOURS` | `lib/credits.ts` |
 | `CONTACT_REFUND_NOTE` | `lib/credits.ts` |
 | `ContactCard` | `app/work/(provider)/requests/[id]/_contact.tsx` |
+| `contactChargeNote` | `lib/credits.ts` |
+| `contactCostRangeLabel` | `lib/credits.ts` |
+| `contactCostTetri` | `lib/credits.ts` |
 | `contactCountOf` | `lib/creditsServer.ts` |
 | `contactIsOpen` | `lib/jobRows.ts` |
 | `contactKey` | `lib/credits.ts` |
@@ -231,7 +219,9 @@
 | `contactPlacesLeft` | `lib/credits.ts` |
 | `contactRefundedProviderEmail` | `lib/emailTemplates.ts` |
 | `contactRefundKey` | `lib/credits.ts` |
+| `contactRefundNote` | `lib/credits.ts` |
 | `contactsAffordable` | `lib/credits.ts` |
+| `contactsLabel` | `lib/credits.ts` |
 | `contactUnlocked` | `lib/creditsServer.ts` |
 | `Container` | `components/Container.tsx` |
 | `ConversationList` | `components/chat/ConversationList.tsx` |
@@ -249,8 +239,10 @@
 | `createServiceRequest` | `lib/requestsServer.ts` |
 | `createSession` | `lib/auth.ts` |
 | `CredentialsBlock` | `app/experts/[slug]/_providerBlocks.tsx` |
+| `CREDIT_PACKS` | `lib/credits.ts` |
 | `CREDIT_TASKS` | `lib/credits.ts` |
 | `CREDIT_TASKS_TOTAL` | `lib/credits.ts` |
+| `CreditPack` | `lib/credits.ts` |
 | `CreditPill` | `components/CreditPill.tsx` |
 | `creditReasonLabel` | `lib/credits.ts` |
 | `CREDITS_ENFORCED` | `lib/credits.ts` |
@@ -263,7 +255,7 @@
 | `DEFAULT_OFFER_LIMIT` | `lib/requests.ts` |
 | `DEFAULT_PREFS` | `lib/notify.ts` · `app/settings/_types.ts` |
 | `defaultState` | `lib/outboundSettings.ts` |
-| `DELETE` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/categories/[id]/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/reviews/[id]/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/favorites/route.ts` · `app/api/me/route.ts` |
+| `DELETE` | `app/api/admin/categories/[id]/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/reviews/[id]/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/favorites/route.ts` · `app/api/me/route.ts` |
 | `DeleteBody` | `lib/userDeletion.ts` |
 | `DeleteImpact` | `app/admin/_parts.tsx` |
 | `DeleteMode` | `lib/userDeletion.ts` · `app/admin/_parts.tsx` |
@@ -281,7 +273,7 @@
 | `DORMANT_GROUP_IDS` | `lib/requestTopics.ts` |
 | `downloadCsv` | `app/admin/_parts.tsx` |
 | `Draft` | `app/request/_model.ts` · `app/work/profile/_types.ts` |
-| `dynamic` | `app/about/page.tsx` · `app/abroad/page.tsx` · `app/admin/layout.tsx` · `app/api/admin/funnel/route.ts` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/messages/route.ts` · `app/api/admin/provider-applications/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/b2b-services/[id]/image/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/categories/route.ts` · `app/api/events/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/me/route.ts` · `app/api/me/threads/route.ts` · `app/api/provider/requests/[id]/photo/route.ts` · `app/api/provider-applications/[id]/route.ts` · `app/api/provider-applications/route.ts` · `app/api/providers/[id]/photo/route.ts` · `app/api/providers/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/work/threads/route.ts` · `app/blog/[slug]/page.tsx` · `app/blog/page.tsx` · `app/business/page.tsx` · `app/contact/page.tsx` · `app/experts/[slug]/page.tsx` · `app/experts/page.tsx` · `app/help/page.tsx` · `app/join/page.tsx` · `app/me/favorites/page.tsx` · `app/me/layout.tsx` · `app/me/messages/o/[offerId]/page.tsx` · `app/me/messages/page.tsx` · `app/me/page.tsx` · `app/me/profile/page.tsx` · `app/me/r/[ref]/page.tsx` · `app/me/requests/page.tsx` · `app/not-found.tsx` · `app/notifications/layout.tsx` · `app/notifications/page.tsx` · `app/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/rss.xml/route.ts` · `app/settings/layout.tsx` · `app/settings/page.tsx` · `app/sitemap.ts` · `app/work/(provider)/layout.tsx` · `app/work/(provider)/offers/[offerId]/page.tsx` · `app/work/(provider)/offers/page.tsx` · `app/work/(provider)/requests/[id]/offer/page.tsx` · `app/work/(provider)/requests/[id]/page.tsx` · `app/work/(provider)/requests/page.tsx` · `app/work/account/page.tsx` · `app/work/balance/page.tsx` · `app/work/jobs/page.tsx` · `app/work/layout.tsx` · `app/work/messages/layout.tsx` · `app/work/messages/o/[offerId]/page.tsx` · `app/work/page.tsx` · `app/work/profile/page.tsx` |
+| `dynamic` | `app/about/page.tsx` · `app/admin/layout.tsx` · `app/api/admin/funnel/route.ts` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/messages/route.ts` · `app/api/admin/provider-applications/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/categories/route.ts` · `app/api/events/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/me/route.ts` · `app/api/me/threads/route.ts` · `app/api/provider/requests/[id]/photo/route.ts` · `app/api/provider-applications/[id]/route.ts` · `app/api/provider-applications/route.ts` · `app/api/providers/[id]/photo/route.ts` · `app/api/providers/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/work/threads/route.ts` · `app/blog/[slug]/page.tsx` · `app/blog/page.tsx` · `app/contact/page.tsx` · `app/experts/[slug]/page.tsx` · `app/experts/page.tsx` · `app/help/page.tsx` · `app/join/page.tsx` · `app/me/favorites/page.tsx` · `app/me/layout.tsx` · `app/me/messages/o/[offerId]/page.tsx` · `app/me/messages/page.tsx` · `app/me/page.tsx` · `app/me/profile/page.tsx` · `app/me/r/[ref]/page.tsx` · `app/me/requests/page.tsx` · `app/not-found.tsx` · `app/notifications/layout.tsx` · `app/notifications/page.tsx` · `app/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/rss.xml/route.ts` · `app/settings/layout.tsx` · `app/settings/page.tsx` · `app/sitemap.ts` · `app/work/(provider)/layout.tsx` · `app/work/(provider)/offers/[offerId]/page.tsx` · `app/work/(provider)/offers/page.tsx` · `app/work/(provider)/requests/[id]/offer/page.tsx` · `app/work/(provider)/requests/[id]/page.tsx` · `app/work/(provider)/requests/page.tsx` · `app/work/account/page.tsx` · `app/work/balance/page.tsx` · `app/work/jobs/page.tsx` · `app/work/layout.tsx` · `app/work/messages/layout.tsx` · `app/work/messages/o/[offerId]/page.tsx` · `app/work/page.tsx` · `app/work/profile/page.tsx` |
 | `earnedTasks` | `lib/credits.ts` |
 | `emailFormatError` | `lib/emailRule.ts` |
 | `EMPTY_DRAFT` | `app/request/_model.ts` |
@@ -293,16 +285,12 @@
 | `ensureProviderSlug` | `lib/providerSlug.ts` |
 | `EntityCard` | `components/EntityCard.tsx` |
 | `EntityChip` | `components/EntityCard.tsx` |
-| `EntityKinds` | `components/EntityCard.tsx` |
 | `EntityPrice` | `components/EntityCard.tsx` |
 | `EntityView` | `components/EntityCard.tsx` |
 | `errText` | `lib/requestRoomErrors.ts` |
-| `eurFromGel` | `lib/abroad.ts` |
-| `eurLabel` | `lib/abroad.ts` |
 | `EVENT_PRUNE_SQL` | `lib/events.ts` |
 | `EVENT_RETENTION_DAYS` | `lib/events.ts` |
 | `EVENTS` | `lib/events.ts` |
-| `expandQuery` | `lib/searchSynonyms.ts` |
 | `EXPERT_BROWSE_GROUPS` | `lib/requestTopics.ts` |
 | `expertCountsByCategory` | `lib/categoryCounts.ts` |
 | `ExtraQuestion` | `lib/requestTopics.ts` |
@@ -316,7 +304,6 @@
 | `Fault` | `components/FieldError.tsx` |
 | `FaultKit` | `app/settings/_types.ts` |
 | `FavoritesClient` | `app/me/favorites/client.tsx` |
-| `FEATURE_ABROAD` | `lib/flags.ts` |
 | `FeaturedExperts` | `app/_home/experts.tsx` |
 | `fetchMe` | `lib/me.ts` |
 | `Field` | `app/join/_shared/_fields.tsx` · `app/signin/_fields.tsx` · `app/work/profile/_parts.tsx` |
@@ -367,14 +354,13 @@
 | `FunnelEvent` | `lib/funnelEvents.ts` |
 | `FunnelSection` | `app/admin/_funnel.tsx` |
 | `gel` | `lib/requests.ts` |
-| `gelFromSiteText` | `lib/abroad.ts` |
 | `gelLabel` | `lib/credits.ts` |
 | `generateMetadata` | `app/about/page.tsx` · `app/blog/[slug]/page.tsx` · `app/blog/page.tsx` · `app/contact/page.tsx` · `app/experts/[slug]/page.tsx` · `app/experts/page.tsx` · `app/help/page.tsx` · `app/join/page.tsx` · `app/page.tsx` |
 | `georgianError` | `lib/georgianText.ts` |
 | `georgianNameError` | `lib/georgianText.ts` |
 | `georgianNameRefine` | `lib/georgianText.ts` |
 | `georgianRefine` | `lib/georgianText.ts` |
-| `GET` | `app/api/admin/audit/route.ts` · `app/api/admin/b2b-services/route.ts` · `app/api/admin/business-leads/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/funnel/route.ts` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/impersonate/status/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/messages/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/provider-applications/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/requests/route.ts` · `app/api/admin/reviews/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/stats/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/admin/users/route.ts` · `app/api/auth/google/callback/route.ts` · `app/api/auth/google/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/b2b-services/[id]/image/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/categories/route.ts` · `app/api/favorites/route.ts` · `app/api/health/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/me/company/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/provider/route.ts` · `app/api/me/route.ts` · `app/api/me/threads/route.ts` · `app/api/notifications/route.ts` · `app/api/provider/requests/[id]/photo/route.ts` · `app/api/provider/service-profile/route.ts` · `app/api/provider-applications/[id]/route.ts` · `app/api/provider-applications/route.ts` · `app/api/providers/[id]/photo/route.ts` · `app/api/providers/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/requests/[ref]/status/route.ts` · `app/api/work/nav-badges/route.ts` · `app/api/work/threads/route.ts` · `app/rss.xml/route.ts` |
+| `GET` | `app/api/admin/audit/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/funnel/route.ts` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/impersonate/status/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/messages/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/provider-applications/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/requests/route.ts` · `app/api/admin/reviews/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/stats/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/admin/users/route.ts` · `app/api/auth/google/callback/route.ts` · `app/api/auth/google/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/categories/route.ts` · `app/api/favorites/route.ts` · `app/api/health/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/provider/route.ts` · `app/api/me/route.ts` · `app/api/me/threads/route.ts` · `app/api/notifications/route.ts` · `app/api/provider/requests/[id]/photo/route.ts` · `app/api/provider/service-profile/route.ts` · `app/api/provider-applications/[id]/route.ts` · `app/api/provider-applications/route.ts` · `app/api/providers/[id]/photo/route.ts` · `app/api/providers/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/requests/[ref]/status/route.ts` · `app/api/work/nav-badges/route.ts` · `app/api/work/threads/route.ts` · `app/rss.xml/route.ts` |
 | `getCurrentUser` | `lib/auth.ts` |
 | `getImpersonatorId` | `lib/auth.ts` |
 | `getIntegrations` | `lib/integrations.ts` |
@@ -386,8 +372,6 @@
 | `grantEarnedTasks` | `lib/creditsServer.ts` |
 | `grantJobDone` | `lib/creditsServer.ts` |
 | `Group` | `app/work/profile/_types.ts` |
-| `groupByDirection` | `lib/b2b.ts` |
-| `groupByKind` | `lib/b2b.ts` |
 | `groupIdOf` | `lib/requestTopics.ts` |
 | `groupIsLive` | `lib/requestTopics.ts` |
 | `groupIsService` | `lib/requestTopics.ts` |
@@ -417,8 +401,6 @@
 | `HelpTopic` | `lib/helpTopics.ts` |
 | `HelpWidget` | `components/HelpWidget.tsx` |
 | `hierarchyError` | `lib/categoryTree.ts` |
-| `HOME_TRADE_IDS` | `lib/serviceMarks.ts` |
-| `HOME_TRADES` | `lib/serviceMarks.ts` |
 | `HomeCat` | `app/_home/data.tsx` |
 | `homeForHats` | `lib/hats.ts` |
 | `homeForRole` | `lib/roleHome.ts` |
@@ -442,16 +424,14 @@
 | `INTEGRATIONS_TAG` | `lib/integrations.ts` |
 | `IntegrationsSection` | `app/admin/_integrations.tsx` |
 | `inviteProviderToRequest` | `lib/requestInvite.ts` |
-| `isAbroadCategory` | `lib/abroad.ts` |
 | `isAdminAdjust` | `lib/credits.ts` |
 | `isAnonymized` | `lib/userDeletion.ts` |
 | `isAssignable` | `lib/categoryTree.ts` |
-| `isBalancePaid` | `lib/b2b.ts` |
+| `isAvatarPick` | `lib/defaultAvatar.ts` |
 | `isBotUserAgent` | `lib/events.ts` |
 | `isCmdOrCtrl` | `lib/keyboard.ts` |
 | `isGeorgian` | `lib/georgianText.ts` |
 | `isGeorgianMobile` | `lib/phone.ts` |
-| `isKnownServiceTopic` | `lib/serviceMarks.ts` |
 | `isKnownSiteTextKey` | `lib/siteTextDefs.ts` |
 | `isLaunchCategory` | `lib/launchTaxonomy.ts` |
 | `isOfferableTopic` | `lib/serviceProfile.ts` |
@@ -496,7 +476,6 @@
 | `KeyboardShortcuts` | `components/KeyboardShortcuts.tsx` |
 | `kickSweep` | `lib/sweepRunner.ts` |
 | `KIND` | `lib/requestTopics.ts` |
-| `kindLabel` | `lib/b2b.ts` |
 | `kindOf` | `lib/requestTopics.ts` |
 | `kindsOfTopic` | `lib/requestTopics.ts` |
 | `LandingProps` | `app/HomeClient.tsx` |
@@ -507,7 +486,6 @@
 | `lastSweepRunAt` | `lib/sweepRunner.ts` |
 | `LAUNCH_CATEGORIES` | `lib/launchTaxonomy.ts` |
 | `launchFirst` | `lib/launchTaxonomy.ts` |
-| `LeadForm` | `app/business/LeadForm.tsx` |
 | `LEGAL_EMAIL` | `lib/supportEmails.ts` |
 | `LifecycleRow` | `lib/offerLifecycle.ts` · `lib/requestRouting.ts` |
 | `LIVE_OFFER` | `lib/userDeletion.ts` |
@@ -530,7 +508,6 @@
 | `makePublicRef` | `lib/requests.ts` |
 | `markAllNotificationsRead` | `lib/notifications.ts` |
 | `markDoneWhere` | `lib/offerLifecycle.ts` |
-| `MARKED_GROUP_IDS` | `lib/topicMarks.tsx` |
 | `MARKED_SLUGS` | `lib/categoryMarks.tsx` |
 | `MarketingTopBar` | `components/MarketingTopBar.tsx` |
 | `markNotificationRead` | `lib/notifications.ts` |
@@ -569,7 +546,7 @@
 | `MessageTextGroup` | `lib/messageTextDefs.ts` |
 | `messageTextKey` | `lib/messageTextDefs.ts` |
 | `messageTextSync` | `lib/messageText.ts` |
-| `metadata` | `app/abroad/page.tsx` · `app/business/page.tsx` · `app/contact/layout.tsx` · `app/cookies/page.tsx` · `app/layout.tsx` · `app/me/favorites/page.tsx` · `app/me/layout.tsx` · `app/me/messages/page.tsx` · `app/me/page.tsx` · `app/me/profile/page.tsx` · `app/me/r/[ref]/page.tsx` · `app/not-found.tsx` · `app/notifications/layout.tsx` · `app/privacy/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/settings/layout.tsx` · `app/signin/layout.tsx` · `app/signup/layout.tsx` · `app/terms/page.tsx` · `app/work/(provider)/layout.tsx` · `app/work/(provider)/offers/[offerId]/page.tsx` · `app/work/(provider)/offers/page.tsx` · `app/work/account/page.tsx` · `app/work/balance/page.tsx` · `app/work/jobs/page.tsx` · `app/work/messages/layout.tsx` · `app/work/page.tsx` · `app/work/profile/page.tsx` |
+| `metadata` | `app/contact/layout.tsx` · `app/cookies/page.tsx` · `app/layout.tsx` · `app/me/favorites/page.tsx` · `app/me/layout.tsx` · `app/me/messages/page.tsx` · `app/me/page.tsx` · `app/me/profile/page.tsx` · `app/me/r/[ref]/page.tsx` · `app/not-found.tsx` · `app/notifications/layout.tsx` · `app/privacy/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/settings/layout.tsx` · `app/signin/layout.tsx` · `app/signup/layout.tsx` · `app/terms/page.tsx` · `app/work/(provider)/layout.tsx` · `app/work/(provider)/offers/[offerId]/page.tsx` · `app/work/(provider)/offers/page.tsx` · `app/work/account/page.tsx` · `app/work/balance/page.tsx` · `app/work/jobs/page.tsx` · `app/work/messages/layout.tsx` · `app/work/page.tsx` · `app/work/profile/page.tsx` |
 | `MIN_RESPONSE_SAMPLE` | `lib/responseStats.ts` |
 | `MiniChart` | `app/admin/_charts.tsx` |
 | `minutesToView` | `lib/offerEvents.ts` |
@@ -597,8 +574,8 @@
 | `newProviderApplicationAdminEmail` | `lib/emailTemplates.ts` |
 | `newPublicRef` | `lib/requestsServer.ts` |
 | `nextStepId` | `app/request/_model.ts` |
-| `NO_BALANCE_NOTE` | `lib/credits.ts` |
 | `NO_CAP` | `app/experts/_filters.tsx` |
+| `noBalanceNote` | `lib/credits.ts` |
 | `normalize` | `lib/helpSearch.ts` |
 | `normalizeAvatar` | `lib/normalizeAvatar.ts` |
 | `normalizeEventName` | `lib/events.ts` |
@@ -664,6 +641,8 @@
 | `outboundLabel` | `lib/outbound.ts` |
 | `OutboundPreview` | `lib/outboundPreview.ts` |
 | `OverviewSection` | `app/admin/_overview.tsx` |
+| `packBonusPct` | `lib/credits.ts` |
+| `packContacts` | `lib/credits.ts` |
 | `PAGE_SEO` | `lib/pageSeoDefs.ts` |
 | `PageHeader` | `components/PageHeader.tsx` |
 | `pageMetadata` | `lib/pageSeo.ts` |
@@ -679,11 +658,9 @@
 | `PasswordChangeInput` | `lib/passwordPolicy.ts` · `lib/passwordPolicy.ts` |
 | `passwordError` | `lib/passwordPolicy.ts` |
 | `PasswordSection` | `app/settings/_password.tsx` |
-| `PATCH` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/business-leads/route.ts` · `app/api/admin/categories/[id]/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/messages/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/providers/[id]/category/route.ts` · `app/api/admin/providers/[id]/featured/route.ts` · `app/api/admin/providers/[id]/verified/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/provider/route.ts` · `app/api/me/route.ts` · `app/api/notifications/[id]/read/route.ts` · `app/api/provider-applications/[id]/route.ts` |
+| `PATCH` | `app/api/admin/categories/[id]/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/messages/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/providers/[id]/category/route.ts` · `app/api/admin/providers/[id]/featured/route.ts` · `app/api/admin/providers/[id]/verified/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/provider/route.ts` · `app/api/me/route.ts` · `app/api/provider-applications/[id]/route.ts` |
 | `PAYMENTS_LIVE` | `lib/flags.ts` |
-| `paymentSourceOf` | `lib/b2b.ts` |
 | `PeriodSwitch` | `app/admin/_parts.tsx` |
-| `PH_KEYS` | `components/CategoryMarks.tsx` |
 | `phMark` | `components/CategoryMarks.tsx` |
 | `phoneFormatError` | `lib/phone.ts` |
 | `PhoneInput` | `components/PhoneInput.tsx` |
@@ -695,7 +672,7 @@
 | `PitchFaqLd` | `app/join/_sections.tsx` |
 | `PitchSections` | `app/join/_sections.tsx` |
 | `placesLeft` | `lib/requests.ts` |
-| `POST` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/broadcast/preview/route.ts` · `app/api/admin/broadcast/send/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/balance/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/impersonate/[userId]/route.ts` · `app/api/admin/impersonate/exit/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/presence/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/message/route.ts` · `app/api/auth/otp/send/route.ts` · `app/api/auth/otp/verify/route.ts` · `app/api/auth/reset/confirm/route.ts` · `app/api/auth/reset/request/route.ts` · `app/api/auth/signin/route.ts` · `app/api/auth/signout/route.ts` · `app/api/auth/signup/route.ts` · `app/api/business/lead/route.ts` · `app/api/contact/route.ts` · `app/api/events/route.ts` · `app/api/favorites/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/me/password/route.ts` · `app/api/notifications/read/route.ts` · `app/api/provider/offers/route.ts` · `app/api/provider/requests/[id]/contact/route.ts` · `app/api/provider-applications/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/accept/route.ts` · `app/api/requests/[ref]/cancel/route.ts` · `app/api/requests/[ref]/invite/route.ts` · `app/api/requests/[ref]/offers/[offerId]/done/route.ts` · `app/api/requests/[ref]/offers/[offerId]/review/route.ts` · `app/api/requests/[ref]/offers/[offerId]/withdraw/route.ts` · `app/api/requests/[ref]/open/route.ts` · `app/api/requests/route.ts` · `app/api/uploads/route.ts` |
+| `POST` | `app/api/admin/broadcast/preview/route.ts` · `app/api/admin/broadcast/send/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/impersonate/[userId]/route.ts` · `app/api/admin/impersonate/exit/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/presence/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/message/route.ts` · `app/api/auth/otp/send/route.ts` · `app/api/auth/otp/verify/route.ts` · `app/api/auth/reset/confirm/route.ts` · `app/api/auth/reset/request/route.ts` · `app/api/auth/signin/route.ts` · `app/api/auth/signout/route.ts` · `app/api/auth/signup/route.ts` · `app/api/contact/route.ts` · `app/api/events/route.ts` · `app/api/favorites/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/me/password/route.ts` · `app/api/notifications/read/route.ts` · `app/api/provider/offers/route.ts` · `app/api/provider/requests/[id]/contact/route.ts` · `app/api/provider-applications/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/accept/route.ts` · `app/api/requests/[ref]/call/route.ts` · `app/api/requests/[ref]/cancel/route.ts` · `app/api/requests/[ref]/invite/route.ts` · `app/api/requests/[ref]/offers/[offerId]/done/route.ts` · `app/api/requests/[ref]/offers/[offerId]/review/route.ts` · `app/api/requests/[ref]/offers/[offerId]/withdraw/route.ts` · `app/api/requests/[ref]/open/route.ts` · `app/api/requests/route.ts` · `app/api/uploads/route.ts` |
 | `postAuthHome` | `lib/auth.ts` |
 | `PrefKey` | `lib/notify.ts` · `app/settings/_types.ts` |
 | `prefRows` | `app/settings/_types.ts` |
@@ -794,7 +771,6 @@
 | `PUBLIC_REF_RE` | `lib/requests.ts` |
 | `PublicDoor` | `app/join/_door/PublicDoor.tsx` |
 | `PublicHeader` | `components/PublicHeader.tsx` |
-| `PublicService` | `app/business/BusinessLanding.tsx` |
 | `PublicTopBar` | `components/PublicTopBar.tsx` |
 | `PUT` | `app/api/provider/service-profile/route.ts` |
 | `PWD_MAX` | `lib/passwordPolicy.ts` |
@@ -928,7 +904,6 @@
 | `scoreCandidate` | `lib/topicMatch.ts` |
 | `scoreTopics` | `lib/helpSearch.ts` |
 | `SEARCH_FALLBACK_HREF` | `lib/searchFocus.ts` |
-| `SEARCH_SYNONYMS` | `lib/searchSynonyms.ts` |
 | `searchAllTopics` | `lib/requestTopics.ts` |
 | `searchAnswer` | `lib/helpSearch.ts` |
 | `SearchHero` | `app/experts/_hero.tsx` |
@@ -943,7 +918,6 @@
 | `SERVICE_BROWSE_GROUPS` | `lib/requestTopics.ts` |
 | `SERVICE_SUFFIX` | `lib/homeCatalogue.ts` |
 | `serviceLabels` | `lib/serviceProfile.ts` |
-| `servicePriceLabel` | `lib/b2b.ts` |
 | `ServiceProfileInput` | `lib/serviceProfile.ts` · `lib/serviceProfile.ts` |
 | `ServiceRequestInput` | `lib/requests.ts` · `lib/requests.ts` |
 | `serviceRequestRow` | `lib/requests.ts` |
@@ -995,6 +969,7 @@
 | `sortInboxRows` | `lib/inboxRows.ts` |
 | `sortJobRows` | `lib/jobRows.ts` |
 | `SPACE_LABEL` | `lib/roles.ts` |
+| `SpaceChrome` | `components/SpaceChrome.tsx` |
 | `sphereOfProfession` | `lib/professions.ts` |
 | `sphereOfProfessions` | `lib/professions.ts` |
 | `sphereOfServices` | `lib/requestTopics.ts` |
@@ -1036,6 +1011,7 @@
 | `TAB_ALIASES` | `app/admin/_nav.tsx` |
 | `TabHeader` | `app/admin/_parts.tsx` |
 | `takeCertFiles` | `app/join/_shared/_upload.tsx` |
+| `taskAnchor` | `lib/credits.ts` |
 | `taskHref` | `lib/credits.ts` |
 | `TB_OFFSET_MS` | `lib/tz.ts` |
 | `TBILISI` | `lib/tz.ts` |
@@ -1169,23 +1145,17 @@
 
 # Prisma models and their fields
 
-32 models. The UI word is not the column name — check here before writing a query.
+29 models. The UI word is not the column name — check here before writing a query.
 
 **AuditLog** — id:String · actorId:String · action:String · targetType:String? · targetId:String? · meta:Json? · createdAt:DateTime
-
-**B2BService** — id:String · kind:String · direction:String · title:String · description:String? · format:String? · imageUrl:String? · priceGel:Int · priceOnRequest:Boolean · order:Int · visible:Boolean · createdAt:DateTime · updatedAt:DateTime · requests:BusinessLead[]
-
-**BusinessLead** — id:String · companyName:String · taxId:String? · contactName:String · phone:String · email:String · interest:String? · message:String? · status:BusinessLeadStatus · serviceId:String? · service:B2BService? · agreedPrice:Int? · adminNote:String? · createdAt:DateTime
 
 **Category** — id:String · slug:String · name:String · icon:String? · count:Int · order:Int · isLive:Boolean · status:CategoryStatus · parentId:String? · parent:Category? · children:Category[] · providers:ServiceProfile[] · serviceRequests:ServiceRequest[]
 
 **Certificate** — id:String · providerId:String · title:String · issuer:String · year:Int · fileUrl:String? · verified:Boolean · createdAt:DateTime · provider:ServiceProfile
 
-**Company** — id:String · name:String · taxId:String? · balance:Int · status:CompanyStatus · note:String? · createdAt:DateTime · updatedAt:DateTime · members:CompanyMember[] · transactions:CompanyTransaction[] · serviceProfile:ServiceProfile? · requestOffers:RequestOffer[] · requestAccess:RequestAccess?
+**Company** — id:String · name:String · taxId:String? · status:CompanyStatus · note:String? · createdAt:DateTime · updatedAt:DateTime · members:CompanyMember[] · serviceProfile:ServiceProfile? · requestOffers:RequestOffer[] · requestAccess:RequestAccess?
 
 **CompanyMember** — id:String · companyId:String · userId:String · role:CompanyMemberRole · createdAt:DateTime · company:Company · user:User
-
-**CompanyTransaction** — id:String · companyId:String · type:CompanyTransactionType · amount:Int · balanceAfter:Int · bookingId:String? · actorId:String? · note:String? · createdAt:DateTime · company:Company
 
 **CreditEntry** — id:String · userId:String · user:User · amountTetri:Int · reason:String · grantKey:String? · refId:String? · createdAt:DateTime
 

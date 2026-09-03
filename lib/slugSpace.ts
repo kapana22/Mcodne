@@ -27,12 +27,15 @@ import { OFFER_GROUPS, OFFER_TOPICS } from './serviceProfile'
  */
 export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   // 1. the route words — live…
-  'about', 'abroad', 'admin', 'api', 'blog', 'business', 'contact', 'cookies',
+  'about', 'admin', 'api', 'blog', 'contact', 'cookies',
   'experts', 'help', 'join', 'me', 'notifications', 'privacy', 'request',
   'session', 'settings', 'signin', 'signup', 'swavleba', 'terms', 'work',
-  // …and retired (a 308 is still an address a person can type)
-  'apply', 'ask', 'categories', 'konsultacia', 'masters', 'provider',
-  'services', 'student', 'tutor', 'tutors',
+  // …and retired (a 308 is still an address a person can type; so is a 404 —
+  // 'abroad' and 'business' were deleted outright on 2026-09-03 and stay
+  // reserved, because a provider slug is forever and those two words are
+  // exactly what a firm would ask for)
+  'abroad', 'apply', 'ask', 'business', 'categories', 'konsultacia', 'masters',
+  'provider', 'services', 'student', 'tutor', 'tutors',
   // …plus the generic segments a marketplace URL is expected to grow
   'all', 'edit', 'new', 'search',
   // 2. every profession landing

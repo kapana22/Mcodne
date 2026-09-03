@@ -31,7 +31,6 @@ import {
   LIVE_OFFER_GROUPS, OFFER_GROUPS, OFFER_TOPICS,
   TRADE_LANDING_MIN, resolveTrade, tradeTopicIds, countCovering,
 } from '../lib/serviceProfile'
-import { categoryPath } from '../lib/categoryRoutes'
 
 const ROOT = join(__dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -361,9 +360,16 @@ test('F2. /categories → /experts, /categories/<slug> → /experts?category=<sl
   assert.equal(location('/categories/law?utm_source=x').to, 'https://mcodne.ge/experts?utm_source=x&category=law')
   assert.equal(location('/categories/law?category=old').to, 'https://mcodne.ge/experts?category=law')
   assert.equal(hit('/categoriesx').status, 200)
-  // …and lands exactly where lib/categoryRoutes sends a category today.
+  // …and lands on the catalogue, filtered to that sphere.
+  //
+  // ⚠️ THIS USED TO COMPARE AGAINST `categoryPath()` from lib/categoryRoutes,
+  // so the redirect and the link-builder could not drift apart. That file was
+  // deleted on 2026-09-03: nothing in app/ or components/ had imported it since
+  // /categories was retired, and a helper only its own test calls is not a
+  // second opinion — it is the same assertion written twice. The address is
+  // written out here instead, which is what the pin was ever about.
   assert.equal(new URL(location('/categories/tax').to!).pathname + new URL(location('/categories/tax').to!).search,
-    categoryPath({ slug: 'tax', status: 'VISIBLE', parent: null }))
+    '/experts?category=tax')
   assert.equal(has('app/categories'), false, 'app/categories came back')
 })
 

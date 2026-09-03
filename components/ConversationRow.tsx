@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Icon } from './Icon'
 import { fmtKaThreadTime } from '@/lib/kaDate'
-import { defaultAvatarFor } from '@/lib/defaultAvatar'
+import { DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { msgPreview } from '@/lib/msgText'
 
 /* One conversation in the messages inbox — shared by the client's list and the
@@ -69,9 +69,7 @@ export function ConversationRow({
   const preview = msgPreview(lastBody, lastHasFile)
   const isUnread = unread > 0
   const chip = [topic, price].filter(Boolean).join(' · ')
-  // The peer's own name seeds the default face, so the same person shows the
-  // same one here and in <Avatar> on the thread beside this row.
-  const photo = avatarUrl || defaultAvatarFor(name)
+  const photo = avatarUrl || DEFAULT_AVATAR
   return (
     <Link
       href={href}

@@ -176,8 +176,13 @@ test('the masters badge rides on the ONE stats fetch', () => {
   assert.match(navFile, /if\s+\(id\s+===\s+'providers'\)\s+return\s+pendingProviders\s+\?\?\s+0/)
   assert.doesNotMatch(navFile, /if \(id === 'bookings'\)/, 'a bookings badge came back — there are no bookings')
   assert.doesNotMatch(navFile, /if \(id === 'disputes'\)/, 'a disputes badge came back — there are no disputes')
-  assert.equal((navFile.match(/navBadge\(it\.id, helpOpen, b2bLeads, newRequests, pendingProviders\)/g) ?? []).length, 2,
-    'both surfaces must call navBadge with the same four counts')
+  // ⚠️ `b2bLeads` WAS THE FOURTH COUNT until 2026-09-03. It carried the unread
+  // B2B enquiry queue, which went with /business; three counts is the whole
+  // list now, and what this pins is unchanged — both surfaces read the same
+  // helper with the same arguments, so a badge cannot mean one thing on desktop
+  // and another on mobile.
+  assert.equal((navFile.match(/navBadge\(it\.id, helpOpen, newRequests, pendingProviders\)/g) ?? []).length, 2,
+    'both surfaces must call navBadge with the same three counts')
 })
 
 /* ═══════════ consistency: one idea, written once ════════════════════════ */

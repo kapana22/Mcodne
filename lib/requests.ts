@@ -103,9 +103,9 @@ export const REQUEST_PATH_PREFIXES = [
 /**
  * Is the subsystem on for this deployment?
  *
- * AN ENV VAR AND NOT A CONSTANT, deliberately unlike B2B_VISIBILITY and
- * FEATURE_ABROAD. Those are constants because their owner flips them as part of
- * a release. This one is a kill switch for an unfinished experiment
+ * AN ENV VAR AND NOT A CONSTANT, deliberately unlike the constants in
+ * lib/flags. Those are flipped by their owner as part of a release. This one is
+ * a kill switch for an unfinished experiment
  * that is being tested against the live database: it has to be turnable off
  * from the Railway dashboard at three in the morning, without a code change and
  * without a working laptop.
