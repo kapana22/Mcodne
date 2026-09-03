@@ -218,11 +218,11 @@ test('§F the preview card is built from the draft, not from the stored row', ()
   assert.match(src, /price: draft\.priceList\[id\] \?\? null/,
     'the card\'s prices stopped being built from the draft')
 
-  // The completeness checklist reads the draft too, and its anchors are in-page
-  // now that there is one page to scroll.
-  const score = read('lib/profileScore.ts')
-  assert.doesNotMatch(score, /anchor: '\/work\//,
-    'the completeness checklist navigates away from the form it is scoring')
+  // ⚠️ AN ANCHOR CHECK ON lib/profileScore STOOD HERE (deleted 2026-09-03 with
+  // that file). It held the completeness checklist to in-page anchors now that
+  // there is one page to scroll. The checklist the editor actually draws is
+  // ProfileCompleteness in ./_parts, off the grant's own six tasks, and it never
+  // held a href at all.
 })
 
 /* ═══════════ G. no image column in a form payload ═══════════════════════ */

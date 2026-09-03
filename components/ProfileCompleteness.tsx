@@ -12,7 +12,8 @@ import {
    missing, and what finishing it pays.
 
    ⚠️ IT SCORED A DIFFERENT SIX THINGS UNTIL 2026-09-03, and that was the bug.
-   It ran on `lib/profileScore` — services, price, bio, headline, avatar,
+   It ran on `lib/profileScore` (that file is deleted — the last thing reading it
+   was this component) — services, price, bio, headline, avatar,
    languages, weighted to 100 — and printed „+15%" against each row, while the
    balance page listed the SIX TASKS THAT ACTUALLY PAY (professions, service,
    work photo, photo, bio, experience) with „+20₾" against each. Two lists, two

@@ -53,9 +53,13 @@ export async function GET() {
   //
   // It was also the WRONG NUMBER for where it was drawn: lib/profileScore's
   // weighted checks, sitting directly above a line derived from the grant's
-  // tasks — two different six-item lists. lib/profileScore is still right for
-  // the checklist on /work/profile, which is about whether a profile READS
-  // well; it was never the grant's measure.
+  // tasks — two different six-item lists.
+  //
+  // ⚠️ lib/profileScore ITSELF IS GONE (2026-09-03). This note used to end „it
+  // is still right for the checklist on /work/profile“ — it was not, and had not
+  // been since that checklist moved onto the six tasks that pay
+  // (components/ProfileCompleteness). Nothing imported the module after that, so
+  // it was deleted rather than left as a second answer to a settled question.
 
   // ⚠️ AND THE THREE PLACEHOLDERS ARE GONE (2026-08-26). `requests: 0`,
   // `reschedules: 0` and `noAvailability: null` were kept because the browser's

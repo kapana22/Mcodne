@@ -2,7 +2,7 @@
 
 # Where every export lives
 
-1134 symbols across 421 files. `grep` the name you need.
+1130 symbols across 420 files. `grep` the name you need.
 
 | symbol | file |
 | --- | --- |
@@ -102,7 +102,6 @@
 | `budgetLabel` | `lib/requestTopics.ts` |
 | `BudgetUnitName` | `lib/requestTopics.ts` |
 | `buildJobRows` | `lib/jobRows.ts` |
-| `buildProfileChecks` | `lib/profileScore.ts` |
 | `byPrice` | `lib/catalogItems.ts` |
 | `callableProviders` | `lib/creditsServer.ts` |
 | `canAffordContact` | `lib/credits.ts` |
@@ -609,6 +608,7 @@
 | `offerAcceptedProviderEmail` | `lib/emailTemplates.ts` |
 | `OfferActions` | `app/work/(provider)/offers/_actions.tsx` |
 | `offerArrivedClientEmail` | `lib/emailTemplates.ts` |
+| `offerArrivedSms` | `lib/smsTemplates.ts` |
 | `offerDoneClientEmail` | `lib/emailTemplates.ts` |
 | `offerDoneProviderEmail` | `lib/emailTemplates.ts` |
 | `offerDoneReminderClientEmail` | `lib/emailTemplates.ts` |
@@ -716,10 +716,8 @@
 | `ProfileEditor` | `app/work/profile/_editor.tsx` |
 | `profileFacts` | `lib/creditsServer.ts` |
 | `ProfileFacts` | `lib/credits.ts` |
-| `ProfileForCompleteness` | `lib/profileScore.ts` |
 | `profileGaps` | `lib/serviceProfile.ts` |
 | `profileIsRoutable` | `lib/serviceProfile.ts` |
-| `profilePercent` | `lib/profileScore.ts` |
 | `ProfileSection` | `app/settings/_profile.tsx` |
 | `ProfileStatusBand` | `app/work/profile/_parts.tsx` |
 | `profileViewKey` | `lib/events.ts` |
@@ -842,6 +840,7 @@
 | `RequestMessageInput` | `lib/requestChat.ts` · `lib/requestChat.ts` |
 | `RequestOfferInput` | `lib/requests.ts` · `lib/requests.ts` |
 | `requestReceivedClientEmail` | `lib/emailTemplates.ts` |
+| `requestReceivedSms` | `lib/smsTemplates.ts` |
 | `RequestRoom` | `app/request/[ref]/_room.tsx` |
 | `RequestRoomData` | `app/request/[ref]/_room.tsx` |
 | `requestsFeatureExists` | `lib/requests.ts` |
@@ -923,9 +922,7 @@
 | `serviceRequestRow` | `lib/requests.ts` |
 | `ServicesSections` | `app/work/profile/_secServices.tsx` |
 | `sessionDate` | `components/workspace/sessionTime.ts` |
-| `sessionDateTime` | `components/workspace/sessionTime.ts` |
 | `sessionTime` | `components/workspace/sessionTime.ts` |
-| `sessionWeekdayShort` | `components/workspace/sessionTime.ts` |
 | `setMessageState` | `lib/outboundSettings.ts` |
 | `SHARED_INVALID` | `lib/actionErrors.ts` |
 | `Sheet` | `components/Sheet.tsx` |
@@ -953,8 +950,6 @@
 | `SiteTextsSection` | `app/admin/_texts.tsx` |
 | `siteUrl` | `lib/siteUrl.ts` |
 | `Skeleton` | `components/Skeleton.tsx` |
-| `SkeletonKpi` | `components/Skeleton.tsx` |
-| `SkeletonRow` | `components/Skeleton.tsx` |
 | `SkipLink` | `components/SkipLink.tsx` |
 | `slugify` | `lib/slug.ts` |
 | `slugReserved` | `lib/slugSpace.ts` |
@@ -1015,6 +1010,7 @@
 | `taskHref` | `lib/credits.ts` |
 | `TB_OFFSET_MS` | `lib/tz.ts` |
 | `TBILISI` | `lib/tz.ts` |
+| `tbilisiDayKey` | `lib/tz.ts` |
 | `tbilisiDeltaHours` | `lib/tz.ts` |
 | `tbilisiParts` | `lib/tz.ts` |
 | `telHref` | `lib/phone.ts` |

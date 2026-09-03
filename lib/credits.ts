@@ -261,9 +261,18 @@ export const CONTACT_COST_DEFAULT_TETRI = 3 * TETRI
  * average of a band, which would invent a figure nobody typed.
  */
 export function contactCostTetri(budgetMin: number, budgetMax: number | null): number {
-  // ⚠️ „NOTHING WAS SAID" IS ITS OWN ANSWER, not the bottom of the ladder — see
-  // CONTACT_COST_DEFAULT_TETRI for the measurement that forced this line.
-  if ((budgetMin ?? 0) <= 0 && budgetMax === null) return CONTACT_COST_DEFAULT_TETRI
+  /* ⚠️ „NOTHING WAS SAID" IS ITS OWN ANSWER, not the bottom of the ladder — see
+     CONTACT_COST_DEFAULT_TETRI for the measurement that forced this line.
+
+     ⚠️ AND `undefined` COUNTS AS NOTHING, NOT AS ZERO (caught 2026-09-03 by
+     walking a draft through the run). The guard originally tested
+     `budgetMax === null`, which is what Prisma returns — so production was
+     right and every OTHER caller was not: `contactCostTetri(undefined,
+     undefined)` fell past this line, floored to 0 and priced at 1₾, silently
+     charging a third of the intended fee. A guard that is correct only for one
+     caller's null-shape is the kind that fails quietly. */
+  const stated = (budgetMin ?? 0) > 0 || (budgetMax ?? null) !== null
+  if (!stated) return CONTACT_COST_DEFAULT_TETRI
   const gel = Math.max(0, budgetMax ?? budgetMin ?? 0)
   if (gel < 100) return 1 * TETRI
   if (gel < 300) return 2 * TETRI

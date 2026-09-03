@@ -83,30 +83,12 @@ Skeleton.Card = SkeletonCard
 Skeleton.Avatar = SkeletonAvatar
 Skeleton.Line = SkeletonLinePreset
 
-// Legacy named-export helpers used by existing dashboards. Keep intact.
+// ⚠️ „Legacy named-export helpers used by existing dashboards. Keep intact."
+// stood here over `SkeletonKpi` and `SkeletonRow`, and on 2026-09-03 a sweep
+// found no dashboard — no call site anywhere in app/, components/ or lib/ — so
+// both went. The sentence was the only thing keeping them, and it was wrong.
+// Everything a loading state needs is `SkeletonBase` and the primitives above.
 function SkeletonLine({ className = '' }: { className?: string }) {
   return <SkeletonBase className={`h-3.5 w-full ${className}`} />
 }
 
-export function SkeletonKpi({ className = '' }: { className?: string }) {
-  return (
-    <div className={`rounded-card border border-ink-200 bg-white p-4 ${className}`}>
-      <SkeletonBase className="h-3 w-16 mb-3" />
-      <SkeletonBase className="h-7 w-14 mb-2" />
-      <SkeletonBase className="h-3 w-24" />
-    </div>
-  )
-}
-
-export function SkeletonRow({ className = '' }: { className?: string }) {
-  return (
-    <div className={`p-4 sm:p-5 flex items-center gap-3 ${className}`}>
-      <SkeletonBase className="h-10 w-10 rounded-full" rounded="" />
-      <div className="flex-1 min-w-0 space-y-2">
-        <SkeletonBase className="h-3.5 w-1/3" />
-        <SkeletonBase className="h-3 w-2/3" />
-      </div>
-      <SkeletonBase className="h-8 w-20" />
-    </div>
-  )
-}

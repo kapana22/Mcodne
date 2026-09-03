@@ -30,6 +30,30 @@ export const TB_OFFSET_MS = 4 * 3_600_000
  * For FORMATTING, don't reach for this — use `fmtDateTime(..., TBILISI)` below
  * or `components/workspace/sessionTime`.
  */
+/**
+ * The Tbilisi CALENDAR DAY of an instant, as „YYYY-MM-DD".
+ *
+ * ⚠️ IT EXISTS BECAUSE A CHART WAS BUCKETING BY UTC (2026-09-03). The admin's
+ * help graph built its axis with `new Date().toISOString().slice(0, 10)` and
+ * asked Postgres for `date_trunc('day', "at")` — both UTC, so the two AGREED
+ * and nothing looked wrong. What they agreed on was the wrong day: Tbilisi is
+ * UTC+4, so everything that happens between midnight and 04:00 local is filed
+ * under the previous day.
+ *
+ * The same +4 shift `tbilisiParts` uses, and for the same stated reason — the
+ * process's own zone is an accident of `TZ=Asia/Tbilisi` in production and is
+ * unset in local dev, so a day boundary computed from `getDate()` means two
+ * different things on two machines.
+ *
+ * ⚠️ THE SQL SIDE HAS TO MOVE WITH IT. A query still saying
+ * `date_trunc('day', "at")` while the axis says Tbilisi produces an axis whose
+ * keys match no row — the chart would go flat rather than shift. Both halves,
+ * or neither.
+ */
+export function tbilisiDayKey(d: Date): string {
+  return new Date(d.getTime() + TB_OFFSET_MS).toISOString().slice(0, 10)
+}
+
 export function tbilisiParts(d: Date): { isoDow: number; hour: number; minute: number } {
   const t = new Date(d.getTime() + TB_OFFSET_MS)
   const dow = t.getUTCDay()

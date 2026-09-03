@@ -118,6 +118,15 @@ test('a credit buys one client contact, and the arithmetic is legible', () => {
      those off the floor would read „every job on this platform is small", which
      is not something anybody said. */
   assert.equal(contactCostTetri(0, null), CONTACT_COST_DEFAULT_TETRI)
+  /* ⚠️ EVERY SHAPE OF „NOTHING", not just Prisma's. The guard first tested
+     `budgetMax === null` and a caller passing `undefined` fell straight past it
+     to the ladder's floor — 1₾ where 3₾ was intended, silently. Found by
+     walking a draft through the run rather than by a type error, because both
+     shapes type-check. */
+  for (const [a, b] of [[undefined, undefined], [undefined, null], [0, undefined], [null, null]] as [any, any][]) {
+    assert.equal(contactCostTetri(a, b), CONTACT_COST_DEFAULT_TETRI,
+      `an unstated budget as (${a}, ${b}) priced off the ladder instead of the default`)
+  }
   assert.equal(contactCostTetri(0, null), 3 * TETRI, 'the unpriced default moved off the price it replaced')
   // …but a budget of „up to 60₾" IS a statement, and it prices on the ladder.
   assert.equal(contactCostTetri(30, 60), CONTACT_COST_MIN_TETRI)

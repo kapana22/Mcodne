@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { requireRoleApi } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
+import { tbilisiDayKey } from '@/lib/tz'
 import { parseIntParam } from '@/lib/apiParams'
 import { HELP_EVENTS, ALL_TOPICS } from '@/lib/helpTopics'
 
@@ -115,7 +116,15 @@ export async function GET(req: NextRequest) {
 
     // 4. Day series for the four names at once — one scan instead of four.
     prisma.$queryRawUnsafe<{ d: string; name: string; n: number }[]>(
-      `SELECT to_char(date_trunc('day', "at"), 'YYYY-MM-DD') AS d, "name", COUNT(*)::int AS n
+      /* ⚠️ BUCKETED IN TBILISI, NOT IN UTC (2026-09-03). `date_trunc('day',
+         "at")` runs in the DATABASE session's zone, which is UTC — so an event
+         at 01:00 Tbilisi was counted on the previous day. It agreed with the
+         axis below, which was making the same mistake, so the chart looked
+         right and was a day out for every small hour. `AT TIME ZONE` shifts the
+         timestamp into Tbilisi before the truncation; the axis uses
+         `tbilisiDayKey` for the same shift, and the two must always move
+         together or the keys stop matching and the series reads as zero. */
+      `SELECT to_char(date_trunc('day', "at" AT TIME ZONE 'Asia/Tbilisi'), 'YYYY-MM-DD') AS d, "name", COUNT(*)::int AS n
          FROM "Event"
         WHERE "name" = ANY($1) AND "at" > now() - ($2 * interval '1 day')
         GROUP BY 1, 2 ORDER BY 1`,
@@ -145,7 +154,9 @@ export async function GET(req: NextRequest) {
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today)
     d.setDate(d.getDate() - i)
-    axis.push(d.toISOString().slice(0, 10))
+    // The Tbilisi day, matching the `AT TIME ZONE` in the query above — see
+    // lib/tz → tbilisiDayKey for why `toISOString()` alone was a day out.
+    axis.push(tbilisiDayKey(d))
   }
   const pick = (name: string) => {
     const m = new Map(series.filter(s => s.name === name).map(s => [s.d, Number(s.n)]))

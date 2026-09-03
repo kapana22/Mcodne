@@ -18,17 +18,12 @@
 
 import { fmtDateTime, TBILISI } from '@/lib/tz'
 
-/** „ხუთ, 24 ივლ, 14:00" — the standard session stamp. */
-export function sessionDateTime(iso: string, opts?: { month?: 'short' | 'long'; year?: boolean }): string {
-  return fmtDateTime(iso, {
-    weekday: 'short',
-    day: 'numeric',
-    month: opts?.month ?? 'short',
-    ...(opts?.year ? { year: 'numeric' as const } : {}),
-    hour: '2-digit',
-    minute: '2-digit',
-  }, TBILISI).local
-}
+// ⚠️ `sessionDateTime` AND `sessionWeekdayShort` WERE HERE (deleted 2026-09-03).
+// „ხუთ, 24 ივლ, 14:00" and „ხუთ" — the stacked date chip and the combined stamp
+// the consultation product's session lists drew. Nothing has called either since
+// that product went; what survives is `sessionDate` + `sessionTime`, which
+// /work/jobs prints side by side. The module's rule is unchanged and is the
+// reason it exists at all: every workspace clock reads Tbilisi wall-time.
 
 /** „24 ივლ" — date only. */
 export function sessionDate(iso: string, opts?: { month?: 'short' | 'long'; weekday?: boolean; year?: boolean }): string {
@@ -38,11 +33,6 @@ export function sessionDate(iso: string, opts?: { month?: 'short' | 'long'; week
     month: opts?.month ?? 'short',
     ...(opts?.year ? { year: 'numeric' as const } : {}),
   }, TBILISI).local
-}
-
-/** „ხუთ" — weekday only, for date chips that stack their parts. */
-export function sessionWeekdayShort(iso: string): string {
-  return fmtDateTime(iso, { weekday: 'short' }, TBILISI).local
 }
 
 /** „14:00" — 24h, zero-padded. */

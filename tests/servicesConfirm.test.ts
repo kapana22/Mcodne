@@ -26,7 +26,6 @@ import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { completeness, type ProfileFacts } from '../lib/credits'
-import { buildProfileChecks } from '../lib/profileScore'
 
 const ROOT = join(__dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -86,19 +85,16 @@ test('A2: the migration seeds a category’s topics and never an academic one', 
 
 /* ═══════════ B. the checklist can see the difference ═════════════════════ */
 
-test('B: „has one" is not the question — an unconfirmed list is not done', () => {
-  const seeded = { services: ['contract', 'court'], servicesConfirmedAt: null }
-  const theirs = { services: ['contract'], servicesConfirmedAt: new Date() }
-
-  const of = (p: Parameters<typeof buildProfileChecks>[0]) =>
-    buildProfileChecks(p, null).find(c => c.id === 'services')!
-
-  assert.equal(of(seeded).done, false,
-    'a list the migration filled in reads as done — which is exactly the profile least likely to be true')
-  assert.equal(of(theirs).done, true, 'a provider who saved their own list is still being asked')
-  assert.notEqual(of(seeded).label, of(theirs).label,
-    'the unconfirmed row must say WHY it is there — „აირჩიე" reads as „you did nothing"')
-})
+// ⚠️ „B: „has one" is not the question" WAS HERE (deleted 2026-09-03) WITH
+// lib/profileScore.ts. It asked that module's weighted checklist whether a
+// seeded, unconfirmed service list read as done, and whether the unconfirmed row
+// said WHY. That checklist is not what any screen draws: /work/profile scores
+// the six tasks that PAY (lib/creditsServer → profileFacts, and _editor.tsx says
+// so in as many words), and nothing in app/ or components/ had imported
+// profileScore for some time. The invariant it was defending did not go with it
+// — it moved to a better mechanism, and §C below is where it lives: the note
+// that admits WE filled the list in, cannot be dismissed, and clears only on a
+// save. B2 keeps the money half against the live module.
 
 test('B2: confirming earns nothing — save must stay a free, honest yes', () => {
   const base: ProfileFacts = {

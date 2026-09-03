@@ -13,6 +13,7 @@ import type { ReactNode } from 'react'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { fmtDateTime, TBILISI } from '@/lib/tz'
+import { safeHttpUrl } from '@/lib/safeUrl'
 import Link from 'next/link'
 import { Card } from '@/components/Card'
 import { tileHue } from '@/app/_home/data'
@@ -209,9 +210,23 @@ export function AboutBlock({ p }: { p: ProviderProfileData }) {
  * the database; nothing on the site reads them any more.
  */
 export function CredentialsBlock({ p }: { p: ProviderProfileData }) {
+  // ⚠️ EVERY ONE OF THESE IS TYPED BY A PROVIDER AND GOES STRAIGHT INTO AN
+  // href. React escapes text; it does NOT sanitise this attribute, so
+  // `javascript:…` in that box would execute in a reader's authenticated
+  // origin on click. `safeHttpUrl` drops anything that is not an ordinary
+  // navigable scheme, and a link with nothing left is not rendered at all.
+  //
+  // The write side already refuses it — `optionalUrl` in lib/serviceProfile and
+  // app/api/me/provider demands `^https?://`. This is the second layer, and it
+  // is here because the two guards protect against different things: that one
+  // is a form rule somebody may loosen for a good reason, this one is about
+  // what a browser will do with the string. lib/safeUrl was written for exactly
+  // this and, found on 2026-09-03, had no caller at all — the only surface that
+  // renders a provider's own URL was not using it (pinned by
+  // tests/safe-url.test.ts § „the provider's links are sanitised").
   const links = [
-    p.websiteUrl ? { href: p.websiteUrl, label: 'ვებგვერდი' } : null,
-    p.linkedinUrl ? { href: p.linkedinUrl, label: 'LinkedIn' } : null,
+    safeHttpUrl(p.websiteUrl) ? { href: safeHttpUrl(p.websiteUrl)!, label: 'ვებგვერდი' } : null,
+    safeHttpUrl(p.linkedinUrl) ? { href: safeHttpUrl(p.linkedinUrl)!, label: 'LinkedIn' } : null,
   ].filter((x): x is { href: string; label: string } => x !== null)
   if (links.length === 0) return null
   return (

@@ -8,6 +8,8 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { safeHttpUrl, safeStoredFileUrl } from '../lib/safeUrl'
 
 test('safeHttpUrl blocks active-content schemes', () => {
@@ -59,4 +61,34 @@ test('the dangerous inputs ARE valid URLs (why zod .url() was insufficient)', ()
   // new URL(...) does not throw for these — that is exactly the trap.
   assert.doesNotThrow(() => new URL('javascript:alert(1)'))
   assert.doesNotThrow(() => new URL('data:text/html,<script>alert(1)</script>'))
+})
+
+/* ═══════════ the guard has a caller ══════════════════════════════════════ */
+
+// ⚠️ FOUND 2026-09-03 BY A DEAD-CODE SWEEP: `lib/safeUrl` had NO importer in
+// app/, components/ or lib/ — only this file. It read as a module to delete,
+// and the sweep nearly did. What it actually was is a guard nobody had wired:
+// `CredentialsBlock` on the public provider page put a provider's own
+// `websiteUrl` and `linkedinUrl` straight into an href.
+//
+// Nothing exploitable reached production — the write side has always demanded
+// `^https?://` (`optionalUrl`, in lib/serviceProfile and app/api/me/provider) —
+// so this is defence in depth, and the two layers guard different things: that
+// one is a form rule somebody may loosen for a good reason, this one is about
+// what a browser does with the string it was given.
+//
+// The pin is here rather than in the render's own test file because it is this
+// module's reason to exist. A guard with no caller is not a guard.
+
+test('the provider page renders its links through safeHttpUrl', () => {
+  const src = readFileSync(
+    join(import.meta.dirname, '..', 'app', 'experts', '[slug]', '_providerBlocks.tsx'),
+    'utf8',
+  )
+  for (const field of ['websiteUrl', 'linkedinUrl']) {
+    assert.match(src, new RegExp(`safeHttpUrl\\(p\\.${field}\\)`),
+      `p.${field} is no longer sanitised before it becomes an href`)
+    assert.doesNotMatch(src, new RegExp(`href: p\\.${field}\\b`),
+      `p.${field} goes into an href raw — that is the stored-XSS shape this module exists for`)
+  }
 })
