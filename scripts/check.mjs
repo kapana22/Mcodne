@@ -42,6 +42,13 @@ import { spawn } from 'node:child_process'
 import { readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { ensureNode22 } from './node22.mjs'
+
+// FIRST LINE OF WORK: put ourselves on Node 22 if the shell did not. `node` on
+// this machine is v26.5.0 and Next 15.5 fails under it in ways that read as code
+// errors — see scripts/node22.mjs for why this belongs in the script and not in
+// a sentence somebody has to remember.
+ensureNode22()
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const FAST = process.argv.includes('fast')

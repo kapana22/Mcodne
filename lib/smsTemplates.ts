@@ -38,3 +38,35 @@ export async function verifiedRequestSms(topicLabel: string): Promise<string> {
   return t('request.verified.provider', 'sms', { topic: topicLabel })
 }
 
+
+/* ═══════════ the client's two texts (2026-09-03) ════════════════════════
+ *
+ * ⚠️ THEY EXIST BECAUSE THE INTAKE STOPPED ASKING FOR AN EMAIL. Owner:
+ * „კონტაქტის ველიდან ამოვიღოთ მელი." A client who never registers now leaves a
+ * name and a number, so everything the six client letters used to carry has to
+ * fit through one channel — and two of the six are the ones that cannot be
+ * allowed to go silent: „we have it, here is your page" and „somebody
+ * answered".
+ *
+ * ⚠️ AND THESE TWO DO CARRY THE `MC-` REFERENCE, WHICH THE FILE HEADER FORBIDS.
+ * The carve-out is real and it is narrow. That rule is about a PROVIDER's
+ * notification: the reference is 25 bits opening a page that holds SOMEBODY
+ * ELSE'S phone number, so it must never travel to a person it does not belong
+ * to. Here it travels to the number the client typed into their own request —
+ * the same address, the same person, and exactly what `request.received.client`
+ * has always put in their inbox as `rowCode`. Withholding it would leave a
+ * client with no account and no email holding no way back to their own request
+ * at all, which is not a privacy win, it is losing the request.
+ */
+
+/** „we have it — here is your page". The one message that carries the code. */
+export async function requestReceivedSms(ref: string): Promise<string> {
+  const t = await messageText()
+  return t('request.received.client', 'sms', { ref })
+}
+
+/** „somebody answered" — the whole product, in one part. */
+export async function offerArrivedSms(ref: string): Promise<string> {
+  const t = await messageText()
+  return t('request.offerArrived.client', 'sms', { ref })
+}

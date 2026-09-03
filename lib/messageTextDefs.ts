@@ -218,6 +218,12 @@ export const MESSAGE_TEXTS: MessageTextGroup[] = [
       { part: 'subject', label: SUBJ, vars: ['ref'], default: 'ახალი შეთავაზება — {ref}' },
       { part: 'heading', label: HEAD, default: 'ახალი შეთავაზება მოგივიდა' },
       { part: 'cta', label: CTA, default: 'შეთავაზებების ნახვა' },
+      /* ⚠️ THE SMS EXISTS BECAUSE THE EMAIL FIELD WENT (2026-09-03). Owner:
+         „კონტაქტის ველიდან ამოვიღოთ მელი." Without an address this is the only
+         way a client who has no account learns that somebody answered — and
+         „somebody answered" is the whole product. The words are the letter's
+         own heading, moved rather than written. */
+      { part: 'sms', label: 'SMS — ტექსტი (70 სიმბოლომდე = 1 ნაწილი)', vars: ['ref'], default: 'მცოდნე: ახალი შეთავაზება. mcodne.ge/request/{ref}' },
     ],
   },
   {
@@ -230,6 +236,12 @@ export const MESSAGE_TEXTS: MessageTextGroup[] = [
       { part: 'body1', label: BODY, multiline: true, default: 'შევამოწმებთ და ექსპერტებს გადავცემთ. შეთავაზებები ამ ელფოსტაზე მოგივა.' },
       { part: 'body2', label: BODY2, multiline: true, default: 'ეს ბმული შენი მოთხოვნის გვერდია — შეინახე, აქ ნახავ შეთავაზებებს და მოგვწერ, თუ რამე დასამატებელი გაქვს.' },
       { part: 'cta', label: CTA, default: 'ჩემი მოთხოვნა' },
+      /* ⚠️ THIS ONE CARRIES THE CODE, AND IT HAS TO. With no email field the
+         `MC-` reference exists in exactly one place — the thank-you screen —
+         and closing that tab used to mean losing the request for ever. The
+         letter has always carried it (see `rowCode` above); the text now does
+         the same job for the same person. */
+      { part: 'sms', label: 'SMS — ტექსტი (70 სიმბოლომდე = 1 ნაწილი)', vars: ['ref'], default: 'მცოდნე: მოთხოვნა მივიღეთ. შენი გვერდი: mcodne.ge/request/{ref}' },
     ],
   },
   {

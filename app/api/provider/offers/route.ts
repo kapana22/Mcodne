@@ -29,6 +29,8 @@ import { sendMail } from '@/lib/mailer'
 import { notifyMany } from '@/lib/notify'
 import { offerArrivedClientEmail } from '@/lib/emailTemplates'
 import { recordOfferEvent } from '@/lib/offerEvents'
+import { sendSms } from '@/lib/sms'
+import { offerArrivedSms } from '@/lib/smsTemplates'
 import { providerUserIdsOf } from '@/lib/offerLifecycle'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
@@ -171,7 +173,15 @@ export async function POST(req: Request) {
       id: true,
       expertUser: { select: { fullName: true } },
       company: { select: { name: true } },
-      request: { select: { publicRef: true, topic: true, kind: true, email: true, offerCount: true, userId: true } },
+      /* ⚠️ `phone` JOINED THIS SELECT ON 2026-09-03, and it is the ONE place in
+         the provider's half of the subsystem where a client's number is read.
+         It is never returned, never rendered and never reaches the provider —
+         it is handed straight to `sendSms` inside an `after()`, because with
+         the email field gone the text is the only way the client hears that
+         this very offer arrived. The contact rule (lib/requests →
+         clientIdentityOpen) is about what a PROVIDER may see; a notification
+         the platform sends on their behalf is not that. */
+      request: { select: { publicRef: true, topic: true, kind: true, email: true, phone: true, offerCount: true, userId: true } },
     } as const
 
     // ── The offer itself, and it is FREE ─────────────────────────────────
@@ -298,6 +308,30 @@ export async function POST(req: Request) {
           // it never claims a delivery that did not happen.
           await recordOfferEvent(offer.id, 'DELIVERED', { channel: 'email' })
         } catch { /* mail is best-effort */ }
+      })
+    }
+
+    /* ── AND BY SMS (2026-09-03) ───────────────────────────────────────────
+       ⚠️ FOR MOST CLIENTS THIS IS THE ONLY WAY THEY LEARN. The intake stopped
+       asking for an email that day, so `offer.request.email` is null on every
+       request filed since — and „somebody answered" is the one event this
+       product exists to deliver. The bell above only reaches a signed-in
+       client; the letter only reaches an address; the number is what everybody
+       leaves.
+
+       ⚠️ THE `DELIVERED` EVENT IS RECORDED HERE TOO, with its own channel. The
+       provider's question is „did it reach them", not „did an email reach
+       them" — and with no address on the row the email branch never runs, so a
+       mail-only stamp would read as „never delivered" on every request the new
+       intake produces. */
+    const smsTo = offer.request.phone
+    if (smsTo) {
+      const text = await offerArrivedSms(offer.request.publicRef)
+      after(async () => {
+        try {
+          await sendSms({ key: 'request.offerArrived.client', to: smsTo, text })
+          await recordOfferEvent(offer.id, 'DELIVERED', { channel: 'sms' })
+        } catch { /* the text is best-effort, like the letter */ }
       })
     }
 

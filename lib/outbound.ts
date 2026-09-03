@@ -66,8 +66,17 @@ export const OUTBOUND = [
   { key: 'auth.passwordReset',      label: 'პაროლის აღდგენის ბმული',      when: '/signin → პაროლი დამავიწყდა', audience: 'anyone', channels: ['mail'], credential: true },
 
   /* ── the client's side of a request ──────────────────────────────────── */
-  { key: 'request.received.client',      label: 'განაცხადი მიღებულია',      when: 'განაცხადის შევსებისთანავე', audience: 'client', channels: ['mail'] },
-  { key: 'request.offerArrived.client',  label: 'შემოვიდა შეთავაზება',      when: 'პროვაიდერი წერს შეთავაზებას', audience: 'client', channels: ['mail'] },
+  /* ⚠️ THESE TWO GAINED AN SMS CHANNEL ON 2026-09-03, and the reason is that
+     the intake stopped asking for an email. A client with no account now has a
+     phone number and nothing else, so „we got it, here is your page" and
+     „somebody answered" are the two things that must still reach them. The
+     other four client events stay mail-only: they matter to somebody who
+     registered, and that person has an address.
+     ⚠️ SMS still defaults to OFF per message (lib/outboundSettings) — a letter
+     is free and a text is not. Turning these on is a decision with a bill, and
+     it is the owner's to make in /admin. */
+  { key: 'request.received.client',      label: 'განაცხადი მიღებულია',      when: 'განაცხადის შევსებისთანავე', audience: 'client', channels: ['mail', 'sms'] },
+  { key: 'request.offerArrived.client',  label: 'შემოვიდა შეთავაზება',      when: 'პროვაიდერი წერს შეთავაზებას', audience: 'client', channels: ['mail', 'sms'] },
   { key: 'request.offerDigest.client',   label: 'შეთავაზებების შეხსენება',  when: 'ღამის cron — უპასუხო შეთავაზებები', audience: 'client', channels: ['mail'] },
   { key: 'request.closedNoOffers.client', label: 'განაცხადი დაიხურა უპასუხოდ', when: 'ღამის cron — ვადა გავიდა, შეთავაზება არ იყო', audience: 'client', channels: ['mail'] },
   { key: 'request.done.client',          label: 'სამუშაო დასრულდა',         when: 'პროვაიდერი აღნიშნავს დასრულებულად', audience: 'client', channels: ['mail'] },

@@ -122,39 +122,24 @@ export function StepContact({ draft, patch, signedIn, fault }: {
         <Hint id="req-contact-phone-hint">ნომერს მხოლოდ ჩვენ ვიყენებთ — მოთხოვნის გადასამოწმებლად.</Hint>
       </div>
 
-      <div className="block">
-        {/* ⚠️ NO LONGER `optional` (2026-08-17). See ServiceRequestInput: every
-            message this subsystem sends a client is an email, so an absent one
-            meant the system never spoke to them again. */}
-        <Label htmlFor="req-contact-email">ელფოსტა</Label>
-        <input
-          id="req-contact-email"
-          type="email" autoComplete="email" required
-          value={draft.email}
-          onChange={e => patch({ email: e.target.value })}
-          {...props('email')}
-          aria-describedby={describedBy('email', 'req-contact-email-hint')}
-          className={`${INPUT} ${bad('email') ? FIELD_ERROR_BORDER : ''}`} placeholder="you@example.ge"
-        />
-        {error('email')}
-        {/* The account is made from this field — said HERE, where it is typed,
-            rather than as a checkbox or a step. See lib/requestAccount: an
-            email is the only thing that makes an account reachable, so it is
-            the only thing that creates one.
-            ⚠️ …which is why the sentence CANNOT be the same when somebody is
-            already signed in. lib/requestAccount returns SIGNED_IN for them and
-            creates nothing, so „ანგარიში თავისით შეიქმნება" would be promising
-            a thing that will not happen to a person who already has it. */}
-        {/* ⚠️ „ელფოსტაზეც" BECAME „ელფოსტაზე" (2026-08-17), one letter, and it
-            is the difference between a courtesy and the channel. „-ც" implied a
-            second route alongside some first one; there is no first one — this
-            is where offers and replies are announced, and nowhere else. */}
-        <Hint id="req-contact-email-hint">
-          {signedIn
-            ? 'შეთავაზებები ელფოსტაზე მოგივა.'
-            : 'შეთავაზებები ელფოსტაზე მოგივა და ანგარიში თავისით შეიქმნება.'}
-        </Hint>
-      </div>
+      {/* ⚠️ THE EMAIL FIELD IS GONE (2026-09-03). Owner: „კონტაქტის ველიდან
+          ამოვიღოთ მელი." It was made REQUIRED on 2026-08-17 for one reason —
+          every message this subsystem sent a client was an email, so an absent
+          address meant the system never spoke to them again — and
+          `ServiceRequestInput` said in the same breath what the real fix was:
+          „THE HONEST FIX IS SMS, NOT THIS… When an SMS channel exists, this goes
+          back to optional."
+
+          It exists now: `request.received.client` texts the `MC-` code and
+          `request.offerArrived.client` texts „somebody answered"
+          (lib/smsTemplates). So the last screen before a submit is two fields
+          again — a name and a number — which is where forms die and where every
+          field removed is worth more than one added anywhere else.
+
+          The account is no longer made here either: `lib/requestAccount` needs
+          an address and there is none, so a request filed this way belongs to
+          its `MC-` reference until somebody registers. That was already true of
+          every request written before 2026-08-17. */}
 
       {/* ── The description, no longer worth a screen of its own ───────────
           It WAS one — „დაამატებ დეტალებს?", a full step with a textarea and a

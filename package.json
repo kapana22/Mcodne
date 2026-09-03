@@ -4,9 +4,9 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node scripts/withNode22.mjs next dev",
+    "build": "node scripts/withNode22.mjs next build",
+    "start": "node scripts/withNode22.mjs next start",
     "lint": "eslint .",
     "check": "node scripts/check.mjs",
     "test": "node scripts/check.mjs fast",

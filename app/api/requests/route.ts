@@ -31,6 +31,8 @@ import { sendMail } from '@/lib/mailer'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 import { triageFlags, triageNote } from '@/lib/requestTriage'
 import { requestReceivedClientEmail } from '@/lib/emailTemplates'
+import { sendSms } from '@/lib/sms'
+import { requestReceivedSms } from '@/lib/smsTemplates'
 import { mailVerifiedRequest } from '@/lib/requestJobs'
 import { notifyMany } from '@/lib/notify'
 import { ROLE } from '@/lib/roles'
@@ -337,6 +339,34 @@ export async function POST(req: Request) {
             topicLabel: topicLabel(parsed.data.topic),
           })),
         })
+      } catch { /* best-effort; the request is committed either way */ }
+    })
+  }
+
+  /* ── …AND THE SAME NEWS BY SMS (2026-09-03) ────────────────────────────────
+     ⚠️ THIS IS NOW THE ONLY COPY OF THE CODE FOR MOST SENDERS. The email field
+     left the intake that day (owner: „კონტაქტის ველიდან ამოვიღოთ მელი"), so a
+     client who does not register has a phone number and nothing else — and the
+     `MC-` reference is the whole of their access to their own request. The
+     paragraph above says exactly what this is preventing: „the code lived only
+     on the screen they had just closed."
+
+     Sent BESIDE the letter rather than instead of it: somebody who does have an
+     address (a signed-in client, or a row written before today) gets both, and
+     nothing here has to decide which channel is the real one. Same `after()`,
+     same best-effort contract — a failed text must not fail a committed
+     request. */
+  const smsTo = row.phone
+  if (smsTo) {
+    after(async () => {
+      try {
+        const text = await requestReceivedSms(created.publicRef)
+        // ⚠️ THE KEY SITS ON THE SAME LINE AS THE BRACE, and that is not
+        // formatting: tests/outbound looks for the literal
+        // `sendSms({ key: '<id>'` to prove that a message advertising an SMS
+        // switch actually has a sender behind it. A switch that does nothing
+        // when you flip it is worse than no switch.
+        await sendSms({ key: 'request.received.client', to: smsTo, text })
       } catch { /* best-effort; the request is committed either way */ }
     })
   }

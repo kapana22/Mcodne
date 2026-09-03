@@ -451,37 +451,52 @@ test('the client’s reference is never shown to a provider', async () => {
     'the accepted-offer mail to the provider carries the client’s reference again')
 })
 
-test('a client we cannot reach is refused at the door', () => {
-  // ⚠️ EMAIL IS REQUIRED, AND IT USED TO BE OPTIONAL ON PURPOSE. The old rule
-  // („the whole flow runs on the phone number") was good and was defeated by
-  // something outside the schema: every automated message this subsystem sends
-  // a client is an EMAIL, and there is no SMS anywhere in the codebase. So an
-  // absent email did not mean „reach me by phone" — it meant the system never
-  // spoke to them again: no offer notice, no reply notice, no nudge.
+test('a client leaves a phone, and the phone is what reaches them', () => {
+  /* ⚠️ THIS TEST HAS HELD BOTH ANSWERS AND THE PREVIOUS ONE SAID WHEN TO SWITCH.
+     It pinned „email is REQUIRED" from 2026-08-17, because every automated
+     message this subsystem sent a client was an email and an absent address
+     meant permanent silence — no offer notice, no reply notice, no nudge. Its
+     last assertion was the exit condition, in its own words: „When SMS exists
+     this requirement should come back OUT."
+
+     It exists as of 2026-09-03 (owner: „კონტაქტის ველიდან ამოვიღოთ მელი"), so
+     the requirement came out and this test now pins the replacement: a request
+     may be filed with a phone alone, and the two events that cannot go quiet
+     have an SMS behind them. */
   const base = {
     kind: 'MEETING', topic: 'contract',
     description: 'ხელშეკრულება მჭირდება იჯარაზე.',
     budgetBand: 'c2', timing: 'this_week', format: 'ONLINE', city: 'TBILISI',
     contactName: 'ნინო მაგალიძე', phone: '555123456',
   }
-  assert.equal(ServiceRequestInput.safeParse({ ...base, email: 'nino@example.ge' }).success, true)
-  assert.equal(ServiceRequestInput.safeParse(base).success, false,
-    'a request with no email is accepted again — that client can never be told an offer arrived')
-  assert.equal(ServiceRequestInput.safeParse({ ...base, email: '' }).success, false,
-    'an empty email is accepted again')
+  assert.equal(ServiceRequestInput.safeParse({ ...base, email: 'nino@example.ge' }).success, true,
+    'an address is still accepted — a signed-in client has one and it is still used')
+  assert.equal(ServiceRequestInput.safeParse(base).success, true,
+    'a request with a phone and no email is refused — that is the field that was removed')
+  assert.equal(ServiceRequestInput.safeParse({ ...base, email: '' }).success, true,
+    'the empty string the removed field used to submit is refused')
+  // A malformed address is still wrong. Optional is not „anything goes".
+  assert.equal(ServiceRequestInput.safeParse({ ...base, email: 'nino@' }).success, false,
+    'a broken address is accepted now that the field is optional')
 
-  // ⚠️ THE DOWNSTREAM GUARDS STAY. Rows written before this rule have no email
-  // and must still be readable; every notifier keeps its `if (email)` so an old
-  // row degrades to silence instead of throwing.
+  // …and the screen no longer asks for one.
+  assert.doesNotMatch(codeOf('app/request/_stepContact.tsx'), /id="req-contact-email"/,
+    'the email field is back on the last screen before a submit')
+
+  /* ⚠️ THE TWO TEXTS ARE THE WHOLE JUSTIFICATION, so they are asserted here and
+     not only in tests/outbound: „we have it, here is your code" and „somebody
+     answered". Without these two this change is the 2026-08-17 silence again. */
+  assert.match(codeOf('app/api/requests/route.ts'), /sendSms\(\{ key: 'request\.received\.client'/,
+    'a client who filed by phone is never sent their own MC- code')
+  assert.match(codeOf('app/api/provider/offers/route.ts'), /sendSms\(\{ key: 'request\.offerArrived\.client'/,
+    'a client who filed by phone is never told an offer arrived')
+
+  // ⚠️ THE DOWNSTREAM GUARDS STAY, and now they guard the common case rather
+  // than the legacy one: most rows have no email at all.
   assert.match(codeOf('app/api/provider/offers/route.ts'), /const to = offer\.request\.email\s*\n\s*if \(to\)/,
-    'the offer notifier stopped guarding on a missing email — old rows predate the requirement')
+    'the offer notifier stopped guarding on a missing email')
   assert.match(codeOf('lib/requestJobs.ts'), /!r\.email/,
     'the client nudge stopped guarding on a missing email')
-
-  // When SMS exists this requirement should come back OUT. Pinned so that the
-  // reason is findable from the test rather than only from a git blame.
-  assert.match(read('lib/requests.ts'), /THE HONEST FIX IS SMS/,
-    'the note explaining why this requirement is temporary was removed')
 })
 
 test('NOBODY outside the allowlist can be mailed about a request', () => {

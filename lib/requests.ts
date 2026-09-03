@@ -1161,11 +1161,30 @@ export const ServiceRequestInput = z.object({
    * channel exists, this goes back to optional and the note above becomes true
    * again. Until then it would be a lie.
    *
-   * The DB column stays nullable: rows written before today have no email and
-   * must still be readable, and every `if (email)` guard downstream stays for
-   * exactly that reason.
+   * ⚠️ THAT DAY IS 2026-09-03, AND THIS IS THE PARAGRAPH ABOVE BEING CASHED IN.
+   * Owner: „კონტაქტის ველიდან ამოვიღოთ მელი." The channel now exists for the
+   * two events that cannot go quiet — `request.received.client` carries the
+   * `MC-` code by text and `request.offerArrived.client` says somebody
+   * answered (lib/smsTemplates, lib/outbound). So the field left the last
+   * screen and this rule went back to what it was before 2026-08-17.
+   *
+   * ⚠️ WHAT IS STILL EMAIL-ONLY, NAMED RATHER THAN DISCOVERED: the offer
+   * digest, the closed-unanswered notice, „the work is done" and its reminder.
+   * Each matters to somebody who registered — and that person has an address,
+   * because /signup asks for one. A client who filed by phone alone now hears
+   * the two things that decide whether they come back, and the bell carries the
+   * rest the moment they have an account.
+   *
+   * ⚠️ AND THE TEXTS ARE OFF UNTIL SOMEBODY TURNS THEM ON. SMS defaults to off
+   * per message (lib/outboundSettings) because a letter is free and a text is
+   * not. With no email field and the switch down, the intake is silent — which
+   * is why this is flagged here, at the field that stopped being required,
+   * rather than left in a settings page nobody opens.
+   *
+   * The DB column stays nullable and every `if (email)` guard downstream stays:
+   * rows written between 2026-08-17 and today all carry one.
    */
-  email: z.string().trim().email().max(200),
+  email: z.string().trim().email().max(200).optional().or(z.literal('')),
   // ⚠️ THE HONEYPOT. A field no human ever sees, so anything in it came from
   // something filling every input on the page.
   //

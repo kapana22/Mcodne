@@ -150,11 +150,34 @@ grep '^\*\*RequestOffer\*\*' docs/MAP.md
 
 ## How to work here
 
-**Node 22.** `export PATH="/opt/homebrew/opt/node@22/bin:$PATH"`. Next 15.5 fails
-on Node 26 in ways that read as code errors.
+**Node 22 — and you no longer have to arrange it (2026-09-03).** `node` on this
+machine is v26.5.0, and Next 15.5 fails under 26 in ways that read as code
+errors. Every session used to open with
+`export PATH="/opt/homebrew/opt/node@22/bin:$PATH"`; measured across the last 50
+transcripts that prefix rode **2 808 of 9 365 bash calls — 29%**, and was
+missing from the other 71%, where the failure looks like a bug in whatever you
+just touched. `npm run dev|build|start|check` now correct their own interpreter
+(`scripts/node22.mjs`, `scripts/withNode22.mjs`), so the shell can be anything.
+Railway is unaffected: nixpacks pins nodejs_22 and both shims no-op there.
+
+⚠️ Anything you run OUTSIDE those scripts still gets the shell's node — `npx
+next …` by hand is the one that bites. Use the npm script.
+
+**The Bash tool keeps its working directory between calls.** `cd` into `mcodne/`
+once; prefixing every command with it is 30% of the bash calls in those same
+transcripts, and a `cd` inside a compound command can trigger a permission
+prompt that the bare command would not.
 
 **While working:** `npx tsc --noEmit` (~2s), or one test file
-(`npx tsx tests/<file>.test.ts`). Not the whole gate after every edit.
+(`npx tsx tests/<file>.test.ts`). Not the whole gate after every edit. Both are
+on the project allowlist (`.claude/settings.json`) and ask nothing.
+
+**Editing by script?** `node scripts/patch.mjs <file>` with `[{old,new}]` on
+stdin. It is the same exact-text replace a hand-rolled `assert old in s` does,
+except that a missed anchor prints the nearest lines in the file with their
+numbers instead of a bare AssertionError — measured 2026-09-03, that failure was
+the largest identified cause of wasted tool calls (201 of them across 50
+sessions, one round trip each). It writes nothing unless every edit matched.
 
 **Before deploying:** `npm run check` — types → schema → 83 tests → `next build`.
 There is no CI, and `railway up` uploads the WORKING TREE, so this script is the
@@ -203,7 +226,9 @@ overwrote, so the two engines cleared each other's stamp for ever and nothing
 was warm twice running: `npm run check` paid the full ~112s replay every time,
 and so did the first request after a deploy whenever a local run had written
 last. Keyed by fingerprint they simply hold a row each. **`npm run check` is
-39s** — 1s types, 3s schema, 14s tests, 20s build, measured 2026-09-01.
+~53s warm** — 7s types, 3s schema, 18s tests, 24s build, measured 2026-09-03.
+Cold (no `.next-check`) the build alone is 135s, so do not delete it to „start
+clean" — the gate is the thing that gets slower.
 
 ⚠️ **`lib/dbBoot` throws the whole boot on one failed statement**, so it holds no
 DDL that names a dropped table. The 2026-08-24 services-only migration sits LAST
