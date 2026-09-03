@@ -186,7 +186,17 @@ export function StepContact({ draft, patch, signedIn, fault }: {
       )}
 
       <p className="pt-1 text-small text-ink-600">
-        გადავამოწმებთ და ექსპერტებს გადავცემთ. უფასოა.
+        {/* ⚠️ „გადავამოწმებთ და" WENT ON 2026-09-03, and only that. A clean
+            request is auto-verified — app/api/requests/route: „VERIFIED WITHOUT
+            A HUMAN, when nothing was flagged" — so it reaches experts with
+            nobody having looked at it first. The operator still phones every
+            row; they simply no longer stand in front of it, which is not what
+            „we will check it" promises to somebody about to press send.
+            The same sentence was corrected on the wizard's own footer on
+            2026-08-18 („მოთხოვნას ჯერ ჩვენ ვამოწმებთ" — „stopped being true
+            the day triage started releasing clean requests on arrival") and
+            these words were left standing here. */}
+        ექსპერტებს გადავცემთ. უფასოა.
       </p>
 
       {/* ── The honeypot — see the schema comment in lib/requests ──

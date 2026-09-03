@@ -198,7 +198,13 @@ export const MESSAGE_TEXTS: MessageTextGroup[] = [
       { part: 'rowTiming', label: ROW('ვადა'), default: 'ვადა' },
       { part: 'subject', label: SUBJ, vars: ['topic'], default: 'ახალი მოთხოვნა — {topic}' },
       { part: 'heading', label: HEAD, default: 'ახალი მოთხოვნა' },
-      { part: 'body1', label: BODY, multiline: true, default: 'ადგილები შეზღუდულია — პირველი შეთავაზებები იგებენ.' },
+      { part: 'body1', label: BODY, multiline: true, // ⚠️ „— პირველი შეთავაზებები იგებენ" REMOVED 2026-09-03. The first half is a
+      // fact: `offerLimit` caps how many offers a request takes. The second was
+      // an invented incentive — nothing makes an early offer win, the client
+      // picks on price, profile and the conversation, and the platform measures
+      // no such thing. CLAUDE.md rule 6: if it was not measured it does not go
+      // on the page.
+      default: 'ადგილები შეზღუდულია.' },
       { part: 'cta', label: CTA, default: 'ნახე და შესთავაზე' },
       // ⚠️ ONE SMS PART IS 70 GEORGIAN CHARACTERS (lib/sms → smsParts) and each
       // part is billed. The hint says so in the editor; nothing refuses a longer
@@ -233,7 +239,11 @@ export const MESSAGE_TEXTS: MessageTextGroup[] = [
       { part: 'rowCode', label: ROW('კოდი'), default: 'კოდი' },
       { part: 'subject', label: SUBJ, vars: ['ref'], default: 'მოთხოვნა მივიღეთ — {ref}' },
       { part: 'heading', label: HEAD, default: 'მოთხოვნა მივიღეთ' },
-      { part: 'body1', label: BODY, multiline: true, default: 'შევამოწმებთ და ექსპერტებს გადავცემთ. შეთავაზებები ამ ელფოსტაზე მოგივა.' },
+      { part: 'body1', label: BODY, multiline: true, // ⚠️ „შევამოწმებთ და" REMOVED 2026-09-03 — see app/request/_stepContact for
+      // the measurement. A clean request is auto-verified and reaches experts
+      // with nobody having read it; this letter was promising a check that does
+      // not happen before the hand-off. Nothing else in the sentence changed.
+      default: 'ექსპერტებს გადავცემთ. შეთავაზებები ამ ელფოსტაზე მოგივა.' },
       { part: 'body2', label: BODY2, multiline: true, default: 'ეს ბმული შენი მოთხოვნის გვერდია — შეინახე, აქ ნახავ შეთავაზებებს და მოგვწერ, თუ რამე დასამატებელი გაქვს.' },
       { part: 'cta', label: CTA, default: 'ჩემი მოთხოვნა' },
       /* ⚠️ THIS ONE CARRIES THE CODE, AND IT HAS TO. With no email field the
