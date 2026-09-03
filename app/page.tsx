@@ -7,7 +7,10 @@ import { prisma } from '@/lib/prisma'
 import { ensureDbReadyWithin } from '@/lib/dbBoot'
 import { initialMe } from '@/lib/meServer'
 import { queryProviders } from './experts/_providers'
-import { expertCountsByCategory } from '@/lib/categoryCounts'
+import { expertCountsByCategory, priceFloorsByCategory } from '@/lib/categoryCounts'
+import { requestsOn, REQUEST_ROUTE } from '@/lib/requests'
+import { providerKey, replyLabel, responseStatsFor } from '@/lib/responseStats'
+import type { SupplyFacts } from './_home/cta'
 import { ABROAD_CATEGORY_SLUG } from '@/lib/abroad'
 import { homeItems } from '@/lib/homeCatalogue'
 import type { CatalogueCardItem } from '@/components/home/CatalogueGrid'
@@ -97,12 +100,24 @@ async function homeCategories(): Promise<HomeCat[]> {
     orderBy: [{ order: 'asc' }, { name: 'asc' }],
     select: { id: true, slug: true, name: true, status: true, parentId: true },
   })
-  const counts = await expertCountsByCategory(all)
+  // ⚠️ TWO STATISTICS, ONE GATE (2026-08-31). The redesign's tile carries
+  // „N ექსპერტი · X₾-დან", and both halves come from lib/categoryCounts so the
+  // count and the floor can never describe two different sets of people. See
+  // `priceFloorsByCategory` for why a sphere nobody priced simply has no floor.
+  const [counts, floors] = await Promise.all([
+    expertCountsByCategory(all),
+    priceFloorsByCategory(all),
+  ])
   return all
     // The /abroad marker is not a sphere anybody should be filed under
     // (lib/abroad) and never belongs in a browse list.
     .filter(c => c.status === 'VISIBLE' && c.slug !== ABROAD_CATEGORY_SLUG)
-    .map(c => ({ slug: c.slug, name: c.name, expertCount: counts.get(c.id) ?? 0 }))
+    .map(c => ({
+      slug: c.slug,
+      name: c.name,
+      expertCount: counts.get(c.id) ?? 0,
+      priceFrom: floors.get(c.id) ?? null,
+    }))
     .filter(c => (c.expertCount ?? 0) > 0)
     // ⚠️ BUSIEST FIRST, not the admin's display order. Only six of these reach
     // the home page, and `order`/`name` decided which six by a rule that has
@@ -130,6 +145,7 @@ export default async function Page() {
   // empty list, and each section draws nothing rather than an error.
   let items: CatalogueCardItem[] = []
   let categories: HomeCat[] = []
+  let facts: SupplyFacts = { requestsThisWeek: 0 }
   try {
     // ⚠️ BOUNDED, AND THE BOUND IS WHAT MAKES THE PROMISE ABOVE TRUE
     // (2026-08-27). The `catch` below has always been here; what it could not
@@ -138,17 +154,60 @@ export default async function Page() {
     // measured on the standalone build. Four seconds, then the catch renders
     // the same empty state a blip has always been supposed to produce.
     await ensureDbReadyWithin(4000)
-    const [providers, cats] = await Promise.all([
+
+    // ⚠️ THE WEEK IS SEVEN DAYS BACK FROM NOW, NOT „SINCE MONDAY". „ამ კვირაში"
+    // read as a calendar week would print 3 on a Monday morning and 200 on a
+    // Sunday night for a marketplace whose volume never changed — the badge
+    // would be measuring the day of the week. A rolling seven days is the same
+    // sentence and is stable.
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+    const [providers, cats, requestsThisWeek] = await Promise.all([
       // Enough to fill six cards — not the catalogue's whole roster: this page
       // renders six and would pay for the rest in SSR payload.
       queryProviders({ groups: [], topics: [], cities: [], limit: 12 }),
       homeCategories(),
+      // 🔒 MEASURED, AND ITS ONE READER IS NOW THE CLOSING BAND. The hero's
+      // badge counted this too, plus a groupBy over the distinct providers who
+      // had answered; the owner deleted the badge on 2026-08-31 (see
+      // app/_home/hero.tsx) and the groupBy went with it — a query nobody reads
+      // is latency the busiest page on the site pays for nothing.
+      prisma.serviceRequest.count({ where: { createdAt: { gte: weekAgo } } }),
+      /* ⚠️ `countVisibleExperts()` WAS THE FOURTH QUERY AND IS GONE (2026-09-02).
+         It fed two readouts — the catalogue tile's „N ექსპერტი" and the closing
+         band's „N ექსპერტი პლატფორმაზე" — and both were deleted the same day at
+         the owner's „არასად არ ეწეროს ეგ ინფო, არასაჭიროა." A count nobody
+         prints is latency the busiest page on the site pays for nothing, which
+         is the reason given three lines up for deleting the last one. */
     ])
-    items = homeItems(providers.rows)
+
+    // The reply chip on each card — MEASURED from the offer journal, and null
+    // for everybody under the sample floor (lib/responseStats). Six rows, one
+    // query; it is deliberately resolved AFTER the roster rather than for the
+    // whole catalogue.
+    const shown = providers.rows.filter(m => !!m.slug).slice(0, 6)
+    let replies = new Map<string, string | null>()
+    try {
+      const stats = await responseStatsFor(shown)
+      replies = new Map(
+        shown
+          .map(m => [providerKey(m), replyLabel(stats.get(providerKey(m) ?? ''))] as const)
+          .filter((e): e is readonly [string, string | null] => e[0] !== null)
+          .map(([k, v]) => [k, v]),
+      )
+    } catch {
+      // A card without a chip is the correct card. Never take the page down for
+      // a decoration.
+      replies = new Map()
+    }
+
+    items = homeItems(providers.rows, replies)
     categories = cats
+    facts = { requestsThisWeek }
   } catch {
     items = []
     categories = []
+    facts = { requestsThisWeek: 0 }
   }
 
   // Resolve the viewer server-side so the header is right on the FIRST paint,
@@ -170,7 +229,28 @@ export default async function Page() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd(await orgDescription())) }} />
-      <Landing categories={categories} items={items} initialUser={initialUser} />
+      {/* ⚠️ THE INTAKE'S ADDRESS IS RESOLVED HERE, AND THE FLAG IS READ EXACTLY
+          ONCE. `requestsOn()` is an environment variable; a `'use client'`
+          section cannot see it, and a second read somewhere else is how two
+          surfaces on one page start disagreeing about whether a subsystem
+          exists. null means „the hero submits to the catalogue" — never a link
+          onto a 404.
+
+          ⚠️ AND null FOR SOMEBODY WHO SELLS HERE (owner, 2026-08-31). The gate
+          in lib/requestsServer already refuses them, so this changes nothing
+          about what they CAN do; what it changes is that the biggest field on
+          the site stops inviting a provider to buy and searches the catalogue
+          instead. `initialUser` is already resolved above — the header reads
+          the same `provider` boolean for the same reason (lib/requests →
+          showRequestCta), so the two surfaces cannot disagree.
+          Pinned by tests/requests.test.ts (app/_home/hero.tsx, gated here). */}
+      <Landing
+        categories={categories}
+        items={items}
+        initialUser={initialUser}
+        requestHref={requestsOn() && initialUser?.provider !== true ? REQUEST_ROUTE : null}
+        facts={facts}
+      />
     </>
   )
 }

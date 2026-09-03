@@ -14,7 +14,7 @@
  * Two queries total, whatever the number of categories.
  */
 import { prisma } from '@/lib/prisma'
-import { foldCounts } from '@/lib/categoryTree'
+import { foldCounts, foldMin } from '@/lib/categoryTree'
 import type { TreeNode } from '@/lib/categoryTree'
 
 /**
@@ -41,3 +41,45 @@ export async function expertCountsByCategory(cats: readonly TreeNode[]): Promise
   })
   return foldCounts(cats, grouped.map((g: { categoryId: string | null; _count: { _all: number } }) => ({ categoryId: g.categoryId, count: g._count._all })))
 }
+
+/**
+ * categoryId → the CHEAPEST price anybody in that sphere names, in lari.
+ *
+ * ⚠️ THE SAME `COUNTABLE_EXPERT` GATE AS THE COUNT ABOVE, and that is the whole
+ * point of it living here rather than at the call site. „24 ექსპერტი · 40₾-დან"
+ * is one sentence about one set of people; resolved by two `where` clauses it
+ * becomes a floor quoted by somebody the tile did not count and the visitor
+ * cannot find.
+ *
+ * 🔒 NEVER INVENT A NUMBER. `priceFrom` is null for a provider who quotes per
+ * job, and Postgres' MIN already ignores those — but a sphere where NOBODY
+ * named a price comes back with `_min.priceFrom === null`, and that row is
+ * dropped rather than folded as 0. The tile then prints the count alone.
+ */
+export async function priceFloorsByCategory(cats: readonly TreeNode[]): Promise<Map<string, number>> {
+  const grouped = await prisma.serviceProfile.groupBy({
+    by: ['categoryId'],
+    where: COUNTABLE_EXPERT,
+    _min: { priceFrom: true },
+  })
+  return foldMin(
+    cats,
+    grouped
+      .map((g: { categoryId: string | null; _min: { priceFrom: number | null } }) =>
+        ({ categoryId: g.categoryId, value: g._min.priceFrom }))
+      // A sphere nobody priced has no floor — not a floor of zero.
+      .filter((g): g is { categoryId: string | null; value: number } => g.value !== null && g.value > 0),
+  )
+}
+
+/* ⚠️ `countVisibleExperts()` LIVED HERE AND IS DELETED (2026-09-02). It answered
+ * „the whole visible roster, as ONE number", and on 2026-09-02 the site stopped
+ * asking: the home page's catalogue tile, the home closing band, the catalogue
+ * hero, the trade landing and /about all printed that number and all four
+ * claims were removed at the owner's „არასად არ ეწეროს ეგ ინფო, არასაჭიროა."
+ *
+ * Deleted rather than left exported, which is this repo's own rule and its own
+ * precedent — „stop exporting 126 symbols nobody imports" (2026-08-21). The
+ * gate it wrapped (`COUNTABLE_EXPERT`) stays: the PER-CATEGORY counts still use
+ * it, and they are read by the home page's populated-only filter, which is the
+ * one reader of a count that never reaches a screen. */

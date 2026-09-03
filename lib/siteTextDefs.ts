@@ -4,6 +4,8 @@
 // it. To make a new string editable: add an entry here + render it with
 // <SiteText k="..."/> (or useSiteText) where it appears.
 
+import { contactCostRangeLabel } from '@/lib/credits'
+
 export type SiteTextDef = {
   key: string
   group: string      // admin UI grouping
@@ -35,6 +37,7 @@ export type SiteTextDef = {
 }
 
 import { PAGE_SEO, pageSeoKey } from '@/lib/pageSeoDefs'
+import { MESSAGE_TEXTS, messageTextKey } from '@/lib/messageTextDefs'
 
 /**
  * The SEO block, expanded from lib/pageSeoDefs so the defaults here and the
@@ -45,6 +48,29 @@ import { PAGE_SEO, pageSeoKey } from '@/lib/pageSeoDefs'
  * address has one source (lib/supportEmails) so it can never be typed two ways.
  * Its TITLE is editable like every other.
  */
+/**
+ * The words in every letter and text, expanded from lib/messageTextDefs.
+ *
+ * ⚠️ THEY LIVE IN *THIS* REGISTRY RATHER THAN A TABLE OF THEIR OWN, and that is
+ * the whole point. The owner went looking for them and asked „სადა ტექსტები ვერ
+ * ვნახე ადმინშში" — a second copy system with a second editor and a second set
+ * of rules is one more place to look, not one fewer. Riding SITE_TEXTS means
+ * the editor, the save route, the tag invalidation and the orphan report all
+ * already work, and „the copy is the owner's" means the same thing on a page
+ * and in an email.
+ *
+ * Same shape as SEO_TEXTS directly below, for the same reason.
+ */
+const MESSAGE_COPY: SiteTextDef[] = MESSAGE_TEXTS.flatMap(g =>
+  g.texts.map(t => ({
+    key: messageTextKey(g.key, t.part),
+    group: `წერილი — ${g.label}`,
+    label: t.vars?.length ? `${t.label}  ·  ${t.vars.map(v => `{${v}}`).join(' ')}` : t.label,
+    default: t.default,
+    ...(t.multiline ? { multiline: true as const } : {}),
+  })),
+)
+
 const SEO_TEXTS: SiteTextDef[] = PAGE_SEO.flatMap(p => {
   const group = `SEO — ${p.label}`
   // A retired page's rows are retired rows — see PageSeoDef.retired.
@@ -74,15 +100,15 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // one here and the page does not move until the row changes too — that is
   // documented in CLAUDE.md and it is the reason the live title still said
   // „ონლაინ კონსულტაცია" weeks after the source stopped saying it.
-  { key: 'home.hero.line1', group: 'მთავარი — Hero', label: 'სათაური, 1-ლი ხაზი', default: 'იპოვე ექსპერტი,' },
-  { key: 'home.hero.line2', group: 'მთავარი — Hero', label: 'სათაური, აქცენტი (მწვანე)', default: 'რომელიც გააკეთებს' },
-  { key: 'home.hero.subtitle', group: 'მთავარი — Hero', label: 'ქვესათაური', multiline: true, default: 'ბუღალტერი, იურისტი, ფსიქოლოგი, სანტექნიკოსი — თბილისში. ყველა პროფილი ხელით მოწმდება,' },
+  { key: 'home.hero.line1', group: 'მთავარი — Hero', label: 'სათაური, 1-ლი ხაზი', default: 'იპოვე ექსპერტი,', retired: true },
+  { key: 'home.hero.line2', group: 'მთავარი — Hero', label: 'სათაური, აქცენტი (მწვანე)', default: 'რომელიც გააკეთებს', retired: true },
+  { key: 'home.hero.subtitle', group: 'მთავარი — Hero', label: 'ქვესათაური', multiline: true, default: 'ბუღალტერი, იურისტი, ფსიქოლოგი, სანტექნიკოსი — თბილისში. ყველა პროფილი ხელით მოწმდება,', retired: true },
   // ⚠️ „მოთხოვნა უფასოა" LEFT (2026-08-20). Owner: „უფასო და ესეთი რამები, რაც
   // არაპროფესიონალურია და საიტს ნდობას უკარგავს, არ გამოიყენო." He is right and
   // so is the market: Fiverr, Upwork and Thumbtack put counts and verification
   // in this slot, never the price of asking — which only invites the question
   // „so what DOES cost?".
-  { key: 'home.hero.subtitleEmphasis', group: 'მთავარი — Hero', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'ფასი პროფილზევე წერია.' },
+  { key: 'home.hero.subtitleEmphasis', group: 'მთავარი — Hero', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'ფასი პროფილზევე წერია.', retired: true },
   // ⚠️ RETIRED 2026-08-21 (the redesign — see app/_home/hero). The trust strip
   // and the ratings-fallback line belonged to the hero's stats lattice, and the
   // design canvas replaces the whole lattice with six real priced cards
@@ -94,11 +120,11 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // The placeholder is a worked EXAMPLE, not an instruction („მაგ. …"): a
   // marketplace box that says „ძებნა" teaches nothing, and the chip rail under
   // it is the same lesson in eight more words. Keep it a real, bookable thing.
-  { key: 'home.hero.searchPlaceholder', group: 'მთავარი — Hero', label: 'საძიებო ველი — მინიშნება', default: 'მაგ. ბინის დალაგება' },
-  { key: 'home.hero.searchCta', group: 'მთავარი — Hero', label: 'საძიებო ველი — ღილაკი', default: 'ვეძებოთ' },
+  { key: 'home.hero.searchPlaceholder', group: 'მთავარი — Hero', label: 'საძიებო ველი — მინიშნება', default: 'მაგ. ბინის დალაგება', retired: true },
+  { key: 'home.hero.searchCta', group: 'მთავარი — Hero', label: 'საძიებო ველი — ღილაკი', default: 'ვეძებოთ', retired: true },
   // Read aloud, never seen — the label a screen reader announces for the field.
   // A placeholder is not a label: it vanishes the moment somebody types.
-  { key: 'home.hero.searchLabel', group: 'მთავარი — Hero', label: 'საძიებო ველი — ხმოვანი წარწერა', default: 'რას ეძებ?' },
+  { key: 'home.hero.searchLabel', group: 'მთავარი — Hero', label: 'საძიებო ველი — ხმოვანი წარწერა', default: 'რას ეძებ?', retired: true },
 
   // ── Home · Categories section ──
   // ⚠️ ONE HEADING NOW (2026-08-21). The section was an eyebrow + a heading + a
@@ -112,7 +138,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'home.categories.title', group: 'მთავარი — კატეგორიები', label: 'სათაური', default: 'აირჩიე შენი კატეგორია', retired: true },
   { key: 'home.categories.subtitle', group: 'მთავარი — კატეგორიები', label: 'ქვესათაური', default: 'აირჩიე მიმართულება და ნახე, ვინ მუშაობს ამაზე.', retired: true },
   { key: 'home.categories.allEyebrow', group: 'მთავარი — კატეგორიები', label: 'იარლიყი კატეგორიების სიის ზემოთ', default: 'ყველა კატეგორია', retired: true },
-  { key: 'home.spheres.title', group: 'მთავარი — კატეგორიები', label: 'სათაური', default: 'კატეგორიები' },
+  { key: 'home.spheres.title', group: 'მთავარი — კატეგორიები', label: 'სათაური', default: 'კატეგორიები', retired: true },
 
   // ── Home · Experts section ──
   // `home.experts.title` is the section h2 — but ONLY while no sphere is
@@ -132,8 +158,8 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // „ახლა ხელმისაწვდომია" is a claim the grid under it has to keep: every card
   // is a live, listed, priced offer. If that ever stops being true, change the
   // query, not this line.
-  { key: 'home.now.title', group: 'მთავარი — ახლა ხელმისაწვდომია', label: 'სათაური', default: 'ახლა ხელმისაწვდომია' },
-  { key: 'home.now.allCta', group: 'მთავარი — ახლა ხელმისაწვდომია', label: 'ბმული სათაურის გვერდით', default: 'ყველა' },
+  { key: 'home.now.title', group: 'მთავარი — ახლა ხელმისაწვდომია', label: 'სათაური', default: 'ახლა ხელმისაწვდომია', retired: true },
+  { key: 'home.now.allCta', group: 'მთავარი — ახლა ხელმისაწვდომია', label: 'ბმული სათაურის გვერდით', default: 'ყველა', retired: true },
 
   // ── Home · How it works ──
   // The WHOLE section is editable, top to bottom (2026-08-04). Before that, the
@@ -167,19 +193,19 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // list. Reusing the key would print the request wording under a heading about
   // browsing — the CMS lying, quietly, on the busiest page on the site. The old
   // rows survive untouched and come back with the section if it ever returns.
-  { key: 'home.steps.title', group: 'მთავარი — როგორ მუშაობს', label: 'სათაური', default: 'როგორ მუშაობს' },
-  { key: 'home.steps.s1.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — სათაური', default: 'აირჩიე' },
-  { key: 'home.steps.s1.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'ფასი პროფილზე წერია — ხედავ და ირჩევ, არაფერს ელოდები.' },
-  { key: 'home.steps.s2.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — სათაური', default: 'შეთანხმდი' },
-  { key: 'home.steps.s2.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'დეტალებს პირდაპირ ექსპერტთან აზუსტებ. თუ დრო სჭირდება — საათსაც ირჩევ.' },
-  { key: 'home.steps.s3.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'შესრულდა' },
+  { key: 'home.steps.title', group: 'მთავარი — როგორ მუშაობს', label: 'სათაური', default: 'როგორ მუშაობს', retired: true },
+  { key: 'home.steps.s1.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — სათაური', default: 'აირჩიე', retired: true },
+  { key: 'home.steps.s1.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'ფასი პროფილზე წერია — ხედავ და ირჩევ, არაფერს ელოდები.', retired: true },
+  { key: 'home.steps.s2.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — სათაური', default: 'შეთანხმდი', retired: true },
+  { key: 'home.steps.s2.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'დეტალებს პირდაპირ ექსპერტთან აზუსტებ. თუ დრო სჭირდება — საათსაც ირჩევ.', retired: true },
+  { key: 'home.steps.s3.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'შესრულდა', retired: true },
   // ⚠️ THE SECOND SENTENCE WAS A PROMISE ABOUT CONTACT (2026-08-21). „კონტაქტს
   // მხოლოდ არჩეული იღებს" was true until the phone number stopped being
   // released to anybody (lib/requests → clientIdentityOpen). THE LIVE PAGE MAY
   // STILL SAY THE OLD SENTENCE: this is only the default, and a `SiteText` row
   // overrides it — that row has to be edited in /admin the day this ships, not
   // before, because until then the deployed code still shows the number.
-  { key: 'home.steps.s3.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'სამუშაო სრულდება შეთანხმებულ ფასში. ყველაფერს მიმოწერაში თანხმდებით.' },
+  { key: 'home.steps.s3.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'სამუშაო სრულდება შეთანხმებულ ფასში. ყველაფერს მიმოწერაში თანხმდებით.', retired: true },
 
   // ── Home · What every booking includes — RETIRED 2026-08-08 (owner) ──
   // The three-cell strip at the foot of „როგორ მუშაობს" was deleted from
@@ -222,11 +248,147 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // The four `home.expertCta.*` keys above are retired for the usual reason —
   // their rows hold the old pitch („მიიღე კლიენტები." / „შენ ადგენ ფასს…"),
   // which is about a consultation practice; this band sells listing a SERVICE.
-  { key: 'home.supply.title', group: 'მთავარი — დაარეგისტრირე სერვისი', label: 'სათაური', default: 'შენი სერვისი — შენი ფასი' },
-  { key: 'home.supply.body', group: 'მთავარი — დაარეგისტრირე სერვისი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'დაარეგისტრირე რასაც აკეთებ და დაწერე ფასი. კლიენტი ბარათიდანვე ხედავს, რას ყიდი და რა ღირს.' },
+  { key: 'home.supply.title', group: 'მთავარი — დაარეგისტრირე სერვისი', label: 'სათაური', default: 'შენი სერვისი — შენი ფასი', retired: true },
+  { key: 'home.supply.body', group: 'მთავარი — დაარეგისტრირე სერვისი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'დაარეგისტრირე რასაც აკეთებ და დაწერე ფასი. კლიენტი ბარათიდანვე ხედავს, რას ყიდი და რა ღირს.', retired: true },
   // How long it takes, beside the button. Two words, and they answer the one
   // objection („not now") before it is formed.
   { key: 'home.supply.note', group: 'მთავარი — დაარეგისტრირე სერვისი', label: 'ღილაკის გვერდით — რამდენი დრო', default: '2 წუთი' },
+
+  /* ═══════════════════════════════════════════════════════════════════════
+   * THE 2026-08-31 REDESIGN — the owner's design canvas („mcodne.ge პროფილის
+   * რედიზაინი"), ported screen by screen.
+   *
+   * ⚠️ EVERY KEY BELOW IS NEW, AND NOT ONE OF THEM REUSES AN OLD ONE. That is
+   * the rule this file has followed twice before and it is not tidiness: the
+   * LIVE site reads the `SiteText` TABLE, and those rows still hold the
+   * previous wording. Reusing `home.hero.line1` would print „იპოვე ექსპერტი,"
+   * — a browse headline — over a hero whose one button files a request. The
+   * superseded keys are marked `retired: true` above rather than deleted,
+   * because a production row is keyed by them.
+   *
+   * ⚠️ NO COMMISSION SENTENCE ANYWHERE IN HERE. Owner, 2026-08-31:
+   * „საკომისიოები არასდ [არასდროს] დაწერო." The canvas's „0% საკომისიო
+   * სამუშაოს ფასიდან" and „საკომისიოს არც ექსპერტს ვართმევთ" are both gone.
+   * /terms is untouched — that copy is legal and the owner's.
+   * ═══════════════════════════════════════════════════════════════════════ */
+
+  // ── Home — the hero, which is the intake ──
+  { key: 'home.ask.line1', group: 'მთავარი — Hero', label: 'სათაური, 1-ლი ხაზი', default: 'დაწერე, რა გჭირდება.' },
+  { key: 'home.ask.line2', group: 'მთავარი — Hero', label: 'სათაური, მე-2 ხაზი', default: 'ფასს თავად შემოგთავაზებენ.' },
+  // ⚠️ RETIRED 2026-08-31 BY THE OWNER („ესეც წაშალე"). The hero card is a
+  // headline, a field and four steps now; the sub-line said in a sentence what
+  // step 01 says with a drawing over it. The row stays — it may hold copy
+  // somebody typed by hand — and the key is skipped in the admin editor.
+  { key: 'home.ask.sub', group: 'მთავარი — Hero', label: 'ქვესათაური', multiline: true, default: 'ერთი წინადადება კმარა. მოთხოვნა უფასოა და არაფერს გავალდებულებს.', retired: true },
+  { key: 'home.ask.placeholder', group: 'მთავარი — Hero', label: 'ველი — მინიშნება', default: 'რა უნდა გაკეთდეს?' },
+  // ⚠️ A LABEL, NOT A SECOND PLACEHOLDER. It is `sr-only`, and it exists
+  // because a placeholder disappears the moment somebody types — a screen
+  // reader announcing „edit text, blank" is describing a control nobody can use.
+  { key: 'home.ask.label', group: 'მთავარი — Hero', label: 'ველი — ხმოვანი წარწერა', default: 'რა უნდა გაკეთდეს?' },
+  { key: 'home.ask.cta', group: 'მთავარი — Hero', label: 'ველის ღილაკი', default: 'ფასის მოთხოვნა' },
+  // ⚠️ RETIRED 2026-08-31 WITH THE CHIPS IT LABELLED („ეს წაშალე და ხაზი").
+  { key: 'home.ask.examplesLabel', group: 'მთავარი — Hero', label: 'მაგალითების წინ', default: 'მაგალითად:', retired: true },
+
+  // ── Home — the category tiles ──
+  { key: 'home.tiles.title', group: 'მთავარი — კატეგორიები', label: 'სათაური', default: 'რაში ეხმარებიან ხშირად' },
+  { key: 'home.tiles.allCta', group: 'მთავარი — კატეგორიები', label: 'ბმული სათაურის გვერდით', default: 'ყველა კატეგორია' },
+  { key: 'home.tiles.allTile', group: 'მთავარი — კატეგორიები', label: 'ბოლო ფილა', default: 'ყველა სერვისი' },
+  // ⚠️ THE EIGHTH TILE (2026-08-31). The grid is 4×2 and six spheres are
+  // populated, so with the catalogue door it stood at seven and one hole. The
+  // hole could not be filled with a seventh SPHERE — measured that day, every
+  // remaining category has 0 experts and is HIDDEN, and a tile that opens „ვერ
+  // ვიპოვეთ" is the dead end the count line exists to prevent. So the eighth
+  // door is the site's own action: the visitor who does not see their sphere
+  // among six should be describing what they need, not filtering an empty list.
+  // Both defaults are the owner's existing words — the top bar's CTA and the
+  // home page's own title — rather than new copy written here.
+  { key: 'home.tiles.askTile', group: 'მთავარი — კატეგორიები', label: 'მოთხოვნის ფილა', default: 'მოთხოვნის გაგზავნა' },
+  { key: 'home.tiles.askMeta', group: 'მთავარი — კატეგორიები', label: 'მოთხოვნის ფილა — ქვეწარწერა', default: 'აღწერე რა გჭირდება' },
+
+  // ── Home — the three steps ──
+  // ⚠️ THEY DESCRIBE THE REQUEST AGAIN. `home.steps.*` (retired above) describe
+  // BROWSING — they were rewritten that way on 2026-08-21 when the hero became
+  // a search box. The hero is the intake again, so the steps are again about
+  // what happens after that button. „3-მდე" is `DEFAULT_OFFER_LIMIT`
+  // (lib/requests), not a marketing number.
+  /* ⚠️ TWO OF THIS GROUP ARE RETIRED, NOT DELETED (2026-08-31). The four steps
+   * moved ONTO the hero card (app/_home/how.tsx → FlowSteps), where they sit
+   * under the search field with no section heading of their own and no line
+   * beside a button — so „როგორ მუშაობს" as an h2 and „კლიენტისთვის სრულიად
+   * უფასოა." have no surface left. `retired` is this file's word for exactly
+   * that: the key stays, a production SiteText row typed under it stays
+   * readable, and only the admin editor stops offering it. „ფასის მოთხოვნა"
+   * goes with them: the card's own button is `home.ask.cta`, which says the
+   * same words one surface up, and two editable copies of one label is how the
+   * two come to disagree. The eight step keys below are LIVE and are what the
+   * card prints. */
+  { key: 'home.flow.title', group: 'მთავარი — როგორ მუშაობს', label: 'სათაური', default: 'როგორ მუშაობს', retired: true },
+  // ⚠️ FOUR STEPS SINCE 2026-08-31, AND THE WORDS ARE THE OWNER'S OWN — pasted
+  // into the session verbatim, numbered 01–04. It was three, from the design
+  // canvas; this splits „choose" into COMPARE and START, which is the honest
+  // shape of the journey: comparing offers and then working with the person you
+  // picked are two different acts, and the second one is where the phone number
+  // opens. No key here has a SiteText row yet (these were created today), so
+  // the defaults ARE what the live page prints — changing them here changes it.
+  /* ⚠️ „აღწერე, რა გჭირდება" IS THE OWNER'S OWN WORDING, pasted into the
+   * session as step 01 of four. It was briefly shortened to „აღწერე მოთხოვნა"
+   * on a real argument — the card's headline two hundred pixels above says
+   * „დაწერე, რა გჭირდება", so the long form repeats it — but the owner's copy
+   * is the owner's copy, and the two verbs are not the same word. If the
+   * repetition ever grates, the line to change is the HEADLINE's, not this one:
+   * this is the step, and steps are what somebody reads to find out what
+   * happens next. */
+  { key: 'home.flow.s1.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — სათაური', default: 'აღწერე, რა გჭირდება' },
+  { key: 'home.flow.s1.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 1 — აღწერა', multiline: true, default: 'დაწერე, რაში გჭირდება დახმარება.' },
+  { key: 'home.flow.s2.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — სათაური', default: 'მიიღე შეთავაზებები' },
+  { key: 'home.flow.s2.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 2 — აღწერა', multiline: true, default: 'ექსპერტები გაეცნობიან მოთხოვნას და შეთავაზებას გამოგიგზავნიან.' },
+  { key: 'home.flow.s3.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'შეადარე და აირჩიე' },
+  /* ⚠️ „შეფასებები" LEFT THIS SENTENCE (2026-09-02), AND THE FEATURE DID NOT.
+     `Review` is a real model, /experts has a „მინ. რეიტინგი" filter, and the
+     provider card is written to show a rating the day one exists. Measured
+     2026-09-02: the table holds ZERO rows. So step 3 was telling every visitor
+     to compare something no card on the site can show, three scrolls above the
+     grid that cannot show it.
+
+     The filter already handles this correctly — `ratingUseless(facets)` hides
+     it while there is nothing to filter by — and this line is the same rule
+     applied to the copy. It goes back the day reviews exist. */
+  { key: 'home.flow.s3.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'შეადარე ფასები და გამოცდილება, აირჩიე ექსპერტი.' },
+  { key: 'home.flow.s4.title', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 4 — სათაური', default: 'დაიწყე თანამშრომლობა' },
+  { key: 'home.flow.s4.desc', group: 'მთავარი — როგორ მუშაობს', label: 'ნაბიჯი 4 — აღწერა', multiline: true, default: 'დაუკავშირდი ექსპერტს და დაიწყე.' },
+  { key: 'home.flow.free', group: 'მთავარი — როგორ მუშაობს', label: 'ღილაკის გვერდით', default: 'კლიენტისთვის სრულიად უფასოა.', retired: true },
+  { key: 'home.flow.cta', group: 'მთავარი — როგორ მუშაობს', label: 'ღილაკი', default: 'ფასის მოთხოვნა', retired: true },
+
+
+  // ── Home — the roster, which is the SECOND door ──
+  // ⚠️ „ან" IS THE WHOLE HEADING. This section used to lead the page; it is now
+  // the alternative for somebody who would rather choose than describe.
+  // The subtitle promises the PRICE only. The canvas also promised „პასუხის
+  // სიჩქარე", and the reply chip beside it is measured (lib/responseStats) —
+  // so most cards carry none of it yet, and a heading must not promise what
+  // most of the grid under it cannot show.
+  { key: 'home.pick.title', group: 'მთავარი — ექსპერტები', label: 'სათაური', default: 'ან პირდაპირ აირჩიე' },
+  { key: 'home.pick.sub', group: 'მთავარი — ექსპერტები', label: 'ქვესათაური', default: 'ფასი თავიდანვე ჩანს' },
+  { key: 'home.pick.allCta', group: 'მთავარი — ექსპერტები', label: 'ბმული სათაურის გვერდით', default: 'კატალოგი' },
+
+  // ── Home — the closing supply band ──
+  // ⚠️ THE BUTTON'S WORD IS NOT HERE. „დაარეგისტრირე სერვისი" is
+  // `JOIN_DOOR_LABEL` in lib/capabilities, shared with the header and the
+  // footer: the site's three supply links say one thing and point at one door.
+  // ⚠️ THE PRICE IN THE BODY IS INTERPOLATED, and it is interpolated because it
+  // was TYPED here until 2026-09-02 and went stale. The price moved 1₾ → 3₾ on
+  // 2026-09-01 (the owner's design canvas → „Expert Jobs"); `ClosingBand`'s
+  // tile reads the constant and printed 3₾, this line did not and printed 1₾ —
+  // two prices for one thing, forty pixels apart, on the page that recruits
+  // providers, with 3₾ actually charged. lib/credits already says the rule this
+  // line was breaking: „THE PRICE IS SPELLED ONCE, HERE, NEVER ON A SCREEN."
+  // ⚠️ The sentence is
+  // the product's own rule (lib/credits → CONTACT_COST_NOTE), not the canvas's
+  // „1₾ როცა კლიენტი გიპასუხებს" — the charge fires when the PROVIDER opens the
+  // client's contact, which is a different moment and a different promise.
+  { key: 'home.supply2.eyebrow', group: 'მთავარი — დაარეგისტრირე სერვისი', label: 'პატარა იარლიყი', default: 'ექსპერტებისთვის' },
+  { key: 'home.supply2.title', group: 'მთავარი — დაარეგისტრირე სერვისი', label: 'სათაური', default: 'დაარეგისტრირე სერვისი და იმუშავე შენი ფასით' },
+  { key: 'home.supply2.body', group: 'მთავარი — დაარეგისტრირე სერვისი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: `შეთავაზების გაგზავნა უფასოა. კლიენტის კონტაქტი ${contactCostRangeLabel()} ღირს — ერთხელ იხდი, მერე ყოველთვის გიჩანს.` },
 
   // ── Categories page — RETIRED 2026-08-19 (stage 8) ──
   // app/categories/∗ was deleted; the URLs 308 to /experts?category=. The keys
@@ -252,7 +414,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // ── Blog ──
   { key: 'blog.eyebrow', group: 'ბლოგი', label: 'პატარა იარლიყი', default: 'ბლოგი' },
   { key: 'blog.title', group: 'ბლოგი', label: 'სათაური', default: 'პრაქტიკული ცოდნა, პირდაპირ ექსპერტებისგან' },
-  { key: 'blog.subtitle', group: 'ბლოგი', label: 'ქვესათაური', multiline: true, default: 'პრაქტიკული სახელმძღვანელოები, კონსულტანტების ჩანაწერები და ინდუსტრიის ანალიზი — ქართველი ექსპერტებისგან.' },
+  { key: 'blog.subtitle', group: 'ბლოგი', label: 'ქვესათაური', multiline: true, default: 'პრაქტიკული სახელმძღვანელოები ქართველი ექსპერტებისგან.' },
   { key: 'blog.empty.badge', group: 'ბლოგი', label: 'ცარიელი გვერდი — აბრა', default: 'მალე გამოვა' },
   { key: 'blog.empty.title', group: 'ბლოგი', label: 'ცარიელი გვერდი — სათაური', default: 'ბლოგი მალე ამოქმედდება' },
   { key: 'blog.empty.body', group: 'ბლოგი', label: 'ცარიელი გვერდი — ტექსტი', multiline: true, default: 'პირველი სტატიები მზადდება. დაგვიკავშირდი და შეგატყობინებთ გამოსვლისას.' },
@@ -260,21 +422,79 @@ export const SITE_TEXTS: SiteTextDef[] = [
 
   // ── About page ──
   { key: 'about.hero.title', group: 'ჩვენ შესახებ', label: 'სათაური', default: 'ცოდნა, რომელსაც შენ ენდობი' },
-  { key: 'about.hero.body', group: 'ჩვენ შესახებ', label: 'შესავალი', multiline: true, default: 'ბევრი ეძებს პასუხს რთულ პროფესიულ კითხვაზე, მაგრამ ვერ პოულობს ექსპერტს, ვისაც ენდობა. მცოდნე გაკავშირებს გამოცდილ სპეციალისტთან — მოკლედ, პირდაპირ და უსაფრთხოდ.' },
+  { key: 'about.hero.body', group: 'ჩვენ შესახებ', label: 'შესავალი', multiline: true, default: 'ბევრი ეძებს ექსპერტს, ვისაც ენდობა. მცოდნე გაკავშირებს გამოცდილთან.' },
   { key: 'about.principles.title', group: 'ჩვენ შესახებ', label: 'პრინციპები — სათაური', default: 'ჩვენი პრინციპები' },
-  { key: 'about.value1.title', group: 'ჩვენ შესახებ', label: 'პრინციპი 1 — სათაური', default: 'გადამოწმებული ცოდნა' },
-  { key: 'about.value1.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 1 — ტექსტი', multiline: true, default: 'ხელით ვამოწმებთ გამოცდილებას, პორტფოლიოსა და რეპუტაციას.' },
+  /* ⚠️ RETIRED 2026-09-02 — the verification claim, measured false. 1 of 26
+     published providers carries the ✓, and the whole ProviderApplication table
+     holds THREE rows (2 approved), so „ხელით ვამოწმებთ გამოცდილებას,
+     პორტფოლიოსა და რეპუტაციას" described a process almost nobody went through.
+     It is the same claim removed from the site description, the OG cards and
+     the sign-in screen on the same day. Kept as keys, never deleted: a
+     production SiteText row may hold copy typed under them. */
+  { key: 'about.value1.title', group: 'ჩვენ შესახებ', label: 'პრინციპი 1 — სათაური', default: 'გადამოწმებული ცოდნა', retired: true },
+  { key: 'about.value1.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 1 — ტექსტი', multiline: true, default: 'ხელით ვამოწმებთ გამოცდილებას, პორტფოლიოსა და რეპუტაციას.', retired: true },
   { key: 'about.value2.title', group: 'ჩვენ შესახებ', label: 'პრინციპი 2 — სათაური', default: 'გამჭვირვალე ფასი' },
-  { key: 'about.value2.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 2 — ტექსტი', multiline: true, default: 'ფასი შეთავაზებაშივე წერია — ფარული დანამატები არ არის. დაცული გადახდები — მალე.' },
-  { key: 'about.value3.title', group: 'ჩვენ შესახებ', label: 'პრინციპი 3 — სათაური', default: 'ღირებული დრო' },
-  { key: 'about.value3.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 3 — ტექსტი', multiline: true, default: 'ფასი წინასწარ ცნობილია. სამუშაო კონკრეტულია და შედეგზე ორიენტირებული.' },
+  /* ⚠️ „დაცული გადახდები — მალე." CAME OFF THIS LINE (2026-09-02). `PAYMENTS_LIVE`
+     is false and carries no date, so „მალე" was a promise nobody could keep or
+     check — the one kind of sentence CLAUDE.md rule 6 is about. The first half
+     is true today and stays. */
+  { key: 'about.value2.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 2 — ტექსტი', multiline: true, default: 'ფასი შეთავაზებაშივე წერია — ფარული დანამატები არ არის.' },
+  /* ⚠️ RETIRED 2026-09-02 — it said principle 2 again. „ფასი წინასწარ
+     ცნობილია" is „ფასი შეთავაზებაშივე წერია" in other words, one card to the
+     left, and the rest („სამუშაო კონკრეტულია და შედეგზე ორიენტირებული") is a
+     sentence that cannot be false and therefore says nothing. */
+  { key: 'about.value3.title', group: 'ჩვენ შესახებ', label: 'პრინციპი 3 — სათაური', default: 'ღირებული დრო', retired: true },
+  { key: 'about.value3.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 3 — ტექსტი', multiline: true, default: 'ფასი წინასწარ ცნობილია. სამუშაო კონკრეტულია და შედეგზე ორიენტირებული.', retired: true },
   { key: 'about.value4.title', group: 'ჩვენ შესახებ', label: 'პრინციპი 4 — სათაური', default: 'ქართული საზოგადოება' },
   { key: 'about.value4.body', group: 'ჩვენ შესახებ', label: 'პრინციპი 4 — ტექსტი', multiline: true, default: 'ცოდნა ქართულად — ბიზნესი, სამართალი, კარიერა, ფსიქოლოგია.' },
-  { key: 'about.create.title', group: 'ჩვენ შესახებ', label: 'რას ვქმნით — სათაური', default: 'პირდაპირი წვდომა ცოდნაზე' },
-  { key: 'about.create.p1', group: 'ჩვენ შესახებ', label: 'რას ვქმნით — აბზაცი 1', multiline: true, default: 'კარგი კონსულტაცია ძნელი საპოვნია — ცოდნა არსებობს, მაგრამ ხელმისაწვდომი არაა. მცოდნე ამ ხარვეზს ავსებს.' },
-  { key: 'about.create.p2', group: 'ჩვენ შესახებ', label: 'რას ვქმნით — აბზაცი 2', multiline: true, default: 'გაკავშირებთ ხელით შერჩეულ ქართველ ექსპერტთან — სამუშაოზე, რომელიც გჭირდება, ან წინასწარ კონსულტაციაზე. ერთმა სწორმა ადამიანმა შეიძლება შენი პროექტი თუ საქმე შეცვალოს.' },
+  { key: 'about.create.title', group: 'ჩვენ შესახებ', label: 'რას ვქმნით — სათაური', default: 'პირდაპირი წვდომა ცოდნაზე' , retired: true },
+  { key: 'about.create.p1', group: 'ჩვენ შესახებ', label: 'რას ვქმნით — აბზაცი 1', multiline: true, default: 'კარგი კონსულტაცია ძნელი საპოვნია — ცოდნა არსებობს, მაგრამ ხელმისაწვდომი არაა. მცოდნე ამ ხარვეზს ავსებს.' , retired: true },
+  { key: 'about.create.p2', group: 'ჩვენ შესახებ', label: 'რას ვქმნით — აბზაცი 2', multiline: true, default: 'გაკავშირებთ ქართველ ექსპერტთან — სამუშაოზე, რომელიც გჭირდება, ან წინასწარ კონსულტაციაზე.' , retired: true },
   { key: 'about.cta.title', group: 'ჩვენ შესახებ', label: 'ექსპერტის CTA — სათაური', default: 'ხარ ექსპერტი? გვინდა შენი ცოდნა' },
   { key: 'about.cta.body', group: 'ჩვენ შესახებ', label: 'ექსპერტის CTA — ტექსტი', multiline: true, default: 'გაქვს გამოცდილება? შემოგვიერთდი — განაცხადს 24–48 საათში განვიხილავთ.' },
+
+  // ── /about — „როგორ მუშაობს", the owner's „How It Works + Help" canvas ───
+  //
+  // ⚠️ THE HEADER HAS NAMED /about „როგორ მუშაობს" ALL ALONG and the page never
+  // answered the question — it opened on „ცოდნა, რომელსაც შენ ენდობი" and went
+  // straight to principles. The canvas puts the answer first: a green card, a
+  // კლიენტს/ექსპერტს switch, and the numbered steps under it. Everything that
+  // was on the page is still on it, below the closing band — none of these keys
+  // replaces one, they are added beside them („თუ აკლია რამე დამატე, არ
+  // წაშალო").
+  { key: 'about.how.title', group: 'როგორ მუშაობს', label: 'სათაური (მწვანე ბარათი)', default: 'როგორ მუშაობს' },
+  { key: 'about.how.body', group: 'როგორ მუშაობს', label: 'ქვესათაური (მწვანე ბარათი)', multiline: true, default: 'ჩვენი საქმე დაკავშირებაა. ფასს და დეტალებს თქვენ ათანხმებთ.' },
+  // ⚠️ THE CLIENT'S STEPS ARE NOT HERE, AND THAT IS THE POINT. They are
+  // `home.flow.s1…s4`, rendered on the home page's green card since 2026-08-31
+  // — the same four sentences telling the same story. A fifth copy of them
+  // under an `about.*` key would be a second thing to edit and a second thing
+  // to forget; the owner edits „აღწერე, რა გჭირდება" ONCE.
+  //
+  // The provider's side has no existing copy anywhere, so it gets its own keys.
+  // ⚠️ NO COMMISSION SENTENCE. The canvas's third step ends „სამუშაოს ფასიდან
+  // საკომისიოს არ ვიღებთ" and the owner has not decided the commission question
+  // („ჯერ არ გადავწყვიტოთ"); it is written nowhere on the site and this is not
+  // where it starts.
+  { key: 'about.provider.s1.title', group: 'როგორ მუშაობს', label: 'ექსპერტს · ნაბიჯი 1 — სათაური', default: 'დაარეგისტრირე სერვისი' },
+  { key: 'about.provider.s1.desc', group: 'როგორ მუშაობს', label: 'ექსპერტს · ნაბიჯი 1 — აღწერა', multiline: true, default: 'აირჩიე, რას აკეთებ, და დაადე საორიენტაციო ფასი. 2 წუთი.' },
+  { key: 'about.provider.s2.title', group: 'როგორ მუშაობს', label: 'ექსპერტს · ნაბიჯი 2 — სათაური', default: 'მიიღე მოთხოვნები' },
+  { key: 'about.provider.s2.desc', group: 'როგორ მუშაობს', label: 'ექსპერტს · ნაბიჯი 2 — აღწერა', multiline: true, default: 'მოთხოვნები მხოლოდ შენს სერვისებზე მოგდის. შეთავაზების გაგზავნა უფასოა.' },
+  { key: 'about.provider.s3.title', group: 'როგორ მუშაობს', label: 'ექსპერტს · ნაბიჯი 3 — სათაური', default: 'გადაიხადე მხოლოდ პასუხზე' },
+  // ⚠️ THE THIRD STEP HAS NO `desc` KEY, AND THAT IS DELIBERATE. Its sentence
+  // quotes a PRICE — the canvas writes „1₾ ჩამოგეჭრება…" — and lib/credits
+  // states the rule for that number: „THE PRICE IS SPELLED ONCE, HERE, NEVER ON
+  // A SCREEN." So the page renders `CONTACT_COST_NOTE` + `CONTACT_REFUND_NOTE`
+  // straight out of lib/credits, exactly as the provider's own screens do. An
+  // editable copy would freeze today's lari into a database row and keep
+  // printing it after a re-price, with nothing reporting the drift — the same
+  // reasoning as `HELP_LOCKED_ANSWER_IDS`.
+  // The closing band, one per side. The EXPERT side reuses `about.cta.title` /
+  // `about.cta.body` above — „ხარ ექსპერტი? გვინდა შენი ცოდნა" is already
+  // exactly this band's copy, and the owner has typed a row under those keys.
+  { key: 'about.cta.client.title', group: 'როგორ მუშაობს', label: 'კლიენტს · დასასრული — სათაური', default: 'დაწერე მოთხოვნა' },
+  { key: 'about.cta.client.body', group: 'როგორ მუშაობს', label: 'კლიენტს · დასასრული — ტექსტი', multiline: true, default: 'ერთი წინადადება — ფასს თავად შემოგთავაზებენ.' },
+  { key: 'about.cta.client.button', group: 'როგორ მუშაობს', label: 'კლიენტს · დასასრული — ღილაკი', default: 'ფასის მოთხოვნა' },
+  { key: 'about.cta.expert.button', group: 'როგორ მუშაობს', label: 'ექსპერტს · დასასრული — ღილაკი', default: 'რეგისტრაცია' },
 
   // ── /join — THE BARE DOOR, what a signed-out visitor meets ─────────────
   //
@@ -292,9 +512,16 @@ export const SITE_TEXTS: SiteTextDef[] = [
   //
   // The HEADING is not a row — it is `JOIN_DOOR_LABEL` in lib/capabilities,
   // because it must be the same word as the header link that leads here.
-  { key: 'join.hero.eyebrow', group: 'რეგისტრაცია — კარი', label: 'პატარა იარლიყი', default: 'ექსპერტებისთვის' },
+  /* ⚠️ RETIRED 2026-08-31, NOT DELETED. The guest door stopped asking the
+   * profession — /join is one page on both sides of the sign-up wall now
+   * (app/join/_door/PublicDoor explains what the screen was and why the answer
+   * was worth nothing) — so the eyebrow above the h1 and the bolded question
+   * above the picker have no surface left. A production SiteText row may hold
+   * copy typed under either key; `retired` keeps the key and the row and only
+   * hides it from ადმინი → ტექსტები. */
+  { key: 'join.hero.eyebrow', group: 'რეგისტრაცია — კარი', label: 'პატარა იარლიყი', default: 'ექსპერტებისთვის', retired: true },
   { key: 'join.hero.body', group: 'რეგისტრაცია — კარი', label: 'ტექსტი სათაურის ქვეშ', multiline: true, default: 'მიიღე კლიენტები. ფასს, დროსა და მოცულობას შენ ადგენ.' },
-  { key: 'join.hero.ask', group: 'რეგისტრაცია — კარი', label: 'ხაზი ამომრჩევის ზემოთ', default: 'აირჩიე, რას აკეთებ.' },
+  { key: 'join.hero.ask', group: 'რეგისტრაცია — კარი', label: 'ხაზი ამომრჩევის ზემოთ', default: 'აირჩიე, რას აკეთებ.', retired: true },
   { key: 'join.hero.note', group: 'რეგისტრაცია — კარი', label: 'პატარა ხაზი ღილაკის ქვეშ', default: 'რეგისტრაცია 2 წუთია' },
 
   // ── /apply — the public „გახდი ექსპერტი" page ──────────────────────────
@@ -350,7 +577,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // `scripts/sitetext-step3-2026-08-29.ts`, or edit the key in
   // ადმინი → ტექსტები.
   { key: 'apply.how.step3.title', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 3 — სათაური', default: 'მიიღე მოთხოვნები' },
-  { key: 'apply.how.step3.desc', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'დამტკიცების შემდეგ შენი პროფილი ძიებაში გამოჩნდება და კლიენტების მოთხოვნებს მიიღებ — შეთავაზებას თავად აგზავნი.' },
+  { key: 'apply.how.step3.desc', group: 'გახდი ექსპერტი — როგორ მუშაობს', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'დამტკიცების შემდეგ მოთხოვნებს მიიღებ და შეთავაზებას თავად აგზავნი.' },
 
   { key: 'apply.who.eyebrow', group: 'გახდი ექსპერტი — ვის ვეძებთ', label: 'პატარა იარლიყი', default: 'ვის ვეძებთ' },
   // One profession per LINE. Empty lines are ignored, so the list length is
@@ -369,22 +596,22 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // 2026-08-05. ⚠ It no longer follows the flag — re-type it here when paid
   // bookings ship.
   { key: 'apply.get.card4.title', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 4 — სათაური', default: 'საკომისიო' },
-  { key: 'apply.get.card4.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 4 — ტექსტი', multiline: true, default: 'ფასს შენ ადგენ. პლატფორმა 15%-ს იტოვებს — ონლაინ გადახდების ამოქმედების შემდეგ.' },
+  { key: 'apply.get.card4.body', group: 'გახდი ექსპერტი — რას იღებ', label: 'ბარათი 4 — ტექსტი', multiline: true, default: 'ფასს შენ ადგენ.' },
 
   { key: 'apply.faq.eyebrow', group: 'გახდი ექსპერტი — კითხვები', label: 'პატარა იარლიყი', default: 'ხშირად დასმული კითხვები' },
   { key: 'apply.faq.q1', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 1', default: 'რა მჭირდება დასაწყებად?' },
-  { key: 'apply.faq.a1', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 1', multiline: true, default: 'რეალური გამოცდილება შენს მიმართულებაში და მოკლე აღწერა იმისა, რაშიც ეხმარები კლიენტს. განაცხადს ხელით ვამოწმებთ.' },
+  { key: 'apply.faq.a1', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 1', multiline: true, default: 'რეალური გამოცდილება შენს მიმართულებაში. განაცხადს ხელით ვამოწმებთ.' },
   { key: 'apply.faq.q2', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 2', default: 'რამდენი დრო სჭირდება განაცხადს?' },
   { key: 'apply.faq.a2', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 2', multiline: true, default: 'რამდენიმე წუთი. დანარჩენს — ვიდეო, სერტიფიკატები, ბმულები — პროფილში ავსებ დამტკიცების შემდეგ.' },
   { key: 'apply.faq.q3', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 3', default: 'ვინ ადგენს ფასს?' },
   { key: 'apply.faq.a3', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 3', multiline: true, default: 'შენ. ფასს თითოეულ სერვისზე ცალკე ადგენ და კლიენტი მას წინასწარ ხედავს.' },
   { key: 'apply.faq.q4', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 4', default: 'როგორ სრულდება სამუშაო?' },
-  { key: 'apply.faq.a4', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 4', multiline: true, default: 'სამუშაო, რომელიც ადგილზე კეთდება, კლიენტის მისამართზე სრულდება. დანარჩენს კლიენტთან ერთად ათანხმებ — ონლაინ თუ პირისპირ. მიმოწერა მცოდნეზეა.' },
+  { key: 'apply.faq.a4', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 4', multiline: true, default: 'ადგილზე შესასრულებელი — კლიენტის მისამართზე. დანარჩენს კლიენტთან ათანხმებ.' },
   // Q6 is the money question. It sits FOURTH on the page (see ApplyMarketing's
   // FAQ array) but is numbered 6 because keys may never be renumbered — its
   // predecessor was hardcoded, so there is simply no q6 row anywhere yet.
   { key: 'apply.faq.q6', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა — გადახდები', default: 'რა ხდება გადახდებთან დაკავშირებით?' },
-  { key: 'apply.faq.a6', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი — გადახდები', multiline: true, default: 'პლატფორმა 15%-ს იტოვებს. ონლაინ გადახდები ჯერ არ ამოქმედებულა — როცა ამოქმედდება, წინასწარ შეგატყობინებთ.' },
+  { key: 'apply.faq.a6', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი — გადახდები', multiline: true, default: 'ონლაინ გადახდები ჯერ არ ამოქმედებულა — როცა ამოქმედდება, წინასწარ შეგატყობინებთ.' },
   { key: 'apply.faq.q5', group: 'გახდი ექსპერტი — კითხვები', label: 'კითხვა 5', default: 'შემიძლია დატვირთვა თავად განვსაზღვრო?' },
   { key: 'apply.faq.a5', group: 'გახდი ექსპერტი — კითხვები', label: 'პასუხი 5', multiline: true, default: 'დიახ. რომელ მოთხოვნას უპასუხებ, შენ წყვეტ, ვადას კი შეთავაზებაში წერ. ნებისმიერ დროს შეგიძლია პროფილი პაუზაზე დააყენო.' },
 
@@ -426,53 +653,69 @@ export const SITE_TEXTS: SiteTextDef[] = [
 
   // ── დახმარება · დაწყება ──
   { key: 'help.faq.what-is.q', group: 'დახმარება — დაწყება', label: 'კითხვა', default: 'რა არის მცოდნე?' },
-  { key: 'help.faq.what-is.a', group: 'დახმარება — დაწყება', label: 'პასუხი', multiline: true, default: 'პლატფორმა, სადაც აღწერ რა გჭირდება და ხელით შერჩეული ექსპერტები თავად გამოგიგზავნიან შეთავაზებას — ხელშეკრულებიდან და დეკლარაციიდან დალაგებამდე. შეთავაზების მიღების შემდეგ მიმოწერაც გაქვს — ეს იმის გარკვევაა, სწორ ადამიანთან ხარ თუ არა.' },
+  { key: 'help.faq.what-is.a', group: 'დახმარება — დაწყება', label: 'პასუხი', multiline: true, default: 'პლატფორმა, სადაც აღწერ რა გჭირდება და ექსპერტები შეთავაზებას გამოგიგზავნიან.' },
   { key: 'help.faq.find-expert.q', group: 'დახმარება — დაწყება', label: 'კითხვა', default: 'როგორ ვიპოვო შესაფერისი ექსპერტი?' },
-  { key: 'help.faq.find-expert.a', group: 'დახმარება — დაწყება', label: 'პასუხი', multiline: true, default: 'გვერდზე „ექსპერტები“ გაფილტრე კატეგორიით, ფასითა და შეფასებით. პროფილში ნახავ ვიდეოგაცნობას, გამოცდილებასა და შეფასებებს.' },
+  /* ⚠️ THIS ANSWER PROMISED THREE THINGS AND TWO OF THEM WERE EMPTY
+     (2026-09-02). Measured that day, of 26 published profiles: ZERO carry a
+     video (`videoUrl` exists and nobody has filled it) and the Review table
+     holds ZERO rows — so „გაფილტრე… შეფასებით" named a filter the catalogue
+     hides, and „ნახავ ვიდეოწარდგენას… და შეფასებებს" named two things no
+     profile on the site displays. A help page that describes features the
+     product has not got is the one page a confused person goes to.
+     ⚠️ A SiteText ROW OVERRIDES THIS DEFAULT and holds the same claim — the
+     default and the row must both change or the site keeps the old sentence. */
+  { key: 'help.faq.find-expert.a', group: 'დახმარება — დაწყება', label: 'პასუხი', multiline: true, default: 'გვერდზე „ექსპერტები“ გაფილტრე კატეგორიითა და ფასით. პროფილში ნახავ გამოცდილებას, სერვისებსა და ფასებს.' },
   { key: 'help.faq.price.q', group: 'დახმარება — დაწყება', label: 'კითხვა', default: 'რა ჯდება?' },
   // პასუხი „price" გამოთვლადია (კონსტანტა/ფლაგი) — იხ. HELP_LOCKED_ANSWER_IDS
 
-  // ── დახმარება · დაჯავშნა და სესია ──
+  // ── დახმარება · მოთხოვნა და შეთავაზება ──
+  // ⚠️ THE HEADING SAID „დაჯავშნა და სესია" UNTIL 2026-08-31 and named a product
+  // removed on 2026-08-24 — there is no booking and no session. Every `group:`
+  // on the four entries below already read „მოთხოვნა და შეთავაზება"; only this
+  // comment had not moved, so the file's own section index disagreed with the
+  // admin panel's. The KEY IDS still say `how-to-book` / `where-session`: those
+  // are DB keys and may never be renamed (see the ledger in
+  // tests/siteTexts.test.ts), which is why the ids read older than the copy.
   { key: 'help.faq.how-to-book.q', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'კითხვა', default: 'როგორ დავიწყო?' },
   // პასუხი „how-to-book" გამოთვლადია (კონსტანტა/ფლაგი) — იხ. HELP_LOCKED_ANSWER_IDS
   { key: 'help.faq.where-session.q', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'კითხვა', default: 'სად სრულდება სამუშაო?' },
-  { key: 'help.faq.where-session.a', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'პასუხი', multiline: true, default: 'დამოკიდებულია იმაზე, რა გჭირდება: ადგილზე შესასრულებელი სამუშაო შენს მისამართზე კეთდება, დანარჩენს კი ექსპერტთან ერთად ათანხმებ — ონლაინ თუ პირისპირ. მიმოწერა მცოდნეზეა.' },
+  { key: 'help.faq.where-session.a', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'პასუხი', multiline: true, default: 'ადგილზე შესასრულებელი — შენს მისამართზე. დანარჩენს ექსპერტთან ათანხმებ.' },
   { key: 'help.faq.cancel.q', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'კითხვა', default: 'შემიძლია გავაუქმო?' },
   // პასუხი „cancel" გამოთვლადია (კონსტანტა/ფლაგი) — იხ. HELP_LOCKED_ANSWER_IDS
   { key: 'help.faq.expert-noshow.q', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'კითხვა', default: 'რა მოხდება, თუ ექსპერტმა სამუშაო არ შეასრულა?' },
-  { key: 'help.faq.expert-noshow.a', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'პასუხი', multiline: true, default: 'მოგვწერე — გამოვიძიებთ და სხვა ექსპერტს შემოგთავაზებთ. გადახდების ამოქმედების შემდეგ თანხა ექსპერტს მხოლოდ სამუშაოს დასრულების შემდეგ გადაერიცხება.' },
+  { key: 'help.faq.expert-noshow.a', group: 'დახმარება — მოთხოვნა და შეთავაზება', label: 'პასუხი', multiline: true, default: 'მოგვწერე — გამოვიძიებთ და სხვა ექსპერტს შემოგთავაზებთ.' },
 
   // ── დახმარება · ანგარიში და შეხვედრა ──
   // Added 2026-08-04 from the unanswered log — every one of these was typed by
   // a real visitor and got „I have no answer for that".
   { key: 'help.faq.signup.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'როგორ დავრეგისტრირდე?' },
-  { key: 'help.faq.signup.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'რეგისტრაცია უფასოა — გახსენი „დარეგისტრირდი“ და შედი Google-ით ან ელფოსტითა და პაროლით. ანგარიში მხოლოდ მოთხოვნის დასატოვებლად გჭირდება; ექსპერტების დათვალიერება რეგისტრაციის გარეშეც შეგიძლია.' },
+  { key: 'help.faq.signup.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'რეგისტრაცია უფასოა. ანგარიში მხოლოდ მოთხოვნის დასატოვებლად გჭირდება — ექსპერტებს ისედაც ნახავ.' },
   { key: 'help.faq.duration.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'რამდენი ხანი გრძელდება?' },
   { key: 'help.faq.duration.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'ეს სამუშაოზეა დამოკიდებული და შეთავაზებაში წერია — ექსპერტი მოცულობასა და ვადას იქვე უთითებს.' },
   { key: 'help.faq.location.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'სად მდებარეობთ? ოფისში უნდა მოვიდე?' },
-  { key: 'help.faq.location.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'დამოკიდებულია იმაზე, რა გჭირდება. სამუშაო, რომელიც ადგილზე კეთდება, შენს მისამართზე სრულდება — ამას ექსპერტთან შეათანხმებ. დანარჩენს ექსპერტთან ერთად ათანხმებ — ონლაინ თუ პირისპირ. ჩვენთან ოფისში მოსვლა არასდროს გჭირდება.' },
+  { key: 'help.faq.location.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'ოფისში მოსვლა არ გჭირდება. ყველაფერი პლატფორმაზე და ექსპერტთან შეთანხმებით ხდება.' },
   { key: 'help.faq.contact.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'ტელეფონის ნომერი გაქვთ?' },
   // პასუხი „contact" გამოთვლადია (SUPPORT_EMAIL) — იხ. HELP_LOCKED_ANSWER_IDS
-  { key: 'help.faq.language.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'რომელ ენაზე ტარდება კონსულტაცია?' },
-  { key: 'help.faq.language.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'ენას ექსპერტი უთითებს და პროფილშივე ხედავ — უმეტესობა ქართულად მუშაობს, ნაწილი ინგლისურადაც. აირჩიე ის, ვისაც შენთვის სასურველი ენა უწერია.' },
+  { key: 'help.faq.language.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'რომელ ენაზე ტარდება შეხვედრა?' },
+  { key: 'help.faq.language.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'ენა პროფილში წერია. აირჩიე ის, ვისაც შენთვის სასურველი უწერია.' },
   { key: 'help.faq.pre-contact.q', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'კითხვა', default: 'შემიძლია ექსპერტს წინასწარ მივწერო?' },
-  { key: 'help.faq.pre-contact.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'მიმოწერა შეთავაზების მიღების შემდეგ იხსნება — სწორედ იქ აზუსტებთ დეტალებს, სანამ დაეთანხმები. მანამდე კითხვა თავად მოთხოვნაში დაწერე, რომ ექსპერტმა ზუსტად ის შემოგთავაზოს, რაც გჭირდება.' },
+  { key: 'help.faq.pre-contact.a', group: 'დახმარება — ანგარიში და შეხვედრა', label: 'პასუხი', multiline: true, default: 'მიმოწერა შეთავაზების მიღების შემდეგ იხსნება. კითხვა თავად მოთხოვნაში დაწერე.' },
 
   // ── დახმარება · გადახდა ──
   { key: 'help.faq.payment-safety.q', group: 'დახმარება — გადახდა', label: 'კითხვა', default: 'უსაფრთხოა თუ არა გადახდა?' },
-  { key: 'help.faq.payment-safety.a', group: 'დახმარება — გადახდა', label: 'პასუხი', multiline: true, default: 'მოთხოვნის დატოვება უფასოა, ბარათს არ ვთხოვთ. გაშვების შემდეგ თანხა დაცული იქნება — ექსპერტს მხოლოდ სამუშაოს დასრულების შემდეგ გადაერიცხება.' },
+  { key: 'help.faq.payment-safety.a', group: 'დახმარება — გადახდა', label: 'პასუხი', multiline: true, default: 'მოთხოვნის დატოვება უფასოა, ბარათს არ ვთხოვთ.' },
   { key: 'help.faq.payment-methods.q', group: 'დახმარება — გადახდა', label: 'კითხვა', default: 'რომელი გადახდის მეთოდები მიიღება?' },
-  { key: 'help.faq.payment-methods.a', group: 'დახმარება — გადახდა', label: 'პასუხი', multiline: true, default: 'ონლაინ გადახდა ჯერ არ არის — მოთხოვნის დატოვება უფასოა. მეთოდების სიას ამოქმედებისთანავე გამოვაქვეყნებთ.' },
+  { key: 'help.faq.payment-methods.a', group: 'დახმარება — გადახდა', label: 'პასუხი', multiline: true, default: 'ონლაინ გადახდა ჯერ არ არის. მოთხოვნის დატოვება უფასოა.' },
   { key: 'help.faq.invoice.q', group: 'დახმარება — გადახდა', label: 'კითხვა', default: 'შემიძლია მივიღო ინვოისი?' },
   { key: 'help.faq.invoice.a', group: 'დახმარება — გადახდა', label: 'პასუხი', multiline: true, default: 'ინვოისები გადახდებთან ერთად ამოქმედდება — ავტომატურად მოვა ელფოსტაზე. მანამდე მოთხოვნა უფასოა.' },
 
   // ── დახმარება · ექსპერტებისთვის ──
   { key: 'help.faq.become-expert.q', group: 'დახმარება — ექსპერტებისთვის', label: 'კითხვა', default: 'როგორ ვხდები ექსპერტი?' },
-  { key: 'help.faq.become-expert.a', group: 'დახმარება — ექსპერტებისთვის', label: 'პასუხი', multiline: true, default: '„გახდი ექსპერტი“ გვერდზე შეავსე განაცხადი — გამოცდილება, სპეციალიზაცია, პორტფოლიო. პასუხს 24–48 საათში მიიღებ.' },
+  { key: 'help.faq.become-expert.a', group: 'დახმარება — ექსპერტებისთვის', label: 'პასუხი', multiline: true, default: 'შეავსე განაცხადი და პასუხს 24–48 საათში მიიღებ.' },
   { key: 'help.faq.commission.q', group: 'დახმარება — ექსპერტებისთვის', label: 'კითხვა', default: 'რა კომისიას იღებს პლატფორმა?' },
   // პასუხი „commission" გამოთვლადია (კონსტანტა/ფლაგი) — იხ. HELP_LOCKED_ANSWER_IDS
   { key: 'help.faq.payout.q', group: 'დახმარება — ექსპერტებისთვის', label: 'კითხვა', default: 'როდის მივიღებ თანხას?' },
-  { key: 'help.faq.payout.a', group: 'დახმარება — ექსპერტებისთვის', label: 'პასუხი', multiline: true, default: 'გადახდები მალე ამოქმედდება — მანამდე პლატფორმა საკომისიოს არ იკავებს. გაშვების შემდეგ შემოსავალი რეგულარული გრაფიკით გადმოგერიცხება.' },
+  { key: 'help.faq.payout.a', group: 'დახმარება — ექსპერტებისთვის', label: 'პასუხი', multiline: true, default: 'ონლაინ გადახდები ჯერ არ ამოქმედებულა.' },
 
   // ── დახმარება · ანგარიში და უსაფრთხოება ──
   { key: 'help.faq.account-security.q', group: 'დახმარება — ანგარიში და უსაფრთხოება', label: 'კითხვა', default: 'როგორ დავიცვა ჩემი ანგარიში?' },
@@ -483,7 +726,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // პასუხი „report-abuse" გამოთვლადია (კონსტანტა/ფლაგი) — იხ. HELP_LOCKED_ANSWER_IDS
 
   // ── Footer ──
-  { key: 'footer.tagline', group: 'Footer', label: 'აღწერა', multiline: true, default: 'მცოდნე — აღწერე რა გჭირდება და მიიღე შეთავაზებები ხელით შერჩეული ექსპერტებისგან.' },
+  { key: 'footer.tagline', group: 'Footer', label: 'აღწერა', multiline: true, default: 'მცოდნე — აღწერე რა გჭირდება და მიიღე შეთავაზებები.' },
 
   // ── /abroad — the diaspora landing (FEATURE_ABROAD) ──────────────────────
   // EVERY visible string on that page is here, deliberately: the audience is
@@ -496,17 +739,17 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // by lib/abroad → eurLabel. Editing the lari number here moves the euro figure
   // with it; the rate itself is ABROAD_EUR_PER_GEL in lib/flags.ts.
   { key: 'abroad.hero.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'Hero — სათაური', multiline: true, default: 'ცხოვრობ საზღვარგარეთ? მოაგვარე საქმეები საქართველოში — ონლაინ' },
-  { key: 'abroad.hero.subtitle', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'Hero — ქვესათაური', multiline: true, default: 'ქართველი იურისტი, ბუღალტერი და კარიერის ექსპერტი ონლაინ. ჩამოსვლა და რიგში დგომა არ დაგჭირდება — საკმარისია ტელეფონი.' },
+  { key: 'abroad.hero.subtitle', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'Hero — ქვესათაური', multiline: true, default: 'ქართველი იურისტი, ბუღალტერი და კარიერის ექსპერტი ონლაინ.' },
   { key: 'abroad.hero.cta', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'Hero — ღილაკი', default: 'ნახე ექსპერტები' },
 
   { key: 'abroad.cards.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისები — სათაური', default: 'რა გჭირდება?' },
   { key: 'abroad.card1.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 1 — სათაური', default: 'ქონება, მინდობილობა და მემკვიდრეობა' },
-  { key: 'abroad.card1.body', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 1 — ტექსტი', multiline: true, default: 'ბინა, მიწა თუ მემკვიდრეობა საქართველოში — რა დოკუმენტი გჭირდება, რა უნდა ეწეროს მინდობილობაში და როგორ გააფორმო ჩამოსვლის გარეშე.' },
+  { key: 'abroad.card1.body', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 1 — ტექსტი', multiline: true, default: 'ბინა, მიწა თუ მემკვიდრეობა — რა დოკუმენტი გჭირდება და როგორ გააფორმო ჩამოსვლის გარეშე.' },
   { key: 'abroad.card1.priceGel', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 1 — ფასი ლარში (ევრო თავად გამოითვლება)', default: '120' },
   { key: 'abroad.card1.cta', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 1 — ღილაკი', default: 'იურისტთან' },
 
   { key: 'abroad.card2.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 2 — სათაური', default: 'გადასახადები და ინდივიდუალური მეწარმე' },
-  { key: 'abroad.card2.body', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 2 — ტექსტი', multiline: true, default: 'უცხოეთიდან მიღებული შემოსავალი, ქონების გადასახადი, ინდივიდუალური მეწარმის სტატუსი. ბუღალტერი გეტყვის, რა გევალება და რა — არა.' },
+  { key: 'abroad.card2.body', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 2 — ტექსტი', multiline: true, default: 'უცხოური შემოსავალი, ქონების გადასახადი, ინდივიდუალური მეწარმის სტატუსი.' },
   { key: 'abroad.card2.priceGel', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 2 — ფასი ლარში (ევრო თავად გამოითვლება)', default: '150' },
   { key: 'abroad.card2.cta', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 2 — ღილაკი', default: 'ბუღალტერთან' },
 
@@ -518,7 +761,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // „ვისაც სამსახური აქვს და გადასვლა უნდა" — which is precisely a Georgian
   // working abroad. Do not reintroduce a tutoring card here.
   { key: 'abroad.card3.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 3 — სათაური', default: 'ვფიქრობ დაბრუნებაზე — რა მელოდება?' },
-  { key: 'abroad.card3.body', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 3 — ტექსტი', multiline: true, default: 'ხელფასი, ვაკანსიები, საკუთარი საქმის დაწყება. ესაუბრე იმას, ვინც დღეს საქართველოში ქირაობს ან ბიზნესს უძღვება.' },
+  { key: 'abroad.card3.body', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 3 — ტექსტი', multiline: true, default: 'ხელფასი, ვაკანსიები, საკუთარი საქმის დაწყება.' },
   { key: 'abroad.card3.priceGel', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 3 — ფასი ლარში (ევრო თავად გამოითვლება)', default: '150' },
   { key: 'abroad.card3.cta', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'სერვისი 3 — ღილაკი', default: 'ესაუბრე ექსპერტს' },
 
@@ -531,7 +774,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'abroad.how.step3.desc', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ნაბიჯი 3 — აღწერა', multiline: true, default: 'ფორმატს ექსპერტთან ერთად ირჩევთ — დეტალებს მიმოწერაში ათანხმებთ.' },
 
   { key: 'abroad.experts.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ექსპერტები — სათაური', default: 'ვინ დაგელაპარაკება' },
-  { key: 'abroad.experts.subtitle', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ექსპერტები — ქვესათაური', multiline: true, default: 'ხელით შერჩეული ქართველი ექსპერტები — გამოცდილება შემოწმებულია.' },
+  { key: 'abroad.experts.subtitle', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ექსპერტები — ქვესათაური', multiline: true, default: 'ქართველი ექსპერტები.' },
   { key: 'abroad.experts.empty', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ექსპერტები — ცარიელი მდგომარეობა', multiline: true, default: 'ექსპერტების სია მზადდება. მოგვწერე და შენს საკითხზე სპეციალისტს შეგირჩევთ.' },
 
   { key: 'abroad.cta.title', group: 'დიასპორა (/abroad)', vertical: 'abroad', label: 'ბოლო CTA — სათაური', default: 'ვერ იპოვე შენი საკითხი?' },
@@ -567,15 +810,30 @@ export const SITE_TEXTS: SiteTextDef[] = [
   { key: 'signup.learn.title1', group: 'რეგისტრაცია — ვსწავლობ', label: 'სათაური, 1-ლი ხაზი', default: 'შემოგვიერთდი.' },
   { key: 'signup.learn.title2', group: 'რეგისტრაცია — ვსწავლობ', label: 'სათაური, აქცენტი (მწვანე)', default: 'ფასი წინასწარ ცნობილია.' },
   { key: 'signup.learn.subEmphasis', group: 'რეგისტრაცია — ვსწავლობ', label: 'ქვესათაური — აქცენტი (მუქი)', default: 'ამჟამად მოთხოვნა უფასოა' },
-  { key: 'signup.learn.subRest', group: 'რეგისტრაცია — ვსწავლობ', label: 'ქვესათაური — გაგრძელება', default: '— დაცული გადახდა მალე.' },
+  // ⚠️ RETIRED 2026-08-31 — it repeated step 02's own heading („დაცული გადახდა
+  // (მალე)") four lines above it. Same reason `signup.teach.subEmphasis` was
+  // retired in 2026-08-10: one mention per surface (owner).
+  { key: 'signup.learn.subRest', group: 'რეგისტრაცია — ვსწავლობ', label: 'ქვესათაური — გაგრძელება', default: '— დაცული გადახდა მალე.', retired: true },
   { key: 'signup.learn.step1.title', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 1 — სათაური', default: 'ფასი წინასწარ ცნობილია' },
   { key: 'signup.learn.step1.desc', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 1 — აღწერა', default: 'გადაიხდი მხოლოდ მაშინ, როცა შეთავაზებას დაეთანხმები.' },
   { key: 'signup.learn.step2.title', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 2 — სათაური', default: 'დაცული გადახდა (მალე)' },
-  { key: 'signup.learn.step2.desc', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 2 — აღწერა', default: 'თანხა ერიცხება სესიის შემდეგ.' },
+  // ⚠️ 2026-08-31 — „სესიის შემდეგ" → „სამუშაოს დასრულების შემდეგ". Only the
+  // NOUN changed, and it changed because the old one names a product that was
+  // removed on 2026-08-24: there is no session, no booking and no slot, so a
+  // client's first screen was timing a payment against something that cannot
+  // happen. No row exists under this key (checked), so the default is what the
+  // page prints. The sentence is otherwise the owner's and stays theirs.
+  { key: 'signup.learn.step2.desc', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 2 — აღწერა', default: 'თანხა ერიცხება სამუშაოს დასრულების შემდეგ.' },
   { key: 'signup.learn.step3.title', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 3 — სათაური', default: 'ხელით განხილული' },
   { key: 'signup.learn.step3.desc', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნაბიჯი 3 — აღწერა', default: 'ყველა ექსპერტი — სანამ პლატფორმაზე მოვა.' },
-  { key: 'signup.learn.trust.title', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნდობის ხაზი — სათაური', default: 'ექსპერტებს ხელით განვიხილავთ' },
-  { key: 'signup.learn.trust.desc', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნდობის ხაზი — აღწერა', default: 'გამოცდილება და რეპუტაცია გამოწმებული.' },
+  // ⚠️ RETIRED 2026-08-31 — the trust strip under the client panel's numbered
+  // list. It said what step 03 („ხელით განხილული / ყველა ექსპერტი — სანამ
+  // პლატფორმაზე მოვა.") already said, eight lines above it, and it was the one
+  // block the provider panel beside it does not have. The surface is gone from
+  // app/signin/_signup.tsx; the keys stay known so a production row typed under
+  // them survives and the strings can never be reused for something else.
+  { key: 'signup.learn.trust.title', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნდობის ხაზი — სათაური', default: 'ექსპერტებს ხელით განვიხილავთ', retired: true },
+  { key: 'signup.learn.trust.desc', group: 'რეგისტრაცია — ვსწავლობ', label: 'ნდობის ხაზი — აღწერა', default: 'გამოცდილება და რეპუტაცია გამოწმებული.', retired: true },
 
   /* ⚠️ THE THIRD IDENTITY (2026-08-18). Owner: „სამი ვარიანტი უნდა დაემატოს …
      მესამე სერვისები — ვინც ტვირთავს, ჩვეულებრივი ადამიანი და ბიზნესი."
@@ -635,6 +893,7 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // metadata and the most-edited copy on the whole site — the home hero — was
   // about thirty fields down. Order here IS the reading order in the panel, and
   // the panel should open on what people actually change.
+  ...MESSAGE_COPY,
   ...SEO_TEXTS,
 ]
 

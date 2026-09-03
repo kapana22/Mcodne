@@ -84,3 +84,41 @@ test('the stamp is consulted by ensureDbReady, not bypassed', () => {
   const src = read('lib/dbBoot.ts')
   assert.match(src, /bootPromise = runMigrationsOnce\(\)/, 'ensureDbReady calls runMigrations directly again — the stamp is dead code')
 })
+
+test('the ledger is keyed by fingerprint, so two transpilers cannot evict each other', () => {
+  // ⚠️ THE BUG THIS PINS (measured 2026-09-01). This file is compiled by TWO
+  // toolchains — esbuild under `tsx` (the gate's schema stage and every test)
+  // and SWC under `next build` / `next dev` / the standalone server. SWC also
+  // minifies, so the same DDL yields a different function text and therefore a
+  // different hash: 99031636… under esbuild, 5057fd61… under SWC.
+  //
+  // While the ledger was ONE row at `id = 1` that each boot overwrote, the two
+  // engines took turns clearing each other's stamp and nothing was ever warm:
+  // the schema stage paid the full ~112-second replay on every `npm run check`,
+  // and the first request after a deploy paid it again whenever a local run had
+  // written last. A row per fingerprint costs a few dozen bytes and ends it.
+  //
+  // Source-level, like the two tests above: these functions need a live
+  // database and are deliberately not exported.
+  const src = read('lib/dbBoot.ts')
+  const record = src.slice(src.indexOf('async function recordApplied'))
+  const body = record.slice(0, record.indexOf('\n}\n'))
+  assert.doesNotMatch(
+    body,
+    /VALUES\s*\(\s*1\s*,/,
+    'recordApplied writes a fixed row again — the esbuild and SWC stamps would evict each other and neither boot would ever be warm',
+  )
+  assert.doesNotMatch(
+    body,
+    /DO UPDATE/,
+    'recordApplied overwrites instead of appending — one engine’s stamp would replace the other’s',
+  )
+  assert.match(body, /ON CONFLICT DO NOTHING/, 'a stamp collision must never throw: the migrations have already succeeded by then')
+
+  const applied = src.slice(src.indexOf('async function alreadyApplied'))
+  assert.match(
+    applied.slice(0, applied.indexOf('\n}\n')),
+    /WHERE "fingerprint" = '\$\{fp\}'/,
+    'alreadyApplied no longer asks whether THIS fingerprint is in the ledger — a row-1 read is what the two-transpiler bug was',
+  )
+})

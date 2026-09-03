@@ -1,5 +1,6 @@
 import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
+import { PWD_MIN, PWD_MAX } from '@/lib/passwordPolicy'
 import { firstGeorgianMessage, georgianNameRefine } from '@/lib/georgianText'
 import { prisma } from '@/lib/prisma'
 import { createSession, hashPassword } from '@/lib/auth'
@@ -17,7 +18,7 @@ const Body = z.object({
   // is how every Latin-named row on the site got in.
   fullName: z.string().min(2).max(80).superRefine(georgianNameRefine('სახელი')),
   email: z.string().email(),
-  password: z.string().min(8).max(120),
+  password: z.string().min(PWD_MIN).max(PWD_MAX),
   // Required since 2026-08-09 (owner). The rule lives in lib/phone so the form,
   // this route, /apply and the profile editor all judge a number the same way.
   // Refused here as a NAMED field: a bare 400 INVALID on a required field the
@@ -85,8 +86,8 @@ export async function POST(req: Request) {
   // Welcome email — fire-and-forget so a mail hiccup never blocks signup, and
   // registration itself is NOT gated on it (no verification wall).
   after(async () => {
-    const { subject, html } = welcomeEmail(user.fullName)
-    await sendMail({ to: user.email, subject, html }).catch(() => {})
+    const { subject, html } = await welcomeEmail(user.fullName)
+    await sendMail({ key: 'auth.welcome', to: user.email, subject, html }).catch(() => {})
   })
 
   return NextResponse.json({ ok: true, role: user.role, userId: user.id })

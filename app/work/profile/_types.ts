@@ -58,17 +58,27 @@ export type Loaded = {
   /** Is the profile switched on? READ-ONLY here — /work/account owns the
    *  control, and this screen only reports what it is currently true. */
   available: boolean
+  /** ⚠️ THE GRANT'S OWN MEASURE, NOT lib/profileScore (2026-08-31). The status
+   *  band draws a ring at this percentage above a line saying what the rest is
+   *  worth, and the two would contradict each other the moment they came from
+   *  different six-item lists — which is exactly what happened to the rail on
+   *  2026-08-30. `lib/creditsServer → profileCompletion` answers both. */
+  percent: number
+  /** What finishing it is still worth, in TETRI. 0 ⇒ nothing left to earn. */
+  unearnedTetri: number
 }
 
-export type Category = {
-  id: string
-  slug: string
-  name: string
-  /** Sub-fields absorbed into this sphere — offered here, never in browse. */
-  children?: { id: string; slug: string; name: string }[]
-}
+/* ⚠️ `Category` LIVED HERE AND IS DELETED (2026-09-02). Its one consumer was
+ * the sphere <select> inside the profession picker, and both left this screen
+ * the same day — the sphere is derived from the services on the server now
+ * (lib/requestTopics → sphereOfServices). Nothing in app/work/profile fetches
+ * or renders the category vocabulary any more. */
 
-// Password policy — mirrors /api/me/password (min 8). Kept in one place so the
-// inline check, the input `minLength` and the copy can never drift apart.
-export const PWD_MIN = 8
-export const PWD_MIN_MSG = 'პაროლი უნდა იყოს მინიმუმ 8 სიმბოლო'
+// Password policy. ⚠️ IT MOVED TO lib/passwordPolicy ON 2026-08-31 and is
+// re-exported here so /work/account keeps its import. The number was declared
+// in this file AND, three days earlier, as a local `MIN_PASSWORD` in
+// app/me/profile/client.tsx — two single-sources-of-truth for one rule, which
+// is how the /me/profile copy came to say „6" while the endpoint said 8. The
+// routes now import the same constant, so `tests/formValidation.test.ts` can
+// assert the two halves agree instead of grepping for the digit.
+export { PWD_MIN, PWD_MAX, PWD_MIN_MSG, passwordError } from '@/lib/passwordPolicy'

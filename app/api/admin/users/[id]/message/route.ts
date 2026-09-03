@@ -78,13 +78,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   let emailOk = false
   let emailMode = 'none'
   if (target.email) {
-    const { subject: mailSubject, html } = adminDirectMessageEmail({
+    const { subject: mailSubject, html } = await adminDirectMessageEmail({
       name: target.fullName,
       subject,
       body,
       template,
     })
-    const res = await sendMail({ to: target.email, subject: mailSubject, html, replyTo: SUPPORT_EMAIL })
+    const res = await sendMail({ key: 'admin.directMessage', to: target.email, subject: mailSubject, html, replyTo: SUPPORT_EMAIL })
     emailOk = res.ok
     emailMode = res.mode
   }

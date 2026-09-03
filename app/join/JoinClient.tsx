@@ -28,62 +28,56 @@ import { JOIN_DOOR_LABEL } from '@/lib/capabilities'
 import { ProviderApplyClient } from './_provider/client'
 import { DoorQuestion, clearAsked, readJoin, type DoorAnswer } from './_door/DoorQuestion'
 
-export function JoinClient({ me }: { me: Me }) {
-  const [stage, setStage] = useState<'door' | 'form'>('door')
-  /** The door's answer — set by the question, or restored from the public side
-   *  of the wall. `null` while it is still being asked. */
+export function JoinClient({ me, initialStatus = null }: { me: Me; initialStatus?: string | null }) {
+  /** What they told the PUBLIC door, if anything — restored from the far side
+   *  of the sign-up wall. `null` means they arrived here directly. */
   const [answer, setAnswer] = useState<DoorAnswer | null>(null)
 
-  /** ⚠️ THE ANSWER SURVIVES THE WALL (2026-08-20). Somebody who answered the
-   *  question on the public door, made an account and came back has already told
-   *  us what they do. Asking again on this side would make the first ask look
-   *  like a trick — the classic „it did not save my answer" reading — so the
-   *  form opens straight away. `asked` is cleared on arrival, so the NEXT visit
-   *  to /join is an ordinary door with their answer pre-ticked. */
+  /** ⚠️ THE ANSWER SURVIVES THE WALL (2026-08-20). Somebody who answered on the
+   *  public door, made an account and came back has already told us what they
+   *  do; asking again would read as „it did not save my answer". `asked` is
+   *  cleared on arrival so it is used once. Since 2026-08-31 there is no door
+   *  on THIS side to pre-tick — the word goes straight into the form's search. */
   useEffect(() => {
     const d = readJoin()
     if (!d?.asked) return
     clearAsked()
     if (d.professions.length === 0 && !d.sphere) return
-    openForm({ sphere: d.sphere, sphereSlug: d.sphereSlug, professions: d.professions })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setAnswer({ sphere: d.sphere, sphereSlug: d.sphereSlug, professions: d.professions })
   }, [])
-
-  function openForm(a: DoorAnswer) {
-    setAnswer(a)
-    setStage('form')
-  }
 
   const seed = useMemo(
     () => ({ cats: answer?.sphere ? [answer.sphere] : [], professions: answer?.professions ?? [] }),
     [answer],
   )
 
-  if (stage === 'form') {
-    return (
-      <ProviderApplyClient
-        email={me?.email ?? ''}
-        name={me?.fullName ?? ''}
-        phone={me?.phone ?? ''}
-        me={me}
-        seed={seed}
-      />
-    )
-  }
-
+  /* ⚠️ ONE PAGE (2026-08-31). /join used to be TWO screens: a „door" that asked
+   * „აირჩიე, რას აკეთებ." with the profession picker and a continue button,
+   * and only then the form. Owner: „ერთ გვერდზე იყოს ყველაფერი… დასაწყისში
+   * უაზროდ ყრია სიტყვები."
+   *
+   * ⚠️ AND THE DOOR WAS COSTING A WHOLE SCREEN FOR A PRE-FILLED SEARCH BOX.
+   * Measured before removing it: its answer is never submitted — the form's
+   * body carries no `professions` — and the ONLY thing it does downstream is
+   * seed the search query in stage 1 („Their own word into the search"). So a
+   * person answered a question, pressed a button, and arrived at a form that
+   * asked what looked like the same question again with their word typed in.
+   * That is the „twice" the owner saw.
+   *
+   * The seed READ stays: somebody who answered on the PUBLIC door (the
+   * signed-out `_door/GuestDoor`, a different surface behind the sign-up wall)
+   * still gets their word carried in. `_door/DoorQuestion` is untouched on
+   * disk — nothing renders it, and it is one line from returning if the door
+   * is ever wanted back.
+   */
   return (
-    <div className="font-sans bg-ink-50/30 text-ink-900 antialiased min-h-screen flex flex-col">
-      <PublicTopBar activeHref="/join" initialUser={me} />
-      <Container as="main" size="narrow" className="flex-1 py-10 sm:py-14">
-        {/* The h1 is the word the header, the user menu and the footer's action
-            all use — one source, so the click is confirmed by the heading. */}
-        <h1 className="font-display text-h1 font-bold tracking-tight">{JOIN_DOOR_LABEL}</h1>
-
-        <p className="mt-2 text-body text-ink-600">აირჩიე, რას აკეთებ.</p>
-
-        <DoorQuestion onContinue={openForm} />
-      </Container>
-      <Footer />
-    </div>
+    <ProviderApplyClient
+      email={me?.email ?? ''}
+      name={me?.fullName ?? ''}
+      phone={me?.phone ?? ''}
+      me={me}
+      seed={seed}
+      initialStatus={initialStatus}
+    />
   )
 }

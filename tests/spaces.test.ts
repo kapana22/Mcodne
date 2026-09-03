@@ -19,6 +19,7 @@ import { PROVIDER_ROUTE, PROVIDER_WORKSPACE_PATHS, isProviderWorkspacePath, isRe
 import { homeForRole } from '../lib/roleHome'
 import { homeForHats } from '../lib/hats'
 import { navFor, WORKSPACE_NAV } from '../components/work/navConfig'
+import { titleForPath as clientTitleForPath } from '../components/me/navConfig'
 
 const ROOT = join(import.meta.dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -211,8 +212,14 @@ test('§D the /work shell is chrome only: nothing without a session, groups by c
 
      ⚠️ THE RAIL IS THE SAME FOR BOTH GROUPS NOW, and that is the real change
      this pins: nothing in it depends on the allowlist any more. */
+  /* ⚠️ AND „/work/balance" JOINED IT ON 2026-09-01, between the last row about
+     selling and the row that is not about selling. `CREDITS_ENFORCED` had been
+     true the whole time with no page to read the rules on: the balance was
+     drawn in three places (the pill, the strip, the profile bar) and all three
+     print a TOTAL, so „ეს 65₾ საიდან მოვიდა" had no answer anywhere on the
+     site. The position is the argument — see the note on the row itself. */
   assert.deepEqual(railOf({ work: true }), [
-    '/work', '/work/jobs', '/work/messages', '/work/profile', '/work/account',
+    '/work', '/work/jobs', '/work/messages', '/work/profile', '/work/balance', '/work/account',
   ], 'the rail is no longer the service pipeline in order')
   assert.deepEqual(railOf({ work: false }), railOf({ work: true }),
     'a rail row depends on the allowlist again — every destination in it opens for both')
@@ -363,7 +370,18 @@ test('§F the subsystem owns three /work screens, never /work — and the chrome
     /PROVIDER_TABS[\s\S]*?href: '\/work'[\s\S]*?\]/.test(nav),
     'PROVIDER_TABS lost its /work home — a provider on a phone cannot reach their balance',
   )
-  assert.match(nav, /\/\^\\\/\(\?:me\|work\)\\\/messages\\\/\[\^\/\]\+\$\//, 'the focused-screen regex still names the old spaces')
+  /* ⚠️ THE SPACES ARE THE RULE, NOT THE PATH SHAPE (widened 2026-09-01).
+     This matched the focused-screen regex CHARACTER FOR CHARACTER, including
+     `messages/[^/]+` — a one-segment path, which is the shape booking threads
+     had. Conversations have lived at `/…/messages/o/<offerId>` since
+     2026-08-19, so the regex it was pinning had matched nothing for months and
+     the tab bar sat on top of every composer; the pin was holding the bug in
+     place. What §F is about is that the two SPACES are `me` and `work` — never
+     the retired `student`/`tutor` — so that is what is asserted, on whatever
+     thread path the bar currently recognises. */
+  assert.match(nav, /isFocusedScreen[\s\S]{0,600}\(\?:me\|work\)\\\/messages/,
+    'the focused-screen regex still names the old spaces')
+  assert.doesNotMatch(nav, /\(\?:student\|tutor\)/, 'the retired spaces are back in the phone bar')
   assert.match(read('components/AppShell.tsx'), /const inProviderSpace = isProviderWorkspacePath\(path \?\? ''\)/)
   // The switcher and the homes.
   const menu = read('components/UserMenu.tsx')
@@ -431,6 +449,17 @@ test('the eyebrow names a parent you cannot see — never the room you are in', 
   // On a top-level page the eyebrow names the room, which the rail is already
   // saying in a lit row ~40px to its left. On a DETAIL page it is the one fact
   // the screen cannot otherwise give you. So: detail pages only.
+  //
+  // ⚠️ THE LIST IS A CEILING, NOT A ROSTER (2026-09-01, the owner's design
+  // canvas → „Expert Jobs"). It was an EQUALITY, which smuggled in a second
+  // rule nobody ever argued for: that a detail page MUST wear an eyebrow. The
+  // canvas redrew /work/requests/[id] without a <PageHeader> at all — the job's
+  // own outcome is the h1 („კლიენტმა შეგარჩია"), and the layout it draws has no
+  // room above it — so the page left the set and the equality read that as the
+  // regression it is not. Only one direction has evidence behind it: an eyebrow
+  // on a TOP-LEVEL page repeats the lit rail row beside it. A detail page
+  // dropping one costs nobody anything. So what is checked is the direction
+  // that harms: nothing OUTSIDE this list may carry an eyebrow.
   const DETAIL = [
     'app/work/(provider)/offers/[offerId]/page.tsx',
     'app/work/(provider)/requests/[id]/page.tsx',
@@ -440,8 +469,14 @@ test('the eyebrow names a parent you cannot see — never the room you are in', 
     const s = codeOf(f)
     if (/<PageHeader[\s\S]{0,240}?eyebrow=/.test(s)) withEyebrow.push(f)
   }
-  assert.deepEqual(withEyebrow.sort(), [...DETAIL].sort(),
+  assert.deepEqual(withEyebrow.filter(f => !DETAIL.includes(f)), [],
     'a top-level page grew an eyebrow again — the rail already says where you are')
+  // …and the allowlist has to keep naming real pages, or it rots into a comment:
+  // a permission for a file that no longer exists permits nothing and hides that
+  // it permits nothing.
+  for (const f of DETAIL) {
+    assert.doesNotThrow(() => codeOf(f), `${f} is allowed an eyebrow and no longer exists`)
+  }
 })
 
 test('a page title is the rail row that was clicked', () => {
@@ -455,8 +490,26 @@ test('a page title is the rail row that was clicked', () => {
   // answer — it is now everything a client reads, services and prices included.
   assert.ok(labels.has('ჩემი გვერდი'), 'the provider rail lost its profile row')
   assert.ok(labels.has('ანგარიში'), 'the provider rail lost its account row')
+  /* ⚠️ /me/profile IS PINNED THROUGH ITS CRUMB NOW (2026-09-02), and that is
+     the rule this test was always about rather than a loophole in it. The page
+     stopped drawing its own `PageHeader title="პროფილი"` on that day: it was a
+     second implementation of /settings — 367 lines re-doing the same name,
+     phone and password forms over the same endpoints — and it renders
+     app/settings' own screen now, whose h1 reads „პარამეტრები".
+
+     So the rail row and the screen genuinely name different things, which is
+     exactly what `crumb` exists for („the rail row is a place and the crumb
+     names what is on the screen", NavItem) and what „მთავარი" → „ჩემი
+     მოთხოვნები" has done since the canvas. What must not drift is the pair the
+     READER sees: the bar above the screen and the h1 inside it. This asserts
+     that pair through `titleForPath`, the function ClientTopBar actually calls,
+     rather than through a literal in a file. */
+  assert.equal(clientTitleForPath('/me/profile'), 'პარამეტრები',
+    'the /me/profile crumb no longer names the screen it opens')
+  assert.match(read('app/settings/client.tsx'), /title="პარამეტრები"/,
+    'the account screen no longer prints the h1 its crumb promises')
+
   for (const [file, title] of [
-    ['app/me/profile/page.tsx', 'პროფილი'],
     // ⚠️ `app/me/requests/page.tsx` WAS HERE AND IS A REDIRECT NOW (2026-08-30):
     // the home draws the list, and a home's title is a greeting in both rooms,
     // so it has no rail-row title to match.

@@ -6,12 +6,12 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').repla
 
 export const metadata: Metadata = {
   title: 'რეგისტრაცია — მცოდნე',
-  description: 'შექმენი ანგარიში მცოდნეზე — იპოვე გადამოწმებული ექსპერტი ან გახდი ექსპერტი.',
+  description: 'შექმენი ანგარიში მცოდნეზე — იპოვე ექსპერტი ან გახდი ექსპერტი.',
   alternates: { canonical: `${SITE_URL}/signup` },
   robots: { index: false, follow: true },
   openGraph: {
     title: 'რეგისტრაცია — მცოდნე',
-    description: 'შექმენი ანგარიში მცოდნეზე — იპოვე გადამოწმებული ექსპერტი ან გახდი ექსპერტი.',
+    description: 'შექმენი ანგარიში მცოდნეზე — იპოვე ექსპერტი ან გახდი ექსპერტი.',
     url: `${SITE_URL}/signup`,
   },
 }

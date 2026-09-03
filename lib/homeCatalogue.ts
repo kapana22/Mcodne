@@ -33,7 +33,7 @@ const HOME_ITEMS = 6
 export const SERVICE_SUFFIX = 'სერვისზე'
 
 /** One provider → one card. */
-function fromProvider(m: ProviderRow): CatalogueCardItem {
+function fromProvider(m: ProviderRow, reply: string | null): CatalogueCardItem {
   return {
     id: m.id,
     slug: m.slug,
@@ -41,14 +41,31 @@ function fromProvider(m: ProviderRow): CatalogueCardItem {
     // The first trade they list, in the catalogue's own order — resolved to a
     // label by the query, so this file never sees a topic id.
     badge: m.services[0] ?? '',
-    blurb: (m.about ?? '').trim() || m.services.slice(1, 3).join(' · '),
+    // ⚠️ THE FIRST CITY, NOT THE LIST. `areas` is „თბილისი, ბათუმი" and the
+    // card has one quiet line for „what · where"; a second city there costs the
+    // profession its space. The profile prints all of them.
+    area: (m.areas ?? '').split(',')[0]?.trim() ?? '',
+    // ⚠️ THE HEADLINE FIRST (2026-08-31). A professional's one line about
+    // themselves („12 წელია სამართალში ვმუშაობ") is what the canvas's card
+    // shows, and it is a better sentence than the first 90 characters of a bio.
+    // `about` stays the fallback, and the trade list the fallback after that.
+    blurb: (m.headline ?? '').trim() || (m.about ?? '').trim() || m.services.slice(1, 3).join(' · '),
     // 🔒 NEVER INVENT A NUMBER. `priceValue` is null for somebody who quotes per
     // job (lib/serviceProfile → priceHint) — that is a way of working, not a
     // missing field, and the card says so in words rather than printing ₾0.
-    priceLabel: m.priceValue !== null ? `₾${m.priceValue}-დან` : null,
+    // ⚠️ „80₾-დან", NOT „₾80-დან" (2026-09-02). The symbol went BEFORE the
+    // number here and after it everywhere else, so the home page printed both
+    // grammars at once: the category tiles read „50₾-დან" and the expert cards
+    // under them „₾80-დан", on one screen. lib/requests → `gel` states the rule
+    // and the reason — „one place, so the form, the provider card and the admin
+    // agree… two numbers never look like two systems" — and this line was the
+    // one place not obeying it. Georgian writes the symbol after the number.
+    priceLabel: m.priceValue !== null ? `${m.priceValue}₾-დან` : null,
     priceSuffix: SERVICE_SUFFIX,
     photo: m.photoSrc,
     verified: m.verified,
+    isCompany: m.isCompany,
+    reply,
   }
 }
 
@@ -60,6 +77,15 @@ function fromProvider(m: ProviderRow): CatalogueCardItem {
  * page does not exist yet (`slug: null`) would be a card that goes nowhere, and
  * a card that does nothing is worse on a home page than one fewer card.
  */
-export function homeItems(providers: ProviderRow[]): CatalogueCardItem[] {
-  return providers.filter(m => !!m.slug).slice(0, HOME_ITEMS).map(fromProvider)
+export function homeItems(
+  providers: ProviderRow[],
+  /** providerKey → „პასუხობს ~2 საათში", MEASURED (lib/responseStats). Absent
+   *  for everybody under the sample floor, which today is most of the roster —
+   *  the card then omits the chip rather than guessing. */
+  replies: ReadonlyMap<string, string | null> = new Map(),
+): CatalogueCardItem[] {
+  return providers
+    .filter(m => !!m.slug)
+    .slice(0, HOME_ITEMS)
+    .map(m => fromProvider(m, replies.get(m.userId ?? m.companyId ?? '') ?? null))
 }

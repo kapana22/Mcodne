@@ -7,6 +7,8 @@ import { Icon } from '@/components/Icon'
 import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
 import { authErrorMessage } from '@/lib/authErrors'
+import { emailFormatError } from '@/lib/emailRule'
+import { FIELD_ERROR_BORDER, useFault } from '@/components/FieldError'
 import { Field, GoogleMark, PwInput, inputCls } from './_fields'
 import { View, readEmailParam, redirectAfterSignin, startGoogleSignin } from './_model'
 
@@ -21,45 +23,79 @@ import { View, readEmailParam, redirectAfterSignin, startGoogleSignin } from './
 /* SIGN IN VIEW                                                         */
 /* ═══════════════════════════════════════════════════════════════════ */
 
+/**
+ * THE MARKETING HALF OF THE DOOR — a green card, not bare text on paper.
+ *
+ * ⚠️ RESTYLED 2026-08-31, AND NOTHING IT SAYS CHANGED. The pill, the headline,
+ * the sentence and the three points are word for word what was here; only the
+ * surface under them moved. The redesign gives the site exactly ONE material
+ * for „this is what we are" — the green radial card the home page's hero, the
+ * „როგორ მუშაობს" page and the provider's status band all use — and this
+ * column was the last marketing surface still drawn as loose text on the cream
+ * ground beside a white form. Two different treatments of the same job on one
+ * screen is what made the door look older than the pages either side of it.
+ *
+ * ⚠️ THE THREE POINTS ARE STILL HONEST, and that is the part worth keeping
+ * whatever the surface: no invented counts, no stock faces. They were rewritten
+ * on 2026-08-26 because they promised „უფასო დაჯავშნა · გადაწყვიტე ჯავშნის
+ * შემდეგ" on a site with no booking; sign-in is the last screen before somebody
+ * commits and must not reintroduce a trust lie.
+ */
 const SignInIntro = () => (
-  <div>
-    {/* Trust pill */}
-    <span className="inline-flex items-center gap-2 h-7 pl-2.5 pr-3 rounded-pill bg-white border border-ink-200 shadow-xs mb-8">
-      <Icon.shieldCheck className="w-3.5 h-3.5 text-brand-600" />
-      <span className="text-meta text-ink-700">გადამოწმებული ექსპერტები</span>
-    </span>
+  <div className="relative overflow-hidden rounded-band bg-[radial-gradient(120%_140%_at_12%_8%,#26806E_0%,#1E6656_42%,#123A31_100%)] px-6 py-9 text-white sm:px-9 sm:py-11 lg:px-10 lg:py-12">
+    {/* The card's own light — the same gesture as the home hero's, so the two
+        read as one material rather than as two green rectangles. */}
+    <span
+      aria-hidden
+      className="pointer-events-none absolute -right-12 -top-16 h-[260px] w-[260px] rounded-full bg-white/[0.06]"
+    />
 
-    <h1 className="font-display text-display xs:text-display-lg sm:text-display-lg lg:text-hero font-bold leading-[1.02] sm:leading-[0.96] tracking-[-0.028em] text-ink-900 motion-safe:animate-rise-in">
-      კეთილი იყოს<br />
-      <span className="text-brand-600">დაბრუნება.</span>
-    </h1>
-    <p className="text-body-lg sm:text-h3 text-ink-700 mt-5 sm:mt-7 max-w-[440px] motion-safe:animate-rise-in" style={{ animationDelay: '80ms' }}>
-      აღწერე რა გჭირდება, მიიღე შეთავაზებები, აირჩიე ერთი.
-    </p>
+    <div className="relative">
+      {/* ⚠️ A SHIELD CHIP READING „გადამოწმებული ექსპერტები" STOOD HERE UNTIL
+          2026-09-02, and it was the only VISIBLE copy of the claim — the other
+          four were metadata. Measured that day: 1 of 26 published providers is
+          verified. Owner: „არ უნდა იყოს ტყუილები, როგორც სხვა საიტებზე არის
+          ქართულზე… ესეთი რაღაცები არ გვჭირდება."
 
-    {/* Honest value points — no invented counts or stock (pravatar) faces. The
-        landing and /experts deliberately removed exactly that pattern; sign-in,
-        the last screen before somebody commits, must not reintroduce a trust
-        lie. ⚠️ AND THE THREE POINTS THEMSELVES WERE ONE (2026-08-26): they
-        promised „უფასო დაჯავშნა · გადაწყვიტე ჯავშნის შემდეგ" on a site with no
-        booking. */}
-    <ul className="mt-10 lg:mt-12 pt-8 border-t border-ink-200 space-y-4">
-      {[
-        { icon: Icon.users, t: 'ხელით შერჩეული ექსპერტები', s: 'ყველა პროფილი გამოწმებული' },
-        { icon: Icon.shieldCheck, t: 'უფასო მოთხოვნა', s: 'გადაწყვიტე შეთავაზებების ნახვის შემდეგ' },
-        { icon: Icon.clock, t: 'ყველაფერი ერთ ადგილას', s: 'მოთხოვნები და მიმოწერა' },
-      ].map((r, i) => (
-        <li key={i} className="flex items-start gap-3.5">
-          <span className="w-9 h-9 rounded-btn bg-brand-50 text-brand-700 inline-flex items-center justify-center shrink-0">
-            <r.icon className="w-4 h-4" />
-          </span>
-          <div className="pt-0.5">
-            <div className="font-display text-body font-semibold text-ink-900">{r.t}</div>
-            <div className="text-small text-ink-500 mt-0.5">{r.s}</div>
-          </div>
-        </li>
-      ))}
-    </ul>
+          Deleted rather than reworded. It was a trust badge on a sign-in
+          screen, which is decoration wearing a fact's clothes: the person
+          reading it is already a member and is trying to get in. The ✓ that
+          means something stays where it is earned — on the card of the one
+          provider who has it. */}
+
+      <h1 className="font-display text-display font-extrabold leading-[1.02] tracking-[-0.028em] motion-safe:animate-rise-in sm:text-display-lg sm:leading-[0.96]">
+        კეთილი იყოს<br />
+        დაბრუნება.
+      </h1>
+      {/* ⚠️ NO ENTRANCE ANIMATION ON THIS LINE (2026-08-31). It carried
+          `motion-safe:animate-rise-in` with an 80ms delay, and `rise-in` holds
+          its FROM state through `animation-fill-mode: both` — measured locally
+          the moment this column moved onto the green card, the sentence never
+          arrived and left a blank band between the headline and the rule. The
+          headline above keeps its own; one delayed child was buying nothing
+          and could cost the sentence entirely. */}
+      <p className="mt-5 max-w-[440px] text-body-lg leading-[1.55] text-white/[0.82] sm:mt-6">
+        აღწერე რა გჭირდება, მიიღე შეთავაზებები, აირჩიე ერთი.
+      </p>
+
+      <ul className="mt-9 space-y-4 border-t border-white/[0.14] pt-7">
+        {[
+          { icon: Icon.users, t: 'ხელით შერჩეული ექსპერტები', s: 'ყველა პროფილი გამოწმებული' },
+          { icon: Icon.shieldCheck, t: 'უფასო მოთხოვნა', s: 'გადაწყვიტე შეთავაზებების ნახვის შემდეგ' },
+          { icon: Icon.clock, t: 'ყველაფერი ერთ ადგილას', s: 'მოთხოვნები და მიმოწერა' },
+        ].map((r, i) => (
+          <li key={i} className="flex items-start gap-3.5">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-btn bg-white/[0.12]">
+              <r.icon className="h-4 w-4" />
+            </span>
+            <div className="pt-0.5">
+              <div className="font-display text-body font-semibold">{r.t}</div>
+              <div className="mt-0.5 text-small text-white/[0.7]">{r.s}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   </div>
 )
 
@@ -69,6 +105,8 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
   const [remember, setRemember] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [errMsg, setErrMsg] = useState<string | null>(null)
+  // Which box is wrong, and why — see components/FieldError.
+  const { fault, fail, props, bad, clearField, reset: clearFault, error } = useFault('signin')
 
   // Why a failed Google round-trip sent them back here. The callback redirects
   // to /signin?error=<code> and every one of those codes used to land on this
@@ -84,10 +122,29 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
     if (paramEmail) setEmail(paramEmail)
   }, [])
 
+  /* ⚠️ `INVALID` MEANT „პაროლი მინიმუმ 8 სიმბოლო" HERE AND THAT WAS A LIE
+   * (fixed 2026-08-31). The route's schema is `{ email: z.string().email(),
+   * password: z.string().min(1) }` — there is NO length rule on the password at
+   * sign-in, and there must not be one: it has to accept whatever the account
+   * was created with. So a 400 INVALID can only mean the ADDRESS did not parse,
+   * and the one thing this screen said about it was a false statement about a
+   * password that was fine. Somebody with „ana@gmail" retyped their password
+   * until they gave up.
+   *
+   * The format is checked here now, with lib/emailRule — literally the same
+   * `z.string().email()` the route runs — so the sentence arrives before the
+   * round trip and lands on the address.
+   *
+   * ⚠️ BAD_CREDENTIALS DELIBERATELY POINTS AT NO FIELD. „არასწორი ელფოსტა ან
+   * პაროლი" is vague on purpose: naming which half was wrong is an oracle for
+   * „does this address have an account here". It stays a form-level line. */
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !pw) { setErrMsg('შეიყვანე ელფოსტა და პაროლი'); return }
-    setSubmitting(true); setErrMsg(null)
+    setErrMsg(null); clearFault()
+    const emailMsg = emailFormatError(email)
+    if (emailMsg) { fail('email', emailMsg); return }
+    if (!pw) { fail('password', 'შეიყვანე პაროლი'); return }
+    setSubmitting(true)
     try {
       const res = await fetch('/api/auth/signin', {
         method: 'POST',
@@ -96,10 +153,11 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
+        if (data.error === 'INVALID') { fail('email', 'ელფოსტა არასწორია'); setSubmitting(false); return }
         setErrMsg(
           data.error === 'BAD_CREDENTIALS' ? 'არასწორი ელფოსტა ან პაროლი' :
-          data.error === 'INVALID' ? 'პაროლი მინიმუმ 8 სიმბოლო' :
           data.error === 'RATE_LIMITED' ? `ბევრი მცდელობა — სცადე ${Math.ceil((data.retryInSec ?? 60)/60)} წუთში` :
+          data.message ??
           'შეცდომა, სცადე თავიდან'
         )
         setSubmitting(false)
@@ -150,9 +208,14 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
           <div className="flex-1 h-px bg-ink-200" />
         </div>
 
-        <form onSubmit={submit} className="space-y-4">
+        {/* `noValidate` so the handler above gets to name the field: the
+            browser's own bubble fires first otherwise, and it speaks the
+            BROWSER's language on a Georgian screen. The rules it replaces are
+            the route's own, so nothing is lost. */}
+        <form onSubmit={submit} noValidate className="space-y-4">
           <Field label="ელფოსტა">
-            <input type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null) }} placeholder="anu@gmail.com" autoComplete="email" className={inputCls} />
+            <input type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={email} onChange={e => { setEmail(e.target.value); if (errMsg) setErrMsg(null); clearField('email') }} placeholder="anu@gmail.com" autoComplete="email" {...props('email')} className={`${inputCls} ${bad('email') ? FIELD_ERROR_BORDER : ''}`} />
+            {error('email')}
           </Field>
 
           <div>
@@ -160,7 +223,14 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
               <label className="block font-display text-micro font-semibold uppercase text-ink-700">პაროლი</label>
               <button type="button" onClick={() => setView('reset')} className="tap-area text-meta text-brand-700 hover:text-brand-800 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1 rounded">დაგავიწყდა?</button>
             </div>
-            <PwInput value={pw} onChange={(v) => { setPw(v); if (errMsg) setErrMsg(null) }} placeholder="მინ. 8 სიმბოლო" autoComplete="current-password" />
+            {/* ⚠️ THE „მინ. 8 სიმბოლო" PLACEHOLDER IS LEFT AS THE OWNER WROTE
+                IT, and it is worth knowing that it is not this field's rule:
+                sign-in accepts whatever the account already has (`min(1)`), so
+                nothing here refuses a shorter one. The FALSE part — an INVALID
+                response translated into „your password is too short" — is gone;
+                the placeholder is copy and copy is the owner's. */}
+            <PwInput value={pw} onChange={(v) => { setPw(v); if (errMsg) setErrMsg(null); clearField('password') }} placeholder="მინ. 8 სიმბოლო" autoComplete="current-password" field={props('password')} invalid={bad('password')} />
+            {error('password')}
           </div>
 
           <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
@@ -171,7 +241,10 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
             <span className="text-small text-ink-700">დამიმახსოვრე 30 დღით</span>
           </label>
 
-          {errMsg && (
+          {/* Left for what belongs to no box: BAD_CREDENTIALS (deliberately
+              vague — see the note on submit), a suspension, a rate limit, a
+              dropped network. */}
+          {errMsg && !fault && (
             <div role="alert" className="rounded-field bg-danger-50 border border-danger-200 px-3 py-2 text-small text-danger-700 leading-[1.45] break-words">{errMsg}</div>
           )}
           <button

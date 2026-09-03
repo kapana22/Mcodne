@@ -530,7 +530,12 @@ const GROUP_EXTRAS: Record<string, ExtraQuestion[]> = {
  * „used before its declaration" — in a file `middleware.ts` imports, which means
  * every route on the site. Built on the first lookup and kept. */
 let groupOfTopic: Map<string, string> | null = null
-function groupIdOf(topicId: string): string | undefined {
+/** ⚠️ EXPORTED 2026-09-02 so a SAVED request can find its family mark. The
+ *  client's own list (app/me/_requests) draws `topicGroupMark(groupId)` beside
+ *  each row, and a request row stores a topic id — the group is one map read
+ *  away and was already built here for `extrasFor`. Pure, no JSX, so nothing
+ *  about `middleware.ts` importing this file changes. */
+export function groupIdOf(topicId: string): string | undefined {
   if (!groupOfTopic) {
     groupOfTopic = new Map(TOPIC_GROUPS.flatMap(g => g.topics.map(t => [t.id, g.id] as const)))
   }
@@ -626,15 +631,37 @@ export function extrasLabels(
  * the city irrelevant, and asking a question whose answer does not matter is
  * how a four-step form becomes a six-step one.
  */
-export const FORMATS = [
+/**
+ * ⚠️ TWO LISTS, THE SAME SPLIT THE CITIES USE — and for the same two reasons.
+ *
+ * `ALL_FORMATS` is the VOCABULARY: every id the `format` column has ever
+ * stored. It may never shrink. Rows written before 2026-08-31 carry EITHER, and
+ * six surfaces render one through `formatLabel` — the admin table, the
+ * provider's job page, the client's own request page and the notification mail
+ * — every one of which would print „EITHER" as a raw latin id the day the list
+ * forgot it.
+ *
+ * `FORMATS` is what the wizard OFFERS TODAY. Owner, 2026-08-31: „სულერთია
+ * წაშალე. იყოს ადგილზე და ონლაინ." „სულერთია" asked the client to decline to
+ * answer and handed the decision to whoever read the request later; with one
+ * city the question is a clean binary, and a two-row screen is one tap either
+ * way. Offering it again is one line here.
+ */
+export const ALL_FORMATS = [
   { id: 'ONLINE',   label: 'ონლაინ' },
   { id: 'IN_PERSON',label: 'ადგილზე' },
   { id: 'EITHER',   label: 'სულერთია' },
 ] as const
-export type FormatName = (typeof FORMATS)[number]['id']
+export type FormatName = (typeof ALL_FORMATS)[number]['id']
+
+/** The formats offered today — see above. */
+export const FORMATS: readonly { id: FormatName; label: string }[] =
+  ALL_FORMATS.filter(f => f.id !== 'EITHER')
 
 export function formatLabel(id: string): string {
-  return FORMATS.find(f => f.id === id)?.label ?? id
+  // Reads the VOCABULARY, never the offered list: an old row must still say
+  // „სულერთია" rather than „EITHER". Same contract as `cityLabel`.
+  return ALL_FORMATS.find(f => f.id === id)?.label ?? id
 }
 
 /**
@@ -1278,6 +1305,40 @@ export function professionsOfTopic(id: string | null | undefined): string[] {
   return topicById(id)?.professions ?? []
 }
 
+/**
+ * THE SPHERE A SERVICE LIST IMPLIES — first topic that names one wins.
+ *
+ * ⚠️ WHY THIS EXISTS (2026-09-02). The provider editor asked „რომელ პროფესიად
+ * გეძებენ" above „რას აკეთებ" — two questions the owner read as one asked twice
+ * („ეს გადამრთველიც რა საჭიროა, ვერ ვხდები" was about /about; this is the same
+ * complaint one screen over). The profession chips could not simply be deleted,
+ * because `categoryId` — which decides the catalogue, the filter and half the
+ * routing — was DERIVED from them (`sphereOfProfessions`, first pick wins).
+ *
+ * So the sphere needed another source, and it turned out to already have one:
+ * `Topic.categorySlug` says „the live sphere whose experts could serve this".
+ * Measured against the roster the day this was written, 27 published profiles:
+ *
+ *     23  derived sphere === stored sphere
+ *      2  differ — and BOTH derivations are better than what was stored
+ *         („აუდიტის დეპარტამენტში 15 წელი" was filed under `relocation`)
+ *      2  derive nothing — both cleaning-only profiles, which is correct:
+ *         a SERVICE topic carries no `categorySlug` by design, and those
+ *         providers route on their services alone
+ *
+ * ⚠️ FIRST PICK WINS, DELIBERATELY — the same rule `sphereOfProfessions` uses,
+ * so the two derivations cannot disagree about what „the sphere" means for a
+ * person who has both. Returning several would make the caller choose, and the
+ * caller is a database column that holds one.
+ */
+export function sphereOfServices(services: readonly string[] | null | undefined): string | undefined {
+  for (const s of services ?? []) {
+    const slug = topicById(s)?.categorySlug
+    if (slug) return slug
+  }
+  return undefined
+}
+
 export function groupsForKind(kind: RequestKindName): TopicGroup[] {
   return TOPIC_GROUPS.filter(g => g.kinds.includes(kind))
 }
@@ -1440,6 +1501,65 @@ export function verticalOfTopic(id: string | null | undefined): Vertical | null 
   return g ? (groupIsService(g) ? 'SERVICE' : 'EXPERT') : null
 }
 
+/** Every topic id → its side, built once. `verticalOfTopic` scans; the
+ *  catalogue asks this of every provider on every keystroke. */
+const VERTICAL_BY_TOPIC: Map<string, Vertical> = (() => {
+  const m = new Map<string, Vertical>()
+  for (const g of TOPIC_GROUPS) {
+    const v: Vertical = groupIsService(g) ? 'SERVICE' : 'EXPERT'
+    for (const t of g.topics) m.set(t.id, v)
+  }
+  return m
+})()
+
+/**
+ * WHICH SIDES A PROVIDER IS ON, from the services they listed.
+ *
+ * ⚠️ A LIST, NOT A VALUE, and that is deliberate. A designer who also fits
+ * kitchens is one person with one card, and forcing them onto one side would
+ * either hide them from half the site or file them where their work is not.
+ * They appear under both switches, because both are true.
+ *
+ * ⚠️ AND „NOTHING TICKED" IS „პროფესიული", NOT „NOWHERE". A profile with no
+ * services yet still has a category, a headline and a face; dropping them out
+ * of both sides would delete a real person from the catalogue over a field they
+ * have not filled in. EXPERT is where the roster is (measured 2026-09-01: 23 of
+ * 23), and it is the side the switch opens on.
+ */
+export function verticalsOfTopics(ids: readonly string[]): Vertical[] {
+  const out = new Set<Vertical>()
+  for (const id of ids) {
+    const v = VERTICAL_BY_TOPIC.get(id)
+    if (v) out.add(v)
+  }
+  return out.size === 0 ? ['EXPERT'] : [...out]
+}
+
+/**
+ * THE ONE WORD FOR EACH SIDE.
+ *
+ * Owner, 2026-09-01: „ჩვენ ხო გვაქვს ორი მთავარი კატეგორია — ვინც ადგილზე
+ * მიდის და ვინც პროფესიოლია — და ეს მინდა იყოს გადამრთველი, რომ არევა არ
+ * მოხდეს ამათი … მოვიფიქროთ, რა არის უკეთ, რომ ერთი სიტყვით დავარქვათ და
+ * გასაგები იყოს ორივე მიმართულებას."
+ *
+ * ⚠️ IT WAS FOUR NAMES FOR TWO THINGS. Measured that morning: /join called them
+ * „სერვისი სახლში" and „პროფესიული სერვისები", /work/profile „სერვისი" and
+ * „პროფესიული სერვისები", the catalogue rail „ყოველდღიური სერვისები" and
+ * „პროფესიული სერვისები", and this file's own `VERTICAL_COPY.label`
+ * „სერვისები" and „ექსპერტები" — a word that means BOTH sides used as the name
+ * of one of them. A provider reads two of those surfaces and a client reads the
+ * other two, and nothing told either of them it was the same question.
+ *
+ * One adjective each, and every surface composes its own noun around it
+ * („პროფესიული სერვისები" where a heading needs one, bare on the switch where
+ * the two words sit side by side and the contrast IS the sentence).
+ */
+export const VERTICAL_LABEL: Record<Vertical, string> = {
+  EXPERT: 'პროფესიული',
+  SERVICE: 'ყოველდღიური',
+}
+
 /**
  * The door's own words. Two questions, because one question that fits both is a
  * question that fits neither — „რა გჭირდება?" is what you ask a person who is
@@ -1453,7 +1573,9 @@ export const VERTICAL_COPY: Record<Vertical, {
   suggested: readonly string[]
 }> = {
   SERVICE: {
-    label: 'სერვისები',
+    // ⚠️ THE SHARED WORD, NOT A FIFTH ONE (2026-09-01). It read „სერვისები" —
+    // the name of everything the site sells, used as the name of half of it.
+    label: VERTICAL_LABEL.SERVICE,
     // ⚠️ NOT „რა გაფუჭდა?" (2026-08-18). Cleaning is one of the four live
     // groups — a third of the open catalogue — and nothing is broken when
     // somebody wants their flat cleaned. Both the home tile „ბინის დალაგება"
@@ -1466,14 +1588,21 @@ export const VERTICAL_COPY: Record<Vertical, {
     // masters who cover that trade, and a wait. Saying the true thing costs
     // nothing and is the difference between a promise and a description.
     hint: 'დაწერე შენი სიტყვებით — ფასს შემოგთავაზებენ.',
-    placeholder: 'ონკანი ჟონავს',
+    // ⚠️ NO EXAMPLE (2026-09-01, owner: „ძალიან კონკრეტული მაგალითები გაქვს
+    // მოყვანილი და არაპროფესიონალურად არის"). It read „ონკანი ჟონავს". The
+    // instruction is already above the box („დაწერე შენი სიტყვებით — ფასს
+    // შემოგთავაზებენ"), so the example taught nothing and narrowed everything:
+    // this one field covers cleaning, moving, electrics and repair, and a
+    // dripping tap told the other four they were in the wrong place. Same
+    // change the provider-side pickers took the same day.
+    placeholder: 'მოძებნე სერვისი',
     suggested: ['plumb-leak', 'clean-flat', 'elec-socket', 'app-washer', 'plumb-drain', 'clean-deep'],
   },
   EXPERT: {
-    label: 'ექსპერტები',
+    label: VERTICAL_LABEL.EXPERT,
     title: 'რაში გჭირდება დახმარება?',
     hint: 'დაწერე შენი სიტყვებით — ექსპერტები შემოგთავაზებენ.',
-    placeholder: 'ხელშეკრულება, დეკლარაცია, ბრენდი…',
+    placeholder: 'მოძებნე სერვისი',
     // Same reordering as SUGGESTED_TOPIC_IDS, and the same reason: what is
     // DELIVERED first, and no dormant topic (`math` left with its group).
     suggested: ['contract', 'declaration', 'logo', 'accounting', 'cv', 'english'],

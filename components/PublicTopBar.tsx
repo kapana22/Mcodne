@@ -10,7 +10,6 @@ import { UserMenu } from './UserMenu'
 import { Container } from '@/components/Container'
 import { useMe, type Me } from '@/lib/me'
 import { useMessagesUnread, type MessagesSpace } from '@/lib/messagesUnread'
-import { JOIN_HREF } from '@/lib/roleHome'
 import { JOIN_DOOR_HREF, JOIN_DOOR_LABEL, showJoinInvite } from '@/lib/capabilities'
 import { requestsOn, showRequestCta } from '@/lib/requests'
 import { ROLE } from '@/lib/roles'
@@ -59,10 +58,16 @@ import { ROLE } from '@/lib/roles'
 //                              showApplyCta, so an existing expert never reads
 //                              an invitation to become one. Same words and same
 //                              address as the footer's item — one string, one
-//                              meaning. A guest still gets „დაწყება" (JOIN_HREF,
-//                              the door that asks who you are) as the filled
-//                              action; a signed-in person keeps the UserMenu
-//                              item (K5).
+//                              meaning. A signed-in person keeps the UserMenu
+//                              item (K5); a guest reads this same link.
+//                              ⚠️ THE GUEST'S „დაწყება" IS GONE (2026-08-31).
+//                              Owner: „დაწყება წაშალე და შესვლაზე გადმოიტანე,
+//                              ერთი და იგივეს აკეთებს." It did: JOIN_HREF is
+//                              /signup and „შესვლა" is /signin, and both render
+//                              the SAME component (app/signup → AuthPage, only
+//                              `defaultView` differs), so the bar carried two
+//                              buttons onto one screen. „შესვლა" took the
+//                              filled treatment and the pair became one.
 //   · „დახმარება"              — the UserMenu and the footer.
 // Reading the bar left-to-right should say what the site is before it says
 // what to press — so the two sections come first and the action is a button
@@ -394,7 +399,8 @@ export function PublicTopBar({
           {/* THE ACTION (stage 9). Desktop only — at 390px a signed-in client's
               row is already four controls (measured below), and the drawer
               carries the same button for the phone. Secondary, not primary:
-              the guest's „დაწყება" keeps the one filled button in the bar. */}
+              „შესვლა" is the bar's one filled button (2026-08-31; it was
+              „დაწყება" until the two merged). */}
           {cta && (
             <Link
               href={cta.href}
@@ -423,23 +429,31 @@ export function PublicTopBar({
                   GUEST-ONLY on purpose: a signed-in student's header already
                   carries ♥ + bell + avatar + ☰, and a fifth control does not
                   fit at 390px. They also have the workspace nav. */}
+              {/* ⚠️ ONE BUTTON, NOT TWO (2026-08-31). „შესვლა" (/signin) and
+                  „დაწყება" (/signup) stood side by side and opened the SAME
+                  screen — app/signup renders app/signin's AuthPage with a
+                  different `defaultView`, and that page's own „არ გაქვს
+                  ანგარიში? დარეგისტრირდი უფასოდ" switches between them. Owner:
+                  „ერთი და იგივეს აკეთებს." So the pair is one control and it
+                  keeps the filled treatment the green button had.
+
+                  ⚠️ AND IT LOST `hidden md:`. „შესვლა" used to be a desktop-only
+                  quiet link because the phone's filled „დაწყება" was the guest's
+                  auth control; with that gone, hiding this below `md` would
+                  leave a phone guest no way into an account from the bar at all.
+                  It is the shorter word of the two, so the 390px row measured
+                  below only got roomier.
+
+                  ⚠️ THE SIZE STAYS `text-body`: tests/designTokens §F ties a
+                  button's label to its height tier (h-11 → text-body), so
+                  shrinking it to match the nav words would make the one filled
+                  control in the bar quieter than the links around it.
+                  `bg-brand-600`, never 500 — white on 500 measures 3.38 (CLAUDE.md). */}
               <Link
                 href="/signin"
-                className="hidden md:inline-flex h-11 px-4 rounded-btn font-display font-semibold text-small text-ink-800 hover:bg-ink-100 items-center transition-colors duration-fast"
+                className="tap-shrink h-11 px-6 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-bold text-body transition-all duration-fast ease-out-quart inline-flex items-center shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)]"
               >
                 შესვლა
-              </Link>
-              <Link
-                href={JOIN_HREF}
-                /* The one filled action, and the design keeps it that way.
-                   `uppercase` dropped with the rest — see the nav.
-                   ⚠️ AND THE SIZE STAYS `text-body`: tests/designTokens §F ties a
-                   button's label to its height tier (h-11 → text-body), so
-                   shrinking this to match the nav words would have made the one
-                   filled control in the bar quieter than the links around it. */
-                className="tap-shrink h-11 px-6 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-bold text-body transition-all duration-fast ease-out-quart inline-flex items-center gap-1.5 shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)]"
-              >
-                დაწყება
               </Link>
             </>
           ) : (
@@ -628,27 +642,21 @@ export function PublicTopBar({
                     </Link>
                   </li>
                 )}
-                {!me && (
-                  <li>
-                    <Link
-                      href="/signin"
-                      onClick={() => setMobOpen(false)}
-                      className="flex items-center h-12 px-3 rounded-btn text-small font-display font-semibold uppercase text-ink-800 hover:bg-ink-100 transition-colors duration-fast"
-                    >
-                      შესვლა
-                    </Link>
-                  </li>
-                )}
+                {/* ⚠️ THE QUIET „შესვლა" ROW LEFT WITH „დაწყება" (2026-08-31).
+                    The drawer carried both — a list row into /signin and a
+                    filled footer button into /signup — which is the same one
+                    screen named twice, on the surface with the least room for
+                    it. The footer button below is now the single door. */}
               </ul>
             </nav>
             {!me && (
               <div className="px-5 pb-5 pt-3 border-t border-ink-100">
                 <Link
-                  href={JOIN_HREF}
+                  href="/signin"
                   onClick={() => setMobOpen(false)}
-                  className="tap-shrink w-full h-12 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-bold text-body-lg uppercase inline-flex items-center justify-center gap-2 shadow-brand-glow transition-all duration-fast"
+                  className="tap-shrink w-full h-12 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-bold text-body-lg uppercase inline-flex items-center justify-center shadow-brand-glow transition-all duration-fast"
                 >
-                  დაწყება
+                  შესვლა
                 </Link>
               </div>
             )}

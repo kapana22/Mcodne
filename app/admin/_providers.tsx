@@ -13,7 +13,7 @@
 // „დამტკიცება" and getting a 400.
 //
 // ⚠️ THE PHOTOS LOAD PER OPENED ROW. The list endpoint omits them because they
-// are base64 columns; see app/api/admin/master-applications for the arithmetic.
+// are base64 columns; see app/api/admin/provider-applications for the arithmetic.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Btn } from '@/components/Btn'
@@ -64,7 +64,13 @@ export function ProvidersSection({ onChanged }: { onChanged?: () => void }) {
       // after an approval, and a browser-cached copy would redraw the row the
       // admin just decided — see tests/adminNav.test.ts for the panel this
       // already happened to.
-      const res = await fetch(`/api/admin/master-applications?status=${status}`, { cache: 'no-store' })
+      // THE ADDRESS WAS `/api/admin/master-applications` (renamed 2026-08-31),
+      // and it WORKED — middleware.ts 308s the retired „master" names to their
+      // „provider" ones and fetch follows a redirect. So this is a tidy-up, not
+      // a fix: one round trip instead of two on a list that reloads after every
+      // approval, and one less live reference to a word the product retired.
+      // The redirect stays where it is — it is there for bookmarks, not for us.
+      const res = await fetch(`/api/admin/provider-applications?status=${status}`, { cache: 'no-store' })
       const d = await res.json()
       if (!d?.ok) { setFailed(true); return }
       setRows(d.rows); setCounts(d.counts ?? {})

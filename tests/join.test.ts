@@ -88,7 +88,14 @@ test('§B /api/me carries the one fact beside the hats, and lib/me types it', ()
 test('§C /join exists, /apply does not, and there is ONE form behind it', () => {
   for (const f of [
     'app/join/page.tsx', 'app/join/JoinClient.tsx',
-    'app/join/_door/DoorQuestion.tsx', 'app/join/_door/GuestDoor.tsx', 'app/join/_door/PublicDoor.tsx',
+    /* ⚠️ `GuestDoor.tsx` LEFT THIS LIST WITH THE FILE (2026-09-02). It was the
+       signed-out „answer first, register second" screen; nothing has rendered
+       it since /join became one page on both sides of the wall, and a file
+       nobody imports is what CLAUDE.md calls a control that lies. Its argument
+       is preserved in full in `_door/PublicDoor.tsx`, which is where the
+       decision to undo it is recorded — so the reasoning survives and the dead
+       code does not. `DoorQuestion` STAYS: JoinClient really imports it. */
+    'app/join/_door/DoorQuestion.tsx', 'app/join/_door/PublicDoor.tsx',
     'app/join/_provider/client.tsx', 'app/join/_provider/_workPhotos.tsx',
     // Shared with /work/profile since the consultation wizard was deleted and
     // took the uploader and the sphere list with it.
@@ -130,6 +137,48 @@ test('§D the page: guest → the pitch WITH the question on it, admin → /admi
   assert.doesNotMatch(read('app/join/page.tsx'), /["'`]\/provider/)
 })
 
+test('§D2 somebody who has applied is shown the answer, not the form again', () => {
+  /* ⚠️ MEASURED, 2026-09-01, and reported by the owner the same hour: „განცხადება
+     გამოიგზავნა და ისევ იგივე ადგილას join-ზე დამაბრუნა და თითქოს არ გაიგზავნა".
+     Two defects made one impression, and both are pinned here.
+
+       · THE CONFIRMATION WAS OFF-SCREEN. Pressing „დასრულება" at scrollY 2 260
+         shrank the document from 3 509px to 1 247px; the browser clamped the
+         scroll to its new maximum of 415, which put 0 pixels of the card and
+         821 of the 832 visible pixels of FOOTER on screen.
+       · AND /join WAS STILL THE FORM AFTERWARDS — h1 „დაარეგისტრირე სერვისი"
+         over 3 324px of pre-filled inputs, with „განაცხადი გამოგზავნილია" as
+         one line inside it.
+
+     A source scan is a weak instrument and this file already leans on one; what
+     it can hold is that the two mechanisms exist at all. The property is: a
+     SUBMITTED application decides the screen, and the server knows it before
+     the first paint. */
+  const page = codeOf('app/join/page.tsx')
+  assert.match(page, /providerApplication\.findUnique/,
+    'the page stopped reading the application — the first paint is a registration form again')
+  assert.match(page, /initialStatus=\{/, 'the status is read and then not passed to the client')
+
+  const form = codeOf('app/join/_provider/client.tsx')
+  assert.match(form, /useState<string \| null>\(initialStatus\)/,
+    'the form ignores what the server already knew and waits for its own fetch')
+  // The confirmation branch must not be `done` alone: `done` is state, so it
+  // survives nothing — not a reload, not a back button, not a second visit.
+  assert.match(form, /if \(sent\) \{/, 'the confirmation branch is gated on something else')
+  assert.match(form, /const sent = \(done \|\| status === 'SUBMITTED'\) && !editing/,
+    'the confirmation is gated on submit-in-this-tab again')
+  assert.match(form, /status === 'SUBMITTED'/, 'SUBMITTED stopped deciding the screen')
+  assert.match(form, /window\.scrollTo\(\{ top: 0/,
+    'the viewport is left where the tall form was — the card renders above the fold line')
+  // NEEDS_REVISION and REJECTED exist to be acted on: they must still open the
+  // form, with the reason above it.
+  for (const st of ['NEEDS_REVISION', 'REJECTED']) {
+    assert.match(form, new RegExp(`status === '${st}'`), `${st} lost its card`)
+  }
+  // And nobody is locked out of their own application.
+  assert.match(form, /setEditing\(true\)/, 'there is no way back into a submitted application')
+})
+
 test('§E the door: one question, one form, and the answer persists', () => {
   // ⚠️ TWO FILES SINCE 2026-08-20. The question moved into the leaf both doors
   // import (`_door/DoorQuestion`) so that a GUEST can answer it before the
@@ -141,7 +190,12 @@ test('§E the door: one question, one form, and the answer persists', () => {
   assert.match(door, /'mcodne:join'/, 'the choice is not persisted')
   assert.match(read('lib/signout.ts'), /'mcodne:join'/, 'sign-out leaves the door choice for the next person on a shared device')
   // One form, opened directly — no `wizardFor`, no second stage, no hand-off.
-  assert.match(door, /setStage\('form'\)/, 'the door stopped opening the one form')
+  // ⚠️ THERE IS NO SECOND STAGE TO OPEN SINCE 2026-08-31 — /join IS the form
+  // („ერთ გვერდზე იყოს ყველაფერი"). `setStage('form')` was the old hand-off and
+  // the thing it guaranteed — ONE form, opened directly, no wizard branch — is
+  // now true by construction: the client renders `<ProviderApplyClient>` and
+  // nothing else. That is what is asserted.
+  assert.match(door, /<ProviderApplyClient/, 'the door stopped opening the one form')
   assert.doesNotMatch(door, /wizardFor|onContinueMaster|onContinueExpert/, 'the two-wizard hand-off came back')
   assert.match(door, /seed=\{seed\}/, 'the form is no longer seeded from the door’s answer')
 })

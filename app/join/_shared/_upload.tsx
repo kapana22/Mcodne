@@ -28,7 +28,7 @@ function uploadErrMsg(code: string): string {
   // formats are listed next to every picker, so BAD_TYPE points at them rather
   // than naming a list that differs per upload kind (avatar vs certificate).
   return code === 'TOO_LARGE' ? 'ფაილი ძალიან დიდია — ატვირთე უფრო მცირე ზომის'
-    : code === 'BAD_TYPE' || code === 'BAD_CONTENT' ? 'ეს ფორმატი არ იტვირთება — იხილე დაშვებული ფორმატები ღილაკის გვერდით'
+    : code === 'BAD_TYPE' || code === 'BAD_CONTENT' ? 'ეს ფორმატი არ იტვირთება.'
     : code === 'RATE_LIMITED' ? 'ბევრი ატვირთვა — დაელოდე ერთ წუთს და სცადე თავიდან'
     : 'ატვირთვა ვერ მოხერხდა — სცადე თავიდან'
 }
@@ -172,7 +172,15 @@ export const PhotoUploader = ({ value, onChange }: { value?: string; onChange: (
         {err
           ? <p className="mt-2 text-meta text-danger-700">{err}</p>
           : <p className="mt-2 text-meta text-ink-500 leading-[1.5]">JPG, PNG ან WebP · მაქსიმუმ 8MB.</p>}
-        <p className="mt-1 text-meta text-ink-500 leading-[1.5]">აირჩიე ფოტო, სადაც სახე კარგად ჩანს — სუფთა ფონი და კარგი განათება.</p>
+        {/* ⚠️ A SECOND LINE OF ADVICE STOOD HERE („აირჩიე ფოტო, სადაც სახე
+            კარგად ჩანს — სუფთა ფონი და კარგი განათება.") AND IS DELETED
+            (2026-09-02). Owner, pointing at this exact control: „აი ამხელა
+            ტექსტებზე გეუბნებოდი, რომ არაა საჭირო და ტვირთავს."
+            The line above it is a CONSTRAINT — the two formats and the one size
+            the server actually refuses — and a person who breaks it gets an
+            error, so it earns its place. This one was photography advice under
+            a file picker: nobody uploads a badly-lit photo because they had not
+            thought of light. */}
       </div>
       {/* Hidden file input + crop dialog. The „ატვირთვა" button calls pickPhoto;
           the upload only runs after the crop is confirmed. */}

@@ -63,7 +63,22 @@ export function WorkTabs({ showOffers, openRequests = 0 }: { showOffers: boolean
   ]
 
   return (
-    <div role="tablist" className="mb-5 flex items-center gap-1 border-b border-ink-100">
+    /* ⚠️ PILLS, NOT AN UNDERLINE BAR (2026-08-31, from the owner's design
+       canvas → Work Profile). It was four text labels on a hairline with a 2px
+       marker under the live one — legible, and completely flat: the four stages
+       of a job read as four words in a row rather than as places you move
+       between. The canvas draws them as chips with the count INSIDE, the
+       active one filled.
+
+       ⚠️ THE COUNT MOVES INSIDE THE CHIP AND KEEPS ITS OWN WEIGHT. It was a
+       filled brand badge beside the label; at chip size two filled shapes
+       nested inside each other is noise, so the number sits in the chip at 65%
+       opacity — the canvas's treatment. It is still only drawn when there IS
+       one; „ახალი 0" is a stage announcing its own emptiness.
+
+       `role="tablist"` and `aria-selected` are untouched: the shape changed,
+       the semantics did not. */
+    <div role="tablist" className="mb-5 flex flex-wrap items-center gap-2">
       {tabs.map(t => {
         const base = t.href.split('?')[0]
         const onPath = path === base || path.startsWith(base + '/')
@@ -78,17 +93,16 @@ export function WorkTabs({ showOffers, openRequests = 0 }: { showOffers: boolean
             href={t.href}
             role="tab"
             aria-selected={on}
-            className={`relative inline-flex items-center h-11 px-3 font-display text-small font-semibold whitespace-nowrap transition-colors duration-fast ${
-              on ? 'text-ink-900' : 'text-ink-500 hover:text-ink-800'
+            className={`inline-flex h-11 items-center whitespace-nowrap rounded-pill border px-[18px] font-display text-body font-semibold transition-[background-color,border-color,transform] duration-fast motion-safe:active:scale-[0.97] ${
+              on
+                ? 'border-ink-900 bg-ink-900 text-white'
+                : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-75'
             }`}
           >
             {t.label}
             {t.n > 0 && (
-              <span className="ml-1.5 min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center rounded-pill bg-brand-600 text-white text-micro font-bold tabular-nums">
-                {t.n}
-              </span>
+              <span className="ml-2 text-meta tabular-nums opacity-65">{t.n}</span>
             )}
-            {on && <span className="absolute left-3 right-3 -bottom-px h-[2px] bg-brand-500 rounded-full" />}
           </Link>
         )
       })}

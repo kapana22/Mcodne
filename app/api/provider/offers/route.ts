@@ -23,10 +23,13 @@ import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { RequestOfferInput, offerProviderError, kindOf, KIND, gel, offerPriceLabel, topicLabel } from '@/lib/requests'
+import { validationIssueMessage } from '@/lib/validationMessages'
 import { requestsViewer } from '@/lib/requestsServer'
 import { sendMail } from '@/lib/mailer'
+import { notifyMany } from '@/lib/notify'
 import { offerArrivedClientEmail } from '@/lib/emailTemplates'
 import { recordOfferEvent } from '@/lib/offerEvents'
+import { providerUserIdsOf } from '@/lib/offerLifecycle'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
@@ -44,7 +47,14 @@ export async function POST(req: Request) {
 
   // THE SAME schema the provider's form validated with (lib/requests).
   const parsed = RequestOfferInput.safeParse(await req.json().catch(() => ({})))
-  if (!parsed.success) return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    return NextResponse.json({
+      ok: false, error: 'INVALID',
+      field: typeof issue?.path[0] === 'string' ? issue.path[0] : null,
+      message: validationIssueMessage(issue),
+    }, { status: 400 })
+  }
 
   const expertUserId = provider.kind === 'EXPERT' ? provider.userId : null
   const companyId = provider.kind === 'COMPANY' ? provider.companyId : null
@@ -73,23 +83,53 @@ export async function POST(req: Request) {
     select: { id: true },
   })
 
+  // ── WHO COUNTS AS „ME" ───────────────────────────────────────────────────
+  // 🔒 NOBODY BIDS ON THEIR OWN REQUEST (2026-08-31). Owner: „მინდა რომ ვისაც
+  // სერვისი აქვს იმას არ შეძლოს სერვისის დაკვეთა." Refusing them the INTAKE
+  // (lib/requests → canFileRequest) only closes the front door; this is the
+  // one that matters, because the whole chain hangs off it — bid on your own
+  // request, accept it (you hold the reference), mark it done, and write
+  // yourself five stars into `ServiceProfile.rating`, which is printed on every
+  // card in the catalogue. The review end is closed too (lib/offerLifecycle →
+  // reviewGate 'SELF'); this closes the end where it starts.
+  //
+  // TWO CASES THAT ARE ONE RULE. An EXPERT is one account. A COMPANY is all of
+  // its members: a colleague answering a colleague's request is the same act
+  // with a second login, and `providerUserIdsOf` is already the list the rest
+  // of the subsystem means by „the provider".
+  //
+  // ⚠️ AND IT DOES NOT CLOSE ITSELF WHEN THE INTAKE DID. Requests filed before
+  // today exist, and a company member could always file one — the front door
+  // was never the only way a row gets an author.
+  const selfIds = await providerUserIdsOf({ expertUserId, companyId })
+
   // ── THE CLAIM ────────────────────────────────────────────────────────────
-  // Status and place, in one conditional write. Note what is NOT here: no
-  // findUnique, no `if (count < limit)`, no transaction wrapping a read. The
-  // `where` IS the guard.
+  // Status, place AND authorship, in one conditional write. Note what is NOT
+  // here: no findUnique, no `if (count < limit)`, no transaction wrapping a
+  // read. The `where` IS the guard (CLAUDE.md rule 4) — and putting the
+  // authorship test in it rather than in a read above means two tabs cannot
+  // both pass a check and then both write.
+  //
+  // ⚠️ THE `OR` IS NOT TIDINESS, IT IS NULL SAFETY. `userId` is nullable and
+  // MOST REQUESTS ARE ANONYMOUS — somebody who filled the form without an
+  // account. In SQL `NULL NOT IN (…)` is NULL, which is not true, so a bare
+  // `notIn` would have matched zero anonymous rows and silently refused every
+  // offer on the majority of the queue. Written out, the two cases are
+  // obviously both allowed.
   const claimed = await prisma.serviceRequest.updateMany({
     where: {
       id: parsed.data.requestId,
       status: 'VERIFIED',
       offerCount: { lt: prisma.serviceRequest.fields.offerLimit },
+      ...(selfIds.length ? { OR: [{ userId: null }, { userId: { notIn: selfIds } }] } : {}),
     },
     data: { offerCount: { increment: 1 } },
   })
   if (claimed.count !== 1) {
-    // One code for „not verified", „full" and „does not exist" alike. A
-    // provider who may not bid learns only that they may not bid — telling them
-    // WHICH of the three it was would be a way to enumerate requests they are
-    // not allowed to see.
+    // One code for „not verified", „full", „does not exist" and now „it is
+    // yours" alike. A provider who may not bid learns only that they may not
+    // bid — telling them WHICH of the four it was would be a way to enumerate
+    // requests they are not allowed to see.
     return NextResponse.json({ ok: false, error: 'NOT_OPEN' }, { status: 409 })
   }
 
@@ -100,14 +140,38 @@ export async function POST(req: Request) {
   try {
     const data = {
       priceGel: parsed.data.priceGel,
+      /* ⚠️ THIS LINE WAS MISSING AND THE COLUMN WAS A LIE (fixed 2026-09-01).
+       *
+       * `priceKind` has been parsed, validated and defaulted by
+       * `RequestOfferInput` since the field shipped, and it was read a hundred
+       * lines below to word the notification mail — but it was never written.
+       * Every FROM and every ON_SITE offer has been stored on the column's
+       * `'FIXED'` default, so the client's own page rendered „80₾" through
+       * `offerPriceLabel` for an offer whose mail had told them „80₾-დან", and
+       * an on-site estimate came out as a flat price. The two screens disagreed
+       * because only one of them was reading what the provider actually chose.
+       *
+       * Found while adding HOURLY: a third kind that is silently stored as the
+       * first is the same bug with a new value, and worse — an hourly rate read
+       * as a fixed total is a real misquote rather than a softened one.
+       *
+       * ⚠️ ROWS WRITTEN BEFORE TODAY CANNOT BE REPAIRED. Nothing recorded the
+       * intended kind, so there is no source to backfill from; those offers stay
+       * FIXED, which is at least what their own page has always said.
+       */
+      priceKind: parsed.data.priceKind,
       daysEstimate: parsed.data.daysEstimate ?? null,
+      // What the price covers — the line the client's offer list compares on
+      // (2026-09-01, the canvas). Required by the schema, so it is always a
+      // real sentence by the time it gets here.
+      priceIncludes: parsed.data.priceIncludes.trim(),
       message: parsed.data.message.trim(),
     }
     const SELECT = {
       id: true,
       expertUser: { select: { fullName: true } },
       company: { select: { name: true } },
-      request: { select: { publicRef: true, topic: true, kind: true, email: true, offerCount: true } },
+      request: { select: { publicRef: true, topic: true, kind: true, email: true, offerCount: true, userId: true } },
     } as const
 
     // ── The offer itself, and it is FREE ─────────────────────────────────
@@ -173,9 +237,41 @@ export async function POST(req: Request) {
     // Contact-rule note: the PROVIDER'S NAME is in this mail and that is not a
     // leak — the client's page already shows every offer's name; only phone
     // and email wait for acceptance.
+    // ⚠️ THE BELL TOO, SINCE 2026-09-01. This route sent the mail and stopped
+    // there, and the site has had a notification centre the whole time — the
+    // header bell, /notifications, `lib/notify`. Being offered work is the one
+    // event a client is waiting for, and it was the one event that never
+    // reached it: somebody sitting on the site when an offer landed saw
+    // nothing, and found out only by going to their mail. Every other party
+    // already gets a bell (a provider is told when their offer is chosen, an
+    // admin when a request arrives); the client was missed.
+    //
+    // GENERIC on purpose — the opt-outable categories all belong to the booking
+    // product that was removed, and this is not marketing anybody should be
+    // able to unsubscribe from.
+    //
+    // ⚠️ NO `publicRef`, NOT IN THE BODY AND NOT IN THE HREF. The reference is
+    // a credential: it opens the request page, the private thread, and every
+    // rival offer. `/me` is the client's own room behind their own session and
+    // lists the request anyway, so the bell needs no secret to be useful.
+    // Only an account can hold a notification — a guest who filed with an email
+    // and never signed up still has the mail below, which is their door back.
+    if (offer.request.userId) {
+      after(async () => {
+        try {
+          await notifyMany([offer.request.userId as string], {
+            type: 'GENERIC',
+            title: 'ახალი შეთავაზება მოგივიდა',
+            body: topicLabel(offer.request.topic),
+            href: '/me',
+          })
+        } catch { /* the bell is best-effort; the mail below is the guarantee */ }
+      })
+    }
+
     const to = offer.request.email
     if (to) {
-      const mail = offerArrivedClientEmail({
+      const mail = await offerArrivedClientEmail({
         publicRef: offer.request.publicRef,
         topicLabel: topicLabel(offer.request.topic),
         // The unit comes from the vocabulary, never re-derived here — a price
@@ -186,12 +282,17 @@ export async function POST(req: Request) {
         priceLabel: parsed.data.priceKind === 'FIXED'
           ? `${offerPriceLabel(parsed.data.priceGel, 'FIXED')} ${KIND[kindOf(offer.request.kind)].unitLabel}`
           : offerPriceLabel(parsed.data.priceGel, parsed.data.priceKind),
+        // The same sentence the client will read under this price on their own
+        // page, sent with the mail that announces it — a mail that carried only
+        // a number would make the client open the page to learn whether the
+        // materials were in it.
+        priceIncludes: parsed.data.priceIncludes.trim(),
         providerName: offer.expertUser?.fullName ?? offer.company?.name ?? 'ექსპერტი',
         offerCount: offer.request.offerCount,
       })
       after(async () => {
         try {
-          await sendMail({ to, ...mail })
+          await sendMail({ key: 'request.offerArrived.client', to, ...mail })
           // „We did our part" — the first thing an expert asks when nobody
           // opened their offer. Recorded only on an actual successful send, so
           // it never claims a delivery that did not happen.

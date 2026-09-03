@@ -24,7 +24,7 @@ import { middleware } from '../middleware'
 import {
   ALL_PROFESSIONS, PROFESSION_CAN, professionCan, professionsThatCan,
 } from '../lib/professions'
-import { TOPIC_GROUPS, professionsOfTopic, topicById } from '../lib/requestTopics'
+import { TOPIC_GROUPS, professionsOfTopic, topicById, sphereOfServices } from '../lib/requestTopics'
 import { routeRequest, type RoutableProvider } from '../lib/requestRouting'
 import { professions, professionBySlug } from '../lib/professionSeo'
 import {
@@ -419,4 +419,48 @@ test('G. nothing in app/, components/, lib/ links to /konsultacia or /categories
   // keys stay under their historical stems.
   assert.match(read('lib/pageSeoDefs.ts'), /page: 'konsultacia'/)
   assert.match(read('lib/pageSeoDefs.ts'), /page: 'categories',\s*retired: true/)
+})
+
+/* ═══════════ the sphere a services list implies ═════════════════════════════
+ *
+ * ⚠️ THIS BECAME LOAD-BEARING ON 2026-09-02. The provider editor stopped asking
+ * „რომელ პროფესიად გეძებენ" — 24 of 27 published providers had left it empty
+ * and it contributed 0 routing topics to the three who had not — but the sphere
+ * was DERIVED from those professions, and `categoryId` decides the catalogue,
+ * the filter and half the routing. It is derived from the SERVICES now, so this
+ * function is the only thing standing between a provider and no sphere at all.
+ */
+test('sphereOfServices — first topic that names a sphere wins, and nothing invents one', () => {
+  assert.equal(sphereOfServices([]), undefined, 'an empty list must not resolve to a sphere')
+  assert.equal(sphereOfServices(undefined), undefined)
+  assert.equal(sphereOfServices(['no-such-topic-id']), undefined,
+    'an unknown id resolved to a sphere — that is a category assigned from nothing')
+
+  // Every topic that DOES name a sphere must resolve to itself when it is first.
+  const withSphere = TOPIC_GROUPS.flatMap(g => g.topics).filter(t => topicById(t.id)?.categorySlug)
+  assert.ok(withSphere.length > 0, 'no topic carries a categorySlug — the derivation has no input')
+  for (const t of withSphere.slice(0, 40)) {
+    assert.equal(sphereOfServices([t.id]), topicById(t.id)?.categorySlug,
+      `${t.id}: a single service stopped resolving to its own sphere`)
+  }
+
+  // FIRST PICK WINS — the same rule sphereOfProfessions uses, so the two
+  // derivations cannot disagree for somebody who has both.
+  const [a, b] = withSphere.filter((t, i, all) =>
+    topicById(t.id)?.categorySlug !== topicById(all[0].id)?.categorySlug || i === 0).slice(0, 2)
+  if (a && b) {
+    assert.equal(sphereOfServices([a.id, b.id]), topicById(a.id)?.categorySlug,
+      'the derivation stopped taking the FIRST sphere — order must decide, as it does for professions')
+  }
+
+  /* 🔒 A TRADE MUST STILL RESOLVE TO NOTHING. `Topic.categorySlug` is „the live
+     sphere whose experts could serve this", and a SERVICE topic has none by
+     design — those providers route on their services alone (lib/requestRouting
+     → queueScope handles `categoryId: null`). If a trade ever starts resolving,
+     cleaning providers get filed under an expert sphere they are not in. */
+  const trades = TOPIC_GROUPS.filter(g => g.id.startsWith('clean') || g.id.startsWith('plumb'))
+    .flatMap(g => g.topics).map(t => t.id)
+  for (const id of trades.slice(0, 10)) {
+    assert.equal(sphereOfServices([id]), undefined, `${id}: a trade resolved to an expert sphere`)
+  }
 })

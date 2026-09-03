@@ -119,5 +119,25 @@ export function georgianNameRefine(label: string) {
  * matching on `code === 'custom'` alone.
  */
 export function firstGeorgianMessage(err: { issues: { message: string }[] }): string | null {
-  return err.issues.find(i => /[Ⴀ-ჿᲐ-Ჿ]/.test(i.message))?.message ?? null
+  return firstGeorgianIssue(err)?.message ?? null
+}
+
+/**
+ * The same issue, WITH ITS PATH — which is how the form learns which box.
+ *
+ * ⚠️ WHY THE MESSAGE ALONE WAS NOT ENOUGH (2026-08-31). /api/me runs this gate
+ * over TWO fields — `fullName` (the strict name rule) and `bio` (the prose
+ * share test) — and answered both with one code, `INVALID_TEXT`, and one
+ * sentence. /settings then had to guess which of its four boxes to mark, and
+ * the only clue was the noun the message happens to open with („სახელი…" vs
+ * „აღწერა…"), i.e. a substring match on copy. A rule that names a field must
+ * hand the NAME over, not leave the reader's screen to infer it from prose.
+ */
+export function firstGeorgianIssue(
+  err: { issues: { message: string; path?: PropertyKey[] }[] },
+): { message: string; field: string | null } | null {
+  const hit = err.issues.find(i => /[Ⴀ-ჿᲐ-Ჿ]/.test(i.message))
+  if (!hit) return null
+  const head = hit.path?.[0]
+  return { message: hit.message, field: typeof head === 'string' ? head : null }
 }

@@ -6,7 +6,7 @@ import { audit } from '@/lib/audit'
 import { normalizePrefs } from '@/lib/notify'
 import { ROLE } from '@/lib/roles'
 
-const Segment = z.enum(['all', 'students', 'tutors', 'recent'])
+const Segment = z.enum(['all', 'clients', 'providers', 'recent'])
 const Body = z.object({
   segment: Segment,
   subject: z.string().min(1).max(120),
@@ -16,8 +16,8 @@ const Body = z.object({
 function whereForSegment(segment: z.infer<typeof Segment>) {
   switch (segment) {
     case 'all': return {}
-    case 'students': return { role: ROLE.USER }
-    case 'tutors': return { role: ROLE.PROVIDER }
+    case 'clients': return { role: ROLE.USER }
+    case 'providers': return { role: ROLE.PROVIDER }
     case 'recent': {
       const since = new Date(Date.now() - 7 * 24 * 3600 * 1000)
       return { createdAt: { gte: since } }

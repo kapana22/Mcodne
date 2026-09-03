@@ -5,36 +5,41 @@ import React from 'react'
 // the card→profile morph. Unsupported browsers get plain navigation.
 import { Link } from 'next-view-transitions'
 import { Avatar } from '@/components/Avatar'
-import { Card } from '@/components/Card'
 import { Reveal } from '@/components/Reveal'
 import { Icon } from '@/components/Icon'
 
 /**
- * ONE CARD FOR THE WHOLE CATALOGUE — the home page's „ახლა ხელმისაწვდომია".
+ * ONE CARD FOR THE WHOLE CATALOGUE — the home page's „ან პირდაპირ აირჩიე".
  *
  * ⚠️ IT REPLACES `components/home/ExpertGrid` (2026-08-21). That component was
  * expert-shaped by its type as well as its layout — `rate`, `reviews`,
  * `sessions`, a „დაჯავშნე" button — so a PROVIDER could not appear in it at
  * all, and the home page's roster silently showed only the consulting half of a
  * catalogue the canon says is one list („One catalogue, one card, one
- * namespace"). The rule that both halves appear, service first, cannot be
- * honoured by a grid that can only render one of them.
+ * namespace").
  *
- * ⚠️ THE CARD IS COMPACT ON PURPOSE — it comes from the design canvas
- * („მცოდნე — მთავარი გვერდი"): a 52px face, a name, ONE badge, ONE line of what
- * they do, and the price on its own strip at the foot. The card it replaces was
- * a 96px portrait over five stacked facts and a booking button — a browse card
- * doing a profile's job, three-up on a home page. Six of these fit the fold;
- * six of those did not.
+ * ⚠️ RE-CUT 2026-08-31 FROM THE OWNER'S DESIGN CANVAS („mcodne.ge პროფილის
+ * რედიზაინი" → Home). Four things moved, and each is a fact the card could not
+ * carry before:
  *
- * What survives from the old grid, because it was never about the format:
- *  - ONLY facts that exist. No „0 სესია", no „★ 0.0", and 🔒 never a price
- *    somebody did not name — a provider who quotes per job says so in words.
- *  - The FLAGSHIP price and duration from the SAME tier (the caller resolves it
- *    through `primaryPriceLabel`), never the profile's flat rate beside another
- *    tier's clock.
- *  - <Avatar>, never a raw <img>: an avatarUrl that is present but unusable
- *    renders a broken-image glyph, and several are.
+ *   · THE FACE IS 64px AND ITS SHAPE IS THE IDENTITY. A person is a circle, a
+ *     firm is a rounded square (components/Avatar → `shape`). That distinction
+ *     was in the data (`isCompany`) and on the /experts card, and missing here.
+ *   · THE PRICE MOVED OFF ITS OWN STRIP and onto the card's foot rule, beside
+ *     the one word that says what the click does. The strip was a second plate
+ *     on a card that is already a plate on paper.
+ *   · A REPLY CHIP, and it is MEASURED (lib/responseStats). The canvas prints
+ *     „პასუხობს 2 საათში" on every card; that number does not exist as a stored
+ *     column, so it is derived from the offer journal and printed only above
+ *     `MIN_RESPONSE_SAMPLE`. 🔒 Most cards will show nothing here for a while,
+ *     and that is the correct look for a young marketplace.
+ *   · NO PLACEHOLDER STATE. The canvas has „ახალი პროფილი" where the reply chip
+ *     would be. It reads as a warning label on the newest people on the site —
+ *     the ones who most need the first job — so an unmeasured card simply omits
+ *     the row.
+ *
+ * What survives, because it was never about the format: ONLY facts that exist —
+ * no „0 სესია", no „★ 0.0", and 🔒 never a price somebody did not name.
  */
 
 export type CatalogueCardItem = {
@@ -52,20 +57,29 @@ export type CatalogueCardItem = {
    * things CLAUDE.md says must not come back.
    */
   badge: string
+  /** „თბილისი" — where they work. Empty when they named no city. */
+  area: string
   /** One line in their own words. Empty is fine — the row goes away. */
   blurb: string
-  /** „₾64-დან" — already formatted by `offerPriceLabel`, or null for „ask". */
+  /** „₾64-დან" — already formatted by the caller, or null for „ask". */
   priceLabel: string | null
-  /** The half-line after the price — „სერვისი" or „45 წთ". */
+  /** The half-line after the price — „სერვისი". */
   priceSuffix: string
   photo: string | null
   verified?: boolean
+  /** A firm, not a person — decides the face's shape. */
+  isCompany?: boolean
+  /** „პასუხობს ~2 საათში", MEASURED, or null. See lib/responseStats. */
+  reply?: string | null
 }
 
 /** Six is the grid: 3×2 on desktop, 2×3 on tablet, a single column on a phone. */
 const CATALOGUE_GRID_SIZE = 6
 
-const GRID = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5'
+const GRID = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'
+
+const SHELL =
+  'flex flex-col gap-4 rounded-card border border-ink-100 bg-white p-5'
 
 export function CatalogueGrid({
   items,
@@ -78,23 +92,23 @@ export function CatalogueGrid({
     return (
       <div className={GRID} aria-busy="true">
         {Array.from({ length: CATALOGUE_GRID_SIZE }, (_, i) => (
-          <Card key={i} padding="none" className="motion-safe:animate-pulse">
-            <div className="flex gap-3 p-4">
-              {/* Shape + size mirror the real <Avatar> below (round, 52px) — a
+          <div key={i} className={`${SHELL} motion-safe:animate-pulse`}>
+            <div className="flex items-center gap-3.5">
+              {/* Shape + size mirror the real <Avatar> below (round, 64px) — a
                   rounded-SQUARE placeholder resolving into a circle is a
                   visible pop, and it was one for as long as the old skeleton
                   existed. */}
-              <div className="h-[52px] w-[52px] shrink-0 rounded-full bg-ink-100" />
+              <div className="h-16 w-16 shrink-0 rounded-full bg-ink-100" />
               <div className="min-w-0 flex-1">
                 <div className="h-4 w-2/3 rounded bg-ink-100" />
-                <div className="mt-2.5 h-5 w-20 rounded-pill bg-ink-100" />
-                <div className="mt-2.5 h-3 w-full rounded bg-ink-100" />
+                <div className="mt-2.5 h-3 w-24 rounded bg-ink-100" />
               </div>
             </div>
-            <div className="border-t border-ink-100 px-4 py-3">
+            <div className="h-3.5 w-full rounded bg-ink-100" />
+            <div className="mt-auto border-t border-ink-100 pt-3.5">
               <div className="h-5 w-24 rounded bg-ink-100" />
             </div>
-          </Card>
+          </div>
         ))}
       </div>
     )
@@ -107,40 +121,35 @@ export function CatalogueGrid({
     <Reveal stagger className={GRID}>
       {items.map(e => (
         /* WHOLE-CARD LINK, and it is the whole card because there is nothing
-           else on it to press. The old grid needed a stretched overlay only
-           because it carried a „დაჯავშნე" anchor inside — a real <a> cannot
-           wrap another one. With the button gone the card IS the link, which
-           is both simpler markup and one focus stop instead of two. */
-        <Card
-          as={Link}
+           else on it to press. With no button inside, the card IS the link —
+           simpler markup and one focus stop instead of two. */
+        <Link
           key={e.id}
-          padding="none"
-          // ⚠️ NOT `interactive`, AND THAT IS THE MOTION, NOT AN OMISSION.
-          // `interactive` adds `.hover-lift` — a 2px raise. The canvas lifts a
-          // card 4px into a wider shadow and warms its border to brand-200, and
-          // the two cannot be combined: `.hover-lift:hover` and a
-          // `hover:-translate-y-*` utility have identical specificity (0-2-0),
-          // so which raise wins would be decided by stylesheet emit order.
-          // Written out here, all three properties move together on ONE curve.
           href={`/experts/${e.slug || e.id}`}
-          className="group flex flex-col overflow-hidden
+          className={`group ${SHELL}
                      transition-[transform,box-shadow,border-color] duration-mid ease-out-quart
                      hover:border-brand-200 hover:shadow-card-hover motion-safe:hover:-translate-y-1
-                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2`}
         >
-          <div className="flex flex-1 items-start gap-3 p-4">
+          <div className="flex items-center gap-3.5">
             {/* Shared-element pair with the profile's own avatar — the face
                 morphs across the navigation rather than cutting. */}
             <span
               style={{ viewTransitionName: `vt-photo-${e.id}` }}
               className="inline-block shrink-0"
             >
-              <Avatar src={e.photo ?? undefined} name={e.name} size={52} className="h-[52px] w-[52px]" />
+              <Avatar
+                src={e.photo ?? undefined}
+                name={e.name}
+                size={64}
+                shape={e.isCompany ? 'card' : 'circle'}
+                className="h-16 w-16"
+              />
             </span>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h3 className="truncate font-display text-body-lg font-bold tracking-tight text-ink-900 transition-colors duration-mid group-hover:text-brand-700">
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5">
+                <h3 className="truncate font-display text-body-lg font-bold tracking-[-0.01em] text-ink-900 transition-colors duration-mid group-hover:text-brand-700">
                   {e.name}
                 </h3>
                 {e.verified && (
@@ -151,41 +160,46 @@ export function CatalogueGrid({
                     <Icon.check className="h-2.5 w-2.5" />
                   </span>
                 )}
-              </div>
-
-              {e.badge && (
-                <p className="mt-1.5">
-                  <span className="inline-flex h-6 items-center rounded-pill border border-ink-200 bg-ink-75 px-2 text-meta text-ink-500">
-                    {e.badge}
-                  </span>
-                </p>
+              </span>
+              {/* „ბუღალტერი · თბილისი" — what they do and where, in one quiet
+                  line. The canvas's card carries both; the old one carried the
+                  first inside a bordered chip, which gave a label the weight of
+                  a control. */}
+              {(e.badge || e.area) && (
+                <span className="mt-0.5 block truncate text-meta text-ink-500">
+                  {[e.badge, e.area].filter(Boolean).join(' · ')}
+                </span>
               )}
-
-              {e.blurb && (
-                <p className="mt-2 line-clamp-2 text-meta leading-[1.45] text-ink-500">{e.blurb}</p>
-              )}
-            </div>
+            </span>
           </div>
 
-          {/* THE PRICE STRIP. Its own ground, so the number reads as the card's
-              conclusion rather than as one more line of the paragraph above it. */}
-          <div className="flex items-baseline gap-1.5 border-t border-ink-100 bg-gradient-to-b from-ink-75/40 to-ink-75/80 px-4 py-3">
+          {e.blurb && (
+            <p className="line-clamp-2 text-small leading-[1.55] text-ink-600">{e.blurb}</p>
+          )}
+
+          {/* 🔒 MEASURED OR ABSENT — see the header. */}
+          {e.reply && (
+            <span className="inline-flex h-[26px] shrink-0 items-center self-start rounded-pill border border-brand-100 bg-brand-50 px-2.5 text-meta font-semibold text-brand-700">
+              {e.reply}
+            </span>
+          )}
+
+          <span className="mt-auto flex flex-wrap items-baseline justify-between gap-3 border-t border-ink-100 pt-3.5">
             {e.priceLabel ? (
-              <>
-                <span className="font-display text-h2 font-bold tabular-nums tracking-tight text-ink-900">
-                  {e.priceLabel}
-                </span>
-                <span className="text-meta text-ink-500">· {e.priceSuffix}</span>
-              </>
+              <span className="font-display text-h3 font-extrabold tabular-nums tracking-[-0.01em] text-ink-900">
+                {e.priceLabel}
+                <span className="ml-1.5 text-meta font-normal text-ink-500">· {e.priceSuffix}</span>
+              </span>
             ) : (
               /* 🔒 NEVER INVENT A NUMBER. Somebody who quotes per job is working
                  normally, not leaving a blank (lib/serviceProfile → priceHint) —
-                 so the strip says what actually happens next instead of
-                 printing a ₾0 that would read as free. */
+                 so the line says what actually happens next instead of printing
+                 a ₾0 that would read as free. */
               <span className="text-small text-ink-500">ფასი შეთანხმებით</span>
             )}
-          </div>
-        </Card>
+            <span className="font-display text-meta font-semibold text-brand-700">პროფილი</span>
+          </span>
+        </Link>
       ))}
     </Reveal>
   )

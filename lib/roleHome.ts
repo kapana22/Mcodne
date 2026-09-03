@@ -37,6 +37,15 @@ export function homeForRole(role: string | null | undefined): string {
  * diverge; that divergence is the exact bug tests/regression-invariants §K
  * exists to catch, and it caught this change.
  */
+/**
+ * ⚠️ NOTHING LINKS THIS FROM THE PUBLIC HEADER SINCE 2026-08-31, and the
+ * constant stays because the ADDRESS is still real: /signup is the client's
+ * registration route (CLAUDE.md), app/signup is a first-class page, and
+ * regression-invariants K0 pins that the guest door has ONE destination rather
+ * than two chromes inventing their own. What left is the bar's „დაწყება"
+ * button — owner: „ერთი და იგივეს აკეთებს", and it did: /signup and /signin
+ * render one component with a different `defaultView`.
+ */
 export const JOIN_HREF = '/signup'
 
 /**

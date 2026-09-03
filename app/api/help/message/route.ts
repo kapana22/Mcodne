@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { messageText } from '@/lib/messageText'
 import type { NextRequest } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
@@ -94,10 +95,11 @@ export async function POST(req: NextRequest) {
   // The alarm. Deliberately after the write and deliberately non-fatal: the
   // message is already safe, and a mail outage must not turn into a 500 that
   // makes someone send it twice.
-  void sendMail({
+  const t = await messageText()
+  void sendMail({ key: 'inbox.help',
     to: process.env.CONTACT_INBOX || SUPPORT_EMAIL,
     replyTo: replyEmail ?? undefined,
-    subject: `[მცოდნე] დახმარების ჩათი — ${(displayName || 'ანონიმური').replace(/[\r\n]+/g, ' ')}`,
+    subject: t('inbox.help', 'subject', { name: (displayName || t('inbox.help', 'anon')).replace(/[\r\n]+/g, ' ') }),
     html: `<div style="font-family:sans-serif;line-height:1.6;color:#181B20">
       <h2 style="margin:0 0 12px">ახალი პრობლემა დახმარების ჩათიდან</h2>
       <p><b>გვერდი:</b> ${esc(route || '—')}</p>

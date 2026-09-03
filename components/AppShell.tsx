@@ -48,6 +48,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // reload. The previous role stays on screen while the re-check is in
   // flight, so there's no flicker on ordinary navigations.
   const [role, setRole] = useState<Role | null>(null)
+  /* ⚠️ AND WHETHER THEY SELL, WHICH IS A DIFFERENT QUESTION (2026-09-03).
+     /api/me has returned `provider` — identityOf's own boolean — since the
+     balance rode along with it, and this component threw it away and kept the
+     role. Three of 27 real providers carry `role: USER`, so the tab bar handed
+     them the client's set everywhere outside /me and /work. The whole finding
+     is written at components/BottomNav's tab block. Read from the SAME
+     response as the role, so the two can never describe different people. */
+  const [sells, setSells] = useState(false)
   // ⚠️ THE CAPABILITY LIST WAS READ HERE AND IS GONE (2026-08-30). It existed
   // for the tab bar: /work was home to two kinds of seller, and the bar had a
   // set for each. There is ONE kind since 2026-08-24, and `/api/me` stopped
@@ -84,8 +92,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         const r = m?.role as Role | undefined
         if (r === 'USER' || r === 'PROVIDER' || r === 'ADMIN') setRole(r)
         else setRole(null)
+        setSells(m?.provider === true)
       })
-      .catch(() => { if (!cancelled) { setRole(null) } })
+      .catch(() => { if (!cancelled) { setRole(null); setSells(false) } })
     return () => { cancelled = true }
   }, [path])
 
@@ -237,9 +246,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               never overlap; hides itself entirely while a mobile booking CTA
               owns the bottom edge — see HelpWidget. */}
           {!inProviderSpace && <HelpWidget />}
-          <BottomNav role={role} />
+          <BottomNav role={role} sells={sells} />
         </>
       )}
+      {/* ⚠️ …AND THE HELP BUBBLE REACHES THE INTAKE TOO (2026-09-02). It was
+          inside the block above, so `isRequestPath` took it away with the tab
+          bar — on the one screen in the product where being stuck costs a
+          request rather than a page view. Owner, on /request: „ჰედერი საერთოდ
+          არ გაქვს, არც ფუტერი, არც უკან დაბრუნება."
+
+          BottomNav and BackToTop stay away, and the reason is unchanged: a tab
+          bar is twelve ways to leave a form, and the intake is short enough
+          that nothing scrolls far enough to need a lift back. A help bubble is
+          neither — it is the way to finish, not the way out. */}
+      {inRequests && !inProviderSpace && <HelpWidget />}
     </ToastProvider>
   )
 }

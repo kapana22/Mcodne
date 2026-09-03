@@ -30,6 +30,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { PRICE_ON_REQUEST } from '../lib/requests'
 
 const ROOT = join(__dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -120,7 +121,20 @@ test('the card keeps the portrait, chips, meta, clamp and footer strip', () => {
   // „50₾-დან" claims a minimum, which is the one thing that is always true,
   // and it is the form every comparable marketplace uses.
   assert.match(code(MASTER), /<EntityPrice>\{m\.priceValue\}₾-დან<\/EntityPrice>/, 'the floor price left the service card')
-  assert.match(code(MASTER), /ფასს შემოგთავაზებს/, 'the no-floor sentence is gone — the slot would be blank')
+  /* ⚠️ THE WORD MOVED TO A CONSTANT AND CHANGED (2026-09-02). It was the
+     literal „ფასს შემოგთავაზებს", spelled here and in four other files. Owner:
+     „ეს სიტყვა რაღაც არაპროფესიონალურად ჟღერს… სხვა საიტები როგორ იყენებენ?" —
+     and of six live marketplaces checked, none writes a SENTENCE in the price
+     slot: it holds a figure or a verb on a control. This card already has the
+     verb („მიიღე შეთავაზება"), so the slot said the same promise twice.
+
+     The rule this line defends is unchanged and is the one worth pinning: the
+     slot MUST NOT BE BLANK when there is no floor, or a card with no price
+     reads as a card that failed to load. Pinned through the constant now, plus
+     the constant being non-empty — which the literal could not check. */
+  assert.match(code(MASTER), /<span[^>]*>\{PRICE_ON_REQUEST\}<\/span>/,
+    'the no-floor slot stopped printing PRICE_ON_REQUEST — it would be blank')
+  assert.ok(PRICE_ON_REQUEST.trim().length > 0, 'PRICE_ON_REQUEST is empty — the slot would be blank')
   assert.doesNotMatch(code(MASTER), /გამოძახება/, 'the price wording belongs to lib/serviceProfile → priceHint, never to the card')
 })
 
@@ -142,8 +156,14 @@ test('the master card’s one action is the profile, and it is a real link', () 
   // ONE namespace since stage 11 (2026-08-19) — both cards in one list build
   // the same prefix, so a reader is never sent into a second address space.
   assert.match(m, /`\/experts\/\$\{m\.slug\}`/, 'the master card must address /experts/<slug>')
-  assert.match(m, /<Btn\s+href=\{href\}\s+variant="secondary"\s+size="sm"/, 'the „პროფილი" action must be a <Btn href>, not a hand-built control')
-  assert.match(m, /პროფილი/)
+  // ⚠️ THE ACTION IS „მიიღე შეთავაზება" AND IT IS `primary` SINCE 2026-08-31
+  // (the owner's design canvas → Catalogue). It was a secondary „პროფილი", and
+  // the change is not the colour: the WHOLE CARD already opens the profile
+  // through EntityCard's overlay, so a second control saying „პროფილი" offered
+  // the same destination twice. What is pinned is unchanged — one action, a
+  // real <Btn href>, addressing /experts/<slug>.
+  assert.match(m, /<Btn\s+href=\{href\}\s+variant="primary"\s+size="sm"/, 'the card action must be a <Btn href>, not a hand-built control')
+  assert.match(m, /მიიღე შეთავაზება/)
   // ⚠️ THE BUTTON IS A SIBLING OF THE OVERLAY, NEVER A CHILD — EntityCard
   // renders `overlay` before the body, and the button opts above it with
   // `relative z-10`. Nesting a link inside a link is invalid HTML and the

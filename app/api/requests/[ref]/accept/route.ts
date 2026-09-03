@@ -151,7 +151,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
   // ⚠️ NO publicRef IN A PROVIDER'S MAIL (2026-08-17) — it is the client's
   // credential, and this route is the proof: it authorises on that string
   // alone. See app/provider/requests/[id]/page.
-  const mail = offerAcceptedProviderEmail({
+  const mail = await offerAcceptedProviderEmail({
     topicLabel: topicLabel(offer.request.topic),
   })
   const emails = recipients.length
@@ -159,7 +159,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
     : []
   after(async () => {
     for (const to of emails) {
-      try { await sendMail({ to, ...mail }) } catch { /* best-effort per address */ }
+      try { await sendMail({ key: 'request.offerAccepted.provider', to, ...mail }) } catch { /* best-effort per address */ }
     }
   })
 

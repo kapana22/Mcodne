@@ -45,8 +45,15 @@
 }
 
 html, body {
-  /* Pure white canvas — cream removed per product decision. */
-  background-color: #FFFFFF;
+  /* ⚠️ WARM PAPER, AND IT IS A REVERSAL OF A REVERSAL (2026-08-31). This line
+     read „Pure white canvas — cream removed per product decision" and painted
+     #FFFFFF. The owner's design canvas („mcodne.ge პროფილის რედიზაინი" → Home)
+     puts the whole page back on cream, with white reserved for the things that
+     sit ON it — cards, the search pill, the „როგორ მუშაობს" plate. That is the
+     newer decision, so it wins.
+     MIRRORED in tailwind.config.js as ink-50. Touch one, touch the other: this
+     rule paints the page and that token is what call sites can name. */
+  background-color: #FBF9F5;
   /* Warm near-black — never harsh #000. Softer for long-session reading. */
   color: #2E2A21;
   /* `clip` (not `hidden`): hidden turns body into a scroll container, which
@@ -353,9 +360,23 @@ label:has(> input.sr-only:focus-visible) {
   .tap-area::before {
     content: '';
     position: absolute;
-    /* -12px vertical takes a 16–22px line to 40–46px; horizontal stays small so
-       adjacent crumbs cannot swallow each other's targets. */
-    inset: -12px -6px;
+    /* ⚠️ A FLOOR, NOT AN INSET (2026-09-02). This was `inset: -12px -6px`, whose
+       note read „takes a 16–22px line to 40–46px" — true, and the assumption in
+       it was the bug: a line SHORTER than 16px lands under the floor, and the
+       arithmetic is silent about it. Measured at 390px on a real iPhone
+       viewport, the cookie bar's „პოლიტიკა" is a 12px inline link whose box is
+       14px, so -12px gave it 38 — two pixels under CLAUDE.md rule 3, in a
+       control every visitor meets exactly once.
+       Anchoring a 40px box to the centre states the rule instead of computing
+       towards it: any line, any type size, ≥40px. `min-height: 100%` keeps a
+       TALLER target (a two-line link) covered by its own box. Horizontal stays
+       ±6px so adjacent crumbs cannot swallow each other's targets. */
+    left: -6px;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 40px;
+    min-height: 100%;
   }
 
   /* Button tap-shrink — brief scale on press. Applied globally to `button`
@@ -588,7 +609,7 @@ label:has(> input.sr-only:focus-visible) {
  * host only adds `rounded-*`. Don't stack `shadow-*`/`bg-*`/`border-*` on top
  * (this rule is unlayered CSS and therefore beats Tailwind utilities).
  *
- * DELIBERATELY TRANSPARENT (55%): the page background is white, so anything
+ * DELIBERATELY TRANSPARENT (55%): the page background is cream (ink-50), so anything
  * above ~0.8 alpha reads as a solid capsule and the blur becomes invisible.
  * The whole point is that text and photos scrolling under it show through as a
  * soft, saturated smudge.
@@ -616,7 +637,7 @@ label:has(> input.sr-only:focus-visible) {
      blur silently fails to paint (GPU blocklist, low-power, macOS „Reduce
      transparency") it was simply illegible. Still translucent, still
      saturating what is behind it — just readable first. */
-  background-color: rgba(255, 255, 255, 0.86);
+  background-color: rgba(251, 249, 245, 0.86);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   backdrop-filter: blur(16px) saturate(180%);
   border: 1px solid rgba(223, 216, 203, 0.85); /* ink-200 hairline */
@@ -648,7 +669,7 @@ label:has(> input.sr-only:focus-visible) {
  * Must stay AFTER `.glass`. */
 @media (max-width: 1023.98px) {
   .glass-over-copy {
-    background-color: rgba(255, 255, 255, 0.97);
+    background-color: rgba(251, 249, 245, 0.97);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     will-change: transform;
@@ -673,7 +694,7 @@ label:has(> input.sr-only:focus-visible) {
  *      shadow: the page has visibly slid *under* the bar.
  */
 .glass-bar {
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(251, 249, 245, 0.9);
   -webkit-backdrop-filter: blur(20px) saturate(190%);
   backdrop-filter: blur(20px) saturate(190%);
   border: 0;
@@ -690,7 +711,7 @@ label:has(> input.sr-only:focus-visible) {
 }
 /* Must stay AFTER `.glass-bar` — same specificity, later declaration wins. */
 .glass-bar-quiet {
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(251, 249, 245, 0.8);
   box-shadow: inset 0 -1px 0 rgba(223, 216, 203, 0.45);
 }
 /* No backdrop-filter support (old Firefox, locked-down engines): fall back to
@@ -698,7 +719,7 @@ label:has(> input.sr-only:focus-visible) {
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass,
   .glass-bar,
-  .glass-bar-quiet { background-color: rgba(255, 255, 255, 0.95); }
+  .glass-bar-quiet { background-color: rgba(251, 249, 245, 0.95); }
 }
 
 /* Reduced-motion NET — not the fix. `motion-safe:` at the call site is what
@@ -964,19 +985,28 @@ td, th, label, span {
  */
 .range-thumb { -webkit-appearance: none; appearance: none; background: transparent; pointer-events: none; }
 .range-thumb::-webkit-slider-runnable-track { background: transparent; border: none; }
+/* ⚠️ WHITE DISC, GREEN RING — INVERTED ON 2026-09-01, from the owner's
+   screenshots of the budget slider. It was a green disc inside a white ring,
+   which on the green ACTIVE segment of the track read as a notch cut out of the
+   bar rather than as a handle you grab; on the grey inactive part it read as a
+   dot. The canvas draws the two handles as white discs ringed in brand — the
+   same figure/ground the site uses everywhere else (a white card on a coloured
+   plate), and the only version where both handles are equally visible wherever
+   they sit on the track. 22px rather than 18px for the same reason: at 18px the
+   ring and the 6px bar were nearly the same weight. */
 .range-thumb::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 18px; height: 18px; border-radius: 9999px;
-  background: #2F9C86; border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(46, 42, 33, 0.28);
+  width: 22px; height: 22px; border-radius: 9999px;
+  background: #fff; border: 2.5px solid #26806E;
+  box-shadow: 0 1px 4px rgba(46, 42, 33, 0.22);
   cursor: grab; pointer-events: auto;
 }
 .range-thumb::-webkit-slider-thumb:active { cursor: grabbing; }
 .range-thumb::-moz-range-track { background: transparent; border: none; }
 .range-thumb::-moz-range-thumb {
-  width: 18px; height: 18px; border-radius: 9999px;
-  background: #2F9C86; border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(46, 42, 33, 0.28);
+  width: 22px; height: 22px; border-radius: 9999px;
+  background: #fff; border: 2.5px solid #26806E;
+  box-shadow: 0 1px 4px rgba(46, 42, 33, 0.22);
   cursor: grab; pointer-events: auto;
 }
 .range-thumb::-moz-range-thumb:active { cursor: grabbing; }
@@ -984,7 +1014,7 @@ td, th, label, span {
 .range-thumb:focus-visible::-moz-range-thumb { outline: 2px solid #2F9C86; outline-offset: 2px; }
 /* Touch devices: the track is untappable (pointer-events:none keeps the two
    overlaid handles independent), so the thumb IS the only hit target. Enlarge it
-   from 18px so it's grabbable with a finger. */
+   from 22px so it's grabbable with a finger. */
 @media (pointer: coarse) {
   .range-thumb::-webkit-slider-thumb { width: 28px; height: 28px; }
   .range-thumb::-moz-range-thumb { width: 28px; height: 28px; }
@@ -1054,3 +1084,63 @@ td, th, label, span {
     animation: none !important;
   }
 }
+
+/* ── the offers room — one DOM, two layouts (2026-09-03) ───────────────────
+   app/request/[ref]/OfferList draws the client's offers as the owner's canvas
+   does: a column of comparable cards on the left, ONE detail pane on the right
+   carrying the chosen offer and its conversation.
+
+   Stacked on a phone that was a trap. The pane sits after the WHOLE list in
+   the DOM, so tapping the third card changed something two screens below and
+   read as „nothing happened" — owner, on a screenshot of exactly that: „ეს
+   პროცესი აქ არაკომფორტულია შეიძლება დაიკარგოს ოფერი."
+
+   So below the wrap point the pane moves under the card that opened it:
+
+     · `display: contents` dissolves the list's own box, so the cards become
+       direct flex children of the wrap and share ONE ordering with the pane;
+     · the component sets `order` — cards 0, 2, 4…, the pane at
+       (selected × 2 + 1) — so it lands between its own card and the next.
+
+   ⚠️ A CONTAINER QUERY, NOT A MEDIA QUERY, and that is the same decision the
+   `flex-wrap` above it already made: this list renders inside two different
+   chromes (/request/<ref> in the intake shell, /me/r/<ref> in the client
+   workspace beside a rail) and a `lg:` breakpoint would answer about the
+   WINDOW while the columns wrap on the SPACE. 755px is one pixel under
+   320 + 420 + the 16px gap — the width at which the two panes stop fitting.
+
+   ⚠️ AND THE PANE'S BASIS HAS TO BE RESET. `flex: 1 1 420px` is a basis on the
+   MAIN axis; the moment the wrap turns into a column that 420px is a HEIGHT,
+   and an empty pane would open 420px tall. */
+.offers-room { container-type: inline-size; }
+
+@container (max-width: 755px) {
+  .offers-wrap { flex-direction: column; flex-wrap: nowrap; }
+  .offers-list { display: contents; }
+  .offers-detail { flex: 0 0 auto; }
+}
+
+/* ── native number spinners are off, everywhere (2026-09-03) ───────────────
+   9 `type="number"` fields across 5 files, and every one of them is a PRICE or
+   a COUNT somebody types: the offer's amount and deadline, a service's floor,
+   the join form's call-out fee, two admin fields. Chrome and Safari draw their
+   own ⌃⌄ stepper inside each, and on the offer form — 190px wide, holding a
+   number set in `text-h3` — that stepper lands between the amount and its „₾"
+   and pushes the unit off the number it belongs to. Owner, looking at exactly
+   that: „რაღაც ძალიან არაპროფესიონალურია."
+
+   ⚠️ IT REMOVES A MOUSE AFFORDANCE AND NO ABILITY. ↑/↓ still increment, which
+   is the keyboard path and the accessible one; what goes is a pair of 8px
+   arrows nobody aims at. On money it was worse than decoration — a ±1 step on
+   a 100₾ quote is not a gesture anybody wants, and the field's real input has
+   always been the keyboard.
+
+   Here rather than at nine call sites, because the site's rule is to change the
+   token and not the call site — and because the tenth `type="number"` somebody
+   adds should not have to remember this. */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] { -moz-appearance: textfield; appearance: textfield; }

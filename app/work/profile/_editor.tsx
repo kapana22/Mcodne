@@ -42,8 +42,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Btn } from '@/components/Btn'
+import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { PageHeader } from '@/components/PageHeader'
+import { Skeleton } from '@/components/Skeleton'
+import { ProfileStatusBand } from './_parts'
 import { ProfileCompleteness } from '@/components/ProfileCompleteness'
 import { useAvatarCropper } from '@/components/AvatarCropper'
 import { useToast } from '@/components/ToastProvider'
@@ -53,12 +56,23 @@ import { ConfirmServicesNote } from '../_components/ConfirmServicesNote'
 import { IdentitySection } from './_secIdentity'
 import { ServicesSections } from './_secServices'
 import { PhotosSection } from './_secPhotos'
-import type { Category, Draft, Loaded } from './_types'
+import type { Draft, Loaded } from './_types'
+
+/** The page's own name, written once. It is printed on the loading state, on
+ *  the failure state and on the editor itself, and three copies of one title is
+ *  how a screen starts renaming itself halfway through loading. */
+const TITLE = 'ჩემი გვერდი'
+const SUB = 'ეს არის ის, რასაც კლიენტი ხედავს'
 
 export function ProfileEditor() {
   const { toast } = useToast()
   const [data, setData] = useState<Loaded | null>(null)
-  const [categories, setCategories] = useState<Category[]>([])
+  /* ⚠️ THE CATEGORY LIST WENT WITH THE PROFESSION PICKER (2026-09-02). It was
+     fetched from /api/categories on every open of this page, for one consumer:
+     the sphere <select> inside that picker. The sphere is derived from the
+     services on the server now, so nothing on this screen needs the vocabulary
+     — and a fetch whose result nothing reads is latency on the page a provider
+     opens most. */
   const [draft, setDraft] = useState<Draft | null>(null)
   /** The last-saved values, so „is there unsaved work here" is answerable. */
   const [saved, setSaved] = useState<Draft | null>(null)
@@ -82,14 +96,13 @@ export function ProfileEditor() {
   // once — one for the tabs, one for the work-photo form below them — so one
   // page could ask „შენახული არ არის?" twice, about two halves of one row, at
   // two different moments.
-  useUnsavedGuard(dirty, 'შენახული არ არის — თუ გახვალ, ცვლილებები დაიკარგება. მაინც გავიდე?')
+  useUnsavedGuard(dirty, 'შენახული არ არის — ცვლილებები დაიკარგება. მაინც გავიდე?')
 
   const load = useCallback(async () => {
     try {
-      const [r, cats] = await Promise.all([
-        fetch('/api/provider/service-profile', { cache: 'no-store' }),
-        fetch('/api/categories').then(x => x.json()).catch(() => []),
-      ])
+      // One request, not two: /api/categories was fetched beside this one for
+      // the sphere <select> that left with the profession picker (2026-09-02).
+      const r = await fetch('/api/provider/service-profile', { cache: 'no-store' })
       const j = await r.json().catch(() => ({}))
       if (!r.ok || !j.ok) { setError('ვერ ჩაიტვირთა.'); return }
       const p = j.profile ?? {}
@@ -97,11 +110,12 @@ export function ProfileEditor() {
         id: p.id ?? null,
         stamp: String(p.updatedAt ?? ''),
         gaps: j.gaps ?? [],
+        percent: typeof j.percent === 'number' ? j.percent : 0,
+        unearnedTetri: typeof j.unearnedTetri === 'number' ? j.unearnedTetri : 0,
         groups: j.groups ?? [],
         cities: j.cities ?? [],
         available: p.available !== false,
       })
-      setCategories(Array.isArray(cats) ? cats : (cats?.categories ?? []))
       setAvatarUrl(j.user?.avatarUrl ?? null)
       setUnconfirmed(p.id != null && p.servicesConfirmedAt == null)
       // ⚠️ THE STORED PHOTOS ARRIVE AS A COUNT, NEVER AS BYTES — the GET refuses
@@ -161,8 +175,50 @@ export function ProfileEditor() {
   }
   const { open: pickAvatar, ui: avatarCropperUi } = useAvatarCropper({ onCropped: uploadAvatar })
 
-  if (error && !draft) return <p className="text-body text-danger-700">{error}</p>
-  if (!data || !draft) return <p className="text-body text-ink-500">იტვირთება…</p>
+  /* ⚠️ BOTH OF THESE WERE ONE BARE SENTENCE ON AN OTHERWISE EMPTY PAGE UNTIL
+     2026-09-01, and this screen is where that costs the most: /work/profile is
+     a client component behind a server gate, so EVERY open of „ჩემი გვერდი"
+     passes through the second branch. Measured today with `curl` against the
+     local database, the whole served body of this page between the rail and the
+     footer was the single word „იტვირთება…" — no title, no shape, and then the
+     entire editor arriving at once into the gap.
+
+     ⚠️ AND THE FAILURE BRANCH WAS A DEAD END. One red line reading „ვერ
+     ჩაიტვირთა." with nothing to press: `load` is a `useCallback` this component
+     already holds, so the one thing the reader wants — ask again — was one
+     `onClick` away and was not offered. The only recovery was a browser reload.
+
+     The title is drawn in all three states so the room does not rename itself
+     while it loads, and the skeleton reserves the band + three sections + the
+     preview column so nothing jumps when the data lands. */
+  if (error && !draft) return (
+    <div>
+      <PageHeader className="mb-5" title={TITLE} sub={SUB} />
+      <EmptyState
+        icon={<Icon.warn className="w-6 h-6" />}
+        // The endpoint's own sentence, not a second one written here.
+        title={error}
+        cta={{ label: 'სცადე თავიდან', onClick: () => { setError(null); load() } }}
+      />
+    </div>
+  )
+  if (!data || !draft) return (
+    <div aria-busy="true">
+      <PageHeader className="mb-5" title={TITLE} sub={SUB} />
+      <Skeleton className="mb-5 h-[148px] w-full" rounded="rounded-panel" />
+      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-7 xl:items-start">
+        <div className="flex flex-col gap-5 min-w-0">
+          <Skeleton className="h-[220px] w-full" rounded="rounded-card" />
+          <Skeleton className="h-[300px] w-full" rounded="rounded-card" />
+          <Skeleton className="h-[180px] w-full" rounded="rounded-card" />
+        </div>
+        <aside className="mt-6 flex flex-col gap-4 xl:mt-0">
+          <Skeleton className="h-[260px] w-full" rounded="rounded-card" />
+          <Skeleton className="h-[160px] w-full" rounded="rounded-card" />
+        </aside>
+      </div>
+    </div>
+  )
 
   const patch = (p: Partial<Draft>) => {
     setDraft(d => (d ? { ...d, ...p } : d))
@@ -260,61 +316,45 @@ export function ProfileEditor() {
   return (
     <div>
       <PageHeader
-        className="mb-6"
-        title="ჩემი გვერდი"
-        sub="ეს არის ის, რასაც კლიენტი ხედავს"
+        className="mb-5"
+        title={TITLE}
+        sub={SUB}
         actions={data.id && (
           <a
             href={`/experts/${data.id}?preview=1`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-small transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="inline-flex items-center gap-1.5 h-11 px-3.5 rounded-btn bg-white border border-ink-200 hover:border-ink-300 text-ink-800 font-display font-semibold text-small transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
-            <Icon.external className="w-3.5 h-3.5" />
-            ნახე შენი პროფილი
+            <Icon.eye className="w-4 h-4" />
+            საჯარო ხედი
           </a>
         )}
       />
 
+      <ProfileStatusBand data={data} />
+
       {/* Above the form, because it explains why the form is not already right. */}
       {unconfirmed && <div className="mb-5"><ConfirmServicesNote /></div>}
 
-      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-7 xl:items-start">
+      <div id="profile-form" className="scroll-mt-24 xl:grid xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-7 xl:items-start">
         <div className="flex flex-col gap-5 min-w-0">
 
-          {/* ── Is this page actually going to receive anything ──────────────
-              ⚠️ IT REPORTS, IT NO LONGER SWITCHES (2026-08-30). The control that
-              sat in this row was the SECOND writer of `available`, and its copy
-              named only half of what the column does. The switch is on
-              /work/account now, alone, saying both halves; this line is left
-              doing what it always did well — telling somebody whose list is
-              empty that nothing is being routed to them, which nothing else on
-              the page would say. */}
-          <div className={`rounded-card border px-4 py-3 flex items-center justify-between gap-4 flex-wrap ${
-            data.gaps.length > 0 || !data.available ? 'border-warning-200 bg-warning-50' : 'border-ink-200 bg-ink-50'
-          }`}>
-            <p className="text-body text-ink-900">
-              {!data.available
-                ? 'გვერდი დამალულია — არც ძებნაში ჩანხარ და არც მოთხოვნები მოგდის.'
-                : data.gaps.length > 0
-                  ? `ჯერ არ ხარ სიაში — ${data.gaps.join(', ')}.`
-                  : (data.cities.length > 1
-                      ? 'მოთხოვნები მოგდის არჩეულ სერვისებზე და ქალაქებზე.'
-                      : 'მოთხოვნები მოგდის არჩეულ სერვისებზე.')}
-            </p>
-            {!data.available && (
-              <Link href="/work/account" className="text-small font-display font-semibold text-brand-700 hover:text-brand-800 min-h-11 inline-flex items-center">
-                ჩართვა ანგარიშშია
-              </Link>
-            )}
-          </div>
+          {/* ⚠️ THE ROUTING STATUS MOVED INTO THE BAND ABOVE (2026-08-31).
+              It was a warning-tinted strip here saying one of three sentences —
+              „გვერდი დამალულია", „ჯერ არ ხარ სიაში — …", „მოთხოვნები მოგდის" —
+              and it was the right sentence in the wrong place: it answers „is
+              this page working", which is the FIRST question somebody opening
+              their own profile has, and it was the fourth thing on the screen.
+              The owner's design canvas („mcodne.ge პროფილის რედიზაინი" → Work
+              Profile) opens the screen on it, with the completion ring and what
+              finishing is worth beside it. See `ProfileStatusBand`. */}
 
           <IdentitySection
             avatarUrl={avatarUrl}
             avatarUploading={avatarUploading}
             pickAvatar={pickAvatar}
             avatarCropperUi={avatarCropperUi}
-            categories={categories}
             draft={draft}
             patch={patch}
           />
@@ -343,6 +383,7 @@ export function ProfileEditor() {
               headline={draft.headline || null}
               services={shopfront}
               workPhotos={draft.workPhotos.length}
+              priceFrom={draft.priceFrom}
             />
           </div>
           <ProfileCompleteness profile={scored} avatarUrl={avatarUrl} variant="card" alwaysShow />

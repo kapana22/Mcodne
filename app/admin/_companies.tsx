@@ -32,6 +32,7 @@ import {
   TabHeader, SubTabs, SectionCard, RowList,
   AdminEmpty, AdminError, AdminLoading, CopyBtn, OpenBtn,
 } from './_parts'
+import { actionError } from '@/lib/actionErrors'
 
 type Company = {
   id: string; name: string; taxId: string | null; balance: number
@@ -69,20 +70,15 @@ const INPUT =
   'transition-colors duration-fast'
 
 /** Server codes → Georgian. Never show a reader a raw code. */
-function errText(code?: string): string {
-  switch (code) {
-    case 'TAX_ID_TAKEN': return 'ეს საიდენტიფიკაციო კოდი უკვე გამოყენებულია.'
-    case 'USER_NOT_FOUND': return 'ამ ელფოსტაზე ანგარიში არ არსებობს — ჯერ დარეგისტრირდეს.'
-    case 'ADMIN_CANNOT_BE_MEMBER': return 'ადმინი ვერ იქნება კომპანიის წევრი — მოთხოვნის დატოვება ადმინს არ შეუძლია.'
-    case 'USER_SUSPENDED': return 'ეს ანგარიში შეჩერებულია.'
-    case 'ALREADY_MEMBER': return 'უკვე ამ კომპანიის წევრია.'
-    case 'MEMBER_OF_ANOTHER': return 'უკვე სხვა კომპანიის წევრია.'
-    case 'INSUFFICIENT': return 'ბალანსზე საკმარისი თანხა არ არის.'
-    case 'NOT_FOUND': return 'ვერ მოიძებნა.'
-    case 'INVALID': return 'შეავსე ველები სწორად.'
-    default: return 'ვერ შესრულდა — სცადე თავიდან.'
-  }
-}
+/* USER_NOT_FOUND, NOT_FOUND, INVALID and the default are in lib/actionErrors. */
+const errText = (code?: string) => actionError(code, {
+  TAX_ID_TAKEN: 'ეს საიდენტიფიკაციო კოდი უკვე გამოყენებულია.',
+  ADMIN_CANNOT_BE_MEMBER: 'ადმინი ვერ იქნება კომპანიის წევრი — მოთხოვნის დატოვება ადმინს არ შეუძლია.',
+  USER_SUSPENDED: 'ეს ანგარიში შეჩერებულია.',
+  ALREADY_MEMBER: 'უკვე ამ კომპანიის წევრია.',
+  MEMBER_OF_ANOTHER: 'უკვე სხვა კომპანიის წევრია.',
+  INSUFFICIENT: 'ბალანსზე საკმარისი თანხა არ არის.',
+})
 
 async function post(url: string, body: unknown, method: 'POST' | 'PATCH' | 'DELETE' = 'POST') {
   const res = await fetch(url, {
@@ -612,7 +608,7 @@ function ServicesView() {
       <SectionCard
         eyebrow="ახალი"
         title="სერვისის დამატება"
-        sub="ორი კითხვა: რა არის — კონსულტაცია თუ ტრენინგი, და რაში — მიმართულება."
+        sub="ორი კითხვა: რა არის — სერვისი თუ ტრენინგი, და რაში — მიმართულება."
       >
         <div className="grid sm:grid-cols-2 gap-3">
           {/* TWO AXES, TWO CONTROLS. They used to be one free-text field, so

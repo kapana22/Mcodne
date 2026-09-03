@@ -39,5 +39,7 @@ export default async function SettingsPage() {
     hasPassword: !!user.passwordHash,
   }
 
-  return <SettingsClient initialMe={initialMe} />
+  // `chrome={false}`: the rail comes from ./layout → SpaceChrome now, exactly
+  // as it has for /me/profile since that screen was merged into this component.
+  return <SettingsClient initialMe={initialMe} chrome={false} />
 }

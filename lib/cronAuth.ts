@@ -11,13 +11,54 @@
 //      sends: it moved to the header on 2026-08-30. Accepted on GET only, for a
 //      cron system that can ping nothing but a URL.
 //
-// ⚠️ THE RAILWAY CRON WAS RED FOR DAYS AND WAS FIXED ON 2026-08-30 — in the
-// cron command, which is where the fault was. It had been sending POST with
-// `?secret=`, the one combination nothing accepts. Widening this gate fixes
-// that too and was measured to work, and it was REVERTED anyway: it would make
-// „a secret in a URL" the normal way to call a MUTATING endpoint, for ever, to
-// accommodate one caller's quoting. The command now sends the Bearer header and
-// the first tick after the change ran green.
+// ⚠️ THE RAILWAY CRON IS RED AGAIN, AND THE 2026-08-30 ENTRY BELOW WAS WRONG
+// ABOUT THE CURE (re-measured 2026-09-01). What that day's note claimed — „the
+// command now sends the Bearer header and the first tick after the change ran
+// green" — is not what is deployed. The live command, read back today, is the
+// LEGACY query form, and every tick since has returned 401:
+//
+//     curl -fsS "https://mcodne.ge/api/internal/cleanup?secret=$CLEANUP_SECRET"
+//
+// THE ROOT CAUSE IS THE MISSING SHELL, not the query form. Measured, in order:
+//   · `CLEANUP_SECRET` on `cleanup-cron` and on `mcodne` are the SAME value
+//     (identical sha256, both 64 chars) — so the secret is not stale;
+//   · it is pure hex, so no `+` or `/` is being mangled by URL decoding, and it
+//     survives a query round-trip intact;
+//   · this GET path accepts `?secret=` (`allowQuery: true` below), so the form
+//     the cron uses IS one the server honours;
+//   · a request carrying the LITERAL string `$CLEANUP_SECRET` reproduces the
+//     cron's failure exactly: 401 `{"ok":false,"error":"UNAUTHORIZED"}`.
+// The value the container sends is therefore not the value stored beside it.
+// `curlimages/curl` has `curl` as its ENTRYPOINT, so the command does not run
+// through a shell and `$CLEANUP_SECRET` is never expanded.
+//
+// The command that actually works has to ask for a shell by name:
+//
+//     sh -c 'curl -fsS -X POST -H "Authorization: Bearer $CLEANUP_SECRET" \
+//       https://mcodne.ge/api/internal/cleanup'
+//
+// Widening this gate would fix it too and was measured to work back in August;
+// it was REVERTED then and stays reverted, because it would make „a secret in a
+// URL" the normal way to call a MUTATING endpoint, for ever, to accommodate one
+// caller's quoting.
+//
+// ⚠️ THE COMMAND *CAN* BE READ BACK — the August note said it could not, and
+// that is why the wrong cure went unchecked for two days. It is one call:
+//
+//     railway status --json \
+//       | jq -r '.. | objects | select(.serviceName? == "cleanup-cron") | .startCommand'
+//
+// ⚠️ A `grep -o '"startCommand":"[^"]*"'` DOES NOT WORK here and this note
+// carried one for an hour: the command contains escaped quotes, so the class
+// stops at the first `\"` and the match is dropped entirely — it prints
+// NOTHING, which reads exactly like „no start command set". Use the jq form.
+//
+// Verify the command IS what you think before believing any fix. Two things
+// have already claimed this change was made when it was not: `railway agent`
+// reported „Done" on 2026-09-01 and the read-back showed the old command, and
+// a hand edit in the dashboard the same afternoon did not land either. The
+// field is Service → Settings → Deploy → Custom Start Command, and it needs
+// saving; the read-back is the only proof.
 //
 // ⚠️ WHAT MADE IT SURVIVABLE, AND WHAT MADE IT INVISIBLE. `lib/sweepRunner` runs
 // the same job off ordinary traffic with this header, claimed through `JobRun`,

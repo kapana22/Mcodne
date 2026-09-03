@@ -32,10 +32,11 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
+    "/private/tmp/claude-501/-Users-kapana-Desktop-------/e1dea262-0fa4-4ff3-8da2-290455efcc40/scratchpad/next-build/types/**/*.ts",
     "/private/tmp/claude-501/-Users-kapana-Desktop-------/e1dea262-0fa4-4ff3-8da2-290455efcc40/scratchpad/next-dev/types/**/*.ts",
     "/private/tmp/claude-501/mcodne-build/types/**/*.ts",
     "next-env.d.ts",
-    "/private/tmp/claude-501/-Users-kapana-Desktop-------/e1dea262-0fa4-4ff3-8da2-290455efcc40/scratchpad/next-build/types/**/*.ts"
+    ".next-check/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

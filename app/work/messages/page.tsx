@@ -3,7 +3,7 @@ import { Icon } from '@/components/Icon'
 // Index route of the messages center: on desktop the right pane's "pick a
 // conversation" placeholder (the list renders from the layout); on mobile the
 // list IS the page, so this renders nothing visible (layout hides the pane).
-export default function TutorMessagesIndexPage() {
+export default function WorkMessagesIndexPage() {
   return (
     <div className="flex-1 hidden lg:flex flex-col items-center justify-center text-center p-8 bg-ink-50/40">
       <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white border border-ink-200 text-ink-400 mb-3">

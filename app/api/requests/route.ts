@@ -26,6 +26,7 @@ import { resolveRequestTarget } from '@/lib/requestTarget'
 import { inviteProviderToRequest } from '@/lib/requestInvite'
 import { accountForRequest } from '@/lib/requestAccount'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
+import { validationIssueMessage } from '@/lib/validationMessages'
 import { sendMail } from '@/lib/mailer'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 import { triageFlags, triageNote } from '@/lib/requestTriage'
@@ -36,7 +37,13 @@ import { ROLE } from '@/lib/roles'
 
 export async function POST(req: Request) {
   const viewer = await requestsViewer()
-  if (!viewer.clientAllowed) {
+  // 🔒 `mayFile`, NOT `clientAllowed` — this is the one endpoint that CREATES a
+  // request, so it is the one that asks the audience question (lib/requests →
+  // canFileRequest: the subsystem is on AND the caller does not sell here).
+  // Owner, 2026-08-31: „ვისაც სერვისი აქვს იმას არ შეძლოს სერვისის დაკვეთა."
+  // The page redirects a seller to /work before they ever see the form; this is
+  // what answers a typed POST, and it is the only line that actually decides.
+  if (!viewer.mayFile) {
     return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
   }
 
@@ -64,7 +71,12 @@ export async function POST(req: Request) {
   // hand-written copy — the gap that has silently broken two features here.
   const parsed = ServiceRequestInput.safeParse(json)
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+    const issue = parsed.error.issues[0]
+    return NextResponse.json({
+      ok: false, error: 'INVALID',
+      field: typeof issue?.path[0] === 'string' ? issue.path[0] : null,
+      message: validationIssueMessage(issue),
+    }, { status: 400 })
   }
 
   // ── The honeypot ─────────────────────────────────────────────────────────
@@ -318,11 +330,12 @@ export async function POST(req: Request) {
     after(async () => {
       try {
         await sendMail({
+          key: 'request.received.client',
           to,
-          ...requestReceivedClientEmail({
+          ...(await requestReceivedClientEmail({
             publicRef: created.publicRef,
             topicLabel: topicLabel(parsed.data.topic),
-          }),
+          })),
         })
       } catch { /* best-effort; the request is committed either way */ }
     })
@@ -377,6 +390,7 @@ export async function POST(req: Request) {
           + (row.description ? `\n\n${row.description}` : '')
 
         await sendMail({
+          key: 'inbox.newRequest',
           // The same destination as the contact form and the B2B lead:
           // CONTACT_INBOX overrides, and the fallback is the one advertised
           // support address, read from lib/supportEmails and never typed as a

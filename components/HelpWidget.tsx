@@ -8,8 +8,10 @@ import { useSiteTextMap } from '@/components/SiteTextProvider'
 import { searchAnswer, scoreTopics, smallTalk, redactQuery, MAX_QUERY_CHARS } from '@/lib/helpSearch'
 import type { HelpProfession } from '@/lib/helpProfessions'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
+import { emailFormatError } from '@/lib/emailRule'
 import { useMe } from '@/lib/me'
 import { showJoinInvite } from '@/lib/capabilities'
+import { SEND_FAILED } from '@/lib/actionErrors'
 
 /* THE HELP WIDGET — a shortcut to answers, not a chatbot.
  *
@@ -109,6 +111,16 @@ export function HelpWidget() {
   const [msg, setMsg] = useState('')
   const [msgEmail, setMsgEmail] = useState('')
   const [msgState, setMsgState] = useState<'idle' | 'short' | 'sending' | 'sent' | 'error'>('idle')
+  /* ⚠️ THE OPTIONAL ADDRESS WAS ONLY EVER JUDGED BY THE SERVER (fixed
+   * 2026-08-31). /api/help/message parses it with `.email()`, so a typo in a
+   * field labelled „სურვილისამებრ" refused the WHOLE report — and the only
+   * thing the widget could say was „ვერ გაიგზავნა — სცადე თავიდან.", which
+   * points at the message, not the address. Somebody who is already stuck and
+   * has typed out their problem loses it to a missing dot in their own email.
+   *
+   * `required: false` is the point: empty stays legal here, exactly as the
+   * schema has it — the label promises that and must keep it. */
+  const [msgEmailErr, setMsgEmailErr] = useState<string | null>(null)
   // Which questions were asked on this page — drives both the suggestion list
   // (asked ones drop off) and the context that travels with „ვერ ვიპოვე
   // პასუხი". „Someone wrote in“ and „this person read the price answer and the
@@ -299,6 +311,14 @@ export function HelpWidget() {
     // primary CTA) — so refusing has to SAY something. A grey button that does
     // nothing when tapped is the same dead end wearing a different colour.
     if (body.length < 10) { setMsgState('short'); return }
+    // The route's own rule on the optional address — see the note by the state.
+    const emailMsg = emailFormatError(msgEmail, { required: false })
+    if (emailMsg) {
+      setMsgEmailErr(emailMsg)
+      requestAnimationFrame(() => document.getElementById('help-report-email')?.focus())
+      return
+    }
+    setMsgEmailErr(null)
     setMsgState('sending')
     try {
       const res = await fetch('/api/help/message', {
@@ -321,7 +341,7 @@ export function HelpWidget() {
         // is watching this live.
         text: me || msgEmail.trim()
           ? 'მადლობა — მივიღეთ. ადმინისტრაცია 24 საათში გიპასუხებს ელფოსტაზე.'
-          : 'მადლობა — მივიღეთ და გავარკვევთ. ელფოსტა არ დაგიტოვებია, ამიტომ პასუხს ვერ მოგწერთ; თუ პასუხი გჭირდება, დაგვიტოვე მისამართი.',
+          : 'მადლობა — მივიღეთ. პასუხისთვის ელფოსტა დაგვიტოვე.',
       }])
     } catch {
       setMsgState('error')
@@ -481,7 +501,7 @@ export function HelpWidget() {
                       </p>
                       <a
                         href={`/experts/${b.prof.slug}`}
-                        className="mt-2.5 h-9 px-3.5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-small inline-flex items-center justify-center transition-colors duration-fast"
+                        className="mt-2.5 h-10 sm:h-9 px-3.5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-small inline-flex items-center justify-center transition-colors duration-fast"
                       >
                         {b.prof.label} →
                       </a>
@@ -541,6 +561,7 @@ export function HelpWidget() {
                             onChange={e => { setMsg(e.target.value); if (msgState === 'short') setMsgState('idle') }}
                             rows={2}
                             maxLength={2000}
+                            aria-invalid={msgState === 'short' || undefined}
                             placeholder="მოგვწერე შენი პრობლემის შესახებ…"
                             className="w-full px-3 py-2 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 outline-none resize-none leading-[1.5]"
                           />
@@ -549,19 +570,27 @@ export function HelpWidget() {
                               the report gets abandoned — so it is optional, and
                               the label says what it costs to leave it empty. */}
                           {!me && (
-                            <input
-                              type="email" autoComplete="email"
-                              value={msgEmail}
-                              onChange={e => setMsgEmail(e.target.value)}
-                              placeholder="ელფოსტა — რომ პასუხი მოგწეროთ (სურვილისამებრ)"
-                              className="w-full h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 outline-none"
-                            />
+                            <>
+                              <input
+                                id="help-report-email"
+                                type="email" autoComplete="email"
+                                value={msgEmail}
+                                onChange={e => { setMsgEmail(e.target.value); setMsgEmailErr(null) }}
+                                placeholder="ელფოსტა — რომ პასუხი მოგწეროთ (სურვილისამებრ)"
+                                aria-invalid={!!msgEmailErr || undefined}
+                                aria-describedby={msgEmailErr ? 'help-report-email-err' : undefined}
+                                className={`w-full h-11 px-3 rounded-field border bg-white text-body text-ink-900 placeholder-ink-400 outline-none ${msgEmailErr ? 'border-danger-500' : 'border-ink-200'}`}
+                              />
+                              {msgEmailErr && (
+                                <p id="help-report-email-err" role="alert" className="text-meta text-danger-700">{msgEmailErr}</p>
+                              )}
+                            </>
                           )}
                           {msgState === 'error' && (
-                            <p className="text-meta text-danger-700">ვერ გაიგზავნა — სცადე თავიდან.</p>
+                            <p role="alert" className="text-meta text-danger-700">{SEND_FAILED}</p>
                           )}
                           {msgState === 'short' && (
-                            <p className="text-meta text-ink-500">დაწერე ცოტა მეტი — მინიმუმ 10 სიმბოლო.</p>
+                            <p role="alert" className="text-meta text-ink-500">დაწერე ცოტა მეტი — მინიმუმ 10 სიმბოლო.</p>
                           )}
                           <button
                             type="submit"
@@ -585,7 +614,7 @@ export function HelpWidget() {
                     {action && (
                       <a
                         href={action.href}
-                        className="mt-2.5 h-9 px-3.5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-small inline-flex items-center justify-center transition-colors duration-fast"
+                        className="mt-2.5 h-10 sm:h-9 px-3.5 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-small inline-flex items-center justify-center transition-colors duration-fast"
                       >
                         {action.label}
                       </a>

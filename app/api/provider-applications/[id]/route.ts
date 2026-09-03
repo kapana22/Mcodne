@@ -21,6 +21,7 @@ import { requireRoleApi } from '@/lib/auth'
 import { after } from 'next/server'
 import { notify, isTypeEnabled } from '@/lib/notify'
 import { sendMail } from '@/lib/mailer'
+import type { OutboundKey } from '@/lib/outbound'
 import {
   providerApprovedEmail, providerRevisionEmail, providerRejectedEmail,
 } from '@/lib/emailTemplates'
@@ -47,12 +48,12 @@ const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { st
  * here rather than passed in — `ProviderApplication` carries its own name and
  * phone but no email, so the account's is the only one.
  */
-async function sendMasterMail(userId: string, mail: { subject: string; html: string }) {
+async function sendMasterMail(userId: string, key: OutboundKey, mail: { subject: string; html: string }) {
   try {
     const u = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
     if (!u?.email) return
     if (!(await isTypeEnabled(userId, 'APPLICATION_STATUS'))) return
-    await sendMail({ to: u.email, subject: mail.subject, html: mail.html })
+    await sendMail({ key, to: u.email, subject: mail.subject, html: mail.html })
   } catch {
     // Silent — a decision that already committed must not fail on a mail server.
   }
@@ -129,9 +130,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     })
     // `after()` and fully guarded: the decision has committed and must not be
     // undone by a mail failure.
-    after(() => sendMasterMail(app.userId, status === 'NEEDS_REVISION'
-      ? providerRevisionEmail({ name: app.fullName, note })
-      : providerRejectedEmail({ name: app.fullName, note })))
+    after(async () => sendMasterMail(app.userId, status === 'NEEDS_REVISION' ? 'application.revision' : 'application.rejected',
+      status === 'NEEDS_REVISION'
+        ? await providerRevisionEmail({ name: app.fullName, note })
+        : await providerRejectedEmail({ name: app.fullName, note })))
     await audit(me.id, `provider.${action}`, { targetType: 'ProviderApplication', targetId: id })
     return NextResponse.json({ ok: true, status })
   }
@@ -245,7 +247,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // on the site — not the public header, not the user menu — so this link is a
   // newly-approved master's only route into their own workspace short of
   // guessing the URL or waiting for the next sign-in.
-  after(() => sendMasterMail(app.userId, providerApprovedEmail({ name: app.fullName, note: note || null })))
+  after(async () => sendMasterMail(app.userId, 'application.approved', await providerApprovedEmail({ name: app.fullName, note: note || null })))
   await audit(me.id, 'provider.approve', {
     targetType: 'ProviderApplication',
     targetId: id,

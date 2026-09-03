@@ -1,234 +1,298 @@
 'use client'
-// Home — the hero: where we work, the one sentence, and ONE field.
+// Home — the hero: one green band, one sentence, and the field that starts a
+// request.
 //
-// ⚠️ REBUILT 2026-08-21 FROM THE DESIGN CANVAS („მცოდნე — მთავარი გვერდი").
-// What it replaces was a two-door hero with a rotating expert preview card, a
-// live avatar stack and three counted stats — 466 lines whose job was to prove
-// the marketplace was real before the visitor had asked it anything. The canvas
-// answers the same doubt with the six real cards directly underneath, and gives
-// this band the single thing a marketplace hero is for: a way in.
+// ⚠️ REBUILT 2026-08-31 FROM THE OWNER'S DESIGN CANVAS („mcodne.ge პროფილის
+// რედიზაინი" → Home). What it replaces was a pale, full-bleed band with a
+// single search box that submitted to /experts — a hero whose one action was
+// „browse". The canvas inverts the page: the loudest thing on it is now
+// „დაწერე, რა გჭირდება" and the catalogue is the SECOND door, further down
+// („ან პირდაპირ აირჩიე"). That is the commerce model the product actually runs
+// on (CLAUDE.md: „a client describes what they need, providers write offers"),
+// stated by the page for the first time.
 //
-// ⚠️ THE FIELD IS BACK, AND IT IS A REVERSAL. Stage 9 (2026-08-19) removed the
-// hero search deliberately („No search field"), because at the time the only
-// thing under it was a browse list a visitor could not usefully query. It
-// returns because the catalogue now merges both halves and answers `?q=` across
-// them, and because the chip rail underneath TEACHES the field what to expect —
-// eight real topics, so nobody is left guessing what this box wants. A search
-// box with worked examples beside it is not the same control as a bare one.
+// ⚠️ IT IS A CARD, NOT A BAND, and that is what the cream ground bought. The
+// old hero had to be pale because it ran edge to edge and the page under it was
+// white; a 36px rounded card floating on warm paper can be as dark as it likes.
+// Everything else in the canvas follows from the same move.
 //
-// ⚠️ ONE ENTRANCE. The rule stage 9 wrote („იყოს ამ ეტაპზე ექსპერტები მხოლოდ")
-// is untouched: submitting lands on /experts, and so does every chip. The
-// intake keeps its door in the header, where an action belongs.
+// ⚠️ THE GRADIENT STARTS AT brand-600, NOT brand-500 — the one place this file
+// departs from the canvas by a measurable amount. The canvas's first stop is
+// #2F9C86 and white text on it measures 3.38:1, under AA; `tests/designTokens`
+// computes exactly that and CLAUDE.md's rule 2 („a filled brand surface is
+// brand-600, never brand-500") is one of the six that protect a person rather
+// than a preference. #26806E is 4.78:1 and, at 8% of the way across a radial
+// that reaches brand-900, is not a visible difference — it is the same picture,
+// legible.
 //
-// ⚠️ THE LIGHTS ARE 13–15% STOPS, NOT A WASH. `.glow-brand` / `.glow-brand-soft`
-// with `.aurora-a` / `.aurora-b` drift — the palette canon forbids a decorative
-// saturated fill competing with content, and this is not one: it is light you
-// register as depth, never as colour. `.grain` at 3.5% is what stops a large
-// pale area reading as flat paper.
+// ⚠️ THE BADGE AND THE SUB-LINE ARE GONE (2026-08-31, the owner: „ესეც
+// წაშალე", twice). The badge was a measured one — `app/page.tsx` counted both
+// numbers against the real tables and drew the sentence only when both were
+// non-zero, because 🔒 rule 6 („never invent a number") forbids the canvas's
+// placeholder „214 · 96". It printed 8 and 1. Being measured is what made it
+// unpublishable: the site's loudest surface opened by reporting how little had
+// happened on it. Removing the reader removed the queries too.
+//
+// What is left in the card is a headline, a field, and the four steps — which
+// is the reference the owner sent, and nothing else.
+//
+// ⚠️ AND THE PILL COLLAPSES TO ONE ROW UNDER `sm` (2026-08-31, the owner's
+// „Mobile" canvas → frame 1 „მთავარი", which is this hero drawn at 390×844).
+// The desktop pill is three things — field · city · a wide worded button — and
+// under `sm` they were simply stacked, so the site's one action was ~186px of
+// chrome on the smallest screen it has. The canvas answers with a single field
+// and a round 48px dark disc, and the two rows that disappear are handled
+// individually below rather than dropped. Everything from `sm` up is byte-for-
+// byte the layout that was here.
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { SiteText, useSiteText } from '@/components/SiteTextProvider'
-import { Container } from '@/components/Container'
 import { Icon } from '@/components/Icon'
-import { Btn } from '@/components/Btn'
-import { CITIES } from '@/lib/requestTopics'
-import { ServiceRail } from './rail'
-
-/**
- * THE TWO LIGHTS' OWN GRADIENTS — hero-only, and not `.glow-brand`.
- *
- * ⚠️ WHY NOT THE SHARED TOKEN. `.glow-brand` peaks at 0.13 alpha and
- * `.glow-brand-soft` at 0.15, with a LINEAR `closest-side` falloff. Measured
- * A/B in Chrome at 1440: re-centring those two over the band moved the mean
- * pixel by 5.4 and the peak by 21 — i.e. the owner looked at the result and
- * correctly said the background was unchanged („ფონი იგივეა"). 0.13 stretched
- * across an 890px circle on a near-white ground is not a light, it is a rumour
- * of one. The token stays exactly as it is: app/NotFoundClient and app/error
- * use it behind a short message, where that weight is right.
- *
- * ⚠️ WHAT CHANGED IS THE CURVE, NOT JUST THE NUMBER. Three explicit stops give
- * a DENSE core that still reaches zero well inside the rim, so the band gets a
- * light with a middle instead of a uniform tint. Same two palette hues —
- * brand-500 (47,156,134) and brand-300 (127,199,180) — so no new colour enters
- * the page; only its concentration changed.
- */
-const LIGHT_A =
-  'radial-gradient(circle at center,' +
-  ' rgba(47,156,134,0.30) 0%,' +
-  ' rgba(47,156,134,0.13) 42%,' +
-  ' rgba(47,156,134,0) 72%)'
-const LIGHT_B =
-  'radial-gradient(circle at center,' +
-  ' rgba(127,199,180,0.32) 0%,' +
-  ' rgba(127,199,180,0.14) 44%,' +
-  ' rgba(127,199,180,0) 74%)'
+import { Container } from '@/components/Container'
+import { FlowSteps } from './how'
 
 /** Where we actually work, read off the taxonomy rather than typed here — the
  *  day a second city opens, the badge says so without an edit. */
-const WHERE = CITIES.map(c => c.label).join(' · ')
 
-export const HomeHero = () => {
+/** The canvas's radial, with the first stop lifted to brand-600. See above. */
+const HERO_GRADIENT =
+  'radial-gradient(120% 140% at 12% 8%, #26806E 0%, #1E6656 42%, #123A31 100%)'
+
+export const HomeHero = ({
+  requestHref,
+}: {
+  /** Where the field submits. `/request` when the subsystem is on (resolved in
+   *  app/page.tsx — a client component cannot read the env var), otherwise the
+   *  catalogue, so the field is never a door onto a 404. */
+  requestHref: string | null
+}) => {
   const router = useRouter()
   const [q, setQ] = useState('')
-  const placeholder = useSiteText('home.hero.searchPlaceholder')
+  const placeholder = useSiteText('home.ask.placeholder')
+  // The SAME key the wide button prints, read as a string because the phone's
+  // button has no room for the words and needs them as its accessible name.
+  // One key, two renderings — the copy is the owner's and is not retyped here.
+  const cta = useSiteText('home.ask.cta')
 
-  // An empty field is not an error — it is „just show me everybody", which is
-  // exactly what /experts unfiltered is. Never block the one entrance on a
-  // validation message.
+  // An empty field is not an error. On the intake it means „I'll describe it on
+  // the next screen"; on the catalogue it means „show me everybody". Never
+  // block the one entrance on a validation message.
+  const go = (term: string) => {
+    const t = term.trim()
+    const base = requestHref ?? '/experts'
+    router.push(t ? `${base}?q=${encodeURIComponent(t)}` : base)
+  }
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    const term = q.trim()
-    router.push(term ? `/experts?q=${encodeURIComponent(term)}` : '/experts')
+    go(q)
   }
 
   return (
-    <section className="relative overflow-hidden border-b border-ink-100 bg-gradient-to-b from-ink-75/60 to-ink-75 grain">
-      {/* THE TWO LIGHTS. `overflow-hidden` on the section clips them, so they can
-          drift past the edge without ever growing the page's scroll width.
+    /* ⚠️ EVERY SECTION ON THIS PAGE IS A <Container size="wide">, INCLUDING THIS
+       ONE. The canvas is drawn at 1440 with a flat 40px gutter and no maximum,
+       which is the same picture as a 1280 column at that width and a very
+       different one at 2560. One column for the whole page also means the hero
+       card's edge and the tiles' edge below it are the same line — they are
+       not, the moment two sections resolve their own gutters. */
+    <section className="pt-4 sm:pt-6 lg:pt-7">
+      <Container size="wide">
+      <div
+        style={{ backgroundImage: HERO_GRADIENT }}
+        className="relative overflow-hidden rounded-band px-6 py-9 text-white sm:px-10 sm:py-11 lg:px-14 lg:py-12"
+      >
+        {/* ⚠️ THE TWO LIGHTS ARE GONE (2026-08-31). Owner: „წრები მოაშორე
+            შიგნით რომ ხატია ჰეროუში." They were the canvas's — a white circle
+            top-right and a warm one bottom-right, placed by their centres so
+            the card read as lit rather than flat. What the card actually needed
+            them for it already has: HERO_GRADIENT is a radial, so the light and
+            its falloff are in the background itself, and two hard-edged discs
+            on top of it were a second, competing source. `overflow-hidden`
+            stays — it is what rounds the corners.
 
-          ⚠️ EACH LIGHT IS TWO ELEMENTS, AND BOTH ARE LOAD-BEARING.
-          · the OUTER div carries the static centring translate;
-          · the INNER span carries the drift animation.
-          They cannot be one element: `.aurora-a` animates `transform`, which
-          overwrites a `-translate-x-1/2` utility outright — the light would
-          jump half its own width the moment the animation's first frame lands.
+            The warm accent left with them, and that is a simplification rather
+            than a loss: #EFD48A was the one hex in this file that belonged to
+            neither of the site's two colours (docs/design-system.md), kept only
+            because decoration means nothing. Nothing decorative is left to
+            justify it. */}
+        <div className="relative max-w-[840px]">
+          {/* ⚠️ THE BADGE WAS HERE AND THE OWNER DELETED IT (2026-08-31):
+              „ამ კვირაში 8 მოთხოვნა · 1 ექსპერტმა უპასუხა — ესეც წაშალე."
+              It was measured and it was honest, and that is exactly why it had
+              to go: measured against a marketplace this young it prints 8 and
+              1, and the first thing the loudest surface on the site said about
+              itself was how little had happened on it. Its fallback („თბილისი")
+              went with it rather than being left behind alone — the field two
+              lines down already carries the city, with a pin beside it.
 
-          ⚠️ POSITIONED BY THEIR CENTRES, WHICH IS THE FIX (2026-08-21). They
-          used to be placed by EDGE (`-left-[18%]`, `-right-[14%]`), and measured
-          in Chrome at 1440 that put the two cores at 6% and 91% of the width —
-          outside the column the copy actually occupies. A radial-gradient peaks
-          at 0.13–0.15 alpha in the middle and reaches ZERO at the rim, so all
-          the band ever showed was two faded tails: the owner's „სიცოცხლე აკლია
-          ბექრაუნდზე". The canvas puts the cores at 22% / 81% of the width and
-          just under the top edge, with radii ~31% / ~27% of it — those are the
-          numbers below, and they are why the light now reads as light. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
-        <div className="absolute left-[22%] top-[100px] -translate-x-1/2 -translate-y-1/2">
-          <span
-            style={{ backgroundImage: LIGHT_A }}
-            className="aurora-a block h-[560px] w-[560px] rounded-full sm:h-[760px] sm:w-[760px] lg:h-[880px] lg:w-[880px]"
-          />
+              The two counts are no longer computed either (app/page.tsx): a
+              query whose only reader is deleted is a page paying for an answer
+              nobody asks for. */}
+          <h1 className="mt-0 font-display text-h1 font-extrabold leading-[1.02] tracking-[-0.03em] text-balance sm:text-display lg:text-display-lg">
+            <SiteText k="home.ask.line1" />
+            <br />
+            <SiteText k="home.ask.line2" />
+          </h1>
+
+          {/* ⚠️ THE SUB-LINE WENT TOO, SAME INSTRUCTION („ერთი წინადადება კმარა.
+              მოთხოვნა უფასოა და არაფერს გავალდებულებს. — ესეც წაშალე"). The
+              headline and the field say it faster, and the four steps under
+              them are the answer it was reaching for. `home.ask.sub` is retired
+              in lib/siteTextDefs rather than deleted — a row may hold copy
+              somebody typed under that key. */}
         </div>
-        <div className="absolute left-[81%] top-[40px] -translate-x-1/2 -translate-y-1/2">
-          <span
-            style={{ backgroundImage: LIGHT_B }}
-            className="aurora-b block h-[500px] w-[500px] rounded-full sm:h-[680px] sm:w-[680px] lg:h-[780px] lg:w-[780px]"
-          />
-        </div>
-      </div>
 
-      {/* ⚠️ THE ENTRANCE IS A CASCADE, NOT FOUR HAND-TIMED ANIMATIONS.
-          `.stagger` pins every DIRECT child to `riseIn` and steps the delay by
-          40ms (globals.css) — badge → h1 → sub → field — which is the canvas's
-          e1/e2/e3/e4 expressed in the site's own scale instead of four new
-          off-scale durations.
+        {/* ── THE FIELD ────────────────────────────────────────────────────
+            `role="search"` + a real label, because a placeholder is not a
+            label: it disappears the moment somebody types, and a screen reader
+            that announces „edit text, blank" is describing a control nobody can
+            use.
 
-          ⚠️ IT IS `stagger`, NOT `motion-safe:stagger`, AND THE PREFIX IS THE
-          BUG. `.stagger` is a hand-written rule in globals.css, not a Tailwind
-          utility, so Tailwind cannot build a variant of it: `motion-safe:stagger`
-          compiles to nothing and leaves the element wearing a literal class name
-          that no selector matches. Measured in Chrome 2026-08-21 —
-          `animationName` came back `none` on all four children. The rule already
-          lives INSIDE the `prefers-reduced-motion: no-preference` block, so the
-          contract (CLAUDE.md §3, 🔒) is kept by the stylesheet rather than by
-          the call site. ⚠️ Nine other call sites across /work, /me and
-          /me/favorites still write the prefixed form and are silently dead;
-          they are not this page's to change.
-
-          ⚠️ EVERY CHILD OF THIS <Container> ANIMATES. Add a fifth and it joins
-          the cascade at 160ms; add a wrapper div and the cascade collapses to
-          one step, because the selector is `>`. */}
-      <Container className="stagger relative z-10 pt-12 text-center sm:pt-14 lg:pt-16">
-        {/* WHERE, first and small. A marketplace that serves one city has to say
-            so before it takes anybody's search — the alternative is a visitor in
-            Batumi reading the whole page and finding out at the results. */}
-        <p className="inline-flex h-8 items-center gap-2 rounded-pill border border-ink-200 bg-white/80 px-3.5 text-meta text-ink-500 backdrop-blur-sm">
-          <span
-            aria-hidden
-            className="h-1.5 w-1.5 rounded-full bg-brand-500 ring-4 ring-brand-500/20"
-          />
-          {WHERE}
-        </p>
-
-        {/* The line break is the design's, not the copy's: both halves stay
-            separately editable (they always have been), and the <br> is what
-            keeps „იპოვე ექსპერტი," on its own line at every width the balance
-            algorithm would otherwise break differently. */}
-        <h1 className="mt-4 font-display text-h1 font-bold leading-[1.02] tracking-[-0.035em] text-ink-900 text-balance sm:mt-5 sm:text-display-lg lg:text-display-xl">
-          <SiteText k="home.hero.line1" />
-          <br />
-          <SiteText k="home.hero.line2" />
-        </h1>
-
-        <p className="mx-auto mt-4 max-w-[460px] text-body-lg leading-[1.6] text-ink-500 text-pretty sm:mt-5">
-          <SiteText k="home.hero.subtitle" /> <SiteText k="home.hero.subtitleEmphasis" />
-        </p>
-
-        {/* THE ONE FIELD. `role="search"` + a real label, because a placeholder
-            is not a label: it disappears the moment somebody types, and a
-            screen reader that announces „edit text, blank" is describing a
-            control nobody can use. */}
+            ⚠️ IT IS A PILL ON A DARK CARD, so the focus ring cannot be the
+            site's usual brand glow — green on green is invisible. The shell
+            takes a white ring instead, which is the only high-contrast option
+            against the gradient and reads as the same gesture. */}
         <form
           role="search"
           onSubmit={submit}
-          // h-14 is the FIELD SHELL, not a control tier — the tappable things
-          // inside it are the input and a canon h-11 <Btn>. The focus ring
-          // lives here too (`focus-within`), because the glow belongs to the
-          // whole field rather than to the bare <input> sitting inside it.
-          className="mx-auto mt-7 flex h-14 max-w-[552px] items-center gap-2.5 rounded-field border border-ink-200 bg-white/95 pl-4 pr-1.5 shadow-pop backdrop-blur-sm
-                     transition-[border-color,box-shadow] duration-mid ease-out-quart
-                     focus-within:border-brand-300 focus-within:ring-4 focus-within:ring-brand-500/10
-                     sm:pl-5 sm:pr-[7px]"
+          /* ⚠️ NO `max-w` — THE FIELD IS AS WIDE AS THE CARD (2026-08-31).
+             Owner: „ეს სერჩი ბოლომდე გაშალე კონტეინერზე რაც არის ჩარჩოებში,
+             კიდებზე არ მიტანო ბოლომდე." It was capped at 940px inside a card
+             whose content box is 1104px at `lg` (Container wide 1280 − 64
+             gutter − 2×56 card padding), so the page's one action stopped
+             164px short of the frame it sits in and read as unfinished.
+             „Not to the edges" is the CARD'S padding doing the work — px-6 /
+             sm:px-10 / lg:px-14 — not a width of its own. */
+          /* ⚠️ ONE ROW AT EVERY WIDTH SINCE 2026-08-31 — the owner's „Mobile"
+             canvas, frame 1 („მთავარი"), which is this same hero drawn at 390.
+             Under `sm` the pill was `flex-col`, so it stacked field → city →
+             wide button and stood ~186px tall: three rows of chrome on the one
+             screen where the whole card, the headline and the four steps that
+             explain it have to share 844px. The canvas draws the phone pill as
+             ONE row — the field, and a round 48px dark button carrying a
+             chevron — and that is the right call, because the two things the
+             column bought (a full-width button, a city on its own line) are
+             both cheaper elsewhere: the button loses its words, the city loses
+             the white ground. See below for each.
+             `rounded-[28px]` went with the column. A one-row pill is a pill at
+             every width, which is also what the canvas draws (9999px). From
+             `sm` up NOTHING here changed: `flex items-center` is what
+             `sm:flex-row sm:items-center` already resolved to. */
+          className="relative mt-7 flex items-center gap-2 rounded-pill bg-white p-2 shadow-[0_24px_60px_rgba(9,32,27,0.28)]
+                     transition-shadow duration-mid ease-out-quart
+                     focus-within:ring-4 focus-within:ring-white/40
+                     sm:mt-7"
         >
-          <label htmlFor="home-search" className="sr-only">
-            <SiteText k="home.hero.searchLabel" />
+          {/* h-12 on a phone, matching the canvas's 48px field and the 48px
+              disc beside it; the desktop's 54 is untouched. */}
+          <label htmlFor="home-ask" className="flex h-12 min-w-0 flex-1 items-center gap-3 px-4 sm:h-[54px] sm:flex-[2.2] sm:px-[18px]">
+            <span className="sr-only"><SiteText k="home.ask.label" /></span>
+            <Icon.search aria-hidden className="h-5 w-5 shrink-0 text-ink-400" />
+            <input
+              id="home-ask"
+              name="q"
+              type="search"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder={placeholder}
+              autoComplete="off"
+              // ⚠️ `focus:!shadow-none` — AND THE `!` IS LOAD-BEARING.
+              // globals.css draws a 4px brand glow on every focused text input,
+              // which is right for a bordered field standing on its own and
+              // wrong here: the SHELL owns the focus state. Plain
+              // `focus:shadow-none` loses — the global selector is
+              // `input[type="search"]:focus` (0-2-1) against a utility class at
+              // 0-2-0, so specificity, not order, decides it.
+              className="min-w-0 flex-1 bg-transparent text-body-lg text-ink-900 outline-none placeholder:text-ink-400 focus:!shadow-none
+                         [&::-webkit-search-cancel-button]:appearance-none"
+            />
           </label>
-          <Icon.search aria-hidden className="h-[18px] w-[18px] shrink-0 text-ink-400" />
-          <input
-            id="home-search"
-            name="q"
-            type="search"
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder={placeholder}
-            autoComplete="off"
-            // `text-start` is load-bearing: the hero is centred, and an input
-            // inherits `text-align` from it — the caret would sit in the middle
-            // of an empty box.
-            // ⚠️ `focus:!shadow-none` — AND THE `!` IS LOAD-BEARING. globals.css
-            // draws a 4px brand glow on every focused text input, which is right
-            // for a bordered field standing on its own and wrong here: measured
-            // in Chrome at 1440 it painted a SECOND rounded rectangle inside the
-            // shell that already owns the focus state (the shell's
-            // `focus-within:ring`). Plain `focus:shadow-none` loses — the global
-            // selector is `input[type="search"]:focus` (0-2-1) against a utility
-            // class at 0-2-0, so specificity, not order, decides it.
-            className="min-w-0 flex-1 bg-transparent text-start text-body-lg text-ink-900 outline-none placeholder:text-ink-400 focus:!shadow-none
-                       [&::-webkit-search-cancel-button]:appearance-none"
-          />
-          {/* `variant="hero"` is the canvas's `.cta`: it rests on the brand glow
-              and deepens it on hover, where `primary` rests flat. The lift is
-              the other half — BASE already transitions `transform`, so this is
-              one utility rather than a new animation. */}
-          <Btn
-            type="submit"
-            size="md"
-            variant="hero"
-            className="shrink-0 whitespace-nowrap motion-safe:hover:-translate-y-px"
-          >
-            <SiteText k="home.hero.searchCta" />
-          </Btn>
-        </form>
-      </Container>
 
-      {/* The periphery — eight real topics, drifting. See ./rail.
-          It sits OUTSIDE the container (it is full-bleed), so it cannot be a
-          stagger child — the 160ms is the fifth step of the cascade above,
-          written out rather than inherited. Same keyframe, same curve. */}
-      <div className="motion-safe:animate-rise-in motion-safe:[animation-delay:160ms]">
-        <ServiceRail />
+          {/* ⚠️ THERE IS NO CITY IN THIS PILL, AND THAT IS THE OWNER'S CALL
+              (2026-09-01): „ეს თბილისი საერთოდ წაშალე". What stood here was a
+              STATEMENT, never an input — a field you can type into promises the
+              answer changes something and with `CITIES` at one entry it cannot.
+              The argument for keeping the statement is recorded below where the
+              phone's copy used to be; it lost. One field, one button. */}
+          {/* ⚠️ THE PHONE'S BUTTON IS A ROUND 48px DISC WITH NO WORDS IN IT
+              (2026-08-31, the canvas). „ფასის მოთხოვნა" is eleven characters
+              and beside a search field at 390px it cannot share a row — that
+              single fact is what stacked the pill. A disc carrying the
+              direction of travel fits, and it is the same `type="submit"`
+              running the same handler; only its shape changed.
+
+              ⚠️ IT KEEPS THE WORDS AS ITS ACCESSIBLE NAME, from the SAME
+              SiteText key the wide button prints. An icon-only control with no
+              name announces as „button", and a hero whose one action is
+              unnameable to a screen reader has no entrance at all. 48px is
+              also over the 40px tap floor with room to spare (CLAUDE.md → 3). */}
+          <button
+            type="submit"
+            aria-label={cta}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-pill bg-ink-900 text-white
+                       transition-[background-color,transform] duration-fast ease-out-quart
+                       hover:bg-ink-800 motion-safe:active:scale-[0.97]
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-800
+                       sm:hidden"
+          >
+            <Icon.chevR aria-hidden className="h-5 w-5" />
+          </button>
+
+          {/* The near-black fill: this is the page's loudest action and green is
+              already spoken for by the card it sits on. See components/Btn.
+              `hidden sm:block` — the disc above is this same button at phone
+              width, and two submits drawn at once would be two answers to one
+              question. `block` and not `inline-flex`: as a flex item this
+              button was ALREADY blockified from its default `inline-block`, and
+              a <button> centres its own label vertically only while it is not
+              itself a flex container. Same computed display as before, so from
+              `sm` up the pixel is unchanged. */}
+          <button
+            type="submit"
+            className="hidden h-[54px] shrink-0 rounded-pill bg-ink-900 px-7 font-display text-body-lg font-bold text-white
+                       transition-[background-color,transform] duration-fast ease-out-quart
+                       hover:bg-ink-800 motion-safe:active:scale-[0.97]
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-800
+                       sm:block"
+          >
+            <SiteText k="home.ask.cta" />
+          </button>
+        </form>
+
+        {/* ⚠️ THE CITY IS GONE FROM THIS PAGE ENTIRELY (2026-09-01), BY THE
+            OWNER: „ეს თბილისი საერთოდ წაშალე". Both the pill's statement and
+            the phone's line under it were removed in the same edit.
+
+            THE ARGUMENT THAT LOST IS KEPT HERE ON PURPOSE, because it is about
+            a person rather than a layout: with nothing naming the one city, a
+            reader in Batumi finds out at the RESULTS, after typing out their
+            job. If that turns up in feedback, the cheap repair is to name the
+            city where a result already is — the results header or the empty
+            state — rather than putting a row back above the field, which is
+            the thing the owner did not want. `CITIES` still holds the answer
+            (lib/requestTopics), so nothing has to be re-derived to do it. */}
+        {/* ⚠️ THE „მაგალითად:" CHIPS WERE HERE AND THE OWNER DELETED THEM
+            (2026-08-31): „ხელშეკრულება / დეკლარაცია / ლოგო და ბრენდბუქი /
+            რემონტის დაგეგმვა ეს წაშალე და ხაზი." They were four
+            `SUGGESTED_TOPICS` that filled the field, and they cost the card
+            ~60px between the one action and the four steps that explain it —
+            on a 1440×800 laptop that was the difference between the card
+            ending on screen and being cut. `SUGGESTED_TOPICS` is unchanged and
+            still opens the intake's what-step (lib/requestTopics), which is
+            where somebody who needs examples now meets them: one screen later,
+            after they have already started. */}
+
+        {/* ⚠️ THE FOUR STEPS ARE PART OF THIS CARD (2026-08-31), not a section
+            under it. They were a white plate two sections down the page until
+            the owner sent one picture of the whole green surface — headline,
+            field, then 01 → 02 → 03 → 04. On its own the field asks somebody to
+            describe a job to strangers and says nothing about what happens
+            next; the answer to that question belongs on the same screen as the
+            question, and a chapter break between the two was the seam. */}
+        <FlowSteps />
       </div>
+      </Container>
     </section>
   )
 }

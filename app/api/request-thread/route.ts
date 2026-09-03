@@ -214,9 +214,9 @@ export async function POST(req: Request) {
         // ოფლაინ ვართ" and the hint promises the message reaches us anyway —
         // this is the line that makes that true. Same inbox as the request
         // notification and the contact form: one address, one place to look.
-        const mail = requestThreadEmail({ toStaff: true, publicRef: r.request.publicRef, preview: body })
+        const mail = await requestThreadEmail({ toStaff: true, publicRef: r.request.publicRef, preview: body })
         try {
-          await sendMail({ to: process.env.CONTACT_INBOX || SUPPORT_EMAIL, ...mail })
+          await sendMail({ key: 'inbox.threadCopy', to: process.env.CONTACT_INBOX || SUPPORT_EMAIL, ...mail })
         } catch { /* best-effort */ }
         const admins = await prisma.user.findMany({
           where: { role: 'ADMIN', suspendedAt: null }, select: { id: true },
@@ -228,8 +228,8 @@ export async function POST(req: Request) {
           href: '/admin?tab=requests',
         })
       } else if (r.request.email) {
-        const mail = requestThreadEmail({ toStaff: false, publicRef: r.request.publicRef, preview: body })
-        try { await sendMail({ to: r.request.email, ...mail }) } catch { /* … */ }
+        const mail = await requestThreadEmail({ toStaff: false, publicRef: r.request.publicRef, preview: body })
+        try { await sendMail({ key: 'thread.message', to: r.request.email, ...mail }) } catch { /* … */ }
       }
     } catch { /* notification is best-effort; the message is written */ }
   })

@@ -47,7 +47,13 @@ test('the profile exists as a container plus parts, and is the Profile archetype
   assert.match(page, /<ProviderCta/)
   assert.match(page, /<PublicTopBar/)
   assert.match(page, /<Footer/)
-  assert.match(page, /lg:grid-cols-\[1fr_360px\]/, 'the two-column shape of the expert profile')
+  // ⚠️ THE COLUMNS ARE 1fr + 340px SINCE 2026-08-31 (the owner's design canvas
+  // → Public Profile), AND THE HERO IS NO LONGER INSIDE THEM. What is pinned is
+  // the SHAPE that matters — a content column and a rail — not the exact
+  // pixels, which are the canvas's to move. `minmax(0,1fr)` rather than `1fr`
+  // is load-bearing: a grid track will not shrink below its content's intrinsic
+  // width, and one long provider name scrolled the page sideways at 390px.
+  assert.match(page, /lg:grid-cols-\[minmax\(0,1fr\)_340px\]/, 'the two-column shape of the profile')
   // The breadcrumb is the same trail the catalogue draws, one step deeper.
   // TWO steps since stage 10 (2026-08-19): „სერვისები" was a door that is gone
   // and „ხელოსნები" was a second name for the one catalogue.
@@ -207,7 +213,19 @@ test('the CTA is the intake, gated by the page, and the dual link goes to /exper
   // the flag would have deleted the page's entire OFFER on a deployment with
   // the intake off. A price is CONTENT; only the button that opens the intake
   // is a feature of it.
-  assert.match(page, /\{on && <ProviderCta/, 'the CTA no longer mounts on the subsystem flag')
+  // ⚠️ THE GATE MOVED INWARD AGAIN ON 2026-08-31, one step further, and the
+  // invariant got STRONGER rather than weaker. The rail used to be `{on &&
+  // <ProviderCta …>}`, so a deployment with the intake off lost the whole card.
+  // The canvas puts „ფასი იწყება — 60₾" and the three response facts in that
+  // card, and those are CONTENT by exactly the argument this test already made
+  // about the price list: only the BUTTON belongs to the requests subsystem.
+  // So the card always renders and carries the flag as `enabled`.
+  assert.match(page, /<ProviderCta[\s\S]{0,120}enabled=\{on\}/,
+    'the CTA card stopped receiving the subsystem flag — its button would show on a deployment without the intake')
+  assert.doesNotMatch(page, /\{on && <ProviderCta/,
+    'the whole rail is gated on the flag again — the price and the facts must survive the intake being off')
+  assert.match(read(`${DIR}/_providerCta.tsx`), /\{enabled && \(\s*<Btn/,
+    'the rail draws its intake button without checking the flag it was handed')
   assert.match(page, /<PricedServicesBlock\s+p=\{p\}\s+ordering=\{on\}\s+\/>/,
     'the price list is gated on the flag again — prices must survive the intake being off')
   const cta = read(`${DIR}/_providerCta.tsx`)
@@ -217,14 +235,20 @@ test('the CTA is the intake, gated by the page, and the dual link goes to /exper
   // CTA imports the builder rather than assembling a query string of its own.
   assert.match(cta, /import\s+\{\s+requestHrefFor\s+\}\s+from\s+'\.\/_providerData'/)
   assert.match(cta, /href=\{requestHrefFor\(provider\)\}/)
-  // ⚠️ „დატოვე მოთხოვნა" SINCE 2026-08-21. The word changed, not the property:
-  // this line exists so the card keeps ONE primary that is the intake. Owner:
-  // „რეალურად მოთხოვნას უგზავნი და უტოვებ ლიდს, რომ დაუკავშირდე." See the
-  // component for why „გამოაგზავნე" was tender language for an addressed request.
-  assert.match(cta, /დატოვე მოთხოვნა/)
+  // ⚠️ „მიიღე შეთავაზება" SINCE 2026-08-31, and this is the THIRD wording. The
+  // word changed, not the property: this line exists so the card keeps ONE
+  // primary and that primary is the intake. „გამოაგზავნე მოთხოვნა" was tender
+  // language for an addressed request; „დატოვე მოთხოვნა" (2026-08-21) carried
+  // the return; the canvas's names what the reader GETS, and it is the same
+  // verb the home page's hero uses, so one journey says one thing twice.
+  assert.match(cta, /მიიღე შეთავაზება/)
   // …and the card now SAYS the request is addressed. That is not decoration:
   // `offerLimit: 1` has made it exclusive since 2026-08-20 and no screen said so.
-  assert.match(cta, /სხვას არ ეჩვენება/,
+  // …and the card still SAYS the request is addressed. That is not decoration:
+  // `offerLimit: 1` has made it exclusive since 2026-08-20 and no screen said
+  // so. The sentence is shorter than it was (the canvas's line) and this is the
+  // clause that had to survive the trim.
+  assert.match(cta, /პირდაპირ ამ პროფილს მიდის/,
     'the CTA stopped telling the client their request goes to this provider alone')
   assert.match(read(DATA), /REQUEST_HREF = '\/request\?for=service'/)
   assert.match(read(DATA), /requestHrefFor[\s\S]{0,200}&to=\$\{encodeURIComponent\(p\.slug\s+\|\|\s+p\.id\)\}/,

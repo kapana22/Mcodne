@@ -91,8 +91,12 @@ test('a price for an unticked service is refused at the door', () => {
     services: ['clean-flat'],
     areas: ['TBILISI'],
     about: 'თორმეტი წელია ვმუშაობ სანტექნიკაზე და დალაგებაზე. ჩემი ინსტრუმენტით მოვდივარ, ვმუშაობ სუფთად.',
-    yearsExp: 12, calloutFee: null, priceFrom: null,
-    photoUrl: null, workPhotos: [],
+    // ⚠️ `priceOnAsk` IS PART OF A COMPLETE BODY SINCE 2026-09-01 — the price
+    // question takes a number OR the tick, and „neither" is refused. This
+    // fixture is about the price MAP, so it answers with the tick and leaves
+    // the map to the cases below.
+    yearsExp: 12, calloutFee: null, priceFrom: null, priceOnAsk: true,
+    photoUrl: 'data:image/webp;base64,AA', workPhotos: [],
   }
   assert.equal(ProviderApplicationInput.safeParse({ ...base, priceList: { 'clean-flat': 60 } }).success, true)
   assert.equal(ProviderApplicationInput.safeParse({ ...base, priceList: {} }).success, true, 'pricing nothing must stay legal')

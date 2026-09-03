@@ -106,18 +106,35 @@ export function withdrawWhere(offerId: string, provider: ProviderIdentity) {
   }
 }
 
-type ReviewGate = 'OK' | 'NOT_DONE' | 'ALREADY_REVIEWED' | 'NO_ACCOUNT'
+type ReviewGate = 'OK' | 'NOT_DONE' | 'ALREADY_REVIEWED' | 'NO_ACCOUNT' | 'SELF'
 
-/** May a review be written on this offer? Done, unreviewed, by somebody with
- *  an account to sign it. */
+/**
+ * May a review be written on this offer? Done, unreviewed, by somebody with an
+ * account to sign it — AND NOT BY THE PERSON BEING REVIEWED.
+ *
+ * 🔒 `SELF` IS THE ONE THAT PROTECTS SOMEBODY (added 2026-08-31). This gate
+ * asked three questions and none of them was „who is rating whom", which left
+ * the whole chain open end to end: file a request, bid on it yourself, accept
+ * it (you hold the reference), mark it done, write yourself five stars. The
+ * row lands in `Review` and moves `ServiceProfile.rating` and `reviewsCount`,
+ * which are printed on every card in the catalogue. That is CLAUDE.md's rule 6
+ * — „never invent a number" — committed by the product rather than by a person
+ * typing one, and the numbers it invents are the ones a client picks by.
+ *
+ * The caller resolves `selfReview` because the answer needs the database for a
+ * COMPANY offer (every member counts as the provider — lib/offerLifecycle →
+ * providerUserIdsOf) and this file's gates stay pure.
+ */
 export function reviewGate(o: {
   doneAt: Date | string | null
   reviewed: boolean
   authorUserId: string | null
+  selfReview: boolean
 }): ReviewGate {
   if (o.doneAt == null) return 'NOT_DONE'
   if (o.reviewed) return 'ALREADY_REVIEWED'
   if (!o.authorUserId) return 'NO_ACCOUNT'
+  if (o.selfReview) return 'SELF'
   return 'OK'
 }
 

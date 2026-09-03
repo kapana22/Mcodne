@@ -24,6 +24,7 @@
 
 import { Avatar } from '@/components/Avatar'
 import { Icon } from '@/components/Icon'
+import { PRICE_ON_REQUEST } from '@/lib/requests'
 
 export type ShopfrontProps = {
   name: string
@@ -35,15 +36,28 @@ export type ShopfrontProps = {
   /** How many work photos exist — drawn as plates, never fetched here. */
   workPhotos?: number
   verified?: boolean
+  /** ⚠️ THE ONE PRICE (2026-09-01, owner: „ერთი ფასი და „შეთანხმებით"").
+   *  Null is „ფასი შეთანხმებით", which is now an answer somebody chose rather
+   *  than a box they left alone. Before this prop the preview derived its whole
+   *  „კატალოგში … ₾-დან" line from the per-service map — the map the editor
+   *  stopped writing — so the card that exists to show „what a client will see"
+   *  showed no price to anybody, while the real catalogue card beside it read
+   *  `lowestPrice(r) ?? r.priceFrom` and printed one. */
+  priceFrom?: number | null
 }
 
 export function ShopfrontCard({
-  name, avatarUrl, headline, services, workPhotos = 0, verified = false,
+  name, avatarUrl, headline, services, workPhotos = 0, verified = false, priceFrom = null,
 }: ShopfrontProps) {
   // The catalogue prints a „from" price off the cheapest priced service — the
   // same rule, so the number here and the number there cannot disagree.
+  // ⚠️ AND THE SAME FALLBACK, IN THE SAME ORDER, as app/experts/_providers
+  // („lowestPrice(r) ?? r.priceFrom"). A legacy per-service map still wins
+  // where one exists; everybody else has one price and this is where it lands.
   const priced = services.filter(s => s.price !== null && s.price > 0)
-  const from = priced.length > 0 ? Math.min(...priced.map(s => s.price as number)) : null
+  const from = priced.length > 0 ? Math.min(...priced.map(s => s.price as number)) : priceFrom
+  /** Is there a price column to draw at all — see the row below. */
+  const anyPriced = priced.length > 0
 
   return (
     <div className="rounded-card border border-ink-200 bg-white p-5 shadow-sm">
@@ -84,12 +98,23 @@ export function ShopfrontCard({
                 </span>
                 {/* ⚠️ NO EMPTY SLOT. A blank where the neighbour has a number
                     reads as „hiding it"; the catalogue's own words for an
-                    unpriced service are these. */}
-                <span className={`shrink-0 tabular-nums ${s.price
-                  ? 'font-display text-small font-bold text-ink-900'
-                  : 'text-meta text-ink-400'}`}>
-                  {s.price ? `${s.price} ₾` : 'ფასს შემოგთავაზებს'}
-                </span>
+                    unpriced service are these.
+                    ⚠️ AND NO COLUMN AT ALL WHERE THERE IS NO NEIGHBOUR
+                    (2026-09-01). Per-service prices stopped being collected
+                    when the question became one price plus „შეთანხმებით", so
+                    every row printed „ფასს შემოგთავაზებს" — five times — while
+                    the footer three lines below said „კატალოგში 80 ₾-დან". The
+                    card contradicted itself. The rule above is unchanged and is
+                    what decides this: it exists so a blank cannot sit beside a
+                    number, and where no row has a number there is nothing to
+                    sit beside. */}
+                {anyPriced && (
+                  <span className={`shrink-0 tabular-nums ${s.price
+                    ? 'font-display text-small font-bold text-ink-900'
+                    : 'text-meta text-ink-400'}`}>
+                    {s.price ? `${s.price} ₾` : PRICE_ON_REQUEST}
+                  </span>
+                )}
               </li>
             ))}
             {services.length > 5 && (

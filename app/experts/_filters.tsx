@@ -12,11 +12,20 @@
 // never a second axis." It is now not expressible.)
 //
 // ⚠️ ONE STATE, ONE SURFACE (2026-08-19). The refinements live in ONE place: the
-// shared rail (components/catalog/FilterPanel), 240px and sticky from `lg`,
+// shared rail (components/catalog/FilterPanel), 264px and sticky from `lg`,
 // folded into components/catalog/MobileCollapse below it. Same component at both
 // breakpoints, so „the two surfaces disagree" is not a bug that can exist here.
 // The search field and the sort select were never filters and live in the
 // results header (app/experts/_results.tsx).
+//
+// ⚠️ AND ONE THING IN THIS FILE IS NOT A REFINEMENT (2026-09-01). `VerticalSwitch`
+// chooses which HALF of the site is being read — „პროფესიული" or „ყოველდღიური",
+// the site's one pair of words (lib/requestTopics → VERTICAL_LABEL). It filters
+// the roster like everything else here, but it is the axis rather than a
+// narrowing: exactly one side is always on, `anyRefined` ignores it, „ფილტრის
+// მოხსნა" keeps it, and it is drawn OUTSIDE the fold-away panel so a phone
+// cannot hide it. Owner: „ორი მთავარი კატეგორია … მინდა იყოს გადამრთველი, რომ
+// არევა არ მოხდეს ამათი და კომფორტულად იყოს."
 //
 // ⚠️ THE SET IS NOT FIXED — a refinement is offered only while it can actually
 // change the result set. See usefulLangs / ratingUseless below: the language and
@@ -25,15 +34,20 @@
 
 import React from 'react'
 import { Icon } from '@/components/Icon'
-import { FilterGroup, FilterNest, FilterPanel, FilterRow } from '@/components/catalog/FilterPanel'
+import Link from 'next/link'
+import {
+  FilterGroup, FilterMore, FilterNest, FilterPanel, FilterRow, FilterSearch, FilterSwitch,
+} from '@/components/catalog/FilterPanel'
+import { tileHue } from '@/app/_home/data'
 import { LANG_LABELS, PRIMARY_LANG_CODES } from '@/lib/languages'
 import { tradeTopicIds } from '@/lib/catalogItems'
 import { LIVE_OFFER_GROUPS } from '@/lib/serviceProfile'
-import { LIVE_SERVICE_GROUP_IDS } from '@/lib/requestTopics'
+import { LIVE_SERVICE_GROUP_IDS, VERTICAL_LABEL, verticalsOfTopics, type Vertical } from '@/lib/requestTopics'
 
 /** The everyday half of the roster — the trades that arrive with daily demand.
- *  The professional half is the block above, drawn from the admin categories,
- *  and the two must not name the same thing twice. */
+ *  The professional half is drawn from the admin categories instead, and the two
+ *  must not name the same thing twice. Which of them the rail draws is the
+ *  switch's answer (`Filters.vertical`), never both at once. */
 const EVERYDAY_OFFER_GROUPS = LIVE_OFFER_GROUPS.filter(g => LIVE_SERVICE_GROUP_IDS.includes(g.id))
 import { CITIES, ONE_CITY } from '@/lib/requestTopics'
 import type { ProviderRow } from './_providers'
@@ -78,15 +92,13 @@ export function PriceRange({ value, onChange }: { value: [number, number]; onCha
   }
   return (
     <div className="px-1 pt-1 pb-1.5">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-small font-display font-bold text-ink-900 tabular-nums">
-          {active ? `₾${lo} – ${hiRaw >= NO_CAP ? `₾${PRICE_MAX}+` : `₾${hiRaw}`}` : 'ნებისმიერი'}
-        </span>
-        {active && (
-          <button type="button" onClick={() => onChange([0, NO_CAP])} className="text-meta font-display font-semibold text-ink-500 hover:text-ink-800 transition-colors duration-fast">
-            გასუფთავება
-          </button>
-        )}
+      {/* ⚠️ THE BAND IS 22px NOW, AND THE „გასუფთავება" LEFT THIS BOX
+          (2026-09-01, the owner's screenshots). It was a 13px line with the
+          clear beside it: the one number the section exists to state, set in
+          the same type as a checkbox label. The way out moved up to the
+          heading, where every section's action now lives. */}
+      <div className="mb-3 font-display text-h2 font-bold text-ink-900 tabular-nums">
+        {active ? `₾${lo} – ${hiRaw >= NO_CAP ? `₾${PRICE_MAX}+` : `₾${hiRaw}`}` : 'ნებისმიერი'}
       </div>
       <div className="relative h-6">
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-ink-200" />
@@ -178,6 +190,14 @@ export const ratingUseless = (facets: Facets) =>
  * same question asked at two grains.
  */
 export type Filters = {
+  /**
+   * WHICH SIDE OF THE SITE IS BEING READ — and it is NOT a refinement, it is
+   * the axis (lib/requestTopics → VERTICAL_LABEL). Exactly one of the two is
+   * always on; `anyRefined` deliberately ignores it and „ფილტრის მოხსნა"
+   * deliberately keeps it, because clearing your filters means „show me
+   * everybody like this", never „send me to the other half of the site".
+   */
+  vertical: Vertical
   cats: string[]
   langs: string[]
   minRating: number
@@ -187,6 +207,11 @@ export type Filters = {
 }
 
 export const EMPTY_FILTERS: Filters = {
+  // ⚠️ THE PROFESSIONAL SIDE OPENS FIRST — the same order the rail's two blocks
+  // held before the switch replaced them, for the same reason (owner: „უფრო
+  // მაღალი დონის სერვისები და ინტელექტუალურიც იყოს"), and it is also where the
+  // roster is: 23 of 23 public providers on 2026-09-01.
+  vertical: 'EXPERT',
   cats: [], langs: [], minRating: 0, price: [0, NO_CAP], trades: [], cities: [],
 }
 
@@ -200,7 +225,12 @@ export const anyRefined = (f: Filters) =>
 // own options would yield against the OTHER active refinements (standard facet
 // semantics). Sharing it is the point: a count computed by a second copy of this
 // logic would promise „4.5+ (3)" and then hand back two cards.
-export function passesFilters(m: ProviderRow, f: Filters, skip?: 'rating' | 'lang'): boolean {
+export function passesFilters(m: ProviderRow, f: Filters, skip?: 'rating' | 'lang' | 'vertical'): boolean {
+  /* ⚠️ THE SIDE IS TESTED FIRST AND IT IS NOT OPTIONAL — this is the whole
+     „რომ არევა არ მოხდეს ამათი". A provider who does BOTH (a designer who also
+     fits kitchens) carries both and passes on either side, which is not mixing:
+     it is one person, twice true. */
+  if (skip !== 'vertical' && !m.verticals.includes(f.vertical)) return false
   if (skip !== 'rating' && f.minRating > 0 && m.rating < f.minRating) return false
   /* Budget band — honour both the floor and the cap (NO_CAP = no ceiling),
      against the SAME number the card prints. Somebody who quotes per job has no
@@ -224,9 +254,80 @@ export function passesFilters(m: ProviderRow, f: Filters, skip?: 'rating' | 'lan
   return true
 }
 
+/**
+ * THE SAME FILTERS, READ FOR THE OTHER SIDE.
+ *
+ * ⚠️ SWITCHING SIDES DROPS THE OTHER SIDE'S PICKS, and it has to. „სამართალი"
+ * is a Category slug that only the professional list draws and only a
+ * professional row carries; carried across the switch it survives as an
+ * INVISIBLE filter — the everyday list has no row that could untick it — and
+ * every everyday provider fails it, so the reader taps the switch and gets an
+ * empty page refined by something they cannot see. The side-neutral
+ * refinements (budget, language, rating, city) are questions about a person
+ * rather than about a vocabulary, so they cross.
+ *
+ * ⚠️ AND THE COUNT ON THE SWITCH IS COMPUTED THROUGH THIS SAME FUNCTION, so
+ * the number on a segment is what pressing that segment actually yields. Two
+ * copies of this rule would be a switch that promises 4 and hands back 0.
+ */
+export function sideFilters(f: Filters, v: Vertical): Filters {
+  return {
+    ...f,
+    vertical: v,
+    cats: v === 'EXPERT' ? f.cats : [],
+    trades: v === 'SERVICE' ? f.trades : [],
+  }
+}
+
+/**
+ * The side a `?trade=` link is asking for, or null when it asks for nothing.
+ *
+ * Every /experts?trade=… address ever sent predates the switch, so the switch
+ * has to be able to read one: a link to „სანტექნიკა" must open on the everyday
+ * side rather than land on the professional one with its own filter invisible.
+ */
+export function verticalOfTrades(trades: string[]): Vertical | null {
+  const ids = tradeTopicIds(trades)
+  if (!ids) return null
+  return verticalsOfTopics([...ids]).includes('SERVICE') ? 'SERVICE' : 'EXPERT'
+}
+
 // Labels come from lib/languages so the chips ALWAYS match what a card renders
 // (they are compared as strings — a divergent spelling silently yields 0 hits).
 export const FILTER_LANGS = PRIMARY_LANG_CODES.map(c => ({ l: LANG_LABELS[c] }))
+
+/* ───── The switch ───── */
+
+/**
+ * THE TWO SIDES OF THE SITE, ABOVE EVERYTHING ELSE THE RAIL DOES.
+ *
+ * ⚠️ IT IS RENDERED OUTSIDE `MobileCollapse`, NOT INSIDE THIS PANEL (see
+ * app/experts/client). Below `lg` the rail folds behind a „ფილტრი" button, and
+ * the axis of the whole catalogue cannot be something you open the filters to
+ * find. One instance, one piece of state, drawn once at every width.
+ *
+ * ⚠️ THE COUNTS ARE MEASURED WITH THE SIDE ITSELF EXCLUDED — standard facet
+ * semantics, the same rule `usefulLangs` and the rating rows follow. So a
+ * search for „ელექტრიკოსი" that matches nobody professional and four everyday
+ * providers says exactly that ON the switch, which is the one place it helps:
+ * free-text search deliberately crosses the two sides (lib/requestTopics), so
+ * the switch is where a reader learns which side their words landed on.
+ */
+export const VerticalSwitch = ({ value, onChange, counts }: {
+  value: Vertical
+  onChange: (v: Vertical) => void
+  counts: Record<Vertical, number>
+}) => (
+  <FilterSwitch
+    label="რომელი მხარე"
+    value={value}
+    onChange={onChange}
+    options={[
+      { id: 'EXPERT' as Vertical, label: VERTICAL_LABEL.EXPERT, count: counts.EXPERT },
+      { id: 'SERVICE' as Vertical, label: VERTICAL_LABEL.SERVICE, count: counts.SERVICE },
+    ]}
+  />
+)
 
 /* ───── The rail ───── */
 
@@ -246,7 +347,7 @@ export const FILTER_LANGS = PRIMARY_LANG_CODES.map(c => ({ l: LANG_LABELS[c] }))
  * control with no number — a range has no single count to print, and inventing
  * one would be exactly the fabrication the rest of this file removed.
  */
-export const CatalogFilters = ({ filters, setFilters, liveCats, facets, activeCount, onReset }: {
+export const CatalogFilters = ({ filters, setFilters, liveCats, facets, activeCount, onReset, requestHref }: {
   filters: Filters
   setFilters: (f: Filters) => void
   liveCats: LiveCat[]
@@ -255,89 +356,143 @@ export const CatalogFilters = ({ filters, setFilters, liveCats, facets, activeCo
    *  when there is something to leave. */
   activeCount: number
   onReset: () => void
+  /** The intake address, or null when FEATURE_REQUESTS is off — read ONCE in
+   *  the server page. See `NotFoundCard` at the foot of this file. */
+  requestHref?: string | null
 }) => {
   const ratingDead = ratingUseless(facets)
   const langOpts = usefulLangs(facets)
+  const priceOn = priceBandActive(filters.price[0], filters.price[1])
+
+  /* ═══════════ THE ONE LIST THE CHOSEN SIDE OWNS ═════════════════════════
+   *
+   * ⚠️ IT WAS TWO BLOCKS, STACKED (2026-08-20 → 2026-09-01). „პროფესიული
+   * სერვისები" drawn from the admin categories, „ყოველდღიური სერვისები" drawn
+   * from the trade groups, one above the other, both on screen at once. The
+   * owner's answer to that is the switch above this panel: the two lists are
+   * the two sides of the site, so only one of them is a list at a time.
+   *
+   * WHAT DID NOT CHANGE, and must not: each side still draws its OWN
+   * vocabulary, counted by its OWN query — `expertCount` on a Category row
+   * against `categoryId`, `facets.trades` against `services[]` — and writes its
+   * OWN state field. That is why they were never merged into one flat list, and
+   * the switch is not a merge: it is the same two lists with one of them put
+   * away. The overlap this file fixed on 2026-08-31 (thirteen slugs drawn in
+   * both blocks with different numbers beside them) cannot recur, because the
+   * two are never on screen together.
+   */
+  type OptionRow = {
+    key: string
+    label: string
+    count: number
+    on: boolean
+    toggle: () => void
+    topics?: { id: string; label: string }[]
+  }
+
+  const rows: OptionRow[] = React.useMemo(() => {
+    if (filters.vertical === 'EXPERT') {
+      return liveCats
+        .map(c => ({
+          key: `c:${c.slug}`,
+          label: c.name,
+          count: c.expertCount ?? 0,
+          on: filters.cats.includes(c.slug),
+          toggle: () => setFilters({ ...filters, cats: toggleIn(filters.cats, c.slug) }),
+        }))
+        // Inside the list, count IS the right order — it says where there is
+        // somebody to answer.
+        .sort((a, b) => b.count - a.count)
+    }
+    return EVERYDAY_OFFER_GROUPS
+      .map(g => ({
+        key: `t:${g.id}`,
+        label: g.label,
+        count: facets.trades[g.id] ?? 0,
+        on: filters.trades.includes(g.id),
+        toggle: () => setFilters({ ...filters, trades: toggleIn(filters.trades, g.id) }),
+        topics: g.topics,
+      }))
+      // ⚠️ EMPTY GROUPS ARE NOT DRAWN. A group appears the moment somebody
+      // registers a service inside it; until then the row would be a promise
+      // with a (0) beside it.
+      .filter(row => row.count > 0 || row.on)
+      .sort((a, b) => b.count - a.count)
+  }, [filters, setFilters, liveCats, facets])
+
+  /* ⚠️ A FIELD AND A CAP OVER THE LIST (2026-09-01, the owner's screenshots).
+     Twenty professional categories is a rail you scroll instead of results.
+     Six, then „კიდევ N სერვისი", and a field for the person who already knows
+     the word.
+
+     ⚠️ THE TWO CONTROLS APPEAR ON DIFFERENT TESTS, and the difference is what
+     each one can promise. „კიდევ N" is drawn only when something is actually
+     hidden — a button offering „კიდევ 0" is a lie about the list. The FIELD is
+     drawn from six rows on, hidden or not: the screenshots draw it, and at six
+     rows it is already the difference between reading a column and typing three
+     letters. It was `> CAP`, which meant that with exactly six live categories
+     — what the roster had the day this shipped — the panel never drew the field
+     at all and did not look like the design it was built from. */
+  const CAP = 6
+  const [listQuery, setListQuery] = React.useState('')
+  const [expanded, setExpanded] = React.useState(false)
+  // The list is a different list on the other side of the switch; a query typed
+  // over one of them must not survive into the other, where it would silently
+  // hide rows the reader never searched for.
+  React.useEffect(() => { setListQuery(''); setExpanded(false) }, [filters.vertical])
+
+  const q = listQuery.trim().toLowerCase()
+  const matches = q
+    ? rows.filter(r => r.label.toLowerCase().includes(q) || r.topics?.some(t => t.label.toLowerCase().includes(q)))
+    : rows
+  const shown = q || expanded ? matches : matches.slice(0, CAP)
+  const rest = matches.length - shown.length
+  const picked = filters.vertical === 'EXPERT' ? filters.cats.length : filters.trades.length
 
   return (
+    <>
     <FilterPanel reset={activeCount > 0 ? { onClick: onReset } : undefined}>
 
-      {/* ⚠️ TWO BLOCKS, IN THE SITE'S OWN ORDER (2026-08-20). It was one list
-          sorted by COUNT, and count is not what this site is about: the everyday
-          trades fell to the bottom with zeros beside them while six professional
-          rows sat above, and a visitor read the ordering as a ranking of what
-          mattered.
-
-          The order is the PRODUCT's, and it does not move as the roster does.
-          Owner: „უფრო მაღალი დონის სერვისები და ინტელექტუალურიც იყოს…
-          პარალელურად სერვისებსაც, რაც ყოველდღიურად სჭირდება — დალაგება და
-          ხელოსანი, ესეც." Professional first, because that is what the site
-          leads with; everyday second, because it is half of what it sells.
-
-          They keep separate state fields (`cats` are category slugs, `trades`
-          are topic ids) because they filter different columns; a reader cannot
-          tell, and should not have to. */}
-      <FilterGroup title="პროფესიული სერვისები">
-        {liveCats.length === 0
-          ? <p className="text-small text-ink-500">იტვირთება…</p>
-          : liveCats
-              .map(c => ({
-                key: `c:${c.slug}`,
-                label: c.name,
-                count: c.expertCount ?? 0,
-                on: filters.cats.includes(c.slug),
-                toggle: () => setFilters({ ...filters, cats: toggleIn(filters.cats, c.slug) }),
-              }))
-              // Inside a block, count IS the right order — it says where there
-              // is somebody to answer, without claiming the block itself is
-              // more important than the one below.
-              .sort((a, b) => b.count - a.count)
-              .map(row => (
-                <FilterRow key={row.key} on={row.on} onClick={row.toggle} label={row.label} count={row.count} />
-              ))}
+      {/* ⚠️ THE BUDGET IS FIRST AND OPEN, as the owner's screenshots draw it.
+          It was last and collapsed, on the argument that six open sections make
+          a 1230px rail — which the cap on the list below now answers instead.
+          A budget is the refinement somebody brings WITH them; it belongs where
+          they look first. */}
+      <FilterGroup
+        title="ფასი"
+        collapsible={false}
+        action={priceOn && (
+          <button
+            type="button"
+            onClick={() => setFilters({ ...filters, price: [0, NO_CAP] })}
+            className="no-caps font-display font-semibold text-ink-500 hover:text-ink-800 transition-colors duration-fast"
+          >
+            გასუფთავება
+          </button>
+        )}
+      >
+        <PriceRange value={filters.price} onChange={p => setFilters({ ...filters, price: p })} />
       </FilterGroup>
 
-      {/* OPEN, like the block above it. Collapsing it made the ordering into a
-          hiding place: the professional block leads because it is drawn FIRST,
-          which is enough — a second tap to reach half of what the site sells is
-          a barrier, not a hierarchy.
+      {/* ⚠️ NO SECTION AT ALL WHEN THIS SIDE HAS NOTHING TO OFFER. The everyday
+          side had 0 of 23 providers on 2026-09-01, and the rail drew the
+          heading „ყოველდღიური სერვისები" over an empty box — a section that
+          looks broken rather than early. The results column says what is true
+          („ჯერ არავინ არის სიაში") and offers the intake; a rail cannot say it
+          twice. */}
+      {rows.length > 0 && (
+        <FilterGroup
+          title="სერვისი"
+          collapsible={false}
+          action={picked > 0 && <span className="tabular-nums">{picked} არჩეული</span>}
+        >
+          {rows.length >= CAP && (
+            <FilterSearch value={listQuery} onChange={setListQuery} placeholder="სერვისის ძებნა" />
+          )}
 
-          ⚠️ IT DRAWS THE EVERYDAY GROUPS ONLY, SINCE 2026-08-31 — and it is now
-          called what this file, tests/catalog and tests/lexicon have all called
-          it in prose since the day it was written: „ყოველდღიური სერვისები".
-          It used to draw all of `LIVE_OFFER_GROUPS`, which is 28 groups, 20 of
-          them professional — so THIRTEEN slugs were listed in BOTH blocks:
-          business, law, marketing, it, design, psychology, career, media,
-          relocation, grants, logistics, health, agriculture. „მარკეტინგი და
-          გაყიდვები" appeared twice with 6 beside one and 5 beside the other,
-          because the two blocks are counted by two different queries over two
-          different columns — `expertCount` on the Category row above,
-          `facets.trades` over `services[]` here.
-          The note two comments up says „a reader cannot tell, and should not
-          have to". Measured on the live rail, a reader CAN tell: the same words
-          twice, with different numbers, is the one thing that makes a filter
-          look broken rather than plentiful. The blocks stay two — merging them
-          into one flat list has been tried twice and was wrong twice — but each
-          one now owns its own words. Overlap after this change: zero. */}
-      {EVERYDAY_OFFER_GROUPS.length > 0 && (
-        <FilterGroup title="ყოველდღიური სერვისები">
-          {EVERYDAY_OFFER_GROUPS
-            .map(g => ({
-              key: `t:${g.id}`,
-              label: g.label,
-              count: facets.trades[g.id] ?? 0,
-              on: filters.trades.includes(g.id),
-              toggle: () => setFilters({ ...filters, trades: toggleIn(filters.trades, g.id) }),
-              topics: g.topics,
-            }))
-            // ⚠️ EMPTY GROUPS ARE NOT DRAWN. The roster is the whole vocabulary
-            // since 2026-08-24 — 24 live groups — and a rail listing every one
-            // of them would be twenty rows of „(0)" above the first card. A
-            // group appears the moment somebody registers a service inside it.
-            .filter(row => row.count > 0 || row.on)
-            .sort((a, b) => b.count - a.count)
-            .map(row => (
-              <div key={row.key} className="flex flex-col gap-1">
+          <div className="mt-1.5 flex flex-col gap-1.5">
+            {shown.map(row => (
+              <div key={row.key} className="flex flex-col gap-1.5">
                 <FilterRow on={row.on} onClick={row.toggle} label={row.label} count={row.count} />
                 {/* The narrower topics unfold only under a ticked group — all
                     of them at once is a hundred and seventy rows above the
@@ -357,15 +512,26 @@ export const CatalogFilters = ({ filters, setFilters, liveCats, facets, activeCo
                 )}
               </div>
             ))}
+          </div>
+
+          {/* A typed query is its own „show everything that matches", so the
+              cap steps out of the way while there is one. */}
+          {!q && (rest > 0 || expanded) && (
+            <FilterMore n={rest} more={!expanded} onClick={() => setExpanded(e => !e)} />
+          )}
+          {q && matches.length === 0 && (
+            <p className="px-2.5 py-2 text-small text-ink-500">ვერ ვიპოვეთ — სცადე სხვა სიტყვა</p>
+          )}
         </FilterGroup>
       )}
 
-      <FilterGroup title="ფასი" defaultOpen={false} active={priceBandActive(filters.price[0], filters.price[1])}>
-        <PriceRange value={filters.price} onChange={p => setFilters({ ...filters, price: p })} />
-      </FilterGroup>
-
       {langOpts.length > 0 && (
-        <FilterGroup title="ენა" defaultOpen={false} active={filters.langs.length > 0}>
+        <FilterGroup
+          title="ენა"
+          defaultOpen={false}
+          active={filters.langs.length > 0}
+          action={filters.langs.length > 0 && <span className="tabular-nums">{filters.langs.length} არჩეული</span>}
+        >
           {langOpts.map(l => (
             <FilterRow
               key={l.l}
@@ -379,7 +545,12 @@ export const CatalogFilters = ({ filters, setFilters, liveCats, facets, activeCo
       )}
 
       {!ratingDead && (
-        <FilterGroup title="მინ. რეიტინგი" defaultOpen={false} active={filters.minRating > 0}>
+        <FilterGroup
+          title="მინ. რეიტინგი"
+          defaultOpen={false}
+          active={filters.minRating > 0}
+          action={filters.minRating > 0 && <span className="tabular-nums">{filters.minRating.toFixed(1)}+</span>}
+        >
           {FILTER_RATINGS.map(r => {
             const on = filters.minRating === r
             const n = facets.rating[String(r)] ?? 0
@@ -406,7 +577,12 @@ export const CatalogFilters = ({ filters, setFilters, liveCats, facets, activeCo
           teaches the visitor the rail is full of things that do not work. It
           returns by itself the day a second city is served — see CITIES. */}
       {!ONE_CITY && (
-        <FilterGroup title="ქალაქი" defaultOpen={false} active={filters.cities.length > 0}>
+        <FilterGroup
+          title="ქალაქი"
+          defaultOpen={false}
+          active={filters.cities.length > 0}
+          action={filters.cities.length > 0 && <span className="tabular-nums">{filters.cities.length} არჩეული</span>}
+        >
           {CITIES.map(c => (
             <FilterRow
               key={c.id}
@@ -419,5 +595,35 @@ export const CatalogFilters = ({ filters, setFilters, liveCats, facets, activeCo
         </FilterGroup>
       )}
     </FilterPanel>
+
+      {/* ⚠️ „ვერ იპოვე?" — THE INTAKE MOVED HERE FROM THE HEADER BAND
+          (2026-08-31, from the owner's design canvas → Catalogue). It was a big
+          green button beside the h1, i.e. an invitation to skip the list
+          offered BEFORE anybody had looked at it. Under the filters is where
+          the question „nothing here fits me" is actually asked, and the amber
+          plate is the canvas's — the one warm tile on a page of white cards, so
+          it reads as a different KIND of thing from the refinements above it.
+          The catalogue's empty state keeps its own door (app/experts/client);
+          this is the one for a list that returned results and still missed. */}
+      {requestHref && (
+        <div
+          style={{ backgroundColor: tileHue(1).bg, borderColor: tileHue(1).border }}
+          className="mt-4 hidden rounded-tile border p-4 lg:block"
+        >
+          <p className="font-display text-body font-bold text-ink-900">ვერ იპოვე?</p>
+          <p className="mt-1.5 text-meta leading-[1.55] text-ink-600">
+            დაწერე მოთხოვნა — ფასს თავად შემოგთავაზებენ.
+          </p>
+          <Link
+            href={requestHref}
+            className="mt-3 flex h-11 items-center justify-center rounded-field bg-ink-900 font-display text-body font-bold text-white
+                       transition-colors duration-fast ease-out-quart hover:bg-ink-800
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+          >
+            მიიღე შეთავაზება
+          </Link>
+        </div>
+      )}
+    </>
   )
 }

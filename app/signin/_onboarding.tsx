@@ -331,6 +331,9 @@ export const OnboardingView = ({ setView }: { setView: (v: View) => void }) => {
               </button>
             )}
           </div>
+          {areas.length === 0 && (
+            <p className="mt-3 text-right text-meta text-ink-500">გასაგრძელებლად აირჩიე მინიმუმ ერთი ქალაქი.</p>
+          )}
         </div>
       </div>
     </Container>

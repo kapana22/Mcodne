@@ -17,6 +17,9 @@
 //      allowlist does not admit. 404 and NOT 403: a 403 confirms the page is
 //      there, and a redirect to /signin tells an anonymous visitor it is real
 //      and worth returning to with an account.
+//      ⚠️ ONE AUDIENCE GETS A REDIRECT INSTEAD (2026-08-31): somebody who SELLS
+//      here goes to /work. They are not being hidden from — they are being told
+//      which side they are on. See the guard in the body.
 //   3. robots: noindex, nofollow — nofollow deliberately, matching /business
 //      and /abroad: a crawler that reached this page must not walk out of it.
 //   4. absent from app/sitemap.ts (STATIC_ROUTES is an allowlist) and from
@@ -28,9 +31,9 @@
 //      tests/requests.test.ts scans the tree and fails if that stops being true.
 
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { requestsViewer, coveredTopicIds } from '@/lib/requestsServer'
-import { isVertical } from '@/lib/requests'
+import { isVertical, PROVIDER_ROUTE } from '@/lib/requests'
 import { resolveRequestTarget } from '@/lib/requestTarget'
 import { RequestWizard } from './RequestWizard'
 
@@ -49,6 +52,22 @@ export default async function Page({ searchParams }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const viewer = await requestsViewer()
+
+  // 🔒 A SELLER DOES NOT ORDER HERE (owner, 2026-08-31: „მინდა რომ ვისაც სერვისი
+  // აქვს იმას არ შეძლოს სერვისის დაკვეთა — ირევა ძალიან კოდი"). Checked BEFORE
+  // `clientAllowed`, which is false for exactly this person: the order is what
+  // decides whether they get an explanation or a wall.
+  //
+  // ⚠️ A REDIRECT, NOT THE 404 THE REST OF THIS ROUTE ANSWERS WITH, and the
+  // difference is who is asking. The 404 exists so a stranger cannot learn the
+  // subsystem is here; a provider answers requests in /work every day and has
+  // nothing left to learn. Sending them to their own workspace says which side
+  // of the marketplace they are on, in one move, with no copy to write — and it
+  // is the same answer wherever they clicked from, which is the point: the
+  // catalogue's CTA and a provider's profile still carry an intake link for the
+  // anonymous majority who are the ones it is for.
+  if (viewer.sells) redirect(PROVIDER_ROUTE)
+
   if (!viewer.clientAllowed) notFound()
 
   // ⚠️ `?q=` IS A HANDOVER, NOT A FILTER. The home band asks „რა გჭირდება" in

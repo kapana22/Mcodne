@@ -27,10 +27,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     throw e
   }
 
-  await audit(admin.id, parsed.data.featured ? 'tutor.feature' : 'tutor.unfeature', {
-    targetType: 'TutorProfile',
+  await audit(admin.id, parsed.data.featured ? 'provider.feature' : 'provider.unfeature', {
+    targetType: 'ServiceProfile',
     targetId: id,
   })
 
-  return NextResponse.json({ ok: true, tutor: updated })
+  return NextResponse.json({ ok: true, provider: updated })
 }

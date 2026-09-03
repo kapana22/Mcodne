@@ -11,13 +11,25 @@
 // in, and offering SOMETHING. A visitor who offers nothing gets the same answer
 // an unknown URL gets — the requests subsystem's 404-never-403 rule, which
 // app/work/(provider)/layout.tsx explains at length.
+import type { Metadata } from 'next'
+
+// ⚠️ ITS OWN NAME (2026-09-01). Swept every route locally and this one still
+// printed the root's marketing line, „მცოდნე — აღწერე რა გჭირდება, მიიღე
+// შეთავაზებები", so a signed-in person could not tell it from the
+// landing page in a row of tabs. Same fix the client room got; the word is
+// the screen's own, not a new one.
+export const metadata: Metadata = { title: 'მიმოწერა — მცოდნე' }
+
 import { notFound } from 'next/navigation'
 import { requireUser } from '@/lib/auth'
 import { isProvider } from '@/lib/capabilities'
 import { ROLE } from '@/lib/roles'
 import { requestAccessOf } from '@/lib/requestsServer'
 import { offerInboxRows } from '@/lib/inboxRows'
-import { MessagesFrame } from './_frame'
+// ⚠️ THE FRAME LEFT THIS FOLDER ON 2026-08-31 (it was `./_frame`). The owner's
+// „Messages" artboard draws the same screen for the client, so the geometry is
+// shared and only the WORDS are passed in — see components/chat/InboxFrame.
+import { InboxFrame } from '@/components/chat/InboxFrame'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,5 +50,21 @@ export default async function MessagesLayout({ children }: { children: React.Rea
   // Returns [] for anybody the allowlist does not admit, an ADMIN included, so
   // there is no second gate to keep in step.
   const threads = await offerInboxRows(await requestAccessOf(user.id))
-  return <MessagesFrame threads={threads}>{children}</MessagesFrame>
+  return (
+    <InboxFrame
+      threads={threads}
+      title="მიმოწერა"
+      // The artboard's line, in the owner's register. „საუბანი" in the artboard
+      // is a typo for „საუბარი"; the plural is what the screen actually holds.
+      sub="ყველა საუბარი სამუშაოს გვერდით"
+      endpoint="/api/work/threads"
+      empty={{
+        title: 'მიმოწერა ჯერ არ გაქვს',
+        description: 'როცა კლიენტი დაგიწერს, საუბარი აქ გამოჩნდება.',
+        cta: { label: 'ჩემი სამუშაოები', href: '/work/jobs' },
+      }}
+    >
+      {children}
+    </InboxFrame>
+  )
 }

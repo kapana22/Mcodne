@@ -204,7 +204,7 @@ type ProfileViewer = {
   viewerUserId?: string | null
   viewerRole?: string | null
   /** The User.id BEHIND the expert profile — not the TutorProfile id. */
-  tutorUserId?: string | null
+  providerUserId?: string | null
 }
 
 /**
@@ -215,7 +215,7 @@ export function countsAsProfileView(v: ProfileViewer): boolean {
   if (isBotUserAgent(v.userAgent)) return false
   if (v.viewerRole === 'ADMIN') return false
   // An expert must never inflate their own number by reloading their profile.
-  if (v.viewerUserId && v.tutorUserId && v.viewerUserId === v.tutorUserId) return false
+  if (v.viewerUserId && v.providerUserId && v.viewerUserId === v.providerUserId) return false
   return true
 }
 

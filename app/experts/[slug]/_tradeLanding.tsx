@@ -72,9 +72,17 @@ export function TradeLanding({
               <h1 className="font-display text-h1 sm:text-display font-bold text-ink-900 tracking-tight">
                 {label}
               </h1>
-              {result ? (
-                <p className="mt-2 text-small text-ink-500 tabular-nums">ნაჩვენებია {result.rows.length} ექსპერტი</p>
-              ) : (
+              {/* ⚠️ „ნაჩვენებია N ექსპერტი" STOOD HERE UNTIL 2026-09-02.
+                  Owner: „არასად არ ეწეროს ეგ ინფო, არასაჭიროა." On a trade
+                  landing page the number is at its smallest and its worst — the
+                  page exists to sell ONE trade, and „ნაჩვენებია 2 ექსპერტი"
+                  under the heading is the first thing the visitor reads about
+                  it. The cards below say everything this line said, and they
+                  say it without counting themselves.
+
+                  The empty branch keeps its sentence: with no cards at all the
+                  page still has to tell somebody what to do. */}
+              {!result && (
                 // The door's one sentence — plain, and it says what to do.
                 <p className="mt-2 text-body text-ink-600">აღწერე, რა გჭირდება — გიპასუხებენ.</p>
               )}

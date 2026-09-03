@@ -22,13 +22,23 @@ const check = (name: string, ok: boolean, why = '') => {
 }
 
 const src = readFileSync(new URL('../lib/categoryMarks.tsx', import.meta.url), 'utf8')
-// `-` must be allowed inside the icon capture too: the real-estate entry is
-// `CatIcon['real-estate']`, and without it that row silently failed to match —
-// making C1 report a missing mark that was in fact right there.
-const entries = [...src.matchAll(/^\s+'?([\w-]+)'?:\s+\{ icon: (CatIcon[.[][\w'\-\]]+),\s+description: '([^']*)'/gm)]
+/* ⚠️ THE MAP HOLDS A KEY NOW, NOT AN ELEMENT (2026-09-02). It was
+   `icon: CatIcon.law` — a ready-rendered hand-drawn glyph — and the whole set
+   moved to Phosphor duotone that day (components/CategoryMarks; the owner
+   rejected the hand-drawn one on sight, and the size measurements behind that
+   are in its header). So a row now reads `icon: 'law'` and this pattern reads
+   the quoted key.
+
+   Everything C1 and C2 assert is unchanged, and that is the point of writing
+   it this way: „every slug has a mark" and „no two share a drawing" are
+   properties of the TABLE, not of what the table happens to store. The old
+   note about `-` still applies — `real-estate` is a quoted key on both sides
+   of the colon. */
+const entries = [...src.matchAll(/^\s+'?([\w-]+)'?:\s+\{ icon: '([\w-]+)',\s+description: '([^']*)',\s+photo: '([^']*)'/gm)]
 const MARKED_SLUGS = entries.map(m => m[1])
 const iconOf = (slug: string) => entries.find(m => m[1] === slug)?.[2]
 const blurbOf = (slug: string) => entries.find(m => m[1] === slug)?.[3] ?? ''
+const photoOf = (slug: string) => entries.find(m => m[1] === slug)?.[4] ?? ''
 
 check('C1: every live category slug has a mark',
   ['business', 'tax', 'finance', 'law', 'marketing', 'sales', 'it', 'product',
@@ -36,8 +46,8 @@ check('C1: every live category slug has a mark',
     .every(s => MARKED_SLUGS.includes(s) && !!iconOf(s)),
   `missing: ${['business','tax','finance','law','marketing','sales','it','product','design','career','hr','psychology','real-estate','relocation','crypto'].filter(s => !MARKED_SLUGS.includes(s)).join(', ')}`)
 
-// The map is `slug: { icon: CatIcon.x }` — two slugs pointing at the same CatIcon
-// key is exactly the duplication this file exists to stop.
+// The map is `slug: { icon: 'x' }` — two slugs pointing at the same mark is
+// exactly the duplication this file exists to stop.
 const used = entries.map(m => m[2])
 const dupes = used.filter((v, i) => used.indexOf(v) !== i)
 check('C2: no two categories share a drawing', dupes.length === 0,
@@ -51,6 +61,45 @@ check('C4: there is a fallback for an unknown slug', /const FALLBACK: CategoryMa
 check('C5: every category carries a blurb',
   MARKED_SLUGS.every(s => blurbOf(s).trim().length > 3),
   MARKED_SLUGS.filter(s => blurbOf(s).trim().length <= 3).join(', '))
+
+/* ── THE PHOTOGRAPH (2026-08-31) ───────────────────────────────────────────────
+ * The home tile's plate is a picture now (app/_home/categories → Plate), and
+ * both ways it can fail are silent. A path with no file behind it renders a
+ * blank band on the busiest page on the site — next/image does not throw, it
+ * just draws nothing — and two spheres sharing a picture is the C2 bug one
+ * layer up: the eye reads two tiles as one thing whatever their glyphs say.
+ * These read the DISK, so a file deleted or renamed fails here rather than in
+ * production. */
+const publicFile = (path: string) => new URL(`../public${path}`, import.meta.url)
+
+check('C8: every category names a photograph',
+  MARKED_SLUGS.every(s => /^\/category-photos\/[\w-]+\.webp$/.test(photoOf(s))),
+  MARKED_SLUGS.filter(s => !/^\/category-photos\/[\w-]+\.webp$/.test(photoOf(s))).join(', '))
+
+check('C9: every photograph is a file that exists',
+  MARKED_SLUGS.every(s => existsSync(publicFile(photoOf(s)))),
+  `missing from public/: ${MARKED_SLUGS.filter(s => !existsSync(publicFile(photoOf(s)))).map(photoOf).join(', ')}`)
+
+const pics = MARKED_SLUGS.map(photoOf)
+const picDupes = pics.filter((v, i) => pics.indexOf(v) !== i)
+check('C10: no two categories share a photograph', picDupes.length === 0,
+  `repeated: ${[...new Set(picDupes)].join(', ')}`)
+
+// The two home tiles that are not spheres — „ყველა სერვისი" and „მოთხოვნის
+// გაგზავნა" — have no row in MARKS, so C9 cannot see their plates.
+const namedPhoto = (k: string) => src.match(new RegExp(`export const ${k} = '([^']*)'`))?.[1] ?? ''
+for (const [n, k, what] of [
+  ['C11', 'ALL_CATEGORIES_PHOTO', '„ყველა სერვისი"'],
+  ['C12', 'REQUEST_TILE_PHOTO', '„მოთხოვნის გაგზავნა"'],
+] as const) {
+  const photo = namedPhoto(k)
+  check(`${n}: the ${what} tile has a photograph too`,
+    !!photo && existsSync(publicFile(photo)) && !pics.includes(photo),
+    photo ? `${photo} is missing, or is a sphere's picture reused` : `${k} is gone`)
+}
+check('C13: the two door tiles do not share one picture',
+  namedPhoto('ALL_CATEGORIES_PHOTO') !== namedPhoto('REQUEST_TILE_PHOTO'),
+  'both doors draw the same photograph — on one row the eye reads them as one thing')
 
 // The old duplicate maps must stay deleted.
 /* Read the WHOLE home surface, not just the container. C6 is a negative check,

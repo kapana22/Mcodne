@@ -87,6 +87,10 @@ export type Draft = {
   /** The clarifying answers ({ audience: 'pupil' }). Optional per key and as a
    *  whole — see the schema comment in lib/requests. */
   details: Record<string, string>
+  /** ⚠️ THE VOCABULARY, not the offered list — EITHER left the screen on
+   *  2026-08-31 (FORMATS in lib/requestTopics) and BATUMI on 2026-08-20, and a
+   *  draft revived from sessionStorage across either deploy still holds one.
+   *  Both still submit; neither can be picked again. */
   format: 'ONLINE' | 'IN_PERSON' | 'EITHER'
   city: 'TBILISI' | 'BATUMI' | 'KUTAISI' | 'RUSTAVI' | 'OTHER'
   contactName: string

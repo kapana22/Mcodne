@@ -146,6 +146,22 @@ export type ProviderProfileData = {
   areas: string[]
   /** „გამოძახება 30₾ · სამუშაო 50₾-დან", or null when they quote per job. */
   price: string | null
+  /**
+   * ⚠️ THE NUMBER BEHIND „ფასი იწყება" (2026-08-31, from the owner's design
+   * canvas → Public Profile). `price` above is a SENTENCE and the canvas's rail
+   * wants a figure it can set in 30px type. It is the lowest of what they
+   * actually named — the cheapest priced service, else `priceFrom`, else the
+   * callout fee — and null for somebody who quotes per job, where the rail says
+   * so in words rather than printing ₾0.
+   */
+  priceFromGel: number | null
+  /** The provider identity, for the offer journal (lib/responseStats). Exactly
+   *  one of the two is set — the schema's CHECK. */
+  userId: string | null
+  companyId: string | null
+  /** The year they joined — „პლატფორმაზეა 2024-დან". Measured, obviously, but
+   *  it is one of the three facts the canvas's rail asks for. */
+  since: number
   /** ⚠️ THE CENTRE OF THIS PAGE (2026-08-20) — „ბინის დალაგება — 60₾", one row
    *  per service the provider priced. A profile that lists what somebody sells,
    *  with the price beside it, is the single thing this catalogue has that the
@@ -193,13 +209,35 @@ export type ProviderReview = {
  * answered that, but the two are separate reads and the rule is applied to
  * both). Cached per request: metadata and the render share one round trip.
  */
+/**
+ * The cheapest figure this provider actually named, in lari.
+ *
+ * ⚠️ THE ORDER IS THE HONESTY. A priced service („ბინის დალაგება — 60₾") is the
+ * strongest claim, `priceFrom` („სამუშაო 50₾-დან") the next, and the callout fee
+ * last — it is what it costs somebody to TURN UP, which is a real floor and the
+ * only one some trades quote. 🔒 Null when they named none of the three: „ask"
+ * is a way of working, not a missing field.
+ */
+function lowestNamedPrice(r: {
+  priced: { price: number }[]
+  priceFrom: number | null
+  calloutFee: number | null
+}): number | null {
+  const named = [
+    ...r.priced.map(s => s.price),
+    r.priceFrom ?? null,
+    r.calloutFee ?? null,
+  ].filter((n): n is number => typeof n === 'number' && n > 0)
+  return named.length ? Math.min(...named) : null
+}
+
 export const getProviderProfile = cache(async (id: string): Promise<ProviderProfileData | null> => {
   try {
     const row = await prisma.serviceProfile.findFirst({
       where: { id, ...VISIBLE },
       select: {
         id: true, slug: true, services: true, areas: true, calloutFee: true, priceFrom: true, priceList: true,
-        about: true, updatedAt: true,
+        about: true, updatedAt: true, createdAt: true,
         // The professional half. Scalars only — `photoUrl` and `workPhotos`
         // are blobs and are probed below, never selected.
         headline: true, professions: true, languages: true,
@@ -288,6 +326,15 @@ export const getProviderProfile = cache(async (id: string): Promise<ProviderProf
       services: serviceLabels(clean.services),
       areas: areaLabels(clean.areas),
       price: priceHint(row),
+      // 🔒 THE LOWEST THING THEY NAMED, never a figure nobody stands behind.
+      priceFromGel: lowestNamedPrice({
+        priced: pricedServices({ services: clean.services, priceList: row.priceList }),
+        priceFrom: row.priceFrom,
+        calloutFee: row.calloutFee,
+      }),
+      userId: row.userId,
+      companyId: row.companyId,
+      since: row.createdAt.getFullYear(),
       // Read through the TICKS, never listed from the map — see pricedServices
       // for why the order of those two operations is the guard.
       priced: pricedServices({ services: clean.services, priceList: row.priceList }),

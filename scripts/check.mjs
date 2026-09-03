@@ -16,9 +16,11 @@
  * Both are now pinned by tests. Pins only work if something checks them.
  *
  * WHAT IT RUNS, in ascending cost so the cheapest failure surfaces first:
- *   1. tsc --noEmit          (~9s)   — types across the whole tree
- *   2. tests/*.test.ts       (~10s)  — the 98 pure tests, each its own process
- *   3. next build            (~60s)  — the thing Railway will run anyway
+ *   1. tsc --noEmit          (~1s)   — types across the whole tree
+ *   2. tests/*.test.ts       (~13s)  — the 84 pure tests, each its own process
+ *   3. next build            (~60s)  — the thing Railway will run anyway,
+ *                                    into .next-check so a running `next dev`
+ *                                    is never building into the same folder
  *
  * WHAT IT DOES NOT RUN: `tests/blogLinks.check.ts`, which reads the live DB to
  * find posts linking at a draft or a redirect. It is `.check.ts` precisely so
@@ -43,6 +45,8 @@ import { dirname, join } from 'node:path'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const FAST = process.argv.includes('fast')
+// The gate's own build directory. Not .next — see the build stage below.
+const DIST = '.next-check'
 
 // Every stage gets a deadline. On 2026-08-19 one test file waited on something
 // that never arrived and, because the runner had no timeout, the gate sat there
@@ -50,7 +54,7 @@ const FAST = process.argv.includes('fast')
 // report as a failure, never as silence.
 const run = (cmd, args, opts = {}) =>
   new Promise(resolve => {
-    const p = spawn(cmd, args, { cwd: ROOT, stdio: opts.quiet ? ['ignore', 'pipe', 'pipe'] : 'inherit', shell: false })
+    const p = spawn(cmd, args, { cwd: ROOT, stdio: opts.quiet ? ['ignore', 'pipe', 'pipe'] : 'inherit', shell: false, env: { ...process.env, ...(opts.env || {}) } })
     let out = ''
     let timer = null
     if (opts.quiet) { p.stdout.on('data', d => (out += d)); p.stderr.on('data', d => (out += d)) }
@@ -62,6 +66,14 @@ const run = (cmd, args, opts = {}) =>
     }
     p.on('close', code => { if (timer) clearTimeout(timer); resolve({ code, out, timedOut: !!timer && code === null }) })
   })
+
+/* ⚠️ THE TIMEOUTS, NAMED AND IN ONE PLACE (2026-09-02). The build's was 600s
+   typed inline, which is fine until a build legitimately takes longer — it did
+   (975s, against the production database) and the gate reported that as a
+   FAILURE. 20 minutes is not permissive: nothing here comes close when the
+   database is local, and a gate that kills honest work teaches people to stop
+   trusting it. */
+const TIMEOUTS = { test: 120_000, build: 1_200_000 }
 
 const started = process.hrtime.bigint()
 const secs = from => `${Number(process.hrtime.bigint() - from) / 1e9 | 0}s`
@@ -127,7 +139,7 @@ console.log('\n\x1b[1m▸ tests\x1b[0m')
       for (;;) {
         const f = queue.shift()
         if (!f) return
-        results.push({ f, ...(await run('npx', ['tsx', join('tests', f)], { quiet: true, timeout: 120000 })) })
+        results.push({ f, ...(await run('npx', ['tsx', join('tests', f)], { quiet: true, timeout: TIMEOUTS.test })) })
       }
     }
     await Promise.all(Array.from({ length: LANES }, lane))
@@ -145,17 +157,55 @@ console.log('\n\x1b[1m▸ tests\x1b[0m')
 if (!FAST) {
   console.log('\n\x1b[1m▸ build\x1b[0m')
   const t = process.hrtime.bigint()
-  // `next build` and a running `next dev` share .next and fight over the
-  // manifests — a build that fails with PageNotFoundError on an API route is
-  // almost always this, not the change under test.
-  const { code, out } = await run('npx', ['next', 'build'], { quiet: true, timeout: 600000 })
+  // ⚠️ BUILD BESIDE `next dev`, NEVER ON TOP OF IT (2026-09-01).
+  //
+  // This used to run straight into .next, which a running `next dev` also
+  // owns. Two builds over one directory leave half-written manifests, and
+  // the result reads as a product bug — unstyled pages, a missing manifest,
+  // `PageNotFoundError` on an API route — so the afternoon goes on the
+  // change under test, which was innocent. next.config.js honours
+  // NEXT_DIST_DIR; setting it here is the whole fix, and Railway (which
+  // sets nothing) still builds into .next exactly as before.
+  //
+  // The cost is one cold cache the first time, and ~450 MB of disk that
+  // .gitignore and .railwayignore both drop.
+  const { code, out } = await run('npx', ['next', 'build'], { quiet: true, timeout: TIMEOUTS.build, env: { NEXT_DIST_DIR: DIST } })
   if (code === 0) console.log(`  \x1b[32m✓\x1b[0m compiled (${secs(t)})`)
   else {
     failed++
-    const hint = /pages-manifest|routes-manifest|PageNotFoundError/.test(out)
-      ? '\n    hint: stop `next dev`, rm -rf .next, retry — they share the build dir\n          (and Next 15.5 fails intermittently on Node 26; use Node 22)'
-      : ''
-    console.log(`  \x1b[31m✗\x1b[0m${hint}\n${out.split('\n').filter(l => /error|Error|✗/.test(l)).slice(0, 15).map(l => '    ' + l).join('\n')}`)
+    // The dev-server collision is designed out (see DIST above), so a manifest
+    // error here is no longer «something else is building» — the remaining
+    // known cause is the Node version.
+    /* ⚠️ A KILLED STAGE IS NOT A FAILED ONE, AND MUST NOT READ LIKE ONE
+       (2026-09-02). Measured: the build ran 975s against the PRODUCTION
+       database while a dev server competed for the same connection, this stage
+       killed it at 600s, and the display then filtered the captured output for
+       /error|Error|✗/ — which matched nothing except the ROUTE NAME
+       `/api/log-error`. The gate printed „✗  ├ ƒ /api/log-error" over a build
+       that had compiled perfectly, and the search went looking for a broken
+       route. The runner already appended „TIMEOUT after Ns — killed"; it was
+       simply not in the filter.
+       Now the kill is reported first, on its own — a killed build has no error
+       lines worth reading — and `/api/log-error` can never again be mistaken
+       for one. */
+    if (/TIMEOUT after/.test(out)) {
+      console.log(`  \x1b[31m✗\x1b[0m killed after ${TIMEOUTS.build / 1000}s — NOT rejected.
+    It compiles; it did not finish in time. The usual cause is the database:
+    \`next build\` collects page data, .env points at PRODUCTION, and a dev
+    server on this machine competes for that connection. Stop the dev server,
+    or put a local DATABASE_URL in .env.local, then re-run.`)
+    } else {
+      // The dev-server collision is designed out (see DIST above), so a manifest
+      // error here is no longer «something else is building» — the remaining
+      // known cause is the Node version.
+      const hint = /pages-manifest|routes-manifest|PageNotFoundError/.test(out)
+        ? `\n    hint: Next 15.5 fails intermittently on Node 26 — use Node 22.\n          If it persists: rm -rf ${DIST} and retry (cold cache, ~2min).`
+        : ''
+      const lines = out.split('\n')
+        .filter(l => /error|Error|✗/.test(l) && !/\/api\/log-error/.test(l))
+        .slice(0, 15).map(l => '    ' + l).join('\n')
+      console.log(`  \x1b[31m✗\x1b[0m${hint}\n${lines || '    (no error lines — read the full output with: npx next build)'}`)
+    }
   }
 }
 

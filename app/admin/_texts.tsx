@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { TabHeader, AdminLoading, AdminError } from './_parts'
 import { Icon } from '@/components/Icon'
+import { Card } from '@/components/Card'
 import { Container } from '@/components/Container'
 
 /** An override stored in the DB whose key no longer exists in the registry. */
@@ -116,6 +117,24 @@ export const SiteTextsSection = () => {
       />
 
       <Container as="section" size="content" className="py-6">
+        {/* ⚠️ WHERE THE OTHER COPY IS. This tab is 303 keys of PAGE text, and it
+            is where somebody naturally looks for any text at all — the owner
+            did, and came back with „სადა ტექსტები ვერ ვნახე ადმინშში". Email
+            and SMS wording is not here: it lives in code and is read (not yet
+            edited) on the messages tab. A tab that silently answers only half
+            of „the texts" is what sent them looking. */}
+        <Card as="a" href="#messages" interactive padding="compact" className="mb-5 flex items-start gap-3">
+          <Icon.mail className="w-4 h-4 text-ink-400 shrink-0 mt-0.5" />
+          <span className="min-w-0">
+            <span className="block font-display text-small font-bold text-ink-900">
+              წერილებისა და SMS-ის ტექსტი აქ არ არის
+            </span>
+            <span className="block text-meta text-ink-600 mt-0.5 leading-snug">
+              ეს გვერდი საიტის ტექსტებია. რას წერს მცოდნე მეილში და SMS-ში — „შეტყობინებები“ ტაბზე იკითხება.
+            </span>
+          </span>
+        </Card>
+
         {err && <AdminError message={err} className="mb-4" />}
         {flash && (
           <div role="alert" className={`mb-4 rounded-btn border px-3 py-2 text-small font-medium ${flash.kind === 'success' ? 'border-success-200 bg-success-50 text-success-800' : 'border-danger-200 bg-danger-50 text-danger-800'}`}>{flash.msg}</div>

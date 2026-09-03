@@ -18,6 +18,8 @@ import {
   reviewGate, ReviewInput, reminderDue, closeDue,
 } from '../lib/offerLifecycle'
 import { OFFER_EVENTS, OFFER_EVENT_LABEL, BILLABLE_EVENTS } from '../lib/offerEvents'
+// The screen's own resolver, called rather than grepped — see §E.
+import { errText } from '../lib/requestRoomErrors'
 
 const ROOT = join(import.meta.dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -84,11 +86,26 @@ test('§A withdraw: only a SENT offer, and only by the provider in the where', (
   )
 })
 
-test('§A review: only after done, once, by somebody with an account', () => {
-  assert.equal(reviewGate({ doneAt: null, reviewed: false, authorUserId: 'u1' }), 'NOT_DONE')
-  assert.equal(reviewGate({ doneAt: new Date(), reviewed: true, authorUserId: 'u1' }), 'ALREADY_REVIEWED')
-  assert.equal(reviewGate({ doneAt: new Date(), reviewed: false, authorUserId: null }), 'NO_ACCOUNT')
-  assert.equal(reviewGate({ doneAt: new Date(), reviewed: false, authorUserId: 'u1' }), 'OK')
+test('§A review: only after done, once, by somebody with an account — and never on yourself', () => {
+  const done = { doneAt: new Date(), reviewed: false, authorUserId: 'u1', selfReview: false }
+  assert.equal(reviewGate({ ...done, doneAt: null }), 'NOT_DONE')
+  assert.equal(reviewGate({ ...done, reviewed: true }), 'ALREADY_REVIEWED')
+  assert.equal(reviewGate({ ...done, authorUserId: null }), 'NO_ACCOUNT')
+  assert.equal(reviewGate(done), 'OK')
+
+  // 🔒 THE ONE THAT PROTECTS SOMEBODY (2026-08-31). Until this the gate asked
+  // three questions and none of them was „who is rating whom", so the chain ran
+  // end to end: file a request, bid on it yourself, accept it (you hold the
+  // reference), mark it done, five stars. `ServiceProfile.rating` and
+  // `reviewsCount` are on every catalogue card, so what that writes is a made-up
+  // number in the field a client chooses by — CLAUDE.md rule 6, committed by the
+  // product rather than by somebody typing it.
+  assert.equal(reviewGate({ ...done, selfReview: true }), 'SELF',
+    'a provider can rate themselves again')
+  // …and it is checked LAST, so an honest refusal still wins: somebody rating
+  // their own finished job that is already reviewed hears ALREADY_REVIEWED.
+  assert.equal(reviewGate({ ...done, selfReview: true, reviewed: true }), 'ALREADY_REVIEWED')
+  assert.equal(reviewGate({ ...done, selfReview: true, doneAt: null }), 'NOT_DONE')
 
   // The body: whole stars 1..5, one short paragraph, empty allowed.
   assert.equal(ReviewInput.safeParse({ rating: 5, body: 'კარგი' }).success, true)
@@ -278,21 +295,60 @@ test('§E the client\'s page: „დასრულდა" on the accepted offer
   // The page feeds the lifecycle state without widening clientOfferView.
   assert.match(dir, /kind:\s+true,\s+doneAt:\s+true,\s*review:\s+\{\s+select:\s+\{\s+rating:\s+true,\s+body:\s+true\s+\}\s+\}/)
   assert.match(dir, /clientOfferView\(\{/, 'the contact rule still comes from lib/requests → clientOfferView')
-  assert.match(dir, /canReview=\{request\.userId !== null\}/)
+  /* ⚠️ THE EXPRESSION MOVED INTO THE LOADER (2026-09-02) and the rule is
+     unchanged: a review has to be SIGNED, and a request filed by reference
+     alone has nobody to sign it as. The room became one component with two
+     addresses on that day (app/request/[ref]/_room — the signed-in client now
+     reads it at /me/r/<ref> inside their own workspace instead of jumping to
+     the intake's chrome), so the fact is derived once where the row is read
+     and handed down, rather than spelled at the call site of each page. Same
+     `dirOf`, so both spellings would be found here; this pins the one that
+     exists. */
+  assert.match(dir, /canReview: request\.userId !== null/,
+    'the review gate stopped asking whether the request has an account')
+  assert.match(dir, /canReview=\{data\.canReview\}/,
+    'the room stopped passing the review gate down')
   // The button, secondary, on the ACCEPTED QUOTE offer that is not done.
-  assert.match(dir, /accepted\s+&&\s+o\.kind\s+===\s+'QUOTE'\s+&&\s+!o\.doneAt\s+&&\s+\([\s\S]{0,200}variant="secondary"[\s\S]{0,300}'დასრულდა'/)
-  assert.match(dir, /\/api\/requests\/\$\{publicRef\}\/offers\/\$\{id\}\/done/)
+  /* ⚠️ „დასრულდა" AND THE ★ MOVED TO THE CLOSING SCREEN (2026-09-01, the
+     canvas → „Request Room v2", screen 3 „მოაგვარე?"). They were a secondary
+     button on the accepted offer's card and a rating that appeared under it.
+     The canvas asks the question once, as its own screen, and only offers the
+     stars when the answer is „დიახ, ექსპერტთან X" — which is the same two acts
+     in the order somebody actually performs them.
+     The LIFECYCLE is what this section pins, not the pixel it lives on: the
+     client can stamp done, the stamp opens the review, and the review is
+     written once. Those three now read from _close.tsx. */
+  const close = read('app/request/[ref]/_close.tsx')
+  assert.match(close, /doneAt/, 'the closing screen no longer knows whether the work was marked done')
+  assert.match(close, /offers\/\$\{[a-zA-Z]+\}\/done/, 'the done stamp lost its endpoint')
   // The picker after done, only with an account; the stars after the review.
-  assert.match(dir, /accepted\s+&&\s+o\.doneAt\s+&&\s+!o\.review\s+&&\s+canReview\s+&&\s+\(\s*<ReviewForm/)
-  assert.match(dir, /accepted\s+&&\s+o\.review\s+&&\s+\([\s\S]{0,200}<Stars\s+n=\{o\.review\.rating\}/)
-  assert.match(dir, /\/api\/requests\/\$\{publicRef\}\/offers\/\$\{offerId\}\/review/)
+  assert.match(close, /rating/, 'the closing screen stopped collecting a rating')
+  // Written once and then READ-ONLY — the half of this rule that is about the
+  // person: a rating somebody can quietly revise is not a rating. Wherever the
+  // stars are drawn back, they are drawn from the stored value.
+  assert.match(dir + close, /review\.rating/, 'a written review is no longer shown back')
+  assert.match(close, /\/review/, 'the review lost its endpoint')
   // The picker: five 40×40 star buttons (the lesson review's row), one textarea
   // capped at the lib's ceiling.
   assert.match(dir, /\[1, 2, 3, 4, 5\]\.map\(n => \(\s*<button/)
   assert.match(dir, /(w-10 h-10|size-10)/, 'the control fell below the 40px tap floor')
   assert.match(dir, /maxLength=\{REVIEW_BODY_MAX\}/)
-  // The done/review 409s read as „out of date", like accept's.
-  assert.match(dir, /case 'ALREADY_DONE':\s*case 'ALREADY_REVIEWED':/)
+  /* The done/review 409s read as „out of date", like accept's.
+
+     ⚠️ ASKED OF THE FUNCTION, NOT OF ITS SHAPE (2026-09-02). This pinned the
+     source text `case 'ALREADY_DONE': case 'ALREADY_REVIEWED':` and broke the
+     day those two lines became two keys in a map — with the screen, the codes
+     and the sentence all unchanged. CLAUDE.md's own rule: „If an assertion can
+     break on a rename, a reformat or a restyle while the screen is identical,
+     it is pinning the wrong thing." What matters is that both 409s say the same
+     out-of-date sentence and that neither leaks a raw code, so that is what is
+     asserted — by calling `errText`. */
+  assert.equal(errText('ALREADY_DONE'), errText('ALREADY_REVIEWED'),
+    'the two „already" 409s stopped saying the same thing')
+  assert.match(errText('ALREADY_DONE'), /განაახლე/,
+    'the done/review 409 stopped reading as „the page is out of date"')
+  assert.doesNotMatch(errText('ALREADY_DONE'), /[A-Z_]{4,}/,
+    'a raw error code reached the screen')
 })
 
 test('§E the thanks screen no longer forbids a „my requests" list', () => {

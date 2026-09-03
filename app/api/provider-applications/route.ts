@@ -24,6 +24,7 @@ import { sendMail } from '@/lib/mailer'
 import { newProviderApplicationAdminEmail } from '@/lib/emailTemplates'
 import { providersOn } from '@/lib/requests'
 import { ProviderApplicationInput, PROVIDER_KIND_LABEL, PROVIDER_STATUS_TEXT } from '@/lib/providerApplication'
+import { validationIssueMessage } from '@/lib/validationMessages'
 import { groupIsService } from '@/lib/requestTopics'
 import { LIVE_OFFER_GROUPS } from '@/lib/serviceProfile'
 import { CITIES, topicLabel, cityLabel } from '@/lib/requestTopics'
@@ -130,7 +131,7 @@ export async function POST(req: Request) {
       ok: false,
       error: 'INVALID',
       field: first?.path?.[0] ?? null,
-      message: first?.message ?? 'შეავსე ველები სწორად.',
+      message: validationIssueMessage(first),
     }, { status: 400 })
   }
 
@@ -203,7 +204,7 @@ export async function POST(req: Request) {
       // told." That lesson was not carried over to this queue, and this queue
       // matters more: an unreviewed tradesperson is the supply side of a
       // vertical with no supply. NOT pref-gated — an ops signal to staff.
-      const { subject, html } = newProviderApplicationAdminEmail({
+      const { subject, html } = await newProviderApplicationAdminEmail({
         name: d.fullName,
         kind: PROVIDER_KIND_LABEL[d.kind],
         company: d.companyName,
@@ -213,7 +214,7 @@ export async function POST(req: Request) {
         email: user.email,
       })
       for (const a of admins) {
-        if (a.email) await sendMail({ to: a.email, subject, html })
+        if (a.email) await sendMail({ key: 'application.new.admin', to: a.email, subject, html })
       }
     } catch {}
   })

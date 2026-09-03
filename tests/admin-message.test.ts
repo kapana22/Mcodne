@@ -35,8 +35,8 @@ test('sanitizeSubject strips CR/LF/tabs and collapses whitespace', () => {
   assert.equal(sanitizeSubject(undefined as unknown as string), '')
 })
 
-test('email subject is single-line even for a hostile subject', () => {
-  const { subject } = adminDirectMessageEmail({
+test('email subject is single-line even for a hostile subject', async () => {
+  const { subject } = await adminDirectMessageEmail({
     name: 'მარიამ ფოფხაძე',
     subject: 'გამარჯობა\r\nBcc: attacker@evil.com',
     body: 'ტექსტი',
@@ -46,13 +46,13 @@ test('email subject is single-line even for a hostile subject', () => {
   assert.equal(subject, 'გამარჯობა Bcc: attacker@evil.com')
 })
 
-test('an empty subject still yields a usable mail subject', () => {
-  const { subject } = adminDirectMessageEmail({ name: 'ნინო', subject: '   ', body: 'ტექსტი' })
+test('an empty subject still yields a usable mail subject', async () => {
+  const { subject } = await adminDirectMessageEmail({ name: 'ნინო', subject: '   ', body: 'ტექსტი' })
   assert.ok(subject.trim().length > 0)
 })
 
-test('admin-typed subject and body are escaped, never rendered as markup', () => {
-  const { html } = adminDirectMessageEmail({
+test('admin-typed subject and body are escaped, never rendered as markup', async () => {
+  const { html } = await adminDirectMessageEmail({
     name: '<img src=x onerror=alert(1)>',
     subject: '<script>alert("subject")</script>',
     body: '<script>alert(\'body\')</script>\n\n<b onclick="x">bold?</b> & "quoted" \'single\'',
@@ -69,8 +69,8 @@ test('admin-typed subject and body are escaped, never rendered as markup', () =>
   assert.ok(html.includes('&#39;'), 'single quotes must be escaped')
 })
 
-test('body keeps its shape: blank lines → paragraphs, single newlines → <br>', () => {
-  const { html } = adminDirectMessageEmail({
+test('body keeps its shape: blank lines → paragraphs, single newlines → <br>', async () => {
+  const { html } = await adminDirectMessageEmail({
     name: 'ნინო',
     subject: 'სათაური',
     body: 'პირველი აბზაცი\nმეორე ხაზი\n\nმეორე აბზაცი',
@@ -79,8 +79,8 @@ test('body keeps its shape: blank lines → paragraphs, single newlines → <br>
   assert.ok(html.includes('<p style="margin:0 0 12px;">მეორე აბზაცი</p>'), 'blank line starts a new paragraph')
 })
 
-test('every link in the mail is absolute (an inbox has no site-relative base)', () => {
-  const { html } = adminDirectMessageEmail({
+test('every link in the mail is absolute (an inbox has no site-relative base)', async () => {
+  const { html } = await adminDirectMessageEmail({
     name: 'ნინო', subject: 'სათაური', body: 'ტექსტი', template: 'expert',
   })
   const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map(m => m[1])
@@ -107,15 +107,17 @@ test('destination is chosen from a fixed map, unknown input falls back to blank'
   for (const t of ['expert', 'info', 'blank', 'nonsense']) {
     const d = adminMessageDestination(t)
     assert.ok(d.href.startsWith('/') && !d.href.startsWith('//'), `must be an app-internal path: ${d.href}`)
-    assert.ok(d.ctaLabel.trim().length > 0)
+    // The LABEL moved to lib/messageTextDefs (the owner edits it); the map
+    // keeps the route and the registry part that names the button.
+    assert.ok(d.ctaPart.trim().length > 0)
   }
 })
 
-test('bounds are the ones the composer and the API agree on', () => {
+test('bounds are the ones the composer and the API agree on', async () => {
   assert.equal(ADMIN_MESSAGE_SUBJECT_MAX, 120)
   assert.equal(ADMIN_MESSAGE_BODY_MAX, 4000)
   // A body at the cap must still render — nothing truncates it into broken HTML.
   const long = 'ა'.repeat(ADMIN_MESSAGE_BODY_MAX)
-  const { html } = adminDirectMessageEmail({ name: 'ნინო', subject: 'ს', body: long })
+  const { html } = await adminDirectMessageEmail({ name: 'ნინო', subject: 'ს', body: long })
   assert.ok(html.includes(long))
 })

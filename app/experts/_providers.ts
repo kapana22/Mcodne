@@ -14,7 +14,7 @@
 import { prisma } from '@/lib/prisma'
 import { ensureProviderSlug } from '@/lib/providerSlug'
 import { LIVE_OFFER_GROUPS, serviceLabels, areaLabels, priceHint, lowestPrice } from '@/lib/serviceProfile'
-import { CITIES, type CityName } from '@/lib/requestTopics'
+import { CITIES, verticalsOfTopics, type CityName, type Vertical } from '@/lib/requestTopics'
 import { langLabel, toLangCode } from '@/lib/languages'
 import { avatarRouteSrc, AVATAR_SHAPE_SQL } from '@/lib/avatarSrc'
 
@@ -281,6 +281,17 @@ export type ProviderRow = {
   rating: number
   /** The sphere slug — what `?category=` filters on. */
   catSlug: string | null
+  /**
+   * WHICH SIDE OF THE SWITCH THIS PERSON IS ON — „პროფესიული", „ყოველდღიური",
+   * or both (lib/requestTopics → verticalsOfTopics, off the services they
+   * listed).
+   *
+   * ⚠️ IT IS DERIVED, NOT STORED, and it has to be: the fact is „which trades
+   * did they tick", and a second column holding an answer to that question is a
+   * column that can disagree with it. A provider who adds a cleaning service
+   * tomorrow is on both sides tomorrow, with no migration and no admin step.
+   */
+  verticals: Vertical[]
 }
 
 export type ProvidersResult = {
@@ -442,6 +453,7 @@ export async function queryProviders(f: ProvidersFilter): Promise<ProvidersResul
       catSlug: r.category?.slug ?? null,
       services: serviceLabels(r.services),
       serviceIds: r.services,
+      verticals: verticalsOfTopics(r.services),
       // ⚠️ THE PROFILE PHOTO FIRST, THE ACCOUNT AVATAR SECOND (2026-08-24). A
       // migrated professional never uploaded a `photoUrl` — the consultation
       // profile showed their account photo — so without this fallback 27 cards

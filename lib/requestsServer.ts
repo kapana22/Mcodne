@@ -14,7 +14,7 @@ import { ensureDbReady } from './dbBoot'
 import { queueWhere } from './requestRouting'
 import {
   makePublicRef,
-  canSeeRequests, canOpenRequestForm,
+  canSeeRequests, canOpenRequestForm, canFileRequest,
   type RequestViewer,
 } from './requests'
 import { queueScope, type QueueScope } from './requestRouting'
@@ -109,6 +109,46 @@ export async function requestAccessOf(userId: string | null | undefined): Promis
   return null
 }
 
+/**
+ * DOES THIS PERSON SELL HERE? The half of „who is who" that the allowlist alone
+ * cannot answer.
+ *
+ * ⚠️ BOTH HALVES ARE REQUIRED, and that is CLAUDE.md's definition rather than a
+ * choice made here: „a provider is somebody with a ServiceProfile AND an active
+ * RequestAccess row". Each half alone describes somebody mid-registration —
+ *
+ *   allowlist, no profile → admitted and has not finished filling the form;
+ *                           their workspace is empty and refusing them the
+ *                           client side too would leave them unable to do
+ *                           anything at all on the site.
+ *   profile, no allowlist → applied through /join and was never let in. They
+ *                           sell nothing yet, so they are a client.
+ *
+ * The profile is looked up through the company as well as the person, matching
+ * `requestAccessOf` above: a member of an allowlisted company is a provider and
+ * the trades live on the company's row rather than theirs.
+ */
+async function hasServiceProfile(userId: string): Promise<boolean> {
+  const n = await prisma.serviceProfile.count({
+    where: { OR: [{ userId }, { company: { members: { some: { userId } } } }] },
+  })
+  return n > 0
+}
+
+/**
+ * The same question for a caller that already holds a user id and does not want
+ * a second session read — /me's layout, which resolves the rail's intake button.
+ *
+ * The allowlist is asked FIRST and short-circuits, so the common case (a plain
+ * client) costs one indexed lookup and never touches ServiceProfile.
+ */
+export async function sellsHere(userId: string | null | undefined): Promise<boolean> {
+  if (!userId) return false
+  await ensureDbReady()
+  if (!(await requestAccessOf(userId))) return false
+  return hasServiceProfile(userId)
+}
+
 /* ── the gate, resolved ─────────────────────────────────────────────────── */
 
 type RequestsViewerState = {
@@ -122,9 +162,26 @@ type RequestsViewerState = {
    * site fail to compile until somebody states which side it is on.
    */
   providerAllowed: boolean
-  /** May this caller open a CLIENT surface? See lib/requests →
-   *  canOpenRequestForm: anyone, when the subsystem is on. */
+  /**
+   * Does this caller SELL here (lib/requestsServer → sellsHere)? Separate from
+   * `providerAllowed`, which answers „may they open a provider SCREEN" and is
+   * true for an admin who sells nothing.
+   */
+  sells: boolean
+  /**
+   * May this caller open a CLIENT surface? See lib/requests →
+   * canOpenRequestForm: anyone, when the subsystem is on.
+   *
+   * ⚠️ IT IS THE SUBSYSTEM GATE, NOT „the client side". A provider reads the
+   * chat and the thread through this same boolean. Do not narrow it by
+   * audience — `mayFile` below is where an audience question belongs.
+   */
   clientAllowed: boolean
+  /**
+   * May this caller FILE a request? `clientAllowed`, minus anybody who sells
+   * here (owner, 2026-08-31). Read by exactly one place: POST /api/requests.
+   */
+  mayFile: boolean
 }
 
 /**
@@ -156,12 +213,42 @@ export async function requestsViewer(): Promise<RequestsViewerState> {
   // platform; taking them off is one switch.
   const provider = user ? await requestAccessOf(user.id) : null
 
+  // ⚠️ THE SECOND HALF, AND IT COSTS NOTHING FOR A CLIENT. `provider` is the
+  // allowlist row; a person who has none cannot be a seller, so the
+  // ServiceProfile count is only ever run for somebody already admitted. See
+  // `hasServiceProfile` above for why one half is not enough.
+  //
+  // ⚠️ AN ADMIN IS NEVER A SELLER FOR THIS PURPOSE, and the precedent is thirty
+  // lines up: „an admin on this list can verify a request and then bid on it —
+  // a real conflict of interest, accepted deliberately at stage 1, one person
+  // running both sides of a test." The same person has to be able to walk the
+  // client half of the funnel on the live site, and an operator account that
+  // also happens to carry a ServiceProfile would otherwise be locked out of the
+  // only screen where the intake can be checked end to end.
+  //
+  // 🔒 IT IS NOT A HOLE IN THE RULE THAT MATTERS. What the owner asked for is
+  // that the two identities do not mix, and the place that could actually
+  // corrupt something — self-bidding and self-review — is closed for EVERYONE,
+  // admins included: app/api/provider/offers claims against the author id and
+  // lib/offerLifecycle → reviewGate answers 'SELF'. This exemption reopens one
+  // form, not the chain behind it.
+  const sells =
+    provider !== null &&
+    !!user &&
+    asRole(user.role) !== 'ADMIN' &&
+    (await hasServiceProfile(user.id))
+
   const viewer: RequestViewer = { role: user?.role, hasAccess: provider !== null }
   return {
     user,
     provider,
+    sells,
     providerAllowed: canSeeRequests(viewer),
     clientAllowed: canOpenRequestForm(),
+    // 🔒 A SELLER CANNOT FILE A REQUEST (owner, 2026-08-31 — see lib/requests →
+    // canFileRequest). This is the authoritative refusal: the POST reads it, so
+    // a hidden link, a typed URL or a crafted request all meet the same answer.
+    mayFile: canFileRequest(sells),
   }
 }
 

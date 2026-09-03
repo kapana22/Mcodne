@@ -108,8 +108,26 @@ export function ProfessionPicker({
      it read as „your answer was lost". Every pick now has a permanent chip
      above the field, outside the filter, so the answer is on screen whatever
      the search is doing. */
-  const launch = shown.filter(g => isLaunchCategory(g.slug))
-  const rest = shown.filter(g => !isLaunchCategory(g.slug))
+  /* ⚠️ THE OPEN LIST IS THE PERSON'S OWN SPHERE, NOT EVERY LAUNCH SPHERE
+     (2026-09-01). Owner, looking at /work/profile: „ეს ძალიან ბევრი ინფოა რა
+     არის ამდენი… შეამცირე და სწორად დალაგე."
+     This rendered every launch category expanded — 103 professions under 20
+     headings — and the services card forty pixels below did the same with its
+     own vocabulary, so a provider opened their profile into roughly two hundred
+     chips.
+     ⚠️ AND THE ANSWER IS NOT AN ACCORDION. The sibling control took that
+     decision TODAY and reversed it on evidence — see _secServices: eight
+     comparable screens and not one collapses its options, because a row you
+     must tap to see hides the very thing you are choosing between. So the CHIPS
+     stay visible and the reduction comes from showing FEWER GROUPS: the sphere
+     this person has already named opens, everything else keeps the „სხვა
+     კატეგორიები" row that was always here. Nothing became unreachable, the
+     search still reads the whole vocabulary, and a provider who has named no
+     sphere yet sees the launch set exactly as before. */
+  const own = spheres.find(sp => sp.name === sphere)?.slug ?? ''
+  const isOpenGroup = (slug: string) => (own ? slug === own : isLaunchCategory(slug))
+  const launch = shown.filter(g => isOpenGroup(g.slug))
+  const rest = shown.filter(g => !isOpenGroup(g.slug))
   const restOpen = showRest || searching || rest.some(g => g.jobs.some(j => value.includes(j)))
 
   /**
@@ -173,12 +191,22 @@ export function ProfessionPicker({
           type="search"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="მოძებნე პროფესია — სანტექნიკოსი, ბუღალტერი, იურისტი…"
+          placeholder="მოძებნე პროფესია"
           aria-label="მოძებნე პროფესია"
-          className="w-full h-11 px-3.5 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-[border-color,box-shadow] duration-fast"
+          /* ⚠️ THE PILL IS THE OWNER'S OWN (2026-08-31, `Join.dc.html`). The
+             artboard draws this question as a 58px pill with a brand ring,
+             followed by a wrap of chips — and when /join was ported the SHELL
+             came across and this control did not, so the door kept a plain
+             input over a checkbox table. Owner, looking at it live: „რაღაც
+             არაკომფორტულია, ამხელა ცხრილი." */
+          className="h-14 w-full rounded-field border border-ink-200 bg-white px-5 text-body-lg text-ink-900 outline-none transition-[border-color,box-shadow] duration-fast placeholder:text-ink-400 focus:border-brand-700 focus:shadow-[0_0_0_4px_theme(colors.brand.50)]"
         />
 
-        <div className="mt-2 rounded-card border border-ink-200 bg-ink-75 p-2" role="group" aria-label="პროფესია">
+        {/* WHITE ON THE CREAM GROUND, like every other panel since the
+            2026-08-31 redesign — it was `bg-ink-75` inside a card, i.e. a tint
+            on a tint, which is what let the whole control read as one grey
+            slab. */}
+        <div className="mt-3 rounded-card border border-ink-100 bg-white p-4" role="group" aria-label="პროფესია">
           {shown.length === 0 && (
             <p className="px-2.5 py-4 text-center text-small text-ink-500">
               ვერაფერი მოიძებნა — მოხსენი ძებნა და გადახედე სიას.
@@ -227,9 +255,30 @@ const Group = ({ name, jobs, value, full, onPick }: {
   full: boolean
   onPick: (job: string) => void
 }) => (
-  <div className="mb-1 last:mb-0">
-    <p className="px-2.5 pt-2 pb-1 font-display text-micro font-semibold uppercase text-ink-500">{name}</p>
-    <div className="grid sm:grid-cols-2 gap-1">
+  <div className="mb-3 last:mb-0">
+    <p className="px-1 pb-2 pt-1 font-display text-micro font-semibold uppercase text-ink-500">{name}</p>
+
+    {/* ⚠️ CHIPS THAT WRAP, NOT A TWO-COLUMN TABLE OF TICK ROWS (2026-08-31).
+        What was here: a `sm:grid-cols-2` of full-width buttons, each an 18px
+        box plus a label at a 44px minimum — six launch categories rendered as
+        roughly thirty-two of those, all open, and the owner's word for it was
+        „ცხრილი". Measured on the same list, the chips fit three to four per row
+        instead of two and the control is about half as tall.
+
+        WHAT DID NOT CHANGE, because it is what makes the control usable:
+        · `role="checkbox"` + `aria-checked` — this is still multi-select and
+          still announces itself as one. A chip is a shape, not a semantic.
+        · The 44px floor (`h-11`), so every one of them clears the tap rule.
+        · The label WRAPS rather than truncating — a profession cut to
+          „…სპეცი…" is not a choice. That is why a chip here is `h-auto
+          min-h-11` and not a fixed-height pill: „ინტელექტუალური საკუთრების
+          იურისტი" is four words and must be allowed two lines on a phone.
+        · The disabled state at the `MAX_PROFESSIONS` ceiling.
+
+        The GROUPS stay, and that is the 2026-08-11 lesson intact: the sphere is
+        still on screen, still in the owner's launch order, still a heading —
+        it is simply not a field. */}
+    <div className="flex flex-wrap gap-2">
       {jobs.map(job => {
         const on = value.includes(job)
         return (
@@ -240,22 +289,14 @@ const Group = ({ name, jobs, value, full, onPick }: {
             aria-checked={on}
             onClick={() => onPick(job)}
             disabled={!on && full}
-            className={`min-w-0 min-h-11 px-2.5 py-2 flex items-center gap-2.5 text-left rounded-btn border transition-colors duration-fast disabled:opacity-45 disabled:cursor-not-allowed ${
+            className={`inline-flex min-h-11 max-w-full items-center gap-2 rounded-pill border px-4 py-2 text-left font-display text-body font-semibold transition-[background-color,border-color,transform] duration-fast motion-safe:active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45 ${
               on
-                ? 'border-brand-500 bg-brand-50 text-brand-800'
-                : 'border-transparent text-ink-900 hover:bg-white hover:border-ink-200'
+                ? 'border-brand-700 bg-brand-700 text-white'
+                : 'border-ink-200 bg-white text-ink-900 hover:border-ink-300 hover:bg-ink-75'
             }`}
           >
-            <span className={`w-[18px] h-[18px] shrink-0 rounded border-[1.5px] inline-flex items-center justify-center ${
-              on ? 'bg-brand-600 border-brand-600 text-white' : 'border-ink-300 bg-white'
-            }`}>
-              {on && <Icon.check className="w-3 h-3" />}
-            </span>
-            {/* WRAPS, never truncates. `truncate` here cost twice: a label cut
-                to „…სპეცი…" is not a choice, and inside a grid item
-                (min-width:auto) whitespace-nowrap widened the track past the
-                card on a 390px screen. */}
-            <span className="min-w-0 flex-1 text-body leading-snug">{job}</span>
+            {on && <Icon.check aria-hidden className="h-3.5 w-3.5 shrink-0" />}
+            <span className="min-w-0 leading-snug">{job}</span>
           </button>
         )
       })}

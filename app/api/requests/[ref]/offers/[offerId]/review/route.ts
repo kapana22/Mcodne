@@ -44,7 +44,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
   })
   if (!offer) return requestsNotFound()
 
-  const gate = reviewGate({ doneAt: offer.doneAt, reviewed: offer.review !== null, authorUserId: offer.request.userId })
+  // 🔒 NOBODY RATES THEMSELVES. Resolved here rather than in the gate because a
+  // COMPANY offer has no single account behind it — every member is the
+  // provider, and a colleague signing the review is the same act. The list is
+  // the one the notification audience already uses, so the two cannot disagree
+  // about who „the provider" is.
+  const providerIds = await providerUserIdsOf(offer)
+  const selfReview = !!offer.request.userId && providerIds.includes(offer.request.userId)
+
+  const gate = reviewGate({
+    doneAt: offer.doneAt,
+    reviewed: offer.review !== null,
+    authorUserId: offer.request.userId,
+    selfReview,
+  })
   if (gate !== 'OK') return NextResponse.json({ ok: false, error: gate }, { status: 409 })
 
   try {
@@ -73,8 +86,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
   // review uses. Best-effort, after the response.
   after(async () => {
     try {
-      const ids = await providerUserIdsOf(offer)
-      await notifyMany(ids, {
+      // The same list the gate above resolved — one query, one answer about who
+      // the provider is.
+      await notifyMany(providerIds, {
         type: 'REVIEW_NEW',
         title: 'ახალი შეფასება',
         body: topicLabel(offer.request.topic),

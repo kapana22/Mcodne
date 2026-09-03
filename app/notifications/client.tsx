@@ -9,13 +9,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { useToast } from '@/components/ToastProvider'
 import { fmtKaDate, fmtKaTime } from '@/lib/kaDate'
 import { Eyebrow } from '@/components/Eyebrow'
-import { Logo } from '@/components/Logo'
-import { NotifBell } from '@/components/NotifBell'
-import { UserMenu } from '@/components/UserMenu'
-import { homeForRole } from '@/lib/roleHome'
-import { ROLE } from '@/lib/roles'
 
-type Role = 'USER' | 'PROVIDER' | 'ADMIN'
 
 type Item = {
   id: string
@@ -64,16 +58,21 @@ const TYPE_LABEL: Record<string, { l: string; cls: string }> = {
   REQUEST_DONE:       { l: 'დასრულდა',     cls: 'border-success-200 text-success-700' },
 }
 
-// ⚠️ THE VIEWER ARRIVES WITH THE PAGE (2026-08-30). This fetched /api/me on
-// mount for ONE reason — the header's name, avatar and role — so the top bar
-// rendered with a hole in it and filled a round trip later. It is the same
-// „half loads, then appears" the owner reported that morning, and the same fix
-// the public pages got: the server resolves the identity, the page is right at
-// the first paint. The NOTIFICATIONS themselves are still fetched here — they
-// have a filter and mark-as-read mutations, so the list is genuinely live.
-export default function NotificationsClient({ viewer }: {
-  viewer: { name: string; avatar: string | null; role: Role }
-}) {
+/* ⚠️ THE `viewer` PROP IS GONE (2026-09-03), AND ITS HISTORY IS THE ARGUMENT.
+   It arrived on 2026-08-30 to fix a real bug: this page fetched /api/me on
+   mount for ONE reason — the header's name, avatar and role — so the bar
+   rendered with a hole and filled it a round trip later („ნახევარს ტვირთავს
+   ხოლმე რაღაცებს და მერე ჩნდება"). Server-resolving it was the right fix for
+   the header that existed.
+
+   That header is now the space's (components/SpaceChrome), which resolves the
+   same identity for the rail — so the prop fed nothing, and a prop threaded
+   through a page to fill a control that is no longer there is the „control that
+   lies" this repo deletes rather than leaves wired.
+
+   The NOTIFICATIONS are still fetched here: they have a filter and
+   mark-as-read mutations, so the list is genuinely live. */
+export default function NotificationsClient() {
   const { toast } = useToast()
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
@@ -86,10 +85,6 @@ export default function NotificationsClient({ viewer }: {
   // them, not on the empty space where the old list used to be.
   const listRef = useRef<HTMLDivElement | null>(null)
   useScrollIntoResults(listRef, [filter])
-  // This page is shared across roles — the authed top bar (bell + user menu)
-  // needs the viewer's identity, so we hold name/avatar/role, not just role.
-  const me = viewer
-
   const load = async () => {
     setLoading(true)
     try {
@@ -173,50 +168,25 @@ export default function NotificationsClient({ viewer }: {
     return acc
   }, {})
 
-  return (
-    <div className="min-h-screen bg-ink-50/40">
-      {/* Same authed workspace chrome the rest of the signed-in app uses:
-          logo → „/“, saved (heart), notification bell, user menu. No sidebar on
-          this standalone page, so the logo stays visible at every breakpoint. */}
-      <header className="sticky top-0 z-chrome bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100">
-        <Container size="content" className="h-14 lg:h-16 flex items-center justify-between gap-4">
-          <div className="inline-flex items-center gap-1">
-            {/* Way back INTO the workspace. Without it this page was a desktop
-                dead end: above lg the BottomNav is hidden and the logo goes to
-                the marketing home, so nothing led back to „ჩემი სივრცე".
-                Same chevron pattern as /settings; it waits for /api/me so the
-                role — and therefore the destination — is the real one. */}
-            {me && (
-              <Link
-                href={homeForRole(me.role)}
-                aria-label="უკან, ჩემს სივრცეში"
-                className="w-10 h-10 -ml-2 rounded-btn inline-flex items-center justify-center text-ink-600 hover:text-ink-900 hover:bg-ink-100 transition-colors duration-fast"
-              >
-                <Icon.chevR className="w-4 h-4 rotate-180" />
-              </Link>
-            )}
-            <Logo size="sm" href="/" />
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {me?.role === ROLE.USER && (
-            <Link
-              href="/me/favorites"
-              aria-label="შენახული ექსპერტები"
-              className="w-10 h-10 rounded-btn inline-flex items-center justify-center text-ink-500 hover:text-ink-900 hover:bg-ink-100 transition-colors duration-fast"
-            >
-              <Icon.heart className="w-[18px] h-[18px]" />
-            </Link>
-            )}
-            <NotifBell />
-            {me && <UserMenu user={{ name: me.name, avatar: me.avatar }} role={me.role} />}
-          </div>
-        </Container>
-      </header>
+  /* ⚠️ NO BAR OF ITS OWN SINCE 2026-09-03 — see components/SpaceChrome.
+     This page drew a fifth header: a back chevron, the logo, the heart, a
+     SECOND bell (on the page the bell leads to) and a second user menu, none of
+     which the reader's own rail was missing. It is rendered inside that rail
+     now, so the page is a page and the chrome is the space's. The ground comes
+     from the shell too, which is why `min-h-screen bg-ink-50/40` went with it.
 
-      <Container as="main" size="content" className="py-8 lg:py-12">
+     `py-7 lg:py-8 pb-12` and `flex-1` are what every screen inside these two
+     shells uses (app/me/favorites, the request room) — a page in a rail is
+     measured by the rail, not by the viewport. */
+  return (
+    <Container as="main" size="content" className="w-full flex-1 py-7 lg:py-8 pb-12">
         <div className="flex items-end justify-between gap-4 mb-6 flex-wrap">
           <div>
-            <Eyebrow tone="muted" className="mb-1">შეტყობინებები</Eyebrow>
+            {/* ⚠️ THE EYEBROW SAID „შეტყობინებები" OVER AN h1 SAYING
+                „შეტყობინებები" (removed 2026-09-03). An eyebrow is the line
+                that says where you are ABOVE the thing you are looking at;
+                repeating the h1 in it is the same word twice with a size
+                change, which tells a reader nothing and costs a line. */}
             <h1 className="font-display text-h1 sm:text-display font-bold text-ink-900 tracking-tight leading-[1.05]">
               შეტყობინებები {unread > 0 && <span className="text-brand-600">({unread})</span>}
             </h1>
@@ -318,7 +288,6 @@ export default function NotificationsClient({ viewer }: {
             ))}
           </div>
         )}
-      </Container>
-    </div>
+    </Container>
   )
 }

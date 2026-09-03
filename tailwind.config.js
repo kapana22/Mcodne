@@ -46,7 +46,19 @@ const BRAND_SCALE = {
 
 // ── The neutral (ink) ramp — ONE definition, reused by the `accent` alias ───
 const INK_SCALE = {
-  50:  '#FFFFFF', // page background — pure white
+  // ⚠️ THE GROUND IS CREAM AGAIN (2026-08-31), from the owner's design canvas
+  // („mcodne.ge პროფილის რედიზაინი" → Home). It was #FFFFFF, and globals.css
+  // still carried the note „cream removed per product decision" from the
+  // reversal before that. The canvas is the newer decision, so both sides moved
+  // together — this token AND the `html, body` rule, which is what actually
+  // paints the page.
+  //
+  // ⚠️ ink-50 IS THE GROUND, `bg-white` IS A CARD. That distinction did not
+  // matter while the two were the same colour and now it is the whole system:
+  // every white surface on the site (a card, a sheet, the search pill) reads as
+  // something LIFTED off the paper. 17 page-root elements that said `bg-white`
+  // were saying „the ground" and now say `bg-ink-50`.
+  50:  '#FBF9F5', // page background — warm paper
   75:  '#F8F6F2', // very light warm-neutral (elevated card interior)
   100: '#EFECE5', // hairline / subtle divider
   200: '#DFD8CB', // border
@@ -258,12 +270,31 @@ module.exports = {
         'chrome':     '40',
       },
 
+      // ── RADIUS — RE-CUT 2026-08-31 from the owner's design canvas ─────────
+      //  („mcodne.ge პროფილის რედიზაინი"). Every surface in that canvas is
+      //  rounder than what shipped, and consistently so: 14px controls, 24px
+      //  cards, 28px panels, 36px full-width bands. Changing the four tokens
+      //  moves ~900 call sites at once, which is the whole reason they are
+      //  tokens — the alternative was a redesign that only reached the screens
+      //  somebody remembered to touch.
+      //
+      //  ⚠️ `btn` GOES BACK TO 14px, WHICH REVERSES A 2026-07-19 DECISION
+      //  („crisper, to echo the logo's geometric character"). The canvas is the
+      //  newer call and it is not a small one: at 10px against a 24px card the
+      //  button read as a different material from the thing it sat on.
       borderRadius: {
-        field: '12px',
-        // Buttons crisper (14px → 10px, 2026-07-19) to echo the logo's
-        // geometric, angular character while staying friendly/legible.
-        btn:   '10px',
-        card:  '20px',
+        field: '14px',
+        btn:   '14px',
+        card:  '24px',
+        // A SECTION PLATE — the white „როგორ მუშაობს" sheet, the profile's
+        // panels. Bigger than a card because it holds cards.
+        panel: '28px',
+        // A FULL-WIDTH BAND — the hero, the closing supply band. The largest
+        // radius on the site and the only one above `panel`; anything rounder
+        // stops reading as a rectangle.
+        band:  '36px',
+        // A THUMBNAIL inside a panel — work photos, tile plates.
+        tile:  '18px',
         pill:  '9999px',
       },
 

@@ -32,7 +32,20 @@ export const metadata: Metadata = {
     default: 'მცოდნე — აღწერე რა გჭირდება, მიიღე შეთავაზებები',
     template: '%s',
   },
-  description: 'აღწერე რა გჭირდება და მიიღე შეთავაზებები — ბუღალტერიდან სანტექნიკოსამდე. გადამოწმებული ექსპერტები თბილისში. მოთხოვნა უფასოა.',
+  /* ⚠️ TWO CLAIMS LEFT THIS SENTENCE ON 2026-09-02, AND BOTH WERE MEASURED
+     FALSE THAT DAY. Owner: „არ უნდა იყოს ტყუილები, როგორც სხვა საიტებზე არის
+     ქართულზე."
+       · „გადამოწმებული ექსპერტები" — 1 of 26 published providers carries the
+         ✓. The per-card badge is a fact about one person and stays; the plural
+         in a site description is a claim about the roster, and 25 cards say the
+         opposite the moment somebody arrives.
+       · „ბუღალტერიდან სანტექნიკოსამდე" — the roster holds ZERO tradespeople.
+         Every one of the 26 is an office service (marketing 4 · law 4 ·
+         accounting 3 · psychology 3 · finance 3 · business 2 · IT 2 · …), so
+         the half of the range that was doing the selling did not exist. It is
+         also the sentence a person searching for a plumber matches on.
+     What is left is what the site does, which needs no adjective. */
+  description: 'აღწერე რა გჭირდება და მიიღე შეთავაზებები ექსპერტებისგან. თბილისი. მოთხოვნა უფასოა.',
   manifest: '/manifest.webmanifest',
   // ⚠️ WITHOUT THIS GOOGLE SHOWS NO THUMBNAIL, whatever images the page
   // carries. The default preview budget is small; `max-image-preview: large`
@@ -74,7 +87,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'მცოდნე — აღწერე რა გჭირდება, მიიღე შეთავაზებები',
-    description: 'ბუღალტერიდან სანტექნიკოსამდე — გადამოწმებული ექსპერტები თბილისში.',
+    description: 'აღწერე რა გჭირდება და მიიღე შეთავაზებები ექსპერტებისგან. თბილისი.',
     images: [{ url: '/og.png', width: 1200, height: 630, alt: 'მცოდნე' }],
     locale: 'ka_GE',
     type: 'website',
@@ -83,7 +96,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'მცოდნე — აღწერე რა გჭირდება, მიიღე შეთავაზებები',
-    description: 'ბუღალტერიდან სანტექნიკოსამდე — გადამოწმებული ექსპერტები თბილისში.',
+    description: 'აღწერე რა გჭირდება და მიიღე შეთავაზებები ექსპერტებისგან. თბილისი.',
     images: [{ url: '/og.png', width: 1200, height: 630, alt: 'მცოდნე' }],
   },
 }

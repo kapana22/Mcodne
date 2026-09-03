@@ -26,14 +26,14 @@
 
 import { MarketingTopBar } from '@/components/MarketingTopBar'
 import { Container } from '@/components/Container'
+import { Btn } from '@/components/Btn'
+import { Illustration } from '@/components/Illustration'
 import { Footer } from '@/components/Footer'
-import { Eyebrow } from '@/components/Eyebrow'
 import { jsonLdString } from '@/lib/jsonLd'
 import { getSiteTextMap } from '@/lib/siteText'
 import { SITE_TEXT_DEFAULTS } from '@/lib/siteTextDefs'
 import { JOIN_DOOR_LABEL } from '@/lib/capabilities'
 import { PitchFaqLd, PitchSections } from '../_sections'
-import { GuestDoor } from './GuestDoor'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -51,7 +51,7 @@ export async function PublicDoor() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-ink-50">
       <PitchFaqLd />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbLd) }} />
       <MarketingTopBar />
@@ -59,21 +59,72 @@ export async function PublicDoor() {
       {/* `content` (820px), not `wide` — the same measure as the two pitches.
           Cap the container OR the content, never both (see app/help). */}
       <Container as="main" size="content" className="py-12 lg:py-16">
-        <div className="max-w-[720px]">
-          <Eyebrow className="mb-3">{t('join.hero.eyebrow')}</Eyebrow>
-          <h1 className="font-display text-display lg:text-display font-bold text-ink-900 tracking-tight leading-[1.05]">
-            {JOIN_DOOR_LABEL}
-          </h1>
-          <p className="mt-5 text-h3 text-ink-600 leading-relaxed">
-            {t('join.hero.body')}
-          </p>
+        {/* ⚠️ THE QUESTION IS NOT ASKED HERE ANY MORE (2026-08-31). Owner, looking
+            at this screen: „ეს გვერდი არ უნდა ყოფილიყო… დასაწყისში უაზროდ ყრია
+            სიტყვები."
 
-          {/* ⚠️ THE QUESTION IS THE HERO'S ACTION — there is no „create an
-              account" button above it. That was the wall. */}
-          <p className="mt-8 text-body font-display font-semibold text-ink-900">{t('join.hero.ask')}</p>
-          <GuestDoor />
+            WHAT THIS SCREEN WAS. An eyebrow, an h1, a sentence, a second bolded
+            question, the profession picker, and a note — six stacked blocks
+            before the visitor could do anything, and the question among them was
+            the SAME one the form asks on the other side of sign-up. Measured
+            before removing it: the guest's answer is never submitted anywhere —
+            the application body carries no `professions` — and its only effect
+            downstream was to pre-fill the search box in the form's first stage.
+            So a person answered, pressed „გაგრძელება", made an account, and
+            arrived at a form that appeared to ask the same thing again with
+            their word typed in. That is what the owner saw twice.
 
-          <p className="mt-3 text-meta text-ink-500">{t('join.hero.note')}</p>
+            ⚠️ AND IT UNDOES A REAL ARGUMENT, ON PURPOSE. `GuestDoor` was written
+            on 2026-08-20 to invert the wall — answer first, register second —
+            citing Baymard on forced registration. The reasoning was sound and
+            the implementation did not deliver it: nothing about the answer
+            survived except a search string, so the visitor paid a screen and got
+            a pre-filled box. /join is ONE page on both sides of the wall now
+            (app/join/JoinClient), and the question is asked once, in the form,
+            where the answer is actually stored.
+
+            ⚠️ `GuestDoor` IS DELETED (2026-09-02), and the sentence that used to
+            stand here was wrong on both halves. It said the two files were
+            „untouched on disk — nothing renders them": `DoorQuestion` is in
+            fact imported by app/join/JoinClient, so only ONE of them was dead —
+            and CLAUDE.md's rule for that one is explicit („a control that lies
+            gets deleted rather than left switched off"). The ARGUMENT is what
+            was worth keeping and it is kept, here, in full: answer first and
+            register second is a good idea that this implementation did not
+            deliver, because nothing of the answer survived the wall except a
+            search string. Rebuilding it needs the answer to carry, which is a
+            different piece of code from the one that was sitting here. */}
+        {/* ⚠️ THE DRAWING IS `lg:flex-row-reverse`, WHICH IS WHY IT IS FIRST IN
+            THE MARKUP. On a phone it sits above the headline; from `lg` the row
+            reverses and it sits to the RIGHT of the words, where it does not
+            push the h1 down a screen. Reversing beats an `order` on the text
+            because the DOM keeps its reading order either way: heading, then
+            sentence, then button — the drawing is decorative and `alt=""`, so
+            a screen reader never meets it at all.
+
+            It is the icon the owner's standard assigns to this screen
+            (MCDONE_3D_ICON_STYLE_GUIDE, 2026-09-03: „პროფილის ბარათი +
+            ხარისხის ბეჯი … იდეალურად ასახავს „დაარეგისტრირე სერვისი"), and it
+            is the ONLY one on the page — the pitch sections below stay text. */}
+        <div className="flex flex-col items-start gap-6 lg:flex-row-reverse lg:items-center lg:justify-between lg:gap-10">
+          <Illustration name="joinProvider" alt="" className="shrink-0" />
+
+          <div className="max-w-[720px]">
+            <h1 className="font-display text-display lg:text-display font-bold text-ink-900 tracking-tight leading-[1.05]">
+              {JOIN_DOOR_LABEL}
+            </h1>
+            <p className="mt-5 text-h3 text-ink-600 leading-relaxed">
+              {t('join.hero.body')}
+            </p>
+
+            {/* The one action, and it is honest about the order: you need an
+                account to sell here, so that is what the button says it does.
+                `redirect` brings them straight back to the form. */}
+            <div className="mt-8 flex flex-wrap items-center gap-4">
+              <Btn href="/signup?redirect=%2Fjoin" size="lg">{JOIN_DOOR_LABEL}</Btn>
+              <p className="text-meta text-ink-500">{t('join.hero.note')}</p>
+            </div>
+          </div>
         </div>
 
         <PitchSections />

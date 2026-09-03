@@ -1563,6 +1563,87 @@ async function runMigrations() {
     `ALTER TABLE "ServiceRequest" ADD COLUMN IF NOT EXISTS "photos" TEXT[] NOT NULL DEFAULT '{}';`,
   )
 
+  // ── AN OFFER SAYS WHAT ITS PRICE COVERS (2026-09-01) ─────────────────────
+  //
+  // The owner's design canvas („Expert Jobs" → the offer form, „Request Room
+  // v2" → every offer card) adds one required line to an offer: „რას მოიცავს
+  // ფასი". It is the field that makes three prices comparable — the client can
+  // read three one-liners where they cannot read three paragraphs — so it is
+  // the LIST's column, and `message` became optional in the same change.
+  //
+  // ⚠️ NULLABLE ON PURPOSE. Every offer written before today has none, and a
+  // NOT NULL DEFAULT would put a sentence the provider never wrote under their
+  // own price. The requirement lives in `RequestOfferInput`, which only new
+  // offers pass through; old rows simply render nothing there.
+  //
+  // ⚠️ NO CHECK, and no change to `RequestOffer_price_positive` above. The new
+  // HOURLY kind takes the ordinary `priceGel > 0` arm — only ON_SITE and
+  // INVITED are exempt, and both are untouched.
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "RequestOffer" ADD COLUMN IF NOT EXISTS "priceIncludes" TEXT;`,
+  )
+
+  // ── WHAT THE SITE HAS SENT (2026-09-02) ─────────────────────────────────
+  //
+  // Owner: „სად მიდის როდის მიდის … და არ გაგვეპაროს შეცდომები." Until this
+  // table a send left one trace — a console line in the Railway log — so from
+  // the admin „the letter never arrived" and „the letter was never sent" were
+  // the same picture, and they want opposite answers.
+  //
+  // ⚠️ IT HOLDS NO BODY. `key` names the message (lib/outbound) and that is
+  // enough to know what went; most of what goes out is a one-time code, and a
+  // table an operator browses is not where a credential belongs.
+  //
+  // Additive and standalone — it references no other table, so it is safe this
+  // far down the set and on a database that has never been migrated.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "MessageLog" (
+      "id"        TEXT NOT NULL,
+      "channel"   TEXT NOT NULL,
+      "key"       TEXT NOT NULL,
+      "to"        TEXT NOT NULL,
+      "status"    TEXT NOT NULL,
+      "mode"      TEXT NOT NULL,
+      "detail"    TEXT,
+      "ref"       TEXT,
+      "parts"     INTEGER,
+      "createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "MessageLog_pkey" PRIMARY KEY ("id")
+    );`)
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "MessageLog_createdAt_idx" ON "MessageLog" ("createdAt" DESC);`,
+  )
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "MessageLog_status_createdAt_idx" ON "MessageLog" ("status", "createdAt" DESC);`,
+  )
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "MessageLog_key_createdAt_idx" ON "MessageLog" ("key", "createdAt" DESC);`,
+  )
+
+  // ── PER-MESSAGE CONTROL, AND WHAT THE CARRIER DID (2026-09-02) ──────────
+  //
+  // `MessageSetting` is the admin's half of lib/outbound: a ROW IS AN OVERRIDE,
+  // so absent means the registry's default and a new message needs no backfill.
+  //
+  // The two MessageLog columns separate „sender.ge took it" from „the phone
+  // rang". Its callback.php answers 0 pending / 1 delivered / 2 undelivered;
+  // until these existed the table could only ever claim the first, which is the
+  // same gap Twilio names `sent` vs `delivered`.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "MessageSetting" (
+      "key"       TEXT NOT NULL,
+      "mailOn"    BOOLEAN NOT NULL DEFAULT true,
+      "smsOn"     BOOLEAN NOT NULL DEFAULT false,
+      "updatedAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "MessageSetting_pkey" PRIMARY KEY ("key")
+    );`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "MessageLog" ADD COLUMN IF NOT EXISTS "delivery" INTEGER;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "MessageLog" ADD COLUMN IF NOT EXISTS "deliveryAt" TIMESTAMPTZ(6);`)
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "MessageLog_pending_delivery_idx"
+      ON "MessageLog" ("createdAt" DESC)
+      WHERE "channel" = 'sms' AND "ref" IS NOT NULL AND "delivery" IS DISTINCT FROM 1;`)
+
 
 
 
@@ -1598,6 +1679,31 @@ async function runMigrations() {
 // fresh stamp and 10 seconds thereafter). A spurious re-run costs a minute of a
 // gate; a spurious SKIP would cost a missing column in production. If the two
 // ever have to trade, they trade this way round.
+//
+// ⚠️ THE LEDGER HOLDS A ROW PER FINGERPRINT, NOT ONE ROW (2026-09-01), and the
+// reason is that THIS FILE IS TRANSPILED BY TWO DIFFERENT COMPILERS. `tsx`
+// (the gate's schema stage, and every test) uses esbuild; `next build`,
+// `next dev` and the standalone server in production use SWC, which also
+// minifies — it rewrites `STAMP_TABLE` to `i`, drops every comment, and turns
+// an uninterpolated template literal into a single-quoted string. Same DDL,
+// two different function texts, therefore two different hashes. Measured:
+//
+//     tsx / esbuild   99031636b27e151d421294cadaf59943
+//     next build / SWC 5057fd61125107be55a12913cde545cf
+//
+// The ledger used to be a single row at `id = 1` that each boot OVERWROTE, so
+// the two engines evicted each other's stamp for ever. Nothing was ever warm
+// twice running: `npm run check` paid the full ~112-second replay in its schema
+// stage on every run (43% of a 261-second gate), and — the part that reached
+// real people — the first request after a deploy paid it again whenever a local
+// run had been the last writer. A cache that two writers take turns clearing is
+// not a cache.
+//
+// Keyed by fingerprint, the two engines simply hold a row each. Neither can
+// evict the other, each pays the replay once, and a DDL change still moves both
+// hashes and re-runs the set for both — the safety property is untouched. The
+// table now grows by one row per (engine × DDL version), which is a few dozen
+// bytes and doubles as a record of when each was applied.
 //
 // ⚠️ WHAT THE STAMP DOES NOT PROMISE. It says „this exact DDL has been applied
 // to this database", not „the schema matches". Someone dropping a column by
@@ -1635,16 +1741,37 @@ async function alreadyApplied(fp: string): Promise<boolean> {
   } catch { /* another process created it in the same instant */ }
   // The SELECT is NOT wrapped: an unreachable database must reach ensureDbReady
   // as a throw, not be mistaken for „nothing applied yet".
-  const rows = await prisma.$queryRawUnsafe<{ fingerprint: string }[]>(
-    `SELECT "fingerprint" FROM "${STAMP_TABLE}" WHERE "id" = 1;`,
+  //
+  // ⚠️ ASK „IS THIS FINGERPRINT IN THE LEDGER", NOT „WHAT IS IN ROW 1" — see
+  // THE LEDGER HOLDS A ROW PER FINGERPRINT above. Still two round trips.
+  const rows = await prisma.$queryRawUnsafe<{ one: number }[]>(
+    `SELECT 1 AS one FROM "${STAMP_TABLE}" WHERE "fingerprint" = '${fp}' LIMIT 1;`,
   )
-  return rows.length > 0 && rows[0].fingerprint === fp
+  return rows.length > 0
 }
 
 async function recordApplied(fp: string): Promise<void> {
+  // Both statements sit on the SLOW path — it has just paid ~100 seconds of
+  // DDL — so the index that keeps the ledger tidy costs a warm boot nothing.
+  try {
+    await prisma.$executeRawUnsafe(
+      `CREATE UNIQUE INDEX IF NOT EXISTS "${STAMP_TABLE}_fingerprint_key" ON "${STAMP_TABLE}" ("fingerprint");`,
+    )
+  } catch { /* concurrent create, or a duplicate left by a pre-index boot */ }
+  // APPEND, never overwrite. `id` stays the table's primary key for the row
+  // that predates this change; new rows take the next one.
+  //
+  // `ON CONFLICT DO NOTHING` with NO target absorbs both possible collisions —
+  // two processes computing the same MAX("id") + 1, and the same fingerprint
+  // arriving twice. Neither may throw: recordApplied is not wrapped by
+  // runMigrationsOnce, so a raised unique violation here would fail a boot
+  // whose migrations had just SUCCEEDED. A process that loses the race simply
+  // does not stamp and re-runs the idempotent set next time — the direction
+  // this file always errs in.
   await prisma.$executeRawUnsafe(
-    `INSERT INTO "${STAMP_TABLE}" ("id", "fingerprint") VALUES (1, '${fp}')
-     ON CONFLICT ("id") DO UPDATE SET "fingerprint" = EXCLUDED."fingerprint", "appliedAt" = now();`,
+    `INSERT INTO "${STAMP_TABLE}" ("id", "fingerprint")
+     SELECT COALESCE(MAX("id"), 0) + 1, '${fp}' FROM "${STAMP_TABLE}"
+     ON CONFLICT DO NOTHING;`,
   )
 }
 

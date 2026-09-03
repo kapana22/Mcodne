@@ -124,7 +124,7 @@ const SECTIONS = [
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-ink-50">
       <MarketingTopBar />
 
       <Container as="main" size="content" className="py-16 lg:py-20">

@@ -9,7 +9,6 @@ import { FilterChip } from '@/components/FilterChip'
 import { Sheet } from '@/components/Sheet'
 import { ViewToggle } from '@/components/catalog/ViewToggle'
 import type { CatalogView } from '@/components/catalog/useCatalogView'
-import { registerSearchInput } from '@/lib/searchFocus'
 import { Eyebrow } from '@/components/Eyebrow'
 import { fmtRating } from '@/lib/fmt'
 
@@ -59,75 +58,72 @@ const SORT_OPTS = [
 // never drift apart again (they read „ახალი ექსპერტები“ vs „ახლის მიხედვით“).
 const SORT_LABEL: Record<string, string> = Object.fromEntries(SORT_OPTS.map(o => [o.id, o.l]))
 
-export const ResultsBar = ({ total, loading, sort, setSort, search, setSearch, onSearch, view, setView, activeFilters, removeFilter, onReset }: {
+export const ResultsBar = ({ total, loading, sort, setSort, view, setView, activeFilters, removeFilter, onReset, filters }: {
   total: number
   loading?: boolean
   sort: string
   setSort: (v: string) => void
-  search: string
-  setSearch: (v: string) => void
-  onSearch: () => void
   view: CatalogView
   setView: (v: CatalogView) => void
   activeFilters: { k: string; v: string; raw?: string }[]
   removeFilter: (k: string, v: string) => void
   onReset: () => void
+  /** ⚠️ THE PHONE'S FILTER TRIGGER (2026-09-01) — the panel itself is still the
+   *  rail's, one instance, at both widths (components/catalog/MobileCollapse).
+   *  This is the button that opens it, and it is here rather than above the
+   *  rail because the three controls that describe a list — narrow it, order
+   *  it, draw it — are one row on a phone instead of three stacked bars. */
+  filters: { panelId: string; open: boolean; onToggle: () => void; count: number }
 }) => (
   <div className="mb-5">
-    {/* ⚠️ SEARCH AND SORT ARE NOT FILTERS, AND THIS IS WHERE THEY BELONG
-        (2026-08-19). The search field used to sit in the hero among the
-        dropdown boxes and the sort select in a bar of its own; the refinements
-        that WERE filters moved to the rail (app/experts/_filters → TutorFilters),
-        and these two stayed with the results, because neither narrows a set —
-        one replaces it and one reorders it. Search left, sort and the layout
-        toggle right: the reader's three questions about the list, in the row
-        directly above it, on both catalogues (/experts has only the third). */}
-    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
-      <div className="group flex-1 min-w-0 bg-white rounded-btn border border-ink-200 flex items-stretch focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100 transition-all duration-fast">
-        <div className="relative flex-1 min-w-0">
-          <Icon.search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
-          {/* Registers itself so the site-wide `/` and ⌘K land HERE — see
-              lib/searchFocus for why it's a registry and not a selector.
-              Escape clears and steps back out, so a mistyped query costs one
-              key rather than a select-all. */}
-          <input
-            ref={registerSearchInput}
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') onSearch()
-              else if (e.key === 'Escape') {
-                e.preventDefault()
-                if (search) setSearch('')
-                else e.currentTarget.blur()
-              }
-            }}
-            /* ⚠️ „ძებნა", not „ექსპერტების ძებნა" (2026-08-19). The label is not
-               reworded copy — it is the same word with a claim removed: this
-               field now searches ONE list that may hold consultations, jobs or
-               both, so naming only one half of it was read aloud as „search
-               experts" over a page of plumbers. The placeholder is unchanged
-               and is true of either half. */
-            aria-label="ძებნა" placeholder="ძებნა სახელით ან თემით…"
-            className="w-full h-11 pl-10 pr-3 bg-transparent text-body text-ink-900 placeholder:text-ink-400 focus:outline-none"
-          />
-        </div>
+    {/* ⚠️ THE SEARCH FIELD LEFT THIS BAR ON 2026-08-31 and is in the header
+        band now (app/experts/_hero), which is the owner's design canvas's
+        placement and is the better argument. It sat here from 2026-08-19 on the
+        reasoning that „neither search nor sort narrows a set — one replaces it
+        and one reorders it, so both belong with the results". The half about
+        SORT is untouched and it is still here. The half about SEARCH stopped
+        being true when the home page's hero began handing a typed query to this
+        page: the field that query lands in cannot be the fourth control down,
+        below a filter rail, on a page the reader arrived at mid-search.
+        What is left is the two controls that describe the list — how it is
+        ordered and how it is drawn — plus the count and the undo chips. */}
+    {/* ⚠️ THE SORT STRETCHES ON A PHONE (2026-08-31, second pass). With the
+        search field gone from this row it was two small controls pinned to the
+        right of an otherwise empty line — measured live at 500px, they read as
+        a stray cluster floating in the margin. The select takes the room the
+        field left; from `sm` the pair goes back to sitting right, where a
+        control that describes the list belongs. */}
+    <div className="mb-3 flex items-center gap-2 sm:justify-end">
+      {/* ⚠️ `lg:hidden` — FROM `lg` THE RAIL IS SIMPLY THERE and a button that
+          opens what is already open would be a control that lies. */}
+      <button
+        type="button"
+        aria-expanded={filters.open}
+        aria-controls={filters.panelId}
+        onClick={filters.onToggle}
+        className={`lg:hidden h-11 shrink-0 inline-flex items-center gap-2 rounded-btn border px-3 font-display text-small font-semibold
+                    transition-[background-color,border-color] duration-fast ${
+          filters.open || filters.count > 0
+            ? 'border-brand-700 bg-brand-50 text-brand-900'
+            : 'border-ink-200 bg-white text-ink-900 hover:border-ink-300 hover:bg-ink-50'
+        }`}
+      >
+        <Icon.sliders aria-hidden className="w-4 h-4 shrink-0 text-brand-600" />
+        <span>ფილტრი</span>
+        {filters.count > 0 && <span className="tabular-nums text-brand-700">{filters.count}</span>}
+      </button>
+      <div className="group relative min-w-0 flex-1 sm:flex-none sm:w-[200px]">
+        <select
+          value={sort}
+          onChange={e => setSort(e.target.value)}
+          aria-label="სორტირება"
+          className="h-11 w-full cursor-pointer appearance-none truncate rounded-btn border border-ink-200 bg-white pl-3.5 pr-9 font-display text-small font-medium text-ink-800 hover:border-ink-300 focus:border-brand-400 focus:outline-none"
+        >
+          {SORT_OPTS.map(o => <option key={o.id} value={o.id}>{o.l}</option>)}
+        </select>
+        <Icon.chevD className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-ink-500 transition-transform duration-fast group-focus-within:rotate-180 group-focus-within:text-brand-600" />
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="relative min-w-0 flex-1 group">
-          <select
-            value={sort}
-            onChange={e => setSort(e.target.value)}
-            aria-label="სორტირება"
-            className="appearance-none w-full h-11 pl-3.5 pr-9 rounded-btn bg-white border border-ink-200 hover:border-ink-300 focus:border-brand-400 font-display text-small font-medium text-ink-800 focus:outline-none cursor-pointer truncate"
-          >
-            {SORT_OPTS.map(o => <option key={o.id} value={o.id}>{o.l}</option>)}
-          </select>
-          <Icon.chevD className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-500 pointer-events-none transition-transform duration-fast group-focus-within:rotate-180 group-focus-within:text-brand-600" />
-        </div>
-        <ViewToggle view={view} onChange={setView} />
-      </div>
+      <ViewToggle view={view} onChange={setView} />
     </div>
 
     {/* ⚠️ THE COUNT IS BACK, AND IT BELONGS HERE (2026-08-19). It left the h1
@@ -144,9 +140,25 @@ export const ResultsBar = ({ total, loading, sort, setSort, search, setSearch, o
         jobs, or both, and picking one word („ექსპერტი") would be false half the
         time while „ექსპერტი და ხელოსანი" is a sentence, not a counter. The type
         rows in the rail carry their own counts, each with its own word. */}
-    <p className="text-meta text-ink-500 min-w-0 truncate">
-      {loading ? 'იტვირთება…' : <>ნაჩვენებია <span className="text-ink-700 font-display font-semibold tabular-nums">{total}</span> · დახარისხებული <span className="text-ink-700 font-display font-semibold">{SORT_LABEL[sort]}</span></>}
-    </p>
+    {/* ⚠️ AND SINCE 2026-09-02 IT ONLY APPEARS ONCE SOMETHING IS FILTERED.
+        Owner, on the roster size: „არასად არ ეწეროს ეგ ინფო, არასაჭიროა."
+        On first load this line held the whole roster — the same claim the
+        catalogue's hero and the home page's tile were making, in a third place
+        and (because the three counted with different rules) a third number.
+
+        It is kept for the refined case because there it is not a claim about
+        the platform at all: somebody who has just ticked a filter needs to be
+        told what it did, and „ნაჩვენებია 4" is that answer. No filter, no
+        answer needed, no line. */}
+    {activeFilters.length > 0 && (
+      <p className="text-meta text-ink-500 min-w-0 truncate">
+        {/* ⚠️ THE SORT HALF IS `sm:` ONLY (2026-09-01). On a phone the select
+            saying „ახლის მიხედვით" sits one row above this line, so „დახარისხებული
+            ახლის მიხედვით" is the same words twice in the same glance; the count
+            is the half that is not printed anywhere else. */}
+        {loading ? 'იტვირთება…' : <>ნაჩვენებია <span className="text-ink-700 font-display font-semibold tabular-nums">{total}</span><span className="hidden sm:inline"> · დახარისხებული <span className="text-ink-700 font-display font-semibold">{SORT_LABEL[sort]}</span></span></>}
+      </p>
+    )}
 
     {/* Active filter chips — the rail folds on a phone, so this row is where a
         refinement stays VISIBLE and undoable at every width.

@@ -14,18 +14,32 @@ import { showJoinInvite } from '@/lib/capabilities'
 // so a reworded question reads correctly here too.
 import { ALL_TOPICS } from '@/lib/helpTopics'
 import { Illustration } from '@/components/Illustration'
+import { FIELD_ERROR_BORDER, useFault } from '@/components/FieldError'
+import { emailFormatError } from '@/lib/emailRule'
+import { validationIssueMessage } from '@/lib/validationMessages'
+import { actionError } from '@/lib/actionErrors'
 
+/* ⚠️ THE FORM MARKED A FIELD AND NEVER SAID WHY (fixed 2026-08-31). It had
+ * `aria-invalid` and it focused the offending box — more than most screens on
+ * this site — but the SENTENCE was a strip at the bottom of the card, wired to
+ * nothing. A screen reader announced „invalid" on an unnamed problem, and a
+ * sighted reader got a red border in one place and an explanation in another.
+ * The message is on the field now, and `aria-describedby` ties the two.
+ *
+ * ⚠️ AND THE RULES WERE THE BROWSER'S. `required` + `minLength` meant Chrome
+ * refused the submit with its own bubble, in ITS language, before this file's
+ * handler ran — on a Georgian site. The same three rules the route parses with
+ * (`name` min 2, a real `email`, `message` min 10) are asked here now, in
+ * Georgian, from lib/validationMessages — so nothing is lost by `noValidate`. */
 type Topic = 'general' | 'expert' | 'billing' | 'press' | 'other'
 type Status = 'idle' | 'sending' | 'ok' | 'error'
 
 // Map server error codes to user-facing Georgian copy — never surface raw codes.
-function contactErrorText(code?: string): string {
-  switch (code) {
-    case 'RATE_LIMITED': return 'ძალიან ბევრი მოთხოვნა — სცადე ცოტა ხანში.'
-    case 'INVALID': return 'შეავსე ველები სწორად.'
-    default: return 'დაფიქსირდა შეცდომა — სცადე თავიდან.'
-  }
-}
+// RATE_LIMITED and INVALID are shared (lib/actionErrors); this form keeps its
+// OWN default, which is older and softer than „ვერ შესრულდა" — a contact form
+// that fails has not failed to do anything the writer can retry differently.
+const contactErrorText = (code?: string) =>
+  actionError(code, {}, 'დაფიქსირდა შეცდომა — სცადე თავიდან.')
 
 const TOPICS: { v: Topic; l: string }[] = [
   { v: 'general', l: 'ზოგადი კითხვა' },
@@ -69,6 +83,13 @@ export default function ContactPage({ initialUser }: { initialUser?: Me | null }
   const [message, setMessage] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [errorText, setErrorText] = useState<string | null>(null)
+  const { fault, fail, props, bad, clearField, reset: clearFault, error } = useFault('contact')
+  /** One place for „they are fixing it now": drop the fault on this field and
+   *  the stale form-level line with it. */
+  const touch = (field: string) => {
+    clearField(field)
+    if (status === 'error') { setStatus('idle'); setErrorText(null) }
+  }
 
   /* Context from the help widget's „ვერ ვიპოვე პასუხი“ (`?from=` / `?asked=`).
    *
@@ -103,8 +124,15 @@ export default function ContactPage({ initialUser }: { initialUser?: Me | null }
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (status === 'sending') return
+    setErrorText(null); clearFault()
+    // POST /api/contact parses `{ name: min(2).max(120), email: .email(),
+    // message: min(10).max(4000) }`. Asked here first, in the product's own
+    // words — `validationIssueMessage` is what the ROUTE answers with too, so
+    // the two halves cannot say the same refusal two different ways.
+    if (name.trim().length < 2) { fail('name', validationIssueMessage({ code: 'too_small', path: ['name'] })); return }
+    { const m = emailFormatError(email); if (m) { fail('email', m); return } }
+    if (message.trim().length < 10) { fail('message', validationIssueMessage({ code: 'too_small', path: ['message'] })); return }
     setStatus('sending')
-    setErrorText(null)
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
@@ -113,8 +141,13 @@ export default function ContactPage({ initialUser }: { initialUser?: Me | null }
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) {
+        // The route answers with the schema's own path AND its Georgian
+        // sentence — so a refusal only the server could reach still lands on
+        // the box, without this file guessing which one.
+        const field = typeof j?.field === 'string' ? j.field : null
+        if (field && j?.message) { fail(field, j.message); return }
         setStatus('error')
-        setErrorText(contactErrorText(j?.error))
+        setErrorText(j?.message ?? contactErrorText(j?.error))
         return
       }
       setStatus('ok')
@@ -129,7 +162,7 @@ export default function ContactPage({ initialUser }: { initialUser?: Me | null }
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-ink-50">
       <PublicTopBar initialUser={initialUser} />
 
       <Container as="main" size="wide" className="py-16 lg:py-24">
@@ -148,41 +181,57 @@ export default function ContactPage({ initialUser }: { initialUser?: Me | null }
 
         <div className="mt-14 grid lg:grid-cols-[1.4fr_1fr] gap-10 lg:gap-16">
           {/* Form */}
-          <form onSubmit={submit} className="rounded-card border border-ink-200 bg-white p-6 lg:p-8">
+          <form onSubmit={submit} noValidate className="rounded-card border border-ink-200 bg-white p-6 lg:p-8">
             <Eyebrow tone="muted" className="mb-1">
               შეტყობინება
             </Eyebrow>
             <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight">გამოგვიგზავნე დეტალები</h2>
 
             <div className="mt-6 grid sm:grid-cols-2 gap-4">
-              <label className="block">
-                <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">სახელი</span>
+              {/* ⚠️ THE ERROR LIVES OUTSIDE THE NAME (2026-08-31). Each field
+                  here was a <label> wrapping its own error message, and an
+                  implicit label names its control with everything inside it —
+                  so the moment „შეიყვანე სახელი" appeared, the box was CALLED
+                  that, and `aria-describedby` then read the same words again. */}
+              <div className="block">
+                <label htmlFor="contact-name" className="block text-small font-display font-semibold text-ink-800 mb-1.5">სახელი</label>
                 <input
+                  id="contact-name"
                   type="text"
                   required
                   minLength={2}
                   value={name}
-                  onChange={e => { setName(e.target.value); if (status === 'error') { setStatus('idle'); setErrorText(null) } }}
-                  className="w-full h-11 px-3.5 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-colors duration-fast"
+                  onChange={e => { setName(e.target.value); touch('name') }}
+                  {...props('name')}
+                  className={`w-full h-11 px-3.5 rounded-field border bg-white text-body text-ink-900 placeholder-ink-400 focus:ring-2 outline-none transition-colors duration-fast ${bad('name') ? FIELD_ERROR_BORDER : 'border-ink-200 focus:border-brand-500 focus:ring-brand-100'}`}
                   placeholder="შენი სახელი"
                 />
-              </label>
-              <label className="block">
-                <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">ელფოსტა</span>
+                {error('name')}
+              </div>
+              <div className="block">
+                <label htmlFor="contact-email" className="block text-small font-display font-semibold text-ink-800 mb-1.5">ელფოსტა</label>
                 <input
+                  id="contact-email"
                   type="email" autoComplete="email"
                   required
                   value={email}
-                  onChange={e => { setEmail(e.target.value); if (status === 'error') { setStatus('idle'); setErrorText(null) } }}
-                  className="w-full h-11 px-3.5 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-colors duration-fast"
+                  onChange={e => { setEmail(e.target.value); touch('email') }}
+                  {...props('email')}
+                  className={`w-full h-11 px-3.5 rounded-field border bg-white text-body text-ink-900 placeholder-ink-400 focus:ring-2 outline-none transition-colors duration-fast ${bad('email') ? FIELD_ERROR_BORDER : 'border-ink-200 focus:border-brand-500 focus:ring-brand-100'}`}
                   placeholder="you@example.com"
                 />
-              </label>
+                {error('email')}
+              </div>
             </div>
 
-            <label className="block mt-4">
-              <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">თემა</span>
-              <div className="flex flex-wrap gap-1.5">
+            {/* ⚠️ NOT A <label> (2026-08-31): there is no control here to label,
+                only a row of buttons, and a <label> that names nothing is a
+                click target that does nothing. It is a GROUP, and the word
+                „თემა" is its name — said once, by `aria-labelledby`, so a
+                screen reader announces the set before reading the chips. */}
+            <div className="block mt-4">
+              <span id="contact-topic-label" className="block text-small font-display font-semibold text-ink-800 mb-1.5">თემა</span>
+              <div role="group" aria-labelledby="contact-topic-label" className="flex flex-wrap gap-1.5">
                 {TOPICS.map(t => (
                   <button
                     key={t.v}
@@ -199,24 +248,29 @@ export default function ContactPage({ initialUser }: { initialUser?: Me | null }
                   </button>
                 ))}
               </div>
-            </label>
+            </div>
 
-            <label className="block mt-4">
-              <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">შეტყობინება</span>
+            {/* ⚠️ The counter below changes on EVERY KEYSTROKE, and while it sat
+                inside the label the box's own name changed with it. */}
+            <div className="block mt-4">
+              <label htmlFor="contact-message" className="block text-small font-display font-semibold text-ink-800 mb-1.5">შეტყობინება</label>
               <textarea
+                id="contact-message"
                 required
                 minLength={10}
                 maxLength={4000}
                 rows={6}
                 value={message}
-                onChange={e => setMessage(e.target.value)}
-                className="w-full px-3.5 py-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none resize-y transition-colors duration-fast leading-relaxed"
+                onChange={e => { setMessage(e.target.value); touch('message') }}
+                {...props('message')}
+                className={`w-full px-3.5 py-3 rounded-field border bg-white text-body text-ink-900 placeholder-ink-400 focus:ring-2 outline-none resize-y transition-colors duration-fast leading-relaxed ${bad('message') ? FIELD_ERROR_BORDER : 'border-ink-200 focus:border-brand-500 focus:ring-brand-100'}`}
                 placeholder="მოგვწერე, რაშიც შეგვიძლია დაგეხმაროთ…"
               />
+              {error('message')}
               <div className={`mt-1 text-meta tabular-nums text-right ${message.length > 3800 ? 'text-warning-700 font-semibold' : 'text-ink-400'}`}>
                 {message.length} / 4000
               </div>
-            </label>
+            </div>
 
             {/* SUCCESS gets the illustration; the error branch below keeps its
                 compact tinted strip. An error is something to act on and wants
@@ -235,7 +289,7 @@ export default function ContactPage({ initialUser }: { initialUser?: Me | null }
                 </p>
               </div>
             )}
-            {status === 'error' && (
+            {status === 'error' && !fault && (
               <div role="alert" className="mt-5 rounded-btn bg-danger-50 border border-danger-200 p-3.5 flex items-start gap-2.5">
                 <Icon.warn className="w-4 h-4 text-danger-700 mt-0.5 shrink-0" />
                 <div className="text-small text-danger-800 leading-relaxed break-words min-w-0">

@@ -62,6 +62,7 @@ import { socialMeta } from '@/lib/seo'
 import { avatarSrc } from '@/lib/avatarSrc'
 import { professionBySlug } from '@/lib/professionSeo'
 import { requestsOn } from '@/lib/requests'
+import { providerKey, responseStatsFor } from '@/lib/responseStats'
 import { resolveTrade, tradeTopicIds, TRADE_LANDING_MIN } from '@/lib/serviceProfile'
 import { queryProviders } from '@/app/experts/_providers'
 import { PublicTopBar } from '@/components/PublicTopBar'
@@ -70,7 +71,7 @@ import { Container } from '@/components/Container'
 import { ProfessionLanding, professionMetadata } from './_profession'
 import { resolveProvider, getProviderProfile, providerPath, countProvidersCovering } from './_providerData'
 import { ProviderBreadcrumb, ProviderHero } from './_providerHero'
-import { PricedServicesBlock, ProfileFactsBlock, AboutBlock, CredentialsBlock, WorkBlock, ReviewsBlock } from './_providerBlocks'
+import { PricedServicesBlock, AboutBlock, CredentialsBlock, WorkBlock, ReviewsBlock } from './_providerBlocks'
 import { ProviderCta } from './_providerCta'
 import { TradeLanding, tradeLabel } from './_tradeLanding'
 
@@ -175,7 +176,7 @@ export async function generateMetadata(
   }
 }
 
-export default async function TutorProfileRoute(
+export default async function ProviderProfileRoute(
   { params, searchParams }: {
     params: Promise<Params>
     searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -279,6 +280,19 @@ async function providerProfile(provider: { id: string; slug: string | null }) {
   // ⚠️ THE FLAG IS READ ONCE, HERE, AND HANDED DOWN — see app/experts/page.tsx.
   const on = requestsOn()
 
+  /* 🔒 „პასუხობს 2 საათში" IS MEASURED OR IT IS NOT PRINTED (2026-08-31). The
+     design canvas asks the rail for three facts about how this person answers;
+     two of them are medians over their own answered leads, derived from the
+     offer journal (lib/responseStats) rather than from `responseMedianMin`,
+     which is a column NOTHING has ever written to. One query, one provider.
+     A failure here costs the rail two rows and never the page. */
+  let stat
+  try {
+    stat = (await responseStatsFor([p])).get(providerKey(p) ?? '')
+  } catch {
+    stat = undefined
+  }
+
   const url = `${SITE_URL}${providerPath(p)}`
   const image = p.photoSrc ? `${SITE_URL}${p.photoSrc}` : null
   const description = excerpt(p.about)
@@ -313,61 +327,48 @@ async function providerProfile(provider: { id: string; slug: string | null }) {
       <PublicTopBar initialUser={initialUser} />
 
       <main>
-        <Container className="py-6 sm:py-10 pb-14 sm:pb-20">
+        <Container size="wide" className="py-5 pb-16 sm:py-7 sm:pb-20">
           <ProviderBreadcrumb name={p.name} />
 
-          {/* Two columns from `lg`, one below it. The rail spans BOTH rows so its
-              sticky card has the whole page height to stick inside; on a phone
-              the DOM order is the reading order — hero, then the action, then
-              the blocks. `min-w-0` on every track: a grid track will not shrink
-              below its content's intrinsic width, and one long name would
-              scroll the page sideways at 390px (app/experts/client.tsx). */}
-          <div className={`sm:mt-6 grid gap-8 xl:gap-12 ${on ? 'lg:grid-cols-[1fr_360px] lg:grid-rows-[auto_1fr]' : ''}`}>
-            <div className="min-w-0">
-              <ProviderHero p={p} />
-            </div>
+          {/* ⚠️ THE HERO IS ITS OWN FULL-WIDTH CARD ABOVE THE COLUMNS
+              (2026-08-31, from the owner's design canvas → Public Profile). It
+              used to sit INSIDE the left column with the rail beside it, which
+              cost the identity — a name, a face and four chips — a third of the
+              page it is the title of. The canvas gives it the whole width and
+              starts the two columns underneath. */}
+          <div className="mt-4">
+            <ProviderHero p={p} />
+          </div>
 
-            {/* ⚠️ THE PRICES MOVED INTO THE RAIL (2026-08-20), UNDER THE ACTIONS.
-                They were the FIRST block of the left column, and that was a
-                deliberate choice — „the offer before the paragraph about the
-                person". Two things beat it.
-                ONE, the owner's: „ფასები მარჯვნივ უნდა გადავიტანოთ მიწერის
-                ქვევით… თორე იკარგება ვისაც ბევრი სერვისი აქვს." A provider with
-                six priced rows pushed „შესახებ" and the work photos off the
-                first screen, so the page about a person opened as a price list.
-                TWO, and it is why the rail is the right home rather than merely
-                a smaller one: PRICE BELONGS BESIDE THE ACTION. What it costs and
-                what to press were in two different columns; the consultation
-                rail on the expert profile has always put them together.
-                The aside keeps `row-span-2` so it starts level with the hero on
-                desktop. On a PHONE there is no rail — the aside is in DOM order,
-                so the reading becomes hero → actions + prices → about → work,
-                which is the same decision in the same order. The list folds past
-                four rows there (PricedServicesBlock → RAIL_ROWS), which is what
-                actually answers „იკარგება". */}
-            {/* ⚠️ THE PRICES ARE NOT GATED ON THE FLAG, THE BUTTONS ARE. The
-                aside used to exist only when `requestsOn()`; moving the price
-                list inside it would have deleted the page's whole offer on a
-                deployment where the intake is off — and a price is CONTENT, not
-                a feature of the requests subsystem. So the rail is drawn either
-                way and `ordering` decides whether a row carries „დაკვეთა". */}
-            <aside className="min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2">
-              <div className="lg:sticky lg:top-[80px]">
-                {on && <ProviderCta provider={p} />}
-                {/* The facts before the price list: „who is this" is the
-                    question the rail could not answer until 2026-08-30, and on
-                    a profile that prices nothing it is the only thing the rail
-                    has to say. */}
-                <ProfileFactsBlock p={p} />
-                <PricedServicesBlock p={p} ordering={on} />
+          {/* Two columns from `lg`, one below it. `min-w-0` on every track: a
+              grid track will not shrink below its content's intrinsic width,
+              and one long name would scroll the page sideways at 390px. On a
+              phone the DOM order IS the reading order — hero, then the price
+              and the action, then what they sell, then who they are. */}
+          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+            {/* ⚠️ THE RAIL IS FIRST IN THE DOM AND SECOND ON SCREEN, and that
+                is deliberate rather than a CSS accident. `lg:order-2` moves it
+                right on a desktop; on a phone it stays where it is written,
+                directly under the identity — which is where „what does this
+                cost and how do I start" belongs on a 390px screen. */}
+            <aside className="min-w-0 lg:order-2">
+              <div className="lg:sticky lg:top-[104px]">
+                {/* ⚠️ THE PRICE AND THE FACTS ARE NOT GATED ON THE FLAG, THE
+                    BUTTON IS. A price is CONTENT, not a feature of the requests
+                    subsystem — the rail is drawn either way and `enabled`
+                    decides whether it carries an action. */}
+                <ProviderCta provider={p} stat={stat} enabled={on} />
               </div>
             </aside>
 
-            <div className="min-w-0 lg:col-start-1">
-              {/* The person, then the proof, then what others said. */}
+            <div className="flex min-w-0 flex-col gap-5 lg:order-1">
+              {/* What they sell, then the person, then the proof, then what
+                  others said. The priced list is the page's centre and it is
+                  back in the wide column (see _providerBlocks → LIST_ROWS). */}
+              <PricedServicesBlock p={p} ordering={on} />
               <AboutBlock p={p} />
-              <CredentialsBlock p={p} />
               <WorkBlock p={p} />
+              <CredentialsBlock p={p} />
               <ReviewsBlock p={p} />
             </div>
           </div>

@@ -49,9 +49,19 @@ export const PAGE_SEO: PageSeoDef[] = [
     page: 'home',
     label: 'მთავარი',
     title: 'აღწერე რა გჭირდება, მიიღე შეთავაზებები | მცოდნე',
-    description: 'აღწერე რა გჭირდება და მიიღე შეთავაზებები — ხელშეკრულება, დეკლარაცია, ბრენდი, საიტი, რემონტი, დალაგება. გადამოწმებული ექსპერტები თბილისში. მოთხოვნა უფასოა.',
+    /* ⚠️ 155 → 122 CHARACTERS, AND TWO CLAIMS GONE (2026-09-02).
+        · „გადამოწმებული" — 1 of 26 published providers carries the ✓.
+        · „რემონტი, დალაგება" — the roster holds ZERO tradespeople, so this was
+          bidding for searches the site cannot answer; a click that bounces is
+          worse than no click.
+        Length: Google truncates a snippet by PIXELS (~920 desktop, ~680 mobile
+        ≈ 120 latin characters). Mkhedruli is wider than latin lowercase, so the
+        Georgian budget is reached sooner — the target here is ~120, not 158.
+        Descriptions are not a ranking factor (Google, confirmed) and are
+        rewritten 63–71% of the time, so keyword-stuffing one buys nothing. */
+    description: 'აღწერე რა გჭირდება და მიიღე შეთავაზებები — ხელშეკრულება, დეკლარაცია, ბრენდი, საიტი. ექსპერტები თბილისში. მოთხოვნა უფასოა.',
     ogTitle: 'მცოდნე — აღწერე რა გჭირდება, მიიღე შეთავაზებები',
-    ogDescription: 'აღწერე რა გჭირდება და მიიღე შეთავაზებები — ხელშეკრულებიდან დალაგებამდე. გადამოწმებული ექსპერტები თბილისში.',
+    ogDescription: 'აღწერე რა გჭირდება და მიიღე შეთავაზებები ექსპერტებისგან. თბილისი.',
   },
   {
     // THE CATALOGUE. The KEY is historical — the page was /tutors until stage 10
@@ -62,17 +72,34 @@ export const PAGE_SEO: PageSeoDef[] = [
     page: 'tutors',
     label: 'ექსპერტების ძებნა',
     title: 'სერვისები და ექსპერტები თბილისში — მიიღე შეთავაზება | მცოდნე',
-    description: 'ერთ სიაში — პროფესიული და ყოველდღიური სერვისები: სამართალი, ბუღალტერია, მარკეტინგი, IT, დალაგება, სანტექნიკა. ხელით შერჩეული ექსპერტები თბილისში.',
+    /* ⚠️ 146 → 104 (2026-09-02). „დალაგება, სანტექნიკა" name trades with no
+        provider on the roster, and „ხელით შერჩეული" is the phrase the owner
+        removed from the site the same day. What is left is the six spheres that
+        actually hold people. */
+    description: 'ერთ სიაში — სამართალი, ბუღალტერია, მარკეტინგი, IT, ფსიქოლოგია. ექსპერტები თბილისში.',
     ogTitle: 'ექსპერტები — მცოდნე',
-    ogDescription: 'ერთ სიაში — პროფესიული და ყოველდღიური სერვისები. ხელით შერჩეული ექსპერტები თბილისში.',
+    ogDescription: 'ერთ სიაში — ექსპერტები და სერვისები თბილისში.',
   },
   {
+    /* ⚠️ „გახდი ექსპერტი" IS A RETIRED PHRASE AND IT WAS SHIPPING AS /join's
+     * BROWSER TAB (fixed 2026-08-31). The site says ONE thing at its supply
+     * door — `JOIN_DOOR_LABEL` in lib/capabilities, „დაარეგისტრირე სერვისი" —
+     * and `home.expertCta.cta` was retired in lib/siteTextDefs for carrying
+     * exactly this wording. It survived here because SEO copy is reachable from
+     * no screen, which is the same way /about came to advertise a booking
+     * product deleted on 2026-08-24. „კონსულტაციით" went with it, for the same
+     * reason: there is no consultation product.
+     * Editable in ადმინი → ტექსტები („SEO — …"); no production row overrides it. */
     page: 'apply',
-    label: 'გახდი ექსპერტი',
-    title: 'გახდი ექსპერტი — მიიღე კლიენტები | მცოდნე',
-    description: 'გახდი ექსპერტი მცოდნეზე — მიიღე კლიენტები კონსულტაციითა თუ ადგილზე სამუშაოთი. ფასს, დროსა და მოცულობას შენ ადგენ.',
-    ogTitle: 'გახდი ექსპერტი — მცოდნე',
-    ogDescription: 'გახდი ექსპერტი მცოდნეზე — ფასს, დროსა და მოცულობას შენ ადგენ.',
+    label: 'დაარეგისტრირე სერვისი',
+    title: 'დაარეგისტრირე სერვისი — მიიღე კლიენტები | მცოდნე',
+    /* ⚠️ 136 → 116 (2026-09-02). Everything in it is true; it was simply past
+        the mobile snippet, and the clause that fell off the end („რეგისტრაცია
+        უფასოა") is the one a provider deciding whether to bother most wants —
+        so it moved up and the middle clause went. */
+    description: 'დაარეგისტრირე რასაც აკეთებ და მიიღე კლიენტები თბილისში. რეგისტრაცია უფასოა, ფასს კი შენ ადგენ.',
+    ogTitle: 'დაარეგისტრირე სერვისი — მცოდნე',
+    ogDescription: 'დაარეგისტრირე რასაც აკეთებ — ფასს შენ ადგენ.',
   },
   {
     page: 'help',
@@ -83,18 +110,35 @@ export const PAGE_SEO: PageSeoDef[] = [
     ogDescription: 'როგორ დავტოვო მოთხოვნა, რა ღირს, როგორ გავაუქმო — პასუხები ხშირად დასმულ კითხვებზე.',
   },
   {
+    /* ⚠️ THIS ENTRY DESCRIBED A PRODUCT THAT WAS REMOVED ON 2026-08-24 (fixed
+     * 2026-08-31). It read „ქართული ექსპერტ-კონსულტაციები" and „ერთსაათიანი
+     * ონლაინ კონსულტაცია" — the booking product, gone with `TutorProfile`, the
+     * calendar and the video room — and it was serving that sentence live as
+     * the browser tab and the Google snippet for the page the header calls
+     * „როგორ მუშაობს". Exactly the failure app/page.tsx records for the home:
+     * a literal nobody could reach from a screen outlives the thing it names.
+     *
+     * The wording below is not new copy — it is the page's own h1 and its own
+     * lead sentence, plus the four steps it draws. Editable in
+     * ადმინი → ტექსტები („SEO — …"), and no production row overrides it today
+     * (verified against the live page), so this default IS what ships. */
     page: 'about',
-    label: 'ჩვენს შესახებ',
-    title: 'ჩვენს შესახებ — ქართული ექსპერტ-კონსულტაციები | მცოდნე',
-    description: 'მცოდნე ქართული ექსპერტული ცოდნის პლატფორმაა — ვაკავშირებთ ადამიანებს გამოცდილ ექსპერტებთან ბიზნესის, ფინანსების, სამართლისა და კარიერის საკითხებზე. ერთსაათიანი ონლაინ კონსულტაცია.',
-    ogTitle: 'ჩვენს შესახებ — მცოდნე',
-    ogDescription: 'ქართული ექსპერტული ცოდნის პლატფორმა — ვაკავშირებთ ადამიანებს გამოცდილ ექსპერტებთან.',
+    label: 'როგორ მუშაობს',
+    title: 'როგორ მუშაობს — მოთხოვნა, შეთავაზება, არჩევანი | მცოდნე',
+    /* ⚠️ 176 → 108 (2026-09-02). It was the longest live description on the
+        site and its second sentence — the one that survives no truncation on a
+        phone — repeated what the first already said. */
+    description: 'აღწერე, რა გჭირდება — ექსპერტები შეთავაზებას გამოგიგზავნიან, შენ კი შეადარებ და აირჩევ.',
+    ogTitle: 'როგორ მუშაობს — მცოდნე',
+    ogDescription: 'აღწერე, რა გჭირდება. ფასს თავად შემოგთავაზებენ.',
   },
   {
     page: 'blog',
     label: 'ბლოგი',
     title: 'ბლოგი — პრაქტიკული რჩევები ექსპერტებისგან | მცოდნე',
-    description: 'პრაქტიკული სახელმძღვანელოები ქართველი ექსპერტებისგან — ბიზნესი, გადასახადები, სამართალი, მარკეტინგი, ფინანსები და კარიერა. კონკრეტული რჩევა, არა ზოგადი თეორია.',
+    /* ⚠️ 159 → 118 (2026-09-02). Six categories and a slogan do not fit a
+        mobile snippet; four categories and no slogan do. */
+    description: 'პრაქტიკული სახელმძღვანელოები ქართველი ექსპერტებისგან — ბიზნესი, გადასახადები, სამართალი, მარკეტინგი.',
     ogTitle: 'ბლოგი — მცოდნე',
     ogDescription: 'პრაქტიკული სახელმძღვანელოები ქართველი ექსპერტებისგან — ბიზნესი, გადასახადები, სამართალი, მარკეტინგი.',
   },
@@ -110,7 +154,14 @@ export const PAGE_SEO: PageSeoDef[] = [
     ogDescription: 'აირჩიე კატეგორია და ნახე, ვინ მუშაობს ამაზე.',
   },
   {
+    /* ⚠️ RETIRED IN FACT SINCE THE TRADES DOOR WENT, FLAGGED ONLY ON 2026-09-02.
+       app/sitemap.ts and app/join/page.tsx both already SAY „the SEO registry
+       row `apply-master` stays retired" — and it was not, so the admin editor
+       offered a page nothing renders, and its description („სანტექნიკა,
+       ელექტრიკა, დალაგება, ტექნიკის შეკეთება") named four trades with no
+       provider. The key stays: a SiteText row may be filed under it. */
     page: 'apply-master',
+    retired: true,
     label: 'დაარეგისტრირე შენი სერვისი',
     title: 'დაარეგისტრირე შენი სერვისი — მიიღე შეკვეთები | მცოდნე',
     description: 'დაარეგისტრირე შენი სერვისი და მიიღე შეკვეთები შენს ქალაქში — სანტექნიკა, ელექტრიკა, დალაგება, ტექნიკის შეკეთება. რეგისტრაცია უფასოა.',

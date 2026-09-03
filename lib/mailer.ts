@@ -23,8 +23,15 @@
 import nodemailer, { type Transporter } from 'nodemailer'
 import { SUPPORT_EMAIL } from './supportEmails'
 import { prisma } from './prisma'
+import { logMessage } from './messageLog'
+import { channelOn } from './outboundSettings'
+import type { OutboundKey } from './outbound'
 
 type MailPayload = {
+  /** WHICH message this is (lib/outbound). Required by the compiler, so a new
+   *  letter cannot exist without appearing in the registry the admin reads —
+   *  the registry then cannot drift from the 27 places that send. */
+  key: OutboundKey
   to: string
   subject: string
   html: string
@@ -51,7 +58,29 @@ function getGmailTransport(user: string, pass: string): Transporter {
   return gmailTransport
 }
 
-export async function sendMail({ to, subject, html, text, replyTo }: MailPayload): Promise<{ ok: boolean; mode: string; status?: number }> {
+type MailResult = { ok: boolean; mode: string; status?: number }
+
+/**
+ * Send, then write down that we sent. Every path out of `deliver` is logged
+ * here rather than at the call sites, for the reason lib/sms gives: a caller
+ * that logs its own send is a caller that can forget one, and the table an
+ * operator trusts would then be quietly incomplete.
+ */
+export async function sendMail(payload: MailPayload): Promise<MailResult> {
+  const r = await deliver(payload)
+  await logMessage({
+    channel: 'mail',
+    key: payload.key,
+    to: payload.to,
+    ok: r.ok,
+    mode: r.mode,
+    detail: r.ok ? null : r.mode,
+    ref: null,
+  })
+  return r
+}
+
+async function deliver({ key, to, subject, html, text, replyTo }: MailPayload): Promise<MailResult> {
   const gmailUser = process.env.GMAIL_USER
   const gmailPass = process.env.GMAIL_APP_PASSWORD
   const explicitMode = process.env.MAILER_MODE // 'send' opts into Resend
@@ -77,6 +106,18 @@ export async function sendMail({ to, subject, html, text, replyTo }: MailPayload
   if (explicitMode === 'off') {
     console.log('📧 [MAIL:off]', { to, replyTo: replyToAddr, subject })
     return { ok: true, mode: 'off' }
+  }
+
+  /* ── 0a. THE ADMIN'S SWITCH, and it sits UNDER the environment's ─────────
+     `MAILER_MODE=off` above is the hard kill and nothing in a browser can walk
+     around it; this one is per message, owned by whoever is in /admin. The
+     order is the point: an operator can silence one letter, and only a
+     deployment can silence them all.
+     ⚠️ A CODE HAS NO SWITCH TO FIND — lib/outboundSettings refuses to write the
+     row, on the server, so this can never be reached for `auth.otp*`. */
+  if (!(await channelOn(key, 'mail'))) {
+    console.log('📧 [MAIL:admin-off]', { to, subject, key })
+    return { ok: true, mode: 'held-admin-off' }
   }
 
   /* ── 0b. NOBODY WHO WAS ALREADY HERE ─────────────────────────────────────

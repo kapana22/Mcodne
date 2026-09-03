@@ -2,7 +2,7 @@
 
 # Where every export lives
 
-1032 symbols across 409 files. `grep` the name you need.
+1158 symbols across 436 files. `grep` the name you need.
 
 | symbol | file |
 | --- | --- |
@@ -22,6 +22,8 @@
 | `accountForRequest` | `lib/requestAccount.ts` |
 | `AccountOutcome` | `lib/requestAccount.ts` |
 | `AccountSection` | `app/settings/_account.tsx` |
+| `ACTION_FAILED` | `lib/actionErrors.ts` |
+| `actionError` | `lib/actionErrors.ts` |
 | `ActiveWorkError` | `lib/userDeletion.ts` |
 | `adjustBalance` | `lib/creditsServer.ts` |
 | `ADMIN_ADJUST` | `lib/credits.ts` |
@@ -44,13 +46,18 @@
 | `adminResult` | `app/admin/_parts.tsx` |
 | `AdminSidebar` | `app/admin/_nav.tsx` |
 | `AdminTab` | `app/admin/_nav.tsx` |
+| `ALL_CATEGORIES_PHOTO` | `lib/categoryMarks.tsx` |
 | `ALL_CITIES` | `lib/requestTopics.ts` |
+| `ALL_FORMATS` | `lib/requestTopics.ts` |
+| `ALL_OFFER_PRICE_KINDS` | `lib/requests.ts` |
 | `ALL_PROFESSIONS` | `lib/professions.ts` |
 | `ALL_TOPICS` | `lib/helpTopics.ts` |
+| `allMessageStates` | `lib/outboundSettings.ts` |
 | `Analytics` | `components/Analytics.tsx` |
 | `ANON_HEADLINE` | `lib/userDeletion.ts` |
 | `ANON_NAME` | `lib/userDeletion.ts` |
 | `anonEmail` | `lib/userDeletion.ts` |
+| `answeredLabel` | `lib/responseStats.ts` |
 | `answerLabel` | `app/request/_model.ts` |
 | `anyRefined` | `app/experts/_filters.tsx` |
 | `APPLY_LINK` | `components/me/navConfig.ts` |
@@ -65,6 +72,8 @@
 | `asRole` | `lib/roles.ts` |
 | `ASSIGNABLE_CATEGORY` | `lib/categoryTree.ts` |
 | `ASSIGNABLE_CATEGORY_WHERE` | `lib/categoryTree.ts` |
+| `Audience` | `lib/outbound.ts` |
+| `AUDIENCE_LABEL` | `lib/outbound.ts` |
 | `audit` | `lib/audit.ts` |
 | `AuditSection` | `app/admin/_audit.tsx` |
 | `AUTH_ERROR_MESSAGES` | `lib/authErrors.ts` |
@@ -110,15 +119,18 @@
 | `byPrice` | `lib/catalogItems.ts` |
 | `canAffordContact` | `lib/credits.ts` |
 | `canBeParent` | `lib/categoryTree.ts` |
+| `CancelRequest` | `app/request/[ref]/_cancel.tsx` |
+| `canFileRequest` | `lib/requests.ts` |
 | `canMarkDone` | `lib/offerLifecycle.ts` |
 | `canOpenRequestForm` | `lib/requests.ts` |
 | `canSeeB2B` | `lib/b2b.ts` |
 | `canSeeRequests` | `lib/requests.ts` |
 | `canSpendAsMember` | `lib/b2b.ts` |
 | `canSpendBalance` | `lib/b2b.ts` |
+| `canToggle` | `lib/outbound.ts` |
 | `canWithdraw` | `lib/offerLifecycle.ts` |
 | `Card` | `components/Card.tsx` |
-| `CATALOG_LINK` | `components/me/navConfig.ts` · `components/work/navConfig.ts` |
+| `CATALOG_LINK` | `components/me/navConfig.ts` |
 | `CATALOG_VIEW_KEY` | `components/catalog/useCatalogView.ts` |
 | `CatalogClient` | `app/experts/client.tsx` |
 | `CatalogFilters` | `app/experts/_filters.tsx` |
@@ -128,7 +140,6 @@
 | `CatalogView` | `components/catalog/useCatalogView.ts` |
 | `Categories` | `app/_home/categories.tsx` |
 | `CategoriesSection` | `app/admin/_categories.tsx` |
-| `Category` | `app/work/profile/_types.ts` |
 | `CATEGORY_BROWSE_PATH` | `lib/categoryRoutes.ts` |
 | `CATEGORY_READ_ORDER` | `lib/categoryTree.ts` |
 | `CategoryFaq` | `lib/categorySeo.ts` |
@@ -137,17 +148,20 @@
 | `CategoryMark` | `lib/categoryMarks.tsx` |
 | `CategoryNode` | `app/join/_shared/useCategories.ts` |
 | `categoryPath` | `lib/categoryRoutes.ts` |
+| `categoryPhoto` | `lib/categoryMarks.tsx` |
 | `CategorySelect` | `app/admin/_categoryPicker.tsx` |
 | `categorySeo` | `lib/categorySeo.ts` |
 | `CategorySeo` | `lib/categorySeo.ts` |
 | `categorySlugFilter` | `lib/categoryTree.ts` |
 | `categorySlugOfTopic` | `lib/requestTopics.ts` |
 | `CategoryStatus` | `lib/categoryTree.ts` |
-| `CatIcon` | `components/Icon.tsx` |
 | `catNameOf` | `app/experts/_cats.ts` |
 | `certificatesPayload` | `app/join/_shared/_upload.tsx` |
 | `CertificateUploader` | `app/join/_shared/_upload.tsx` |
 | `certSlotsLeft` | `app/join/_shared/_upload.tsx` |
+| `Channel` | `lib/outbound.ts` |
+| `CHANNEL_LABEL` | `lib/outbound.ts` |
+| `channelOn` | `lib/outboundSettings.ts` |
 | `chargeFor` | `lib/offerEvents.ts` |
 | `chargeForContact` | `lib/creditsServer.ts` |
 | `CHART` | `app/admin/_charts.tsx` |
@@ -172,12 +186,24 @@
 | `clientContactView` | `lib/requests.ts` |
 | `ClientErrorReporter` | `components/ClientErrorReporter.tsx` |
 | `clientIdentityOpen` | `lib/requests.ts` |
+| `clientInboxRow` | `lib/inboxRows.ts` |
+| `clientInboxRows` | `lib/inboxRows.ts` |
+| `ClientInboxSource` | `lib/inboxRows.ts` |
 | `clientIp` | `lib/rateLimit.ts` |
+| `ClientNavBadges` | `components/me/navConfig.ts` |
 | `clientOfferView` | `lib/requests.ts` |
+| `clientRequestHref` | `lib/requests.ts` |
+| `ClientRequestPill` | `components/requests/StatusPills.tsx` |
+| `clientRequestState` | `lib/myRequests.ts` |
+| `ClientRequestState` | `lib/myRequests.ts` |
+| `ClientRequestTone` | `lib/myRequests.ts` |
 | `ClientShell` | `components/me/ClientShell.tsx` |
 | `ClientSidebar` | `components/me/ClientSidebar.tsx` |
+| `clientThreadHref` | `lib/inboxRows.ts` |
 | `ClientTopBar` | `components/me/ClientTopBar.tsx` |
+| `clientUnreadTotal` | `lib/inboxRows.ts` |
 | `closeDue` | `lib/offerLifecycle.ts` |
+| `CloseRequest` | `app/request/[ref]/_close.tsx` |
 | `ClosingBand` | `app/_home/cta.tsx` |
 | `CODE_RE` | `lib/funnelEvents.ts` |
 | `CodeInjector` | `components/CodeInjector.tsx` |
@@ -190,9 +216,12 @@
 | `CONFLICT` | `lib/offerLifecycle.ts` |
 | `consequenceLine` | `app/join/_door/DoorQuestion.tsx` |
 | `CONTACT_BUTTON_LABEL` | `lib/credits.ts` |
+| `CONTACT_CHARGE_NOTE` | `lib/credits.ts` |
 | `CONTACT_COST_NOTE` | `lib/credits.ts` |
 | `CONTACT_COST_TETRI` | `lib/credits.ts` |
+| `CONTACT_FEE_LABEL` | `lib/credits.ts` |
 | `CONTACT_LIMIT_REASON` | `lib/credits.ts` |
+| `CONTACT_REFUND_HOURS` | `lib/credits.ts` |
 | `CONTACT_REFUND_NOTE` | `lib/credits.ts` |
 | `ContactCard` | `app/work/(provider)/requests/[id]/_contact.tsx` |
 | `contactCountOf` | `lib/creditsServer.ts` |
@@ -223,6 +252,7 @@
 | `CREDIT_TASKS` | `lib/credits.ts` |
 | `CREDIT_TASKS_TOTAL` | `lib/credits.ts` |
 | `CreditPill` | `components/CreditPill.tsx` |
+| `creditReasonLabel` | `lib/credits.ts` |
 | `CREDITS_ENFORCED` | `lib/credits.ts` |
 | `CreditStrip` | `app/work/_components/CreditStrip.tsx` |
 | `CreditSweepResult` | `lib/creditsServer.ts` |
@@ -232,10 +262,13 @@
 | `DEFAULT_AVATAR` | `lib/defaultAvatar.ts` |
 | `DEFAULT_OFFER_LIMIT` | `lib/requests.ts` |
 | `DEFAULT_PREFS` | `lib/notify.ts` · `app/settings/_types.ts` |
+| `defaultState` | `lib/outboundSettings.ts` |
 | `DELETE` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/categories/[id]/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/reviews/[id]/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/favorites/route.ts` · `app/api/me/route.ts` |
 | `DeleteBody` | `lib/userDeletion.ts` |
 | `DeleteImpact` | `app/admin/_parts.tsx` |
 | `DeleteMode` | `lib/userDeletion.ts` · `app/admin/_parts.tsx` |
+| `DELIVERY` | `lib/sms.ts` |
+| `deliveryStatus` | `lib/sms.ts` |
 | `describeViolations` | `lib/georgianOrthography.ts` |
 | `destroySession` | `lib/auth.ts` |
 | `DIRECT_WINDOW_MS` | `lib/requestLive.ts` |
@@ -248,10 +281,12 @@
 | `DORMANT_GROUP_IDS` | `lib/requestTopics.ts` |
 | `downloadCsv` | `app/admin/_parts.tsx` |
 | `Draft` | `app/request/_model.ts` · `app/work/profile/_types.ts` |
-| `dynamic` | `app/about/page.tsx` · `app/abroad/page.tsx` · `app/admin/layout.tsx` · `app/api/admin/funnel/route.ts` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/provider-applications/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/b2b-services/[id]/image/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/categories/route.ts` · `app/api/events/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/me/route.ts` · `app/api/provider-applications/[id]/route.ts` · `app/api/provider-applications/route.ts` · `app/api/providers/[id]/photo/route.ts` · `app/api/providers/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/work/threads/route.ts` · `app/blog/[slug]/page.tsx` · `app/blog/page.tsx` · `app/business/page.tsx` · `app/contact/page.tsx` · `app/experts/[slug]/page.tsx` · `app/experts/page.tsx` · `app/help/page.tsx` · `app/join/page.tsx` · `app/me/favorites/page.tsx` · `app/me/layout.tsx` · `app/me/page.tsx` · `app/me/profile/page.tsx` · `app/me/requests/page.tsx` · `app/not-found.tsx` · `app/notifications/layout.tsx` · `app/notifications/page.tsx` · `app/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/rss.xml/route.ts` · `app/settings/layout.tsx` · `app/settings/page.tsx` · `app/sitemap.ts` · `app/work/(provider)/layout.tsx` · `app/work/(provider)/offers/[offerId]/page.tsx` · `app/work/(provider)/offers/page.tsx` · `app/work/(provider)/requests/[id]/page.tsx` · `app/work/(provider)/requests/page.tsx` · `app/work/account/page.tsx` · `app/work/jobs/page.tsx` · `app/work/layout.tsx` · `app/work/messages/layout.tsx` · `app/work/messages/o/[offerId]/page.tsx` · `app/work/page.tsx` · `app/work/profile/page.tsx` |
+| `dynamic` | `app/about/page.tsx` · `app/abroad/page.tsx` · `app/admin/layout.tsx` · `app/api/admin/funnel/route.ts` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/messages/route.ts` · `app/api/admin/provider-applications/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/b2b-services/[id]/image/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/categories/route.ts` · `app/api/events/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/me/route.ts` · `app/api/me/threads/route.ts` · `app/api/provider/requests/[id]/photo/route.ts` · `app/api/provider-applications/[id]/route.ts` · `app/api/provider-applications/route.ts` · `app/api/providers/[id]/photo/route.ts` · `app/api/providers/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/work/threads/route.ts` · `app/blog/[slug]/page.tsx` · `app/blog/page.tsx` · `app/business/page.tsx` · `app/contact/page.tsx` · `app/experts/[slug]/page.tsx` · `app/experts/page.tsx` · `app/help/page.tsx` · `app/join/page.tsx` · `app/me/favorites/page.tsx` · `app/me/layout.tsx` · `app/me/messages/o/[offerId]/page.tsx` · `app/me/messages/page.tsx` · `app/me/page.tsx` · `app/me/profile/page.tsx` · `app/me/r/[ref]/page.tsx` · `app/me/requests/page.tsx` · `app/not-found.tsx` · `app/notifications/layout.tsx` · `app/notifications/page.tsx` · `app/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/rss.xml/route.ts` · `app/settings/layout.tsx` · `app/settings/page.tsx` · `app/sitemap.ts` · `app/work/(provider)/layout.tsx` · `app/work/(provider)/offers/[offerId]/page.tsx` · `app/work/(provider)/offers/page.tsx` · `app/work/(provider)/requests/[id]/offer/page.tsx` · `app/work/(provider)/requests/[id]/page.tsx` · `app/work/(provider)/requests/page.tsx` · `app/work/account/page.tsx` · `app/work/balance/page.tsx` · `app/work/jobs/page.tsx` · `app/work/layout.tsx` · `app/work/messages/layout.tsx` · `app/work/messages/o/[offerId]/page.tsx` · `app/work/page.tsx` · `app/work/profile/page.tsx` |
 | `earnedTasks` | `lib/credits.ts` |
+| `emailFormatError` | `lib/emailRule.ts` |
 | `EMPTY_DRAFT` | `app/request/_model.ts` |
 | `EMPTY_FILTERS` | `app/experts/_filters.tsx` |
+| `EMPTY_RESPONSE_STAT` | `lib/responseStats.ts` |
 | `EmptyState` | `components/EmptyState.tsx` |
 | `ensureDbReady` | `lib/dbBoot.ts` |
 | `ensureDbReadyWithin` | `lib/dbBoot.ts` |
@@ -261,6 +296,7 @@
 | `EntityKinds` | `components/EntityCard.tsx` |
 | `EntityPrice` | `components/EntityCard.tsx` |
 | `EntityView` | `components/EntityCard.tsx` |
+| `errText` | `lib/requestRoomErrors.ts` |
 | `eurFromGel` | `lib/abroad.ts` |
 | `eurLabel` | `lib/abroad.ts` |
 | `EVENT_PRUNE_SQL` | `lib/events.ts` |
@@ -277,29 +313,40 @@
 | `fallbackSeo` | `lib/categorySeo.ts` |
 | `FaqAction` | `lib/helpTopics.ts` |
 | `FaqGroup` | `lib/helpTopics.ts` |
+| `Fault` | `components/FieldError.tsx` |
+| `FaultKit` | `app/settings/_types.ts` |
 | `FavoritesClient` | `app/me/favorites/client.tsx` |
 | `FEATURE_ABROAD` | `lib/flags.ts` |
 | `FeaturedExperts` | `app/_home/experts.tsx` |
 | `fetchMe` | `lib/me.ts` |
 | `Field` | `app/join/_shared/_fields.tsx` · `app/signin/_fields.tsx` · `app/work/profile/_parts.tsx` |
-| `FieldError` | `app/join/_shared/_fields.tsx` |
+| `FIELD_ERROR_BORDER` | `components/FieldError.tsx` |
+| `FieldError` | `components/FieldError.tsx` · `app/join/_shared/_fields.tsx` |
+| `fieldErrorId` | `components/FieldError.tsx` |
 | `FILTER_LANGS` | `app/experts/_filters.tsx` |
 | `FILTER_RATINGS` | `app/experts/_filters.tsx` |
 | `FilterChip` | `components/FilterChip.tsx` |
 | `filterCounts` | `app/experts/_providers.ts` |
 | `FilterCounts` | `app/experts/_providers.ts` |
 | `FilterGroup` | `components/catalog/FilterPanel.tsx` |
+| `FilterMore` | `components/catalog/FilterPanel.tsx` |
 | `FilterNest` | `components/catalog/FilterPanel.tsx` |
 | `FilterPanel` | `components/catalog/FilterPanel.tsx` |
 | `FilterRow` | `components/catalog/FilterPanel.tsx` |
 | `Filters` | `app/experts/_filters.tsx` |
+| `FilterSearch` | `components/catalog/FilterPanel.tsx` |
+| `FilterSwitch` | `components/catalog/FilterPanel.tsx` |
+| `firstGeorgianIssue` | `lib/georgianText.ts` |
 | `firstGeorgianMessage` | `lib/georgianText.ts` |
+| `firstMissing` | `lib/signupCompleteness.ts` |
 | `firstViewInWindow` | `lib/events.ts` |
 | `FLOW_ID_RE` | `lib/funnelEvents.ts` |
+| `FlowSteps` | `app/_home/how.tsx` |
 | `fmtDateTime` | `lib/tz.ts` |
 | `fmtDT` | `app/admin/_parts.tsx` |
 | `fmtKaDate` | `lib/kaDate.ts` |
 | `fmtKaDateTime` | `lib/kaDate.ts` |
+| `fmtKaDayLabel` | `lib/kaDate.ts` |
 | `fmtKaThreadTime` | `lib/kaDate.ts` |
 | `fmtKaTime` | `lib/kaDate.ts` |
 | `fmtRating` | `lib/fmt.ts` |
@@ -307,6 +354,7 @@
 | `fmtWhenTz` | `lib/emailTemplates.ts` |
 | `focusSearchInput` | `lib/searchFocus.ts` |
 | `foldCounts` | `lib/categoryTree.ts` |
+| `foldMin` | `lib/categoryTree.ts` |
 | `Footer` | `components/Footer.tsx` |
 | `formatLabel` | `lib/requestTopics.ts` |
 | `FormatName` | `lib/requestTopics.ts` |
@@ -326,7 +374,7 @@
 | `georgianNameError` | `lib/georgianText.ts` |
 | `georgianNameRefine` | `lib/georgianText.ts` |
 | `georgianRefine` | `lib/georgianText.ts` |
-| `GET` | `app/api/admin/audit/route.ts` · `app/api/admin/b2b-services/route.ts` · `app/api/admin/business-leads/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/funnel/route.ts` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/impersonate/status/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/provider-applications/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/requests/route.ts` · `app/api/admin/reviews/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/stats/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/admin/users/route.ts` · `app/api/auth/google/callback/route.ts` · `app/api/auth/google/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/b2b-services/[id]/image/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/categories/route.ts` · `app/api/favorites/route.ts` · `app/api/health/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/me/company/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/provider/route.ts` · `app/api/me/route.ts` · `app/api/notifications/route.ts` · `app/api/provider/service-profile/route.ts` · `app/api/provider-applications/[id]/route.ts` · `app/api/provider-applications/route.ts` · `app/api/providers/[id]/photo/route.ts` · `app/api/providers/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/requests/[ref]/status/route.ts` · `app/api/work/nav-badges/route.ts` · `app/api/work/threads/route.ts` · `app/rss.xml/route.ts` |
+| `GET` | `app/api/admin/audit/route.ts` · `app/api/admin/b2b-services/route.ts` · `app/api/admin/business-leads/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/funnel/route.ts` · `app/api/admin/health/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/impersonate/status/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/messages/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/provider-applications/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/requests/route.ts` · `app/api/admin/reviews/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/stats/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/admin/users/route.ts` · `app/api/auth/google/callback/route.ts` · `app/api/auth/google/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/b2b-services/[id]/image/route.ts` · `app/api/blog/[slug]/cover/route.ts` · `app/api/categories/route.ts` · `app/api/favorites/route.ts` · `app/api/health/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/me/company/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/provider/route.ts` · `app/api/me/route.ts` · `app/api/me/threads/route.ts` · `app/api/notifications/route.ts` · `app/api/provider/requests/[id]/photo/route.ts` · `app/api/provider/service-profile/route.ts` · `app/api/provider-applications/[id]/route.ts` · `app/api/provider-applications/route.ts` · `app/api/providers/[id]/photo/route.ts` · `app/api/providers/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/requests/[ref]/status/route.ts` · `app/api/work/nav-badges/route.ts` · `app/api/work/threads/route.ts` · `app/rss.xml/route.ts` |
 | `getCurrentUser` | `lib/auth.ts` |
 | `getImpersonatorId` | `lib/auth.ts` |
 | `getIntegrations` | `lib/integrations.ts` |
@@ -340,11 +388,11 @@
 | `Group` | `app/work/profile/_types.ts` |
 | `groupByDirection` | `lib/b2b.ts` |
 | `groupByKind` | `lib/b2b.ts` |
+| `groupIdOf` | `lib/requestTopics.ts` |
 | `groupIsLive` | `lib/requestTopics.ts` |
 | `groupIsService` | `lib/requestTopics.ts` |
 | `GROUPS` | `lib/helpTopics.ts` |
 | `groupsForKind` | `lib/requestTopics.ts` |
-| `GuestDoor` | `app/join/_door/GuestDoor.tsx` |
 | `hashPassword` | `lib/auth.ts` |
 | `hasIllustration` | `components/Illustration.tsx` |
 | `hasMultipleHats` | `lib/hats.ts` |
@@ -362,6 +410,7 @@
 | `HELP_ROUTE_RE` | `lib/helpTopics.ts` |
 | `HELP_TOPIC_IDS` | `lib/helpTopics.ts` |
 | `HELP_VISIBLE` | `lib/helpTopics.ts` |
+| `HelpFaq` | `app/help/_faq.tsx` |
 | `helpFaqKey` | `lib/helpTopics.ts` |
 | `HelpProfession` | `lib/helpProfessions.ts` |
 | `HelpSection` | `app/admin/_help.tsx` |
@@ -375,7 +424,6 @@
 | `homeForRole` | `lib/roleHome.ts` |
 | `HomeHero` | `app/_home/hero.tsx` |
 | `homeItems` | `lib/homeCatalogue.ts` |
-| `HowItWorks` | `app/_home/how.tsx` |
 | `Icon` | `components/Icon.tsx` |
 | `Identity` | `lib/identity.ts` |
 | `identityOf` | `lib/identity.ts` |
@@ -383,6 +431,8 @@
 | `Illustration` | `components/Illustration.tsx` |
 | `IllustrationName` | `components/Illustration.tsx` |
 | `ImpersonationBanner` | `components/ImpersonationBanner.tsx` |
+| `InboxChrome` | `components/chat/InboxFrame.tsx` |
+| `InboxFrame` | `components/chat/InboxFrame.tsx` |
 | `InboxRow` | `lib/inboxRows.ts` |
 | `inboxUnreadTotal` | `lib/inboxRows.ts` |
 | `initialMe` | `lib/meServer.ts` |
@@ -421,11 +471,13 @@
 | `isVertical` | `lib/requestTopics.ts` |
 | `JOB_DONE_NOTE` | `lib/credits.ts` |
 | `JOB_DONE_TETRI` | `lib/credits.ts` |
+| `JOB_STEPS` | `app/work/(provider)/_tracker.tsx` |
 | `JobBucket` | `lib/jobRows.ts` |
 | `jobDayKey` | `lib/jobRows.ts` |
 | `jobDoneKey` | `lib/credits.ts` |
 | `JobRow` | `lib/jobRows.ts` |
 | `JobsClient` | `app/work/jobs/_client.tsx` |
+| `JobTracker` | `app/work/(provider)/_tracker.tsx` |
 | `JOIN_DOOR_HREF` | `lib/capabilities.ts` |
 | `JOIN_DOOR_LABEL` | `lib/capabilities.ts` |
 | `JOIN_HREF` | `lib/roleHome.ts` |
@@ -461,24 +513,29 @@
 | `LIVE_OFFER` | `lib/userDeletion.ts` |
 | `LIVE_OFFER_GROUPS` | `lib/serviceProfile.ts` |
 | `LIVE_OFFER_TOPICS` | `lib/serviceProfile.ts` |
+| `LIVE_REQUEST_STATUSES` | `lib/myRequests.ts` |
 | `LIVE_SERVICE_GROUP_IDS` | `lib/requestTopics.ts` |
 | `LiveCat` | `app/experts/_cats.ts` |
 | `LiveRefresh` | `app/request/_liveRefresh.tsx` |
+| `liveRequestCount` | `lib/myRequests.ts` |
 | `LiveState` | `lib/requestLiveClient.ts` |
-| `LiveStatus` | `app/request/_live.tsx` |
 | `Loaded` | `app/work/profile/_types.ts` |
 | `LoadMoreBar` | `app/admin/_parts.tsx` |
+| `loadRequestRoom` | `app/request/[ref]/_room.tsx` |
 | `lockPageScroll` | `components/Sheet.tsx` |
+| `logMessage` | `lib/messageLog.ts` |
 | `Logo` | `components/Logo.tsx` |
 | `lowestPrice` | `lib/serviceProfile.ts` |
 | `mailVerifiedRequest` | `lib/requestJobs.ts` |
 | `makePublicRef` | `lib/requests.ts` |
 | `markAllNotificationsRead` | `lib/notifications.ts` |
 | `markDoneWhere` | `lib/offerLifecycle.ts` |
+| `MARKED_GROUP_IDS` | `lib/topicMarks.tsx` |
 | `MARKED_SLUGS` | `lib/categoryMarks.tsx` |
 | `MarketingTopBar` | `components/MarketingTopBar.tsx` |
 | `markNotificationRead` | `lib/notifications.ts` |
 | `markOfferDone` | `lib/offerLifecycle.ts` |
+| `mask` | `lib/sms.ts` |
 | `MASK` | `lib/requestChat.ts` |
 | `maskContacts` | `lib/requestChat.ts` |
 | `MASKED_CLIENT_NAME` | `lib/inboxRows.ts` |
@@ -499,12 +556,25 @@
 | `MAX_WORK_PHOTOS` | `lib/serviceProfile.ts` |
 | `mayAutoVerify` | `lib/requestTriage.ts` |
 | `Me` | `lib/me.ts` · `app/settings/_types.ts` |
-| `MessagesFrame` | `app/work/messages/_frame.tsx` |
+| `MESSAGE_TEXT_DEFAULTS` | `lib/messageTextDefs.ts` |
+| `MESSAGE_TEXTS` | `lib/messageTextDefs.ts` |
+| `MessagesSection` | `app/admin/_messages.tsx` |
 | `MessagesSpace` | `lib/messagesUnread.ts` |
-| `metadata` | `app/abroad/page.tsx` · `app/business/page.tsx` · `app/contact/layout.tsx` · `app/cookies/page.tsx` · `app/layout.tsx` · `app/not-found.tsx` · `app/privacy/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/signin/layout.tsx` · `app/signup/layout.tsx` · `app/terms/page.tsx` · `app/work/(provider)/layout.tsx` · `app/work/account/page.tsx` · `app/work/jobs/page.tsx` · `app/work/page.tsx` · `app/work/profile/page.tsx` |
+| `messageState` | `lib/outboundSettings.ts` |
+| `MessageState` | `lib/outboundSettings.ts` |
+| `MessageStatus` | `lib/messageLog.ts` |
+| `MessageT` | `lib/messageText.ts` |
+| `messageText` | `lib/messageText.ts` |
+| `MessageTextDef` | `lib/messageTextDefs.ts` |
+| `MessageTextGroup` | `lib/messageTextDefs.ts` |
+| `messageTextKey` | `lib/messageTextDefs.ts` |
+| `messageTextSync` | `lib/messageText.ts` |
+| `metadata` | `app/abroad/page.tsx` · `app/business/page.tsx` · `app/contact/layout.tsx` · `app/cookies/page.tsx` · `app/layout.tsx` · `app/me/favorites/page.tsx` · `app/me/layout.tsx` · `app/me/messages/page.tsx` · `app/me/page.tsx` · `app/me/profile/page.tsx` · `app/me/r/[ref]/page.tsx` · `app/not-found.tsx` · `app/notifications/layout.tsx` · `app/privacy/page.tsx` · `app/request/[ref]/page.tsx` · `app/request/page.tsx` · `app/settings/layout.tsx` · `app/signin/layout.tsx` · `app/signup/layout.tsx` · `app/terms/page.tsx` · `app/work/(provider)/layout.tsx` · `app/work/(provider)/offers/[offerId]/page.tsx` · `app/work/(provider)/offers/page.tsx` · `app/work/account/page.tsx` · `app/work/balance/page.tsx` · `app/work/jobs/page.tsx` · `app/work/messages/layout.tsx` · `app/work/page.tsx` · `app/work/profile/page.tsx` |
+| `MIN_RESPONSE_SAMPLE` | `lib/responseStats.ts` |
 | `MiniChart` | `app/admin/_charts.tsx` |
 | `minutesToView` | `lib/offerEvents.ts` |
 | `MISS_BUDGET` | `lib/refGuard.ts` |
+| `missingPhotoMessage` | `lib/providerApplication.ts` |
 | `MobileCollapse` | `components/catalog/MobileCollapse.tsx` |
 | `Msg` | `app/settings/_types.ts` |
 | `MSG_MAX_LEN` | `lib/msgText.ts` |
@@ -522,6 +592,7 @@
 | `NavProgress` | `components/NavProgress.tsx` |
 | `needsClientNudge` | `lib/requestRouting.ts` |
 | `needsProviderNudge` | `lib/requestRouting.ts` |
+| `NEW_REQUEST_ACTION` | `components/me/navConfig.ts` |
 | `newFlowId` | `lib/funnelEvents.ts` |
 | `newProviderApplicationAdminEmail` | `lib/emailTemplates.ts` |
 | `newPublicRef` | `lib/requestsServer.ts` |
@@ -540,6 +611,7 @@
 | `normalizeRoute` | `lib/helpTopics.ts` |
 | `noteRefMiss` | `lib/refGuard.ts` |
 | `NotFoundClient` | `app/NotFoundClient.tsx` |
+| `NotFoundPane` | `components/chat/ThreadPaneShell.tsx` |
 | `NotifBell` | `components/NotifBell.tsx` |
 | `NotifItem` | `lib/notifications.ts` |
 | `NotifType` | `lib/notify.ts` |
@@ -548,8 +620,11 @@
 | `oauthOrigin` | `lib/googleOauth.ts` |
 | `OFFER_EVENT_LABEL` | `lib/offerEvents.ts` |
 | `OFFER_EVENTS` | `lib/offerEvents.ts` |
+| `OFFER_FREE_BODY` | `lib/credits.ts` |
 | `OFFER_FREE_NOTE` | `lib/credits.ts` |
+| `OFFER_FREE_TITLE` | `lib/credits.ts` |
 | `OFFER_GROUPS` | `lib/serviceProfile.ts` |
+| `OFFER_PRICE_FIELD` | `lib/requests.ts` |
 | `OFFER_PRICE_KIND_LABEL` | `lib/requests.ts` |
 | `OFFER_PRICE_KINDS` | `lib/requests.ts` |
 | `OFFER_STATUS_LABEL` | `lib/requests.ts` |
@@ -569,6 +644,7 @@
 | `OfferPriceKind` | `lib/requests.ts` |
 | `offerPriceLabel` | `lib/requests.ts` |
 | `offerProviderError` | `lib/requests.ts` |
+| `offerRowPrice` | `lib/inboxRows.ts` |
 | `OfferStatusName` | `lib/requests.ts` |
 | `OfferStatusPill` | `components/requests/StatusPills.tsx` |
 | `offerTemplateFor` | `lib/requestTopics.ts` |
@@ -581,6 +657,12 @@
 | `OpenBtn` | `app/admin/_parts.tsx` |
 | `openRequestCount` | `lib/requestsServer.ts` |
 | `OTHER_TOPIC` | `lib/requestTopics.ts` |
+| `OUTBOUND` | `lib/outbound.ts` |
+| `outboundDef` | `lib/outbound.ts` |
+| `OutboundDef` | `lib/outbound.ts` |
+| `OutboundKey` | `lib/outbound.ts` |
+| `outboundLabel` | `lib/outbound.ts` |
+| `OutboundPreview` | `lib/outboundPreview.ts` |
 | `OverviewSection` | `app/admin/_overview.tsx` |
 | `PAGE_SEO` | `lib/pageSeoDefs.ts` |
 | `PageHeader` | `components/PageHeader.tsx` |
@@ -594,11 +676,15 @@
 | `parseLimit` | `lib/apiParams.ts` |
 | `parseTrades` | `lib/catalogItems.ts` |
 | `passesFilters` | `app/experts/_filters.tsx` |
+| `PasswordChangeInput` | `lib/passwordPolicy.ts` · `lib/passwordPolicy.ts` |
+| `passwordError` | `lib/passwordPolicy.ts` |
 | `PasswordSection` | `app/settings/_password.tsx` |
-| `PATCH` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/business-leads/route.ts` · `app/api/admin/categories/[id]/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/providers/[id]/category/route.ts` · `app/api/admin/providers/[id]/featured/route.ts` · `app/api/admin/providers/[id]/verified/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/provider/route.ts` · `app/api/me/route.ts` · `app/api/notifications/[id]/read/route.ts` · `app/api/provider-applications/[id]/route.ts` |
+| `PATCH` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/business-leads/route.ts` · `app/api/admin/categories/[id]/route.ts` · `app/api/admin/companies/[id]/route.ts` · `app/api/admin/help/route.ts` · `app/api/admin/integrations/route.ts` · `app/api/admin/messages/route.ts` · `app/api/admin/posts/[id]/route.ts` · `app/api/admin/providers/[id]/category/route.ts` · `app/api/admin/providers/[id]/featured/route.ts` · `app/api/admin/providers/[id]/verified/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/site-texts/route.ts` · `app/api/admin/users/[id]/route.ts` · `app/api/me/notifications-prefs/route.ts` · `app/api/me/provider/route.ts` · `app/api/me/route.ts` · `app/api/notifications/[id]/read/route.ts` · `app/api/provider-applications/[id]/route.ts` |
 | `PAYMENTS_LIVE` | `lib/flags.ts` |
 | `paymentSourceOf` | `lib/b2b.ts` |
 | `PeriodSwitch` | `app/admin/_parts.tsx` |
+| `PH_KEYS` | `components/CategoryMarks.tsx` |
+| `phMark` | `components/CategoryMarks.tsx` |
 | `phoneFormatError` | `lib/phone.ts` |
 | `PhoneInput` | `components/PhoneInput.tsx` |
 | `PhotosSection` | `app/work/profile/_secPhotos.tsx` |
@@ -609,7 +695,7 @@
 | `PitchFaqLd` | `app/join/_sections.tsx` |
 | `PitchSections` | `app/join/_sections.tsx` |
 | `placesLeft` | `lib/requests.ts` |
-| `POST` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/broadcast/preview/route.ts` · `app/api/admin/broadcast/send/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/balance/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/impersonate/[userId]/route.ts` · `app/api/admin/impersonate/exit/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/presence/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/message/route.ts` · `app/api/auth/otp/send/route.ts` · `app/api/auth/otp/verify/route.ts` · `app/api/auth/reset/confirm/route.ts` · `app/api/auth/reset/request/route.ts` · `app/api/auth/signin/route.ts` · `app/api/auth/signout/route.ts` · `app/api/auth/signup/route.ts` · `app/api/business/lead/route.ts` · `app/api/contact/route.ts` · `app/api/events/route.ts` · `app/api/favorites/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/me/password/route.ts` · `app/api/notifications/read/route.ts` · `app/api/provider/offers/route.ts` · `app/api/provider/requests/[id]/contact/route.ts` · `app/api/provider-applications/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/accept/route.ts` · `app/api/requests/[ref]/invite/route.ts` · `app/api/requests/[ref]/offers/[offerId]/done/route.ts` · `app/api/requests/[ref]/offers/[offerId]/review/route.ts` · `app/api/requests/[ref]/offers/[offerId]/withdraw/route.ts` · `app/api/requests/[ref]/open/route.ts` · `app/api/requests/route.ts` · `app/api/uploads/route.ts` |
+| `POST` | `app/api/admin/b2b-services/route.ts` · `app/api/admin/broadcast/preview/route.ts` · `app/api/admin/broadcast/send/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/balance/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/impersonate/[userId]/route.ts` · `app/api/admin/impersonate/exit/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/presence/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/message/route.ts` · `app/api/auth/otp/send/route.ts` · `app/api/auth/otp/verify/route.ts` · `app/api/auth/reset/confirm/route.ts` · `app/api/auth/reset/request/route.ts` · `app/api/auth/signin/route.ts` · `app/api/auth/signout/route.ts` · `app/api/auth/signup/route.ts` · `app/api/business/lead/route.ts` · `app/api/contact/route.ts` · `app/api/events/route.ts` · `app/api/favorites/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/me/password/route.ts` · `app/api/notifications/read/route.ts` · `app/api/provider/offers/route.ts` · `app/api/provider/requests/[id]/contact/route.ts` · `app/api/provider-applications/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/accept/route.ts` · `app/api/requests/[ref]/cancel/route.ts` · `app/api/requests/[ref]/invite/route.ts` · `app/api/requests/[ref]/offers/[offerId]/done/route.ts` · `app/api/requests/[ref]/offers/[offerId]/review/route.ts` · `app/api/requests/[ref]/offers/[offerId]/withdraw/route.ts` · `app/api/requests/[ref]/open/route.ts` · `app/api/requests/route.ts` · `app/api/uploads/route.ts` |
 | `postAuthHome` | `lib/auth.ts` |
 | `PrefKey` | `lib/notify.ts` · `app/settings/_types.ts` |
 | `prefRows` | `app/settings/_types.ts` |
@@ -619,12 +705,14 @@
 | `PresenceBeat` | `app/admin/_presence.tsx` |
 | `presenceHint` | `lib/requestThread.ts` |
 | `presenceLabel` | `lib/requestThread.ts` |
+| `previewOf` | `lib/outboundPreview.ts` |
 | `prevStepId` | `app/request/_model.ts` |
+| `PRICE_ON_REQUEST` | `lib/requests.ts` |
 | `priceBandActive` | `app/experts/_filters.tsx` |
 | `priceBandLabel` | `app/experts/_filters.tsx` |
 | `pricedServices` | `lib/serviceProfile.ts` |
 | `PricedServicesBlock` | `app/experts/[slug]/_providerBlocks.tsx` |
-| `PriceField` | `components/PriceField.tsx` |
+| `priceFloorsByCategory` | `lib/categoryCounts.ts` |
 | `priceHint` | `lib/serviceProfile.ts` |
 | `PriceRange` | `app/experts/_filters.tsx` |
 | `PRIMARY_LANG_CODES` | `lib/languages.ts` |
@@ -646,17 +734,17 @@
 | `professionsOfTopic` | `lib/requestTopics.ts` |
 | `professionsThatCan` | `lib/professions.ts` |
 | `PROFILE_VIEW_DEDUPE_MS` | `lib/events.ts` |
-| `ProfileClient` | `app/me/profile/client.tsx` |
 | `ProfileCompleteness` | `components/ProfileCompleteness.tsx` |
+| `profileCompletion` | `lib/creditsServer.ts` |
 | `ProfileEditor` | `app/work/profile/_editor.tsx` |
 | `profileFacts` | `lib/creditsServer.ts` |
 | `ProfileFacts` | `lib/credits.ts` |
-| `ProfileFactsBlock` | `app/experts/[slug]/_providerBlocks.tsx` |
 | `ProfileForCompleteness` | `lib/profileScore.ts` |
 | `profileGaps` | `lib/serviceProfile.ts` |
 | `profileIsRoutable` | `lib/serviceProfile.ts` |
 | `profilePercent` | `lib/profileScore.ts` |
 | `ProfileSection` | `app/settings/_profile.tsx` |
+| `ProfileStatusBand` | `app/work/profile/_parts.tsx` |
 | `profileViewKey` | `lib/events.ts` |
 | `progressOf` | `app/request/_model.ts` |
 | `PROPS_ARRAY_MAX` | `lib/events.ts` |
@@ -670,6 +758,8 @@
 | `PROVIDER_ROUTE` | `lib/requests.ts` |
 | `PROVIDER_STATUS_TEXT` | `lib/providerApplication.ts` |
 | `PROVIDER_WORKSPACE_PATHS` | `lib/requests.ts` |
+| `providerApplicationBody` | `lib/providerApplication.ts` |
+| `ProviderApplicationDraft` | `lib/providerApplication.ts` |
 | `ProviderApplicationInput` | `lib/providerApplication.ts` · `lib/providerApplication.ts` |
 | `ProviderApplyClient` | `app/join/_provider/client.tsx` |
 | `providerApprovedEmail` | `lib/emailTemplates.ts` |
@@ -679,6 +769,7 @@
 | `ProviderHero` | `app/experts/[slug]/_providerHero.tsx` |
 | `providerHref` | `app/experts/_providerCard.tsx` |
 | `ProviderIdentity` | `lib/requestsServer.ts` |
+| `providerKey` | `lib/responseStats.ts` |
 | `ProviderKind` | `lib/providerApplication.ts` |
 | `ProviderKindName` | `lib/requests.ts` |
 | `providerPath` | `app/experts/[slug]/_providerData.ts` |
@@ -706,8 +797,10 @@
 | `PublicService` | `app/business/BusinessLanding.tsx` |
 | `PublicTopBar` | `components/PublicTopBar.tsx` |
 | `PUT` | `app/api/provider/service-profile/route.ts` |
-| `PWD_MIN` | `app/work/profile/_types.ts` |
-| `PWD_MIN_MSG` | `app/work/profile/_types.ts` |
+| `PWD_MAX` | `lib/passwordPolicy.ts` |
+| `PWD_MAX_MSG` | `lib/passwordPolicy.ts` |
+| `PWD_MIN` | `lib/passwordPolicy.ts` |
+| `PWD_MIN_MSG` | `lib/passwordPolicy.ts` |
 | `PwInput` | `app/signin/_fields.tsx` |
 | `QUERY_MAX` | `lib/events.ts` |
 | `QUERY_MIN` | `lib/events.ts` |
@@ -734,14 +827,17 @@
 | `REF_ALPHABET` | `lib/requests.ts` |
 | `REF_LENGTH` | `lib/requests.ts` |
 | `refBudgetSpent` | `lib/refGuard.ts` |
+| `refreshDeliveries` | `lib/messageLog.ts` |
 | `refreshNavBadges` | `components/work/useNavBadges.ts` |
 | `refundDeadContacts` | `lib/creditsServer.ts` |
 | `refundDeadRequest` | `lib/requestJobs.ts` |
+| `refundSilentContact` | `lib/creditsServer.ts` |
 | `registerSearchInput` | `lib/searchFocus.ts` |
 | `reminderDue` | `lib/offerLifecycle.ts` |
 | `renderMarkdown` | `lib/markdown.ts` |
 | `REPEAT_LIMIT` | `lib/requestTriage.ts` |
 | `replaceSession` | `lib/auth.ts` |
+| `replyLabel` | `lib/responseStats.ts` |
 | `reportClientError` | `lib/reportError.ts` |
 | `REQUEST_FUNNEL_EVENT_NAMES` | `app/request/requestFunnelEvents.ts` |
 | `REQUEST_FUNNEL_EVENTS` | `app/request/requestFunnelEvents.ts` |
@@ -753,8 +849,8 @@
 | `REQUEST_SLUG_RE` | `app/request/requestFunnelEvents.ts` |
 | `REQUEST_STATIONS` | `lib/requests.ts` |
 | `REQUEST_STATUSES` | `lib/requests.ts` |
+| `REQUEST_TILE_PHOTO` | `lib/categoryMarks.tsx` |
 | `requestAccessOf` | `lib/requestsServer.ts` |
-| `RequestBand` | `app/_home/request.tsx` |
 | `RequestChat` | `components/RequestChat.tsx` |
 | `requestChatEmail` | `lib/emailTemplates.ts` |
 | `requestClosedNoOffersClientEmail` | `lib/emailTemplates.ts` |
@@ -767,10 +863,11 @@
 | `requestLiveMark` | `lib/requestLive.ts` |
 | `RequestLiveMark` | `lib/requestLive.ts` |
 | `requestLiveStatus` | `lib/requestLive.ts` |
-| `RequestMessage` | `app/work/(provider)/requests/[id]/_message.tsx` |
 | `RequestMessageInput` | `lib/requestChat.ts` · `lib/requestChat.ts` |
 | `RequestOfferInput` | `lib/requests.ts` · `lib/requests.ts` |
 | `requestReceivedClientEmail` | `lib/emailTemplates.ts` |
+| `RequestRoom` | `app/request/[ref]/_room.tsx` |
+| `RequestRoomData` | `app/request/[ref]/_room.tsx` |
 | `requestsFeatureExists` | `lib/requests.ts` |
 | `RequestShell` | `app/request/_shell.tsx` |
 | `requestsNotFound` | `lib/requestsServer.ts` |
@@ -795,6 +892,8 @@
 | `resolveProvider` | `app/experts/[slug]/_providerData.ts` |
 | `resolveRequestTarget` | `lib/requestTarget.ts` |
 | `resolveTrade` | `lib/serviceProfile.ts` |
+| `ResponseStat` | `lib/responseStats.ts` |
+| `responseStatsFor` | `lib/responseStats.ts` |
 | `ResultsBar` | `app/experts/_results.tsx` |
 | `resumeStepId` | `app/request/_model.ts` |
 | `Reveal` | `components/Reveal.tsx` |
@@ -818,7 +917,7 @@
 | `runCreditJobs` | `lib/creditsServer.ts` |
 | `runOfferLifecycleJobs` | `lib/offerLifecycle.ts` |
 | `runRequestJobs` | `lib/requestJobs.ts` |
-| `runtime` | `app/api/admin/help/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/events/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/uploads/route.ts` · `app/api/work/threads/route.ts` |
+| `runtime` | `app/api/admin/help/route.ts` · `app/api/avatars/[id]/route.ts` · `app/api/events/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/me/threads/route.ts` · `app/api/requests/[ref]/events/route.ts` · `app/api/uploads/route.ts` · `app/api/work/threads/route.ts` |
 | `safeHttpUrl` | `lib/safeUrl.ts` |
 | `safeInternalPath` | `lib/roleHome.ts` |
 | `safeStoredFileUrl` | `lib/safeUrl.ts` |
@@ -835,15 +934,17 @@
 | `SearchHero` | `app/experts/_hero.tsx` |
 | `searchTopics` | `lib/requestTopics.ts` |
 | `SectionCard` | `app/admin/_parts.tsx` |
+| `sellsHere` | `lib/requestsServer.ts` |
+| `SEND_FAILED` | `lib/actionErrors.ts` |
 | `sendErrorText` | `lib/msgText.ts` |
 | `sendMail` | `lib/mailer.ts` |
+| `sendSms` | `lib/sms.ts` |
 | `Sent` | `app/request/RequestWizard.tsx` |
 | `SERVICE_BROWSE_GROUPS` | `lib/requestTopics.ts` |
 | `SERVICE_SUFFIX` | `lib/homeCatalogue.ts` |
 | `serviceLabels` | `lib/serviceProfile.ts` |
 | `servicePriceLabel` | `lib/b2b.ts` |
 | `ServiceProfileInput` | `lib/serviceProfile.ts` · `lib/serviceProfile.ts` |
-| `ServiceRail` | `app/_home/rail.tsx` |
 | `ServiceRequestInput` | `lib/requests.ts` · `lib/requests.ts` |
 | `serviceRequestRow` | `lib/requests.ts` |
 | `ServicesSections` | `app/work/profile/_secServices.tsx` |
@@ -851,6 +952,8 @@
 | `sessionDateTime` | `components/workspace/sessionTime.ts` |
 | `sessionTime` | `components/workspace/sessionTime.ts` |
 | `sessionWeekdayShort` | `components/workspace/sessionTime.ts` |
+| `setMessageState` | `lib/outboundSettings.ts` |
+| `SHARED_INVALID` | `lib/actionErrors.ts` |
 | `Sheet` | `components/Sheet.tsx` |
 | `ShopfrontCard` | `app/work/_components/ShopfrontCard.tsx` |
 | `ShopfrontLabel` | `app/work/_components/ShopfrontCard.tsx` |
@@ -859,8 +962,12 @@
 | `showApplyCta` | `lib/roleHome.ts` |
 | `showJoinInvite` | `lib/capabilities.ts` |
 | `showRequestCta` | `lib/requests.ts` |
+| `sideFilters` | `app/experts/_filters.tsx` |
 | `SignInView` | `app/signin/_signin.tsx` |
 | `signOut` | `lib/signout.ts` |
+| `SignupField` | `lib/signupCompleteness.ts` |
+| `SignupGap` | `lib/signupCompleteness.ts` |
+| `SignupShape` | `lib/signupCompleteness.ts` |
 | `SignUpView` | `app/signin/_signup.tsx` |
 | `SITE_TEXT_DEFAULTS` | `lib/siteTextDefs.ts` |
 | `SITE_TEXT_PUBLIC_DEFAULTS` | `lib/siteTextDefs.ts` |
@@ -879,12 +986,18 @@
 | `slugReserved` | `lib/slugSpace.ts` |
 | `slugTaken` | `lib/slugSpace.ts` |
 | `smallTalk` | `lib/helpSearch.ts` |
+| `smsBalance` | `lib/sms.ts` |
+| `smsDestination` | `lib/sms.ts` |
+| `SmsKind` | `lib/sms.ts` |
+| `smsParts` | `lib/sms.ts` |
+| `SmsResult` | `lib/sms.ts` |
 | `socialMeta` | `lib/seo.ts` |
 | `sortInboxRows` | `lib/inboxRows.ts` |
 | `sortJobRows` | `lib/jobRows.ts` |
 | `SPACE_LABEL` | `lib/roles.ts` |
 | `sphereOfProfession` | `lib/professions.ts` |
 | `sphereOfProfessions` | `lib/professions.ts` |
+| `sphereOfServices` | `lib/requestTopics.ts` |
 | `sphereToReveal` | `lib/categoryTree.ts` |
 | `splitDated` | `lib/jobRows.ts` |
 | `staffIsOnline` | `lib/requestThread.ts` |
@@ -898,14 +1011,12 @@
 | `Stat` | `app/admin/_parts.tsx` |
 | `stationsReached` | `lib/requests.ts` |
 | `STATUS_LABEL` | `lib/requests.ts` |
+| `statusOf` | `lib/messageLog.ts` |
 | `stem` | `lib/helpSearch.ts` |
 | `stemWord` | `lib/topicMatch.ts` |
-| `Step` | `components/StepIndicator.tsx` |
 | `stepComplete` | `app/request/_model.ts` |
 | `StepContact` | `app/request/_stepContact.tsx` |
 | `StepDef` | `app/request/_model.ts` |
-| `stepDotClass` | `components/StepIndicator.tsx` |
-| `StepIndicator` | `components/StepIndicator.tsx` |
 | `StepPick` | `app/request/_stepPick.tsx` |
 | `stepsFor` | `app/request/_model.ts` |
 | `StepWhat` | `app/request/_stepWhat.tsx` |
@@ -916,9 +1027,11 @@
 | `SUGGESTED_TOPIC_IDS` | `lib/requestTopics.ts` |
 | `SUGGESTED_TOPICS` | `lib/requestTopics.ts` |
 | `suggestedFor` | `lib/requestTopics.ts` |
+| `SupplyFacts` | `app/_home/cta.tsx` |
 | `SUPPORT_EMAIL` | `lib/supportEmails.ts` |
 | `SWEEP_STALE_MIN` | `lib/sweepRunner.ts` |
 | `sweepDeadContactRefunds` | `lib/requestJobs.ts` |
+| `sweepSilentContacts` | `lib/requestJobs.ts` |
 | `SystemSection` | `app/admin/_system.tsx` |
 | `TAB_ALIASES` | `app/admin/_nav.tsx` |
 | `TabHeader` | `app/admin/_parts.tsx` |
@@ -928,12 +1041,17 @@
 | `TBILISI` | `lib/tz.ts` |
 | `tbilisiDeltaHours` | `lib/tz.ts` |
 | `tbilisiParts` | `lib/tz.ts` |
+| `telHref` | `lib/phone.ts` |
 | `templateFor` | `lib/requestTopics.ts` |
 | `TETRI` | `lib/credits.ts` |
 | `ThanksCard` | `app/request/_thanks.tsx` |
 | `threadClosedReason` | `lib/requestThread.ts` |
 | `threadIsOpen` | `lib/requestThread.ts` |
+| `ThreadPaneShell` | `components/chat/ThreadPaneShell.tsx` |
 | `ThreadSide` | `lib/requestThread.ts` |
+| `TILE_HUES` | `app/_home/data.tsx` |
+| `tileHue` | `app/_home/data.tsx` |
+| `TileHue` | `app/_home/data.tsx` |
 | `timeAgoKa` | `lib/requests.ts` |
 | `timelineOf` | `lib/offerEvents.ts` |
 | `TIMING` | `lib/requestTopics.ts` |
@@ -953,6 +1071,7 @@
 | `TOPIC_KEYWORDS` | `lib/helpSearch.ts` |
 | `topicById` | `lib/requestTopics.ts` |
 | `TopicGroup` | `lib/requestTopics.ts` |
+| `topicGroupMark` | `lib/topicMarks.tsx` |
 | `TopicHit` | `lib/requestTopics.ts` |
 | `topicLabel` | `lib/requestTopics.ts` |
 | `topicsForProfessions` | `lib/requestRouting.ts` |
@@ -975,12 +1094,12 @@
 | `triageFlags` | `lib/requestTriage.ts` |
 | `triageNote` | `lib/requestTriage.ts` |
 | `TrustStrip` | `components/TrustStrip.tsx` |
-| `TUTOR_PAYOUT_PCT` | `lib/flags.ts` |
 | `TZ_LABEL` | `lib/emailTemplates.ts` · `lib/tz.ts` |
 | `TzNote` | `components/workspace/TzNote.tsx` |
 | `UNANSWERED_NUDGE_HOURS` | `lib/requestRouting.ts` |
 | `UNDATED_LABEL` | `lib/jobRows.ts` |
 | `UnlockResult` | `lib/creditsServer.ts` |
+| `UNNAMED_PROVIDER` | `lib/inboxRows.ts` |
 | `unreadFor` | `lib/requestChat.ts` |
 | `UNSTATED` | `lib/requestTopics.ts` |
 | `UNSTATED_BUDGET` | `lib/requestTopics.ts` |
@@ -988,6 +1107,7 @@
 | `useAvatarCropper` | `components/AvatarCropper.tsx` |
 | `useCatalogView` | `components/catalog/useCatalogView.ts` |
 | `useCategories` | `app/join/_shared/useCategories.ts` |
+| `useFault` | `components/FieldError.tsx` |
 | `usefulLangs` | `app/experts/_filters.tsx` |
 | `useMe` | `lib/me.ts` |
 | `useMenuKeys` | `lib/useMenuKeys.ts` |
@@ -1003,13 +1123,19 @@
 | `useToast` | `components/ToastProvider.tsx` |
 | `useUnsavedGuard` | `lib/useUnsavedGuard.ts` |
 | `VALID_TABS` | `app/admin/_nav.tsx` |
+| `validationIssueMessage` | `lib/validationMessages.ts` |
 | `VerifiedMark` | `components/Avatar.tsx` |
+| `verifiedRequestSms` | `lib/smsTemplates.ts` |
 | `verifyPassword` | `lib/auth.ts` |
 | `VerifyView` | `app/signin/_verify.tsx` |
 | `Vertical` | `lib/requestTopics.ts` |
 | `VERTICAL_COPY` | `lib/requestTopics.ts` |
+| `VERTICAL_LABEL` | `lib/requestTopics.ts` |
 | `verticalOfTopic` | `lib/requestTopics.ts` |
+| `verticalOfTrades` | `app/experts/_filters.tsx` |
 | `VERTICALS` | `lib/requestTopics.ts` |
+| `verticalsOfTopics` | `lib/requestTopics.ts` |
+| `VerticalSwitch` | `app/experts/_filters.tsx` |
 | `View` | `app/signin/_model.tsx` |
 | `VIEW_CLASS` | `components/catalog/useCatalogView.ts` |
 | `VIEW_TITLES` | `app/signin/_model.tsx` |
@@ -1017,7 +1143,7 @@
 | `viewport` | `app/layout.tsx` |
 | `ViewToggle` | `components/catalog/ViewToggle.tsx` |
 | `vocabularyIsConsistent` | `lib/serviceProfile.ts` |
-| `Welcome` | `app/me/_welcome.tsx` |
+| `WaitingRoom` | `app/request/[ref]/_waiting.tsx` |
 | `welcomeEmail` | `lib/emailTemplates.ts` |
 | `withAccountContact` | `app/request/_model.ts` |
 | `withdrawOffer` | `lib/offerLifecycle.ts` |
@@ -1043,7 +1169,7 @@
 
 # Prisma models and their fields
 
-30 models. The UI word is not the column name — check here before writing a query.
+32 models. The UI word is not the column name — check here before writing a query.
 
 **AuditLog** — id:String · actorId:String · action:String · targetType:String? · targetId:String? · meta:Json? · createdAt:DateTime
 
@@ -1075,6 +1201,10 @@
 
 **JobRun** — key:String · ranAt:DateTime · ok:Boolean? · result:Json?
 
+**MessageLog** — id:String · channel:String · key:String · to:String · status:String · mode:String · detail:String? · ref:String? · parts:Int? · delivery:Int? · deliveryAt:DateTime? · createdAt:DateTime
+
+**MessageSetting** — key:String · mailOn:Boolean · smsOn:Boolean · updatedAt:DateTime
+
 **Notification** — id:String · userId:String · title:String · body:String? · href:String? · type:String · readAt:DateTime? · createdAt:DateTime · user:User
 
 **OfferEvent** — id:String · offerId:String · offer:RequestOffer · type:String · at:DateTime · meta:Json?
@@ -1091,7 +1221,7 @@
 
 **RequestMessage** — id:String · offerId:String? · offer:RequestOffer? · requestId:String · request:ServiceRequest · fromClient:Boolean · fromUserId:String? · fromUser:User? · body:String · readByClientAt:DateTime? · readByProviderAt:DateTime? · createdAt:DateTime
 
-**RequestOffer** — id:String · requestId:String · request:ServiceRequest · providerKind:RequestProviderKind · expertUserId:String? · expertUser:User? · companyId:String? · company:Company? · priceGel:Int · priceKind:String · daysEstimate:Int? · message:String · status:RequestOfferStatus · kind:RequestOfferKind · doneAt:DateTime? · doneBy:String? · closedAt:DateTime? · review:Review? · createdAt:DateTime · updatedAt:DateTime · messages:RequestMessage[] · events:OfferEvent[]
+**RequestOffer** — id:String · requestId:String · request:ServiceRequest · providerKind:RequestProviderKind · expertUserId:String? · expertUser:User? · companyId:String? · company:Company? · priceGel:Int · priceKind:String · daysEstimate:Int? · priceIncludes:String? · message:String · status:RequestOfferStatus · kind:RequestOfferKind · doneAt:DateTime? · doneBy:String? · closedAt:DateTime? · review:Review? · createdAt:DateTime · updatedAt:DateTime · messages:RequestMessage[] · events:OfferEvent[]
 
 **Review** — id:String · offerId:String? · studentId:String · rating:Int · body:String · ratingKnowledge:Int? · ratingClarity:Int? · ratingValue:Int? · ratingPunctuality:Int? · tutorResponse:String? · respondedAt:DateTime? · anonymous:Boolean · createdAt:DateTime · offer:RequestOffer? · student:User
 

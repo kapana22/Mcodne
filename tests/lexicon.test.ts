@@ -15,6 +15,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { VERTICAL_LABEL } from '../lib/requestTopics'
 
 const ROOT = join(__dirname, '..')
 function walk(dir: string, out: string[] = []): string[] {
@@ -130,13 +131,31 @@ test('one word per thing, on every screen that says it', () => {
   // so the word is pinned where the site still says it: the home section's
   // eyebrow (SiteText default) and the catalogue's filter loading line.
   assert.match(codeOf('lib/siteTextDefs.ts'), /key: 'home\.categories\.eyebrow'[^\n]*default: 'კატეგორიები'/)
-  // ⚠️ THE RAIL STOPPED SAYING „კატეგორია" (2026-08-20), and that is the change
-  // rather than a regression: it names the two things the site sells —
-  // „პროფესიული სერვისები" and „ყოველდღიური სერვისები" — in the site's own
-  // order, professional first. „კატეგორია" was the word for a shelf when there
-  // were two catalogues to tell apart. What must never come back is „სფეროები",
-  // which the loop below still guards.
-  assert.match(codeOf('app/experts/_filters.tsx'), /პროფესიული სერვისები/)
+  // ⚠️ THE RAIL STOPPED SAYING „კატეგორია" (2026-08-20) and then stopped saying
+  // the two names in its own source (2026-09-01), and both are the change
+  // rather than a regression. It named the two things the site sells —
+  // „პროფესიული სერვისები" and „ყოველდღიური სერვისები" — as two headings; the
+  // owner made them a SWITCH („ეს მინდა იყოს გადამრთველი, რომ არევა არ მოხდეს
+  // ამათი"), and the two words moved into lib/requestTopics → VERTICAL_LABEL
+  // because four surfaces held four spellings of them: /join said „სერვისი
+  // სახლში", /work/profile said „სერვისი", this rail said „ყოველდღიური
+  // სერვისები" and the intake door's own label said „სერვისები" — the name of
+  // everything the site sells, used as the name of half of it.
+  //
+  // So the WORDS are pinned where they now live, and every screen that says
+  // them is pinned to the constant rather than to a literal — which is the
+  // whole of „one word per thing, on every screen that says it".
+  assert.equal(VERTICAL_LABEL.EXPERT, 'პროფესიული')
+  assert.equal(VERTICAL_LABEL.SERVICE, 'ყოველდღიური')
+  for (const f of [
+    'app/experts/_filters.tsx',        // the catalogue's switch
+    'app/join/_provider/client.tsx',   // the door a provider registers through
+    'app/work/profile/_secServices.tsx', // the provider's own service editor
+  ]) {
+    assert.match(codeOf(f), /VERTICAL_LABEL\./, `${f} names a side by hand instead of reading VERTICAL_LABEL`)
+    assert.doesNotMatch(codeOf(f), /'(პროფესიული|ყოველდღიური) სერვისები'/,
+      `${f} writes one of the two names as a literal — it will drift`)
+  }
   for (const f of ['components/PublicTopBar.tsx', 'lib/siteTextDefs.ts', 'app/experts/_hero.tsx', 'app/experts/_filters.tsx']) {
     assert.doesNotMatch(codeOf(f), /სფეროები/, `${f} says „სფეროები"`)
   }

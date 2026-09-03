@@ -29,6 +29,7 @@ export function PhoneInput({
   placeholder = '5XX XX XX XX',
   autoFocus,
   required,
+  field,
 }: {
   value: string
   onChange: (v: string) => void
@@ -36,6 +37,12 @@ export function PhoneInput({
   className?: string
   placeholder?: string
   autoFocus?: boolean
+  /** The per-field error wiring from components/FieldError — `data-fault`,
+   *  `aria-invalid`, `aria-describedby`. Spread onto the real <input> so THE
+   *  phone field can be the one at fault like any other control, and so a
+   *  screen reader is told which box „ნომერი არასწორია" is about. Optional:
+   *  screens that report no per-field errors pass nothing and are unchanged. */
+  field?: Record<string, unknown>
   /** ⚠️ Where the server already demands one. The request intake's zod bound
    *  (lib/requests → ServiceRequestInput.phone, `required: true`) rejects an
    *  empty number, so without this the only way to learn the field was needed
@@ -59,6 +66,7 @@ export function PhoneInput({
       onChange={e => onChange(sanitizePhoneInput(e.target.value))}
       placeholder={placeholder}
       autoFocus={autoFocus}
+      {...field}
       className={className}
     />
   )

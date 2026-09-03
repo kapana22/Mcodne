@@ -19,8 +19,9 @@
  * own verticals at length; this file is their sibling.
  */
 import test from 'node:test'
+import { requestChatEmail } from '../lib/emailTemplates'
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import {
   requestsOn, requestsVisibleTo, canSeeRequests, requestsFeatureExists,
@@ -40,7 +41,7 @@ import {
   kindsOfTopic,
   MAX_REQUEST_PHOTOS,
   serviceRequestRow, topicLabel, REQUEST_STATIONS, stationsReached,
-  canOpenRequestForm, showRequestCta,
+  canOpenRequestForm, canFileRequest, showRequestCta,
 } from '../lib/requests'
 import {
   threadIsOpen, threadClosedReason, staffIsOnline, PRESENCE_TTL_MS,
@@ -308,16 +309,83 @@ test('the two gates are different answers, and each is the right one', () => {
   // …and the client side does not ask at all. Asserted through the source of
   // the exported function rather than by calling it, because it closes over
   // process.env and would only ever prove whatever this machine is set to.
+  //
+  // ⚠️ THIS IS THE SUBSYSTEM GATE AND ITS NAME UNDERSELLS IT — fourteen surfaces
+  // answer 404 behind it, INCLUDING BOTH SIDES OF THE CHAT. Narrowing it to
+  // exclude sellers was tried on 2026-08-31 (the owner's „ვისაც სერვისი აქვს
+  // იმას არ შეძლოს სერვისის დაკვეთა") and would have taken the chat, the thread
+  // and /request/<ref> away from every provider on the site. The audience
+  // question lives in `canFileRequest`, one test down. This assertion is what
+  // catches the re-narrowing next time.
   const src = codeOf('lib/requests.ts')
   const fn = src.slice(src.indexOf('export function canOpenRequestForm'))
     .slice(0, src.slice(src.indexOf('export function canOpenRequestForm')).indexOf('}') + 1)
   assert.match(fn, /return requestsOn\(\)/,
     'canOpenRequestForm no longer answers „on, and nothing else"')
-  assert.doesNotMatch(fn, /role|hasAccess|allowlist|provider/i,
-    'the client gate started asking who the caller is — it must not')
+  assert.doesNotMatch(fn, /role|hasAccess|allowlist|provider|sells/i,
+    'the subsystem gate started asking who the caller is — that is canFileRequest\'s job')
 })
 
-test('the client’s reference is never shown to a provider', () => {
+// ⚠️ THE ONE AUDIENCE THAT IS REFUSED, AND IT IS THE SUPPLY SIDE (2026-08-31).
+// Owner: „მინდა რომ ვისაც სერვისი აქვს იმას არ შეძლოს სერვისის დაკვეთა — ირევა
+// ძალიან კოდი." Hiding the CTA has been the rule since 2026-08-21 and was never
+// a gate: the address is typeable, the catalogue and every provider profile
+// still carry an intake link for the anonymous majority, and a POST needs no
+// page at all. So what is pinned here is the SERVER's refusal.
+test('a provider cannot file a request — and the refusal is the server’s', () => {
+  assert.equal(canFileRequest(true), false, 'somebody who sells here can still file a request')
+  assert.equal(canFileRequest(false), requestsOn(), 'a plain client lost the form')
+  assert.equal(canFileRequest(undefined), requestsOn(),
+    'an unresolved identity must read as demand — a guest has no ServiceProfile')
+  assert.equal(canFileRequest(null), requestsOn())
+
+  const server = codeOf('lib/requestsServer.ts')
+  // The resolver: both halves, or it is describing somebody mid-registration.
+  // The resolver, by its parts rather than by one line's formatting: both
+  // halves of „is a provider", and the admin exemption that lets the operator
+  // still walk the client funnel on the live site.
+  const resolver = server.slice(server.indexOf('const sells ='), server.indexOf('const viewer: RequestViewer'))
+  assert.match(resolver, /provider !== null/, 'requestsViewer stopped requiring the allowlist row')
+  assert.match(resolver, /hasServiceProfile\(user\.id\)/,
+    'requestsViewer stopped requiring a ServiceProfile — an allowlist row alone is somebody mid-registration')
+  assert.match(resolver, /asRole\(user\.role\) !== 'ADMIN'/,
+    'the admin exemption is gone — an operator whose account carries a service could no longer test the intake')
+  assert.match(server, /mayFile: canFileRequest\(sells\)/,
+    'the file gate is answered without asking whether the caller is a seller')
+  assert.match(server, /clientAllowed: canOpenRequestForm\(\)/,
+    'the subsystem gate narrowed by audience again — that is what broke provider chat')
+  assert.match(server, /serviceProfile\.count/,
+    'the seller test no longer looks for a ServiceProfile — an allowlist row alone is somebody who has not finished registering')
+
+  // ONE endpoint creates a row, and it is the only one that may read `mayFile`.
+  const api = codeOf('app/api/requests/route.ts')
+  assert.match(api, /if \(!viewer\.mayFile\)/, 'the create endpoint stopped refusing sellers')
+  const others = sourceFiles()
+    .map(f => relative(ROOT, f))
+    .filter(f => /^app\/.*route\.ts$/.test(f) && f !== 'app/api/requests/route.ts')
+    .filter(f => /viewer\.mayFile/.test(codeOf(f)))
+  assert.deepEqual(others, [],
+    'another endpoint reads mayFile — a read-only surface must not refuse a provider')
+
+  // The page sends them to their own room rather than to the 404 the rest of
+  // this route answers with: they already know the subsystem exists.
+  const page = codeOf('app/request/page.tsx')
+  assert.match(page, /if \(viewer\.sells\) redirect\(PROVIDER_ROUTE\)/,
+    'the intake stopped turning a seller around')
+  assert.ok(
+    page.indexOf('viewer.sells') < page.indexOf('!viewer.clientAllowed'),
+    'the seller check runs after the 404 — a provider would get a wall instead of their workspace',
+  )
+
+  // …and the doors a signed-in provider actually meets are closed too, so the
+  // refusal is never the first they hear of it.
+  assert.match(codeOf('app/page.tsx'), /initialUser\?\.provider !== true/,
+    'the home hero still offers the intake to somebody who sells here')
+  assert.match(codeOf('app/me/layout.tsx'), /await sellsHere\(user\.id\)/,
+    'the client rail still offers „new request" to somebody who sells here')
+})
+
+test('the client’s reference is never shown to a provider', async () => {
   // ⚠️ THE WORST BUG THIS SUBSYSTEM HAS HAD (found 2026-08-17, in review).
   //
   // `publicRef` is not a reference number. It is the client's ENTIRE
@@ -360,9 +428,21 @@ test('the client’s reference is never shown to a provider', () => {
   // at leisure, so they carry the topic instead.
   assert.doesNotMatch(codeOf('app/api/request-chat/route.ts'), /body: r\.offer\.request\.publicRef/,
     'the provider bell body is the client’s reference again')
-  const mail = read('lib/emailTemplates.ts')
-  assert.match(mail, /o\.toProvider\s*\n?\s*\?\s*`ახალი\s+შეტყობინება\s+—\s+\$\{topicLabel\(o\.topic\)\}`/,
-    'the provider chat mail subject carries the client’s reference again')
+  /* ⚠️ RENDERED, NOT GREPPED (2026-09-03). This matched the exact template
+   * literal `o.toProvider ? \`ახალი შეტყობინება — ${topicLabel(o.topic)}\``,
+   * which stopped existing the day the copy moved into the registry the owner
+   * edits — and a regex that can be broken by moving a string is a regex that
+   * was never checking the rule. The RULE is that a provider's copy of this
+   * mail never carries the client's reference, and the way to check that is to
+   * build both mails and look. This version also catches what the old one could
+   * not: the reference appearing anywhere in the BODY. */
+  const provider = await requestChatEmail({ toProvider: true, topic: 'cleaning', publicRef: 'MC-ABCDE', preview: 'გამარჯობა' })
+  assert.doesNotMatch(provider.subject, /MC-ABCDE/, 'the provider chat mail subject carries the client’s reference')
+  assert.doesNotMatch(provider.html, /MC-ABCDE/, 'the provider chat mail body carries the client’s reference')
+  // And the client's own copy still HAS it: it is their way back into the
+  // request, and losing it would be the opposite failure.
+  const client = await requestChatEmail({ toProvider: false, topic: 'cleaning', publicRef: 'MC-ABCDE', preview: 'გამარჯობა' })
+  assert.match(client.subject, /MC-ABCDE/, 'the client lost their own reference')
   // codeOf, not read: the comment explaining the removal names `publicRef`, and
   // a negative assertion that trips on its own documentation is a test nobody
   // can keep true.
@@ -447,7 +527,14 @@ test('the waiting screen animates FACTS — no invented audience', () => {
   // other number is fabricated. It is the „3 people are viewing this room"
   // pattern, and it is worse here: the person is asked to WAIT on it, and what
   // they are waiting for is a phone call we would have misrepresented.
-  const live = codeOf('app/request/_live.tsx')
+  /* ⚠️ THE SCREEN MOVED, THE RULE DID NOT (2026-09-01). This read
+     `app/request/_live.tsx`, the post-send panel, which is gone — it was the
+     second journey widget at one address (see „the two screens describe one
+     journey" above). The waiting screen is now the room's, and every word of
+     the paragraph above applies to it unchanged: at the moment somebody
+     presses send nobody has looked at their request, so any number claiming an
+     audience is fabricated. */
+  const live = codeOf('app/request/[ref]/_waiting.tsx')
   // Since stage 10 the counting lives in lib/requestLive, which BOTH the poll
   // route (./status) and the stream (./events) answer from — one source, so a
   // number cannot be true on one and stale on the other. Both routes must
@@ -467,9 +554,14 @@ test('the waiting screen animates FACTS — no invented audience', () => {
   assert.match(api, /prisma\.serviceProfile\.count/,
     '„how many experts are in this sphere" stopped being a count')
 
-  // „N ექსპერტს ვაცნობეთ" may only render when the count is real and non-zero.
-  assert.match(live, /d\.notified > 0/,
-    'the notified line renders unconditionally — it would claim an audience before routing ran')
+  /* ⚠️ „N ექსპერტს ვაცნობეთ" IS NOT RENDERED ANYWHERE TODAY, and that is why
+     this asserts its ABSENCE rather than its gate. It lived on the deleted
+     panel, behind `d.notified > 0` so it could never claim an audience before
+     routing had run. `lib/requestLive` still computes it and both routes still
+     serve it, so the day it comes back it must come back GATED — which is what
+     the line below refuses to let anybody forget. */
+  assert.doesNotMatch(live, /ვაცნობეთ/,
+    'the notified line came back — it must be gated on a real non-zero count, as `d.notified > 0` was')
 
   // The motion is the site's own closed library — the canon shut it at eight
   // tokens and says to prefer removing motion to adding it.
@@ -490,10 +582,29 @@ test('the two screens describe one journey', () => {
   // both draw the same four stations. Two copies of the list is how one request
   // reads „ვამოწმებთ" on one screen and „შეთავაზებები" on the other.
   assert.equal(REQUEST_STATIONS.length, 4)
-  assert.match(codeOf('app/request/[ref]/page.tsx'), /REQUEST_STATIONS\.map/,
-    'the server track went back to its own copy of the station labels')
-  assert.match(codeOf('app/request/_live.tsx'), /REQUEST_STATIONS\.map/,
-    'the live panel went back to its own copy of the station labels')
+  /* ⚠️ THE ROOM STOPPED DRAWING THE TRACK, AND THE RULE SURVIVES INTACT
+     (2026-09-01, the owner's design canvas → „Request Room v2").
+     The canvas gives /request/<ref> three stages of its own — ლოდინი →
+     შეთავაზებები → დახურვა — and no four-station rail, because by the time a
+     client is IN the room the track has served its purpose: the stations
+     describe getting there, the room is the arrival.
+     What this test protects is unchanged and is asserted below instead: there
+     is ONE list of stations and nobody keeps a private copy. The screens that
+     still draw it must read it from lib/requests, and the room must not
+     re-declare the labels under another name. */
+  assert.doesNotMatch(codeOf('app/request/[ref]/page.tsx'), /'ვამოწმებთ'|'შეთავაზებები'\s*,\s*'/,
+    'the room grew its own copy of the station labels')
+  /* ⚠️ `app/request/_live.tsx` IS GONE (2026-09-01) and this assertion went
+     with it. `LiveStatus` was the four-station track on the post-send screen,
+     and it was the SECOND journey widget at one address: the wizard replaces
+     the URL rather than navigating, so a refresh landed on the room — which
+     the owner's design canvas had redrawn as „ვეძებთ შენთვის ექსპერტს". One
+     link, two different screens, depending on how you arrived.
+     The room won, and liveness did not die with the track: the room mounts
+     `LiveRefresh`, which calls `router.refresh()` and re-renders the whole
+     server component rather than one strip of it. */
+  assert.equal(existsSync(join(ROOT, 'app/request/_live.tsx')), false,
+    'the second journey widget came back — see app/request/_thanks.tsx')
   // NEW reaches „ვამოწმებთ" and stops there — the station in progress, not one
   // already ticked. Getting this wrong tells somebody their request has been
   // checked when nobody has looked at it.
@@ -643,14 +754,36 @@ test('every page and every route ALSO gates itself — the middleware is not the
     const other = gate === 'clientAllowed' ? 'providerAllowed' : 'clientAllowed'
     assert.doesNotMatch(body, new RegExp(`viewer\\.${other}`),
       `${f} reads viewer.${other} — that is the other side's gate`)
-    // notFound, never a redirect: requireRole() would send a signed-out visitor
-    // to /signin, which confirms the page is there.
-    assert.doesNotMatch(body, /redirect\(/, `${f} redirects instead of 404ing`)
+    // notFound, never a redirect — WITH ONE NAMED EXCEPTION (2026-08-31).
+    //
+    // The rule protects a STRANGER: `requireRole()` would send a signed-out
+    // visitor to /signin, and that confirms the page is there. It was written
+    // as „no redirect at all" because until now no redirect could be reached by
+    // anyone but a stranger. The seller turnaround can: it fires only for
+    // somebody with a session, an active allowlist row AND a ServiceProfile —
+    // a person who answers requests in /work every day and has nothing left to
+    // learn about whether this subsystem exists. So the assertion narrows to
+    // what it was always about: every redirect on these pages must be one that
+    // a stranger cannot reach.
+    const redirects = body
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => /\bredirect\(/.test(l) && !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('import '))
+    assert.deepEqual(
+      redirects.filter(l => !/^if \(viewer\.sells\) redirect\(PROVIDER_ROUTE\)$/.test(l)),
+      [],
+      `${f} redirects instead of 404ing — the only redirect allowed here is the seller turnaround`,
+    )
     assert.doesNotMatch(body, /requireRole\(/, `${f} uses requireRole — it would redirect to /signin`)
   }
 
-  const ROUTES: [string, 'clientAllowed' | 'providerAllowed'][] = [
-    ['app/api/requests/route.ts', 'clientAllowed'],
+  const ROUTES: [string, 'clientAllowed' | 'providerAllowed' | 'mayFile'][] = [
+    // ⚠️ THE ONE ROUTE ON THE NARROW GATE (2026-08-31). Every other client
+    // endpoint here READS or REPLIES; this one CREATES, and creating is the act
+    // a seller is refused (lib/requests → canFileRequest). `mayFile` implies
+    // `clientAllowed` — it is that boolean AND the audience test — so this row
+    // is not a weaker check, it is a stricter one.
+    ['app/api/requests/route.ts', 'mayFile'],
     ['app/api/requests/[ref]/accept/route.ts', 'clientAllowed'],
     ['app/api/request-chat/route.ts', 'clientAllowed'],
     ['app/api/request-thread/route.ts', 'clientAllowed'],
@@ -663,6 +796,12 @@ test('every page and every route ALSO gates itself — the middleware is not the
     const body = codeOf(f)
     assert.match(body, /requestsViewer\(\)/, `${f} does not check the gate`)
     assert.match(body, new RegExp(`viewer\\.${gate}`), `${f} does not use viewer.${gate}`)
+    // A route on the narrow gate must not ALSO answer the wide one: two gates
+    // on one endpoint is two places to loosen it from.
+    if (gate === 'mayFile') {
+      assert.doesNotMatch(body, /viewer\.clientAllowed/,
+        `${f} reads both gates — the create endpoint is decided by mayFile alone`)
+    }
     const other = gate === 'clientAllowed' ? 'providerAllowed' : 'clientAllowed'
     assert.doesNotMatch(body, new RegExp(`viewer\\.${other}`),
       `${f} reads viewer.${other} — that is the other side's gate`)
@@ -762,7 +901,67 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   // place the answer lives.
   const CLIENT_ENTRY_POINTS: [file: string, gatedIn: string][] = [
     ['components/PublicTopBar.tsx', 'components/PublicTopBar.tsx'],
-    ['app/_home/request.tsx', 'app/HomeClient.tsx'],
+    /* ⚠️ `app/_home/request.tsx` LEFT THIS LIST WITH THE FILE (2026-09-02).
+       The band stopped being composed with the 2026-08-21 redesign and was kept
+       „one `<RequestBand />` away from returning" so this scan would still know
+       it. Measured on 2026-09-02: nothing imported it, nothing rendered it, and
+       `app/page.tsx` calls it „the old band … NOT what came back". A file whose
+       only remaining purpose is to be listed in a test that watches it is the
+       control CLAUDE.md says to delete rather than leave switched off.
+       Nothing this test guarantees is weakened: what it protects is that no
+       UNARGUED door to /request or to the provider side exists, and a file that
+       does not exist opens no door. If the band is ever rebuilt it arrives as a
+       new entry point and gets argued for then — which is the rule.
+
+       ⚠️ `app/HomeClient.tsx` TAKES ITS PLACE, and it is the honest pairing.
+       The band was never the thing that reached /request from the home — the
+       ADDRESS is, and it arrives as `requestHref`, computed in `app/page.tsx`
+       behind `requestsOn()` and handed down. So the entry point is the file
+       that carries the address and the gate is the file that decides whether
+       there is one, which is exactly what this list is for. */
+    ['app/HomeClient.tsx', 'app/page.tsx'],
+    // ⚠️ THE HOME PAGE'S HERO IS AN INTAKE DOOR AGAIN (2026-08-31). The owner's
+    // design canvas („mcodne.ge პროფილის რედიზაინი" → Home) makes „დაწერე, რა
+    // გჭირდება" the largest type on the site and its field submits to
+    // /request?q=… — the handover the wizard already seeds from. This is the
+    // third time the home page's relationship to the intake has changed and it
+    // is listed rather than pattern-excused for the reason at the top of this
+    // list: the next door somebody adds still has to be argued for.
+    //
+    // GATED IN app/page.tsx, NOT IN HomeClient. `requestsOn()` reads an
+    // environment variable and HomeClient is `'use client'` — the server page
+    // resolves the address once and hands it down as `requestHref`, null when
+    // the subsystem is off. The hero then submits to the catalogue instead, so
+    // the field is never a door onto a 404.
+    //
+    // ⚠️ NEITHER FILE CONTAINS THE STRING „/request", so neither would be
+    // caught by the scan below — they are listed because the PAIRING is the
+    // assertion worth having: it is what fails if app/page.tsx ever stops
+    // reading the flag and starts handing the hero an address unconditionally.
+    // ⚠️ THE HOME'S EIGHTH CATEGORY TILE (2026-08-31). Six spheres cover almost
+    // everybody on the site; the tile beside them is for a need that is outside
+    // all six, and describing it is the only thing that serves that person — so
+    // it is a door into the subsystem sitting in a grid of browse links, which
+    // is exactly the kind of entrance this list exists to make somebody argue
+    // for. It arrived HARDCODED as `href="/request"` and this test caught it:
+    // with the flag off that tile is a 404 on the busiest page on the site. It
+    // takes `requestHref` from app/page.tsx now and is not drawn without one.
+    ['app/_home/categories.tsx', 'app/page.tsx'],
+    ['app/_home/hero.tsx', 'app/page.tsx'],
+    ['app/_home/how.tsx', 'app/page.tsx'],
+    // ⚠️ /about IS „როგორ მუშაობს" AND ITS CLIENT SIDE NOW CLOSES ON THE INTAKE
+    // (2026-08-31, the owner's „How It Works + Help" canvas). The page explains
+    // the request → offers → choose flow and then draws the canvas's dark band
+    // with „ფასის მოთხოვნა" in it; a page that describes filing a request and
+    // then offers no way to file one is the dead end the catalogue's own bridge
+    // was added to fix.
+    //
+    // Listed individually rather than pattern-excused, for the reason at the
+    // top of this list: the next door still has to be argued for. It gates
+    // ITSELF — the page is a server component, so `requestsOn()` is answerable
+    // right where the href is chosen, and with the subsystem off the button
+    // goes to /experts, which carries its own gated CTA one tap away.
+    ['app/about/page.tsx', 'app/about/page.tsx'],
     // ⚠️ THE CATALOGUE'S DEAD END (2026-08-18). „Nobody matches these filters"
     // is the single best moment to offer the other path, and until this link
     // the two halves of the product did not know about each other — browsing
@@ -809,6 +1008,26 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     // /request/<ref>, a page they already hold the key to — and it still gates
     // itself with `requestsOn()`, now to decide whether to read them at all.
     ['app/me/page.tsx', 'app/me/page.tsx'],
+    // ⚠️ THE CLIENT RAIL'S „ახალი მოთხოვნა" (2026-08-31), from the owner's
+    // „Client Space" canvas. The intake had no permanent control in this
+    // chrome: it lived in the /me home's greeting band, on ONE of the three
+    // screens, and vanished the moment somebody opened „შენახული". The canvas
+    // pins it to the bottom of the rail, so it is present on all three.
+    //
+    // Listed rather than pattern-excused, for the reason at the top of this
+    // list — and the PAIRING is the assertion worth having, because neither
+    // file could be caught by the scan below: navConfig quotes `REQUEST_ROUTE`
+    // (the subsystem publishing its own address, the correct direction) and the
+    // sidebar only renders an href it is handed.
+    //
+    // GATED IN app/me/layout.tsx, NOT IN THE SIDEBAR. `requestsOn()` reads an
+    // environment variable and every consumer of navConfig is `'use client'`,
+    // where that variable does not exist — so the flag can only be answered on
+    // the server. The layout resolves it once and hands the shell an href or
+    // null; null draws no button rather than a button onto a 404. The same
+    // shape as the home page's hero one entry up.
+    ['components/me/navConfig.ts', 'app/me/layout.tsx'],
+    ['components/me/ClientSidebar.tsx', 'app/me/layout.tsx'],
     // ⚠️ THE EXPERT'S PROFILE (2026-08-19) — the counterpart of the master's
     // above, and the same shape: the href is BUILT in the page („/request?to="
     // + the expert's slug), the page reads `requestsOn()` ONCE and hands the
@@ -827,24 +1046,8 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
     ['app/experts/[slug]/_providerCta.tsx', 'app/experts/[slug]/page.tsx'],
   ]
   for (const [f, gate] of CLIENT_ENTRY_POINTS) {
-    // ⚠️ A SECTION NOTHING COMPOSES IS NOT AN ENTRY POINT (2026-08-21). The home
-    // band left the composition with the redesign (see app/HomeClient), so
-    // HomeClient no longer reads the flag — and it should not: a page does not
-    // gate a section it does not render. The FILE stays, one `<RequestBand />`
-    // away from returning, which is exactly why the pair stays listed here: it
-    // keeps both files known to the scan below, so the band's /request link is
-    // not mistaken for a new, unargued door. The flag check simply FOLLOWS THE
-    // RENDER — compose the band again and this fires again, unchanged.
-    // `.replace(//…)` strips line comments first: HomeClient EXPLAINS the
-    // removal in prose and names the component while doing so, so a bare match
-    // would read the explanation as the render.
-    const composed =
-      f !== 'app/_home/request.tsx' ||
-      /<RequestBand/.test(read('app/HomeClient.tsx').replace(/\/\/[^\n]*/g, ''))
-    if (composed) {
-      assert.match(read(gate), /requestsOn\(\)/,
-        `${f} reaches /request but ${gate} does not check the flag — it would show on a deployment where the subsystem does not exist`)
-    }
+    assert.match(read(gate), /requestsOn\(\)/,
+      `${f} reaches /request but ${gate} does not check the flag — it would show on a deployment where the subsystem does not exist`)
     assert.doesNotMatch(read(f), /["'`]\/work\/(requests|offers|service-profile)/,
       `${f} links to the PROVIDER side — that surface is reached by invitation only`)
   }
@@ -1051,8 +1254,26 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
   //
   // There is one kind of provider, so there is one supply-side set — asserted
   // above, together with the tab whose absence was the actual cost.
-  assert.doesNotMatch(nav, /PROVIDER_TABS[\s\S]{0,200}role === /,
-    'PROVIDER_TABS became role-keyed — a role is not the allowlist')
+  /* ⚠️ THIS ASSERTION WAS REPLACED ON 2026-09-03, AND THE RULE IT DEFENDED IS
+     THE REASON. It read
+         assert.doesNotMatch(nav, /PROVIDER_TABS[\s\S]{0,200}role === /,
+           'PROVIDER_TABS became role-keyed — a role is not the allowlist')
+     and it went red on the change that made „a role is not the allowlist"
+     TRUE for the first time: the fallback for a page in neither room used to
+     be `TABS_BY_ROLE[role]`, and three of 27 accounts that hold an active
+     RequestAccess row AND a ServiceProfile carry `role: USER` — so three
+     working providers were handed the CLIENT's tab bar everywhere outside /me
+     and /work. The regex matched the new `role === 'ADMIN'` sitting two lines
+     above `sells ? PROVIDER_TABS`, which is a role question about a
+     permission and exactly what a role is for.
+
+     CLAUDE.md: „If an assertion can break on a rename, a reformat or a restyle
+     while the screen is identical, it is pinning the wrong thing." What is
+     pinned now is the decision itself. */
+  assert.match(nav, /sells \? PROVIDER_TABS/,
+    'the supply-side tab set stopped following `sells` — identityOf‘s fact, not a role')
+  assert.doesNotMatch(nav, /TABS_BY_ROLE\[role\]/,
+    'a role is the last resort again — see identityOf in CLAUDE.md')
   const shell = read('components/AppShell.tsx')
   assert.match(shell, /const\s+inProviderSpace\s+=\s+isProviderWorkspacePath\(path\s+\?\?\s+''\)/,
     'AppShell no longer recognises the provider workspace')
@@ -1141,9 +1362,14 @@ test('the PROVIDER side is linked from nowhere, and /request only from named pla
 // The two halves this pins, and they pull in opposite directions on purpose:
 //   · a guest and a plain client still get it — the 2026-08-17 ruling, intact;
 //   · anybody with a capability does not — the 2026-08-21 one.
-// And the PERMISSION is untouched either way: canOpenRequestForm() still admits
-// everyone the flag admits, because a provider who needs a plumber is a client
-// like anybody else. A hidden invitation is not a closed door.
+// ⚠️ AND THE PERMISSION IS NO LONGER UNTOUCHED (2026-08-31). This comment used
+// to end „canOpenRequestForm() still admits everyone the flag admits, because a
+// provider who needs a plumber is a client like anybody else. A hidden
+// invitation is not a closed door." The owner closed the door: „მინდა რომ ვისაც
+// სერვისი აქვს იმას არ შეძლოს სერვისის დაკვეთა." The two functions still answer
+// DIFFERENT questions — this one decides what the chrome draws, the other
+// decides what the server accepts — and that separation is the thing this test
+// exists to keep. They now happen to agree about one audience.
 test('the header CTA invites the demand side only — and never mistakes that for a gate', () => {
   assert.equal(showRequestCta(false), true, 'a guest or a plain client lost the intake CTA')
   assert.equal(showRequestCta(undefined), true, 'an unresolved identity must read as demand, not as supply')
@@ -1152,9 +1378,12 @@ test('the header CTA invites the demand side only — and never mistakes that fo
   // both. One profile, one boolean; the rule („anybody who sells is not the
   // audience for this invitation") is unchanged.
   assert.equal(showRequestCta(true), false, 'a provider with a registered service is still invited to buy one')
-  // The invitation and the door are not the same question — the form stays open
-  // to everyone the flag admits, whatever the bar shows.
-  assert.equal(canOpenRequestForm(), requestsOn(), 'the CTA’s audience leaked into the form’s gate')
+  // The invitation and the door are not the same question, and the proof is
+  // that the bar's rule alone cannot open or close the form: `showRequestCta`
+  // takes no view of the flag, `canOpenRequestForm` does.
+  assert.equal(canOpenRequestForm(), requestsOn(), 'the CTA’s audience leaked into the subsystem gate')
+  assert.equal(showRequestCta(true), canFileRequest(true),
+    'the two rules disagree about a seller — the chrome would draw a door the server refuses')
   // One const feeds both renders (desktop button + mobile drawer), so the two
   // cannot drift apart; and the rule itself is not re-implemented in the bar.
   const bar = codeOf('components/PublicTopBar.tsx')
@@ -1273,13 +1502,54 @@ test('a provider payload cannot carry the client‘s name, phone or email', () =
 
   // The provider-facing SURFACES go through it rather than picking their own
   // columns — the assertion that makes the one above worth anything.
-  for (const f of ['app/work/(provider)/requests/page.tsx', 'app/work/(provider)/requests/[id]/page.tsx']) {
+  const QUEUE = 'app/work/(provider)/requests/page.tsx'
+  const JOB = 'app/work/(provider)/requests/[id]/page.tsx'
+  for (const f of [QUEUE, JOB]) {
     const body = codeOf(f)
     assert.match(body, /providerRequestView/, `${f} shapes the row itself`)
-    for (const col of ['contactName', 'phone: true', 'adminNote']) {
+    // The phone, the email and the admin's private note are never fetched by
+    // NAME on a provider surface. The one legitimate route to the first two is
+    // `CLIENT_CONTACT_SELECT`, which spells them once, in lib/requests, behind
+    // a paid unlock — so a column name appearing in a page is by definition a
+    // second route somebody opened by hand.
+    for (const col of ['phone: true', 'email: true', 'adminNote']) {
       assert.ok(!body.includes(col), `${f} selects „${col}" — a provider must never receive it`)
     }
   }
+
+  /* ⚠️ `contactName` IS NO LONGER BANNED OUTRIGHT ON THE JOB PAGE (2026-09-01,
+     the owner's design canvas → „Expert Jobs"). The blanket source ban was a
+     proxy for the real rule, and the canvas made the proxy wrong while leaving
+     the rule alone.
+
+     THE RULE, unchanged since 2026-08-21: the client's NAME is released the
+     moment they accept somebody's offer — `clientIdentityOpen`, executed in the
+     next test — and not one moment earlier. What changed is only WHICH screen
+     prints it: the canvas moved the fee to the end of the flow, so the provider
+     who has been chosen now meets a „კლიენტმა შეგარჩია" card here, greeting
+     them by the client's name, instead of finding it in the offers inbox.
+
+     WHAT IS PINNED INSTEAD is the thing that would actually hurt somebody: the
+     name must not ride on the SHARED row. `providerRequestView` is handed one
+     object, that object is built by the select at the top of the page, and a
+     nullable `contactName` on it is a field a future render forgets to gate on
+     its first day. So the file is cut at the acceptance branch — everything
+     above it, the shared select included, may not mention the name at all — and
+     the fetch below it must be a conditional expression rather than a
+     statement that always runs. */
+  assert.ok(!codeOf(QUEUE).includes('contactName'),
+    'the queue selects the client‘s name — a list has no acceptance to gate it on, so there is no moment at which it is legitimate there')
+  const job = codeOf(JOB)
+  const gate = job.indexOf("'ACCEPTED'")
+  assert.ok(gate > 0, 'the job page no longer branches on an ACCEPTED offer — the gate this assertion measures from is gone')
+  assert.ok(!job.slice(0, gate).includes('contactName'),
+    'the job page fetches the client‘s name before it knows whether this provider was chosen — that is ProviderRequestRow widening again')
+  const fetched = job.indexOf('contactName', gate)
+  assert.ok(fetched > 0, 'the job page stopped fetching the client‘s name at all — the „chosen" card cannot greet anybody')
+  assert.match(
+    job.slice(job.lastIndexOf('const ', fetched), fetched), /\?/,
+    'the client‘s name is fetched unconditionally — it has to hang off the branch that already established this provider won',
+  )
 })
 
 // ⚠️ THIS TEST USED TO PIN THE OPPOSITE (2026-08-14 → 2026-08-21): „a provider
@@ -1317,29 +1587,74 @@ test('the client‘s phone and email never reach a provider — only the name, a
   }
 })
 
-test('the provider‘s phone and email never reach the client either — the mirror, same day', () => {
+/* ⚠️ THIS TEST WAS REVERSED ON 2026-09-03, AND THE HALF IT KEPT IS THE POINT.
+   It used to be „the provider's phone and email never reach the client either —
+   the mirror, same day", pinning the 2026-08-21 decision to take BOTH numbers
+   off the screen at once. The owner undid the supply half of it: „დარეკვა უნდა
+   იყოს ასარჩევად ორი ღილაკი და შემდეგ აირჩიოს რომელი სჭირდება", so an offer
+   now carries „მიწერა" and „დარეკვა" and the client picks.
+
+   Pinning the absence of the provider's phone would now pin a bug. What is
+   asserted instead is the line the reversal did NOT cross — the client's own
+   contact, which is what the platform sells — plus the two things that keep the
+   new opening narrow: the EMAIL still never leaves, and the room still fetches
+   no column about the client. */
+test('the client may ring their provider — the phone, never the email, and nothing back the other way', () => {
   const base = {
     id: 'o1', priceGel: 1200, priceKind: 'FIXED', daysEstimate: 10, message: 'გავაკეთებ',
     createdAt: new Date('2026-08-14T10:00:00Z'),
-    provider: { name: 'ბესიკ მაგალიძე' },
+    provider: { name: 'ბესიკ მაგალიძე', canCall: true },
   }
-  // ACCEPTED included on purpose: that WAS the revealing branch, and it is the
-  // one a future „just for the chosen one" edit would reopen.
   for (const status of ['SENT', 'WITHDRAWN', 'DECLINED', 'ACCEPTED']) {
     const v = clientOfferView({ ...base, status })
-    const json = JSON.stringify(v)
-    assert.ok(!/phone|email/i.test(json), `clientOfferView emitted a contact field on a ${status} offer`)
+    // ⚠️ ON EVERY STATUS, NOT ONLY THE ACCEPTED ONE. „ასარჩევად" is the owner's
+    // word: the call is offered while the client is still CHOOSING, which is
+    // the whole change. A version that allowed it only after the accept would
+    // pass a laxer assertion and ship the feature nobody asked for.
+    assert.equal(v.providerCanCall, true, `no call offered on a ${status} offer`)
+    // ⚠️ AND IT IS A FLAG, NOT THE DIGITS (2026-09-03, second pass). The number
+    // is sold by POST /api/requests/[ref]/call; a string here would sit in the
+    // page source and make the fee optional.
+    assert.ok(!/55512|phone/i.test(JSON.stringify(v)), `clientOfferView leaked a number on a ${status} offer`)
     // The NAME is always shown — it is what the client is choosing between.
     assert.equal(v.providerName, 'ბესიკ მაგალიძე')
+    // The email did not come with it, and there is no branch where it does.
+    assert.ok(!/email/i.test(JSON.stringify(v)), `clientOfferView emitted an email on a ${status} offer`)
+  }
+  // A provider with nothing on file yields null, never '' — the card asks
+  // `{tel && …}` and an empty string would draw a button that dials nowhere.
+  assert.equal(clientOfferView({ ...base, status: 'SENT', provider: { name: 'ბესიკ' } }).providerCanCall, false)
+
+  /* ⚠️ AND THE MIRROR REALLY IS STILL SHUT. This is the assertion that would
+     have to be deleted for the reversal to have gone too far: nothing the
+     client's room hands over says anything about the CLIENT, whose name opens
+     on the accept and whose number is still bought. */
+  for (const status of ['SENT', 'WITHDRAWN', 'DECLINED', 'INVITED']) {
+    assert.equal(clientIdentityOpen({ status }), false, `${status} unsealed the client‘s identity`)
   }
   // …and the page stopped fetching them, so the shape above cannot be widened
   // from the query side either.
-  const page = codeOf('app/request/[ref]/page.tsx')
+  /* ⚠️ THE QUERY MOVED TO `_room.tsx` ON 2026-09-02 and the page kept the
+     guard. The room became ONE component with TWO addresses that day — the
+     signed-in client reads it at /me/r/<ref> inside their own workspace
+     instead of being thrown into the intake's bare chrome — so both files are
+     read here: the SELECT has to stay narrow wherever it ends up, and neither
+     file may grow a second one. */
+  const page = codeOf('app/request/[ref]/page.tsx') + '\n' + codeOf('app/request/[ref]/_room.tsx')
   assert.match(page, /clientOfferView\(/, 'the client page shapes offers itself')
-  assert.ok(!/phone: true|email: true/.test(page), 'the client page selects the provider‘s contact again')
+  // `phone: true` IS expected now — it is the column the button runs on. The
+  // email is not, and that is still a rule enforced by what is FETCHED.
+  assert.ok(!/email: true/.test(page), 'the client page selects the provider‘s email')
   assert.ok(!page.includes('adminNote'), 'the client page selects the admin‘s private note about them')
   const list = codeOf('app/request/[ref]/OfferList.tsx')
-  assert.ok(!/tel:|mailto:/.test(list), 'the offer list prints a contact link again')
+  assert.ok(!/mailto:/.test(list), 'the offer list prints an email link')
+  /* ⚠️ THE CARD MUST NOT BE ABLE TO BUILD A `tel:` ITSELF (2026-09-03). The
+     number is sold — POST /api/requests/[ref]/call charges the provider and
+     returns the already-shaped link — so a `telHref(` or a template `tel:${…}`
+     back in this file would mean the digits are in the props again, and a fee
+     anybody can read past is not a fee. */
+  assert.ok(!/telHref\(/.test(list), 'the offer list shapes a number itself again')
+  assert.match(list, /requests\/\$\{publicRef\}\/call/, 'the call button stopped going through the paid route')
 })
 
 /* ═══════════ 5. the place limit holds under concurrency ════════════════ */
@@ -1861,8 +2176,40 @@ test('the automation routes, nudges once, and sweeps', () => {
   // that separates this from the lead-mills.
   const jobs = codeOf('lib/requestJobs.ts')
   assert.doesNotMatch(jobs, /status: 'VERIFIED' \}[\s\S]{0,40}data:/, 'a job verifies requests')
-  assert.doesNotMatch(jobs, /'ACCEPTED'/, 'a job accepts offers')
-  assert.doesNotMatch(jobs, /contactName|\bphone\b/, 'a job touches the client contact')
+  /* ⚠️ THE SHAPE, NOT THE WORD (tightened 2026-09-01). This read
+   * `doesNotMatch(jobs, /'ACCEPTED'/)`, which forbade the STRING anywhere in the
+   * file — and the 48-hour refund sweep has to ASK whether an offer was accepted
+   * in order to find the thread it should have produced. Reading an acceptance
+   * is not making one. The rule being pinned was always about the WRITE, and it
+   * is now written the same way the VERIFIED assertion above it is: a status
+   * landing in a `data:` payload. */
+  assert.doesNotMatch(jobs, /status: 'ACCEPTED' \}[\s\S]{0,40}data:/, 'a job accepts offers')
+  assert.doesNotMatch(jobs, /data: \{[^}]*status: 'ACCEPTED'/, 'a job writes an acceptance')
+  /* ⚠️ THE FIELD, NOT THE WORD (tightened 2026-09-02, the same move the
+   * ACCEPTED assertion above made a day earlier). This read
+   * `doesNotMatch(jobs, /contactName|\bphone\b/)` — the WORD „phone" anywhere
+   * in the file — and the provider SMS has to read one: a provider's OWN mobile,
+   * to tell them a job came in. That is the opposite of the rule being pinned.
+   *
+   * The rule is that the CLIENT's contact stays the admin's to reveal. So:
+   * `contactName` is banned outright (it exists on ServiceRequest and nowhere
+   * else), and every `phone` this file reads must be a USER's. */
+  assert.doesNotMatch(jobs, /contactName/, 'a job touches the client contact')
+  /* And the client's number is never READ. `r.phone` / `request.phone` is the
+   * client's; the provider's own comes off `user` and is a different person's
+   * different number — banning the word „phone" banned both, which is how this
+   * assertion came to forbid telling a provider that a job arrived. */
+  assert.doesNotMatch(jobs, /\b(r|row|request|req)\.phone\b/, 'a job reads the client phone')
+  /* Every `phone: true` must be selected off the ALLOWLIST, not off a request:
+   * the nearest prisma call opened before it says whose row it is. */
+  for (let i = jobs.indexOf('phone: true'); i !== -1; i = jobs.indexOf('phone: true', i + 1)) {
+    const calls = [...jobs.slice(0, i).matchAll(/prisma\.([a-zA-Z]+)\./g)]
+    const from = calls.length ? calls[calls.length - 1][1] : '(none)'
+    assert.ok(
+      from === 'requestAccess' || from === 'companyMember',
+      `a job selects a phone off prisma.${from} — only the allowlist may carry one`,
+    )
+  }
   // The nudge CLAIMS before it sends — a crash mid-send must cost one mail,
   // never a loop every 15 minutes.
   // Scoped to the nudge job itself: `sendMail` appears earlier in the file in
@@ -1893,8 +2240,16 @@ test('the live layer and the budget-fit line hold', () => {
   const auto = codeOf('components/AutoRefresh.tsx')
   assert.match(auto, /router\.refresh\(\)/, 'AutoRefresh grew its own data channel')
   assert.match(auto, /visibilityState/, 'AutoRefresh polls hidden tabs')
-  assert.match(codeOf('app/request/[ref]/page.tsx'),
-    /\(request\.status === 'NEW' \|\| request\.status === 'VERIFIED'\) && <AutoRefresh/,
+  /* ⚠️ THE CONDITION IS NAMED NOW (2026-09-02): `live` is „NEW or VERIFIED",
+     derived once in the loader beside every other fact about the request, and
+     both `<AutoRefresh/>` and `<LiveRefresh/>` read it. It is the same rule —
+     a settled request has no next event and a liveness promise on it would be
+     furniture — and naming it is what stops the two controls disagreeing.
+     Pinned on both halves: the derivation and the use. */
+  const room = codeOf('app/request/[ref]/_room.tsx')
+  assert.match(room, /live: request\.status === 'NEW' \|\| request\.status === 'VERIFIED'/,
+    'the client room stopped deriving liveness from the request status')
+  assert.match(room, /\{data\.live && <AutoRefresh/,
     'the client page promises liveness on settled requests too')
   assert.match(codeOf('app/work/(provider)/requests/page.tsx'), /<AutoRefresh/,
     'the provider queue lost its live refresh')
@@ -2118,11 +2473,26 @@ test('the ceilings admit what a person actually types', () => {
   assert.equal(ServiceRequestInput.safeParse({ ...ok, budgetBand: '' }).success, false)
   assert.equal(ServiceRequestInput.safeParse({ ...ok, budgetBand: undefined }).success, false)
 
-  const offer = { requestId: 'req_1', priceGel: 1200, message: 'გავაკეთებ სრულ აუდიტს ორ კვირაში.' }
+  /* ⚠️ THE REQUIRED SENTENCE MOVED (2026-09-01, the canvas). It was `message`
+   * with a 20-character floor, on the argument that a number with no sentence
+   * beside it is a guess. That argument survives — it just names a different
+   * field: what a client cannot compare is not „did they write something" but
+   * „does 90₾ include the materials", and only a short structured line can be
+   * printed on all three offer cards at once. `message` is the provider's own
+   * note now and is optional on both artboards. */
+  const offer = {
+    requestId: 'req_1', priceGel: 1200,
+    priceIncludes: 'მასალა და ტრანსპორტი ფასში შედის',
+    message: 'გავაკეთებ სრულ აუდიტს ორ კვირაში.',
+  }
   assert.equal(RequestOfferInput.safeParse(offer).success, true, 'a minimal real offer is rejected')
   assert.equal(RequestOfferInput.safeParse({ ...offer, message: 'ა'.repeat(4000) }).success, true)
-  // A number with no sentence beside it is a guess, not an offer.
-  assert.equal(RequestOfferInput.safeParse({ ...offer, message: 'კარგი' }).success, false)
+  assert.equal(RequestOfferInput.safeParse({ ...offer, message: 'ა'.repeat(4001) }).success, false)
+  // The note may be empty; what the price covers may not, and 120 is the width
+  // an offer card can print without an ellipsis eating the answer.
+  assert.equal(RequestOfferInput.safeParse({ ...offer, message: '' }).success, true)
+  assert.equal(RequestOfferInput.safeParse({ ...offer, priceIncludes: 'ა'.repeat(120) }).success, true)
+  assert.equal(RequestOfferInput.safeParse({ ...offer, priceIncludes: 'ა'.repeat(121) }).success, false)
   // A free offer is not an offer; the top matches the company balance ceiling.
   assert.equal(RequestOfferInput.safeParse({ ...offer, priceGel: 0 }).success, false)
   assert.equal(RequestOfferInput.safeParse({ ...offer, priceGel: 1_000_000 }).success, true)
@@ -2653,7 +3023,7 @@ test('the platform thread cannot leak the provider conversations', () => {
 /* ═══════════ 12. three ways to name a price ════════════════════════════ */
 
 test('a price says which of three things it is', () => {
-  const { offerPriceLabel, OFFER_PRICE_KINDS, RequestOfferInput } =
+  const { offerPriceLabel, OFFER_PRICE_KINDS, ALL_OFFER_PRICE_KINDS, OFFER_PRICE_FIELD, RequestOfferInput } =
     require('../lib/requests') as typeof import('../lib/requests')
 
   // ⚠️ ONE INTEGER WAS MAKING HONEST TRADESPEOPLE LIE. Somebody driving out to
@@ -2665,6 +3035,12 @@ test('a price says which of three things it is', () => {
   // A free call-out is a selling point and must say so — „0₾" reads as an
   // unfilled field.
   assert.match(offerPriceLabel(0, 'ON_SITE'), /უფასოდ/)
+  // ⚠️ HOURLY, ADDED 2026-09-01 (the owner's design canvas — both artboards draw
+  // it as the third chip). The unit rides ON the number rather than sitting in a
+  // chip beside it, because the client's offer list sets an hourly rate directly
+  // under a fixed total and „90₾" twice with the difference two elements away is
+  // the misquote this whole column exists to prevent.
+  assert.equal(offerPriceLabel(90, 'HOURLY'), '90₾/სთ')
   // An unknown kind falls back to the plain number rather than throwing: a row
   // written before this column existed must still render.
   assert.equal(offerPriceLabel(80, 'WHATEVER'), '80₾')
@@ -2672,7 +3048,17 @@ test('a price says which of three things it is', () => {
   // ⚠️ ZERO IS LEGAL ONLY ON ON_SITE. „0₾ ფიქსირებული" is somebody who did not
   // fill the field in; the database CHECK carries the same rule, so neither
   // layer is load-bearing alone.
-  const base = { requestId: 'r1', message: 'x'.repeat(20), daysEstimate: null }
+  /* ⚠️ `priceIncludes` IS THE REQUIRED SENTENCE NOW, NOT `message` (2026-09-01,
+   * the canvas: „რას მოიცავს ფასი", printed under the price on every offer card
+   * in the client's room). `message` kept its ceiling and lost its floor — the
+   * canvas placeholders it „არასავალდებულო" on both artboards. */
+  const base = { requestId: 'r1', priceIncludes: 'მასალა ფასში შედის', daysEstimate: null }
+  assert.equal(RequestOfferInput.safeParse({ ...base, priceGel: 100 }).success, true,
+    'an offer without a message was refused — the note is optional now')
+  assert.equal(RequestOfferInput.safeParse({ requestId: 'r1', priceGel: 100 }).success, false,
+    'an offer with no „what the price covers" was accepted')
+  assert.equal(RequestOfferInput.safeParse({ ...base, priceGel: 100, priceIncludes: 'კი' }).success, false,
+    'a two-letter answer passed for what the price covers')
   assert.equal(RequestOfferInput.safeParse({ ...base, priceGel: 0, priceKind: 'ON_SITE' }).success, true)
   assert.equal(RequestOfferInput.safeParse({ ...base, priceGel: 0, priceKind: 'FIXED' }).success, false,
     'a zero fixed price was accepted')
@@ -2681,7 +3067,23 @@ test('a price says which of three things it is', () => {
   // parses and still means what it meant.
   const d = RequestOfferInput.safeParse({ ...base, priceGel: 100 })
   assert.equal(d.success && d.data.priceKind, 'FIXED')
-  assert.equal(OFFER_PRICE_KINDS.length, 3)
+
+  /* ⚠️ TWO LISTS SINCE 2026-09-01, THE SAME SPLIT `ALL_FORMATS` / `FORMATS`
+   * MAKES — and the pin that matters is the FIRST one. The vocabulary may never
+   * shrink: ON_SITE is no longer offered by the form but is stored on live rows,
+   * and the day it leaves this array five surfaces start printing „ON_SITE" as a
+   * raw latin id. The form's own list is free to change with the design. */
+  assert.equal(OFFER_PRICE_KINDS.length, 3, 'the form stopped offering exactly three kinds')
+  for (const k of ['FIXED', 'FROM', 'ON_SITE', 'HOURLY']) {
+    assert.ok((ALL_OFFER_PRICE_KINDS as readonly string[]).includes(k),
+      `the vocabulary forgot „${k}" — every row storing it now renders a raw id`)
+  }
+  // Every kind, offered or not, can be parsed and can be labelled. A legacy row
+  // that cannot be re-saved is a row the admin panel cannot touch.
+  for (const k of ALL_OFFER_PRICE_KINDS) {
+    assert.equal(RequestOfferInput.safeParse({ ...base, priceGel: 100, priceKind: k }).success, true, k)
+    assert.ok(OFFER_PRICE_FIELD[k].label.length > 0, `„${k}" has no name for its amount box`)
+  }
 })
 
 test('the database allows exactly the three zeroes it should', () => {
@@ -2826,11 +3228,13 @@ test('„მე ავირჩევ" is a preference about a button, not about
    * in the paragraph after: the mode never decided who is TOLD about the
    * request, and `!hasOffers` still hides the list the moment a real offer
    * arrives. Those two are the rule; the gate was its 2026-08-18 shape. */
-  const live = read('app/request/_live.tsx')
-  assert.match(live, /\{!hasOffers && d\.experts\.length > 0 &&/,
-    'the expert list is gated again, or stopped hiding once offers arrive')
-  assert.doesNotMatch(live, /d\.pickMode === 'SELF'/,
-    'the removed question is being read again')
+  /* ⚠️ THE PANEL THAT HELD THE EXPERT LIST IS GONE (2026-09-01) — see
+     „the two screens describe one journey". The list was gated on
+     `!hasOffers`, so it disappeared the moment a real offer arrived; with the
+     panel deleted nothing renders it at all, which satisfies that rule the
+     blunt way. What was NEVER about the panel, and is the actual subject of
+     this test, is asserted below: the mode a client picked must not decide who
+     is TOLD about their request. */
   // The wizard must not ask it: one screen fewer is the whole change.
   assert.doesNotMatch(read('app/request/_model.ts'), /id: 'mode'/,
     'the „როგორ გირჩევნია?" step is back in the run')
@@ -2873,6 +3277,53 @@ test('one city means the question is not asked, and the vocabulary still reads',
       contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
     }).success, true, 'a service request stopped parsing without the city screen')
   }
+})
+
+test('two formats are offered, and the retired third still reads', () => {
+  /* ⚠️ THE SAME SPLIT AS THE CITIES, one question over (2026-08-31). Owner,
+   * after tapping „ადგილზე" and getting nowhere: „სულერთია წაშალე. იყოს
+   * ადგილზე და ონლაინ."
+   *
+   * Two silent failures, in opposite directions — exactly the pair the city
+   * test above guards:
+   *   · narrow the VOCABULARY and every row written before today prints
+   *     „EITHER" as a raw latin id on six surfaces (the admin table, the
+   *     provider's job page, the client's request page, the mail);
+   *   · narrow the WIRE and a draft revived from sessionStorage across the
+   *     deploy meets „INVALID" on the last screen for an answer it did give. */
+  const { ALL_FORMATS, FORMATS, formatLabel } =
+    require('../lib/requestTopics') as typeof import('../lib/requestTopics')
+
+  assert.deepEqual(FORMATS.map(f => f.id), ['ONLINE', 'IN_PERSON'],
+    'the format screen offers something other than the two the owner asked for')
+  assert.ok(!FORMATS.some(f => f.id === 'EITHER'), '„სულერთია" is back on the screen')
+  assert.ok(ALL_FORMATS.some(f => f.id === 'EITHER'), 'the vocabulary forgot a stored id')
+  assert.equal(formatLabel('EITHER'), 'სულერთია', 'a stored format reads as a raw id')
+
+  // A row written before the change still parses — the wire is the vocabulary.
+  // The fixture the city test above uses, varied only in the format.
+  const base = {
+    kind: 'SERVICE', topic: 'clean-flat', description: 'ბინის დალაგება',
+    budgetBand: 'x', timing: 'flexible', city: 'TBILISI' as const,
+    contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
+  }
+  assert.equal(ServiceRequestInput.safeParse({ ...base, format: 'EITHER' }).success, true,
+    'a draft revived with the retired format is refused at submit')
+  for (const f of FORMATS) {
+    assert.equal(ServiceRequestInput.safeParse({ ...base, format: f.id }).success, true,
+      `${f.id} is offered on screen and refused on the wire`)
+  }
+
+  /* ⚠️ AND „ადგილზე" MUST ADVANCE WHILE THERE IS ONE CITY. It held the screen
+   * waiting for a city list that `!ONE_CITY` stops drawing, so the run had no
+   * way forward at all — the bug that started this change. Source-level because
+   * the branch lives inside a client component and there is no renderer here;
+   * the assertion is on the GUARD, which is the thing that was missing. */
+  const w = codeOf('app/request/RequestWizard.tsx')
+  assert.match(w, /if \(id === 'IN_PERSON' && !ONE_CITY\) \{ patch\(/,
+    'the in-person branch holds the screen again without checking there is a city list to show')
+  assert.doesNotMatch(w, /id === 'ONLINE' \|\| id === 'EITHER'/,
+    'the advance is listed by id again — „ადგილზე" falls through it and strands the run')
 })
 
 test('a request may carry photos, and they never ride in a list', () => {
@@ -2964,4 +3415,65 @@ test('the intake offers only work somebody can actually answer', () => {
    * change becomes a way to lose demand. */
   assert.match(step, /onFreeText\(q\.trim\(\)\)/,
     'the „მაინც მოგვწერე" escape is gone — narrowing without it loses requests')
+
+  /* 🔒 …AND NARROWING MUST NOT OPEN THE BROWSE PANEL (2026-09-02).
+   *
+   * This is the bug that arrived WITH `covered` and stood for three days. The
+   * panel seeded itself open on `onlyTopics.length > 0`, a condition that meant
+   * „a `?to=` provider narrowed this list" when it was written and became
+   * „always" the moment `covered` — the roster's whole offerable set, never
+   * empty — started arriving through the same prop. Every visitor to /request
+   * landed on the folded catalogue the owner deleted on 2026-08-19: „როცა ჩათს
+   * მოსაძებნად დაჭერ, მაშინ იშლებოდეს ქვევით… და არა ესე ჩამოწერილი."
+   *
+   * The two senses of „narrowed" are separate props now, and this pins that:
+   * the initial open may read the query and `narrowed`, never the array. */
+  const openInit = step.slice(step.indexOf('const [open, setOpen] = useState('))
+    .slice(0, step.slice(step.indexOf('const [open, setOpen] = useState(')).indexOf('\n'))
+  assert.doesNotMatch(openInit, /onlyTopics/,
+    'the browse panel opens on onlyTopics again — `covered` is never empty, so that is every visitor')
+  assert.match(openInit, /narrowed/,
+    'the panel lost the one narrowing that SHOULD open it — a client who picked a provider')
+  assert.match(read('app/request/RequestWizard.tsx'), /narrowed=\{Boolean\(to\?\.topics\?\.length\)\}/,
+    'the wizard stopped telling the step which kind of narrowing this is')
+})
+
+/* ═══════════ the client's own way out ═══════════════════════════════════ */
+
+test('a client can cancel their own request — and cannot make a paid-for one vanish', () => {
+  // ⚠️ ADDED WITH THE ROUTE (2026-09-01). The client was the one party with no
+  // exit: a provider withdraws an offer, an admin closes a row, the cron closes
+  // an abandoned one, and the person who OPENED it could only walk away. That
+  // matters beyond tidiness — a standing request is billed to somebody else,
+  // 1₾ every time a provider opens the contact on it.
+  const src = codeOf('app/api/requests/[ref]/cancel/route.ts')
+
+  // 1. CLAIMED, NOT CHECKED. The status must ride in the `where` so the database
+  //    decides the race; reading it first would let a cancel land in the instant
+  //    an offer arrives, and that provider would have paid for nothing.
+  assert.match(src, /updateMany\(/, 'the cancel does not claim the row')
+  assert.match(src, /status: \{ in: \['NEW', 'VERIFIED'\] \}/,
+    'the claim does not name the states it believes it is leaving')
+  assert.match(src, /claimed\.count !== 1/, 'the claim result is not checked — two tabs could both win')
+  assert.match(src, /status: 409/, 'a lost race is not answered with 409')
+
+  // 2. IT IS YOURS OR IT DOES NOT EXIST. Anything softer confirms a live
+  //    reference to a stranger, and the reference is a credential.
+  assert.match(src, /viewer\.user\?\.id/, 'ownership is not checked against the signed-in user')
+  assert.match(src, /noteRefMiss\(req\)/, 'a wrong reference is not counted')
+
+  // 3. THE BOUND. Once an offer exists a provider has written a real answer and
+  //    been charged for it; the honest exit is to choose, not to erase.
+  assert.match(src, /offerCount > 0/, 'the route lets a request with offers be cancelled')
+  assert.match(src, /offerCount: 0/, 'the claim does not re-assert the bound it just read')
+
+  // 4. THE MONEY GOES BACK. Same call the admin close uses.
+  assert.match(src, /refundDeadRequest\(/, 'contacts already paid for are not refunded')
+
+  // 5. The control must not promise what the route refuses.
+  // ⚠️ IN `_room.tsx` SINCE 2026-09-02 — one room, two addresses; the control
+  // is drawn once and therefore guarded once, for the reader of either.
+  const page = codeOf('app/request/[ref]/_room.tsx')
+  assert.match(page, /data\.offers\.length === 0/, 'the cancel button is shown once offers exist')
+  assert.match(page, /data\.ownerUserId === viewerUserId/, 'the cancel button is shown to somebody who does not own the request')
 })

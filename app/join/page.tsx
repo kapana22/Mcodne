@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { pageMetadata } from '@/lib/pageSeo'
 import { ROLE } from '@/lib/roles'
@@ -43,5 +44,20 @@ export default async function Page() {
   // the 100₾ exists. Same destination as lib/hats → HAT_HOME.PROVIDER.
   if (await isProvider(user.id)) redirect('/work')
 
-  return <JoinClient me={user as any} />
+  /* ⚠️ THE STATUS IS READ HERE, NOT ONLY IN THE CLIENT (2026-09-01, owner:
+     „განცხადება გამოიგზავნა და ისევ იგივე ადგილას join-ზე დამაბრუნა და თითქოს
+     არ გაიგზავნა ისეთი შთაბეჭდილება დამრჩა").
+     The form fetches its own application on mount, so a person who had already
+     applied got the FIRST PAINT of a 3 300px registration form under the
+     heading „დაარეგისტრირე სერვისი" and only then, once the fetch landed, the
+     confirmation. The page told them to register, in the largest type on it,
+     after they had registered. One query on a route that is already
+     `force-dynamic` and already awaits the database removes the flash entirely
+     — the client keeps its fetch for everything else. */
+  const application = await prisma.providerApplication.findUnique({
+    where: { userId: user.id },
+    select: { status: true },
+  })
+
+  return <JoinClient me={user as any} initialStatus={application?.status ?? null} />
 }

@@ -68,7 +68,12 @@ test('there is ONE wizard, and the door opens it', () => {
    * What replaces the assertion is the absence: no branch, no second stage. */
   const client = codeOf('app/join/JoinClient.tsx')
   assert.doesNotMatch(client, /wizardFor|'expert'/, 'the door chooses between two wizards again')
-  assert.match(client, /setStage\('form'\)/, 'the door stopped opening the one form')
+  // ⚠️ THERE IS NO SECOND STAGE TO OPEN SINCE 2026-08-31 — /join IS the form
+  // („ერთ გვერდზე იყოს ყველაფერი"). `setStage('form')` was the old hand-off and
+  // the thing it guaranteed — ONE form, opened directly, no wizard branch — is
+  // now true by construction: the client renders `<ProviderApplyClient>` and
+  // nothing else. That is what is asserted.
+  assert.match(client, /<ProviderApplyClient/, 'the door stopped opening the one form')
   assert.throws(() => read('app/join/_expert/ApplyClient.tsx'), 'the consultation wizard came back')
 })
 
@@ -121,7 +126,62 @@ test('a hidden block does not leave a hole in the numbering', () => {
   // „1 2 4 5 6 7" — which tells the applicant something is missing.
   const work = codeOf('app/join/_provider/client.tsx')
   assert.doesNotMatch(work, /<Block n=\{\d+\}/, 'a block number was typed by hand again')
-  assert.match(work, /n=\{\+\+blockNo\}/, 'the blocks stopped numbering themselves')
+  /* ⚠️ THE SOURCE OF THE NUMBER CHANGED ON 2026-09-02 AND THE RULE DID NOT.
+     It was `n={++blockNo}` — a counter incremented in render order, which was
+     the right answer while all three panels were on one page and one of them
+     could stop rendering. The form is three SCREENS now (owner: „ანუ
+     რეგისტრაციას 3 და რედაქტირებისას ერთი მთლიანი"), so exactly one panel is
+     in the document at a time and a render-order counter would print „1" on
+     every step.
+
+     The replacement is stronger than the counter, not weaker: the number is the
+     step's position in `STAGES`, and the rail across the top maps the same
+     array — so a panel's numeral and its rail segment now read one source and
+     cannot come apart, which is a thing the counter could not promise. */
+  assert.match(work, /n=\{STAGES\.findIndex\(s => s\.id === '\w+'\) \+ 1\}/,
+    'the blocks stopped numbering themselves from STAGES')
+  assert.match(work, /STAGES\.map\(\(st, i\) =>/, 'the rail stopped reading the same table the panels do')
+})
+
+test('the three stages are three screens, and every one of them is reachable', () => {
+  /* ⚠️ THE FAILURE THIS PINS IS SILENT (2026-09-02). `jumpTo` finds its target
+     with `document.querySelector('[data-field=…]')` and returns on a miss — and
+     with one panel rendered at a time, every field on another screen IS a miss.
+     So „დარჩა: ფოტო" pressed from step 1, and any refusal naming a field the
+     current screen does not hold, would do nothing at all and say nothing about
+     it. `goToField` switches the step first; `stopOn` and the „დარჩა" links
+     both go through it. */
+  const work = codeOf('app/join/_provider/client.tsx')
+  assert.match(work, /const \[step, setStep\] = useState<StageId>\('what'\)/,
+    'the form stopped being three screens')
+  for (const id of ['what', 'who', 'photos']) {
+    assert.ok(work.includes(`{step === '${id}' && (`), `stage ${id} is no longer a screen of its own`)
+  }
+  assert.match(work, /const goToField = \(field: string\) => \{/, 'the cross-screen jump is gone')
+  assert.match(work, /requestAnimationFrame\(\(\) => goToField\(field\)\)/,
+    'a refusal stopped switching to the screen that owns the field')
+  /* ⚠️ THE „დარჩა:" JUMP LINKS WERE ASSERTED HERE AND ARE GONE (2026-09-02,
+     owner: „მინდა რომ ეს წაშალო — სწრაფი ლინკები"). They were the second
+     caller of `goToField`; `stopOn` is the first and is still pinned above, so
+     the cross-screen jump itself is covered.
+
+     What replaced them is the rail, which reads the same `missing` list and
+     ticks a finished step — asserted below, so „what is still outstanding" is
+     still guaranteed to be on screen somewhere. This line is deleted rather
+     than rewritten because a bar under the reader's thumb, competing with the
+     one control that moves them forward, is not what a three-screen form needs
+     it to be. */
+  assert.doesNotMatch(work, /დარჩა:/, 'the quick-link bar came back')
+  assert.match(work, /const done = !missing\.some\(m => st\.fields\.includes\(m\.field\)\)/,
+    'the rail stopped reading the same „what is missing" list the form does')
+  // ⚠️ A BARE <button> INSIDE A <form> SUBMITS. „შემდეგი" would have posted the
+  // application from step one.
+  assert.match(work, /type="button"\s+size="lg"\s+onClick=\{\(\) => setStep\(STAGES\[stepIndex \+ 1\]\.id\)\}/,
+    'the forward control lost its type="button"')
+  // The submit belongs to the LAST screen only — an application sent from step
+  // one is one whose remaining questions the applicant never saw.
+  assert.match(work, /stepIndex < STAGES\.length - 1 \? \(/,
+    'the submit button is no longer confined to the last step')
 })
 
 test('the one word an applicant is certain of finds them', () => {
@@ -189,29 +249,39 @@ test('the form offers no second half to switch to', () => {
 
 /* ═══════════ THE ORDER: THE QUESTION, THEN THE WALL (2026-08-20) ══════════ */
 
-test('a guest is asked what they do BEFORE being asked to register', () => {
-  /* ⚠️ THE WALL WAS THE FUNNEL'S BIGGEST LEAK AND IT WAS INVISIBLE. /join
-   * showed a signed-out visitor a pitch whose only action was „create an
-   * account", and the door's one question — the profession, from which every
-   * capability, every route and every seeded field is derived — sat behind it.
-   * Two costs: forced registration before any commitment is one of the
-   * best-measured causes of abandonment there is, and somebody who leaves at
-   * the wall leaves NOTHING behind, while somebody who leaves just after it
-   * leaves an address that routes to nobody.
+test('a guest gets ONE action into the flow, and it is the same word everywhere', () => {
+  /* ⚠️ THIS TEST PINNED THE OPPOSITE UNTIL 2026-08-31, and the reversal is the
+   * owner's („ეს გვერდი არ უნდა ყოფილიყო"). What it used to require was
+   * `<GuestDoor />` — the profession question asked BEFORE sign-up — on the
+   * argument that forced registration is the funnel's biggest leak and that
+   * somebody who leaves at the wall leaves nothing behind.
    *
-   * The order is now: answer → account → form. */
+   * The argument was right and the implementation never delivered it. Measured
+   * before removing it: the guest's answer is submitted NOWHERE — the
+   * application body carries no `professions` — and its only effect downstream
+   * was pre-filling the search box in the form's first stage. So the visitor
+   * paid a whole screen and a „გაგრძელება" for a typed-in search term, then met
+   * what looked like the same question again on the other side of the wall.
+   * That doubling is what the owner saw.
+   *
+   * WHAT REPLACES IT is the thing that was actually being protected: a guest
+   * must have ONE unmistakable way into the flow, it must carry them back here
+   * afterwards, and it must be the same word the header, the footer and the
+   * user menu use. A pitch with no action is the failure this test still
+   * catches; the question is now asked once, in the form, where it is stored.
+   *
+   * `GuestDoor` and `DoorQuestion` stay on disk, rendered by nothing, so the
+   * inversion is one line from returning the day the answer actually carries. */
   const pub = codeOf('app/join/_door/PublicDoor.tsx')
-  assert.match(pub, /<GuestDoor/, 'the public door lost its question — it is a pitch behind a wall again')
-  const guest = codeOf('app/join/_door/GuestDoor.tsx')
-  assert.match(guest, /<DoorQuestion/, 'the guest half grew its own copy of the question')
-  assert.match(guest, /\/signup\?redirect=%2Fjoin/, 'the answer no longer carries the visitor into signup')
+  assert.match(pub, /<Btn href="\/signup\?redirect=%2Fjoin"/, 'the public door lost its way into the flow')
+  assert.match(pub, /\{JOIN_DOOR_LABEL\}/, 'the guest action stopped using the site\'s one word for it')
+  assert.doesNotMatch(pub, /<GuestDoor/, 'the pre-wall question is back — it is asked in the form now')
 
-  // …and the answer SURVIVES the round trip, or the first ask was a trick.
-  const leaf = codeOf('app/join/_door/DoorQuestion.tsx')
-  assert.match(leaf, /asked: true/, 'pressing continue no longer records that the question was answered')
+  // …and the signed-in side still READS a guest answer if one was ever left
+  // behind, so a draft written by an older build is not stranded.
   const signed = codeOf('app/join/JoinClient.tsx')
-  assert.match(signed, /if \(!d\?\.asked\) return/, 'the signed-in door stopped reading the guest answer')
-  assert.match(signed, /clearAsked\(\)/, 'the flag is never cleared — the door can no longer be reopened')
+  assert.match(signed, /if \(!d\?\.asked\) return/, 'the signed-in door stopped reading a stored guest answer')
+  assert.match(signed, /clearAsked\(\)/, 'the flag is never cleared — a stale answer would seed for ever')
 })
 
 test('the site invites people to ONE address, in ONE word', () => {
@@ -227,7 +297,12 @@ test('the site invites people to ONE address, in ONE word', () => {
     assert.match(src, /JOIN_DOOR_LABEL/, `${f} types its own word for the door`)
   }
   // The heading confirms the click: the door prints the same constant.
-  assert.match(codeOf('app/join/JoinClient.tsx'), /\{JOIN_DOOR_LABEL\}/, 'the door heading drifted from the link that leads to it')
+  // ⚠️ THE DOOR SCREEN IS GONE (2026-08-31) — /join opens on the form. The
+  // guarantee is untouched and now lives one file in: the page's own heading is
+  // still `JOIN_DOOR_LABEL`, the exact string the header, the user menu and the
+  // footer's action all click through, so the heading still confirms the click.
+  assert.match(read('app/join/_provider/client.tsx'), /\{JOIN_DOOR_LABEL\}/,
+    'the door heading drifted from the link that leads to it')
   assert.match(codeOf('app/join/_door/PublicDoor.tsx'), /\{JOIN_DOOR_LABEL\}/)
 })
 

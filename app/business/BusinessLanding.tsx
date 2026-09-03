@@ -128,7 +128,7 @@ export async function BusinessLanding() {
   ]
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-ink-50">
       <MarketingTopBar />
 
       <main>
@@ -151,7 +151,7 @@ export async function BusinessLanding() {
                 სერვისები კომპანიებისთვის
               </h1>
               <p className="mt-6 text-body-lg text-white/70 max-w-[560px]">
-                კონსულტაცია და ტრენინგი — ბიზნესში, გაყიდვებში და სხვა მიმართულებებში.
+                სერვისები და ტრენინგი — ბიზნესში, გაყიდვებში და სხვა მიმართულებებში.
               </p>
 
               {/* THE ACTION, at the top. The page's whole purpose is one form,
@@ -324,7 +324,7 @@ export async function BusinessLanding() {
                                 on a page with one purpose. */}
                             <a
                               href={`#form-${s.id}`}
-                              className="h-9 px-3.5 rounded-btn border border-ink-200 text-ink-900 hover:border-ink-900 hover:bg-ink-900 hover:text-white font-display text-small font-semibold inline-flex items-center whitespace-nowrap transition-colors duration-fast"
+                              className="h-10 sm:h-9 px-3.5 rounded-btn border border-ink-200 text-ink-900 hover:border-ink-900 hover:bg-ink-900 hover:text-white font-display text-small font-semibold inline-flex items-center whitespace-nowrap transition-colors duration-fast"
                             >
                               მოთხოვნა
                             </a>

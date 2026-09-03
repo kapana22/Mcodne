@@ -125,7 +125,7 @@ export async function AbroadLanding() {
   const t = (k: string) => texts[k] ?? SITE_TEXT_DEFAULTS[k] ?? ''
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-ink-50">
       <MarketingTopBar />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}

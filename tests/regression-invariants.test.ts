@@ -264,15 +264,37 @@ function check(name: string, ok: boolean, hint: string) {
   //
   // ⚠️ THE ITEM LEFT THE BAR, THE DOOR DID NOT (stage 9, 2026-08-19). The
   // header names the two verticals and one action now; the join door in the
-  // public chrome is (a) the guest's „დაწყება" button → JOIN_HREF, rendered by
-  // PublicTopBar itself, and (b) for a signed-in person the UserMenu's /join
-  // item, which PublicTopBar renders and K5 below pins as gated on
-  // showApplyCta(role). Presence in both chromes and gating on the real role
-  // are exactly what these two lines assert.
+  // public chrome is (a) „დაარეგისტრირე სერვისი" → JOIN_DOOR_HREF, rendered by
+  // PublicTopBar itself and gated by showJoinInvite — which is TRUE for a guest
+  // (tests/join.test.ts asserts that pair directly), and (b) for a signed-in
+  // person the UserMenu's /join item, which PublicTopBar also renders and K5
+  // below pins as gated on the same rule.
+  //
+  // ⚠️ IT USED TO ASSERT `href={JOIN_HREF}` — the guest's „დაწყება" button —
+  // and that button is GONE (2026-08-31). Owner: „დაწყება წაშალე და შესვლაზე
+  // გადმოიტანე, ერთი და იგივეს აკეთებს." It did: /signup and /signin render one
+  // component (app/signup → app/signin/auth-client, only `defaultView` differs),
+  // so the bar had two buttons onto one screen. The old assertion would now fail
+  // for a change that removed a DUPLICATE, not a door — and the door it was
+  // written to protect is still in the bar under its own name. Presence in both
+  // chromes and gating on the real fact are what these lines have always meant,
+  // and both still hold; only the element carrying them is named differently.
   check(
-    'K: the public header still carries the join door (guest button → JOIN_HREF; signed-in → the gated UserMenu item)',
-    publicNav.includes('href={JOIN_HREF}') && publicNav.includes('<UserMenu'),
+    'K: the public header still carries the join door (JOIN_DOOR_HREF, gated; signed-in → the UserMenu item)',
+    publicNav.includes('href={JOIN_DOOR_HREF}') && publicNav.includes('<UserMenu'),
     'The public header is the reference surface — if the door leaves it, the two chromes have diverged again.',
+  )
+  // ⚠️ AND A GUEST IS NEVER STRANDED WITHOUT AN ACCOUNT DOOR. Removing
+  // „დაწყება" left ONE auth control in the bar, so it has to be reachable at
+  // every width — it was `hidden md:` while the phone's filled button was the
+  // other one — and the screen behind it has to offer registration, or the site
+  // lost signup from its chrome.
+  check(
+    'K0b: the guest auth door is in the bar at every width, and it opens a screen that can register',
+    /href="\/signin"\n\s+className="tap-shrink h-11/.test(publicNav)
+      && !/hidden md:inline-flex[^"]*"\s*>\s*შესვლა/.test(publicNav)
+      && read('app/signin/_signin.tsx').includes("setView('signup')"),
+    'The one remaining auth button is hidden on phones, or the page behind it no longer offers registration.',
   )
   // ⚠️ K0 IS ABOUT THE GUEST'S DOOR ONLY (2026-08-21). `JOIN_HREF` is /signup
   // because a guest needs the account before the door can ask them anything.

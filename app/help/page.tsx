@@ -1,12 +1,9 @@
-import Link from 'next/link'
-import type { ReactNode } from 'react'
 import { pageMetadata } from '@/lib/pageSeo'
-import { socialMeta } from '@/lib/seo'
-import { COMMISSION_PCT, PAYMENTS_LIVE } from '@/lib/flags'
 import { MarketingTopBar } from '@/components/MarketingTopBar'
 import { Container } from '@/components/Container'
 import { Reveal } from '@/components/Reveal'
 import { Footer } from '@/components/Footer'
+import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { getSiteTextMap } from '@/lib/siteText'
@@ -16,8 +13,32 @@ import { SiteText } from '@/components/SiteTextProvider'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 // FAQ content moved to lib/helpTopics so the help WIDGET reads the same answers
 // — a copy here would drift and start quoting an old cancellation window.
-import { resolveGroups, type FaqGroup } from '@/lib/helpTopics'
+import { resolveGroups } from '@/lib/helpTopics'
 import { Illustration } from '@/components/Illustration'
+import { HelpFaq } from './_faq'
+
+// /help — „დახმარება", ported from the owner's design canvas
+// „How It Works + Help" (2026-08-31).
+//
+// ⚠️ THE CONTENT IS UNCHANGED. Every question and answer still comes from
+// `lib/helpTopics`, resolved ONCE below with `resolveGroups(map)` and handed
+// both to the visible accordion and to the FAQPage structured data. That single
+// resolution is the guarantee tests/siteTexts pins, and it survived the port
+// intact: this was a presentation change, not a content model.
+//
+// ⚠️ WHAT THE CANVAS CHANGED. The list of questions used to be one white plate
+// per group with hairline-divided rows inside it; it is now one CARD per
+// question, with a +/− chip and a brand-200 outline on the open one, over a
+// pill search field. The two support CHANNELS, which were a pair of cards under
+// an illustration, are now the canvas's one dashed „პასუხი ვერ იპოვე?" card —
+// same illustration, same two actions, same hours, one surface.
+//
+// ⚠️ THE INTRO PARAGRAPH LEFT THE TOP OF THE PAGE, and the canvas is why: h1,
+// then the field, and nothing between them. It was three lines carrying two
+// links — `mailto:SUPPORT_EMAIL` and /contact — and BOTH of them are in the
+// dashed card at the bottom, which is where the canvas puts the „can't find it"
+// answer. Nothing was lost; it moved to the place a person looks for it, which
+// is after the questions rather than before them.
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://mcodne.ge').replace(/\/$/, '')
 
@@ -30,32 +51,9 @@ export const dynamic = 'force-dynamic'
 
 export const generateMetadata = () => pageMetadata('help', '/help')
 
-
-type Channel = {
-  icon: ReactNode
-  t: string
-  d: string
-  hours: string
-  cta: string
-  href: string
-  primary?: boolean
-}
-
-// Honest channels only — no invented chat widget or placeholder phone number.
-// Support today is email + the contact form; hours match the canonical schedule.
-/** Built from the SiteText map inside the page — see `buildChannels`. The
- *  email card's DESCRIPTION stays generated: it prints SUPPORT_EMAIL, which has
- *  exactly one source (lib/supportEmails) so the address cannot end up typed
- *  two different ways on two surfaces. */
-const buildChannels = (t: (k: string) => string): Channel[] => [
-  { icon: <Icon.mail className="w-6 h-6" />, t: t('help.channel1.title'), d: `${SUPPORT_EMAIL} · პასუხი 24 საათში`, hours: t('help.channel1.hours'), cta: t('help.channel1.cta'), href: `mailto:${SUPPORT_EMAIL}`, primary: true },
-  { icon: <Icon.chat className="w-6 h-6" />, t: t('help.channel2.title'), d: t('help.channel2.body'), hours: t('help.channel2.hours'), cta: t('help.channel2.cta'), href: '/contact' },
-]
-
 export default async function HelpPage() {
   const map = await getSiteTextMap()
   const t = (k: string) => map[k] ?? SITE_TEXT_DEFAULTS[k] ?? ''
-  const CHANNELS = buildChannels(t)
   // ONE resolved list feeds both the visible accordion and the FAQPage
   // structured data below. Built separately, an admin edit would change the
   // answer on screen while Google kept being served the old one — a mismatch
@@ -73,107 +71,71 @@ export default async function HelpPage() {
     })),
   }
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-ink-50">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(faqLd) }} />
       <MarketingTopBar />
 
-      <Container as="main" size="content" className="py-12 lg:py-16">
+      <Container as="main" size="content" className="py-10 lg:py-14">
         <Eyebrow className="mb-3">
           დახმარება
         </Eyebrow>
-        <h1 className="font-display text-display lg:text-display font-bold text-ink-900 tracking-tight leading-[1.05] motion-safe:animate-rise-in">
+        <h1 className="font-display text-display lg:text-display font-extrabold text-ink-900 tracking-tight leading-[1.05] motion-safe:animate-rise-in">
           <SiteText k="help.hero.title" />
         </h1>
-        <p className="mt-6 text-body-lg text-ink-600 leading-relaxed max-w-[640px]">
-          {/* `tap-area` on both: an inline link in prose is only as tall as its
-              line — 19px here — and the canon floor for anything tappable is
-              40px. Padding would push the sentence around, which is precisely
-              the case globals.css built this class for: it hangs an invisible
-              inset:-12px -6px ::before over the link and the paragraph does not
-              move a pixel. The two are separated by „ან", so their hit areas
-              cannot swallow each other. */}
-          თუ ვერ იპოვე პასუხი აქ, დაწერე{' '}
-          <a href={`mailto:${SUPPORT_EMAIL}`} className="tap-area text-brand-700 hover:text-brand-800 font-semibold">
-            {SUPPORT_EMAIL}
-          </a>{' '}
-          ან{' '}
-          <Link href="/contact" className="tap-area text-brand-700 hover:text-brand-800 font-semibold">
-            შეავსე ფორმა
-          </Link>
-          . პასუხს ჩვეულებრივ 24 საათში იღებ.
-        </p>
 
-        <Reveal stagger className="mt-12 space-y-12">
-          {GROUPS.map(g => (
-            <section key={g.title}>
-              <Eyebrow className="mb-4">
-                {g.title}
-              </Eyebrow>
-              <div className="rounded-card border border-ink-200 bg-white divide-y divide-ink-200">
-                {g.items.map((f, i) => (
-                  <details key={i} className="group">
-                    <summary className="flex items-center justify-between p-5 cursor-pointer list-none gap-4">
-                      <span className="text-body-lg font-display font-semibold text-ink-900 leading-snug">
-                        {f.q}
-                      </span>
-                      <Icon.chevD className="w-4 h-4 text-ink-500 group-open:rotate-180 transition-transform duration-fast shrink-0" />
-                    </summary>
-                    {/* No `max-w-prose` here. The card is already the measure —
-                        `size="content"` caps this column at 820px, which is a
-                        sane line length for body text. Adding a 65ch cap INSIDE
-                        it wrapped every answer at roughly half the card and left
-                        ~440px of white to the right of each one (measured), so
-                        the panel read as broken rather than as considered. Cap
-                        the container OR the text, never both. */}
-                    <div className="px-5 pb-5 text-body text-ink-600 leading-relaxed">{f.a}</div>
-                  </details>
-                ))}
-              </div>
-            </section>
-          ))}
-        </Reveal>
+        {/* The search field and the accordion. A client leaf on purpose — the
+            filter is the only thing here that needs JavaScript, and the
+            questions themselves are <details>, so with scripting off all 25
+            answers are still on the page and still openable. */}
+        <HelpFaq groups={GROUPS} />
 
         <Reveal>
-        <section className="mt-16">
-          {/* Art BESIDE the text on desktop, ABOVE it on mobile — the brief's
-              layout for this block. `items-center` + `gap` is the whole
-              treatment: no plate, no border, just air. The heading keeps the
-              centring it had on mobile and squares up on desktop, where the
-              drawing now holds the left edge. */}
-          <div className="mb-8 flex flex-col sm:flex-row items-center sm:items-center justify-center gap-5 sm:gap-8 text-center sm:text-left">
+        {/* ── „პასუხი ვერ იპოვე?" ─────────────────────────────────────────
+            The canvas's dashed card. It carries what the two channel cards
+            carried — both actions, the address, both response windows — on one
+            surface instead of two, which is what a person needs at the bottom
+            of a page they did not find their answer on.
+
+            `border-dashed` is the canvas's own signal and it is the right one:
+            this is not a card you can act ON, it is an outline around the way
+            out. The two <Btn> inside are the actions. */}
+        <section className="mt-10 rounded-panel border border-dashed border-ink-300 bg-white p-6 sm:p-8">
+          <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-8 text-center sm:text-left">
             <Illustration name="support" size="support" alt="" className="shrink-0" />
-            <div>
+            <div className="flex-1 sm:min-w-[240px]">
               <Eyebrow className="mb-2">
                 პასუხი ვერ იპოვე?
               </Eyebrow>
-              <h2 className="font-display text-h1 lg:text-display font-bold text-ink-900 tracking-tight">
+              <h2 className="font-display text-h1 font-bold text-ink-900 tracking-tight">
                 <SiteText k="help.contact.title" />
               </h2>
-              <p className="mt-2 text-body text-ink-600"><SiteText k="help.contact.sub" /></p>
+              <p className="mt-2 text-body-lg text-ink-600 leading-relaxed"><SiteText k="help.contact.sub" /></p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              {/* h-12 ⇒ text-body-lg — the <Btn size="lg"> pairing. Height is
+                  how a control announces its importance and the label has to
+                  agree (tests/designTokens §F). */}
+              <Btn variant="primary" size="lg" href={`mailto:${SUPPORT_EMAIL}`}>
+                {t('help.channel1.cta')}
+              </Btn>
+              <Btn variant="secondary" size="lg" href="/contact">
+                {t('help.channel2.cta')}
+              </Btn>
             </div>
           </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {CHANNELS.map(c => (
-              <div key={c.t} className={`rounded-card border p-6 ${c.primary ? 'border-brand-500 bg-brand-50/30 ring-2 ring-brand-500/15' : 'border-ink-200 bg-white'}`}>
-                <div className={`w-12 h-12 rounded-card inline-flex items-center justify-center mb-4 ${c.primary ? 'bg-brand-600 text-white' : 'bg-ink-100 text-ink-700'}`}>{c.icon}</div>
-                <h3 className="font-display text-h3 font-bold text-ink-900 tracking-tight">{c.t}</h3>
-                <p className="mt-1.5 text-small text-ink-700 tabular-nums">{c.d}</p>
-                <div className="mt-3 font-mono text-meta tabular-nums text-ink-500">{c.hours}</div>
-                <a
-                  href={c.href}
-                  // h-11 ⇒ text-body, the <Btn size="md"> pairing. Height says
-                  // how important a control is; the label has to agree.
-                  className={`mt-5 w-full h-11 rounded-btn font-display font-semibold text-body inline-flex items-center justify-center gap-2 transition-colors duration-fast ${
-                    c.primary ? 'bg-brand-600 hover:bg-brand-700 text-white' : 'bg-white border border-ink-200 hover:bg-ink-50 text-ink-800'
-                  }`}
-                >
-                  {c.cta}
-                </a>
-              </div>
-            ))}
-          </div>
-          <div className="mt-8 p-5 rounded-card bg-ink-50/50 border border-ink-200 text-center">
-            <div className="font-mono text-meta tabular-nums text-ink-600">
+
+          {/* The facts under the two actions, in the order the buttons sit.
+              SUPPORT_EMAIL is PRINTED rather than typed — it has exactly one
+              source (lib/supportEmails), so it cannot end up written two
+              different ways on two surfaces. */}
+          <div className="mt-6 pt-5 border-t border-ink-100 grid gap-x-8 gap-y-2 sm:grid-cols-2 font-mono text-meta tabular-nums text-ink-500">
+            <div>
+              {t('help.channel1.title')} · {SUPPORT_EMAIL} · {t('help.channel1.hours')}
+            </div>
+            <div>
+              {t('help.channel2.title')} · {t('help.channel2.body')} · {t('help.channel2.hours')}
+            </div>
+            <div className="sm:col-span-2">
               <Icon.star className="w-3.5 h-3.5 inline-block mr-1.5 text-warning-500" />
               ხელით მოდერაცია · პასუხობს ადმინისტრაცია
             </div>

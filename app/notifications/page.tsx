@@ -7,7 +7,6 @@
 // client-side: it has an all/unread filter and mark-as-read mutations, which
 // are the kind of live state a server render cannot hold.
 import { requireUser } from '@/lib/auth'
-import { asRole } from '@/lib/roles'
 import NotificationsClient from './client'
 
 export const dynamic = 'force-dynamic'
@@ -16,10 +15,9 @@ export default async function NotificationsPage() {
   // ⚠️ A REAL GUARD, NOT A CLIENT REDIRECT. The list route answers 401 and the
   // page then sent the browser to /signin — a bounce that cannot happen until
   // React has booted, so a signed-out visitor read an empty page first.
-  const user = await requireUser()
-  return (
-    <NotificationsClient
-      viewer={{ name: user.fullName ?? '', avatar: user.avatarUrl ?? null, role: asRole(user.role) }}
-    />
-  )
+  // The identity is still required — it is the guard — but it is no longer
+  // handed to the list: the rail around this page (app/notifications/layout →
+  // SpaceChrome) is what draws a name and an avatar now.
+  await requireUser()
+  return <NotificationsClient />
 }

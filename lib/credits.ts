@@ -19,16 +19,24 @@
 // THE LOOP — three movements, and the middle one is the product:
 //
 //   +100₾  the profile tasks              one-off, per key, idempotent
-//    −1₾   opening a client's CONTACT     once per request, for ever
+//    −3₾   opening a client's CONTACT     once per request, for ever
 //   +25₾   a job was marked finished      the earn-back, once per offer
 //
 // Reading a request is FREE. Sending an offer is FREE. The only thing a balance
 // buys is the client's name and number, and it buys them once.
 //
-// ⚠️ THE CONTACT OPENS BEFORE THE OFFER, NOT AFTER. The provider reads the job,
-// decides it is worth a call, pays, and may then phone, bid, or do nothing. A
-// contact released only after the client already chose you would be charging
-// for a door that is already open.
+// ⚠️ THE CONTACT OPENS AFTER THE CLIENT HAS CHOSEN, NOT BEFORE (2026-09-01, the
+// owner's design canvas → „Expert Jobs"). This reverses the 2026-08-21 order,
+// and the reversal is the product: a provider now answers for nothing and pays
+// only once somebody has picked them, so the money follows a decision the
+// CLIENT made rather than a bet the provider placed. „შერჩევის საფასური" is the
+// canvas's own name for it and says exactly that.
+//
+// ⚠️ WHAT THAT COSTS, SAID PLAINLY: the provider can no longer phone before
+// bidding. That was the whole argument for the old order (owner, 2026-08-21:
+// read the job, decide it is worth a call, pay, then answer) and it is what the
+// canvas gives up in exchange for an answer that is free to send. The thread is
+// where the questions go now — it opens with the offer and costs nothing.
 
 /** Money is integers. 100₾ = 10 000 თეთრი. */
 export const TETRI = 100
@@ -109,6 +117,34 @@ export function creditTasks(): { key: CreditTaskKey; tetri: number; label: strin
 }
 
 /**
+ * WHERE A TASK IS ANSWERED WITHIN THAT EDITOR — the section to scroll to.
+ *
+ * ⚠️ IT EXISTS BECAUSE THE CHECKLIST MOVED ONTO THIS LIST (2026-09-03). The
+ * card beside the form used to score `lib/profileScore`'s SIX DIFFERENT checks
+ * and print „+15%" against each; the owner, looking at it: „ვფიქრობ აქ ეგ
+ * კრედიტები ან ლარები უნდა ეწეროს." Money is the honest label — these are the
+ * tasks that pay — but the two lists are not the same six things, so the fix
+ * was to change the LIST rather than relabel a percentage as a lari.
+ *
+ * `taskHref` answers „which page"; there is one, so it answers the same thing
+ * for every key. This answers „which part of it", which is what a checklist
+ * beside a long form is for.
+ */
+export function taskAnchor(key: CreditTaskKey): string {
+  switch (key) {
+    // Identity: the photo, the professions, the two sentences about you.
+    case 'PROFILE_PHOTO':
+    case 'PROFILE_BIO':
+    case 'PROFILE_PROFESSIONS': return '#section-avatar'
+    // What you sell and where you travel to.
+    case 'PROFILE_SERVICE':
+    case 'PROFILE_EXPERIENCE': return '#section-services'
+    // The work photos.
+    case 'PROFILE_CERTIFICATE': return '#section-photos'
+  }
+}
+
+/**
  * WHERE A TASK IS ANSWERED — the editor that owns that field.
  *
  * ⚠️ IT IS ONE ADDRESS SINCE 2026-08-30, and the switch that used to stand here
@@ -135,22 +171,140 @@ export const CREDIT_TASKS_TOTAL = CREDIT_TASKS.reduce((n, t) => n + t.tetri, 0)
  * ⚠️ ONE CLIENT'S CONTACT, ONE LARI — and „ჯერ" is part of the decision, so it
  * is a single named constant every screen, refusal and test reads from.
  *
- * WHY SO SMALL. Most leads go quiet, so what a provider risks on one has to be
- * small enough that silence costs almost nothing. It also has to be a number
- * nobody stops to weigh — the point of charging for the contact is that the
- * provider decides „is this worth a phone call", and a price worth thinking
- * about puts a second decision in front of the first.
+ * ⚠️ IT MOVED FROM 1₾ TO 3₾ AND FROM ONE MOMENT TO ANOTHER (2026-09-01, the
+ * owner's design canvas → „Expert Jobs"). Both halves are the same change.
+ *
+ * The old 1₾ was priced for a GAMBLE: a provider paid before bidding, on a lead
+ * that would probably go quiet, so the risk had to be small enough that silence
+ * cost almost nothing. It is not a gamble any more — the canvas charges only
+ * after the client has ALREADY chosen this provider („საფასურს იხდი მხოლოდ
+ * მაშინ, თუ კლიენტი შეგარჩევს და კონტაქტს გახსნი"), so what is being bought is
+ * a job in hand rather than a chance at one. A won job is worth more than a
+ * lottery ticket and is priced accordingly.
+ *
+ * ⚠️ THE CANVAS DISAGREES WITH ITSELF AND THIS IS THE HALF THAT WON. „Expert
+ * Jobs" says 3₾ in three places and ties every one of them to the selection;
+ * „Request Room v2"'s provider footer still reads „უფასოა · 1₾ პასუხზე", which
+ * is the OLD price attached to the OLD moment. The more specific and more
+ * recent statement about this mechanic is the one implemented; the other line
+ * is a leftover of the model this change replaces.
+ *
+ * It still has to be a number nobody stops to weigh — the point is that the
+ * provider decides „is this job worth having", not that they audit a fee.
  *
  * ⚠️ PAID ONCE PER REQUEST, FOR EVER — see `contactKey`. Charging twice for the
  * same phone number is theft, and it is the kind that happens by accident.
+ *
+ * ⚠️ AND IT IS NOT ONE NUMBER ANY MORE (2026-09-03). It scales with the JOB —
+ * see `contactCostTetri` below. Everything above is why the SHAPE of the fee is
+ * what it is; the ladder is why 3₾ stopped being all of it.
  */
-export const CONTACT_COST_TETRI = 1 * TETRI
+export const CONTACT_COST_MIN_TETRI = 1 * TETRI
+export const CONTACT_COST_MAX_TETRI = 10 * TETRI
 
-/** How many client contacts a balance still opens — the only arithmetic the UI
- *  needs. „85 კონტაქტი" is what a provider actually wants to know; „85₾" is
- *  the currency it happens to be denominated in. */
-export function contactsAffordable(balanceTetri: number): number {
-  return Math.max(0, Math.floor(balanceTetri / CONTACT_COST_TETRI))
+/**
+ * ⚠️ WHAT AN UNPRICED REQUEST COSTS — AND MEASURING THIS IS WHY IT EXISTS.
+ *
+ * Run against the live rows on 2026-09-03, the day the ladder was written:
+ * NINETEEN OF TWENTY requests carry `budgetMin: 0, budgetMax: null`. The money
+ * question is optional in the intake and almost nobody answers it. Priced off
+ * the ladder's floor, every one of those would have dropped from 3₾ to 1₾ —
+ * a two-thirds cut to the only revenue this platform has, dressed up as a
+ * smarter price.
+ *
+ * An unstated budget is NOT evidence of a small job; it is the absence of
+ * evidence, and CLAUDE.md rule 6 is about exactly this. So a request that named
+ * no money keeps the price it has had since 2026-09-01, and the ladder applies
+ * where the client actually said something.
+ *
+ * ⚠️ IT ALSO SAYS WHAT TO FIX FIRST. The ladder can only do its job once the
+ * intake collects a budget — that is the change worth making before this one
+ * is worth much, and it is the owner's.
+ */
+export const CONTACT_COST_DEFAULT_TETRI = 3 * TETRI
+
+/**
+ * ⚠️ WHAT ONE CLIENT'S CONTACT COSTS ON THIS JOB — 1₾ to 10₾ (2026-09-03).
+ *
+ * Owner: „მოთხოვნის შესაბამისად არ შეგვიძლია ფასის კორექტირება… 1-10ლ ათამაშე
+ * ვფიქრობ საინტერესო იქნება ძალიან ძვირასც არ გადიახდიან."
+ *
+ * A flat 3₾ was unfair in BOTH directions and the arithmetic says so: on a 70₾
+ * cleaning visit it is 4% of the job, on a 15 000₾ renovation it is 0.02%. The
+ * small job was being taxed and the big one was being given away.
+ *
+ * ⚠️ CHECKED, NOT INVENTED. MyBuilder's shortlist fee „is calculated based on
+ * the likely size, value and location of the Job"; Thumbtack's lead price moves
+ * with „job size, service type, geographic location, and market competition".
+ * This is the first of those two factors and only the first — see the note on
+ * demand below.
+ *
+ * ⚠️ DEMAND IS DELIBERATELY NOT IN HERE YET. Thumbtack re-prices weekly on
+ * supply and demand, and it is their most complained-about mechanic — one of
+ * their own community threads is titled „Why does the lead cost more than the
+ * job?!" and pros report 50–100% spikes with no warning. It also needs data
+ * this platform does not have: measured 2026-09-03, twenty requests in one
+ * city. A demand multiplier today would be an invented number, which CLAUDE.md
+ * rule 6 forbids outright. The budget is real, is already on every row, and is
+ * enough.
+ *
+ * ⚠️ ONE LADDER FOR ALL FOUR KINDS, AND THE LIMIT IS WRITTEN DOWN. The bands in
+ * lib/requestTopics are per-kind and measure different things — LEARNING is per
+ * LESSON, SERVICE is per VISIT, PROJECT is the whole job — so a 120₾ lesson
+ * budget and a 120₾ project are not the same size of work. Reading raw lari
+ * treats them as if they were. That is accepted rather than solved: a per-kind
+ * ladder is four tables to keep in step for a difference that costs at most one
+ * step of this one, and the owner asked for the simple version at this stage.
+ *
+ * `budgetMax` where the client named a ceiling, `budgetMin` where they did not
+ * („250₾-ზე მეტი" has no top) — the higher of the two facts we hold, never an
+ * average of a band, which would invent a figure nobody typed.
+ */
+export function contactCostTetri(budgetMin: number, budgetMax: number | null): number {
+  // ⚠️ „NOTHING WAS SAID" IS ITS OWN ANSWER, not the bottom of the ladder — see
+  // CONTACT_COST_DEFAULT_TETRI for the measurement that forced this line.
+  if ((budgetMin ?? 0) <= 0 && budgetMax === null) return CONTACT_COST_DEFAULT_TETRI
+  const gel = Math.max(0, budgetMax ?? budgetMin ?? 0)
+  if (gel < 100) return 1 * TETRI
+  if (gel < 300) return 2 * TETRI
+  if (gel < 700) return 3 * TETRI
+  if (gel < 1500) return 5 * TETRI
+  if (gel < 5000) return 7 * TETRI
+  return CONTACT_COST_MAX_TETRI
+}
+
+/**
+ * HOW MANY CONTACTS A BALANCE OPENS — as a pair, because it is a pair.
+ *
+ * ⚠️ IT USED TO BE ONE NUMBER AND THAT NUMBER WAS THE POINT. „85 კონტაქტი" is
+ * what a provider wants to know; „85₾" is the currency it happens to be
+ * denominated in. Against a 1–10₾ ladder the single figure became a promise the
+ * platform cannot keep either way — 85₾ opens eight big jobs or eighty small
+ * ones — and CLAUDE.md rule 6 forbids putting the middle of that on a screen.
+ *
+ * So the pair, and `contactsLabel` renders it. Nothing is lost that was true.
+ */
+export function contactsAffordable(balanceTetri: number): { min: number; max: number } {
+  return {
+    min: Math.max(0, Math.floor(balanceTetri / CONTACT_COST_MAX_TETRI)),
+    max: Math.max(0, Math.floor(balanceTetri / CONTACT_COST_MIN_TETRI)),
+  }
+}
+
+/** „6–60", or „6" where the two coincide, or „" for a balance that opens
+ *  nothing. The one place the pair becomes text, so five screens cannot punctuate
+ *  a range five ways. */
+export function contactsLabel(balanceTetri: number): string {
+  const { min, max } = contactsAffordable(balanceTetri)
+  if (max === 0) return ''
+  return min === max ? `${min}` : `${min}–${max}`
+}
+
+/** The fee as a range, for the two screens that speak about the price without
+ *  a job in front of them (the balance page, the home CTA). Two true numbers
+ *  rather than one that used to be true. */
+export function contactCostRangeLabel(): string {
+  return `${CONTACT_COST_MIN_TETRI / TETRI}–${CONTACT_COST_MAX_TETRI / TETRI}₾`
 }
 
 /**
@@ -263,6 +417,51 @@ export function isAdminAdjust(reason: string): boolean {
   return reason === ADMIN_ADJUST || reason.startsWith(`${ADMIN_ADJUST}: `)
 }
 
+/* ═══════════ what one row of the ledger is CALLED ═══════════════════════ */
+
+/**
+ * ⚠️ THE LEDGER HAD NO WORDS UNTIL 2026-09-01, and that is why it had no page.
+ * Every movement was stored as a `reason` the database understands —
+ * „PROFILE_BIO", „CONTACT_OPENED" — and nothing anywhere turned one into
+ * something a provider could read. So the balance could only ever be shown as a
+ * TOTAL: a number that changes for reasons the person it belongs to cannot see.
+ * Owner, 2026-09-01: „ეს 65₾ საიდან მოვიდა… ბალანსის სისტემას გვერდი არ აქვს."
+ *
+ * ⚠️ NOTHING HERE IS NEW COPY. Each label is the site's own sentence with its
+ * number and its explanation cut off — `JOB_DONE_NOTE` already says
+ * „დასრულებული სამუშაო — +25₾ ბალანსზე", `CONTACT_COST_NOTE` already says
+ * „კლიენტის კონტაქტი — 1₾ ბალანსიდან". A ledger row prints its own amount, so
+ * what it needs from those sentences is the subject and not the predicate.
+ *
+ * ⚠️ AND „დაბრუნება" IS NOT SAID, here least of all. A released charge is the
+ * request closing with nobody on it, which is what the row is named after —
+ * never money coming back, which is the sentence that turns a credit into a
+ * liability. See the wording rules at the top of this file.
+ *
+ * An unknown reason returns itself rather than „—": a ledger that silently
+ * blanks a movement is worse than one that prints a key, because the number
+ * still moved and now nothing accounts for it.
+ */
+export function creditReasonLabel(reason: string): string {
+  if (isAdminAdjust(reason)) {
+    const note = reason.slice(`${ADMIN_ADJUST}: `.length).trim()
+    return note || ADMIN_ADJUST
+  }
+  const task = CREDIT_TASKS.find(t => t.key === reason)
+  if (task) return task.label
+  if (reason === 'JOB_DONE') return 'დასრულებული სამუშაო'
+  if (reason === 'CONTACT_OPENED') return 'კლიენტის კონტაქტი'
+  if (reason === 'CONTACT_REFUND') return 'კონტაქტი — მოთხოვნა დაიხურა'
+  // ⚠️ A SECOND REASON, THE SAME `grantKey` (2026-09-01). Both are „the contact
+  // did not become work", and `contactRefundKey` is deliberately shared so the
+  // unique index refuses a second payment however the first one was triggered.
+  // They are told apart in the LEDGER because a provider reading their own
+  // history is owed the actual cause: „the request closed" and „the client you
+  // won never answered" are different things that happened to them.
+  if (reason === 'CONTACT_REFUND_SILENT') return 'კონტაქტი — კლიენტი არ გამოეხმაურა'
+  return reason
+}
+
 /* ═══════════ what blocks ════════════════════════════════════════════════ */
 
 /**
@@ -287,9 +486,87 @@ export function isAdminAdjust(reason: string): boolean {
 export const CREDITS_ENFORCED = true
 
 /** Can this balance open one client's contact? While unenforced, always. */
-export function canAffordContact(balanceTetri: number): boolean {
+export function canAffordContact(balanceTetri: number, costTetri: number): boolean {
   if (!CREDITS_ENFORCED) return true
-  return balanceTetri >= CONTACT_COST_TETRI
+  return balanceTetri >= costTetri
+}
+
+/* ═══════════ what a balance is bought with ══════════════════════════════
+ *
+ * ⚠️ THREE PACKAGES, AND THE BIGGEST IS THE CHEAPEST PER CONTACT (2026-09-03).
+ * Owner: „რაიმე 3 პაკეტი რომ შევქმნათ… 100ლ ვთქვათ არის 1000 ქოინი და ამ ათასი
+ * ქოინით შემდეგ ყიდულობს და ხსნის."
+ *
+ * CHECKED BEFORE CHOOSING THE LADDER. Both comparable platforms sell exactly
+ * this way and both discount the big pack: Bark's credits are „on a sliding
+ * scale, meaning the cost per credit drops when you buy in bigger amounts",
+ * about 25–30% off the largest; Thumbtack's credits likewise drop in bulk. The
+ * bonus here is 0 / 20 / 30 %, which lands inside that range rather than being
+ * picked for how it looks.
+ *
+ * ⚠️ THE BONUS IS EXTRA BALANCE, NOT A DISCOUNT ON THE PRICE, and the two
+ * fields say so: `priceTetri` is what leaves a card, `creditTetri` is what
+ * lands in the ledger. Modelling it as „100₾ costs 83₾" would put a second
+ * price on the same thing and make every receipt disagree with the ledger.
+ *
+ * ⚠️ STILL DENOMINATED IN LARI, AND THE FILE'S OWN CONDITION FOR THAT IS ABOUT
+ * TO EXPIRE. The header says it plainly: lari is safe „WHILE `PAYMENTS_LIVE` IS
+ * FALSE", because a balance that buys one thing and cannot be withdrawn is not
+ * money owed. The moment a card can top it up, „you paid 100₾ and we credited
+ * you 120₾" is a discount on currency — awkward on an invoice and worse in an
+ * account. A COIN fixes that (you bought 1200 coins for 100₾; a coin has no
+ * exchange rate), and it is also what lets a contact's price VARY without every
+ * screen re-stating a lari figure.
+ *
+ * So the coin is right and it arrives WITH the card, not before it: swapping
+ * the display unit on ten screens for a checkout that does not exist would be
+ * the „control that lies" this repo deletes. `creditTetri` is the ledger's own
+ * unit either way, so that swap is a display change and not a migration —
+ * 1 coin = 10 tetri at the owner's own rate (100₾ = 1000 coins), which makes a
+ * contact 30 coins.
+ *
+ * ⚠️ NOT SOLD ANYWHERE YET. `PAYMENTS_LIVE` is false and there is no checkout;
+ * /work/balance draws this list only behind that flag, keeping the honest state
+ * its own header describes — „a price list for something nobody can buy… It
+ * arrives when the flag does."
+ */
+
+export type CreditPack = {
+  key: 'START' | 'STANDARD' | 'PRO'
+  /** What the provider pays. */
+  priceTetri: number
+  /** What lands in the ledger — price plus the bonus. */
+  creditTetri: number
+  /** The owner's word for it on the card. */
+  label: string
+}
+
+/** ⚠️ EVERY AMOUNT IS A WHOLE LARI AND A ROUND ONE. The packs used to be sized
+ *  against a single 3₾ contact; since 2026-09-03 a contact costs 1–10₾ by job
+ *  (`contactCostTetri`), so „N contacts" is no longer a fact a pack can state
+ *  and the numbers answer to nothing but themselves. */
+export const CREDIT_PACKS: readonly CreditPack[] = [
+  { key: 'START',    priceTetri:  30 * TETRI, creditTetri:  30 * TETRI, label: 'დამწყები' },
+  { key: 'STANDARD', priceTetri: 100 * TETRI, creditTetri: 120 * TETRI, label: 'სტანდარტული' },
+  { key: 'PRO',      priceTetri: 300 * TETRI, creditTetri: 390 * TETRI, label: 'პრო' },
+]
+
+/** The bonus as a whole percentage, or 0. Computed rather than stored: a stored
+ *  „+20%" beside a hand-typed pair of numbers is two facts that can disagree,
+ *  and the pair is the one that moves money. */
+export function packBonusPct(p: CreditPack): number {
+  if (p.creditTetri <= p.priceTetri) return 0
+  return Math.round(((p.creditTetri - p.priceTetri) / p.priceTetri) * 100)
+}
+
+/** How many contacts a pack buys, at best and at worst — two true numbers.
+ *
+ *  ⚠️ IT WAS ONE NUMBER AND COULD NOT STAY ONE (2026-09-03). „40 კონტაქტი" was
+ *  exact while every contact cost 3₾; against a 1–10₾ ladder it would be a
+ *  figure the platform cannot honour, which is CLAUDE.md rule 6. The screens
+ *  print the pair or print nothing — never the middle of it. */
+export function packContacts(p: CreditPack): string {
+  return contactsLabel(p.creditTetri)
 }
 
 /* ═══════════ what the provider is told ══════════════════════════════════ */
@@ -300,7 +577,25 @@ export function canAffordContact(balanceTetri: number): boolean {
  * benefit, no reassurance; the wording rules at the top apply to every string
  * below.
  */
-export const CONTACT_COST_NOTE = `კლიენტის კონტაქტი — ${CONTACT_COST_TETRI / TETRI}₾ ბალანსიდან. ერთხელ იხდი, მერე ყოველთვის გიჩანს.`
+export const CONTACT_COST_NOTE = `კლიენტის კონტაქტი — ${contactCostRangeLabel()} ბალანსიდან, სამუშაოს მიხედვით. ერთხელ იხდი, მერე ყოველთვის გიჩანს.`
+
+/**
+ * ⚠️ HOW LONG A PAID CONTACT HAS TO PROVE ITSELF — 48 hours (the canvas).
+ *
+ * The number is here and nowhere else: `CONTACT_REFUND_NOTE` interpolates it,
+ * `sweepSilentContacts` (lib/requestJobs) enforces it, and tests/credits asserts
+ * the two agree. A deadline that is typed twice is a deadline that eventually
+ * means two different things — which is precisely why the previous note refused
+ * to name one at all.
+ *
+ * ⚠️ WHAT „გამოეხმაურა" MEANS IS A MESSAGE, NOT A PHONE CALL. We cannot see a
+ * call, so the only honest evidence of the client answering is a
+ * `RequestMessage` from their side on this offer's thread after the unlock. A
+ * provider who was genuinely phoned back and refunded anyway has lost nothing;
+ * the reverse — charged for silence — is the complaint the refund exists to
+ * answer, so the doubt is spent in the provider's favour.
+ */
+export const CONTACT_REFUND_HOURS = 48
 
 /**
  * ⚠️ THE HALF THAT MAKES THE PRICE FAIR, SAID BEFORE THE CLICK.
@@ -311,22 +606,54 @@ export const CONTACT_COST_NOTE = `კლიენტის კონტაქტ
  * knows about before paying changes no decision; it is a rebate discovered
  * later, not a term of the sale.
  *
- * ⚠️ NO DEADLINE IN THE COPY. „14 დღეში" would be a second place
- * `STALE_OPEN_DAYS` is written down, and the day the two disagree the promise
- * becomes a lie. The condition is stated as it is enforced: the request closed
- * with nobody having answered.
+ * ⚠️ IT HAS A DEADLINE NOW, AND THE DEADLINE IS THE PROMISE (2026-09-01, the
+ * canvas → „Expert Jobs": „თუ კლიენტი 48 საათში არ გამოგეხმაურება, 3₾
+ * ავტომატურად დაგიბრუნდება").
+ *
+ * The old note deliberately named NO period, because the condition was „the
+ * request closed with nobody having answered" and `STALE_OPEN_DAYS` was the
+ * only clock — writing „14 დღეში" into copy would have been a second place that
+ * number lived. That reasoning is intact and the conclusion simply moved with
+ * the mechanic: the charge now happens AFTER the client picked somebody, so
+ * „the request closed unanswered" can no longer be the trigger — by then it is
+ * answered. What a provider is now waiting for is the client to pick up, and
+ * that has its own clock, `CONTACT_REFUND_HOURS`, interpolated here rather than
+ * typed, so this sentence and the sweep cannot drift apart.
  */
-export const CONTACT_REFUND_NOTE = `თუ კლიენტს არავინ გამოეხმაურა და მოთხოვნა დაიხურა — ${CONTACT_COST_TETRI / TETRI}₾ ავტომატურად ბრუნდება ბალანსზე.`
+export const contactRefundNote = (costTetri: number) =>
+  `თუ კლიენტი ${CONTACT_REFUND_HOURS} საათში არ გამოგეხმაურება, ${costTetri / TETRI}₾ ავტომატურად დაგიბრუნდება.`
 
-/** The button, before the click. The price belongs ON the control that spends
- *  it — a cost a person finds out about afterwards is the thing a
- *  lari-denominated balance must never produce. */
-export const CONTACT_BUTTON_LABEL = `კონტაქტის ნახვა · ${CONTACT_COST_TETRI / TETRI}₾`
+/** The same promise where no job is in hand — the amount is „whatever you
+ *  paid", so the sentence says the period and not a figure. */
+export const CONTACT_REFUND_NOTE = `თუ კლიენტი ${CONTACT_REFUND_HOURS} საათში არ გამოგეხმაურება, თანხა ავტომატურად დაგიბრუნდება.`
+
+/** What the fee IS, in the canvas's own words — a fee for having been chosen,
+ *  not for a phone number. Read by the provider's job card. */
+export const CONTACT_FEE_LABEL = 'შერჩევის საფასური'
+
+/** Said beside the button that spends it. The price belongs ON the control —
+ *  a cost a person finds out about afterwards is the thing a lari-denominated
+ *  balance must never produce. */
+export const contactChargeNote = (costTetri: number) => `ბალანსიდან ჩამოიჭრება ${costTetri / TETRI}₾`
+
+/** The button, before the click. ⚠️ THE PRICE CAME OFF THE LABEL (2026-09-01,
+ *  the canvas). It read „კონტაქტის ნახვა · 1₾" because the button was the only
+ *  place a provider met the number; the canvas puts the fee above it and
+ *  `CONTACT_CHARGE_NOTE` beside it, so printing it a third time on the control
+ *  itself is the same fact said three ways in one card. */
+export const CONTACT_BUTTON_LABEL = 'კონტაქტის გახსნა' 
 
 /** ⚠️ SAID ON THE OFFER FORM, because it is the half that CHANGED. A provider
  *  who used to pay 5₾ to answer has to be told plainly that answering is now
  *  free, or the old price is what they will assume. */
-export const OFFER_FREE_NOTE = 'შეთავაზების გაგზავნა უფასოა.'
+export const OFFER_FREE_NOTE = 'გაგზავნა უფასოა'
+
+/** The canvas's tinted plate on the job card — the headline and the condition.
+ *  Two constants rather than one string because the canvas sets them at two
+ *  weights, and because the second is the sentence that actually describes the
+ *  new mechanic: the money follows the CLIENT's choice. */
+export const OFFER_FREE_TITLE = 'შეთავაზება უფასოა'
+export const OFFER_FREE_BODY = 'საფასურს იხდი მხოლოდ მაშინ, თუ კლიენტი შეგარჩევს და კონტაქტს გახსნი.'
 
 /** The earn-back, in one line, for the screen that has to answer „და მერე?" */
 export const JOB_DONE_NOTE = `დასრულებული სამუშაო — +${JOB_DONE_TETRI / TETRI}₾ ბალანსზე.`
@@ -334,7 +661,8 @@ export const JOB_DONE_NOTE = `დასრულებული სამუშ�
 /** What a provider is told when the balance is short. It names the PRICE rather
  *  than the shortfall — the shortfall is arithmetic they can do, the price is
  *  the fact they need. */
-export const NO_BALANCE_NOTE = `ბალანსი არ არის საკმარისი — კონტაქტი ${CONTACT_COST_TETRI / TETRI}₾ ღირს.`
+export const noBalanceNote = (costTetri: number) =>
+  `ბალანსი არ არის საკმარისი — კონტაქტი ${costTetri / TETRI}₾ ღირს.`
 
 /** What they are told when the client has already been reached by as many
  *  providers as they asked for. A function, because the ceiling is the

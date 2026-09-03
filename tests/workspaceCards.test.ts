@@ -64,21 +64,24 @@ test('every list that shows a request titles it with the headline', () => {
   // ⚠️ `app/me/requests/page.tsx` LEFT THIS LIST ON 2026-08-30 — it is a
   // redirect now; the rows it drew are `app/me/_requests.tsx`, which is still
   // here and still asserted.
+  // ⚠️ THE QUEUE CARD JOINED THIS LIST (2026-09-01, the owner's design canvas →
+  // „Expert Jobs"). It used to print the description ITSELF as the title, on
+  // the argument that it was the one screen with room for the whole paragraph;
+  // the canvas gives the card a photograph and a three-fact row, so the room is
+  // gone and the title is `line-clamp-2` — which is what `requestHeadline`
+  // already computes, and computing it twice in two places is how a card and
+  // the page it opens start calling one request two things.
+  //
+  // The fallback rides along and is the whole reason to read the shared value
+  // rather than `r.description`: no description, no title, so the category
+  // takes over — a card with no title is worse than a repeated one.
   for (const f of [
+    'app/work/(provider)/requests/page.tsx',
     'app/work/(provider)/requests/[id]/page.tsx',
     'app/me/_requests.tsx',
   ]) {
     assert.match(codeOf(f), /\{r\.headline\}/, `${f} still titles rows by category`)
   }
-  // ⚠️ THE QUEUE CARD IS THE ONE SCREEN WITH ROOM FOR THE WHOLE PARAGRAPH, so
-  // it prints the description ITSELF as the title rather than the shortened
-  // headline — printing both put the same first sentence on the card twice.
-  // The fallback is the same one `requestHeadline` applies: no description, no
-  // title, so the category takes over.
-  assert.match(codeOf('app/work/(provider)/requests/page.tsx'),
-    /\{titled \? r\.description : r\.topicLabel\}/, 'the queue card stopped titling by what the client wrote')
-  assert.match(codeOf('app/work/(provider)/requests/page.tsx'),
-    /const titled = \(r\.description \?\? ''\)\.trim\(\) !== ''/, 'the untitled-card fallback is gone')
   // The offers row has room for the paragraph too, so it titles by the
   // description itself — and must not ALSO print it below, which is exactly
   // what the first pass of this redesign did on both list screens.
@@ -153,7 +156,17 @@ test('the lists move and the controls do not', () => {
   // rule with a usability cost rather than a taste one.
   const q = codeOf('app/work/(provider)/requests/page.tsx')
   // 🔒 The entrance is the accessibility contract; the grid spacing is taste.
-  assert.match(q, /grid-cols/, 'the queue is no longer a grid')
+  //
+  // ⚠️ AND THE TASTE HALF IS SPENT (2026-09-01, the owner's design canvas →
+  // „Expert Jobs"). The queue is a single column of full-width rows now — a
+  // photograph on the left, the job on the right — because the photo is what
+  // lets a provider name a price without opening a conversation, and a
+  // half-width grid cell had nowhere to put one. `grid-cols` pinned the OLD
+  // shape, which the line above already said was not the thing worth pinning.
+  // What replaces it is the container the entrance hangs on: a list, one child
+  // per request, so the cascade below has something to cascade.
+  assert.match(q, /className="[^"]*\bflex flex-col\b[^"]*\bstagger\b[^"]*"[\s\S]{0,80}?requests\.map/,
+    'the queue list is no longer one column of rows carrying the entrance')
   // ⚠️ THIS READ `/motion-safe:/` UNTIL 2026-08-26, and the file's ONLY match
   // was `motion-safe:stagger` — the form that compiles to nothing (see above).
   // So the assertion passed on the string that guaranteed no animation ran.
@@ -161,34 +174,105 @@ test('the lists move and the controls do not', () => {
   // gate is in globals.css, where the browser can answer it.
   assert.match(q, /\bstagger\b/, 'the queue list lost its entrance')
   assert.doesNotMatch(q, /motion-safe:stagger/, 'motion-safe:stagger compiles to nothing')
-  assert.match(q, /<Card\s+key=\{r\.id\}\s+className="flex\s+flex-col\s+h-full\s+hover-lift">/, 'the queue card lost hover-lift or equal height')
+  // ⚠️ IT WAS `<LeadCard>` FROM 2026-08-31 TO 2026-09-01, and it is a plain
+  // `<Link>` again — the owner's newer canvas („Expert Jobs") redrew the card
+  // as a photo row and `app/work/(provider)/_lead` has no importer left.
+  //
+  // Of the two things this line has always protected, one was answered by the
+  // shape and one still needs asserting. `h-full` was equal height ACROSS A
+  // GRID ROW; there is no row any more, so nothing can be ragged. The lift is
+  // the live half: it is the only thing on the card that says the whole card is
+  // pressable, so it is pinned to the element that IS the card — and that
+  // element being a `<Link>` is the stronger form of the same promise, one tab
+  // stop for one destination instead of a card with a button in it.
+  assert.match(q, /<Link\s+key=\{r\.id\}[\s\S]{0,320}?hover-lift/, 'the queue card is no longer one link, or it lost hover-lift')
   assert.doesNotMatch(q, /<Btn[^>]*animate-/, 'an entrance was put on a button')
   const jobs = codeOf('app/work/jobs/_client.tsx')
   assert.match(jobs, /<div\s+key=\{tab\}\s+className="space-y-6\s+motion-safe:animate-fade-in-fast">/,
     'switching a filter no longer replays — an instant swap with no transition reads as „did that work?"')
 })
 
-/* ── D. The queue card, and the two words that changed ───────────────────── */
+/* ── D. The queue card: three facts, one tab stop ────────────────────────── */
 
-test('the provider queue leads with money and asks for an offer', () => {
+test('the provider queue card is a bounded set of facts, not the whole request', () => {
   const q = codeOf('app/work/(provider)/requests/page.tsx')
   // The six-field <dl> wrapped unevenly and set the strongest fact on the card
   // in the same size as „ფორმატი: ონლაინ".
   assert.doesNotMatch(q, /<dl /, 'the six-field definition list is back')
-  assert.doesNotMatch(q, /r\.extras/, 'the clarifiers are back on the triage card — they belong to the quote')
-  // The amount at h3, the unit weaker beside it — the split is exact because
-  // it is this kind's own unitLabel, not a guess at where the spaces fall.
-  assert.match(q, /text-h3\s+font-bold\s+text-ink-900\s+tabular-nums">\{amount\}/, 'the budget stopped leading')
-  assert.match(q, /const unit = KIND\[r\.kind\]\.unitLabel/, 'the unit is being guessed rather than read')
+
+  /* ⚠️ THE CLARIFIERS ARE BACK ON THE CARD, DELIBERATELY (2026-09-01, the
+     owner's design canvas → „Expert Jobs"), and the ban that stood here was
+     aimed at the wrong noun. „they belong to the quote" was written against a
+     card that printed the WHOLE `extras` bag — six answers at one weight,
+     which is the same defect the <dl> above had, wearing different markup.
+     The canvas asks for exactly three facts („ადგილი / მოცულობა / მასალა") and
+     two of those three are clarifiers: they are what makes one cleaning job
+     differ from the next, which is precisely what a triage card is for.
+
+     So what is pinned is the BOUND, which is the thing that was ever at risk.
+     The card takes at most two clarifiers and shows at most three facts in
+     total, so a topic that asks the client eight questions produces the same
+     card as one that asks none. */
+  assert.match(q, /r\.extras\.slice\(0,\s*2\)/, 'the clarifier bag is spread onto the card uncapped again')
+  assert.match(q, /\]\.slice\(0,\s*3\)/, 'the fact row lost its ceiling — a card is three facts, whatever the topic asks')
+
+  /* ⚠️ THE MONEY STOPPED LEADING, AND THAT IS THE CANVAS'S CALL. It was set at
+     `text-h3` with the unit beside it, because the card had nothing else with
+     any weight on it. It has a photograph now — the one thing that lets a price
+     be named without a conversation — so the budget is one of the three facts,
+     at the same weight as the other two.
+
+     What is still worth asserting is that it is THERE and that it is the SHAPED
+     value: `budgetLabel` comes off `providerRequestView`, already carrying this
+     kind's own unit, so the card cannot re-derive „₾ / სესია" and disagree with
+     the page it opens. That is what `const unit = KIND[r.kind].unitLabel` used
+     to protect, and reading the shaped string protects it without the split. */
+  assert.match(q, /\{ k: 'ბიუჯეტი', v: r\.budgetLabel \}/, 'the budget left the card, or is being re-derived on it')
+
   // Places left is a decision, so it is a badge — and the last one is a warning.
-  assert.match(q, /border-warning-300 text-warning-700' : 'border-brand-200 text-brand-700/, 'the places badge lost its two states')
+  // Two states, and the last place is the warning — the colours moved into the
+  // canvas's own hue table, so what is pinned is that the page still BRANCHES
+  // on „is this the last place". Inline since 2026-09-01; the branch is the
+  // rule, the local that held it was not.
+  assert.match(q, /r\.placesLeft === 1\s*\?/, 'the places badge lost its two states')
   // ⚠️ THE 11px FLOOR. `text-micro` is for uppercase mtavruli and bare numerals
   // only; this badge is sentence-case mkhedruli, which turns to mush below
   // 12px. Caught by review after it shipped in the first pass of this card.
-  assert.doesNotMatch(q, /rounded-pill border text-micro/, 'a sentence-case Georgian badge went under the 12px floor')
-  // „ნახვა" is the name of a page; „შეთავაზება" is the reason they are here.
-  assert.match(q, /შეთავაზება\s*\n?\s*<\/Btn>/, 'the queue action went back to naming a page')
-  assert.doesNotMatch(q, /variant="secondary"[^>]*>\s*ნახვა/, 'the secondary „ნახვა" button is back')
+  //
+  // ⚠️ WIDENED 2026-09-01: it read `rounded-pill border text-micro`, three
+  // utilities in one order, and the canvas's pills are not all bordered — the
+  // photo count is a filled `rounded-pill bg-ink-900/85`. The floor is about
+  // the SIZE of Georgian text in a pill, so it is now asked of any pill.
+  for (const m of q.matchAll(/className=\{?`?"?[^"`]*\brounded-pill\b[^"`]*"?`?\}?/g)) {
+    assert.doesNotMatch(m[0], /\btext-micro\b/, 'a sentence-case Georgian badge went under the 12px floor')
+  }
+
+  /* ⚠️ „ნახვა" IS HONEST NOW, AND IT WAS NOT BEFORE (2026-09-01, the canvas).
+     This line read „„ნახვა" is the name of a page; „შეთავაზება" is the reason
+     they are here" — true while the card opened a screen with the offer form
+     stacked on it, so calling the button „ნახვა" hid the only verb that
+     mattered. The canvas moved the form to a screen of its own
+     (`.../[id]/offer`), so the card now genuinely leads to a page you read
+     before you answer, and naming it after the offer would promise a form that
+     is one click further on.
+
+     What replaces the word is the rule the word was standing in for: the card
+     is ONE destination and ONE tab stop. The affordance is drawn inside the
+     link and marked `aria-hidden`, so a keyboard reaches the card once — a
+     real control nested in a card-wide link is two stops to the same place, and
+     it is what the „ნახვა" button used to be. */
+  assert.match(q, /aria-hidden\s*\n\s*className="[^"]*"\s*>\s*\n?\s*ნახვა/,
+    'the card affordance is no longer decoration inside the link')
+  // ⚠️ SCOPED WITH ITS OWN GUARDS, because a `doesNotMatch` over a slice that
+  // came back empty is the assertion that passes for ever and means nothing.
+  const from = q.search(/<Link\s+key=\{r\.id\}/)
+  assert.ok(from > 0, 'the queue card is no longer <Link key={r.id}> — the assertion below has nothing to scope to')
+  const to = q.indexOf('</Link>', from)
+  assert.ok(to > from, 'the card link never closes — the slice below would be the rest of the file')
+  const card = q.slice(from, to)
+  assert.ok(card.length > 400, `the card link scoped to ${card.length} characters — that is not the card`)
+  assert.doesNotMatch(card, /<Btn|<button/,
+    'a control was nested inside the card link — the card is one destination and must be one tab stop')
 })
 
 test('the kind filter names what is bought, not who does it', () => {
@@ -198,8 +282,20 @@ test('the kind filter names what is bought, not who does it', () => {
   assert.doesNotMatch(codeOf('lib/requestTopics.ts'), /label: 'მასწავლებელი'/)
   // …and the workspace's two filter strips are one grammar now.
   const q = codeOf('app/work/(provider)/requests/page.tsx')
-  assert.match(q, /border-b border-ink-200/, 'the request filter is not the workspace tab strip')
-  assert.match(q, /-bottom-px h-\[2px\] bg-brand-500/, 'the active tab lost its underline')
+  // ⚠️ ONE STRIP, AND IT IS THE SHARED COMPONENT NOW. The assertion used to
+  // read a hairline class, which only ever proved the two strips LOOKED alike;
+  // the queue renders `<WorkTabs>` itself since 2026-08-31, so they cannot
+  // differ at all. The canvas turned that strip into pills — a class pin would
+  // have broken on the restyle while the guarantee held.
+  assert.match(q, /<WorkTabs\b/, 'the request filter is not the workspace tab strip')
+  // ⚠️ THE UNDERLINE BECAME A FILL (2026-08-31, the canvas's pills). What the
+  // line protects is that the LIVE stage is visibly the live one, and the
+  // marker now lives in the shared component rather than in this page — so it
+  // is asserted there, once, for every screen that draws the strip.
+  assert.match(codeOf('app/work/_components/WorkTabs.tsx'), /aria-selected=\{on\}/,
+    'the stage strip stopped telling assistive tech which stage is live')
+  assert.match(codeOf('app/work/_components/WorkTabs.tsx'), /on\s*\n?\s*\?\s*'border-ink-900 bg-ink-900 text-white'/,
+    'the active stage lost its fill')
 })
 
 /* ── E. No system dialogs ────────────────────────────────────────────────── */

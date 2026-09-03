@@ -24,7 +24,10 @@ import { Card } from '@/components/Card'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { MAX_SERVICES } from '@/lib/serviceProfile'
+import { VERTICAL_LABEL } from '@/lib/requestTopics'
 import type { Draft, Loaded } from './_types'
+import { PRICE_ON_REQUEST } from '@/lib/requests'
+import { topicGroupMark } from '@/lib/topicMarks'
 
 /** A number field that distinguishes „empty" from „zero". `null` is „ask me",
  *  and it has to survive the round trip — see lib/serviceProfile. */
@@ -49,6 +52,19 @@ export function ServicesSections({ data, draft, patch }: {
   // after the fetch called six — React #310, which reaches the provider as a
   // blank screen. The parent owns the loading branch now, but the rule is why
   // these two stayed at the top rather than moving down beside their pickers.
+  /* ⚠️ TWO STATES, AND FOR ONE COMPILE THEY WERE ONE (2026-09-02).
+     `openGroup` held BOTH „which world section is expanded" (as `world:SERVICE`)
+     and, after the category strip landed here, „which category is open" (a bare
+     group id). One variable, two meanings — so opening „სამართალი" set it to
+     `law`, which made `openGroup !== 'world:EXPERT'` true on the section's
+     `hidden`, and the entire section vanished, taking the strip that had just
+     been tapped with it.
+
+     Caught by reading the file rather than by the screen, because the browser
+     panel was unusable at that moment — and it is the same defect this whole
+     run has been about, one level down: two things sharing one name always end
+     up disagreeing. */
+  const [openWorld, setOpenWorld] = useState<string | null>(null)
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const [query, setQuery] = useState('')
 
@@ -109,9 +125,13 @@ export function ServicesSections({ data, draft, patch }: {
       .filter(Boolean) as ('SERVICE' | 'EXPERT')[],
   )
   // No services yet (a brand-new row): show both, in the catalogue's order.
+  // The two names are the site's one pair (lib/requestTopics → VERTICAL_LABEL),
+  // the same words /join asks with and the catalogue's switch filters by. This
+  // list said „სერვისი" for the everyday half until 2026-09-01 — the name of
+  // everything the site sells, used for half of it.
   const ORDER = [
-    { v: 'EXPERT' as const, title: 'პროფესიული სერვისები' },
-    { v: 'SERVICE' as const, title: 'სერვისი' },
+    { v: 'EXPERT' as const, title: `${VERTICAL_LABEL.EXPERT} სერვისები` },
+    { v: 'SERVICE' as const, title: `${VERTICAL_LABEL.SERVICE} სერვისები` },
   ]
   const sections = (mine.size === 1 ? [...ORDER].sort(a => (mine.has(a.v) ? -1 : 1)) : ORDER)
     .map(s => ({ ...s, groups: data.groups.filter(g => g.vertical === s.v), theirs: mine.has(s.v) }))
@@ -130,18 +150,6 @@ export function ServicesSections({ data, draft, patch }: {
       services: on ? draft.services.filter(s => s !== id) : [...draft.services, id],
       priceList: rest,
     })
-  }
-
-  /** The price map, always an object — a stored `null` must not reach `[id]`. */
-  const setPrice = (id: string, raw: string) => {
-    const next = { ...prices }
-    const n = num(raw)
-    // Blank REMOVES the key rather than storing a zero: „ask me" is an honest
-    // answer for a job whose price depends on what is behind the wall, and the
-    // card prints „ფასს შემოგთავაზებს" for it.
-    if (n === null || n <= 0) delete next[id]
-    else next[id] = n
-    patch({ priceList: next })
   }
 
   const toggleArea = (id: string) => {
@@ -171,13 +179,20 @@ export function ServicesSections({ data, draft, patch }: {
             Every chosen service, with its price on the same row and its own
             way off. Empty until the first tick, so a first visit opens on the
             search field and nothing else. */}
+        {/* ⚠️ THE PRICE CAME OFF THESE ROWS (2026-09-01, owner: „ერთი ფასი და
+            „შეთანხმებით""). Each row carried its own money box, and the
+            sentence over the list explained them: „ფასი სავალდებულო არ არის…
+            კატალოგში სერვისი ფასით უფრო ხშირად აირჩევა." Both are gone.
+            The BOXES, because 1 of 25 published providers had ever filled one
+            — a question asked five times per provider and answered by one.
+            The SENTENCE, because its second half is a claim about what clients
+            do, and no search or click data has ever been collected on this site
+            (CLAUDE.md → „never invent a number"). What replaces both is one
+            price under the list, and „შეთანხმებით" beside it.
+            The row keeps its own way off; that was never the problem. */}
         {draft.services.length > 0 && (
           <div className="mt-4">
-            <p className="text-small text-ink-500">
-              ფასი სავალდებულო არ არის. ცარიელი ნიშნავს, რომ ფასს ყოველ ჯერზე ამბობ —
-              ერთი ფასიც კმარა, კატალოგში სერვისი ფასით უფრო ხშირად აირჩევა.
-            </p>
-            <ul className="mt-3 divide-y divide-ink-100 border-y border-ink-100">
+            <ul className="divide-y divide-ink-100 border-y border-ink-100">
               {draft.services.map(id => {
                 const t = topicById(id)
                 return (
@@ -185,30 +200,67 @@ export function ServicesSections({ data, draft, patch }: {
                     <span className="min-w-0 font-display text-body font-semibold text-ink-900 truncate">
                       {t?.label ?? id}
                     </span>
-                    <span className="inline-flex items-center gap-2 shrink-0">
-                      <input
-                        type="number" min={1} max={1000000} inputMode="numeric"
-                        value={prices[id] ?? ''}
-                        onChange={e => setPrice(id, e.target.value)}
-                        aria-label={`${t?.label ?? id} — ფასი`}
-                        placeholder="—"
-                        className="w-24 h-11 px-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 tabular-nums text-right focus:border-brand-500 outline-none transition-colors duration-fast"
-                      />
-                      <span className="text-small text-ink-600">₾</span>
-                      {/* 40px, like anything else tappable — the glyph is 16. */}
-                      <button
-                        type="button"
-                        onClick={() => toggleService(id)}
-                        aria-label={`მოხსენი ${t?.label ?? id}`}
-                        className="w-10 h-10 inline-flex items-center justify-center rounded-btn text-ink-400 hover:text-danger-700 hover:bg-danger-50 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-                      >
-                        <Icon.x aria-hidden className="w-4 h-4" />
-                      </button>
-                    </span>
+                    {/* 40px, like anything else tappable — the glyph is 16. */}
+                    <button
+                      type="button"
+                      onClick={() => toggleService(id)}
+                      aria-label={`მოხსენი ${t?.label ?? id}`}
+                      className="w-10 h-10 shrink-0 inline-flex items-center justify-center rounded-btn text-ink-400 hover:text-danger-700 hover:bg-danger-50 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                    >
+                      <Icon.x aria-hidden className="w-4 h-4" />
+                    </button>
                   </li>
                 )
               })}
             </ul>
+
+            {/* ── ONE PRICE, AND THE HONEST ALTERNATIVE ────────────────────
+                The intake's plate (app/join/_provider/client.tsx), in this
+                card's own materials — the same two answers, in the same order,
+                worded the same way. It lives INSIDE „რას აკეთებ" because it
+                prices what that list holds; „სამუშაო, ₾-დან" used to sit two
+                cards below, next to the call-out fee, which is a question
+                about a VISIT and not about the work.
+
+                ⚠️ THE TICK IS DERIVED HERE AND IS REAL STATE ON /join, and the
+                difference is not an oversight. A saved profile has always
+                answered — `priceFrom === null` IS „შეთანხმებით" — so deriving
+                it invents nothing. A BLANK application has not answered yet,
+                and deriving it there would pre-tick an answer nobody gave. */}
+            <div className="mt-4 rounded-tile border border-ink-100 bg-ink-50 p-4">
+              <label className="flex flex-wrap items-center justify-between gap-3">
+                <span className="min-w-[120px] flex-1 font-display text-small font-semibold text-ink-900">ფასი იწყება</span>
+                <span className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-field border border-ink-200 bg-white px-3.5 transition-colors duration-fast focus-within:border-brand-600">
+                  <input
+                    type="number" min={1} max={1000000} inputMode="numeric"
+                    value={draft.priceFrom ?? ''}
+                    onChange={e => patch({ priceFrom: num(e.target.value) })}
+                    aria-label="ფასი, ₾-დან"
+                    placeholder="ფასი"
+                    className="w-20 min-w-0 border-0 bg-transparent p-0 text-body font-bold tabular-nums text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-400"
+                  />
+                  <span className="text-small text-ink-600">₾</span>
+                </span>
+              </label>
+              <div className="mt-3 border-t border-ink-100 pt-3">
+                <button
+                  type="button"
+                  aria-pressed={draft.priceFrom === null}
+                  onClick={() => patch({ priceFrom: null })}
+                  className={`inline-flex min-h-10 max-w-full items-center gap-2 rounded-pill border px-3.5 py-1.5 text-left font-display text-small font-semibold transition-[background-color,border-color,transform] duration-fast motion-safe:active:scale-[0.97] ${
+                    draft.priceFrom === null
+                      ? 'border-brand-600 bg-brand-600 text-white'
+                      : 'border-ink-200 bg-white text-ink-900 hover:border-ink-300 hover:bg-ink-75'
+                  }`}
+                >
+                  {draft.priceFrom === null && <Icon.check aria-hidden className="h-3.5 w-3.5 shrink-0" />}
+                  <span className="min-w-0 leading-snug">ფასი შეთანხმებით</span>
+                </button>
+                {/* The catalogue card's own sentence, not new copy — see
+                    app/experts/_providerCard.tsx. */}
+                <p className="mt-2 text-meta text-ink-500">ბარათზე დაიწერება „{PRICE_ON_REQUEST}“.</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -223,7 +275,7 @@ export function ServicesSections({ data, draft, patch }: {
             value={query}
             onChange={e => setQuery(e.target.value)}
             aria-label="მოძებნე სერვისი"
-            placeholder="მოძებნე — ონკანი, დეკლარაცია, დალაგება…"
+            placeholder="მოძებნე სერვისი"
             className="w-full h-11 pl-10 pr-3 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder-ink-400 focus:border-brand-500 outline-none transition-colors duration-fast"
           />
         </div>
@@ -233,7 +285,7 @@ export function ServicesSections({ data, draft, patch }: {
           // group heading over one chip is furniture. The intake's rule.
           <div className="mt-3 flex flex-wrap gap-2">
             {hits.length === 0
-              ? <p className="text-small text-ink-500">ვერაფერი მოიძებნა — სცადე სხვა სიტყვა ან გაასუფთავე ველი და გადახედე სიას.</p>
+              ? <p className="text-small text-ink-500">ვერაფერი მოიძებნა — სცადე სხვა სიტყვა.</p>
               : hits.map(t => {
                   const on = draft.services.includes(t.id)
                   const blocked = !on && atCap
@@ -244,7 +296,7 @@ export function ServicesSections({ data, draft, patch }: {
                       aria-pressed={on}
                       disabled={blocked}
                       onClick={() => toggleService(t.id)}
-                      className={`h-11 px-4 rounded-pill border text-body font-display font-semibold transition-[background-color,border-color,transform] duration-fast motion-safe:active:scale-[0.97] ${
+                      className={`h-10 px-3.5 rounded-pill border text-small font-display font-semibold transition-[background-color,border-color,transform] duration-fast motion-safe:active:scale-[0.97] ${
                         on
                           ? 'border-brand-600 bg-brand-600 text-white'
                           : blocked
@@ -267,8 +319,8 @@ export function ServicesSections({ data, draft, patch }: {
                 {!s.theirs && mine.size === 1 && (
                   <button
                     type="button"
-                    aria-expanded={openGroup === `world:${s.v}`}
-                    onClick={() => setOpenGroup(openGroup === `world:${s.v}` ? '' : `world:${s.v}`)}
+                    aria-expanded={openWorld === s.v}
+                    onClick={() => setOpenWorld(openWorld === s.v ? '' : s.v)}
                     className="w-full min-h-11 py-2 flex items-center justify-between gap-3 text-left rounded-btn hover:bg-ink-50 transition-colors duration-fast"
                   >
                     <span className="min-w-0">
@@ -279,69 +331,110 @@ export function ServicesSections({ data, draft, patch }: {
                         სხვა კატეგორია — {s.groups.length} ჯგუფი. გახსენი, თუ ესეც აკეთებ.
                       </span>
                     </span>
-                    <Icon.chevD className={`w-4 h-4 text-ink-500 transition-transform duration-fast ${openGroup === `world:${s.v}` ? 'rotate-180' : ''}`} />
+                    <Icon.chevD className={`w-4 h-4 text-ink-500 transition-transform duration-fast ${openWorld === s.v ? 'rotate-180' : ''}`} />
                   </button>
                 )}
-                <div hidden={!s.theirs && mine.size === 1 && openGroup !== `world:${s.v}`}>
+                <div hidden={!s.theirs && mine.size === 1 && openWorld !== s.v}>
                 {s.theirs || mine.size !== 1 ? <Eyebrow as="h3" tone="muted">{s.title}</Eyebrow> : null}
-                <div className="mt-1 flex flex-col gap-1">
-                  {s.groups.map(g => {
-                    const chosen = g.topics.filter(t => draft.services.includes(t.id)).length
-                    // A group that already holds a choice opens on its own the
-                    // first time the list is drawn — otherwise a returning
-                    // provider has to hunt for their own answers.
-                    const open = openGroup === null ? chosen > 0 : openGroup === g.id
-                    return (
-                      <div key={g.id} className="border-b border-ink-100 last:border-b-0">
+                {/* ⚠️ THE SAME CONTROL /join USES, AND FOR ONE DAY IT WAS NOT
+                    (2026-09-02). Owner, on this exact screen: „ამაზე რატომ არ
+                    გადაწყვიტე როგორც რეგისტრაციაზე გვქონდა კომფორტულად??? ხო
+                    ვთქვით ესეც."
+
+                    Fair, and it was the very duplication this run was called to
+                    end: ONE question — „what do you sell" — with two
+                    implementations, and only one of them fixed. This screen
+                    still printed every group heading and every chip at once, so
+                    a provider on the professional side scrolled past ~109 chips
+                    to change one. The measurements and the six-marketplace
+                    comparison that produced the strip are written out at the
+                    browse panel in app/join/_provider/client.tsx; they apply
+                    here unchanged, because it is the same taxonomy.
+
+                    ⚠️ AND THE 2026-09-01 NOTE THAT STOOD HERE IS NOT BEING
+                    REVERSED. It refused an ACCORDION — „a row that must be
+                    tapped to reveal its contents spends a full line and the
+                    whole width to print one word" — and every word of that
+                    holds. The categories below are not hidden and are not rows:
+                    they are one scrolling line of chips, all present, and they
+                    are themselves the vocabulary. One question answered, the
+                    next appears under it. */}
+                <div className="mt-2 relative">
+                  <div className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-1 px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {s.groups.map(g => {
+                      const chosen = g.topics.filter(t => draft.services.includes(t.id)).length
+                      const open = openGroup === g.id
+                      return (
                         <button
+                          key={g.id}
                           type="button"
-                          aria-expanded={open}
-                          onClick={() => setOpenGroup(open ? '' : g.id)}
-                          className="w-full min-h-11 py-2 flex items-center justify-between gap-3 text-left rounded-btn hover:bg-ink-50 transition-colors duration-fast"
+                          aria-pressed={open}
+                          onClick={() => setOpenGroup(open ? null : g.id)}
+                          className={`inline-flex min-h-10 shrink-0 snap-start items-center gap-1.5 rounded-field border px-3.5 py-1.5 text-left font-display text-small font-semibold transition-[background-color,border-color] duration-fast ${
+                            open ? 'border-brand-700 bg-brand-700 text-white'
+                              : 'border-ink-200 bg-white text-ink-800 hover:border-ink-300 hover:bg-ink-75'
+                          }`}
                         >
-                          <span className="font-display text-body font-semibold text-ink-900">{g.label}</span>
-                          <span className="flex items-center gap-2 shrink-0">
-                            {chosen > 0 && (
-                              <span className="h-6 min-w-6 px-2 inline-flex items-center justify-center rounded-pill bg-brand-600 text-white text-meta font-display font-semibold tabular-nums">
-                                {chosen}
-                              </span>
-                            )}
-                            <Icon.chevD className={`w-4 h-4 text-ink-500 transition-transform duration-fast ${open ? 'rotate-180' : ''}`} />
-                          </span>
+                          {/* ⚠️ THE SAME MARK THE INTAKE AND /join DRAW
+                              (2026-09-02). One taxonomy, one icon per family
+                              (lib/topicMarks) — the provider ticking
+                              „სამართალი" here sees the scales a client saw
+                              filing the request that will reach them. White on
+                              the open chip, which is a filled brand surface;
+                              `brand-600` on the rest. */}
+                          {(() => {
+                            const mark = topicGroupMark(g.id, 'w-4 h-4 shrink-0')
+                            return mark && <span className={open ? 'text-white' : 'text-brand-600'}>{mark}</span>
+                          })()}
+                          <span className="whitespace-nowrap leading-snug">{g.label}</span>
+                          {chosen > 0 && (
+                            <span className={`inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-pill border px-1 font-display text-meta font-bold tabular-nums ${
+                              open ? 'border-white/40 text-white' : 'border-brand-200 text-brand-700'
+                            }`}>
+                              {chosen}
+                            </span>
+                          )}
+                          {open && <Icon.chevD aria-hidden className="h-3.5 w-3.5 shrink-0 rotate-180 text-white" />}
                         </button>
-                        {open && (
-                          <div className="pb-3 flex flex-wrap gap-2">
-                            {g.topics.map(t => {
-                              const on = draft.services.includes(t.id)
-                              // Disabled only when it would be a no-op — a ticked
-                              // chip at the cap must stay pressable, or the cap
-                              // becomes a trap.
-                              const blocked = !on && atCap
-                              return (
-                                <button
-                                  key={t.id}
-                                  type="button"
-                                  aria-pressed={on}
-                                  disabled={blocked}
-                                  onClick={() => toggleService(t.id)}
-                                  className={`h-11 px-4 rounded-pill border text-body font-display font-semibold transition-[background-color,border-color,transform] duration-fast motion-safe:active:scale-[0.97] ${
-                                    on
-                                      ? 'border-brand-600 bg-brand-600 text-white'
-                                      : blocked
-                                        ? 'border-ink-100 text-ink-300 cursor-not-allowed'
-                                        : 'border-ink-200 text-ink-800 hover:border-ink-300 hover:bg-ink-50'
-                                  }`}
-                                >
-                                  {t.label}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
+                  <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
                 </div>
+
+                {(() => {
+                  const g = s.groups.find(x => x.id === openGroup)
+                  if (!g) return null
+                  return (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-ink-100 pt-3">
+                      {g.topics.map(t => {
+                        const on = draft.services.includes(t.id)
+                        // Disabled only when it would be a no-op — a ticked chip
+                        // at the cap must stay pressable, or the cap becomes a
+                        // trap.
+                        const blocked = !on && atCap
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            aria-pressed={on}
+                            disabled={blocked}
+                            onClick={() => toggleService(t.id)}
+                            className={`h-11 px-4 rounded-pill border text-body font-display font-semibold transition-[background-color,border-color,transform] duration-fast motion-safe:active:scale-[0.97] ${
+                              on
+                                ? 'border-brand-600 bg-brand-600 text-white'
+                                : blocked
+                                  ? 'border-ink-100 text-ink-300 cursor-not-allowed'
+                                  : 'border-ink-200 text-ink-800 hover:border-ink-300 hover:bg-ink-50'
+                            }`}
+                          >
+                            {t.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
                 </div>
               </div>
             ))}
@@ -413,8 +506,17 @@ export function ServicesSections({ data, draft, patch }: {
               for „დაუწერე ფასი ერთ სერვისს მაინც" and `profileFacts` reads that
               column to decide — so the task sat on the provider's home screen
               with no field anywhere on the site that could tick it. */}
+      {/* ⚠️ ONE FIELD NOW, AND THE HEADING SAYS SO (2026-09-01). „სამუშაო,
+          ₾-დან" sat here beside the call-out fee, and the card was called
+          „გამოძახება და მინიმუმი" — two questions about two different things
+          filed together because both happen to be money. One asks what the WORK
+          costs and belongs on the list of work („რას აკეთებ", above); the other
+          asks what a VISIT costs before anybody knows what the work is, and
+          that is this card's whole subject.
+          The remaining field keeps „სავალდებულო არ არის", which is still true
+          of it — it is the price question above that stopped being optional. */}
       <Card>
-        <h2 className="font-display text-h3 font-bold text-ink-900">გამოძახება და მინიმუმი</h2>
+        <h2 className="font-display text-h3 font-bold text-ink-900">გამოძახება</h2>
         <p className="mt-1 text-small text-ink-500">
           რა ღირს მისვლა და დათვალიერება, სანამ სამუშაო ცნობილია. სავალდებულო არ არის.
         </p>
@@ -431,20 +533,6 @@ export function ServicesSections({ data, draft, patch }: {
               onChange={e => patch({ calloutFee: num(e.target.value) })}
               className={FIELD}
               placeholder="30"
-            />
-          </label>
-          <label className="block">
-            <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">
-              სამუშაო, ₾-დან
-            </span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              value={draft.priceFrom ?? ''}
-              onChange={e => patch({ priceFrom: num(e.target.value) })}
-              className={FIELD}
-              placeholder="50"
             />
           </label>
         </div>

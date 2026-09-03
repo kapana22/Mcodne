@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { messageText } from '@/lib/messageText'
 import { z } from 'zod'
 import { randomBytes, createHash } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
@@ -41,11 +42,14 @@ export async function POST(req: Request) {
   // they control and steal the token. Use the trusted allowlist.
   const url = `${siteUrl(req)}/signin?view=reset&t=${token}`
 
+  const t = await messageText()
+
   await sendMail({
+    key: 'auth.passwordReset',
     to: email,
-    subject: 'პაროლის აღდგენა — მცოდნე',
-    html: `<p>დააჭირე ბმულს ახალი პაროლის დასაყენებლად:</p><p><a href="${url}">${url}</a></p><p>ვადა: 1 საათი.</p>`,
-    text: `პაროლის აღდგენა: ${url} (1 საათი)`,
+    subject: t('auth.passwordReset', 'subject'),
+    html: `<p>${t('auth.passwordReset', 'body1')}</p><p><a href="${url}">${url}</a></p><p>${t('auth.passwordReset', 'body2')}</p>`,
+    text: `${t('auth.passwordReset', 'body1')} ${url} — ${t('auth.passwordReset', 'body2')}`,
   })
 
   return NextResponse.json({ ok: true })

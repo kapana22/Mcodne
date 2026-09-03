@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { PasswordChangeInput } from '@/lib/passwordPolicy'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser, hashPassword, verifyPassword, revokeOtherSessions } from '@/lib/auth'
 import { rateLimit } from '@/lib/rateLimit'
 
-const Body = z.object({
-  // currentPassword only needs to be non-empty (it's checked against the hash).
-  currentPassword: z.string().min(1),
-  // New password must meet the SAME min-8 policy as signup + reset, so the
-  // change endpoint can't be used to downgrade to a weaker password.
-  newPassword: z.string().min(8).max(120),
-})
+// ⚠️ THE SCHEMA IS SHARED, AND THAT IS THE FIX FOR A REAL SHIPPED BUG. It used
+// to be declared here; app/work/account posted `{ current, next }` at it and
+// every provider password change had been failing since. One object in
+// lib/passwordPolicy, parsed by this route and used by both forms to build
+// their body — see the note there.
+const Body = PasswordChangeInput
 
 export async function POST(req: Request) {
   const user = await getCurrentUser()

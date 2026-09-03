@@ -103,7 +103,7 @@ export default async function BlogPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-ink-50">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(blogLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbLd) }} />
       <MarketingTopBar />

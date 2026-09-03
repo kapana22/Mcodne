@@ -19,7 +19,7 @@ import { randomUUID } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
-  CREDIT_TASKS, CONTACT_COST_TETRI, JOB_DONE_TETRI, BIO_MIN, CREDITS_ENFORCED,
+  CREDIT_TASKS, JOB_DONE_TETRI, BIO_MIN, CREDITS_ENFORCED,
   earnedTasks, completeness, contactKey, contactRefundKey, jobDoneKey, adminAdjustReason,
   type CreditTaskKey, type ProfileFacts,
 } from '@/lib/credits'
@@ -56,7 +56,7 @@ export async function profileFacts(userId: string): Promise<ProfileFacts> {
     prisma.serviceProfile.findUnique({
       where: { userId },
       select: {
-        about: true, services: true, areas: true, priceList: true, photoUrl: true, workPhotos: true,
+        about: true, services: true, areas: true, priceFrom: true, priceList: true, photoUrl: true, workPhotos: true,
         professions: true, yearsExp: true,
         // ⚠️ SELECTED HERE SO NOBODY ELSE READS THE ROW. /work needs to know
         // whether this provider has ever saved their own service list (the
@@ -76,9 +76,28 @@ export async function profileFacts(userId: string): Promise<ProfileFacts> {
   // routingWhere), and a PRICE against one of those ticks earns SERVICE. Were
   // both to read `services[]`, one tap would pay 40₾ and the profile would
   // still say nothing a client can shop for.
-  const priced = provider?.priceList && typeof provider.priceList === 'object' && !Array.isArray(provider.priceList)
+  // ⚠️ THE SINGLE PRICE EARNS IT NOW, NOT THE MAP (2026-09-01, owner: „ერთი
+  // ფასი და „შეთანხმებით""). No screen writes `priceList` any more, and this is
+  // the exact failure that column caused once already — the note in
+  // app/work/profile/_secServices calls it out: „20₾ OF THE BONUS WAS
+  // UNWINNABLE", a task sitting on the provider's home screen with no field
+  // anywhere on the site that could tick it. Reading a column nothing fills is
+  // how that happens, so the read moved with the question.
+  //
+  // ⚠️ „ფასი შეთანხმებით" DOES NOT EARN IT, and that is deliberate rather than
+  // an oversight. Both answers are honest and the form takes either; this task
+  // pays 20₾ for the one that makes the card shoppable — its own `why` is
+  // „ეს არის ის, რასაც კლიენტი კატალოგში ხედავს", and „ფასს შემოგთავაზებს" is
+  // not a thing anybody can shop by. Money is the right instrument for a nudge
+  // that a required field would have turned into an invented number.
+  //
+  // The legacy arm stays: one provider priced their services individually
+  // before the question changed, and a bonus already earned must not un-earn
+  // itself under somebody who did nothing wrong.
+  const legacyMap = provider?.priceList && typeof provider.priceList === 'object' && !Array.isArray(provider.priceList)
     ? Object.values(provider.priceList as Record<string, unknown>).some(v => typeof v === 'number' && v > 0)
     : false
+  const priced = (provider?.priceFrom ?? 0) > 0 || legacyMap
 
   return {
     hasPhoto: !!user?.avatarUrl || !!provider?.photoUrl,
@@ -114,6 +133,38 @@ export async function profileFacts(userId: string): Promise<ProfileFacts> {
  * profile save correct — a read-then-write would pay twice under two tabs, and
  * this is money-shaped. Returns what was newly granted so a caller can say so.
  */
+/**
+ * THE SAME TWO NUMBERS, WITHOUT PAYING ANYBODY.
+ *
+ * ⚠️ IT EXISTS BECAUSE A GET MUST NOT GRANT (2026-08-31). The provider's own
+ * profile screen now opens on a status band that states its completeness and
+ * what finishing is worth (app/work/profile/_editor → ProfileStatusBand, from
+ * the owner's design canvas). The obvious way to fill it was to call
+ * `grantEarnedTasks` in `GET /api/provider/service-profile` — and that function
+ * WRITES: it pays out every newly-earned task. A read that moves money is the
+ * kind of thing that looks fine until a page prefetch or a double render pays
+ * somebody twice, and it would make the endpoint's response depend on whether
+ * it had been called before.
+ *
+ * Same facts, same arithmetic, no INSERT. `grantEarnedTasks` keeps its own copy
+ * of these three lines rather than calling this — it already holds `facts` and
+ * a second `profileFacts` round trip is the duplicate read this file exists to
+ * prevent.
+ */
+export async function profileCompletion(userId: string): Promise<{
+  unearnedTetri: number
+  percent: number
+}> {
+  const facts = await profileFacts(userId)
+  const earned = earnedTasks(facts)
+  return {
+    unearnedTetri: CREDIT_TASKS
+      .filter(t => !(earned as string[]).includes(t.key))
+      .reduce((n, t) => n + t.tetri, 0),
+    percent: completeness(facts),
+  }
+}
+
 export async function grantEarnedTasks(userId: string): Promise<{
   /** Paid ON THIS CALL — what the caller may announce. */
   granted: { key: CreditTaskKey; tetri: number }[]
@@ -214,6 +265,12 @@ export async function chargeForContact(
   userId: string,
   requestId: string,
   offerLimit: number,
+  /** ⚠️ THE PRICE IS AN ARGUMENT SINCE 2026-09-03, and it has to be: a contact
+   *  costs 1–10₾ by the job's budget (lib/credits → contactCostTetri), so a
+   *  constant in this statement would charge every job the same again from the
+   *  one place the money actually moves. Both callers compute it from the
+   *  request row they already hold. */
+  costTetri: number,
 ): Promise<UnlockResult> {
   const key = contactKey(requestId)
 
@@ -246,11 +303,11 @@ export async function chargeForContact(
     // disable a promise made to a person.
     const written = await tx.$executeRaw`
       INSERT INTO "CreditEntry" ("id", "userId", "amountTetri", "reason", "grantKey", "refId", "createdAt")
-      SELECT ${randomUUID()}::text, ${userId}::text, ${-CONTACT_COST_TETRI}::integer,
+      SELECT ${randomUUID()}::text, ${userId}::text, ${-costTetri}::integer,
              'CONTACT_OPENED'::text, ${key}::text, ${requestId}::text, now()
       WHERE ( ${!CREDITS_ENFORCED}::boolean
               OR (SELECT COALESCE(SUM("amountTetri"), 0) FROM "CreditEntry" WHERE "userId" = ${userId}::text)
-                 >= ${CONTACT_COST_TETRI}::integer )
+                 >= ${costTetri}::integer )
         AND (SELECT COUNT(*) FROM "CreditEntry" WHERE "grantKey" = ${key}::text) < ${offerLimit}::integer
     `
     if (written === 1) return { ok: true as const, charged: true }
@@ -435,15 +492,82 @@ export async function runCreditJobs(_now: number = Date.now()): Promise<CreditSw
  * everybody who was ever refunded. The caller mails them, and a re-run must
  * not re-mail somebody whose money came back a week ago.
  */
-export async function refundDeadContacts(requestId: string): Promise<string[]> {
+/**
+ * THE 48-HOUR REFUND — one provider, one request, because the client they won
+ * never spoke to them.
+ *
+ * ⚠️ WHY IT IS A SEPARATE FUNCTION FROM `refundDeadContacts`. That one is keyed
+ * on a REQUEST dying and pays everybody who bought its contact; this is keyed on
+ * ONE provider's silence and pays only them. Since 2026-09-01 a contact can only
+ * be bought by the provider the client chose, so in practice both lists have one
+ * name in them — but they answer different questions and the ledger has to say
+ * which happened.
+ *
+ * ⚠️ THE SAME `grantKey`, DELIBERATELY. `contactRefundKey(requestId)` with
+ * `@@unique([userId, grantKey])` is what makes „refunded at most once" a fact
+ * about the database rather than a promise about the code, and it has to hold
+ * ACROSS the two paths: a request that both goes quiet AND later closes must
+ * pay its provider once, not twice. Only `reason` differs, so a provider reading
+ * their own history sees the real cause.
+ *
+ * Returns whether THIS call was the one that paid it — the caller counts, and a
+ * re-run must not count a refund that landed a week ago.
+ */
+export async function refundSilentContact(userId: string, requestId: string): Promise<number> {
+  /* ⚠️ THE AMOUNT COMES FROM THE SPEND ROW, NEVER FROM A CONSTANT (2026-09-03).
+     A contact costs 1–10₾ by job now, so „refund the fee" is only answerable by
+     reading what this provider actually paid on THIS request. A constant here
+     would hand a 1₾ payer 10₾ and a 10₾ payer 1₾, and the second is the one
+     that turns the promise into a complaint. */
+  const spend = await prisma.creditEntry.findFirst({
+    where: { userId, grantKey: contactKey(requestId), reason: 'CONTACT_OPENED' },
+    select: { amountTetri: true },
+  })
+  // Nothing was spent, so there is nothing to give back — and writing a refund
+  // against no purchase would be inventing money.
+  if (!spend) return 0
+  const amount = Math.abs(spend.amountTetri)
+  try {
+    await prisma.creditEntry.create({
+      data: {
+        userId,
+        amountTetri: amount,
+        reason: 'CONTACT_REFUND_SILENT',
+        grantKey: contactRefundKey(requestId),
+        refId: requestId,
+      },
+    })
+    /* ⚠️ RETURNS THE AMOUNT, NOT A BOOLEAN (2026-09-03). The caller prints it
+       in the bell — „3₾ დაგიბრუნდა" — and since a contact costs 1–10₾ by job
+       there is no constant it could have reached for instead. 0 means „nothing
+       was given back", which is the same falsy answer the old boolean gave. */
+    return amount
+  } catch (err) {
+    // Only the unique violation means „already paid" — the same narrow catch
+    // `refundDeadContacts` argues for below, and for the same reason: a bare
+    // catch would read a dropped connection as success and the provider would
+    // never be made whole, with nothing anywhere saying so.
+    if ((err as { code?: string })?.code === 'P2002') return 0
+    console.error('[server-error]', JSON.stringify({
+      scope: 'contact-refund-silent', requestId, detail: String(err).slice(0, 200),
+    }))
+    return 0
+  }
+}
+
+/** ⚠️ RETURNS THE PAIRS, NOT THE IDS (2026-09-03) — each provider got back what
+ *  THEY paid, and the caller's bell and mail print that figure. */
+export async function refundDeadContacts(requestId: string): Promise<{ userId: string; amountTetri: number }[]> {
   const spends = await prisma.creditEntry.findMany({
     where: { grantKey: contactKey(requestId), reason: 'CONTACT_OPENED' },
-    select: { userId: true },
+    // The amount too — each provider gets back what THEY paid. See
+    // `refundSilentContact` for why a constant here is the wrong shape.
+    select: { userId: true, amountTetri: true },
   })
   if (spends.length === 0) return []
 
   const key = contactRefundKey(requestId)
-  const refunded: string[] = []
+  const refunded: { userId: string; amountTetri: number }[] = []
   for (const s of spends) {
     // `createMany` + `skipDuplicates` would do this in one statement, but a
     // per-row create is what tells us WHICH were new — and that is the list the
@@ -452,13 +576,13 @@ export async function refundDeadContacts(requestId: string): Promise<string[]> {
       await prisma.creditEntry.create({
         data: {
           userId: s.userId,
-          amountTetri: CONTACT_COST_TETRI,
+          amountTetri: Math.abs(s.amountTetri),
           reason: 'CONTACT_REFUND',
           grantKey: key,
           refId: requestId,
         },
       })
-      refunded.push(s.userId)
+      refunded.push({ userId: s.userId, amountTetri: Math.abs(s.amountTetri) })
     } catch (err) {
       // ⚠️ ONLY THE UNIQUE VIOLATION MAY BE SWALLOWED, and the check has to be
       // narrow. A bare `catch {}` here read „already refunded" out of EVERY
@@ -476,4 +600,64 @@ export async function refundDeadContacts(requestId: string): Promise<string[]> {
     }
   }
   return refunded
+}
+
+/* ═══════════ who can still be rung ══════════════════════════════════════ */
+
+/**
+ * Of these providers, which ones would a „დარეკვა" actually go through for?
+ *
+ * ⚠️ ASKED BEFORE THE BUTTON IS DRAWN, NOT AFTER IT IS PRESSED (2026-09-03),
+ * and the reason is that the answer depends on somebody ELSE'S balance. Since
+ * the client's call is what spends `CONTACT_COST_TETRI`, a provider who has run
+ * out cannot be reached — and a client pressing a control that then refuses,
+ * for a reason that is neither their business nor anything they can fix, is the
+ * worst possible way to learn it. The offer card simply draws one button
+ * instead of two, which is the shape the owner asked for anyway: „ვისაც უნდა
+ * დარეკავს ვისაც უნდა არაა."
+ *
+ * TWO QUERIES FOR THE WHOLE LIST, never one per offer:
+ *   · who already holds this request's unlock — they are reachable for ever,
+ *     whatever their balance says (`contactKey` is „paid once, for ever");
+ *   · everybody else's balance, summed in one `groupBy`.
+ *
+ * ⚠️ IT DOES NOT AUTHORISE ANYTHING. The route charges, and the charge carries
+ * its own conditions inside the INSERT — this is what the SCREEN is allowed to
+ * promise, and a screen's promise is never a permission.
+ */
+export async function callableProviders(
+  userIds: string[],
+  requestId: string,
+  /** What a contact costs on THIS request — lib/credits → contactCostTetri. */
+  costTetri: number,
+): Promise<Set<string>> {
+  const ids = [...new Set(userIds)]
+  if (ids.length === 0) return new Set()
+
+  const key = contactKey(requestId)
+  const [paid, sums] = await Promise.all([
+    prisma.creditEntry.findMany({
+      where: { userId: { in: ids }, grantKey: key },
+      select: { userId: true },
+    }),
+    prisma.creditEntry.groupBy({
+      by: ['userId'],
+      where: { userId: { in: ids } },
+      _sum: { amountTetri: true },
+    }),
+  ])
+
+  const out = new Set(paid.map(p => p.userId))
+  // ⚠️ `!CREDITS_ENFORCED` MAKES EVERYBODY REACHABLE, deliberately — it is the
+  // same escape the charge itself carries, and the two must agree or the button
+  // would be hidden from a provider the INSERT would happily have let through.
+  for (const s of sums) {
+    if (out.has(s.userId)) continue
+    if (!CREDITS_ENFORCED || (s._sum.amountTetri ?? 0) >= costTetri) out.add(s.userId)
+  }
+  // A provider with NO ledger row at all has no group here and a balance of
+  // zero — correctly absent unless enforcement is off, which the loop above
+  // cannot express for them. Said once, rather than by seeding the set.
+  if (!CREDITS_ENFORCED) for (const id of ids) out.add(id)
+  return out
 }

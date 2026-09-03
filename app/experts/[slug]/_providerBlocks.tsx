@@ -15,12 +15,29 @@ import { Icon } from '@/components/Icon'
 import { fmtDateTime, TBILISI } from '@/lib/tz'
 import Link from 'next/link'
 import { Card } from '@/components/Card'
+import { tileHue } from '@/app/_home/data'
 import type { ProviderProfileData } from './_providerData'
 import { requestHrefFor } from './_providerData'
 
-const Section = ({ id, title, children }: { id: string; title: string; children: ReactNode }) => (
-  <section id={id} className="mt-10 lg:mt-12 pt-8 border-t border-ink-100 scroll-mt-24">
-    <h2 className="font-display text-h2 font-bold text-ink-900 tracking-tight">{title}</h2>
+/**
+ * ⚠️ EVERY BLOCK IS A WHITE PANEL NOW (2026-08-31, from the owner's design
+ * canvas → Public Profile). They were `border-t` rules on one continuous white
+ * sheet, which is the right way to divide a document and the wrong way to
+ * divide a PROFILE: „რას აკეთებს", „შესახებ" and „ნამუშევარი" answer three
+ * different questions and a hairline says they are three paragraphs of one.
+ * The cream ground is what makes the alternative available — each block is now
+ * an object with its own edge, and the gap between them does the dividing.
+ *
+ * `aside` carries the OPTIONAL half-line under the heading („ფასი
+ * საორიენტაციოა…"), which the canvas puts there rather than at the foot of the
+ * list where it used to sit unread.
+ */
+const Section = ({ id, title, aside, children }: {
+  id: string; title: string; aside?: ReactNode; children: ReactNode
+}) => (
+  <section id={id} className="scroll-mt-24 rounded-panel border border-ink-100 bg-white p-6 sm:p-7">
+    <h2 className="font-display text-h2 font-extrabold tracking-[-0.02em] text-ink-900">{title}</h2>
+    {aside && <p className="mt-2 text-body text-ink-500">{aside}</p>}
     <div className="mt-4">{children}</div>
   </section>
 )
@@ -64,18 +81,37 @@ const Section = ({ id, title, children }: { id: string; title: string; children:
  * and the client repeats it in the description. If that ever feels like a
  * retype, the fix is a `?service=` the wizard reads, not a second door.
  */
-/** How many rows the rail shows before folding. FOUR is the measured line: the
- *  provider with the longest list has six, and at six the block is taller than
- *  the CTA it sits under — which is the „იკარგება" the owner named. */
-const RAIL_ROWS = 4
+/** How many rows the list shows before folding.
+ *
+ *  ⚠️ IT WAS FOUR, AND FOUR WAS A RAIL'S NUMBER. The block lived in the 360px
+ *  aside until 2026-08-31, where six rows stood taller than the CTA above them
+ *  — the „იკარგება" the owner named on 2026-08-20. The canvas moves the list
+ *  back into the wide column and the rail keeps only the price and the button,
+ *  so the constraint that set this number is gone. Six is the longest list any
+ *  provider actually has (measured 2026-08-20), which means the fold is now
+ *  dormant for everybody and exists only so a 20-row list cannot bury
+ *  „შესახებ". */
+const LIST_ROWS = 6
 
 /** One priced service. Extracted because the block draws the list twice (open
- *  and folded) and two copies of a row is how the two halves drift apart. */
-const PricedRow = ({ s, p, ordering }: { s: { id: string; label: string; price: number }; p: ProviderProfileData; ordering: boolean }) => (
-  <li className="flex items-center justify-between gap-3 py-2.5">
-    <span className="min-w-0 text-small text-ink-900">{s.label}</span>
-    <span className="shrink-0 flex items-center gap-2.5">
-      <span className="font-display text-body-lg font-bold text-ink-900 tabular-nums leading-none">{s.price}₾</span>
+ *  and folded) and two copies of a row is how the two halves drift apart.
+ *
+ *  ⚠️ THE 36px TINTED SQUARE IS THE CANVAS'S, and it is not decoration: this
+ *  list is the page's centre and it was five words and a numeral per row, so a
+ *  provider with six services rendered as a receipt. The mark gives each row a
+ *  left edge to start from. Its hue comes from `TILE_HUES` — the same family
+ *  the home page's category tiles use, cycled by position — so the site has one
+ *  set of colours rather than a second one invented here. */
+const PricedRow = ({ s, p, ordering, i }: { s: { id: string; label: string; price: number }; p: ProviderProfileData; ordering: boolean; i: number }) => (
+  <li className="flex items-center gap-4 border-t border-ink-100 py-3.5">
+    <span
+      aria-hidden
+      style={{ backgroundColor: tileHue(i).bg }}
+      className="h-9 w-9 shrink-0 rounded-tile"
+    />
+    <span className="min-w-0 flex-1 font-display text-body font-semibold text-ink-900">{s.label}</span>
+    <span className="flex shrink-0 items-center gap-3">
+      <span className="font-display text-body-lg font-extrabold leading-none tabular-nums text-ink-900">{s.price}₾</span>
       {/* The row's own label rides along as `?q=` — the wizard's „რა გჭირდება"
           is then already answered. See requestHrefFor. Absent when the intake
           does not exist on this deployment: the PRICE is still the answer to
@@ -84,7 +120,7 @@ const PricedRow = ({ s, p, ordering }: { s: { id: string; label: string; price: 
         <Link
           href={requestHrefFor(p, s.label)}
           aria-label={`${s.label} — დაკვეთა`}
-          className="h-9 px-3 rounded-btn bg-brand-50 hover:bg-brand-600 hover:text-white border border-brand-200 hover:border-brand-600 text-brand-700 font-display font-semibold text-meta tracking-wide inline-flex items-center transition-colors duration-fast"
+          className="inline-flex h-10 items-center rounded-btn border border-brand-200 bg-brand-50 px-3.5 font-display text-meta font-semibold text-brand-700 transition-colors duration-fast hover:border-brand-600 hover:bg-brand-600 hover:text-white"
         >
           დაკვეთა
         </Link>
@@ -93,80 +129,50 @@ const PricedRow = ({ s, p, ordering }: { s: { id: string; label: string; price: 
   </li>
 )
 
-/* ⚠️ THE FACTS LEFT THE HERO (2026-08-30). City, years and languages sat in one
-   `text-small` row under the chips, five words apart and all weighing the same
-   as each other — and on a profile with no priced services the rail held one
-   button and then stopped, leaving the page empty exactly where a reader looks
-   for the answer to „who is this".
-   Measured on /experts/nika-tsotsoria: name, headline, chips, that one grey
-   line, one paragraph, footer. sheniani.ge puts the same four facts in a rail
-   block with a LABEL on each row, and that is the whole of the difference —
-   the facts were already here, they had no room.
-   THE LABELS ARE THE SITE'S OWN WORDS, not new copy: „ქალაქი" and „ენა" are the
-   catalogue's own filter groups (app/experts/_filters.tsx) and „გამოცდილება" is
-   what the hero said. NO SECTION HEADING for the same reason — a title here
-   would be a word nobody has approved, and every row already names itself. */
-/* ⚠️ „გამოცდილება — N წელი" LEFT THIS BLOCK ON 2026-08-31, one day after it
-   arrived. Owner: „გამოცდილება 0 წელი … წაშალე, ყველგან არაა საჭირო." The
-   number was collected in two places and read in four, and a profile that had
-   never been asked the question printed „0 წელი" — a measured-looking figure
-   that measured nothing. The two fields that wrote it are gone with it. */
-const FACT_ROWS = (p: ProviderProfileData) => [
-  p.areas.length > 0 ? { k: 'ქალაქი', v: p.areas.join(', ') } : null,
-  p.langs.length > 0 ? { k: 'ენა', v: p.langs.join(', ') } : null,
-].filter((x): x is { k: string; v: string } => x !== null)
-
-export function ProfileFactsBlock({ p }: { p: ProviderProfileData }) {
-  const rows = FACT_ROWS(p)
-  if (rows.length === 0) return null
-  return (
-    <Card as="section" className="mt-3">
-      {/* A `<dl>`, because that is what this is: a term and its value. Hairline
-          rows in the rail's own grammar — the same `divide-y divide-ink-100
-          border-t` the price list uses two blocks down.
-          NOT a two-column grid with `display:contents` rows: `contents` removes
-          the wrapper from the box tree, so `divide-y` would have nothing to draw
-          a border on. Each row is a real flex box instead. */}
-      <dl className="divide-y divide-ink-100 border-t border-ink-100">
-        {rows.map(r => (
-          <div key={r.k} className="flex items-baseline justify-between gap-4 py-2.5">
-            <dt className="shrink-0 text-meta text-ink-500">{r.k}</dt>
-            <dd className="min-w-0 text-small text-ink-900 text-right break-words">{r.v}</dd>
-          </div>
-        ))}
-      </dl>
-    </Card>
-  )
-}
+/* ⚠️ `ProfileFactsBlock` STOOD HERE AND IS GONE (2026-08-31). It was a labelled
+   `<dl>` in the rail — „ქალაქი: თბილისი", „ენა: ქართული, ინგლისური" — added on
+   2026-08-30 because the hero was a bare header with no room for them, and it
+   was the right fix for that hero.
+   The canvas replaces the hero with a CARD, and puts both facts in its chip row
+   beside the professions (./_providerHero). Two rows of a table and two chips
+   say the same thing; the chips say it where the reader is already looking, and
+   they give the rail back to the price and the button, which is what a rail is
+   for. „გამოცდილება — N წელი" left this block one day earlier, on the owner's
+   „წაშალე, ყველგან არაა საჭირო", and did not come back. */
 
 export function PricedServicesBlock({ p, ordering = true }: { p: ProviderProfileData; ordering?: boolean }) {
   if (p.priced.length === 0) return null
-  const shown = p.priced.slice(0, RAIL_ROWS)
-  const rest = p.priced.slice(RAIL_ROWS)
+  const shown = p.priced.slice(0, LIST_ROWS)
+  const rest = p.priced.slice(LIST_ROWS)
   return (
-    <Card as="section" id="services" className="mt-3 scroll-mt-24">
-      <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">სერვისები და ფასები</h2>
-      <ul className="mt-3 divide-y divide-ink-100 border-t border-ink-100">
-        {shown.map(s => <PricedRow key={s.id} s={s} p={p} ordering={ordering} />)}
+    <Section
+      id="services"
+      title="რას აკეთებს"
+      /* ⚠️ THE CAVEAT MOVED TO THE TOP (2026-08-31, the canvas's placement). It
+         was the last line of the block, under a fold that most readers never
+         opened — so the one sentence that stops „60₾" being read as a quote sat
+         where it could not do that job. */
+      aside="ფასი საორიენტაციოა — ზუსტს შენს მოთხოვნაზე შემოგთავაზებს."
+    >
+      <ul>
+        {shown.map((s, i) => <PricedRow key={s.id} s={s} p={p} ordering={ordering} i={i} />)}
       </ul>
       {/* ⚠️ A PLAIN <details>, NOT A TOGGLE COMPONENT. This block is server-
           rendered and the rest of the profile has no client bundle; a „show all"
           that needed `useState` would pull one in for a disclosure the browser
-          has done natively for years — and it keeps working with JS off, which
-          a rail full of prices should. */}
+          has done natively for years — and it keeps working with JS off. */}
       {rest.length > 0 && (
         <details className="group">
-          <summary className="mt-3 list-none cursor-pointer text-small font-display font-semibold text-brand-700 hover:text-brand-800 tap-area">
+          <summary className="tap-area mt-3 cursor-pointer list-none font-display text-small font-semibold text-brand-700 hover:text-brand-800">
             <span className="group-open:hidden">ყველა სერვისი (<span className="tabular-nums">{p.priced.length}</span>)</span>
             <span className="hidden group-open:inline">დამალვა</span>
           </summary>
-          <ul className="divide-y divide-ink-100 border-t border-ink-100">
-            {rest.map(s => <PricedRow key={s.id} s={s} p={p} ordering={ordering} />)}
+          <ul>
+            {rest.map((s, i) => <PricedRow key={s.id} s={s} p={p} ordering={ordering} i={LIST_ROWS + i} />)}
           </ul>
         </details>
       )}
-      <p className="mt-3 text-meta text-ink-500">საორიენტაციო ფასია — ზუსტს შენს მოთხოვნაზე შემოგთავაზებს.</p>
-    </Card>
+    </Section>
   )
 }
 
@@ -238,15 +244,23 @@ export function CredentialsBlock({ p }: { p: ProviderProfileData }) {
  * priced list, the paragraph, and the photos of finished work. */
 
 export function WorkBlock({ p }: { p: ProviderProfileData }) {
-  if (p.workPhotoSrcs.length === 0) return null
+  const n = p.workPhotoSrcs.length
+  if (n === 0) return null
   return (
-    <Section id="work" title="ნამუშევრები">
+    <Section id="work" title="ნამუშევარი">
+      {/* The count, beside the heading rather than under it — it tells a reader
+          whether the grid is worth scrolling before they scroll it. Measured,
+          obviously: it is the length of the list right below. */}
+      <p className="-mt-8 mb-4 text-right text-meta tabular-nums text-ink-400">{n} ფოტო</p>
       {/* Each <img> is ONE request to the photo route (`?n=`), lazy, in a
-          reserved square — six of them is six small fetches, never a megabyte
-          of data URI in the HTML. */}
-      <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          reserved 4:3 box — six of them is six small fetches, never a megabyte
+          of data URI in the HTML.
+          ⚠️ 4:3, NOT SQUARE (2026-08-31, the canvas's ratio). A finished room, a
+          repaired wall and a document are all wider than they are tall; a
+          square crop cut the middle out of every one of them. */}
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {p.workPhotoSrcs.map((src, i) => (
-          <li key={src} className="aspect-square rounded-card overflow-hidden ring-1 ring-ink-200 bg-ink-100">
+          <li key={src} className="aspect-[4/3] overflow-hidden rounded-tile bg-ink-100 ring-1 ring-ink-100">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={src}
@@ -254,8 +268,8 @@ export function WorkBlock({ p }: { p: ProviderProfileData }) {
               loading="lazy"
               decoding="async"
               width={400}
-              height={400}
-              className="w-full h-full object-cover"
+              height={300}
+              className="h-full w-full object-cover"
             />
           </li>
         ))}

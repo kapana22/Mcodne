@@ -1,7 +1,7 @@
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from 'react'
 import Link from 'next/link'
 
-type Variant = 'primary' | 'hero' | 'cta' | 'secondary' | 'ghost' | 'danger'
+type Variant = 'primary' | 'hero' | 'cta' | 'dark' | 'secondary' | 'ghost' | 'danger'
 type Size = 'sm' | 'md' | 'lg'
 
 const BASE =
@@ -37,6 +37,17 @@ const SIZES: Record<Size, string> = {
 // physical state change rather than a flat color the whole time.
 const VARIANTS: Record<Variant, string> = {
   primary:   'bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white shadow-xs hover:shadow-sm',
+  // ⚠️ THE NEAR-BLACK FILL (2026-08-31, from the owner's design canvas
+  // „mcodne.ge პროფილის რედიზაინი"). The canvas gives the page's LOUDEST
+  // action — „დაწყება" in the header, „მიიღე შეთავაზებები" in the hero — an ink
+  // fill rather than a green one, and reserves green for the second-loudest.
+  // That is a hierarchy the palette could not express before: every filled
+  // control was brand-600, so a page with two of them had no way to say which
+  // came first.
+  //   · ink-900 on white measures 18.6:1 — it cannot fail contrast.
+  //   · It is NOT a replacement for `primary`. A screen with one action keeps
+  //     the green; `dark` is for a screen where green is already spoken for.
+  dark:      'bg-ink-900 hover:bg-ink-800 active:bg-ink-950 text-white shadow-xs hover:shadow-sm',
   hero:      'bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white shadow-brand-glow hover:shadow-[0_10px_32px_rgba(47,156,134,0.36)]',
   // The gradient-cta token as a component variant — pages should reach for
   // this instead of hand-rolling `bg-gradient-cta …` button classes.

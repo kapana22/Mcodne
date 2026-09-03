@@ -79,10 +79,18 @@ ok('null on no issues', firstGeorgianMessage({ issues: [] }) === null)
   walk('app/api')
   // `applyValidationFailure` is /apply's richer equivalent — it returns field +
   // message from the same rules, so a route using it already answers.
+  //
+  // ⚠️ `firstGeorgianIssue` JOINED THE LIST ON 2026-08-31, and it is the one to
+  // reach for. It returns the same message PLUS the schema's path, which is
+  // what lets the form mark the box rather than print the sentence at the foot
+  // of the card — /api/me covers two gated fields (`fullName`, `bio`) with one
+  // code, so /settings had been inferring which box from the noun the copy
+  // opens with. `firstGeorgianMessage` is still correct for a route with one
+  // gated field and stays accepted.
   const offenders = routes.filter(p => {
     const src = readFileSync(p, 'utf8')
     const gates = /georgianRefine|georgianNameRefine/.test(src)
-    return gates && !/firstGeorgianMessage|applyValidationFailure/.test(src)
+    return gates && !/firstGeorgianMessage|firstGeorgianIssue|applyValidationFailure/.test(src)
   })
   ok(`every gated route surfaces its message${offenders.length ? ` — ${offenders.join(', ')}` : ''}`, offenders.length === 0)
 }

@@ -30,6 +30,28 @@ import { UNSTATED } from '@/lib/requestTopics'
 
 /** The client's form. */
 export const REQUEST_ROUTE = '/request'
+
+/**
+ * Where a SIGNED-IN client reads one of their own requests (2026-09-02).
+ *
+ * ⚠️ THE SAME ROOM AS `${REQUEST_ROUTE}/<ref>`, IN THE OTHER CHROME — one
+ * component (app/request/[ref]/_room), two addresses, and the difference is who
+ * is let in and what is drawn around it. Owner, 2026-09-02: „ესე დახტუნავს
+ * ძალიან" — every row of /me used to open the intake's bare shell and take a
+ * signed-in person out of their own workspace.
+ *
+ * ⚠️ EVERY CLIENT-SIDE LINK GOES THROUGH THIS FUNCTION so the two addresses
+ * cannot be chosen differently in two places. A guest still gets
+ * `${REQUEST_ROUTE}/<ref>`; the reference is their only credential and their
+ * email carries it.
+ *
+ * `offerId` preselects one conversation in the room — what a notification and
+ * an inbox row both want, and the reason /me/messages/o/<id> can be a resolver
+ * rather than a second screen.
+ */
+export function clientRequestHref(publicRef: string, offerId?: string | null): string {
+  return `/me/r/${publicRef}${offerId ? `?o=${encodeURIComponent(offerId)}` : ''}`
+}
 /** The master's workspace lives under /work — ONE address with the expert's
  *  (stage 6, 2026-08-19): /work/requests and /work/offers,
  *  behind their own guard (app/work/(provider)/layout.tsx). The prefix is the
@@ -191,6 +213,17 @@ export function canSeeRequests(viewer: RequestViewer): boolean {
  * marketplace where the only people who could ASK were the people we had hand-
  * picked to ANSWER. That is a demo, not a market.
  *
+ * ⚠️ IT IS THE SUBSYSTEM GATE AND ITS NAME UNDERSELLS IT. Fourteen surfaces
+ * answer 404 behind this one boolean — the intake, /request/<ref>, accept,
+ * open, status, events, invite, done, review, and BOTH sides of the chat and
+ * the thread. „Client" here means „not the provider WORKSPACE", not „not a
+ * provider": a provider reads the same chat rows from the other end.
+ *
+ * So it stays „is the subsystem on", and the audience question lives one
+ * function down in `canFileRequest`. Narrowing THIS one to exclude sellers was
+ * tried on 2026-08-31 and took the chat away from every provider on the site
+ * before a grep caught it.
+ *
  * What still protects each client surface is NOT this gate:
  *   · the form   — a honeypot and a rate limit, the same pair every public
  *                  intake on this site uses.
@@ -206,6 +239,35 @@ export function canSeeRequests(viewer: RequestViewer): boolean {
  */
 export function canOpenRequestForm(): boolean {
   return requestsOn()
+}
+
+/**
+ * MAY THIS PERSON FILE A REQUEST? A narrower question than the one above, and
+ * the two must never be collapsed — `canOpenRequestForm` guards fourteen
+ * surfaces and this one guards a single POST.
+ *
+ * ⚠️ THE SUPPLY SIDE IS REFUSED (2026-08-31). Owner: „მინდა რომ ვისაც სერვისი
+ * აქვს იმას არ შეძლოს სერვისის დაკვეთა — ირევა ძალიან კოდი." Somebody who sells
+ * here cannot ORDER here. This reverses the paragraph that used to stand under
+ * `showRequestCta` („a provider who needs a plumber is a client like anybody
+ * else"); that reading was defensible and it is not the owner's — the two
+ * registrations „არ უნდა აირიოს" (CLAUDE.md), and one person holding both ends
+ * of the same trade is the mixing that sentence forbids.
+ *
+ * ⚠️ IT IS A SEPARATE FUNCTION AND NOT A SECOND ARGUMENT TO THE GATE ABOVE, and
+ * that was learned the expensive way in the hour this shipped: `clientAllowed`
+ * reads as „the client side" and is in fact THE SUBSYSTEM GATE — the accept
+ * route, the review route, /request/<ref>, and BOTH sides of the chat all
+ * answer 404 behind it. Narrowing it to exclude sellers did not close the
+ * intake; it took the chat, the thread and the whole request screen away from
+ * every provider on the site. One question, one function, one call site.
+ *
+ * `sells` is PASSED IN, never read here: this file does not import prisma.
+ * lib/requestsServer → `sellsHere` resolves it (a ServiceProfile AND an active
+ * allowlist row — CLAUDE.md's definition of a provider).
+ */
+export function canFileRequest(sells: boolean | undefined | null): boolean {
+  return requestsOn() && sells !== true
 }
 
 /**
@@ -229,12 +291,12 @@ export function canOpenRequestForm(): boolean {
  * when there were two profile tables). The caller passes the answer in: this
  * file's whole contract is that it does not import prisma.
  *
- * ⚠️ A HIDDEN INVITATION IS NOT A CLOSED DOOR. `canOpenRequestForm` is
- * untouched, so /request still answers everyone the flag admits — a provider
- * who needs a plumber is a client like anybody else („CLIENT is the floor",
- * lib/hats), and the home band, the catalogue's empty state and the address
- * itself all still reach it. What is removed is the standing invitation, not
- * the permission.
+ * ⚠️ IT IS A CLOSED DOOR NOW, NOT A HIDDEN INVITATION (2026-08-31). This
+ * paragraph used to end „what is removed is the standing invitation, not the
+ * permission", and the permission is removed too: `canOpenRequestForm` refuses
+ * the same person. So this function is no longer the only thing standing
+ * between a provider and the intake — it is the polite half, which keeps a
+ * door out of the chrome that the gate behind it would only slam.
  *
  * A GUEST KEEPS IT — settled, owner 2026-08-17: „აქ ხო უნდა ჩანდეს რეალურად
  * როცა არაა დარეგისტრირებული მაშინაც." Somebody who offers nothing yet reads
@@ -293,7 +355,20 @@ export const PROVIDER_PATH_PREFIXES = [
   ...PROVIDER_WORKSPACE_PATHS,
   '/api/provider',
   '/api/provider-applications',
-  '/api/admin/master-applications',
+  // ⚠️ IT SAID `/api/admin/master-applications` UNTIL 2026-08-31, AND THAT ENTRY
+  // COULD NEVER MATCH. The rename redirect in middleware.ts sits at the TOP of
+  // the file (line ~140) and `isProviderPath` is consulted at the BOTTOM, so a
+  // request to the old name is 308'd away long before the gate sees it — and
+  // the request that comes back carries the NEW name, which was not in this
+  // list. The FEATURE_PROVIDERS gate was therefore guarding a path that cannot
+  // arrive and not guarding the one that does.
+  //
+  // Nothing was exposed: the route self-gates on its first line
+  // (`if (!providersOn()) → 404`). What was wrong is the second layer — and
+  // CLAUDE.md's rule for this subsystem is that BOTH are required and neither
+  // is load-bearing alone. A second layer aimed at a URL nobody can request is
+  // worth nothing while looking like it works.
+  '/api/admin/provider-applications',
 ] as const
 
 export function isProviderPath(pathname: string): boolean {
@@ -419,6 +494,34 @@ export type {
   RequestKindName, BudgetUnitName, BudgetBand, TimingOption,
   FormatName, CityName, Topic, TopicGroup, TopicHit, ExtraQuestion,
 } from './requestTopics'
+
+/**
+ * WHAT A CARD SAYS WHERE THERE IS NO FIGURE — one word, one definition.
+ *
+ * ⚠️ IT WAS „ფასს შემოგთავაზებს" AND IT WAS A SENTENCE (2026-09-02). Owner:
+ * „ეს სიტყვა რაღაც არაპროფესიონალურად ჟღერს — ფასს შემოგთავაზებს. სხვა საიტები
+ * როგორ იყენებენ?"
+ *
+ * Checked against six live marketplaces (Mobbin, 2026-09-02) — Fiverr,
+ * Airtasker, Dribbble, Base44, Notion, Canva. NOT ONE of them writes a sentence
+ * in the price slot. It holds either a FIGURE („From $150", „From $500 ·
+ * $100/hr", „Project budget $250–$10,000") or a VERB on a control („Request
+ * Quote", „Contact", „Book session"). „ფასს შემოგთავაზებს" is neither: it is a
+ * prediction of what will happen, in the slot reserved for what something
+ * costs, which is exactly why it read as unprofessional.
+ *
+ * ⚠️ AND THE PRODUCT ALREADY HAD THE RIGHT WORD, IN THREE PLACES. The provider
+ * ticks „ფასი შეთანხმებით" on the join form and on /work/profile; the admin's
+ * company table prints „შეთანხმებით" for the same state. So one state had two
+ * names and the client-facing one was the odd spelling. It is also the Georgian
+ * marketplace convention (myhome.ge, mymarket.ge).
+ *
+ * ⚠️ A CONSTANT, BECAUSE IT WAS A LITERAL IN FIVE FILES — the catalogue card,
+ * the shortlist, the provider's own shopfront preview, and the two price
+ * editors' hint lines. Five copies of one word is five chances to change four
+ * of them.
+ */
+export const PRICE_ON_REQUEST = 'შეთანხმებით'
 
 export const REQUEST_STATUSES = ['NEW', 'VERIFIED', 'REJECTED', 'MATCHED', 'CLOSED'] as const
 export type RequestStatusName = (typeof REQUEST_STATUSES)[number]
@@ -614,13 +717,22 @@ export function requestIsOpen(r: { status: string; offerCount: number; offerLimi
  *
  * A provider browsing the queue sees the problem, the budget band, the deadline
  * and the city — never the client's name, phone or email. The client reading
- * their offers sees the price, the days, the sentence and the provider's name —
- * never their phone or email. Both sides get the other's details at exactly one
- * moment: the client accepts an offer.
+ * their offers sees the price, the days, the sentence, the provider's name and
+ * — since 2026-09-03 — the provider's PHONE, so they can call instead of
+ * writing. The client's own contact still opens at exactly one moment, and it
+ * is still bought: the accept, then `CONTACT_COST_TETRI`.
+ *
+ * ⚠️ SO THE RULE IS DELIBERATELY ASYMMETRIC NOW, AND THE ASYMMETRY IS THE
+ * POINT. A provider PUBLISHES a number in order to be rung — it is on their
+ * public profile's reason for existing. A client's number is what somebody
+ * bought a lead to get. Treating the two as one rule is what made the 2026-08-21
+ * pass take both away together, and taking the supply side's number away
+ * protected nobody while costing every client the one channel Georgians
+ * actually use.
  *
  * That is not a privacy nicety bolted onto a marketplace. It is the reason the
- * marketplace has anything to sell — the contact is what we open, so an
- * endpoint that leaks it has given away the whole feature, silently, while
+ * marketplace has anything to sell — the CLIENT's contact is what we open, so
+ * an endpoint that leaks it has given away the whole feature, silently, while
  * looking like it works.
  *
  * The two shaping functions below are the enforcement. Endpoints call them
@@ -788,10 +900,63 @@ export function clientContactView(r: { contactName: string; phone: string; email
 
 type ProviderContact = {
   name: string
-  /* ⚠️ NO `phone`, NO `email` (2026-08-21). The client used to be handed the
-     chosen provider's number and address here, the mirror of what the provider
-     was handed about them; both halves went the same day and for the same
-     reason (see clientIdentityOpen above). The conversation is the channel. */
+  /** ⚠️ THE PHONE CAME BACK ON 2026-09-03 — AND ONLY THE PHONE.
+   *
+   *  It left on 2026-08-21 with the block that printed it („არ უჩანდეს ეგრევე
+   *  ტელეფონი"), on the argument that the thread is channel enough. It was
+   *  not. Owner, reading the offers screen: „ვისაც უნდა დარეკავას ვისაც უნდა
+   *  არაა", and then the decision itself: „დარეკვა უნდა იყოს ასარჩევად ორი
+   *  ღილაკი და შემდეგ აირჩიოს რომელი სჭირდება."
+   *
+   *  So an offer carries two channels and the client picks. The research point
+   *  behind agreeing: on this market the phone is the default channel, and a
+   *  screen whose only answer is „write to them and wait" loses the errand to
+   *  whoever picks up — the client does not wait, they leave.
+   *
+   *  ⚠️ THE MIRROR DID NOT MOVE, AND THAT IS THE WHOLE BALANCE.
+   *  `clientIdentityOpen`, `CLIENT_CONTACT_SELECT` and the charge on
+   *  /api/provider/requests/[id]/contact are untouched: the CLIENT's number
+   *  still needs an accepted offer and still costs the provider money. What
+   *  opens here is the supply side's number, which its owner published in
+   *  order to be rung.
+   *
+   *  ⚠️ AND IT IS THE PHONE, NEVER THE EMAIL. „დარეკვა" is a button; an
+   *  address is a second channel nobody asked for and one more column leaving
+   *  the server for no decision it changes.
+   *
+   *  ⚠️ AND THE PRICING QUESTION IT OPENED IS ANSWERED, SAME DAY. A client who
+   *  dials shows their own number by caller ID, so the lead could complete
+   *  without the accept and therefore without the charge. The answer is that
+   *  THE CALL ITSELF IS THE CHARGE: pressing „დარეკვა" spends the provider's
+   *  `CONTACT_COST_TETRI` and opens the number — POST /api/requests/[ref]/call.
+   *
+   *  ⚠️ IT IS THE SAME CHARGE, NOT A SECOND ONE. `contactKey(requestId)` is
+   *  unique per (provider, request), so a client who rings and then accepts
+   *  costs that provider 3₾ once, and the accept path finds it already paid.
+   *  One lead, one fee, whichever side opened it.
+   *
+   *  ⚠️ THIS IS MyBuilder's MODEL, CHECKED (2026-09-03). There the homeowner
+   *  shortlists and the tradesman is charged automatically for it, having done
+   *  nothing — „it is not necessary for you to be awarded the job for the
+   *  shortlist fee to be payable". Bark and Thumbtack charge the provider too,
+   *  but before contact rather than on the client's action; only Checkatrade
+   *  lets a customer ring freely, and it takes a monthly subscription instead.
+   *  What all three of the pay-per-contact sites are hated for is the same
+   *  thing: money taken for a client who then said nothing. mcodne already
+   *  answers that — `sweepSilentContacts` refunds after CONTACT_REFUND_HOURS —
+   *  and this pass widened its evidence so a call that DID work is not swept. */
+  /** ⚠️ A BOOLEAN, NOT THE NUMBER (2026-09-03, second pass). It WAS the number
+   *  for a few hours, and that was wrong the moment the call became billable:
+   *  a string in the page's props is readable by anybody who opens the source,
+   *  so the fee would have been optional. The number now leaves the server only
+   *  from POST /api/requests/[ref]/call, which charges first.
+   *
+   *  What this answers is „may the button be drawn at all" — the provider has a
+   *  number AND the charge would go through (already paid, or affordable). A
+   *  control that cannot act is a promise the screen cannot keep, and here the
+   *  reason it could not act would be a STRANGER'S balance, which is neither the
+   *  client's business nor anything they could fix. */
+  canCall?: boolean
   /** The PUBLIC profile facts — what the client is entitled to see BEFORE
    *  choosing, because the profile page itself is public. The research point
    *  this carries: on every reference marketplace the client chooses by
@@ -800,8 +965,10 @@ type ProviderContact = {
   profile?: { slug: string | null; verified: boolean; rating: number; reviewsCount: number } | null
 }
 
-/** One offer, as the CLIENT is allowed to see it. PUBLIC profile facts and the
- *  offer's own terms — no contact of any kind; see clientIdentityOpen. */
+/** One offer, as the CLIENT is allowed to see it: PUBLIC profile facts, the
+ *  offer's own terms, and whether this provider can be RUNG — a boolean, never
+ *  the number, which is sold. No email ever, and nothing at all about the
+ *  CLIENT; that direction is `clientIdentityOpen`. */
 export function clientOfferView(o: {
   id: string
   priceGel: number
@@ -833,6 +1000,10 @@ export function clientOfferView(o: {
     // review is noise wearing a number, and the browse surfaces hide it too.
     providerRating: prof && prof.reviewsCount >= 1 && prof.rating > 0 ? prof.rating : null,
     providerReviews: prof?.reviewsCount ?? 0,
+    /** Whether „დარეკვა" may be drawn — see ProviderContact.canCall. The
+     *  number itself is never in this shape; it is bought.  Measured
+     *  2026-09-03: 22 of 28 provider accounts carry a number at all. */
+    providerCanCall: o.provider.canCall === true,
   }
 }
 
@@ -938,6 +1109,14 @@ export const ServiceRequestInput = z.object({
   ).max(MAX_REQUEST_PHOTOS).optional(),
   budgetBand: z.string().trim().max(8).default(''),
   timing: z.string().trim().min(1).max(24),
+  // ⚠️ BOTH ARE THE VOCABULARY, NOT THE OFFERED LIST, and that is deliberate —
+  // `FORMATS`/`CITIES` (lib/requestTopics) are what the wizard draws today,
+  // `ALL_FORMATS`/`ALL_CITIES` what this column has ever held. EITHER stopped
+  // being offered on 2026-08-31 and BATUMI on 2026-08-20; a draft revived from
+  // sessionStorage across that deploy still carries one, and refusing it here
+  // would meet the person with „INVALID" on the last screen for an answer they
+  // did give. Narrowing the OFFER is the honest half; narrowing the wire is how
+  // a form loses somebody's work.
   format: z.enum(['ONLINE', 'IN_PERSON', 'EITHER']),
   city: z.enum(['TBILISI', 'BATUMI', 'KUTAISI', 'RUSTAVI', 'OTHER']),
   // Ceilings match the rest of the site's name fields (BusinessLeadInput
@@ -1110,14 +1289,59 @@ export function serviceRequestRow(input: ServiceRequestInput) {
  * calendar: a price that only exists after somebody looks at the job cannot be
  * agreed in advance.
  */
-export const OFFER_PRICE_KINDS = ['FIXED', 'FROM', 'ON_SITE'] as const
-export type OfferPriceKind = (typeof OFFER_PRICE_KINDS)[number]
+/**
+ * ⚠️ TWO LISTS, THE SAME SPLIT `ALL_FORMATS` / `FORMATS` ALREADY MAKES IN
+ * requestTopics — and for the same two reasons (2026-09-01).
+ *
+ * `ALL_OFFER_PRICE_KINDS` is the VOCABULARY: every value the `priceKind` column
+ * has ever stored. IT MAY NEVER SHRINK. Offers written before today carry
+ * ON_SITE, and five surfaces render one through `offerPriceLabel` — the
+ * client's offer list, the provider's own list, the accepted-work row, the
+ * admin table and the notification mail — every one of which would print
+ * „ON_SITE" as a raw latin id the day this list forgot it.
+ *
+ * `OFFER_PRICE_KINDS` is what the FORM OFFERS TODAY. The owner's design canvas
+ * („Expert Jobs", and „Request Room v2"'s provider panel, which draws the same
+ * three) replaces „ადგილზე შევაფასებ" with „საათში".
+ *
+ * ⚠️ AND ON_SITE IS NOT DELETED, WHICH IS NOT TIMIDITY. It is the ONLY kind on
+ * which `priceGel: 0` is legal — „ვიზიტი უფასოდ, სამუშაო ადგილზე" is a real
+ * offer with a real zero in it — and that exemption is written into the zod
+ * refine below AND into a database CHECK. Removing the value would mean a
+ * migration to drop the exemption and a rewrite of every stored row that uses
+ * it, in exchange for nothing a provider can see: the form simply stops
+ * offering it.
+ */
+export const ALL_OFFER_PRICE_KINDS = ['FIXED', 'FROM', 'ON_SITE', 'HOURLY'] as const
+export type OfferPriceKind = (typeof ALL_OFFER_PRICE_KINDS)[number]
 
-/** What the provider picks, in their own words. */
+/** The three the form draws, in the canvas's order. */
+export const OFFER_PRICE_KINDS = ['FIXED', 'FROM', 'HOURLY'] as const satisfies readonly OfferPriceKind[]
+
+/** What the provider picks, in their own words. „-დან" carries its hyphen: the
+ *  canvas writes the chip exactly as the suffix reads („90₾-დან"), where the
+ *  bare „დან" was a syllable with nothing in front of it. */
 export const OFFER_PRICE_KIND_LABEL: Record<OfferPriceKind, string> = {
   FIXED: 'ფიქსირებული',
-  FROM: 'დან',
+  FROM: '-დან',
+  HOURLY: 'საათში',
   ON_SITE: 'ადგილზე შევაფასებ',
+}
+
+/**
+ * What the AMOUNT BOX is called, and what rides after the number, per kind.
+ *
+ * ⚠️ THE LABEL IS PART OF THE CHOICE, not decoration (the canvas). One box
+ * headed „ფასი" means three different things depending on the chip beside it,
+ * and „90" under „საათობრივი" is unmistakable where „90" under „ფასი" is a
+ * figure the client has to interpret. The suffix is the same fact inside the
+ * box, so the two cannot disagree.
+ */
+export const OFFER_PRICE_FIELD: Record<OfferPriceKind, { label: string; suffix: string }> = {
+  FIXED: { label: 'ფასი', suffix: '₾' },
+  FROM: { label: 'ფასი იწყება', suffix: '₾-დან' },
+  HOURLY: { label: 'საათობრივი', suffix: '₾/სთ' },
+  ON_SITE: { label: 'გამოძახების ფასი', suffix: '₾' },
 }
 
 /**
@@ -1131,6 +1355,10 @@ export const OFFER_PRICE_KIND_LABEL: Record<OfferPriceKind, string> = {
 export function offerPriceLabel(priceGel: number, kind: string): string {
   const money = gel(priceGel)
   if (kind === 'FROM') return `${money}-დან`
+  // „90₾/სთ". The client's offer card sets this beside a fixed price on the
+  // same list, so the unit has to travel with the number rather than sit in a
+  // chip the eye reads separately.
+  if (kind === 'HOURLY') return `${money}/სთ`
   if (kind === 'ON_SITE') {
     // A free call-out is a selling point and has to say so — „0₾" would read as
     // an empty field.
@@ -1163,17 +1391,40 @@ export const RequestOfferInput = z.object({
    * The database CHECK carries the same rule, so neither layer is load-bearing
    * alone.
    */
-  priceKind: z.enum(OFFER_PRICE_KINDS).default('FIXED'),
+  // ⚠️ VALIDATED AGAINST THE VOCABULARY, NOT AGAINST THE FORM. `ON_SITE` is no
+  // longer offered (see ALL_OFFER_PRICE_KINDS) but remains storable and
+  // therefore remains acceptable: this object is also what the admin panel and
+  // any future edit path parse with, and a schema narrower than the column
+  // turns every legacy row into an unsaveable one.
+  priceKind: z.enum(ALL_OFFER_PRICE_KINDS).default('FIXED'),
   // Optional: some work honestly cannot be estimated before a conversation, and
   // a required field there produces a fictional number. 365 rather than a
   // rounder ceiling because a year is the longest estimate that is still an
   // estimate; past it, the answer is „let's talk".
   daysEstimate: z.number().int().min(1).max(365).nullable().optional(),
-  // 20 characters is the floor at which the message stops being a restatement
-  // of the price. A number with no sentence beside it is a guess, and the
-  // client has nothing to compare. Same 4000 ceiling as the description above,
-  // for the same reason: the two halves of one conversation.
-  message: z.string().trim().min(20).max(4000),
+  /**
+   * ⚠️ THE REQUIRED SENTENCE IS THIS ONE NOW, NOT `message` (2026-09-01, the
+   * canvas — „რას მოიცავს ფასი", and on the client's side the same string is
+   * what every offer card shows under the price).
+   *
+   * The old floor was 20 characters of free text, on the argument that a number
+   * with no sentence beside it is a guess. That argument was right about the
+   * problem and wrong about the field: what the client cannot compare is not
+   * „did they write something" but „does 90₾ include the materials". Both
+   * artboards answer that with a one-line, structured field the offer LIST can
+   * print — „მასალა და ტრანსპორტი ფასში შედის." — where a 400-word message can
+   * only be read one offer at a time.
+   *
+   * 120 rather than 4000 because it has to survive `text-overflow: ellipsis` on
+   * a 350px card. 10 is a floor against „კი".
+   */
+  priceIncludes: z.string().trim().min(10).max(120),
+  // ⚠️ OPTIONAL SINCE 2026-09-01, and the canvas says so twice — the textarea
+  // is placeholdered „არასავალდებულო" on both artboards. The sentence that
+  // carries the offer moved to `priceIncludes` above; what is left here is the
+  // provider's own note, and a required field for it produced the padding the
+  // 20-character floor was invented to prevent.
+  message: z.string().trim().max(4000).default(''),
 }).refine(o => o.priceKind === 'ON_SITE' || o.priceGel > 0, {
   message: 'ფასი მიუთითე',
   path: ['priceGel'],

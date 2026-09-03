@@ -31,7 +31,7 @@
 // by tests/credits — this component is the main thing they were written for.
 import { Btn } from '@/components/Btn'
 import { Card } from '@/components/Card'
-import { gelLabel, contactsAffordable, CONTACT_COST_TETRI, JOB_DONE_NOTE } from '@/lib/credits'
+import { gelLabel, contactsLabel, contactCostRangeLabel, JOB_DONE_NOTE } from '@/lib/credits'
 
 export function CreditStrip({ balanceTetri, percent, nextTask, editHref }: {
   balanceTetri: number
@@ -42,18 +42,24 @@ export function CreditStrip({ balanceTetri, percent, nextTask, editHref }: {
   /** Where that task is answered — it differs by capability, see the caller. */
   editHref: string
 }) {
-  const contacts = contactsAffordable(balanceTetri)
+  const contacts = contactsLabel(balanceTetri)
   return (
     <Card className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
         <p className="text-meta text-ink-500">ბალანსი</p>
         <p className="mt-0.5 flex items-baseline gap-2">
           <span className="font-display text-h1 font-bold text-ink-900 tabular-nums leading-none">{gelLabel(balanceTetri)}</span>
-          {/* The translation. „85₾" is what it is; „17 შეთავაზება" is what it
-              does, and the second is the one that decides anything. */}
-          <span className="text-small text-ink-600 tabular-nums">
-            {contacts} კონტაქტი · {gelLabel(CONTACT_COST_TETRI)} თითო
-          </span>
+          {/* The translation. „85₾" is what it is; „17 კონტაქტი" is what it
+              does, and the second is the one that decides anything.
+              ⚠️ A RANGE SINCE 2026-09-03, because the price is one: a contact
+              costs 1–10₾ by the job's budget, so „17" was about to become a
+              figure this balance cannot honour on the expensive end. Two true
+              numbers instead of one that used to be true. */}
+          {contacts && (
+            <span className="text-small text-ink-600 tabular-nums">
+              {contacts} კონტაქტი · {contactCostRangeLabel()} თითო
+            </span>
+          )}
         </p>
       </div>
 

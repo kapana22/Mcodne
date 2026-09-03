@@ -1,57 +1,44 @@
 'use client'
-// /student — the top of the workspace: the greeting, the search box and the
-// first-visit tour.
+// /me — the first-visit tour, and nothing else any more.
+//
+// ⚠️ `Welcome` AND `StartRequest` LEFT THIS FILE ON 2026-08-31, with the
+// greeting band the owner's „Client Space" canvas replaced. They were the
+// full-bleed white section at the top of /me: „გამარჯობა, <name>.", one line of
+// lead copy, the „აღწერე, რა გჭირდება" button and a quieter „ან მოძებნე
+// ექსპერტი პირდაპირ" beneath it.
+//
+// Both of those doors survive, permanently and in the chrome rather than on one
+// screen: the rail's pinned „ახალი მოთხოვნა" is the intake and the rail's
+// „ექსპერტები" row is the catalogue, so they are reachable from all three /me
+// screens instead of only this one. The reasoning the band's own notes fought
+// for — that DESCRIBING is the product and searching is the alternative — is
+// intact: the intake is the filled button, the catalogue is a plain row.
+//
+// The file keeps its name because the tour is still the „first minutes here"
+// surface. What is below is unchanged apart from losing its own <Container>:
+// the page it mounts into now provides one, and two nested grids double the
+// gutter.
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Eyebrow } from '@/components/Eyebrow'
 import { Icon } from '@/components/Icon'
-import { Container } from '@/components/Container'
-
-/* ───── The two ways in, in the order the product actually works ─────
- *
- * ⚠️ SEARCHING WAS THE PRIMARY ACTION AND IT SHOULD NEVER HAVE BEEN
- * (2026-08-30). Owner, on this screen: „მთავარ გვერდზე ექსპერტის მოსაძებნი
- * უნდა იყოს პირველი? არაა რა თქმა უნდა."
- *
- * They are right, and the page's own sentence one line above said so already:
- * „აღწერე, რა გჭირდება — ან მოძებნე ექსპერტი პირდაპირ." Describing is the
- * product. A client who knew which expert they wanted would not need us; the
- * whole machine — routing, offers, the price a provider quotes against a real
- * brief — starts from a description. Searching is the ALTERNATIVE, for the
- * minority who already have somebody in mind.
- *
- * So the hero asks for the brief and offers the catalogue underneath it, at the
- * weight of a link. The rail already carries „ექსპერტები" as a permanent door;
- * this does not need to be a third one at button weight.
- */
-const StartRequest = ({ requestHref }: { requestHref: string | null }) => (
-  <div className="mt-6 flex flex-col items-start gap-3">
-    {requestHref && (
-      <Link
-        href={requestHref}
-        className="h-12 px-6 rounded-btn bg-brand-600 hover:bg-brand-700 text-white font-display font-semibold text-body-lg tracking-wide inline-flex items-center gap-2 shadow-xs transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
-      >
-        <Icon.edit className="w-4 h-4" />
-        აღწერე, რა გჭირდება
-      </Link>
-    )}
-    <Link
-      href="/experts"
-      className="font-display text-small font-semibold text-ink-600 hover:text-ink-900 inline-flex items-center gap-1.5 transition-colors duration-fast"
-    >
-      <Icon.search className="w-3.5 h-3.5" />
-      ან მოძებნე ექსპერტი პირდაპირ
-    </Link>
-  </div>
-)
 
 /* ───── Onboarding tour — first-run getting-started card ───── */
-export const OnboardingTour = ({ userId, joinedAt, requestHref }: {
+export const OnboardingTour = ({ userId, joinedAt, requestHref, hasRequests }: {
   userId?: string
   joinedAt?: string
-  /** The intake address — the same one the hero uses, so the first screen a
-   *  client sees cannot offer two different „start here"s. */
+  /** ⚠️ THE TOUR TEACHES STEP 1, SO IT MUST NOT OUTLIVE STEP 1 (2026-09-01).
+   *  It gated on a dismissal and on the account being under a week old, and on
+   *  neither of the two things that actually matter: whether the person has
+   *  already done the thing it is explaining. Somebody who signed up and filed
+   *  a request the same minute read „3 ნაბიჯი — და მზად ხარ / 1. აღწერე, რა
+   *  გჭირდება" printed directly ABOVE the request they had just described — for
+   *  the next seven days. Filing one is the tour finishing; it should behave
+   *  that way. */
+  hasRequests?: boolean
+  /** The intake address — the same one the rail's button uses, so the first
+   *  screen a client sees cannot offer two different „start here"s. */
   requestHref: string | null
 }) => {
   const [dismissed, setDismissed] = useState(true) // start dismissed to avoid SSR flash
@@ -65,6 +52,15 @@ export const OnboardingTour = ({ userId, joinedAt, requestHref }: {
     } catch {}
   }, [userId])
   if (dismissed) return null
+  // Step 1 is done. Nothing here is news any more.
+  if (hasRequests) return null
+  // ⚠️ AND IT MUST NOT PRECEDE STEP 1 EITHER (2026-09-01). The rule above is
+  // „the tour teaches step 1, so it must not outlive step 1"; the same sentence
+  // read forwards says it must not run where step 1 is impossible. `requestHref`
+  // is null for somebody who SELLS here — /request refuses them (owner,
+  // 2026-08-31: a seller does not order) — and the card would have opened their
+  // client room with a three-step guide whose first step has no door on it.
+  if (!requestHref) return null
   // Only show for accounts younger than 7 days.
   if (joinedAt) {
     const ageMs = Date.now() - new Date(joinedAt).getTime()
@@ -89,20 +85,23 @@ export const OnboardingTour = ({ userId, joinedAt, requestHref }: {
   //
   // Step 2 pointed at /experts TOO, which is worse than a wrong link: you do
   // not receive offers by going to the catalogue. It waits, so it links to the
-  // place the waiting is visible — the client's own request list.
+  // place the waiting is visible — which since 2026-08-30 is /me itself, the
+  // screen this card is standing on. So it links nowhere: a step that says
+  // „you are already looking at it" is honest, and a link back to the current
+  // page reads as broken.
   const steps = [
     { n: 1, l: 'აღწერე, რა გჭირდება', d: 'რამდენიმე კითხვა — და მოთხოვნა გასულია.', href: requestHref },
-    { n: 2, l: 'მიიღე შეთავაზებები', d: 'ექსპერტები ფასთან ერთად გამოგიგზავნიან — შენ ირჩევ.', href: '/me/requests' },
+    { n: 2, l: 'მიიღე შეთავაზებები', d: 'ექსპერტები ფასთან ერთად გამოგიგზავნიან — შენ ირჩევ.', href: null as string | null },
     { n: 3, l: 'შეათანხმე დეტალები', d: 'მიმოწერა მცოდნეზეა — იქვე ათანხმებთ ვადასა და ფორმატს.', href: null as string | null },
   ]
   return (
-    <Container as="section" className="mt-6 motion-safe:animate-scale-in">
-      <div className="rounded-card bg-white border border-ink-200 p-5 sm:p-6 relative overflow-hidden">
+    <section className="mb-4 motion-safe:animate-scale-in">
+      <div className="rounded-card bg-white border border-ink-100 p-5 sm:p-6 relative overflow-hidden">
         <button
           type="button"
           onClick={close}
           aria-label="დახურვა"
-          className="absolute top-3 right-3 w-9 h-9 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast z-10"
+          className="absolute top-3 right-3 w-10 h-10 rounded-btn text-ink-500 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast z-10"
         >
           <Icon.x className="w-4 h-4" />
         </button>
@@ -117,7 +116,7 @@ export const OnboardingTour = ({ userId, joinedAt, requestHref }: {
               // also paid for a compositor layer per card to tint the page
               // background by 20%.
               const inner = (
-                <div className="p-4 rounded-card border border-ink-200 bg-white h-full flex flex-col hover:border-brand-300 hover-lift transition-colors duration-fast">
+                <div className="p-4 rounded-tile border border-ink-100 bg-ink-50 h-full flex flex-col hover:border-brand-300 transition-colors duration-fast">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-600 text-white font-display font-bold text-small shadow-xs">{s.n}</span>
                     <span className="font-display text-body font-bold text-ink-900">{s.l}</span>
@@ -126,56 +125,12 @@ export const OnboardingTour = ({ userId, joinedAt, requestHref }: {
                 </div>
               )
               return s.href
-                ? <Link key={s.n} href={s.href} className="block focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 rounded-card">{inner}</Link>
+                ? <Link key={s.n} href={s.href} className="block focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 rounded-tile">{inner}</Link>
                 : <div key={s.n}>{inner}</div>
             })}
           </div>
         </div>
       </div>
-    </Container>
-  )
-}
-
-/* ⚠️ THE COUNTER IS GONE WITH WHAT IT COUNTED (2026-08-24). This header said
-   „დაჯავშნილი გაქვს N სესია", derived through `lib/bookings → deriveSummary`,
-   the shared helper that kept it in step with the session list beside it. There
-   are no sessions; there is one sentence, and it says what the page is for. */
-
-export const Welcome = ({ name, requestHref }: {
-  /** The reader's full name, resolved on the SERVER — this used to be the whole
-   *  `me` object, fetched by the page after mount. */
-  name: string
-  /** The intake address, or null when FEATURE_REQUESTS is off. Read once by the
-   *  server page so the hero and the rest of the screen cannot disagree. */
-  requestHref: string | null
-}) => {
-  // ⚠️ THE CLOCK IS GONE (2026-08-30), and it took three problems with it.
-  //
-  //   · It could not be server-rendered (Node's ICU has no ka-GE), so it drew
-  //     „—" on the first paint and swapped a beat later — a visible stutter on
-  //     the client's landing page, which is the complaint that started this.
-  //   · It re-rendered every 30 seconds, for ever, to say nothing.
-  //   · „თბილისი" beside it is a CONSTANT: `CITIES` in lib/requestTopics holds
-  //     one city. A field whose value cannot differ carries no information.
-  //
-  // What a person needs on their own home screen is their name and the one
-  // thing to do — not the time, which their device already shows them.
-  const firstName = name.split(' ')[0] ?? ''
-
-  return (
-    <section className="border-b border-ink-100 bg-white">
-      <Container className="pt-6 sm:pt-10 lg:pt-12 pb-6 sm:pb-8">
-        <div className="min-w-0">
-          <h1 className="font-display text-h1 sm:text-display-lg lg:text-display-xl font-bold tracking-[-0.028em] leading-[1.02] text-ink-900">
-            {firstName ? `გამარჯობა, ${firstName}.` : 'გამარჯობა.'}
-          </h1>
-          <p className="mt-3 text-body-lg text-ink-600 max-w-[560px] leading-[1.55]">
-            აღწერე, რა გჭირდება — ექსპერტები ფასს შემოგთავაზებენ.
-          </p>
-
-          <StartRequest requestHref={requestHref} />
-        </div>
-      </Container>
     </section>
   )
 }

@@ -41,18 +41,70 @@ test('archetype 2 — catalogue: one card shell, one chip, a breadcrumb, two emp
   const shell = read('app/experts/client.tsx')
   assert.match(shell, /<MobileCollapse/, 'the catalogue does not fold its filter rail on a phone')
   assert.match(shell, /from '@\/components\/catalog\/MobileCollapse'/, 'the catalogue folds with a private copy')
+  // ⚠️ AND THE TRIGGER IS IN THE RESULTS HEADER SINCE 2026-09-01, beside the
+  // sort and the layout toggle — one 44px row on a phone, where it was three
+  // stacked full-width bars. tests/catalog.test.ts pins the pair in full.
+  assert.match(read('app/experts/_results.tsx'), /aria-controls=\{filters\.panelId\}/,
+    'the phone lost the button that opens the filter rail')
   assert.match(read('app/experts/page.tsx'), /<CatalogClient/, 'the catalogue page stopped rendering its container')
   // Two empty states, distinguished — „nobody is here yet" (nothing loaded at
   // all) and „nobody matches this" (the filters emptied a non-empty list).
   const empties = shell
-  assert.match(empties, /providers\.length === 0 \? \(/, 'the cold-marketplace empty state is gone')
+  // ⚠️ THE COLD ONE IS PER SIDE SINCE 2026-09-01. With the switch on the rail
+  // („პროფესიული" / „ყოველდღიური"), the roster is never empty while the other
+  // side holds 23 people — so the question „is anybody here at all" became a
+  // question about the SIDE being read, or the everyday side would answer it
+  // with „ვერ ვიპოვეთ — სცადე სხვა ფილტრი" over filters that narrowed nothing.
+  assert.match(empties, /sidePool\.length === 0 \? \(/, 'the cold-marketplace empty state is gone')
+  assert.match(empties, /providers\.filter\(m => m\.verticals\.includes\(filters\.vertical\)\)/,
+    'the cold empty state stopped asking about the side the reader is on')
   assert.match(empties, /ვერ ვიპოვეთ — სცადე სხვა ფილტრი/, 'the filtered-to-zero empty state is gone')
 })
 
-test('archetype 4 — intake wizard: one StepIndicator, Container sizes, no hand max-w', () => {
-  assert.ok(has('components/StepIndicator.tsx'))
-  // ⚠️ THE CONSULTATION WIZARD WAS THE OTHER CALLER (2026-08-24) and is gone.
-  assert.match(read('app/request/_shell.tsx'), /<StepIndicator[^>]*variant="list"/)
+test('archetype 4 — intake wizard: one stage rail, Container sizes, no hand max-w', () => {
+  /* ⚠️ `components/StepIndicator.tsx` IS DELETED (2026-09-02), and the sentence
+     that used to justify keeping it was simply not true.
+     The intake shell stopped using it on 2026-08-31, from the owner's design
+     canvas: the primitive draws numbered dots on a connector line, right for a
+     run whose steps are named destinations, and the intake's three are
+     PROPORTIONS of one form, which the canvas draws as three filled bars. The
+     note then said „the component is untouched and still serves its other call
+     sites" — measured on 2026-09-02, it had NONE. Not one file imported it or
+     rendered it; the only mention left in the whole tree was the comment above
+     the rail explaining that it was no longer used.
+     So this line asserted the presence of a file whose only purpose had become
+     satisfying this line. What the archetype is actually about is asserted
+     below and is untouched: the run says where you are, ONCE, in an ordered
+     list, and never as links — you cannot jump to „კონტაქტი" without answering
+     what precedes it. */
+  const shell = read('app/request/_shell.tsx')
+  // Comment-stripped: the file EXPLAINS the removal above the rail and names
+  // the component while doing so. A negative assertion read against prose that
+  // records the reason fails on its own changelog.
+  const shellCode = shell.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  assert.doesNotMatch(shellCode, /<StepIndicator/, 'the shell draws BOTH the bars and the dots — one control, or the reader gets two answers')
+  assert.match(shell, /<ol className="flex items-center gap-3">/, 'the stage rail is no longer an ordered list')
+  assert.match(shell, /stages\.map/, 'the stage rail stopped rendering the run’s own stages')
+  /* ⚠️ THE RULE IS „NO JUMPING AHEAD", AND IT WAS PINNED AS „NOTHING IS
+     TAPPABLE" (repinned 2026-09-01, owner: „ზევით რომ აქვს პროცესი ღილაკების…
+     მანდ გადასვლა-გადმოსვლებიც უნდა ჰქონდეს კომფორტისთვის").
+     Those are not the same assertion, and the difference is the whole feature:
+     a FINISHED stage is an answer already given, and `Transcript` has offered
+     exactly that jump since the wizard was written. What must stay impossible
+     is reaching „კონტაქტი" over an unanswered question — so the shell hands
+     `onStage` to `done` rows and to nothing else, which is what is asserted
+     here instead of the blanket ban.
+     A `<Link>` would still be wrong: it is a route change, and this run has one
+     address. */
+  const rail = shell.slice(shell.indexOf('<ol className="flex items-center gap-3">'))
+  assert.doesNotMatch(rail, /<Link/, 'a stage became a link — the run lives at one address')
+  // Every `onStage ?` on the rail must be guarded, and by `done` — counting
+  // them is what makes „and by nothing else" an assertion rather than a hope.
+  const guarded = rail.match(/\w+ && onStage \? \(/g) ?? []
+  const all = rail.match(/onStage \? \(/g) ?? []
+  assert.deepEqual([...new Set(guarded)], ['done && onStage ? ('],
+    'a stage that is not finished became tappable — you cannot jump ahead in this form')
+  assert.equal(all.length, guarded.length, 'the rail hands onStage to a row with no guard at all')
   for (const f of ['app/join/_provider/client.tsx', 'app/join/JoinClient.tsx', 'app/request/_shell.tsx']) {
     assert.doesNotMatch(read(f), /<Container[^>]*max-w-\[/, `${f} hand-writes a max-w on Container — pick a size instead`)
   }
@@ -62,7 +114,11 @@ test('archetype 4 — intake wizard: one StepIndicator, Container sizes, no hand
   // ⚠️ THE PICKER LIVES IN THE LEAF SINCE 2026-08-20 (`_door/DoorQuestion`),
   // because the PUBLIC door asks the same question before the sign-up wall and
   // two copies of it would answer differently within a week.
-  assert.match(read('app/join/JoinClient.tsx'), /<Container as="main" size="narrow"/)
+  // ⚠️ /join IS ONE PAGE SINCE 2026-08-31 („ერთ გვერდზე იყოს ყველაფერი"), so
+  // JoinClient no longer draws a screen of its own — it renders the form, and
+  // the narrow column is the form's (`_provider/client.tsx`). Same archetype,
+  // one file further in.
+  assert.match(read('app/join/_provider/client.tsx'), /<Container size="(narrow|content)"/)
   assert.match(read('app/join/_door/DoorQuestion.tsx'), /<ProfessionPicker/)
   assert.doesNotMatch(read('app/join/JoinClient.tsx'), /<ProfessionPicker/, 'the door grew a second copy of the question')
 })

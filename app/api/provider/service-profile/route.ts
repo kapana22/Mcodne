@@ -21,14 +21,15 @@ import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { requestsViewer } from '@/lib/requestsServer'
 import { CITIES } from '@/lib/requests'
-import { groupIsService } from '@/lib/requestTopics'
+import { groupIsService, sphereOfServices } from '@/lib/requestTopics'
 import {
   ServiceProfileInput, LIVE_OFFER_GROUPS, sanitizeStored, profileGaps,
   KEPT_PHOTO, MAX_WORK_PHOTOS,
 } from '@/lib/serviceProfile'
+import { validationIssueMessage } from '@/lib/validationMessages'
 import { ASSIGNABLE_CATEGORY_WHERE } from '@/lib/categoryTree'
 import { ALL_PROFESSIONS, MAX_PROFESSIONS } from '@/lib/professions'
-import { grantEarnedTasks } from '@/lib/creditsServer'
+import { grantEarnedTasks, profileCompletion } from '@/lib/creditsServer'
 import { gelLabel } from '@/lib/credits'
 import { avatarSrc } from '@/lib/avatarSrc'
 
@@ -175,6 +176,11 @@ export async function GET() {
     // „What is still missing", computed HERE rather than in the component, so
     // the page and the routing agree on what „ready" means.
     gaps: profileGaps(clean),
+    // ⚠️ HOW FULL THE PROFILE IS, AND WHAT FINISHING IT PAYS — the two numbers
+    // the status band states (app/work/profile/_editor). `profileCompletion`,
+    // NOT `grantEarnedTasks`: the second one WRITES, and a GET that pays money
+    // is a double-render away from paying twice. See lib/creditsServer.
+    ...(await profileCompletion(viewer.user.id)),
     exists: row !== null,
     ...vocabulary(),
   })
@@ -189,10 +195,11 @@ export async function PUT(req: Request) {
     return NextResponse.json({
       ok: false,
       error: 'INVALID',
+      field: typeof parsed.error.issues[0]?.path[0] === 'string' ? parsed.error.issues[0].path[0] : null,
       // The first message only. These are the provider's own form errors and
       // they are written to be read (lib/serviceProfile) — but a list of five is
       // a wall, and the form highlights the field anyway.
-      detail: parsed.error.issues[0]?.message ?? null,
+      detail: validationIssueMessage(parsed.error.issues[0]),
     }, { status: 400 })
   }
 
@@ -322,6 +329,44 @@ export async function PUT(req: Request) {
         }, { status: 400 })
       }
       category = { categoryId: cat.id }
+    }
+  }
+
+  /* ⚠️ THE SPHERE ANSWERS ITSELF WHEN NOBODY ANSWERED IT (2026-09-02).
+   *
+   * The editor stopped asking „რომელ პროფესიად გეძებენ" on this date — see
+   * app/work/profile/_secIdentity — so `categoryId` no longer arrives on a save
+   * from that screen, and a provider who never had one would never get one.
+   * `categorySlug` on the topics they DID tick already says which sphere their
+   * work belongs to (lib/requestTopics → sphereOfServices, and its note carries
+   * the measurement: 23 of 27 derivations matched the stored sphere exactly and
+   * the two that differed were better than what was stored).
+   *
+   * ⚠️ IT ONLY EVER FILLS A HOLE. Three guards, and each one matters:
+   *   · `categoryId === undefined` — a caller that DID send a sphere keeps it,
+   *     including `null`, which is somebody deliberately clearing it;
+   *   · the stored value must be null — nobody's existing filing is rewritten
+   *     underneath them by a save about their bio;
+   *   · the derived slug must resolve to an ASSIGNABLE category, the same set
+   *     the block above checks, so this cannot write a sphere the picker would
+   *     have refused.
+   * A services list that implies no sphere (the trades — a SERVICE topic
+   * carries no `categorySlug` by design) simply leaves it null, which is what
+   * `queueScope` already handles: those providers route on their services. */
+  if (categoryId === undefined && sent.services !== undefined) {
+    const slug = sphereOfServices(sent.services as string[] | undefined)
+    if (slug) {
+      const current = await prisma.serviceProfile.findUnique({
+        where: { userId: viewer.user.id },
+        select: { categoryId: true },
+      })
+      if (!current?.categoryId) {
+        const cat = await prisma.category.findFirst({
+          where: { ...ASSIGNABLE_CATEGORY_WHERE, slug },
+          select: { id: true },
+        })
+        if (cat) category = { categoryId: cat.id }
+      }
     }
   }
 

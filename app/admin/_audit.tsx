@@ -44,12 +44,25 @@ const ACTION_LABEL: Record<string, string> = {
   'user.revokeAdmin': 'მოეხსნა ადმინის უფლება',
   'user.delete': 'ანგარიში სრულად წაიშალა',
   'user.anonymize': 'ანგარიში ანონიმიზდა',
+  'provider.feature': 'ექსპერტი გახდა რჩეული',
+  'provider.unfeature': 'ექსპერტს მოეხსნა რჩეული',
+  'provider.verify': 'ექსპერტი ვერიფიცირდა',
+  'provider.unverify': 'ვერიფიკაცია მოეხსნა',
+  // ⚠️ THE `tutor.*` KEYS STAY, AND THEY ARE NOT DEAD CODE. An audit action is
+  // WRITTEN INTO THE ROW (lib/audit → AuditLog.action); every entry filed before
+  // the rename still says `tutor.verify`, and a label map that forgot the old
+  // key would print the raw string into the one table whose whole job is to be
+  // readable months later. Nothing emits these any more — the three routes under
+  // /api/admin/providers now write `provider.*` — so this block only ever grows
+  // older, and it is deleted the day the rows it explains are.
   'tutor.feature': 'ექსპერტი გახდა რჩეული',
   'tutor.unfeature': 'ექსპერტს მოეხსნა რჩეული',
   'tutor.verify': 'ექსპერტი ვერიფიცირდა',
   'tutor.unverify': 'ვერიფიკაცია მოეხსნა',
   'integration.set': 'ინტეგრაციის კოდი ჩაიწერა',
   'integration.clear': 'ინტეგრაციის კოდი ამოიშალა',
+  'message.on': 'შეტყობინება ჩაირთო',
+  'message.off': 'შეტყობინება გამოირთო',
   'siteText.set': 'საიტის ტექსტი შეიცვალა',
   'siteText.reset': 'საიტის ტექსტი დაუბრუნდა ნაგულისხმევს',
   'post.create': 'სტატია შეიქმნა',
@@ -97,7 +110,8 @@ const ACTION_LABEL: Record<string, string> = {
   'credits.deduct': 'კრედიტი ჩამოეჭრა',
 
   // ── The provider's own row ──
-  'tutor.category.set': 'ექსპერტს კატეგორია შეეცვალა',
+  'provider.category.set': 'ექსპერტს კატეგორია შეეცვალა',
+  'tutor.category.set': 'ექსპერტს კატეგორია შეეცვალა', // historical rows — see above
 
   // ── B2B. The vertical is dark (lib/flags → B2B_VISIBILITY), and these stay
   //    because the audit log is written by whatever ran, not by what is on

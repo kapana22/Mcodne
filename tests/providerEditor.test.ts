@@ -265,13 +265,33 @@ test('§I the picker narrows to the world the provider is in', () => {
   assert.match(sec, /const mine = new Set\(/, 'the editor stopped deriving the provider\'s own world')
   assert.doesNotMatch(sec, /setWorld|რომელ კატეგორიაშია/,
     'the editor asks a question the provider already answered by registering')
-  // ⚠️ THE OTHER WORLD IS COLLAPSED, NEVER REMOVED — a cleaner who starts
-  // teaching is a real person.
-  assert.match(sec, /world:\$\{s\.v\}/, 'the other world stopped being reachable')
+  /* ⚠️ THE OTHER WORLD IS COLLAPSED, NEVER REMOVED — a cleaner who starts
+     teaching is a real person.
+
+     ⚠️ THE KEY CHANGED SHAPE ON 2026-09-02 AND THE RULE DID NOT. It was a
+     string `world:${s.v}` kept in `openGroup` — the same variable that, once
+     this editor took /join's category strip, also had to hold „which CATEGORY
+     is open". One variable, two meanings: opening a category set it to a group
+     id, which made the section's `hidden` fire and took the whole world — and
+     the strip inside it — off the screen.
+
+     So the disclosure has its own state now. What is pinned is the BEHAVIOUR
+     the note above describes, which is what it always should have been: the
+     other world is `hidden`, never filtered out of `sections`. */
+  assert.match(sec, /const \[openWorld, setOpenWorld\]/,
+    'the world disclosure lost its own state — it is sharing one with the category strip again')
+  assert.match(sec, /hidden=\{!s\.theirs && mine\.size === 1 && openWorld !== s\.v\}/,
+    'the other world stopped being reachable')
+  assert.doesNotMatch(sec, /sections\s*\.filter\(/,
+    'a world was filtered out of the editor rather than collapsed')
 
   // /join asks once and narrows; the editor never asks. Two mechanisms, one rule.
   const join = codeOf('app/join/_provider/client.tsx')
-  assert.match(join, /const \[world, setWorld\]/, 'the registration form stopped asking which world')
+  // ⚠️ THE STATE HOLDS A SET SINCE 2026-09-01 — `worlds`, not `world`. What is
+  // pinned is that the form still ASKS, not how many answers it accepts: a
+  // provider who does both halves may now tick both, and an empty selection
+  // means the whole list. See the note beside `worlds` in the form.
+  assert.match(join, /const \[worlds, setWorlds\]/, 'the registration form stopped asking which world')
 })
 
 /* ═══════════ J. the name is on the card, the password is not ════════════ */

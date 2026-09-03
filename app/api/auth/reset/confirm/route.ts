@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { PWD_MIN, PWD_MAX } from '@/lib/passwordPolicy'
 import { createHash } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
 import { hashPassword, createSession, postAuthHome } from '@/lib/auth'
@@ -7,7 +8,7 @@ import { rateLimit, clientIp } from '@/lib/rateLimit'
 
 const Body = z.object({
   token: z.string().min(20),
-  password: z.string().min(8).max(120),
+  password: z.string().min(PWD_MIN).max(PWD_MAX),
 })
 
 export async function POST(req: Request) {

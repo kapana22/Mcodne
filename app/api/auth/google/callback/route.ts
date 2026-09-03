@@ -168,10 +168,11 @@ export async function GET(req: Request) {
   {
     const u = user
     const build = link.notify ? googleLinkedEmail : isNewUser ? welcomeEmail : null
+    const buildKey = link.notify ? 'auth.googleLinked' as const : 'auth.welcome' as const
     if (build) {
       after(async () => {
-        const { subject, html } = build(u.fullName)
-        await sendMail({ to: u.email, subject, html }).catch(() => {})
+        const { subject, html } = await build(u.fullName)
+        await sendMail({ key: buildKey, to: u.email, subject, html }).catch(() => {})
       })
     }
   }

@@ -1,0 +1,93 @@
+# ⚠️ THE FIRST THING THAT RUNS THE TESTS WITHOUT SOMEBODY REMEMBERING TO.
+#
+# CLAUDE.md, until today: „There is no CI, and `railway up` uploads the WORKING
+# TREE, so this script is the only thing that ever runs the tests and a commit
+# is a record rather than a release."  That is still true of the deploy — this
+# does not gate it — but it stops being true of the tests: every push and every
+# pull request now runs the same `npm run check` a person would run by hand,
+# plus the one end-to-end walk, against a real Postgres.
+#
+# ⚠️ IT NEVER SEES PRODUCTION. `DATABASE_URL` here is the job's own throwaway
+# container. Nothing in this file has, or needs, a production credential — the
+# gate's schema stage applies `lib/dbBoot`'s migrations to the empty database,
+# which is also the only place those migrations are ever exercised from scratch.
+name: check
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A second push to the same branch makes the first run pointless — cancel it
+# rather than queue it, or a busy afternoon spends its minutes on stale commits.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        # Matches the local Homebrew version this project is developed against.
+        image: postgres:16
+        env:
+          POSTGRES_USER: mcodne
+          POSTGRES_PASSWORD: mcodne
+          POSTGRES_DB: mcodne
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://mcodne:mcodne@localhost:5432/mcodne
+      E2E_DATABASE_URL: postgresql://mcodne:mcodne@localhost:5432/mcodne
+      # The gate builds into its own directory so it can never collide with a
+      # dev server's `.next` — see scripts/check.mjs.
+      NEXT_DIST_DIR: .next-check
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ⚠️ NODE 22, NOT „latest". CLAUDE.md: „Next 15.5 fails on Node 26 in ways
+      # that read as code errors." Pinning it here is what stops a green local
+      # run and a red CI run from being blamed on the change under test.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The base schema. `lib/dbBoot` applies the hand-written deltas on top at
+      # first request, and the gate's schema stage is what triggers that here.
+      - run: npx prisma generate
+      - run: npx prisma db push --skip-generate
+
+      # types → schema → 84 test files → next build
+      - run: npm run check
+
+      # ⚠️ THE WALK, AND WHY IT IS A SEPARATE STEP. `npm run check` reads source
+      # text; this drives a browser. Every defect that reached production in the
+      # week before this file existed was invisible to the first and caught by
+      # the second — see e2e/flow.spec.ts for the list.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e:seed
+      - run: npm run e2e
+
+      # On failure the trace is the whole story — the DOM, the network and the
+      # screenshot at the moment it broke. Without this the CI log is the only
+      # evidence and it is the least useful part of the run.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-trace
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

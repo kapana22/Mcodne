@@ -17,24 +17,23 @@
 //
 // PRESENTATIONAL. The parent owns the draft, the save and the dirty flag.
 
+import { Card } from '@/components/Card'
 import { Icon } from '@/components/Icon'
 import { Eyebrow } from '@/components/Eyebrow'
 import { Avatar } from '@/components/Avatar'
 import { LanguagePicker } from '@/components/LanguagePicker'
-import { ProfessionPicker } from '@/components/ProfessionPicker'
 import { HEADLINE_MAX } from '@/lib/headline'
 import { NAME_MIN, NAME_MAX } from '@/lib/serviceProfile'
 import { Field } from './_parts'
-import type { Category, Draft } from './_types'
+import type { Draft } from './_types'
 
 export function IdentitySection({
-  avatarUrl, avatarUploading, pickAvatar, avatarCropperUi, categories, draft, patch,
+  avatarUrl, avatarUploading, pickAvatar, avatarCropperUi, draft, patch,
 }: {
   avatarUrl: string | null
   avatarUploading: boolean
   pickAvatar: () => void
   avatarCropperUi: React.ReactNode
-  categories: Category[]
   draft: Draft
   patch: (p: Partial<Draft>) => void
 }) {
@@ -43,8 +42,21 @@ export function IdentitySection({
 
         {/* Avatar block — hover overlay pattern, keyboard-focusable button.
             Reuses the existing `uploadAvatar` handler and hidden file input. */}
-        <section id="section-avatar" className="scroll-mt-24 p-6 rounded-card border border-ink-200 bg-white">
-          <Eyebrow tone="muted" className="mb-4">ავატარი</Eyebrow>
+        {/* <Card> rather than the hand-spelled shell it was (2026-09-01): the
+            exact `rounded-card border-ink-200 bg-white` surface the primitive
+            owns. `padding="none"` and `p-6` written out, because 24px is not
+            one of Card's four tiers and two padding utilities on one element
+            resolve by Tailwind's emit order, not by the order they are typed. */}
+        <Card as="section" id="section-avatar" padding="none" className="scroll-mt-24 p-6">
+          {/* ⚠️ `as="h2"` (2026-09-01). „ავატარი" and „საჯარო პროფილი" are the
+              titles of two panels on this page and they were the only two of
+              its seven that were not headings — _secServices already writes
+              `<h2>` and `<Eyebrow as="h3">`, and /work/balance writes
+              `<Eyebrow as="h2">`. So somebody moving through this long form by
+              heading skipped straight from „ჩემი გვერდი" to „რას აკეთებ" and
+              never met the face or the sentence. `Eyebrow` puts its classes on
+              whatever tag it is given: nothing on screen changes. */}
+          <Eyebrow as="h2" tone="muted" className="mb-4">ავატარი</Eyebrow>
           <div className="flex items-center gap-5">
             <button
               type="button"
@@ -78,11 +90,16 @@ export function IdentitySection({
               {/* Truthful: the server caps images at MAX_IMAGE_BYTES = 8MB
                   (the old „500KB" was never the real limit). */}
               <div className="mt-1 text-meta text-ink-500">JPG/PNG/WebP · მინ. 256×256 · მაქს. 8MB</div>
-              <div className="mt-1 text-meta text-ink-500 leading-[1.5]">სუფთა ფონი, კარგი განათება, სახე ცენტრში და ნათლად ჩანდეს — პროფესიული სურათი ნდობას ზრდის.</div>
+              {/* ⚠️ THE PHOTOGRAPHY ADVICE IS GONE (2026-09-02) — it was the
+                  same line the join door carried under the same control, and it
+                  went from there on the same day. */}
             </div>
             {avatarCropperUi}
           </div>
-            <Eyebrow className="mb-2">საჯარო პროფილი</Eyebrow>
+            {/* `h3`, not `h2`: this labels the SECOND block inside the same
+                plate „ავატარი" heads, so it nests under it — the same h2/h3
+                pairing _secServices already uses for its groups. */}
+            <Eyebrow as="h3" className="mb-2">საჯარო პროფილი</Eyebrow>
 
             {/* 200 → HEADLINE_MAX (60). 200 characters is not a headline, it
                 is a paragraph: the browse card gives this field ~2 lines and
@@ -116,29 +133,46 @@ export function IdentitySection({
                 stored value stands untouched and the approval flow keeps
                 writing it. */}
 
-            {/* SPHERE + PROFESSIONS — the SAME control /apply uses
-                (components/ProfessionPicker). It replaced a lone category
-                <select> here, which asked half the question: an expert could
-                say „მარკეტინგი და გაყიდვები" but not that they are a
-                marketer AND a graphic designer. Two screens asking one question
-                two different ways is how the category vocabulary drifted apart
-                in the first place.
-                Both values ride the existing saveProfile PATCH. */}
-            <div className="mb-5">
-              <ProfessionPicker
-                spheres={categories.map(c => ({ slug: c.slug, name: c.name }))}
-                sphere={categories.find(c => c.id === draft.categoryId)?.name ?? ''}
-                onSphere={name => patch({ categoryId: categories.find(c => c.name === name)?.id ?? '' })}
-                value={draft.professions}
-                onChange={next => patch({ professions: next })}
-              />
-              {!draft.categoryId && (
-                <p className="mt-2 flex items-start gap-1.5 text-meta text-warning-700 leading-snug">
-                  <Icon.warn className="w-3.5 h-3.5 shrink-0 mt-px" />
-                  <span>მის გარეშე ვერცერთ კატეგორიაში და ვერც ფილტრში ვერ მოგნახავენ.</span>
-                </p>
-              )}
-            </div>
+            {/* ═══════════ „რომელ პროფესიად გეძებენ" IS GONE (2026-09-02) ══════
+             *
+             * It was a sphere <select> plus a wall of roughly thirty profession
+             * chips („სხვა კატეგორიები (14)" under them), sitting directly above
+             * „რას აკეთებ" — and the owner read the two as one question asked
+             * twice, twice: „ორჯერ რატო არის სერვისის დამატება და ერთი და
+             * იგივესი არ მესმის?" (2026-09-01) and again on 2026-09-02.
+             *
+             * The previous answer was to NAME the two apart with a sentence
+             * („ამის მიხედვით მოგდის მოთხოვნები"). That is a label on a control,
+             * not a reason for it, and the measurement says the control had no
+             * reason. Against the roster on 2026-09-02, 27 published profiles:
+             *
+             *     24  had left `professions` completely empty — 89% of the
+             *         people this wall was shown to never used it
+             *      0  services ticked by nobody — every single provider fills
+             *         the OTHER question
+             *      0  extra routing topics contributed by the whole field, for
+             *         anybody: `topicsForProfessions` on the three who did fill
+             *         it returned nothing their services did not already cover
+             *
+             * So it cost every provider a wall and bought no request for anyone.
+             *
+             * ⚠️ THE SPHERE WENT WITH IT AND IS NOT LOST, which is the half that
+             * needed work. `categoryId` decides the catalogue, the filter and
+             * part of the routing, and it was DERIVED from the professions here
+             * (`sphereOfProfessions`). It is derived from the SERVICES now, in
+             * one place on the server — POST /api/provider/service-profile — so
+             * every surface that writes a profile gets the same answer and this
+             * screen does not have to ask. lib/requestTopics → `sphereOfServices`
+             * carries the measurement for that derivation.
+             *
+             * ⚠️ AND THE PROFESSIONS ARE NOT DERIVED, deliberately. Reading them
+             * back off the services was tried and rejected the same hour: a
+             * provider who ticks smm/seo/ads derives to eight job titles
+             * including „PR სპეციალისტი" and „კოპირაითერი" — public claims they
+             * never made. CLAUDE.md rule 6 covers invented numbers; an invented
+             * credential is worse. The stored column and the three people who
+             * filled it are untouched: their chips still render on their public
+             * page and an admin can still set one. */}
 
             {/* The single most consequential text on the profile — it is what
                 a client reads before booking and what Google indexes — and it
@@ -157,8 +191,13 @@ export function IdentitySection({
                 <span className="text-ink-700"> რა კონკრეტულ პრობლემებში ეხმარები</span>,
                 <span className="text-ink-700"> რა შედეგამდე მიჰყავხარ კლიენტი</span>.
               </p>
+              {/* ⚠️ NO EXAMPLE (2026-09-01). Three paragraphs of an ACCOUNTANT's
+                  biography stood in the box as the model answer, on an editor
+                  every trade shares. The three questions printed right above it
+                  („რა გამოცდილება გაქვს… რა პრობლემებში ეხმარები… რა შედეგამდე
+                  მიჰყავხარ") are the instruction, and they are general; the
+                  example only told a plumber to write like a bookkeeper. */}
               <textarea rows={8} maxLength={2000}
-                        placeholder={'მაგ.: 12 წელია ვმუშაობ ბუღალტრად — ძირითადად მცირე ბიზნესთან და ინდმეწარმეებთან.\n\nყველაზე ხშირად მომმართავენ, როცა დღგ-ს ზღვარს უახლოვდებიან ან დეკლარაციაში ვერ არკვევენ, რა უნდა ჩააბარონ და როდის. ვმუშაობდი…\n\nბოლოს გექნება კონკრეტული ნაბიჯები: რა ჩააბარო, რა ვადაში და რა დაგიჯდება.'}
                         value={draft.about} onChange={e => patch({ about: e.target.value })}
                         className="w-full px-3 py-2.5 rounded-field border border-ink-200 bg-white text-body text-ink-900 placeholder:text-ink-400 focus:border-brand-400 focus:outline-none resize-y" />
               {(() => {
@@ -206,7 +245,7 @@ export function IdentitySection({
                 idPrefix="profile-lang"
               />
             </Field>
-        </section>
+        </Card>
     </>
   )
 }

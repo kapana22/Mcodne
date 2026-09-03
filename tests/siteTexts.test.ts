@@ -43,9 +43,15 @@ const FILE_BY_PAGE: Record<string, string> = {
   // `categories` is RETIRED (stage 8), and `services`, `masters` and
   // `konsultacia` are RETIRED (stage 10): those pages are gone, their rows stay.
   // Skipped in the loop below by `retired`, so none of them has a file here.
-  // Both provider pitches are served by the one door since 2026-08-19; the
-  // page picks the registry row from `?can=`. The ids are DB keys — never renamed.
-  'apply-master': 'app/join/page.tsx',
+  // ⚠️ `apply-master` HAD A FILE HERE UNTIL 2026-09-02, AND THE COMMENT ABOVE IT
+  // WAS ALREADY OUT OF DATE. It read „the page picks the registry row from
+  // `?can=`" — but `?can=` went on 2026-08-24 (see app/join/page.tsx), and that
+  // file has called `pageMetadata('apply', '/join')` ever since. So nothing
+  // rendered the `apply-master` row, while app/join and app/sitemap both said in
+  // their own comments that it „stays retired" and the registry did not mark it.
+  // It is `retired: true` now and therefore has no file — which is what the
+  // assertion below checks, and what made this stale line visible at last.
+  // The KEY stays in the registry: a SiteText row may be filed under it.
   contact: 'app/contact/page.tsx',
 }
 
@@ -212,6 +218,15 @@ test('NO KEY MAY EVER BE RENAMED OR REMOVED', () => {
     'about.value3.title', 'about.value3.body', 'about.value4.title', 'about.value4.body',
     'about.create.title', 'about.create.p1', 'about.create.p2',
     'about.cta.title', 'about.cta.body',
+    // /about became „როგორ მუშაობს" on 2026-08-31 (the owner's „How It Works +
+    // Help" canvas). Added, never swapped: every `about.*` key above is still
+    // rendered by the same page, below the new half.
+    'about.how.title', 'about.how.body',
+    'about.provider.s1.title', 'about.provider.s1.desc',
+    'about.provider.s2.title', 'about.provider.s2.desc',
+    'about.provider.s3.title',
+    'about.cta.client.title', 'about.cta.client.body', 'about.cta.client.button',
+    'about.cta.expert.button',
     'help.hero.title', 'help.contact.title', 'help.contact.sub',
     'footer.tagline',
   ]

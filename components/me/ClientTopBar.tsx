@@ -1,20 +1,42 @@
 'use client'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Logo } from '@/components/Logo'
-import { Icon } from '@/components/Icon'
 import { NotifBell } from '@/components/NotifBell'
 import { UserMenu } from '@/components/UserMenu'
+import { Eyebrow } from '@/components/Eyebrow'
+import { titleForPath } from './navConfig'
 
-/* Compact workspace header for the student — page title (from nav config) +
-   saved (heart) + bell + user menu. Mirrors the tutor's WorkspaceTopBar; the
-   full nav lives in ClientSidebar on desktop and the global BottomNav on
-   mobile. The heart stays here (not the sidebar-only list) so „შენახული“ is one
-   glanceable tap on mobile, where the sidebar is hidden. */
+/* THE CLIENT'S TOP BAR — rebuilt 2026-08-31 from the owner's design canvas
+   („Client Space"): a 72px bar carrying an uppercase crumb on the left and the
+   account on the right, over cream glass.
+
+   ⚠️ THE CRUMB CAME BACK, AND IT IS NOT THE LABEL THAT WAS REMOVED. A page
+   title lived here until 2026-08-30 and went with the note „the sidebar already
+   shows the active section, so a duplicate label here just took space" — which
+   was true of a label reading exactly what the lit rail row read. The canvas's
+   crumb is the SCREEN's name, not the row's: the rail lights „მთავარი" and the
+   bar says „ჩემი მოთხოვნები" (see NavItem.crumb). And on a phone, where there
+   is no rail at all, it is the only thing that names where you are.
+
+   ⚠️ THE HEART LEFT (2026-08-31). It was here so „შენახული" would be „one
+   glanceable tap on mobile, where the sidebar is hidden" — and it has not been
+   the only mobile route since 2026-07-31: BottomNav's second-to-last tab IS
+   /me/favorites (components/BottomNav → STUDENT_TABS), and the desktop rail
+   carries the row. Three controls to one list, on the one bar the canvas draws
+   with two.
+
+   ⚠️ THE BELL AND THE MENU STAY, and the canvas simply does not depict them —
+   it draws a 34px avatar where they sit. Notifications and sign-out have no
+   other home in this chrome, and „port the canvas" is not „delete a feature it
+   did not need to draw". The UserMenu trigger is a 32px avatar in an h-11
+   button, which is the canvas's mark at the tap floor.
+
+   `.glass-bar` is the ported pane: rgba(251,249,245,0.9) + blur + an ink-200
+   hairline, i.e. the canvas's own header values, already a primitive. */
 export function ClientTopBar({ user }: { user?: { name: string; avatar?: string | null } }) {
   const path = usePathname() ?? ''
-  const savedActive = path === '/me/favorites' || path.startsWith('/me/favorites/')
+  const crumb = titleForPath(path)
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -25,30 +47,16 @@ export function ClientTopBar({ user }: { user?: { name: string; avatar?: string 
   }, [])
 
   return (
-    <header
-      className={`sticky top-0 z-chrome bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
-        scrolled ? 'shadow-sm' : ''
-      }`}
-    >
-      <div className="px-4 sm:px-6 lg:px-8 h-14 lg:h-16 flex items-center justify-between gap-4">
+    <header className={`sticky top-0 z-chrome ${scrolled ? 'glass-bar' : 'glass-bar glass-bar-quiet'}`}>
+      <div className="px-4 sm:px-6 lg:px-8 h-16 lg:h-[72px] flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          {/* No page title — the sidebar already shows the active section, so a
-              duplicate label here just took space. Mobile keeps the logo. */}
+          {/* The logo is the mobile rail's stand-in; on lg the sidebar has it. */}
           <span className="lg:hidden shrink-0">
             <Logo size="sm" />
           </span>
+          <Eyebrow as="span" tone="muted" className="truncate">{crumb}</Eyebrow>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Link
-            href="/me/favorites"
-            aria-label="შენახული"
-            aria-current={savedActive ? 'page' : undefined}
-            className={`w-10 h-10 rounded-btn inline-flex items-center justify-center transition-colors duration-fast ${
-              savedActive ? 'text-brand-700 bg-brand-50' : 'text-ink-500 hover:text-ink-900 hover:bg-ink-100'
-            }`}
-          >
-            <Icon.heart className="w-[18px] h-[18px]" />
-          </Link>
           <NotifBell />
           <UserMenu user={user} role="USER" />
         </div>

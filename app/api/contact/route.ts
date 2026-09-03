@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { messageText } from '@/lib/messageText'
 import { z } from 'zod'
 import { sendMail } from '@/lib/mailer'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
+import { validationIssueMessage } from '@/lib/validationMessages'
 
 const Body = z.object({
   name: z.string().min(2).max(120),
@@ -41,7 +43,13 @@ export async function POST(req: Request) {
 
   const parsed = Body.safeParse(json)
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+    const issue = parsed.error.issues[0]
+    return NextResponse.json({
+      ok: false,
+      error: 'INVALID',
+      field: typeof issue?.path[0] === 'string' ? issue.path[0] : null,
+      message: validationIssueMessage(issue),
+    }, { status: 400 })
   }
 
   const { name, email, topic, message } = parsed.data
@@ -70,13 +78,13 @@ export async function POST(req: Request) {
 
   const text = `ახალი შეტყობინება — მცოდნე\n\nსახელი: ${name}\nელფოსტა: ${email}\nთემა: ${topicLabel}\n\n${message}`
 
-  await sendMail({
+  await sendMail({ key: 'inbox.contact',
     // CONTACT_INBOX overrides; the fallback is the one advertised support
     // address. Both must be a mailbox the domain can actually RECEIVE at —
     // see the note at the top of lib/mailer.ts.
     to: process.env.CONTACT_INBOX || SUPPORT_EMAIL,
     replyTo,
-    subject: `[მცოდნე] ${topicLabel} — ${name.replace(/[\r\n]+/g, ' ').trim()}`,
+    subject: (await messageText())('inbox.contact', 'subject', { topic: topicLabel, name: name.replace(/[\r\n]+/g, ' ').trim() }),
     html,
     text,
   })

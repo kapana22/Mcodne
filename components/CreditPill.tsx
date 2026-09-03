@@ -35,7 +35,12 @@ export function CreditPill({ tetri, className = '' }: {
   const label = gelLabel(tetri)
   return (
     <Link
-      href="/work"
+      /* ⚠️ IT POINTED AT `/work` UNTIL 2026-09-01 — the workspace home, where
+         the strip prints the SAME total this chip prints. So the one control on
+         the site that shows a balance took you to another view of the same
+         number and answered nothing. It is the natural door to the ledger and
+         now it is one. */
+      href="/work/balance"
       // The full sentence for a screen reader; the pill itself is two glyphs and
       // „80₾" alone says nothing about what it is.
       aria-label={`ბალანსი — ${label}`}

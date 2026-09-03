@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { messageText } from '@/lib/messageText'
 import { z } from 'zod'
 import { randomInt } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
@@ -44,11 +45,20 @@ export async function POST(req: Request) {
     data: { userId: user.id, code, purpose: parsed.data.purpose, expiresAt },
   })
 
+  // ⚠️ THE WORDS COME FROM THE REGISTRY, THE CODE DOES NOT. `{code}` is filled
+  // here and nowhere else: an owner editing this string in /admin can move the
+  // code inside the sentence, and cannot leak it anywhere — MessageLog stores
+  // no body (lib/messageLog) and a live send never prints one (lib/mailer).
+  const key = parsed.data.purpose === 'verify' ? 'auth.otpVerify' : 'auth.otpReset'
+  const t = await messageText()
+  const line1 = t(key, 'body1', { code })
+  const line2 = t(key, 'body2')
   const mailResult = await sendMail({
+    key,
     to: email,
-    subject: parsed.data.purpose === 'verify' ? 'დაადასტურე ელფოსტა — მცოდნე' : 'პაროლის აღდგენა — მცოდნე',
-    html: `<p>შენი კოდი: <b>${code}</b></p><p>ვადა: 10 წუთი</p>`,
-    text: `შენი კოდი: ${code}. ვადა 10 წუთი.`,
+    subject: t(key, 'subject'),
+    html: `<p>${line1}</p><p>${line2}</p>`,
+    text: `${line1.replace(/<[^>]+>/g, '')}. ${line2}`,
   })
 
   if (!mailResult.ok) {

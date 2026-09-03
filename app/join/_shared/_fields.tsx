@@ -2,6 +2,17 @@
 // /join — the field layer: the error context a field reads, the labelled
 // wrapper, and the input.
 //
+// ⚠️ NOTHING IMPORTS THIS FILE (measured 2026-08-31: zero references to
+// `_shared/_fields`, `ApplyErr` or `ApplyErrCtx` anywhere outside it). It went
+// dead with the consultation wizard on 2026-08-24 — `_upload` and
+// `useCategories` beside it are still live, which is why the folder is not.
+//
+// ⚠️ AND IT EXPORTS A SECOND `FieldError`. The live one is
+// **components/FieldError.tsx** — same idea, one form-scoped id so
+// `aria-describedby` can point at the message, and `useFault` to move the
+// cursor. An auto-import can reach either name; reach for the one in
+// components/. This file is a deletion candidate, left in place only because
+// the owner is working in app/join/ today.
 // ⚠️ TWO HINTS LEFT THIS FILE ON 2026-08-24 — `BioCounter` and
 // `NameScriptHint` — with the consultation wizard that was their only caller.
 // `ApplyErr` came from that wizard's `_form.tsx` too; it is three fields wide

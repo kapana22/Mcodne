@@ -7,12 +7,12 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { AdminConfirmDialog, TabHeader } from './_parts'
 
 /* ───── Section: Broadcast (in-app Notification fan-out) ───── */
-type Segment = 'all' | 'students' | 'tutors' | 'recent'
+type Segment = 'all' | 'clients' | 'providers' | 'recent'
 
 const SEGMENT_LABEL: Record<Segment, string> = {
   all: 'ყველა მომხმარებელი',
-  students: 'ყველა კლიენტი',
-  tutors: 'ყველა ექსპერტი',
+  clients: 'ყველა კლიენტი',
+  providers: 'ყველა ექსპერტი',
   recent: 'ბოლო 7 დღის რეგისტრაცია',
 }
 
@@ -93,7 +93,7 @@ export const BroadcastSection = () => {
         <div>
           <Eyebrow as="label" tone="muted" className="block mb-1.5">სეგმენტი</Eyebrow>
           <div className="inline-flex flex-wrap items-center p-0.5 rounded-pill bg-white border border-ink-200">
-            {(['all', 'students', 'tutors', 'recent'] as Segment[]).map(s => (
+            {(['all', 'clients', 'providers', 'recent'] as Segment[]).map(s => (
               <button
                 key={s}
                 type="button"

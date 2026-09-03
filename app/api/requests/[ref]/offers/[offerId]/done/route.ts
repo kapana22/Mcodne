@@ -102,14 +102,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ref: s
         const emails = ids.length
           ? (await prisma.user.findMany({ where: { id: { in: ids } }, select: { email: true } })).map(u => u.email)
           : []
-        const mail = offerDoneProviderEmail({ topicLabel: topic })
+        const mail = await offerDoneProviderEmail({ topicLabel: topic })
         for (const to of emails) {
-          try { await sendMail({ to, ...mail }) } catch { /* best-effort per address */ }
+          try { await sendMail({ key: 'request.done.provider', to, ...mail }) } catch { /* best-effort per address */ }
         }
       } else if (offer.request.email) {
         await sendMail({
+          key: 'request.done.client',
           to: offer.request.email,
-          ...offerDoneClientEmail({ publicRef: offer.request.publicRef, topicLabel: topic }),
+          ...(await offerDoneClientEmail({ publicRef: offer.request.publicRef, topicLabel: topic })),
         })
       }
     } catch { /* notification is best-effort; the stamp is written */ }

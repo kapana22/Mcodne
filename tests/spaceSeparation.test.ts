@@ -17,6 +17,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { SPACE_LABEL } from '../lib/roles'
+import { navFor } from '../components/work/navConfig'
 
 const ROOT = join(__dirname, '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -26,6 +27,58 @@ test('the client door is conditional on the room holding something', () => {
   assert.match(
     menu, /!inClientSpace && me\?\.clientRoom/,
     'the menu offers „ჩემი სივრცე" unconditionally again — 27 of 29 providers would be given a door into an empty room',
+  )
+})
+
+/* ═══════════ AND SINCE 2026-09-02 IT IS NOT „conditional", IT IS „never" ═════
+ *
+ * The rule above was the 2026-08-21 one: a provider got the client door once
+ * their client room held something. The owner has since made it absolute —
+ * „თუ ექსპერტად რეგისტრირდება ადამიანი, მაგ შემთხვევაში აღარ უნდა ჰქონდეს
+ * კლიენტის ფუნქციები."
+ *
+ * The three tests below pin the three halves of that, and they are three
+ * because the rule is enforced in three places on purpose: a menu that does not
+ * draw the door, a rail that does not carry the client catalogue, and a layout
+ * that refuses the address whether or not anybody linked to it.
+ *
+ * Measured the day it changed: of 26 providers, ONE had ever filed a request
+ * and NONE had saved anybody. */
+
+test('a seller is never offered the client room', () => {
+  const menu = read('components/UserMenu.tsx')
+  // The condition that pushes SPACE_LABEL.CLIENT must exclude anybody who sells
+  // here. Read the condition itself rather than the whole file, so an unrelated
+  // `sellsHere` elsewhere in the menu cannot make this pass.
+  const at = menu.indexOf("href: '/me', label: SPACE_LABEL.CLIENT")
+  assert.ok(at > 0, 'the client-door push is gone entirely — this test can no longer see what it guards')
+  const condition = menu.slice(menu.lastIndexOf('if (', at), at)
+  assert.match(
+    condition, /!sellsHere/,
+    'a provider is offered „ჩემი სივრცე" again — the room refuses every control it contains, so the door is a dead end',
+  )
+})
+
+test('the provider rail carries no client catalogue', () => {
+  // Behaviour, not spelling: ask the rail what it renders.
+  const hrefs = navFor({ work: true }).flatMap(s => s.items).map(i => i.href)
+  assert.ok(
+    !hrefs.some(h => h.startsWith('/experts')),
+    '/experts is back in the seller\'s rail — that is the screen a CLIENT uses to shop for somebody like them',
+  )
+  const sidebar = read('components/work/WorkspaceSidebar.tsx')
+  assert.doesNotMatch(
+    sidebar, /CATALOG_LINK/,
+    'the sidebar renders a catalogue row again, outside the list navFor returns',
+  )
+})
+
+test('/me refuses somebody who sells here', () => {
+  // 🔒 The menu not drawing a link is not the same as the address being closed.
+  const layout = read('app/me/layout.tsx')
+  assert.match(
+    layout, /if \(await sellsHere\([^)]*\)\)\s*redirect\(/,
+    '/me no longer turns a seller away — a typed URL reaches the client room the product says they do not have',
   )
 })
 

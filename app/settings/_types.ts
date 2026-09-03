@@ -1,8 +1,18 @@
 // /settings — shapes shared by the page and its section components.
 import { ROLE } from '@/lib/roles'
 
-/** The success/error line every settings card renders under its form. */
+/** The success/error line every settings card renders under its form.
+ *
+ *  ⚠️ IT IS NO LONGER THE ONLY PLACE A REFUSAL LANDS (2026-08-31). A card with
+ *  four boxes answering „შენახვა ვერ მოხერხდა" under all of them named nothing;
+ *  each section now takes a `fault` (components/FieldError) and puts the
+ *  sentence on the control. This line stays for what has NO field — a rate
+ *  limit, a dropped network, an upload that was too large. */
 export type Msg = { kind: 'success' | 'error'; text: string } | null
+
+/** What a settings section needs to draw a per-field refusal. Shaped as the
+ *  return of `useFault` so a section can spread it straight onto a control. */
+export type FaultKit = ReturnType<typeof import('@/components/FieldError').useFault>
 
 export type PrefKey = 'MESSAGE_NEW' | 'REVIEW_NEW' | 'APPLICATION_STATUS' | 'ADMIN_BROADCAST'
 export type PrefsMap = Record<PrefKey, boolean>

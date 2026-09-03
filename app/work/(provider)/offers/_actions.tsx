@@ -20,6 +20,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Btn } from '@/components/Btn'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { ACTION_FAILED } from '@/lib/actionErrors'
 
 export function OfferActions({ offerId, status, kind, doneAt }: {
   offerId: string
@@ -38,9 +39,9 @@ export function OfferActions({ offerId, status, kind, doneAt }: {
     try {
       const res = await fetch(`/api/requests/_/offers/${offerId}/${verb}`, { method: 'POST' })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) { setErr('ვერ შესრულდა — სცადე თავიდან.'); return }
+      if (!res.ok || !j.ok) { setErr(ACTION_FAILED); return }
       router.refresh()
-    } catch { setErr('ვერ შესრულდა — სცადე თავიდან.') }
+    } catch { setErr(ACTION_FAILED) }
     finally { setBusy(null) }
   }
 
@@ -72,7 +73,7 @@ export function OfferActions({ offerId, status, kind, doneAt }: {
       <ConfirmModal
         open={ask === 'withdraw'}
         title="შემოთავაზების გატანა"
-        body={<>შემოთავაზება კლიენტს აღარ დაუჩნდება და უკან ვეღარ დააბრუნებ. ადგილი კი გათავისუფლდება.</>}
+        body={<>უკან ვეღარ დააბრუნებ. ადგილი გათავისუფლდება.</>}
         confirmLabel="გატანა"
         cancelLabel="დატოვე"
         tone="danger"

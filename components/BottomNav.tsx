@@ -1,7 +1,8 @@
 'use client'
-// BottomNav — mobile-only bottom tab bar. Rendered from AppShell, receives
-// the user's role. Renders nothing for anonymous visitors (role === null) or
-// admins (they use a desktop-first workspace). Toggles `data-bottom-nav` on
+// BottomNav — mobile-only bottom tab bar. Rendered from AppShell, which hands
+// it the reader's role AND whether they sell (`identity.provider`, off
+// /api/me). Renders nothing for anonymous visitors (role === null) or admins
+// (they use a desktop-first workspace). Toggles `data-bottom-nav` on
 // <body> so pages can add safe-area padding only when the bar is actually
 // showing (see globals.css § "BottomNav spacing").
 //
@@ -43,6 +44,12 @@ const STUDENT_TABS: Tab[] = [
   // ⚠️ IT STAYS ON THE BAR EVEN THOUGH THE RAIL PUTS IT BELOW A DIVIDER: the
   // catalogue is the core action of a marketplace and must be one tap away.
   { href: '/experts',      label: 'ექსპერტები', icon: Icon.search, match: startsWith('/experts') },
+  // ⚠️ THE CLIENT'S INBOX CAME BACK ON 2026-08-31 (the owner's „Messages"
+  // artboard), and it needs a route on a phone or it is desktop-only —
+  // /work/messages learnt exactly this, and the rail on the client's side does
+  // not exist below `lg`. Same slot the provider's bar gives it, so the two
+  // rooms read as one product.
+  { href: '/me/messages',  label: 'მიმოწერა',   icon: Icon.chat,   match: startsWith('/me/messages') },
   // „შენახული" TOOK THE PROFILE SLOT (2026-07-31). The old comment above claimed
   // saved-experts lived „in the StudentAppBar rail + profile" — but that rail is
   // `hidden lg:flex` and the public header's heart was `hidden sm:`, so on a
@@ -88,9 +95,13 @@ const PROVIDER_TABS: Tab[] = [
   // One editor since 2026-08-30 — see components/work/navConfig. „ანგარიში" is
   // deliberately NOT here: five tabs is the ceiling on a phone, and the
   // password is not something anybody reaches for from a bottom bar.
+  // ⚠️ THIS ROW WAS HERE TWICE (fixed 2026-09-02). „ჩემი გვერდი" and „პროფილი"
+  // were two tabs, two labels, the same icon and the SAME href — the second a
+  // leftover from before the two editors became one on 2026-08-30. On a phone
+  // that is two of five tabs spent on one destination, and the second one lights
+  // up with the first, so the bar showed two active tabs at once on /work/profile.
   { href: '/work/profile', label: 'ჩემი გვერდი', icon: Icon.user,
     match: p => startsWith('/work/profile')(p) || startsWith('/work/services')(p) },
-  { href: '/work/profile',  label: 'პროფილი',        icon: Icon.user,      match: startsWith('/work/profile') },
 ]
 
 const TABS_BY_ROLE: Record<Role, Tab[]> = {
@@ -103,7 +114,13 @@ const TABS_BY_ROLE: Record<Role, Tab[]> = {
 // that the second product took with it on 2026-08-24; every caller passed an
 // array that /api/me had stopped filling, and the one branch that read it could
 // not be reached. A parameter nobody can populate is not an input.
-export function BottomNav({ role }: { role: Role | null }) {
+export function BottomNav({ role, sells = false }: {
+  role: Role | null
+  /** Does this person actually SELL here — a ServiceProfile plus an active
+   *  allowlist row, `identity.provider` as /api/me already reports it.
+   *  See the tab-set block below for why a role could not answer this. */
+  sells?: boolean
+}) {
   const path = usePathname() ?? ''
   // Shared store (one poll app-wide, visibility-gated + cross-tab). Reads the
   // unread count for the profile/messages dot.
@@ -133,11 +150,37 @@ export function BottomNav({ role }: { role: Role | null }) {
   // provider now, so there is one supply-side set, and which ROOM you are
   // standing in is the whole question: /me is the client's, /work is the
   // provider's. Role is the last resort, for a page in neither.
+  /* ⚠️ THE LAST RESORT IS `sells`, NOT `role` (2026-09-03), AND IT IS THE ONE
+     RULE CLAUDE.md STATES OUTRIGHT: „Still ask identityOf, not role, for what
+     does this person sell. A role is a permission; a profile plus an allowlist
+     row is the fact."
+
+     MEASURED THE DAY THIS CHANGED: of 27 accounts holding an active
+     RequestAccess row AND a ServiceProfile — providers, by the product's own
+     definition — THREE carry `role: USER`. For those three the fallback below
+     resolved to STUDENT_TABS, so everywhere outside /me and /work (the account
+     screen, the bell, an expert's public page) a working provider got the
+     CLIENT's tab bar: „ექსპერტები", „შენახული", and a home that is not theirs.
+
+     It was invisible while those pages had no rail of their own to disagree
+     with. app/notifications and app/settings now wear the reader's workspace
+     (components/SpaceChrome, which asks `sellsHere`), so the top of the screen
+     said „provider" while the bottom said „client" — the same screen answering
+     one question two ways.
+
+     The converse is fixed by the same line: a granted PROVIDER who never
+     finished registering sells nothing and is an ordinary client, and used to
+     get the supply-side bar off `role` alone.
+
+     ADMIN keeps its own (empty) entry — an admin is not a seller and the bar
+     is not their navigation. */
   const tabs =
       path.startsWith('/me') ? STUDENT_TABS
     : path.startsWith('/work') ? PROVIDER_TABS
     : !role ? []
-    : TABS_BY_ROLE[role] ?? []
+    : role === 'ADMIN' ? TABS_BY_ROLE.ADMIN
+    : sells ? PROVIDER_TABS
+    : STUDENT_TABS
   // Focused screens own the full viewport including the bottom edge, so the
   // tab bar steps aside there:
   //  • conversation threads (student AND tutor) — the composer owns the
@@ -145,8 +188,18 @@ export function BottomNav({ role }: { role: Role | null }) {
   //  • student booking detail — its fixed MobileActionBar (join/reschedule/
   //    cancel) is the bottom surface; stacking the tab bar under it just
   //    hides the tabs behind an action bar.
+  /* ⚠️ THIS REGEX HAD GONE STALE AND THE TAB BAR SAT ON EVERY COMPOSER
+     (fixed 2026-09-01). `/…/messages/<id>` is ONE segment — the shape booking
+     threads had. Conversations have lived at `/…/messages/o/<offerId>`, TWO
+     segments, since 2026-08-19, so no thread matched: the bar stayed up over
+     the message box on both sides and globals.css kept reserving its 64px.
+     Measured at 800×600 before the fix: 201px of document below the fold with
+     the composer behind the tab strip.
+     The `u/<userId>` arm below is dead the same way — pre-booking pair threads
+     went with the bookings — and is kept only because a stale link may still
+     resolve; it costs one test and hides nothing that exists. */
   const isFocusedScreen =
-    /^\/(?:me|work)\/messages\/[^/]+$/.test(path) ||
+    /^\/(?:me|work)\/messages\/o\/[^/]+$/.test(path) ||
     // Pre-booking pair threads (/…/messages/u/[userId]) — the composer owns
     // the bottom edge, same as booking threads.
     /^\/(?:me|work)\/messages\/u\/[^/]+$/.test(path) ||

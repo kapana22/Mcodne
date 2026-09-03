@@ -12,6 +12,9 @@ import { homeForRole } from '@/lib/roleHome'
 import { Eyebrow } from '@/components/Eyebrow'
 import { PageHeader } from '@/components/PageHeader'
 import { georgianNameError } from '@/lib/georgianText'
+import { phoneFormatError } from '@/lib/phone'
+import { passwordError } from '@/lib/passwordPolicy'
+import { useFault } from '@/components/FieldError'
 
 // Local mirror of lib/notify.ts PrefKey. Keeping this in-file so the Settings
 // page doesn't import from a server helper. All keys default to true when
@@ -29,7 +32,25 @@ import { PrefsSection } from './_prefs'
 // The fetch is not gone, it MOVED: `reload()` still re-reads /api/me after a
 // save, an avatar change or an email verification, which is what keeps the form
 // honest. What went is the one on mount, and with it the blank first screen.
-export default function SettingsClient({ initialMe }: { initialMe: Me }) {
+export default function SettingsClient({ initialMe, chrome = true }: {
+  initialMe: Me
+  /**
+   * ⚠️ THE SCREEN, WITHOUT ITS OWN PAGE FURNITURE (2026-09-02). This component
+   * draws a `min-h-screen` ground, a sticky bar, a logo and a back chevron —
+   * a FIFTH chrome in a product that already has four (AppShell, RequestShell,
+   * ClientShell, WorkspaceShell). That is fine at /settings, which nothing
+   * wraps. It is wrong at /me/profile, where the client workspace has already
+   * drawn a rail, a top bar, a bell and an avatar.
+   *
+   * The client room used to solve that by having its OWN account screen —
+   * app/me/profile/client.tsx, 367 lines re-implementing this file's name,
+   * phone, avatar and password forms. Owner, 2026-09-02: „10 ჯერ ერთი და
+   * იგივე რამის დახატვა და გამოტანა გადავიტანოთ და ერთი დიზაინ პატერნით
+   * ვიმუშაოთ." So there is one account screen now, and the chrome is the
+   * page's business — the same split app/request/[ref]/_room made the same day.
+   */
+  chrome?: boolean
+}) {
   const router = useRouter()
   const [me, setMe] = useState<Me | null>(initialMe)
   // Starts FALSE: the first values arrive with the document. It still turns
@@ -45,6 +66,11 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialMe.avatarUrl ?? null)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileMsg, setProfileMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  // ⚠️ TWO SCOPES, ONE PER CARD. Both forms are mounted at once on this page, so
+  // one shared prefix would let `aria-describedby` on the password card point at
+  // a message rendered in the profile card. See components/FieldError.
+  const profileFault = useFault('set-profile')
+  const pwFault = useFault('set-pw')
 
   // password fields
   const [currentPw, setCurrentPw] = useState('')
@@ -208,21 +234,37 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
     }
   }
 
+  /* ⚠️ THE PHONE RULE WAS ENFORCED ONLY BY THE SERVER, AND ITS ANSWER LANDED
+   * AT THE BOTTOM OF A FOUR-FIELD CARD (fixed 2026-08-31). /api/me runs
+   * `phoneFormatError` over anything typed here and returns `field: 'phone'`
+   * beside the sentence — this screen read the sentence and threw the field
+   * away, so „ნომერი არასწორია" appeared under the bio with nothing marking the
+   * phone box. Same story for the bio's own Georgian-language gate.
+   *
+   * All three of the endpoint's rules are asked here first now, and every one
+   * of them names its own control. */
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     if (savingProfile) return
+    setProfileMsg(null); profileFault.reset()
     if (fullName.trim().length < 2) {
-      setProfileMsg({ kind: 'error', text: 'სახელი მინიმუმ 2 სიმბოლო' })
+      profileFault.fail('fullName', 'სახელი მინიმუმ 2 სიმბოლო')
       return
     }
     // Same rule as /api/me, answered before the round-trip.
     const nameMsg = georgianNameError('სახელი და გვარი', fullName.trim())
     if (nameMsg) {
-      setProfileMsg({ kind: 'error', text: nameMsg })
+      profileFault.fail('fullName', nameMsg)
+      return
+    }
+    // An EMPTY phone stays legal — the column is nullable and the route only
+    // judges a number that was actually typed.
+    const phoneMsg = phone.trim() ? phoneFormatError(phone, { required: true }) : null
+    if (phoneMsg) {
+      profileFault.fail('phone', phoneMsg)
       return
     }
     setSavingProfile(true)
-    setProfileMsg(null)
     try {
       const res = await fetch('/api/me', {
         method: 'PATCH',
@@ -233,7 +275,12 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
       if (!res.ok || data?.ok === false) {
         // `message` carries our own validation copy (e.g. the Georgian-language
         // gate). Falling back to the generic line would hide the one thing the
-        // user needs in order to fix the field.
+        // user needs in order to fix the field — and `field` says which box.
+        // `field` is the schema's own path — the route sends it for the phone
+        // rule and for the Georgian-language gate alike, so nothing here has to
+        // infer a box from the wording of a sentence.
+        const field = typeof data?.field === 'string' ? data.field : null
+        if (field && data?.message) { profileFault.fail(field, data.message); return }
         setProfileMsg({ kind: 'error', text: data?.message || 'შენახვა ვერ მოხერხდა' })
         return
       }
@@ -303,11 +350,15 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
   const savePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (savingPw) return
-    if (newPw.length < 8) { setPwMsg({ kind: 'error', text: 'ახალი პაროლი მინიმუმ 8 სიმბოლო' }); return }
-    if (newPw !== confirmPw) { setPwMsg({ kind: 'error', text: 'პაროლი არ ემთხვევა' }); return }
-    if (!currentPw) { setPwMsg({ kind: 'error', text: 'შეიყვანე მიმდინარე პაროლი' }); return }
+    setPwMsg(null); pwFault.reset()
+    if (!currentPw) { pwFault.fail('currentPassword', 'შეიყვანე მიმდინარე პაროლი'); return }
+    // `passwordError` is the floor AND the ceiling /api/me's `newPassword`
+    // states (`min(8).max(120)`); the old check had only the floor, so a pasted
+    // passphrase over 120 came back INVALID and was blamed on being too SHORT.
+    const lenMsg = passwordError(newPw)
+    if (lenMsg) { pwFault.fail('newPassword', lenMsg); return }
+    if (newPw !== confirmPw) { pwFault.fail('confirmPassword', 'პაროლი არ ემთხვევა'); return }
     setSavingPw(true)
-    setPwMsg(null)
     try {
       const res = await fetch('/api/me', {
         method: 'PATCH',
@@ -316,10 +367,17 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
       })
       const data = await res.json().catch(() => ({} as any))
       if (!res.ok || data?.ok === false) {
+        if (data?.error === 'BAD_CURRENT_PASSWORD') {
+          pwFault.fail('currentPassword', 'მიმდინარე პაროლი არასწორია'); return
+        }
         setPwMsg({
           kind: 'error',
-          text: data?.error === 'BAD_CURRENT_PASSWORD' ? 'მიმდინარე პაროლი არასწორია'
-            : data?.error === 'INVALID' ? 'ახალი პაროლი მინიმუმ 8 სიმბოლო'
+          // ⚠️ INVALID IS NO LONGER READ AS „TOO SHORT". Both bounds are checked
+          // above against the constant the route's schema is built from, so a
+          // bare INVALID here means something this screen did not predict —
+          // and naming a cause it cannot know is what sends people to retype a
+          // password that was never the problem.
+          text: data?.error === 'RATE_LIMITED' ? 'ბევრი მცდელობა — სცადე მოგვიანებით.'
             : 'შენახვა ვერ მოხერხდა',
         })
         return
@@ -391,7 +449,10 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-ink-50">
+      // `min-h-screen` only when this component owns the window. Inside the
+      // client workspace the rail is already full height and a second one
+      // pushes the footer a screen down.
+      <div className={`${chrome ? 'min-h-screen' : 'min-h-[320px]'} flex items-center justify-center bg-ink-50`}>
         <div className="inline-flex items-center gap-2 text-ink-500 text-small">
           <span aria-hidden className="inline-block w-4 h-4 rounded-full border-2 border-ink-300 border-t-transparent motion-safe:animate-spin" />
           იტვირთება…
@@ -404,8 +465,8 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
   // (never a blank white screen, and never a bogus sign-out).
   if (!me) {
     return (
-      <div className="min-h-screen bg-ink-50/50 flex flex-col items-center justify-center gap-4 px-6">
-        <Logo size="sm" />
+      <div className={`${chrome ? 'min-h-screen' : 'min-h-[320px]'} bg-ink-50/50 flex flex-col items-center justify-center gap-4 px-6`}>
+        {chrome && <Logo size="sm" />}
         <div className="text-center max-w-[360px]">
           <div className="font-display text-body-lg font-bold text-ink-900 tracking-tight">ვერ ჩაიტვირთა</div>
           <p className="text-small text-ink-500 mt-1.5 leading-relaxed">
@@ -426,8 +487,16 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
 
   const backHref = homeForRole(me.role)
 
+  /* ⚠️ THE GROUND AND THE BAR ARE THE ONLY THING `chrome` SWITCHES. Everything
+     below — the header, every section, both modals — is drawn identically at
+     /settings and at /me/profile, which is the whole point of the prop: a
+     second copy of this screen is what it exists to prevent. Inside the client
+     workspace `ClientShell` has already painted the ground and the bar, so
+     drawing them again gives a second sticky header under the first and a
+     second full-height column beside the rail. */
   return (
-    <div className="min-h-screen bg-ink-50/50">
+    <div className={chrome ? 'min-h-screen bg-ink-50/50' : ''}>
+      {chrome && (
       <header className="sticky top-0 z-chrome bg-ink-50 lg:bg-ink-50/90 lg:backdrop-blur-md border-b border-ink-100">
         <Container size="content" className="h-16 flex items-center justify-between gap-6">
           <div className="inline-flex items-center gap-2">
@@ -446,8 +515,12 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
               as navigation. The back chevron and logo carry the chrome. */}
         </Container>
       </header>
+      )}
 
-      <Container as="main" size="content" className="py-10 space-y-8">
+      {/* `py-10` when this component owns the page; the workspace's own rhythm
+          (`py-7 lg:py-8`) when it does not, so /me/profile opens level with
+          every other screen in that room. */}
+      <Container as="main" size="content" className={`space-y-8 ${chrome ? 'py-10' : 'py-7 lg:py-8 pb-12'}`}>
         {/* Page header — the sticky utility bar above is chrome, not a
             heading; this is the page's actual title, on the shared workspace
             PageHeader (same scale as /student/bookings, /tutor/*). */}
@@ -470,6 +543,7 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
           pickAvatar={pickAvatar}
           uploadAvatar={uploadAvatar}
           removeAvatar={removeAvatar}
+          fault={profileFault}
         />
 
         <PasswordSection
@@ -488,6 +562,7 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
           savingPw={savingPw}
           pwMsg={pwMsg}
           savePassword={savePassword}
+          fault={pwFault}
         />
 
         <AccountSection
@@ -548,10 +623,15 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
               />
             </label>
             {needsDeletePw && (
-              <label className="block">
+              <div className="block">
+                {/* ⚠️ A <div> (2026-08-31): the show/hide eye below is a BUTTON,
+                    which a <label> may not contain — it made the field's name
+                    „მიმდინარე პაროლი აჩვენე" and rewrote it on every toggle. On
+                    the box that confirms account DELETION, of all of them. */}
                 <Eyebrow as="span" tone="muted">მიმდინარე პაროლი</Eyebrow>
                 <div className="relative mt-2">
                   <input
+                    aria-label="მიმდინარე პაროლი"
                     type={showDeletePw ? 'text' : 'password'}
                     value={deletePw}
                     onChange={e => setDeletePw(e.target.value)}
@@ -568,7 +648,7 @@ export default function SettingsClient({ initialMe }: { initialMe: Me }) {
                     {showDeletePw ? <Icon.eyeOff className="w-4 h-4" /> : <Icon.eye className="w-4 h-4" />}
                   </button>
                 </div>
-              </label>
+              </div>
             )}
             {deleteErr && (
               <div role="alert" className="rounded-btn border border-danger-200 bg-danger-50 text-danger-800 px-3 py-2 text-meta font-medium">

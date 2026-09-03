@@ -15,6 +15,7 @@ import { BlogSection } from './_blog'
 import { SiteTextsSection } from './_texts'
 import { IntegrationsSection } from './_integrations'
 import { SystemSection } from './_system'
+import { MessagesSection } from './_messages'
 import { HelpSection } from './_help'
 import { CompaniesSection } from './_companies'
 import { RequestsSection } from './_requests'
@@ -129,6 +130,7 @@ export default function AdminOverview() {
             so `active` can never hold 'funnel' on a deployment without the
             request wizard. */}
         {active === 'funnel' && <FunnelSection />}
+        {active === 'messages' && <MessagesSection />}
         {active === 'system' && <SystemSection />}
       </main>
       </div>

@@ -156,7 +156,7 @@ on Node 26 in ways that read as code errors.
 **While working:** `npx tsc --noEmit` (~2s), or one test file
 (`npx tsx tests/<file>.test.ts`). Not the whole gate after every edit.
 
-**Before deploying:** `npm run check` — types → schema → 79 tests → `next build`.
+**Before deploying:** `npm run check` — types → schema → 84 tests → `next build`.
 There is no CI, and `railway up` uploads the WORKING TREE, so this script is the
 only thing that ever runs the tests and a commit is a record rather than a
 release.
@@ -164,11 +164,17 @@ release.
 **Deploy:** `railway up --detach` (project Tutor → service mcodne → mcodne.ge),
 then verify live.
 
-**Three things that cost an afternoon if you don't know them:**
-- `npm run check` and `npm run dev` share `.next`, and two `next build`s fight
-  over it. The symptoms read as product bugs — unstyled pages, missing
-  manifests, `PageNotFoundError` on an API route. Stop the other one,
-  `rm -rf .next`, retry.
+**The gate no longer fights `next dev` (2026-09-01).** It used to: both built
+into `.next`, and two `next build`s over one directory leave half-written
+manifests whose symptoms read as product bugs — unstyled pages, missing
+manifests, `PageNotFoundError` on an API route — so the afternoon went on the
+change under test, which was innocent. `next.config.js` now honours
+`NEXT_DIST_DIR` and `scripts/check.mjs` sets it to `.next-check`, so the gate
+builds beside the dev server. Railway sets nothing and still builds into
+`.next`. If a manifest error ever comes back it is NOT this — check the Node
+version first.
+
+**Two things that cost an afternoon if you don't know them:**
 - Keep the project off an iCloud-synced folder.
 - ⚠️ **`tsc` DOES NOT CATCH A STALE PRISMA SELECT.** It looks like it must —
   the generated client types every field — and measured on 2026-08-26 it does
@@ -188,6 +194,17 @@ the set with a hash of its own source, so a warm boot costs two round trips
 instead of one per statement — edit that file and the next boot legitimately
 re-runs once.
 
+⚠️ **The stamp ledger holds a ROW PER FINGERPRINT, and that is not a detail
+(2026-09-01).** `lib/dbBoot` is transpiled by TWO compilers — esbuild under
+`tsx` (the gate's schema stage and every test) and SWC under `next build`,
+`next dev` and production — and SWC minifies, so the same DDL hashes
+differently under each. The ledger used to be one row that every boot
+overwrote, so the two engines cleared each other's stamp for ever and nothing
+was warm twice running: `npm run check` paid the full ~112s replay every time,
+and so did the first request after a deploy whenever a local run had written
+last. Keyed by fingerprint they simply hold a row each. **`npm run check` is
+39s** — 1s types, 3s schema, 14s tests, 20s build, measured 2026-09-01.
+
 ⚠️ **`lib/dbBoot` throws the whole boot on one failed statement**, so it holds no
 DDL that names a dropped table. The 2026-08-24 services-only migration sits LAST
 in `runMigrations()` and everything above it assumes the old tables still exist
@@ -199,7 +216,7 @@ Prefer additive DDL, and **that is advice, not a prohibition.** Dropping a
 stops writing it, then drop the column. The hazard is the sequence and it has a
 known answer — it was never a reason to keep dead columns.
 
-**Testing.** 79 files, no runner, each exits non-zero on failure. Pin
+**Testing.** 84 files, no runner, each exits non-zero on failure. Pin
 BEHAVIOUR: call the function, render the tree, execute the redirect table. A
 regex over source text is a last resort, and ~1 500 of them exist — debt, not a
 pattern to copy. If an assertion can break on a rename, a reformat or a restyle

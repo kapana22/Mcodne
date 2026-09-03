@@ -190,9 +190,28 @@ export function foldCounts(
   cats: readonly TreeNode[],
   raw: readonly { categoryId: string | null; count: number }[],
 ): Map<string, number> {
+  return foldInto(cats, raw.map(r => ({ categoryId: r.categoryId, value: r.count })), (a, b) => a + b)
+}
+
+/**
+ * THE FOLD ITSELF, with the combiner passed in — the routing rule stated ONCE.
+ *
+ * ⚠️ IT EXISTS BECAUSE A SECOND STATISTIC ARRIVED (2026-08-31). The redesign's
+ * category tile carries „N ექსპერტი · 40₾-დან", so a sphere now needs a MINIMUM
+ * as well as a SUM, and the two must route a redirected category to the same
+ * parent — otherwise the count and the price on one tile can describe two
+ * different sets of people. `foldCounts` sums, `foldMin` takes the smaller;
+ * both walk this, so „where does a redirected category's row go" is written in
+ * exactly one place, which is the whole reason this module exists.
+ */
+function foldInto(
+  cats: readonly TreeNode[],
+  raw: readonly { categoryId: string | null; value: number }[],
+  combine: (a: number, b: number) => number,
+): Map<string, number> {
   const byId = new Map(cats.map(c => [c.id, c]))
   const out = new Map<string, number>()
-  for (const { categoryId, count } of raw) {
+  for (const { categoryId, value } of raw) {
     if (!categoryId) continue
     const cat = byId.get(categoryId)
     if (!cat) continue
@@ -201,9 +220,27 @@ export function foldCounts(
       ? (cat.parentId ? byId.get(cat.parentId) : undefined)
       : cat
     if (!sphere || sphere.status !== 'VISIBLE') continue
-    out.set(sphere.id, (out.get(sphere.id) ?? 0) + count)
+    const prev = out.get(sphere.id)
+    out.set(sphere.id, prev === undefined ? value : combine(prev, value))
   }
   return out
+}
+
+/**
+ * Per-category MINIMA, folded the same way — „the cheapest thing anybody in
+ * this sphere lists".
+ *
+ * ⚠️ A NULL IS NOT A ZERO, and the caller has to strip them before this. A
+ * provider who quotes per job has `priceFrom: null` (lib/serviceProfile →
+ * priceHint); folding that as 0 would print „0₾-დან" on a sphere where nobody
+ * named a price — the exact invented number CLAUDE.md forbids. A sphere where
+ * NOBODY named one simply has no entry here, and the tile omits the half-line.
+ */
+export function foldMin(
+  cats: readonly TreeNode[],
+  raw: readonly { categoryId: string | null; value: number }[],
+): Map<string, number> {
+  return foldInto(cats, raw, (a, b) => Math.min(a, b))
 }
 
 /* ═══════════ where an expert may be FILED ════════════════════════════════

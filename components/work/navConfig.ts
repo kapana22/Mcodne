@@ -102,6 +102,19 @@ export const WORKSPACE_NAV: NavItem[] = [
   // paint the old path. Cheap, and it stops the rail going dark mid-navigation.
   { href: '/work/profile',  label: 'ჩემი გვერდი', icon: 'user',
     match: p => startsWith('/work/profile')(p) || startsWith('/work/services')(p) },
+  // ⚠️ BEFORE „ანგარიში", AND THAT IS THE PIPELINE ARGUMENT, NOT AN INDEX
+  // (2026-09-01). The row above this one is the last thing about SELLING and
+  // the row below is the residue — the password and the visibility switch,
+  // „the one row here that is not about selling anything". A balance that
+  // `CREDITS_ENFORCED` spends on every client contact is squarely about
+  // selling, so it belongs on the selling side of that line.
+  //
+  // ⚠️ AND THE PILL IS NOT ENOUGH ON ITS OWN. `components/CreditPill` now opens
+  // this page, which is the right door for somebody looking AT the number — but
+  // a destination reachable only from a 40px chip in the corner is a
+  // destination most people never learn exists, and this one carries the rules
+  // their money is already being spent under.
+  { href: '/work/balance',  label: 'ბალანსი',     icon: 'wallet',   match: startsWith('/work/balance') },
   { href: '/work/account',  label: 'ანგარიში',    icon: 'settings', match: startsWith('/work/account') },
 ]
 
@@ -148,10 +161,16 @@ export function navFor(groups: NavGroups): NavSection[] {
   return items.length ? [{ caption: null, items }] : []
 }
 
-// Outside the workspace proper — rendered below a divider in the sidebar.
-export const CATALOG_LINK: NavItem = {
-  href: '/experts', label: 'ექსპერტები', icon: 'search', match: startsWith('/experts'),
-}
+/* ⚠️ `CATALOG_LINK` LIVED HERE AND IS DELETED (2026-09-02). It put „ექსპერტები"
+ * → /experts below a divider in the provider's rail, and /experts is the CLIENT
+ * catalogue — the screen somebody uses to shop for a provider. Owner: „თუ
+ * ექსპერტად რეგისტრირდება ადამიანი, მაგ შემთხვევაში აღარ უნდა ჰქონდეს კლიენტის
+ * ფუნქციები."
+ *
+ * Deleted rather than left unused, which is this repo's own rule for a control
+ * nobody reaches. The CLIENT rail keeps its own copy — components/me/navConfig
+ * has a `CATALOG_LINK` of its own, and that one is correct: a client browsing
+ * the catalogue is the catalogue's whole purpose. */
 
 /** Page title for the top bar: longest matching workspace destination. */
 export function titleForPath(path: string): string {

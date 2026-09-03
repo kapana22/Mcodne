@@ -143,6 +143,18 @@ function JobsInner({ quotes }: Props) {
             cta={{ label: 'ახალი მოთხოვნები', href: '/work/requests' }}
           />
         ) : (
+          /* ⚠️ THE SENTENCE NAMED A PLACE AND GAVE NO DOOR TO IT (2026-09-01).
+             „მიმდინარე სამუშაო არ არის — ნახე დასრულებული." told a provider to
+             go and look at the other stage and then handed them nothing to
+             press; the same for the reverse. The stage bar above the list is
+             the way there and it is real — this is not a dead end — but an
+             empty state that ends in an instruction is the one place on the
+             screen where the reader is already looking for what to do next,
+             and the instruction was pointing off-screen.
+
+             THE LABELS ARE THE STAGE BAR'S OWN WORDS (app/work/_components/
+             WorkTabs), so the button and the chip a provider then sees lit are
+             spelled the same. Nothing new is said here. */
           <EmptyState
             icon={<Icon.check className="w-6 h-6" />}
             title={tab === 'active' ? 'ყველაფერი მოგვარებულია' : 'ამ ფილტრში არაფერია'}
@@ -150,6 +162,11 @@ function JobsInner({ quotes }: Props) {
               tab === 'active'
                 ? 'მიმდინარე სამუშაო არ არის — ნახე დასრულებული.'
                 : 'დასრულებული სამუშაო ჯერ არ გაქვს.'
+            }
+            cta={
+              tab === 'active'
+                ? { label: 'დასრულებული', href: '/work/jobs?tab=history' }
+                : { label: 'ხელში მაქვს', href: '/work/jobs?tab=active' }
             }
           />
         )

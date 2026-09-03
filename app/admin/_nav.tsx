@@ -16,7 +16,7 @@ const Logo = () => (
 )
 
 /* ───── Admin shell — sidebar + top bar ───── */
-export type AdminTab = 'system' | 'help' | 'overview' | 'users' | 'broadcast' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit' | 'companies' | 'requests' | 'access' | 'providers' | 'reviews' | 'funnel'
+export type AdminTab = 'system' | 'help' | 'overview' | 'users' | 'broadcast' | 'messages' | 'categories' | 'blog' | 'texts' | 'integrations' | 'audit' | 'companies' | 'requests' | 'access' | 'providers' | 'reviews' | 'funnel'
 
 /**
  * Hashes that no longer name a tab, and where they now go.
@@ -142,6 +142,10 @@ const ADMIN_NAV: NavItem[] = ([
   // one is a number you read before deciding what to change.
   { id: 'funnel',     l: 'ძაბრი', icon: 'pulse', g: 'signals' },
 
+  // Beside the system tab and above the audit trail: all three answer
+  // "is the machine doing what it says", and this one answers it for
+  // everything that leaves the building.
+  { id: 'messages',   l: 'შეტყობინებები', icon: 'mail', g: 'system' },
   { id: 'system',     l: 'სისტემა', icon: 'settings', g: 'system' },
   { id: 'audit',      l: 'აუდიტი', icon: 'shield', g: 'system' },
   // The requests allowlist. Filed under „სისტემა" and NOT beside „მოთხოვნები":

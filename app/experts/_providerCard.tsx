@@ -49,6 +49,7 @@ import { Icon } from '@/components/Icon'
 import { Btn } from '@/components/Btn'
 import { EntityCard, EntityPrice, CHIP_CAP, type EntityView } from '@/components/EntityCard'
 import type { ProviderRow } from './_providers'
+import { PRICE_ON_REQUEST } from '@/lib/requests'
 
 /** The one address, so the overlay and the button agree. Null = not a link.
  *  ONE namespace since stage 11 (2026-08-19): the same /experts/<slug> prefix
@@ -215,8 +216,19 @@ export function ProviderCard({ m, view = 'grid' }: { m: ProviderRow; view?: Enti
               what makes the two halves of this catalogue read as one product,
               where a blank on one of them would not. */}
           <span className="min-w-0">
+            {/* ⚠️ THE FLOOR IS LABELLED „ფასი იწყება" NOW (2026-08-31, from the
+                owner's design canvas → Catalogue). „60₾-დან" already says it is
+                a floor, and the label is not a repeat: at 20px, alone in the
+                card's foot, the numeral reads as A PRICE, and the „-დან" that
+                stops it doing so is four characters at the end of it. The
+                canvas puts the eleven-pixel label above the number so the
+                qualification arrives first. Only above a number — the „ask"
+                sentence beneath is already a sentence. */}
             {m.priceValue !== null ? (
-              <EntityPrice>{m.priceValue}₾-დან</EntityPrice>
+              <>
+                <span className="block text-micro text-ink-400">ფასი იწყება</span>
+                <EntityPrice>{m.priceValue}₾-დან</EntityPrice>
+              </>
             ) : (
               /* ⚠️ IT NOW WEIGHS WHAT THE PARAGRAPH ABOVE PROMISES (2026-08-30).
                  „Same position, same weight, different sentence" was the rule
@@ -228,7 +240,7 @@ export function ProviderCard({ m, view = 'grid' }: { m: ProviderRow; view?: Enti
                  NOT EntityPrice: this is a sentence, not a number, and setting
                  it at h2 would make a card with no price shout louder than one
                  with. Body-large semibold is the same LINE, one notch quieter. */
-              <span className="font-display text-body-lg font-semibold text-ink-700 leading-none">ფასს შემოგთავაზებს</span>
+              <span className="font-display text-body-lg font-semibold text-ink-700 leading-none">{PRICE_ON_REQUEST}</span>
             )}
             {/* One line, `text-meta`, under the number — the smallest thing on
                 the card that still reads. See `alsoConsults` for why it is a
@@ -247,8 +259,22 @@ export function ProviderCard({ m, view = 'grid' }: { m: ProviderRow; view?: Enti
                this button is the row's one focusable target. Its aria-label
                names the master and starts with the visible word, which is what
                WCAG 2.5.3 „Label in Name" requires. */
-            <Btn href={href} variant="secondary" size="sm" aria-label={`პროფილი — ${m.name}`} className="relative z-10 shrink-0">
-              პროფილი
+            /* ⚠️ IT WAS A SECONDARY „პროფილი" UNTIL 2026-08-31, and the canvas
+               makes it the green „მიიღე შეთავაზება". The change is not the
+               colour: the WHOLE CARD already opens the profile through
+               EntityCard's overlay, so a second control saying „პროფილი" was
+               the same destination offered twice — one of them a 36px button
+               competing with the card it sits on. The card opens the profile;
+               the button does the thing the reader came to do.
+               ⚠️ IT STILL POINTS AT THE PROFILE, NOT AT THE INTAKE, and that is
+               deliberate: the addressed request lives on the profile behind
+               `requestHrefFor` (which needs the recipient, the price and the
+               facts the reader has not seen yet), and a card that jumped
+               straight into a wizard would skip the page that lets somebody
+               choose this person over the next one. Same door, one step of
+               reading in between — and the label names what waits there. */
+            <Btn href={href} variant="primary" size="sm" aria-label={`მიიღე შეთავაზება — ${m.name}`} className="relative z-10 shrink-0">
+              მიიღე შეთავაზება
             </Btn>
           )}
         </div>

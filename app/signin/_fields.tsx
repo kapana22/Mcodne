@@ -30,11 +30,18 @@ export const Field = ({ label, hint, optional, required, children }: { label: st
   </label>
 )
 
-export const PwInput = ({ value, onChange, placeholder = 'მინ. 8 სიმბოლო', autoComplete = 'new-password' }: { value: string; onChange: (v: string) => void; placeholder?: string; autoComplete?: string }) => {
+/**
+ * `field` is the wiring from components/FieldError — `data-fault`,
+ * `aria-invalid`, `aria-describedby` — spread onto the real <input> so a
+ * password box can be the one at fault like any other control. Optional: the
+ * screens that do not report per-field errors pass nothing and are unchanged.
+ * `invalid` only colours the border; the SENTENCE is a <FieldError> beside it.
+ */
+export const PwInput = ({ value, onChange, placeholder = 'მინ. 8 სიმბოლო', autoComplete = 'new-password', field, invalid = false, label = 'პაროლი' }: { value: string; onChange: (v: string) => void; placeholder?: string; autoComplete?: string; field?: Record<string, unknown>; invalid?: boolean; label?: string }) => {
   const [show, setShow] = useState(false)
   return (
     <div className="relative">
-      <input type={show ? 'text' : 'password'} aria-label="პაროლი" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} autoComplete={autoComplete} className="w-full h-12 pl-3.5 pr-12 rounded-field bg-white border border-ink-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none text-body-lg text-ink-900 placeholder:text-ink-400 transition-colors duration-fast" />
+      <input type={show ? 'text' : 'password'} aria-label={label} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} autoComplete={autoComplete} {...field} className={`w-full h-12 pl-3.5 pr-12 rounded-field bg-white border ${invalid ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-100' : 'border-ink-200 focus:border-brand-500 focus:ring-brand-100'} focus:ring-2 focus:outline-none text-body-lg text-ink-900 placeholder:text-ink-400 transition-colors duration-fast`} />
       {/* 40×40 (`right-1` + `pr-12`), not 36×36. This was the LAST password
           toggle on the site still at w-9 — the three in /settings and the
           delete-account one were already 40 — and a live 390/360px audit

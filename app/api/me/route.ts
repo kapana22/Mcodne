@@ -3,13 +3,14 @@ import { normalizePhone, phoneFormatError } from '@/lib/phone'
 import { cookies } from 'next/headers'
 import { kickSweep } from '@/lib/sweepRunner'
 import { z } from 'zod'
+import { PWD_MIN, PWD_MAX } from '@/lib/passwordPolicy'
 import { identityOf } from '@/lib/identity'
 import { balanceOf } from '@/lib/creditsServer'
 import { getCurrentUser, hashPassword, verifyPassword, revokeOtherSessions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeAvatar } from '@/lib/normalizeAvatar'
 import { rateLimit } from '@/lib/rateLimit'
-import { firstGeorgianMessage, georgianNameRefine, georgianRefine } from '@/lib/georgianText'
+import { firstGeorgianIssue, georgianNameRefine, georgianRefine } from '@/lib/georgianText'
 import { ROLE } from '@/lib/roles'
 
 
@@ -140,7 +141,7 @@ const Patch = z.object({
     .refine(v => /^data:image\/(png|jpeg|webp|gif);base64,/.test(v) || /^https:\/\//.test(v), 'BAD_AVATAR')
     .nullable().optional(),
   currentPassword: z.string().min(1).optional(),
-  newPassword: z.string().min(8).max(120).optional(),
+  newPassword: z.string().min(PWD_MIN).max(PWD_MAX).optional(),
 })
 
 export async function PATCH(req: Request) {
@@ -150,8 +151,21 @@ export async function PATCH(req: Request) {
   if (!parsed.success) {
     // Surface OUR validation copy (e.g. the Georgian-language gate); zod's
     // own English messages stay behind the generic code.
-    const msg = firstGeorgianMessage(parsed.error)
-    return NextResponse.json({ ok: false, error: msg ? 'INVALID_TEXT' : 'INVALID', message: msg ?? undefined }, { status: 400 })
+    //
+    // ⚠️ AND ITS FIELD (2026-08-31). This gate covers `fullName` AND `bio`, and
+    // returning one code with one sentence left /settings guessing which of its
+    // four boxes to mark — by matching on the noun the copy opens with. The
+    // path comes back now, so the form marks the control the schema refused.
+    const issue = firstGeorgianIssue(parsed.error)
+    return NextResponse.json(
+      {
+        ok: false,
+        error: issue ? 'INVALID_TEXT' : 'INVALID',
+        field: issue?.field ?? undefined,
+        message: issue?.message ?? undefined,
+      },
+      { status: 400 },
+    )
   }
 
   const { fullName, phone, bio, avatarUrl, currentPassword, newPassword } = parsed.data

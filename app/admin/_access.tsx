@@ -25,6 +25,8 @@ import {
   TabHeader, SectionCard, RowList, AdminEmpty, AdminError, AdminLoading, fmtDT,
 } from './_parts'
 import { PROVIDER_KINDS, type ProviderKindName } from '@/lib/requests'
+import { FIELD_ERROR_BORDER, useFault } from '@/components/FieldError'
+import { actionError, SHARED_INVALID } from '@/lib/actionErrors'
 
 type Row = {
   id: string; kind: string; active: boolean; note: string | null; createdAt: string
@@ -42,28 +44,38 @@ const KIND_LABEL: Record<ProviderKindName, string> = {
   COMPANY: 'კომპანია',
 }
 
-/** Server codes → Georgian. Never show a reader a raw code. */
-function errText(code?: string): string {
-  switch (code) {
-    case 'USER_NOT_FOUND': return 'ამ ელფოსტაზე ანგარიში არ არსებობს — ჯერ დარეგისტრირდეს.'
-    case 'COMPANY_NOT_FOUND': return 'ასეთი კომპანია არ არის.'
-    // ADMIN_ALREADY_HAS_ACCESS was removed 2026-08-14: an admin sees the
-    // subsystem by role but is not a PROVIDER without a row here, so refusing
-    // the row meant they could never write an offer. The endpoint accepts them
-    // now — see the note there.
-    case 'SUBJECT_AMBIGUOUS': return 'აირჩიე ერთი — ან ექსპერტი, ან კომპანია.'
-    case 'SUBJECT_MISSING':
-    case 'SUBJECT_KIND_MISMATCH':
-    case 'INVALID': return 'შეავსე ველები სწორად.'
-    default: return 'ვერ შესრულდა — სცადე თავიდან.'
-  }
+/** Which box each server code is ABOUT. A code with no entry has no field —
+ *  the form-level line answers it. (2026-08-31: „ამ ელფოსტაზე ანგარიში არ
+ *  არსებობს" used to appear under the whole form, with the address it was
+ *  about sitting unmarked two rows up.) */
+const CODE_FIELD: Record<string, string> = {
+  USER_NOT_FOUND: 'email',
+  COMPANY_NOT_FOUND: 'companyId',
+  SUBJECT_KIND_MISMATCH: 'kind',
+  SUBJECT_MISSING: 'kind',
+  SUBJECT_AMBIGUOUS: 'kind',
 }
+
+/** Server codes → Georgian. Never show a reader a raw code. */
+/* USER_NOT_FOUND, INVALID and the default are in lib/actionErrors. The two
+   SUBJECT_* codes stay here and stay pointed at the shared INVALID sentence:
+   they are this endpoint's way of saying the same thing.
+   ADMIN_ALREADY_HAS_ACCESS was removed 2026-08-14: an admin sees the subsystem
+   by role but is not a PROVIDER without a row here, so refusing the row meant
+   they could never write an offer. The endpoint accepts them now. */
+const errText = (code?: string) => actionError(code, {
+  COMPANY_NOT_FOUND: 'ასეთი კომპანია არ არის.',
+  SUBJECT_AMBIGUOUS: 'აირჩიე ერთი — ან ექსპერტი, ან კომპანია.',
+  SUBJECT_MISSING: SHARED_INVALID,
+  SUBJECT_KIND_MISMATCH: SHARED_INVALID,
+})
 
 export function AccessSection() {
   const [rows, setRows] = useState<Row[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [formErr, setFormErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const { fault, fail, props, bad, clearField, reset: clearFault, error } = useFault('access')
 
   const [kind, setKind] = useState<ProviderKindName>('EXPERT')
   const [email, setEmail] = useState('')
@@ -86,7 +98,7 @@ export function AccessSection() {
   const add = async (e: React.FormEvent) => {
     e.preventDefault()
     if (busy) return
-    setBusy(true); setFormErr(null)
+    setBusy(true); setFormErr(null); clearFault()
     try {
       const res = await fetch('/api/admin/requests/access', {
         method: 'POST',
@@ -94,7 +106,12 @@ export function AccessSection() {
         body: JSON.stringify({ kind, email, companyId, note }),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) { setFormErr(errText(j?.error)); return }
+      if (!res.ok || !j.ok) {
+        const field = CODE_FIELD[j?.error as string]
+        if (field && field !== 'kind') { fail(field, errText(j?.error)); return }
+        setFormErr(errText(j?.error))
+        return
+      }
       setEmail(''); setCompanyId(''); setNote('')
       await load()
     } catch {
@@ -146,21 +163,31 @@ export function AccessSection() {
                 subject is the rule (accessSubjectError in lib/requests), and a
                 form that can hold two is a form that will eventually send two. */}
             {kind === 'EXPERT' ? (
-              <label className="block">
-                <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">ელფოსტა</span>
+              <div className="block">
+                {/* ⚠️ <div> + <label htmlFor> (2026-08-31): a wrapping <label>
+                    names its control with everything inside it, and the error
+                    message sat in there — so the box was called „ელფოსტა" plus
+                    the error, which `aria-describedby` then read again. */}
+                <label htmlFor="access-email" className="block text-small font-display font-semibold text-ink-800 mb-1.5">ელფოსტა</label>
                 <input
-                  type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  className={INPUT} placeholder="expert@example.ge"
+                  id="access-email"
+                  type="email" value={email} onChange={e => { setEmail(e.target.value); clearField('email') }}
+                  {...props('email')}
+                  className={bad('email') ? `${INPUT} ${FIELD_ERROR_BORDER}` : INPUT} placeholder="expert@example.ge"
                 />
-              </label>
+                {error('email')}
+              </div>
             ) : (
-              <label className="block">
-                <span className="block text-small font-display font-semibold text-ink-800 mb-1.5">კომპანიის ID</span>
+              <div className="block">
+                <label htmlFor="access-company" className="block text-small font-display font-semibold text-ink-800 mb-1.5">კომპანიის ID</label>
                 <input
-                  type="text" value={companyId} onChange={e => setCompanyId(e.target.value)}
-                  className={INPUT} placeholder="cme…"
+                  id="access-company"
+                  type="text" value={companyId} onChange={e => { setCompanyId(e.target.value); clearField('companyId') }}
+                  {...props('companyId')}
+                  className={bad('companyId') ? `${INPUT} ${FIELD_ERROR_BORDER}` : INPUT} placeholder="cme…"
                 />
-              </label>
+                {error('companyId')}
+              </div>
             )}
 
             <label className="block sm:col-span-2">
@@ -173,7 +200,7 @@ export function AccessSection() {
               />
             </label>
 
-            {formErr && <div className="sm:col-span-2"><AdminError message={formErr} /></div>}
+            {formErr && !fault && <div className="sm:col-span-2"><AdminError message={formErr} /></div>}
 
             <div className="sm:col-span-2">
               <Btn type="submit" disabled={!canAdd} aria-busy={busy}>დამატება</Btn>

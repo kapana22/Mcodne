@@ -33,11 +33,17 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  CREDIT_TASKS, CREDIT_TASKS_TOTAL, CONTACT_COST_TETRI, TETRI, CREDITS_ENFORCED,
+  CREDIT_TASKS, CREDIT_TASKS_TOTAL, CONTACT_COST_MIN_TETRI, CONTACT_COST_MAX_TETRI,
+  CONTACT_COST_DEFAULT_TETRI,
+  contactCostTetri, contactCostRangeLabel, contactsLabel, TETRI, CREDITS_ENFORCED,
   JOB_DONE_TETRI, CONTACT_COST_NOTE, CONTACT_BUTTON_LABEL, OFFER_FREE_NOTE,
-  JOB_DONE_NOTE, NO_BALANCE_NOTE, contactLimitNote, contactPlacesLeft,
+  contactChargeNote, contactRefundNote, CONTACT_REFUND_HOURS,
+  OFFER_FREE_TITLE, OFFER_FREE_BODY,
+  JOB_DONE_NOTE, noBalanceNote, contactLimitNote, contactPlacesLeft,
   gelLabel, contactsAffordable, canAffordContact, earnedTasks, completeness, creditTasks, taskHref,
   contactKey, jobDoneKey, adminAdjustReason, isAdminAdjust, ADMIN_ADJUST,
+  CREDIT_PACKS, packBonusPct, packContacts,
+  creditReasonLabel,
   type ProfileFacts, type CreditTaskKey,
 } from '../lib/credits'
 
@@ -83,13 +89,64 @@ test('the biggest grant is the field that decides who sees a request', () => {
 /* ── B. It is spent on the CONTACT, and reading a request is free ────────── */
 
 test('a credit buys one client contact, and the arithmetic is legible', () => {
-  assert.equal(CONTACT_COST_TETRI, 1 * TETRI)
-  assert.equal(CONTACT_COST_TETRI % TETRI, 0, 'a contact costs a fraction of a lari')
-  // 100₾ ÷ 1₾ = 100 contacts.
-  assert.equal(contactsAffordable(CREDIT_TASKS_TOTAL), 100)
-  assert.equal(contactsAffordable(0), 0)
-  assert.equal(contactsAffordable(CONTACT_COST_TETRI - 1), 0, 'a partial credit buys a contact')
-  assert.equal(contactsAffordable(CONTACT_COST_TETRI), 1)
+  /* ⚠️ 3₾ SINCE 2026-09-01, from the owner's design canvas → „Expert Jobs",
+   * which prints it three times and ties every one to the selection. It was 1₾,
+   * and the re-price came with the mechanic: a contact is now bought AFTER the
+   * client has chosen this provider, so it buys a job in hand rather than a
+   * chance at one. See lib/credits → CONTACT_COST_TETRI for the whole argument,
+   * including which half of the canvas won — „Request Room v2" still carries the
+   * old „1₾ პასუხზე" in a footer and is the stale statement.
+   *
+   * ⚠️ THE ASSERTION IS THE ARITHMETIC, NOT THE NUMBER. What must not break is
+   * that the grant divides cleanly into contacts and that the two constants
+   * agree; the price itself is the owner's to move again.
+   */
+  /* ⚠️ REWRITTEN 2026-09-03 — THE PRICE IS A LADDER NOW. It asserted
+     `CONTACT_COST_TETRI === 3 * TETRI`; a contact costs 1₾ to 10₾ by the
+     client's budget (owner: „1-10ლ ათამაშე"), so the fixed figure is gone and
+     what is pinned is what was always the point: the SHAPE. */
+  assert.equal(CONTACT_COST_MIN_TETRI, 1 * TETRI)
+  assert.equal(CONTACT_COST_MAX_TETRI, 10 * TETRI)
+  for (const t of [CONTACT_COST_MIN_TETRI, CONTACT_COST_MAX_TETRI]) {
+    assert.equal(t % TETRI, 0, 'a contact costs a fraction of a lari')
+  }
+
+  // The ladder only climbs, never dips, and it stays inside its own two ends.
+  /* ⚠️ A REQUEST THAT NAMED NO MONEY KEEPS THE OLD FLAT PRICE, and this is the
+     assertion that stops the ladder quietly cutting revenue by two thirds.
+     Measured 2026-09-03: 19 of 20 live rows carry no budget at all. Pricing
+     those off the floor would read „every job on this platform is small", which
+     is not something anybody said. */
+  assert.equal(contactCostTetri(0, null), CONTACT_COST_DEFAULT_TETRI)
+  assert.equal(contactCostTetri(0, null), 3 * TETRI, 'the unpriced default moved off the price it replaced')
+  // …but a budget of „up to 60₾" IS a statement, and it prices on the ladder.
+  assert.equal(contactCostTetri(30, 60), CONTACT_COST_MIN_TETRI)
+
+  let last = 0
+  for (const gel of [50, 99, 100, 299, 300, 699, 700, 1499, 1500, 4999, 5000, 100000]) {
+    const c = contactCostTetri(1, gel)
+    assert.ok(c >= CONTACT_COST_MIN_TETRI && c <= CONTACT_COST_MAX_TETRI, `${gel}₾ prices outside 1–10₾`)
+    assert.ok(c >= last, `the fee fell between ${gel}₾ and the band below it`)
+    assert.equal(c % TETRI, 0, `${gel}₾ prices a fraction of a lari`)
+    last = c
+  }
+  // Both ends are actually reachable — a ladder nobody can climb to the top of
+  // is a range that lies about itself.
+  assert.equal(contactCostTetri(0, 50), CONTACT_COST_MIN_TETRI)
+  assert.equal(contactCostTetri(15000, null), CONTACT_COST_MAX_TETRI)
+  // ⚠️ THE CEILING WINS WHERE THERE IS ONE. „500–1 000₾" is priced on 1 000,
+  // not on 500: the higher of the two facts the client actually typed.
+  assert.ok(contactCostTetri(500, 1000) > contactCostTetri(500, 600))
+  // …and where the band has no top („15 000₾-ზე მეტი"), the floor is all there
+  // is and must not read as zero.
+  assert.equal(contactCostTetri(5000, null), CONTACT_COST_MAX_TETRI)
+
+  // What a balance opens is a PAIR now, for the same reason.
+  assert.deepEqual(contactsAffordable(0), { min: 0, max: 0 })
+  assert.deepEqual(contactsAffordable(CREDIT_TASKS_TOTAL), { min: 10, max: 100 })
+  assert.equal(contactsLabel(0), '', 'a balance that opens nothing still printed a number')
+  assert.equal(contactsLabel(CREDIT_TASKS_TOTAL), '10–100')
+  assert.equal(contactsLabel(CONTACT_COST_MAX_TETRI), '1–10')
 
   /* ⚠️ THE STRUCTURAL RULE, AND IT WAS REVERSED BY THE OWNER ON 2026-08-21.
    *
@@ -188,10 +245,17 @@ test('the contact is paid for once, and the client is not called by twenty peopl
 test('a balance that can refuse is a balance that can recover', () => {
   // The flag itself: whichever way it points, the predicate must agree with it.
   // This is behaviour, and it is the whole of what the switch does.
-  assert.equal(canAffordContact(0), !CREDITS_ENFORCED,
+  assert.equal(canAffordContact(0, CONTACT_COST_MIN_TETRI), !CREDITS_ENFORCED,
     'the switch and the predicate disagree — one of them is not reading CREDITS_ENFORCED')
-  assert.equal(canAffordContact(CONTACT_COST_TETRI), true, 'the exact price of one contact must buy one contact')
-  assert.equal(canAffordContact(CREDIT_TASKS_TOTAL), true)
+  assert.equal(canAffordContact(CONTACT_COST_MIN_TETRI, CONTACT_COST_MIN_TETRI), true,
+    'the exact price of one contact must buy one contact')
+  assert.equal(canAffordContact(CREDIT_TASKS_TOTAL, CONTACT_COST_MAX_TETRI), true)
+  // ⚠️ AND THE PRICE IS AN ARGUMENT, so a balance that buys a cheap contact may
+  // still refuse an expensive one. That is the whole point of the ladder.
+  if (CREDITS_ENFORCED) {
+    assert.equal(canAffordContact(CONTACT_COST_MIN_TETRI, CONTACT_COST_MAX_TETRI), false,
+      'a 1₾ balance opened a 10₾ contact')
+  }
 
   if (!CREDITS_ENFORCED) return
 
@@ -232,8 +296,23 @@ test('the loop closes: reading and answering are free, a finished job pays', () 
   // CONTACT_LIMIT_REASON); 3 is what an ordinary request carries.
   const ORDINARY_LIMIT = 3
   assert.equal(contactPlacesLeft({ contactCount: 0, offerLimit: ORDINARY_LIMIT }), ORDINARY_LIMIT)
-  assert.ok(JOB_DONE_TETRI > ORDINARY_LIMIT * CONTACT_COST_TETRI,
-    'a finished job pays back less than one request can take out of the supply side — the loop shrinks')
+  /* ⚠️ THE COMPARISON NARROWED ON 2026-09-03, AND THE THING IT GAVE UP IS
+     WRITTEN DOWN RATHER THAN DELETED.
+     It read `JOB_DONE_TETRI > ORDINARY_LIMIT * <the contact price>` — 25₾ > 3×3₾
+     — and the price became a 1–10₾ ladder (owner: „1-10ლ ათამაშე"). At the TOP
+     rung that arithmetic no longer holds: three providers opened on one
+     15 000₾ project take 30₾ out of the supply side while finishing it puts 25₾
+     back. Two honest ways out and both are the owner's, not this file's:
+     cap the ladder at 8₾ (3×8 = 24 < 25), or raise what a finished job pays.
+     FLAGGED, not chosen — and the ceiling stays where the owner put it.
+
+     What is asserted instead is the loop that must hold for a PERSON, which is
+     what the surrounding test is named for: whatever a provider paid to reach a
+     client, finishing the work has to be worth more than that. The pool-level
+     version is also softened in practice by `sweepSilentContacts`, which gives
+     back every contact the client never answered — the losing two, usually. */
+  assert.ok(JOB_DONE_TETRI > CONTACT_COST_MAX_TETRI,
+    'a finished job pays back less than the most expensive contact — the loop shrinks for the person who did the work')
   assert.ok(JOB_DONE_TETRI <= CREDIT_TASKS_TOTAL,
     'one finished job pays more than the whole starting grant — the grant stops meaning anything')
 
@@ -306,6 +385,11 @@ test('the vocabulary never turns a discount into a liability', () => {
     'lib/credits.ts', 'lib/creditsServer.ts', 'app/work/profile/_editor.tsx',
     'app/work/(provider)/requests/[id]/OfferForm.tsx', 'app/work/_components/CreditStrip.tsx',
     'app/api/admin/users/[id]/credits/route.ts',
+    // ⚠️ AND THE PAGE THAT NOW SAYS ALL OF IT AT ONCE (2026-09-01). /work/balance
+    // is the first screen to print the rules, the grants and every movement
+    // together — which makes it the single easiest place for one careless word
+    // to turn a credit into a liability.
+    'app/work/balance/page.tsx',
   ]) {
     const src = read(f)
     for (const w of BANNED) {
@@ -315,6 +399,45 @@ test('the vocabulary never turns a discount into a liability', () => {
       assert.deepEqual(lines, [], `${f} calls the balance „${w}" — see the wording rules at the top of lib/credits`)
     }
   }
+})
+
+/* ── C2. Every movement has a word for the person it happened to ─────────── */
+
+test('the ledger can name every reason the code is able to write', () => {
+  /* ⚠️ THIS IS WHY THE BALANCE HAD NO PAGE UNTIL 2026-09-01. `CreditEntry.reason`
+     is written in seven shapes and NOTHING turned one into Georgian, so the
+     only honest thing a screen could show was the total — a number that moves
+     for reasons its owner cannot see. Owner, reading his own workspace:
+     „ეს 65₾ საიდან მოვიდა".
+
+     The list below is not a copy of the labels; it is the list of reasons the
+     WRITERS actually produce (lib/creditsServer: `t.key`, 'JOB_DONE',
+     'CONTACT_OPENED', 'CONTACT_REFUND', `adminAdjustReason`). If a new movement
+     is added and nothing names it, this fails — which is the property, because
+     the alternative is a row on a provider's ledger reading „PROFILE_BIO". */
+  const written = [
+    ...CREDIT_TASKS.map(t => t.key),
+    'JOB_DONE', 'CONTACT_OPENED', 'CONTACT_REFUND',
+    adminAdjustReason('ხელით შესწორება'),
+  ]
+  for (const reason of written) {
+    const label = creditReasonLabel(reason)
+    assert.notEqual(label, reason, `„${reason}" reaches a provider's ledger as its own key`)
+    assert.ok(label.trim().length > 0, `„${reason}" has an empty label`)
+    // The wording rules are not suspended by a label being short.
+    for (const w of ['ანაზღაურება', 'შენი ფული', 'გამომუშავებულ', 'გატანა', 'ქეშბექ', 'დაბრუნება']) {
+      assert.ok(!label.includes(w), `the ledger calls „${reason}" „${w}"`)
+    }
+  }
+  // A task's row is named by the task's own label — never a second wording that
+  // can drift from the checklist two cards above it on the same page.
+  for (const t of CREDIT_TASKS) assert.equal(creditReasonLabel(t.key), t.label)
+  // An admin movement shows the note somebody typed, not the prefix.
+  assert.equal(creditReasonLabel(adminAdjustReason('ხელით შესწორება')), 'ხელით შესწორება')
+  assert.equal(creditReasonLabel(`${ADMIN_ADJUST}: `), ADMIN_ADJUST, 'an empty note blanks the row')
+  // ⚠️ AN UNKNOWN REASON RETURNS ITSELF and must not blank. The number still
+  // moved; a ledger that hides one movement is worse than one printing a key.
+  assert.equal(creditReasonLabel('SOMETHING_NEW'), 'SOMETHING_NEW')
 })
 
 /* ── D. The score is the same arithmetic as the grant ─────────────────────── */
@@ -586,6 +709,14 @@ test('the screen says what opening a contact costs, before the click', () => {
    * ⚠️ AND THE OFFER FORM MUST NOT MENTION A PRICE AT ALL (2026-08-21). Sending
    * is free now; a cost line left behind on that form would be the site
    * charging for something in words while charging for something else in code.
+   *
+   * ⚠️ THE PRICE CAME OFF THE BUTTON AND THE RULE DID NOT (2026-09-01, the
+   * canvas). „კონტაქტის ნახვა · 1₾" became „კონტაქტის გახსნა" with the fee set
+   * above it and `CONTACT_CHARGE_NOTE` beside it, because the canvas's card
+   * already states the number twice and a third copy on the control itself is
+   * one fact said three ways. What is pinned is what was always the point —
+   * SOMETHING ON THAT CARD NAMES THE PRICE BEFORE THE CLICK — so the assertion
+   * moves from the label to the line that now carries it.
    */
   const contact = read('app/work/(provider)/requests/[id]/_contact.tsx')
   assert.match(contact, /CONTACT_COST_NOTE|CONTACT_BUTTON_LABEL/, 'the unlock stopped saying what it costs')
@@ -596,13 +727,25 @@ test('the screen says what opening a contact costs, before the click', () => {
   // The sentences are built from the constants, so the price is spelled in ONE
   // place — a hard-coded „1₾" on a screen is how a copy change and a code
   // change stop agreeing.
-  const price = `${CONTACT_COST_TETRI / TETRI}₾`
-  assert.match(CONTACT_COST_NOTE, new RegExp(price), 'the cost line no longer names the price')
+  /* ⚠️ THE PRICE IS PER JOB NOW, so the sentences that name a figure take one.
+     `CONTACT_COST_NOTE` speaks where no job is in hand and carries the RANGE;
+     the two beside the button are functions of what THIS contact costs. */
+  assert.match(CONTACT_COST_NOTE, new RegExp(contactCostRangeLabel()), 'the cost line no longer names the price')
   assert.match(CONTACT_COST_NOTE, /ბალანს/, 'the cost line no longer names what it is spent from')
-  assert.match(CONTACT_BUTTON_LABEL, new RegExp(price), 'the button no longer carries the price')
-  assert.match(NO_BALANCE_NOTE, new RegExp(price))
+  const someFee = contactCostTetri(800, null)
+  assert.match(contactChargeNote(someFee), new RegExp(`${someFee / TETRI}₾`),
+    'nothing beside the button carries this job‘s price')
+  assert.match(contact, /contactChargeNote\(/, 'the unlock card stopped naming the charge before the click')
+  // The refund is a TERM OF THE SALE and has to be readable before paying, not
+  // discovered after — and it now names its own window, so the sentence and the
+  // sweep that enforces it are the same number.
+  assert.match(contactRefundNote(someFee), new RegExp(String(CONTACT_REFUND_HOURS)),
+    'the refund promise stopped naming its deadline')
+  assert.match(contactRefundNote(someFee), new RegExp(`${someFee / TETRI}₾`))
+  assert.match(noBalanceNote(someFee), new RegExp(`${someFee / TETRI}₾`))
   assert.match(JOB_DONE_NOTE, new RegExp(`${JOB_DONE_TETRI / TETRI}₾`), 'the earn-back line no longer names what a finished job pays')
-  for (const line of [CONTACT_COST_NOTE, CONTACT_BUTTON_LABEL, OFFER_FREE_NOTE, JOB_DONE_NOTE, NO_BALANCE_NOTE, contactLimitNote(0)]) {
+  for (const line of [CONTACT_COST_NOTE, CONTACT_BUTTON_LABEL, contactChargeNote(someFee), OFFER_FREE_NOTE,
+                      OFFER_FREE_TITLE, OFFER_FREE_BODY, JOB_DONE_NOTE, noBalanceNote(someFee), contactLimitNote(0)]) {
     for (const banned of ['ანაზღაურება', 'შენი ფული', 'გამომუშავებ', 'გატანა', 'ქეშბექ', 'დაბრუნება']) {
       assert.ok(!line.includes(banned), `„${line}" calls the balance „${banned}"`)
     }
@@ -637,6 +780,27 @@ test('the contact is claimed, not checked — and it never leaves the server unp
   for (const code of ['NO_BALANCE', '402', '409']) {
     assert.ok(route.includes(code), `the unlock route lost its ${code} answer`)
   }
+  /* ⚠️ THE AUTHORISATION ITSELF, PINNED FOR THE FIRST TIME (2026-09-01, the
+     owner's design canvas → „Expert Jobs"). Nothing anywhere asserted WHO may
+     unlock a contact — the old rule („the request is VERIFIED") was open to
+     every allowlisted provider, so there was little to get wrong. The canvas
+     moved the fee behind the client's choice, and that turns this route into
+     the boundary between „a stranger with a balance" and „the person this
+     client picked", which is a phone number's worth of difference.
+
+     Two halves, and the second is the one a plausible rewrite loses: the
+     question is asked of THIS PROVIDER'S OWN OFFER, not of the request. A
+     `MATCHED` request says somebody was chosen and never says who — a route
+     that read the status alone would sell the winner's client to every provider
+     who lost, while passing any test that only looked for the word ACCEPTED. */
+  const gate = codeOf('app/api/provider/requests/[id]/contact/route.ts')
+  assert.match(gate, /prisma\.requestOffer\.findFirst\([\s\S]{0,300}?status: 'ACCEPTED'/,
+    'the unlock no longer requires an accepted offer — it is chargeable before the client has chosen')
+  assert.match(gate, /status: 'ACCEPTED',[\s\S]{0,120}?expertUserId: userId/,
+    'the accepted offer is not keyed to the caller — every loser can buy the winner\'s client')
+  assert.doesNotMatch(gate, /status: 'MATCHED'/,
+    'the request\'s own status is being used as the gate — it says somebody was chosen, never who')
+
   // And the phone is fetched inside the paid path, never selected into the
   // page that lists requests — the rule lib/requests set when it took
   // phone/email out of ProviderRequestRow.
@@ -672,9 +836,13 @@ test('a dead lead gives the money back, and the index is what makes it safe', ()
 
   // It pays back exactly what was taken, as a POSITIVE row (the spend is
   // negative). A sign error here is a second charge wearing a refund's name.
+  /* ⚠️ IT PAYS BACK WHAT THE SPEND ROW SAYS (2026-09-03), not a constant — a
+     contact costs 1–10₾ by job, so „refund the fee" is only answerable by
+     reading what this provider actually paid. A constant here would hand a 1₾
+     payer 10₾ and, worse, a 10₾ payer 1₾. */
   assert.match(codeOf('lib/creditsServer.ts'),
-    /amountTetri: CONTACT_COST_TETRI,[\s\S]{0,120}?reason: 'CONTACT_REFUND'/,
-    'the refund no longer credits exactly one contact')
+    /amountTetri: Math\.abs\(s\.amountTetri\),[\s\S]{0,120}?reason: 'CONTACT_REFUND'/,
+    'the refund no longer gives back exactly what was taken')
   assert.ok(server.includes('reason: \'CONTACT_OPENED\''),
     'the refund no longer looks for the spend it is undoing')
 })
@@ -708,10 +876,10 @@ test('the refund is told to the provider, not left to be discovered', () => {
     'a refunded provider is no longer mailed')
 
   const mail = read('lib/emailTemplates.ts')
-  assert.match(mail, /export function contactRefundedProviderEmail/)
+  assert.match(mail, /export async function contactRefundedProviderEmail/)
   // No „claim your refund" CTA anywhere in it: there is nothing to claim, and
   // an action button would recreate the appeals process this replaces.
-  const body = mail.slice(mail.indexOf('export function contactRefundedProviderEmail'))
+  const body = mail.slice(mail.indexOf('export async function contactRefundedProviderEmail'))
     .slice(0, 1600)
   assert.doesNotMatch(body, /მოითხოვ|განაცხად|დაბრუნების ფორმა/,
     'the refund mail asks the provider to apply for their own money')
@@ -781,4 +949,59 @@ test('the rail says what the profile is worth, not how full it is', () => {
   // And it must not restate the balance the top bar already carries.
   assert.doesNotMatch(rail, /balanceTetri/,
     'the rail prints the balance again — CreditPill already does, in the same chrome')
+})
+
+/* ═══════════ the three packages (2026-09-03) ════════════════════════════ */
+
+test('every pack buys a WHOLE number of contacts', () => {
+  /* ⚠️ REWRITTEN WITH THE LADDER (2026-09-03). It asserted that every pack
+     divided cleanly by a single 3₾ contact; against a 1–10₾ price no pack can,
+     and „N contacts" is a range rather than a figure. What survives is the part
+     that was always the point: a pack is a whole number of lari, and what it
+     buys is stated the same way the balance states it. */
+  for (const p of CREDIT_PACKS) {
+    assert.equal(p.priceTetri % TETRI, 0, `${p.key} charges a fraction of a lari`)
+    assert.equal(p.creditTetri % TETRI, 0, `${p.key} credits a fraction of a lari`)
+    assert.equal(packContacts(p), contactsLabel(p.creditTetri), `${p.key} counts contacts its own way`)
+  }
+})
+
+test('the ladder only goes one way — bigger pack, better rate', () => {
+  // The whole reason a pack exists. Both comparable platforms discount the big
+  // one (Bark's credits are „on a sliding scale… the cost per credit drops when
+  // you buy in bigger amounts"); a ladder that flattened or inverted would be a
+  // price list with no argument for its top row.
+  for (let i = 1; i < CREDIT_PACKS.length; i++) {
+    const prev = CREDIT_PACKS[i - 1]
+    const cur = CREDIT_PACKS[i]
+    assert.ok(cur.priceTetri > prev.priceTetri, `${cur.key} does not cost more than ${prev.key}`)
+    assert.ok(packBonusPct(cur) >= packBonusPct(prev), `${cur.key} gives away less than ${prev.key}`)
+    // Price per contact, in tetri — strictly better as you go up.
+    // Price per lari of balance — strictly better as you go up. („Per contact"
+    // is no longer a single number; per lari is the same claim without one.)
+    assert.ok(
+      cur.priceTetri / cur.creditTetri < prev.priceTetri / prev.creditTetri,
+      `${cur.key} is not cheaper per lari of balance than ${prev.key}`,
+    )
+  }
+})
+
+test('the bonus is computed from the money, never stored beside it', () => {
+  // A typed „+20%" next to a pair of amounts is two facts that can disagree,
+  // and only one of them moves money.
+  assert.equal(packBonusPct({ key: 'START', priceTetri: 100, creditTetri: 100, label: 'x' }), 0)
+  assert.equal(packBonusPct({ key: 'START', priceTetri: 100, creditTetri: 120, label: 'x' }), 20)
+  // A pack that credited LESS than it costs is not a discount, it is a bug —
+  // and it must read as 0 rather than as a negative bonus on a card.
+  assert.equal(packBonusPct({ key: 'START', priceTetri: 100, creditTetri: 90, label: 'x' }), 0)
+})
+
+test('nothing sells a pack while PAYMENTS_LIVE is false', () => {
+  /* ⚠️ THE PAGE'S OWN RULE, EXECUTED. app/work/balance says a „პაკეტები" block
+     „would be a price list for something nobody can buy" — so the block exists
+     but is gated, and this is the assertion that keeps the gate. If a checkout
+     ever ships, this test is the one that should be deleted deliberately, with
+     the flag. */
+  const page = readFileSync(join(process.cwd(), 'app/work/balance/page.tsx'), 'utf8')
+  assert.match(page, /PAYMENTS_LIVE && \(/, 'the packages block lost its flag')
 })

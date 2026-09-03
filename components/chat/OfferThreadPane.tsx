@@ -1,5 +1,5 @@
-// ONE OFFER CONVERSATION, on its own — the pane the unified inbox opens for a
-// row of kind OFFER.
+// ONE OFFER CONVERSATION, on its own — the pane the provider's inbox opens for
+// a row of kind OFFER.
 //
 // ⚠️ NOTHING ABOUT THE CHAT IS NEW. It is components/RequestChat, mounted the
 // way /work/offers used to mount it inline: no `ref` (the session is the
@@ -18,38 +18,29 @@
 // thread. `offerPeerName` still decides the NAME the header prints — one rule,
 // in lib/requests, asked rather than copied.
 //
-// TWO MOUNTS, ONE IMPLEMENTATION: the expert reads it inside the messages
-// centre, and a WORK-only provider — whom the (expert) guard never lets into
-// /work/messages — reads it in their own space. Same component, so the two can
-// never drift; the caller passes only where „back" goes.
+// ⚠️ AND `publicRef` IS NOT SELECTED, NOW OR EVER. It is the client's
+// credential (25 bits, and it opens a page carrying their phone number) and
+// possession of it IS how /api/request-chat authenticates them — a provider
+// holding it could accept an offer on the client's behalf. The CLIENT's own
+// pane reads it, in their own room, and that is why the two are separate files:
+// see components/chat/ThreadPaneShell.
+//
+// ⚠️ THE ARTBOARD'S HEADER, SINCE 2026-08-31 (owner's „Messages"): the disc, the
+// name, the metadata line and the „სამუშაო" button now live in ThreadPaneShell,
+// shared with the client's pane so the two sides of one conversation cannot be
+// drawn two ways. The button is new — the pane named the job and offered no way
+// to open it.
 
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { requestsViewer } from '@/lib/requestsServer'
 import {
-  timeAgoKa, topicLabel, offerPriceLabel,
+  topicLabel, offerPriceLabel, PROVIDER_ROUTE,
   OFFER_STATUS_LABEL, type OfferStatusName,
 } from '@/lib/requests'
 import { offerPeerName } from '@/lib/inboxRows'
 import { RequestChat } from '@/components/RequestChat'
-import { Btn } from '@/components/Btn'
-import { Icon } from '@/components/Icon'
-
-/** The „this is not yours, or it is gone" state. Identical wording to the
- *  booking thread's, and deliberately the same for both causes — a pane that
- *  distinguishes them tells a stranger which offer ids exist. */
-function NotFoundPane({ backHref }: { backHref: string }) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-      <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-ink-100 text-ink-500 mb-3">
-        <Icon.warn className="w-6 h-6" />
-      </span>
-      <div className="font-display text-body-lg font-semibold text-ink-800">მიმოწერა ვერ მოიძებნა</div>
-      <p className="text-small text-ink-500 mt-1">წაიშალა, ან არ არის შენი.</p>
-      <div className="mt-4"><Btn variant="secondary" size="sm" href={backHref}>სიაში დაბრუნება</Btn></div>
-    </div>
-  )
-}
+import { NotFoundPane, ThreadPaneShell } from '@/components/chat/ThreadPaneShell'
 
 export async function OfferThreadPane({
   offerId, backHref,
@@ -81,6 +72,9 @@ export async function OfferThreadPane({
       // agreed sum, not a contact detail: `offerPriceLabel` turns it into words
       // („ფასს შემოგთავაზებს") when there is no figure.
       priceGel: true, priceKind: true,
+      // The request's own id — the address of the job behind this conversation
+      // (/work/requests/[id] takes the ServiceRequest id, never the reference).
+      requestId: true,
       request: {
         select: {
           topic: true, status: true,
@@ -94,39 +88,32 @@ export async function OfferThreadPane({
   })
   if (!offer) return <NotFoundPane backHref={backHref} />
 
-  return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      <div className="px-4 sm:px-5 py-3.5 border-b border-ink-100">
-        <div className="flex items-center gap-3">
-          <Btn variant="ghost" size="sm" href={backHref} className="lg:hidden -ml-2">უკან</Btn>
-          <div className="min-w-0">
-            {/* ⚠️ „კლიენტი" until the choice is made — lib/requests decides it,
-                and the name is now the ONLY thing that decision releases. */}
-            <div className="font-display text-body font-semibold text-ink-900 truncate">
-              {offerPeerName(offer, offer.request.contactName)}
-            </div>
-            <p className="text-meta text-ink-500 truncate">
-              {topicLabel(offer.request.topic)}
-              {' · '}{offerPriceLabel(offer.priceGel, offer.priceKind)}
-              {' · '}{OFFER_STATUS_LABEL[offer.status as OfferStatusName]}
-              {' · '}{timeAgoKa(offer.createdAt)}
-            </p>
-          </div>
-        </div>
-      </div>
+  // ⚠️ „კლიენტი" until the choice is made — lib/requests decides it, and the
+  // name is now the ONLY thing that decision releases.
+  const peerName = offerPeerName(offer, offer.request.contactName)
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 pb-4">
-        {/* No `ref` on this side: the session is the identity, and the endpoint
-            works the side out from it. Open on arrival — a row was tapped to
-            read exactly this, so a collapsed pane would be one more tap between
-            the provider and the message they came for. `peerName` is the masked
-            one, for the same reason the header's is. */}
-        <RequestChat
-          thread={{ kind: 'OFFER', offerId: offer.id }}
-          peerName={offerPeerName(offer, offer.request.contactName)}
-          defaultOpen
-        />
-      </div>
-    </div>
+  return (
+    <ThreadPaneShell
+      peerName={peerName}
+      // ⚠️ THE CREATION TIME LEFT THIS LINE ON 2026-08-31. The artboard's
+      // metadata is the JOB („სერვისი 1 · 60₾ · ხელში მაქვს"), and the row in
+      // the list two hundred pixels to the left already carries when anybody
+      // last spoke, which is the time somebody actually looks for.
+      meta={`${topicLabel(offer.request.topic)} · ${offerPriceLabel(offer.priceGel, offer.priceKind)} · ${OFFER_STATUS_LABEL[offer.status as OfferStatusName]}`}
+      backHref={backHref}
+      // The request behind the conversation, inside the queue this provider is
+      // already admitted to (the same allowlist gate the pane itself passed).
+      job={{ href: `${PROVIDER_ROUTE}/requests/${offer.requestId}`, label: 'სამუშაო' }}
+    >
+      {/* No `ref` on this side: the session is the identity, and the endpoint
+          works the side out from it. `pane` because the conversation IS the
+          screen here — a row was tapped to read exactly this. `peerName` is the
+          masked one, for the same reason the header's is. */}
+      <RequestChat
+        thread={{ kind: 'OFFER', offerId: offer.id }}
+        peerName={peerName}
+        layout="pane"
+      />
+    </ThreadPaneShell>
   )
 }

@@ -80,8 +80,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // BOTH sides in the meta. „who moved this expert, and out of what" is the
   // question this row will be asked months later; the new value alone answers
   // half of it.
-  await audit(admin.id, 'tutor.category.set', {
-    targetType: 'TutorProfile',
+  await audit(admin.id, 'provider.category.set', {
+    targetType: 'ServiceProfile',
     targetId: id,
     meta: {
       fromCategoryId: before.categoryId,
@@ -91,5 +91,5 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     },
   })
 
-  return NextResponse.json({ ok: true, tutor: updated })
+  return NextResponse.json({ ok: true, provider: updated })
 }

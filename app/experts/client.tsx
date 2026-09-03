@@ -46,9 +46,11 @@ import {
   byPrice, cityLabelOf, parseCities, parseTrades, tradeLabel, matchesQuery,
 } from '@/lib/catalogItems'
 import {
-  CatalogFilters, EMPTY_FILTERS, FILTER_LANGS, FILTER_RATINGS, type Facets, type Filters,
-  NO_CAP, passesFilters, priceBandActive, priceBandLabel,
+  anyRefined, CatalogFilters, EMPTY_FILTERS, FILTER_LANGS, FILTER_RATINGS, type Facets, type Filters,
+  NO_CAP, passesFilters, priceBandActive, priceBandLabel, sideFilters, VerticalSwitch,
+  verticalOfTrades,
 } from './_filters'
+import { isVertical, type Vertical } from '@/lib/requestTopics'
 import { LiveCat, catNameOf } from './_cats'
 import { SearchHero } from './_hero'
 import { Pagination, ResultsBar } from './_results'
@@ -76,7 +78,7 @@ export type CatalogProps = {
 // Wrapper — useSearchParams requires a Suspense boundary in Next 15.
 export function CatalogClient(props: CatalogProps) {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+    <Suspense fallback={<div className="min-h-screen bg-ink-50" />}>
       <Catalog {...props} />
     </Suspense>
   )
@@ -127,7 +129,20 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
     if (catParam && catParam !== 'all' && !seedCats.includes(catParam)) {
       seedCats.push(catParam)
     }
+    // ⚠️ `?for=service` IS THE SAME DOOR THE INTAKE READS (app/request/page →
+    // the owner's option „ა", 2026-08-18): same parameter, same vocabulary,
+    // same fallback, so the link that opens the everyday catalogue and the link
+    // that opens the everyday request form are spelled the same way. It was
+    // briefly `?vertical=SERVICE` — a second name for a door the site already
+    // had.
+    const forParam = (p?.get('for') ?? '').trim().toUpperCase()
+    const trades = parseTrades(p?.get('trade'))
     return {
+      // An explicit `?for=` wins; otherwise a pre-switch `?trade=` link is read
+      // for the side it is obviously asking about (every /experts?trade=… link
+      // ever sent predates the switch); otherwise the professional side, which
+      // is what the site leads with.
+      vertical: isVertical(forParam) ? forParam : (verticalOfTrades(trades) ?? EMPTY_FILTERS.vertical),
       cats: seedCats,
       langs: csv('langs'),
       minRating: num('minRating', 0),
@@ -135,10 +150,23 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
       // ⚠️ THE SAME PARAMETER NAMES /experts HAS ALWAYS USED. `?trade=` still
       // takes a group id or a topic id in one list and `?city=` still takes city
       // ids, so every /experts?trade=… link ever sent keeps working.
-      trades: parseTrades(p?.get('trade')),
+      trades,
       cities: parseCities(p?.get('city')),
     }
   })
+
+  /* THE RAIL'S FOLD, OWNED HERE (2026-09-01). The trigger is in the results
+     header and the panel is in the rail column, so the boolean cannot live in
+     either — one state, two places that render it, no way for them to disagree.
+     Ignored from `lg`, where the panel is always drawn.
+
+     ⚠️ ARRIVING ON A NARROWED VIEW OPENS IT, and it is the INITIAL value rather
+     than an effect: somebody who followed „ელექტრიკოსი თბილისში" should see
+     what is ticked without a tap, and re-opening it on every later change would
+     fight the reader who just closed it after choosing something. `anyRefined`
+     is the same question the fold's own `useState(activeCount > 0)` asked
+     before the button moved. */
+  const [filtersOpen, setFiltersOpen] = useState(() => anyRefined(filters))
 
   /* ONE LIST OF PEOPLE. Not refetched, not paged on the server: this is the
      whole public roster (app/experts/_providers → queryProviders with no filter,
@@ -208,8 +236,17 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
     if (window.scrollY > top + 4) window.scrollTo({ top, behavior: 'smooth' })
   }
 
-  // Reset returns the page to what the address alone shows: EVERYBODY.
-  const resetFilters = () => setFilters({ ...EMPTY_FILTERS, price: [0, NO_CAP] })
+  // Reset returns the page to what the address alone shows: everybody ON THIS
+  // SIDE. Clearing your filters means „show me all of these", never „send me to
+  // the other half of the site" — the switch is the axis, not a refinement, and
+  // „ფილტრის მოხსნა" does not count it (see `filterCount`).
+  const resetFilters = () => setFilters({ ...EMPTY_FILTERS, price: [0, NO_CAP], vertical: filters.vertical })
+
+  // ⚠️ ONE FUNCTION FOR THE ACT AND FOR THE NUMBER ON IT (app/experts/_filters
+  // → sideFilters): pressing a segment drops the other side's picks, and the
+  // count printed on that segment is measured through the same drop, so a
+  // segment cannot promise 4 and hand back 0.
+  const setVertical = (v: Vertical) => setFilters(sideFilters(filters, v))
 
   // The admin-managed CATEGORIES (GET /api/categories → VISIBLE only). Starts empty
   // → the sphere filter is hidden until this resolves (and stays hidden if the
@@ -240,6 +277,10 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
     // track the useState initializer above; when the two disagreed the default
     // sort was written into every URL as if the user had chosen it.
     if (sort !== 'new') url.set('sort', sort)
+    // Only the non-default side lands in the address, for the same reason the
+    // default sort does not: a parameter the visitor never chose reads as one
+    // they did.
+    if (filters.vertical !== EMPTY_FILTERS.vertical) url.set('for', filters.vertical.toLowerCase())
     if (filters.cats.length > 0) url.set('cats', filters.cats.join(','))
     if (filters.langs.length > 0) url.set('langs', filters.langs.join(','))
     if (filters.minRating > 0) url.set('minRating', String(filters.minRating))
@@ -350,6 +391,27 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
     }
   }, [queryPool, filters, tradeCounts])
 
+  /* WHAT EACH SEGMENT WOULD ACTUALLY HAND BACK.
+     Measured through `sideFilters`, the same function the press runs, and with
+     the side's own dimension excluded — standard facet semantics, and the one
+     number that makes the switch honest about a side the roster has not
+     reached yet (0 of 23 on the everyday side, 2026-09-01). */
+  const sideCounts = React.useMemo(() => {
+    const count = (v: Vertical) =>
+      queryPool.filter(m => passesFilters(m, sideFilters(filters, v))).length
+    return { EXPERT: count('EXPERT'), SERVICE: count('SERVICE') }
+  }, [queryPool, filters])
+
+  /* Is there anybody at all on this side, before any refinement? „NOBODY YET"
+     and „NOBODY LIKE THAT" are different answers needing different screens, and
+     since the switch exists the first one is a question about a SIDE rather
+     than about the roster — the roster is never empty while the other side has
+     23 people in it. */
+  const sidePool = React.useMemo(
+    () => providers.filter(m => m.verticals.includes(filters.vertical)),
+    [providers, filters.vertical],
+  )
+
   const total = visible.length
   // 8 split a 9-person roster into „გვერდი 1 / 2" with ONE card on page two —
   // pagination that exists only to announce how short the list is. 24 is four
@@ -370,7 +432,7 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
   const searchQEcho = searchQ.length > 40 ? `${searchQ.slice(0, 40)}…` : searchQ
 
   return (
-    <div className="font-sans bg-white text-ink-900 antialiased">
+    <div className="font-sans bg-ink-50 text-ink-900 antialiased">
       {/* ONE header, every viewer (2026-08-08, owner: „ექსპერტებზე რომ
           გადავდივარ — იცვლება; მინდა როგორც ორიგინალში"). Browse and the profile
           it leads to are the same public section, so they get the same bar.
@@ -378,7 +440,17 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
           PublicTopBar. */}
       <PublicTopBar initialUser={initialUser} />
 
-      <SearchHero filters={filters} total={total} liveCats={liveCats} requestHref={requestHref} />
+      {/* ⚠️ THE FIELD IS THE BAND'S NOW (2026-08-31, the owner's design canvas
+          → Catalogue). It was in <ResultsBar>; see that file for why the home
+          page's hero handing a typed query to this page is what settled it. */}
+      <SearchHero
+        filters={filters}
+        total={total}
+        liveCats={liveCats}
+        search={search}
+        setSearch={setSearch}
+        onSearch={runSearch}
+      />
 
       {/* ⚠️ `min-w-0` ON BOTH TRACKS, AND WITHOUT IT THE PAGE SCROLLS SIDEWAYS
           AT 390px. A grid item's default `min-width` is `auto`, not 0 — so a
@@ -387,11 +459,18 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
           the viewport. It is invisible until somebody opens a phone, and it has
           already been caught once here. */}
       <Container as="main" id="main" className="py-8 sm:py-10 pb-14 sm:pb-20">
-        <div className="grid gap-8 lg:grid-cols-[240px_1fr] items-start">
+        <div className="grid gap-8 lg:grid-cols-[264px_minmax(0,1fr)] items-start">
           <div className="min-w-0">
-            {/* The rail counts FILTERS, not the typed query: the query is not in
-                the rail, so „ფილტრის მოხსნა" must not claim to undo it. */}
-            <MobileCollapse panelId="catalog-filter-panel" activeCount={filterCount}>
+            {/* ⚠️ THE SWITCH IS ABOVE THE FOLD-AWAY RAIL, NOT INSIDE IT
+                (2026-09-01). Owner: „ორი მთავარი კატეგორია … მინდა იყოს
+                გადამრთველი, რომ არევა არ მოხდეს ამათი და კომფორტულად იყოს."
+                Below `lg` the panel collapses behind a „ფილტრი" button, and the
+                axis of the whole catalogue cannot be a thing you open the
+                filters to find. One instance, one piece of state, every width. */}
+            <div className="mb-3">
+              <VerticalSwitch value={filters.vertical} onChange={setVertical} counts={sideCounts} />
+            </div>
+            <MobileCollapse panelId="catalog-filter-panel" open={filtersOpen}>
               <CatalogFilters
                 filters={filters}
                 setFilters={setFilters}
@@ -399,6 +478,7 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
                 facets={facets}
                 activeCount={filterCount}
                 onReset={resetFilters}
+                requestHref={requestHref}
               />
             </MobileCollapse>
           </div>
@@ -409,14 +489,15 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
               loading={false}
               sort={sort}
               setSort={setSort}
-              search={search}
-              setSearch={setSearch}
-              onSearch={runSearch}
               view={view}
               setView={setView}
               activeFilters={activeFilters}
               removeFilter={removeFilter}
               onReset={resetFilters}
+              /* The trigger counts FILTERS, not the typed query: the query is
+                 not in the rail, so neither the badge nor „ფილტრის მოხსნა" may
+                 claim to undo it. */
+              filters={{ panelId: 'catalog-filter-panel', open: filtersOpen, onToggle: () => setFiltersOpen(o => !o), count: filterCount }}
             />
 
             <div className="relative">
@@ -463,11 +544,13 @@ function Catalog({ initialProviders, tradeCounts, initialUser, requestHref }: Ca
                       </button>
                     </div>
                   </div>
-                ) : providers.length === 0 ? (
+                ) : sidePool.length === 0 ? (
                   <div className="py-12 px-6 text-center rounded-card border border-dashed border-ink-200 bg-white motion-safe:animate-fade-in">
-                    {/* The drawing replaces the grey icon disc once its PNG
-                        ships; until then `hasIllustration` keeps the disc, so
-                        this state never degrades to a bare heading. */}
+                    {/* The drawing arrived on 2026-09-03 (the owner's icon
+                        standard names this screen); `hasIllustration` is what
+                        kept the grey disc here until it did, and it stays as
+                        the guard so this state can never degrade to a bare
+                        heading if the file is ever pulled. */}
                     {hasIllustration('expertSearch') ? (
                       <div className="flex justify-center mb-2">
                         <Illustration name="expertSearch" alt="" />

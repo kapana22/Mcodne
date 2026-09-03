@@ -152,19 +152,55 @@ test('the inbox list is in the first paint, not one round trip later', () => {
   // /api/work/threads. So the inbox showed an empty column and filled it a
   // round trip later, on the one screen where the missing thing is a person
   // waiting for an answer.
-  assert.match(codeOf('components/chat/ConversationList.tsx'),
-    /useState<Thread\[\] \| null>\(initialThreads \?\? cachedThreads \?\? null\)/,
+  //
+  // ⚠️ REWRITTEN 2026-08-31, SAME GUARANTEE, TWO ROOMS. The client's inbox came
+  // back with the owner's „Messages" artboard, so this list now takes the room
+  // it polls as a prop and the cache is keyed by it. What is asserted is
+  // unchanged: the rows are in the FIRST paint, they come from the same helper
+  // the poll's route calls, and the poll still runs. The two source lines that
+  // used to be pinned as literals were pinning the spelling.
+  const list = codeOf('components/chat/ConversationList.tsx')
+  assert.match(list,
+    /useState<Thread\[\] \| null>\(initialThreads \?\? cachedThreads\.get\(endpoint\) \?\? null\)/,
     'the conversation list opens empty again')
+  // …and one cache slot per room, or a dual-role person is shown the wrong
+  // inbox for a beat every time they switch.
+  assert.match(list, /const cachedThreads = new Map<string, Thread\[\]>\(\)/,
+    'the thread cache is shared between the two rooms again')
 
   // Seeded from the SAME helper the route calls, so the rows on screen and the
-  // rows the poll returns cannot disagree.
-  const layout = codeOf('app/work/messages/layout.tsx')
-  assert.match(layout, /offerInboxRows\(await requestAccessOf\(user\.id\)\)/,
+  // rows the poll returns cannot disagree — on BOTH sides.
+  assert.match(codeOf('app/work/messages/layout.tsx'), /offerInboxRows\(await requestAccessOf\(user\.id\)\)/,
     'the inbox layout stopped reading the rows it hands down')
   assert.match(codeOf('app/api/work/threads/route.ts'), /offerInboxRows\(await requestAccessOf\(user\.id\)\)/,
     'the route and the layout build the inbox two different ways')
+  /* ⚠️ THE CLIENT'S HALF MOVED FROM `layout.tsx` TO `page.tsx` (2026-09-02) and
+     the guarantee is untouched. That room's inbox stopped being a two-pane
+     frame — the right-hand pane drew an offer conversation that the request
+     room already draws beside the price it is about, so /me/messages is a list
+     now and /me/messages/o/<id> is a resolver into the room. With no second
+     slot to fill, a layout wrapping a single page was indirection for nothing.
+     What is asserted here has not changed: the rows are seeded from the SAME
+     helper the poll's route calls. */
+  assert.match(codeOf('app/me/messages/page.tsx'), /clientInboxRows\(user\.id\)/,
+    'the client inbox page stopped reading the rows it hands down')
+  assert.match(codeOf('app/api/me/threads/route.ts'), /clientInboxRows\(user\.id\)/,
+    'the client route and its page build the inbox two different ways')
 
-  // The poll STAYS: a message can arrive while the page is open.
-  assert.match(codeOf('components/chat/ConversationList.tsx'), /fetch\('\/api\/work\/threads'\)/,
+  // The poll STAYS: a message can arrive while the page is open. It reads the
+  // room it was given, and the provider's inbox is still the default.
+  /* ⚠️ THE RULE IS „IT STILL POLLS", NOT „IT SPELLS THE CALL THIS WAY"
+     (widened 2026-09-01). The literal `fetch(endpoint)` blocked the fix for a
+     real defect: neither /api/me/threads nor /api/work/threads sends a
+     `Cache-Control`, and `force-dynamic` governs the SERVER cache rather than
+     the browser's — so after sending a message the transcript gained it (that
+     read is `no-store`) while the row beside it kept the old preview, time and
+     unread dot. The options argument is now allowed; what is still pinned is
+     that the poll exists and reads the endpoint it was given. */
+  assert.match(list, /fetch\(endpoint[,)]/,
     'the inbox stopped refreshing — a message arriving while the page is open would not show')
+  assert.match(list, /cache: 'no-store'/,
+    'the inbox row can be served from the browser cache — it will show a stale preview after a send')
+  assert.match(list, /endpoint = '\/api\/work\/threads'/,
+    'the default room is no longer the provider inbox this list was written for')
 })

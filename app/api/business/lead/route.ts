@@ -17,11 +17,13 @@
 //      write; the mail goes out afterwards via after(), best-effort.
 
 import { NextResponse, after } from 'next/server'
+import { messageText } from '@/lib/messageText'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { canSeeB2B, BusinessLeadInput, businessLeadRow, B2B_ROUTE } from '@/lib/b2b'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
+import { validationIssueMessage } from '@/lib/validationMessages'
 import { sendMail } from '@/lib/mailer'
 import { SUPPORT_EMAIL } from '@/lib/supportEmails'
 
@@ -57,7 +59,12 @@ export async function POST(req: Request) {
   // by exactly the rules the browser applied, never by a second hand-written copy.
   const parsed = BusinessLeadInput.safeParse(json)
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: 'INVALID' }, { status: 400 })
+    const issue = parsed.error.issues[0]
+    return NextResponse.json({
+      ok: false, error: 'INVALID',
+      field: typeof issue?.path[0] === 'string' ? issue.path[0] : null,
+      message: validationIssueMessage(issue, 'შეავსეთ ველები სწორად.'),
+    }, { status: 400 })
   }
   const row = businessLeadRow(parsed.data)
 
@@ -118,7 +125,7 @@ export async function POST(req: Request) {
       const text = lines.filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join('\n')
         + (row.message ? `\n\n${row.message}` : '')
 
-      await sendMail({
+      await sendMail({ key: 'inbox.businessLead',
         // Same destination as the contact form: CONTACT_INBOX overrides, and the
         // fallback is the one advertised support address. Deliberately NOT a new
         // B2B_INBOX env var — a second address to configure is a second address
@@ -130,7 +137,7 @@ export async function POST(req: Request) {
         // an unvalidated string here is a header-injection hole. The value
         // already passed zod's .email(), which admits no newline.
         replyTo: row.email.replace(/[\r\n]/g, '').trim() || undefined,
-        subject: `[მცოდნე] B2B — ${row.companyName.replace(/[\r\n]+/g, ' ').trim()}`,
+        subject: (await messageText())('inbox.businessLead', 'subject', { company: row.companyName.replace(/[\r\n]+/g, ' ').trim() }),
         html,
         text,
       })

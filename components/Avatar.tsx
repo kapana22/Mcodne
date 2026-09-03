@@ -1,10 +1,12 @@
 import Image from 'next/image'
+import { defaultAvatarFor } from '@/lib/defaultAvatar'
 
 export function Avatar({
   src,
   name,
   size = 40,
   interactive = false,
+  shape = 'circle',
   className = '',
 }: {
   src?: string | null
@@ -13,6 +15,17 @@ export function Avatar({
   // When true, the avatar responds to hover: subtle scale + brand ring reveal.
   // Use for clickable avatars (menu triggers, profile links).
   interactive?: boolean
+  /**
+   * ⚠️ A PERSON IS A CIRCLE, A FIRM IS A ROUNDED SQUARE (2026-08-31, from the
+   * owner's design canvas — and the same distinction components/EntityCard has
+   * drawn since it was written, pinned by tests/entityCard). It is the one
+   * thing on a catalogue card that tells a reader „this is a company" without
+   * a badge saying so, and a badge is the alternative: a word on every card,
+   * to make a distinction a shape makes for free.
+   *
+   * Default stays `circle` — 40-odd call sites are people.
+   */
+  shape?: 'circle' | 'card'
   className?: string
 }) {
   const s = { width: size, height: size }
@@ -30,7 +43,10 @@ export function Avatar({
           non-square photo (or any next/image intrinsic sizing) can NEVER show
           square corners outside the circle — the reported "photo escapes the
           frame" bug. The ring lives on the clip. */}
-      <span className="block w-full h-full rounded-full overflow-hidden ring-2 ring-white" style={s}>
+      <span
+        className={`block w-full h-full overflow-hidden ring-2 ring-white ${shape === 'card' ? 'rounded-card' : 'rounded-full'}`}
+        style={s}
+      >
         {hasPhoto ? (
           <Image
             src={src!}
@@ -53,19 +69,38 @@ export function Avatar({
             // exactly this class of bug. An image appearing is not an event.
             className="w-full h-full object-cover"
           />
-        ) : (
-          // Friendly on-brand default: a soft person glyph on the brand-green
-          // wash. Shown for every photo-less user (incl. Google auto-avatars)
-          // until they upload their own — no letter monogram, no stock face.
+        ) : shape === 'card' ? (
+          // ⚠️ A FIRM DOES NOT GET A FACE. The rounded square is the one thing
+          // on a catalogue card that says „this is a company" without a badge,
+          // and a portrait inside it says the opposite in a louder voice. The
+          // abstract glyph that used to be everybody's default stays here,
+          // where „a person" is not the answer, until the set has a firm mark.
           <span
             aria-label={name ? `${name} — ავატარი` : 'ავატარი'}
-            className="w-full h-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-end justify-center overflow-hidden motion-safe:animate-fade-in-fast"
+            className="w-full h-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-end justify-center overflow-hidden"
           >
             <svg viewBox="0 0 40 40" className="w-full h-full" aria-hidden>
               <circle cx="20" cy="15.5" r="6.8" className="fill-brand-600" />
               <path d="M6.5 37c0-7.7 6-13 13.5-13s13.5 5.3 13.5 13z" className="fill-brand-600" />
             </svg>
           </span>
+        ) : (
+          // The default for a PERSON: one of the two drawn portraits, picked
+          // from the name so the same person keeps the same face on every
+          // screen (see lib/defaultAvatar). It replaced the glyph above on
+          // 2026-09-03, with the rest of the 3D set.
+          //
+          // NO entrance animation here either, for the reason given above: the
+          // fallback is what most rows draw, and a fade-in with fill-mode holds
+          // them invisible until the first frame.
+          <Image
+            src={defaultAvatarFor(name)}
+            alt=""
+            aria-label={name ? `${name} — ავატარი` : 'ავატარი'}
+            width={size}
+            height={size}
+            className="w-full h-full object-cover"
+          />
         )}
       </span>
     </span>

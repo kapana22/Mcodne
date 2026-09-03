@@ -1,5 +1,6 @@
 node_modules
 .next
+.next-check
 out
 .env
 .env.local
@@ -19,3 +20,11 @@ scripts/_qa*.ts
 
 # Build output written by a stray distDir override — never commit it.
 private/
+
+# Playwright's own output — a trace zip is ~5 MB and a failed run leaves several.
+# `railway up` uploads the WORKING TREE, so anything here would ship with the
+# site if it were not ignored.
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

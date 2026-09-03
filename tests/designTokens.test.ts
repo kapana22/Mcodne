@@ -19,7 +19,7 @@
 // Both are now enforced here, arithmetically — the ratios below are computed,
 // not pasted, so re-tuning a palette step re-runs the real check.
 
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { execSync } from 'child_process'
 
@@ -84,7 +84,39 @@ const AA = 4.5
   }
   // Same element, both classes. `bg-brand-500/40` style opacity utilities are
   // decoration (a glow, a track) and are excluded by the `[^/]` guard.
-  const offenders = grep('bg-brand-500[^/]').filter(l => /text-white(?![\w/])/.test(l))
+  //
+  // ⚠️ ONE LINE IS NOT ONE ELEMENT (2026-08-31). This filter read a grep line
+  // at a time, and a `className={…}` holding a ternary spans several — so
+  // components/work/WorkspaceSidebar.tsx put `text-white` on one line and
+  // `bg-brand-500` on the next, and THIS GUARD, written for exactly that
+  // defect, walked past it. Nothing else would have caught it: the branch was
+  // unreachable (navConfig defines two badge keys and both name their own
+  // colour), so no screen showed it and no eye could find it. The third badge
+  // somebody added would have shipped 3.38 contrast.
+  //
+  // So the unit is now the className EXPRESSION, not the line. `spans` pulls
+  // each `className=…` out whole, newlines and all, and both tokens have to
+  // land inside the same one.
+  const spans = (): string[] => {
+    const out: string[] = []
+    const walk = (dir: string) => {
+      for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
+        const rel = `${dir}/${e.name}`
+        if (e.isDirectory()) { if (e.name !== 'node_modules') walk(rel); continue }
+        if (!/\.tsx$/.test(e.name)) continue
+        const src = read(rel)
+        for (const m of src.matchAll(/className=(?:\{`[\s\S]*?`\}|\{[\s\S]*?\n?\s*\}|"[^"]*")/g)) {
+          out.push(`${rel}:${src.slice(0, m.index).split('\n').length}:${m[0]}`)
+        }
+      }
+    }
+    walk('app'); walk('components')
+    return out
+  }
+  const bothIn = (token: RegExp) =>
+    spans().filter(sp => token.test(sp) && /text-white(?![\w/])/.test(sp))
+
+  const offenders = bothIn(/bg-brand-500(?!\/)/)
   check(
     'B: no element pairs a brand-500 fill with white text',
     offenders.length === 0,
@@ -269,24 +301,50 @@ const AA = 4.5
 // different lines, which is exactly the shape a `grep h-8 | grep onClick`
 // would miss.
 {
-  const { readdirSync } = require('fs') as typeof import('fs')
+  // ⚠️ THE WHOLE APP, NOT JUST /admin (2026-09-01), AND h-9 COUNTS. This
+  // walked one directory and looked for h-7/h-8 — so 36px (`h-9`) passed, and
+  // everything outside /admin was never looked at. Two real ones were sitting
+  // in the open: the „← უკან" button on the REQUEST WIZARD, the flow every
+  // client walks, and the remove-avatar button in /settings. Both were a flat
+  // `h-9`: 36px under a thumb, on a phone, below the floor CLAUDE.md calls a
+  // rule that protects a person.
+  //
+  // `h-9` is only wrong UNPREFIXED. `h-10 sm:h-9` is the canon's compact tier —
+  // 40px on touch, 36px where there is a mouse — so a tag carrying an `sm:h-9`
+  // is correct and must not be reported.
+  const { readdirSync, statSync } = require('fs') as typeof import('fs')
   const offenders: string[] = []
   const tag = /<(?:button|a|Link)\b[^>]*>/gs
-  for (const f of readdirSync(join(root, 'app/admin')).filter(f => f.endsWith('.tsx'))) {
-    const src = read(join('app/admin', f))
+  const walk = (dir: string): string[] => {
+    const out: string[] = []
+    for (const e of readdirSync(join(root, dir))) {
+      const rel = `${dir}/${e}`
+      if (statSync(join(root, rel)).isDirectory()) out.push(...walk(rel))
+      else if (e.endsWith('.tsx')) out.push(rel)
+    }
+    return out
+  }
+  for (const rel of [...walk('app'), ...walk('components')]) {
+    const src = read(rel)
     for (const m of src.matchAll(tag)) {
       // Comment lines inside a tag (`// h-8 is 32px…`) are prose, not classes.
       const t = m[0].replace(/^\s*\/\/.*$/gm, '')
       if (!/\bonClick=|\bhref=/.test(t)) continue
-      if (!/(?<![\w:-])h-[78](?![\w.])/.test(t)) continue
+      if (!/(?<![\w:-])h-[789](?![\w.])/.test(t)) continue
       if (/\btap-area\b/.test(t)) continue
-      offenders.push(`app/admin/${f}:${src.slice(0, m.index).split('\n').length}`)
+      offenders.push(`${rel}:${src.slice(0, m.index).split('\n').length}`)
     }
   }
   check(
-    'G: no h-7/h-8 element with onClick/href in app/admin',
-    offenders.length === 0,
-    `${offenders.length} tappable chip(s) under the 40px floor: ${offenders.slice(0, 5).join(', ')}. Use h-10 sm:h-9 (Btn size="sm") or add tap-area.`,
+    // ⚠️ A RATCHET, NOT A ZERO — and the number is the point. Everything a
+    // CLIENT or a PROVIDER can reach is at the floor as of 2026-09-01; what is
+    // left is the admin panel plus the impersonation banner, which only an
+    // operator sees and which the owner has deprioritised. The limit exists so
+    // the pile cannot grow while that stays true: add one anywhere and this
+    // fails. Fix an admin one and LOWER the number — never raise it.
+    'G: no NEW tap target under 40px (client-facing is already at zero)',
+    offenders.length <= 6,
+    `${offenders.length} tappable chip(s) under the 40px floor (limit 6): ${offenders.slice(0, 6).join(', ')}. Use h-10 sm:h-9 (Btn size="sm") or add tap-area.`,
   )
 }
 

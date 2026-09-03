@@ -12,8 +12,10 @@
     "test": "node scripts/check.mjs fast",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:seed": "tsx prisma/seed.ts",
-    "map": "node scripts/build-map.mjs"
+    "map": "node scripts/build-map.mjs",
+    "e2e": "playwright test",
+    "e2e:seed": "tsx prisma/seed-e2e.ts",
+    "e2e:ui": "playwright test --ui"
   },
   "engines": {
     "node": ">=20 <24"
@@ -34,6 +36,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",

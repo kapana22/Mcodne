@@ -1,6 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  // ⚠️ THE GATE AND `next dev` MUST NOT SHARE A BUILD DIR (2026-09-01).
+  //
+  // They did, and the collision was the single most expensive thing in this
+  // repo to diagnose, because it does not read as a build problem: two
+  // `next build`s over one .next leave half-written manifests, and what you
+  // see is unstyled pages, a missing manifest, or `PageNotFoundError` on an
+  // API route. Every one of those looks like the change under test.
+  //
+  // `npm run check` now sets NEXT_DIST_DIR=.next-check, so the gate builds
+  // beside the dev server instead of on top of it and the failure mode is
+  // simply gone. Railway sets nothing, gets '.next', and is unaffected —
+  // which is the point: this must not be able to change what deploys.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'i.pravatar.cc' },

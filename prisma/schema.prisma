@@ -898,6 +898,8 @@ model ServiceRequest {
   // Null = never nudged, which is what every row starts as. See
   // lib/requestRouting for the clock these two are read against.
   /**
+   * /**
+   * /**
    * /** The unanswered-request re-mail, widened to every provider. Once.
    */
   providerNudgeAt DateTime?
@@ -985,13 +987,33 @@ model RequestOffer {
   /// A String and not an enum, for the reason the rest of this subsystem gives:
   /// the set will grow (a per-hour form is the obvious fourth) and a taxonomy
   /// expected to grow is not worth an ALTER TYPE each time.
-  priceKind    String @default("FIXED")
+  priceKind     String  @default("FIXED")
   // „about ten days". Nullable because some work honestly cannot be estimated
   // before a conversation, and forcing a number there produces a fictional one.
-  daysEstimate Int?
-  // What they will actually do. The 20-character floor is zod's (lib/requests):
-  // a price with no sentence beside it is not an offer, it is a guess.
-  message      String
+  daysEstimate  Int?
+  /// ⚠️ WHAT THE PRICE COVERS — one line, and the one the CLIENT'S LIST SHOWS
+  /// (2026-09-01, the owner's design canvas: „რას მოიცავს ფასი", printed under
+  /// the price on every offer card in „Request Room v2").
+  ///
+  /// It exists because `message` could not do this job. A client comparing
+  /// three offers cannot read three paragraphs to find out which of them
+  /// includes the materials; they can read three one-liners. zod caps it at 120
+  /// characters for exactly that reason — it has to survive an ellipsis on a
+  /// 350px card.
+  ///
+  /// ⚠️ NULLABLE, AND THAT IS THE MIGRATION AND NOT A DESIGN CHOICE. Every
+  /// offer written before today has none, and a NOT NULL column with a default
+  /// would put an invented sentence in somebody's mouth — the client would read
+  /// „—" as a claim the provider never made. New offers are required to carry
+  /// one by `RequestOfferInput`; old ones render nothing where it would go.
+  priceIncludes String?
+  // The provider's own note. ⚠️ OPTIONAL SINCE 2026-09-01 — it was required with
+  // a 20-character floor, on the argument that a price with no sentence beside
+  // it is a guess. `priceIncludes` above is that sentence now, structured, and
+  // the canvas placeholders this field „არასავალდებულო" on both artboards.
+  // The COLUMN stays NOT NULL: an empty string is what „no note" means here,
+  // and 100+ rows already hold real text.
+  message       String
 
   status RequestOfferStatus @default(SENT)
 
@@ -1626,4 +1648,85 @@ model JobRun {
   ranAt  DateTime @default(now()) @db.Timestamptz(6)
   ok     Boolean?
   result Json?
+}
+
+/// ONE ROW PER ATTEMPTED OUTBOUND MESSAGE — mail and SMS both.
+///
+/// Owner, 2026-09-02: „სად მიდის როდის მიდის და ასეთი დეტალები რომ კარგად იყოს
+/// მოწესრიგებული და არ გაგვეპაროს შეცდომები." Before this table the only trace
+/// a send left was a console line in the Railway log, which scrolls away — so a
+/// letter that never arrived and a letter that was never sent looked identical
+/// from the admin, and the difference is the whole of the complaint.
+///
+/// ⚠️ WRITTEN BY THE SENDERS THEMSELVES (lib/mailer, lib/sms), after the send
+/// resolves, never by the caller. A caller that logs its own send is a caller
+/// that can forget to, and the two would then disagree about what happened.
+///
+/// ⚠️ IT HOLDS NO MESSAGE BODY. Most of what goes out is a one-time code or
+/// somebody's phone number, and a table an operator can browse is not where
+/// either belongs — `key` says WHICH message it was and lib/outbound says what
+/// that message contains. `detail` carries the provider's own error text only.
+model MessageLog {
+  id         String    @id @default(cuid())
+  /// 'mail' | 'sms'
+  channel    String
+  /// An OutboundKey (lib/outbound). Stored as text: a row must outlive a
+  /// rename of the key it names, and `outboundLabel` falls back to the raw
+  /// string for exactly that case.
+  key        String
+  /// The address or number as the sender received it. Masked at render for a
+  /// phone (lib/sms → mask); an address is shown whole, as it is in the user
+  /// table beside it.
+  to         String
+  /// 'sent' — the provider took it · 'failed' — it did not · 'held' — a rule
+  /// here stopped it (cutoff, off switch) · 'logged' — no transport configured.
+  status     String
+  /// The exact branch that answered: 'gmail', 'resend', 'send', 'log',
+  /// 'held-pre-existing', 'sender-http-402'… The status groups; this explains.
+  mode       String
+  /// The provider's own words when it refused. Truncated at 300.
+  detail     String?
+  /// The provider's id for the message, when it gave one — the string to quote
+  /// at sender.ge or Resend when asking why something did not arrive.
+  ref        String?
+  /// SMS only: parts billed. Georgian is UCS-2, so this is the cost.
+  parts      Int?
+  /// SMS only: what the CARRIER said, resolved later from sender.ge's
+  /// callback.php — 0 pending · 1 delivered · 2 undelivered.
+  ///
+  /// ⚠️ `status: 'sent'` IS NOT DELIVERY, and the gap is real rather than
+  /// pedantic. sender.ge answering 200 means it accepted the message, exactly
+  /// as Twilio's `sent` means „the carrier acknowledged receipt" while
+  /// `delivered` waits for a delivery receipt — a message can sit in the gap
+  /// for ever with nobody reporting a failure. Null = never asked.
+  delivery   Int?
+  /// When the delivery report was read, so the poller can skip settled rows.
+  deliveryAt DateTime? @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([key, createdAt(sort: Desc)])
+}
+
+/// PER-MESSAGE CONTROL — the admin's half of lib/outbound.
+///
+/// Owner, 2026-09-02: „მინდა ვმართოთ … სად მიდის როდის მიდის." The registry says
+/// what the site CAN send; this table says what it currently DOES, and an admin
+/// owns it rather than a deploy.
+///
+/// ⚠️ A ROW IS AN OVERRIDE, NOT THE TRUTH. Absent = the registry's default, so a
+/// message that has never been touched needs no row and a new message arrives
+/// switched on without a migration. Same shape as SiteText over siteTextDefs.
+///
+/// ⚠️ AND A CODE CANNOT BE SWITCHED OFF. lib/outboundSettings refuses to write a
+/// row that disables a `credential` message — a password-reset code with an off
+/// switch is somebody locked out of their account by a checkbox. Enforced on the
+/// server, not by hiding the toggle.
+model MessageSetting {
+  /// An OutboundKey (lib/outbound).
+  key       String   @id
+  mailOn    Boolean  @default(true)
+  smsOn     Boolean  @default(false)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
 }

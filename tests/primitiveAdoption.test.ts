@@ -63,13 +63,22 @@ const handButtons = count(
 ratchet(
   'hand-built card shells',
   cardShells,
-  100, // 2026-08-29: measured 100. The ratchet had been sitting at 189 since the catalogue merge while the real number fell to 100 — a ceiling 89 above the floor is not a ratchet, it is permission. Lowered to what is actually there, so the next hand-rolled card fails this test instead of being absorbed silently.
+  76, // 2026-09-01: measured 76, down from 79 — the UX sweep put `_tracker`, the
+      // provider's identity panel and the offer thread on <Card>. The file's own
+      // rule is that the limit IS the measurement, so it comes down with it;
+      // a ceiling left above the count stops guarding the next hand-rolled shell.
+      // Previously: 79 // 2026-08-31 (later the same day, after „How It Works + Help" landed on /about and /help): measured 78, down from 81 — the /about principle cards and the /help channel cards are <Card edge="hairline"> now. Same reason as the 100 → 81 step above: the owner's canvases draw one card, so a ported screen reaches for the primitive. Lowered to the measurement, as the note above requires.
+  // +1 on 2026-08-31: the redesign's 28px `rounded-panel` sections are not a
+  // <Card> tier, and one of them still spells the card shell by hand. Debt,
+  // logged rather than hidden — lower it the moment that panel becomes a
+  // primitive.
   'Use <Card> (components/Card.tsx). If the padding is not one of its tiers, that is a design decision — raise it rather than hand-rolling a shell.',
 )
 ratchet(
   'hand-built primary buttons',
   handButtons,
-  47, // 2026-08-29: measured 47, down from a 98 ceiling set at the catalogue merge. Same reasoning as the line above — the limit is the measurement, or it stops guarding anything.
+  37, // 2026-09-01: measured 37, down from 38 — /me's error boundary uses <Btn>.
+      // Previously: 38 // 2026-08-31 (later the same day): measured 38, down from 40 — /about's closing band and /help's two support actions are <Btn> now. Same reasoning as the line above — the limit is the measurement, or it stops guarding anything.
   'Use <Btn variant="primary">. A hand-built copy opts out of the shared focus ring, press state and disabled handling.',
 )
 

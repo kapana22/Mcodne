@@ -1,5 +1,6 @@
 node_modules
 .next
+.next-check
 .git
 .env
 .env.local
@@ -26,3 +27,27 @@ _audit_tmp*
 *.md
 .h.png
 .hero.png
+
+# The end-to-end walk and its fixture are development tooling — they are
+# never imported by the app and would only add weight to the deploy.
+/e2e/
+playwright.config.ts
+# ⚠️ AND ITS SEED, WHICH MUST TRAVEL WITH IT (2026-09-02). `prisma/seed-e2e.ts`
+# does `import { E2E } from '../e2e/accounts'`, so ignoring the folder while
+# uploading the importer sent Railway a file whose module does not exist —
+# `tsconfig` includes `**/*.ts` and `next build` type-checks it. Every deploy
+# after the seed was written (2026-09-02 10:56) failed with:
+#
+#     Type error: Cannot find module '../e2e/accounts'
+#
+# ⚠️ `npm run check` CANNOT CATCH THIS AND NEVER WILL. Its `next build` runs
+# against the working tree, where `e2e/` is present — the gate is green and the
+# deploy is broken, because the two do not see the same set of files. That is
+# the hazard `railway up` carries by design (CLAUDE.md: „uploads the WORKING
+# TREE"), and the only defence is that anything ignored here is ignored WITH
+# whatever imports it.
+#
+# It is dev tooling by the same argument as the line above: its own header says
+# it refuses to run against anything but a local database, and `npm run e2e:seed`
+# is the only caller.
+prisma/seed-e2e.ts

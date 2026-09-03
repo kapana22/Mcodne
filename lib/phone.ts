@@ -16,6 +16,27 @@ export function normalizePhone(raw: string | null | undefined): string {
   return plus ? `+${digits}` : digits
 }
 
+/**
+ * The `tel:` value for a number we hold, or null when there is nothing to dial.
+ *
+ * ⚠️ E.164 FOR A GEORGIAN MOBILE, VERBATIM FOR EVERYTHING ELSE. „555 12 34 56"
+ * dials from a Georgian handset and from nowhere else, so the +995 goes in —
+ * it costs nothing and is the difference between a client abroad reaching their
+ * provider and hearing a dead tone. Anything that is NOT a Georgian mobile is
+ * handed back as it was normalised rather than rejected: a landline or a
+ * foreign number is still a number somebody meant to be called, and guessing a
+ * country code onto it would dial the wrong one.
+ *
+ * Null only for an empty value — a button with no destination is not drawn.
+ */
+export function telHref(raw: string | null | undefined): string | null {
+  const n = normalizePhone(raw)
+  if (!n) return null
+  if (!isGeorgianMobile(n)) return `tel:${n}`
+  const local = n.startsWith('+995') ? n.slice(4) : n.startsWith('995') ? n.slice(3) : n
+  return `tel:+995${local}`
+}
+
 /** A Georgian mobile: 9 digits starting with 5, with or without the +995. */
 export function isGeorgianMobile(normalized: string): boolean {
   const local = normalized.startsWith('+995') ? normalized.slice(4)

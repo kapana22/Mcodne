@@ -8,6 +8,7 @@ import { runRequestJobs } from '@/lib/requestJobs'
 import { runOfferLifecycleJobs, DONE_REMINDER_DAYS, DONE_CLOSE_DAYS } from '@/lib/offerLifecycle'
 import { runCreditJobs } from '@/lib/creditsServer'
 import { sendMail } from '@/lib/mailer'
+import { refreshDeliveries } from '@/lib/messageLog'
 import { offerDoneReminderClientEmail } from '@/lib/emailTemplates'
 import { lastSweepRunAt } from '@/lib/sweepRunner'
 
@@ -44,8 +45,15 @@ import { lastSweepRunAt } from '@/lib/sweepRunner'
 //   1. Set env CLEANUP_SECRET=<random 32+ char string> in Variables
 //   2. Dashboard → Service → Cron → add job:
 //        Schedule: every 15 minutes (`0,15,30,45 * * * *`)
-//        Command:  curl -fsS -X POST -H "Authorization: Bearer $CLEANUP_SECRET" \
-//                    https://mcodne.ge/api/internal/cleanup
+//        Command:  sh -c 'curl -fsS -X POST -H "Authorization: Bearer $CLEANUP_SECRET" \
+//                    https://mcodne.ge/api/internal/cleanup'
+//
+//      ⚠️ `sh -c` IS LOAD-BEARING and this recipe used to omit it, which is how
+//      the cron came to spend days returning 401. `curlimages/curl` runs `curl`
+//      as its ENTRYPOINT, so without a shell nothing expands `$CLEANUP_SECRET`
+//      and the literal 15 characters go on the wire. Keep `-f` too: without it
+//      curl exits 0 on a 401 and Railway reports „Completed" while the sweep
+//      never ran. See lib/cronAuth for the measurements.
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -78,6 +86,13 @@ export async function POST(req: Request) {
   let eventsPruned = 0
   try { eventsPruned = await pruneEvents() } catch { /* best-effort */ }
 
+  // ── Did the texts we sent actually arrive? ─────────────────────────────
+  // sender.ge's 200 only means it accepted the message; callback.php is the
+  // carrier's answer (lib/sms → deliveryStatus). Without this tick the log can
+  // claim „გაიგზავნა" for a text that never rang a phone.
+  let deliveries = { checked: 0, settled: 0 }
+  try { deliveries = await refreshDeliveries() } catch { /* best-effort */ }
+
   // ── The requests subsystem's own jobs ──────────────────────────────────
   // Re-route a request nobody answered (once, widened past the sphere that
   // stayed silent), remind a client sitting on unchosen offers (once), and
@@ -101,7 +116,7 @@ export async function POST(req: Request) {
   const offerJobs = requestsOn()
     ? await runOfferLifecycleJobs(now.getTime(), {
         remindClient: async o => {
-          await sendMail({ to: o.email, ...offerDoneReminderClientEmail({ publicRef: o.publicRef, topicLabel: topicLabel(o.topic) }) })
+          await sendMail({ key: 'request.doneReminder.client', to: o.email, ...(await offerDoneReminderClientEmail({ publicRef: o.publicRef, topicLabel: topicLabel(o.topic) })) })
         },
         remindProvider: async (ids, o) => {
           await notifyMany(ids, {
@@ -137,6 +152,7 @@ export async function POST(req: Request) {
       notifications: notifs.count,
     },
     eventsPruned,
+    deliveries,
     requests: requestJobs,
     offers: offerJobs,
     // The only place an operator can see the earn-back is alive.

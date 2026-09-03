@@ -9,12 +9,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Btn } from '@/components/Btn'
+import { Icon } from '@/components/Icon'
 import {
   ServiceRequestInput, KIND, kindOf, TIMING, FORMATS, CITIES, ONE_CITY,
   extrasFor, topicLabel, kindsOfTopic, OTHER_TOPIC,
   MAX_REQUEST_PHOTOS, VERTICAL_COPY,
   type RequestKindName, type Vertical,
 } from '@/lib/requests'
+import { validationIssueMessage } from '@/lib/validationMessages'
+import { useFault } from '@/components/FieldError'
 import { newFlowId } from '@/lib/funnelEvents'
 import { WorkPhotos } from '@/app/join/_provider/_workPhotos'
 import { REQUEST_FUNNEL_EVENTS, trackRequestFunnel } from './requestFunnelEvents'
@@ -30,6 +33,7 @@ import { StepPick } from './_stepPick'
 import { StepContact } from './_stepContact'
 import type { AccountOutcome } from '@/lib/requestAccount'
 import { ThanksCard } from './_thanks'
+import { actionError, SEND_FAILED } from '@/lib/actionErrors'
 
 type Status = 'idle' | 'sending' | 'error'
 export type Sent = {
@@ -44,13 +48,28 @@ export type Sent = {
 }
 
 /** Server codes → Georgian. Never surface a raw code to a reader. */
-function errText(code?: string): string {
-  switch (code) {
-    case 'RATE_LIMITED': return 'ძალიან ბევრი მოთხოვნა — სცადე ცოტა ხანში.'
-    case 'INVALID': return 'შეავსე ველები სწორად.'
-    default: return 'ვერ გაიგზავნა — სცადე თავიდან.'
-  }
-}
+/* Every case this screen had is a shared one — RATE_LIMITED, INVALID, and a
+   send's default. It keeps no map of its own. */
+const errText = (code?: string) => actionError(code, {}, SEND_FAILED)
+
+/**
+ * The three boxes the LAST screen owns, and the only ones a refusal can be put
+ * on from here.
+ *
+ * ⚠️ EVERY OTHER FIELD BELONGS TO A SCREEN THAT IS NO LONGER ON SCREEN. A
+ * `topic`, `timing` or `budgetBand` issue means the draft got past
+ * `stepComplete` in some state the wizard did not expect (that has happened
+ * once — see the clarifier note further down, where a chip id was written into
+ * `draft.timing` and „გაგზავნა" then stayed dead for the rest of the run). It
+ * cannot be pointed at a control, so it stays a form-level line — with, at
+ * least, the field-aware sentence `validationIssueMessage` builds from the path.
+ *
+ * `description` IS on the list even though it folds away: its only rule is
+ * `.max(4000)`, so a value that breaks it is by definition non-empty, and the
+ * screen opens the box for any non-empty description. There is no state where
+ * that fault has no control to land on.
+ */
+const CONTACT_FIELDS = new Set(['contactName', 'phone', 'email', 'description'])
 
 /* ── The draft survives a refresh ──────────────────────────────────────────
    sessionStorage, revived through reviveDraft and applied AFTER mount — the
@@ -117,6 +136,8 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
   const [restored, setRestored] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [errorText, setErrorText] = useState<string | null>(null)
+  // Which box on the contact screen is wrong, and why — see components/FieldError.
+  const contact = useFault('req')
   const [sent, setSent] = useState<Sent | null>(null)
   const hydratedRef = useRef(false)
   const sentRef = useRef(false)
@@ -233,12 +254,35 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
   const patch = (p: Partial<Draft>) => {
     setDraft(d => ({ ...d, ...p }))
     if (status === 'error') { setStatus('idle'); setErrorText(null) }
+    // Clear the fault the moment they start fixing THAT box — a red border
+    // under a field they have already corrected is noise.
+    for (const k of Object.keys(p)) contact.clearField(k)
   }
 
+  /* ⚠️ A REFUSAL USED TO LAND AT THE FOOT OF THE PAGE (fixed 2026-08-31). The
+   * contact screen is three boxes and a submit; the schema already knew which
+   * one was wrong — `issues[0].path` — and the wizard threw the path away and
+   * printed the sentence in a red strip under the button. On a phone, with the
+   * description box open, „ნომერი არასწორია" appeared below the fold of the
+   * field it was about, with nothing marking that field at all.
+   *
+   * The path is now carried onto the control: red border, `aria-invalid`,
+   * `aria-describedby` → the sentence, and the cursor moved there. The sentence
+   * itself is unchanged — the schema's own Georgian message, or
+   * `validationIssueMessage` for a structural issue with no copy of its own. */
   const submit = async (d: Draft) => {
     if (status === 'sending') return
+    contact.reset()
     const parsed = ServiceRequestInput.safeParse(d)
-    if (!parsed.success) { setStatus('error'); setErrorText(errText('INVALID')); return }
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0]
+      const path = typeof issue?.path?.[0] === 'string' ? issue.path[0] : ''
+      const text = validationIssueMessage(issue, errText('INVALID'))
+      if (CONTACT_FIELDS.has(path)) { contact.fail(path, text); return }
+      setStatus('error')
+      setErrorText(text)
+      return
+    }
     setStatus('sending')
     setErrorText(null)
     try {
@@ -257,7 +301,12 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) {
         trackRequestFunnel(REQUEST_FUNNEL_EVENTS.failed, { flowId: flowIdRef.current, code: String(j?.error ?? 'ERROR') })
-        setStatus('error'); setErrorText(errText(j?.error)); return
+        // The endpoint answers with the SAME `field` + `message` pair the schema
+        // produced here, so a refusal that only the server could reach (a
+        // crafted body, a schema this build is behind on) still lands on a box.
+        const field = typeof j?.field === 'string' ? j.field : ''
+        if (CONTACT_FIELDS.has(field) && j?.message) { contact.fail(field, j.message); return }
+        setStatus('error'); setErrorText(j?.message ?? errText(j?.error)); return
       }
       trackRequestFunnel(REQUEST_FUNNEL_EVENTS.sent, {
         flowId: flowIdRef.current, kind: d.kind, topic: d.topic, rejected: Boolean(j.rejected),
@@ -295,6 +344,31 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
   const back = () => setStepId(prevStepId(step.id, draft))
 
   /** One tap on a single-question screen: record the answer, go. */
+  /** The question this screen is waiting on, once somebody has tried to leave
+   *  it. Null until then — a form that goes red before you have touched it is
+   *  telling you off for arriving. */
+  const [missingQ, setMissingQ] = useState<string | null>(null)
+
+  /** Mark it, and take them to it. The same gesture app/join uses for a refused
+   *  field (`stopOn`): a message with nothing scrolled into view is a message
+   *  nobody reads on a screen this long. */
+  const stopOnQuestion = (id: string) => {
+    setMissingQ(id)
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(`[data-question="${id}"]`)
+      if (!el) return
+      const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      el.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center' })
+    })
+  }
+
+  /** The date, on a screen that also carries clarifiers: recorded, never an
+   *  advance. See the note in `pickOption`. */
+  const pickTiming = (id: string) => {
+    setDraft(d => ({ ...d, timing: id }))
+    setMissingQ(null)
+  }
+
   const pickAndGo = (p: Partial<Draft>) => {
     const d = { ...draft, ...p }
     setDraft(d)
@@ -352,8 +426,8 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
    *
    * ⚠️ DISAMBIGUATED BY ID, not by which list was clicked. On the format screen
    * both the format rows and the city rows are on screen at once; their ids
-   * cannot collide (ONLINE/IN_PERSON/EITHER vs TBILISI/…), so one function
-   * serves both and there is no „which list did this come from" to get wrong.
+   * cannot collide (ONLINE/IN_PERSON vs TBILISI/…), so one function serves both
+   * and there is no „which list did this come from" to get wrong.
    */
   /**
    * A tap on a CLARIFIER chip — and it is deliberately NOT `pickOption`.
@@ -395,14 +469,38 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
       advance(d, 'kind')
       return
     }
-    if (step.id === 'timing') { pickAndGo({ timing: id }); return }
+    if (step.id === 'timing') {
+      /* ⚠️ THE TAP THAT ENDED THE SCREEN COULD SKIP THE QUESTIONS ABOVE IT
+         (2026-09-01, owner: „ერთს რომ ვაწვები ვერ ვხდები რომ მეორესაც უნდა
+         დავაწვე"). Reproduced on the live wizard: on „ბინის დალაგება" this
+         screen asks THREE questions — სად · რამდენი ოთახია · როდის მოვიდეს —
+         and only the last one advanced. Answering the first and tapping a date
+         moved the run on with the room count silently dropped, and the code's
+         own note two hundred lines up says the lead's quality IS the product
+         on a paid-lead platform.
+         With clarifiers on the page the date is no longer the exit: nothing on
+         this screen advances by itself and „გავაგრძელოთ" is the one way out —
+         which is also what makes every row here behave the same way. */
+      if (extras.length > 0) { pickTiming(id); return }
+      pickAndGo({ timing: id })
+      return
+    }
     if (step.id === 'city') { pickAndGo({ city: id as Draft['city'] }); return }
     if (step.id === 'format') {
       if (CITIES.some(c => c.id === id)) { pickAndGo({ city: id as Draft['city'] }); return }
-      // In-person needs the city; online does not — the sub-question appears
-      // only on the answer that earns it, so this one does NOT advance.
-      if (id === 'ONLINE' || id === 'EITHER') { pickAndGo({ format: id as Draft['format'] }); return }
-      patch({ format: id as Draft['format'] })
+      // ⚠️ ONLY THE ANSWER THAT ACTUALLY OPENS A SUB-QUESTION HOLDS THE SCREEN,
+      // and until 2026-08-31 „ადგილზე" held it unconditionally. The city list
+      // it was waiting for is drawn under `!ONE_CITY` (below), and ONE_CITY has
+      // been true since 2026-08-20 — so tapping „ადგილზე" highlighted the row,
+      // revealed nothing, and left a run with no way forward: no city list, no
+      // continue button, and the number keys landing on this same branch.
+      // Owner, 2026-08-31: „როცა ადგილზე ვაწვები არ მუშაობს."
+      //
+      // The `numbered` prop three hundred lines down had ALREADY been taught
+      // about one city („with one city there is no list below"); the advance
+      // had not, which is why the screen looked right and did nothing.
+      if (id === 'IN_PERSON' && !ONE_CITY) { patch({ format: 'IN_PERSON' }); return }
+      pickAndGo({ format: id as Draft['format'] })
     }
   }
 
@@ -452,7 +550,8 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
 
   if (sent) {
     return (
-      <RequestShell>
+      <RequestShell
+    >
         {/* The transform, not a page: the last screen leaves and the room
             arrives with the same entrance every step used (`slide-in-b`), so
             it reads as the next step of the same errand — which it is. One
@@ -466,6 +565,31 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
 
   return (
     <RequestShell
+      /* ⚠️ THE PRIMARY ACTION IS THE SHELL'S STICKY BAR NOW (2026-08-31, from
+         the owner's `Mobile.dc.html`). It was an in-flow row at the foot of a
+         column whose answers sit above the fold, so on a phone the way forward
+         was below the scroll on the one screen that has to be effortless. The
+         BUTTON is unchanged — same handler, same disabled and busy states, same
+         words; only where it lives moved. Tap-screens still advance on the tap,
+         so the bar is empty on those and the shell draws nothing.
+
+         ⚠️ AND IT MUST LIVE ON *THIS* SHELL. It was attached to the one inside
+         `if (sent)` — the THANK-YOU screen — where `step.id` is never 'contact',
+         so the bar was empty there AND absent here: the contact screen had no
+         send button at all and a finished request could not be filed. Found by
+         walking the intake signed in (2026-09-01); the wizard renders two
+         shells and the prop went to the wrong one. */
+      action={step.id === 'contact' ? (
+        <Btn
+          onClick={() => advance(draft)}
+          disabled={status === 'sending'}
+          aria-busy={status === 'sending'}
+          size="lg"
+          className="w-full"
+        >
+          {status === 'sending' ? 'იგზავნება…' : 'გაგზავნა'}
+        </Btn>
+      ) : undefined}
       progress={progressOf(step.id, draft)}
       // ⚠️ SHOWN FROM THE FIRST SCREEN, unlike the counter below it. The whole
       // point is that the SHAPE of the run is legible before the first tap —
@@ -477,6 +601,19 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
       // Two when the person is already chosen, three otherwise — one source,
       // `stepsFor`, so a stage cannot be named that this run never reaches.
       stages={stagesFor(draft)}
+      // ⚠️ BACK ONLY, AND THE SHELL ENFORCES THAT — it hands this to the
+      // FINISHED rows and nothing else (2026-09-01). The target is the first
+      // step of the stage, read from `stepsFor` rather than a second table, so
+      // a stage whose screens change cannot start landing on the wrong one.
+      // Nothing is cleared: the draft is untouched and walking forward again
+      // steps over answers that are already there.
+      onStage={id => {
+        const first = stepsFor(draft).find(st => stageOfStep(st.id) === id)
+        if (first) {
+          setStepId(first.id)
+          window.scrollTo({ top: 0 })
+        }
+      }}
       // The recipient's name, said once, for the whole run — see _shell.
       to={to ? { name: to.name, photoSrc: to.photoSrc } : null}
       // Not on the first screen: until a topic is picked the run's length is a
@@ -535,7 +672,7 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
           <button
             type="button"
             onClick={back}
-            className="inline-flex items-center gap-1.5 h-9 -ml-1 px-2 rounded-btn text-small font-display font-semibold text-ink-600 hover:text-ink-900 hover:bg-ink-75 motion-safe:active:scale-[0.97] transition-[color,background-color,transform] duration-fast"
+            className="inline-flex items-center gap-1.5 h-10 sm:h-9 -ml-1 px-2 rounded-btn text-small font-display font-semibold text-ink-600 hover:text-ink-900 hover:bg-ink-75 motion-safe:active:scale-[0.97] transition-[color,background-color,transform] duration-fast"
           >
             {/* Functional, not decoration: it is the direction of travel and the
                 whole label at 390px where the word is what shrinks first. */}
@@ -616,6 +753,13 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
                browse list AND the search hits (see _stepWhat → `only`), and
                empty means „no narrowing", never „nothing". */
             onlyTopics={to?.topics ?? covered}
+            /* ⚠️ THE HALF `onlyTopics` CAN NO LONGER SAY (2026-09-02). The list
+               above is narrowed in two very different senses — to ONE provider
+               the client chose, or to the roster's covered topics — and only
+               the first should greet somebody with the browse panel already
+               open. `covered` is never empty, so passing that distinction
+               through the array's length opened the panel for every visitor. */
+            narrowed={Boolean(to?.topics?.length)}
             // ⚠️ THE CATALOGUE COULD NOT NAME IT, SO THE SENTENCE BECOMES THE
             // REQUEST (2026-08-17). „მჭირდება სახლის დალაგება" matched nothing
             // — there is no cleaning topic — and the screen used to answer
@@ -676,31 +820,105 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
         {step.id === 'kind' && (
           <StepPick options={options} value={draft.kind} onPick={pickOption} numbered />
         )}
+        {/* ══════ THE DETAILS SCREEN — EVERY QUESTION DRAWN THE SAME WAY ══════
+            ⚠️ MEASURED ON THE LIVE WIZARD, 2026-09-01, „ბინის დალაგება" at
+            390px, and every number below is why this block was rewritten:
+
+              · the two clarifier headings were 13px/600 — SMALLER than the
+                16px option labels underneath them. A heading quieter than its
+                own answers is not a heading, it is a caption.
+              · the THIRD question had no heading at all. `stepsFor` swaps
+                `KIND[kind].timingLabel` for the page title „ორიოდე დეტალი" when
+                clarifiers exist, so the one question that ended the screen was
+                the only one with nothing naming it — it read as four more rows
+                of „რამდენი ოთახია".
+              · 10px between rows of one question, 24px between two DIFFERENT
+                questions. Nine identical rows, one list.
+
+            So the three complaints in the owner's sentence are one defect: the
+            page never said it was asking three things. It says so now — one
+            heading treatment, a tick that fills as each is answered, and real
+            air between them.
+
+            ⚠️ THE TIMING QUESTION IS IN THIS LIST, NOT UNDER IT. It is asked of
+            everybody and the others are not, which is why it used to be the
+            exit — but „asked of everybody" is a fact about the vocabulary, not
+            something the person answering can see. On this screen it is simply
+            the last question, and it gets its own name back. */}
         {step.id === 'timing' && extras.length > 0 && (
-          <div className="flex flex-col gap-6 mb-6">
-            {extras.map((q, i) => (
-              <div key={q.id}>
-                {/* The screen's own title names the group, so each question
-                    still has to name itself — two unlabelled chip rows are two
-                    questions nobody can tell apart. */}
-                <p className="text-small font-display font-semibold text-ink-800 mb-2.5">{q.label}</p>
-                <StepPick
-                  options={[...q.options]}
-                  value={draft.details[q.id] ?? ''}
-                  // ⚠️ ITS OWN QUESTION, BOUND HERE. Never `pickOption` — see
-                  // `answerExtra`: the option ids collide with the timing
-                  // ladder's, so the row that was tapped is the only thing that
-                  // knows which question it answers.
-                  onPick={optionId => answerExtra(q.id, optionId)}
-                  // Numbered on the first UNANSWERED one only — the keys index
-                  // that list (see `options`), and a badge on a row the digits
-                  // do not reach is a lie about the shortcut.
-                  // Never numbered: the digits belong to the timing list below,
-                  // which is the question that advances.
-                  numbered={false}
-                />
-              </div>
+          <div className="flex flex-col gap-8 mb-6">
+            {[
+              ...extras.map(q => ({
+                id: q.id,
+                label: q.label,
+                options: [...q.options],
+                value: draft.details[q.id] ?? '',
+                // ⚠️ ITS OWN QUESTION, BOUND HERE. Never `pickOption` — see
+                // `answerExtra`: the option ids collide with the timing
+                // ladder's, so the row that was tapped is the only thing that
+                // knows which question it answers.
+                pick: (optionId: string) => { answerExtra(q.id, optionId); setMissingQ(null) },
+                // The digits index ONE list (see `options`) and that list is
+                // the timing ladder — a badge on a row the keys do not reach
+                // is a lie about the shortcut.
+                numbered: false,
+              })),
+              {
+                id: 'timing',
+                label: KIND[kind].timingLabel,
+                options,
+                value: draft.timing,
+                pick: (optionId: string) => pickOption(optionId),
+                numbered: true,
+              },
+            ].map(q => (
+              <section key={q.id} data-question={q.id}>
+                <div className="mb-3 flex items-center gap-2.5">
+                  {/* Filled when answered, hollow when not — so „what is left"
+                      is readable at a glance down the page rather than by
+                      re-reading every group. */}
+                  <span
+                    aria-hidden
+                    className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors duration-fast ${
+                      q.value ? 'bg-brand-600 text-white' : 'border border-ink-300 bg-white'
+                    }`}
+                  >
+                    {q.value && <Icon.check aria-hidden className="h-3 w-3" />}
+                  </span>
+                  <h2 className={`font-display text-body-lg font-bold transition-colors duration-fast ${
+                    missingQ === q.id ? 'text-danger-700' : 'text-ink-900'
+                  }`}>
+                    {q.label}
+                  </h2>
+                </div>
+                <StepPick options={q.options} value={q.value} onPick={q.pick} numbered={q.numbered} />
+              </section>
             ))}
+
+            {/* ⚠️ A BUTTON, BECAUSE THE SCREEN STOPPED HAVING A SECRET EXIT.
+                It is pressable while the form is incomplete and REPORTS — the
+                lesson app/join wrote down at length: a disabled control under a
+                long screen is a dead grey rectangle whose only feedback is that
+                nothing happened. */}
+            <div>
+              <Btn
+                size="md"
+                onClick={() => {
+                  const gap = extras.find(q => !draft.details[q.id])
+                  if (gap) { stopOnQuestion(gap.id); return }
+                  if (!draft.timing) { stopOnQuestion('timing'); return }
+                  setMissingQ(null)
+                  advance(draft, 'timing')
+                }}
+              >
+                გავაგრძელოთ
+              </Btn>
+              {missingQ && (
+                <p role="alert" className="mt-2.5 text-small text-danger-700">
+                  ერთი კითხვა ჯერ უპასუხოდაა.
+                </p>
+              )}
+            </div>
           </div>
         )}
         {/* ⚠️ THE BUDGET SCREEN IS GONE (2026-08-19). Owner: „არ გვინდა
@@ -723,7 +941,9 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
             „not asked"), so the row and every reader of it keep working. The
             floor warning that lived here went with the question: nothing left
             to warn about. */}
-        {step.id === 'timing' && (
+        {/* Only when this screen asks ONE question. With clarifiers the timing
+            ladder is drawn inside the list above, with its own heading. */}
+        {step.id === 'timing' && extras.length === 0 && (
           <StepPick options={options} value={draft.timing} onPick={pickOption} numbered />
         )}
         {step.id === 'format' && (
@@ -779,7 +999,7 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
             </div>
           </div>
         )}
-        {step.id === 'contact' && <StepContact draft={draft} patch={patch} signedIn={account !== null} />}
+        {step.id === 'contact' && <StepContact draft={draft} patch={patch} signedIn={account !== null} fault={contact} />}
       </div>
 
       {status === 'error' && errorText && (
@@ -794,18 +1014,6 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
           see the note there). The empty span stays so `justify-between` keeps
           the primary action on the right rather than jumping to the left edge
           on the screens that have one. */}
-      <div className="mt-6 flex items-center justify-between gap-3">
-        <span />
-        {step.id === 'contact' && (
-          <Btn
-            onClick={() => advance(draft)}
-            disabled={!stepComplete('contact', draft) || status === 'sending'}
-            aria-busy={status === 'sending'}
-          >
-            {status === 'sending' ? 'იგზავნება…' : 'გაგზავნა'}
-          </Btn>
-        )}
-      </div>
       </div>
     </RequestShell>
   )

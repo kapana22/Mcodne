@@ -5,6 +5,7 @@
 import { SUPPORT_EMAIL } from './supportEmails'
 import { fmtKaDateTime, type KaDateOpts } from './kaDate'
 import { topicLabel } from './requestTopics'
+import { messageText, type MessageT } from './messageText'
 
 const BASE = 'https://mcodne.ge'
 
@@ -52,6 +53,8 @@ function esc(s: string): string {
 
 // Shared shell: header wordmark, white card, optional CTA button, muted footer.
 function shell(opts: {
+  /** Resolved copy, passed in: `shell` is sync and the words are not. */
+  t?: MessageT
   heading: string
   bodyHtml: string
   cta?: { label: string; href: string }
@@ -61,7 +64,7 @@ function shell(opts: {
   footerNote?: string
 }): string {
   const { heading, bodyHtml, cta } = opts
-  const footerNote = opts.footerNote ?? 'ავტომატური შეტყობინება'
+  const footerNote = opts.footerNote ?? opts.t?.('shell', 'footer') ?? 'ავტომატური შეტყობინება'
   const button = cta
     ? `<tr><td style="padding:8px 0 4px;">
          <a href="${esc(cta.href)}" style="display:inline-block;background:${BRAND};color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 24px;border-radius:10px;">${esc(cta.label)}</a>
@@ -83,7 +86,7 @@ function shell(opts: {
           </table>
         </td></tr>
         <tr><td style="padding:16px 4px;font-size:12px;line-height:1.6;color:${MUTED};">
-          mcodne — კონსულტაციები ექსპერტებთან.<br>
+          mcodne<br>
           ${esc(footerNote)} · <a href="mailto:${SUPPORT_EMAIL}" style="color:${MUTED};">${SUPPORT_EMAIL}</a>
         </td></tr>
       </table>
@@ -104,7 +107,7 @@ function p(text: string): string {
 // which is a silent missed-session bug rather than a cosmetic one. So every
 // time string that leaves the server — email bodies AND the notify() bodies the
 // booking routes write — goes through this, never through fmtKaDateTime alone.
-export const TZ_LABEL = 'თბილისის დროით'
+export const TZ_LABEL = 'თბილისის დროით' // a timezone name, not copy
 export function fmtWhenTz(d: Date, opts?: KaDateOpts): string {
   return `${fmtKaDateTime(d, opts)} (${TZ_LABEL})`
 }
@@ -119,16 +122,18 @@ function detail(rows: { label: string; value: string }[]): string {
   </table>`
 }
 
-export function welcomeEmail(name: string) {
+export async function welcomeEmail(name: string) {
+  const t = await messageText()
   const first = (name || '').trim().split(/\s+/)[0] || ''
   return {
-    subject: 'კეთილი იყოს მობრძანება 👋',
+    subject: t('auth.welcome', 'subject'),
     html: shell({
-      heading: first ? `${esc(first)}, კეთილი იყოს შენი მობრძანება!` : 'კეთილი იყოს შენი მობრძანება!',
+      t,
+      heading: t('auth.welcome', 'heading', { name: first ? `${esc(first)}, ` : '' }),
       bodyHtml:
-        p('დარეგისტრირდი <b>მცოდნეზე</b> — აქ შენს საკითხზე პირდაპირ ექსპერტს ესაუბრები.') +
-        p('აღწერე რა გჭირდება — ექსპერტები შეთავაზებას ფასთან ერთად თავად გამოგიგზავნიან.'),
-      cta: { label: 'იპოვე ექსპერტი', href: `${BASE}/experts` },
+        p(t('auth.welcome', 'body1')) +
+        p(t('auth.welcome', 'body2')),
+      cta: { label: t('auth.welcome', 'cta'), href: `${BASE}/experts` },
     }),
   }
 }
@@ -142,17 +147,19 @@ export function welcomeEmail(name: string) {
 // and in the case the revocation exists for — someone else had registered this
 // address — this is the ONLY signal the real owner ever gets that it happened.
 // The CTA therefore goes to password recovery, not to the home page.
-export function googleLinkedEmail(name: string) {
+export async function googleLinkedEmail(name: string) {
+  const t = await messageText()
   const first = (name || '').trim().split(/\s+/)[0] || ''
   return {
-    subject: 'უსაფრთხოება — ანგარიშში Google-ით შეხვედი',
+    subject: t('auth.googleLinked', 'subject'),
     html: shell({
-      heading: first ? `${esc(first)}, ანგარიშში Google-ით შეხვედი` : 'ანგარიშში Google-ით შეხვედი',
+      t,
+      heading: t('auth.googleLinked', 'heading', { name: first ? `${esc(first)}, ` : '' }),
       bodyHtml:
-        p('შენი ელფოსტა აქამდე დადასტურებული არ იყო, ამიტომ უსაფრთხოებისთვის <b>ძველი პაროლი გავაუქმეთ</b> და ყველა გახსნილი სესია დავხურეთ.') +
-        p('ამიერიდან ანგარიშში Google-ით შედი. თუ პაროლითაც გინდა შესვლა, დააყენე ახალი — ეს ერთი წუთის საქმეა.') +
-        p(`თუ ეს შენ არ ყოფილხარ, მაშინვე მოგვწერე: <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>`),
-      cta: { label: 'ახალი პაროლის დაყენება', href: `${BASE}/signin?view=reset` },
+        p(t('auth.googleLinked', 'body1')) +
+        p(t('auth.googleLinked', 'body2')) +
+        p(t('auth.googleLinked', 'body3', { support: SUPPORT_EMAIL })),
+      cta: { label: t('auth.googleLinked', 'cta'), href: `${BASE}/signin?view=reset` },
     }),
   }
 }
@@ -196,26 +203,28 @@ export function googleLinkedEmail(name: string) {
 // day; a master who misses theirs is the supply side of a vertical that has no
 // supply, and they are the person we asked to upload a photo of their face.
 
-export function newProviderApplicationAdminEmail(o: {
+export async function newProviderApplicationAdminEmail(o: {
   name: string; kind: string; company?: string | null
   services: string[]; areas: string[]; phone?: string | null; email?: string | null
 }) {
+  const t = await messageText()
   const rows: { label: string; value: string }[] = [
-    { label: 'ტიპი', value: o.company ? `${o.kind} — ${o.company}` : o.kind },
-    { label: 'სერვისები', value: o.services.join(', ') || '—' },
-    { label: 'ქალაქი', value: o.areas.join(', ') || '—' },
-    { label: 'ტელეფონი', value: o.phone || '—' },
-    { label: 'ელფოსტა', value: o.email || '—' },
+    { label: t('application.new.admin', 'rowKind'), value: o.company ? `${o.kind} — ${o.company}` : o.kind },
+    { label: t('application.new.admin', 'rowServices'), value: o.services.join(', ') || '—' },
+    { label: t('application.new.admin', 'rowCity'), value: o.areas.join(', ') || '—' },
+    { label: t('application.new.admin', 'rowPhone'), value: o.phone || '—' },
+    { label: t('application.new.admin', 'rowEmail'), value: o.email || '—' },
   ]
   return {
     // The name rides in the subject, so strip CR/LF — header injection here
     // would be user-controlled. Same rule as the expert queue's version.
-    subject: `ახალი განაცხადი — სერვისი — ${String(o.name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 60)}`,
+    subject: t('application.new.admin', 'subject', { name: String(o.name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 60) }),
     html: shell({
-      heading: 'ახალი განაცხადი მოდერაციაში',
-      bodyHtml: p(`<b>${esc(o.name)}</b> გამოგზავნა განაცხადი სერვისზე.`) + detail(rows),
-      cta: { label: 'გახსენი მოდერაცია', href: `${BASE}/admin#masters` },
-      footerNote: 'ადმინის შეტყობინება',
+      t,
+      heading: t('application.new.admin', 'heading'),
+      bodyHtml: p(t('application.new.admin', 'body1', { name: esc(o.name) })) + detail(rows),
+      cta: { label: t('application.new.admin', 'cta'), href: `${BASE}/admin#masters` },
+      footerNote: t('application.new.admin', 'footer'),
     }),
   }
 }
@@ -224,16 +233,18 @@ export function newProviderApplicationAdminEmail(o: {
 // whole point of the message. /provider is reachable from nowhere on the site —
 // not the header, not the user menu — so until this mail existed an approved
 // master's only route in was to guess the URL or wait for the next sign-in.
-export function providerApprovedEmail(o: { name: string; note?: string | null }) {
+export async function providerApprovedEmail(o: { name: string; note?: string | null }) {
+  const t = await messageText()
   const first = (o.name || '').trim().split(/\s+/)[0] || ''
   return {
-    subject: 'დამტკიცდი — მოთხოვნები უკვე მოგდის',
+    subject: t('application.approved', 'subject'),
     html: shell({
-      heading: first ? `${esc(first)}, დამტკიცდი` : 'დამტკიცდი',
+      t,
+      heading: t('application.approved', 'heading', { name: first ? `${esc(first)}, ` : '' }),
       bodyHtml:
-        p('შენი მიმართულების და შენს ქალაქში გამოგზავნილი მოთხოვნები ახლა შენთან მოდის.') +
-        p('გახსენი სია, წაიკითხე და ფასი თვითონ დაწერე. სხვები შენს შეთავაზებას ვერ ხედავენ.') +
-        (o.note ? p(`<span style="color:${MUTED};">კომენტარი:</span> ${esc(o.note)}`) : ''),
+        p(t('application.approved', 'body1')) +
+        p(t('application.approved', 'body2')) +
+        (o.note ? p(`<span style="color:${MUTED};">${esc(t('application.approved', 'noteLabel'))}</span> ${esc(o.note)}`) : ''),
       // ⚠️ THROUGH SIGN-IN, NOT DIRECT — and this mail is exactly the case the
       // rule was written for. Every /provider surface answers notFound() rather
       // than redirecting (a redirect would tell a stranger the page is real),
@@ -241,23 +252,25 @@ export function providerApprovedEmail(o: { name: string; note?: string | null })
       // tap „გახსენი მოთხოვნები" and land on „page not found" — about the
       // workspace we had just told them they were approved for. `gatedLink`
       // 307s straight through for anyone who does turn out to have a session.
-      cta: { label: 'გახსენი მოთხოვნები', href: gatedLink('/work/requests') },
+      cta: { label: t('application.approved', 'cta'), href: gatedLink('/work/requests') },
     }),
   }
 }
 
 // The note is the message. A revision request without its reason is „fix it"
 // and nothing else, which is why the endpoint refuses to send one without.
-export function providerRevisionEmail(o: { name: string; note: string }) {
+export async function providerRevisionEmail(o: { name: string; note: string }) {
+  const t = await messageText()
   const first = (o.name || '').trim().split(/\s+/)[0] || ''
   return {
-    subject: 'განაცხადს ერთი რამ აკლია',
+    subject: t('application.revision', 'subject'),
     html: shell({
-      heading: first ? `${esc(first)}, ერთი რამ აკლია` : 'ერთი რამ აკლია',
+      t,
+      heading: t('application.revision', 'heading', { name: first ? `${esc(first)}, ` : '' }),
       bodyHtml:
         p(esc(o.note)) +
-        p('შეავსე და ხელახლა გამოგზავნე — თავიდან ყველაფრის შევსება არ დაგჭირდება.'),
-      cta: { label: 'გახსენი განაცხადი', href: `${BASE}/join?can=WORK` },
+        p(t('application.revision', 'body1')),
+      cta: { label: t('application.revision', 'cta'), href: `${BASE}/join?can=WORK` },
     }),
   }
 }
@@ -265,14 +278,16 @@ export function providerRevisionEmail(o: { name: string; note: string }) {
 // Sent, not silent. A refusal nobody is told about is somebody waiting for a
 // call that will not come — and /apply/master used to render nothing at all for
 // this status, so they could not have found out by visiting either.
-export function providerRejectedEmail(o: { name: string; note: string }) {
+export async function providerRejectedEmail(o: { name: string; note: string }) {
+  const t = await messageText()
   const first = (o.name || '').trim().split(/\s+/)[0] || ''
   return {
-    subject: 'განაცხადი არ დამტკიცდა',
+    subject: t('application.rejected', 'subject'),
     html: shell({
-      heading: first ? `${esc(first)}, განაცხადი არ დამტკიცდა` : 'განაცხადი არ დამტკიცდა',
+      t,
+      heading: t('application.rejected', 'heading', { name: first ? `${esc(first)}, ` : '' }),
       bodyHtml: p(esc(o.note)),
-      footerNote: 'თუ რამე შეიცვალა, ხელახლა გამოგზავნა შეგიძლია.',
+      footerNote: t('application.rejected', 'body1'),
     }),
   }
 }
@@ -315,13 +330,18 @@ export const ADMIN_MESSAGE_BODY_MAX = 4000
 // Where the message TAKES the person: the email CTA and the in-app notification
 // href are the same destination. Kept server-side (never accepted from the
 // request body) so a typed message can't be turned into an arbitrary link.
-const ADMIN_MESSAGE_DEST: Record<AdminMessageTemplate, { href: string; ctaLabel: string }> = {
-  expert: { href: '/join',          ctaLabel: 'ექსპერტად რეგისტრაცია' },
-  info:   { href: '/settings',      ctaLabel: 'ანგარიშის გახსნა' },
-  blank:  { href: '/notifications', ctaLabel: 'შეტყობინების ნახვა' },
+// ⚠️ THE LABEL LEFT THIS MAP (2026-09-03). It is COPY, and copy has one home
+// now — the registry the owner edits (lib/messageTextDefs → admin.directMessage
+// → ctaExpert / ctaAccount / ctaMessage). A second copy here would be the exact
+// drift this whole conversion exists to end. The map keeps the ROUTE, which is
+// not copy and must never come from the request body.
+const ADMIN_MESSAGE_DEST: Record<AdminMessageTemplate, { href: string; ctaPart: string }> = {
+  expert: { href: '/join',          ctaPart: 'ctaExpert' },
+  info:   { href: '/settings',      ctaPart: 'ctaAccount' },
+  blank:  { href: '/notifications', ctaPart: 'ctaMessage' },
 }
 
-export function adminMessageDestination(t?: string | null): { href: string; ctaLabel: string } {
+export function adminMessageDestination(t?: string | null): { href: string; ctaPart: string } {
   // Explicit allowlist rather than `MAP[t] ?? MAP.blank`: an indexed lookup with
   // '__proto__' (or 'constructor') resolves through the prototype chain and
   // returns a truthy object, which would sail past the ?? and yield href
@@ -336,12 +356,13 @@ export function sanitizeSubject(s: string): string {
   return String(s ?? '').replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim()
 }
 
-export function adminDirectMessageEmail(o: {
+export async function adminDirectMessageEmail(o: {
   name: string
   subject: string
   body: string
   template?: AdminMessageTemplate | string | null
 }) {
+  const t = await messageText()
   const first = (o.name || '').trim().split(/\s+/)[0]
   const subject = sanitizeSubject(o.subject)
   const dest = adminMessageDestination(o.template)
@@ -354,15 +375,16 @@ export function adminDirectMessageEmail(o: {
     .map(b => p(esc(b).replace(/\r?\n/g, '<br>')))
     .join('')
   return {
-    subject: subject || 'შეტყობინება მცოდნესგან',
+    subject: subject || t('admin.directMessage', 'subject'),
     html: shell({
-      heading: first ? `${esc(first)}, გამარჯობა` : 'გამარჯობა',
+      t,
+      heading: t('admin.directMessage', 'heading', { name: first ? `${esc(first)}, ` : '' }),
       bodyHtml:
         (subject ? p(`<b>${esc(subject)}</b>`) : '') +
         bodyBlocks +
-        p(`<span style="color:${MUTED};">უპასუხე პირდაპირ ამ წერილს — ჩვენს ფოსტაზე მოვა და ცოცხალი ადამიანი წაიკითხავს.</span>`),
-      cta: { label: dest.ctaLabel, href: `${BASE}${dest.href}` },
-      footerNote: 'მცოდნეს გუნდი',
+        p(`<span style="color:${MUTED};">${esc(t('admin.directMessage', 'replyNote'))}</span>`),
+      cta: { label: t('admin.directMessage', dest.ctaPart), href: `${BASE}${dest.href}` },
+      footerNote: t('admin.directMessage', 'signature'),
     }),
   }
 }
@@ -383,55 +405,68 @@ export function adminDirectMessageEmail(o: {
  */
 
 /** To every allowlisted provider the moment a request is VERIFIED. */
-export function requestVerifiedProviderEmail(o: {
+export async function requestVerifiedProviderEmail(o: {
   topicLabel: string
   kindLabel: string
   budgetLabel: string
   timingLabel: string
   requestId: string
 }) {
+  const t = await messageText()
   return {
-    subject: `ახალი მოთხოვნა — ${o.topicLabel}`,
+    subject: t('request.verified.provider', 'subject', { topic: o.topicLabel }),
     html: shell({
-      heading: 'ახალი მოთხოვნა',
+      t,
+      heading: t('request.verified.provider', 'heading'),
       bodyHtml:
         detail([
-          { label: 'რა', value: o.topicLabel },
-          { label: 'ტიპი', value: o.kindLabel },
-          { label: 'ბიუჯეტი', value: o.budgetLabel },
-          { label: 'ვადა', value: o.timingLabel },
+          { label: t('request.verified.provider', 'rowWhat'), value: o.topicLabel },
+          { label: t('request.verified.provider', 'rowKind'), value: o.kindLabel },
+          { label: t('request.verified.provider', 'rowBudget'), value: o.budgetLabel },
+          { label: t('request.verified.provider', 'rowTiming'), value: o.timingLabel },
         ]) +
         // The one line that matters after the facts: places are limited and the
         // first answers win — true, and the reason to open the mail now.
-        p('ადგილები შეზღუდულია — პირველი შეთავაზებები იგებენ.'),
-      cta: { label: 'ნახე და შესთავაზე', href: gatedLink(`/work/requests/${o.requestId}`) },
+        p(t('request.verified.provider', 'body1')),
+      cta: { label: t('request.verified.provider', 'cta'), href: gatedLink(`/work/requests/${o.requestId}`) },
     }),
   }
 }
 
 /** To the CLIENT each time an offer lands. They usually have no account — this
  *  link is their only door back in, so it is the mail's whole body. */
-export function offerArrivedClientEmail(o: {
+export async function offerArrivedClientEmail(o: {
   publicRef: string
   topicLabel: string
   priceLabel: string
+  /** „მასალა და ტრანსპორტი ფასში შედის" — what the price covers (2026-09-01,
+   *  the owner's design canvas). Optional because every offer written before
+   *  the column existed has none. */
+  priceIncludes?: string | null
   providerName: string
   offerCount: number
 }) {
+  const t = await messageText()
   return {
-    subject: `ახალი შეთავაზება — ${o.publicRef}`,
+    subject: t('request.offerArrived.client', 'subject', { ref: o.publicRef }),
     html: shell({
-      heading: 'ახალი შეთავაზება მოგივიდა',
+      t,
+      heading: t('request.offerArrived.client', 'heading'),
       bodyHtml:
         detail([
-          { label: 'მოთხოვნა', value: `${o.topicLabel} · ${o.publicRef}` },
-          { label: 'ვისგან', value: o.providerName },
-          { label: 'ფასი', value: o.priceLabel },
+          { label: t('request.offerArrived.client', 'rowRequest'), value: `${o.topicLabel} · ${o.publicRef}` },
+          { label: t('request.offerArrived.client', 'rowFrom'), value: o.providerName },
+          { label: t('request.offerArrived.client', 'rowPrice'), value: o.priceLabel },
+          // ⚠️ THE ROW IS OMITTED, NOT EMPTIED, WHEN THERE IS NONE. A „რას
+          // მოიცავს" line with a dash after it in a mail reads as a provider
+          // who declined to answer, and the older offers simply predate the
+          // field. The client's own page applies the same rule.
+          ...(o.priceIncludes ? [{ label: t('request.offerArrived.client', 'rowIncludes'), value: o.priceIncludes }] : []),
         ]) +
         p(o.offerCount > 1
-          ? `სულ ${o.offerCount} შეთავაზება გაქვს — შეადარე და აირჩიე.`
-          : 'ნახე დეტალები და თუ მოგეწონება, აირჩიე.'),
-      cta: { label: 'შეთავაზებების ნახვა', href: `${BASE}/request/${o.publicRef}` },
+          ? t('request.offerArrived.client', 'bodyMany', { count: String(o.offerCount) })
+          : t('request.offerArrived.client', 'bodyOne')),
+      cta: { label: t('request.offerArrived.client', 'cta'), href: `${BASE}/request/${o.publicRef}` },
     }),
   }
 }
@@ -455,22 +490,24 @@ export function offerArrivedClientEmail(o: {
  * at 02:00. What is promised is true and checkable: the request is recorded,
  * the link works, and offers arrive at this address.
  */
-export function requestReceivedClientEmail(o: {
+export async function requestReceivedClientEmail(o: {
   publicRef: string
   topicLabel: string
 }) {
+  const t = await messageText()
   return {
-    subject: `მოთხოვნა მივიღეთ — ${o.publicRef}`,
+    subject: t('request.received.client', 'subject', { ref: o.publicRef }),
     html: shell({
-      heading: 'მოთხოვნა მივიღეთ',
+      t,
+      heading: t('request.received.client', 'heading'),
       bodyHtml:
         detail([
-          { label: 'რა', value: o.topicLabel },
-          { label: 'კოდი', value: o.publicRef },
+          { label: t('request.received.client', 'rowWhat'), value: o.topicLabel },
+          { label: t('request.received.client', 'rowCode'), value: o.publicRef },
         ]) +
-        p('შევამოწმებთ და ექსპერტებს გადავცემთ. შეთავაზებები ამ ელფოსტაზე მოგივა.') +
-        p('ეს ბმული შენი მოთხოვნის გვერდია — შეინახე, აქ ნახავ შეთავაზებებს და მოგვწერ, თუ რამე დასამატებელი გაქვს.'),
-      cta: { label: 'ჩემი მოთხოვნა', href: `${BASE}/request/${o.publicRef}` },
+        p(t('request.received.client', 'body1')) +
+        p(t('request.received.client', 'body2')),
+      cta: { label: t('request.received.client', 'cta'), href: `${BASE}/request/${o.publicRef}` },
     }),
   }
 }
@@ -491,21 +528,23 @@ export function requestReceivedClientEmail(o: {
  * the old one is closed, and sending somebody to a dead screen to read „closed"
  * is the same silence with an extra click.
  */
-export function requestClosedNoOffersClientEmail(o: {
+export async function requestClosedNoOffersClientEmail(o: {
   publicRef: string
   topicLabel: string
 }) {
+  const t = await messageText()
   return {
-    subject: `შეთავაზება არ მოვიდა — ${o.publicRef}`,
+    subject: t('request.closedNoOffers.client', 'subject', { ref: o.publicRef }),
     html: shell({
-      heading: 'ამ მოთხოვნაზე შეთავაზება არ მოვიდა',
+      t,
+      heading: t('request.closedNoOffers.client', 'heading'),
       bodyHtml:
         detail([
-          { label: 'მოთხოვნა', value: `${o.topicLabel} · ${o.publicRef}` },
+          { label: t('request.closedNoOffers.client', 'rowRequest'), value: `${o.topicLabel} · ${o.publicRef}` },
         ]) +
-        p('ვცადეთ, მაგრამ ამ მიმართულებით თავისუფალი ექსპერტი ვერ მოვძებნეთ. მოთხოვნა დავხურეთ.') +
-        p('თუ პირობები შეიცვალა — ბიუჯეტი, ვადა ან ფორმატი — გამოგვიგზავნე ახალი მოთხოვნა და თავიდან ვცდით.'),
-      cta: { label: 'ახალი მოთხოვნა', href: `${BASE}/request` },
+        p(t('request.closedNoOffers.client', 'body1')) +
+        p(t('request.closedNoOffers.client', 'body2')),
+      cta: { label: t('request.closedNoOffers.client', 'cta'), href: `${BASE}/request` },
     }),
   }
 }
@@ -525,22 +564,24 @@ export function requestClosedNoOffersClientEmail(o: {
  * screen, unprompted, before anybody asks. There is no CTA to „claim" it,
  * because there is nothing to claim: the money is already there.
  */
-export function contactRefundedProviderEmail(o: {
+export async function contactRefundedProviderEmail(o: {
   topicLabel: string
   amountLabel: string
 }) {
+  const t = await messageText()
   return {
-    subject: `დაგიბრუნეთ ${o.amountLabel} — კლიენტი არ გამოეხმაურა`,
+    subject: t('request.contactRefunded.provider', 'subject', { amount: o.amountLabel }),
     html: shell({
-      heading: `${o.amountLabel} დაგიბრუნდა`,
+      t,
+      heading: t('request.contactRefunded.provider', 'heading', { amount: o.amountLabel }),
       bodyHtml:
         detail([
-          { label: 'მოთხოვნა', value: o.topicLabel },
-          { label: 'დაბრუნდა', value: o.amountLabel },
+          { label: t('request.contactRefunded.provider', 'rowRequest'), value: o.topicLabel },
+          { label: t('request.contactRefunded.provider', 'rowAmount'), value: o.amountLabel },
         ]) +
-        p(`ამ მოთხოვნაზე კონტაქტი გახსენი, კლიენტი კი აღარ გამოხმაურებია — არავის შეთავაზება არ მიუღია. ასეთ დროს ფული თავისით ბრუნდება ბალანსზე.`) +
-        p('არაფრის გაკეთება არ გჭირდება — თანხა უკვე ბალანსზეა.'),
-      cta: { label: 'ბალანსი', href: gatedLink('/work') },
+        p(t('request.contactRefunded.provider', 'body1')) +
+        p(t('request.contactRefunded.provider', 'body2')),
+      cta: { label: t('request.contactRefunded.provider', 'cta'), href: gatedLink('/work') },
     }),
   }
 }
@@ -548,19 +589,21 @@ export function contactRefundedProviderEmail(o: {
 /** To the chosen provider when the client accepts. The page it links to is
  *  where the contact now lives — the mail itself still carries none, so a
  *  forwarded or mis-addressed mail leaks nothing. */
-export function offerAcceptedProviderEmail(o: { topicLabel: string }) {
+export async function offerAcceptedProviderEmail(o: { topicLabel: string }) {
+  const t = await messageText()
   return {
-    subject: 'შენი შეთავაზება აირჩიეს 🎉',
+    subject: t('request.offerAccepted.provider', 'subject'),
     html: shell({
-      heading: 'შენი შეთავაზება აირჩიეს',
+      t,
+      heading: t('request.offerAccepted.provider', 'heading'),
       bodyHtml:
         // ⚠️ NO publicRef (2026-08-17). It used to be printed here in brackets.
         // It is the CLIENT'S CREDENTIAL, not a reference number — see
         // app/provider/requests/[id]/page — and a mail is the easiest place in
         // the system to read one off and keep it.
-        p(`კლიენტმა აირჩია შენი შეთავაზება — <b>${esc(o.topicLabel)}</b>.`) +
-        p('კლიენტის კონტაქტი უკვე შენს გვერდზეა. დაუკავშირდი მალე — ის ამას ელოდება.'),
-      cta: { label: 'კონტაქტის ნახვა', href: gatedLink('/work/offers') },
+        p(t('request.offerAccepted.provider', 'body1', { topic: esc(o.topicLabel) })) +
+        p(t('request.offerAccepted.provider', 'body2')),
+      cta: { label: t('request.offerAccepted.provider', 'cta'), href: gatedLink('/work/offers') },
     }),
   }
 }
@@ -584,35 +627,38 @@ export function offerAcceptedProviderEmail(o: { topicLabel: string }) {
  * and to the operator it is a job rather than a notification. The CTA differs
  * too — staff land in the panel, the client on their own page.
  */
-export function requestThreadEmail(o: {
+export async function requestThreadEmail(o: {
   toStaff: boolean
   publicRef: string
   preview: string
 }) {
+  const t = await messageText()
   const href = o.toStaff ? gatedLink('/admin?tab=requests') : `${BASE}/request/${o.publicRef}`
   const preview = o.preview.length > 140 ? `${o.preview.slice(0, 140)}…` : o.preview
   return {
     subject: o.toStaff
-      ? `[მცოდნე] შეტყობინება მოთხოვნაზე ${o.publicRef}`
-      : `პასუხი — ${o.publicRef}`,
+      ? t('thread.message', 'subjectStaff', { ref: o.publicRef })
+      : t('thread.message', 'subject', { ref: o.publicRef }),
     html: shell({
-      heading: o.toStaff ? 'კლიენტი წერს' : 'გიპასუხეთ',
+      t,
+      heading: o.toStaff ? t('thread.message', 'headingStaff') : t('thread.message', 'heading'),
       bodyHtml:
         p(o.toStaff
-          ? `მოთხოვნა ${esc(o.publicRef)} — კლიენტმა მიმოწერაში დაწერა.`
-          : 'შენს მოთხოვნაზე გიპასუხეთ.') +
+          ? t('thread.message', 'bodyStaff', { ref: esc(o.publicRef) })
+          : t('thread.message', 'body1')) +
         `<blockquote style="margin:0 0 12px;padding:10px 14px;border-left:3px solid ${BRAND};background:#f7f9f8;font-size:15px;line-height:1.6;color:${INK};white-space:pre-wrap">${esc(preview)}</blockquote>`,
-      cta: { label: 'პასუხის გაცემა', href },
+      cta: { label: t('thread.message', 'cta'), href },
     }),
   }
 }
 
-export function requestChatEmail(o: {
+export async function requestChatEmail(o: {
   toProvider: boolean
   topic: string
   publicRef: string
   preview: string
 }) {
+  const t = await messageText()
   const href = o.toProvider ? gatedLink('/work/offers') : `${BASE}/request/${o.publicRef}`
   // Trimmed to a glance. A full message in the body is a message nobody comes
   // back to the site to answer — and answering is the point.
@@ -623,16 +669,17 @@ export function requestChatEmail(o: {
     // that opens their request and belongs there; in a provider's inbox it is a
     // key to somebody else's account, sitting in a searchable archive forever.
     subject: o.toProvider
-      ? `ახალი შეტყობინება — ${topicLabel(o.topic)}`
-      : `ახალი შეტყობინება — ${o.publicRef}`,
+      ? t('chat.message', 'subjectProvider', { topic: topicLabel(o.topic) })
+      : t('chat.message', 'subject', { ref: o.publicRef }),
     html: shell({
-      heading: 'ახალი შეტყობინება',
+      t,
+      heading: t('chat.message', 'heading'),
       bodyHtml:
         p(o.toProvider
-          ? 'კლიენტმა მოგწერა შენს შეთავაზებაზე.'
-          : 'ექსპერტმა გიპასუხა.') +
+          ? t('chat.message', 'bodyProvider')
+          : t('chat.message', 'body1')) +
         `<blockquote style="margin:0 0 12px;padding:10px 14px;border-left:3px solid ${BRAND};background:#f7f9f8;font-size:15px;line-height:1.6;color:${INK};white-space:pre-wrap">${esc(preview)}</blockquote>`,
-      cta: { label: 'პასუხის გაცემა', href },
+      cta: { label: t('chat.message', 'cta'), href },
     }),
   }
 }
@@ -642,15 +689,17 @@ export function requestChatEmail(o: {
 /** To the client when the PROVIDER marked the job finished. The page it links
  *  to is where the client confirms and rates — the mail carries no name, no
  *  price, and (to a client) their own reference is not a leak. */
-export function offerDoneClientEmail(o: { publicRef: string; topicLabel: string }) {
+export async function offerDoneClientEmail(o: { publicRef: string; topicLabel: string }) {
+  const t = await messageText()
   return {
-    subject: `სამუშაო დასრულდა — ${o.publicRef}`,
+    subject: t('request.done.client', 'subject', { ref: o.publicRef }),
     html: shell({
-      heading: 'სამუშაო დასრულდა',
+      t,
+      heading: t('request.done.client', 'heading'),
       bodyHtml:
-        detail([{ label: 'მოთხოვნა', value: `${o.topicLabel} · ${o.publicRef}` }]) +
-        p('ექსპერტმა მონიშნა, რომ სამუშაო დასრულდა. შეაფასე შენს გვერდზე.'),
-      cta: { label: 'შეფასება', href: `${BASE}/request/${o.publicRef}` },
+        detail([{ label: t('request.done.client', 'rowRequest'), value: `${o.topicLabel} · ${o.publicRef}` }]) +
+        p(t('request.done.client', 'body1')),
+      cta: { label: t('request.done.client', 'cta'), href: `${BASE}/request/${o.publicRef}` },
     }),
   }
 }
@@ -658,28 +707,32 @@ export function offerDoneClientEmail(o: { publicRef: string; topicLabel: string 
 /** To the provider when the CLIENT marked the job finished. NO publicRef —
  *  the client's credential never rides in a provider mail (see
  *  offerAcceptedProviderEmail). */
-export function offerDoneProviderEmail(o: { topicLabel: string }) {
+export async function offerDoneProviderEmail(o: { topicLabel: string }) {
+  const t = await messageText()
   return {
-    subject: 'კლიენტმა სამუშაო დასრულებულად მონიშნა',
+    subject: t('request.done.provider', 'subject'),
     html: shell({
-      heading: 'სამუშაო დასრულდა',
-      bodyHtml: p(`კლიენტმა მონიშნა, რომ სამუშაო დასრულდა — <b>${esc(o.topicLabel)}</b>.`),
-      cta: { label: 'ჩემი შეთავაზებები', href: gatedLink('/work/offers') },
+      t,
+      heading: t('request.done.provider', 'heading'),
+      bodyHtml: p(t('request.done.provider', 'body1', { topic: esc(o.topicLabel) })),
+      cta: { label: t('request.done.provider', 'cta'), href: gatedLink('/work/offers') },
     }),
   }
 }
 
 /** The ONE reminder, 14 days after acceptance with nobody saying it finished
  *  (lib/offerLifecycle → runOfferLifecycleJobs). A question, not a claim. */
-export function offerDoneReminderClientEmail(o: { publicRef: string; topicLabel: string }) {
+export async function offerDoneReminderClientEmail(o: { publicRef: string; topicLabel: string }) {
+  const t = await messageText()
   return {
-    subject: `დასრულდა სამუშაო? — ${o.publicRef}`,
+    subject: t('request.doneReminder.client', 'subject', { ref: o.publicRef }),
     html: shell({
-      heading: 'დასრულდა სამუშაო?',
+      t,
+      heading: t('request.doneReminder.client', 'heading'),
       bodyHtml:
-        detail([{ label: 'მოთხოვნა', value: `${o.topicLabel} · ${o.publicRef}` }]) +
-        p('თუ სამუშაო დასრულდა, მონიშნე შენს გვერდზე და შეაფასე.'),
-      cta: { label: 'გახსნა', href: `${BASE}/request/${o.publicRef}` },
+        detail([{ label: t('request.doneReminder.client', 'rowRequest'), value: `${o.topicLabel} · ${o.publicRef}` }]) +
+        p(t('request.doneReminder.client', 'body1')),
+      cta: { label: t('request.doneReminder.client', 'cta'), href: `${BASE}/request/${o.publicRef}` },
     }),
   }
 }

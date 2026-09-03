@@ -5,7 +5,7 @@ import { Icon } from '@/components/Icon'
 import { Logo } from '@/components/Logo'
 import { gelLabel } from '@/lib/credits'
 import { Eyebrow } from '@/components/Eyebrow'
-import { navFor, CATALOG_LINK, type NavItem, type NavGroups } from './navConfig'
+import { navFor, type NavItem, type NavGroups } from './navConfig'
 import type { NavBadges } from './useNavBadges'
 
 function badgeCount(item: NavItem, badges: NavBadges): number {
@@ -42,7 +42,15 @@ function NavRow({ item, badges }: { item: NavItem; badges: NavBadges }) {
       {count > 0 && (
         <span
           className={`min-w-[20px] h-5 px-1.5 rounded-pill inline-flex items-center justify-center text-meta font-bold tabular-nums text-white ${
-            item.badgeKey === 'messages' ? 'bg-danger-500' : item.badgeKey === 'openRequests' ? 'bg-brand-600' : 'bg-brand-500'
+            /* ⚠️ THE FALLBACK IS brand-600, NOT brand-500 (2026-08-31). This
+               badge is white text on a filled brand surface, and white on
+               brand-500 measures 3.38 — below the 4.5 that small text needs.
+               No badge reaches this branch today (navConfig defines only
+               `messages` and `openRequests`), which is exactly why it was
+               wrong and nothing said so: the third badge somebody adds would
+               have shipped the failure. Measured, not assumed — brand-600 is
+               4.78 and danger-500 is 7.62. */
+            item.badgeKey === 'messages' ? 'bg-danger-500' : item.badgeKey === 'openRequests' ? 'bg-brand-600' : 'bg-brand-600'
           }`}
         >
           {count > 99 ? '99+' : count}
@@ -99,9 +107,12 @@ export function WorkspaceSidebar({ badges, groups, unearnedTetri = 0, grantPerce
         ))}
       </nav>
 
-      <div className="mt-4 pt-4 border-t border-ink-100">
-        <NavRow item={CATALOG_LINK} badges={badges} />
-      </div>
+      {/* ⚠️ THE CATALOGUE ROW IS GONE (2026-09-02). „ექსპერტები" → /experts sat
+          below a divider here, and /experts is the screen a CLIENT uses to shop
+          for somebody like this person. Owner: „თუ ექსპერტად რეგისტრირდება
+          ადამიანი, მაგ შემთხვევაში აღარ უნდა ჰქონდეს კლიენტის ფუნქციები."
+          A provider's own card is „ჩემი გვერდი" two rows above, which is the
+          selling-side answer to the one thing they might have wanted here. */}
 
       <div className="flex-1" />
 

@@ -16,13 +16,15 @@
 
 import { prisma } from './prisma'
 import { sendMail } from './mailer'
+import { sendSms } from './sms'
+import { verifiedRequestSms } from './smsTemplates'
 import { notifyMany } from './notify'
 import {
   requestVerifiedProviderEmail, offerArrivedClientEmail,
   requestClosedNoOffersClientEmail, contactRefundedProviderEmail,
 } from './emailTemplates'
-import { refundDeadContacts } from './creditsServer'
-import { CONTACT_COST_TETRI, gelLabel, contactRefundKey } from './credits'
+import { refundDeadContacts, refundSilentContact } from './creditsServer'
+import { CONTACT_REFUND_HOURS, gelLabel, contactRefundKey } from './credits'
 import { KIND, kindOf, budgetLabel, timingLabel, topicLabel, PROVIDER_ROUTE } from './requests'
 import {
   routeRequest, needsProviderNudge, needsClientNudge, shouldAutoClose,
@@ -35,6 +37,7 @@ import {
  *  whole cleanup route — the same bound every other job in that file uses. */
 const BATCH = 100
 
+
 /* ═══════════ the allowlist, as routable providers ═══════════════════════ */
 
 /**
@@ -44,14 +47,14 @@ const BATCH = 100
  * and are flagged as such — see RoutableProvider for why that is a flag rather
  * than a null.
  */
-export async function routableProviders(): Promise<(RoutableProvider & { email: string })[]> {
+export async function routableProviders(): Promise<(RoutableProvider & { email: string; phone: string | null })[]> {
   const [people, members] = await Promise.all([
     prisma.requestAccess.findMany({
       where: { active: true, kind: 'EXPERT', userId: { not: null } },
       select: {
         user: {
           select: {
-            id: true, email: true,
+            id: true, email: true, phone: true,
             // ⚠️ `tutor` WAS SELECTED HERE UNTIL 2026-08-26 AND THE RELATION IS
             // GONE — TutorProfile was dropped on 2026-08-24 and the comment
             // below already said so („ONE PROFILE SINCE 2026-08-24 … They are
@@ -88,17 +91,18 @@ export async function routableProviders(): Promise<(RoutableProvider & { email: 
     }),
     prisma.companyMember.findMany({
       where: { company: { requestAccess: { active: true } } },
-      select: { user: { select: { id: true, email: true } } },
+      select: { user: { select: { id: true, email: true, phone: true } } },
     }),
   ])
 
-  const out = new Map<string, RoutableProvider & { email: string }>()
+  const out = new Map<string, RoutableProvider & { email: string; phone: string | null }>()
   for (const p of people) {
     if (!p.user) continue
     const svc = p.user.serviceProfile
     out.set(p.user.id, {
       userId: p.user.id,
       email: p.user.email,
+      phone: p.user.phone,
       categoryId: svc?.categoryId ?? null,
       professions: svc?.professions ?? [],
       // A paused master keeps an empty list, which matches no topic — so they
@@ -113,7 +117,7 @@ export async function routableProviders(): Promise<(RoutableProvider & { email: 
     // grant is the more specific fact, and overwriting it with the company's
     // sphere-less row would drop them out of every targeted audience.
     if (out.has(m.user.id)) continue
-    out.set(m.user.id, { userId: m.user.id, email: m.user.email, categoryId: null, isCompanyMember: true })
+    out.set(m.user.id, { userId: m.user.id, email: m.user.email, phone: m.user.phone, categoryId: null, isCompanyMember: true })
   }
   return [...out.values()]
 }
@@ -145,6 +149,8 @@ export async function mailVerifiedRequest(
     select: {
       id: true, kind: true, topic: true, categoryId: true, city: true,
       budgetMin: true, budgetMax: true, timing: true,
+      // 🔒 WHO WROTE IT — read only to take them OUT of the audience below.
+      userId: true,
     },
   })
   if (!r) return { audience: 'NONE', sent: 0 }
@@ -159,11 +165,29 @@ export async function mailVerifiedRequest(
   // become a mail because it was on screen when somebody pressed send.
   const allowed = new Set(providers.map(p => p.userId))
   const audience = only ? 'MANUAL' : routed.audience
-  const recipients = only ? only.filter(id => allowed.has(id)) : routed.recipients
+  const chosen = only ? only.filter(id => allowed.has(id)) : routed.recipients
+
+  // 🔒 THE AUTHOR IS NOT AN AUDIENCE (2026-08-31). „ახალი მოთხოვნა შენს
+  // სფეროში" landing in the inbox of the person who just wrote it is the
+  // clearest possible version of the mixing the owner asked to remove („ირევა
+  // ძალიან კოდი"), and it is not only cosmetic: the mail is the invitation to
+  // bid, and bidding on your own request is refused three lines deep in
+  // app/api/provider/offers. Inviting somebody to do a thing the server will
+  // then refuse is worse than not inviting them.
+  //
+  // ⚠️ IT APPLIES TO THE MANUAL LIST TOO, and that is deliberate: an admin
+  // ticking boxes in the panel is choosing from a UI, and „I did not notice"
+  // is exactly the case a filter is for. Same reason `allowed` filters it.
+  //
+  // A COMPANY colleague is NOT filtered here — `routableProviders` keys the
+  // audience by user, and one member's request does not make the whole company
+  // ineligible to hear about work. The colleague who reads it still cannot bid
+  // on it; the offer endpoint owns that rule and owns it alone.
+  const recipients = r.userId ? chosen.filter(id => id !== r.userId) : chosen
   if (recipients.length === 0) return { audience, sent: 0 }
 
   const kind = kindOf(r.kind)
-  const mail = requestVerifiedProviderEmail({
+  const mail = await requestVerifiedProviderEmail({
     topicLabel: topicLabel(r.topic),
     kindLabel: KIND[kind].label,
     budgetLabel: budgetLabel(kind, r.budgetMin, r.budgetMax),
@@ -178,12 +202,21 @@ export async function mailVerifiedRequest(
     href: `${PROVIDER_ROUTE}/requests/${r.id}`,
   })
 
-  const byId = new Map(providers.map(p => [p.userId, p.email]))
+  const byId = new Map(providers.map(p => [p.userId, p]))
+  const smsText = await verifiedRequestSms(topicLabel(r.topic))
   let sent = 0
   for (const id of recipients) {
-    const to = byId.get(id)
-    if (!to) continue
-    try { await sendMail({ to, ...mail }); sent++ } catch { /* best-effort per address */ }
+    const p = byId.get(id)
+    if (!p) continue
+    try { await sendMail({ key: 'request.verified.provider', to: p.email, ...mail }); sent++ } catch { /* best-effort per address */ }
+    // ⚠️ THE TEXT IS AN ADDITION TO THE LETTER, NEVER A REPLACEMENT. Six of the
+    // 26 providers on the allowlist have no Georgian mobile (measured
+    // 2026-09-02), so an SMS-only path would simply stop telling them. It is
+    // also OFF until somebody turns it on in /admin — lib/outboundSettings
+    // defaults every product SMS to off, because a part is billed.
+    if (p.phone) {
+      try { await sendSms({ key: 'request.verified.provider', to: p.phone, text: smsText }) } catch { /* best-effort */ }
+    }
   }
   return { audience, sent }
 }
@@ -216,7 +249,9 @@ export async function refundDeadRequest(
   requestId: string,
   label: string,
 ): Promise<number> {
-  let refunded: string[] = []
+  /* ⚠️ PAIRS, NOT IDS (2026-09-03). A contact costs 1–10₾ by the job's budget,
+     so „N₾ დაგიბრუნდა" can only be said per provider — see refundDeadContacts. */
+  let refunded: { userId: string; amountTetri: number }[] = []
   try {
     refunded = await refundDeadContacts(requestId)
   } catch {
@@ -227,22 +262,28 @@ export async function refundDeadRequest(
   }
   if (refunded.length === 0) return 0
 
-  const amount = gelLabel(CONTACT_COST_TETRI)
-  await notifyMany(refunded, {
-    type: 'PAYOUT',
-    title: `${amount} დაგიბრუნდა`,
-    body: `${label} — კლიენტი არ გამოეხმაურა.`,
-    href: '/work',
-  })
-
-  const users = await prisma.user.findMany({
-    where: { id: { in: refunded } },
-    select: { email: true },
-  })
-  const mail = contactRefundedProviderEmail({ topicLabel: label, amountLabel: amount })
-  for (const u of users) {
-    if (!u.email) continue
-    try { await sendMail({ to: u.email, ...mail }) } catch { /* best-effort */ }
+  /* ⚠️ ONE BELL AND ONE MAIL PER PROVIDER, because the figure differs per
+     provider now. `notifyMany` still exists and is still right where a whole
+     audience shares a sentence; here they do not. The list is at most the
+     request's `offerLimit` — three — so the loop is not a fan-out. */
+  const emails = new Map(
+    (await prisma.user.findMany({
+      where: { id: { in: refunded.map(r => r.userId) } },
+      select: { id: true, email: true },
+    })).map(u => [u.id, u.email]),
+  )
+  for (const r of refunded) {
+    const amount = gelLabel(r.amountTetri)
+    await notifyMany([r.userId], {
+      type: 'PAYOUT',
+      title: `${amount} დაგიბრუნდა`,
+      body: `${label} — კლიენტი არ გამოეხმაურა.`,
+      href: '/work',
+    })
+    const to = emails.get(r.userId)
+    if (!to) continue
+    const mail = await contactRefundedProviderEmail({ topicLabel: label, amountLabel: amount })
+    try { await sendMail({ key: 'request.contactRefunded.provider', to, ...mail }) } catch { /* best-effort */ }
   }
   return refunded.length
 }
@@ -291,6 +332,146 @@ export async function sweepDeadContactRefunds(): Promise<number> {
 
   let n = 0
   for (const r of dead) n += await refundDeadRequest(r.id, topicLabel(r.topic))
+  return n
+}
+
+/**
+ * THE 48-HOUR PROMISE, KEPT — a contact paid for, and a client who never spoke.
+ *
+ * ⚠️ THIS IS THE HALF THAT MAKES THE NEW PRICE FAIR (2026-09-01, the canvas:
+ * „თუ კლიენტი 48 საათში არ გამოგეხმაურება, 3₾ ავტომატურად დაგიბრუნდება"). The
+ * money now changes hands AFTER the client picked somebody, which removes the
+ * old risk — the dead lead — and creates a new one: being chosen by somebody who
+ * then goes quiet. A provider who pays on the strength of „you have been picked"
+ * and hears nothing has been sold a job that did not exist.
+ *
+ * ⚠️ IT ASKS THE LEDGER FIRST, like its neighbour above, and for the same
+ * reason: money left, so the ledger holds the evidence and the query is two
+ * indexed reads on a job that usually has nothing to do. Walking recent unlocks
+ * from the request side would be one query per row.
+ *
+ * ⚠️ WHAT COUNTS AS „გამოეხმაურა" IS A MESSAGE AFTER THE UNLOCK, and the choice
+ * is deliberately generous to the provider. We cannot observe a phone call, so
+ * the only evidence we have is the thread. A provider who WAS called back and
+ * gets refunded anyway has lost nothing; a provider charged for silence is the
+ * exact complaint the refund exists to answer. The doubt is spent their way.
+ *
+ * ⚠️ AND IT IS `> unlockedAt`, NOT „any client message". The client wrote when
+ * they accepted the offer; counting that would mean nobody is ever refunded,
+ * because acceptance is the event that made the purchase possible in the first
+ * place.
+ *
+ * ⚠️ BEING CHOSEN AFTER THE UNLOCK IS ALSO AN ANSWER (2026-09-03), AND WITHOUT
+ * THIS THE SWEEP WOULD HAVE STARTED REFUNDING WON JOBS. The client can now open
+ * a provider's number themselves — POST /api/requests/[ref]/call charges for
+ * it — so an unlock no longer implies „this provider was already chosen". The
+ * normal shape of a good outcome became: client rings, they agree on the phone,
+ * client presses „ავირჩევ", and NOBODY TYPES ANYTHING. Message-only evidence
+ * reads that as silence and hands the fee back on the one lead that worked.
+ *
+ * The accept is read from `OfferEvent` and not from `RequestOffer.status`,
+ * because the question is WHEN. A status is a fact with no clock on it, and on
+ * the older path — provider pays after being chosen — the offer is ACCEPTED
+ * before the unlock exists, so a status test would refund nobody, ever. The
+ * event carries `at`, so „chosen AFTER you paid" is askable.
+ */
+export async function sweepSilentContacts(now: number = Date.now()): Promise<number> {
+  const cutoff = new Date(now - CONTACT_REFUND_HOURS * 3_600_000)
+
+  /* ⚠️ THE „ALREADY REFUNDED" FILTER IS IN THE SQL, NOT AFTER THE `take`, AND
+   * THAT IS THE WHOLE CORRECTNESS OF THIS SWEEP.
+   *
+   * The obvious shape — take a batch of old spends, then drop the settled ones
+   * in JavaScript — works until the settled ones outnumber the batch. Every
+   * contact ever bought stays older than 48 hours for ever, so the pool of
+   * already-refunded rows only grows; past `BATCH` of them the page fills
+   * entirely with rows that need nothing and the genuinely unpaid ones are
+   * never reached. The sweep would go quiet without failing, which is the worst
+   * way for a promise about money to break.
+   *
+   * `NOT EXISTS` against the refund key does the same work in the index and
+   * lets `LIMIT` mean „this many rows that still need something".
+   *
+   * The key is the pair (userId, grantKey) because that is the unique index the
+   * refund is idempotent by — matching on `refId` alone would treat one
+   * provider's refund as settling the request for everybody on it.
+   */
+  const spends = await prisma.$queryRawUnsafe<{ userId: string; refId: string; createdAt: Date }[]>(
+    `SELECT s."userId", s."refId", s."createdAt"
+       FROM "CreditEntry" s
+      WHERE s."reason" = 'CONTACT_OPENED'
+        AND s."refId" IS NOT NULL
+        AND s."createdAt" <= $1
+        AND NOT EXISTS (
+              SELECT 1 FROM "CreditEntry" r
+               WHERE r."userId" = s."userId"
+                 AND r."grantKey" = $3 || s."refId"
+            )
+      ORDER BY s."createdAt" ASC
+      LIMIT $2`,
+    cutoff, BATCH, contactRefundKey(''),
+  )
+  if (spends.length === 0) return 0
+  const ids = [...new Set(spends.map(s => s.refId))]
+
+  // One read for the batch. The bell names the job — „ბინის დალაგება —
+  // კლიენტი არ გამოეხმაურა." — and a provider with several open contacts
+  // cannot tell which was refunded without it.
+  const topics = new Map(
+    (await prisma.serviceRequest.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, topic: true },
+    })).map(r => [r.id, topicLabel(r.topic)]),
+  )
+
+  let n = 0
+  for (const s of spends) {
+    // Did the client speak on THIS provider's thread after they paid? Asked as
+    // a count over the offer relation so one query answers it — the thread is
+    // per offer (prisma/schema → RequestMessage), and the provider's own
+    // ACCEPTED offer is the only one they can read.
+    const spoke = await prisma.requestMessage.count({
+      where: {
+        requestId: s.refId,
+        fromClient: true,
+        createdAt: { gt: s.createdAt },
+        offer: { is: { expertUserId: s.userId, status: 'ACCEPTED' } },
+      },
+    })
+    if (spoke > 0) continue
+
+    // …or did they CHOOSE this provider after paying? See the note above: with
+    // the client able to open a number, being picked is the strongest evidence
+    // the contact worked, and it is often the only one — a call leaves no row.
+    const chosen = await prisma.offerEvent.count({
+      where: {
+        type: 'ACCEPTED',
+        at: { gt: s.createdAt },
+        offer: { is: { requestId: s.refId, expertUserId: s.userId } },
+      },
+    })
+    if (chosen > 0) continue
+
+    const back = await refundSilentContact(s.userId, s.refId)
+    if (back > 0) {
+      n++
+      // ⚠️ TOLD, NOT JUST PAID — the same argument `refundDeadRequest` makes one
+      // function above, in the same words and the same notification type. A
+      // balance that quietly goes back up is indistinguishable, from where the
+      // provider sits, from never having been refunded; and two vocabularies for
+      // one event („PAYOUT" here, something else there) would be a provider
+      // learning the same fact twice. Best-effort: a failed bell must not cost
+      // the refund, which has already been written.
+      try {
+        await notifyMany([s.userId], {
+          type: 'PAYOUT',
+          title: `${gelLabel(back)} დაგიბრუნდა`,
+          body: `${topics.get(s.refId) ?? 'მოთხოვნა'} — კლიენტი არ გამოეხმაურა.`,
+          href: '/work',
+        })
+      } catch { /* the money is the promise; the bell is the courtesy */ }
+    }
+  }
   return n
 }
 
@@ -368,11 +549,11 @@ export async function runRequestJobs(now: number = Date.now()): Promise<RequestJ
       out.contactsRefunded += await refundDeadRequest(r.id, topicLabel(r.topic))
 
       if (!r.email) continue
-      const mail = requestClosedNoOffersClientEmail({
+      const mail = await requestClosedNoOffersClientEmail({
         publicRef: r.publicRef,
         topicLabel: topicLabel(r.topic),
       })
-      try { await sendMail({ to: r.email, ...mail }) } catch { /* best-effort */ }
+      try { await sendMail({ key: 'request.closedNoOffers.client', to: r.email, ...mail }) } catch { /* best-effort */ }
     }
 
     const oldMatched = await prisma.serviceRequest.updateMany({
@@ -399,6 +580,14 @@ export async function runRequestJobs(now: number = Date.now()): Promise<RequestJ
   // costs two indexed reads and writes nothing.
   try {
     out.contactsRefunded += await sweepDeadContactRefunds()
+  } catch { /* one job's failure is not the tick's */ }
+
+  // ── 1c. The 48-hour promise on a contact the client never answered ──────
+  // Counted into the same total: from the operator's side both are „a paid
+  // lead that came to nothing, given back", and splitting the number would
+  // make the dashboard describe the implementation rather than the promise.
+  try {
+    out.contactsRefunded += await sweepSilentContacts(now)
   } catch { /* one job's failure is not the tick's */ }
 
   // ── 2. Unanswered → re-mail, WIDENED ────────────────────────────────────
@@ -435,15 +624,19 @@ export async function runRequestJobs(now: number = Date.now()): Promise<RequestJ
       if (claimed.count !== 1) continue
 
       const kind = kindOf(r.kind)
-      const mail = requestVerifiedProviderEmail({
+      const mail = await requestVerifiedProviderEmail({
         topicLabel: topicLabel(r.topic),
         kindLabel: KIND[kind].label,
         budgetLabel: budgetLabel(kind, r.budgetMin, r.budgetMax),
         timingLabel: timingLabel(kind, r.timing),
         requestId: r.id,
       })
+      const smsText = await verifiedRequestSms(topicLabel(r.topic))
       for (const p of providers) {
-        try { await sendMail({ to: p.email, ...mail }) } catch { /* best-effort */ }
+        try { await sendMail({ key: 'request.verified.provider', to: p.email, ...mail }) } catch { /* best-effort */ }
+        if (p.phone) {
+          try { await sendSms({ key: 'request.verified.provider', to: p.phone, text: smsText }) } catch { /* best-effort */ }
+        }
       }
       out.providerNudges++
     }
@@ -475,14 +668,14 @@ export async function runRequestJobs(now: number = Date.now()): Promise<RequestJ
       // near-identical one: what the client needs is the count and the link,
       // and that is exactly what it carries. The provider name is the one
       // field that does not fit a summary, so it says how many instead.
-      const mail = offerArrivedClientEmail({
+      const mail = await offerArrivedClientEmail({
         publicRef: r.publicRef,
         topicLabel: topicLabel(r.topic),
         priceLabel: `${r.offerCount} შეთავაზება`,
         providerName: 'ექსპერტები',
         offerCount: r.offerCount,
       })
-      try { await sendMail({ to: r.email, ...mail }); out.clientNudges++ } catch { /* best-effort */ }
+      try { await sendMail({ key: 'request.offerDigest.client', to: r.email, ...mail }); out.clientNudges++ } catch { /* best-effort */ }
     }
   } catch { /* … */ }
 

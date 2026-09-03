@@ -200,9 +200,21 @@ export function UserMenu({
   // client, and `clientRoom` flips the moment they do any of the three, so
   // nobody is ever locked out of their own bookings or messages.
   //
-  // Somebody ALREADY IN the client space keeps the way back regardless — that is
-  // the switcher doing its job, not an invitation.
-  if ((isDualRole || sellsHere) && !inClientSpace && me?.clientRoom) {
+  // ⚠️ AND SINCE 2026-09-02 A SELLER DOES NOT GET THIS DOOR AT ALL. The rule
+  // above was „when there is something in it"; the owner has made it „never":
+  // „თუ ექსპერტად რეგისტრირდება ადამიანი, მაგ შემთხვევაში აღარ უნდა ჰქონდეს
+  // კლიენტის ფუნქციები."
+  //
+  // The site already refused a seller the two things the room is FOR — POST
+  // /api/requests answers 404 on `mayFile` (2026-08-31, „a seller does not
+  // order") and the favourites endpoint 403s a provider — so the door led to a
+  // room whose controls were already switched off. Measured 2026-09-02: of 26
+  // providers, ONE had ever filed a request (one request) and NONE had saved
+  // anything. It was furniture for 25 people and a dead end for the 26th.
+  //
+  // ⚠️ `isDualRole` STAYS ON THE LEFT because it is not only about selling —
+  // ADMIN gets both doors from `adminSpaceItems` below, which is untouched.
+  if (isDualRole && !sellsHere && !inClientSpace && me?.clientRoom) {
     switchItems.push({ href: '/me', label: SPACE_LABEL.CLIENT, icon: Icon.home })
   }
   // ADMIN manages all three worlds — give the menu direct doors into both

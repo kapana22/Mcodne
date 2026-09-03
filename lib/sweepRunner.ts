@@ -15,7 +15,11 @@ import { ensureDbReady } from '@/lib/dbBoot'
  * session went by with neither party reminded.
  *
  * The lesson is not "fix the cron command" (that too), it is that correctness
- * must not depend on one un-monitored external caller. So the same sweep is
+ * must not depend on one un-monitored external caller. ⚠️ AND THE CRON IS RED
+ * AGAIN as of 2026-09-01 — a different fault, same silence: the command lost
+ * its `sh -c`, so `$CLEANUP_SECRET` never expands and every tick 401s. This
+ * runner is why that costs only the quiet hours rather than everything, which
+ * is also, again, why nobody noticed. lib/cronAuth carries the measurements. So the same sweep is
  * ALSO kicked off by ordinary site traffic:
  *
  *   - the claim is a guarded UPDATE on `JobRun`, so exactly ONE request per
@@ -23,7 +27,7 @@ import { ensureDbReady } from '@/lib/dbBoot'
  *     in-memory flag would not survive a restart and would not span instances.
  *   - the work runs inside `after()` at the call site, never on the response
  *     path: a visitor's request is not delayed by it.
- *   - it is safe to run alongside a (later-fixed) real cron — both go through
+ *   - it is safe to run alongside a real cron — both go through
  *     the same claim, so they cannot double-process.
  *
  * The sweep body itself is NOT duplicated here. Next validates that a route

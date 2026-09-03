@@ -13,7 +13,6 @@ export const PAYMENTS_LIVE = false
 // The one commission number. Every string that mentions commission reads from
 // here, so „15% here / 10% there" cannot regress.
 export const COMMISSION_PCT = 15
-export const TUTOR_PAYOUT_PCT = 100 - COMMISSION_PCT
 
 // The diaspora vertical: /abroad, the EUR display, the diaspora surfaces. This
 // one line is the entire switch — off, /abroad 404s and no other page changes.

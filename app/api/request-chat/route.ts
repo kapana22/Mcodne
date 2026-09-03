@@ -25,6 +25,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { normalizePublicRef, topicLabel } from '@/lib/requests'
 import { requestsViewer } from '@/lib/requestsServer'
+import { clientThreadHref } from '@/lib/inboxRows'
 import {
   RequestMessageInput, chatIsOpen, chatClosedReason, maskContacts,
   chatMessageView, type ChatSide,
@@ -44,7 +45,12 @@ type Resolved = {
     requestId: string
     expertUserId: string | null
     companyId: string | null
-    request: { publicRef: string; status: string; topic: string; email: string | null }
+    request: {
+      publicRef: string; status: string; topic: string; email: string | null
+      /** The account that filed it, or null for a request left by reference
+       *  alone. The client's bell needs it — see the notify block in POST. */
+      userId: string | null
+    }
   }
   /** Every provider account behind this offer — one expert, or a company's
    *  members. The notification audience, and the read-receipt owners. */
@@ -62,7 +68,7 @@ async function resolve(offerId: string, ref: string | null): Promise<Resolved | 
     where: { id: offerId },
     select: {
       id: true, status: true, requestId: true, expertUserId: true, companyId: true,
-      request: { select: { publicRef: true, status: true, topic: true, email: true } },
+      request: { select: { publicRef: true, status: true, topic: true, email: true, userId: true } },
     },
   })
   if (!offer) return null
@@ -167,6 +173,13 @@ export async function GET(req: Request) {
     side: r.side,
     open: chatIsOpen(r.offer.request, r.offer),
     closedReason: chatClosedReason(r.offer.request, r.offer),
+    // ⚠️ THE SAME BOOLEAN THE POST MASKS BY, so the pane can never say
+    // „contacts are open" while the endpoint is still scrubbing numbers out of
+    // what is typed into it. It is a STATE, not a contact: no phone, no email,
+    // no name — only whether the firewall in lib/requestChat is still standing.
+    // The owner's Messages artboard prints one line about it in the transcript,
+    // and a line that could go stale would be worse than no line.
+    contactOpen: r.offer.status === 'ACCEPTED',
     // Re-ordered oldest-first for the reader: the CAP takes from the end, the
     // BUBBLES read from the start.
     messages: [...rows].reverse().map(m => chatMessageView(m, r.side)),
@@ -218,9 +231,11 @@ export async function POST(req: Request) {
   }
 
   // ── Telling the other side ───────────────────────────────────────────────
-  // After the response has flushed. A client has no account, so their only
-  // channel is the email they left (optional — many leave none, and the admin's
-  // call covers those). A provider has both.
+  // After the response has flushed. BOTH SIDES GET A BELL AND A MAIL — the
+  // client's bell was added 2026-09-02 and the note that used to stand here
+  // („a client has no account, so their only channel is the email they left")
+  // described the by-reference era. It is still true of a GUEST, which is why
+  // the mail stayed: see the client branch below.
   after(async () => {
     try {
       if (r.side === 'CLIENT') {
@@ -234,7 +249,12 @@ export async function POST(req: Request) {
             // a place a provider reads it at a glance, which is exactly what
             // must not happen.
             body: topicLabel(r.offer.request.topic),
-            href: '/work/offers',
+            /* ⚠️ THE THREAD, NOT THE LIST (2026-09-01). This pointed at
+               /work/offers, so „ახალი შეტყობინება" put the provider on a list
+               of every offer they had ever sent and left them to find the one
+               that had just been written to — the same defect the won-job
+               page's „მიმოწერა" button had. The offer id is right here. */
+            href: `/work/offers/${r.offer.id}`,
           })
         }
         const emails = r.providerUserIds.length
@@ -242,23 +262,60 @@ export async function POST(req: Request) {
               where: { id: { in: r.providerUserIds } }, select: { email: true },
             })).map(u => u.email)
           : []
-        const mail = requestChatEmail({
+        const mail = await requestChatEmail({
           toProvider: true,
           topic: r.offer.request.topic,
           publicRef: r.offer.request.publicRef,
           preview: body,
         })
         for (const to of emails) {
-          try { await sendMail({ to, ...mail }) } catch { /* best-effort per address */ }
+          try { await sendMail({ key: 'chat.message', to, ...mail }) } catch { /* best-effort per address */ }
         }
-      } else if (r.offer.request.email) {
-        const mail = requestChatEmail({
-          toProvider: false,
-          topic: r.offer.request.topic,
-          publicRef: r.offer.request.publicRef,
-          preview: body,
-        })
-        try { await sendMail({ to: r.offer.request.email, ...mail }) } catch { /* … */ }
+      } else {
+        /* ⚠️ THE CLIENT'S BELL NEVER RANG (fixed 2026-09-02). Owner: „მესიჯები
+           რომ მოდიოდეს შეტყობინებებში კარგი იქნება. რადგან ესე დაიკარგება."
+           This branch sent a mail and stopped, on the strength of a comment
+           four lines up that said „a client has no account, so their only
+           channel is the email they left". That was true while a request was
+           something a stranger filed by reference; a signed-in client has had
+           a room, a bell and an inbox since 2026-08-31.
+
+           What it cost, and it is exactly the shape of the complaint: the
+           FIRST event reached them — app/api/provider/offers already rings the
+           bell when an offer lands — and every event after it, the actual
+           conversation, was silent. Somebody sitting on the site while an
+           expert answered them saw nothing move.
+
+           ⚠️ NO `publicRef`, NOT IN THE BODY AND NOT IN THE HREF, the same
+           rule the offer bell states: the reference is a credential (CLAUDE.md
+           §5) and `clientThreadHref` needs only the offer id. The client owns
+           the ref, but a notification row is a place it would sit in plain
+           text for ever.
+
+           REQUEST_MESSAGE, so /settings' „ახალი შეტყობინება · ახალი ტექსტი
+           მიმოწერაში" finally governs BOTH directions of the same chat rather
+           than the provider's half alone (lib/notify → prefKeyForType).
+
+           The mail below is unchanged and still goes to whoever left an
+           address — including a guest with no account, for whom it remains the
+           only channel. */
+        if (r.offer.request.userId) {
+          await notify(r.offer.request.userId, {
+            type: 'REQUEST_MESSAGE',
+            title: 'ახალი შეტყობინება მოგივიდა',
+            body: topicLabel(r.offer.request.topic),
+            href: clientThreadHref(r.offer.id),
+          })
+        }
+        if (r.offer.request.email) {
+          const mail = await requestChatEmail({
+            toProvider: false,
+            topic: r.offer.request.topic,
+            publicRef: r.offer.request.publicRef,
+            preview: body,
+          })
+          try { await sendMail({ key: 'chat.message', to: r.offer.request.email, ...mail }) } catch { /* … */ }
+        }
       }
     } catch { /* notification is best-effort; the message is written */ }
   })

@@ -23,7 +23,7 @@ import { VerifyView } from './_verify'
 // useSearchParams requires a Suspense boundary in Next 15.
 export default function AuthPage({ defaultView = 'signin' }: { defaultView?: View }) {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+    <Suspense fallback={<div className="min-h-screen bg-ink-50" />}>
       <AuthInner defaultView={defaultView} />
     </Suspense>
   )
@@ -65,7 +65,7 @@ function AuthInner({ defaultView }: { defaultView: View }) {
   }
 
   return (
-    <div className="font-sans bg-white text-ink-900 antialiased">
+    <div className="font-sans bg-ink-50 text-ink-900 antialiased">
       <PublicTopBar />
       {view === 'signin' && <SignInView setView={setView} />}
       {view === 'signup' && <SignUpView setView={setView} />}

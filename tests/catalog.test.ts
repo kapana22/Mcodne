@@ -61,6 +61,23 @@ const {
   byPrice, matchesQuery, parseTrades, parseCities, tradeTopicIds,
 } = require('../lib/catalogItems') as typeof import('../lib/catalogItems')
 
+/** Prose explains what markup is NOT there; a negative assertion must not be
+ *  failed by the comment that records the reason. */
+const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+
+const { verticalsOfTopics } = require('../lib/requestTopics') as typeof import('../lib/requestTopics')
+
+// ⚠️ THE RAIL IS A .tsx AND IT IS REQUIRED FOR ITS FUNCTIONS, NOT ITS MARKUP.
+// The filter model, its predicate and the two side helpers live beside the
+// components that draw them, and pinning behaviour beats pinning a regex over
+// the source. Loading the module runs the JSX in its import graph
+// (components/Icon), which reaches for a `React` binding only Next's compiler
+// injects — the same one global tests/b2b.test.ts needs for the same reason.
+;(globalThis as any).React ??= require('react')
+const {
+  EMPTY_FILTERS, passesFilters, sideFilters, verticalOfTrades,
+} = require('../app/experts/_filters') as typeof import('../app/experts/_filters')
+
 /* ═══════════ the shell ═══════════════════════════════════════════════════ */
 
 test('one filter panel, from components/catalog, for the whole catalogue', () => {
@@ -77,18 +94,42 @@ test('one filter panel, from components/catalog, for the whole catalogue', () =>
 
 test('the rail is 240px and sticky from lg, and folds below it', () => {
   const shell = read(SHELL)
-  assert.match(shell, /lg:grid-cols-\[240px_1fr\]/, 'the catalogue is not the two-column shell any more')
+  // ⚠️ 264px SINCE 2026-08-31 (the owner's design canvas → Catalogue), and the
+  // content track is `minmax(0,1fr)` rather than `1fr` — see the next test for
+  // why that spelling is the sideways-scroll fix rather than a synonym.
+  assert.match(shell, /lg:grid-cols-\[264px_minmax\(0,1fr\)\]/, 'the catalogue is not the two-column shell any more')
   assert.match(shell, /<MobileCollapse/, 'the rail does not fold on a phone')
   assert.match(shell, /from '@\/components\/catalog\/MobileCollapse'/, 'the rail folds with a private copy')
   // Sticky lives in the shared panel, once — `lg:` so it only sticks where
   // there is a column to stick in.
   assert.match(read('components/catalog/FilterPanel.tsx'), /lg:sticky/,
     'the rail stopped sticking — it scrolls away from the results it refines')
-  // And the fold is `lg:hidden` button + `lg:block` panel: on a desktop the
-  // rail is simply always there.
-  const collapse = read('components/catalog/MobileCollapse.tsx')
-  assert.match(collapse, /lg:hidden/)
-  assert.match(collapse, /lg:block/)
+  // And the fold is a `lg:hidden` TRIGGER + a `lg:block` panel: on a desktop
+  // the rail is simply always there and the button is not drawn at all.
+  //
+  // ⚠️ THE TWO HALVES LIVE IN TWO FILES SINCE 2026-09-01, and the split is the
+  // phone's whole point (owner: „ტელეფონის დიზაინსაც მიხედე"). The panel stays
+  // in the rail column; the trigger joined the sort and the layout toggle in
+  // the results header, so a phone has ONE 44px row of controls instead of
+  // three stacked full-width bars. Comment-stripped, because both files EXPLAIN
+  // the other half and a prose mention must not pass for the markup.
+  const collapse = stripComments(read('components/catalog/MobileCollapse.tsx'))
+  assert.match(collapse, /lg:block/, 'the panel stopped being drawn on a desktop')
+  assert.doesNotMatch(collapse, /<button/, 'the fold grew its own trigger back — there is one, in the results header')
+  const bar = stripComments(read('app/experts/_results.tsx'))
+  assert.match(bar, /lg:hidden h-11/, 'the results header lost the phone\'s filter trigger')
+  assert.match(bar, /aria-controls=\{filters\.panelId\}/, 'the trigger no longer names the panel it opens')
+  // ⚠️ ONE STATE. The trigger and the panel are in two components, so the
+  // boolean is the container's — a `useState` inside either one is two answers
+  // to „are the filters open".
+  assert.doesNotMatch(collapse, /useState/, 'the fold owns its own open state again')
+  assert.match(read(SHELL), /const \[filtersOpen, setFiltersOpen\] = useState/)
+  // …and arriving ON a narrowed view still opens it, which is the one thing the
+  // fold's own `useState(activeCount > 0)` used to do for free. The INITIAL
+  // value, not an effect — an effect would re-open it under the reader who just
+  // closed it, and it is a cascading render the linter is right about.
+  assert.match(read(SHELL), /useState\(\(\) => anyRefined\(filters\)\)/,
+    'a phone that arrives on „ელექტრიკოსი თბილისში" no longer shows what is ticked')
 })
 
 test('BOTH grid tracks carry min-w-0', () => {
@@ -97,7 +138,7 @@ test('BOTH grid tracks carry min-w-0', () => {
   // page sideways at 390px. Caught in a screenshot on /masters once already,
   // and the canon is explicit that the body must never scroll horizontally.
   const src = read(SHELL)
-  const grid = src.slice(src.indexOf('lg:grid-cols-[240px_1fr]'))
+  const grid = src.slice(src.indexOf('lg:grid-cols-[264px_minmax(0,1fr)]'))
   const tracks = (grid.match(/className="min-w-0"/g) ?? []).length
   assert.ok(tracks >= 2, `${tracks} of the 2 grid tracks carry min-w-0 — the page will scroll sideways on a phone`)
 })
@@ -164,46 +205,101 @@ test('every refinement is in the URL, so a narrowed view is linkable and Back wo
   assert.doesNotMatch(shellCode, /\bpreset\b/, 'the container branches on a preset again — there is one page')
 })
 
-test('one taxonomy, and every section is always drawn', () => {
-  // ⚠️ ONE RAIL, TWO NAMED BLOCKS, IN THE PRODUCT'S ORDER (2026-08-20).
-  //
-  // The history in three steps. It was „კატეგორია" (expert spheres) and
-  // „სერვისი" (trades) — two headings answering the SAME question, so a plumber
-  // and an accountant were filed apart with no way to know which. They became
-  // ONE list ordered by count. Count then turned out to be the wrong ordering
-  // for this site: the everyday trades fell to the bottom with zeros beside
-  // them while the professional rows sat above, and a visitor read that as a
-  // ranking of what mattered.
-  //
-  // Now the blocks are named and their ORDER is fixed by the product, not by
-  // the roster: „პროფესიული სერვისები" first because that is what the site
-  // leads with, „ყოველდღიური სერვისები" second because it is the other half of
-  // what it sells. Count still orders rows INSIDE a block, where it means „here
-  // is somebody to answer" rather than „this half matters more".
-  //
-  // Do not merge them back into one flat list, and do not sort the blocks
-  // themselves — both changes have been made once and both were wrong.
+test('ONE taxonomy per side, and the switch is what chooses between them', () => {
+  /* ⚠️ ONE RAIL, ONE SWITCH, ONE LIST (2026-09-01) — and the history is four
+     steps now.
+
+     It was „კატეგორია" (expert spheres) and „სერვისი" (trades): two headings
+     answering the SAME question, so a plumber and an accountant were filed
+     apart with no way to know which. They became ONE list ordered by count.
+     Count turned out to be the wrong ordering for this site, so they became two
+     NAMED blocks in the product's own order — „პროფესიული სერვისები" above
+     „ყოველდღიური სერვისები" — and stayed that way for eleven days.
+
+     Stacking is what the owner then named as the problem: „ჩვენ ხო გვაქვს ორი
+     მთავარი კატეგორია — ვინც ადგილზე მიდის და ვინც პროფესიოლია — და ეს მინდა
+     იყოს გადამრთველი, რომ არევა არ მოხდეს ამათი და კომფორტულად იყოს." Both
+     vocabularies on screen at once, counted by two different queries over two
+     different columns, is the mixing; a switch is the un-mixing. Professional
+     still leads — it is the side the switch opens on (EMPTY_FILTERS).
+
+     What is pinned here is the PROPERTY, not the fix: each side still draws its
+     own vocabulary and writes its own state field, and they are never both
+     drawn at once. Do not merge them into one flat list — that has been tried
+     twice and was wrong twice, and the switch is not a third attempt at it. */
   const rail = read(RAIL)
   assert.doesNotMatch(rail, /FilterGroup title="კატეგორია"/, 'the rail went back to one unnamed category list')
-  const proIdx = rail.indexOf('FilterGroup title="პროფესიული სერვისები"')
-  const dayIdx = rail.indexOf('FilterGroup title="ყოველდღიური სერვისები"')
-  assert.ok(proIdx > -1, 'the professional block is gone')
-  assert.ok(dayIdx > -1, 'the everyday block is gone')
-  assert.ok(proIdx < dayIdx, 'the services block is drawn before the professional one')
-  // Each block draws its own taxonomy…
-  const pro = rail.slice(proIdx, dayIdx)
-  const day = rail.slice(dayIdx)
-  assert.match(pro, /liveCats/, 'the professional block lost the admin categories')
-  assert.match(day, /EVERYDAY_OFFER_GROUPS/, 'the everyday block lost the trades')
-  assert.match(pro, /\.sort\(\(a, b\) => b\.count - a\.count\)/, 'rows inside a block are no longer ordered by what has people')
-  assert.match(day, /\.sort\(\(a, b\) => b\.count - a\.count\)/, 'rows inside a block are no longer ordered by what has people')
-  // …and each still writes its own state field, because they filter different
-  // columns; a reader cannot tell, and should not have to.
-  assert.match(pro, /cats: toggleIn\(filters\.cats/)
-  assert.match(day, /trades: toggleIn\(filters\.trades/)
-  for (const section of ['title="ფასი"', 'title="ენა"', 'title="მინ. რეიტინგი"', 'title="ქალაქი"']) {
+  assert.match(rail, /<VerticalSwitch|export const VerticalSwitch/, 'the switch is gone — the two sides are stacked again')
+  // The professional side is the admin categories, the everyday side the trade
+  // groups, and each writes the field that filters ITS OWN column.
+  assert.match(rail, /liveCats/, 'the professional side lost the admin categories')
+  assert.match(rail, /EVERYDAY_OFFER_GROUPS/, 'the everyday side lost the trades')
+  assert.match(rail, /cats: toggleIn\(filters\.cats/)
+  assert.match(rail, /trades: toggleIn\(filters\.trades/)
+  assert.match(rail, /\.sort\(\(a, b\) => b\.count - a\.count\)/, 'rows are no longer ordered by what has people')
+  // Comment-stripped: the file's own prose explains what the two headings were.
+  const code = rail.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  assert.doesNotMatch(code, /FilterGroup title="(პროფესიული|ყოველდღიური) სერვისები"/,
+    'the two blocks came back as headings — the switch exists so only one list is drawn')
+  for (const section of ['title="ფასი"', 'title="სერვისი"', 'title="ენა"', 'title="მინ. რეიტინგი"', 'title="ქალაქი"']) {
     assert.ok(rail.indexOf(section) > -1, `the section ${section} is gone`)
   }
+})
+
+test('the switch SPLITS the roster — a side never shows the other side\'s people', () => {
+  /* ⚠️ THE POINT OF THE WHOLE CHANGE, and it is a claim about the RESULT SET
+     rather than about the rail: „რომ არევა არ მოხდეს ამათი". A switch that only
+     swapped which checkboxes are drawn, while the cards underneath stayed the
+     same twenty-three people, would be decoration. */
+  const plumber = provider('p', { serviceIds: ['plumb-leak'], verticals: ['SERVICE'] })
+  const lawyer = provider('l', { serviceIds: ['contract'], verticals: ['EXPERT'] })
+  const both = provider('b', { serviceIds: ['plumb-leak', 'contract'], verticals: ['SERVICE', 'EXPERT'] })
+  const on = (v: 'SERVICE' | 'EXPERT') => ({ ...EMPTY_FILTERS, vertical: v })
+  assert.deepEqual(
+    [plumber, lawyer, both].filter(m => passesFilters(m, on('EXPERT'))).map((m: { id: string }) => m.id),
+    ['l', 'b'], 'the professional side is showing everyday providers, or hiding somebody who does both')
+  assert.deepEqual(
+    [plumber, lawyer, both].filter(m => passesFilters(m, on('SERVICE'))).map((m: { id: string }) => m.id),
+    ['p', 'b'], 'the everyday side is showing professionals, or hiding somebody who does both')
+
+  // ⚠️ A PROVIDER WHO TICKED NOTHING IS NOT NOWHERE. Their card still has a
+  // category, a headline and a face; dropping them out of both sides would
+  // delete a real person over an unfilled field.
+  assert.deepEqual(verticalsOfTopics([]), ['EXPERT'])
+  assert.deepEqual(verticalsOfTopics(['plumb-leak']), ['SERVICE'])
+  assert.deepEqual(verticalsOfTopics(['contract']), ['EXPERT'])
+  assert.deepEqual(verticalsOfTopics(['plumb-leak', 'contract']).sort(), ['EXPERT', 'SERVICE'])
+
+  /* ⚠️ SWITCHING SIDES DROPS THE OTHER SIDE'S PICKS. „სამართალი" is a Category
+     slug only the professional list draws and only a professional row carries:
+     carried across the switch it survives as a filter with no row that could
+     untick it, and every everyday provider fails it — the reader taps the
+     switch and gets an empty page refined by something invisible. The
+     side-neutral refinements are questions about a PERSON and they cross. */
+  const refined: typeof EMPTY_FILTERS = {
+    ...EMPTY_FILTERS, vertical: 'EXPERT', cats: ['law'], trades: ['plumbing'],
+    langs: ['ქართული'], minRating: 4.5, price: [50, 100], cities: ['TBILISI'],
+  }
+  const crossed = sideFilters(refined, 'SERVICE')
+  assert.deepEqual(crossed.cats, [], 'a Category slug crossed the switch as an invisible filter')
+  assert.deepEqual(crossed.trades, ['plumbing'], 'the everyday side lost its own picks on the way in')
+  assert.equal(crossed.vertical, 'SERVICE')
+  assert.deepEqual(crossed.langs, ['ქართული'], 'language stopped crossing — it is a question about a person')
+  assert.equal(crossed.minRating, 4.5)
+  assert.deepEqual(crossed.price, [50, 100])
+  assert.deepEqual(crossed.cities, ['TBILISI'])
+  assert.deepEqual(sideFilters(refined, 'EXPERT').trades, [], 'a trade id crossed back the other way')
+
+  // ⚠️ EVERY /experts?trade=… LINK EVER SENT PREDATES THE SWITCH, so the switch
+  // has to be able to read one: a link to სანტექნიკა must open on the everyday
+  // side rather than land on the professional one with its own filter hidden.
+  assert.equal(verticalOfTrades(['plumbing']), 'SERVICE')
+  assert.equal(verticalOfTrades(['law']), 'EXPERT')
+  assert.equal(verticalOfTrades([]), null, 'an empty selection must not choose a side for anybody')
+
+  // And „ფილტრის მოხსნა" is not a way out of the side you are on.
+  assert.match(read(SHELL), /vertical: filters\.vertical/,
+    'clearing the filters now moves the reader to the other half of the site')
 })
 
 test('the two filter blocks never name the same thing twice', () => {
@@ -242,7 +338,10 @@ const provider = (id: string, over: Record<string, unknown> = {}) => ({
   id, userId: `u-${id}`, companyId: null, slug: `s-${id}`, name: `provider-${id}`, isCompany: false,
   areas: '', areaIds: [], price: null, priceValue: 50, about: null, services: [],
   serviceIds: ['plumb-leak'], photoSrc: null, createdAt: '2026-02-01T00:00:00.000Z',
-  headline: null, professions: [], verified: false, langs: [], rating: 0, catSlug: null, ...over,
+  headline: null, professions: [], verified: false, langs: [], rating: 0, catSlug: null,
+  // Every row carries its side since 2026-09-01 (app/experts/_providers →
+  // verticalsOfTopics). The default matches `serviceIds` above.
+  verticals: ['SERVICE'], ...over,
 }) as never
 
 test('the typed query matches the words on the card, and nothing else', () => {
@@ -306,7 +405,17 @@ test('the results header says how many are on screen', () => {
   const results = read(RESULTS)
   assert.match(results, /ნაჩვენებია <span[^>]*>\{total\}/,
     'the merged list stopped saying how many cards are below it')
-  assert.match(results, /aria-label="ძებნა"/, 'the search field left the results header')
+  // ⚠️ THE SEARCH FIELD LEFT THIS HEADER ON 2026-08-31 and is in the page's
+  // band now (app/experts/_hero) — the owner's design canvas puts it there, and
+  // the home page's hero handing a typed query to this page is what settled it:
+  // the field a query lands in cannot be the fourth control down. What is
+  // asserted is that the field still EXISTS on the page and still registers
+  // itself for the site-wide „/" and ⌘K, which is the property that would
+  // actually break a reader.
+  assert.doesNotMatch(results, /aria-label="ძებნა"/, 'the search field is back in the results header — it belongs in the band')
+  const hero = read('app/experts/_hero.tsx')
+  assert.match(hero, /aria-label="ძებნა"/, 'the catalogue lost its search field entirely')
+  assert.match(hero, /registerSearchInput/, 'the „/" and ⌘K shortcuts no longer land on the catalogue search')
   assert.match(results, /aria-label="სორტირება"/, 'the sort select left the results header')
   // ⚠️ THE CROSS-KIND DEAD END IS GONE WITH THE SPLIT (2026-08-24). „ამ
   // ფილტრით არავინ არის — მოხსენი ფილტრი" existed because ticking a
@@ -336,7 +445,17 @@ test('one rail, and every row is state — the refinements are still addresses',
 test('the catalogue filters in ONE place — no dropdown bar, no second drawer', () => {
   const hero = read(HERO)
   assert.doesNotMatch(hero, /<FilterBox/, 'the horizontal dropdown filter bar is back in the hero')
-  assert.doesNotMatch(hero, /<input/, 'the search field is back in the hero — it belongs with the results')
+  // ⚠️ THIS USED TO FORBID EVERY `<input>` IN THE BAND, on the reasoning that
+  // the search field „belongs with the results". The field moved back into the
+  // band on 2026-08-31 (the owner's design canvas → Catalogue) and the rule it
+  // was really protecting is untouched: what must not return is a SECOND
+  // REFINEMENT SURFACE above the results — the row of labelled dropdown boxes
+  // (კატეგორია / ფასი / ენა / შეფასება) that stood here until 2026-08-19 and
+  // duplicated the rail. Search is not a refinement: it replaces the set rather
+  // than narrowing it. So: exactly ONE field, and no checkbox or select.
+  const fields = (hero.match(/<input/g) ?? []).length
+  assert.equal(fields, 1, `the band carries ${fields} fields — one search box, or the dropdown filter bar is back`)
+  assert.doesNotMatch(hero, /<select|type="checkbox"/, 'a refinement control is back in the band — the rail is the one filter surface')
   const client = read(SHELL)
   assert.doesNotMatch(client, /<Sheet/, 'the phone filters drawer is back — one rail serves both widths')
   assert.doesNotMatch(client, /FiltersPanel/, 'the drawer’s copy of the refinements is back')

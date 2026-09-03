@@ -13,6 +13,7 @@
 // beats BOTH transports — by actually calling the function with each transport
 // configured and checking nothing goes out.
 
+process.env.MESSAGE_LOG = 'off' // no test rows in the operator's table
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -33,7 +34,7 @@ function withEnv(patch: Record<string, string | undefined>, fn: () => Promise<vo
   })
 }
 
-const LETTER = { to: 'someone@example.com', subject: 'x', html: '<p>x</p>' }
+const LETTER = { key: 'test.manual' as const, to: 'someone@example.com', subject: 'x', html: '<p>x</p>' }
 
 test('MAILER_MODE=off stops mail even with Gmail credentials present', async () => {
   const { sendMail } = await import('../lib/mailer')

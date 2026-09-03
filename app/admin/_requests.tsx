@@ -38,6 +38,7 @@ import {
   extrasLabels, gel, offerPriceLabel,
   type RequestStatusName, type OfferStatusName,
 } from '@/lib/requests'
+import { actionError } from '@/lib/actionErrors'
 
 type Offer = {
   id: string; priceGel: number; priceKind: string; daysEstimate: number | null; message: string
@@ -71,19 +72,15 @@ const INPUT =
   'transition-colors duration-fast'
 
 /** Server codes → Georgian. Never show a reader a raw code. */
-function errText(code?: string): string {
-  switch (code) {
-    // The database refuses offerCount > offerLimit, so lowering the limit past
-    // what has already arrived is a real conflict rather than a validation slip.
-    case 'LIMIT_BELOW_RECEIVED': return 'უკვე მეტი შეთავაზებაა მიღებული — ლიმიტს ვერ დაწევ.'
-    case 'NOTHING_TO_DO': return 'არაფერი შეცვლილა.'
-    case 'INVALID': return 'შეავსე ველები სწორად.'
-    case 'NOT_FOUND': return 'ვერ მოიძებნა.'
-    // Somebody else changed the row between reading it and this click (D4).
-    case 'CHANGED': return 'ეს მოთხოვნა ახლახან შეიცვალა — განაახლე გვერდი.'
-    default: return 'ვერ შესრულდა — სცადე თავიდან.'
-  }
-}
+/* INVALID, NOT_FOUND, CHANGED and the default now come from lib/actionErrors —
+   they were the same four sentences as five other screens. What is left here is
+   what only this screen can answer. */
+const errText = (code?: string) => actionError(code, {
+  // The database refuses offerCount > offerLimit, so lowering the limit past
+  // what has already arrived is a real conflict rather than a validation slip.
+  LIMIT_BELOW_RECEIVED: 'უკვე მეტი შეთავაზებაა მიღებული — ლიმიტს ვერ დაწევ.',
+  NOTHING_TO_DO: 'არაფერი შეცვლილა.',
+})
 
 /** The request's whole shape in one line — the same words every other surface
  *  uses, from the same functions, so the admin never reads a different label

@@ -57,6 +57,7 @@ import {
 } from '@/lib/requests'
 import { StepPick } from './_stepPick'
 import type { Draft } from './_model'
+import { topicGroupMark } from '@/lib/topicMarks'
 
 /**
  * One example, one tap.
@@ -121,7 +122,7 @@ function narrowedGroups(vertical: Vertical, only: Set<string>): TopicGroup[] {
     .filter(g => g.topics.length > 0)
 }
 
-export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, initialQuery = '', vertical, onlyTopics = [] }: {
+export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, initialQuery = '', vertical, onlyTopics = [], narrowed = false }: {
   draft: Draft
   /** ⚠️ WHICH DOOR THEY CAME THROUGH — and it is the only thing that decides
    *  what this screen offers (owner, 2026-08-18, approving „ა": the door picks
@@ -168,6 +169,25 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
    * no provider, and this screen is exactly what it was.
    */
   onlyTopics?: string[]
+  /**
+   * ⚠️ WAS THE LIST NARROWED TO A PERSON THE CLIENT ALREADY CHOSE?
+   *
+   * This exists because `onlyTopics` stopped being able to answer that on
+   * 2026-08-30, and nothing noticed for three days. The prop used to carry one
+   * thing — a `?to=` provider's own trades — so „it is non-empty" and „a
+   * provider was chosen" were the same fact, and the panel opened itself on the
+   * strength of it. Then `covered` (every topic with a live provider, the whole
+   * roster's) began arriving through the SAME prop, and `covered` is never
+   * empty — so the browse panel opened on arrival for every visitor to
+   * /request.
+   *
+   * That is precisely the screen the owner removed on 2026-08-19, holding a
+   * screenshot of it: „როცა ჩათს მოსაძებნად დაჭერ, მაშინ იშლებოდეს ქვევით…
+   * და არა ესე ჩამოწერილი." The field asks for a sentence; a wall of folded
+   * groups under it asks the visitor to browse instead, and the loud invitation
+   * was the wrong one again.
+   */
+  narrowed?: boolean
 }) {
   // Seeded, not controlled: after the first paint this field belongs entirely
   // to the person typing in it. A `useEffect` syncing it back to the prop would
@@ -184,13 +204,16 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
    * field, the first character typed, ArrowDown, and the browse line.
    *
    * Seeded open when the home band handed over a real query, because then the
-   * hits ARE the answer to a question already asked.
+   * hits ARE the answer to a question already asked — and when the list was
+   * narrowed to a provider the client already picked, because then it is short
+   * and it IS the question. Never on `onlyTopics` alone: see `narrowed` above
+   * for the three days that condition was silently true for everybody.
    */
-  const [open, setOpen] = useState(initialQuery.trim().length >= 2 || onlyTopics.length > 0)
+  const [open, setOpen] = useState(initialQuery.trim().length >= 2 || narrowed)
   // Opened on the ONE group a narrowed list usually has — with the catalogue
   // already down to this provider's own trades, a fold to press is ceremony.
   const [openGroup, setOpenGroup] = useState<string | null>(() => {
-    if (onlyTopics.length === 0) return null
+    if (!narrowed) return null
     const gs = narrowedGroups(vertical, new Set(onlyTopics))
     return gs.length === 1 ? gs[0].id : null
   })
@@ -367,10 +390,34 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
         // placeholder's real example plus this line: the browse path is named,
         // so nobody has to guess that tapping the field reveals one, and it
         // costs one row instead of thirty-one.
+        //
+        // ⚠️ AND IT WAS REPLACED BY AN INLINE CATEGORY LIST FOR ONE AFTERNOON
+        // (2026-09-02, reverted the same day). The void under this line was
+        // real — ~350px on the first screen of the intake — and the fix tried
+        // was the control /join and /work/profile had just settled on: the
+        // categories, on the page, chosen rather than disclosed. First as a
+        // scrolling strip („ეს გადასქროლი უფრო არაკომფორტული იქნება ვფიქრობ" —
+        // correct, seven items fit and a strip hides them), then wrapped. The
+        // owner did not want either: „არა, არ მომწონს, დააბრუნე როგორც იყო."
+        //
+        // So the line stands, and what it is defending is worth writing down
+        // rather than rediscovering: this screen's job is to get ONE sentence
+        // typed. A grid of categories under the field is a second question
+        // competing with the first, and the first is the one that produces a
+        // request somebody can actually route. The empty space below is the
+        // cost of that focus, not an oversight.
         <button
           type="button"
           onClick={() => { setOpen(true); inputRef.current?.focus() }}
-          className="mt-3 inline-flex items-center gap-1.5 text-meta text-ink-600 hover:text-ink-900 underline decoration-ink-200 hover:decoration-ink-400 underline-offset-4 transition-colors duration-fast"
+          /* ⚠️ `min-h-10` AND `-ml-1 px-1` — THE TAP TARGET, NOT THE TYPE
+             (2026-09-02, found by measuring the intake on a phone). The line
+             is `text-meta` and sat 17px tall: a control the whole browse path
+             hangs off, under half the 40px floor CLAUDE.md rule 3 sets, on the
+             one screen a client cannot skip. The height is added to the BOX and
+             not to the text — the underline still hugs the words, so nothing
+             about how it reads changes. `-ml-1 px-1` widens the same way while
+             keeping the text optically flush with the field above it. */
+          className="mt-3 -ml-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-meta text-ink-600 hover:text-ink-900 underline decoration-ink-200 hover:decoration-ink-400 underline-offset-4 transition-colors duration-fast"
         >
           ან აირჩიე კატეგორიებიდან
           <Icon.chevD aria-hidden className="w-3.5 h-3.5" />
@@ -460,6 +507,15 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
               </div>
             )
           ) : (
+            /* ⚠️ THE SCROLL AREA HOLDS THE GROUPS AND NOTHING ELSE
+               (2026-08-31). „სხვა" used to sit INSIDE it, and measured live on
+               /request at both 500px and 1440px the panel's max-height landed
+               part-way through that chip — the escape hatch for somebody whose
+               job is in none of the eight groups was a half-visible pill you
+               had to scroll a nested list to reach. It is pinned under the
+               scroll area now: always on screen, still last, still after
+               everything it is a resort from. */
+            <>
             <div className={PANEL_SCROLL}>
               {/* ⚠️ BROWSABLE, NOT ALL (2026-08-18). Four of the eight service
                   groups are closed at launch — see requestTopics →
@@ -480,8 +536,37 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
                         type="button"
                         aria-expanded={expanded}
                         onClick={() => setOpenGroup(expanded ? null : g.id)}
-                        className="w-full text-left px-4 h-12 flex items-center gap-3 hover:bg-ink-50 transition-colors duration-fast"
+                        className={`w-full text-left px-4 h-12 flex items-center gap-3 transition-colors duration-fast ${
+                          // The open row keeps a tint while its children are
+                          // out, so the parent of the indented list is legible
+                          // as their parent rather than as one more row.
+                          expanded ? 'bg-brand-50' : 'hover:bg-ink-50'
+                        }`}
                       >
+                        {/* ⚠️ THE ICON COLUMN (2026-09-02). Owner, from a
+                            competitor's category list: „ესე დავამატოთ აიქონები
+                            შესაბამისი კატეგორიის." Thirty-one Georgian phrases
+                            in a column gave somebody who does not know our
+                            vocabulary nothing to aim at.
+                            `topicGroupMark` returns null for a group it has no
+                            honest mark for, and then the row simply has none —
+                            see the note there for why that is better than a
+                            default drawing. The 20px box is reserved either
+                            way, so the labels stay on one left edge. */}
+                        {/* ⚠️ BRAND, NOT INK (2026-09-02, owner: „ცოტა ბრენდის
+                            ფერში ხომ არ შევალამაზოთ"). `brand-600` is a
+                            STROKE on white here, not a filled surface, so
+                            CLAUDE.md rule 2's „fills start at 600" is not what
+                            governs it — what governs it is that a meaningful
+                            graphic needs 3:1 against its background, and 600
+                            clears that with room. The open row goes a shade
+                            darker so the parent of the indented list reads as
+                            the one you are inside. */}
+                        <span className={`flex h-5 w-5 shrink-0 items-center justify-center ${
+                          expanded ? 'text-brand-800' : 'text-brand-600'
+                        }`}>
+                          {topicGroupMark(g.id)}
+                        </span>
                         {/* `no-caps` — see _stepPick. The accordion headings are
                             buttons, so the „case" feature shouted every group
                             name. */}
@@ -504,9 +589,53 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
                           className={`w-4 h-4 text-ink-400 shrink-0 transition-transform duration-fast ${expanded ? 'rotate-180' : ''}`}
                         />
                       </button>
+                      {/* ⚠️ INDENTED ROWS, NOT A BAG OF CHIPS (2026-09-02, from
+                          the same screenshot). The children were wrapping pills
+                          under the heading, which reads as a separate cluster
+                          that happens to sit below it; the reference stacks
+                          them as ROWS, indented past the parent's icon, so the
+                          hierarchy is visible in the left edge alone.
+                          They carry the PARENT's mark, greyed — which is what
+                          the reference does and is right here for the opposite
+                          of its reason: a topic has no mark of its own, and
+                          repeating the family's says „still inside სამართალი"
+                          rather than pretending to name the topic.
+                          `pl-12` = the row's `px-4` plus the 20px icon plus its
+                          12px gap: the labels land exactly under the parent's
+                          label. */}
                       {expanded && (
-                        <div className="px-4 pb-4 pt-1 flex flex-wrap gap-2 motion-safe:animate-fade-in-fast">
-                          {g.topics.map(t => <Chip key={t.id} t={t} on={draft.topic === t.id} onPick={onPick} />)}
+                        <div className="pb-2 motion-safe:animate-fade-in-fast">
+                          {g.topics.map(t => {
+                            const on = draft.topic === t.id
+                            return (
+                              <button
+                                key={t.id}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() => onPick(t.id)}
+                                className={`w-full min-h-11 pl-12 pr-4 flex items-center gap-3 text-left transition-colors duration-fast ${
+                                  on ? 'bg-brand-50' : 'hover:bg-ink-50'
+                                }`}
+                              >
+                                {/* The family's mark, quieter — `brand-400`, not
+                                    the `ink-300` it was: at ink the column
+                                    read as disabled rather than as secondary.
+                                    It repeats on purpose (see the note above);
+                                    what keeps it from competing with the parent
+                                    is the shade and the indent, not a different
+                                    drawing. */}
+                                <span className="flex h-4 w-4 shrink-0 items-center justify-center text-brand-400">
+                                  {topicGroupMark(g.id, 'w-4 h-4')}
+                                </span>
+                                <span className={`min-w-0 flex-1 font-display text-body no-caps ${
+                                  on ? 'font-semibold text-brand-900' : 'text-ink-800'
+                                }`}>
+                                  {t.label}
+                                </span>
+                                {on && <Icon.check aria-hidden className="h-4 w-4 shrink-0 text-brand-700" />}
+                              </button>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
@@ -514,14 +643,15 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
                 })}
               </div>
 
+            </div>
+
               {/* „სხვა" closes the list, as it always has: it is the last
-                  resort, so it sits after everything it is a resort from —
-                  inside the panel now, because the closed screen is the field
-                  and nothing else. */}
-              <div className="px-4 py-4 border-t border-ink-100">
+                  resort, so it sits after everything it is a resort from — and
+                  OUTSIDE the scroll, so the list can never bury it. */}
+              <div className="px-4 py-4 border-t border-ink-100 bg-white">
                 <Chip t={OTHER_TOPIC} on={draft.topic === OTHER_TOPIC.id} onPick={onPick} />
               </div>
-            </div>
+            </>
           )}
         </div>
       )}

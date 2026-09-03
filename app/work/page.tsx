@@ -29,7 +29,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { queueWhere } from '@/lib/requestRouting'
 import { PROVIDER_ROUTE, requestsOn } from '@/lib/requests'
-import { creditTasks, completeness, taskHref, gelLabel, type CreditTaskKey } from '@/lib/credits'
+import { creditTasks, completeness, taskHref, gelLabel, contactsLabel, TETRI, type CreditTaskKey } from '@/lib/credits'
 import { balanceOf, profileFacts } from '@/lib/creditsServer'
 import { earnedTasks } from '@/lib/credits'
 import { PageHeader } from '@/components/PageHeader'
@@ -37,13 +37,18 @@ import { ConfirmServicesNote } from './_components/ConfirmServicesNote'
 import { CreditStrip } from './_components/CreditStrip'
 import Link from 'next/link'
 import { Card } from '@/components/Card'
-import { Icon } from '@/components/Icon'
+import { tileHue } from '@/app/_home/data'
 
 // Re-verified on every request, like the two group layouts beside it: this page
 // must never be served from a render that outlived a session or a capability.
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = { title: 'სამუშაო სივრცე', robots: { index: false, follow: false } }
+// ⚠️ „— მცოდნე" (2026-09-01). This was the ONE screen in either room whose tab
+// carried no site name: /work/jobs, /work/balance, /work/profile, /work/account
+// and all three /me pages end in it. Measured today by reading the ten served
+// <title>s. The name itself is `SPACE_LABEL.PROVIDER` (lib/roles) and is
+// unchanged — it is what the user menu calls this room.
+export const metadata: Metadata = { title: 'სამუშაო სივრცე — მცოდნე', robots: { index: false, follow: false } }
 
 export default async function WorkHome() {
   const user = await getCurrentUser()
@@ -167,61 +172,114 @@ export default async function WorkHome() {
         />
         </div>
 
+        {/* ── THE ONE THING TO DO NEXT ──────────────────────────────────
+            ⚠️ REBUILT 2026-08-31 FROM THE OWNER'S DESIGN CANVAS („mcodne.ge
+            პროფილის რედიზაინი" → Work Profile). It was a pale `brand-50` link
+            card that read like a notice; the canvas makes it the page's one
+            dark surface with a gold action on it. The CONTENT is unchanged —
+            the queue when there is one, otherwise the quiet truth — because
+            that decision („ერთი ნაკადი გახდეს… რომ არ დაიბნეს") is the owner's
+            own and was right.
+
+            ⚠️ THE GOLD BUTTON IS THE ONE PLACE THE ACCENT BECOMES A CONTROL.
+            ink-900 on #EFD48A measures 13.9:1; white or green on this gradient
+            does not carry. Same rule as the profile's status band. */}
         {nextUp ? (
-          <Link
-            href={nextUp.href}
-            className="block rounded-card border border-brand-200 bg-brand-50/50 hover:bg-brand-50 p-5 sm:p-6 transition-colors duration-fast"
-          >
-            <div className="flex items-center gap-5 flex-wrap">
-              <span className="w-12 h-12 shrink-0 rounded-card bg-white border border-brand-100 inline-flex items-center justify-center">
-                <Icon.list className="w-6 h-6 text-brand-700" />
-              </span>
-              <span className="flex-1 min-w-[180px]">
-                <span className="block font-display text-body-lg font-bold text-ink-900 tabular-nums">
+          <div className="relative overflow-hidden rounded-panel bg-[radial-gradient(120%_160%_at_8%_0%,#26806E_0%,#1E6656_46%,#123A31_100%)] px-6 py-7 text-white sm:px-8">
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="min-w-[240px] flex-1">
+                <p className="font-display text-micro font-bold uppercase text-white/60">ახლა ერთი საქმეა</p>
+                <p className="mt-2 font-display text-h2 font-extrabold tracking-[-0.02em] tabular-nums">
                   {nextUp.n} {nextUp.label}
-                </span>
+                </p>
                 {/* ⚠️ NO PRICE ON THE ANSWER. Sending an offer costs nothing;
                     `CONTACT_COST_TETRI` is what OPENING A CLIENT'S CONTACT
                     costs, and saying „პასუხი — 1₾" here would put a price on
                     the wrong act. The balance is the true and useful fact. */}
-                <span className="block mt-0.5 text-small text-ink-600">
+                <p className="mt-2 max-w-[520px] text-body leading-[1.55] text-white/[0.76]">
                   ბალანსზე {gelLabel(balance)} გაქვს.
-                </span>
-              </span>
-              <span className="h-11 px-5 rounded-btn bg-brand-600 text-white font-display font-semibold text-body inline-flex items-center">
+                </p>
+              </div>
+              <Link
+                href={nextUp.href}
+                style={{ backgroundColor: '#EFD48A' }}
+                className="inline-flex h-[52px] shrink-0 items-center rounded-field px-6 font-display text-body-lg font-extrabold text-ink-900 transition-[filter] duration-fast hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-900"
+              >
                 {nextUp.cta}
-              </span>
+              </Link>
             </div>
-          </Link>
+          </div>
         ) : (
           <Card>
             <p className="text-body text-ink-700">დღეს ახალი არაფერია. მოთხოვნა როგორც კი გადამოწმდება, აქ გამოჩნდება.</p>
           </Card>
         )}
 
-        {/* The summary: what is in flight, one line each. No links — each of
-            these is one row of the rail, two inches to the left. */}
-        {(waiting > 0 || inHand > 0) && (
-          <Card>
-            <h2 className="font-display text-h3 font-bold text-ink-900">რა მიდის</h2>
-            <div className="mt-4 divide-y divide-ink-100 border-t border-ink-100">
-              {waiting > 0 && (
-                <div className="flex items-center gap-4 py-3">
-                  <span className="w-2 h-2 rounded-pill bg-ink-300 shrink-0" />
-                  <span className="flex-1 text-body text-ink-800">გაგზავნილი შეთავაზება, პასუხს ველოდები</span>
-                  <span className="font-display text-body-lg font-bold text-ink-900 tabular-nums">{waiting}</span>
-                </div>
-              )}
-              {inHand > 0 && (
-                <div className="flex items-center gap-4 py-3">
-                  <span className="w-2 h-2 rounded-pill bg-brand-500 shrink-0" />
-                  <span className="flex-1 text-body text-ink-800">ხელში მაქვს</span>
-                  <span className="font-display text-body-lg font-bold text-ink-900 tabular-nums">{inHand}</span>
-                </div>
+        {/* ── WHAT IS IN FLIGHT, AND WHAT IT COSTS TO ANSWER ────────────────
+            Two panels side by side, the canvas's shape. „რა მიდის" carries no
+            links — every one of its rows is one click away in the rail, two
+            inches to the left. */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {(waiting > 0 || inHand > 0) && (
+            <section className="rounded-panel border border-ink-100 bg-white p-6 sm:p-7">
+              <h2 className="font-display text-h3 font-extrabold tracking-[-0.01em] text-ink-900">რა მიდის</h2>
+              <div className="mt-4 border-t border-ink-100">
+                {waiting > 0 && (
+                  <div className="flex items-center gap-3.5 border-b border-ink-100 py-3.5 last:border-b-0">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-pill bg-ink-300" />
+                    <span className="flex-1 text-body text-ink-800">გაგზავნილი შეთავაზება, პასუხს ველოდები</span>
+                    <span className="font-display text-body-lg font-extrabold tabular-nums text-ink-900">{waiting}</span>
+                  </div>
+                )}
+                {inHand > 0 && (
+                  <div className="flex items-center gap-3.5 py-3.5">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-pill bg-brand-500" />
+                    <span className="flex-1 text-body text-ink-800">ხელში მაქვს</span>
+                    <span className="font-display text-body-lg font-extrabold tabular-nums text-ink-900">{inHand}</span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* ⚠️ THE BALANCE PANEL IS DESKTOP-ONLY, AND `CreditStrip` ABOVE IS
+              THE PHONE'S (`lg:hidden`). One instance per viewport — the rail
+              carries the same two facts permanently from `lg` up, so a third
+              statement of one number was what this page had before.
+              ⚠️ NO TOP-UP CHIPS. The canvas draws „შევსება: 10₾ · 25₾ · 50₾".
+              Measured 2026-08-31: the ONLY routes that write a balance are
+              `/api/admin/users/[id]/credits` and the company one — a provider
+              cannot add to their own balance at all, and `PAYMENTS_LIVE` is
+              false. Three buttons that do nothing is a control that lies. */}
+          <section className="hidden flex-col rounded-panel border border-ink-100 bg-white p-6 sm:p-7 lg:flex">
+            <h2 className="font-display text-h3 font-extrabold tracking-[-0.01em] text-ink-900">ბალანსი</h2>
+            <div className="mt-3 flex flex-wrap items-baseline gap-2.5">
+              <span className="font-display text-display font-extrabold tracking-[-0.03em] tabular-nums text-ink-900">
+                {gelLabel(balance)}
+              </span>
+              {/* 🔒 DERIVED, NOT DECORATIVE — what that money actually opens
+                  (lib/credits → contactsAffordable). */}
+              {contactsLabel(balance) && (
+                <span className="text-body text-ink-500 tabular-nums">
+                  = {contactsLabel(balance)} კლიენტის კონტაქტი
+                </span>
               )}
             </div>
-          </Card>
-        )}
+            <div className="flex-1" />
+            {next && (
+              <Link
+                href={taskHref(next.key)}
+                style={{ backgroundColor: tileHue(1).bg, borderColor: tileHue(1).border }}
+                className="mt-5 block rounded-tile border p-4 transition-[filter] duration-fast hover:brightness-[0.98]"
+              >
+                <p className="font-display text-body font-bold text-ink-900 tabular-nums">
+                  {next.label} — +{next.tetri / TETRI}₾
+                </p>
+                <p className="mt-1 text-meta leading-[1.5] text-ink-600">{next.why}</p>
+              </Link>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   )

@@ -69,7 +69,7 @@ export function Toast({
         type="button"
         onClick={onDismiss}
         aria-label="დახურვა"
-        className="shrink-0 w-9 h-9 -m-1 rounded-btn text-ink-400 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast"
+        className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 -m-1 rounded-btn text-ink-400 hover:text-ink-800 hover:bg-ink-100 inline-flex items-center justify-center transition-colors duration-fast"
       >
         <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
           <path d="m6 6 12 12M18 6 6 18" />

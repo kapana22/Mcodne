@@ -17,7 +17,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizePhone, isGeorgianMobile, phoneFormatError, formatPhone } from '../lib/phone'
+import { normalizePhone, isGeorgianMobile, phoneFormatError, formatPhone, telHref } from '../lib/phone'
 
 test('normalize keeps the digits and one leading +, drops the noise', () => {
   assert.equal(normalizePhone(' 555 12 34 56 '), '555123456')
@@ -70,4 +70,32 @@ test('display format never invents digits', () => {
   assert.equal(formatPhone('+995555123456'), '+995 555 123 456')
   assert.equal(formatPhone('+49301234567'), '+49301234567')
   assert.equal(formatPhone(''), '')
+})
+
+/* ── the dialable form (2026-09-03) ────────────────────────────────────────
+   `telHref` exists because the client's offer list grew a „დარეკვა" button and
+   a hand-written `tel:${phone}` at the call site would have shipped „555123456"
+   — which dials only from a Georgian handset, and the diaspora is exactly who
+   files a request for work in a flat they are not standing in. */
+test('a Georgian mobile is dialed in full, whatever it was stored as', () => {
+  for (const stored of ['555123456', '+995555123456', '995555123456', '555 12 34 56']) {
+    assert.equal(telHref(stored), 'tel:+995555123456', `stored as ${stored}`)
+  }
+})
+
+test('a number that is not a Georgian mobile keeps its own shape', () => {
+  // ⚠️ NO COUNTRY CODE IS GUESSED ONTO ONE. „322123456" is a Tbilisi landline
+  // and „+995322123456" would be right; „+322123456" — what prefixing a bare +
+  // produces — is Belgium. The rule this file already states („display format
+  // never invents digits") is the same rule: hand back what we hold.
+  assert.equal(telHref('+49301234567'), 'tel:+49301234567')
+  assert.equal(telHref('322123456'), 'tel:322123456')
+})
+
+test('nothing to dial returns null, so no button is drawn', () => {
+  // A '' here would render an <a href="tel:"> that opens the dialler empty —
+  // the offer card asks `{tel && …}` and null is what makes that question work.
+  for (const empty of ['', '   ', null, undefined]) {
+    assert.equal(telHref(empty), null, JSON.stringify(empty))
+  }
 })
