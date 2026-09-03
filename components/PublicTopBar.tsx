@@ -132,6 +132,16 @@ export function PublicTopBar({
     me?.role === ROLE.PROVIDER ? 'expert' : me?.role === ROLE.USER ? 'client' : null
   const msgUnread = useMessagesUnread(msgSpace)
   const [mobOpen, setMobOpen] = useState(false)
+  /* ⚠️ THE ACCOUNT MENU LIFTS THE BAR TOO (2026-09-03), for the same reason the
+     drawer does. This <header> is `sticky` with a z-index, so it owns a
+     stacking context and NOTHING inside it can paint above the header's own
+     layer — the dropdown asks for `z-50` and is worth `z-chrome`.
+     That was harmless until a second sticky header appeared under the bar at
+     the same layer: the intake's progress rail (app/request/_shell) is also
+     `z-chrome` and sits LATER in the DOM, so it painted over the open menu.
+     Owner, on the screenshot: „ასეთი პრობლემები არ უნდა ქონდეს საიტს."
+     One boolean, one class — the mechanism the drawer already proved. */
+  const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
   // Scroll-driven elevation — the glass bar is flat and extra-transparent
@@ -294,7 +304,7 @@ export function PublicTopBar({
       // sticky offset measured off this header elsewhere assumes (`top-16`,
       // `sm:top-20`, `lg:top-[80px]`, `scroll-mt-24`). Don't retune it here —
       // fix the header if it drifts, not the consumers.
-      className={`sticky top-0 ${mobOpen ? 'z-drawer' : 'z-chrome'}`}
+      className={`sticky top-0 ${mobOpen || menuOpen ? 'z-drawer' : 'z-chrome'}`}
     >
       {/* The bar. Full width; `.glass-bar` owns background/hairline/shadow/blur
           — add nothing but geometry. `-quiet` = the flat scroll-top state.
@@ -546,7 +556,7 @@ export function PublicTopBar({
                 </Link>
               )}
               <NotifBell />
-              <UserMenu user={{ name: me.fullName, avatar: me.avatarUrl }} role={me.role} />
+              <UserMenu user={{ name: me.fullName, avatar: me.avatarUrl }} role={me.role} onOpenChange={setMenuOpen} />
             </>
           )}
           <button

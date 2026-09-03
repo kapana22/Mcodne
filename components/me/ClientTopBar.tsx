@@ -37,6 +37,16 @@ import { titleForPath } from './navConfig'
 export function ClientTopBar({ user }: { user?: { name: string; avatar?: string | null } }) {
   const path = usePathname() ?? ''
   const crumb = titleForPath(path)
+  /* ⚠️ THE ACCOUNT MENU LIFTS THIS BAR (2026-09-03). The <header> below is
+     `sticky` with a z-index, so it owns a stacking context and nothing inside
+     it can paint above the header's own layer — the dropdown asks for `z-50`
+     and is worth `z-chrome`. Any second sticky element at the same layer, later
+     in the DOM, then covers the open menu. It was found on the intake (its
+     progress rail is also `z-chrome`); the same shape exists wherever a page
+     inside this space carries its own sticky sub-header, so the fix is here
+     rather than at the one screen that showed it.
+     Owner: „ასეთი პრობლემები არ უნდა ქონდეს საიტს." */
+  const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -47,7 +57,7 @@ export function ClientTopBar({ user }: { user?: { name: string; avatar?: string 
   }, [])
 
   return (
-    <header className={`sticky top-0 z-chrome ${scrolled ? 'glass-bar' : 'glass-bar glass-bar-quiet'}`}>
+    <header className={`sticky top-0 ${menuOpen ? 'z-drawer' : 'z-chrome'} ${scrolled ? 'glass-bar' : 'glass-bar glass-bar-quiet'}`}>
       <div className="px-4 sm:px-6 lg:px-8 h-16 lg:h-[72px] flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           {/* The logo is the mobile rail's stand-in; on lg the sidebar has it. */}
@@ -58,7 +68,7 @@ export function ClientTopBar({ user }: { user?: { name: string; avatar?: string 
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <NotifBell />
-          <UserMenu user={user} role="USER" />
+          <UserMenu user={user} role="USER" onOpenChange={setMenuOpen} />
         </div>
       </div>
     </header>

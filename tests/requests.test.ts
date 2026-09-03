@@ -2903,6 +2903,35 @@ test('the honeypot stays invisible and stays dumb', () => {
     'the honeypot branch stopped answering ok:true — it now tells bots they were caught')
 })
 
+test('a bar that hosts the account menu lifts itself while it is open', () => {
+  /* ⚠️ THE MENU WAS PAINTED UNDER A PROGRESS RAIL (2026-09-03). Every top bar
+     on the site is `sticky` WITH a z-index, which opens a stacking context —
+     so the dropdown inside it asks for `z-50` and is worth whatever the header
+     is worth. Any SECOND sticky element at the same layer, later in the DOM,
+     then covers the open menu. The intake's progress rail is `z-chrome`, the
+     bar was `z-chrome`, and the account menu came out cut in half. Owner:
+     „ასეთი პრობლემები არ უნდა ქონდეს საიტს."
+
+     `PublicTopBar` already knew the fix — it lifts to `z-drawer` while the
+     MOBILE DRAWER is open, and its own comment explains why a child cannot
+     escape. What it did not do was the same thing for the menu.
+
+     Pinned for all three bars rather than the one screen that showed it: the
+     collision needs only a sticky sub-header, and /work and /me have pages
+     that carry one. */
+  for (const f of [
+    'components/PublicTopBar.tsx',
+    'components/work/WorkspaceTopBar.tsx',
+    'components/me/ClientTopBar.tsx',
+  ]) {
+    const src = codeOf(f)
+    assert.match(src, /<UserMenu[^>]*onOpenChange=/,
+      `${f} hosts the account menu and is never told when it opens`)
+    assert.match(src, /menuOpen[^\n]*\?[^\n]*'z-drawer'/,
+      `${f} does not lift itself while the account menu is open — the menu paints under any sticky sub-header`)
+  }
+})
+
 test('every screen the run can produce is a screen the wizard draws', () => {
   /* ⚠️ THIS TEST EXISTS BECAUSE THE FUNNEL SHIPPED BROKEN (2026-09-03).
      The budget screen and the per-clarifier screens were added to `stepsFor`,

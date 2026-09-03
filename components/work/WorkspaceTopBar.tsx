@@ -22,6 +22,16 @@ export function WorkspaceTopBar({ user, role = 'PROVIDER', balanceTetri = null }
   role?: 'USER' | 'PROVIDER' | 'ADMIN'
 }) {
   const path = usePathname() ?? ''
+  /* ⚠️ THE ACCOUNT MENU LIFTS THIS BAR (2026-09-03). The <header> below is
+     `sticky` with a z-index, so it owns a stacking context and nothing inside
+     it can paint above the header's own layer — the dropdown asks for `z-50`
+     and is worth `z-chrome`. Any second sticky element at the same layer, later
+     in the DOM, then covers the open menu. It was found on the intake (its
+     progress rail is also `z-chrome`); the same shape exists wherever a page
+     inside this space carries its own sticky sub-header, so the fix is here
+     rather than at the one screen that showed it.
+     Owner: „ასეთი პრობლემები არ უნდა ქონდეს საიტს." */
+  const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -33,7 +43,7 @@ export function WorkspaceTopBar({ user, role = 'PROVIDER', balanceTetri = null }
 
   return (
     <header
-      className={`sticky top-0 z-chrome bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
+      className={`sticky top-0 ${menuOpen ? 'z-drawer' : 'z-chrome'} bg-white lg:bg-white/95 lg:backdrop-blur-md border-b border-ink-100 transition-shadow duration-mid ease-out-quart ${
         scrolled ? 'shadow-sm' : ''
       }`}
     >
@@ -47,7 +57,7 @@ export function WorkspaceTopBar({ user, role = 'PROVIDER', balanceTetri = null }
         <div className="flex items-center gap-2 shrink-0">
           <CreditPill tetri={balanceTetri} />
           <NotifBell />
-          <UserMenu user={user} role={role} />
+          <UserMenu user={user} role={role} onOpenChange={setMenuOpen} />
         </div>
       </div>
     </header>

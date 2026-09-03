@@ -7,7 +7,7 @@
 import Link from 'next/link'
 import { showJoinInvite, JOIN_DOOR_HREF, JOIN_DOOR_LABEL } from '@/lib/capabilities'
 import { usePathname } from 'next/navigation'
-import { Fragment, useEffect, useRef, useState, type ReactElement } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactElement, useCallback } from 'react'
 import { Avatar } from './Avatar'
 import { Icon } from './Icon'
 import { Eyebrow } from '@/components/Eyebrow'
@@ -87,11 +87,40 @@ const ADMIN_ITEMS = (onSignout: () => void): MenuItem[] => [
 export function UserMenu({
   user,
   role,
+  onOpenChange,
 }: {
   user?: { name: string; avatar?: string | null }
   role: Role
+  /**
+   * ⚠️ THE BAR HAS TO KNOW THIS MENU IS OPEN (2026-09-03), and the reason is
+   * stacking rather than state. `PublicTopBar`'s <header> is `sticky` WITH a
+   * z-index, so it opens its OWN stacking context — its own comment says so —
+   * and everything inside it is capped by the header's layer no matter what
+   * z-index the child carries. This dropdown asks for `z-50` and gets
+   * `z-chrome` (40), because that is what its parent is worth.
+   *
+   * That was invisible until a second sticky header appeared UNDER the bar at
+   * the SAME layer: the intake's own progress rail (app/request/_shell) is also
+   * `z-chrome`, and it comes later in the DOM, so it painted straight over this
+   * menu. Owner, on a screenshot of the menu cut in half by the green rail:
+   * „ასეთი პრობლემები არ უნდა ქონდეს საიტს."
+   *
+   * The bar already solves this for the mobile drawer — it lifts itself to
+   * `z-drawer` while the drawer is open — and this is the same fix for the
+   * same reason. The state lives here, so the bar is TOLD.
+   */
+  onOpenChange?: (open: boolean) => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpenState] = useState(false)
+  /* One writer, so the callback cannot be forgotten at a call site — a menu
+     that opened without telling the bar is exactly the bug above. */
+  const setOpen = useCallback((next: boolean | ((o: boolean) => boolean)) => {
+    setOpenState(prev => {
+      const v = typeof next === 'function' ? (next as (o: boolean) => boolean)(prev) : next
+      if (v !== prev) onOpenChange?.(v)
+      return v
+    })
+  }, [onOpenChange])
   const [busy, setBusy] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
   // ↑/↓/Home/End/Escape/Tab for the dropdown. The role="menu" below was already
