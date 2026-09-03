@@ -2903,6 +2903,51 @@ test('the honeypot stays invisible and stays dumb', () => {
     'the honeypot branch stopped answering ok:true — it now tells bots they were caught')
 })
 
+test('every screen the run can produce is a screen the wizard draws', () => {
+  /* ⚠️ THIS TEST EXISTS BECAUSE THE FUNNEL SHIPPED BROKEN (2026-09-03).
+     The budget screen and the per-clarifier screens were added to `stepsFor`,
+     to the `options` list and to `pickOption` — and NOT to the render. So the
+     wizard drew a heading with nothing under it and no way forward: a dead end
+     on the one page this product depends on, live, found by the owner („რა
+     არის ესა?"). Types cannot see it: a step id is a string and a missing JSX
+     branch is not an error.
+
+     The same commit had a second instance. The timing screen's render was
+     guarded on `extras.length === 0`, which was true while the clarifiers
+     shared that page; once they moved out, `extras` was still computed for the
+     timing step and every topic WITH a clarifier drew no options either.
+
+     A step needs THREE things — a place in the run, a way to answer, and
+     something that draws it — and the run only ever checked the first two.
+     This is the third. */
+  const { withTopic, stepsFor, EMPTY_DRAFT } =
+    require('../app/request/_model') as typeof import('../app/request/_model')
+  const wizard = codeOf('app/request/RequestWizard.tsx')
+
+  const ids = new Set<string>()
+  for (const g of TOPIC_GROUPS) for (const t of g.topics) {
+    for (const st of stepsFor(withTopic(EMPTY_DRAFT, t.id))) ids.add(st.id)
+  }
+  for (const st of stepsFor(EMPTY_DRAFT)) ids.add(st.id)
+
+  for (const id of ids) {
+    // A clarifier screen is drawn by `step.extraId`, not by its own id — there
+    // is one branch for all of them, which is the point of the id scheme.
+    /* ⚠️ THE `{` MATTERS. `step.id === 'budget'` also appears in `pickOption`,
+       so a bare `includes` was satisfied by the handler and passed on the very
+       bug this test was written for — checked by deleting the render and
+       watching it stay green. A RENDER branch opens with `{step.id === …` and
+       nothing else in this file does. */
+    const drawn = id.startsWith('extra:')
+      ? wizard.includes('{step.extraId && (')
+      : wizard.includes(`{step.id === '${id}'`)
+    assert.ok(drawn, `the run produces a „${id}" screen and nothing in the wizard draws it`)
+  }
+  // …and the guard that silently emptied the timing screen must not come back.
+  assert.doesNotMatch(wizard, /step\.id === 'timing' && extras\.length/,
+    'the timing screen is gated on a clarifier count again — it drew nothing for half the topics')
+})
+
 test('the money question is a REQUIRED BAND, never a number and never a refusal', () => {
   /* ⚠️ THIS TEST HAS NOW PINNED BOTH ANSWERS, AND THE THIRD VERSION IS THE
      INTERESTING ONE. It first guarded a warning under a budget ladder; on
@@ -2921,6 +2966,19 @@ test('the money question is a REQUIRED BAND, never a number and never a refusal'
   assert.match(m, /id: 'budget'/, 'stepsFor stopped listing the budget screen')
   assert.match(w, /step\.id === 'budget'/, 'the wizard stopped rendering the budget screen')
   assert.match(w, /BUDGET_BANDS\[kind\]/, 'the budget screen stopped offering this kind‘s own bands')
+
+  /* ⚠️ AND IT SAYS WHAT THE NUMBER MEASURES (2026-09-03). „20–40₾" is per
+     LESSON on a learning request and the WHOLE JOB on a project — the same
+     five labels meaning four different things. The provider's job card has
+     always printed the unit (`budgetLabel` ends „…ერთ გამოძახებაზე"); the
+     person choosing the band was the only one who was not told. Owner, looking
+     at the bare ladder: „ესე ვერ მიხვდება." */
+  assert.match(w, /step\.id === 'budget' &&[\s\S]{0,200}?KIND\[kind\]\.unitLabel/,
+    'the budget screen stopped saying whether the band is per lesson, per visit or for the whole job')
+  // …and the unit is the ONE table, never retyped: four kinds, four words.
+  for (const k of REQUEST_KINDS) {
+    assert.ok(KIND[k].unitLabel.trim().length > 0, `${k} has no unit for its budget bands`)
+  }
 
   // ⚠️ REQUIRED, WHICH HERE MEANS „NOT SKIPPABLE". The photo screen is the only
   // one in the run that carries `skippable`; a budget screen that grew one
@@ -3233,8 +3291,25 @@ test('the budget is a band, and the ladder is the only way to answer it', () => 
   // (The word „budgetAmount" itself still appears once, in _model's revive
   // step, which DELETES it off a draft written before the removal — that is the
   // migration, not the field, so the assertion is on the patch form.)
-  assert.ok(!/type="number"/.test(src), 'the intake grew a number input again')
+  /* ⚠️ THE NUMBER FIELD IS BACK AND THE RULE IS NOT (2026-09-03). Owner:
+     „ჩასაწერი ველი მინდა." This assertion used to read
+         assert.ok(!/type="number"/.test(src), 'the intake grew a number input again')
+     and it was pinning two things at once — that no amount reaches the WIRE,
+     and that no box on the SCREEN takes one. Only the first was ever the rule.
+
+     The screen now has both: the ladder, and a box for somebody who already
+     knows their figure. What the box does is RESOLVE the number to the band it
+     falls into and store that band — so the wire format is unchanged and every
+     assertion above still holds, which is why they are untouched. The thing
+     that must never come back is a second way to WRITE a budget, and that is
+     what the second line still pins. */
   assert.ok(!/budgetAmount:/.test(src), 'something writes a typed budget onto the draft again')
+  const wizard = codeOf('app/request/RequestWizard.tsx')
+  assert.match(wizard, /id="req-budget-amount"/, 'the typed-amount box is gone from the budget screen')
+  // …and it advances by BAND. `pickAndGo({ budgetBand: … })` is the only exit;
+  // anything patching an amount onto the draft would trip the line above.
+  assert.match(wizard, /amountBand[\s\S]{0,200}?budgetBand: amountBand\.id/,
+    'the typed amount stopped resolving to a band before it advances')
 })
 
 test('the client is told their request exists, at the moment they send it', () => {

@@ -6,7 +6,7 @@
 // the submit; every screen is a sibling component and every rule lives in
 // _model or lib/requests — the container holds no validation of its own.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Btn } from '@/components/Btn'
 import { Icon } from '@/components/Icon'
@@ -338,10 +338,36 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
         notesLen: d.description.trim().length,
       })
     }
+    setGoingBack(false)
     setStepId(nx)
     window.scrollTo({ top: 0 })
   }
-  const back = () => setStepId(prevStepId(step.id, draft))
+  /* ⚠️ WHICH WAY THE LAST MOVE WENT (2026-09-03). Owner: „ანიმაცია არაა
+     დამახასიათებელი… იგივეა." It was: every screen played the same
+     `slide-in-b`, so stepping forward and stepping back were the same
+     gesture on screen and the motion told the reader nothing.
+     The pattern every multi-step form settles on is direction-aware — next
+     arrives from one side, previous from the other. The keyframe library is
+     CLOSED (lib/design/README §4), so this picks between two entrances that
+     already exist rather than minting a third: forward SLIDES IN from the
+     right, back FADES in. Different, and honest about which is which — going
+     back is a retreat and a quiet arrival is what that is. */
+  const [goingBack, setGoingBack] = useState(false)
+
+  /* The typed budget, and the band it lands in. Kept as a STRING because that
+     is what an input holds — „0" and „" are different states and a number would
+     collapse them. `amountBand` is null while the box is empty or the figure is
+     outside every band, which is what disables the button: a screen that
+     advanced on an unresolvable number would file a request with no budget
+     after asking for one. */
+  const [amount, setAmount] = useState('')
+  const amountBand = useMemo(() => {
+    const n = Number(amount)
+    if (!amount.trim() || !Number.isFinite(n) || n <= 0) return null
+    return BUDGET_BANDS[kindOf(draft.kind)].find(b => n >= b.min && (b.max === null || n <= b.max)) ?? null
+  }, [amount, draft.kind])
+
+  const back = () => { setGoingBack(true); setStepId(prevStepId(step.id, draft)) }
 
   /** One tap on a single-question screen: record the answer, go. */
   /** The question this screen is waiting on, once somebody has tried to leave
@@ -729,9 +755,12 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
           what removes the seam rather than moving it.
 
           Keyed on the step so each new question ENTERS rather than swapping in
-          place — `slide-in-b` is the existing token the booking steps use; no
-          new animation was minted for this. */}
-      <div key={`q:${step.id}`} className="motion-safe:animate-slide-in-b">
+          place. The entrance now depends on the DIRECTION — see `goingBack`.
+          Both tokens already existed; no new animation was minted. */}
+      <div
+        key={`q:${step.id}`}
+        className={goingBack ? 'motion-safe:animate-fade-in' : 'motion-safe:animate-slide-in-r'}
+      >
         <h1 className="font-display text-h1 font-bold text-ink-900 tracking-tight text-balance">
           {step.title}
         </h1>
@@ -749,6 +778,24 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
           <p className="mt-2 text-body text-ink-600">
             {VERTICAL_COPY[draft.vertical].hint}
           </p>
+        )}
+        {/* ⚠️ THE BUDGET SCREEN HAS TO SAY WHAT THE NUMBER MEASURES (2026-09-03).
+            Owner, pointing at the bare ladder: „ესე ვერ მიხვდება."
+
+            The bands are PER UNIT and the unit is different for every kind —
+            „20–40₾" is per LESSON on a learning request, per VISIT on a service,
+            and the WHOLE JOB on a project (lib/requestTopics → BUDGET_BANDS,
+            which says so in a comment at each). Somebody budgeting 2 000₾ to
+            learn web development reads „120₾-ზე მეტი" as the top of the ladder
+            and cannot tell whether that is absurd or exactly right.
+
+            The provider has always been told: their job card prints
+            `budgetLabel`, which ends „30–60₾ ერთ გამოძახებაზე". The person
+            CHOOSING the band was the only one who was not. Same word, from the
+            same table — `KIND[kind].unitLabel` — so the two sides cannot say it
+            differently, and nothing new is written. */}
+        {step.id === 'budget' && (
+          <p className="mt-2 text-body text-ink-600">{KIND[kind].unitLabel}</p>
         )}
       </div>
       {/* ⚠️ THE „kind · topic" RESTATEMENT LIVED HERE AND IS GONE (2026-08-17).
@@ -869,81 +916,101 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
             exit — but „asked of everybody" is a fact about the vocabulary, not
             something the person answering can see. On this screen it is simply
             the last question, and it gets its own name back. */}
-        {step.id === 'timing' && extras.length > 0 && (
-          <div className="flex flex-col gap-8 mb-6">
-            {[
-              ...extras.map(q => ({
-                id: q.id,
-                label: q.label,
-                options: [...q.options],
-                value: draft.details[q.id] ?? '',
-                // ⚠️ ITS OWN QUESTION, BOUND HERE. Never `pickOption` — see
-                // `answerExtra`: the option ids collide with the timing
-                // ladder's, so the row that was tapped is the only thing that
-                // knows which question it answers.
-                pick: (optionId: string) => { answerExtra(q.id, optionId); setMissingQ(null) },
-                // The digits index ONE list (see `options`) and that list is
-                // the timing ladder — a badge on a row the keys do not reach
-                // is a lie about the shortcut.
-                numbered: false,
-              })),
-              {
-                id: 'timing',
-                label: KIND[kind].timingLabel,
-                options,
-                value: draft.timing,
-                pick: (optionId: string) => pickOption(optionId),
-                numbered: true,
-              },
-            ].map(q => (
-              <section key={q.id} data-question={q.id}>
-                <div className="mb-3 flex items-center gap-2.5">
-                  {/* Filled when answered, hollow when not — so „what is left"
-                      is readable at a glance down the page rather than by
-                      re-reading every group. */}
-                  <span
-                    aria-hidden
-                    className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors duration-fast ${
-                      q.value ? 'bg-brand-600 text-white' : 'border border-ink-300 bg-white'
-                    }`}
-                  >
-                    {q.value && <Icon.check aria-hidden className="h-3 w-3" />}
-                  </span>
-                  <h2 className={`font-display text-body-lg font-bold transition-colors duration-fast ${
-                    missingQ === q.id ? 'text-danger-700' : 'text-ink-900'
-                  }`}>
-                    {q.label}
-                  </h2>
-                </div>
-                <StepPick options={q.options} value={q.value} onPick={q.pick} numbered={q.numbered} />
-              </section>
-            ))}
+        {/* ⚠️ THE STACKED-QUESTIONS SCREEN STOOD HERE AND IS GONE (2026-09-03).
+            It drew every clarifier AND the timing ladder down one page, with a
+            „გავაგრძელოთ" button because no single tap could be allowed to end a
+            screen holding three questions. The clarifiers have their own
+            screens again — owner: „ორად რომ არის ჩამოშლილი… დაყო ცალკე
+            გვერდებად" — so `extras` on this step is always empty, this branch
+            was unreachable, and the `extras.length === 0` guard below it was
+            the only thing still drawing anything. Both are simplified into the
+            one unconditional render.
 
-            {/* ⚠️ A BUTTON, BECAUSE THE SCREEN STOPPED HAVING A SECRET EXIT.
-                It is pressable while the form is incomplete and REPORTS — the
-                lesson app/join wrote down at length: a disabled control under a
-                long screen is a dead grey rectangle whose only feedback is that
-                nothing happened. */}
-            <div>
-              <Btn
-                size="md"
-                onClick={() => {
-                  const gap = extras.find(q => !draft.details[q.id])
-                  if (gap) { stopOnQuestion(gap.id); return }
-                  if (!draft.timing) { stopOnQuestion('timing'); return }
-                  setMissingQ(null)
-                  advance(draft, 'timing')
-                }}
-              >
-                გავაგრძელოთ
-              </Btn>
-              {missingQ && (
-                <p role="alert" className="mt-2.5 text-small text-danger-700">
-                  ერთი კითხვა ჯერ უპასუხოდაა.
+            ⚠️ IT ALSO TOOK A LIVE BUG WITH IT. Between the split and this
+            commit the guard read `extras.length === 0`, and `extras` was still
+            computed for the timing step — so on every topic WITH a clarifier
+            the timing screen rendered no options at all. Same class of mistake
+            as the two screens below: a step added to the run without a block
+            that draws it. */}
+        {step.id === 'timing' && (
+          <StepPick options={options} value={draft.timing} onPick={pickOption} numbered />
+        )}
+
+        {/* ⚠️ THE BUDGET SCREEN, AND THE REASON THIS BLOCK EXISTS AT ALL. It was
+            added to `stepsFor` and to `options` and to `pickOption` on
+            2026-09-03 and NOT here — so it shipped as a heading with nothing
+            under it and no way forward: the request funnel's own dead end,
+            found on production by the owner („რა არის ესა?"). Every screen in
+            this file needs three things and the run only checks two of them. */}
+        {step.id === 'budget' && (
+          <>
+            <StepPick options={options} value={draft.budgetBand} onPick={pickOption} numbered />
+            {/* ── …OR TYPE THE AMOUNT ────────────────────────────────────────
+                Owner, 2026-09-03: „ჩასაწერი ველი მინდა."
+
+                ⚠️ IT RESOLVES TO A BAND, IT DOES NOT REPLACE ONE. The typed
+                number picks the band it falls into and stores THAT — so
+                everything downstream is unchanged: `serviceRequestRow` still
+                derives budgetMin/Max from a band id, the provider's card still
+                reads „30–60₾ ერთ გამოძახებაზე", and the contact fee is still
+                priced off the same two columns (lib/credits →
+                contactCostTetri). No schema change, no second meaning for one
+                column.
+
+                ⚠️ AND IT ANSWERS THE OBJECTION THE BANDS WERE CHOSEN FOR. The
+                bands exist because „750₾" is a figure somebody has to invent
+                (the 2026-08-19 removal argued exactly that). This does not
+                force anybody to invent one — the ladder is still there and
+                still one tap. What it adds is the person who ALREADY KNOWS
+                their number and was being made to translate it into somebody
+                else's range.
+
+                ⚠️ TYPING DOES NOT ADVANCE. A screen that moved on mid-number
+                would leave on „7" of „750". The row below shows which band the
+                figure landed in — so the translation is visible rather than
+                silent — and „გავაგრძელოთ" is the exit. */}
+            <div className="mt-5 border-t border-ink-100 pt-5">
+              <label htmlFor="req-budget-amount" className="block text-small font-display font-semibold text-ink-800">
+                ან ჩაწერე თანხა
+              </label>
+              <div className="mt-2 flex flex-wrap items-center gap-2.5">
+                <span className="inline-flex h-12 w-[150px] items-center gap-1.5 rounded-field border border-ink-200 bg-white px-4 transition-[border-color,box-shadow] duration-fast focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+                  <input
+                    id="req-budget-amount"
+                    type="number" min={1} max={1000000} step={1} inputMode="numeric"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    className="min-w-0 flex-1 border-0 bg-transparent p-0 text-right font-display text-h3 font-bold tabular-nums text-ink-900 placeholder-ink-400 outline-none"
+                    placeholder="0"
+                  />
+                  <span className="shrink-0 text-small text-ink-500">₾</span>
+                </span>
+                <Btn
+                  size="lg"
+                  disabled={!amountBand}
+                  onClick={() => { if (amountBand) pickAndGo({ budgetBand: amountBand.id }) }}
+                >
+                  გავაგრძელოთ
+                </Btn>
+              </div>
+              {amountBand && (
+                <p className="mt-2 text-meta text-ink-500">
+                  {amountBand.label} · {KIND[kind].unitLabel}
                 </p>
               )}
             </div>
-          </div>
+          </>
+        )}
+
+        {/* One clarifier, one screen — the same three parts. `step.extraId`
+            names the question; `options` above resolves its rows. */}
+        {step.extraId && (
+          <StepPick
+            options={options}
+            value={draft.details[step.extraId] ?? ''}
+            onPick={pickOption}
+            numbered
+          />
         )}
         {/* ⚠️ THE BUDGET SCREEN IS GONE (2026-08-19). Owner: „არ გვინდა
             ბიუჯეტი საერთოდ, 5 ეტაპამდე უნდა შემცირდეს."
@@ -965,11 +1032,6 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
             „not asked"), so the row and every reader of it keep working. The
             floor warning that lived here went with the question: nothing left
             to warn about. */}
-        {/* Only when this screen asks ONE question. With clarifiers the timing
-            ladder is drawn inside the list above, with its own heading. */}
-        {step.id === 'timing' && extras.length === 0 && (
-          <StepPick options={options} value={draft.timing} onPick={pickOption} numbered />
-        )}
         {step.id === 'format' && (
           <StepPick
             options={FORMATS.map(f => f.id === 'IN_PERSON' && !ONE_CITY

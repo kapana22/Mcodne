@@ -36,7 +36,31 @@ export function StepPick({ options, value, onPick, onSkip, numbered = false }: {
 }) {
   return (
     <div>
-      <div className="grid gap-2.5">
+      {/* ⚠️ `.stagger`, AND IT IS THE SYSTEM'S OWN (2026-09-03). Owner: „ანიმაცია
+          არაა დამახასიათებელი… ერთი ლამაზი, დახვეწილი." Every screen played the
+          same single `slide-in-b` on the whole block, so a five-row ladder
+          arrived as one rectangle and going back looked exactly like going
+          forward.
+
+          The rows now arrive one after another — `.stagger` in globals.css,
+          `riseIn` at 40ms per child, already written and used nowhere near
+          here. lib/design/README §4 is explicit that the keyframe library is
+          CLOSED, so this adds no animation: it uses the stagger helper that
+          exists and the entrance the wizard already picks per direction.
+
+          ⚠️ NO `motion-safe:` PREFIX, AND THAT IS NOT AN OMISSION. The whole
+          `.stagger` block lives inside `@media (prefers-reduced-motion:
+          no-preference)` in globals.css, so the guard is in the definition
+          rather than at the call site — a `motion-safe:` variant here would ask
+          Tailwind for a class it never generated and the rows would simply not
+          animate at all.
+
+          ⚠️ IT COVERS EIGHT CHILDREN. The helper's delays stop at
+          `nth-child(8)`; a ninth row simply arrives with no delay rather than
+          not arriving. The longest ladder on the site is six (PROJECT), so
+          nothing reaches the edge today — said here because the edge is silent
+          rather than loud. */}
+      <div className="grid gap-2.5 stagger">
         {options.map((o, i) => {
           const on = value === o.id
           return (
