@@ -493,6 +493,27 @@ export function stepsFor(d: Draft): StepDef[] {
      people to write to while waiting. That list now shows for everybody
      (app/request/_live.tsx) — which is strictly more useful and one decision
      fewer. The column stays and still defaults to OFFERS. */
+  /* ⚠️ THE BRIEF, AND IT MOVED HERE FROM SECOND PLACE (2026-09-04, same day it
+     was added). It first sat directly after „რა გჭირდება" — pick a sphere, and
+     the very next thing is a ten-row empty box. Owner: „ჯერ მიმართულება
+     ავარჩევინოთ… მერე დაწეროს აღწერა… ბოლოსკენ, ან ლოგიკურად სწორად როცა
+     ჯდება."
+
+     The rule it now follows is the ordinary one for forms: cheap questions
+     first, the effortful one once somebody has something invested. Budget,
+     deadline and place are one tap each; by the time this screen arrives the
+     person has answered four things and is describing a job they have already
+     half-specified — which also makes the sentence better, because they have
+     just decided what it is worth and when it is needed.
+
+     ⚠️ BEFORE THE CONTACT SCREEN, NOT AFTER. The phone number is the last
+     thing asked on purpose, and putting a writing task after it would ask
+     somebody to work for a form they have already finished paying for.
+
+     ⚠️ THIS IS A HYPOTHESIS WITH A MEASUREMENT ATTACHED. `trackRequestFunnel`
+     records every step, so which order actually holds people is a question the
+     funnel will answer rather than one this comment settles. */
+  out.push({ id: 'details', title: 'აღწერე, რა გჭირდება' })
   out.push({ id: 'contact', title: 'როგორ დაგიკავშირდეთ?' })
   return out
 }
@@ -562,6 +583,16 @@ export function answerLabel(id: string, d: Draft): string | null {
 export function stepComplete(id: string, d: Draft): boolean {
   if (id === 'what') return d.topic !== '' && kindsOfTopic(d.topic).length > 0
   if (id === 'kind') return d.kind !== '' && d.topic !== '' && isTopicOfKind(d.kind, d.topic)
+  /* ⚠️ REQUIRED, AND THE FLOOR IS A REAL SENTENCE (2026-09-04). „Not empty"
+     would be satisfied by one character and by nobody else: the provider pays
+     to reach this lead and „ok" is not a brief. Twelve characters is about
+     three Georgian words — „ჭერი ჩამომინგრა" is 15 — so it refuses a keysmash
+     without demanding an essay. */
+  if (id === 'details') return d.description.trim().length >= 12
+  /* ⚠️ REQUIRED SINCE 2026-09-04, and only ever asked of SERVICE — the step is
+     pushed for that kind alone (`stepsFor`), so this line cannot strand a
+     lawyer or a tutor behind a camera. */
+  if (id === 'photos') return d.photos.length > 0
   if (id === 'timing') return d.kind !== '' && TIMING[kindOf(d.kind)].some(t => t.id === d.timing)
   /* ⚠️ REQUIRED, AND ASKED OF THE BANDS RATHER THAN OF THE STRING (2026-09-03).
      `bandOf` returns undefined for UNSTATED and for a band belonging to another
@@ -639,9 +670,26 @@ export function resumeStepId(d: Draft): string {
   return steps[steps.length - 1].id
 }
 
-/** 0..1 — the shell's thin progress bar. The reference products show a bar,
- *  not „3 / 4": with a run whose length depends on answers, a shrinking
- *  denominator reads as the form growing under you. */
+/** 0..1 — the fill on the header's bottom edge.
+ *
+ *  ⚠️ THIS WAS DELETED FOR HALF A DAY ON 2026-09-03 AND CAME STRAIGHT BACK.
+ *  The segmented rail and the percentage bar were two controls answering one
+ *  question in 126px of chrome, and removing BOTH of them was the overcorrect
+ *  half of the right fix. Owner, on the result: „ძალიან სადა, არაფრის
+ *  მომცემია" — nothing on the screen moved any more, so nothing told them the
+ *  form was going anywhere.
+ *
+ *  What was actually wrong was the DUPLICATION, and that is still fixed: there
+ *  is one indicator now, not two, and it costs 2px rather than 62 because it
+ *  IS the header's bottom border rather than a block under it.
+ *
+ *  The old note here argued a bar over „3 / 4", on the grounds that a run whose
+ *  length depends on answers has a moving denominator. Worth keeping the answer
+ *  written down: the denominator settles on the SECOND screen — `kind` and
+ *  `topic` decide which extras exist, they are the first two questions, and
+ *  nothing after them changes `stepsFor().length`. The counter is hidden on
+ *  screen one for exactly that reason (`RequestWizard`), so the two never
+ *  disagree. */
 export function progressOf(id: string, d: Draft): number {
   const steps = stepsFor(d)
   const ix = Math.max(0, steps.findIndex(s => s.id === id))
@@ -674,6 +722,23 @@ export function withKind(d: Draft, kind: RequestKindName): Draft {
  * → keep a still-compatible previous choice, clear an incompatible one.
  */
 export function withTopic(d: Draft, topicId: string): Draft {
+  /* ⚠️ CLEARING THE TOPIC CLEARS THE TOPIC, AND NOTHING ELSE (2026-09-04).
+     Owner: „ბოლოში მივდივარ და უკან რაიმეს შესწორება მინდა — უკან შლის
+     ყველაფერს."
+
+     `onClearTopic` (the „change" control on screen one) calls this with an
+     empty id, and it used to fall through to the branch below: `kindsOfTopic('')`
+     is empty, so the previous kind was never „included", so kind, budgetBand,
+     timing and details were all wiped. Somebody who walked to the contact
+     screen, came back to correct one word and tapped „change" lost the band and
+     the date they had already given — before they had chosen anything new.
+
+     The clearing decision belongs to the NEXT pick, not to this one, and the
+     branch below already makes it correctly: a new topic that still carries the
+     old kind keeps everything, and one that cannot carry it clears exactly what
+     was keyed to it. Verified both ways — re-picking the same topic restores a
+     full draft, and a LEARNING-only topic still resets the PROJECT band. */
+  if (topicId === '') return { ...d, topic: '' }
   const kinds = kindsOfTopic(topicId)
   const next = { ...d, topic: topicId }
   if (kinds.length === 1) return withKind(next, kinds[0])

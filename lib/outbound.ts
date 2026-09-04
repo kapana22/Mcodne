@@ -62,6 +62,16 @@ export const OUTBOUND = [
   { key: 'auth.welcome',            label: 'მოგესალმებით',                when: 'რეგისტრაციისთანავე', audience: 'anyone', channels: ['mail'] },
   { key: 'auth.googleLinked',       label: 'Google მიება ანგარიშს',       when: 'Google-ით პირველი შესვლისას არსებულ ანგარიშზე', audience: 'anyone', channels: ['mail'] },
   { key: 'auth.otpVerify',          label: 'ელფოსტის დადასტურების კოდი',  when: 'როცა მომხმარებელი კოდს ითხოვს', audience: 'anyone', channels: ['mail'], credential: true },
+  /* ⚠️ `smsByDefault` — THE ONE PRODUCT MESSAGE THAT STARTS ON, and the rule it
+     breaks is worth naming. Every other SMS defaults to off because a part is
+     billed and nobody should be charged for a channel they did not turn on
+     (lib/outboundSettings → defaultState). This one is not a notification about
+     the product, it IS the front door: phone registration is passwordless, so a
+     person whose code never arrives cannot register and cannot sign in. Shipping
+     it off would ship a door that is locked. The owner can still switch it off
+     in /admin — and /api/auth/phone/start reports the hold to the screen rather
+     than pretending the code went, so it fails loudly instead of silently. */
+  { key: 'auth.phoneCode',          label: 'ნომრით შესვლის კოდი',         when: 'როცა მომხმარებელი ნომერს წერს /signin-ზე', audience: 'anyone', channels: ['sms'], smsByDefault: true, credential: true },
   { key: 'auth.otpReset',           label: 'პაროლის აღდგენის კოდი',       when: 'როცა მომხმარებელი კოდს ითხოვს', audience: 'anyone', channels: ['mail'], credential: true },
   { key: 'auth.passwordReset',      label: 'პაროლის აღდგენის ბმული',      when: '/signin → პაროლი დამავიწყდა', audience: 'anyone', channels: ['mail'], credential: true },
 
@@ -79,13 +89,29 @@ export const OUTBOUND = [
   { key: 'request.offerArrived.client',  label: 'შემოვიდა შეთავაზება',      when: 'პროვაიდერი წერს შეთავაზებას', audience: 'client', channels: ['mail', 'sms'] },
   { key: 'request.offerDigest.client',   label: 'შეთავაზებების შეხსენება',  when: 'ღამის cron — უპასუხო შეთავაზებები', audience: 'client', channels: ['mail'] },
   { key: 'request.closedNoOffers.client', label: 'განაცხადი დაიხურა უპასუხოდ', when: 'ღამის cron — ვადა გავიდა, შეთავაზება არ იყო', audience: 'client', channels: ['mail'] },
-  { key: 'request.done.client',          label: 'სამუშაო დასრულდა',         when: 'პროვაიდერი აღნიშნავს დასრულებულად', audience: 'client', channels: ['mail'] },
+  /* ⚠️ SMS JOINED THIS ROW ON 2026-09-04, and it is now the channel that
+     actually fires. The client's email field left the intake on 2026-09-03, so
+     a request filed since has no address and the mail branch sent nothing —
+     the provider marked the job finished and the client was never told, which
+     is also why they were never asked for the review this product is built
+     around. Same reasoning, same shape as `request.offerArrived.client` above. */
+  { key: 'request.done.client',          label: 'სამუშაო დასრულდა',         when: 'პროვაიდერი აღნიშნავს დასრულებულად', audience: 'client', channels: ['mail', 'sms'] },
   { key: 'request.doneReminder.client',  label: 'დაადასტურე დასრულება',     when: 'ღამის cron — დაუდასტურებელი დასრულება', audience: 'client', channels: ['mail'] },
 
   /* ── the provider's side ─────────────────────────────────────────────── */
   // ⚠️ THE ONE THE MARKETPLACE TURNS ON. 17 requests have produced 6 offers
   // (measured 2026-09-02); the gap is providers not seeing a request in time.
-  { key: 'request.verified.provider',    label: 'ახალი განაცხადი შენს კატეგორიაში', when: 'ადმინი ადასტურებს განაცხადს', audience: 'provider', channels: ['mail', 'sms'] },
+  /* ⚠️ `smsByDefault` ADDED 2026-09-04 ON THE OWNER'S INSTRUCTION: „როდესაც
+     ექსპერტი დარეგისტრირდება და კატეგორიას აირჩევს შეტყობინებები და
+     შეთავაზებები მიდიოდეს ამ ნომერზე."
+
+     It was wired on 2026-09-02 and left switched off under the general rule
+     that a billed channel starts off. The owner has now made that call for this
+     one message — the only one that carries actual paid work to somebody who
+     can do it, and the reason a provider comes back to the site at all. Every
+     kill switch above it is untouched: `SMS_MODE`, the /admin toggle and
+     `SMS_ONLY_AFTER` all still stop it. */
+  { key: 'request.verified.provider',    label: 'ახალი განაცხადი შენს კატეგორიაში', when: 'ადმინი ადასტურებს განაცხადს', audience: 'provider', channels: ['mail', 'sms'], smsByDefault: true },
   { key: 'request.offerAccepted.provider', label: 'შენი შეთავაზება მიიღეს',   when: 'კლიენტი იღებს შეთავაზებას', audience: 'provider', channels: ['mail'] },
   { key: 'request.done.provider',        label: 'სამუშაო დასრულებულად აღინიშნა', when: 'დასრულების აღნიშვნისას', audience: 'provider', channels: ['mail'] },
   { key: 'request.contactRefunded.provider', label: 'კონტაქტის თანხა დაბრუნდა', when: 'განაცხადი უპასუხოდ დაიხურა — ავტომატური დაბრუნება', audience: 'provider', channels: ['mail'] },
@@ -168,3 +194,23 @@ export function canToggle(key: string, channel: Channel): boolean {
   return true
 }
 
+
+/**
+ * Is this a code or a link the recipient is AT THAT MOMENT WAITING FOR?
+ *
+ * ⚠️ IT DECIDES WHETHER THE „DO NOT CONTACT PRE-EXISTING PEOPLE" CUTOFF APPLIES
+ * (2026-09-04). `MAIL_ONLY_AFTER` / `SMS_ONLY_AFTER` exist so a pre-launch site
+ * does not INITIATE contact with rows that were here before it — owner: „ვინც
+ * user არის ახლანდელი, იმათ არ გაუგზავნო." Somebody who has just typed their
+ * number into the sign-in form and is watching the code field is not being
+ * contacted by us. They asked. Holding that message protects nobody and locks
+ * them out of their own account, silently, with `ok: true` in the log.
+ *
+ * The flag was already on the three `auth.*` codes; it had simply never been
+ * read by a sender. Phone registration is what made it urgent — those accounts
+ * are passwordless, so the code is the ONLY door they have.
+ */
+export function isCredential(key: string): boolean {
+  const d = outboundDef(key)
+  return !!d && 'credential' in d
+}

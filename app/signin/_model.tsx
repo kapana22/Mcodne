@@ -102,12 +102,25 @@ function readRedirectParam(): string | null {
   return safeRedirect(url.searchParams.get('redirect') || url.searchParams.get('next'))
 }
 
-export function redirectAfterSignin(role: string, home?: string | null) {
-  // Precedence: explicit ?redirect= deep-link → server-decided landing
-  // (`home` from the auth API — role home, or /apply for a pending expert
-  // applicant) → shared role map as the fallback.
+/**
+ * ⚠️ `formDest` IS THE SAME LESSON `startGoogleSignin` LEARNED THE HARD WAY
+ * (added 2026-09-04 for the phone door). A choice made on the FORM — „ვარ
+ * ხელოსანი" — is local state and never reaches the URL, so a door that reads
+ * only `?redirect=` discards it and drops the person into the client room with
+ * no application and no trace they chose anything. That is the exact bug the
+ * note on `startGoogleSignin` describes; the phone flow is a third door onto
+ * the same forms, and it would have repeated it.
+ *
+ * The URL parameter still WINS: arriving at /signup?redirect=/join is an
+ * instruction from wherever they came from, and a form default must not
+ * override it.
+ */
+export function redirectAfterSignin(role: string, home?: string | null, formDest?: string | null) {
+  // Precedence: explicit ?redirect= deep-link → the form's own destination →
+  // server-decided landing (`home` from the auth API — role home, or /join for
+  // a pending applicant) → shared role map as the fallback.
   const explicit = readRedirectParam()
-  const dest = explicit ?? safeInternalPath(home) ?? homeForRole(role)
+  const dest = explicit ?? safeRedirect(formDest) ?? safeInternalPath(home) ?? homeForRole(role)
   window.location.href = dest
 }
 

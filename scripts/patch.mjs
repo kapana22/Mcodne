@@ -35,7 +35,21 @@ for (const [i, e] of edits.entries()) {
   const n = out.split(old).length - 1
   if (n === 0) { misses.push({ i, old }); continue }
   if (n > 1 && !all) { misses.push({ i, old, note: `matches ${n} times — pass "all": true or lengthen the anchor` }); continue }
-  out = all ? out.split(old).join(rep) : out.replace(old, rep)
+  /* ⚠️ `split().join()` ON BOTH BRANCHES, AND `String.replace` ON NEITHER
+     (2026-09-04). `replace` treats the REPLACEMENT string as a template: `$&`,
+     `` $` ``, `$'` and `$1` are all expanded. `$'` means „everything after the
+     match", so an edit whose new text merely CONTAINED `$'` — a SQL regex
+     anchor followed by a quote, `~ '^5[0-9]{8}$'`, is how this was found —
+     silently truncated the replacement at that point and appended a second copy
+     of the whole rest of the file. The file it corrupted was lib/dbBoot.ts and
+     the corruption read as 80 nonsense parse errors 200 lines away from the
+     edit.
+
+     This tool exists to make a failed edit LOUD (that is the whole point of the
+     miss report below), so a silent corruption is the one bug it must not have.
+     `n === 1` is already proven above, so joining a one-element split is the
+     same edit with no template language in it. */
+  out = out.split(old).join(rep)
 }
 
 if (misses.length) {

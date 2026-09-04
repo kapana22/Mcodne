@@ -100,7 +100,7 @@ test('B2: confirming earns nothing — save must stay a free, honest yes', () =>
   const base: ProfileFacts = {
     hasPhoto: true, hasBio: true, hasProfessions: true,
     hasExperience: true, hasService: true, hasCertificate: true,
-    servicesConfirmed: false,
+    servicesConfirmed: false, notVisible: [],
   }
   assert.equal(
     completeness({ ...base, servicesConfirmed: true }),

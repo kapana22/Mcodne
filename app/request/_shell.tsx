@@ -2,9 +2,10 @@
 //
 // ⚠️ THIS IS NOT A PAGE OF THE SITE, and it must not read as one. No site
 // header, no footer, no bottom nav, no help bubble (AppShell suppresses those
-// three on these paths). What is left is a logo that goes home and, on the
-// wizard, a progress bar — because the two questions somebody has here are
-// „where am I" and „how much is left", and nothing else.
+// three on these paths). What is left is one row: the three stages and „3 / 6"
+// — because the two questions somebody has here are „where am I" and „how much
+// is left", and nothing else. Both are answered on that row, once each. It used
+// to take three controls and 126px; see the header.
 //
 // A person lands on this URL because they were sent it. They have one job. Any
 // control that is not part of that job is an invitation to abandon it, and a
@@ -12,15 +13,15 @@
 
 import Link from 'next/link'
 import { Container } from '@/components/Container'
+import { Icon } from '@/components/Icon'
 import { STAGES, type StageId } from './_model'
 import { REQUEST_ROUTE } from '@/lib/requests'
 import { Footer } from '@/components/Footer'
 import { PublicTopBar } from '@/components/PublicTopBar'
 
 export function RequestShell({
-  body = 'narrow',
-  privacyLine = true,
   progress,
+  body = 'narrow',
   step,
   stage,
   onStage,
@@ -61,10 +62,7 @@ export function RequestShell({
    * an OPEN question for the owner; until it is answered the room says nothing
    * rather than something untrue.
    */
-  privacyLine?: boolean
   /** 0..1. Omit on pages that are not a wizard — the bar is then absent
-   *  rather than drawn at zero. */
-  progress?: number
   /**
    * „3 / 5", when the run's length is settled.
    *
@@ -95,8 +93,12 @@ export function RequestShell({
    * labels cannot. The labels answer „where am I", which the bar cannot. They
    * are two different questions and the header has room for both.
    *
-   * Omitted on the pages that are not a wizard, exactly like `progress`.
+   * Omitted on the pages that are not a wizard; the row is then a spacer.
    */
+  /** 0..1 — how far through the run this screen is. Drawn as the header's own
+   *  bottom edge, so it costs 2px and not a block. Omitted by the pages that
+   *  are not a wizard; the edge is then a plain hairline. */
+  progress?: number
   stage?: StageId
   onStage?: (id: StageId) => void
   /** The stages this run actually has — `_model → stagesFor`. Defaulted to all
@@ -141,8 +143,7 @@ export function RequestShell({
    * the node and keeps every behaviour it already had. Nothing here changes
    * what a tap does.
    *
-   * Omitted by the pages that are not a wizard, exactly like `progress` and
-   * `stage`; the bar is then absent rather than drawn empty.
+   * Omitted by the pages that are not a wizard, exactly like `stage`.
    *
    * ⚠️ NOBODY PASSES IT YET, AND THAT IS A HALF-DONE PORT, NOT A DARK FEATURE.
    * The wizard's primary action still renders in flow at the foot of the
@@ -197,14 +198,16 @@ export function RequestShell({
           header — a 40% tint of a colour that WAS white, i.e. a white page with
           a white bar on it. With the ground at #FBF9F5 the two are different
           materials again: the questions sit on paper and the chrome floats. */}
-      {/* ⚠️ ONE BOTTOM EDGE, NOT TWO (2026-08-31, second pass). The header wore
-          `border-b border-ink-100` AND drew the progress bar directly under it,
-          so on the cream ground the two stacked into a faint grey hairline with
-          a thick dark-green stub beneath it — measured live on /request, it read
-          as a stray underline that stopped at 20% of the width rather than as a
-          bar filling. The BAR is the edge whenever there is one; the border
-          only stands in on the pages that are not a wizard. */}
-      <header className={`sticky top-0 z-chrome bg-ink-50/90 backdrop-blur-md ${showBar ? '' : 'border-b border-ink-100'}`}>
+      {/* ⚠️ ONE BOTTOM EDGE, AND NOW IT IS ALWAYS THE BORDER (2026-08-31,
+          settled 2026-09-03). The header once wore `border-b border-ink-100`
+          AND drew a progress bar directly under it, so on the cream ground the
+          two stacked into a faint grey hairline with a thick dark-green stub
+          beneath it — measured live on /request, it read as a stray underline
+          that stopped at 20% of the width rather than as a bar filling. The
+          fix then was „the bar IS the edge whenever there is one", which meant
+          the border was conditional. There is no bar any more, so the
+          condition had exactly one branch left and the border is plain. */}
+      <header className="sticky top-0 z-chrome bg-ink-50/90 backdrop-blur-md">
         {/* ⚠️ `narrow`, MATCHING THE WIZARD'S OWN COLUMN (2026-08-18).
             RequestWizard centres its questions in a 560px column inside this
             820px shell — so the logo, the stage row, the „n/7" counter and the
@@ -223,7 +226,114 @@ export function RequestShell({
               `PublicTopBar` above carries the mark, and two logos 64px apart is
               the „one thing drawn twice" this whole run has been about. The
               spacer keeps the counter on the right where it has always been. */}
-          <span aria-hidden />
+          {/* ── THE STAGES, ON ONE LINE (2026-09-03) ────────────────────────
+              ⚠️ THEY HAD A BLOCK OF THEIR OWN AND TWO BARS. Measured on the
+              live funnel: this header was 126px — a 64px row, a 58px segmented
+              rail under it, and a 4px percentage bar under that — and the
+              question itself did not start until y=307 on an 832px viewport.
+              37% of the screen was spent before the reader saw what was being
+              asked.
+
+              ⚠️ AND THE TWO BARS ANSWERED ONE QUESTION TWICE, differently. The
+              three segments sat in a 512px column; the thin bar ran 581px edge
+              to edge; one was `brand-200`, the other `brand-600`. „Where am I"
+              and „how much is left" are the same question to the person asking
+              it, and every reference product answers it once — Airtasker and
+              Bark with a counter, and nothing else.
+
+              ⚠️ A THIRD DEFECT WENT WITH THEM, and it is the one the owner
+              could see: the segments were not on one line. Measured 132 · 132 ·
+              136. A DONE stage was a <button> (46px tall) and the live one a
+              <span> (39px), and the <ol> centred them — so the current stage's
+              bar sat 4px low, on every screen of the funnel. Two elements that
+              must align cannot be two different tags under `items-center`.
+
+              What is kept is the thing the owner asked for on 2026-09-01
+              („მანდ გადასვლა-გადმოსვლებიც უნდა ჰქონდეს კომფორტისთვის"): a
+              finished stage is still a way back. It is a text button now, and
+              the 40px floor is carried by `py-3 -my-3` rather than by a box
+              that has to be drawn — the line box is 17px, so it takes 12px a
+              side to clear 40, and `py-2` measured 33 live. The negative
+              margin hands the row back its original height, so the hit area
+              grows and the layout does not.
+
+              Saved: 62px on every screen of the run. */}
+          {stage && stages.length > 0 ? (
+            /* ⚠️ STILL A nav > ol > li, WHICH IS THE BREADCRUMB PATTERN AND
+               NOT DECORATION. The rail it replaces argued its own `<ol>` on
+               the grounds that three stages ARE an ordered list and the order
+               is the information — that did not stop being true when the bars
+               went. `<nav>` around it is what the pattern adds: this row is
+               now the only way back through the run, so it is navigation and
+               a screen reader should be able to reach it as such. */
+            <nav aria-label="ეტაპები" className="min-w-0">
+              <ol className="flex items-center gap-1.5 text-meta">
+              {stages.map((st, i) => {
+                const at = stages.findIndex(x => x.id === stage)
+                const done = i < at
+                const live = i === at
+                const name = (
+                  <>
+                    {st.label}
+                    {live && <span className="sr-only"> — მიმდინარე</span>}
+                  </>
+                )
+                return (
+                  <li key={st.id} className="flex items-center gap-1.5 min-w-0">
+                    {i > 0 && <span aria-hidden className="text-ink-300">·</span>}
+                    {done && onStage ? (
+                      /* ⚠️ THE CHECK IS THE ONLY THING THAT CELEBRATES, AND IT
+                         FIRES TWICE PER RUN (2026-09-04). The bar below is
+                         flat now; the acknowledgement a step change needed had
+                         been answered with ornament on the bar, which is the
+                         wrong place — a percentage moving 20% is not an event.
+                         FINISHING A STAGE is, and there are three stages, so
+                         this happens twice in a five-screen run rather than
+                         five times. Rare enough to read as a moment.
+                         No key is needed for the entrance: a stage going
+                         live → done swaps a <span> for this <button>, so React
+                         mounts a fresh node and `scale-in` plays exactly once,
+                         at exactly the right time. */
+                      <button
+                        type="button"
+                        onClick={() => onStage(st.id)}
+                        className="flex items-center gap-1 truncate py-3 -my-3 font-display font-semibold text-ink-500 underline decoration-ink-200 underline-offset-4 transition-colors duration-fast hover:text-ink-900 hover:decoration-ink-400"
+                      >
+                        <Icon.check aria-hidden className="w-3 h-3 shrink-0 text-brand-600 motion-safe:animate-scale-in" />
+                        <span className="truncate">{name}</span>
+                        <span className="sr-only"> — დაბრუნება</span>
+                      </button>
+                    ) : (
+                      /* ⚠️ THE LIVE STAGE IS BRAND, NOT INK (2026-09-03). The
+                         fill on the edge below is `brand-600` and it stops
+                         under the stage you are in; colouring the name to
+                         match is what makes those two marks read as ONE
+                         indicator rather than as a bar and, separately, some
+                         bold text. It is also the only colour on the row, so
+                         „where am I" is answered before anything is read.
+                         `key={st.id}` on the live one so React remounts it
+                         when the stage changes and the entrance replays — the
+                         stage row is otherwise the one part of the screen that
+                         does not move between steps, and a step change that
+                         nothing acknowledges is what „არაფრის მომცემია" was
+                         about. `fade-in` is the existing token; the keyframe
+                         library is closed (lib/design/README §4) and did not
+                         need opening for this. */
+                      <span
+                        key={live ? `live-${st.id}` : st.id}
+                        className={`truncate font-display transition-colors duration-mid ${live ? 'font-bold text-brand-700 motion-safe:animate-fade-in' : 'font-semibold text-ink-400'}`}
+                      >
+                        {name}
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
+              </ol>
+            </nav>
+          ) : (
+            <span aria-hidden />
+          )}
 
           {/* `text-micro` is the numeric-counter tier the canon reserves for
               exactly this, and `tabular-nums` so the digits do not shift the
@@ -235,81 +345,13 @@ export function RequestShell({
           )}
         </Container>
 
-        {/* ── The three stages ─────────────────────────────────────────────
-            ⚠️ IT NO LONGER USES <StepIndicator> (2026-08-31). That primitive
-            draws numbered dots on a connector line, which is the right shape
-            for a run whose steps are named destinations; these three are
-            PROPORTIONS of one form, and a bar is what says so. The component is
-            untouched and still serves its other call sites. */}
-        {/* ⚠️ THE STAGES ARE SEGMENTED BARS NOW (2026-08-31, the canvas's
-            shape), NOT a row of numbered dots. One bar per stage, filled for
-            the ones behind you, half-tinted for the one you are in, plain for
-            what is ahead — with the label under it. It answers „where am I" and
-            „how much is left" in one control, which is what the two separate
-            controls under this header used to do between them; the 1px
-            percentage bar below is now the fine-grained half of the same
-            answer and no longer the only one.
-            ⚠️ A FINISHED STAGE IS A WAY BACK NOW (2026-09-01, owner: „ზევით
-            რომ აქვს პროცესი ღილაკების… მანდ გადასვლა-გადმოსვლებიც უნდა ჰქონდეს
-            კომფორტისთვის"). The rule this note used to state — „you cannot jump
-            to „კონტაქტი" without answering what comes before it" — is about
-            going FORWARD, and it still holds: `live` and `todo` stay plain
-            text, exactly as before. Going BACK to something already answered
-            was never unsafe; `Transcript` two hundred lines away has offered it
-            since the wizard was written (`onEdit` → `setStepId`), so the rail
-            was the one place on the screen where a completed answer looked
-            unreachable.
-            The stage row lands on the FIRST step of that stage, so „რა
-            გჭირდება" reopens the question rather than some screen in the middle
-            of it. Nothing is discarded on the way — the draft is untouched and
-            walking forward again passes the answers already given.
-            An `<ol>` because it IS an ordered list of three things and the
-            order is the information. */}
-        {stage && (
-          <Container size="narrow" className="pb-3">
-            <ol className="flex items-center gap-3">
-              {stages.map((st, i) => {
-                const at = stages.findIndex(x => x.id === stage)
-                const done = i < at
-                const live = i === at
-                const bar = (
-                  <span
-                    aria-hidden
-                    className={`block h-1.5 rounded-pill ${done ? 'bg-brand-700' : live ? 'bg-brand-200' : 'bg-ink-100'}`}
-                  />
-                )
-                const label = (
-                  <span className={`font-display text-meta font-semibold ${live || done ? 'text-ink-900' : 'text-ink-400'}`}>
-                    {st.label}
-                    {live && <span className="sr-only"> — მიმდინარე</span>}
-                  </span>
-                )
-                return (
-                  <li key={st.id} className="flex flex-1 flex-col">
-                    {done && onStage ? (
-                      // ⚠️ THE WHOLE COLUMN IS THE TARGET, bar included — a
-                      // 12px word is not a tap target, and `py-1` carries the
-                      // 1.5px bar and the label to the 40px floor together.
-                      <button
-                        type="button"
-                        onClick={() => onStage(st.id)}
-                        className="group flex flex-col gap-2 py-1 text-left transition-opacity duration-fast hover:opacity-70"
-                      >
-                        {bar}
-                        <span className="underline decoration-transparent underline-offset-2 transition-colors duration-fast group-hover:decoration-current">
-                          {label}
-                        </span>
-                        <span className="sr-only"> — დაბრუნება</span>
-                      </button>
-                    ) : (
-                      <span className="flex flex-col gap-2 py-1">{bar}{label}</span>
-                    )}
-                  </li>
-                )
-              })}
-            </ol>
-          </Container>
-        )}
+        {/* ⚠️ THE SEGMENTED RAIL STOOD HERE AND IT WENT ON 2026-09-03. Three
+            filled bars with a label under each, plus the percentage bar below
+            — 62px of chrome answering the question the counter beside the
+            stage names already answers. The stages did not stop being shown;
+            they moved UP, onto the header's own row, which was carrying a
+            spacer and a counter and nothing else. The header's full reasoning
+            is on that row. */}
 
         {/* The recipient. Under the stages and above the bar, because it is
             context for the whole run rather than for any one screen — and it
@@ -329,24 +371,74 @@ export function RequestShell({
           </Container>
         )}
 
-        {showBar && (
-          // A real <progress> semantic, drawn by hand so it can carry the brand
-          // colour. `duration-mid` because the bar MOVES and the user watches
-          // it arrive — that is the token's whole definition.
-          <div
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={pct}
-            aria-label="შევსების პროგრესი"
-            className="h-1 bg-ink-200"
-          >
+        {/* ── THE EDGE IS THE BAR ──────────────────────────────────────────
+            ⚠️ THE BAR CAME BACK THE SAME DAY IT WENT (2026-09-03). Removing the
+            segmented rail was right — two controls, 126px, one question — but
+            removing the percentage bar WITH it left a header on which nothing
+            ever moved. Owner: „სადა ანიმაცია, რაღაცა რომ შევსებულია… ძალიან
+            სადა, არაფრის მომცემია." A form that never shows itself advancing
+            is a form you cannot tell you are winning.
+
+            ⚠️ IT COSTS 2px, NOT 62, BECAUSE IT IS THE BORDER. The header needs
+            a bottom edge either way — it was `border-b border-ink-100`, a 1px
+            hairline — so the track simply IS that edge, at 2px, and the fill
+            runs over it. That is also the 2026-08-31 rule („the BAR is the
+            edge whenever there is one") finally holding with no exception:
+            there is no second hairline to stack with, because the border is
+            gone from the header's own class list.
+
+            `duration-slow` and not `mid`: this is the one element on the
+            screen the eye follows to a destination, and 360ms is the length at
+            which it reads as travel rather than a jump. `rounded-r-pill` gives
+            the fill a leading edge, so what you see is a thing arriving rather
+            than a rectangle resizing.
+
+            `motion-safe:` on the transition, and the width is still correct
+            without it — a reduced-motion reader gets the same bar, placed
+            rather than animated. */}
+        {/* ── THE EDGE IS THE BAR ──────────────────────────────────────────
+            ⚠️ FLAT, AND THAT IS THE THIRD ANSWER TO THIS (2026-09-04). The
+            first was two controls in 126px; the second was one 2px line, which
+            the owner read as „ძალიან სადა, არაფრის მომცემია"; the third was a
+            gradient with a light sweeping over it and a glowing bead riding
+            the head, which the owner read as „არაპროფესიონალური, საიტს არ
+            უხდება". They were right, and the reasons are worth keeping so this
+            does not get re-invented:
+
+            · THE BEAD WAS THE ONLY LIGHT SOURCE ON THE SITE. Six rungs on the
+              shadow ladder and every one of them casts DOWNWARD — a card
+              lifting off paper. A radial glow had nothing to belong to.
+            · THE SWEEP SAID THE WRONG WORD. A light travelling over a bar is
+              the universal „loading, wait". Nothing is loading; the bar
+              reports POSITION. The animation contradicted the meaning.
+            · IT PULLED THE EYE INTO THE CHROME. This whole run has been about
+              getting a reader past ~310px of furniture to the question. Moving
+              light in the part you are trying to make people ignore is a
+              regression against the goal that started the work.
+            · THE GRADIENT WAS INVISIBLE ANYWAY. Three stops across 4px of
+              height and, on the early screens, ~150px of width.
+
+            So: `brand-600`, flat, 2px, and the transition is the whole of the
+            motion. `duration-slow` because this is the one element the eye
+            follows to a destination and 360ms reads as travel rather than a
+            jump. What acknowledges a step now is the QUESTION arriving
+            (RequestWizard animates it) and, twice per run, a stage completing
+            — see the check on the row above. Rare enough to be an event. */}
+        <div
+          role={showBar ? 'progressbar' : undefined}
+          aria-valuemin={showBar ? 0 : undefined}
+          aria-valuemax={showBar ? 100 : undefined}
+          aria-valuenow={showBar ? pct : undefined}
+          aria-label={showBar ? 'შევსების პროგრესი' : undefined}
+          className={showBar ? 'h-0.5 bg-ink-100' : 'h-px bg-ink-100'}
+        >
+          {showBar && (
             <div
-              className="h-full bg-brand-600 transition-[width] duration-mid ease-out-quart"
+              className="h-full rounded-r-pill bg-brand-600 motion-safe:transition-[width] motion-safe:duration-slow motion-safe:ease-out-quart"
               style={{ width: `${pct}%` }}
             />
-          </div>
-        )}
+          )}
+        </div>
       </header>
 
       {/* The extra bottom padding is for the cookie consent banner: wizard
@@ -399,16 +491,21 @@ export function RequestShell({
               fixed is not choosing an expert. The half that IS true — and is
               the only promise on this page worth making — is what happens to
               the phone number, so that is what it now says. */}
-          {/* ⚠️ REWRITTEN 2026-08-21, same day and same reason as the hint in
-              _stepContact: „ნომერს მხოლოდ იმას ვაძლევთ, ვისაც შენ აირჩევ" was
-              a promise the code stopped keeping when the number stopped being
-              handed to anybody at all. One sentence, in both places, saying the
-              same true thing. */}
-          {privacyLine && (
-            <p className="text-meta text-ink-500">
-              ნომერს არავის ვაძლევთ — მიმოწერა პლატფორმაზეა.
-            </p>
-          )}
+          {/* ⚠️ THE PRIVACY LINE IS GONE (2026-09-04). Owner, pointing at the
+              contact screen's version of it: „აი ასე ჩაშლილად არ დაწერო
+              არსად, წაშალე საერთოდ ეს ზედმეტი ინფო."
+
+              It read „ნომერს არავის ვაძლევთ — მიმოწერა პლატფორმაზეა", and it
+              was the THIRD wording of the same promise: first „only the expert
+              you choose will see it" (true until 2026-08-21), then „only we
+              use it", then this. Each rewrite followed the code moving under
+              it, and the code moved again — a client who presses „დარეკვა" on
+              an offer now opens the provider's number and the platform charges
+              them for it (app/api/requests/[ref]/call), and the request SMS
+              carries the client's own number to reach them.
+              A sentence that has needed rewriting three times in three weeks
+              is not a promise, it is a moving target. It went rather than
+              becoming a fourth version. */}
         </Container>
       </footer>
 

@@ -56,6 +56,7 @@ export default async function ClientProfilePage() {
     bio: user.bio,
     phone: user.phone,
     emailVerified: user.emailVerified,
+    phoneVerified: user.phoneVerified,
     // A boolean, never the hash — an SSO-only account carries an unusable one
     // and the delete flow must not demand a password it does not have.
     hasPassword: !!user.passwordHash,

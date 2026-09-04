@@ -35,9 +35,16 @@ import type { ProviderProfileData } from './_providerData'
 export function ProviderBreadcrumb({ name }: { name: string }) {
   return (
     <nav aria-label="ნავიგაცია" className="hidden sm:flex items-center gap-2 text-meta text-ink-400">
-      <Link href="/" className="hover:text-ink-700 transition-colors duration-fast">მთავარი</Link>
+      {/* ⚠️ `py-1 -my-1` IS THE 24px FLOOR, NOT PADDING (2026-09-04). These
+          crumbs are `text-meta` on a 17px line box, and measured live they were
+          17px tall — under WCAG 2.2 SC 2.5.8, which asks 24×24 CSS px of any
+          pointer. The nav is `hidden sm:flex`, so a phone never sees it and the
+          project's own 40px thumb floor is not the rule that applies here; 24
+          is. The negative margin hands the row back its height, so the target
+          grows and nothing on the page moves. */}
+      <Link href="/" className="inline-flex items-center py-1 -my-1 hover:text-ink-700 transition-colors duration-fast">მთავარი</Link>
       <span aria-hidden>·</span>
-      <Link href="/experts" className="hover:text-ink-700 transition-colors duration-fast">ექსპერტები</Link>
+      <Link href="/experts" className="inline-flex items-center py-1 -my-1 hover:text-ink-700 transition-colors duration-fast">ექსპერტები</Link>
       <span aria-hidden>·</span>
       <span className="font-display font-semibold text-ink-600 truncate">{name}</span>
     </nav>

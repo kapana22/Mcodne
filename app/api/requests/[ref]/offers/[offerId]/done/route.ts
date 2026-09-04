@@ -16,13 +16,15 @@
 import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
-import { normalizePublicRef, topicLabel, PROVIDER_ROUTE } from '@/lib/requests'
+import { normalizePublicRef, topicLabel, PROVIDER_ROUTE, clientRequestHref } from '@/lib/requests'
 import { requestsViewer, requestsNotFound } from '@/lib/requestsServer'
 import { markOfferDone, providerUserIdsOf, type DoneBy } from '@/lib/offerLifecycle'
 import { grantJobDone } from '@/lib/creditsServer'
 import { notifyMany } from '@/lib/notify'
 import { sendMail } from '@/lib/mailer'
 import { offerDoneClientEmail, offerDoneProviderEmail } from '@/lib/emailTemplates'
+import { sendSms } from '@/lib/sms'
+import { offerDoneSms } from '@/lib/smsTemplates'
 
 export async function POST(_req: Request, { params }: { params: Promise<{ ref: string; offerId: string }> }) {
   const viewer = await requestsViewer()
@@ -37,9 +39,21 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ref: s
     where: { id: offerId },
     select: {
       id: true, expertUserId: true, companyId: true,
-      // ⚠️ TOPIC, REF AND THE CLIENT'S EMAIL ONLY. The ref is compared, never
-      // printed; the email is where the client's mail goes.
-      request: { select: { publicRef: true, topic: true, email: true } },
+      // ⚠️ TOPIC, REF, AND THE TWO WAYS TO REACH THE CLIENT. The ref is
+      // compared, never printed; the email is where the client's mail goes.
+      //
+      // ⚠️ `phone` JOINED ON 2026-09-04, for the reason app/api/provider/offers
+      // states at length: the client's email field left the intake on
+      // 2026-09-03, so for every request filed since, `email` is null and this
+      // route's client branch sent nothing at all. The provider marked the job
+      // done and the client was never told — which also means the review this
+      // product is built around was never asked for.
+      // The number is read here and handed straight to `sendSms` inside the
+      // same `after()`. It is never returned, never rendered, never reaches
+      // the provider. The contact rule (lib/requests → clientIdentityOpen) is
+      // about what a PROVIDER may see; a message the platform sends on the
+      // client's own request is not that.
+      request: { select: { publicRef: true, topic: true, email: true, phone: true, userId: true } },
     },
   })
   if (!offer) return requestsNotFound()
@@ -100,18 +114,61 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ref: s
           href: `${PROVIDER_ROUTE}/offers`,
         })
         const emails = ids.length
-          ? (await prisma.user.findMany({ where: { id: { in: ids } }, select: { email: true } })).map(u => u.email)
+          // A phone-registered provider has no address — see the same filter
+          // in ./accept. They hear about this through the bell and the SMS.
+          ? (await prisma.user.findMany({ where: { id: { in: ids } }, select: { email: true } }))
+              .map(u => u.email).filter((e): e is string => !!e)
           : []
         const mail = await offerDoneProviderEmail({ topicLabel: topic })
         for (const to of emails) {
           try { await sendMail({ key: 'request.done.provider', to, ...mail }) } catch { /* best-effort per address */ }
         }
-      } else if (offer.request.email) {
-        await sendMail({
-          key: 'request.done.client',
-          to: offer.request.email,
-          ...(await offerDoneClientEmail({ publicRef: offer.request.publicRef, topicLabel: topic })),
-        })
+      } else {
+        /* ⚠️ THE BELL FIRST, BECAUSE IT IS THE ONE THAT WORKS TODAY
+           (2026-09-04). Measured on production the same day: `SMS_MODE` is
+           `off` at the environment level AND `smsOn` defaults to false per
+           message, so both texts below are held until an operator turns two
+           switches on — deliberately, since a text is billed per part.
+           A notification is free and instant, and it reaches EXACTLY the
+           people who can act on it: `reviewGate` answers NO_ACCOUNT without a
+           user, so a signed-in client is the only one the review form is even
+           drawn for. Telling them is therefore not a second-best channel here
+           — it is the whole of the audience that can leave a review.
+           `clientRequestHref` lands them on their own room rather than the
+           public one, which is the address that carries the rating form. */
+        if (offer.request.userId) {
+          await notifyMany([offer.request.userId], {
+            type: 'REQUEST_DONE',
+            title: 'სამუშაო დასრულდა',
+            body: topic,
+            href: clientRequestHref(offer.request.publicRef),
+          })
+        }
+
+        // ⚠️ BOTH CHANNELS, AND THE SMS IS THE ONE THAT USUALLY FIRES. Most
+        // people who file a request never register and, since the email field
+        // went, never give an address either — so the letter below is now the
+        // exception and the text is the rule. Each is independently guarded
+        // and independently best-effort: a missing address must not cost the
+        // message, and a failing gateway must not cost the letter.
+        if (offer.request.email) {
+          try {
+            await sendMail({
+              key: 'request.done.client',
+              to: offer.request.email,
+              ...(await offerDoneClientEmail({ publicRef: offer.request.publicRef, topicLabel: topic })),
+            })
+          } catch { /* best-effort */ }
+        }
+        if (offer.request.phone) {
+          try {
+            await sendSms({
+              key: 'request.done.client',
+              to: offer.request.phone,
+              text: await offerDoneSms(offer.request.publicRef),
+            })
+          } catch { /* best-effort */ }
+        }
       }
     } catch { /* notification is best-effort; the stamp is written */ }
   })

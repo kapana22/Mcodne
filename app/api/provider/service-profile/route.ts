@@ -32,6 +32,7 @@ import { ALL_PROFESSIONS, MAX_PROFESSIONS } from '@/lib/professions'
 import { grantEarnedTasks, profileCompletion } from '@/lib/creditsServer'
 import { gelLabel } from '@/lib/credits'
 import { avatarSrc } from '@/lib/avatarSrc'
+import { syncPublished } from '@/lib/profilePublish'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
@@ -426,6 +427,13 @@ export async function PUT(req: Request) {
       },
     }),
   ])
+
+  // ⚠️ `published` IS DERIVED (2026-09-04). This write can be the one that
+  // completes the card — or the one that empties it — so the flag is
+  // recomputed here rather than left to whoever reads it next. lib/profilePublish
+  // never throws into this path: republishing is a consequence of the save, not
+  // the save itself.
+  await syncPublished(viewer.user.id)
 
   /* ⚠️ THE BONUS IS PAID HERE, NOT ON THE NEXT NAVIGATION (2026-08-21).
    *

@@ -246,7 +246,7 @@ export function FilterSwitch<T extends string>({ value, onChange, options, label
             role="radio"
             aria-checked={on}
             onClick={() => onChange(o.id)}
-            className={`h-[52px] flex flex-col items-center justify-center gap-0.5 rounded-field border px-2 transition-[background-color,border-color] duration-fast ${
+            className={`h-[52px] flex flex-col items-center justify-center gap-0.5 rounded-field border px-1.5 transition-[background-color,border-color] duration-fast ${
               on ? 'border-brand-700 bg-brand-50 text-brand-900'
                 : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-75'
             }`}
@@ -258,13 +258,27 @@ export function FilterSwitch<T extends string>({ value, onChange, options, label
                 place left: „პროფესიული 23 · ყოველდღიური 2" over the catalogue,
                 where 2 is the first thing a visitor learns about half the site.
 
-                The word stays MKHEDRULI and the plate stays 52px: the rail is
-                264px, a segment 128px, its content 112px, and „ყოველდღიური" is
-                99px at 13px bold mkhedruli against 108px in the mtavruli every
-                button gets from globals.css. Caps plus one line truncates the
-                longer name, and the one thing this control must never do is
-                fail to say which side you are on. */}
-            <span className="no-caps max-w-full truncate font-display text-small font-bold leading-none">{o.label}</span>
+                ⚠️ AND THE WORD IS MTAVRULI AGAIN (2026-09-04). Owner, holding
+                a screenshot of this control: „ღილაკები tt უნდა იყოს" — TT is
+                this project's own name for mtavruli caps (app/globals.css says
+                so at the top), and every other button on the site gets them
+                from that file. These two opted out with `no-caps`, so the axis
+                of the whole catalogue was the one control drawn in a different
+                case from everything around it.
+
+                The opt-out had a real reason and it was a WIDTH, so the width
+                is what moved. Re-measured live at 13px bold, the longer word
+                „ყოველდღიური" is 99.1px in mkhedruli and 117.7px in mtavruli —
+                and the rail gives it 112px (264px rail → 128px segment → 112px
+                inside `px-2`). Caps at 13 therefore truncated, which is the one
+                thing this control must never do: it has to say which side you
+                are on.
+                Two changes buy it back. `text-meta` (12px) puts mtavruli at
+                109.4px, and `px-1.5` widens the box to 116 — 6.6px of room
+                rather than a 5.7px overflow. Both are tokens; nothing here is
+                a hand-written size. The plate stays 52px and the wide sheet,
+                where the button is 275px, was never in question. */}
+            <span className="max-w-full truncate font-display text-meta font-bold leading-none">{o.label}</span>
           </button>
         )
       })}

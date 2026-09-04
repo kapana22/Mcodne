@@ -50,13 +50,19 @@ export const prefRows = (role: Me['role'] | null | undefined): Array<{ key: Pref
 
 export type Me = {
   id: string
-  email: string
+  // ⚠️ NULL FOR A PHONE ACCOUNT (2026-09-04). Somebody who registered with a
+  // number and an SMS code has no address, and this screen prints the number
+  // where the address would have been rather than an empty row.
+  email: string | null
   fullName: string
   role: 'USER' | 'PROVIDER' | 'ADMIN'
   avatarUrl?: string | null
   bio?: string | null
   phone?: string | null
   emailVerified?: boolean
+  /** Somebody answered an SMS on `phone`. For a phone account this is the
+   *  verification badge; `emailVerified` has nothing to say about them. */
+  phoneVerified?: boolean
   // False for SSO-only accounts (Google) — they have no usable password, so the
   // delete flow must not demand one.
   hasPassword?: boolean

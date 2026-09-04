@@ -34,6 +34,7 @@ import { balanceOf, profileFacts } from '@/lib/creditsServer'
 import { earnedTasks } from '@/lib/credits'
 import { PageHeader } from '@/components/PageHeader'
 import { ConfirmServicesNote } from './_components/ConfirmServicesNote'
+import { NotVisibleNote } from './_components/NotVisibleNote'
 import { CreditStrip } from './_components/CreditStrip'
 import Link from 'next/link'
 import { Card } from '@/components/Card'
@@ -74,6 +75,10 @@ export default async function WorkHome() {
   // may not grow its own serviceProfile query, or the queue narrowing has two
   // sources that can disagree. `profileFacts` already reads the row.
   const unconfirmed = !facts.servicesConfirmed
+  // ⚠️ OFF `facts` FOR THE SAME REASON `unconfirmed` IS — tests/requestQueue §F
+  // forbids this page a serviceProfile query of its own, and `profileFacts`
+  // already read every column the answer needs.
+  const notVisible = facts.notVisible
   const earned = new Set<CreditTaskKey>(earnedTasks(facts))
   const [balance, scope] = await Promise.all([
     balanceOf(user.id),
@@ -147,6 +152,12 @@ export default async function WorkHome() {
         {/* FIRST on the page, above the balance and the board. It is the only
             thing here that asks the reader for something we cannot do for them,
             and it is the reason their card looks like three other people’s. */}
+        {/* ⚠️ ABOVE EVERYTHING, INCLUDING THE SERVICES NOTE (2026-09-04). „Your
+            card is not on the site" outranks „check your service list": one is
+            a state the provider does not know they are in, the other is a
+            review of something already live. See NotVisibleNote for why the
+            hiding cannot be silent. */}
+        {notVisible.length > 0 && <NotVisibleNote missing={notVisible} />}
         {unconfirmed && <ConfirmServicesNote />}
         {/* ⚠️ ONLY WHERE THE RAIL IS NOT (2026-08-30). The rail now carries the
             balance's other half permanently — „კიდევ 40 ₾ პროფილის

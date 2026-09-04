@@ -58,6 +58,7 @@ import { IdentitySection } from './_secIdentity'
 import { ServicesSections } from './_secServices'
 import { PhotosSection } from './_secPhotos'
 import type { Draft, Loaded } from './_types'
+import { profileBlockers, faceFrom } from '@/lib/profileCompleteness'
 
 /** The page's own name, written once. It is printed on the loading state, on
  *  the failure state and on the editor itself, and three copies of one title is
@@ -324,6 +325,23 @@ export function ProfileEditor() {
       || Object.values(draft.priceList ?? {}).some(v => typeof v === 'number' && v > 0),
     hasCertificate: draft.workPhotos.length > 0,
     servicesConfirmed: !unconfirmed,
+    /* ⚠️ COMPUTED FROM THE DRAFT, so the answer changes as they type rather
+       than after they save. It is the same pure function the server calls
+       (lib/profileCompleteness) and the same one the offer route refuses on —
+       one rule, three readers, no third statement of it here.
+
+       Note the photo asks `avatarUrl` alone, exactly as `hasPhoto` above does
+       and for the reason given there: this editor does not hold the profile's
+       own `photoUrl`. The server has both and is the one that sets `published`,
+       so the worst case is this saying „ფოტო" for somebody who already has one
+       — and the moment they save, lib/profilePublish settles it correctly. */
+    notVisible: profileBlockers({
+      hasFace: faceFrom(null, avatarUrl),
+      about: draft.about,
+      services: draft.services,
+      areas: draft.areas,
+      categoryId: draft.categoryId || null,
+    }),
   }
 
   return (

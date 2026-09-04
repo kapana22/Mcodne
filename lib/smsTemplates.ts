@@ -70,3 +70,13 @@ export async function offerArrivedSms(ref: string): Promise<string> {
   const t = await messageText()
   return t('request.offerArrived.client', 'sms', { ref })
 }
+
+/** „the work you commissioned is finished — rate it".
+ *
+ *  ⚠️ SENT ONLY WHEN THE PROVIDER MARKED IT DONE. A client who marked it done
+ *  themselves is already on the page that asks for the rating; texting them
+ *  about a button they just pressed is the definition of noise. */
+export async function offerDoneSms(ref: string): Promise<string> {
+  const t = await messageText()
+  return t('request.done.client', 'sms', { ref })
+}

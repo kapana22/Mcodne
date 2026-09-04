@@ -277,11 +277,17 @@ export const SITE_TEXTS: SiteTextDef[] = [
   // step 01 says with a drawing over it. The row stays — it may hold copy
   // somebody typed by hand — and the key is skipped in the admin editor.
   { key: 'home.ask.sub', group: 'მთავარი — Hero', label: 'ქვესათაური', multiline: true, default: 'ერთი წინადადება კმარა. მოთხოვნა უფასოა და არაფერს გავალდებულებს.', retired: true },
-  { key: 'home.ask.placeholder', group: 'მთავარი — Hero', label: 'ველი — მინიშნება', default: 'რა უნდა გაკეთდეს?' },
+  /* ⚠️ „ვინ გჭირდება?" SINCE 2026-09-04, and it was „რა უნდა გაკეთდეს?". Owner,
+     on the hero: „მგონი კითხვის ფორმა არასწორია — ვინ გჭირდება უფრო სწორია."
+     It also matches what now sits under the field: five professions rather than
+     five subjects, so the question and the answers offered agree. The search
+     itself is unchanged and still finds topics — measured, „ბუღალტერი" finds
+     ბუღალტერია — so asking who does not narrow what a person may type. */
+  { key: 'home.ask.placeholder', group: 'მთავარი — Hero', label: 'ველი — მინიშნება', default: 'ვინ გჭირდება?' },
   // ⚠️ A LABEL, NOT A SECOND PLACEHOLDER. It is `sr-only`, and it exists
   // because a placeholder disappears the moment somebody types — a screen
   // reader announcing „edit text, blank" is describing a control nobody can use.
-  { key: 'home.ask.label', group: 'მთავარი — Hero', label: 'ველი — ხმოვანი წარწერა', default: 'რა უნდა გაკეთდეს?' },
+  { key: 'home.ask.label', group: 'მთავარი — Hero', label: 'ველი — ხმოვანი წარწერა', default: 'ვინ გჭირდება?' },
   { key: 'home.ask.cta', group: 'მთავარი — Hero', label: 'ველის ღილაკი', default: 'ფასის მოთხოვნა' },
   // ⚠️ RETIRED 2026-08-31 WITH THE CHIPS IT LABELLED („ეს წაშალე და ხაზი").
   { key: 'home.ask.examplesLabel', group: 'მთავარი — Hero', label: 'მაგალითების წინ', default: 'მაგალითად:', retired: true },

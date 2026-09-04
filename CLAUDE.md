@@ -66,6 +66,50 @@ Owner, 2026-08-21: „ორი რეგისტრაცია მაგი�
 **`Role` is `USER` · `PROVIDER` · `ADMIN`** since 2026-08-24. The old
 `STUDENT` / `TUTOR` values are gone from the enum, not merely unused.
 
+**A THIRD DOOR: a number and an SMS code, with no password (2026-09-04).** Owner:
+„მე მინდა დავამატოთ მობილურით რეგისტრაცია." `/signup` and `/signin` both carry
+it beside Google; three steps — the number, the code, and the name only if no
+account came back. Registration and sign-in are ONE flow on purpose: a form that
+answered „this number already has an account" would hand a stranger a fact about
+somebody else for the price of nine digits.
+
+⚠️ **So `User.email` and `User.passwordHash` are NULLABLE, and neither is ever
+faked.** A synthetic address is a row the mailer then tries to deliver to. Every
+read handles null — `tsc` finds them — and a passwordless account sets its first
+password without typing a current one (`/api/me/password`).
+
+⚠️ **`User.phone` is now a CREDENTIAL, stored canonical.** One spelling —
+`lib/phone → canonicalPhone`, „+995555123456" — because the same number used to
+be storable three ways, which is what `lib/sms → phoneVariants` exists to paper
+over and what no unique index can see through. The uniqueness is PARTIAL, on
+`phoneVerified = true` only: a number typed into a profile field is contact
+information two people may honestly share (two production pairs do), and a
+number somebody answered a code on is an identity that they cannot. Editing the
+phone on `/api/me` clears `phoneVerified`. The whole lifecycle is
+`lib/phoneAuth`; the code is stored hashed and five wrong guesses burn the row.
+
+**A provider's card is visible only when it is finished (2026-09-04).** Owner:
+„სანამ სრულად არ შევსებს, ფოტოს არ დადებს, იქამდე არ გამოჩნდეს პროფილზე."
+`ServiceProfile.published` is now DERIVED, not typed in: `lib/profileCompleteness
+→ profileBlockers` is the rule (face · აღწერა · სერვისი · ქალაქი · კატეგორია)
+and `lib/profilePublish → syncPublished` is its only writer, called from every
+write path. Every existing reader still asks `published && available` and none
+of them changed. Backfill: `npx tsx scripts/republish-profiles.ts --write`.
+
+⚠️ **„HAS A PHOTO" MEANS `photoUrl` OR `User.avatarUrl`, and getting that wrong
+empties the site.** 25 of 28 profiles have `photoUrl = null` and 24 of those draw
+a perfectly good face from the account avatar (`app/experts/_providers`). Read
+as the column alone the rule hides 28 of 28; read as „is there a face", it hides
+5. Ask the database for the BOOLEAN — selecting the column ships a ~32KB base64
+blob, which `tests/apiPayloadHygiene` refuses.
+
+⚠️ **Hiding the card does NOT stop the request SMS, and that is the design.**
+Routing is gated on `RequestAccess`, not on `published`, so an incomplete
+provider still hears about work — silence is what makes a new provider leave.
+What is refused is SENDING an offer (`/api/provider/offers` → 409
+`PROFILE_INCOMPLETE`), and `/work` says so in the first position on the page
+(`NotVisibleNote`) rather than ambushing them at the moment they bid.
+
 **Still ask `identityOf`, not `role`, for „what does this person sell".** A role
 is a permission; a profile plus an allowlist row is the fact.
 `lib/identity → identityOf(userId)` returns `{ role, hats, provider }` from one
@@ -128,13 +172,15 @@ part, not the page**.
 | the door — one question, one form | `app/join/` — `_door/` `_master/` `_shared/` |
 | the two spaces | `app/me/` (client) · `app/work/` (supply) |
 | a provider's whole public card — ONE editor, one save | `app/work/profile/` (`_editor` + `_sec*`) |
-| the password and the one visibility switch | `app/work/account/` |
+| the password and the pause switch (`available`) | `app/work/account/` |
+| whether the card may be SEEN (`published`) — derived, never typed | `lib/profileCompleteness` + `lib/profilePublish` |
+| the phone door — one flow for both registration and sign-in | `app/signin/_phone.tsx` + `app/api/auth/phone/` + `lib/phoneAuth` |
 | the intake | `app/request/` |
 | admin | `app/admin/` — one `_<tab>.tsx` per tab |
 | retired URLs → 308 | `middleware.ts`, executed by `tests/redirects.test.ts` |
 
-**`docs/MAP.md` is generated — grep it, never read it whole.** 1 134 exported
-symbols → their file; 29 Prisma models → their real columns. `lib/` is 103 files
+**`docs/MAP.md` is generated — grep it, never read it whole.** 1 151 exported
+symbols → their file; 30 Prisma models → their real columns. `lib/` is 106 files
 flat and the request family alone is 13 whose names differ by a suffix —
 `requestsViewer` lives in `requestsServer.ts`, which is not guessable. The UI word
 is rarely the column: a RequestOffer's price is `priceGel`, a ServiceProfile's
@@ -179,7 +225,14 @@ numbers instead of a bare AssertionError — measured 2026-09-03, that failure w
 the largest identified cause of wasted tool calls (201 of them across 50
 sessions, one round trip each). It writes nothing unless every edit matched.
 
-**Before deploying:** `npm run check` — types → schema → 83 tests → `next build`.
+⚠️ **It used `String.replace` until 2026-09-04**, which treats the REPLACEMENT
+as a template: an edit whose new text merely CONTAINED `$'` — a SQL regex anchor
+followed by a quote — was silently truncated there and a second copy of the rest
+of the file appended. It corrupted `lib/dbBoot.ts` and read as 80 parse errors
+200 lines from the edit. It joins a split now; the tool whose job is to make a
+failed edit LOUD may not fail quietly.
+
+**Before deploying:** `npm run check` — types → schema → 84 tests → `next build`.
 There is no CI, and `railway up` uploads the WORKING TREE, so this script is the
 only thing that ever runs the tests and a commit is a record rather than a
 release.
@@ -241,7 +294,7 @@ Prefer additive DDL, and **that is advice, not a prohibition.** Dropping a
 stops writing it, then drop the column. The hazard is the sequence and it has a
 known answer — it was never a reason to keep dead columns.
 
-**Testing.** 83 files, no runner, each exits non-zero on failure. Pin
+**Testing.** 84 files, no runner, each exits non-zero on failure. Pin
 BEHAVIOUR: call the function, render the tree, execute the redirect table. A
 regex over source text is a last resort, and ~1 500 of them exist — debt, not a
 pattern to copy. If an assertion can break on a rename, a reformat or a restyle
@@ -256,6 +309,18 @@ primitives (`Btn` `Card` `Eyebrow` `PageHeader` `Container` `EmptyState` `Sheet`
 When the owner ships a design canvas, that is the newer decision — port it and
 update whatever test pinned the older one.
 → the full canon and its measurements: **`docs/design-system.md`**
+
+**Messages.** ⚠️ **A CODE THE PERSON IS WAITING FOR IS NEVER HELD BY THE
+CUTOFF (2026-09-04).** `MAIL_ONLY_AFTER` / `SMS_ONLY_AFTER` exist so the site
+does not INITIATE contact with people who were here before launch. Somebody
+staring at the code field asked for it — and for a passwordless account it is
+the only door there is, so holding it locks them out with `ok: true` in the log.
+`lib/outbound → isCredential` is the exemption; it was already true of the
+password-reset code and had simply never been exercised. `auth.phoneCode` is
+also the one product SMS that ships switched ON, because a door that is off is a
+door that is locked — and `request.verified.provider` was switched on the same
+day on the owner's instruction („შეტყობინებები და შეთავაზებები მიდიოდეს ამ
+ნომერზე").
 
 **Dark features.** `PAYMENTS_LIVE` is off in `lib/flags.ts`, and its code and
 copy stay reachable so the flag can simply be turned on. A dark feature is not a

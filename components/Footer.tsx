@@ -55,6 +55,16 @@ const COLS: { titleKey: string; links: { label: string; href: string }[] }[] = [
    needs air above the footer it should say so itself.
    (A `{/* … *\/}` cannot be the first thing inside a parenthesised return —
    same trap as app/_home/cta's ExpertCta.) */
+// ⚠️ THE DESKTOP FLOOR IS 24px, NOT NOTHING (2026-09-04). These links carried
+// `min-h-[40px] sm:min-h-0` — the project's 40px tap floor on a phone, released
+// entirely from the `sm` breakpoint up. Measured live at 903px that left them
+// 19–22px tall: the mail address 19, „ბლოგი" 21, „დაგვიკავშირდი" 22.
+//
+// Releasing the 40 on desktop is right — 40px is a THUMB rule and a cursor is
+// not a thumb — but releasing it to zero skips the other floor. WCAG 2.2 SC
+// 2.5.8 („Target Size (Minimum)", AA) asks 24×24 CSS px of ANY pointer, mouse
+// included, and 19px is under it. 24 is also invisible as a change: the links
+// already sit in a `gap`-spaced column, so nothing moves on the page.
 export function Footer() {
   return (
     <footer className="relative">
@@ -78,7 +88,7 @@ export function Footer() {
             </p>
             <a
               href={`mailto:${SUPPORT_EMAIL}`}
-              className="inline-flex items-center gap-1.5 mt-4 min-h-[40px] sm:min-h-0 text-small text-ink-700 hover:text-brand-700 transition-colors duration-fast font-display font-medium"
+              className="inline-flex items-center gap-1.5 mt-4 min-h-[40px] sm:min-h-[24px] text-small text-ink-700 hover:text-brand-700 transition-colors duration-fast font-display font-medium"
             >
               {SUPPORT_EMAIL}
             </a>
@@ -98,7 +108,7 @@ export function Footer() {
                     <li key={l.href}>
                       <Link
                         href={l.href}
-                        className="text-body text-ink-700 hover:text-brand-700 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 rounded-sm flex items-center min-h-[40px] sm:inline-block sm:min-h-0"
+                        className="text-body text-ink-700 hover:text-brand-700 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 rounded-sm flex items-center min-h-[40px] sm:inline-flex sm:items-center sm:min-h-[24px]"
                       >
                         {l.label}
                       </Link>

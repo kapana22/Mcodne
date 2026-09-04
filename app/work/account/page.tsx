@@ -69,7 +69,7 @@ export default async function Page() {
           names the CONTENTS, which is what a sub-line under a room's title is
           for. Same fact, the owner's words. */}
       <PageHeader className="mb-6" title="ანგარიში" sub="ის, რასაც კლიენტი არ ხედავს" />
-      <AccountClient email={user.email} available={profile?.available !== false} />
+      <AccountClient email={user.email} phone={user.phone} available={profile?.available !== false} />
     </div>
   )
 }

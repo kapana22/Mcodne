@@ -73,11 +73,13 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
        message box ends up under the whole offer list, which is exactly the
        „hidden and lost" the owner reported. The panes wrap on their own below
        the breakpoint, so a phone still gets one column. */
-    /* `privacyLine={false}`: the wizard's „ნომერს არავის ვაძლევთ — მიმოწერა
-       პლატფორმაზეა" is about the INTAKE, and on this screen its second half is
-       contradicted by the „დარეკვა" button on every offer card. See the prop's
-       note in ../_shell — the replacement sentence is the owner's to write. */
-    <RequestShell body="wide" privacyLine={false}>
+    /* ⚠️ `privacyLine={false}` STOOD HERE AND THE PROP IS GONE (2026-09-04).
+       This screen had to switch the shell's „ნომერს არავის ვაძლევთ" line off,
+       because the „დარეკვა" button on every offer card contradicts its second
+       half. The line has now been removed from the shell for every screen —
+       owner: „წაშალე საერთოდ ეს ზედმეტი ინფო" — so there is nothing left to
+       switch off and the override went with it. */
+    <RequestShell body="wide">
       <RequestRoom data={data} viewerUserId={viewer.user?.id ?? null} />
     </RequestShell>
   )

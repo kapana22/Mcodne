@@ -33,6 +33,7 @@ export default async function SettingsPage() {
     bio: user.bio,
     phone: user.phone,
     emailVerified: user.emailVerified,
+    phoneVerified: user.phoneVerified,
     // Whether the account has a usable password. SSO-only accounts (Google)
     // carry a random unusable hash, so the delete flow must not demand one.
     // A boolean, never the hash — the same line /api/me draws.

@@ -28,7 +28,7 @@ import {
   type Draft, type AccountContact,
 } from './_model'
 import { Transcript } from './_transcript'
-import { StepWhat } from './_stepWhat'
+import { StepWhat, type CatTile } from './_stepWhat'
 import { StepPick } from './_stepPick'
 import { StepContact } from './_stepContact'
 import type { AccountOutcome } from '@/lib/requestAccount'
@@ -85,7 +85,7 @@ function loadDraft(): Draft {
   }
 }
 
-export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT', to = null, covered = [] }: {
+export function RequestWizard({ account, initialQuery = '', initialTopic = '', initialCategory = '', vertical = 'EXPERT', to = null, covered = [], tiles = [] }: {
   /** ⚠️ THE DOOR, FROM THE URL (`?for=service`). Owner, 2026-08-18, approving
    *  option „ა": the entry point picks the vertical and the wizard never asks
    *  again — the ss.ge shape, where you choose the world at the entrance and
@@ -99,6 +99,16 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
   /** What they typed on the home band, handed to the first screen's search so
    *  nobody retypes the answer they just gave. See app/request/page. */
   initialQuery?: string
+  /** A topic the visitor already chose by name on the home band — validated in
+   *  app/request/page against the vocabulary before it reaches here. Empty is
+   *  the ordinary case and changes nothing. */
+  initialTopic?: string
+  /** A sphere named on the home band — see _stepWhat. */
+  initialCategory?: string
+  /** The spheres the first screen draws under its field — resolved on the
+   *  server because the price floor is a measurement, never a constant.
+   *  Passed straight through; nothing here reads them. */
+  tiles?: CatTile[]
   /** Topic ids at least one live provider offers — see lib/requestsServer →
    *  coveredTopicIds. Empty is „do not narrow", which is what a database with
    *  no providers at all should do rather than offering nothing. */
@@ -126,7 +136,16 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
   // Seeded WITH the account AND with the chosen provider's topic, so the first
   // paint is already the right screen — no flash, nothing to reconcile at
   // hydration.
-  const seed = () => withTarget(withAccountContact({ ...EMPTY_DRAFT, vertical }, account), to?.topics ?? [], !!to)
+  /* ⚠️ THE TOPIC IS APPLIED TO THE SEED, not set afterwards — the same reason
+     the account and the target are: a first paint that is already the right
+     screen has nothing to reconcile at hydration. `withTopic` also resolves the
+     kind when the topic carries only one, so a person who tapped „ხელშეკრულება"
+     on the home page lands on the money question rather than on a screen asking
+     what they just answered. */
+  const seed = () => {
+    const base = withTarget(withAccountContact({ ...EMPTY_DRAFT, vertical }, account), to?.topics ?? [], !!to)
+    return initialTopic ? withTopic(base, initialTopic) : base
+  }
   const [draft, setDraft] = useState<Draft>(seed)
   // ⚠️ NOT THE LITERAL 'what'. With a provider chosen the run starts on the
   // budget question and there IS no „what" screen — a hard-coded first step
@@ -388,13 +407,6 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
     })
   }
 
-  /** The date, on a screen that also carries clarifiers: recorded, never an
-   *  advance. See the note in `pickOption`. */
-  const pickTiming = (id: string) => {
-    setDraft(d => ({ ...d, timing: id }))
-    setMissingQ(null)
-  }
-
   const pickAndGo = (p: Partial<Draft>) => {
     const d = { ...draft, ...p }
     setDraft(d)
@@ -402,11 +414,20 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
   }
 
   const kind = kindOf(draft.kind)
-  /** Every clarifier this draft asks — all of them on one screen now, so this
-   *  is a list rather than the single question it used to resolve. */
-  // The clarifiers now live ON the timing screen — see _model → stepsFor for
-  // why they lost their own page.
-  const extras = step.id === 'timing' ? extrasFor(kind, draft.topic) : []
+  /* ⚠️ `extras` STOOD HERE AND IT WAS THE LAST HALF OF A HALF-DONE SPLIT
+     (removed 2026-09-04). The clarifiers went back to their own screens on
+     2026-09-03 (`stepsFor` → `extra:<id>`), which made this list — every
+     clarifier the draft asks, computed for the TIMING step — describe a screen
+     that no longer exists. The render was corrected in that commit and the
+     PICK HANDLER was not, so `pickOption` still asked `extras.length > 0` and
+     took the „record, do not advance" branch on every topic that has a
+     clarifier. That branch was written for a screen with three questions and a
+     „გავაგრძელოთ" button; the button went with the screen. The result on
+     production: you tap a date, the row ticks, and nothing else ever happens.
+     Owner, with a screenshot of step 4/6: „ბაგი ვიპოვე, ამის მერე არ გადადის."
+     Same class as the blank screens and the empty option list before it — a
+     step whose three parts (produce · draw · advance) were not changed
+     together. */
 
   /**
    * Every option the LIVE question offers, in the order it is drawn.
@@ -519,22 +540,20 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
     /* One tap, and it is the only question on the screen — so it advances,
        the same contract every single-question screen in this run has. */
     if (step.id === 'budget') { pickAndGo({ budgetBand: id }); return }
-    if (step.id === 'timing') {
-      /* ⚠️ THE TAP THAT ENDED THE SCREEN COULD SKIP THE QUESTIONS ABOVE IT
-         (2026-09-01, owner: „ერთს რომ ვაწვები ვერ ვხდები რომ მეორესაც უნდა
-         დავაწვე"). Reproduced on the live wizard: on „ბინის დალაგება" this
-         screen asks THREE questions — სად · რამდენი ოთახია · როდის მოვიდეს —
-         and only the last one advanced. Answering the first and tapping a date
-         moved the run on with the room count silently dropped, and the code's
-         own note two hundred lines up says the lead's quality IS the product
-         on a paid-lead platform.
-         With clarifiers on the page the date is no longer the exit: nothing on
-         this screen advances by itself and „გავაგრძელოთ" is the one way out —
-         which is also what makes every row here behave the same way. */
-      if (extras.length > 0) { pickTiming(id); return }
-      pickAndGo({ timing: id })
-      return
-    }
+    /* ⚠️ AND THE DATE ADVANCES AGAIN (2026-09-04). It did not between
+       2026-09-01 and today, on purpose then and by omission after: the
+       clarifiers were briefly drawn on THIS screen, so a tap on a date could
+       have ended a page holding three questions with two of them unanswered
+       (owner, 2026-09-01: „ერთს რომ ვაწვები ვერ ვხდები რომ მეორესაც უნდა
+       დავაწვე" — reproduced on „ბინის დალაგება", where the room count was
+       silently dropped). The answer then was to let nothing on the screen
+       advance and to add „გავაგრძელოთ".
+       The clarifiers moved back to their own screens on 2026-09-03 and the
+       button went with the stacked page — but this branch kept asking whether
+       clarifiers existed, so on every topic that has one the screen recorded
+       the tap and offered no way out. One question on the screen, one tap that
+       ends it: the contract every other single-question step here follows. */
+    if (step.id === 'timing') { pickAndGo({ timing: id }); return }
     if (step.id === 'city') { pickAndGo({ city: id as Draft['city'] }); return }
     if (step.id === 'format') {
       if (CITIES.some(c => c.id === id)) { pickAndGo({ city: id as Draft['city'] }); return }
@@ -640,13 +659,13 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
           {status === 'sending' ? 'იგზავნება…' : 'გაგზავნა'}
         </Btn>
       ) : undefined}
-      progress={progressOf(step.id, draft)}
       // ⚠️ SHOWN FROM THE FIRST SCREEN, unlike the counter below it. The whole
       // point is that the SHAPE of the run is legible before the first tap —
       // three named parts, so „how long is this" has an answer that does not
       // depend on knowing the topic yet. The counter cannot do that (its
       // denominator is unsettled until a topic lands); the stage names never
       // move, whatever gets picked.
+      progress={progressOf(step.id, draft)}
       stage={stageOfStep(step.id)}
       // Two when the person is already chosen, three otherwise — one source,
       // `stepsFor`, so a stage cannot be named that this run never reaches.
@@ -823,6 +842,8 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
                honest offer; `covered` is the whole roster's. Both narrow the
                browse list AND the search hits (see _stepWhat → `only`), and
                empty means „no narrowing", never „nothing". */
+            tiles={tiles}
+            initialCategory={initialCategory}
             onlyTopics={to?.topics ?? covered}
             /* ⚠️ THE HALF `onlyTopics` CAN NO LONGER SAY (2026-09-02). The list
                above is narrowed in two very different senses — to ONE provider
@@ -942,6 +963,41 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
             under it and no way forward: the request funnel's own dead end,
             found on production by the owner („რა არის ესა?"). Every screen in
             this file needs three things and the run only checks two of them. */}
+        {/* ── THE BRIEF, ON ITS OWN SCREEN AND REQUIRED (2026-09-04) ──────
+            Owner: „ცალკე უნდა იყოს ველი, დამატე, გაზარდე." Ten rows rather than
+            the four the collapsed field on the contact step had — a box is an
+            instruction about how much to write, and a four-row box asks for
+            four rows.
+            ⚠️ TYPING DOES NOT ADVANCE, and there is no „skip": „გავაგრძელოთ"
+            enables at twelve characters (_model → stepComplete) and the line
+            beside it says why it is still grey, so the wall is never silent. */}
+        {step.id === 'details' && (
+          <div className="mt-5">
+            <textarea
+              id="req-details"
+              autoFocus
+              rows={10}
+              maxLength={4000}
+              value={draft.description}
+              onChange={e => patch({ description: e.target.value })}
+              placeholder="დაწერე რაც შეიძლება დაწვრილებით — რა გჭირდება, სად და როდის."
+              className="w-full resize-y rounded-field border border-ink-200 bg-white px-4 py-3.5 text-body text-ink-900 outline-none transition-colors duration-fast placeholder-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            />
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Btn
+                variant="primary"
+                size="md"
+                disabled={draft.description.trim().length < 12}
+                onClick={() => advance(draft, 'details')}
+              >
+                გავაგრძელოთ
+              </Btn>
+              {draft.description.trim().length < 12 && (
+                <span className="text-meta text-ink-500">დაწერე ორი-სამი სიტყვა მაინც</span>
+              )}
+            </div>
+          </div>
+        )}
         {step.id === 'budget' && (
           <>
             <StepPick options={options} value={draft.budgetBand} onPick={pickOption} numbered />
@@ -1070,13 +1126,33 @@ export function RequestWizard({ account, initialQuery = '', vertical = 'EXPERT',
               max={MAX_REQUEST_PHOTOS}
             />
             <div className="mt-5 flex items-center gap-3">
+              {/* ⚠️ „გამოტოვება" IS GONE AND A PHOTO IS REQUIRED (2026-09-04).
+                  Owner: „ასევე ფოტოს ატვირთვა [სავალდებულო]."
+
+                  This screen shipped on 2026-08-29 with the opposite rule
+                  written into `stepsFor`: „`photos: []` is a complete request —
+                  the person with water on the floor is exactly the one who has
+                  nothing to upload and exactly the one whose request must still
+                  arrive." That reasoning is answered rather than forgotten:
+                  the screen only EXISTS for SERVICE (39 of the 171 topic×kind
+                  combinations — a tap, a leak, a move), where there is always
+                  something to point a phone at. The 77 MEETING, 77 PROJECT and
+                  55 LEARNING runs never reach this step at all, so a lawyer and
+                  a tutor are not being asked to photograph anything.
+                  Inside SERVICE the picture is what lets a first offer be a
+                  price rather than a question, which is the whole argument the
+                  step was added on. */}
               <Btn
-                variant={draft.photos.length > 0 ? 'primary' : 'secondary'}
+                variant="primary"
                 size="md"
+                disabled={draft.photos.length === 0}
                 onClick={() => advance(draft, 'photos')}
               >
-                {draft.photos.length > 0 ? 'გავაგრძელოთ' : 'გამოტოვება'}
+                გავაგრძელოთ
               </Btn>
+              {draft.photos.length === 0 && (
+                <span className="text-meta text-ink-500">ერთი ფოტო მაინც დაურთე</span>
+              )}
               {draft.photos.length > 0 && (
                 <span className="text-small text-ink-500 tabular-nums">
                   {draft.photos.length} / {MAX_REQUEST_PHOTOS}

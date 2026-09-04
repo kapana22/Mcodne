@@ -10,6 +10,7 @@ import { Icon } from '@/components/Icon'
 import { Container } from '@/components/Container'
 import { Eyebrow } from '@/components/Eyebrow'
 import { Field, GoogleMark, PwInput, StrengthBar, inputCls } from './_fields'
+import { PhoneAuth } from './_phone'
 import { PhoneInput } from '@/components/PhoneInput'
 import { FIELD_ERROR_BORDER, useFault } from '@/components/FieldError'
 import { phoneFormatError } from '@/lib/phone'
@@ -122,6 +123,10 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
   const [phone, setPhone] = useState('')
   const [pw, setPw] = useState('')
   const [agree, setAgree] = useState(false)
+  // Which door this card is showing. Local, not a URL view: the phone flow
+  // spends a one-time code, so a browser BACK into its second step would land
+  // on a screen whose code is already gone.
+  const [byPhone, setByPhone] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errMsg, setErrMsg] = useState<string | null>(null)
   const { fault, fail, props, bad, clearField, reset: clearFault, error } = useFault('signup')
@@ -204,8 +209,21 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
 
   return (
     <div>
+      {byPhone ? <PhoneAuth onCancel={() => setByPhone(false)} /> : (<>
       {/* Google is the only SSO. */}
       <a href="/api/auth/google" onClick={startGoogleSignin} className="h-12 w-full px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-small text-ink-800 tracking-wide transition-colors duration-fast"><GoogleMark /> Google-ით გაგრძელება</a>
+      {/* ⚠️ BESIDE GOOGLE, NOT UNDER THE FORM (2026-09-04, owner: „მე მინდა
+          დავამატოთ მობილურით რეგისტრაცია"). Both are doors that ask for no
+          password; the form below is the third. One tap swaps this card's body
+          — the three steps behind it are shorter than the form, and a route
+          change would hand back everything that saves. */}
+      <button
+        type="button"
+        onClick={() => setByPhone(true)}
+        className="h-12 w-full px-4 mt-3 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-small text-ink-800 tracking-wide transition-colors duration-fast"
+      >
+        <Icon.phone aria-hidden className="w-4 h-4 text-ink-500" /> ნომრით რეგისტრაცია
+      </button>
 
       <div className="flex items-center gap-3 my-6">
         <div className="flex-1 h-px bg-ink-200" />
@@ -274,6 +292,7 @@ const StudentSignUp = ({ setView }: { setView: (v: View) => void }) => {
           <span className="font-display font-semibold text-brand-700">მოთხოვნა ამჟამად უფასოა.</span>
         </p>
       </form>
+      </>)}
     </div>
   )
 }
@@ -309,6 +328,10 @@ const ProviderSignUp = ({ setView }: { setView: (v: View) => void }) => {
   const [phone, setPhone] = useState('')
   const [pw, setPw] = useState('')
   const [agree, setAgree] = useState(false)
+  // Which door this card is showing. Local, not a URL view: the phone flow
+  // spends a one-time code, so a browser BACK into its second step would land
+  // on a screen whose code is already gone.
+  const [byPhone, setByPhone] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errMsg, setErrMsg] = useState<string | null>(null)
   // A SECOND scope („signup-p"), not a second copy of the first: both forms can
@@ -393,6 +416,7 @@ const ProviderSignUp = ({ setView }: { setView: (v: View) => void }) => {
             /student, with no application and no record that they had chosen
             anything at all. The password path below was unaffected, which is
             why it survived testing. See _model → startGoogleSignin. */}
+        {byPhone ? <PhoneAuth onCancel={() => setByPhone(false)} dest={dest} /> : (<>
         <a
           href="/api/auth/google"
           onClick={e => startGoogleSignin(e, { dest })}
@@ -400,6 +424,18 @@ const ProviderSignUp = ({ setView }: { setView: (v: View) => void }) => {
         >
           <GoogleMark /> Google-ით გაგრძელება
         </a>
+        {/* ⚠️ BESIDE GOOGLE, NOT UNDER THE FORM (2026-09-04, owner: „მე მინდა
+            დავამატოთ მობილურით რეგისტრაცია"). Both are doors that ask for no
+            password; the form below is the third. One tap swaps this card's body
+            — the three steps behind it are shorter than the form, and a route
+            change would hand back everything that saves. */}
+          <button
+          type="button"
+          onClick={() => setByPhone(true)}
+          className="h-12 w-full px-4 mt-3 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-small text-ink-800 tracking-wide transition-colors duration-fast"
+          >
+          <Icon.phone aria-hidden className="w-4 h-4 text-ink-500" /> ნომრით რეგისტრაცია
+        </button>
 
         <div className="flex items-center gap-3 my-6">
           <div className="flex-1 h-px bg-ink-200" />
@@ -485,6 +521,7 @@ const ProviderSignUp = ({ setView }: { setView: (v: View) => void }) => {
             <p className="text-meta text-ink-500 text-center">{gap.message}</p>
           )}
         </form>
+        </>)}
       </div>
     </div>
   )

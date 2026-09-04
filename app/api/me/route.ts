@@ -1,5 +1,5 @@
 import { NextResponse, after } from 'next/server'
-import { normalizePhone, phoneFormatError } from '@/lib/phone'
+import { canonicalPhone, phoneFormatError } from '@/lib/phone'
 import { cookies } from 'next/headers'
 import { kickSweep } from '@/lib/sweepRunner'
 import { z } from 'zod'
@@ -85,6 +85,9 @@ export async function GET() {
       phone: user.phone,
       bio: (user as any).bio,
       emailVerified: (user as any).emailVerified,
+      // For a phone account this is the verification badge; `emailVerified` has
+      // nothing to say about somebody who has no address (2026-09-04).
+      phoneVerified: (user as any).phoneVerified,
       // Whether the account has a usable password. SSO-only accounts (Google)
       // carry a random unusable hash, but for surfaces like account-deletion the
       // client needs to know whether to collect a current-password. Kept as a
@@ -195,16 +198,24 @@ export async function PATCH(req: Request) {
 
   const data: any = {}
   if (fullName !== undefined) data.fullName = fullName.trim()
-  if (phone !== undefined) data.phone = phone.trim() ? normalizePhone(phone) : null
+  /* ⚠️ CANONICAL, AND EDITING IT CLEARS THE PROOF (2026-09-04). `User.phone`
+     is a credential now, so typing a DIFFERENT number into the profile field
+     cannot silently carry the old number's „somebody answered a code here"
+     over to it — that would let anyone with a session mark any number as their
+     verified own and take the passwordless door to whatever account holds it.
+     Re-typing the SAME number changes nothing, which is what a person editing
+     their bio expects. */
+  if (phone !== undefined) {
+    const next = phone.trim() ? canonicalPhone(phone) : null
+    data.phone = next
+    if (next !== user.phone) data.phoneVerified = false
+  }
   if (bio !== undefined) data.bio = bio.trim() || null
   // Downscale an inbound base64 avatar to a 256px webp (same as /api/uploads)
   // so this write path can't persist a multi-MB avatar. null clears it.
   if (avatarUrl !== undefined) data.avatarUrl = avatarUrl ? await normalizeAvatar(avatarUrl) : null
 
   if (newPassword) {
-    if (!currentPassword) {
-      return NextResponse.json({ ok: false, error: 'CURRENT_PASSWORD_REQUIRED' }, { status: 400 })
-    }
     // Throttle password changes here too — this PATCH is a second path to the
     // same operation as /api/me/password, so share the `pwchange` budget (an
     // attacker with a live session shouldn't get unlimited current-password guesses).
@@ -212,8 +223,15 @@ export async function PATCH(req: Request) {
     if (!rl.ok) return NextResponse.json({ ok: false, error: 'RATE_LIMITED', retryInSec: rl.retryInSec }, { status: 429 })
     const fresh = await prisma.user.findUnique({ where: { id: user.id }, select: { passwordHash: true } })
     if (!fresh) return NextResponse.json({ ok: false, error: 'UNAUTHORIZED' }, { status: 401 })
-    const ok = await verifyPassword(currentPassword, fresh.passwordHash)
-    if (!ok) return NextResponse.json({ ok: false, error: 'BAD_CURRENT_PASSWORD' }, { status: 400 })
+    // A null hash is a phone- or Google-registered account setting its FIRST
+    // password — the same carve-out as /api/me/password, and the same reason.
+    if (fresh.passwordHash) {
+      if (!currentPassword) {
+        return NextResponse.json({ ok: false, error: 'CURRENT_PASSWORD_REQUIRED' }, { status: 400 })
+      }
+      const ok = await verifyPassword(currentPassword, fresh.passwordHash)
+      if (!ok) return NextResponse.json({ ok: false, error: 'BAD_CURRENT_PASSWORD' }, { status: 400 })
+    }
     data.passwordHash = await hashPassword(newPassword)
   }
 
@@ -261,7 +279,7 @@ export async function DELETE(req: Request) {
     if (!parsed.data.currentPassword) {
       return NextResponse.json({ ok: false, error: 'CURRENT_PASSWORD_REQUIRED' }, { status: 400 })
     }
-    const ok = await verifyPassword(parsed.data.currentPassword, user.passwordHash)
+    const ok = await verifyPassword(parsed.data.currentPassword, user.passwordHash!)
     if (!ok) return NextResponse.json({ ok: false, error: 'BAD_CURRENT_PASSWORD' }, { status: 400 })
   }
 

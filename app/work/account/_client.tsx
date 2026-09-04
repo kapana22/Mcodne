@@ -45,6 +45,7 @@ import { Field } from '../profile/_parts'
 import { PWD_MIN, passwordError } from '../profile/_types'
 import { PasswordChangeInput } from '@/lib/passwordPolicy'
 import { FIELD_ERROR_BORDER, useFault } from '@/components/FieldError'
+import { formatPhone } from '@/lib/phone'
 
 // ⚠️ 48px, NOT 44 (2026-08-31, the owner's design canvas → „Work Profile", the
 // ACCOUNT screen). The canvas draws every field on this page at 48 with a 14px
@@ -53,10 +54,14 @@ import { FIELD_ERROR_BORDER, useFault } from '@/components/FieldError'
 const INPUT =
   'w-full h-12 px-4 rounded-field border border-ink-200 bg-white text-body focus:border-brand-400 focus:outline-none'
 
-export function AccountClient({ email, available: initialAvailable }: {
+// ⚠️ `email` IS NULLABLE SINCE PHONE REGISTRATION (2026-09-04) — a provider
+// who signed up with a number has none, and the line under their name prints
+// the number instead.
+export function AccountClient({ email, phone, available: initialAvailable }: {
   /** The signed-in address, printed under the password heading. Read on the
    *  server — a page that shows one row does not need a round trip for it. */
-  email: string
+  email: string | null
+  phone: string | null
   /** `ServiceProfile.available` as it stands right now. Never null: the switch
    *  must show the truth on the first paint or not be a switch. */
   available: boolean
@@ -244,7 +249,7 @@ export function AccountClient({ email, available: initialAvailable }: {
       {/* ── Password ────────────────────────────────────────────────────── */}
       <form onSubmit={changePassword} noValidate className="p-6 sm:p-7 rounded-panel border border-ink-100 bg-white space-y-4">
         <Eyebrow as="h2" tone="muted" className="mb-2">პაროლის შეცვლა</Eyebrow>
-        <p className="-mt-1 text-small text-ink-500 truncate">{email}</p>
+        <p className="-mt-1 text-small text-ink-500 truncate">{email ?? formatPhone(phone)}</p>
 
         {/* `noValidate`: the browser's own bubble fires before this form's
             handler can name the field, and it speaks the BROWSER's language on

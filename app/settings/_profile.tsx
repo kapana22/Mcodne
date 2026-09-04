@@ -6,6 +6,7 @@ import { AVATAR_PICKS, DEFAULT_AVATAR } from '@/lib/defaultAvatar'
 import { Icon } from '@/components/Icon'
 import { FIELD_ERROR_BORDER } from '@/components/FieldError'
 import type { FaultKit, Me, Msg } from './_types'
+import { formatPhone } from '@/lib/phone'
 
 type Props = {
   me: Me
@@ -39,7 +40,8 @@ export function ProfileSection({ me, fullName, setFullName, phone, setPhone, bio
           <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">პროფილი</h2>
           <p className="text-small text-ink-500 mt-0.5">როგორ გხედავენ სხვები</p>
         </div>
-        <span className="hidden sm:block font-mono text-meta tabular-nums text-ink-400 truncate max-w-[220px] shrink" title={me.email}>{me.email}</span>
+        {/* The address, or the number for an account that has no address. */}
+        <span className="hidden sm:block font-mono text-meta tabular-nums text-ink-400 truncate max-w-[220px] shrink" title={me.email ?? formatPhone(me.phone)}>{me.email ?? formatPhone(me.phone)}</span>
       </div>
 
       {/* `noValidate` — the handler names the field; the browser's own bubble

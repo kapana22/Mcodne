@@ -36,10 +36,44 @@ import { requestsViewer, coveredTopicIds } from '@/lib/requestsServer'
 import { isVertical, PROVIDER_ROUTE } from '@/lib/requests'
 import { resolveRequestTarget } from '@/lib/requestTarget'
 import { RequestWizard } from './RequestWizard'
+import { topicById } from '@/lib/requests'
+import type { CatTile } from './_stepWhat'
+import { prisma } from '@/lib/prisma'
+import { expertCountsByCategory, priceFloorsByCategory } from '@/lib/categoryCounts'
 
 // A dark page must never be pre-rendered into the build's static output — and
 // the gate reads the session, which is per-request by definition.
 export const dynamic = 'force-dynamic'
+
+/** The spheres, by the home page's own rule (app/page → homeCategories):
+ *  VISIBLE, populated, busiest first.
+ *
+ *  ⚠️ THE `expertCount > 0` FILTER IS THE WHOLE GUARD. A tile that opens onto
+ *  an empty sphere is a dead end the visitor built for us, and the catalogue
+ *  refuses it in two other places already (app/page and app/experts/client).
+ *  The count is never printed — owner, 2026-09-02: „არასად არ ეწეროს ეგ ინფო"
+ *  — it only decides whether the tile exists at all. */
+async function sphereTiles(): Promise<CatTile[]> {
+  const all = await prisma.category.findMany({
+    orderBy: [{ order: 'asc' }, { name: 'asc' }],
+    select: { id: true, slug: true, name: true, status: true, parentId: true },
+  })
+  const [counts, floors] = await Promise.all([
+    expertCountsByCategory(all),
+    priceFloorsByCategory(all),
+  ])
+  return all
+    .filter(c => c.status === 'VISIBLE')
+    .map(c => ({
+      slug: c.slug,
+      name: c.name,
+      count: counts.get(c.id) ?? 0,
+      priceFrom: floors.get(c.id) ?? null,
+    }))
+    .filter(c => c.count > 0)
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ka'))
+    .map(({ slug, name, priceFrom }) => ({ slug, name, priceFrom }))
+}
 
 export const metadata: Metadata = {
   title: 'მოთხოვნა — მცოდნე',
@@ -79,7 +113,27 @@ export default async function Page({ searchParams }: {
   // their words, not a vocabulary id, and quietly choosing „ხელშეკრულება"
   // because they wrote „ხელშეკრულებაზე მჭირდება იურისტი" is the wizard putting
   // an answer in their mouth. They still tap the hit they meant.
+  /* ⚠️ `?topic=` IS THE HANDOVER `?q=` COULD NOT BE (2026-09-04). The note above
+     refuses to pick a topic FROM WORDS, and that refusal stands: „ხელშეკრულებაზე
+     მჭირდება იურისტი" is somebody's sentence, not a vocabulary id, and choosing
+     for them would be the wizard putting an answer in their mouth.
+     This is the other case. The home band now shows matching topics as you type
+     and carries a row of common ones beneath the field, so a person arriving
+     with this parameter TAPPED the topic by name — the same act the wizard asks
+     of them on screen one, done one screen earlier. Making them tap it twice is
+     the retyping problem the `?q=` note is about.
+     Validated through the vocabulary, never trusted: an unknown id is dropped
+     and the run starts where it always did. */
   const sp = await searchParams
+  const topicParam = typeof sp.topic === 'string' ? sp.topic : ''
+  const initialTopic = topicById(topicParam)?.id ?? ''
+  /* A sphere rather than a topic — what the home band's profession chips carry.
+     „ფინანსისტი" matches no topic label (measured: four of the fifteen
+     professions find nothing through search), so sending the WORD would be a
+     dead end; the sphere they work in always exists. Checked against the tiles
+     this page already resolved, so a slug that is hidden, empty or invented
+     simply does not filter anything. */
+  const categoryParam = typeof sp.category === 'string' ? sp.category : ''
   const raw = typeof sp.q === 'string' ? sp.q : ''
   // Bounded before it reaches a component: this is a URL anybody can craft, and
   // the search box has no business rendering a novel.
@@ -115,10 +169,19 @@ export default async function Page({ searchParams }: {
   // note in RequestWizard, and app/request/_model → withAccountContact for the
   // fill rule (empty fields only, never an overwrite).
   const covered = await coveredTopicIds()
+  const tiles = await sphereTiles()
 
   return (
     <RequestWizard
       initialQuery={initialQuery}
+      /* ⚠️ THE SPHERES THE FIRST SCREEN DRAWS. Resolved here and not in the
+         wizard because `priceFrom` is a MEASUREMENT — the cheapest floor
+         anybody in that sphere actually named — and a client component cannot
+         ask the database for one. The header note above says „no data is
+         fetched here anymore"; that stopped being true today and this is why. */
+      tiles={tiles}
+      initialTopic={initialTopic}
+      initialCategory={tiles.some(t => t.slug === categoryParam) ? categoryParam : ''}
       vertical={vertical}
       // ⚠️ WHAT ANYBODY ACTUALLY DOES, read fresh on every open. The wizard
       // offered 148 topics against 46 with a live provider until 2026-08-30 —

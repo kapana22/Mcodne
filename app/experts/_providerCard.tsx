@@ -273,7 +273,19 @@ export function ProviderCard({ m, view = 'grid' }: { m: ProviderRow; view?: Enti
                straight into a wizard would skip the page that lets somebody
                choose this person over the next one. Same door, one step of
                reading in between — and the label names what waits there. */
-            <Btn href={href} variant="primary" size="sm" aria-label={`მიიღე შეთავაზება — ${m.name}`} className="relative z-10 shrink-0">
+            /* ⚠️ `md`, NOT `sm` (2026-09-04). `sm` is `h-10 sm:h-9` — 40px on a
+               phone and 36 from the sm breakpoint up, and the 36 is deliberate
+               for the compact controls it was sized against („ყველა
+               წაკითხულად", filter toggles, CSV export). This is not one of
+               those. It is the primary conversion control of the whole
+               catalogue, repeated on every row, and at `sm` it was drawn the
+               same size as a filter chip while being the thing the reader came
+               to press. Measured live on /experts at 903px: 36px, four under
+               this project's own tap floor, on every card on the page.
+               `md` is 44px at every width, so the desktop exception no longer
+               applies to the one control that cannot afford it. The size token
+               moves; the compact ladder is untouched for everything else. */
+            <Btn href={href} variant="primary" size="md" aria-label={`მიიღე შეთავაზება — ${m.name}`} className="relative z-10 shrink-0">
               მიიღე შეთავაზება
             </Btn>
           )}

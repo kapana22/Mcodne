@@ -10,6 +10,7 @@ import { authErrorMessage } from '@/lib/authErrors'
 import { emailFormatError } from '@/lib/emailRule'
 import { FIELD_ERROR_BORDER, useFault } from '@/components/FieldError'
 import { Field, GoogleMark, PwInput, inputCls } from './_fields'
+import { PhoneAuth } from './_phone'
 import { View, readEmailParam, redirectAfterSignin, startGoogleSignin } from './_model'
 
 /* The bespoke AuthHeader/AuthFooter that used to live here are gone: the auth
@@ -103,6 +104,10 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [remember, setRemember] = useState(true)
+  // Which door the card is showing. Local state, not a URL view: the phone
+  // flow spends a one-time code, so a browser BACK into step 2 would land on a
+  // screen whose code is already gone.
+  const [byPhone, setByPhone] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errMsg, setErrMsg] = useState<string | null>(null)
   // Which box is wrong, and why — see components/FieldError.
@@ -198,9 +203,23 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
           </div>
         )}
 
+        {byPhone ? <PhoneAuth onCancel={() => setByPhone(false)} /> : (<>
         <a href="/api/auth/google" onClick={e => startGoogleSignin(e, { remember })} className="h-12 w-full px-4 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-small text-ink-800 tracking-wide transition-colors duration-fast">
           <GoogleMark /> Google-ით გაგრძელება
         </a>
+        {/* ⚠️ IT SITS BESIDE GOOGLE, NOT UNDER THE FORM (2026-09-04). These two
+            are the same kind of thing — a door that asks for no password — and
+            the email form below is the third. Owner: „მე მინდა დავამატოთ
+            მობილურით რეგისტრაცია." One tap swaps the card's body rather than
+            navigating: the three steps behind it are shorter than this form,
+            and a route change would hand back everything that buys. */}
+        <button
+          type="button"
+          onClick={() => setByPhone(true)}
+          className="h-12 w-full px-4 mt-3 rounded-btn border border-ink-200 bg-white hover:bg-ink-50 hover:border-ink-300 inline-flex items-center justify-center gap-2.5 font-display font-medium text-small text-ink-800 tracking-wide transition-colors duration-fast"
+        >
+          <Icon.phone aria-hidden className="w-4 h-4 text-ink-500" /> ნომრით გაგრძელება
+        </button>
 
         <div className="flex items-center gap-3 my-7">
           <div className="flex-1 h-px bg-ink-200" />
@@ -273,6 +292,7 @@ const SignInForm = ({ setView }: { setView: (v: View) => void }) => {
             </p>
           )}
         </form>
+        </>)}
       </div>
 
       {/* Sign up CTA below the card */}

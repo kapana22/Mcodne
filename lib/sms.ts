@@ -27,6 +27,7 @@
 // Failures log the destination and the status; never the words.
 
 import { normalizePhone, isGeorgianMobile } from './phone'
+import { isCredential } from './outbound'
 import { prisma } from './prisma'
 import { logMessage } from './messageLog'
 import { channelOn } from './outboundSettings'
@@ -197,7 +198,19 @@ async function deliver({ key, to, text, kind = 'info', skipSubscriptionCheck = f
      ⚠️ AND IT FAILS CLOSED. A lookup that throws holds the message. A missed
      SMS on a pre-launch site costs nothing; one sent to somebody who was
      promised silence is the whole of the complaint. */
-  const onlyAfter = process.env.SMS_ONLY_AFTER
+  /* ⚠️ A CODE THE PERSON IS WAITING FOR IS NEVER HELD BY THE CUTOFF
+     (2026-09-04). The cutoff exists so the site does not INITIATE contact with
+     people who were here before it launched — owner: „ვინც user არის ახლანდელი,
+     იმათ არ გაუგზავნო". Somebody who has just typed their number into the sign-in
+     form and is staring at the code field is not being contacted by us; they
+     asked. Holding that message does not protect them, it locks them out of
+     their own account with no error anywhere — and since phone registration is
+     PASSWORDLESS, for those accounts it is the only door there is.
+
+     This was already true of the password-reset code on the mail side and had
+     simply never been exercised. `credential: true` in lib/outbound is exactly
+     the set of messages this applies to. */
+  const onlyAfter = isCredential(key) ? null : process.env.SMS_ONLY_AFTER
   if (onlyAfter) {
     const cutoff = new Date(onlyAfter)
     if (Number.isNaN(cutoff.getTime())) {

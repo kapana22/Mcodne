@@ -460,12 +460,12 @@ test('completeness is earned, not invented', () => {
   const none: ProfileFacts = {
     hasPhoto: false, hasBio: false, hasProfessions: false,
     hasExperience: false, hasService: false, hasCertificate: false,
-    servicesConfirmed: false,
+    servicesConfirmed: false, notVisible: [],
   }
   const all: ProfileFacts = {
     hasPhoto: true, hasBio: true, hasProfessions: true,
     hasExperience: true, hasService: true, hasCertificate: true,
-    servicesConfirmed: false,
+    servicesConfirmed: false, notVisible: [],
   }
   assert.equal(completeness(none), 0)
   assert.equal(completeness(all), 100)

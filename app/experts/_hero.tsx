@@ -77,7 +77,14 @@ export const SearchHero = ({ filters, total, liveCats, search, setSearch, onSear
     <section className="pt-5 sm:pt-7">
       <Container size="wide">
         <nav aria-label="ნავიგაცია" className="mb-4 hidden items-center gap-2 text-meta text-ink-400 sm:flex">
-          <Link href="/" className="transition-colors duration-fast hover:text-ink-700">მთავარი</Link>
+      {/* ⚠️ `py-1 -my-1` IS THE 24px FLOOR, NOT PADDING (2026-09-04). These
+          crumbs are `text-meta` on a 17px line box, and measured live they were
+          17px tall — under WCAG 2.2 SC 2.5.8, which asks 24×24 CSS px of any
+          pointer. The nav is `hidden sm:flex`, so a phone never sees it and the
+          project's own 40px thumb floor is not the rule that applies here; 24
+          is. The negative margin hands the row back its height, so the target
+          grows and nothing on the page moves. */}
+          <Link href="/" className="inline-flex items-center py-1 -my-1 transition-colors duration-fast hover:text-ink-700">მთავარი</Link>
           <span aria-hidden>·</span>
           <span className="font-display font-semibold text-ink-600">ექსპერტები</span>
         </nav>

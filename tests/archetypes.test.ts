@@ -83,8 +83,18 @@ test('archetype 4 — intake wizard: one stage rail, Container sizes, no hand ma
   // records the reason fails on its own changelog.
   const shellCode = shell.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
   assert.doesNotMatch(shellCode, /<StepIndicator/, 'the shell draws BOTH the bars and the dots — one control, or the reader gets two answers')
-  assert.match(shell, /<ol className="flex items-center gap-3">/, 'the stage rail is no longer an ordered list')
-  assert.match(shell, /stages\.map/, 'the stage rail stopped rendering the run’s own stages')
+  /* ⚠️ THIS ASSERTED A CLASSNAME UNTIL 2026-09-03 — `<ol className="flex
+     items-center gap-3">`, the exact markup of the segmented rail. The rail
+     is gone (the stages moved onto the header's own row; `_shell` holds the
+     measurements), and this line would have failed on a screen that still
+     shows the same three stages in the same order with the same rule about
+     jumping ahead. That is the definition of pinning the wrong thing.
+     What the archetype is about survives, and is what is asserted now: the
+     run says where you are ONCE, as an ordered list, from the run's own
+     stages. */
+  assert.match(shell, /<ol className=/, 'the stages are no longer an ordered list — the order is the information')
+  assert.match(shell, /stages\.map/, 'the stage row stopped rendering the run’s own stages')
+  assert.match(shell, /<nav aria-label="ეტაპები"/, 'the stage row is the only way back through the run and must be reachable as navigation')
   /* ⚠️ THE RULE IS „NO JUMPING AHEAD", AND IT WAS PINNED AS „NOTHING IS
      TAPPABLE" (repinned 2026-09-01, owner: „ზევით რომ აქვს პროცესი ღილაკების…
      მანდ გადასვლა-გადმოსვლებიც უნდა ჰქონდეს კომფორტისთვის").
@@ -96,7 +106,7 @@ test('archetype 4 — intake wizard: one stage rail, Container sizes, no hand ma
      here instead of the blanket ban.
      A `<Link>` would still be wrong: it is a route change, and this run has one
      address. */
-  const rail = shell.slice(shell.indexOf('<ol className="flex items-center gap-3">'))
+  const rail = shell.slice(shell.indexOf('<nav aria-label="ეტაპები"'))
   assert.doesNotMatch(rail, /<Link/, 'a stage became a link — the run lives at one address')
   // Every `onStage ?` on the rail must be guarded, and by `done` — counting
   // them is what makes „and by nothing else" an assertion rather than a hope.

@@ -36,7 +36,7 @@
 import { randomBytes } from 'crypto'
 import { prisma } from './prisma'
 import { hashPassword, createSession } from './auth'
-import { normalizePhone } from './phone'
+import { canonicalPhone } from './phone'
 import { ROLE } from '@/lib/roles'
 
 export type AccountOutcome = 'SIGNED_IN' | 'NONE' | 'CREATED' | 'EXISTS'
@@ -77,7 +77,12 @@ export async function accountForRequest(input: {
         fullName: input.contactName.trim(),
         // 32 random bytes, hashed and discarded. See the header.
         passwordHash: await hashPassword(randomBytes(32).toString('hex')),
-        phone: normalizePhone(input.phone),
+        // ⚠️ CANONICAL, NOT MERELY NORMALISED (2026-09-04). `User.phone` is a
+        // CREDENTIAL now — a code answered on it signs somebody in — and the
+        // same number used to be storable three ways („555…", „995555…",
+        // „+995555…"), which no unique index can see through. lib/phone →
+        // canonicalPhone is the one spelling.
+        phone: canonicalPhone(input.phone),
         role: ROLE.USER,
       },
       select: { id: true },

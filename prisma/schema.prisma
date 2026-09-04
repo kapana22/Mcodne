@@ -59,10 +59,28 @@ enum CategoryStatus {
 
 model User {
   id                String    @id @default(cuid())
-  email             String    @unique
-  passwordHash      String
+  // ⚠️ NULLABLE SINCE 2026-09-04, AND THAT IS THE POINT OF PHONE REGISTRATION.
+  // Owner: „მინდა დავამატოთ მობილურით რეგისტრაცია" — a person who signs up with
+  // a number and an SMS code has no address to store, and a synthetic one
+  // („5551234@mcodne.ge") would be a lie the mailer would then try to deliver
+  // to. Every read must handle null; `tsc` finds them.
+  email             String?   @unique
+  // ⚠️ NULLABLE FOR THE SAME REASON. A phone account is PASSWORDLESS: there is
+  // no password to hash at registration and none is ever required. Null means
+  // „this account cannot be signed into with a password", which the signin
+  // route answers by naming the door that does work, not by a bare 401.
+  passwordHash      String?
   fullName          String
+  // ⚠️ STORED CANONICAL SINCE 2026-09-04 — lib/phone → canonicalPhone, i.e.
+  // „+995555123456". It used to be stored as typed, in three shapes, which is
+  // why lib/sms carries `phoneVariants`. A credential cannot have three
+  // spellings.
   phone             String?
+  // Has somebody actually answered an SMS on this number? Only a VERIFIED phone
+  // is unique (partial index in lib/dbBoot) and only a verified phone signs
+  // anybody in — a number typed into a profile field is contact information,
+  // and two people may honestly type the same one.
+  phoneVerified     Boolean   @default(false)
   avatarUrl         String?
   bio               String?
   role              Role      @default(USER)
@@ -131,6 +149,50 @@ model OtpCode {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, purpose])
+}
+
+/**
+ * THE CODE THAT REGISTERS AND SIGNS SOMEBODY IN BY PHONE (2026-09-04).
+ *
+ * ⚠️ IT IS NOT `OtpCode`, AND THE DIFFERENCE IS THE WHOLE REASON IT EXISTS.
+ * `OtpCode` hangs off a `userId` — it confirms an address for an account that
+ * already exists. This code is sent to a number that, the first time, belongs
+ * to NOBODY: the account is created after it is answered. A nullable FK on
+ * OtpCode would have made every existing read ask „and is the user null here",
+ * for a row that means something else.
+ *
+ * ⚠️ THE CODE IS STORED HASHED, unlike OtpCode's. This is the ONLY credential
+ * on a passwordless account: anyone who can read this table during the ten
+ * minutes a row lives could otherwise sign in as its owner. A SHA-256 of six
+ * digits is not a secret against an offline attack — but the row is gone in ten
+ * minutes and the search space is closed by `attempts`, and it costs nothing.
+ *
+ * `attempts` is the brute-force floor that a rate limiter cannot be: the limiter
+ * is per-instance and in memory (lib/rateLimit), so it resets on every deploy.
+ * This counter is in the row, and five wrong guesses burn THAT code for good.
+ */
+model PhoneOtp {
+  id        String   @id @default(cuid())
+  /** Canonical — lib/phone → canonicalPhone. Never as typed. */
+  phone     String
+  /** SHA-256 of the six digits. The digits themselves are never stored. */
+  codeHash  String
+  /** Wrong guesses so far. At 5 the row is spent whatever the clock says. */
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  /**
+   * Set when the code was answered correctly but no account existed yet, and
+   * the person is on the „what is your name" step. Holds the SHA-256 of a
+   * one-time ticket: proof, for the next 15 minutes, that THIS browser proved
+   * ownership of THIS number. Without it the register endpoint would have to
+   * take a bare phone number and trust it.
+   */
+  ticketHash String?
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
+  @@index([expiresAt])
 }
 
 model PasswordResetToken {

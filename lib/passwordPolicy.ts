@@ -72,7 +72,15 @@ export function passwordError(value: string | null | undefined): string | null {
 export const PasswordChangeInput = z.object({
   // Only non-empty — it is checked against the stored hash, not against policy.
   // A password created before a rule tightened must still be usable to change.
-  currentPassword: z.string().min(1),
+  //
+  // ⚠️ OPTIONAL SINCE 2026-09-04, AND THE ROUTES STILL REQUIRE IT. A phone
+  // account is passwordless — `passwordHash` is null — so there is no current
+  // password to type and this is how such an account SETS its first one. The
+  // rule „an account that has a password must prove it" did not move; it moved
+  // from the parser, which cannot see the account, to the two routes, which can.
+  // Leaving it required here would have locked every phone-registered person
+  // out of ever getting a password.
+  currentPassword: z.string().min(1).optional(),
   // The new one meets the SAME policy as signup and reset, so the change
   // endpoint cannot be used to downgrade to a weaker password.
   newPassword: z.string().min(PWD_MIN).max(PWD_MAX),

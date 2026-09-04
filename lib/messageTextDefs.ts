@@ -59,6 +59,17 @@ const BODY2 = 'ტექსტი — მეორე აბზაცი'
 
 export const MESSAGE_TEXTS: MessageTextGroup[] = [
   {
+    /* ⚠️ ONE SMS PART IS 70 GEORGIAN CHARACTERS (lib/sms → smsParts). The
+       default below is 33 with the code filled in, and it stays short on
+       purpose: this is the message a person reads off a notification banner
+       without unlocking the phone, so the digits come early and nothing
+       follows them. */
+    key: 'auth.phoneCode', label: 'ნომრით შესვლის კოდი',
+    texts: [
+      { part: 'sms', label: 'SMS — ტექსტი (70 სიმბოლომდე = 1 ნაწილი)', vars: ['code'], default: 'მცოდნე: კოდი {code}. ვადა 10 წუთი.' },
+    ],
+  },
+  {
     key: 'auth.otpVerify', label: 'ელფოსტის დადასტურების კოდი',
     texts: [
       { part: 'subject', label: SUBJ, default: 'დაადასტურე ელფოსტა — მცოდნე' },
@@ -318,6 +329,16 @@ export const MESSAGE_TEXTS: MessageTextGroup[] = [
       { part: 'heading', label: HEAD, default: 'სამუშაო დასრულდა' },
       { part: 'body1', label: BODY, multiline: true, default: 'ექსპერტმა მონიშნა, რომ სამუშაო დასრულდა. შეაფასე შენს გვერდზე.' },
       { part: 'cta', label: CTA, default: 'შეფასება' },
+      /* ⚠️ THE SMS EXISTS FOR THE SAME REASON `request.offerArrived.client`'s
+         does (2026-09-04). The client's email field left the intake on
+         2026-09-03 („კონტაქტის ველიდან ამოვიღოთ მელი"), and this letter was
+         the ONLY way somebody heard that the work they commissioned had been
+         marked finished — so for every request filed since, nobody heard at
+         all. The provider marks it done, the client is never told, and the
+         review the whole page is built around is never asked for.
+         Wording is the letter's own, shortened to one SMS part: the event and
+         the address. */
+      { part: 'sms', label: 'SMS — ტექსტი (70 სიმბოლომდე = 1 ნაწილი)', vars: ['ref'], default: 'მცოდნე: სამუშაო დასრულდა. შეაფასე: mcodne.ge/request/{ref}' },
     ],
   },
   {

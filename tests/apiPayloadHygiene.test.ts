@@ -67,6 +67,19 @@ test('every API route selecting avatarUrl either shapes it or is on the reviewed
       .replace(/\/\/.*$/gm, '')
     if (!/avatarUrl/.test(src)) continue
     if (/avatarSrc|stripTutorBlobs|stripAvatar/.test(src)) continue
+    /* ⚠️ ASKING WHETHER ONE EXISTS IS NOT FETCHING ONE (2026-09-04). The rule
+       here is about BYTES: a base64 avatar is ~32KB and must not ride in a
+       payload. `"avatarUrl" IS NOT NULL` inside SQL computes a boolean in
+       Postgres and the blob never leaves it — the same trick lib/avatarSrc →
+       AVATAR_SHAPE_SQL plays for the catalogue, which this detector already
+       waves through by name.
+
+       Found by /api/provider/offers, which needs „does this provider have a
+       face" to decide whether their card may make an offer. Selecting the
+       column to answer that would have shipped the portrait to a route that
+       throws it away — exactly the defect — so it asks Postgres instead, and
+       was then flagged for the word appearing in the query text. */
+    if (/"?avatarUrl"?\s+IS\s+(NOT\s+)?NULL/i.test(src)) continue
     offenders.push(rel)
   }
   assert.deepEqual(

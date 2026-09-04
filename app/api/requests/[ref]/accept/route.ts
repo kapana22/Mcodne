@@ -155,7 +155,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
     topicLabel: topicLabel(offer.request.topic),
   })
   const emails = recipients.length
-    ? (await prisma.user.findMany({ where: { id: { in: recipients } }, select: { email: true } })).map(u => u.email)
+    // ⚠️ `.filter(Boolean)` IS THE PHONE-REGISTRATION CASE, NOT DEFENSIVENESS
+    // (2026-09-04). A provider who registered with a number has no address at
+    // all; they are reached by SMS and by the bell, and mailing `null` throws.
+    ? (await prisma.user.findMany({ where: { id: { in: recipients } }, select: { email: true } }))
+        .map(u => u.email).filter((e): e is string => !!e)
     : []
   after(async () => {
     for (const to of emails) {

@@ -23,6 +23,7 @@ import {
   earnedTasks, completeness, contactKey, contactRefundKey, jobDoneKey, adminAdjustReason,
   type CreditTaskKey, type ProfileFacts,
 } from '@/lib/credits'
+import { profileBlockers, faceFrom } from '@/lib/profileCompleteness'
 
 /** The balance, summed from the ledger. There is no counter to read instead. */
 export async function balanceOf(userId: string): Promise<number> {
@@ -58,6 +59,9 @@ export async function profileFacts(userId: string): Promise<ProfileFacts> {
       select: {
         about: true, services: true, areas: true, priceFrom: true, priceList: true, photoUrl: true, workPhotos: true,
         professions: true, yearsExp: true,
+        // For `notVisible` — a card with no category is in no list and reachable
+        // from no filter, so it is one of the five things that hide it.
+        categoryId: true,
         // ⚠️ SELECTED HERE SO NOBODY ELSE READS THE ROW. /work needs to know
         // whether this provider has ever saved their own service list (the
         // migration seeded it from their category), and tests/requestQueue §F
@@ -122,6 +126,17 @@ export async function profileFacts(userId: string): Promise<ProfileFacts> {
     // Not a task — see the type. A provider with no row at all has nothing to
     // confirm and is not nagged: the note only shows where a profile exists.
     servicesConfirmed: provider === null || provider.servicesConfirmedAt !== null,
+    // ⚠️ EMPTY WHEN THERE IS NO PROFILE AT ALL, not „everything is missing".
+    // Somebody with no row has not failed to finish a card, they have not
+    // started one, and /work must not open on a list of five gaps for a person
+    // who has never seen the editor.
+    notVisible: provider === null ? [] : profileBlockers({
+      hasFace: faceFrom(provider.photoUrl, user?.avatarUrl),
+      about: provider.about,
+      services: provider.services,
+      areas: provider.areas,
+      categoryId: provider.categoryId,
+    }),
   }
 }
 

@@ -376,12 +376,33 @@ export async function openRequestCount(
  * and routes to EVERYONE rather than to a filed specialist. So the narrowing
  * removes dead ends, not requests.
  *
- * The same pair every routing read uses: published AND available. A paused
- * provider is not supply.
+ * ⚠️ `available` ALONE, AND **NOT** `published` (2026-09-04). This was the pair
+ * every routing read uses, and on the day `published` became DERIVED from
+ * profile completeness (lib/profileCompleteness) that stopped being right —
+ * measured the same day, it would have deleted SIX topics from the client's
+ * form: clean-flat · clean-deep · clean-repair · clean-office · clean-sofa ·
+ * clean-window, the whole cleaning family, because the one profile covering
+ * them was missing a category.
+ *
+ * The two questions are different and only look alike:
+ *   · `published` — „is this CARD fit for a client to look at?"
+ *   · this        — „is there anybody here who could DO this work?"
+ *
+ * Somebody with an unfinished card can still do the job, still receives the
+ * request by SMS and mail (lib/requestJobs → notifyProviders reads
+ * `RequestAccess`, never `published`), and still sees it in their queue. Owner,
+ * 2026-09-04: „შეუვსებელს ოფერი უნდა მიდიოდეს ტელეფონზე და მეილზე რომ კლიენტი
+ * იშოვს და ინიციატივა ქონდეს." Narrowing HERE would have made that impossible
+ * in the only way that cannot be recovered from — not by silencing the
+ * notification, but by removing the topic so the request is never filed at all.
+ *
+ * `available` stays: a provider who has paused themselves has said they are not
+ * taking work, and that is their own answer rather than our judgement of their
+ * card.
  */
 export async function coveredTopicIds(): Promise<string[]> {
   const rows = await prisma.serviceProfile.findMany({
-    where: { published: true, available: true },
+    where: { available: true },
     select: { services: true },
   })
   return [...new Set(rows.flatMap(r => r.services))]

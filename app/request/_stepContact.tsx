@@ -63,7 +63,6 @@ export function StepContact({ draft, patch, signedIn, fault }: {
   const band = draft.kind ? bandOf(kind, draft.budgetBand) : undefined
   /** Opened by the reader, never by us. A textarea that appears on its own is
    *  the screen this replaced. */
-  const [open, setOpen] = useState(false)
   /** The same per-kind scaffold the old details screen used, kept as the
    *  PLACEHOLDER rather than inserted text: a pre-filled box reads as already
    *  answered and gets submitted with the blanks still in it. */
@@ -111,15 +110,20 @@ export function StepContact({ draft, patch, signedIn, fault }: {
         <Label htmlFor="req-contact-phone">ტელეფონის ნომერი</Label>
         <PhoneInput id="req-contact-phone" value={draft.phone} onChange={v => patch({ phone: v })} className={`${INPUT} ${bad('phone') ? FIELD_ERROR_BORDER : ''}`} required field={{ ...props('phone'), 'aria-describedby': describedBy('phone', 'req-contact-phone-hint') }} />
         {error('phone')}
-        {/* ⚠️ THE ANSWER TO „WHO WILL SEE IT" CHANGED ON 2026-08-21, so this
-            line had to. It said „ნომერს მხოლოდ ის ექსპერტი ნახავს, ვისაც შენ
-            აირჩევ" — true until that day, and false the moment the number
-            stopped being released to anybody (owner: „არ უჩანდეს ეგრევე
-            ტელეფონი"; see lib/requests → clientIdentityOpen). A promise about
-            somebody's phone number is the last sentence on a site allowed to
-            drift out of date, so it now says the one thing that is still true:
-            we are the only ones who use it, to check the request is real. */}
-        <Hint id="req-contact-phone-hint">ნომერს მხოლოდ ჩვენ ვიყენებთ — მოთხოვნის გადასამოწმებლად.</Hint>
+        {/* ⚠️ THE HINT UNDER THIS FIELD IS GONE (2026-09-04). Owner: „აი ასე
+            ჩაშლილად არ დაწერო არსად, წაშალე საერთოდ ეს ზედმეტი ინფო."
+
+            It read „ნომერს მხოლოდ ჩვენ ვიყენებთ — მოთხოვნის გადასამოწმებლად",
+            and it had already been rewritten once (2026-08-21) when the earlier
+            promise — „only the expert you choose will see it" — stopped being
+            true. The replacement was heading the same way: the number now
+            reaches a provider the moment the client presses „დარეკვა", and it
+            carries the request SMS, so „only we use it" was a sentence about to
+            need its third version.
+            A field labelled „ტელეფონის ნომერი" on a form that says who it is
+            for does not need a paragraph explaining itself. The line went
+            rather than getting rewritten a third time — which is also the
+            general instruction: no spelled-out reassurance under fields. */}
       </div>
 
       {/* ⚠️ THE EMAIL FIELD IS GONE (2026-09-03). Owner: „კონტაქტის ველიდან
@@ -141,49 +145,15 @@ export function StepContact({ draft, patch, signedIn, fault }: {
           its `MC-` reference until somebody registers. That was already true of
           every request written before 2026-08-17. */}
 
-      {/* ── The description, no longer worth a screen of its own ───────────
-          It WAS one — „დაამატებ დეტალებს?", a full step with a textarea and a
-          skip button. Measured on 19 real requests: 8 carried a description, so
-          58% walked through a whole screen to skip it. A step most people
-          advance past without typing is not an optional question, it is a tax
-          on everybody for the benefit of two in five.
-
-          Here it costs nothing when unused: one line, and the box only exists
-          once somebody asks for it. Whoever typed their need as a sentence on
-          step one already has it filled — `onFreeText` writes straight into
-          `description` — so for them it opens showing their own words. */}
-      {open || draft.directTo || draft.description.trim() !== '' ? (
-        <div className="block">
-          <label htmlFor="req-description" className="block text-small font-display font-semibold text-ink-800 mb-1.5">
-            {draft.directTo
-              /* ⚠️ WRITING TO ONE PERSON, THE MESSAGE IS THE REQUEST (2026-08-19).
-                 With nobody chosen the structured taps carry a quotable request
-                 and this field is a nicety; with a provider named, the taps are
-                 gone and this sentence is the only thing they receive. */
-              ? 'რა გჭირდება?'
-              : <>დეტალები <span className="font-normal text-ink-400">არასავალდებულო</span></>}
-          </label>
-          <textarea
-            id="req-description"
-            rows={4}
-            maxLength={4000}
-            value={draft.description}
-            onChange={e => patch({ description: e.target.value })}
-            placeholder={placeholder}
-            {...props('description')}
-            className={`w-full px-3.5 py-3 rounded-field border bg-white text-body text-ink-900 placeholder-ink-400 focus:ring-2 outline-none resize-y transition-colors duration-fast ${bad('description') ? FIELD_ERROR_BORDER : 'border-ink-200 focus:border-brand-500 focus:ring-brand-100'}`}
-          />
-          {error('description')}
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="self-start text-small font-display font-semibold text-brand-700 underline underline-offset-2"
-        >
-          დეტალების დამატება
-        </button>
-      )}
+      {/* ⚠️ THE DESCRIPTION FIELD LEFT THIS SCREEN (2026-09-04). It was a
+          collapsed optional line here — „დეტალები არასავალდებულო", opened by a
+          link — because on 2026-08-18 the measurement said 58% of people walked
+          past a whole screen without typing. It is now a REQUIRED screen of its
+          own before the budget (owner: „ცალკე უნდა იყოს ველი, დამატე,
+          გაზარდე"), so a second box for the same column here would be the same
+          question asked twice, and the second one would be the one nobody
+          expects to matter. `draft.description` is unchanged; only where it is
+          typed moved. */}
 
       <p className="pt-1 text-small text-ink-600">
         {/* ⚠️ „გადავამოწმებთ და" WENT ON 2026-09-03, and only that. A clean

@@ -1552,9 +1552,61 @@ async function runMigrations() {
       ON "MessageLog" ("createdAt" DESC)
       WHERE "channel" = 'sms' AND "ref" IS NOT NULL AND "delivery" IS DISTINCT FROM 1;`)
 
+  /* ── REGISTRATION BY PHONE (2026-09-04) ──────────────────────────────────
+     The executable twin of prisma/manual-migrations/2026-09-04-phone-auth/,
+     whose header carries the reasoning. Additive and standalone — it names only
+     "User", which every database here has, so it is safe this far down the set.
 
-
-
+     ⚠️ THE UNIQUE INDEX IS PARTIAL AND THAT IS WHY THIS BOOT SURVIVES. Measured
+     on production the day it was written: 27 accounts carry a phone and 25 are
+     distinct — TWO PAIRS COLLIDE. A plain unique index would abort, and this
+     file throws the WHOLE boot on one failed statement. A number typed into a
+     profile field is contact information and may honestly be shared; a number
+     somebody answered a code on is an identity and cannot be. Every existing
+     row starts unverified, so the index is empty the moment it exists. */
+  await prisma.$executeRawUnsafe(`ALTER TABLE "User" ALTER COLUMN "email" DROP NOT NULL;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "User" ALTER COLUMN "passwordHash" DROP NOT NULL;`)
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "phoneVerified" BOOLEAN NOT NULL DEFAULT false;`,
+  )
+  // ONE SPELLING for a Georgian mobile — lib/phone → canonicalPhone. The same
+  // number was stored three ways, which is what lib/sms's `phoneVariants` is
+  // for; a lookup list is a fine answer for a cutoff check and an impossible
+  // one for a unique index. Idempotent: the last clause makes a second run a
+  // no-op rather than a rewrite of every row.
+  await prisma.$executeRawUnsafe(`
+    UPDATE "User"
+       SET "phone" = '+995' || right(regexp_replace("phone", '\\D', '', 'g'), 9)
+     WHERE "phone" IS NOT NULL
+       AND regexp_replace("phone", '\\D', '', 'g') ~ '^(995)?5[0-9]{8}$'
+       AND "phone" <> '+995' || right(regexp_replace("phone", '\\D', '', 'g'), 9);`)
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "User_phone_verified_key"
+        ON "User" ("phone")
+     WHERE "phoneVerified" = true;`)
+  // The code that registers and signs somebody in. NOT `OtpCode`: that one
+  // hangs off a userId, and this code is sent to a number that the first time
+  // belongs to nobody. Stored hashed — it is the only credential a passwordless
+  // account has — and `attempts` is the brute-force floor lib/rateLimit cannot
+  // be, because that limiter is per-instance memory and resets on every deploy.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PhoneOtp" (
+      "id"         TEXT NOT NULL,
+      "phone"      TEXT NOT NULL,
+      "codeHash"   TEXT NOT NULL,
+      "attempts"   INTEGER NOT NULL DEFAULT 0,
+      "expiresAt"  TIMESTAMPTZ(6) NOT NULL,
+      "consumed"   BOOLEAN NOT NULL DEFAULT false,
+      "ticketHash" TEXT,
+      "createdAt"  TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "PhoneOtp_pkey" PRIMARY KEY ("id")
+    );`)
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "PhoneOtp_phone_createdAt_idx" ON "PhoneOtp" ("phone", "createdAt" DESC);`,
+  )
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "PhoneOtp_expiresAt_idx" ON "PhoneOtp" ("expiresAt");`,
+  )
 }
 
 /* ── the stamp: why the second boot costs two round-trips, not 166 ─────────── */

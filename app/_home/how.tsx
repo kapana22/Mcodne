@@ -133,7 +133,18 @@ export const FlowSteps = () => (
               alternative was rendering the step twice and hiding one. */}
           <div className="order-2 min-w-0 sm:contents">
             <div className="flex items-center sm:order-1">
-              <span className="font-display text-h3 font-extrabold tabular-nums leading-none tracking-[-0.02em] text-brand-200/45 sm:text-h2 lg:text-h1">
+              {/* ⚠️ aria-hidden, AND THAT IS THE FIX RATHER THAN A DARKER GREEN
+                  (2026-09-04). At `brand-200/45` on this band the number
+                  measured 1.74:1 against a 3.0 requirement for 22px text — so
+                  it was simultaneously unreadable to a low-vision reader AND
+                  announced to a screen reader, which is the worst of both.
+                  It is not information: the four TITLES carry the sequence
+                  („აღწერე" → „მიიღე" → „შეადარე" → „დაიწყე"), the block reads
+                  in order without it, and the same file already says so twenty
+                  lines up. So it is decoration, and decoration says so out
+                  loud. Darkening it instead would have made a number compete
+                  with the title beside it for no gain. */}
+              <span aria-hidden className="font-display text-h3 font-extrabold tabular-nums leading-none tracking-[-0.02em] text-brand-200/45 sm:text-h2 lg:text-h1">
                 {s.n}
               </span>
               {i < STEPS.length - 1 && <Connector />}
@@ -150,7 +161,21 @@ export const FlowSteps = () => (
                 „შეადარე" → „დაიწყე") and the sentence under each was the whole
                 reason the block was 635px and the words were wrapping to five
                 lines in a 139px column. */}
-            <p className="mt-1 hidden max-w-[16rem] text-body leading-[1.6] text-white/[0.72] text-pretty sm:order-4 sm:mt-0 sm:block">
+            {/* ⚠️ NO ALPHA AT ALL, AND THAT IS FORCED (2026-09-04). The
+                sentence was `text-white/[0.72]` and measured 3.29:1 against the
+                4.5 body text needs. The obvious fix is a higher alpha, and it
+                does not exist: this band's lightest stop is `brand-600`
+                (#26806E — the live gradient is radial, brand-600 → brand-700),
+                and white on brand-600 is 4.78:1 EXACTLY — that number is why
+                CLAUDE.md rule 2 makes brand-600 the floor for a filled brand
+                surface. Every point of transparency spends part of a margin
+                that is only 0.28 wide. Computed against that stop: .72→3.29,
+                .80→3.68, .86→3.99, .90→4.20, .95→4.48. Even 95% fails.
+                So the hierarchy has to come from somewhere other than opacity —
+                and it already did: the title above is `text-body-lg font-bold`
+                and this is `text-body` regular. Size and weight were carrying
+                it the whole time; the alpha added nothing but the failure. */}
+            <p className="mt-1 hidden max-w-[16rem] text-body leading-[1.6] text-white text-pretty sm:order-4 sm:mt-0 sm:block">
               <SiteText k={s.dk} />
             </p>
           </div>

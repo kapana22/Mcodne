@@ -59,9 +59,20 @@ test('every message names at least one channel, and mail is one of them today', 
     // Not a law — a statement of where the product is. SMS is an addition to a
     // letter, never the only way somebody hears something, because a third of
     // the people in the database have no Georgian mobile (measured 2026-09-02:
-    // 27 of 56 users, 20 of 26 active providers). Delete this the day that
-    // stops being true; do not delete it to make an SMS-only message pass.
-    assert.ok((d.channels as readonly string[]).includes('mail'), `${d.key} is SMS-only`)
+    // 27 of 56 users, 20 of 26 active providers).
+    //
+    // \u26a0\ufe0f NARROWED, NOT DELETED, ON 2026-09-04. The note here used to say
+    // „do not delete it to make an SMS-only message pass", and that instruction
+    // is kept for every message it was written about. `auth.phoneCode` is the
+    // one case it cannot describe: it is the code that REGISTERS somebody by
+    // phone, and its recipient is a nine-digit number that, the first time, has
+    // no account and therefore no address anywhere in the system. There is
+    // nothing to add a letter to. Any OTHER key appearing in this set is the
+    // drift the rule was written to catch.
+    const smsOnlyByNature = new Set(['auth.phoneCode'])
+    if (!smsOnlyByNature.has(d.key)) {
+      assert.ok((d.channels as readonly string[]).includes('mail'), `${d.key} is SMS-only`)
+    }
   }
 })
 
@@ -69,7 +80,10 @@ test('a code the recipient is waiting for is marked as one', () => {
   const credentials = OUTBOUND.filter(d => 'credential' in d).map(d => d.key)
   // If a new OTP-shaped message appears it belongs here, because `credential`
   // is what tells the admin tab never to render the body.
-  assert.deepEqual(credentials.sort(), ['auth.otpReset', 'auth.otpVerify', 'auth.passwordReset'])
+  // `auth.phoneCode` joined them on 2026-09-04. It is the strongest of the
+  // four: registration by phone is passwordless, so that code is not a second
+  // factor on top of a password, it IS the whole credential.
+  assert.deepEqual(credentials.sort(), ['auth.otpReset', 'auth.otpVerify', 'auth.passwordReset', 'auth.phoneCode'])
 })
 
 test('every audience and channel in use has a Georgian label', () => {
@@ -116,7 +130,14 @@ test('an ordinary message can be switched off, and SMS only where it is wired', 
   assert.equal(canToggle('request.verified.provider', 'sms'), true)
   // Not wired for SMS → no switch, because a control that does nothing when
   // you flip it is worse than no control (CLAUDE.md, on flags with no reader).
-  assert.equal(canToggle('request.done.client', 'sms'), false)
+  //
+  // ⚠️ THIS USED TO NAME `request.done.client`, AND THAT KEY GREW AN SMS. The
+  // assertion was pinning the ABSENCE of a feature rather than the rule, so
+  // wiring the text made a passing test fail while nothing at all was wrong.
+  // `auth.welcome` is mail-only because a welcome letter is the one message
+  // with nothing urgent in it, and a billed part cannot be justified for it.
+  // If that ever changes, re-point this line again rather than deleting it.
+  assert.equal(canToggle('auth.welcome', 'sms'), false)
   assert.equal(canToggle('nonsense.key', 'mail'), false)
 })
 
@@ -125,9 +146,21 @@ test('every message that offers an SMS switch actually sends one', () => {
   // working switch, so something must call sendSms with that key. A switch that
   // does nothing when you flip it is worse than no switch at all — the same
   // reasoning CLAUDE.md applies to a flag with no reader.
+  /* ⚠️ IT USED TO REQUIRE THE CALL ON ONE LINE, AND THAT IS NOT THE RULE
+     (fixed 2026-09-04). The check was `CODE.includes("sendSms({ key: 'x'")`,
+     which passes only for a call written flat. `request.done.client` is wired
+     — correctly, inside a guard, wrapped across lines the way every other
+     await in that handler is — and this failed anyway, reporting „nothing calls
+     sendSms" about a call sitting four lines below it. A pin that breaks on a
+     line wrap is pinning the formatting, not the behaviour (CLAUDE.md, on
+     regexes over source text being a last resort).
+
+     Asked as „does some `sendSms(` call name this key" instead: still a source
+     pin — nothing here can execute a send — but one that survives a reformat. */
+  const SENDS = [...CODE.matchAll(/sendSms\(\s*\{[^}]*?key:\s*'([^']+)'/g)].map(m => m[1])
   for (const d of OUTBOUND.filter(x => (x.channels as readonly string[]).includes('sms'))) {
     assert.ok(
-      CODE.includes(`sendSms({ key: '${d.key}'`),
+      SENDS.includes(d.key),
       `${d.key} lists sms but nothing calls sendSms({ key: '${d.key}' … })`,
     )
   }

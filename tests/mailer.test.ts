@@ -96,7 +96,12 @@ test('a recipient who was already here before the cutoff is held', async () => {
      SKIPS rather than fails when there is none, because a unit gate that turns
      red on a missing DATABASE_URL teaches people to ignore it. */
   const { prisma } = await import('../lib/prisma')
+  // ⚠️ `email: { not: null }` SINCE PHONE REGISTRATION (2026-09-04). The oldest
+  // account may now have no address at all, and this test is about the mailer's
+  // cutoff, not about who has one — it needs the oldest account THAT CAN BE
+  // MAILED.
   const existing = await prisma.user.findFirst({
+    where: { email: { not: null } },
     orderBy: { createdAt: 'asc' }, select: { email: true, createdAt: true },
   }).catch(() => null)
   if (!existing) { console.log('  (no database — skipped)'); return }
@@ -109,7 +114,7 @@ test('a recipient who was already here before the cutoff is held', async () => {
     { MAILER_MODE: 'send', MAIL_ONLY_AFTER: cutoff, RESEND_API_KEY: 're_test_key',
       GMAIL_USER: undefined, GMAIL_APP_PASSWORD: undefined },
     async () => {
-      const r = await sendMail({ ...LETTER, to: existing.email })
+      const r = await sendMail({ ...LETTER, to: existing.email! })
       assert.equal(r.mode, 'held-pre-existing',
         'an account that predates the cutoff was mailed anyway')
     },

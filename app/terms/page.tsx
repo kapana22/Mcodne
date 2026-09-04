@@ -169,7 +169,7 @@ export default function TermsPage() {
         </div>
 
         <div className="mt-12 pt-8 border-t border-ink-200 flex items-center justify-between gap-4 flex-wrap">
-          <Link href="/" className="inline-flex items-center min-h-[40px] sm:min-h-0 text-small text-brand-700 hover:text-brand-800 font-semibold">
+          <Link href="/" className="inline-flex items-center min-h-[40px] sm:min-h-[24px] text-small text-brand-700 hover:text-brand-800 font-semibold">
             ← მთავარზე დაბრუნება
           </Link>
           <div className="text-small text-ink-500">

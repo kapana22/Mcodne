@@ -16,6 +16,7 @@
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { syncPublished } from '@/lib/profilePublish'
 import { ensureDbReady } from '@/lib/dbBoot'
 import { requireRoleApi } from '@/lib/auth'
 import { after } from 'next/server'
@@ -217,6 +218,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       },
     })
   })
+
+  // ⚠️ APPROVAL NO LONGER PUBLISHES BY ITSELF (2026-09-04). `published` defaults
+  // to true on the column, so an approved profile used to go live whatever it
+  // held. It now goes live if and only if it is complete — and the four things
+  // `approvalBlockers` demanded of the APPLICATION are the same four
+  // `profileBlockers` asks of the PROFILE, so a clean approval still publishes
+  // immediately and nothing about the admin's day changes.
+  await syncPublished(app.userId)
 
   // Public URL slug — „/experts/giorgi-maisuradze" instead of the raw cuid.
   // Deliberately OUTSIDE the grant transaction and fully guarded: a slug is

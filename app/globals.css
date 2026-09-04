@@ -1118,7 +1118,34 @@ td, th, label, span {
   .offers-wrap { flex-direction: column; flex-wrap: nowrap; }
   .offers-list { display: contents; }
   .offers-detail { flex: 0 0 auto; }
+
+  /* ── THE CONVERSATION IS A SCREEN, NOT A DRAWER (2026-09-04) ────────────
+     Owner, on the accordion: „მესიჯი ქვევით ხოარ იშლებოდა, ცალკე იხნებოდა —
+     ესე ძალიან ცუდია, დიზაინშიც სხვანაირად გაქვს დახატული." The canvas
+     („კლიენტის მოთხოვნის ოთახი" → 3 · მიმოწერა) draws it as its own screen:
+     a back arrow, who you are talking to, the offer pinned above the thread.
+
+     Opening it below the card meant the composer arrived with the card above
+     it and the rest of the list below it — a band in the middle of a long
+     page rather than a place you went. So while a thread is open the cards
+     step aside and the pane has the screen.
+
+     ⚠️ THE CARDS ARE HIDDEN, NOT UNMOUNTED. `RequestChat` keeps its mount, its
+     stream and its unread receipts — the exact thing the `display: contents`
+     accordion was built to protect (rendering the pane twice means two mounts,
+     two streams and two of every receipt). Going back is a class change, so
+     nothing refetches and a half-typed message survives it.
+
+     WIDE SCREENS ARE UNTOUCHED. There the list is BESIDE the thread rather
+     than above it, nothing is being pushed anywhere, and a „back" to something
+     already on screen would be a control that lies — which is why the back
+     button lives inside this query too. */
+  .offers-room[data-thread='open'] .offers-list > * { display: none; }
+  .offers-room[data-thread='open'] .offers-back { display: flex; }
 }
+
+/* Off by default: the button only exists inside the query above. */
+.offers-back { display: none; }
 
 /* ── native number spinners are off, everywhere (2026-09-03) ───────────────
    9 `type="number"` fields across 5 files, and every one of them is a PRICE or

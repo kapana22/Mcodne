@@ -23,7 +23,7 @@
 import { z } from 'zod'
 // TYPE ONLY — lib/capabilities imports prisma and this file must not; see
 // `showRequestCta` below.
-import { phoneFormatError, normalizePhone } from '@/lib/phone'
+import { phoneFormatError, canonicalPhone } from '@/lib/phone'
 import { UNSTATED } from '@/lib/requestTopics'
 
 /* ── the routes the subsystem lives on ──────────────────────────────────── */
@@ -957,12 +957,27 @@ type ProviderContact = {
    *  reason it could not act would be a STRANGER'S balance, which is neither the
    *  client's business nor anything they could fix. */
   canCall?: boolean
+  /** A route URL for their face, or null — see lib/avatarSrc. NEVER the stored
+   *  `data:` value: this shape travels to the browser. */
+  avatar?: string | null
   /** The PUBLIC profile facts — what the client is entitled to see BEFORE
    *  choosing, because the profile page itself is public. The research point
    *  this carries: on every reference marketplace the client chooses by
    *  reviews, rating and profile, and an offer card reduced to a name forces
    *  them to choose by price alone. */
-  profile?: { slug: string | null; verified: boolean; rating: number; reviewsCount: number } | null
+  profile?: {
+    slug: string | null
+    verified: boolean
+    rating: number
+    reviewsCount: number
+    /* ⚠️ `headline` IS WHAT THE STAR STANDS IN FOR (2026-09-04). The research
+       point above is right and its instrument was wrong for THIS site:
+       measured that day, 0 of 28 profiles carry a rating and 0 reviews exist
+       in the database, while 25 of 28 have written a headline. Owner: „ჯერ
+       რაც არ გვაქვს არ გვინდა… რა ინფოც გვაქვს." So the line that says who
+       this person is comes from the one field they actually filled in. */
+    headline?: string | null
+  } | null
 }
 
 /** One offer, as the CLIENT is allowed to see it: PUBLIC profile facts, the
@@ -996,6 +1011,13 @@ export function clientOfferView(o: {
     // protects nothing and only degrades the choice.
     providerProfileHref: prof?.slug ? `/experts/${prof.slug}` : null,
     providerVerified: prof?.verified ?? false,
+    /** Their own one-liner. Null for the three who never wrote one, and the
+     *  card then draws nothing there rather than a placeholder. */
+    providerHeadline: prof?.headline?.trim() || null,
+    /** A face for the card. ALREADY a route URL, never the stored base64 —
+     *  the caller converts it with lib/avatarSrc, which is the rule that file
+     *  states in capitals. */
+    providerAvatar: o.provider.avatar ?? null,
     // Null below the platform's own display floor: a rating computed from one
     // review is noise wearing a number, and the browse surfaces hide it too.
     providerRating: prof && prof.reviewsCount >= 1 && prof.rating > 0 ? prof.rating : null,
@@ -1081,7 +1103,14 @@ export const ServiceRequestInput = z.object({
   // essay was double work standing exactly where forms die (the one field
   // that demands composition). The ceiling stays at 4000, matching
   // /api/contact.
-  description: z.string().trim().max(4000).optional().or(z.literal('')),
+  /* ⚠️ REQUIRED SINCE 2026-09-04, and required HERE and not only in the wizard.
+     Owner: „სავალდებულო უნდა იყოს რომ ტექსტი შეავსოს." The screen blocks an
+     empty box, but a screen is a courtesy and an endpoint is a contract — a
+     direct POST walked straight past it while this line said `.optional()`.
+     Twelve characters is the same floor `_model → stepComplete` applies, so the
+     two cannot disagree: about three Georgian words, enough to refuse a
+     keysmash and not enough to demand an essay. */
+  description: z.string().trim().min(12).max(4000),
   // The BAND id („l1", „p3"), never a typed figure. A person who does not know
   // what the work costs cannot type one, and free text would produce
   // „договорная" in four spellings. The numbers are resolved server-side from
@@ -1286,7 +1315,11 @@ export function serviceRequestRow(input: ServiceRequestInput) {
     contactName: input.contactName.trim(),
     // Stored normalised (digits + one leading +) so two people typing the same
     // number two ways produce one value an admin can actually dial or search.
-    phone: normalizePhone(input.phone),
+    // One spelling, the same rule as User.phone — lib/phone → canonicalPhone.
+    // Not a credential here, but the cutoff lookup in lib/sms and every future
+    // „is this the same person" join reads better with one shape than with the
+    // three-element IN list `phoneVariants` exists to paper over.
+    phone: canonicalPhone(input.phone),
     email: blank(input.email)?.toLowerCase() ?? null,
     /** Not a column — the caller resolves it to a real id before writing. */
     categorySlug: categorySlugOfTopic(input.topic),

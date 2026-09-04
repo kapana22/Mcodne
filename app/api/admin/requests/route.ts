@@ -130,16 +130,20 @@ export async function GET(req: Request) {
         orderBy: { createdAt: 'asc' },
         select: {
           href: true, createdAt: true,
-          user: { select: { id: true, fullName: true, email: true } },
+          user: { select: { id: true, fullName: true, email: true, phone: true } },
         },
       })
     : []
-  const notifiedByRequest: Record<string, { id: string; name: string; email: string; at: string }[]> = {}
+  // ⚠️ `email` IS NULLABLE SINCE PHONE REGISTRATION (2026-09-04). A provider
+  // who registered with a number has no address, and the tab prints their
+  // phone instead — see app/admin/_requests.tsx. Filling it with the phone
+  // under the name `email` would be a field that lies.
+  const notifiedByRequest: Record<string, { id: string; name: string; email: string | null; phone: string | null; at: string }[]> = {}
   for (const n of notified) {
     const r = requests.find(x => n.href?.includes(x.id))
     if (!r) continue
     ;(notifiedByRequest[r.id] ??= []).push({
-      id: n.user.id, name: n.user.fullName, email: n.user.email,
+      id: n.user.id, name: n.user.fullName, email: n.user.email, phone: n.user.phone,
       at: n.createdAt.toISOString(),
     })
   }

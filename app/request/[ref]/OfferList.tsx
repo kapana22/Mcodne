@@ -86,6 +86,11 @@ type Offer = {
   providerVerified: boolean
   providerRating: number | null
   providerReviews: number
+  /** Their own one-liner — see lib/requests → clientOfferView for why this,
+   *  and not a rating, is what says „who is this" on this site today. */
+  providerHeadline: string | null
+  /** A route URL, never the stored base64 — lib/avatarSrc. */
+  providerAvatar: string | null
   /** ⚠️ A BOOLEAN, NOT THE NUMBER. The digits are bought — see the header —
    *  and a string in these props would be readable by anybody who opened the
    *  page source, which would make the fee optional. False also when the
@@ -254,6 +259,22 @@ export function OfferList({ publicRef, statusWord, offers, matched, canReview, s
 
   const chatRef = useRef<HTMLDivElement | null>(null)
   const [chatNudge, setChatNudge] = useState(0)
+  /* ⚠️ THE CONVERSATION IS ITS OWN SCREEN ON A PHONE (2026-09-04). Owner,
+     looking at it: „მესიჯი ქვევით ხოარ იშლებოდა, ცალკე იხნებოდა — ესე ძალიან
+     ცუდია, დიზაინშიც სხვანაირად გაქვს დახატული."
+
+     They are right on both counts. The canvas draws the conversation as a
+     screen — a back arrow, who you are talking to, the offer pinned above the
+     thread — and the accordion turned it into a drawer that pushes the rest of
+     the list down the page. On a 390px screen that means the composer opens
+     with the card you came from still above it and four more offers still
+     below it, so the thing you tapped into is a middle band of a long page
+     rather than a place you went.
+
+     Wide screens keep the two panes: there the list is BESIDE the thread, not
+     above it, and nothing is being pushed anywhere. So this is one boolean and
+     a container query, not a second layout. */
+  const [threadOpen, setThreadOpen] = useState(false)
   useEffect(() => {
     if (chatNudge === 0) return
     /* CLAUDE.md §1 in the one place a Tailwind `motion-safe:` cannot reach —
@@ -320,13 +341,16 @@ export function OfferList({ publicRef, statusWord, offers, matched, canReview, s
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="font-display text-h1 font-extrabold leading-tight tracking-[-0.025em] text-balance sm:text-display">
+        {/* ⚠️ NOT AN `h1` ANY MORE, AND THE REFERENCE LINE IS GONE FROM HERE
+            (2026-09-04). The band above this list is now the page's heading and
+            already carries the state word and the `MC-` code — printing them
+            again three centimetres lower was the same two facts twice, which is
+            exactly what the canvas moved into the band to stop.
+            The count keeps its own line because it is the one thing the band
+            cannot say: how many people have answered. */}
+        <h2 className="font-display text-h2 font-bold leading-tight tracking-[-0.015em] text-balance text-ink-900">
           {offers.length} შეთავაზება მოვიდა
-        </h1>
-        {/* The reference stays on the page — small, `tabular-nums`, and read
-            down a phone when somebody calls us about this request. It was the
-            h1 once (2026-08-18: „ძალიან არაკომფორტულია"); it is meta now. */}
-        <p className="mt-2 text-meta tabular-nums text-ink-400">{statusWord} · {publicRef}</p>
+        </h2>
       </div>
 
       {error && (
@@ -356,7 +380,7 @@ export function OfferList({ publicRef, statusWord, offers, matched, canReview, s
           არაკომფორტულია შეიძლება დაიკარგოს ოფერი." It could: the pane sat
           after the WHOLE list, so tapping a card changed something two screens
           below and read as „nothing happened". */}
-      <div className="offers-room">
+      <div className="offers-room" data-thread={threadOpen ? 'open' : undefined}>
       <div className="offers-wrap flex flex-wrap items-stretch gap-4">
         <div className="offers-list flex flex-[1_1_320px] flex-col gap-2.5">
           {offers.map((o, i) => {
@@ -407,22 +431,44 @@ export function OfferList({ publicRef, statusWord, offers, matched, canReview, s
                   'no-caps flex w-full flex-col gap-2.5 px-4 pt-4 pb-3 text-left',
                 ].join(' ')}
               >
-                <span className="flex items-center gap-2">
-                  {/* The dot is the canvas's summary of „გადამოწმებული"; the
-                      WORD is in the pane beside the name. A colour alone would
-                      be a fact only a sighted reader gets, so the fact travels
-                      with it. */}
-                  <span aria-hidden className={`h-2 w-2 shrink-0 rounded-pill ${o.providerVerified ? 'bg-brand-500' : 'bg-ink-200'}`} />
-                  {o.providerVerified && <span className="sr-only">გადამოწმებული</span>}
-                  <span className={`min-w-0 flex-1 truncate font-display text-body-lg text-ink-900 ${o.unread > 0 ? 'font-extrabold' : 'font-bold'}`}>
-                    {o.providerName}
-                  </span>
-                  {o.unread > 0 && (
-                    <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-danger-500 px-1.5 text-micro font-bold tabular-nums text-white">
-                      {o.unread}
-                      <span className="sr-only"> წაუკითხავი</span>
+                {/* ── THE PERSON FIRST (2026-09-04, the canvas) ──────────
+                    ⚠️ THE ROW USED TO OPEN WITH A DOT AND A NAME, and the next
+                    thing under it was the price. That makes the client compare
+                    numbers, which is the one axis on which the cheapest offer
+                    always wins and nobody learns anything about who they are
+                    hiring. Owner, on the competitor's screen: the list should
+                    read as people who answered.
+
+                    A FACE and THEIR OWN LINE — not a rating: 0 of 28 profiles
+                    carry one and 0 reviews exist (measured 2026-09-04), so a
+                    star here would be an empty slot on the exact screen where
+                    trust is decided. 25 of 28 wrote a headline. */}
+                <span className="flex items-start gap-3">
+                  <Avatar src={o.providerAvatar ?? undefined} name={o.providerName} size={44} />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className={`min-w-0 flex-1 truncate font-display text-body-lg text-ink-900 ${o.unread > 0 ? 'font-extrabold' : 'font-bold'}`}>
+                        {o.providerName}
+                      </span>
+                      {/* The word travels with the mark: a colour alone is a
+                          fact only a sighted reader gets. */}
+                      {o.providerVerified && (
+                        <>
+                          <Icon.check aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-600" />
+                          <span className="sr-only">გადამოწმებული</span>
+                        </>
+                      )}
+                      {o.unread > 0 && (
+                        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-danger-500 px-1.5 text-micro font-bold tabular-nums text-white">
+                          {o.unread}
+                          <span className="sr-only"> წაუკითხავი</span>
+                        </span>
+                      )}
                     </span>
-                  )}
+                    {o.providerHeadline && (
+                      <span className="mt-0.5 block truncate text-meta text-ink-400">{o.providerHeadline}</span>
+                    )}
+                  </span>
                 </span>
 
                 <span className="flex flex-wrap items-baseline gap-2">
@@ -467,7 +513,7 @@ export function OfferList({ publicRef, statusWord, offers, matched, canReview, s
               <div className="flex items-center gap-2 border-t border-ink-75 px-3 py-2.5">
                 <button
                   type="button"
-                  onClick={() => { setSelId(o.id); setChatNudge(n => n + 1) }}
+                  onClick={() => { setSelId(o.id); setThreadOpen(true); setChatNudge(n => n + 1) }}
                   className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-btn border border-ink-200 bg-white text-small font-semibold text-ink-800 transition-colors duration-fast hover:border-ink-300 hover:bg-ink-50"
                 >
                   <Icon.chat aria-hidden className="h-4 w-4" />
@@ -515,6 +561,19 @@ export function OfferList({ publicRef, statusWord, offers, matched, canReview, s
           style={{ order: Math.max(0, offers.findIndex(o => o.id === sel.id)) * 2 + 1 }}
           className="offers-detail flex flex-[1_1_420px] flex-col overflow-hidden rounded-panel border border-ink-100 bg-white"
         >
+          {/* ── BACK. Drawn only while the thread has the screen to itself —
+              on a wide layout the list is right there beside it and a „back"
+              to something already visible is a control that lies. `offers-back`
+              is `display: none` until the container query turns it on. */}
+          <button
+            type="button"
+            onClick={() => setThreadOpen(false)}
+            className="offers-back no-caps h-12 w-full items-center gap-2 border-b border-ink-100 px-4 text-left font-display text-small font-semibold text-ink-700"
+          >
+            <Icon.chevL aria-hidden className="h-4 w-4" />
+            ყველა შეთავაზება
+          </button>
+
           <div className="flex flex-wrap items-start gap-4 border-b border-ink-100 px-5 py-5 sm:px-6">
             {/* No photo reaches this side — `clientOfferView` hands over the
                 name and the public profile facts and nothing else — so this is
@@ -525,13 +584,22 @@ export function OfferList({ publicRef, statusWord, offers, matched, canReview, s
                 <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-pill ${sel.providerVerified ? 'bg-brand-500' : 'bg-ink-200'}`} />
                 <span className="font-display text-h3 font-extrabold tracking-tight text-ink-900">{sel.providerName}</span>
               </div>
+              {/* ⚠️ THEIR OWN LINE, WHERE THE RATING USED TO BE (2026-09-04).
+                  The star was drawn from `ServiceProfile.rating` — a column
+                  NOTHING IN THE CODEBASE EVER WRITES. lib/offerLifecycle even
+                  documents a review as „moving" it; that sentence describes
+                  something that does not exist, so the guard `providerRating
+                  !== null` was permanently false and the slot was dead markup
+                  waiting on a number that could never arrive.
+                  What is there instead is the field 25 of 28 providers filled
+                  in themselves. Owner: „რა ინფოც გვაქვს."
+                  The rating comes back the day something computes it — the
+                  fields are still carried on the view for exactly that. */}
+              {sel.providerHeadline && (
+                <p className="mt-1 text-small leading-snug text-ink-600">{sel.providerHeadline}</p>
+              )}
               <p className="mt-1 text-small text-ink-500">
-                {/* Verified = the word the whole site uses; the rating only
-                    where reviews exist — a number from nothing is noise. */}
                 {sel.providerVerified && <span className="font-semibold text-brand-700">✓ გადამოწმებული · </span>}
-                {sel.providerRating !== null && (
-                  <span className="tabular-nums text-ink-700">★ {sel.providerRating.toFixed(1)} ({sel.providerReviews}) · </span>
-                )}
                 {sel.daysEstimate ? `${sel.daysEstimate} დღე` : 'ვადა შეთანხმებით'}
                 {sel.status !== 'SENT' && ` · ${OFFER_STATUS_LABEL[sel.status as OfferStatusName]}`}
               </p>

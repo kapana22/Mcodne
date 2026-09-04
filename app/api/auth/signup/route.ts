@@ -7,7 +7,7 @@ import { createSession, hashPassword } from '@/lib/auth'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { sendMail } from '@/lib/mailer'
 import { welcomeEmail } from '@/lib/emailTemplates'
-import { normalizePhone, phoneFormatError } from '@/lib/phone'
+import { canonicalPhone, phoneFormatError } from '@/lib/phone'
 import { ROLE } from '@/lib/roles'
 
 // NB: `role` is intentionally NOT accepted from the client. Every self-signup
@@ -68,7 +68,12 @@ export async function POST(req: Request) {
         email: emailLc,
         fullName: fullName.trim(),
         passwordHash: await hashPassword(password),
-        phone: normalizePhone(phone),
+        // ⚠️ CANONICAL, NOT MERELY NORMALISED (2026-09-04). `User.phone` is a
+        // CREDENTIAL now — a code answered on it signs somebody in — and the
+        // same number used to be storable three ways („555…", „995555…",
+        // „+995555…"), which no unique index can see through. lib/phone →
+        // canonicalPhone is the one spelling.
+        phone: canonicalPhone(phone),
         role: ROLE.USER,
       },
     })
@@ -85,10 +90,16 @@ export async function POST(req: Request) {
 
   // Welcome email — fire-and-forget so a mail hiccup never blocks signup, and
   // registration itself is NOT gated on it (no verification wall).
-  after(async () => {
-    const { subject, html } = await welcomeEmail(user.fullName)
-    await sendMail({ key: 'auth.welcome', to: user.email, subject, html }).catch(() => {})
-  })
+  // Narrowed, not asserted — this route always writes an address, but the
+  // column is nullable since phone registration and the compiler is the only
+  // thing that will notice if that ever stops being true here.
+  const welcomeTo = user.email
+  if (welcomeTo) {
+    after(async () => {
+      const { subject, html } = await welcomeEmail(user.fullName)
+      await sendMail({ key: 'auth.welcome', to: welcomeTo, subject, html }).catch(() => {})
+    })
+  }
 
   return NextResponse.json({ ok: true, role: user.role, userId: user.id })
 }

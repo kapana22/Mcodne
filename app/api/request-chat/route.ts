@@ -260,7 +260,7 @@ export async function POST(req: Request) {
         const emails = r.providerUserIds.length
           ? (await prisma.user.findMany({
               where: { id: { in: r.providerUserIds } }, select: { email: true },
-            })).map(u => u.email)
+            })).map(u => u.email).filter((e): e is string => !!e)
           : []
         const mail = await requestChatEmail({
           toProvider: true,

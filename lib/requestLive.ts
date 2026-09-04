@@ -124,13 +124,7 @@ export async function requestLiveStatus(ref: string): Promise<RequestLiveStatus 
   // Six, ordered the way the catalogue orders itself: verified first, then
   // rating. More than six is a directory, and this screen is not one.
   const [notified, expertsInField, experts] = await Promise.all([
-    // Literally „who did we tell" — one Notification row per provider, written
-    // by lib/requestJobs when the request was routed. Counting the rows rather
-    // than recomputing the audience means this can never claim somebody was
-    // told who was not. `type` is named so the count rides the `[type, href]`
-    // index (lib/requestJobs writes exactly this pair) — this runs on every
-    // stream tick, so a sequential scan here would be one per open room.
-    prisma.notification.count({ where: { type: 'GENERIC', href: `${PROVIDER_ROUTE}/requests/${r.id}` } }),
+    requestNotifiedCount(r.id),
     // Everyone filed under this sphere, by the same filter the admin panel
     // lists candidates with (`available: true`). Not „online", not „looking" —
     // „this many exist", which is the honest and more useful number.
@@ -162,17 +156,7 @@ export async function requestLiveStatus(ref: string): Promise<RequestLiveStatus 
     // since stage 5, and it is now the ONLY profile — so the cards are drawn
     // for whoever covers the sphere, which is what the count beside them
     // already measured.
-    r.categoryId
-      ? prisma.serviceProfile.findMany({
-          where: { categoryId: r.categoryId, available: true, published: true },
-          orderBy: [{ verified: 'desc' }, { rating: 'desc' }],
-          take: 6,
-          select: {
-            id: true, slug: true, verified: true, rating: true, headline: true,
-            user: { select: { id: true, fullName: true, avatarUrl: true } },
-          },
-        })
-      : Promise.resolve([]),
+    suggestedProfiles(r.categoryId),
   ])
 
   // The addressed state, resolved once here so no screen has to reconstruct it
@@ -260,4 +244,58 @@ export async function requestLiveMark(ref: string): Promise<RequestLiveMark | nu
     status: [r.status, r.offerCount, r._count.offers, notified, r.updatedAt.getTime()].join('|'),
     messages: [r.messages[0]?.id ?? '', r._count.messages, staff > 0 ? 1 : 0].join('|'),
   }
+}
+
+/* ═══════════ the two facts the client's own room prints ═══════════════════
+ *
+ * ⚠️ EXPORTED SO THERE IS ONE DEFINITION, NOT TWO (2026-09-04). The request
+ * room (app/request/[ref]/_room) draws „N ექსპერტს გაეგზავნა" and the list of
+ * people the client can write to first, straight from the owner's canvas. Both
+ * numbers were already computed HERE for the live stream, and copying either
+ * query into the loader is how the two screens start disagreeing about who was
+ * told — the stream saying six and the page saying five, with no way to tell
+ * which is lying.
+ */
+
+/**
+ * Literally „who did we tell" — one Notification row per provider, written by
+ * lib/requestJobs when the request was routed. Counting the ROWS rather than
+ * recomputing the audience means this can never claim somebody was told who
+ * was not.
+ *
+ * `type` is named so the count rides the `[type, href]` index (lib/requestJobs
+ * writes exactly this pair) — the stream asks it on every tick, so a sequential
+ * scan here would be one per open room.
+ */
+export function requestNotifiedCount(requestId: string): Promise<number> {
+  return prisma.notification.count({
+    where: { type: 'GENERIC', href: `${PROVIDER_ROUTE}/requests/${requestId}` },
+  })
+}
+
+/**
+ * Up to six providers the client may write to before anybody has bid — the
+ * canvas's „შესაფერისი ექსპერტები".
+ *
+ * ⚠️ `published` IS REQUIRED HERE AND IS NOT A COPY-PASTE. This list draws
+ * CARDS at a client, which is exactly the surface the completeness gate exists
+ * for (lib/profileCompleteness): an unfinished card must not be offered to
+ * somebody choosing who to hire. That is the opposite of `coveredTopicIds`,
+ * which asks „could anybody DO this" and must NOT narrow on it — the two
+ * questions look alike and are not.
+ *
+ * Ordered the way the catalogue orders itself. More than six is a directory,
+ * and this screen is not one.
+ */
+export function suggestedProfiles(categoryId: string | null) {
+  if (!categoryId) return Promise.resolve([])
+  return prisma.serviceProfile.findMany({
+    where: { categoryId, available: true, published: true },
+    orderBy: [{ verified: 'desc' }, { rating: 'desc' }],
+    take: 6,
+    select: {
+      id: true, slug: true, verified: true, rating: true, headline: true, priceFrom: true,
+      user: { select: { id: true, fullName: true, avatarUrl: true } },
+    },
+  })
 }

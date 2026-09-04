@@ -3,6 +3,7 @@ import sharp from 'sharp'
 import { getCurrentUser } from '@/lib/auth'
 import { rateLimit } from '@/lib/rateLimit'
 import { prisma } from '@/lib/prisma'
+import { syncPublished } from '@/lib/profilePublish'
 
 export const runtime = 'nodejs'
 
@@ -181,6 +182,9 @@ export async function POST(req: Request) {
       where: { userId: user.id, NOT: { photoUrl: null } },
       data: { photoUrl: null },
     })
+    // A face is one of the five things `published` is computed from, and this
+    // route is one of the two places one can appear. See lib/profilePublish.
+    await syncPublished(user.id)
     return NextResponse.json({ ok: true, url: dataUrl })
   }
   return NextResponse.json({ ok: true, url: dataUrl, fileName: file.name, size: outBuf.length, type: outType })

@@ -167,7 +167,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       <MarketingTopBar />
 
       <Container as="main" size="content" className="py-12 lg:py-16">
-        <Link href="/blog" className="inline-flex items-center gap-1.5 min-h-[40px] sm:min-h-0 text-small text-ink-500 hover:text-ink-800 transition-colors duration-fast">
+        <Link href="/blog" className="inline-flex items-center gap-1.5 min-h-[40px] sm:min-h-[24px] text-small text-ink-500 hover:text-ink-800 transition-colors duration-fast">
           <Icon.back className="w-3.5 h-3.5" /> ბლოგი
         </Link>
 

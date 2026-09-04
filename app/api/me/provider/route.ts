@@ -19,6 +19,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { syncPublished } from '@/lib/profilePublish'
 import { getCurrentUser } from '@/lib/auth'
 import { firstGeorgianMessage, georgianRefine } from '@/lib/georgianText'
 import { ASSIGNABLE_CATEGORY_WHERE } from '@/lib/categoryTree'
@@ -179,5 +180,7 @@ export async function PATCH(req: Request) {
     data,
     omit: { photoUrl: true, workPhotos: true },
   })
+  // Second writer of the same columns as the full editor — same recompute.
+  await syncPublished(user.id)
   return NextResponse.json({ ok: true, profile: updated })
 }

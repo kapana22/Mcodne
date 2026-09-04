@@ -78,3 +78,29 @@ export function formatPhone(raw: string | null | undefined): string {
   }
   return v
 }
+
+/**
+ * THE ONE SHAPE A NUMBER IS STORED AND COMPARED IN — „+995555123456".
+ *
+ * ⚠️ IT EXISTS BECAUSE THE SAME PHONE WAS STORED THREE WAYS. `normalizePhone`
+ * strips punctuation and stops there, so „555123456", „995555123456" and
+ * „+995555123456" are one person's number in three rows that no `findUnique`
+ * can join. lib/sms carries `phoneVariants` — a three-element `IN` list — for
+ * exactly that reason, and a lookup list is a workable answer for a cutoff
+ * check and an impossible one for a UNIQUE INDEX.
+ *
+ * Since 2026-09-04 a phone is a CREDENTIAL (a code sent to it signs somebody
+ * in), and a credential that three strings can spell is not one. Everything
+ * that writes a phone writes this; the partial unique index in lib/dbBoot
+ * enforces it for verified numbers.
+ *
+ * Non-Georgian numbers pass through as `normalizePhone` left them: they already
+ * carry their country code (phoneFormatError refuses them otherwise) and
+ * guessing one onto them would dial the wrong country.
+ */
+export function canonicalPhone(raw: string | null | undefined): string {
+  const v = normalizePhone(raw)
+  if (!v) return ''
+  if (!isGeorgianMobile(v)) return v
+  return `+995${v.replace(/^\+?995/, '')}`
+}

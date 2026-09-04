@@ -37,7 +37,7 @@
 import { prisma } from '@/lib/prisma'
 import { ensureDbReady } from '@/lib/dbBoot'
 import {
-  clientOfferView, kindOf,
+  clientOfferView, kindOf, KIND,
   budgetLabel, timingLabel, formatLabel, cityLabel, topicLabel, extrasLabels,
   timeAgoKa, UNSTATED,
 } from '@/lib/requests'
@@ -49,7 +49,10 @@ import { callableProviders } from '@/lib/creditsServer'
 import { contactCostTetri } from '@/lib/credits'
 import { LiveRefresh } from '../_liveRefresh'
 import { OfferList } from './OfferList'
-import { WaitingRoom } from './_waiting'
+import { WaitingRoom, type SuggestedExpert } from './_waiting'
+import { RequestHero } from './_hero'
+import { requestNotifiedCount, suggestedProfiles } from '@/lib/requestLive'
+import { avatarSrc } from '@/lib/avatarSrc'
 
 /* ⚠️ THE CLIENT'S WORD FOR THE STATE, NOT THE ADMIN'S. `STATUS_LABEL`
    (lib/requests) is documented as „the admin's words for each state" and says
@@ -95,6 +98,24 @@ export type RequestRoomData = {
   live: boolean
   description: string
   brief: string[]
+  /* ── THE BAND (2026-09-04, the canvas) ─────────────────────────────────
+     ⚠️ THE SERVICE IS THE ACCENT AND `brief` IS NO LONGER THE OPENING OF THIS
+     SCREEN. Owner: „უბრალოდ სერვისი იყოს მთავარი აქცენტი." `service` is the
+     topic label in the largest type on the page; `facts` are the two or three
+     values that qualify it. `brief` stays — the offer screens still print the
+     full brief — but it is not what the reader meets first. */
+  service: string
+  facts: string[]
+  /** The brief MINUS whatever the band already prints — the budget, the
+   *  deadline and the clarifying answers. Deduped rather than dropped: see
+   *  the note where it is built. */
+  briefRest: string[]
+  /** How many providers were actually TOLD — counted rows, never an estimate
+   *  (lib/requestLive → requestNotifiedCount). */
+  notified: number
+  /** People the client may go and read while nobody has answered. Empty for a
+   *  request with no category, and drawn as nothing rather than as a hole. */
+  suggested: SuggestedExpert[]
   /** The one line under the waiting headline. Wording is state-dependent and
    *  is decided in the loader, so the component states no policy about it. */
   note: string
@@ -133,6 +154,13 @@ export async function loadRequestRoom(
       kind: true, topic: true, details: true,
       budgetMin: true, budgetMax: true, budgetUnit: true,
       timing: true, format: true, city: true, createdAt: true,
+      // ⚠️ FOR THE BAND AND FOR WHO IS SUGGESTED (2026-09-04, the canvas). The
+      // category names the sphere on the hero and is the key
+      // `suggestedProfiles` matches on; a request with none simply draws no
+      // sphere chip and gets no suggestions, which is honest — see
+      // lib/requestLive.
+      categoryId: true,
+      category: { select: { name: true } },
       // `adminNote` is deliberately NOT selected. It is the operator's own
       // scratch note about this person and their call — the one column on the
       // row that must never reach the person it is about.
@@ -164,6 +192,11 @@ export async function loadRequestRoom(
               id: true,
               // NAME + the public profile facts.
               fullName: true,
+              // ⚠️ READ AND CONVERTED, NEVER PASSED THROUGH. It is a base64
+              // `data:` URI; `avatarSrc` turns it into the cacheable route URL
+              // below and the bytes never reach the browser. Bounded here in a
+              // way a catalogue is not — `offerLimit` is 1–3.
+              avatarUrl: true,
               // ⚠️ READ, AND NEVER RENDERED (2026-09-03). It is here to answer
               // ONE boolean — „is there a number to ring at all" — which the
               // card needs before it may draw „დარეკვა". The number itself does
@@ -176,7 +209,11 @@ export async function loadRequestRoom(
               // The PUBLIC profile facts for the offer card — slug, verified,
               // rating. Public by definition (/experts/[slug] shows them to
               // anyone), so this widens nothing the seal protects.
-              serviceProfile: { select: { slug: true, verified: true, rating: true, reviewsCount: true } },
+              // ⚠️ `headline` JOINED THEM ON 2026-09-04 AND IT IS THE POINT OF
+              // THE NEW CARD. 25 of 28 providers have written one; 0 have a
+              // rating. It is the one line that says „who is this" on a screen
+              // where the star it stands in for does not exist yet.
+              serviceProfile: { select: { slug: true, verified: true, rating: true, reviewsCount: true, headline: true } },
             },
           },
           company: { select: { name: true } },
@@ -229,6 +266,17 @@ export async function loadRequestRoom(
     contactCostTetri(request.budgetMin, request.budgetMax),
   )
 
+  /* ── WHO WE TOLD, AND WHO THEY CAN READ WHILE WAITING ──────────────────
+     Both asked from lib/requestLive, which is where the live stream asks them
+     — one definition, so the page and the stream can never disagree about how
+     many people were told. Asked ONLY while nobody has answered: once there
+     are offers the screen has better things to show, and two queries per room
+     view for a block that is not drawn is pure cost. */
+  const waiting = request.offers.length === 0 && request.status !== 'CLOSED' && request.status !== 'REJECTED'
+  const [notified, suggestedRows] = waiting
+    ? await Promise.all([requestNotifiedCount(request.id), suggestedProfiles(request.categoryId)])
+    : [0, [] as Awaited<ReturnType<typeof suggestedProfiles>>]
+
   const kind = kindOf(request.kind)
 
   /* ── The brief, as chips ──────────────────────────────────────────────────
@@ -256,6 +304,15 @@ export async function loadRequestRoom(
     ...(request.format !== 'ONLINE' ? [cityLabel(request.city)] : []),
   ].filter((v): v is string => typeof v === 'string' && v.trim() !== '')
 
+  /* The band's own chips. No labels: „ქალაქი: თბილისი" is two words of
+     scaffolding around a fact the client typed. An ONLINE request gets no city
+     chip, for the same reason `brief` drops one. */
+  const bandFacts = [
+    request.category?.name ?? null,
+    request.format !== 'ONLINE' ? cityLabel(request.city) : null,
+    kind === 'SERVICE' ? null : KIND[kind].label,
+  ].filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+
   return {
     publicRef: request.publicRef,
     ownerUserId: request.userId,
@@ -266,6 +323,34 @@ export async function loadRequestRoom(
     live: request.status === 'NEW' || request.status === 'VERIFIED',
     description: request.description,
     brief,
+    // The SERVICE — the accent, and the largest type on the screen.
+    service: topicLabel(request.topic),
+    facts: bandFacts,
+    /* ⚠️ WHAT THE BAND DOES NOT ALREADY SAY — AND IT MUST STILL BE SAID
+       (2026-09-04). Moving the header into the hero nearly dropped this
+       entirely: the old waiting screen printed the whole brief in a „შენი
+       მოთხოვნა" card, the new one has a band that carries the service, the
+       sphere and the city — and the BUDGET, the DEADLINE and every clarifying
+       answer the client typed were left computed and rendered nowhere.
+       Porting a canvas is not permission to lose a screen's function.
+
+       So the brief is kept and DEDUPED against the band rather than repeated
+       under it: what survives is exactly the facts the header cannot show. */
+    briefRest: brief.filter(b => b !== topicLabel(request.topic) && !bandFacts.includes(b)),
+    notified,
+    suggested: suggestedRows.map(p => ({
+      id: p.id,
+      href: `/experts/${p.slug ?? p.id}`,
+      name: p.user?.fullName ?? 'ექსპერტი',
+      headline: p.headline,
+      verified: p.verified,
+      // ⚠️ NULL WHEN THEY HAVE NOT PRICED ANYTHING, and the row then prints
+      // nothing there. „0₾-დან" would be a number we invented for somebody.
+      priceFrom: p.priceFrom && p.priceFrom > 0 ? p.priceFrom : null,
+      // Through the route, never the column: `User.avatarUrl` is a base64 data
+      // URI and passing it raw is what made /experts half a megabyte of HTML.
+      avatar: p.user ? avatarSrc(p.user.id, p.user.avatarUrl) : null,
+    })),
     note:
       request.status === 'VERIFIED'
         // ⚠️ NOT „ექსპერტები ხედავენ" (2026-08-18). Present tense claiming
@@ -282,6 +367,7 @@ export async function loadRequestRoom(
           provider: o.expertUser
             ? {
                 name: o.expertUser.fullName,
+                avatar: avatarSrc(o.expertUser.id, o.expertUser.avatarUrl),
                 canCall: !!o.expertUser.phone && callable.has(o.expertUser.id),
                 profile: o.expertUser.serviceProfile
                   ? {
@@ -289,6 +375,7 @@ export async function loadRequestRoom(
                       verified: o.expertUser.serviceProfile.verified,
                       rating: o.expertUser.serviceProfile.rating,
                       reviewsCount: o.expertUser.serviceProfile.reviewsCount,
+                      headline: o.expertUser.serviceProfile.headline,
                     }
                   : null,
               }
@@ -296,7 +383,7 @@ export async function loadRequestRoom(
                /api/provider/requests/[id]/contact already makes: the ledger is
                keyed on a USER, so there is nobody to charge. No company holds
                active access today. The card draws one button instead of two. */
-            : { name: o.company?.name ?? '—', canCall: false, profile: null },
+            : { name: o.company?.name ?? '—', avatar: null, canCall: false, profile: null },
         }),
       )
       .map(o => ({
@@ -392,20 +479,41 @@ export function RequestRoom({
           fallback; both go through router.refresh(). Same condition. */}
       {data.live && <LiveRefresh publicRef={data.publicRef} />}
 
-      {data.over && (
-        <p className="text-body text-ink-600">
-          {data.status === 'REJECTED' ? 'ამ მოთხოვნაზე ვერ დაგეხმარებით.' : 'მოთხოვნა დახურულია.'}
+      {/* ═══ THE SERVICE — the accent, above every state ═══
+          ⚠️ ONE BAND FOR ALL THREE SCREENS (2026-09-04, the canvas). It used to
+          be that each screen opened with its own headline about US („ვეძებთ
+          შენთვის ექსპერტს", „შეთავაზებები"), so a client with three open
+          requests could not tell at a glance WHICH one they were looking at.
+          The service name answers that in one line and never moves. */}
+      <RequestHero
+        service={data.service}
+        statusWord={data.statusWord}
+        publicRef={data.publicRef}
+        facts={data.facts}
+        tone={data.live ? 'live' : 'settled'}
+        sub={data.over
+          ? (data.status === 'REJECTED' ? 'ამ მოთხოვნაზე ვერ დაგეხმარებით.' : 'მოთხოვნა დახურულია.')
+          : null}
+      />
+
+      {/* ⚠️ THE CLIENT'S OWN WORDS, UNDER THE BAND AND NOT IN IT. They are the
+          longest thing on the page and the one part the reader already knows;
+          the band states what this is, and the description stays available
+          without being the first thing they meet. */}
+      {data.description && !data.over && (
+        <p className="mt-4 whitespace-pre-wrap text-body leading-relaxed text-ink-600">
+          {data.description}
         </p>
       )}
 
       {/* ═══ 1 · ლოდინი ═══ */}
       {!data.over && data.offers.length === 0 && (
+        <div className="mt-6">
         <WaitingRoom
-          statusWord={data.statusWord}
-          publicRef={data.publicRef}
-          description={data.description}
-          brief={data.brief}
+          notified={data.notified}
           note={data.note}
+          brief={data.briefRest}
+          suggested={data.suggested}
         >
           {/* ── The way out ───────────────────────────────────────────────
               ⚠️ ONLY THE OWNER, AND ONLY BEFORE ANYBODY HAS OFFERED
@@ -422,12 +530,14 @@ export function RequestRoom({
             <CancelRequest publicRef={data.publicRef} />
           )}
         </WaitingRoom>
+        </div>
       )}
 
       {/* ═══ 2 · შეთავაზებები · 3 · დახურვა ═══
           One component, because the second screen is reached FROM the first and
           the selection has to survive the move — see OfferList. */}
       {data.offers.length > 0 && (
+        <div className="mt-6">
         <OfferList
           publicRef={data.publicRef}
           statusWord={data.statusWord}
@@ -436,6 +546,7 @@ export function RequestRoom({
           canReview={data.canReview}
           selectedOfferId={selectedOfferId}
         />
+        </div>
       )}
 
       {/* ── The experts the client wrote to first ───────────────────────────

@@ -1886,6 +1886,48 @@ test('every direction has a description template', () => {
   }
 })
 
+test('going back to change the topic does not throw the draft away', () => {
+  /* ⚠️ THE BUG THIS PINS SHIPPED AND THE OWNER FOUND IT (2026-09-04): „ბოლოში
+     მივდივარ და უკან რაიმეს შესწორება მინდა — უკან შლის ყველაფერს."
+
+     `onClearTopic` — the „change" control on screen one — calls
+     `withTopic(d, '')`, and an empty id has no kinds, so the „is the old kind
+     still possible?" branch answered no and wiped kind, budgetBand, timing and
+     details. Somebody who reached the contact screen, came back to fix one word
+     and tapped change lost the band and the date before choosing anything new.
+
+     What is pinned is the RULE, not the fix: clearing the topic clears the
+     topic, and the decision about what the old answers are still worth belongs
+     to the next pick — which must still clear an incompatible kind. Both halves
+     are asserted, because a change that only satisfies the first would let a
+     PROJECT band survive onto a LEARNING run. */
+  const { withTopic, withKind, EMPTY_DRAFT } =
+    require('../app/request/_model') as typeof import('../app/request/_model')
+
+  let full = withTopic(EMPTY_DRAFT, 'contract')
+  full = withKind(full, 'PROJECT')
+  full = { ...full, description: 'ხელშეკრულების შედგენა მჭირდება', budgetBand: 'p2', timing: 'two_weeks' }
+
+  const cleared = withTopic(full, '')
+  assert.equal(cleared.topic, '', 'the topic was not cleared')
+  assert.equal(cleared.kind, 'PROJECT', 'clearing the topic threw the kind away')
+  assert.equal(cleared.budgetBand, 'p2', 'clearing the topic threw the budget away')
+  assert.equal(cleared.timing, 'two_weeks', 'clearing the topic threw the date away')
+  assert.equal(cleared.description.length, full.description.length, 'clearing the topic threw the brief away')
+
+  // Coming back to the same answer restores a complete draft.
+  const same = withTopic(cleared, 'contract')
+  assert.equal(same.kind, 'PROJECT')
+  assert.equal(same.budgetBand, 'p2')
+  assert.equal(same.timing, 'two_weeks')
+
+  // …and the other half still holds: a topic that cannot carry the old kind
+  // resets what was keyed to it.
+  const other = withTopic(cleared, 'chemistry')
+  assert.notEqual(other.kind, 'PROJECT', 'an incompatible topic kept the old kind')
+  assert.notEqual(other.budgetBand, 'p2', 'a PROJECT band survived onto a LEARNING run')
+})
+
 test('the run is one question per screen, derived from the draft', () => {
   // The reference model (owner, 2026-08-17): profi-style single-question
   // screens, the kind folding away when the topic answers it, free text
@@ -1959,9 +2001,25 @@ test('the run is one question per screen, derived from the draft', () => {
      არის ჩამოშლილი ამას ვგულისხმობ… დაყო ცალკე გვერდებად." Chemistry asks two
      — who it is for, and what level — so its run is seven. See stepsFor for
      what the merge was right about and what it cost. */
+  /* ⚠️ „details" IS BACK, AS A REQUIRED SCREEN (2026-09-04) — and the line
+     under this one used to assert its ABSENCE. Owner: „სავალდებულო უნდა იყოს
+     რომ ტექსტი შეავსოს… ცალკე უნდა იყოს ველი, დამატე, გაზარდე."
+     The 2026-08-18 measurement that removed it (8 descriptions in 19 requests,
+     „58% walked through a whole screen to skip it") was an argument about an
+     OPTIONAL screen and it is not being disputed. A required one is a different
+     object: nobody walks past it, and what it collects is the only thing on the
+     run a provider can quote against — every other answer is a tap naming a
+     CATEGORY of job rather than the job. On a platform where the provider pays
+     to reach the lead, the sentence is what they are buying. */
+  /* ⚠️ „details" SITS SECOND-TO-LAST, NOT SECOND (moved 2026-09-04, the same
+     day it was added). It first followed „what" directly — a sphere tapped and
+     then a ten-row empty box — and the owner moved it: „ბოლოსკენ, ან ლოგიკურად
+     სწორად როცა ჯდება." Cheap taps first, the writing once something is
+     invested; before „contact", because asking somebody to write after they
+     have given their number is asking them to work for a finished form. */
   assert.deepEqual(chemRun,
-    ['what', 'budget', 'extra:audience', 'extra:level', 'timing', 'format', 'contact'])
-  assert.ok(!chemRun.includes('details'), 'the free-text screen came back')
+    ['what', 'budget', 'extra:audience', 'extra:level', 'timing', 'format', 'details', 'contact'])
+  assert.ok(chemRun.includes('details'), 'the required brief screen went missing')
 
   // An ambiguous topic no longer earns a screen — it is answered on screen one.
   /* An ambiguous topic lists the budget screen too, before the kind that
@@ -1969,7 +2027,7 @@ test('the run is one question per screen, derived from the draft', () => {
      denominator still. See the note at the `else` in stepsFor. */
   const con = withTopic(EMPTY_DRAFT, 'contract')
   assert.deepEqual(stepsFor(con).map(st => st.id),
-    ['what', 'budget', 'timing', 'format', 'contact'])
+    ['what', 'budget', 'timing', 'format', 'details', 'contact'])
   // A clarifier screen is OPTIONAL and says so — it is the only kind of screen
   // in the run besides the photos that may be walked past.
   for (const st of stepsFor(chem)) {
@@ -2022,9 +2080,15 @@ test('the run is one question per screen, derived from the draft', () => {
          replacement is the FORMULA — a step that appears for some kinds and not
          others still fails here, because the only thing allowed to vary is the
          clarifier count. */
+      /* ⚠️ THE CONSTANT WENT 5 → 6 ON 2026-09-04, and the sixth is „details" —
+         the required brief (owner: „სავალდებულო უნდა იყოს რომ ტექსტი
+         შეავსოს"). The formula is what is pinned, not the number: the only
+         thing allowed to vary between runs is the clarifier count, and a step
+         that appears for some kinds and not others still fails here. */
       const clarifiers = run.filter(id => id.startsWith('extra:')).length
-      assert.equal(run.length, 5 + clarifiers,
+      assert.equal(run.length, 6 + clarifiers,
         `${t.id} runs in ${run.length} screens with ${clarifiers} clarifiers`)
+      assert.ok(run.includes('details'), `${t.id} can be sent without a word typed`)
       assert.ok(clarifiers <= 2, `${t.id} asks ${clarifiers} clarifiers — the run is getting long`)
       assert.ok(run.includes('budget'), `${t.id} is never asked what it can spend`)
       // ⚠️ THE SKIPPED SCREEN MUST NOT LEAVE A WRONG ANSWER BEHIND. The draft
@@ -2054,16 +2118,24 @@ test('the run is one question per screen, derived from the draft', () => {
   // Resume lands on the frontier: a draft holding only its topic resumes at the
   // first unanswered question — the budget band since 2026-09-03, which is the
   // screen that now sits directly after „what".
+  /* „details" since 2026-09-04 — it is now the screen directly after „what",
+     so a draft holding only its topic resumes on the brief. */
+  /* Back to „budget": „details" moved to second-to-last on 2026-09-04, so the
+     first unanswered screen after the topic is the money again. */
   assert.equal(resumeStepId(chem), 'budget')
 
-  // The description is OPTIONAL — the schema accepts an empty one, because the
-  // structured answers carry the request. It has no screen at all; the contact
-  // step carries it as a folded field.
+  /* ⚠️ THIS PINNED THE OPPOSITE UNTIL 2026-09-04 — „an empty description is
+     rejected — the essay wall is back" — because the structured taps were held
+     to carry the request on their own. The owner asked for the wall: „ტექსტი
+     სავალდებულო უნდა იყოს." What the taps carry is a CATEGORY of job; what a
+     provider pays to reach is the job, and only the sentence says which it is.
+     Checked at the ENDPOINT and not only on the screen: a screen is a courtesy
+     and a schema is the contract. */
   assert.equal(ServiceRequestInput.safeParse({
     kind: 'LEARNING', topic: 'chemistry', description: '',
     budgetBand: 'x', timing: 'twice_week', format: 'ONLINE', city: 'TBILISI',
     contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
-  }).success, true, 'an empty description is rejected — the essay wall is back')
+  }).success, false, 'an empty description still passes — the wizard is the only wall')
 
   // ⚠️ AND THE SCHEMA MUST ACCEPT „NOT ASKED" MONEY. The wizard no longer
   // collects a band, so every request that reaches the endpoint carries the
@@ -2071,7 +2143,7 @@ test('the run is one question per screen, derived from the draft', () => {
   // request on the site — and would do it at the last screen, after the person
   // typed their name and number.
   assert.equal(ServiceRequestInput.safeParse({
-    kind: 'LEARNING', topic: 'chemistry', description: 'ალგებრა',
+    kind: 'LEARNING', topic: 'chemistry', description: 'ალგებრა მჭირდება მეათე კლასში',
     budgetBand: 'x', timing: 'twice_week', format: 'ONLINE', city: 'TBILISI',
     contactName: 'ნინო მაგალიძე', phone: '555123456', email: 'nino@example.ge',
   }).success, true, 'the UNSTATED budget is refused — no request can be sent')
@@ -2502,10 +2574,15 @@ test('the ceilings admit what a person actually types', () => {
   // asking a support question — the 4000 /api/contact allows.
   assert.equal(ServiceRequestInput.safeParse({ ...ok, description: 'ა'.repeat(4000) }).success, true,
     'the description ceiling is below what a person writes')
-  // The description is OPTIONAL (the reference decision — the admin's call is
-  // the quality gate), so a short one is simply a short one.
+  /* ⚠️ THE DESCRIPTION IS REQUIRED SINCE 2026-09-04, and these two lines
+     pinned the opposite („a short one is simply a short one, the admin's call
+     is the quality gate"). Owner: „ტექსტი სავალდებულო უნდა იყოს." The floor is
+     twelve characters — about three Georgian words — so a real sentence passes
+     and a keysmash does not. */
   assert.equal(ServiceRequestInput.safeParse({ ...ok, description: 'მჭირდება იურისტი' }).success, true)
-  assert.equal(ServiceRequestInput.safeParse({ ...ok, description: '' }).success, true)
+  assert.equal(ServiceRequestInput.safeParse({ ...ok, description: '' }).success, false)
+  assert.equal(ServiceRequestInput.safeParse({ ...ok, description: 'აა' }).success, false,
+    'two characters pass — the floor is not doing anything')
   // A foreign number with its country code — the diaspora case lib/phone exists
   // to admit, and this form gets it for free by using THE phone rule.
   assert.equal(ServiceRequestInput.safeParse({ ...ok, phone: '+4915112345678' }).success, true)
@@ -2975,6 +3052,52 @@ test('every screen the run can produce is a screen the wizard draws', () => {
   // …and the guard that silently emptied the timing screen must not come back.
   assert.doesNotMatch(wizard, /step\.id === 'timing' && extras\.length/,
     'the timing screen is gated on a clarifier count again — it drew nothing for half the topics')
+
+  /* ⚠️ AND THE THIRD PART: A SCREEN MUST ALSO BE ABLE TO END (2026-09-04).
+     The note above says a step needs three things — a place in the run, a way
+     to answer, and something that draws it. That was one short. The clarifiers
+     moved to their own screens on 2026-09-03, the RENDER was corrected in that
+     commit, and `pickOption` was not: it still asked `extras.length > 0` on the
+     timing step and took the „record, do not advance" branch, which had been
+     written for a stacked page whose „გავაგრძელოთ" button no longer existed.
+     So on every topic that HAS a clarifier the last question of the details
+     stage recorded the tap and went nowhere. Owner, with a screenshot of step
+     4 of 6: „ბაგი ვიპოვე, ამის მერე არ გადადის."
+     Produce · draw · ADVANCE. Anything that records without advancing needs a
+     visible way out on the same screen, and only two screens have one. */
+  /* The PICK handler alone. Slicing it off means a render branch — which also
+     spells `step.id === '…'` — can never stand in for a handler that moves. */
+  const handler = wizard.slice(wizard.indexOf('const pickOption ='))
+  const ADVANCE_EXEMPT = new Set([
+    'budget',   // has „გავაგრძელოთ" — a typed amount must not advance mid-number
+    'photos',   // has „გავაგრძელოთ" / „გამოტოვება"
+    'contact',  // the last screen; its action is „გაგზავნა"
+    'what',     // a search field, not an option list
+    'notes',    // free text
+  ])
+  for (const id of ids) {
+    if (id.startsWith('extra:') || ADVANCE_EXEMPT.has(id)) continue
+    /* Two spellings both advance and both are correct: `pickAndGo` patches the
+       draft and moves, `advance(d, …)` is used where the handler has already
+       built the draft it wants to hand on (the „kind" screen fires an analytics
+       event between the two). What is pinned is that SOMETHING moves — not
+       which helper does it.
+       Read as a window of text after the branch opens rather than as one
+       regex: the handler bodies contain object literals, so a `[^}]*` span
+       stops at the first brace and reports a working screen as broken. */
+    const at = handler.indexOf(`step.id === '${id}'`)
+    assert.ok(at >= 0, `pickOption has no branch for the „${id}" screen`)
+    /* ⚠️ THE WINDOW ENDS AT THE NEXT BRANCH, and that is the whole assertion.
+       A fixed 420-character look-ahead was the first version and it passed on
+       the very bug this pins: the branches are one-liners, so the window ran
+       straight into `step.id === 'city'` next door and found ITS `pickAndGo`.
+       Proved by putting the bug back and watching the test stay green — the
+       same way the „draws it" half above was proved. */
+    const nextBranch = handler.indexOf("step.id === '", at + 1)
+    const body = handler.slice(at, nextBranch > at ? nextBranch : at + 420)
+    assert.ok(/pickAndGo|advance\(/.test(body),
+      `picking on the „${id}" screen never advances — the run can reach it and never leave it`)
+  }
 })
 
 test('the money question is a REQUIRED BAND, never a number and never a refusal', () => {
@@ -3275,7 +3398,7 @@ test('the budget is a band, and the ladder is the only way to answer it', () => 
   // accepted the key while the screen no longer sent it would be a silent
   // second way to write a request.
   const base = {
-    kind: 'SERVICE' as const, topic: 'clean-flat', description: '',
+    kind: 'SERVICE' as const, topic: 'clean-flat', description: 'ბინის დალაგება, ორი ოთახი',
     timing: 'tomorrow', format: 'IN_PERSON' as const, city: 'TBILISI' as const,
     details: {}, contactName: 'ნინო', phone: '599112233', email: 'n@example.ge',
   }
@@ -3383,7 +3506,7 @@ test('„მე ავირჩევ" is a preference about a button, not about
   // Omitted → OFFERS, so a request written before the question existed still
   // parses and still means what it meant.
   const base = {
-    kind: 'SERVICE' as const, topic: 'clean-flat', description: '',
+    kind: 'SERVICE' as const, topic: 'clean-flat', description: 'ბინის დალაგება, ორი ოთახი',
     budgetBand: 's2', timing: 'tomorrow', format: 'IN_PERSON' as const,
     city: 'TBILISI' as const, details: {}, contactName: 'ნინო',
     phone: '599112233', email: 'n@example.ge',
@@ -3574,8 +3697,30 @@ test('the intake offers only work somebody can actually answer', () => {
    * offerable the moment a provider ticks it and stops when the last one
    * un-ticks it, because the set is a query over the roster rather than a
    * constant somebody has to remember to edit. */
-  assert.match(server, /published: true, available: true/,
+  /* ⚠️ `available` ALONE SINCE 2026-09-04, AND THE `published` HALF WAS REMOVED
+   * ON PURPOSE. This assertion used to demand the pair. On the day `published`
+   * became DERIVED from profile completeness (lib/profileCompleteness) the two
+   * halves stopped meaning the same kind of thing:
+   *
+   *   · `available` — the provider's OWN answer: „I am not taking work." Still
+   *     required here, which is the whole point of the sentence below.
+   *   · `published` — OUR judgement of whether their card is fit to be seen.
+   *     Nothing to do with whether the work can be done.
+   *
+   * Keeping it would have deleted SIX topics from the client's form the moment
+   * the completeness gate landed — clean-flat · clean-deep · clean-repair ·
+   * clean-office · clean-sofa · clean-window, the whole cleaning family,
+   * because the one profile covering them was missing a category. Measured
+   * that day. Nobody would have seen a bug: the provider simply would never
+   * have been texted, because the request could never have been FILED.
+   *
+   * Owner, 2026-09-04: „შეუვსებელს ოფერი უნდა მიდიოდეს ტელეფონზე და მეილზე რომ
+   * კლიენტი იშოვს და ინიციატივა ქონდეს." */
+  assert.match(server, /where: \{ available: true \},/,
     'coveredTopicIds stopped asking for LIVE supply — a paused provider is not supply')
+  const covered = server.slice(server.indexOf('export async function coveredTopicIds'))
+  assert.doesNotMatch(covered.slice(0, covered.indexOf('\n}')), /published/,
+    'coveredTopicIds filters on `published` again — an unfinished card would silently delete its topics from the intake, and the request that would have reached its owner is never filed')
   assert.doesNotMatch(server.slice(server.indexOf('coveredTopicIds')), /const COVERED|\[\s*'[a-z-]+',\s*'[a-z-]+'/,
     'the covered set became a hand-kept list — it must stay a query')
 

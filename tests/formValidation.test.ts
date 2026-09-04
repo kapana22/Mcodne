@@ -222,11 +222,17 @@ test('no shared schema can refuse a field the interface has no word for', () => 
 /* ═══════════ 5 · THE INTAKE POINTS AT THE RIGHT BOX ═════════════════════ */
 
 /** A draft the wizard would consider finished, so each case below changes ONE
- *  thing and the issue it produces is unambiguous. */
+ *  thing and the issue it produces is unambiguous.
+ *
+ *  ⚠️ `description` CARRIES A REAL SENTENCE SINCE 2026-09-04. It was `''` while
+ *  the field was optional; the brief is now a required screen with a twelve
+ *  character floor (owner: „ტექსტი სავალდებულო უნდა იყოს"), so an empty one
+ *  made this draft invalid and every case below vacuous — the first issue
+ *  reported was always „description", whatever the case had changed. */
 const goodRequest = {
   kind: 'SERVICE' as const,
   topic: 'clean-flat',
-  description: '',
+  description: 'ბინის დალაგება, ორი ოთახი',
   pickMode: 'OFFERS' as const,
   budgetBand: 's2',
   timing: 'today',

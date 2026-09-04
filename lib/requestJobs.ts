@@ -47,7 +47,7 @@ const BATCH = 100
  * and are flagged as such — see RoutableProvider for why that is a flag rather
  * than a null.
  */
-export async function routableProviders(): Promise<(RoutableProvider & { email: string; phone: string | null })[]> {
+export async function routableProviders(): Promise<(RoutableProvider & { email: string | null; phone: string | null })[]> {
   const [people, members] = await Promise.all([
     prisma.requestAccess.findMany({
       where: { active: true, kind: 'EXPERT', userId: { not: null } },
@@ -95,7 +95,10 @@ export async function routableProviders(): Promise<(RoutableProvider & { email: 
     }),
   ])
 
-  const out = new Map<string, RoutableProvider & { email: string; phone: string | null }>()
+  // ⚠️ `email` IS NULLABLE SINCE PHONE REGISTRATION (2026-09-04) and `phone`
+  // has always been. A provider now legitimately has ONE of the two, so every
+  // send below asks before it sends rather than assuming an address exists.
+  const out = new Map<string, RoutableProvider & { email: string | null; phone: string | null }>()
   for (const p of people) {
     if (!p.user) continue
     const svc = p.user.serviceProfile
@@ -208,7 +211,12 @@ export async function mailVerifiedRequest(
   for (const id of recipients) {
     const p = byId.get(id)
     if (!p) continue
-    try { await sendMail({ key: 'request.verified.provider', to: p.email, ...mail }); sent++ } catch { /* best-effort per address */ }
+    // ⚠️ `p.email` CAN BE NULL SINCE PHONE REGISTRATION (2026-09-04) — a
+    // provider who signed up with a number has no address at all, and for them
+    // the SMS below is not an addition to the letter, it IS the notification.
+    if (p.email) {
+      try { await sendMail({ key: 'request.verified.provider', to: p.email, ...mail }); sent++ } catch { /* best-effort per address */ }
+    }
     // ⚠️ THE TEXT IS AN ADDITION TO THE LETTER, NEVER A REPLACEMENT. Six of the
     // 26 providers on the allowlist have no Georgian mobile (measured
     // 2026-09-02), so an SMS-only path would simply stop telling them. It is
@@ -633,7 +641,10 @@ export async function runRequestJobs(now: number = Date.now()): Promise<RequestJ
       })
       const smsText = await verifiedRequestSms(topicLabel(r.topic))
       for (const p of providers) {
-        try { await sendMail({ key: 'request.verified.provider', to: p.email, ...mail }) } catch { /* best-effort */ }
+        // Null for a phone-registered provider — see the same guard in notifyProviders.
+        if (p.email) {
+          try { await sendMail({ key: 'request.verified.provider', to: p.email, ...mail }) } catch { /* best-effort */ }
+        }
         if (p.phone) {
           try { await sendSms({ key: 'request.verified.provider', to: p.phone, text: smsText }) } catch { /* best-effort */ }
         }

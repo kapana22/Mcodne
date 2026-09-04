@@ -36,7 +36,7 @@ import { useSyncExternalStore } from 'react'
 
 export type Me = {
   id: string
-  email?: string
+  email?: string | null
   fullName: string
   avatarUrl?: string | null
   role: 'USER' | 'PROVIDER' | 'ADMIN'

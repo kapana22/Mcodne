@@ -32,6 +32,7 @@ import { recordOfferEvent } from '@/lib/offerEvents'
 import { sendSms } from '@/lib/sms'
 import { offerArrivedSms } from '@/lib/smsTemplates'
 import { providerUserIdsOf } from '@/lib/offerLifecycle'
+import { profileBlockers } from '@/lib/profileCompleteness'
 
 const notFound = () => NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 })
 
@@ -68,6 +69,51 @@ export async function POST(req: Request) {
   if (shapeErr) return NextResponse.json({ ok: false, error: shapeErr }, { status: 400 })
 
   await ensureDbReady()
+
+  /* ── AN UNFINISHED CARD MAY NOT MAKE AN OFFER (2026-09-04) ───────────────
+     Owner: „სანამ სრულად არ შევსებს, ფოტოს არ დადებს, იქამდე არ გამოჩნდეს
+     პროფილზე."
+
+     ⚠️ HIDING THE CARD IS NOT ENOUGH ON ITS OWN, and this is the half that
+     does not follow from the sentence. Routing is gated on `RequestAccess`,
+     not on `published`, so an incomplete provider still hears about every
+     request — and if they could answer one, the client would receive an offer
+     and click through to the empty profile we had just decided was not fit to
+     be seen. Same bad impression, moved onto the screen where money is decided.
+
+     ⚠️ AND THE SMS STILL GOES. Deliberately. Silence is what kills a new
+     provider — they registered, heard nothing for two weeks, left. Real work
+     waiting is the only strong reason to go and upload the photo, so the
+     notification stays and THIS is the door that says why. The refusal names
+     what is missing, so it is one screen away from being fixed.
+
+     Individuals only: a COMPANY offer is made in the firm's name and its
+     profile hangs off the company row, not this person's. */
+  if (expertUserId) {
+    /* ⚠️ RAW, AND ONLY BECAUSE OF THE FACE. An avatar is a base64 data URI —
+       ~32KB a row — so `select: { avatarUrl: true }` would ship a whole
+       portrait to this route to ask „is it null". tests/apiPayloadHygiene
+       refuses that, and caught this query on its first pass. The boolean is
+       computed in Postgres and the blob never leaves it; the same trick
+       app/experts/_providers plays on the catalogue, for the same reason. */
+    const [mine] = await prisma.$queryRaw<{
+      hasFace: boolean; about: string | null; services: string[]; areas: string[]; categoryId: string | null
+    }[]>`
+      SELECT ("sp"."photoUrl" IS NOT NULL OR "u"."avatarUrl" IS NOT NULL) AS "hasFace",
+             "sp"."about", "sp"."services", "sp"."areas", "sp"."categoryId"
+        FROM "ServiceProfile" "sp"
+        JOIN "User" "u" ON "u"."id" = "sp"."userId"
+       WHERE "sp"."userId" = ${expertUserId}
+       LIMIT 1`
+    const missing = mine ? profileBlockers(mine) : ['პროფილი']
+    if (missing.length > 0) {
+      return NextResponse.json(
+        { ok: false, error: 'PROFILE_INCOMPLETE', missing,
+          message: `შეთავაზების გასაგზავნად დაასრულე პროფილი — დარჩა: ${missing.join(', ')}` },
+        { status: 409 },
+      )
+    }
+  }
 
   // ── Is the client already talking to me? ─────────────────────────────────
   // An INVITED row means they wrote first (see the invite route). Answering

@@ -66,11 +66,19 @@ export async function POST(req: Request) {
 
   // ── Auth-artefact deletes ─────────────────────────────────────────────
   const notifCutoff = new Date(now.getTime() - 120 * 24 * 3600_000) // 120 days
-  const [sessions, otps, resets, notifs] = await Promise.all([
+  const [sessions, otps, phoneOtps, resets, notifs] = await Promise.all([
     prisma.session.deleteMany({ where: { expiresAt: { lt: now } } }),
     prisma.otpCode.deleteMany({
       where: { OR: [{ consumed: true }, { expiresAt: { lt: now } }] },
     }),
+    /* ⚠️ `expiresAt` ALONE, AND NOT `consumed` (2026-09-04). A PhoneOtp row is
+       consumed the moment the code is answered — and then goes on living for
+       another 15 minutes as the TICKET that lets the person type their name
+       (lib/phoneAuth). Deleting on `consumed` the way the row above does would
+       throw that proof away mid-registration and refuse them with
+       „TICKET_EXPIRED" while they were still typing. The clock covers both:
+       `expiresAt` is extended to the ticket window on consumption. */
+    prisma.phoneOtp.deleteMany({ where: { expiresAt: { lt: now } } }),
     prisma.passwordResetToken.deleteMany({
       where: { OR: [{ consumed: true }, { expiresAt: { lt: now } }] },
     }),
@@ -148,6 +156,7 @@ export async function POST(req: Request) {
     deleted: {
       sessions: sessions.count,
       otpCodes: otps.count,
+      phoneOtps: phoneOtps.count,
       passwordResetTokens: resets.count,
       notifications: notifs.count,
     },
@@ -204,6 +213,7 @@ export async function GET(req: Request) {
     actions: [
       'Delete expired Session rows',
       'Delete consumed/expired OtpCode rows',
+      'Delete expired PhoneOtp rows (the phone-registration code, and the ticket it becomes)',
       'Delete consumed/expired PasswordResetToken rows',
       'Prune READ notifications older than 120 days',
       `Prune "Event" analytics rows older than ${EVENT_RETENTION_DAYS} days`,

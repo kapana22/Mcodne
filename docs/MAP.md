@@ -2,7 +2,7 @@
 
 # Where every export lives
 
-1130 symbols across 420 files. `grep` the name you need.
+1151 symbols across 428 files. `grep` the name you need.
 
 | symbol | file |
 | --- | --- |
@@ -15,6 +15,7 @@
 | `accessSubjectError` | `lib/requests.ts` |
 | `AccountClient` | `app/work/account/_client.tsx` |
 | `AccountContact` | `app/request/_model.ts` |
+| `accountForPhone` | `lib/phoneAuth.ts` |
 | `accountForRequest` | `lib/requestAccount.ts` |
 | `AccountOutcome` | `lib/requestAccount.ts` |
 | `AccountSection` | `app/settings/_account.tsx` |
@@ -109,6 +110,7 @@
 | `CancelRequest` | `app/request/[ref]/_cancel.tsx` |
 | `canFileRequest` | `lib/requests.ts` |
 | `canMarkDone` | `lib/offerLifecycle.ts` |
+| `canonicalPhone` | `lib/phone.ts` |
 | `canOpenRequestForm` | `lib/requests.ts` |
 | `canSeeRequests` | `lib/requests.ts` |
 | `canToggle` | `lib/outbound.ts` |
@@ -153,6 +155,7 @@
 | `ChatSide` | `lib/requestChat.ts` |
 | `checkGeorgian` | `lib/georgianText.ts` |
 | `checkGeorgianCopy` | `lib/georgianOrthography.ts` |
+| `checkPhoneCode` | `lib/phoneAuth.ts` |
 | `CHIP_CAP` | `components/EntityCard.tsx` |
 | `ChromeUser` | `components/SpaceChrome.tsx` |
 | `CITIES` | `lib/requestTopics.ts` |
@@ -189,6 +192,8 @@
 | `CloseRequest` | `app/request/[ref]/_close.tsx` |
 | `ClosingBand` | `app/_home/cta.tsx` |
 | `CODE_RE` | `lib/funnelEvents.ts` |
+| `CODE_TTL_MS` | `lib/phoneAuth.ts` |
+| `CodeCheck` | `lib/phoneAuth.ts` |
 | `CodeInjector` | `components/CodeInjector.tsx` |
 | `CodeInput` | `app/signin/_fields.tsx` |
 | `COMMISSION_PCT` | `lib/flags.ts` |
@@ -296,6 +301,7 @@
 | `extrasFor` | `lib/requestTopics.ts` |
 | `extrasLabels` | `lib/requestTopics.ts` |
 | `Eyebrow` | `components/Eyebrow.tsx` |
+| `faceFrom` | `lib/profileCompleteness.ts` |
 | `Facets` | `app/experts/_filters.tsx` |
 | `fallbackSeo` | `lib/categorySeo.ts` |
 | `FaqAction` | `lib/helpTopics.ts` |
@@ -429,18 +435,21 @@
 | `isAvatarPick` | `lib/defaultAvatar.ts` |
 | `isBotUserAgent` | `lib/events.ts` |
 | `isCmdOrCtrl` | `lib/keyboard.ts` |
+| `isCredential` | `lib/outbound.ts` |
 | `isGeorgian` | `lib/georgianText.ts` |
 | `isGeorgianMobile` | `lib/phone.ts` |
 | `isKnownSiteTextKey` | `lib/siteTextDefs.ts` |
 | `isLaunchCategory` | `lib/launchTaxonomy.ts` |
 | `isOfferableTopic` | `lib/serviceProfile.ts` |
 | `isOfferEvent` | `lib/offerEvents.ts` |
+| `isProfileComplete` | `lib/profileCompleteness.ts` |
 | `isProvider` | `lib/capabilities.ts` |
 | `isProviderPath` | `lib/requests.ts` |
 | `isProviderWorkspacePath` | `lib/requests.ts` |
 | `isRequestPath` | `lib/requests.ts` |
 | `isRetiredSiteTextKey` | `lib/siteTextDefs.ts` |
 | `isServerOnlySiteTextKey` | `lib/siteTextDefs.ts` |
+| `issuePhoneCode` | `lib/phoneAuth.ts` |
 | `isTopicOfKind` | `lib/requestTopics.ts` |
 | `isTypeEnabled` | `lib/notify.ts` |
 | `isTypingTarget` | `lib/keyboard.ts` |
@@ -511,6 +520,7 @@
 | `MarketingTopBar` | `components/MarketingTopBar.tsx` |
 | `markNotificationRead` | `lib/notifications.ts` |
 | `markOfferDone` | `lib/offerLifecycle.ts` |
+| `markPhoneVerified` | `lib/phoneAuth.ts` |
 | `mask` | `lib/sms.ts` |
 | `MASK` | `lib/requestChat.ts` |
 | `maskContacts` | `lib/requestChat.ts` |
@@ -521,6 +531,7 @@
 | `MatchableCategory` | `lib/categoryTree.ts` |
 | `MATCHED_CLOSE_DAYS` | `lib/requestRouting.ts` |
 | `matchesQuery` | `lib/catalogItems.ts` |
+| `MAX_ATTEMPTS` | `lib/phoneAuth.ts` |
 | `MAX_BODY_CHARS` | `lib/funnelEvents.ts` |
 | `MAX_CERTS` | `app/join/_shared/_upload.tsx` |
 | `MAX_PROFESSIONS` | `lib/professions.ts` |
@@ -593,6 +604,7 @@
 | `NotifType` | `lib/notify.ts` |
 | `notify` | `lib/notify.ts` |
 | `notifyMany` | `lib/notify.ts` |
+| `NotVisibleNote` | `app/work/_components/NotVisibleNote.tsx` |
 | `oauthOrigin` | `lib/googleOauth.ts` |
 | `OFFER_EVENT_LABEL` | `lib/offerEvents.ts` |
 | `OFFER_EVENTS` | `lib/offerEvents.ts` |
@@ -612,6 +624,7 @@
 | `offerDoneClientEmail` | `lib/emailTemplates.ts` |
 | `offerDoneProviderEmail` | `lib/emailTemplates.ts` |
 | `offerDoneReminderClientEmail` | `lib/emailTemplates.ts` |
+| `offerDoneSms` | `lib/smsTemplates.ts` |
 | `OfferForm` | `app/work/(provider)/requests/[id]/OfferForm.tsx` |
 | `offerInboxRow` | `lib/inboxRows.ts` |
 | `offerInboxRows` | `lib/inboxRows.ts` |
@@ -662,8 +675,11 @@
 | `PAYMENTS_LIVE` | `lib/flags.ts` |
 | `PeriodSwitch` | `app/admin/_parts.tsx` |
 | `phMark` | `components/CategoryMarks.tsx` |
+| `PhoneAccount` | `lib/phoneAuth.ts` |
+| `PhoneAuth` | `app/signin/_phone.tsx` |
 | `phoneFormatError` | `lib/phone.ts` |
 | `PhoneInput` | `components/PhoneInput.tsx` |
+| `phoneLoginKey` | `lib/phoneAuth.ts` |
 | `PhotosSection` | `app/work/profile/_secPhotos.tsx` |
 | `PhotoUploader` | `app/join/_shared/_upload.tsx` |
 | `PICK_MODE_OPTION` | `lib/requests.ts` |
@@ -672,7 +688,7 @@
 | `PitchFaqLd` | `app/join/_sections.tsx` |
 | `PitchSections` | `app/join/_sections.tsx` |
 | `placesLeft` | `lib/requests.ts` |
-| `POST` | `app/api/admin/broadcast/preview/route.ts` · `app/api/admin/broadcast/send/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/impersonate/[userId]/route.ts` · `app/api/admin/impersonate/exit/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/presence/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/message/route.ts` · `app/api/auth/otp/send/route.ts` · `app/api/auth/otp/verify/route.ts` · `app/api/auth/reset/confirm/route.ts` · `app/api/auth/reset/request/route.ts` · `app/api/auth/signin/route.ts` · `app/api/auth/signout/route.ts` · `app/api/auth/signup/route.ts` · `app/api/contact/route.ts` · `app/api/events/route.ts` · `app/api/favorites/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/me/password/route.ts` · `app/api/notifications/read/route.ts` · `app/api/provider/offers/route.ts` · `app/api/provider/requests/[id]/contact/route.ts` · `app/api/provider-applications/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/accept/route.ts` · `app/api/requests/[ref]/call/route.ts` · `app/api/requests/[ref]/cancel/route.ts` · `app/api/requests/[ref]/invite/route.ts` · `app/api/requests/[ref]/offers/[offerId]/done/route.ts` · `app/api/requests/[ref]/offers/[offerId]/review/route.ts` · `app/api/requests/[ref]/offers/[offerId]/withdraw/route.ts` · `app/api/requests/[ref]/open/route.ts` · `app/api/requests/route.ts` · `app/api/uploads/route.ts` |
+| `POST` | `app/api/admin/broadcast/preview/route.ts` · `app/api/admin/broadcast/send/route.ts` · `app/api/admin/categories/route.ts` · `app/api/admin/companies/[id]/members/route.ts` · `app/api/admin/companies/route.ts` · `app/api/admin/impersonate/[userId]/route.ts` · `app/api/admin/impersonate/exit/route.ts` · `app/api/admin/posts/route.ts` · `app/api/admin/presence/route.ts` · `app/api/admin/requests/[id]/route.ts` · `app/api/admin/requests/access/route.ts` · `app/api/admin/users/[id]/credits/route.ts` · `app/api/admin/users/[id]/message/route.ts` · `app/api/auth/otp/send/route.ts` · `app/api/auth/otp/verify/route.ts` · `app/api/auth/phone/register/route.ts` · `app/api/auth/phone/start/route.ts` · `app/api/auth/phone/verify/route.ts` · `app/api/auth/reset/confirm/route.ts` · `app/api/auth/reset/request/route.ts` · `app/api/auth/signin/route.ts` · `app/api/auth/signout/route.ts` · `app/api/auth/signup/route.ts` · `app/api/contact/route.ts` · `app/api/events/route.ts` · `app/api/favorites/route.ts` · `app/api/help/message/route.ts` · `app/api/internal/cleanup/route.ts` · `app/api/log-error/route.ts` · `app/api/me/password/route.ts` · `app/api/notifications/read/route.ts` · `app/api/provider/offers/route.ts` · `app/api/provider/requests/[id]/contact/route.ts` · `app/api/provider-applications/route.ts` · `app/api/request-chat/route.ts` · `app/api/request-thread/route.ts` · `app/api/requests/[ref]/accept/route.ts` · `app/api/requests/[ref]/call/route.ts` · `app/api/requests/[ref]/cancel/route.ts` · `app/api/requests/[ref]/invite/route.ts` · `app/api/requests/[ref]/offers/[offerId]/done/route.ts` · `app/api/requests/[ref]/offers/[offerId]/review/route.ts` · `app/api/requests/[ref]/offers/[offerId]/withdraw/route.ts` · `app/api/requests/[ref]/open/route.ts` · `app/api/requests/route.ts` · `app/api/uploads/route.ts` |
 | `postAuthHome` | `lib/auth.ts` |
 | `PrefKey` | `lib/notify.ts` · `app/settings/_types.ts` |
 | `prefRows` | `app/settings/_types.ts` |
@@ -711,7 +727,9 @@
 | `professionsOfTopic` | `lib/requestTopics.ts` |
 | `professionsThatCan` | `lib/professions.ts` |
 | `PROFILE_VIEW_DEDUPE_MS` | `lib/events.ts` |
+| `profileBlockers` | `lib/profileCompleteness.ts` |
 | `ProfileCompleteness` | `components/ProfileCompleteness.tsx` |
+| `ProfileCompletenessInput` | `lib/profileCompleteness.ts` |
 | `profileCompletion` | `lib/creditsServer.ts` |
 | `ProfileEditor` | `app/work/profile/_editor.tsx` |
 | `profileFacts` | `lib/creditsServer.ts` |
@@ -797,6 +815,7 @@
 | `readyToApprove` | `lib/providerApplication.ts` |
 | `recordOfferEvent` | `lib/offerEvents.ts` |
 | `redactQuery` | `lib/helpSearch.ts` |
+| `redeemPhoneTicket` | `lib/phoneAuth.ts` |
 | `redirectAfterSignin` | `app/signin/_model.tsx` |
 | `REF_ALPHABET` | `lib/requests.ts` |
 | `REF_LENGTH` | `lib/requests.ts` |
@@ -1002,6 +1021,7 @@
 | `SWEEP_STALE_MIN` | `lib/sweepRunner.ts` |
 | `sweepDeadContactRefunds` | `lib/requestJobs.ts` |
 | `sweepSilentContacts` | `lib/requestJobs.ts` |
+| `syncPublished` | `lib/profilePublish.ts` |
 | `SystemSection` | `app/admin/_system.tsx` |
 | `TAB_ALIASES` | `app/admin/_nav.tsx` |
 | `TabHeader` | `app/admin/_parts.tsx` |
@@ -1021,6 +1041,7 @@
 | `threadIsOpen` | `lib/requestThread.ts` |
 | `ThreadPaneShell` | `components/chat/ThreadPaneShell.tsx` |
 | `ThreadSide` | `lib/requestThread.ts` |
+| `TICKET_TTL_MS` | `lib/phoneAuth.ts` |
 | `TILE_HUES` | `app/_home/data.tsx` |
 | `tileHue` | `app/_home/data.tsx` |
 | `TileHue` | `app/_home/data.tsx` |
@@ -1141,7 +1162,7 @@
 
 # Prisma models and their fields
 
-29 models. The UI word is not the column name — check here before writing a query.
+30 models. The UI word is not the column name — check here before writing a query.
 
 **AuditLog** — id:String · actorId:String · action:String · targetType:String? · targetId:String? · meta:Json? · createdAt:DateTime
 
@@ -1179,6 +1200,8 @@
 
 **PasswordResetToken** — id:String · userId:String · tokenHash:String · expiresAt:DateTime · consumed:Boolean · createdAt:DateTime · user:User
 
+**PhoneOtp** — id:String · phone:String · codeHash:String · attempts:Int · expiresAt:DateTime · consumed:Boolean · ticketHash:String? · createdAt:DateTime
+
 **Post** — id:String · slug:String · title:String · excerpt:String? · body:String · coverUrl:String? · tag:String? · status:String · authorName:String? · publishedAt:DateTime? · createdAt:DateTime · updatedAt:DateTime
 
 **ProviderApplication** — id:String · userId:String · user:User · kind:ProviderKind · fullName:String · phone:String · companyName:String? · taxId:String? · services:String[] · areas:String[] · professions:String[] · about:String · yearsExp:Int? · calloutFee:Int? · priceFrom:Int? · priceList:Json? · photoUrl:String? · workPhotos:String[] · status:ApplicationStatus · moderatorNote:String? · reviewedAt:DateTime? · createdAt:DateTime · updatedAt:DateTime
@@ -1199,5 +1222,5 @@
 
 **SiteText** — key:String · value:String · updatedAt:DateTime
 
-**User** — id:String · email:String · passwordHash:String · fullName:String · phone:String? · avatarUrl:String? · bio:String? · role:Role · locale:String · emailVerified:Boolean · notificationPrefs:Json? · suspendedAt:DateTime? · supportSeenAt:DateTime? · createdAt:DateTime · updatedAt:DateTime · companyMemberships:CompanyMember[] · reviewsGiven:Review[] · favorites:Favorite[] · creditEntries:CreditEntry[] · notifications:Notification[] · sessions:Session[] · otpCodes:OtpCode[] · resetTokens:PasswordResetToken[] · serviceRequests:ServiceRequest[] · requestOffers:RequestOffer[] · requestMessages:RequestMessage[] · requestAccess:RequestAccess? · serviceProfile:ServiceProfile? · providerApplication:ProviderApplication?
+**User** — id:String · email:String? · passwordHash:String? · fullName:String · phone:String? · phoneVerified:Boolean · avatarUrl:String? · bio:String? · role:Role · locale:String · emailVerified:Boolean · notificationPrefs:Json? · suspendedAt:DateTime? · supportSeenAt:DateTime? · createdAt:DateTime · updatedAt:DateTime · companyMemberships:CompanyMember[] · reviewsGiven:Review[] · favorites:Favorite[] · creditEntries:CreditEntry[] · notifications:Notification[] · sessions:Session[] · otpCodes:OtpCode[] · resetTokens:PasswordResetToken[] · serviceRequests:ServiceRequest[] · requestOffers:RequestOffer[] · requestMessages:RequestMessage[] · requestAccess:RequestAccess? · serviceProfile:ServiceProfile? · providerApplication:ProviderApplication?
 

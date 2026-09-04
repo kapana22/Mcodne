@@ -169,10 +169,14 @@ export async function GET(req: Request) {
     const u = user
     const build = link.notify ? googleLinkedEmail : isNewUser ? welcomeEmail : null
     const buildKey = link.notify ? 'auth.googleLinked' as const : 'auth.welcome' as const
-    if (build) {
+    // `to` is narrowed rather than asserted: a Google account always carries an
+    // address, but `User.email` is nullable since phone registration and an
+    // assertion here would be the one place the compiler stops checking.
+    const to = u.email
+    if (build && to) {
       after(async () => {
         const { subject, html } = await build(u.fullName)
-        await sendMail({ key: buildKey, to: u.email, subject, html }).catch(() => {})
+        await sendMail({ key: buildKey, to, subject, html }).catch(() => {})
       })
     }
   }

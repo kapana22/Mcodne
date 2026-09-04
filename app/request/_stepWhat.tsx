@@ -52,12 +52,14 @@ import { Icon } from '@/components/Icon'
 import {
   searchAllTopics, OTHER_TOPIC, KIND, kindsOfTopic,
   browseGroupsFor, VERTICAL_COPY, verticalOfTopic,
-  topicLabel,
+  topicLabel, TOPIC_GROUPS,
   type Topic, type TopicGroup, type RequestKindName, type Vertical,
 } from '@/lib/requests'
 import { StepPick } from './_stepPick'
 import type { Draft } from './_model'
 import { topicGroupMark } from '@/lib/topicMarks'
+import { categoryIcon, categoryPhoto } from '@/lib/categoryMarks'
+import Image from 'next/image'
 
 /**
  * One example, one tap.
@@ -112,6 +114,38 @@ const PANEL_ID = 'what-panel'
  * read the SAME list — computing it twice in two places is how a panel opens on
  * a group that is not there.
  */
+/** One sphere, as the intake draws it: the name, the measured floor, and the
+ *  photograph the home page already prints for it. Resolved on the server —
+ *  `priceFrom` is a query, not a constant. */
+export type CatTile = { slug: string; name: string; priceFrom: number | null }
+
+/** Every topic filed under a sphere. `Topic.categorySlug` is the ONE place the
+ *  two vocabularies touch (lib/requestTopics), so this is a read of that field
+ *  and not a second table to keep in step. Built once at module load. */
+const TOPICS_BY_CATEGORY: Record<string, string[]> = (() => {
+  const out: Record<string, string[]> = {}
+  for (const g of TOPIC_GROUPS) {
+    for (const t of g.topics) {
+      if (t.categorySlug) (out[t.categorySlug] ??= []).push(t.id)
+    }
+  }
+  return out
+})()
+
+/** Which fold to open for a sphere: the one holding the MOST of its topics.
+ *
+ *  ⚠️ IT WAS `gs[0]` AND THAT WAS WRONG (2026-09-04). A sphere's topics are
+ *  spread across the browse groups — „law" has eight and they do not all live
+ *  together — so the FIRST narrowed group can be the one holding a single
+ *  entry. Measured on /request?category=law: one topic on screen where the
+ *  tile tap showed seven. Opening the biggest is what „show me this sphere"
+ *  means, and it makes the URL and the tile agree. */
+function bestGroupFor(vertical: Vertical, only: Set<string>): string | null {
+  const gs = narrowedGroups(vertical, only)
+  if (gs.length === 0) return null
+  return gs.reduce((a, b) => (b.topics.length > a.topics.length ? b : a)).id
+}
+
 function narrowedGroups(vertical: Vertical, only: Set<string>): TopicGroup[] {
   const all = browseGroupsFor(vertical)
   if (!only.size) return all
@@ -122,7 +156,7 @@ function narrowedGroups(vertical: Vertical, only: Set<string>): TopicGroup[] {
     .filter(g => g.topics.length > 0)
 }
 
-export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, initialQuery = '', vertical, onlyTopics = [], narrowed = false }: {
+export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, initialQuery = '', vertical, onlyTopics = [], narrowed = false, tiles = [], initialCategory = '' }: {
   draft: Draft
   /** ⚠️ WHICH DOOR THEY CAME THROUGH — and it is the only thing that decides
    *  what this screen offers (owner, 2026-08-18, approving „ა": the door picks
@@ -169,6 +203,15 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
    * no provider, and this screen is exactly what it was.
    */
   onlyTopics?: string[]
+  /** The spheres, drawn under the field. Server-resolved (app/request/page):
+   *  VISIBLE, populated, busiest first — the home page's own rule, so a tile
+   *  can never open onto „ვერ ვიპოვეთ". Empty = draw none, which is what every
+   *  caller other than the intake wants. */
+  tiles?: CatTile[]
+  /** A sphere the visitor named on the home band (`?category=`), validated in
+   *  app/request/page. It seeds the same filter a tile tap sets — the panel
+   *  opens on that sphere's topics — and empty changes nothing. */
+  initialCategory?: string
   /**
    * ⚠️ WAS THE LIST NARROWED TO A PERSON THE CLIENT ALREADY CHOSE?
    *
@@ -209,10 +252,16 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
    * and it IS the question. Never on `onlyTopics` alone: see `narrowed` above
    * for the three days that condition was silently true for everybody.
    */
-  const [open, setOpen] = useState(initialQuery.trim().length >= 2 || narrowed)
+  const [open, setOpen] = useState(initialQuery.trim().length >= 2 || narrowed || !!initialCategory)
   // Opened on the ONE group a narrowed list usually has — with the catalogue
   // already down to this provider's own trades, a fold to press is ceremony.
   const [openGroup, setOpenGroup] = useState<string | null>(() => {
+    /* Arriving with a sphere named opens its fold, for the reason a tile tap
+       does: a closed heading repeating the word just tapped trades one tap for
+       another. */
+    if (initialCategory) {
+      return bestGroupFor(vertical, new Set(TOPICS_BY_CATEGORY[initialCategory] ?? []))
+    }
     if (!narrowed) return null
     const gs = narrowedGroups(vertical, new Set(onlyTopics))
     return gs.length === 1 ? gs[0].id : null
@@ -224,8 +273,26 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
   const listRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const boxRef = useRef<HTMLDivElement | null>(null)
-  /** The narrowing, as a set — empty means „no narrowing", never „nothing". */
-  const only = useMemo(() => new Set(onlyTopics), [onlyTopics])
+  /** ⚠️ THE SPHERE THE VISITOR TAPPED, and it is a FILTER on this screen, not
+   *  an answer stored anywhere. The draft has no category field: the sphere is
+   *  DERIVED from the chosen topic server-side (lib/requests → serviceRequestRow
+   *  reads `categorySlugOfTopic`), which is why tapping a tile narrows the list
+   *  and still leaves the person to name the actual thing they need. */
+  const [catSlug, setCatSlug] = useState<string | null>(initialCategory || null)
+
+  /** The narrowing, as a set — empty means „no narrowing", never „nothing".
+   *
+   *  ⚠️ TWO NARROWINGS, AND THEY INTERSECT. `onlyTopics` is „this provider's
+   *  trades" and comes from outside; `catSlug` is „this sphere" and is chosen
+   *  here. Somebody who arrived from an accountant's profile AND tapped
+   *  „სამართალი" must be shown what that person does under law, not everything
+   *  under law — so the tile can only ever narrow further, never widen. */
+  const only = useMemo(() => {
+    const base = new Set(onlyTopics)
+    if (!catSlug) return base
+    const inCat = TOPICS_BY_CATEGORY[catSlug] ?? []
+    return base.size ? new Set(inCat.filter(id => base.has(id))) : new Set(inCat)
+  }, [onlyTopics, catSlug])
   const hits = useMemo(() => {
     const all = searchAllTopics(q)
     return only.size ? all.filter(h => only.has(h.topic.id)) : all
@@ -419,9 +486,117 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
              keeping the text optically flush with the field above it. */
           className="mt-3 -ml-1 inline-flex min-h-10 items-center gap-1.5 px-1 text-meta text-ink-600 hover:text-ink-900 underline decoration-ink-200 hover:decoration-ink-400 underline-offset-4 transition-colors duration-fast"
         >
-          ან აირჩიე კატეგორიებიდან
+          ან აირჩიე ყველა კატეგორიიდან
           <Icon.chevD aria-hidden className="w-3.5 h-3.5" />
         </button>
+      )}
+
+      {/* ── THE SPHERES, ON THE PAGE ────────────────────────────────────────
+          ⚠️ THIS IS THE SECOND TIME, AND THE FIRST TIME THE OWNER SENT IT BACK
+          (2026-09-04). On 2026-09-02 the void under the field — ~350px on the
+          first screen of the intake — was filled with the categories as a
+          scrolling strip and then as a wrapped list, and both were rejected
+          the same day: „არა, არ მომწონს, დააბრუნე როგორც იყო." The note that
+          replaced them argued that a grid under the field is a second question
+          competing with the first, and that the empty space is the cost of
+          focus rather than an oversight.
+
+          What changed is not the argument, it is the material. Those attempts
+          drew NAMES; this draws the plates the home page already prints —
+          photograph, sphere mark and the measured `priceFrom` — which is the
+          control /join and /work/profile settled on and the shape every
+          reference product in this category uses under its search
+          (servisebi.ge, Airtasker, Fiverr). The owner reviewed it on a draft
+          route first („რაიმე ცარიელ გვერდზე ჯერ"), cut two other blocks that
+          were drawn beside it, and asked for this one on the real screen.
+
+          ⚠️ A TILE NARROWS, IT DOES NOT ANSWER. The draft has no category
+          field — the sphere is derived from the topic server-side — so a tap
+          opens the panel filtered to that sphere and the person still names
+          the thing they need. Six taps become two, and nothing is stored that
+          the wizard would then have to keep in step. */}
+      {!open && !searching && tiles.length > 0 && (
+        <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {tiles.map(c => {
+            const photo = categoryPhoto(c.slug)
+            return (
+              <li key={c.slug}>
+                <button
+                  type="button"
+                  /* ⚠️ THE FOLD OPENS WITH IT, and without this line the tile
+                     saved nothing: tapping „სამართალი" filtered the panel and
+                     then showed a CLOSED group heading called „სამართალი", so
+                     the visitor traded one tap for another and read the same
+                     word twice. The groups are computed here rather than read
+                     from `groups`, which still holds the previous render's
+                     narrowing at this moment — the stale-closure lesson this
+                     wizard has already paid for once. Opening the first is
+                     right even when a sphere spans several: the person named
+                     the sphere, so its topics are what they came to see. */
+                  onClick={() => {
+                    setCatSlug(c.slug)
+                    setOpen(true)
+                    const inCat = TOPICS_BY_CATEGORY[c.slug] ?? []
+                    const base = new Set(onlyTopics)
+                    const next = base.size ? new Set(inCat.filter(id => base.has(id))) : new Set(inCat)
+                    setOpenGroup(bestGroupFor(vertical, next))
+                  }}
+                  /* ⚠️ ONE HUE, NOT EIGHT (2026-09-04). These plates were drawn
+                     with `tileHue(i)` — the home page's eight-hue OKLCH family
+                     — and the owner, holding the six of them: „ეს ერთი ბრენდის
+                     ფერი ხომ არი, ყოს, ძალიან ჭრელია."
+                     The palette itself is good and it stays where it belongs.
+                     What it could not justify HERE is that the hue carries
+                     nothing: `TILE_HUES`'s own note says it is „ASSIGNED BY
+                     POSITION, NOT BY SLUG… Position is honest about being
+                     arbitrary". Six arbitrary colours on the first screen of
+                     the funnel is decoration, and CLAUDE.md's design line is
+                     two colours — brand green and the ink ramp.
+                     So the plate is one green for all six, and the rest of the
+                     colour comes from the PHOTOGRAPHS — which is what every
+                     reference product in this category does anyway.
+
+                     ⚠️ `brand-100` AND NOT `brand-50`, and that is measured.
+                     The first version used the ramp's lightest step and the
+                     owner's answer was „ჩვენი მწვანე რომ გამოვიყენოთ ჯობია" —
+                     correct, because #ECF7F3 against this page's #FBF9F5 ground
+                     measures 1.04, and the eye needs about 1.10 to see a
+                     surface at all. It was our green in the token and white on
+                     the screen. `brand-100` measures 1.18 against the ground
+                     and still carries ink-900 at 15.53 and the price line at
+                     7.77 — so it reads as green and costs nothing. */
+                  className="group flex h-full w-full flex-col overflow-hidden rounded-card border border-brand-200 bg-brand-100 text-left text-ink-900 transition-[transform,box-shadow] duration-mid ease-out-quart hover:shadow-card-hover motion-safe:hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+                >
+                  <span className="relative block h-[84px] overflow-hidden bg-white/40">
+                    {photo && (
+                      <>
+                        {/* Decorative: the name is right under it. */}
+                        <Image src={photo} alt="" aria-hidden fill sizes="(min-width:640px) 200px, 45vw" className="object-cover" />
+                        {/* One wash at one opacity over every picture is what
+                            makes six stock photographs read as a family rather
+                            than a collage — the home page's own reasoning, with
+                            the family's colour now fixed. */}
+                        <span aria-hidden className="absolute inset-0 bg-brand-100 opacity-[0.22]" />
+                      </>
+                    )}
+                    <span
+                      aria-hidden
+                      className="absolute bottom-2 left-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-brand-700 shadow-xs"
+                    >
+                      {categoryIcon(c.slug, 'w-4 h-4')}
+                    </span>
+                  </span>
+                  <span className="block px-3 pb-3 pt-2.5">
+                    <span className="block font-display text-small font-bold leading-snug">{c.name}</span>
+                    {typeof c.priceFrom === 'number' && c.priceFrom > 0 && (
+                      <span className="mt-0.5 block text-meta tabular-nums text-ink-500">{c.priceFrom}₾-დან</span>
+                    )}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
       )}
 
       {open && (
@@ -516,6 +691,27 @@ export function StepWhat({ draft, onPick, onPickKind, onFreeText, onClearTopic, 
                scroll area now: always on screen, still last, still after
                everything it is a resort from. */
             <>
+            {/* ⚠️ THE WAY BACK OUT OF A SPHERE (2026-09-04). Tapping a tile
+                filters this panel to one sphere, and without this row that
+                filter is a trap: „სამართალი" hides the other five and nothing
+                on screen says why the list got short or how to widen it. The
+                row names the filter and undoes it in one tap — and it is drawn
+                only when a tile put it there, so the ordinary browse panel is
+                untouched. */}
+            {catSlug && (
+              <div className="flex items-center justify-between gap-3 border-b border-ink-100 px-4 py-2.5">
+                <p className="min-w-0 truncate text-meta text-ink-600">
+                  {tiles.find(t => t.slug === catSlug)?.name ?? 'კატეგორია'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setCatSlug(null)}
+                  className="-my-2 shrink-0 py-2 text-meta font-display font-semibold text-brand-700 underline decoration-brand-200 underline-offset-4 transition-colors duration-fast hover:decoration-brand-400"
+                >
+                  ყველა კატეგორია
+                </button>
+              </div>
+            )}
             <div className={PANEL_SCROLL}>
               {/* ⚠️ BROWSABLE, NOT ALL (2026-08-18). Four of the eight service
                   groups are closed at launch — see requestTopics →

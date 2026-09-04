@@ -49,7 +49,7 @@ import { Reveal } from '@/components/Reveal'
 import { Container } from '@/components/Container'
 import { Icon } from '@/components/Icon'
 import { ALL_CATEGORIES_PHOTO, REQUEST_TILE_PHOTO, categoryIcon, categoryPhoto } from '@/lib/categoryMarks'
-import { HomeCat, TileHue, tileHue } from './data'
+import { HomeCat } from './data'
 
 /**
  * ⚠️ SIX SPHERES PLUS TWO DOORS — and the number is GEOMETRY, not taste.
@@ -80,7 +80,22 @@ const SPHERE_TILES = 6
  * it wrong is not a layout bug — it is next/image fetching a 1280px file for a
  * 292px slot on every visit to the busiest page on the site.
  */
-const Plate = ({ hue, photo, mark }: { hue: TileHue; photo: string | null; mark: ReactNode }) => (
+/* ⚠️ ONE GREEN, NOT EIGHT (2026-09-04). Owner, holding the tiles: „ეს ერთი
+   ბრენდის ფერი ხომ არი, ყოს, ძალიან ჭრელია" — then, once the intake's own
+   tiles were fixed, „მთავარზეც უნდა გამოასწორო და ერთნაირი სტილი უნდა იყოს."
+
+   `TILE_HUES` was carefully built — OKLCH, lightness and chroma fixed so no
+   tile shouts louder than its neighbour — and the reason it goes anyway is in
+   its own note: the hue is „ASSIGNED BY POSITION, NOT BY SLUG… Position is
+   honest about being arbitrary." Eight arbitrary colours is decoration, and
+   CLAUDE.md's design line is two colours, brand green and the ink ramp.
+
+   `brand-100` and not `brand-50`, measured: #ECF7F3 against this page's
+   #FBF9F5 ground is 1.04 and the eye needs about 1.10 to see a surface at all
+   — our green in the token and white on the screen. #D3ECE4 is 1.18 and still
+   carries ink-900 at 15.53. Same values as app/request/_stepWhat, which is the
+   „ერთნაირი სტილი" half of the instruction. */
+const Plate = ({ photo, mark }: { photo: string | null; mark: ReactNode }) => (
   <span className="relative block h-[110px] overflow-hidden bg-white/40 sm:h-[150px]">
     {photo ? (
       <>
@@ -109,7 +124,7 @@ const Plate = ({ hue, photo, mark }: { hue: TileHue; photo: string | null; mark:
             card's colour begins. That is a decision about taste and it is the
             owner's — this note exists so the next reader knows the collage
             argument was answered rather than forgotten. */}
-        <span aria-hidden style={{ backgroundColor: hue.bg }} className="absolute inset-0 opacity-[0.22]" />
+        <span aria-hidden className="absolute inset-0 bg-brand-100 opacity-[0.22]" />
       </>
     ) : (
       /* The plate's own light, in the tile's hue — what stops a flat rectangle
@@ -119,16 +134,14 @@ const Plate = ({ hue, photo, mark }: { hue: TileHue; photo: string | null; mark:
          — it is the stand-in for a photograph, which is why it stayed.) */
       <span
         aria-hidden
-        style={{ backgroundColor: hue.border }}
-        className="absolute -right-6 -top-8 h-[120px] w-[120px] rounded-full opacity-60"
+        className="absolute -right-6 -top-8 h-[120px] w-[120px] rounded-full bg-brand-200 opacity-60"
       />
     )}
     {/* 40px white chip — the canvas's, and the reason the mark stays legible
         whatever the photograph underneath is doing. */}
     <span
       aria-hidden
-      style={{ color: hue.ink }}
-      className="absolute left-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-field bg-white/[0.92] shadow-xs"
+      className="absolute left-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-field bg-white/[0.92] text-brand-700 shadow-xs"
     >
       {mark}
     </span>
@@ -196,7 +209,6 @@ export const Categories = ({
           className="grid grid-cols-2 gap-4 lg:grid-cols-4"
         >
           {tiles.map((c, i) => {
-            const hue = tileHue(i)
             return (
               /* → /experts?category=<slug>: /categories/* was retired in stage
                  8 and 308s to exactly this — the catalogue's own filter is the
@@ -204,13 +216,12 @@ export const Categories = ({
               <Link
                 key={c.slug}
                 href={`/experts?category=${c.slug}`}
-                style={{ backgroundColor: hue.bg, borderColor: hue.border }}
-                className="group flex flex-col overflow-hidden rounded-card border text-ink-900
+                className="group flex flex-col overflow-hidden rounded-card border border-brand-200 bg-brand-100 text-ink-900
                            transition-[transform,box-shadow] duration-mid ease-out-quart
                            hover:shadow-card-hover motion-safe:hover:-translate-y-1
                            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
               >
-                <Plate hue={hue} photo={categoryPhoto(c.slug)} mark={categoryIcon(c.slug, 'w-5 h-5')} />
+                <Plate photo={categoryPhoto(c.slug)} mark={categoryIcon(c.slug, 'w-5 h-5')} />
 
                 <span className="block px-[18px] pb-[18px] pt-4">
                   <span className="block font-display text-body-lg font-bold tracking-[-0.01em]">
@@ -246,14 +257,12 @@ export const Categories = ({
               destination on a page that shows seven of twenty-odd spheres. */}
           <Link
             href="/experts"
-            style={{ backgroundColor: tileHue(7).bg, borderColor: tileHue(7).border }}
-            className="group flex flex-col overflow-hidden rounded-card border text-ink-900
+            className="group flex flex-col overflow-hidden rounded-card border border-brand-200 bg-brand-100 text-ink-900
                        transition-[transform,box-shadow] duration-mid ease-out-quart
                        hover:shadow-card-hover motion-safe:hover:-translate-y-1
                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
           >
             <Plate
-              hue={tileHue(7)}
               photo={ALL_CATEGORIES_PHOTO}
               mark={<span className="text-h3 font-bold leading-none">+</span>}
             />
@@ -282,14 +291,12 @@ export const Categories = ({
           {requestHref && (
           <Link
             href={requestHref}
-            style={{ backgroundColor: tileHue(6).bg, borderColor: tileHue(6).border }}
-            className="group flex flex-col overflow-hidden rounded-card border text-ink-900
+            className="group flex flex-col overflow-hidden rounded-card border border-brand-200 bg-brand-100 text-ink-900
                        transition-[transform,box-shadow] duration-mid ease-out-quart
                        hover:shadow-card-hover motion-safe:hover:-translate-y-1
                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
           >
             <Plate
-              hue={tileHue(6)}
               photo={REQUEST_TILE_PHOTO}
               mark={<Icon.chat className="w-5 h-5" />}
             />

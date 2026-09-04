@@ -162,7 +162,19 @@ test('the master card’s one action is the profile, and it is a real link', () 
   // through EntityCard's overlay, so a second control saying „პროფილი" offered
   // the same destination twice. What is pinned is unchanged — one action, a
   // real <Btn href>, addressing /experts/<slug>.
-  assert.match(m, /<Btn\s+href=\{href\}\s+variant="primary"\s+size="sm"/, 'the card action must be a <Btn href>, not a hand-built control')
+  // ⚠️ THE SIZE WAS PINNED AS `sm` AND IS NOW „md OR BIGGER" (2026-09-04).
+  // This assertion's own comment says what it is for — one action, a real
+  // <Btn href>, addressing /experts/<slug> — and the size was never part of
+  // that; it rode along in the regex and then failed a deliberate restyle
+  // while the sentence above it stayed true.
+  // It is not simply loosened, though. `sm` is `h-10 sm:h-9`, i.e. 36px from
+  // the sm breakpoint up, and measured live on /experts this card's button was
+  // 36 — four under the project's own tap floor, on the primary conversion
+  // control of the catalogue, once per row. `md` (h-11) and `lg` (h-12) clear
+  // 40 at every width; `sm` and anything below cannot. So the pin now carries
+  // the rule that made the change rather than the value that happened to be
+  // there when it was written.
+  assert.match(m, /<Btn\s+href=\{href\}\s+variant="primary"\s+size="(md|lg)"/, 'the card action must be a <Btn href> at a size that clears the 40px tap floor at every width — `sm` is 36px on desktop')
   assert.match(m, /მიიღე შეთავაზება/)
   // ⚠️ THE BUTTON IS A SIBLING OF THE OVERLAY, NEVER A CHILD — EntityCard
   // renders `overlay` before the body, and the button opts above it with

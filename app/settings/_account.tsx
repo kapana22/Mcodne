@@ -5,6 +5,7 @@ import type { Dispatch, SetStateAction } from 'react'
 import { Icon } from '@/components/Icon'
 import type { Me, Msg } from './_types'
 import { ROLE, roleLabel } from '@/lib/roles'
+import { formatPhone } from '@/lib/phone'
 
 type Props = {
   me: Me
@@ -26,9 +27,18 @@ export function AccountSection({ me, verifyStage, verifyCode, setVerifyCode, ver
         <h2 className="font-display text-h3 font-bold text-ink-900 tracking-tight">ანგარიში</h2>
       </div>
       <dl className="text-small space-y-2">
+        {/* ⚠️ ONE ROW, TWO POSSIBLE IDENTITIES (2026-09-04). A phone account has
+            no address at all, and an „ელფოსტა: —" row would tell somebody who
+            registered perfectly correctly that something is missing. What is
+            printed is what they actually signed up with. */}
         <div className="flex justify-between gap-3">
-          <dt className="text-ink-500 shrink-0">ელფოსტა</dt>
-          <dd className="font-display font-semibold text-ink-900 truncate max-w-[280px]" title={me.email}>{me.email}</dd>
+          <dt className="text-ink-500 shrink-0">{me.email ? 'ელფოსტა' : 'ტელეფონი'}</dt>
+          <dd
+            className="font-display font-semibold text-ink-900 truncate max-w-[280px]"
+            title={me.email ?? formatPhone(me.phone) }
+          >
+            {me.email ?? formatPhone(me.phone)}
+          </dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-ink-500">როლი</dt>
@@ -36,10 +46,17 @@ export function AccountSection({ me, verifyStage, verifyCode, setVerifyCode, ver
             {roleLabel(me.role)}
           </dd>
         </div>
+        {/* ⚠️ A PHONE ACCOUNT IS VERIFIED BY CONSTRUCTION. It could not exist
+            without somebody answering a code on that number, so this row asks
+            about the phone for them and about the address for everybody else —
+            and never offers „send a code to your email" to a person who has no
+            email to send it to. */}
         <div className="flex justify-between items-center gap-3">
           <dt className="text-ink-500">გადამოწმებული</dt>
           <dd className="font-display font-semibold flex items-center gap-2">
-            {me.emailVerified
+            {me.email === null
+              ? <span className="text-success-700 inline-flex items-center gap-1"><Icon.check aria-hidden className="w-3.5 h-3.5" /> გადამოწმებულია</span>
+              : me.emailVerified
               ? <span className="text-success-700 inline-flex items-center gap-1"><Icon.check aria-hidden className="w-3.5 h-3.5" /> გადამოწმებულია</span>
               : (
                 <>
@@ -62,7 +79,7 @@ export function AccountSection({ me, verifyStage, verifyCode, setVerifyCode, ver
         </div>
       </dl>
 
-      {!me.emailVerified && verifyStage === 'sent' && (
+      {me.email !== null && !me.emailVerified && verifyStage === 'sent' && (
         <div className="mt-4 rounded-btn border border-ink-200 bg-ink-50/60 p-4">
           <div className="text-small text-ink-700 mb-2">
             შეიყვანე ელფოსტაზე მიღებული კოდი

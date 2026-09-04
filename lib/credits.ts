@@ -706,6 +706,22 @@ export type ProfileFacts = {
    * nobody has been asked yet.
    */
   servicesConfirmed: boolean
+  /**
+   * What still keeps this card OFF the site — `lib/profileCompleteness →
+   * profileBlockers`, already in Georgian, ready to print. Empty means visible.
+   *
+   * ⚠️ NOT A TASK EITHER, AND NOT THE SAME QUESTION AS THE BONUSES ABOVE. Those
+   * pay for a card worth reading; this decides whether there is a card at all,
+   * and the two thresholds differ on purpose — `BIO_MIN` is 80 characters to
+   * EARN 15₾, `MASTER.ABOUT_MIN` is 40 to BE SEEN. A profile can therefore be
+   * fully visible with a bonus still unclaimed, which is the right way round:
+   * being paid for extra effort must never be the price of existing.
+   *
+   * It rides here for the same reason `servicesConfirmed` does —
+   * `profileFacts()` already reads the row, and tests/requestQueue §F forbids
+   * /work a second serviceProfile query.
+   */
+  notVisible: string[]
 }
 
 /** ⚠️ 80 CHARACTERS, the same floor the application's own validator uses — a

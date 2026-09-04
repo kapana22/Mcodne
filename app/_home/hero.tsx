@@ -45,12 +45,15 @@
 // individually below rather than dropped. Everything from `sm` up is byte-for-
 // byte the layout that was here.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { SiteText, useSiteText } from '@/components/SiteTextProvider'
 import { Icon } from '@/components/Icon'
 import { Container } from '@/components/Container'
 import { FlowSteps } from './how'
+import { searchAllTopics, categorySlugOfTopic } from '@/lib/requests'
+import { categoryIcon } from '@/lib/categoryMarks'
+import { professions } from '@/lib/professionSeo'
 
 /** Where we actually work, read off the taxonomy rather than typed here — the
  *  day a second city opens, the badge says so without an edit. */
@@ -83,6 +86,33 @@ export const HomeHero = ({
     const base = requestHref ?? '/experts'
     router.push(t ? `${base}?q=${encodeURIComponent(t)}` : base)
   }
+
+  /* ⚠️ THE FIELD ANSWERS WHERE IT IS ASKED (2026-09-04). Owner: „სერჩია,
+     რომელიც თითქმის უფუნქციო." It was not — measured, „ჭერი ჩამომინგრა" finds
+     თაბაშირმუყაო and „ხელშეკრულების შედგენა მჭირდება" finds ხელშეკრულება — but
+     the answer only appeared on the NEXT page. Typing produced a page change
+     and another box, so the work bought nothing you could see.
+     `searchAllTopics` is the same function the wizard's own field runs, so the
+     two can never disagree about what a word finds. */
+  const hits = useMemo(
+    () => (q.trim().length >= 2 ? searchAllTopics(q).slice(0, 6) : []),
+    [q],
+  )
+
+  /** Straight to the wizard with the topic already chosen — see
+   *  app/request/page for why a TAPPED topic may be carried and typed words
+   *  may not. */
+  const goTopic = (topicId: string) => {
+    const base = requestHref ?? '/experts'
+    router.push(`${base}?topic=${encodeURIComponent(topicId)}`)
+  }
+
+  /** A profession names a SPHERE, never one topic — see the chips below. */
+  const goCategory = (slug: string) => {
+    const base = requestHref ?? '/experts'
+    router.push(`${base}?category=${encodeURIComponent(slug)}`)
+  }
+
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -260,37 +290,90 @@ export const HomeHero = ({
           </button>
         </form>
 
-        {/* ⚠️ THE CITY IS GONE FROM THIS PAGE ENTIRELY (2026-09-01), BY THE
-            OWNER: „ეს თბილისი საერთოდ წაშალე". Both the pill's statement and
-            the phone's line under it were removed in the same edit.
+        {/* ── WHAT THE TYPING FINDS, HERE ────────────────────────────────────
+            Six at most: this is a shortcut, not the catalogue, and a list long
+            enough to scroll is the browse panel the next screen already draws
+            better. Tapping one carries the topic itself (`?topic=`), so the
+            wizard opens on the money question rather than on the screen asking
+            what was just answered. */}
+        {hits.length > 0 && (
+          <ul className="mt-3 overflow-hidden rounded-card bg-white text-left shadow-[0_24px_60px_rgba(9,32,27,0.28)]">
+            {hits.map(h => (
+              <li key={h.topic.id} className="border-b border-ink-100 last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => goTopic(h.topic.id)}
+                  className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors duration-fast hover:bg-ink-75"
+                >
+                  {/* ⚠️ THE SPHERE'S OWN MARK, NOT A SECOND MAGNIFIER
+                      (2026-09-04). Owner: „ჩვენ ხო გვაქვს აიქონები
+                      კატეგორიებზე და გამოყენე, ახალი რომ არ დაწერო." The row
+                      opened with `Icon.search`, which repeated the icon already
+                      standing in the field and told the reader nothing about
+                      the hit. `lib/categoryMarks` holds a mark for fifteen
+                      spheres and the home tiles print them already;
+                      `categorySlugOfTopic` is the one place the topic and
+                      category vocabularies touch, so the mark is looked up
+                      rather than assigned. A topic with no sphere falls back to
+                      the module's own neutral mark. */}
+                  <span aria-hidden className="shrink-0 text-brand-700">
+                    {categoryIcon(categorySlugOfTopic(h.topic.id), 'w-4 h-4')}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-body text-ink-900">{h.topic.label}</span>
+                  <Icon.chevR aria-hidden className="h-4 w-4 shrink-0 text-ink-400" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
-            THE ARGUMENT THAT LOST IS KEPT HERE ON PURPOSE, because it is about
-            a person rather than a layout: with nothing naming the one city, a
-            reader in Batumi finds out at the RESULTS, after typing out their
-            job. If that turns up in feedback, the cheap repair is to name the
-            city where a result already is — the results header or the empty
-            state — rather than putting a row back above the field, which is
-            the thing the owner did not want. `CITIES` still holds the answer
-            (lib/requestTopics), so nothing has to be re-derived to do it. */}
-        {/* ⚠️ THE „მაგალითად:" CHIPS WERE HERE AND THE OWNER DELETED THEM
-            (2026-08-31): „ხელშეკრულება / დეკლარაცია / ლოგო და ბრენდბუქი /
-            რემონტის დაგეგმვა ეს წაშალე და ხაზი." They were four
-            `SUGGESTED_TOPICS` that filled the field, and they cost the card
-            ~60px between the one action and the four steps that explain it —
-            on a 1440×800 laptop that was the difference between the card
-            ending on screen and being cut. `SUGGESTED_TOPICS` is unchanged and
-            still opens the intake's what-step (lib/requestTopics), which is
-            where somebody who needs examples now meets them: one screen later,
-            after they have already started. */}
+        {/* ── WHO YOU MIGHT NEED ──────────────────────────────────────────
+            ⚠️ THIS ROW WAS BUILT THREE TIMES IN ONE HOUR (2026-09-04) and the
+            third is the one that stands. First five TOPICS — but „SMM და
+            სოციალური ქსელები" is 24 characters and five pills wrapped onto
+            three ragged lines. Then five PROFESSIONS, which fixed the shape and
+            the grammar: the field asks who, so the answers offered should be
+            people. The owner cut that („ეს არ უნდა იყოს"), then kept it on one
+            condition — „თუ ასე უკეთესი იქნება და ვრცლად ექნება მიმართულებები
+            დავტოვოთ." So it is all fifteen rather than a hand-picked five, and
+            the labels come from `lib/professionSeo`, whose `label` field is
+            documented for exactly this („short label, NOMINATIVE — for chips
+            and link strips").
 
-        {/* ⚠️ THE FOUR STEPS ARE PART OF THIS CARD (2026-08-31), not a section
-            under it. They were a white plate two sections down the page until
-            the owner sent one picture of the whole green surface — headline,
-            field, then 01 → 02 → 03 → 04. On its own the field asks somebody to
-            describe a job to strangers and says nothing about what happens
-            next; the answer to that question belongs on the same screen as the
-            question, and a chapter break between the two was the seam. */}
-        <FlowSteps />
+            ⚠️ THEY CARRY THE SPHERE, NOT THE WORD, and that is measured. Sent
+            as `?q=<label>` four of the fifteen find nothing — ფინანსისტი,
+            მარკეტოლოგი, პროდაქტ მენეჯერი, რიელტორი have no topic spelled that
+            way — so a third of the row would have been a dead end. Every
+            profession does have a `categorySlug`, and `?category=` opens the
+            wizard's panel on that sphere's topics: the person said who, the
+            screen shows what they do, and nothing is guessed on their behalf.
+
+            Hidden while the field has something in it — the hits above are the
+            answer to what was typed, and two lists at once is the screen asking
+            somebody to choose how to choose. */}
+        {hits.length === 0 && (
+          <ul className="mt-5 flex flex-wrap items-center gap-2">
+            {professions.map((p, i) => (
+              /* ⚠️ SIX ON A PHONE, ALL FIFTEEN FROM `sm` UP (2026-09-04).
+                 Measured at 557px: fifteen pills wrap onto SEVEN rows and stand
+                 328px tall inside a 568px hero card — more than half the card,
+                 for a row that is a shortcut. At desktop widths the same
+                 fifteen take three rows and cost nothing, which is where
+                 „ვრცლად" was asked for. So the tail is hidden rather than the
+                 list shortened: the breadth is real on the screen that has room
+                 for it, and the phone keeps its hero. */
+              <li key={p.slug} className={i >= 6 ? 'hidden sm:list-item' : undefined}>
+                <button
+                  type="button"
+                  onClick={() => goCategory(p.categorySlug)}
+                  className="inline-flex min-h-10 items-center rounded-pill border border-white/25 bg-white/10 px-4 text-small font-display font-semibold text-white transition-colors duration-fast hover:border-white/50 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  {p.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       </Container>
     </section>
